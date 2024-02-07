@@ -1,6 +1,6 @@
 // scanner.cpp
-#include "scanner.hpp"
-#include "debugger.hpp"
+#include "scanner.hh"
+#include "debugger.hh"
 
 std::vector<Token> Scanner::scanTokens() {
     while (!isAtEnd()) {

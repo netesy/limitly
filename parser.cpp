@@ -1,16 +1,14 @@
 //parser.cpp
-#include "parser.hpp"
-#include "debugger.hpp"
+#include "parser.hh"
+#include "debugger.hh"
 
-void Parser::parse()
-{
+void Parser::parse(){
     while (!scanner.isAtEnd()) {
         parseStatement();
     }
 }
 
-void Parser::parseStatement()
-{
+void Parser::parseStatement(){
     Token nextToken = scanner.getNextToken();
 
     // Check the type of the next token and parse accordingly
@@ -64,8 +62,7 @@ void Parser::parseStatement()
     }
 }
 
-void Parser::parseExpression(int precedence)
-{
+void Parser::parseExpression(int precedence){
     Token currentToken = scanner.getToken();
     // Parse the left operand
     parsePrimary();
@@ -132,104 +129,84 @@ void Parser::parseExpression(int precedence)
     }
 }
 
-void Parser::parsePrimary()
-{
+void Parser::parsePrimary(){
     syntax.primary(scanner);
 }
 
-void Parser::parseUnary()
-{
+void Parser::parseUnary(){
     syntax.unary(scanner);
 }
 
-void Parser::parseBinary(int precedence)
-{
+void Parser::parseBinary(int precedence){
     // Implement parsing of binary expressions with given precedence
 }
 
-void Parser::parseTernary()
-{
+void Parser::parseTernary(){
     syntax.ternary(scanner);
 }
 
-void Parser::parseLogicalOr()
-{
+void Parser::parseLogicalOr(){
     syntax.logicalOr(scanner);
 }
 
-void Parser::parseLogicalAnd()
-{
+void Parser::parseLogicalAnd(){
     syntax.logicalAnd(scanner);
 }
 
-void Parser::parseEquality()
-{
+void Parser::parseEquality(){
     syntax.equality(scanner);
 }
 
-void Parser::parseComparison()
-{
+void Parser::parseComparison(){
     syntax.comparison(scanner);
 }
 
-void Parser::parseAddition()
-{
+void Parser::parseAddition(){
     syntax.addition(scanner);
     emit(Opcode::ADD, scanner.getLine());
 }
 
-void Parser::parseSubstraction()
-{
+void Parser::parseSubstraction(){
     syntax.subtraction(scanner);
 }
 
-void Parser::parseMultiplication()
-{
+void Parser::parseMultiplication(){
     syntax.multiplication(scanner);
 }
 
-void Parser::parseDivision()
-{
+void Parser::parseDivision(){
     syntax.division(scanner);
 }
 
-void Parser::parseModulus()
-{
+void Parser::parseModulus(){
     syntax.modulus(scanner);
 }
 
-void Parser::parseFunctionDeclaration()
-{
+void Parser::parseFunctionDeclaration(){
     syntax.parseFunctionDeclaration(scanner);
 }
 
-void Parser::parseForLoop()
-{
+void Parser::parseForLoop(){
     syntax.parseForLoop(scanner);
 }
 
-void Parser::parseWhileLoop()
-{
+void Parser::parseWhileLoop(){
     syntax.parseWhileLoop(scanner);
 }
 
-void Parser::parseConditional()
-{
+void Parser::parseConditional(){
     syntax.parseConditional(scanner);
 }
 
-void Parser::parseClassDeclaration()
-{
+void Parser::parseClassDeclaration(){
     syntax.parseClassDeclaration(scanner);
 }
 
-void Parser::parseVariableDeclaration()
-{
+void Parser::parseVariableDeclaration(){
     syntax.parseVariableDeclaration(scanner);
 }
 
-void Parser::parseAssignment()
-{
+void Parser::parseAssignment(){
     syntax.parseAssignment(scanner);
 }
 
@@ -238,38 +215,31 @@ void Parser::parseAssignment()
 //    syntax.parseExpression(scanner);
 //}
 
-void Parser::parseAttempt()
-{
+void Parser::parseAttempt(){
     syntax.parseAttempt(scanner);
 }
 
-void Parser::parseString()
-{
+void Parser::parseString(){
     syntax.parseString(scanner);
 }
 
-void Parser::parseConcurrent()
-{
+void Parser::parseConcurrent(){
     syntax.parseConcurrent(scanner);
 }
 
-void Parser::parseParallel()
-{
+void Parser::parseParallel(){
     syntax.parseParallel(scanner);
 }
 
-void Parser::parseAwait()
-{
+void Parser::parseAwait(){
     syntax.parseAwait(scanner);
 }
 
-void Parser::parseAsync()
-{
+void Parser::parseAsync(){
     syntax.parseAsync(scanner);
 }
 
-void Parser::parseIdentifier()
-{
+void Parser::parseIdentifier(){
     // Check if the next token is followed by an assignment operator
     if (scanner.getNextToken().type == TokenType::EQUAL) {
         syntax.parseAssignment(scanner);
@@ -279,33 +249,28 @@ void Parser::parseIdentifier()
     }
 }
 
-void Parser::parseType()
-{
+void Parser::parseType(){
     syntax.parseType(scanner);
 }
 
-void Parser::parseArguments()
-{
+void Parser::parseArguments(){
     syntax.parseArguments(scanner);
 }
 
-void Parser::parsePatternMatching()
-{
+void Parser::parsePatternMatching(){
     syntax.parsePatternMatching(scanner);
 }
 
-void Parser::parseMatchCase()
-{
+void Parser::parseMatchCase(){
     syntax.parseMatchCase(scanner);
 }
 
 void Parser::emit(Opcode op,
-                  uint32_t lineNumber,
-                  int32_t intValue,
-                  float floatValue,
-                  bool boolValue,
-                  const std::string &stringValue)
-{
+                uint32_t lineNumber,
+                int32_t intValue,
+                float floatValue,
+                bool boolValue,
+                const std::string &stringValue){
     Bytecode bytecode;
     // Create and push the instruction onto the bytecode vector
     if (intValue > 0) {
@@ -321,13 +286,11 @@ void Parser::emit(Opcode op,
     }
 }
 
-void Parser::error(const std::string &message, int line, int start)
-{
+void Parser::error(const std::string &message, int line, int start){
     Debugger::error(message, line, start, InterpretationStage::PARSING);
 }
 
-int Parser::getPrecedence(TokenType type)
-{
+int Parser::getPrecedence(TokenType type){
     switch (type) {
     // Group: Delimiters
     case TokenType::LEFT_PAREN:
@@ -397,15 +360,11 @@ int Parser::getPrecedence(TokenType type)
     }
 }
 
-// Example implementation of isUnaryOperator
-bool Parser::isUnaryOperator(TokenType type)
-{
+bool Parser::isUnaryOperator(TokenType type){
     return type == TokenType::MINUS; // Example: consider '-' as unary operator
 }
 
-// Example implementation of consume
-void Parser::consume(TokenType expectedType)
-{
+void Parser::consume(TokenType expectedType){
     Token token = scanner.getNextToken();
     if (token.type != expectedType) {
         // Handle error: unexpected token type

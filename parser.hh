@@ -2,9 +2,9 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-#include "opcodes.hpp"
-#include "scanner.hpp"
-#include "syntax.hpp"
+#include "opcodes.hh"
+#include "scanner.hh"
+#include "syntax.hh"
 
 class Parser
 {
@@ -57,11 +57,11 @@ private:
     //helper
     void error(const std::string &message, int line = 0, int start = 0);
     void emit(Opcode op,
-              uint32_t lineNumber,
-              int32_t intValue = 0,
-              float floatValue = 0.0f,
-              bool boolValue = false,
-              const std::string &stringValue = "");
+            uint32_t lineNumber,
+            int32_t intValue = 0,
+            float floatValue = 0.0f,
+            bool boolValue = false,
+            const std::string &stringValue = "");
     void consume(TokenType expectedType);
     bool isUnaryOperator(TokenType type);
     int getPrecedence(TokenType type);

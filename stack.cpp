@@ -1,4 +1,4 @@
-#include "stack.hpp"
+#include "stack.hh"
 #include <iostream>
 #include <thread>
 #include <vector>

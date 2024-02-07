@@ -1,6 +1,6 @@
 #pragma once
 
-#include "opcodes.hpp"
+#include "opcodes.hh"
 #include <cstdint>
 #include <fstream>
 #include <map>

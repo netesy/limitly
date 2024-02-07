@@ -1,5 +1,5 @@
-#include "syntax.h"
-#include "debugger.h"
+#include "syntax.hpp"
+#include "debugger.hpp"
 
 void Syntax::parseFunctionDeclaration(Scanner& scanner) {
     // Parse function declaration syntax
@@ -257,8 +257,12 @@ void Syntax::parseVariableDeclaration(Scanner& scanner) {
     // var myVar: int = 10;
     advance(scanner);         // Consume 'var' token
     parseIdentifier(scanner); // Parse variable name
+    // Parse the variable name
+    std::string variableName = scanner.getToken().lexeme;
     advance(scanner);         // Consume ':' token
     parseType(scanner);       // Parse variable type
+    // Emit the opcode to declare the variable
+    parser.emit(Opcode::DECLARE_VARIABLE, scanner.getLine(), variableName);
     if (match(scanner, TokenType::EQUAL)) {
         advance(scanner);         // Consume '=' token
         parseExpression(scanner); // Parse expression
@@ -290,8 +294,8 @@ void Syntax::parseExpression(Scanner &scanner)
             advance(scanner); // Consume identifier, number, or string token
         } else {
             error("Expected identifier, number, or string in expression.",
-                  scanner.getLine(),
-                  scanner.getCurrent());
+                scanner.getLine(),
+                scanner.getCurrent());
             return;
         }
         if (match(scanner, TokenType::LEFT_PAREN)) {
@@ -301,8 +305,8 @@ void Syntax::parseExpression(Scanner &scanner)
             }
             if (!match(scanner, TokenType::RIGHT_PAREN)) {
                 error("Expected ')' after function arguments in expression.",
-                      scanner.getLine(),
-                      scanner.getCurrent());
+                    scanner.getLine(),
+                    scanner.getCurrent());
             }
             advance(scanner); // Consume ')' token
         }

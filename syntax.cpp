@@ -1,6 +1,9 @@
+// This code parses a function declaration syntax and checks for default value, or returns the message. It also includes methods to parse functions with different parameters such as name, parameter type,
 #include "syntax.hpp"
 #include "debugger.hpp"
 #include "scanner.hpp"
+#include "opcodes.hh"
+#include "parser.hpp"
 
 void Syntax::parseFunctionDeclaration(Scanner &scanner)
 {
@@ -340,7 +343,11 @@ void Syntax::parseVariableDeclaration(Scanner &scanner)
     advance(scanner);         // Consume 'var' token
     parseIdentifier(scanner); // Parse variable name
     advance(scanner);         // Consume ':' token
-    parseType(scanner);       // Parse variable type
+    parseType(scanner);      // Parse variable type
+    std::string variableName = scanner.getToken().lexeme;
+    // Emit the opcode to declare the variable
+    //Parser::emit(Opcode::DECLARE_VARIABLE, scanner.getLine(), variableName);
+
     if (match(scanner, TokenType::EQUAL)) {
         advance(scanner);         // Consume '=' token
         parseExpression(scanner); // Parse expression
@@ -377,15 +384,20 @@ void Syntax::parseExpression(Scanner &scanner)
             }
             if (!match(scanner, TokenType::RIGHT_PAREN)) {
                 error("Expected ')' after function arguments in expression.",
-                      scanner.line,
-                      scanner.current);
+                    scanner.line,
+                    scanner.current);
             }
             advance(scanner); // Consume ')' token
         }
     } else if (match(scanner, TokenType::STRING)) {
+        // Emit the opcode to store the value in the variable
+        std::string value = scanner.getToken().lexeme;
+        emit(Opcode::STORE_VALUE, scanner.getLine(), value);
         // Parse string literals
         advance(scanner); // Consume string token
     } else if (match(scanner, TokenType::NUMBER)) {
+        std::string value = scanner.getToken().lexeme;
+        emit(Opcode::STORE_VALUE, scanner.getLine(), value);
         // Parse numeric literals
         advance(scanner); // Consume number token
     } else {
@@ -567,8 +579,8 @@ void Syntax::parseMatchCase(Scanner &scanner)
         advance(scanner); // Consume underscore token
     } else {
         error("Expected pattern (number, string, identifier, or '_').",
-              scanner.getLine(),
-              scanner.getCurrent());
+            scanner.getLine(),
+            scanner.getCurrent());
         return;
     }
 
@@ -779,4 +791,32 @@ bool Syntax::match(Scanner &scanner, TokenType expected)
 void Syntax::error(const std::string &message, int line, int start)
 {
     Debugger::error(message, line, start, InterpretationStage::SYNTAX);
+}
+
+void Syntax::emit(Opcode op, uint32_t lineNumber, int32_t intValue){
+    Bytecode bytecode;
+    if (intValue > 0) {
+        bytecode.push_back(Instruction{op, lineNumber, intValue});
+    }
+}
+
+void Syntax::emit(Opcode op, uint32_t lineNumber, float floatValue){
+    Bytecode bytecode;
+    if (floatValue > 0.0f) {
+        bytecode.push_back(Instruction{op, lineNumber, floatValue});
+    }
+}
+
+void Syntax::emit(Opcode op, uint32_t lineNumber, bool boolValue){
+    Bytecode bytecode;
+    if (boolValue == true) {
+        bytecode.push_back(Instruction{op, lineNumber, boolValue});
+    }
+}
+
+void Syntax::emit(Opcode op, uint32_t lineNumber, const std::string &stringValue){
+    Bytecode bytecode;
+    if (stringValue != "") {
+        bytecode.push_back(Instruction{op, lineNumber, stringValue});
+    }
 }

@@ -1,7 +1,7 @@
-#include "repl.hpp"
+#include "repl.hh"
 //#include "parser.h"
-#include "parser.hpp"
-#include "scanner.hpp"
+#include "parser.hh"
+#include "scanner.hh"
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -21,8 +21,9 @@ void REPL::start()
             Parser parser(scanner);
             parser.parse();
             std::cout << "======= Debug =======\n"
-                      << scanner.toString() << "======= End Debug =======\n"
-                      << std::endl;
+                    << scanner.toString()
+                    << "======= End Debug =======\n"
+                    << std::endl;
             // Interpret parsed code
             // Interpreter interpreter(parser.getResult());
             // interpreter.interpret();

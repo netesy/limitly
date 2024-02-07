@@ -1,5 +1,5 @@
 // debugger.cpp
-#include "debugger.hpp"
+#include "debugger.hh"
 
 void Debugger::debugInfo(const std::string& errorMessage, int lineNumber, int position, InterpretationStage stage, const std::string& expectedValue) {
     std::cerr << "Debug Info (" << stageToString(stage) << "):" << std::endl;
@@ -12,11 +12,11 @@ void Debugger::debugInfo(const std::string& errorMessage, int lineNumber, int po
 }
 
 void Debugger::error(const std::string &errorMessage,
-                     int lineNumber,
-                     int position,
-                     InterpretationStage stage,
-                     const std::string &token,
-                     const std::string &expectedValue)
+                    int lineNumber,
+                    int position,
+                    InterpretationStage stage,
+                    const std::string &token,
+                    const std::string &expectedValue)
 {
     std::cerr << "Error at line " << lineNumber << ", position " << position << " (" << stageToString(stage) << "): " << errorMessage << std::endl;
     if (!token.empty()) {

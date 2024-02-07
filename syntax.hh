@@ -1,7 +1,7 @@
 // syntax.hpp
 #pragma once
 
-#include "scanner.hpp"
+#include "scanner.hh"
 
 class Syntax
 {
@@ -45,6 +45,19 @@ public:
     void parseReturnStatement(Scanner &scanner);
 
 private:
+    void emit(Opcode op,
+            uint32_t lineNumber,
+            int32_t intValue);
+    void emit(Opcode op,
+            uint32_t lineNumber,
+            float floatValue);
+    void emit(Opcode op,
+            uint32_t lineNumber,
+            bool boolValue);
+    void emit(Opcode op,
+            uint32_t lineNumber,
+            const std::string &stringValue);
+
     char advance(Scanner &scanner);
     bool match(Scanner &scanner, TokenType expected);
     void error(const std::string &message, int line = 0, int start = 0);
