@@ -1,28 +1,20 @@
-// debugger.h
-#pragma once
+#ifndef DEBUGGER_H
+#define DEBUGGER_H
 
-#include <iostream>
-#include <stdexcept>
-#include <sstream>
+#include <string>
 
-enum class InterpretationStage { SCANNING, PARSING, SYNTAX, SEMANTIC, INTERPRETING };
+enum class InterpretationStage {
+    SCANNING,
+    PARSING,
+    COMPILATION,
+    EXECUTION
+};
 
 class Debugger {
 public:
-    static void debugInfo(const std::string &errorMessage,
-                        int lineNumber,
-                        int position,
-                        InterpretationStage stage,
-                        const std::string &expectedValue = "");
-
-    static void error(const std::string &errorMessage,
-                    int lineNumber,
-                    int position,
-                    InterpretationStage stage,
-                    const std::string &token = "",
-                    const std::string &expectedValue = "");
-
-private:
-    static std::string getSuggestion(const std::string& errorMessage);
-    static std::string stageToString(InterpretationStage stage);
+    static void error(const std::string& message, int line, int position, InterpretationStage stage, const std::string& lexeme = "");
+    static void warning(const std::string& message, int line, int position, InterpretationStage stage, const std::string& lexeme = "");
+    static void info(const std::string& message);
 };
+
+#endif // DEBUGGER_H

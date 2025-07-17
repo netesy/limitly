@@ -1,139 +1,133 @@
-//opcodes.h
-#pragma once
+#ifndef OPCODES_H
+#define OPCODES_H
+
 #include <cstdint>
 #include <string>
 #include <vector>
 
+// Bytecode operation codes
 enum class Opcode {
-    // Arithmetic operations
-    ADD,
-    SUBTRACT,
-    MULTIPLY,
-    DIVIDE,
-    MODULUS,
-
-    // Comparison operations
-    EQUAL,
-    NOT_EQUAL,
-    LESS_THAN,
-    LESS_THAN_OR_EQUAL,
-    GREATER_THAN,
-    GREATER_THAN_OR_EQUAL,
-
-    // Logical operations
-    AND,
-    OR,
-    NOT,
-
-    // Control flow operations
-    JUMP,
-    JUMP_IF_TRUE,
-    JUMP_IF_FALSE,
-    RETURN,
-
+    // Stack operations
+    PUSH_INT,           // Push integer onto stack
+    PUSH_FLOAT,         // Push float onto stack
+    PUSH_STRING,        // Push string onto stack
+    PUSH_BOOL,          // Push boolean onto stack
+    PUSH_NULL,          // Push null onto stack
+    POP,                // Pop value from stack
+    DUP,                // Duplicate top value on stack
+    SWAP,               // Swap top two values on stack
+    
     // Variable operations
-    DECLARE_VARIABLE,
-    LOAD_VARIABLE,
-    STORE_VARIABLE,
-
-    // Other operations
-    NOP,   // No operation
-    HALT,  // Halt execution
-    PRINT, // Print
-
-    // Function definition and invocation
-    DEFINE_FUNCTION,
-    INVOKE_FUNCTION,
-    RETURN_VALUE,
-
-    // Loop operations
-    FOR_LOOP,
-    WHILE_LOOP,
-
-    // Error handling operations
-    ATTEMPT,
-    HANDLE,
-
+    STORE_VAR,          // Store value in variable
+    LOAD_VAR,           // Load variable onto stack
+    STORE_TEMP,         // Store value in temporary variable
+    LOAD_TEMP,          // Load temporary variable onto stack
+    CLEAR_TEMP,         // Clear temporary variable
+    
+    // Arithmetic operations
+    ADD,                // Add top two values
+    SUBTRACT,           // Subtract top value from second value
+    MULTIPLY,           // Multiply top two values
+    DIVIDE,             // Divide second value by top value
+    MODULO,             // Modulo second value by top value
+    NEGATE,             // Negate top value
+    
+    // Comparison operations
+    EQUAL,              // Check if top two values are equal
+    NOT_EQUAL,          // Check if top two values are not equal
+    LESS,               // Check if second value is less than top value
+    LESS_EQUAL,         // Check if second value is less than or equal to top value
+    GREATER,            // Check if second value is greater than top value
+    GREATER_EQUAL,      // Check if second value is greater than or equal to top value
+    
+    // Logical operations
+    AND,                // Logical AND of top two values
+    OR,                 // Logical OR of top two values
+    NOT,                // Logical NOT of top value
+    
+    // Control flow operations
+    JUMP,               // Jump to offset
+    JUMP_IF_TRUE,       // Jump to offset if top value is true
+    JUMP_IF_FALSE,      // Jump to offset if top value is false
+    CALL,               // Call function
+    RETURN,             // Return from function
+    
+    // Function operations
+    BEGIN_FUNCTION,     // Begin function definition
+    END_FUNCTION,       // End function definition
+    DEFINE_PARAM,       // Define function parameter
+    DEFINE_OPTIONAL_PARAM, // Define optional function parameter
+    SET_DEFAULT_VALUE,  // Set default value for optional parameter
+    
     // Class operations
-    DEFINE_CLASS,
-    CREATE_OBJECT,
-    METHOD_CALL,
-
-    // File I/O operations
-    OPEN_FILE,
-    WRITE_FILE,
-    CLOSE_FILE,
-
+    BEGIN_CLASS,        // Begin class definition
+    END_CLASS,          // End class definition
+    GET_PROPERTY,       // Get property from object
+    SET_PROPERTY,       // Set property on object
+    
+    // Collection operations
+    CREATE_LIST,        // Create empty list
+    LIST_APPEND,        // Append value to list
+    CREATE_DICT,        // Create empty dictionary
+    DICT_SET,           // Set key-value pair in dictionary
+    GET_INDEX,          // Get value at index
+    SET_INDEX,          // Set value at index
+    
+    // Iterator operations
+    GET_ITERATOR,       // Get iterator for iterable
+    ITERATOR_HAS_NEXT,  // Check if iterator has next item
+    ITERATOR_NEXT,      // Get next item from iterator
+    ITERATOR_NEXT_KEY_VALUE, // Get next key-value pair from iterator
+    
+    // Scope operations
+    BEGIN_SCOPE,        // Begin new scope
+    END_SCOPE,          // End current scope
+    
+    // Exception handling operations
+    BEGIN_TRY,          // Begin try block
+    END_TRY,            // End try block
+    BEGIN_HANDLER,      // Begin exception handler
+    END_HANDLER,        // End exception handler
+    THROW,              // Throw exception
+    STORE_EXCEPTION,    // Store exception in variable
+    
     // Concurrency operations
-    PARALLEL,
-    CONCURRENT,
-    ASYNC,
-
-    // Generics operations
-    GENERIC_FUNCTION,
-    GENERIC_TYPE,
-
-    // Pattern matching operations (potentially included)
-    PATTERN_MATCH,
-
-    // Additional operations for saving, retrieving values, and string manipulation
-    LOAD_VALUE,     // Load value from memory
-    STORE_VALUE,    // Store value to memory
-    LOAD_STR,       // Load strings from memory
-    STORE_STR,      // Store strings to memory
-    CONCATENATE_STR // Concatenate strings
+    BEGIN_PARALLEL,     // Begin parallel block
+    END_PARALLEL,       // End parallel block
+    BEGIN_CONCURRENT,   // Begin concurrent block
+    END_CONCURRENT,     // End concurrent block
+    AWAIT,              // Await async result
+    
+    // Pattern matching operations
+    MATCH_PATTERN,      // Match value against pattern
+    
+    // Module operations
+    IMPORT,             // Import module
+    
+    // Enum operations
+    BEGIN_ENUM,         // Begin enum definition
+    END_ENUM,           // End enum definition
+    DEFINE_ENUM_VARIANT, // Define enum variant
+    DEFINE_ENUM_VARIANT_WITH_TYPE, // Define enum variant with type
+    
+    // I/O operations
+    PRINT,              // Print values
+    
+    // Debug operations
+    DEBUG_PRINT,        // Print debug information
 };
 
-// Define a struct to represent bytecode instructions
-struct Instruction
-{
+// Instruction structure
+struct Instruction {
     Opcode opcode;
-    uint32_t lineNumber; // Line number in the source code
-    // Additional fields for operands, labels, etc.
-    // Add any other metadata needed for debugging or bytecode generation
-
-    // Fields for saving values
-    int32_t intValue; // For integer values
-    float floatValue; // For floating-point values
-    bool boolValue;   // For boolean values
-
-    // Fields for saving strings
-    std::string stringValue; // For string values
-
-    // Constructor for instructions with integer value
-    Instruction(Opcode op, uint32_t line, int32_t value)
-        : opcode(op)
-        , lineNumber(line)
-        , intValue(value)
-    {}
-
-    // Constructor for instructions with floating-point value
-    Instruction(Opcode op, uint32_t line, float value)
-        : opcode(op)
-        , lineNumber(line)
-        , floatValue(value)
-    {}
-
-    // Constructor for instructions with boolean value
-    Instruction(Opcode op, uint32_t line, bool value)
-        : opcode(op)
-        , lineNumber(line)
-        , boolValue(value)
-    {}
-
-    // Constructor for instructions with string value
-    Instruction(Opcode op, uint32_t line, const std::string &value)
-        : opcode(op)
-        , lineNumber(line)
-        , stringValue(value)
-    {}
-
-    // Constructor for instructions without value
-    Instruction(Opcode op, uint32_t line)
-        : opcode(op)
-        , lineNumber(line)
-    {}
+    uint32_t line;
+    int32_t intValue = 0;
+    float floatValue = 0.0f;
+    bool boolValue = false;
+    std::string stringValue;
 };
 
-// Define a vector type to hold bytecode instructions
+// Bytecode is a vector of instructions
 using Bytecode = std::vector<Instruction>;
+
+#endif // OPCODES_H
