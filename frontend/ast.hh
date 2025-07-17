@@ -27,6 +27,7 @@ namespace AST {
     struct MemberExpr;
     struct ListExpr;
     struct DictExpr;
+    struct RangeExpr;
     struct ExprStatement;
     struct VarDeclaration;
     struct FunctionDeclaration;
@@ -158,6 +159,14 @@ namespace AST {
     // Dictionary literal {'a': 1, 'b': 2}
     struct DictExpr : public Expression {
         std::vector<std::pair<std::shared_ptr<Expression>, std::shared_ptr<Expression>>> entries;
+    };
+    
+    // Range expression (e.g., 1..10)
+    struct RangeExpr : public Expression {
+        std::shared_ptr<Expression> start;
+        std::shared_ptr<Expression> end;
+        std::shared_ptr<Expression> step; // Optional step value
+        bool inclusive; // Whether the range includes the step value
     };
 
     // Expression statement

@@ -386,6 +386,8 @@ std::shared_ptr<AST::Statement> Parser::iterStatement() {
         error("Expected variable name or identifier after 'iter ('.");
     }
 
+            std::string firstVar = peek().lexeme;
+            std::cout << "Current token in iter: "<< firstVar <<" at line "<< peek().line<< std::endl;
     consume(TokenType::RIGHT_PAREN, "Expected ')' after iter clauses.");
 
     // Parse loop body
@@ -585,6 +587,8 @@ std::shared_ptr<AST::Statement> Parser::forStatement() {
         }
     }
 
+            std::string firstVar = peek().lexeme;
+            std::cout << "Current token in for: "<< firstVar << std::endl;
     consume(TokenType::RIGHT_PAREN, "Expected ')' after for clauses.");
     stmt->body = statement();
 
@@ -918,6 +922,17 @@ std::shared_ptr<AST::Expression> Parser::equality() {
 
 std::shared_ptr<AST::Expression> Parser::comparison() {
     auto expr = term();
+
+    // Check for range expressions (e.g., 1..10)
+    if (match({TokenType::RANGE})) {
+        auto rangeExpr = std::make_shared<AST::RangeExpr>();
+        rangeExpr->line = previous().line;
+        rangeExpr->start = expr;
+        rangeExpr->end = term();
+        rangeExpr->step = nullptr; // No step value for now
+        rangeExpr->inclusive = true; // Default to inclusive range
+        return rangeExpr;
+    }
 
     while (match({TokenType::GREATER, TokenType::GREATER_EQUAL, TokenType::LESS, TokenType::LESS_EQUAL})) {
         auto op = previous();
