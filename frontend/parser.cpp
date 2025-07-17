@@ -1222,7 +1222,7 @@ std::shared_ptr<AST::Statement> Parser::typeDeclaration() {
 AST::TypeAnnotation Parser::parseTypeAnnotation() {
     AST::TypeAnnotation type;
     
-    // Check for primitive types or user-defined types
+    // Parse the base type
     if (match({TokenType::INT_TYPE})) {
         type.typeName = "int";
     } else if (match({TokenType::INT8_TYPE})) {
@@ -1296,6 +1296,27 @@ AST::TypeAnnotation Parser::parseTypeAnnotation() {
         } while (match({TokenType::COMMA}));
 
         consume(TokenType::GREATER, "Expected '>' after generic parameters.");
+    }
+    
+    // Check for union types (e.g., int | float)
+    if (match({TokenType::PIPE})) {
+        // This is a union type
+        AST::TypeAnnotation unionType;
+        unionType.typeName = "union";
+        unionType.unionTypes.push_back(type);
+        
+        // Parse the right side of the union
+        do {
+            unionType.unionTypes.push_back(parseTypeAnnotation());
+        } while (match({TokenType::PIPE}));
+        
+        return unionType;
+    }
+    
+    // Check for refined types (e.g., int where value > 0)
+    if (match({TokenType::WHERE})) {
+        // This is a refined type with a constraint
+        type.refinementCondition = expression();
     }
 
     return type;
