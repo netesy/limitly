@@ -845,14 +845,16 @@ std::shared_ptr<AST::Expression> Parser::expression() {
 std::shared_ptr<AST::Expression> Parser::assignment() {
     auto expr = logicalOr();
 
-    if (match({TokenType::EQUAL})) {
-        auto equals = previous();
+    if (match({TokenType::EQUAL, TokenType::PLUS_EQUAL, TokenType::MINUS_EQUAL, 
+               TokenType::STAR_EQUAL, TokenType::SLASH_EQUAL, TokenType::MODULUS_EQUAL})) {
+        auto op = previous();
         auto value = assignment();
 
         if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(expr)) {
             auto assignExpr = std::make_shared<AST::AssignExpr>();
-            assignExpr->line = equals.line;
+            assignExpr->line = op.line;
             assignExpr->name = varExpr->name;
+            assignExpr->op = op.type;
             assignExpr->value = value;
             return assignExpr;
         }
@@ -1219,8 +1221,68 @@ std::shared_ptr<AST::Statement> Parser::typeDeclaration() {
 // Type annotation parsing
 AST::TypeAnnotation Parser::parseTypeAnnotation() {
     AST::TypeAnnotation type;
-
-    type.typeName = consume(TokenType::IDENTIFIER, "Expected type name.").lexeme;
+    
+    // Check for primitive types or user-defined types
+    if (match({TokenType::INT_TYPE})) {
+        type.typeName = "int";
+    } else if (match({TokenType::INT8_TYPE})) {
+        type.typeName = "i8";
+    } else if (match({TokenType::INT16_TYPE})) {
+        type.typeName = "i16";
+    } else if (match({TokenType::INT32_TYPE})) {
+        type.typeName = "i32";
+    } else if (match({TokenType::INT64_TYPE})) {
+        type.typeName = "i64";
+    } else if (match({TokenType::UINT_TYPE})) {
+        type.typeName = "uint";
+    } else if (match({TokenType::UINT8_TYPE})) {
+        type.typeName = "u8";
+    } else if (match({TokenType::UINT16_TYPE})) {
+        type.typeName = "u16";
+    } else if (match({TokenType::UINT32_TYPE})) {
+        type.typeName = "u32";
+    } else if (match({TokenType::UINT64_TYPE})) {
+        type.typeName = "u64";
+    } else if (match({TokenType::FLOAT_TYPE})) {
+        type.typeName = "float";
+    } else if (match({TokenType::FLOAT32_TYPE})) {
+        type.typeName = "f32";
+    } else if (match({TokenType::FLOAT64_TYPE})) {
+        type.typeName = "f64";
+    } else if (match({TokenType::STR_TYPE})) {
+        type.typeName = "str";
+    } else if (match({TokenType::BOOL_TYPE})) {
+        type.typeName = "bool";
+    } else if (match({TokenType::ANY_TYPE})) {
+        type.typeName = "any";
+    } else if (match({TokenType::NIL_TYPE})) {
+        type.typeName = "nil";
+    } else if (match({TokenType::LIST_TYPE})) {
+        type.typeName = "list";
+    } else if (match({TokenType::DICT_TYPE})) {
+        type.typeName = "dict";
+    } else if (match({TokenType::ARRAY_TYPE})) {
+        type.typeName = "array";
+    } else if (match({TokenType::OPTION_TYPE})) {
+        type.typeName = "option";
+    } else if (match({TokenType::RESULT_TYPE})) {
+        type.typeName = "result";
+    } else if (match({TokenType::CHANNEL_TYPE})) {
+        type.typeName = "channel";
+    } else if (match({TokenType::ATOMIC_TYPE})) {
+        type.typeName = "atomic";
+    } else if (match({TokenType::FUNCTION_TYPE})) {
+        type.typeName = "function";
+    } else if (match({TokenType::ENUM_TYPE})) {
+        type.typeName = "enum";
+    } else if (match({TokenType::SUM_TYPE})) {
+        type.typeName = "sum";
+    } else if (match({TokenType::UNION_TYPE})) {
+        type.typeName = "union";
+    } else {
+        // Fall back to identifier for user-defined types
+        type.typeName = consume(TokenType::IDENTIFIER, "Expected type name.").lexeme;
+    }
 
     // Check for optional type
     if (match({TokenType::QUESTION})) {

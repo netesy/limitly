@@ -125,6 +125,7 @@ namespace AST {
     struct AssignExpr : public Expression {
         std::string name;
         std::shared_ptr<Expression> value;
+        TokenType op = TokenType::EQUAL; // Default is simple assignment, but can be +=, -=, etc.
     };
 
     // Ternary expression (condition ? thenExpr : elseExpr)
