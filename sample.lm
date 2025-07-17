@@ -19,7 +19,6 @@ type amount = f64;        // Default float type
 type isTrue = bool;     // Boolean type
 type string = str;       // String type
 
-
 // Type Aliases
 type Id = uint;
 type Name = str;
@@ -30,6 +29,20 @@ type Result<T, E> = Success(T) | Error(E);
 type Option<T> = Some(T) | nil;
 type List<T> = [T];
 type Dict<K: Hashable, V> = {K: V};
+
+// Union Types
+type NumberType = int | float;
+type StringOrNumber = str | NumberType;
+
+// Refined Types
+type PositiveInt = int where value > 0;
+type EmailString = str where matches(value, "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$");
+type Percentage = float where value >= 0.0 and value <= 100.0;
+
+// Structural Types (Row Polymorphism)
+type HasName = { name: str, ...};
+type HasAge = { age: uint, ...};
+type Person = HasName and HasAge;
 
 // Traits (Interfaces)
 //!todo Not Yet Implemented
@@ -48,20 +61,6 @@ trait Display {
 trait Clone {
     fn clone(): Self;
 }
-
-// Union Types
-type NumberType = int | float;
-type StringOrNumber = str | NumberType;
-
-// Refined Types
-type PositiveInt = int where value > 0;
-type EmailString = str where matches(value, "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$");
-type Percentage = float where value >= 0.0 and value <= 100.0;
-
-// Structural Types (Row Polymorphism)
-type HasName = { name: str, ...};
-type HasAge = { age: uint, ...};
-type Person = HasName and HasAge;
 
 // Arithmetic and Logical Operations
 print(10 + 5 * 2);                  // Output: 20
