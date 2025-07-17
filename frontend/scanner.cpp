@@ -155,10 +155,10 @@ void Scanner::annotation() {
     while (isAlphaNumeric(peek())) {
         advance();
     }
-    
+
     // Get the annotation name (without the @ symbol)
     std::string annotationName = source.substr(start + 1, current - start - 1);
-    
+
     // Check for known annotations
     if (annotationName == "open") {
         addToken(TokenType::OPEN);
@@ -175,7 +175,7 @@ void Scanner::annotation() {
     } else {
         // For unknown annotations, just add the AT_SIGN token
         addToken(TokenType::AT_SIGN);
-        
+
         // And then process the identifier separately
         current = start + 1; // Reset to just after the @ symbol
         identifier();
@@ -360,11 +360,23 @@ TokenType Scanner::checkKeyword(size_t start, size_t length, const std::string& 
     if (rest == "cache") return TokenType::CACHE;
     if (rest == "sleep") return TokenType::SLEEP;
     if (rest == "enum") return TokenType::ENUM;
-    
+
     // Check if the identifier matches a type keyword
     if (rest == "int") return TokenType::INT_TYPE;
+    if (rest == "i8") return TokenType::INT8_TYPE;
+    if (rest == "i16") return TokenType::INT16_TYPE;
+    if (rest == "i32") return TokenType::INT32_TYPE;
+    if (rest == "i64") return TokenType::INT64_TYPE;
     if (rest == "uint") return TokenType::UINT_TYPE;
+    if (rest == "u8") return TokenType::UINT8_TYPE;
+    if (rest == "u16") return TokenType::UINT16_TYPE;
+    if (rest == "u32") return TokenType::UINT32_TYPE;
+    if (rest == "u64") return TokenType::UINT64_TYPE;
     if (rest == "float") return TokenType::FLOAT_TYPE;
+    if (rest == "f32") return TokenType::FLOAT32_TYPE;
+    if (rest == "f64") return TokenType::FLOAT64_TYPE;
+    if (rest == "any") return TokenType::ANY_TYPE;
+    if (rest == "nil") return TokenType::NIL_TYPE;
     if (rest == "str") return TokenType::STR_TYPE;
     if (rest == "bool") return TokenType::BOOL_TYPE;
     if (rest == "list") return TokenType::LIST_TYPE;
@@ -602,6 +614,39 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "UNDEFINED";
     case TokenType::EOF_TOKEN:
         return "EOF_TOKEN";
+    case TokenType::ELVIS:
+        return "ELVIS";
+    case TokenType::SAFE:
+        return "SAFE";
+    case TokenType::INT8_TYPE:
+        return "INT8_TYPE";
+    case TokenType::INT16_TYPE:
+        return "INT16_TYPE";
+    case TokenType::INT32_TYPE:
+        return "INT32_TYPE";
+    case TokenType::INT64_TYPE:
+        return "INT64_TYPE";
+    case TokenType::UINT8_TYPE:
+        return "UINT8_TYPE";
+    case TokenType::UINT16_TYPE:
+        return "UINT16_TYPE";
+    case TokenType::UINT32_TYPE:
+        return "UINT32_TYPE";
+    case TokenType::UINT64_TYPE:
+        return "UINT64_TYPE";
+    case TokenType::FLOAT32_TYPE:
+        return "FLOAT32_TYPE";
+    case TokenType::FLOAT64_TYPE:
+        return "FLOAT64_TYPE";
+    case TokenType::SUM_TYPE:
+        return "SUM_TYPE";
+    case TokenType::UNION_TYPE:
+        return "UNION_TYPE";
+    case TokenType::ANY_TYPE:
+        return "ANY_TYPE";
+    case TokenType::NIL_TYPE:
+        return "NIL_TYPE";
+        break;
     }
     return "UNKNOWN";
 }
