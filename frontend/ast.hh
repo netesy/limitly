@@ -81,6 +81,8 @@ namespace AST {
         std::string typeName;
         bool isOptional = false;
         std::vector<TypeAnnotation> genericParams;
+        std::vector<TypeAnnotation> functionParams;
+        std::vector<TypeAnnotation> unionTypes;
     };
 
     // Program - the root of our AST

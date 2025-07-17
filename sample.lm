@@ -13,11 +13,12 @@
 // ---------------------------------------------------
 
 // Primitive Types
-type int = i64;          // Default integer type
-type uint = u64;         // Unsigned integer
-type float = f64;        // Default float type
-type bool = bool;     // Boolean type
-type str = str;       // String type
+type date = i64;          // Default integer type
+type numbers = u64;         // Unsigned integer
+type amount = f64;        // Default float type
+type isTrue = bool;     // Boolean type
+type string = str;       // String type
+
 
 // Type Aliases
 type Id = uint;
