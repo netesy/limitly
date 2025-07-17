@@ -84,6 +84,7 @@ namespace AST {
         std::vector<TypeAnnotation> genericParams;
         std::vector<TypeAnnotation> functionParams;
         std::vector<TypeAnnotation> unionTypes;
+        std::shared_ptr<Expression> refinementCondition = nullptr; // For refined types (e.g., int where value > 0)
     };
 
     // Program - the root of our AST
