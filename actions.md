@@ -94,6 +94,27 @@ This document tracks the specific actions taken during the development of the Li
 **Files Modified/Created**:
 - Updated build.zig with new build configuration
 
+## Action 6: Enhanced Type System
+
+**Prompt**: "add structural types to typeAnnotations" and "in the structural type Extensible records with ... allowing additional fields"
+
+**Changes Made**:
+- Enhanced the type annotation system to support structural types
+- Added support for extensible records with `...` allowing additional fields (row polymorphism)
+- Implemented union types (e.g., `int | float`)
+- Implemented intersection types (e.g., `HasName and HasAge`)
+- Added support for refined types with constraints (e.g., `int where value > 0`)
+- Added support for range expressions (e.g., `1..10`)
+- Implemented compound assignment operators (e.g., `+=`, `-=`, etc.)
+- Updated the AST structure to use shared pointers for type annotations
+- Updated the backend to work with the enhanced AST structure
+
+**Files Modified/Created**:
+- Updated frontend/ast.hh with new type annotation structures
+- Updated frontend/parser.hh and frontend/parser.cpp to parse the new type annotations
+- Updated backend/backend.cpp to handle the new AST structures
+- Updated backend.hh to include new visitor methods
+
 ## Next Steps (Based on activities.md)
 
 ### Backend Development

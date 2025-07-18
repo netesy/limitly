@@ -62,6 +62,11 @@ The project is organized into frontend and backend components:
 - [x] Concurrency primitives (parallel and concurrent blocks)
 - [x] Asynchronous programming with async/await
 - [x] Enums and pattern matching
+- [x] Structural types with extensible records (row polymorphism)
+- [x] Union types and intersection types
+- [x] Refined types with constraints
+- [x] Range expressions
+- [x] Compound assignment operators
 - [ ] Generics
 - [ ] Modules and imports
 - [ ] Standard library

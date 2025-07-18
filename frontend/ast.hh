@@ -89,15 +89,31 @@ namespace AST {
     
     // Type annotation structure
     struct TypeAnnotation {
-        std::string typeName;
-        bool isOptional = false;
-        std::vector<std::shared_ptr<TypeAnnotation>> genericParams;
-        std::vector<std::shared_ptr<TypeAnnotation>> functionParams;
-        std::vector<std::shared_ptr<TypeAnnotation>> unionTypes;
-        std::shared_ptr<Expression> refinementCondition = nullptr; // For refined types (e.g., int where value > 0)
-        std::vector<StructuralTypeField> structuralFields; // For structural types (e.g., { name: str, age: int })
-        bool isStructural = false; // Whether this is a structural type
-        bool hasRest = false; // Whether this structural type has a rest parameter (...) for row polymorphism
+        std::string typeName;                                  // The name of the type (e.g., "int", "str", "Person")
+        bool isOptional = false;                               // Whether this is an optional type (e.g., int?)
+        bool isPrimitive = false;                              // Whether this is a primitive type (e.g., int, str, bool)
+        bool isUserDefined = false;                            // Whether this is a user-defined type (e.g., Person, Vehicle)
+        bool isStructural = false;                             // Whether this is a structural type (e.g., { name: str, age: int })
+        bool isUnion = false;                                  // Whether this is a union type (e.g., int | str)
+        bool isIntersection = false;                           // Whether this is an intersection type (e.g., HasName and HasAge)
+        bool isList = false;                                   // Whether this is a list type (e.g., [int], ListOfString)
+        bool isDict = false;                                   // Whether this is a dictionary type (e.g., {str: int}, DictOfStrToInt)
+        bool isFunction = false;                               // Whether this is a function type
+        bool isRefined = false;                                // Whether this is a refined type (e.g., int where value > 0)
+        bool hasRest = false;                                  // Whether this structural type has a rest parameter (...)
+        
+        std::string baseRecord = "";                           // Name of the base record for extensible records
+        std::vector<std::string> baseRecords;                  // Multiple base records for extensible records
+        
+        std::vector<std::shared_ptr<TypeAnnotation>> functionParams;    // Function parameters for function types
+        std::vector<std::shared_ptr<TypeAnnotation>> unionTypes;        // Types in a union (e.g., int | str)
+        std::vector<StructuralTypeField> structuralFields;              // Fields in a structural type
+        
+        std::shared_ptr<Expression> refinementCondition = nullptr;      // For refined types (e.g., int where value > 0)
+        std::shared_ptr<TypeAnnotation> returnType = nullptr;           // Return type for function types
+        std::shared_ptr<TypeAnnotation> elementType = nullptr;          // Element type for list types (e.g., [int])
+        std::shared_ptr<TypeAnnotation> keyType = nullptr;              // Key type for dictionary types (e.g., {str: int})
+        std::shared_ptr<TypeAnnotation> valueType = nullptr;            // Value type for dictionary types (e.g., {str: int})
     };
 
     // Program - the root of our AST
