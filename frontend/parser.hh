@@ -75,7 +75,9 @@ private:
     std::shared_ptr<AST::Expression> finishCall(std::shared_ptr<AST::Expression> callee);
 
     // Type annotation parsing
-  std::shared_ptr<AST::TypeAnnotation> parseTypeAnnotation();
+    std::shared_ptr<AST::TypeAnnotation> parseTypeAnnotation();
+    bool isPrimitiveType(TokenType type);
+    std::string tokenTypeToString(TokenType type);
 };
 
 #endif // PARSER_H

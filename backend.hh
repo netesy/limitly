@@ -61,6 +61,7 @@ private:
     void visitIndexExpr(const std::shared_ptr<AST::IndexExpr>& expr);
     void visitMemberExpr(const std::shared_ptr<AST::MemberExpr>& expr);
     void visitAwaitExpr(const std::shared_ptr<AST::AwaitExpr>& expr);
+    void visitRangeExpr(const std::shared_ptr<AST::RangeExpr>& expr);
     
     // Helper methods
     void emit(Opcode op, uint32_t lineNumber, 

@@ -75,6 +75,8 @@ void BytecodeGenerator::visitExpression(const std::shared_ptr<AST::Expression>& 
         visitMemberExpr(memberExpr);
     } else if (auto awaitExpr = std::dynamic_pointer_cast<AST::AwaitExpr>(expr)) {
         visitAwaitExpr(awaitExpr);
+    } else if (auto rangeExpr = std::dynamic_pointer_cast<AST::RangeExpr>(expr)) {
+        visitRangeExpr(rangeExpr);
     } else {
         Debugger::error("Unknown expression type", 0, 0, InterpretationStage::COMPILATION);
     }
@@ -89,14 +91,14 @@ void BytecodeGenerator::visitVarDeclaration(const std::shared_ptr<AST::VarDeclar
         visitExpression(stmt->initializer);
     } else {
         // Default initialization based on type
-        if (stmt->type) {
-            if (stmt->type->typeName == "int") {
+        if (stmt->type && *stmt->type) {
+            if ((*stmt->type)->typeName == "int") {
                 emit(Opcode::PUSH_INT, stmt->line, 0);
-            } else if (stmt->type->typeName == "float") {
+            } else if ((*stmt->type)->typeName == "float") {
                 emit(Opcode::PUSH_FLOAT, stmt->line, 0, 0.0f);
-            } else if (stmt->type->typeName == "str") {
+            } else if ((*stmt->type)->typeName == "str") {
                 emit(Opcode::PUSH_STRING, stmt->line, 0, 0.0f, false, "");
-            } else if (stmt->type->typeName == "bool") {
+            } else if ((*stmt->type)->typeName == "bool") {
                 emit(Opcode::PUSH_BOOL, stmt->line, 0, 0.0f, false);
             } else {
                 emit(Opcode::PUSH_NULL, stmt->line);
@@ -426,7 +428,7 @@ void BytecodeGenerator::visitEnumDeclaration(const std::shared_ptr<AST::EnumDecl
     
     // Process enum variants
     for (const auto& variant : stmt->variants) {
-        if (variant.second) {
+        if (variant.second && *variant.second) {
             // Variant with type
             emit(Opcode::DEFINE_ENUM_VARIANT_WITH_TYPE, stmt->line, 0, 0.0f, false, variant.first);
         } else {
@@ -608,8 +610,36 @@ void BytecodeGenerator::visitCallExpr(const std::shared_ptr<AST::CallExpr>& expr
 void BytecodeGenerator::visitAssignExpr(const std::shared_ptr<AST::AssignExpr>& expr) {
     // Generate bytecode for assignment expression
     
-    // Evaluate value
-    visitExpression(expr->value);
+    // For compound assignments (+=, -=, etc.), load the variable first
+    if (expr->op != TokenType::EQUAL) {
+        emit(Opcode::LOAD_VAR, expr->line, 0, 0.0f, false, expr->name);
+        visitExpression(expr->value);
+        
+        // Perform the operation based on the operator
+        switch (expr->op) {
+            case TokenType::PLUS_EQUAL:
+                emit(Opcode::ADD, expr->line);
+                break;
+            case TokenType::MINUS_EQUAL:
+                emit(Opcode::SUBTRACT, expr->line);
+                break;
+            case TokenType::STAR_EQUAL:
+                emit(Opcode::MULTIPLY, expr->line);
+                break;
+            case TokenType::SLASH_EQUAL:
+                emit(Opcode::DIVIDE, expr->line);
+                break;
+            case TokenType::MODULUS_EQUAL:
+                emit(Opcode::MODULO, expr->line);
+                break;
+            default:
+                Debugger::error("Unknown compound assignment operator", expr->line, 0, InterpretationStage::COMPILATION);
+                break;
+        }
+    } else {
+        // Regular assignment
+        visitExpression(expr->value);
+    }
     
     // Duplicate value (for assignment expressions that return the assigned value)
     emit(Opcode::DUP, expr->line);
@@ -697,6 +727,31 @@ void BytecodeGenerator::visitAwaitExpr(const std::shared_ptr<AST::AwaitExpr>& ex
     emit(Opcode::AWAIT, expr->line);
 }
 
+void BytecodeGenerator::visitRangeExpr(const std::shared_ptr<AST::RangeExpr>& expr) {
+    // Generate bytecode for range expression
+    
+    // Evaluate start expression
+    visitExpression(expr->start);
+    
+    // Evaluate end expression
+    visitExpression(expr->end);
+    
+    // Create range object
+    emit(Opcode::CREATE_RANGE, expr->line, 0, 0.0f, expr->inclusive);
+    
+    // If there's a step value, evaluate and set it
+    if (expr->step) {
+        // Duplicate range reference
+        emit(Opcode::DUP, expr->line);
+        
+        // Evaluate step
+        visitExpression(expr->step);
+        
+        // Set step value
+        emit(Opcode::SET_RANGE_STEP, expr->line);
+    }
+}
+
 void BytecodeGenerator::emit(Opcode op, uint32_t lineNumber, int32_t intValue, float floatValue, bool boolValue, const std::string& stringValue) {
     // Create and push instruction onto bytecode vector
     Instruction instruction;
@@ -727,9 +782,9 @@ void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
     } 
     else if (auto varDecl = std::dynamic_pointer_cast<AST::VarDeclaration>(node)) {
         std::cout << indentation << "VarDeclaration: " << varDecl->name;
-        if (varDecl->type) {
-            std::cout << " : " << varDecl->type->typeName;
-            if (varDecl->type->isOptional) std::cout << "?";
+        if (varDecl->type && *varDecl->type) {
+            std::cout << " : " << (*varDecl->type)->typeName;
+            if ((*varDecl->type)->isOptional) std::cout << "?";
         }
         std::cout << std::endl;
         
@@ -743,15 +798,15 @@ void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
         
         std::cout << indentation << "  Parameters:" << std::endl;
         for (const auto& param : funcDecl->params) {
-            std::cout << indentation << "    " << param.first << " : " << param.second.typeName << std::endl;
+            std::cout << indentation << "    " << param.first << " : " << param.second->typeName << std::endl;
         }
         
         for (const auto& param : funcDecl->optionalParams) {
-            std::cout << indentation << "    " << param.first << " : " << param.second.first.typeName << "? (optional)" << std::endl;
+            std::cout << indentation << "    " << param.first << " : " << param.second.first->typeName << "? (optional)" << std::endl;
         }
         
-        if (funcDecl->returnType) {
-            std::cout << indentation << "  ReturnType: " << funcDecl->returnType->typeName << std::endl;
+        if (funcDecl->returnType && *funcDecl->returnType) {
+            std::cout << indentation << "  ReturnType: " << (*funcDecl->returnType)->typeName << std::endl;
         }
         
         std::cout << indentation << "  Body:" << std::endl;

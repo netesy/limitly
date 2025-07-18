@@ -12,49 +12,130 @@
 // Core Type System
 // ---------------------------------------------------
 
-// Primitive Types
-type date = i64;          // Default integer type
-type numbers = u64;         // Unsigned integer
-type amount = f64;        // Default float type
-type isTrue = bool;     // Boolean type
-type string = str;       // String type
+// === Primitive Types ===
+type date = i64;
+type numbers = u64;
+type amount = f64;
+type isTrue = bool;
+type string = str;
 
-// Type Aliases
+// === Type Aliases ===
 type Id = uint;
 type Name = str;
 type Age = uint;
 
-// Generic Type Parameters
-type Result<T, E> = Success(T) | Error(E);
-type Option<T> = Some(T) | nil;
-type List<T> = [T];
-type Dict<K: Hashable, V> = {K: V};
+// === Option Type ===
+//type Some = { kind: "Some", value: any };
+//type None = nil;  
 
-// Union Types
-type NumberType = int | float;
+//type Option = Some | None;
+type options = { kind: "Some", value: any } | nil;
+
+// Example usage:
+// var maybeName: Option = { kind: "Some", value: "Alice" };
+// var noValue: Option = nil;
+
+// === Result Type ===
+type Success = { kind: "Success", value: any };
+type Error = { kind: "Error", message: any };
+
+type Result = Success | Error;
+
+// Example usage:
+// var res: Result = { kind: "Success", value: 42 };
+// var err: Result = { kind: "Error", message: "Not found" };
+
+// === Collection Types ===
+type ListOfAny = [any];
+type ListOfString = [str];
+type ListOfPerson = [Person];
+
+type DictOfAny = {any: any};
+type DictOfString = {str: str};
+type DictOfIntToUser = {int: User};
+
+// === Union Types ===
+type NumberType = int | f64;
 type StringOrNumber = str | NumberType;
 
-// Refined Types
+// === Refined Types ===
 type PositiveInt = int where value > 0;
 type EmailString = str where matches(value, "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$");
 type Percentage = float where value >= 0.0 and value <= 100.0;
 
-// Structural Types (Row Polymorphism)
-type HasName = { name: str, ...};
-type HasAge = { age: uint, ...};
+// === Structural Types ===
+type HasName = { name: str };
+type HasAge = { age: uint };
 type Person = HasName and HasAge;
 
-// Traits (Interfaces)
-//!todo Not Yet Implemented
+// === Extensible Structural Types ===
+type Address = { street: str, city: str, zipcode: str };
+type ContactInfo = { email: str, phone: str };
+type Employee = { ...Person, ...Address, ...ContactInfo, employeeId: uint, department: str };
+type Manager = { ...Employee, managedTeam: [Employee] };
+type ExtendedRecord = { ...BaseRecord, newField: int };
+type MultipleBaseRecord = { ...Base1, ...Base2, additionalField: bool };
+
+// Arithmetic and Logical Operations
+print(10 + 5 * 2);                  // Output: 20
+print((10 > 5) and (5 < 2));        // false
+print("Hello, " + "Luminar!");      // String concatenation
+
+// === Arithmetic and Logical Operations ===
+print(10 + 5 * 2);                  // Output: 20
+print((10 > 5) and (5 < 2));        // false
+print("Hello, " + "Luminar!");      // String concatenation
+
+// === Loops ===
+
+// C-style loop
+for (var i = 0; i < 10; i += 1) {
+    print(i);
+}
+
+// Range-based loop
+iter (i in 1..5) {
+    print("Range iteration: {i}");
+}
+
+// List-based loop with explicit string list type
+var fruits: ListOfString = ["Apple", "Banana", "Cherry"];
+iter (fruit in fruits) {
+    print(fruit);
+}
+
+// Dictionary-based loop with defined key/value type
+type DictOfStrToInt = { string: int };
+var my_dict: DictOfStrToInt = { "a": 1, "b": 2, "c": 3 };
+iter (key, value in my_dict) {
+    print("{key}: {value}");
+}
+
+// Nested loop
+iter (x in 1..3) {
+    iter (y in 1..2) {
+        print("x: {x}, y: {y}");
+    }
+}
+
+// While loop
+var count: int = 0;
+while (count < 3) {
+    print("Count: {count}");
+    count += 1;
+}
+
+// === Traits (Interfaces) ===
+
 @open
 trait Hashable {
     fn hash(): uint;
-    fn equals(other: Self): bool;
+    fn equals(other: Self): isTrue;
 }
 
 @open
 trait Display {
-    fn to_string(): str;
+    fn to_string(): string;
 }
 
 @open
@@ -62,87 +143,25 @@ trait Clone {
     fn clone(): Self;
 }
 
-// Arithmetic and Logical Operations
-print(10 + 5 * 2);                  // Output: 20
-print((10 > 5) and (5 < 2));        // false
-print("Hello, " + "Luminar!");      // String concatenation
+// === I/O Operations ===
 
-// ---------------------------------------------------
-// Loops
-// ---------------------------------------------------
-// C style for loops for legacy code
-for (var i = 0; i < 10; i += 1) {
-    print(i);
+/// Writes string content to a file.
+fn write_to_file(filename: string, content: string): None {
+    var file = open(filename, "write");
+    file.write(content);
+    file.close();
 }
 
-// Range-based loop
-iter (i in 1..5) {
-  print("Range iteration: {i}");
+/// Reads full contents of a file. Returns `Option`.
+fn read_from_file(filename: string): Option {
+    var file = open(filename, "read");
+    var content = file.read_all();
+    file.close();
+    return { kind: "Some", value: content };
 }
 
-// List-based loop
-var fruits: list<str> = ["Apple", "Banana", "Cherry"];
-iter (fruit in fruits) {
-  print(fruit);
-}
+// === Modules ===
 
-// List-based loop
-var fruits: list = ["Apple", "Banana", "Cherry"];
-iter (fruit in fruits) {
-  print(fruit);
-}
-
-// Dictionary iteration
-var my_dict: dict = {"a": 1, "b": 2, "c": 3};
-iter (key, value in my_dict) {
-    print("{key}: {value}");
-}
-
-var my_dict: dict<str, int> = {"a": 1, "b": 2, "c": 3};
-iter (key, value in my_dict) {
-    print("{key}: {value}");
-}
-
-// Nested loop
-iter (x in 1..3) {
-  iter (y in 1..2) {
-    print("x: {x}, y: {y}");
-  }
-}
-
-// While loop
-var count: int = 0;
-while (count < 3) {
-  print("Count: {count}");
-  count += 1;
-}
-
-// ---------------------------------------------------
-// I/O Operations
-// ---------------------------------------------------
-
-// Experimental: File handling
-fn write_to_file(filename: str, content: str): nil {
-  var file = open(filename, "write");
-  file.write(content);
-  file.close();
-}
-
-fn read_from_file(filename: str): str? {
-  var file = open(filename, "read");
-  var content = file.read_all();
-  file.close();
-  return content;
-}
-
-// Usage example:
-// write_to_file("example.txt", "Hello, File!");
-// var content = read_from_file("example.txt");
-// print(content.unwrap_or("File could not be read"));
-
-// ---------------------------------------------------
-// Modules
-// ---------------------------------------------------
 @private: Accessible only within the file.
 @protected: Accessible within the module but not externally.
 
@@ -158,65 +177,57 @@ module MathUtils {
     }
 
     fn factorial(n: int): int {
-        if n <= 1 { return 1; }
+        if (n <= 1) { return 1; }
         return n * factorial(n - 1);
     }
 }
 
 import MathUtils;
 print(MathUtils.add(5, 3));         // Output: 8
-print(MathUtils.factorial(4));      // Should Output: 24 but the module method is not public
+// print(MathUtils.factorial(4));   // Not public, won't compile
 
-// ---------------------------------------------------
-// Error Handling
-// ---------------------------------------------------
+// === Error Handling ===
 
-fn divide(a: int, b: int): int? {
-  contract(b != 0, "Divisor must not be zero");
-  return a / b;
+/// Division that guards against zero using a contract. Returns `Option`.
+fn divide(a: int, b: int): Option {
+    contract(b != 0, "Divisor must not be zero");
+    return { kind: "Some", value: a / b };
 }
 
-match divide(10, 0) {
-  Some(result) => print("Result: {result}"),
-  None => print("Error: Division by zero")
+match (divide(10, 0)) {
+    { kind: "Some", value: result } => print("Result: {result}"),
+    nil => print("Error: Division by zero")
 }
 
-// ────────────────────────────────────────────────────────────────────
-// Function Contracts: Preconditions & Postconditions
-// ────────────────────────────────────────────────────────────────────
+// === Function Contracts ===
 
-fn sqrt(x: float): float {
-    contract(x >= 0, "Cannot compute sqrt of negative number"); // Precondition
-
+/// Square root function with pre- and post-conditions.
+fn sqrt(x: amount): amount {
+    contract(x >= 0, "Cannot compute sqrt of negative number");
     var result = x ** 0.5;
-
-    contract(result >= 0, "Result must be non-negative"); // Postcondition
+    contract(result >= 0, "Result must be non-negative");
     return result;
 }
 
-// ────────────────────────────────────────────────────────────────────
-// Class Contracts: Ensuring Invariants
-// ────────────────────────────────────────────────────────────────────
+// === Class Contracts ===
 
+/// A simple bank account class enforcing invariant rules.
 class BankAccount {
-    var balance: float;
+    var balance: amount;
 
-    // Constructor enforces initial invariants
-    BankAccount(initial_balance: float) {
+    BankAccount(initial_balance: amount) {
         contract(initial_balance >= 0, "Initial balance cannot be negative");
         self.balance = initial_balance;
     }
 
-    // Method contracts enforce valid operations
-    fn deposit(amount: float) {
+    fn deposit(amount: amount) {
         contract(amount > 0, "Deposit amount must be positive");
         self.balance += amount;
     }
 
-    fn withdraw(amount: float) {
+    fn withdraw(amount: amount) {
         contract(amount > 0, "Withdrawal amount must be positive");
         contract(self.balance >= amount, "Insufficient funds");
         self.balance -= amount;
     }
 }
-
