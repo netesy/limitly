@@ -73,9 +73,9 @@ private:
     std::shared_ptr<AST::Expression> call();
     std::shared_ptr<AST::Expression> primary();
     std::shared_ptr<AST::Expression> finishCall(std::shared_ptr<AST::Expression> callee);
-    
+
     // Type annotation parsing
-    AST::TypeAnnotation parseTypeAnnotation();
+  std::shared_ptr<AST::TypeAnnotation> parseTypeAnnotation();
 };
 
 #endif // PARSER_H

@@ -50,6 +50,7 @@ namespace AST {
     struct MatchStatement;
     struct MatchCase;
     struct TypeAnnotation;
+    struct StructuralTypeField;
     struct TypeDeclaration;
     struct TraitDeclaration;
     struct InterfaceDeclaration;
@@ -77,14 +78,26 @@ namespace AST {
         virtual ~Statement() = default;
     };
 
+    // Type annotation structure - forward declaration
+    struct TypeAnnotation;
+    
+    // Field in a structural type
+    struct StructuralTypeField {
+        std::string name;
+        std::shared_ptr<TypeAnnotation> type;
+    };
+    
     // Type annotation structure
     struct TypeAnnotation {
         std::string typeName;
         bool isOptional = false;
-        std::vector<TypeAnnotation> genericParams;
-        std::vector<TypeAnnotation> functionParams;
-        std::vector<TypeAnnotation> unionTypes;
+        std::vector<std::shared_ptr<TypeAnnotation>> genericParams;
+        std::vector<std::shared_ptr<TypeAnnotation>> functionParams;
+        std::vector<std::shared_ptr<TypeAnnotation>> unionTypes;
         std::shared_ptr<Expression> refinementCondition = nullptr; // For refined types (e.g., int where value > 0)
+        std::vector<StructuralTypeField> structuralFields; // For structural types (e.g., { name: str, age: int })
+        bool isStructural = false; // Whether this is a structural type
+        bool hasRest = false; // Whether this structural type has a rest parameter (...) for row polymorphism
     };
 
     // Program - the root of our AST
@@ -179,16 +192,16 @@ namespace AST {
     // Variable declaration
     struct VarDeclaration : public Statement {
         std::string name;
-        std::optional<TypeAnnotation> type;
+        std::optional<std::shared_ptr<TypeAnnotation>> type;
         std::shared_ptr<Expression> initializer;
     };
 
     // Function declaration
     struct FunctionDeclaration : public Statement {
         std::string name;
-        std::vector<std::pair<std::string, TypeAnnotation>> params;
-        std::vector<std::pair<std::string, std::pair<TypeAnnotation, std::shared_ptr<Expression>>>> optionalParams;
-        std::optional<TypeAnnotation> returnType;
+        std::vector<std::pair<std::string, std::shared_ptr<TypeAnnotation>>> params;
+        std::vector<std::pair<std::string, std::pair<std::shared_ptr<TypeAnnotation>, std::shared_ptr<Expression>>>> optionalParams;
+        std::optional<std::shared_ptr<TypeAnnotation>> returnType;
         std::shared_ptr<BlockStatement> body;
         std::vector<std::string> genericParams;
         bool throws = false;
@@ -296,7 +309,7 @@ namespace AST {
     // Enum declaration
     struct EnumDeclaration : public Statement {
         std::string name;
-        std::vector<std::pair<std::string, std::optional<TypeAnnotation>>> variants;
+        std::vector<std::pair<std::string, std::optional<std::shared_ptr<TypeAnnotation>>>> variants;
     };
 
     // Pattern matching
@@ -313,7 +326,7 @@ namespace AST {
     // Type declaration (type aliases)
     struct TypeDeclaration : public Statement {
         std::string name;
-        TypeAnnotation type;
+        std::shared_ptr<TypeAnnotation> type;
     };
     
     // Trait declaration
