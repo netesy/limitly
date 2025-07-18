@@ -637,7 +637,7 @@ std::shared_ptr<AST::FunctionDeclaration> Parser::function(const std::string& ki
             auto paramType = parseTypeAnnotation();
 
             // Check if parameter is optional
-            if (paramType.isOptional) {
+            if (paramType->isOptional) {
                 // Parse default value if provided
                 std::shared_ptr<AST::Expression> defaultValue = nullptr;
                 if (match({TokenType::EQUAL})) {
@@ -793,7 +793,7 @@ std::shared_ptr<AST::EnumDeclaration> Parser::enumDeclaration() {
         do {
             std::string variantName = consume(TokenType::IDENTIFIER, "Expected variant name.").lexeme;
 
-            std::optional<AST::TypeAnnotation> variantType;
+            std::optional<std::shared_ptr<AST::TypeAnnotation>> variantType;
             if (match({TokenType::LEFT_PAREN})) {
                 variantType = parseTypeAnnotation();
                 consume(TokenType::RIGHT_PAREN, "Expected ')' after variant type.");
@@ -845,7 +845,7 @@ std::shared_ptr<AST::Expression> Parser::expression() {
 std::shared_ptr<AST::Expression> Parser::assignment() {
     auto expr = logicalOr();
 
-    if (match({TokenType::EQUAL, TokenType::PLUS_EQUAL, TokenType::MINUS_EQUAL, 
+    if (match({TokenType::EQUAL, TokenType::PLUS_EQUAL, TokenType::MINUS_EQUAL,
                TokenType::STAR_EQUAL, TokenType::SLASH_EQUAL, TokenType::MODULUS_EQUAL})) {
         auto op = previous();
         auto value = assignment();
@@ -1219,104 +1219,153 @@ std::shared_ptr<AST::Statement> Parser::typeDeclaration() {
 }
 
 // Type annotation parsing
-AST::TypeAnnotation Parser::parseTypeAnnotation() {
-    AST::TypeAnnotation type;
-    
+ std::shared_ptr<AST::TypeAnnotation> Parser::parseTypeAnnotation() {
+    auto type = std::make_shared<AST::TypeAnnotation>();
+
+    // Check for structural types (e.g., { name: str, age: int })
+    if (match({TokenType::LEFT_BRACE})) {
+        type->isStructural = true;
+        type->typeName = "struct";
+
+        // Parse fields until we hit a closing brace
+        while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
+            // Check for rest parameter (...)
+            if (match({TokenType::ELLIPSIS})) {
+                type->hasRest = true;
+                consume(TokenType::RIGHT_BRACE, "Expected '}' after rest parameter.");
+                break;
+            }
+
+            // Parse field name
+            std::string fieldName = consume(TokenType::IDENTIFIER, "Expected field name.").lexeme;
+
+            // Parse field type
+            consume(TokenType::COLON, "Expected ':' after field name.");
+            auto fieldType = parseTypeAnnotation();
+
+            // Add field to structural type
+            type->structuralFields.push_back({fieldName, fieldType});
+
+            // Check for comma or end of struct
+            if (!check(TokenType::RIGHT_BRACE)) {
+                consume(TokenType::COMMA, "Expected ',' after field.");
+            }
+        }
+
+        consume(TokenType::RIGHT_BRACE, "Expected '}' after structural type.");
+        return type;
+    }
+
     // Parse the base type
     if (match({TokenType::INT_TYPE})) {
-        type.typeName = "int";
+        type->typeName = "int";
     } else if (match({TokenType::INT8_TYPE})) {
-        type.typeName = "i8";
+        type->typeName = "i8";
     } else if (match({TokenType::INT16_TYPE})) {
-        type.typeName = "i16";
+        type->typeName = "i16";
     } else if (match({TokenType::INT32_TYPE})) {
-        type.typeName = "i32";
+        type->typeName = "i32";
     } else if (match({TokenType::INT64_TYPE})) {
-        type.typeName = "i64";
+        type->typeName = "i64";
     } else if (match({TokenType::UINT_TYPE})) {
-        type.typeName = "uint";
+        type->typeName = "uint";
     } else if (match({TokenType::UINT8_TYPE})) {
-        type.typeName = "u8";
+        type->typeName = "u8";
     } else if (match({TokenType::UINT16_TYPE})) {
-        type.typeName = "u16";
+        type->typeName = "u16";
     } else if (match({TokenType::UINT32_TYPE})) {
-        type.typeName = "u32";
+        type->typeName = "u32";
     } else if (match({TokenType::UINT64_TYPE})) {
-        type.typeName = "u64";
+        type->typeName = "u64";
     } else if (match({TokenType::FLOAT_TYPE})) {
-        type.typeName = "float";
+        type->typeName = "float";
     } else if (match({TokenType::FLOAT32_TYPE})) {
-        type.typeName = "f32";
+        type->typeName = "f32";
     } else if (match({TokenType::FLOAT64_TYPE})) {
-        type.typeName = "f64";
+        type->typeName = "f64";
     } else if (match({TokenType::STR_TYPE})) {
-        type.typeName = "str";
+        type->typeName = "str";
     } else if (match({TokenType::BOOL_TYPE})) {
-        type.typeName = "bool";
+        type->typeName = "bool";
     } else if (match({TokenType::ANY_TYPE})) {
-        type.typeName = "any";
+        type->typeName = "any";
     } else if (match({TokenType::NIL_TYPE})) {
-        type.typeName = "nil";
+        type->typeName = "nil";
     } else if (match({TokenType::LIST_TYPE})) {
-        type.typeName = "list";
+        type->typeName = "list";
     } else if (match({TokenType::DICT_TYPE})) {
-        type.typeName = "dict";
+        type->typeName = "dict";
     } else if (match({TokenType::ARRAY_TYPE})) {
-        type.typeName = "array";
+        type->typeName = "array";
     } else if (match({TokenType::OPTION_TYPE})) {
-        type.typeName = "option";
+        type->typeName = "option";
     } else if (match({TokenType::RESULT_TYPE})) {
-        type.typeName = "result";
+        type->typeName = "result";
     } else if (match({TokenType::CHANNEL_TYPE})) {
-        type.typeName = "channel";
+        type->typeName = "channel";
     } else if (match({TokenType::ATOMIC_TYPE})) {
-        type.typeName = "atomic";
+        type->typeName = "atomic";
     } else if (match({TokenType::FUNCTION_TYPE})) {
-        type.typeName = "function";
+        type->typeName = "function";
     } else if (match({TokenType::ENUM_TYPE})) {
-        type.typeName = "enum";
+        type->typeName = "enum";
     } else if (match({TokenType::SUM_TYPE})) {
-        type.typeName = "sum";
+        type->typeName = "sum";
     } else if (match({TokenType::UNION_TYPE})) {
-        type.typeName = "union";
+        type->typeName = "union";
     } else {
         // Fall back to identifier for user-defined types
-        type.typeName = consume(TokenType::IDENTIFIER, "Expected type name.").lexeme;
+        type->typeName = consume(TokenType::IDENTIFIER, "Expected type name.").lexeme;
     }
 
     // Check for optional type
     if (match({TokenType::QUESTION})) {
-        type.isOptional = true;
+        type->isOptional = true;
     }
 
     // Check for generic type parameters
     if (match({TokenType::LESS})) {
         do {
-            type.genericParams.push_back(parseTypeAnnotation());
+            type->genericParams.push_back(parseTypeAnnotation());
         } while (match({TokenType::COMMA}));
 
         consume(TokenType::GREATER, "Expected '>' after generic parameters.");
     }
-    
+
     // Check for union types (e.g., int | float)
     if (match({TokenType::PIPE})) {
         // This is a union type
-        AST::TypeAnnotation unionType;
-        unionType.typeName = "union";
-        unionType.unionTypes.push_back(type);
-        
+        auto unionType = std::make_shared<AST::TypeAnnotation>();
+        unionType->typeName = "union";
+        unionType->unionTypes.push_back(type);
+
         // Parse the right side of the union
         do {
-            unionType.unionTypes.push_back(parseTypeAnnotation());
+            unionType->unionTypes.push_back(parseTypeAnnotation());
         } while (match({TokenType::PIPE}));
-        
+
         return unionType;
     }
-    
+
+    // Check for intersection types (e.g., HasName and HasAge)
+    if (match({TokenType::AND})) {
+        // This is an intersection type
+        auto intersectionType = std::make_shared<AST::TypeAnnotation>();
+        intersectionType->typeName = "intersection";
+        intersectionType->unionTypes.push_back(type); // Reuse unionTypes for intersection types
+
+        // Parse the right side of the intersection
+        do {
+            intersectionType->unionTypes.push_back(parseTypeAnnotation());
+        } while (match({TokenType::AND}));
+
+        return intersectionType;
+    }
+
     // Check for refined types (e.g., int where value > 0)
     if (match({TokenType::WHERE})) {
         // This is a refined type with a constraint
-        type.refinementCondition = expression();
+        type->refinementCondition = expression();
     }
 
     return type;
