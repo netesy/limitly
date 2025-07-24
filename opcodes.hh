@@ -23,7 +23,8 @@ enum class Opcode {
     STORE_TEMP,         // Store value in temporary variable
     LOAD_TEMP,          // Load temporary variable onto stack
     CLEAR_TEMP,         // Clear temporary variable
-
+    LOAD_THIS,          // Load 'this' reference onto stack
+   
     // Arithmetic operations
     ADD,                // Add top two values
     SUBTRACT,           // Subtract top value from second value
@@ -118,6 +119,12 @@ enum class Opcode {
 
     // Debug operations
     DEBUG_PRINT,        // Print debug information
+
+    // Memory operations
+    LOAD_CONST,         // Load constant onto stack
+    STORE_CONST,        // Store constant onto stack
+    LOAD_MEMBER,        // Load member onto stack
+    STORE_MEMBER,       // Store member onto stack
 };
 
 // Instruction structure

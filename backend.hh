@@ -47,6 +47,9 @@ private:
     void visitImportStatement(const std::shared_ptr<AST::ImportStatement>& stmt);
     void visitEnumDeclaration(const std::shared_ptr<AST::EnumDeclaration>& stmt);
     void visitMatchStatement(const std::shared_ptr<AST::MatchStatement>& stmt);
+    void visitIterStatement(const std::shared_ptr<AST::IterStatement>& stmt);
+    void visitModuleDeclaration(const std::shared_ptr<AST::ModuleDeclaration>& stmt);
+    void visitContractStatement(const std::shared_ptr<AST::ContractStatement>& stmt);
     
     // Expression visitors
     void visitBinaryExpr(const std::shared_ptr<AST::BinaryExpr>& expr);
