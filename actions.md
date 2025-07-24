@@ -115,6 +115,22 @@ This document tracks the specific actions taken during the development of the Li
 - Updated backend/backend.cpp to handle the new AST structures
 - Updated backend.hh to include new visitor methods
 
+## Action 7: Enhanced ASTPrinter and Test Parser
+
+**Changes Made**:
+- Fixed type conversion issues in the ASTPrinter's RangeExpr handling
+- Enhanced ASTPrinter to properly handle all AST node types
+- Updated test_parser to save AST output to files for better debugging
+- Added file output with .ast.txt extension for AST visualization
+- Improved console output formatting for better readability
+- Added error handling for file operations
+
+**Files Modified/Created**:
+- Updated backend/ast_printer.cpp with improved type handling
+- Enhanced test_parser.cpp with file output functionality
+- Updated build.bat to include ast_printer.cpp in the build
+- Added documentation in activities.md
+
 ## Next Steps (Based on activities.md)
 
 ### Backend Development
@@ -184,3 +200,22 @@ The build system uses Zig's build system to:
 - Register allocation
 - Inlining
 - Tail call optimization
+
+## Action 8: Integrated VM Execution in REPL
+
+**Changes Made**:
+- Updated main.cpp to integrate VM execution for both file execution and REPL mode
+- Added proper error handling for VM execution
+- Enhanced REPL output to show execution results with "=>" prefix
+- Added necessary includes and memory management for VM integration
+
+**Files Modified**:
+- main.cpp: Updated to use VM for code execution
+- Added VM integration in both executeFile and startRepl functions
+- Added proper error handling and result display
+
+**Impact**:
+- The REPL now executes code using the VM
+- Users can see the results of their expressions directly in the REPL
+- Error handling provides meaningful feedback for runtime errors
+- The execution environment is properly initialized for each REPL input

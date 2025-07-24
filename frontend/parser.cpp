@@ -1,6 +1,5 @@
 #include "parser.hh"
 #include "../debugger.hh"
-#include <iostream>
 #include <stdexcept>
 
 // Helper methods
@@ -66,8 +65,57 @@ void Parser::synchronize() {
     }
 }
 
-void Parser::error(const std::string &message) {
-    Debugger::error(message, peek().line, 0, InterpretationStage::PARSING);
+void Parser::error(const std::string &message, bool suppressException) {
+    // Get the current token's lexeme for better error reporting
+    std::string lexeme = "";
+    int line = 0;
+    int column = 0;
+    std::string codeContext = "";
+    
+    if (current < scanner.tokens.size()) {
+        Token currentToken = peek();
+        lexeme = currentToken.lexeme;
+        line = currentToken.line;
+        column = currentToken.start;
+        // Extract code context (source line)
+        if (line > 0) {
+            const std::string& src = scanner.getSource();
+            size_t srcLen = src.length();
+            size_t lineStart = 0, lineEnd = srcLen;
+            int curLine = 1;
+            for (size_t i = 0; i < srcLen; ++i) {
+                if (curLine == line) {
+                    lineStart = i;
+                    while (lineStart > 0 && src[lineStart - 1] != '\n') --lineStart;
+                    lineEnd = i;
+                    while (lineEnd < srcLen && src[lineEnd] != '\n') ++lineEnd;
+                    codeContext = src.substr(lineStart, lineEnd - lineStart);
+                    break;
+                }
+                if (src[i] == '\n') ++curLine;
+            }
+        }
+    }
+    
+    // Check if this is an "Expected expression" error in a trait method
+    if (message == "Expected expression." && 
+        (current > 0 && current < scanner.tokens.size() && 
+         scanner.tokens[current-1].type == TokenType::LEFT_BRACE && 
+         scanner.tokens[current].type == TokenType::RIGHT_BRACE)) {
+        // Let the debugger handle this common case
+        Debugger::error(message, line, column, InterpretationStage::PARSING, "", lexeme, codeContext);
+        return;
+    }
+    
+    Debugger::error(message, line, column, InterpretationStage::PARSING, "", lexeme, codeContext);
+
+    // Collect error for multi-error reporting
+    errors.push_back(ParseError{message, line, column, codeContext});
+    if (errors.size() >= MAX_ERRORS) {
+        throw std::runtime_error("Too many syntax errors; aborting parse.");
+    }
+
+    // Do not throw for normal errors; let parser continue and synchronize.
 }
 
 // Main parse method
@@ -87,46 +135,89 @@ std::shared_ptr<AST::Program> Parser::parse() {
         synchronize();
     }
 
+    // After parsing, print all collected errors if any
+    if (!errors.empty()) {
+        std::cerr << "\n--- Syntax Errors ---\n";
+        for (const auto& err : errors) {
+            std::cerr << "[Line " << err.line << ", Col " << err.column << "]: " << err.message << "\n";
+            if (!err.codeContext.empty()) {
+                std::cerr << "    " << err.codeContext << "\n";
+            }
+        }
+        std::cerr << "---------------------\n";
+    }
     return program;
 }
 
 // Parse declarations
+// Helper to collect leading annotations
+std::vector<Token> Parser::collectAnnotations() {
+    std::vector<Token> annotations;
+    while (check(TokenType::PUBLIC) || check(TokenType::PRIVATE) || check(TokenType::PROTECTED)) {
+        annotations.push_back(advance());
+    }
+    return annotations;
+}
+
 std::shared_ptr<AST::Statement> Parser::declaration() {
     try {
+        // Collect leading annotations
+        std::vector<Token> annotations = collectAnnotations();
         if (match({TokenType::CLASS})) {
-            return classDeclaration();
+            auto decl = classDeclaration();
+            if (decl) decl->annotations = annotations;
+            return decl;
         }
         if (match({TokenType::FN})) {
-            return function("function");
+            auto decl = function("function");
+            if (decl) decl->annotations = annotations;
+            return decl;
         }
         if (match({TokenType::ASYNC})) {
             consume(TokenType::FN, "Expected 'fn' after 'async'.");
             auto asyncFn = std::make_shared<AST::AsyncFunctionDeclaration>(*function("async function"));
+            asyncFn->annotations = annotations;
             return asyncFn;
         }
         if (match({TokenType::VAR})) {
-            return varDeclaration();
+            auto decl = varDeclaration();
+            if (decl) decl->annotations = annotations;
+            return decl;
         }
         if (match({TokenType::ENUM})) {
-            return enumDeclaration();
+            auto decl = enumDeclaration();
+            if (decl) decl->annotations = annotations;
+            return decl;
         }
         if (match({TokenType::IMPORT})) {
-            return importStatement();
+            auto decl = importStatement();
+            if (decl) decl->annotations = annotations;
+            return decl;
         }
         if (match({TokenType::TYPE})) {
-            return typeDeclaration();
+            auto decl = typeDeclaration();
+            if (decl) decl->annotations = annotations;
+            return decl;
         }
         if (match({TokenType::TRAIT})) {
-            return traitDeclaration();
+            auto decl = traitDeclaration();
+            if (decl) decl->annotations = annotations;
+            return decl;
         }
         if (match({TokenType::INTERFACE})) {
-            return interfaceDeclaration();
+            auto decl = interfaceDeclaration();
+            if (decl) decl->annotations = annotations;
+            return decl;
         }
         if (match({TokenType::MODULE})) {
-            return moduleDeclaration();
+            auto decl = moduleDeclaration();
+            if (decl) decl->annotations = annotations;
+            return decl;
         }
 
-        return statement();
+        auto stmt = statement();
+        if (stmt) stmt->annotations = annotations;
+        return stmt;
     } catch (const std::exception &e) {
         synchronize();
         return nullptr;
@@ -152,7 +243,8 @@ std::shared_ptr<AST::Statement> Parser::varDeclaration() {
         var->initializer = expression();
     }
 
-    consume(TokenType::SEMICOLON, "Expected ';' after variable declaration.");
+    // Make semicolon optional
+    match({TokenType::SEMICOLON});
     return var;
 }
 
@@ -201,13 +293,22 @@ std::shared_ptr<AST::Statement> Parser::statement() {
 }
 
 std::shared_ptr<AST::Statement> Parser::expressionStatement() {
-    auto expr = expression();
-    consume(TokenType::SEMICOLON, "Expected ';' after expression.");
+    try {
+        auto expr = expression();
+        // Make semicolon optional
+        match({TokenType::SEMICOLON});
 
-    auto stmt = std::make_shared<AST::ExprStatement>();
-    stmt->line = expr->line;
-    stmt->expression = expr;
-    return stmt;
+        auto stmt = std::make_shared<AST::ExprStatement>();
+        stmt->line = expr->line;
+        stmt->expression = expr;
+        return stmt;
+    } catch (const std::exception &e) {
+        // If we can't parse an expression, return an empty statement
+        auto stmt = std::make_shared<AST::ExprStatement>();
+        stmt->line = peek().line;
+        stmt->expression = nullptr;
+        return stmt;
+    }
 }
 
 std::shared_ptr<AST::Statement> Parser::printStatement() {
@@ -224,11 +325,8 @@ std::shared_ptr<AST::Statement> Parser::printStatement() {
     }
 
     consume(TokenType::RIGHT_PAREN, "Expected ')' after print arguments.");
-    if (!isAtEnd() && (peek().type == TokenType::RIGHT_PAREN || previous().type == TokenType::RIGHT_PAREN)) {
-        // Skip semicolon check if we're already at the end of a function call
-    } else {
-        consume(TokenType::SEMICOLON, "Expected ';' after print arguments.");
-    }
+    // Make semicolon optional
+    match({TokenType::SEMICOLON});
     return stmt;
 }
 
@@ -238,11 +336,8 @@ std::shared_ptr<AST::Statement> Parser::traitDeclaration() {
     traitDecl->line = previous().line;
 
     // Check for @open annotation
-    if (match({TokenType::AT_SIGN})) {
-        Token annotation = consume(TokenType::IDENTIFIER, "Expected annotation name after '@'.");
-        if (annotation.lexeme == "open") {
-            traitDecl->isOpen = true;
-        }
+    if (match({TokenType::OPEN})) {
+        traitDecl->isOpen = true;
     }
 
     // Parse trait name
@@ -255,11 +350,56 @@ std::shared_ptr<AST::Statement> Parser::traitDeclaration() {
     // Parse trait methods
     while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
         if (match({TokenType::FN})) {
-            auto method = function("method");
+            // For traits, we need to handle method declarations that might not have bodies
+            auto method = std::make_shared<AST::FunctionDeclaration>();
+            method->line = previous().line;
+            
+            // Parse function name
+            Token name = consume(TokenType::IDENTIFIER, "Expected method name.");
+            method->name = name.lexeme;
+            
+            consume(TokenType::LEFT_PAREN, "Expected '(' after method name.");
+            
+            // Parse parameters
+            if (!check(TokenType::RIGHT_PAREN)) {
+                do {
+                    auto paramName = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
+                    
+                    // Parse parameter type
+                    consume(TokenType::COLON, "Expected ':' after parameter name.");
+                    auto paramType = parseTypeAnnotation();
+                    
+                    method->params.push_back({paramName, paramType});
+                } while (match({TokenType::COMMA}));
+            }
+            
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after parameters.");
+            
+            // Parse return type
+            if (match({TokenType::COLON})) {
+                method->returnType = parseTypeAnnotation();
+            }
+            
+            // Check if there's a semicolon (no body) or a brace (with body)
+            if (match({TokenType::SEMICOLON})) {
+                // Method declaration without body (interface/trait style)
+                method->body = std::make_shared<AST::BlockStatement>();
+                method->body->line = method->line;
+            } else {
+                // Method with body
+                consume(TokenType::LEFT_BRACE, "Expected '{' or ';' after method declaration.");
+                method->body = block();
+            }
+            
             traitDecl->methods.push_back(method);
         } else {
             error("Expected method declaration in trait.");
-            break;
+            // Create a placeholder expression to allow parsing to continue
+            auto errorExpr = std::make_shared<AST::LiteralExpr>();
+            errorExpr->line = peek().line;
+            errorExpr->value = nullptr; // Use null as a placeholder
+            // return errorExpr;
+           break;
         }
     }
 
@@ -464,10 +604,22 @@ std::shared_ptr<AST::BlockStatement> Parser::block() {
     auto block = std::make_shared<AST::BlockStatement>();
     block->line = previous().line;
 
+    // Handle empty blocks
+    if (check(TokenType::RIGHT_BRACE)) {
+        consume(TokenType::RIGHT_BRACE, "Expected '}' after block.");
+        return block;
+    }
+
     while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
-        auto declaration = this->declaration();
-        if (declaration) {
-            block->statements.push_back(declaration);
+        try {
+            // Try to parse a declaration
+            auto declaration = this->declaration();
+            if (declaration) {
+                block->statements.push_back(declaration);
+            }
+        } catch (const std::exception &e) {
+            // Skip invalid statements and continue parsing
+            synchronize();
         }
     }
 
@@ -674,11 +826,12 @@ std::shared_ptr<AST::Statement> Parser::returnStatement() {
     auto stmt = std::make_shared<AST::ReturnStatement>();
     stmt->line = previous().line;
 
-    if (!check(TokenType::SEMICOLON)) {
+    if (!check(TokenType::SEMICOLON) && !check(TokenType::RIGHT_BRACE)) {
         stmt->value = expression();
     }
 
-    consume(TokenType::SEMICOLON, "Expected ';' after return value.");
+    // Make semicolon optional
+    match({TokenType::SEMICOLON});
 
     return stmt;
 }
@@ -707,6 +860,35 @@ std::shared_ptr<AST::ClassDeclaration> Parser::classDeclaration() {
             if (method) {
                 classDecl->methods.push_back(method);
             }
+        } else if (check(TokenType::IDENTIFIER) && peek().lexeme == classDecl->name) {
+            // Parse constructor
+            advance(); // Consume the class name
+            auto constructor = std::make_shared<AST::FunctionDeclaration>();
+            constructor->line = previous().line;
+            constructor->name = classDecl->name;
+            
+            consume(TokenType::LEFT_PAREN, "Expected '(' after constructor name.");
+            
+            // Parse parameters
+            if (!check(TokenType::RIGHT_PAREN)) {
+                do {
+                    auto paramName = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
+                    
+                    // Parse parameter type
+                    consume(TokenType::COLON, "Expected ':' after parameter name.");
+                    auto paramType = parseTypeAnnotation();
+                    
+                    constructor->params.push_back({paramName, paramType});
+                } while (match({TokenType::COMMA}));
+            }
+            
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after parameters.");
+            
+            // Parse constructor body
+            consume(TokenType::LEFT_BRACE, "Expected '{' before constructor body.");
+            constructor->body = block();
+            
+            classDecl->methods.push_back(constructor);
         } else {
             error("Expected class member declaration.");
             break;
@@ -804,10 +986,10 @@ std::shared_ptr<AST::EnumDeclaration> Parser::enumDeclaration() {
     }
 
     consume(TokenType::RIGHT_BRACE, "Expected '}' after enum body.");
-
     return enumDecl;
 }
 
+// Parse match statement: match(value) { pattern => expr, ... }
 std::shared_ptr<AST::Statement> Parser::matchStatement() {
     auto stmt = std::make_shared<AST::MatchStatement>();
     stmt->line = previous().line;
@@ -818,17 +1000,20 @@ std::shared_ptr<AST::Statement> Parser::matchStatement() {
 
     consume(TokenType::LEFT_BRACE, "Expected '{' before match cases.");
 
-    // Parse match cases
+    // Parse match cases: pattern => expr, ...
     while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
         AST::MatchCase matchCase;
-
         // Parse pattern
         matchCase.pattern = expression();
-        consume(TokenType::COLON, "Expected ':' after match pattern.");
-
-        // Parse case body
-        matchCase.body = statement();
-
+        consume(TokenType::ARROW, "Expected '=>' after match pattern.");
+        // Parse body as a single expression (not statement)
+        matchCase.body = std::make_shared<AST::ExprStatement>();
+        std::static_pointer_cast<AST::ExprStatement>(matchCase.body)->expression = expression();
+        // Optional comma between cases
+        if (match({TokenType::COMMA})) {
+            // Allow trailing comma before '}'
+            if (check(TokenType::RIGHT_BRACE)) break;
+        }
         stmt->cases.push_back(matchCase);
     }
 
@@ -854,6 +1039,22 @@ std::shared_ptr<AST::Expression> Parser::assignment() {
             auto assignExpr = std::make_shared<AST::AssignExpr>();
             assignExpr->line = op.line;
             assignExpr->name = varExpr->name;
+            assignExpr->op = op.type;
+            assignExpr->value = value;
+            return assignExpr;
+        } else if (auto memberExpr = std::dynamic_pointer_cast<AST::MemberExpr>(expr)) {
+            auto assignExpr = std::make_shared<AST::AssignExpr>();
+            assignExpr->line = op.line;
+            assignExpr->object = memberExpr->object;
+            assignExpr->member = memberExpr->name;
+            assignExpr->op = op.type;
+            assignExpr->value = value;
+            return assignExpr;
+        } else if (auto indexExpr = std::dynamic_pointer_cast<AST::IndexExpr>(expr)) {
+            auto assignExpr = std::make_shared<AST::AssignExpr>();
+            assignExpr->line = op.line;
+            assignExpr->object = indexExpr->object;
+            assignExpr->index = indexExpr->index;
             assignExpr->op = op.type;
             assignExpr->value = value;
             return assignExpr;
@@ -972,7 +1173,7 @@ std::shared_ptr<AST::Expression> Parser::term() {
 }
 
 std::shared_ptr<AST::Expression> Parser::factor() {
-    auto expr = unary();
+    auto expr = power();
 
     while (match({TokenType::SLASH, TokenType::STAR, TokenType::MODULUS})) {
         auto op = previous();
@@ -987,6 +1188,21 @@ std::shared_ptr<AST::Expression> Parser::factor() {
         expr = binaryExpr;
     }
 
+    return expr;
+}
+
+std::shared_ptr<AST::Expression> Parser::power() {
+    auto expr = unary();
+    while (match({TokenType::POWER})) { // Assuming POWER is '**'
+        auto op = previous();
+        auto right = power(); // Right-associative!
+        auto binaryExpr = std::make_shared<AST::BinaryExpr>();
+        binaryExpr->line = op.line;
+        binaryExpr->left = expr;
+        binaryExpr->op = op.type;
+        binaryExpr->right = right;
+        expr = binaryExpr;
+    }
     return expr;
 }
 
@@ -1129,10 +1345,18 @@ std::shared_ptr<AST::Expression> Parser::primary() {
     }
 
     if (match({TokenType::IDENTIFIER})) {
-        auto varExpr = std::make_shared<AST::VariableExpr>();
-        varExpr->line = previous().line;
-        varExpr->name = previous().lexeme;
-        return varExpr;
+        auto token = previous();
+        // Check if this is 'self' keyword
+        if (token.lexeme == "self") {
+            auto thisExpr = std::make_shared<AST::ThisExpr>();
+            thisExpr->line = token.line;
+            return thisExpr;
+        } else {
+            auto varExpr = std::make_shared<AST::VariableExpr>();
+            varExpr->line = token.line;
+            varExpr->name = token.lexeme;
+            return varExpr;
+        }
     }
 
     if (match({TokenType::LEFT_PAREN})) {
@@ -1188,8 +1412,29 @@ std::shared_ptr<AST::Expression> Parser::primary() {
         return dictExpr;
     }
 
-    error("Expected expression.");
-    throw std::runtime_error("Expected expression.");
+    // Check if we're in a trait method or other context where an empty expression might be valid
+    if (current > 0 && current < scanner.tokens.size() && 
+        scanner.tokens[current-1].type == TokenType::LEFT_BRACE && 
+        scanner.tokens[current].type == TokenType::RIGHT_BRACE) {
+        // This is likely an empty block, so we'll create a placeholder expression
+        auto placeholderExpr = std::make_shared<AST::LiteralExpr>();
+        placeholderExpr->line = peek().line;
+        placeholderExpr->value = nullptr; // Use null as a placeholder
+        return placeholderExpr;
+    } else if (match({TokenType::SELF})) {
+        // Handle 'self' as a special case
+        auto thisExpr = std::make_shared<AST::ThisExpr>();
+        thisExpr->line = previous().line;
+        return thisExpr;
+    } else {
+        // Only report error if we're not at the end of input or at a statement terminator
+        if (!isAtEnd() && !check(TokenType::SEMICOLON) && !check(TokenType::RIGHT_BRACE) && 
+            !check(TokenType::RIGHT_PAREN) && !check(TokenType::RIGHT_BRACKET)) {
+            error("Expected expression.", false);
+            advance(); // Move past the error token to avoid infinite loop
+        }
+        return makeErrorExpr();
+    }
 }
 
 std::shared_ptr<AST::Statement> Parser::typeDeclaration() {
@@ -1228,112 +1473,83 @@ std::shared_ptr<AST::Statement> Parser::typeDeclaration() {
         consume(TokenType::RIGHT_BRACKET, "Expected ']' after list element type.");
         typeDecl->type = listType;
     }
-    // For dictionary literals like {any: any}, {str: str}, {int: User}
+    // For dictionary literals like {any: any}, {str: str}, {int: User} or structural types like {name: str, age: int}
     else if (match({TokenType::LEFT_BRACE})) {
-        // Check if this is a structural type or a dictionary type
+        // We need to determine if this is a dictionary type or a structural type
+        // Dictionary types have the pattern: {KeyType: ValueType} (single key-value pair)
+        // Structural types have the pattern: {field: Type, field: Type, ...} (field names)
+        
+        // Look ahead to determine the type
+        size_t savedCurrent = current;
+        bool isDictionary = false;
+        
+        // Check if the first token is a type (for dictionary) or identifier (for field name)
         if (check(TokenType::IDENTIFIER) || isPrimitiveType(peek().type)) {
-            Token keyToken = peek();
-            
-            // Look ahead to see if there's a colon after the identifier
-            advance(); // Consume the key type token
+            Token firstToken = peek();
+            advance(); // Consume the first token
             
             if (match({TokenType::COLON})) {
-                // This is a dictionary type (e.g., {str: int})
-                auto dictType = std::make_shared<AST::TypeAnnotation>();
-                dictType->typeName = "dict";
-                dictType->isDict = true;
-                
-                // Create the key type
-                auto keyType = std::make_shared<AST::TypeAnnotation>();
-                if (isPrimitiveType(keyToken.type)) {
-                    keyType->typeName = tokenTypeToString(keyToken.type);
-                    keyType->isPrimitive = true;
-                } else if (keyToken.lexeme == "any") {
-                    keyType->typeName = "any";
-                    keyType->isPrimitive = true;
-                } else if (keyToken.lexeme == "int") {
-                    keyType->typeName = "int";
-                    keyType->isPrimitive = true;
-                } else if (keyToken.lexeme == "str") {
-                    keyType->typeName = "str";
-                    keyType->isPrimitive = true;
-                } else {
-                    keyType->typeName = keyToken.lexeme;
-                    keyType->isUserDefined = true;
-                }
-                
-                // Parse the value type
-                auto valueType = parseTypeAnnotation();
-                
-                // Set the key and value types
-                dictType->keyType = keyType;
-                dictType->valueType = valueType;
-                
-                consume(TokenType::RIGHT_BRACE, "Expected '}' after dictionary type.");
-                typeDecl->type = dictType;
-            } else {
-                // This is a structural type with a field that has the same name as a type
-                // Rewind the token stream
-                current--;
-                
-                // Parse as a structural type
-                auto structType = std::make_shared<AST::TypeAnnotation>();
-                structType->typeName = "struct";
-                structType->isStructural = true;
-                
-                // Parse fields until we hit a closing brace
-                while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
-                    // Check for rest parameter (...) or extensible record (...baseRecord)
-                    if (match({TokenType::ELLIPSIS})) {
-                        structType->hasRest = true;
-                        
-                        // Check if there's a base record identifier after ...
-                        if (check(TokenType::IDENTIFIER)) {
-                            // This is an extensible record with a base record
-                            std::string baseRecordName = consume(TokenType::IDENTIFIER, "Expected base record name after '...'.").lexeme;
-                            
-                            // Store the base record name
-                            if (structType->baseRecord.empty()) {
-                                structType->baseRecord = baseRecordName;
-                            }
-                            
-                            // Also add to the list of base records for multiple inheritance
-                            structType->baseRecords.push_back(baseRecordName);
-                        }
-                        
-                        // Check for comma to continue with more fields
-                        if (check(TokenType::COMMA)) {
-                            consume(TokenType::COMMA, "Expected ',' after rest parameter.");
-                            continue;
-                        } else if (check(TokenType::RIGHT_BRACE)) {
-                            // End of record definition
-                            break;
-                        } else {
-                            error("Expected ',' or '}' after rest parameter.");
-                        }
+                // We have a colon, now check what comes after
+                if (check(TokenType::IDENTIFIER) || isPrimitiveType(peek().type)) {
+                    Token secondToken = peek();
+                    advance(); // Consume the second token
+                    
+                    // If we immediately hit a closing brace, it's a dictionary type
+                    if (check(TokenType::RIGHT_BRACE)) {
+                        isDictionary = true;
                     }
-                    
-                    // Parse field name
-                    std::string fieldName = consume(TokenType::IDENTIFIER, "Expected field name.").lexeme;
-                    
-                    // Parse field type
-                    consume(TokenType::COLON, "Expected ':' after field name.");
-                    auto fieldType = parseTypeAnnotation();
-                    
-                    // Add field to structural type
-                    structType->structuralFields.push_back({fieldName, fieldType});
-                    
-                    // Check for comma or end of struct
-                    if (!check(TokenType::RIGHT_BRACE)) {
-                        consume(TokenType::COMMA, "Expected ',' after field.");
+                    // If the first token is a primitive type and second is also a type, it's likely a dictionary
+                    else if (isPrimitiveType(firstToken.type) && (isPrimitiveType(secondToken.type) || 
+                             secondToken.lexeme == "any" || secondToken.lexeme == "str" || 
+                             secondToken.lexeme == "int" || secondToken.lexeme == "float")) {
+                        isDictionary = true;
                     }
                 }
-                
-                consume(TokenType::RIGHT_BRACE, "Expected '}' after structural type.");
-                typeDecl->type = structType;
             }
+        }
+        
+        // Reset the parser position
+        current = savedCurrent;
+        
+        if (isDictionary) {
+            // Parse as dictionary type
+            auto dictType = std::make_shared<AST::TypeAnnotation>();
+            dictType->typeName = "dict";
+            dictType->isDict = true;
+            
+            // Parse key type
+            Token keyToken = advance();
+            auto keyType = std::make_shared<AST::TypeAnnotation>();
+            if (isPrimitiveType(keyToken.type)) {
+                keyType->typeName = tokenTypeToString(keyToken.type);
+                keyType->isPrimitive = true;
+            } else if (keyToken.lexeme == "any") {
+                keyType->typeName = "any";
+                keyType->isPrimitive = true;
+            } else if (keyToken.lexeme == "int") {
+                keyType->typeName = "int";
+                keyType->isPrimitive = true;
+            } else if (keyToken.lexeme == "str") {
+                keyType->typeName = "str";
+                keyType->isPrimitive = true;
+            } else {
+                keyType->typeName = keyToken.lexeme;
+                keyType->isUserDefined = true;
+            }
+            
+            consume(TokenType::COLON, "Expected ':' in dictionary type.");
+            
+            // Parse value type
+            auto valueType = parseTypeAnnotation();
+            
+            // Set the key and value types
+            dictType->keyType = keyType;
+            dictType->valueType = valueType;
+            
+            consume(TokenType::RIGHT_BRACE, "Expected '}' after dictionary type.");
+            typeDecl->type = dictType;
         } else {
-            // This is a structural type
+            // Parse as structural type
             auto structType = std::make_shared<AST::TypeAnnotation>();
             structType->typeName = "struct";
             structType->isStructural = true;
@@ -1382,7 +1598,7 @@ std::shared_ptr<AST::Statement> Parser::typeDeclaration() {
                 
                 // Check for comma or end of struct
                 if (!check(TokenType::RIGHT_BRACE)) {
-                    consume(TokenType::COMMA, "Expected ',' after field.");
+                    match({TokenType::COMMA}); // Optional comma
                 }
             }
             
@@ -1483,55 +1699,8 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseTypeAnnotation() {
     if (match({TokenType::LEFT_BRACE})) {
         // This could be either a structural type or a dictionary type
         
-        // Check if this is a dictionary type (e.g., {str: int})
-        if (check(TokenType::IDENTIFIER) || isPrimitiveType(peek().type)) {
-            Token keyToken = peek();
-            
-            // Look ahead to see if there's a colon after the identifier
-            advance(); // Consume the key type token
-            
-            if (match({TokenType::COLON})) {
-                // This is a dictionary type (e.g., {str: int})
-                type->isDict = true;
-                type->typeName = "dict";
-                
-                // Create the key type
-                auto keyType = std::make_shared<AST::TypeAnnotation>();
-                if (isPrimitiveType(keyToken.type)) {
-                    keyType->typeName = tokenTypeToString(keyToken.type);
-                    keyType->isPrimitive = true;
-                } else if (keyToken.lexeme == "any") {
-                    keyType->typeName = "any";
-                    keyType->isPrimitive = true;
-                } else if (keyToken.lexeme == "int") {
-                    keyType->typeName = "int";
-                    keyType->isPrimitive = true;
-                } else if (keyToken.lexeme == "str") {
-                    keyType->typeName = "str";
-                    keyType->isPrimitive = true;
-                } else if (keyToken.lexeme == "string") {
-                    keyType->typeName = "string";
-                    keyType->isUserDefined = true;
-                } else {
-                    keyType->typeName = keyToken.lexeme;
-                    keyType->isUserDefined = true;
-                }
-                
-                // Parse the value type
-                auto valueType = parseTypeAnnotation();
-                
-                // Set the key and value types
-                type->keyType = keyType;
-                type->valueType = valueType;
-                
-                consume(TokenType::RIGHT_BRACE, "Expected '}' after dictionary type.");
-                return type;
-            } else {
-                // This is a structural type with a field that has the same name as a type
-                // Rewind the token stream
-                current--;
-            }
-        }
+        // For now, treat all { ... } in type declarations as structural types
+        // Dictionary types should be explicitly declared with dict<K, V> syntax
         
         // If we get here, it's a structural type
         type->isStructural = true;
@@ -1570,7 +1739,22 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseTypeAnnotation() {
             }
 
             // Parse field name
-            std::string fieldName = consume(TokenType::IDENTIFIER, "Expected field name.").lexeme;
+            std::string fieldName;
+            if (check(TokenType::IDENTIFIER)) {
+                fieldName = consume(TokenType::IDENTIFIER, "Expected field name.").lexeme;
+            } else if (check(TokenType::STRING)) {
+                // Handle string literals as field names (e.g., { "kind": "Some" })
+                Token stringToken = consume(TokenType::STRING, "Expected field name.");
+                fieldName = stringToken.lexeme;
+                // Remove quotes if present
+                if (fieldName.size() >= 2 && (fieldName[0] == '"' || fieldName[0] == '\'') && 
+                    (fieldName[fieldName.size()-1] == '"' || fieldName[fieldName.size()-1] == '\'')) {
+                    fieldName = fieldName.substr(1, fieldName.size() - 2);
+                }
+            } else {
+                error("Expected field name.");
+                break;
+            }
 
             // Parse field type
             consume(TokenType::COLON, "Expected ':' after field name.");
@@ -1581,7 +1765,7 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseTypeAnnotation() {
 
             // Check for comma or end of struct
             if (!check(TokenType::RIGHT_BRACE)) {
-                consume(TokenType::COMMA, "Expected ',' after field.");
+                match({TokenType::COMMA}); // Optional comma
             }
         }
 

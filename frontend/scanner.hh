@@ -166,6 +166,7 @@ public:
     int getLine() const { return line; }
     int getCurrent() const { return current; }
     std::string getLexeme() const { return source.substr(start, current - start); }
+    const std::string& getSource() const { return source; }
     size_t current;
     int line;
 

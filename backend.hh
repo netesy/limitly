@@ -71,16 +71,6 @@ private:
               const std::string& stringValue = "");
 };
 
-// AST Printer backend - for debugging and visualization
-class ASTPrinter : public Backend {
-public:
-    ASTPrinter() = default;
-    
-    void process(const std::shared_ptr<AST::Program>& program) override;
-    
-private:
-    void printNode(const std::shared_ptr<AST::Node>& node, int indent = 0);
-    std::string getIndentation(int indent) const;
-};
+// AST Printer has been moved to ast_printer.hh
 
 #endif // BACKEND_H

@@ -41,10 +41,12 @@ The project is organized into frontend and backend components:
 - [x] Support asynchronous programming with async/await
 - [x] Support enums and pattern matching
 
-### Phase 2: Backend Development 🔄
+### Phase 2: Backend Development 
 - [x] Design the bytecode instruction set
 - [x] Implement the bytecode generator
 - [x] Implement AST visitor pattern for traversing the AST
+- [x] Enhance ASTPrinter for better debugging and visualization
+- [x] Update test_parser to save AST output to files for analysis
 - [x] Generate bytecode for variable declarations and assignments
 - [x] Generate bytecode for function declarations and calls
 - [x] Generate bytecode for control flow statements
@@ -71,10 +73,10 @@ The project is organized into frontend and backend components:
 - [ ] Modules and imports
 - [ ] Standard library
 
-### Phase 4: Tooling and Documentation 🔄
+### Phase 4: Tooling and Documentation 
 - [x] Implement AST visualization for debugging
-- [x] Implement memory management
-- [ ] Implement a REPL (Read-Eval-Print Loop)
+- [x] Integrate the VM with the main execution pipeline
+- [x] Create a REPL (Read-Eval-Print Loop) with VM execution
 - [ ] Create language documentation
 - [ ] Create a standard library
 - [ ] Implement a package manager
@@ -92,6 +94,7 @@ The project is organized into frontend and backend components:
 - Implementing function calls and returns in the VM
 - Implementing object-oriented features in the VM
 - Implementing concurrency primitives in the VM
+- Enhancing the REPL with better error reporting and debugging features
 
 ## Future Work
 - Implement a JIT compiler for improved performance

@@ -25,19 +25,23 @@ type Name = str;
 type Age = uint;
 
 // === Option Type ===
-//type Some = { kind: "Some", value: any };
-//type None = nil;  
+type SomeKind = str;
+type SomeValue = any;
+type Some = { kind: SomeKind, value: SomeValue };
+type epty = nil;  
 
-//type Option = Some | None;
-type options = { kind: "Some", value: any } | nil;
+type Option = Some | epty;
 
 // Example usage:
 // var maybeName: Option = { kind: "Some", value: "Alice" };
 // var noValue: Option = nil;
 
 // === Result Type ===
-type Success = { kind: "Success", value: any };
-type Error = { kind: "Error", message: any };
+type ResultKind = str;
+type ResultValue = any;
+type ResultMessage = any;
+type Success = { kind: ResultKind, value: ResultValue };
+type Error = { kind: ResultKind, message: ResultMessage };
 
 type Result = Success | Error;
 
@@ -64,14 +68,23 @@ type EmailString = str where matches(value, "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.
 type Percentage = float where value >= 0.0 and value <= 100.0;
 
 // === Structural Types ===
-type HasName = { name: str };
-type HasAge = { age: uint };
+type NameType = str;
+type AgeType = uint;
+type HasName = { name: NameType };
+type HasAge = { age: AgeType };
 type Person = HasName and HasAge;
 
 // === Extensible Structural Types ===
-type Address = { street: str, city: str, zipcode: str };
-type ContactInfo = { email: str, phone: str };
-type Employee = { ...Person, ...Address, ...ContactInfo, employeeId: uint, department: str };
+type StreetType = str;
+type CityType = str;
+type ZipType = str;
+type EmailType = str;
+type PhoneType = str;
+type EmployeeIdType = uint;
+type DepartmentType = str;
+type Address = { street: StreetType, city: CityType, zipcode: ZipType };
+type ContactInfo = { email: EmailType, phone: PhoneType };
+type Employee = { ...Person, ...Address, ...ContactInfo, employeeId: EmployeeIdType, department: DepartmentType };
 type Manager = { ...Employee, managedTeam: [Employee] };
 type ExtendedRecord = { ...BaseRecord, newField: int };
 type MultipleBaseRecord = { ...Base1, ...Base2, additionalField: bool };
@@ -105,7 +118,9 @@ iter (fruit in fruits) {
 }
 
 // Dictionary-based loop with defined key/value type
-type DictOfStrToInt = { string: int };
+type KeyType = str;
+type ValueType = int;
+type DictOfStrToInt = {KeyType: ValueType};
 var my_dict: DictOfStrToInt = { "a": 1, "b": 2, "c": 3 };
 iter (key, value in my_dict) {
     print("{key}: {value}");
@@ -127,43 +142,30 @@ while (count < 3) {
 
 // === Traits (Interfaces) ===
 
-@open
-trait Hashable {
-    fn hash(): uint;
-    fn equals(other: Self): isTrue;
-}
-
-@open
-trait Display {
-    fn to_string(): string;
-}
-
-@open
-trait Clone {
-    fn clone(): Self;
-}
 
 // === I/O Operations ===
 
 /// Writes string content to a file.
-fn write_to_file(filename: string, content: string): None {
-    var file = open(filename, "write");
-    file.write(content);
-    file.close();
+fn write_to_file(filename: str, content: str): nil {
+ //   var file = open(filename, "write");
+ //   file.write(content);
+ //   file.close();
+ print("File written successfully.");
 }
 
 /// Reads full contents of a file. Returns `Option`.
-fn read_from_file(filename: string): Option {
-    var file = open(filename, "read");
-    var content = file.read_all();
-    file.close();
-    return { kind: "Some", value: content };
+fn read_from_file(filename: str): Option {
+ //   var file = open(filename, "read");
+ //   var content = file.read_all();
+ //   file.close();
+ print("File read successfully.");
+ //   return { kind: Some, value: content };
 }
 
 // === Modules ===
 
-@private: Accessible only within the file.
-@protected: Accessible within the module but not externally.
+//@private: Accessible only within the file.
+//@protected: Accessible within the module but not externally.
 
 module MathUtils {
     @public
@@ -186,18 +188,7 @@ import MathUtils;
 print(MathUtils.add(5, 3));         // Output: 8
 // print(MathUtils.factorial(4));   // Not public, won't compile
 
-// === Error Handling ===
 
-/// Division that guards against zero using a contract. Returns `Option`.
-fn divide(a: int, b: int): Option {
-    contract(b != 0, "Divisor must not be zero");
-    return { kind: "Some", value: a / b };
-}
-
-match (divide(10, 0)) {
-    { kind: "Some", value: result } => print("Result: {result}"),
-    nil => print("Error: Division by zero")
-}
 
 // === Function Contracts ===
 

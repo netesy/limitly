@@ -45,7 +45,7 @@ void BytecodeGenerator::visitStatement(const std::shared_ptr<AST::Statement>& st
     } else if (auto matchStmt = std::dynamic_pointer_cast<AST::MatchStatement>(stmt)) {
         visitMatchStatement(matchStmt);
     } else {
-        Debugger::error("Unknown statement type", 0, 0, InterpretationStage::COMPILATION);
+        Debugger::error("Unknown statement type", stmt->line, 0, InterpretationStage::COMPILING, "", "", "");
     }
 }
 
@@ -78,7 +78,7 @@ void BytecodeGenerator::visitExpression(const std::shared_ptr<AST::Expression>& 
     } else if (auto rangeExpr = std::dynamic_pointer_cast<AST::RangeExpr>(expr)) {
         visitRangeExpr(rangeExpr);
     } else {
-        Debugger::error("Unknown expression type", 0, 0, InterpretationStage::COMPILATION);
+        Debugger::error("Unknown expression type", expr->line, 0, InterpretationStage::COMPILING, "", "", "");
     }
 }
 
@@ -539,7 +539,7 @@ void BytecodeGenerator::visitBinaryExpr(const std::shared_ptr<AST::BinaryExpr>& 
             emit(Opcode::OR, expr->line);
             break;
         default:
-            Debugger::error("Unknown binary operator", expr->line, 0, InterpretationStage::COMPILATION);
+            Debugger::error("Unknown binary operator", expr->line, 0, InterpretationStage::COMPILING, "", "", "");
             break;
     }
 }
@@ -559,7 +559,7 @@ void BytecodeGenerator::visitUnaryExpr(const std::shared_ptr<AST::UnaryExpr>& ex
             emit(Opcode::NOT, expr->line);
             break;
         default:
-            Debugger::error("Unknown unary operator", expr->line, 0, InterpretationStage::COMPILATION);
+            Debugger::error("Unknown unary operator", expr->line, 0, InterpretationStage::COMPILING, "", "", "");
             break;
     }
 }
@@ -633,7 +633,7 @@ void BytecodeGenerator::visitAssignExpr(const std::shared_ptr<AST::AssignExpr>& 
                 emit(Opcode::MODULO, expr->line);
                 break;
             default:
-                Debugger::error("Unknown compound assignment operator", expr->line, 0, InterpretationStage::COMPILATION);
+                Debugger::error("Unknown compound assignment operator", expr->line, 0, InterpretationStage::COMPILING, "", "", "");
                 break;
         }
     } else {
@@ -765,235 +765,3 @@ void BytecodeGenerator::emit(Opcode op, uint32_t lineNumber, int32_t intValue, f
     bytecode.push_back(instruction);
 }
 
-// ASTPrinter implementation
-void ASTPrinter::process(const std::shared_ptr<AST::Program>& program) {
-    std::cout << "AST Structure:" << std::endl;
-    printNode(program);
-}
-
-void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
-    std::string indentation = getIndentation(indent);
-    
-    if (auto program = std::dynamic_pointer_cast<AST::Program>(node)) {
-        std::cout << indentation << "Program:" << std::endl;
-        for (const auto& stmt : program->statements) {
-            printNode(stmt, indent + 1);
-        }
-    } 
-    else if (auto varDecl = std::dynamic_pointer_cast<AST::VarDeclaration>(node)) {
-        std::cout << indentation << "VarDeclaration: " << varDecl->name;
-        if (varDecl->type && *varDecl->type) {
-            std::cout << " : " << (*varDecl->type)->typeName;
-            if ((*varDecl->type)->isOptional) std::cout << "?";
-        }
-        std::cout << std::endl;
-        
-        if (varDecl->initializer) {
-            std::cout << indentation << "  Initializer:" << std::endl;
-            printNode(varDecl->initializer, indent + 2);
-        }
-    }
-    else if (auto funcDecl = std::dynamic_pointer_cast<AST::FunctionDeclaration>(node)) {
-        std::cout << indentation << "FunctionDeclaration: " << funcDecl->name << std::endl;
-        
-        std::cout << indentation << "  Parameters:" << std::endl;
-        for (const auto& param : funcDecl->params) {
-            std::cout << indentation << "    " << param.first << " : " << param.second->typeName << std::endl;
-        }
-        
-        for (const auto& param : funcDecl->optionalParams) {
-            std::cout << indentation << "    " << param.first << " : " << param.second.first->typeName << "? (optional)" << std::endl;
-        }
-        
-        if (funcDecl->returnType && *funcDecl->returnType) {
-            std::cout << indentation << "  ReturnType: " << (*funcDecl->returnType)->typeName << std::endl;
-        }
-        
-        std::cout << indentation << "  Body:" << std::endl;
-        printNode(funcDecl->body, indent + 2);
-    }
-    else if (auto classDecl = std::dynamic_pointer_cast<AST::ClassDeclaration>(node)) {
-        std::cout << indentation << "ClassDeclaration: " << classDecl->name << std::endl;
-        
-        std::cout << indentation << "  Fields:" << std::endl;
-        for (const auto& field : classDecl->fields) {
-            printNode(field, indent + 2);
-        }
-        
-        std::cout << indentation << "  Methods:" << std::endl;
-        for (const auto& method : classDecl->methods) {
-            printNode(method, indent + 2);
-        }
-    }
-    else if (auto blockStmt = std::dynamic_pointer_cast<AST::BlockStatement>(node)) {
-        std::cout << indentation << "BlockStatement:" << std::endl;
-        for (const auto& stmt : blockStmt->statements) {
-            printNode(stmt, indent + 1);
-        }
-    }
-    else if (auto ifStmt = std::dynamic_pointer_cast<AST::IfStatement>(node)) {
-        std::cout << indentation << "IfStatement:" << std::endl;
-        
-        std::cout << indentation << "  Condition:" << std::endl;
-        printNode(ifStmt->condition, indent + 2);
-        
-        std::cout << indentation << "  ThenBranch:" << std::endl;
-        printNode(ifStmt->thenBranch, indent + 2);
-        
-        if (ifStmt->elseBranch) {
-            std::cout << indentation << "  ElseBranch:" << std::endl;
-            printNode(ifStmt->elseBranch, indent + 2);
-        }
-    }
-    else if (auto forStmt = std::dynamic_pointer_cast<AST::ForStatement>(node)) {
-        if (forStmt->isIterableLoop) {
-            std::cout << indentation << "ForStatement (iterable):" << std::endl;
-            
-            std::cout << indentation << "  Variables:";
-            for (const auto& var : forStmt->loopVars) {
-                std::cout << " " << var;
-            }
-            std::cout << std::endl;
-            
-            std::cout << indentation << "  Iterable:" << std::endl;
-            printNode(forStmt->iterable, indent + 2);
-        } else {
-            std::cout << indentation << "ForStatement (traditional):" << std::endl;
-            
-            if (forStmt->initializer) {
-                std::cout << indentation << "  Initializer:" << std::endl;
-                printNode(forStmt->initializer, indent + 2);
-            }
-            
-            if (forStmt->condition) {
-                std::cout << indentation << "  Condition:" << std::endl;
-                printNode(forStmt->condition, indent + 2);
-            }
-            
-            if (forStmt->increment) {
-                std::cout << indentation << "  Increment:" << std::endl;
-                printNode(forStmt->increment, indent + 2);
-            }
-        }
-        
-        std::cout << indentation << "  Body:" << std::endl;
-        printNode(forStmt->body, indent + 2);
-    }
-    else if (auto whileStmt = std::dynamic_pointer_cast<AST::WhileStatement>(node)) {
-        std::cout << indentation << "WhileStatement:" << std::endl;
-        
-        std::cout << indentation << "  Condition:" << std::endl;
-        printNode(whileStmt->condition, indent + 2);
-        
-        std::cout << indentation << "  Body:" << std::endl;
-        printNode(whileStmt->body, indent + 2);
-    }
-    else if (auto returnStmt = std::dynamic_pointer_cast<AST::ReturnStatement>(node)) {
-        std::cout << indentation << "ReturnStatement:" << std::endl;
-        
-        if (returnStmt->value) {
-            std::cout << indentation << "  Value:" << std::endl;
-            printNode(returnStmt->value, indent + 2);
-        }
-    }
-    else if (auto printStmt = std::dynamic_pointer_cast<AST::PrintStatement>(node)) {
-        std::cout << indentation << "PrintStatement:" << std::endl;
-        
-        std::cout << indentation << "  Arguments:" << std::endl;
-        for (const auto& arg : printStmt->arguments) {
-            printNode(arg, indent + 2);
-        }
-    }
-    else if (auto exprStmt = std::dynamic_pointer_cast<AST::ExprStatement>(node)) {
-        std::cout << indentation << "ExpressionStatement:" << std::endl;
-        printNode(exprStmt->expression, indent + 1);
-    }
-    else if (auto binaryExpr = std::dynamic_pointer_cast<AST::BinaryExpr>(node)) {
-        std::cout << indentation << "BinaryExpression:" << std::endl;
-        
-        std::cout << indentation << "  Left:" << std::endl;
-        printNode(binaryExpr->left, indent + 2);
-        
-        std::cout << indentation << "  Operator: ";
-        switch (binaryExpr->op) {
-            case TokenType::PLUS: std::cout << "+"; break;
-            case TokenType::MINUS: std::cout << "-"; break;
-            case TokenType::STAR: std::cout << "*"; break;
-            case TokenType::SLASH: std::cout << "/"; break;
-            case TokenType::MODULUS: std::cout << "%"; break;
-            case TokenType::EQUAL_EQUAL: std::cout << "=="; break;
-            case TokenType::BANG_EQUAL: std::cout << "!="; break;
-            case TokenType::LESS: std::cout << "<"; break;
-            case TokenType::LESS_EQUAL: std::cout << "<="; break;
-            case TokenType::GREATER: std::cout << ">"; break;
-            case TokenType::GREATER_EQUAL: std::cout << ">="; break;
-            case TokenType::AND: std::cout << "and"; break;
-            case TokenType::OR: std::cout << "or"; break;
-            default: std::cout << "unknown"; break;
-        }
-        std::cout << std::endl;
-        
-        std::cout << indentation << "  Right:" << std::endl;
-        printNode(binaryExpr->right, indent + 2);
-    }
-    else if (auto unaryExpr = std::dynamic_pointer_cast<AST::UnaryExpr>(node)) {
-        std::cout << indentation << "UnaryExpression:" << std::endl;
-        
-        std::cout << indentation << "  Operator: ";
-        switch (unaryExpr->op) {
-            case TokenType::MINUS: std::cout << "-"; break;
-            case TokenType::BANG: std::cout << "!"; break;
-            default: std::cout << "unknown"; break;
-        }
-        std::cout << std::endl;
-        
-        std::cout << indentation << "  Operand:" << std::endl;
-        printNode(unaryExpr->right, indent + 2);
-    }
-    else if (auto literalExpr = std::dynamic_pointer_cast<AST::LiteralExpr>(node)) {
-        std::cout << indentation << "LiteralExpression: ";
-        
-        if (std::holds_alternative<int>(literalExpr->value)) {
-            std::cout << std::get<int>(literalExpr->value) << " (int)";
-        } else if (std::holds_alternative<double>(literalExpr->value)) {
-            std::cout << std::get<double>(literalExpr->value) << " (float)";
-        } else if (std::holds_alternative<std::string>(literalExpr->value)) {
-            std::cout << "\"" << std::get<std::string>(literalExpr->value) << "\" (string)";
-        } else if (std::holds_alternative<bool>(literalExpr->value)) {
-            std::cout << (std::get<bool>(literalExpr->value) ? "true" : "false") << " (bool)";
-        } else if (std::holds_alternative<std::nullptr_t>(literalExpr->value)) {
-            std::cout << "None (null)";
-        }
-        
-        std::cout << std::endl;
-    }
-    else if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(node)) {
-        std::cout << indentation << "VariableExpression: " << varExpr->name << std::endl;
-    }
-    else if (auto callExpr = std::dynamic_pointer_cast<AST::CallExpr>(node)) {
-        std::cout << indentation << "CallExpression:" << std::endl;
-        
-        std::cout << indentation << "  Callee:" << std::endl;
-        printNode(callExpr->callee, indent + 2);
-        
-        std::cout << indentation << "  Arguments:" << std::endl;
-        for (const auto& arg : callExpr->arguments) {
-            printNode(arg, indent + 2);
-        }
-        
-        if (!callExpr->namedArgs.empty()) {
-            std::cout << indentation << "  NamedArguments:" << std::endl;
-            for (const auto& [name, arg] : callExpr->namedArgs) {
-                std::cout << indentation << "    " << name << ":" << std::endl;
-                printNode(arg, indent + 3);
-            }
-        }
-    }
-    else {
-        std::cout << indentation << "Unknown node type" << std::endl;
-    }
-}
-
-std::string ASTPrinter::getIndentation(int indent) const {
-    return std::string(indent * 2, ' ');
-}

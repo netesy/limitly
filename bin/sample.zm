@@ -95,20 +95,34 @@ while (count < 3) {
 // Traits
 // ---------------------------------------------------
 
+
 @open
 trait Hashable {
-    fn hash(): uint;
-    fn equals(other: Self): isTrue;
+    fn hash() {
+        // Empty implementation for trait method
+        return 0;
+    }
+    
+    fn equals(other: Self) {
+        // Empty implementation for trait method
+        return 0;
+    }
 }
 
 @open
 trait Display {
-    fn to_string(): string;
+    fn to_string() {
+        // Empty implementation for trait method
+        return 0;
+    }
 }
 
 @open
 trait Clone {
-    fn clone(): Self;
+    fn clone() {
+        // Empty implementation for trait method
+        return 0;
+    }
 }
 
 // ---------------------------------------------------

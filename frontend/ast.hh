@@ -19,6 +19,7 @@ namespace AST {
     struct UnaryExpr;
     struct LiteralExpr;
     struct VariableExpr;
+    struct ThisExpr;
     struct CallExpr;
     struct AssignExpr;
     struct TernaryExpr;
@@ -75,6 +76,7 @@ namespace AST {
 
     // Base statement type
     struct Statement : public Node {
+        std::vector<Token> annotations;
         virtual ~Statement() = default;
     };
 
@@ -144,6 +146,11 @@ namespace AST {
         std::string name;
     };
 
+    // 'self' reference in methods
+    struct ThisExpr : public Expression {
+        // No additional fields needed, just represents 'self'
+    };
+
     // Function call
     struct CallExpr : public Expression {
         std::shared_ptr<Expression> callee;
@@ -154,6 +161,12 @@ namespace AST {
     // Assignment expression
     struct AssignExpr : public Expression {
         std::string name;
+    // For member or index assignment
+    std::shared_ptr<Expression> object;
+    std::optional<std::string> member; // for member assignment
+    std::shared_ptr<Expression> index; // for index assignment
+
+
         std::shared_ptr<Expression> value;
         TokenType op = TokenType::EQUAL; // Default is simple assignment, but can be +=, -=, etc.
     };
