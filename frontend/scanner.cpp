@@ -144,7 +144,7 @@ void Scanner::scanToken() {
         } else if (isAlpha(c)) {
             identifier();
         } else {
-            error("Unexpected character.");
+            this->error("Unexpected character.");
         }
         break;
     }
@@ -276,7 +276,7 @@ void Scanner::string() {
     }
 
     if (isAtEnd()) {
-        error("Unterminated string.");
+        this->error("Unterminated string.");
         return;
     }
 
@@ -320,8 +320,6 @@ TokenType Scanner::checkKeyword(size_t start, size_t length, const std::string& 
     if (rest == "for") return TokenType::FOR;
     if (rest == "fn") return TokenType::FN;
     if (rest == "if") return TokenType::IF;
-    if (rest == "nil") return TokenType::NIL;
-    if (rest == "None") return TokenType::NONE;
     if (rest == "or") return TokenType::OR;
     if (rest == "print") return TokenType::PRINT;
     if (rest == "return") return TokenType::RETURN;
@@ -383,7 +381,8 @@ TokenType Scanner::checkKeyword(size_t start, size_t length, const std::string& 
     if (rest == "array") return TokenType::ARRAY_TYPE;
     if (rest == "dict") return TokenType::DICT_TYPE;
     if (rest == "option") return TokenType::OPTION_TYPE;
-    if (rest == "result") return TokenType::RESULT_TYPE;
+    // Always treat "result" as an identifier to avoid conflicts with variable names
+    if (rest == "result") return TokenType::IDENTIFIER;
     if (rest == "channel") return TokenType::CHANNEL_TYPE;
     if (rest == "atomic") return TokenType::ATOMIC_TYPE;
     if (rest == "function") return TokenType::FUNCTION_TYPE;
@@ -652,5 +651,10 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
 }
 
 void Scanner::error(const std::string& message) {
-    Debugger::error(message, getLine(), getCurrent(), InterpretationStage::SCANNING, getLexeme());
+    // Get the current lexeme for better error reporting
+    std::string lexeme = getLexeme();
+    // Use a const reference to avoid ambiguity in function overload resolution
+    const std::string& lexemeRef = lexeme;
+    Debugger::error(message, getLine(), getCurrent(), InterpretationStage::SCANNING, "", lexeme, "");
 }
+

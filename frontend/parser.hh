@@ -21,6 +21,27 @@ private:
     Scanner &scanner;
     size_t current;
 
+    struct ParseError {
+        std::string message;
+        int line;
+        int column;
+        std::string codeContext;
+    };
+    std::vector<ParseError> errors;
+    static constexpr size_t MAX_ERRORS = 20;
+
+public:
+    const std::vector<ParseError>& getErrors() const { return errors; }
+    bool hadError() const { return !errors.empty(); }
+
+    // Helper to create a placeholder error expression
+    std::shared_ptr<AST::LiteralExpr> makeErrorExpr() {
+        auto errorExpr = std::make_shared<AST::LiteralExpr>();
+        errorExpr->line = peek().line;
+        errorExpr->value = nullptr; // Use null as a placeholder
+        return errorExpr;
+    };
+
     // Helper methods
     Token peek();
     Token previous();
@@ -30,7 +51,8 @@ private:
     bool isAtEnd();
     Token consume(TokenType type, const std::string &message);
     void synchronize();
-    void error(const std::string &message);
+    void error(const std::string &message, bool suppressException = false);
+    std::vector<Token> collectAnnotations();
 
     // Parsing methods for statements
     std::shared_ptr<AST::Statement> declaration();
@@ -69,6 +91,7 @@ private:
     std::shared_ptr<AST::Expression> comparison();
     std::shared_ptr<AST::Expression> term();
     std::shared_ptr<AST::Expression> factor();
+    std::shared_ptr<AST::Expression> power();
     std::shared_ptr<AST::Expression> unary();
     std::shared_ptr<AST::Expression> call();
     std::shared_ptr<AST::Expression> primary();

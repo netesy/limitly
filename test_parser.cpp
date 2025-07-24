@@ -1,3 +1,4 @@
+#include "backend/ast_printer.hh"
 #include "frontend/scanner.hh"
 #include "frontend/parser.hh"
 #include "backend.hh"
@@ -24,17 +25,17 @@ int main(int argc, char* argv[]) {
     
     try {
         // Frontend: Lexical analysis (scanning)
-        std::cout << "=== Scanning ===\n";
+        //std::cout << "=== Scanning ===\n";
         Scanner scanner(source);
         scanner.scanTokens();
         
         // Print tokens (optional)
-        std::cout << "Tokens:\n";
-        for (const auto& token : scanner.tokens) {
-            std::cout << "  " << scanner.tokenTypeToString(token.type) 
-                      << ": '" << token.lexeme << "' (line " << token.line << ")\n";
-        }
-        std::cout << std::endl;
+        // std::cout << "Tokens:\n";
+        // for (const auto& token : scanner.tokens) {
+        //     std::cout << "  " << scanner.tokenTypeToString(token.type) 
+        //               << ": '" << token.lexeme << "' (line " << token.line << ")\n";
+        // }
+        // std::cout << std::endl;
         
         // Frontend: Syntax analysis (parsing)
         std::cout << "=== Parsing ===\n";
@@ -42,11 +43,34 @@ int main(int argc, char* argv[]) {
         std::shared_ptr<AST::Program> ast = parser.parse();
         std::cout << "Parsing completed successfully!\n\n";
         
-        // Backend: Print AST
+        // Backend: Print AST to console and file
         std::cout << "=== AST Structure ===\n";
         ASTPrinter printer;
+        
+        // Print to console
         printer.process(ast);
         std::cout << std::endl;
+        
+        // Save to file
+        std::string outputFilename = std::string(argv[1]) + ".ast.txt";
+        std::ofstream outFile(outputFilename);
+        if (outFile.is_open()) {
+            // Redirect cout to file
+            std::streambuf *coutbuf = std::cout.rdbuf();
+            std::cout.rdbuf(outFile.rdbuf());
+            
+            // Print AST to file
+            std::cout << "AST for " << argv[1] << "\n";
+            std::cout << "========================================\n\n";
+            printer.process(ast);
+            
+            // Restore cout
+            std::cout.rdbuf(coutbuf);
+            
+            std::cout << "AST output saved to " << outputFilename << std::endl;
+        } else {
+            std::cerr << "Warning: Could not open " << outputFilename << " for writing" << std::endl;
+        }
         
         // Backend: Generate bytecode
         std::cout << "=== Bytecode Generation ===\n";

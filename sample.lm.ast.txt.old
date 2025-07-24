@@ -1,0 +1,460 @@
+AST for sample.lm
+========================================
+
+AST Dump:
+==========
+TypeDeclaration: date = i64
+TypeDeclaration: numbers = u64
+TypeDeclaration: amount = f64
+TypeDeclaration: isTrue = bool
+TypeDeclaration: string = str
+TypeDeclaration: Id = uint
+TypeDeclaration: Name = str
+TypeDeclaration: Age = uint
+TypeDeclaration: SomeKind = str
+TypeDeclaration: SomeValue = any
+TypeDeclaration: Some = struct
+TypeDeclaration: epty = nil
+TypeDeclaration: Option = Some | epty
+TypeDeclaration: ResultKind = str
+TypeDeclaration: ResultValue = any
+TypeDeclaration: ResultMessage = any
+TypeDeclaration: Success = struct
+TypeDeclaration: Error = struct
+TypeDeclaration: Result = Success | Error
+TypeDeclaration: ListOfAny = [any]
+TypeDeclaration: ListOfString = [str]
+TypeDeclaration: ListOfPerson = [Person]
+TypeDeclaration: DictOfAny = {any: any}
+TypeDeclaration: DictOfString = {str: str}
+TypeDeclaration: DictOfIntToUser = {int: User}
+TypeDeclaration: NumberType = int | f64
+TypeDeclaration: StringOrNumber = str | NumberType
+TypeDeclaration: PositiveInt = int where <condition>
+TypeDeclaration: EmailString = str where <condition>
+TypeDeclaration: Percentage = float where <condition>
+TypeDeclaration: NameType = str
+TypeDeclaration: AgeType = uint
+TypeDeclaration: HasName = {name: NameType}
+TypeDeclaration: HasAge = {age: AgeType}
+TypeDeclaration: Person = intersection
+TypeDeclaration: StreetType = str
+TypeDeclaration: CityType = str
+TypeDeclaration: ZipType = str
+TypeDeclaration: EmailType = str
+TypeDeclaration: PhoneType = str
+TypeDeclaration: EmployeeIdType = uint
+TypeDeclaration: DepartmentType = str
+TypeDeclaration: Address = struct
+TypeDeclaration: ContactInfo = struct
+TypeDeclaration: Employee = struct
+TypeDeclaration: Manager = struct
+TypeDeclaration: ExtendedRecord = struct
+TypeDeclaration: MultipleBaseRecord = struct
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: 10
+    Operator: +
+    Right:
+      BinaryExpression: *
+        Left:
+          Literal: 5
+        Operator: *
+        Right:
+          Literal: 2
+PrintStatement:
+  BinaryExpression: and
+    Left:
+      Grouping:
+        BinaryExpression: >
+          Left:
+            Literal: 10
+          Operator: >
+          Right:
+            Literal: 5
+    Operator: and
+    Right:
+      Grouping:
+        BinaryExpression: <
+          Left:
+            Literal: 5
+          Operator: <
+          Right:
+            Literal: 2
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "\"Hello, \""
+    Operator: +
+    Right:
+      Literal: "\"Luminar!\""
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: 10
+    Operator: +
+    Right:
+      BinaryExpression: *
+        Left:
+          Literal: 5
+        Operator: *
+        Right:
+          Literal: 2
+PrintStatement:
+  BinaryExpression: and
+    Left:
+      Grouping:
+        BinaryExpression: >
+          Left:
+            Literal: 10
+          Operator: >
+          Right:
+            Literal: 5
+    Operator: and
+    Right:
+      Grouping:
+        BinaryExpression: <
+          Left:
+            Literal: 5
+          Operator: <
+          Right:
+            Literal: 2
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "\"Hello, \""
+    Operator: +
+    Right:
+      Literal: "\"Luminar!\""
+ForStatement (traditional):
+  Initializer:
+    VarDeclaration: i
+      Initializer:
+        Literal: 0
+  Condition:
+    BinaryExpression: <
+      Left:
+        Variable: i
+      Operator: <
+      Right:
+        Literal: 10
+  Increment:
+    Assignment: +=
+      Target: i
+      Value:
+      Literal: 1
+  Body:
+    BlockStatement:
+      PrintStatement:
+        Variable: i
+IterStatement:
+  Variables: i
+  Iterable:
+    RangeExpression:
+      Start:
+        Literal: 1
+      End:
+        Literal: 5
+      Inclusive: true
+  Body:
+    BlockStatement:
+      PrintStatement:
+        Literal: "\"Range iteration: {i}\""
+VarDeclaration: fruits
+  Type: [str]
+  Initializer:
+    ListExpression: [3 elements]
+      Literal: "\"Apple\""
+      Literal: "\"Banana\""
+      Literal: "\"Cherry\""
+IterStatement:
+  Variables: fruit
+  Iterable:
+    Variable: fruits
+  Body:
+    BlockStatement:
+      PrintStatement:
+        Variable: fruit
+TypeDeclaration: KeyType = str
+TypeDeclaration: ValueType = int
+TypeDeclaration: DictOfStrToInt = {KeyType: ValueType}
+VarDeclaration: my_dict
+  Type: {str: int}
+  Initializer:
+    DictionaryExpression: {3 entries}
+      Key:
+        Literal: "\"a\""
+      Value:
+        Literal: 1
+      Key:
+        Literal: "\"b\""
+      Value:
+        Literal: 2
+      Key:
+        Literal: "\"c\""
+      Value:
+        Literal: 3
+IterStatement:
+  Variables: key value
+  Iterable:
+    Variable: my_dict
+  Body:
+    BlockStatement:
+      PrintStatement:
+        Literal: "\"{key}: {value}\""
+IterStatement:
+  Variables: x
+  Iterable:
+    RangeExpression:
+      Start:
+        Literal: 1
+      End:
+        Literal: 3
+      Inclusive: true
+  Body:
+    BlockStatement:
+      IterStatement:
+        Variables: y
+        Iterable:
+          RangeExpression:
+            Start:
+              Literal: 1
+            End:
+              Literal: 2
+            Inclusive: true
+        Body:
+          BlockStatement:
+            PrintStatement:
+              Literal: "\"x: {x}, y: {y}\""
+VarDeclaration: count
+  Type: int
+  Initializer:
+    Literal: 0
+WhileStatement:
+  Condition:
+    BinaryExpression: <
+      Left:
+        Variable: count
+      Operator: <
+      Right:
+        Literal: 3
+  Body:
+    BlockStatement:
+      PrintStatement:
+        Literal: "\"Count: {count}\""
+      ExpressionStatement:
+        Assignment: +=
+          Target: count
+          Value:
+          Literal: 1
+FunctionDeclaration: write_to_file
+  Parameters:
+    filename: str
+    content: str
+  ReturnType: nil
+  Body:
+    BlockStatement:
+      PrintStatement:
+        Literal: "\"File written successfully.\""
+FunctionDeclaration: read_from_file
+  Parameters:
+    filename: str
+  ReturnType: Option
+  Body:
+    BlockStatement:
+      PrintStatement:
+        Literal: "\"File read successfully.\""
+ModuleDeclaration: MathUtils
+  Private Members:
+    FunctionDeclaration: add
+      Parameters:
+        a: int
+        b: int
+      ReturnType: int
+      Body:
+        BlockStatement:
+          ReturnStatement:
+            BinaryExpression: +
+              Left:
+                Variable: a
+              Operator: +
+              Right:
+                Variable: b
+    FunctionDeclaration: subtract
+      Parameters:
+        a: int
+        b: int
+      ReturnType: int
+      Body:
+        BlockStatement:
+          ReturnStatement:
+            BinaryExpression: -
+              Left:
+                Variable: a
+              Operator: -
+              Right:
+                Variable: b
+    FunctionDeclaration: factorial
+      Parameters:
+        n: int
+      ReturnType: int
+      Body:
+        BlockStatement:
+          IfStatement:
+            Condition:
+              BinaryExpression: <=
+                Left:
+                  Variable: n
+                Operator: <=
+                Right:
+                  Literal: 1
+            Then:
+              BlockStatement:
+                ReturnStatement:
+                  Literal: 1
+          ReturnStatement:
+            BinaryExpression: *
+              Left:
+                Variable: n
+              Operator: *
+              Right:
+                CallExpression:
+                  Callee:
+                    Variable: factorial
+                  Arguments:
+                    BinaryExpression: -
+                      Left:
+                        Variable: n
+                      Operator: -
+                      Right:
+                        Literal: 1
+ImportStatement: MathUtils
+PrintStatement:
+  CallExpression:
+    Callee:
+      MemberExpression: .add
+        Object:
+          Variable: MathUtils
+    Arguments:
+      Literal: 5
+      Literal: 3
+FunctionDeclaration: sqrt
+  Parameters:
+    x: amount
+  ReturnType: amount
+  Body:
+    BlockStatement:
+      ContractStatement:
+        Condition:
+          BinaryExpression: >=
+            Left:
+              Variable: x
+            Operator: >=
+            Right:
+              Literal: 0
+        Message:
+          Literal: "\"Cannot compute sqrt of negative number\""
+      VarDeclaration: result
+        Initializer:
+          BinaryExpression: **
+            Left:
+              Variable: x
+            Operator: **
+            Right:
+              Literal: 0.5
+      ContractStatement:
+        Condition:
+          BinaryExpression: >=
+            Left:
+              Variable: result
+            Operator: >=
+            Right:
+              Literal: 0
+        Message:
+          Literal: "\"Result must be non-negative\""
+      ReturnStatement:
+        Variable: result
+ClassDeclaration: BankAccount
+  Fields:
+    VarDeclaration: balance
+      Type: amount
+  Methods:
+    FunctionDeclaration: BankAccount
+      Parameters:
+        initial_balance: amount
+      Body:
+        BlockStatement:
+          ContractStatement:
+            Condition:
+              BinaryExpression: >=
+                Left:
+                  Variable: initial_balance
+                Operator: >=
+                Right:
+                  Literal: 0
+            Message:
+              Literal: "\"Initial balance cannot be negative\""
+          ExpressionStatement:
+            Assignment: =
+              Member: balance
+              Object:
+                This
+              Value:
+              Variable: initial_balance
+    FunctionDeclaration: deposit
+      Parameters:
+        amount: amount
+      Body:
+        BlockStatement:
+          ContractStatement:
+            Condition:
+              BinaryExpression: >
+                Left:
+                  Variable: amount
+                Operator: >
+                Right:
+                  Literal: 0
+            Message:
+              Literal: "\"Deposit amount must be positive\""
+          ExpressionStatement:
+            Assignment: +=
+              Member: balance
+              Object:
+                This
+              Value:
+              Variable: amount
+    FunctionDeclaration: withdraw
+      Parameters:
+        amount: amount
+      Body:
+        BlockStatement:
+          ContractStatement:
+            Condition:
+              BinaryExpression: >
+                Left:
+                  Variable: amount
+                Operator: >
+                Right:
+                  Literal: 0
+            Message:
+              Literal: "\"Withdrawal amount must be positive\""
+          ContractStatement:
+            Condition:
+              BinaryExpression: >=
+                Left:
+                  MemberExpression: .balance
+                    Object:
+                      This
+                Operator: >=
+                Right:
+                  Variable: amount
+            Message:
+              Literal: "\"Insufficient funds\""
+          ExpressionStatement:
+            Assignment: -=
+              Member: balance
+              Object:
+                This
+              Value:
+              Variable: amount

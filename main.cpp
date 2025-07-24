@@ -1,10 +1,13 @@
 #include "frontend/scanner.hh"
 #include "frontend/parser.hh"
 #include "backend.hh"
+#include "backend/ast_printer.hh"
+#include "backend/vm.hh"
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <memory>
 
 void printUsage(const char* programName) {
     std::cout << "Limit Programming Language" << std::endl;
@@ -70,8 +73,17 @@ void executeFile(const std::string& filename, bool printAst = false, bool printT
             std::cout << std::endl;
         }
         
-        // TODO: Execute bytecode using a virtual machine
-        std::cout << "Execution not yet implemented." << std::endl;
+        // Execute bytecode using the virtual machine
+        VM vm;
+        try {
+            ValuePtr result = vm.execute(generator.getBytecode());
+            // Only print non-nil results
+            if (result && (!result->type || result->type->tag != TypeTag::Nil)) {
+                std::cout << result->toString() << std::endl;
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "Error: " << e.what() << std::endl;
+        }
         
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
@@ -104,8 +116,29 @@ void startRepl() {
             BytecodeGenerator generator;
             generator.process(ast);
             
-            // TODO: Execute bytecode using a virtual machine
-            std::cout << "Execution not yet implemented." << std::endl;
+            // Execute bytecode using the virtual machine
+            VM vm;
+            try {
+                // Disable debug output for REPL
+                #ifdef DEBUG
+                bool oldDebug = Debugger::getInstance().isEnabled();
+                Debugger::getInstance().setEnabled(false);
+                #endif
+                
+                ValuePtr result = vm.execute(generator.getBytecode());
+                
+                #ifdef DEBUG
+                // Restore debug state
+                Debugger::getInstance().setEnabled(oldDebug);
+                #endif
+                
+                // Only print non-nil results
+                if (result && (!result->type || result->type->tag != TypeTag::Nil)) {
+                    std::cout << "=> " << result->toString() << std::endl;
+                }
+            } catch (const std::exception& e) {
+                std::cerr << "Error: " << e.what() << std::endl;
+            }
             
         } catch (const std::exception& e) {
             std::cerr << "Error: " << e.what() << std::endl;

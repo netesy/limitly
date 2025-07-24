@@ -1,8 +1,36 @@
 #include "vm.hh"
 #include <iostream>
-#include <sstream>
 #include <thread>
-#include <future>
+
+// Helper function to convert TypeTag to string
+static std::string typeTagToString(TypeTag tag) {
+    switch (tag) {
+        case TypeTag::Nil: return "Nil";
+        case TypeTag::Bool: return "Bool";
+        case TypeTag::Int: return "Int";
+        case TypeTag::Int8: return "Int8";
+        case TypeTag::Int16: return "Int16";
+        case TypeTag::Int32: return "Int32";
+        case TypeTag::Int64: return "Int64";
+        case TypeTag::UInt: return "UInt";
+        case TypeTag::UInt8: return "UInt8";
+        case TypeTag::UInt16: return "UInt16";
+        case TypeTag::UInt32: return "UInt32";
+        case TypeTag::UInt64: return "UInt64";
+        case TypeTag::Float32: return "Float32";
+        case TypeTag::Float64: return "Float64";
+        case TypeTag::String: return "String";
+        case TypeTag::List: return "List";
+        case TypeTag::Dict: return "Dict";
+        case TypeTag::Enum: return "Enum";
+        case TypeTag::Function: return "Function";
+        case TypeTag::Any: return "Any";
+        case TypeTag::Sum: return "Sum";
+        case TypeTag::Union: return "Union";
+        case TypeTag::UserDefined: return "UserDefined";
+        default: return "Unknown";
+    }
+}
 
 // VM implementation
 VM::VM() : ip(0) {
@@ -17,7 +45,7 @@ VM::VM() : ip(0) {
     environment = globals;
     
     // Register native functions
-    registerNativeFunction("clock", [this](const std::vector<ValuePtr>& args) -> ValuePtr {
+    registerNativeFunction("clock", [this](const std::vector<ValuePtr>&) -> ValuePtr {
         auto result = memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, static_cast<double>(std::clock()) / CLOCKS_PER_SEC);
         return result;
     });
@@ -208,34 +236,38 @@ void VM::error(const std::string& message) const {
 
 // Instruction handlers
 void VM::handlePushInt(const Instruction& instruction) {
+    (void)instruction; // Mark as unused
     push(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, instruction.intValue));
 }
 
 void VM::handlePushFloat(const Instruction& instruction) {
+    (void)instruction; // Mark as unused
     push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, instruction.floatValue));
 }
 
 void VM::handlePushString(const Instruction& instruction) {
+    (void)instruction; // Mark as unused
     push(memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, instruction.stringValue));
 }
 
 void VM::handlePushBool(const Instruction& instruction) {
+    (void)instruction; // Mark as unused
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, instruction.boolValue));
 }
 
-void VM::handlePushNull(const Instruction& instruction) {
+void VM::handlePushNull(const Instruction& /*unused*/) {
     push(memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
 }
 
-void VM::handlePop(const Instruction& instruction) {
+void VM::handlePop(const Instruction& /*unused*/) {
     pop();
 }
 
-void VM::handleDup(const Instruction& instruction) {
+void VM::handleDup(const Instruction& /*unused*/) {
     push(peek());
 }
 
-void VM::handleSwap(const Instruction& instruction) {
+void VM::handleSwap(const Instruction& /*unused*/) {
     ValuePtr b = pop();
     ValuePtr a = pop();
     push(b);
@@ -243,11 +275,13 @@ void VM::handleSwap(const Instruction& instruction) {
 }
 
 void VM::handleStoreVar(const Instruction& instruction) {
+    (void)instruction; // Mark as unused
     ValuePtr value = peek();
     environment->define(instruction.stringValue, value);
 }
 
 void VM::handleLoadVar(const Instruction& instruction) {
+    (void)instruction; // Mark as unused
     try {
         ValuePtr value = environment->get(instruction.stringValue);
         push(value);
@@ -256,54 +290,92 @@ void VM::handleLoadVar(const Instruction& instruction) {
     }
 }
 
-void VM::handleStoreTemp(const Instruction& instruction) {
+void VM::handleStoreTemp(const Instruction& /*unused*/) {
     tempValue = peek();
 }
 
-void VM::handleLoadTemp(const Instruction& instruction) {
+void VM::handleLoadTemp(const Instruction& /*unused*/) {
     push(tempValue);
 }
 
-void VM::handleClearTemp(const Instruction& instruction) {
+void VM::handleClearTemp(const Instruction& /*unused*/) {
     tempValue = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
 }
 
-void VM::handleAdd(const Instruction& instruction) {
-    ValuePtr b = pop();
-    ValuePtr a = pop();
-    
-    // String concatenation
-    if (a->type->tag == TypeTag::String && b->type->tag == TypeTag::String) {
-        std::string result = std::get<std::string>(a->data) + std::get<std::string>(b->data);
-        push(memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, result));
-        return;
-    }
-    
-    // Numeric addition
-    if (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64) {
-        // Convert to double if needed
-        double aVal = (a->type->tag == TypeTag::Float64) ? 
-            std::get<double>(a->data) : 
-            static_cast<double>(std::get<int32_t>(a->data));
-        
-        double bVal = (b->type->tag == TypeTag::Float64) ? 
-            std::get<double>(b->data) : 
-            static_cast<double>(std::get<int32_t>(b->data));
-        
-        push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, aVal + bVal));
-    } else {
-        // Integer addition
-        int32_t aVal = std::get<int32_t>(a->data);
-        int32_t bVal = std::get<int32_t>(b->data);
-        push(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, aVal + bVal));
-    }
+void VM::handleAdd(const Instruction& /*unused*/) {
+ValuePtr b = pop();
+ValuePtr a = pop();
+
+// String concatenation (string + string)
+if (a->type->tag == TypeTag::String && b->type->tag == TypeTag::String) {
+const std::string& strA = std::get<std::string>(a->data);
+const std::string& strB = std::get<std::string>(b->data);
+
+std::string result;
+result.reserve(strA.length() + strB.length());
+result = strA + strB;
+
+push(memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, std::move(result)));
+return;
 }
 
-void VM::handleSubtract(const Instruction& instruction) {
+// Check if either operand is a number for numeric addition
+bool aIsNumeric = (a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Float64);
+bool bIsNumeric = (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Float64);
+
+if (aIsNumeric && bIsNumeric) {
+// Numeric addition - promote to double if either operand is double
+if (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64) {
+// Convert to double if needed
+double aVal = (a->type->tag == TypeTag::Float64) ? 
+std::get<double>(a->data) : 
+static_cast<double>(std::get<int32_t>(a->data));
+
+double bVal = (b->type->tag == TypeTag::Float64) ? 
+std::get<double>(b->data) : 
+static_cast<double>(std::get<int32_t>(b->data));
+
+// Check for floating-point edge cases
+double result = aVal + bVal;
+if (std::isinf(result)) {
+error("Floating-point addition resulted in infinity");
+}
+
+push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, result));
+} else {
+// Integer addition with overflow check
+int32_t aVal = std::get<int32_t>(a->data);
+int32_t bVal = std::get<int32_t>(b->data);
+
+// Check for integer overflow using well-defined behavior
+if ((bVal > 0 && aVal > std::numeric_limits<int32_t>::max() - bVal) ||
+(bVal < 0 && aVal < std::numeric_limits<int32_t>::min() - bVal)) {
+error("Integer addition overflow");
+}
+
+push(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, aVal + bVal));
+}
+} else {
+// If we get here, the operands are not compatible for addition
+error("Cannot add operands of types " + 
+typeTagToString(a->type->tag) + " and " + 
+typeTagToString(b->type->tag));
+}
+}
+
+void VM::handleSubtract(const Instruction& /*unused*/) {
     ValuePtr b = pop();
     ValuePtr a = pop();
     
-    // Numeric subtraction
+    // Check if either operand is a number for numeric subtraction
+    bool aIsNumeric = (a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Float64);
+    bool bIsNumeric = (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Float64);
+    
+    if (!aIsNumeric || !bIsNumeric) {
+        error("Both operands must be numbers for subtraction");
+    }
+    
+    // Numeric subtraction - promote to double if either operand is double
     if (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64) {
         // Convert to double if needed
         double aVal = (a->type->tag == TypeTag::Float64) ? 
@@ -314,25 +386,54 @@ void VM::handleSubtract(const Instruction& instruction) {
             std::get<double>(b->data) : 
             static_cast<double>(std::get<int32_t>(b->data));
         
-        push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, aVal - bVal));
+        // Check for floating-point edge cases
+        double result = aVal - bVal;
+        if (std::isinf(result)) {
+            error("Floating-point subtraction resulted in infinity");
+        }
+        
+        push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, result));
     } else {
-        // Integer subtraction
+        // Integer subtraction with overflow check
         int32_t aVal = std::get<int32_t>(a->data);
         int32_t bVal = std::get<int32_t>(b->data);
+        
+        // Check for integer overflow
+        if ((bVal > 0 && aVal < std::numeric_limits<int32_t>::min() + bVal) ||
+            (bVal < 0 && aVal > std::numeric_limits<int32_t>::max() + bVal)) {
+            error("Integer subtraction overflow");
+        }
+        
         push(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, aVal - bVal));
     }
 }
 
-void VM::handleMultiply(const Instruction& instruction) {
+void VM::handleMultiply(const Instruction& /*unused*/) {
     ValuePtr b = pop();
     ValuePtr a = pop();
     
-    // String multiplication (string * int)
-    if (a->type->tag == TypeTag::String && b->type->tag == TypeTag::Int) {
-        std::string str = std::get<std::string>(a->data);
-        int32_t count = std::get<int32_t>(b->data);
+    // String multiplication (string * int or int * string)
+    if ((a->type->tag == TypeTag::String && b->type->tag == TypeTag::Int) ||
+        (a->type->tag == TypeTag::Int && b->type->tag == TypeTag::String)) {
+        
+        std::string str;
+        int32_t count;
+        
+        if (a->type->tag == TypeTag::String) {
+            str = std::get<std::string>(a->data);
+            count = std::get<int32_t>(b->data);
+        } else {
+            str = std::get<std::string>(b->data);
+            count = std::get<int32_t>(a->data);
+        }
+        
+        if (count < 0) {
+            error("String repetition count cannot be negative");
+        }
         
         std::string result;
+        result.reserve(str.length() * count);
+        
         for (int i = 0; i < count; ++i) {
             result += str;
         }
@@ -353,34 +454,56 @@ void VM::handleMultiply(const Instruction& instruction) {
             static_cast<double>(std::get<int32_t>(b->data));
         
         push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, aVal * bVal));
-    } else {
-        // Integer multiplication
+    } else if (a->type->tag == TypeTag::Int && b->type->tag == TypeTag::Int) {
+        // Integer multiplication with overflow check
         int32_t aVal = std::get<int32_t>(a->data);
         int32_t bVal = std::get<int32_t>(b->data);
-        push(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, aVal * bVal));
+        int64_t result = static_cast<int64_t>(aVal) * static_cast<int64_t>(bVal);
+        
+        if (result > std::numeric_limits<int32_t>::max() || 
+            result < std::numeric_limits<int32_t>::min()) {
+            error("Integer multiplication overflow");
+        }
+        
+        push(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, 
+            static_cast<int32_t>(result)));
+    } else {
+        error("Invalid operands for multiplication");
     }
 }
 
-void VM::handleDivide(const Instruction& instruction) {
+void VM::handleDivide(const Instruction& /*unused*/) {
     ValuePtr b = pop();
     ValuePtr a = pop();
     
-    // Check for division by zero
+    // Check for non-numeric operands
+    bool aIsNumeric = (a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Float64);
+    bool bIsNumeric = (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Float64);
+    
+    if (!aIsNumeric || !bIsNumeric) {
+        error("Both operands must be numbers for division");
+    }
+    
+    // Check for division by zero with better error message
     bool isZero = false;
+    std::string zeroType;
     
     if (b->type->tag == TypeTag::Float64) {
-        isZero = std::get<double>(b->data) == 0.0;
+        double bVal = std::get<double>(b->data);
+        isZero = bVal == 0.0;
+        zeroType = isZero ? "floating-point zero" : "";
     } else {
-        isZero = std::get<int32_t>(b->data) == 0;
+        int32_t bVal = std::get<int32_t>(b->data);
+        isZero = bVal == 0;
+        zeroType = isZero ? "integer zero" : "";
     }
     
     if (isZero) {
-        error("Division by zero");
+        error("Division by " + zeroType + " is not allowed");
     }
     
-    // Numeric division
+    // Numeric division - always promote to double if either operand is double
     if (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64) {
-        // Convert to double if needed
         double aVal = (a->type->tag == TypeTag::Float64) ? 
             std::get<double>(a->data) : 
             static_cast<double>(std::get<int32_t>(a->data));
@@ -389,31 +512,46 @@ void VM::handleDivide(const Instruction& instruction) {
             std::get<double>(b->data) : 
             static_cast<double>(std::get<int32_t>(b->data));
         
+        // Check for floating-point edge cases
+        if (std::isinf(aVal / bVal)) {
+            error("Floating-point division resulted in infinity");
+        }
+        
         push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, aVal / bVal));
     } else {
-        // Integer division
+        // Integer division with check for INT_MIN / -1 overflow
         int32_t aVal = std::get<int32_t>(a->data);
         int32_t bVal = std::get<int32_t>(b->data);
+        
+        if (aVal == std::numeric_limits<int32_t>::min() && bVal == -1) {
+            error("Integer division overflow");
+        }
+        
         push(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, aVal / bVal));
     }
 }
 
-void VM::handleModulo(const Instruction& instruction) {
+void VM::handleModulo(const Instruction& /*unused*/) {
     ValuePtr b = pop();
     ValuePtr a = pop();
     
+    // Type checking
+    if (a->type->tag != TypeTag::Int || b->type->tag != TypeTag::Int) {
+        error("Modulo operation requires integer operands");
+    }
+    
     // Check for modulo by zero
-    if (std::get<int32_t>(b->data) == 0) {
+    int32_t bVal = std::get<int32_t>(b->data);
+    if (bVal == 0) {
         error("Modulo by zero");
     }
     
     // Integer modulo
     int32_t aVal = std::get<int32_t>(a->data);
-    int32_t bVal = std::get<int32_t>(b->data);
     push(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, aVal % bVal));
 }
 
-void VM::handleNegate(const Instruction& instruction) {
+void VM::handleNegate(const Instruction& /*unused*/) {
     ValuePtr a = pop();
     
     if (a->type->tag == TypeTag::Float64) {
@@ -425,7 +563,7 @@ void VM::handleNegate(const Instruction& instruction) {
     }
 }
 
-void VM::handleEqual(const Instruction& instruction) {
+void VM::handleEqual(const Instruction& /*unused*/) {
     ValuePtr b = pop();
     ValuePtr a = pop();
     
@@ -460,7 +598,7 @@ void VM::handleEqual(const Instruction& instruction) {
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, result));
 }
 
-void VM::handleNotEqual(const Instruction& instruction) {
+void VM::handleNotEqual(const Instruction& /*unused*/) {
     ValuePtr b = pop();
     ValuePtr a = pop();
     
@@ -495,7 +633,7 @@ void VM::handleNotEqual(const Instruction& instruction) {
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, result));
 }
 
-void VM::handleLess(const Instruction& instruction) {
+void VM::handleLess(const Instruction& /*unused*/) {
     ValuePtr b = pop();
     ValuePtr a = pop();
     
@@ -519,7 +657,7 @@ void VM::handleLess(const Instruction& instruction) {
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, result));
 }
 
-void VM::handleLessEqual(const Instruction& instruction) {
+void VM::handleLessEqual(const Instruction& /*unused*/) {
     ValuePtr b = pop();
     ValuePtr a = pop();
     
@@ -543,7 +681,7 @@ void VM::handleLessEqual(const Instruction& instruction) {
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, result));
 }
 
-void VM::handleGreater(const Instruction& instruction) {
+void VM::handleGreater(const Instruction& /*unused*/) {
     ValuePtr b = pop();
     ValuePtr a = pop();
     
@@ -567,7 +705,7 @@ void VM::handleGreater(const Instruction& instruction) {
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, result));
 }
 
-void VM::handleGreaterEqual(const Instruction& instruction) {
+void VM::handleGreaterEqual(const Instruction& /*unused*/) {
     ValuePtr b = pop();
     ValuePtr a = pop();
     
@@ -591,7 +729,7 @@ void VM::handleGreaterEqual(const Instruction& instruction) {
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, result));
 }
 
-void VM::handleAnd(const Instruction& instruction) {
+void VM::handleAnd(const Instruction& /*unused*/) {
     ValuePtr b = pop();
     ValuePtr a = pop();
     
@@ -630,7 +768,7 @@ void VM::handleAnd(const Instruction& instruction) {
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, aVal && bVal));
 }
 
-void VM::handleOr(const Instruction& instruction) {
+void VM::handleOr(const Instruction& /*unused*/) {
     ValuePtr b = pop();
     ValuePtr a = pop();
     
@@ -669,7 +807,7 @@ void VM::handleOr(const Instruction& instruction) {
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, aVal || bVal));
 }
 
-void VM::handleNot(const Instruction& instruction) {
+void VM::handleNot(const Instruction& /*unused*/) {
     ValuePtr a = pop();
     
     bool aVal = false;
@@ -693,10 +831,12 @@ void VM::handleNot(const Instruction& instruction) {
 }
 
 void VM::handleJump(const Instruction& instruction) {
+    (void)instruction; // Mark as unused
     ip += instruction.intValue;
 }
 
 void VM::handleJumpIfTrue(const Instruction& instruction) {
+    (void)instruction; // Mark as unused
     ValuePtr condition = pop();
     
     bool condVal = false;
@@ -722,6 +862,7 @@ void VM::handleJumpIfTrue(const Instruction& instruction) {
 }
 
 void VM::handleJumpIfFalse(const Instruction& instruction) {
+    (void)instruction; // Mark as unused
     ValuePtr condition = pop();
     
     bool condVal = false;
@@ -747,16 +888,19 @@ void VM::handleJumpIfFalse(const Instruction& instruction) {
 }
 
 void VM::handleCall(const Instruction& instruction) {
+    (void)instruction; // Mark as unused
     // TODO: Implement function calls
     error("Function calls not implemented yet");
 }
 
 void VM::handleReturn(const Instruction& instruction) {
+    (void)instruction; // Mark as unused
     // TODO: Implement function returns
     error("Function returns not implemented yet");
 }
 
 void VM::handlePrint(const Instruction& instruction) {
+    (void)instruction; // Mark as unused
     int argCount = instruction.intValue;
     std::vector<ValuePtr> args;
     
@@ -775,42 +919,47 @@ void VM::handlePrint(const Instruction& instruction) {
 }
 
 // Placeholder implementations for other handlers
-void VM::handleBeginFunction(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleEndFunction(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleDefineParam(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleDefineOptionalParam(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleSetDefaultValue(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleBeginClass(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleEndClass(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleGetProperty(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleSetProperty(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleCreateList(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleListAppend(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleCreateDict(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleDictSet(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleGetIndex(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleSetIndex(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleGetIterator(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleIteratorHasNext(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleIteratorNext(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleIteratorNextKeyValue(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleBeginScope(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleEndScope(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleBeginTry(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleEndTry(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleBeginHandler(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleEndHandler(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleThrow(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleStoreException(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleBeginParallel(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleEndParallel(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleBeginConcurrent(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleEndConcurrent(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleAwait(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleMatchPattern(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleImport(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleBeginEnum(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleEndEnum(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleDefineEnumVariant(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleDefineEnumVariantWithType(const Instruction& instruction) { error("Not implemented"); }
-void VM::handleDebugPrint(const Instruction& instruction) { error("Not implemented"); }
+void VM::handleBeginFunction(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleEndFunction(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleDefineParam(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleDefineOptionalParam(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleSetDefaultValue(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleBeginClass(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleEndClass(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleGetProperty(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleSetProperty(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleCreateList(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleListAppend(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleIteratorNextKeyValue(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleBeginScope(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleEndScope(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleBeginTry(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleBeginHandler(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleEndHandler(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleThrow(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleStoreException(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleBeginParallel(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleEndParallel(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleBeginConcurrent(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleEndConcurrent(const Instruction& /*unused*/) { error("Not implemented"); }
+
+void VM::handleMatchPattern(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleImport(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleBeginEnum(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleEndEnum(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleDefineEnumVariant(const Instruction& /*unused*/) { error("Not implemented"); }
+
+// ... (rest of the code remains the same)
+void VM::handleDebugPrint(const Instruction& /*unused*/) {
+    // Print the top value on the stack for debugging
+    if (stack.empty()) {
+        std::cout << "[DEBUG] Stack is empty" << std::endl;
+        return;
+    }
+    ValuePtr value = peek();
+    if (value) {
+        std::cout << "[DEBUG] " << value->toString() << std::endl;
+    } else {
+        std::cout << "[DEBUG] (null value)" << std::endl;
+    }
+}
