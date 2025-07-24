@@ -92,15 +92,28 @@ void executeFile(const std::string& filename, bool printAst = false, bool printT
 
 void startRepl() {
     std::cout << "Limit Programming Language REPL (Interactive Mode)" << std::endl;
-    std::cout << "Type 'exit' to quit" << std::endl;
+    std::cout << "Type 'exit' to quit, '.stack' to show stack, '.debug' to toggle debug mode" << std::endl;
     
+    VM vm;
+    bool debugMode = false;
     std::string line;
+    
     while (true) {
         std::cout << "> ";
         std::getline(std::cin, line);
         
+        // Handle special commands
         if (line == "exit") {
             break;
+        } else if (line == ".stack") {
+            vm.printStack();
+            continue;
+        } else if (line == ".debug") {
+            debugMode = !debugMode;
+            std::cout << "Debug mode " << (debugMode ? "enabled" : "disabled") << std::endl;
+            continue;
+        } else if (line.empty()) {
+            continue;
         }
         
         try {
@@ -117,27 +130,36 @@ void startRepl() {
             generator.process(ast);
             
             // Execute bytecode using the virtual machine
-            VM vm;
             try {
-                // Disable debug output for REPL
+                // Set debug state based on debug mode
                 #ifdef DEBUG
                 bool oldDebug = Debugger::getInstance().isEnabled();
-                Debugger::getInstance().setEnabled(false);
+                Debugger::getInstance().setEnabled(debugMode);
                 #endif
                 
+                // Execute the bytecode
                 ValuePtr result = vm.execute(generator.getBytecode());
+                
+                // Show stack after execution in debug mode
+                if (debugMode) {
+                    vm.printStack();
+                }
+                
+                // Only print non-nil results
+                if (result && (!result->type || result->type->tag != TypeTag::Nil)) {
+                    std::cout << "=> " << result->toString() << std::endl;
+                }
                 
                 #ifdef DEBUG
                 // Restore debug state
                 Debugger::getInstance().setEnabled(oldDebug);
                 #endif
                 
-                // Only print non-nil results
-                if (result && (!result->type || result->type->tag != TypeTag::Nil)) {
-                    std::cout << "=> " << result->toString() << std::endl;
-                }
             } catch (const std::exception& e) {
-                std::cerr << "Error: " << e.what() << std::endl;
+                std::cerr << "Runtime error: " << e.what() << std::endl;
+                if (debugMode) {
+                    vm.printStack();
+                }
             }
             
         } catch (const std::exception& e) {

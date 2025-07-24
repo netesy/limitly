@@ -220,21 +220,8 @@ void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
         std::cout << indentation << "  Body:" << std::endl;
         printNode(whileStmt->body, indent + 2);
     }
-    else if (auto returnStmt = std::dynamic_pointer_cast<AST::ReturnStatement>(node)) {
-        std::cout << indentation << "ReturnStatement";
-        if (returnStmt->value) {
-            std::cout << ":" << std::endl;
-            printNode(returnStmt->value, indent + 1);
-        } else {
-            std::cout << std::endl;
-        }
-    }
-    else if (auto printStmt = std::dynamic_pointer_cast<AST::PrintStatement>(node)) {
-        std::cout << indentation << "PrintStatement:" << std::endl;
-        for (const auto& arg : printStmt->arguments) {
-            printNode(arg, indent + 1);
-        }
-    }
+    // Handle ReturnStatement and PrintStatement in their respective cases below
+    // to avoid duplicate cases
     else if (auto attemptStmt = std::dynamic_pointer_cast<AST::AttemptStatement>(node)) {
         std::cout << indentation << "AttemptStatement:" << std::endl;
         std::cout << indentation << "  Try:" << std::endl;
@@ -376,15 +363,17 @@ void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
             printNode(comptimeStmt->declaration, indent + 1);
         }
     }
+    // Consolidated ReturnStatement case
     else if (auto returnStmt = std::dynamic_pointer_cast<AST::ReturnStatement>(node)) {
-        std::cout << indentation << "ReturnStatement:";
+        std::cout << indentation << "ReturnStatement";
         if (returnStmt->value) {
-            std::cout << std::endl << indentation << "  Value:" << std::endl;
+            std::cout << ":" << std::endl << indentation << "  Value:" << std::endl;
             printNode(returnStmt->value, indent + 2);
         } else {
             std::cout << std::endl;
         }
     }
+    // Consolidated PrintStatement case
     else if (auto printStmt = std::dynamic_pointer_cast<AST::PrintStatement>(node)) {
         std::cout << indentation << "PrintStatement:" << std::endl;
         for (const auto& arg : printStmt->arguments) {
