@@ -278,6 +278,8 @@ std::string Debugger::stageToString(InterpretationStage stage)
         return "Syntax Parsing";
     case InterpretationStage::SEMANTIC:
         return "Semantic Parsing";
+    case InterpretationStage::BYTECODE:
+        return "Bytecode Generation";
     case InterpretationStage::INTERPRETING:
         return "Interpreting";
     case InterpretationStage::COMPILING:

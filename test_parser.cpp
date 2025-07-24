@@ -2,9 +2,143 @@
 #include "frontend/scanner.hh"
 #include "frontend/parser.hh"
 #include "backend.hh"
+#include "opcodes.hh"
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <iomanip>
+#include <unordered_map>
+
+// Map opcode enum values to their string representations
+const std::unordered_map<Opcode, std::string> OPCODE_NAMES = {
+    // Stack operations
+    {Opcode::PUSH_INT, "PUSH_INT"},
+    {Opcode::PUSH_FLOAT, "PUSH_FLOAT"},
+    {Opcode::PUSH_STRING, "PUSH_STRING"},
+    {Opcode::PUSH_BOOL, "PUSH_BOOL"},
+    {Opcode::PUSH_NULL, "PUSH_NULL"},
+    {Opcode::POP, "POP"},
+    {Opcode::DUP, "DUP"},
+    {Opcode::SWAP, "SWAP"},
+    
+    // Variable operations
+    {Opcode::STORE_VAR, "STORE_VAR"},
+    {Opcode::LOAD_VAR, "LOAD_VAR"},
+    {Opcode::STORE_TEMP, "STORE_TEMP"},
+    {Opcode::LOAD_TEMP, "LOAD_TEMP"},
+    {Opcode::CLEAR_TEMP, "CLEAR_TEMP"},
+    {Opcode::LOAD_THIS, "LOAD_THIS"},
+    
+    // Arithmetic operations
+    {Opcode::ADD, "ADD"},
+    {Opcode::SUBTRACT, "SUBTRACT"},
+    {Opcode::MULTIPLY, "MULTIPLY"},
+    {Opcode::DIVIDE, "DIVIDE"},
+    {Opcode::POWER, "POWER"},
+    {Opcode::MODULO, "MODULO"},
+    {Opcode::NEGATE, "NEGATE"},
+    
+    // Comparison operations
+    {Opcode::EQUAL, "EQUAL"},
+    {Opcode::NOT_EQUAL, "NOT_EQUAL"},
+    {Opcode::LESS, "LESS"},
+    {Opcode::LESS_EQUAL, "LESS_EQUAL"},
+    {Opcode::GREATER, "GREATER"},
+    {Opcode::GREATER_EQUAL, "GREATER_EQUAL"},
+    
+    // Logical operations
+    {Opcode::AND, "AND"},
+    {Opcode::OR, "OR"},
+    {Opcode::NOT, "NOT"},
+    
+    // Control flow operations
+    {Opcode::JUMP, "JUMP"},
+    {Opcode::JUMP_IF_TRUE, "JUMP_IF_TRUE"},
+    {Opcode::JUMP_IF_FALSE, "JUMP_IF_FALSE"},
+    {Opcode::CALL, "CALL"},
+    {Opcode::RETURN, "RETURN"},
+    
+    // Function operations
+    {Opcode::BEGIN_FUNCTION, "BEGIN_FUNCTION"},
+    {Opcode::END_FUNCTION, "END_FUNCTION"},
+    {Opcode::DEFINE_PARAM, "DEFINE_PARAM"},
+    {Opcode::DEFINE_OPTIONAL_PARAM, "DEFINE_OPTIONAL_PARAM"},
+    {Opcode::SET_DEFAULT_VALUE, "SET_DEFAULT_VALUE"},
+    
+    // Class operations
+    {Opcode::BEGIN_CLASS, "BEGIN_CLASS"},
+    {Opcode::END_CLASS, "END_CLASS"},
+    {Opcode::GET_PROPERTY, "GET_PROPERTY"},
+    {Opcode::SET_PROPERTY, "SET_PROPERTY"},
+    
+    // Collection operations
+    {Opcode::CREATE_LIST, "CREATE_LIST"},
+    {Opcode::LIST_APPEND, "LIST_APPEND"},
+    {Opcode::CREATE_DICT, "CREATE_DICT"},
+    {Opcode::CREATE_RANGE, "CREATE_RANGE"},
+    {Opcode::SET_RANGE_STEP, "SET_RANGE_STEP"},
+    {Opcode::DICT_SET, "DICT_SET"},
+    {Opcode::GET_INDEX, "GET_INDEX"},
+    {Opcode::SET_INDEX, "SET_INDEX"},
+    
+    // Iterator operations
+    {Opcode::GET_ITERATOR, "GET_ITERATOR"},
+    {Opcode::ITERATOR_HAS_NEXT, "ITERATOR_HAS_NEXT"},
+    {Opcode::ITERATOR_NEXT, "ITERATOR_NEXT"},
+    {Opcode::ITERATOR_NEXT_KEY_VALUE, "ITERATOR_NEXT_KEY_VALUE"},
+    
+    // Scope operations
+    {Opcode::BEGIN_SCOPE, "BEGIN_SCOPE"},
+    {Opcode::END_SCOPE, "END_SCOPE"},
+    
+    // Exception handling operations
+    {Opcode::BEGIN_TRY, "BEGIN_TRY"},
+    {Opcode::END_TRY, "END_TRY"},
+    {Opcode::BEGIN_HANDLER, "BEGIN_HANDLER"},
+    {Opcode::END_HANDLER, "END_HANDLER"},
+    {Opcode::THROW, "THROW"},
+    {Opcode::STORE_EXCEPTION, "STORE_EXCEPTION"},
+    
+    // Concurrency operations
+    {Opcode::BEGIN_PARALLEL, "BEGIN_PARALLEL"},
+    {Opcode::END_PARALLEL, "END_PARALLEL"},
+    {Opcode::BEGIN_CONCURRENT, "BEGIN_CONCURRENT"},
+    {Opcode::END_CONCURRENT, "END_CONCURRENT"},
+    {Opcode::AWAIT, "AWAIT"},
+    
+    // Pattern matching operations
+    {Opcode::MATCH_PATTERN, "MATCH_PATTERN"},
+    
+    // Module operations
+    {Opcode::IMPORT, "IMPORT"},
+    
+    // Enum operations
+    {Opcode::BEGIN_ENUM, "BEGIN_ENUM"},
+    {Opcode::END_ENUM, "END_ENUM"},
+    {Opcode::DEFINE_ENUM_VARIANT, "DEFINE_ENUM_VARIANT"},
+    {Opcode::DEFINE_ENUM_VARIANT_WITH_TYPE, "DEFINE_ENUM_VARIANT_WITH_TYPE"},
+    
+    // I/O operations
+    {Opcode::PRINT, "PRINT"},
+    
+    // Debug operations
+    {Opcode::DEBUG_PRINT, "DEBUG_PRINT"},
+
+    // Memory operations
+    {Opcode::LOAD_CONST, "LOAD_CONST"},
+    {Opcode::STORE_CONST, "STORE_CONST"},
+    {Opcode::LOAD_MEMBER, "LOAD_MEMBER"},
+    {Opcode::STORE_MEMBER, "STORE_MEMBER"}
+};
+
+// Helper function to get opcode name
+std::string getOpcodeName(Opcode opcode) {
+    auto it = OPCODE_NAMES.find(opcode);
+    if (it != OPCODE_NAMES.end()) {
+        return it->second;
+    }
+    return "OP_" + std::to_string(static_cast<int>(opcode));
+}
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
@@ -29,13 +163,21 @@ int main(int argc, char* argv[]) {
         Scanner scanner(source);
         scanner.scanTokens();
         
-        // Print tokens (optional)
-        // std::cout << "Tokens:\n";
-        // for (const auto& token : scanner.tokens) {
-        //     std::cout << "  " << scanner.tokenTypeToString(token.type) 
-        //               << ": '" << token.lexeme << "' (line " << token.line << ")\n";
-        // }
-        // std::cout << std::endl;
+        // Output tokens to file
+        std::string tokensFilename = std::string(argv[1]) + ".tokens.txt";
+        std::ofstream tokensFile(tokensFilename);
+        if (tokensFile.is_open()) {
+            tokensFile << "Tokens for " << argv[1] << "\n";
+            tokensFile << "========================================\n\n";
+            for (const auto& token : scanner.tokens) {
+                tokensFile << "Line " << token.line << ": " 
+                          << scanner.tokenTypeToString(token.type) 
+                          << " = '" << token.lexeme << "'\n";
+            }
+            std::cout << "Tokens output saved to " << tokensFilename << std::endl;
+        } else {
+            std::cerr << "Warning: Could not open " << tokensFilename << " for writing" << std::endl;
+        }
         
         // Frontend: Syntax analysis (parsing)
         std::cout << "=== Parsing ===\n";
@@ -77,14 +219,38 @@ int main(int argc, char* argv[]) {
         BytecodeGenerator generator;
         generator.process(ast);
         
-        // Print bytecode (simplified)
-        std::cout << "Bytecode generated: " << generator.getBytecode().size() << " instructions\n";
-        std::cout << "First 10 instructions:\n";
-        int count = 0;
-        for (const auto& instruction : generator.getBytecode()) {
-            if (count++ >= 10) break;
-            std::cout << "  " << static_cast<int>(instruction.opcode) 
+        // Output bytecode to file
+        std::string bytecodeFilename = std::string(argv[1]) + ".bytecode.txt";
+        std::ofstream bytecodeFile(bytecodeFilename);
+        if (bytecodeFile.is_open()) {
+            bytecodeFile << "Bytecode for " << argv[1] << "\n";
+            bytecodeFile << "========================================\n\n";
+            bytecodeFile << "Total instructions: " << generator.getBytecode().size() << "\n\n";
+            
+            int count = 1;
+            for (const auto& instruction : generator.getBytecode()) {
+                bytecodeFile << std::setw(4) << count++ << ": "
+                           << std::setw(20) << std::left << getOpcodeName(instruction.opcode)
+                           << " (line " << instruction.line << ")";
+                
+                // Add any additional instruction details here if available
+                // Note: Instruction operand access removed as it's not part of the Instruction struct
+                
+                bytecodeFile << "\n";
+            }
+            
+            std::cout << "Bytecode output saved to " << bytecodeFilename << std::endl;
+            
+            // Also print first 10 instructions to console
+            std::cout << "\nFirst 10 instructions:\n";
+            count = 0;
+            for (const auto& instruction : generator.getBytecode()) {
+                if (count++ >= 10) break;
+                std::cout << "  " << std::setw(20) << std::left << getOpcodeName(instruction.opcode)
                       << " (line " << instruction.line << ")\n";
+            }
+        } else {
+            std::cerr << "Warning: Could not open " << bytecodeFilename << " for writing" << std::endl;
         }
         
     } catch (const std::exception& e) {

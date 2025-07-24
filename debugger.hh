@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-enum class InterpretationStage { SCANNING, PARSING, SYNTAX, SEMANTIC, INTERPRETING, COMPILING };
+enum class InterpretationStage { SCANNING, PARSING, SYNTAX, SEMANTIC, BYTECODE, INTERPRETING, COMPILING };
 
 class Debugger
 {

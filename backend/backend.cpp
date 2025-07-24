@@ -1,5 +1,6 @@
 #include "../backend.hh"
 #include "../debugger.hh"
+#include "value.hh"
 #include <iostream>
 
 // BytecodeGenerator implementation
@@ -44,8 +45,18 @@ void BytecodeGenerator::visitStatement(const std::shared_ptr<AST::Statement>& st
         visitEnumDeclaration(enumDecl);
     } else if (auto matchStmt = std::dynamic_pointer_cast<AST::MatchStatement>(stmt)) {
         visitMatchStatement(matchStmt);
+    } else if (auto typeDecl = std::dynamic_pointer_cast<AST::TypeDeclaration>(stmt)) {
+        // Type declarations are handled during semantic analysis, so we can skip them during code generation
+        // They don't generate any bytecode
+        return;
+    } else if (auto iterStmt = std::dynamic_pointer_cast<AST::IterStatement>(stmt)) {
+        visitIterStatement(iterStmt);
+    } else if (auto moduleDecl = std::dynamic_pointer_cast<AST::ModuleDeclaration>(stmt)) {
+        visitModuleDeclaration(moduleDecl);
+    } else if (auto contractStmt = std::dynamic_pointer_cast<AST::ContractStatement>(stmt)) {
+        visitContractStatement(contractStmt);
     } else {
-        Debugger::error("Unknown statement type", stmt->line, 0, InterpretationStage::COMPILING, "", "", "");
+        Debugger::error("Unknown statement type", stmt->line, 0, InterpretationStage::BYTECODE, "", "", "");
     }
 }
 
@@ -77,8 +88,11 @@ void BytecodeGenerator::visitExpression(const std::shared_ptr<AST::Expression>& 
         visitAwaitExpr(awaitExpr);
     } else if (auto rangeExpr = std::dynamic_pointer_cast<AST::RangeExpr>(expr)) {
         visitRangeExpr(rangeExpr);
+    } else if (auto thisExpr = std::dynamic_pointer_cast<AST::ThisExpr>(expr)) {
+        // Handle 'this' reference - load the current instance
+        emit(Opcode::LOAD_THIS, expr->line);
     } else {
-        Debugger::error("Unknown expression type", expr->line, 0, InterpretationStage::COMPILING, "", "", "");
+        Debugger::error("Unknown expression type", expr->line, 0, InterpretationStage::BYTECODE, "", "", "");
     }
 }
 
@@ -489,16 +503,55 @@ void BytecodeGenerator::visitMatchStatement(const std::shared_ptr<AST::MatchStat
 
 // Expression visitors
 void BytecodeGenerator::visitBinaryExpr(const std::shared_ptr<AST::BinaryExpr>& expr) {
-    // Generate bytecode for binary expression
+    // For compound assignment operators, we need to handle them specially
+    // by first evaluating the left-hand side as an lvalue
+    bool isCompoundAssignment = false;
+    TokenType baseOp = expr->op;
     
-    // Evaluate left operand
-    visitExpression(expr->left);
+    // Handle compound assignment operators by converting them to their base form
+    switch (expr->op) {
+        case TokenType::PLUS_EQUAL:   baseOp = TokenType::PLUS;   isCompoundAssignment = true; break;
+        case TokenType::MINUS_EQUAL:  baseOp = TokenType::MINUS;  isCompoundAssignment = true; break;
+        case TokenType::STAR_EQUAL:   baseOp = TokenType::STAR;   isCompoundAssignment = true; break;
+        case TokenType::SLASH_EQUAL:  baseOp = TokenType::SLASH;  isCompoundAssignment = true; break;
+        case TokenType::MODULUS_EQUAL:baseOp = TokenType::MODULUS;isCompoundAssignment = true; break;
+        default: break;
+    }
     
-    // Evaluate right operand
+    // For compound assignments, we need to evaluate the left-hand side twice:
+    // 1. First as an lvalue (to get the address for assignment)
+    // 2. Then as an rvalue (to get the current value)
+    if (isCompoundAssignment) {
+        // Evaluate the left-hand side as an lvalue first
+        if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(expr->left)) {
+            // For simple variables, just emit a LOAD for the current value
+            // First load the variable value
+            visitVariableExpr(varExpr);
+        } else if (auto memberExpr = std::dynamic_pointer_cast<AST::MemberExpr>(expr->left)) {
+            // For member expressions, evaluate the object and member name
+            visitExpression(memberExpr->object);
+            // For member expressions, we'll just load the value for now
+            // The VM will need to handle the actual member access
+            visitExpression(memberExpr);
+        } else if (auto indexExpr = std::dynamic_pointer_cast<AST::IndexExpr>(expr->left)) {
+            // For index expressions, we'll just load the value for now
+            // The VM will need to handle the actual index access
+            visitExpression(indexExpr);
+        }
+        
+        // Now evaluate the left-hand side as an rvalue
+        visitExpression(expr->left);
+    } else {
+        // Normal binary expression, just evaluate both operands
+        visitExpression(expr->left);
+    }
+    
+    // Evaluate the right-hand side
     visitExpression(expr->right);
     
     // Perform operation based on operator type
-    switch (expr->op) {
+    switch (baseOp) {
+        // Arithmetic operators
         case TokenType::PLUS:
             emit(Opcode::ADD, expr->line);
             break;
@@ -514,6 +567,11 @@ void BytecodeGenerator::visitBinaryExpr(const std::shared_ptr<AST::BinaryExpr>& 
         case TokenType::MODULUS:
             emit(Opcode::MODULO, expr->line);
             break;
+        case TokenType::POWER:
+            emit(Opcode::POWER, expr->line);
+            break;
+            
+        // Comparison operators
         case TokenType::EQUAL_EQUAL:
             emit(Opcode::EQUAL, expr->line);
             break;
@@ -532,15 +590,53 @@ void BytecodeGenerator::visitBinaryExpr(const std::shared_ptr<AST::BinaryExpr>& 
         case TokenType::GREATER_EQUAL:
             emit(Opcode::GREATER_EQUAL, expr->line);
             break;
+            
+        // Logical operators
         case TokenType::AND:
             emit(Opcode::AND, expr->line);
             break;
         case TokenType::OR:
             emit(Opcode::OR, expr->line);
             break;
+            
+        // Bitwise operators
+        // case TokenType::AMPERSAND:
+        //     emit(Opcode::BIT_AND, expr->line);
+        //     break;
+        // case TokenType::PIPE:
+        //     emit(Opcode::BIT_OR, expr->line);
+        //     break;
+        // case TokenType::CARET:
+        //     emit(Opcode::BIT_XOR, expr->line);
+        //     break;
+        // case TokenType::LESS_LESS:
+        //     emit(Opcode::BIT_SHL, expr->line);
+        //     break;
+        // case TokenType::GREATER_GREATER:
+        //     emit(Opcode::BIT_SHR, expr->line);
+        //     break;
+            
         default:
-            Debugger::error("Unknown binary operator", expr->line, 0, InterpretationStage::COMPILING, "", "", "");
-            break;
+            Debugger::error("Unsupported binary operator", expr->line, 0, InterpretationStage::BYTECODE, "", "", "");
+            return;
+    }
+    
+    // For compound assignments, store the result back to the lvalue
+    if (isCompoundAssignment) {
+        if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(expr->left)) {
+            // For simple variables, emit a STORE_VAR
+            emit(Opcode::STORE_VAR, expr->line, 0, 0.0f, false, varExpr->name);
+        } else if (auto memberExpr = std::dynamic_pointer_cast<AST::MemberExpr>(expr->left)) {
+            // For member expressions, we'll just use the member expression directly
+            // The VM will need to handle the actual member store
+            visitExpression(memberExpr);
+            emit(Opcode::STORE_MEMBER, expr->line, 0, 0.0f, false, memberExpr->name);
+        } else if (auto indexExpr = std::dynamic_pointer_cast<AST::IndexExpr>(expr->left)) {
+            // For index expressions, we'll just use the index expression directly
+            // The VM will need to handle the actual index store
+            visitExpression(indexExpr);
+            emit(Opcode::SET_INDEX, expr->line);
+        }
     }
 }
 
@@ -559,7 +655,7 @@ void BytecodeGenerator::visitUnaryExpr(const std::shared_ptr<AST::UnaryExpr>& ex
             emit(Opcode::NOT, expr->line);
             break;
         default:
-            Debugger::error("Unknown unary operator", expr->line, 0, InterpretationStage::COMPILING, "", "", "");
+            Debugger::error("Unknown unary operator", expr->line, 0, InterpretationStage::BYTECODE, "", "", "");
             break;
     }
 }
@@ -633,7 +729,7 @@ void BytecodeGenerator::visitAssignExpr(const std::shared_ptr<AST::AssignExpr>& 
                 emit(Opcode::MODULO, expr->line);
                 break;
             default:
-                Debugger::error("Unknown compound assignment operator", expr->line, 0, InterpretationStage::COMPILING, "", "", "");
+                Debugger::error("Unknown compound assignment operator", expr->line, 0, InterpretationStage::BYTECODE, "", "", "");
                 break;
         }
     } else {
@@ -750,6 +846,107 @@ void BytecodeGenerator::visitRangeExpr(const std::shared_ptr<AST::RangeExpr>& ex
         // Set step value
         emit(Opcode::SET_RANGE_STEP, expr->line);
     }
+}
+
+void BytecodeGenerator::visitIterStatement(const std::shared_ptr<AST::IterStatement>& stmt) {
+    // Push the iterable onto the stack
+    visitExpression(stmt->iterable);
+    
+    // Create an iterator from the iterable
+    emit(Opcode::GET_ITERATOR, stmt->line);
+    
+    // Store the iterator in a temporary variable
+    emit(Opcode::STORE_TEMP, stmt->line, 0);
+    
+    // Start of loop
+    size_t loopStart = bytecode.size();
+    
+    // Check if iterator has next value
+    emit(Opcode::LOAD_TEMP, stmt->line, 0);
+    emit(Opcode::ITERATOR_HAS_NEXT, stmt->line);
+    
+    // Jump to end of loop if no more items
+    emit(Opcode::JUMP_IF_FALSE, stmt->line, 0); // Placeholder for jump offset
+    size_t jumpToEnd = bytecode.size() - 1;
+    
+    // Get next value from iterator
+    emit(Opcode::LOAD_TEMP, stmt->line, 0);
+    emit(Opcode::ITERATOR_NEXT, stmt->line);
+    
+    // Store the value in the loop variable
+    // For single variable iteration (like 'for x in iterable')
+    if (stmt->loopVars.size() == 1) {
+        // The value is already on the stack, just need to store it
+        emit(Opcode::STORE_VAR, stmt->line, 0, 0.0f, false, stmt->loopVars[0]);
+    }
+    // For key-value iteration (like 'for k, v in dict.items()')
+    else if (stmt->loopVars.size() == 2) {
+        // The key-value pair is on the stack as [key, value]
+        // Store the value first (it's on top of the stack)
+        emit(Opcode::STORE_VAR, stmt->line, 0, 0.0f, false, stmt->loopVars[1]);
+        // Then store the key
+        emit(Opcode::STORE_VAR, stmt->line, 0, 0.0f, false, stmt->loopVars[0]);
+    }
+    
+    // Generate code for the loop body
+    visitStatement(stmt->body);
+    
+    // Jump back to the start of the loop
+    emit(Opcode::JUMP, stmt->line, loopStart - bytecode.size() - 1);
+    
+    // Update the jump to end of loop with the correct offset
+    bytecode[jumpToEnd].intValue = bytecode.size() - jumpToEnd - 1;
+    
+    // Clean up the temporary iterator
+    emit(Opcode::CLEAR_TEMP, stmt->line, 0);
+}
+
+void BytecodeGenerator::visitModuleDeclaration(const std::shared_ptr<AST::ModuleDeclaration>& stmt) {
+    // For now, we'll just process the module body as a block
+    // In a real implementation, we might want to handle module-level scoping
+    
+    // Create a new scope for the module
+    emit(Opcode::BEGIN_SCOPE, stmt->line);
+    
+    // Process all public members of the module
+    for (const auto& member : stmt->publicMembers) {
+        visitStatement(member);
+    }
+    
+    // Process all protected members of the module
+    for (const auto& member : stmt->protectedMembers) {
+        visitStatement(member);
+    }
+    
+    // Process all private members of the module
+    for (const auto& member : stmt->privateMembers) {
+        visitStatement(member);
+    }
+    
+    // End the module scope
+    emit(Opcode::END_SCOPE, stmt->line);
+}
+
+void BytecodeGenerator::visitContractStatement(const std::shared_ptr<AST::ContractStatement>& stmt) {
+    // Contracts are typically used for preconditions, postconditions, and invariants
+    // In the bytecode, we'll generate code to check the condition and possibly throw an exception if it fails
+    
+    // Evaluate the condition
+    visitExpression(stmt->condition);
+    
+    // If the condition is false, throw an exception with the message
+    emit(Opcode::JUMP_IF_TRUE, stmt->line, 5); // Skip the next 5 instructions if condition is true
+    
+    // Evaluate the message expression (should result in a string)
+    if (stmt->message) {
+        visitExpression(stmt->message);
+    } else {
+        // Default error message if none provided
+        emit(Opcode::PUSH_STRING, stmt->line, 0, 0.0f, false, "Contract violation");
+    }
+    
+    // Throw an exception with the message
+    emit(Opcode::THROW, stmt->line);
 }
 
 void BytecodeGenerator::emit(Opcode op, uint32_t lineNumber, int32_t intValue, float floatValue, bool boolValue, const std::string& stringValue) {

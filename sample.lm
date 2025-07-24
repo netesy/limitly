@@ -94,10 +94,6 @@ print(10 + 5 * 2);                  // Output: 20
 print((10 > 5) and (5 < 2));        // false
 print("Hello, " + "Luminar!");      // String concatenation
 
-// === Arithmetic and Logical Operations ===
-print(10 + 5 * 2);                  // Output: 20
-print((10 > 5) and (5 < 2));        // false
-print("Hello, " + "Luminar!");      // String concatenation
 
 // === Loops ===
 

@@ -318,65 +318,75 @@ void VM::handleClearTemp(const Instruction& /*unused*/) {
     tempValue = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
 }
 
+// Helper function to convert a value to its string representation
+std::string VM::valueToString(const ValuePtr& value) {
+    switch (value->type->tag) {
+        case TypeTag::String:
+            return std::get<std::string>(value->data);
+        case TypeTag::Int:
+            return std::to_string(std::get<int32_t>(value->data));
+        case TypeTag::Float64:
+            return std::to_string(std::get<double>(value->data));
+        case TypeTag::Bool:
+            return std::get<bool>(value->data) ? "true" : "false";
+        case TypeTag::Nil:
+            return "nil";
+        default:
+            return "[object " + typeTagToString(value->type->tag) + "]";
+    }
+}
+
 void VM::handleAdd(const Instruction& /*unused*/) {
-ValuePtr b = pop();
-ValuePtr a = pop();
+    ValuePtr b = pop();
+    ValuePtr a = pop();
 
-// String concatenation (string + string)
-if (a->type->tag == TypeTag::String && b->type->tag == TypeTag::String) {
-const std::string& strA = std::get<std::string>(a->data);
-const std::string& strB = std::get<std::string>(b->data);
+    // String concatenation (if either operand is a string, convert the other to string)
+    if (a->type->tag == TypeTag::String || b->type->tag == TypeTag::String) {
+        std::string strA = valueToString(a);
+        std::string strB = valueToString(b);
+        std::string result = strA + strB;
+        push(memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, std::move(result)));
+        return;
+    }
 
-std::string result;
-result.reserve(strA.length() + strB.length());
-result = strA + strB;
+    // Check if either operand is a number for numeric addition
+    bool aIsNumeric = (a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Float64);
+    bool bIsNumeric = (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Float64);
 
-push(memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, std::move(result)));
-return;
-}
+    if (aIsNumeric && bIsNumeric) {
+        // Numeric addition - promote to double if either operand is double
+        if (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64) {
+            // Convert to double if needed
+            double aVal = (a->type->tag == TypeTag::Float64) ? 
+                std::get<double>(a->data) : 
+                static_cast<double>(std::get<int32_t>(a->data));
 
-// Check if either operand is a number for numeric addition
-bool aIsNumeric = (a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Float64);
-bool bIsNumeric = (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Float64);
+            double bVal = (b->type->tag == TypeTag::Float64) ? 
+                std::get<double>(b->data) : 
+                static_cast<double>(std::get<int32_t>(b->data));
 
-if (aIsNumeric && bIsNumeric) {
-// Numeric addition - promote to double if either operand is double
-if (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64) {
-// Convert to double if needed
-double aVal = (a->type->tag == TypeTag::Float64) ? 
-std::get<double>(a->data) : 
-static_cast<double>(std::get<int32_t>(a->data));
+            // Check for floating-point edge cases
+            double result = aVal + bVal;
+            push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, result));
+        } else {
+            // Integer addition with overflow check
+            int32_t aVal = std::get<int32_t>(a->data);
+            int32_t bVal = std::get<int32_t>(b->data);
 
-double bVal = (b->type->tag == TypeTag::Float64) ? 
-std::get<double>(b->data) : 
-static_cast<double>(std::get<int32_t>(b->data));
+            // Check for integer overflow using well-defined behavior
+            if ((bVal > 0 && aVal > std::numeric_limits<int32_t>::max() - bVal) ||
+                (bVal < 0 && aVal < std::numeric_limits<int32_t>::min() - bVal)) {
+                error("Integer addition overflow");
+            }
 
-// Check for floating-point edge cases
-double result = aVal + bVal;
-if (std::isinf(result)) {
-error("Floating-point addition resulted in infinity");
-}
-
-push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, result));
-} else {
-// Integer addition with overflow check
-int32_t aVal = std::get<int32_t>(a->data);
-int32_t bVal = std::get<int32_t>(b->data);
-
-// Check for integer overflow using well-defined behavior
-if ((bVal > 0 && aVal > std::numeric_limits<int32_t>::max() - bVal) ||
-(bVal < 0 && aVal < std::numeric_limits<int32_t>::min() - bVal)) {
-error("Integer addition overflow");
-}
-
-push(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, aVal + bVal));
-}
-} else {
-// If we get here, the operands are not compatible for addition
-error("Cannot add operands of types " + 
-typeTagToString(a->type->tag) + " and " + 
-typeTagToString(b->type->tag));
-}
+            push(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, aVal + bVal));
+        }
+    } else {
+        // If we get here, the operands are not compatible for addition
+        error("Cannot add operands of types " + 
+              typeTagToString(a->type->tag) + " and " + 
+              typeTagToString(b->type->tag));
+    }
 }
 
 void VM::handleSubtract(const Instruction& /*unused*/) {
