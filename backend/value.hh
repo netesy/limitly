@@ -123,7 +123,6 @@ struct Type
     // In value.hh, add this inside the Type struct
     Type(const Type& other)
         : tag(other.tag), extra(other.extra) {
-        std::cout << "[DEBUG] Type: Copy constructor called" << std::endl;
     }
 
     std::string toString() const
@@ -392,36 +391,25 @@ struct Value {
         data;
 
     // Default constructor
-    Value() : type(nullptr) {
-        std::cout << "[DEBUG] Value: Default constructor called" << std::endl;
-    }
+    Value() : type(nullptr) {}
 
     // Constructor with type only
-    explicit Value(TypePtr t) : type(std::move(t)) {
-        std::cout << "[DEBUG] Value: Constructor with type " << (type ? type->toString() : "null") << std::endl;
-    }
+    explicit Value(TypePtr t) : type(std::move(t)) {}
 
     // String constructors
-    Value(TypePtr t, const std::string& str) : type(std::move(t)), data(str) {
-        std::cout << "[DEBUG] Value: Constructor with string" << std::endl;
-    }
+    Value(TypePtr t, const std::string& str) : type(std::move(t)), data(str) {}
 
-    Value(TypePtr t, const char* str) : type(std::move(t)), data(std::string(str)) {
-        std::cout << "[DEBUG] Value: Constructor with string literal" << std::endl;
-    }
+    // String literal constructor
+    Value(TypePtr t, const char* str) : type(std::move(t)), data(std::string(str)) {}
 
     // Boolean constructor
-    Value(TypePtr t, bool val) : type(std::move(t)), data(val) {
-        std::cout << "[DEBUG] Value: Constructor with bool" << std::endl;
-    }
+    Value(TypePtr t, bool val) : type(std::move(t)), data(val) {}
 
     // Floating point constructors
     Value(TypePtr t, float val) : type(std::move(t)), data(val) {
-        std::cout << "[DEBUG] Value: Constructor with float" << std::endl;
     }
 
     Value(TypePtr t, double val) : type(std::move(t)), data(val) {
-        std::cout << "[DEBUG] Value: Constructor with double" << std::endl;
     }
 
     // Template constructor for integer types - eliminates ambiguity
@@ -429,7 +417,7 @@ struct Value {
     Value(TypePtr t, T val,
           typename std::enable_if_t<std::is_integral_v<T> && !std::is_same_v<T, bool>>* = nullptr)
         : type(std::move(t)) {
-        std::cout << "[DEBUG] Value: Constructor with integer type" << std::endl;
+        
 
         // Store based on the TypeTag, not the input type
         if (!type) {
@@ -474,47 +462,45 @@ struct Value {
     Value(Value&& other) noexcept
         : type(std::move(other.type)),
           data(std::move(other.data)) {
-        std::cout << "[DEBUG] Value: Move constructor called" << std::endl;
+        
     }
 
     // Copy constructor
     Value(const Value& other)
     : type(other.type ? std::make_shared<Type>(*other.type) : nullptr),
       data(other.data) {
-    std::cout << "[DEBUG] Value: Copy constructor called at " << this 
-              << " (type: " << (type ? type->toString() : "null") 
-              << ")" << std::endl;
+   
 }
 
 // Update the destructor:
 ~Value() {
-    std::cout << "[DEBUG] Value: Destructor called at " << this 
-              << " (type: " << (type ? type->toString() : "null") 
-              << ")" << std::endl;
+   
 }
         // Constructor for ListValue
         Value(TypePtr t, const ListValue& lv) : type(std::move(t)), data(lv) {
-            std::cout << "[DEBUG] Value: Constructor with ListValue" << std::endl;
+           
         }
 
         // Constructor for DictValue
         Value(TypePtr t, const DictValue& dv) : type(std::move(t)), data(dv) {
-            std::cout << "[DEBUG] Value: Constructor with DictValue" << std::endl;
+           
+;
         }
 
         // Constructor for EnumValue
         Value(TypePtr t, const EnumValue& ev) : type(std::move(t)), data(ev) {
-            std::cout << "[DEBUG] Value: Constructor with EnumValue" << std::endl;
+           
         }
 
         // Constructor for SumValue
         Value(TypePtr t, const SumValue& sv) : type(std::move(t)), data(sv) {
-            std::cout << "[DEBUG] Value: Constructor with SumValue" << std::endl;
+           
+;
         }
 
         // Constructor for UserDefinedValue
         Value(TypePtr t, const UserDefinedValue& udv) : type(std::move(t)), data(udv) {
-            std::cout << "[DEBUG] Value: Constructor with UserDefinedValue" << std::endl;
+           
         }
 
     friend std::ostream &operator<<(std::ostream &os, const Value &value);

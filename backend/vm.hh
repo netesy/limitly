@@ -54,6 +54,12 @@ private:
     ValuePtr pop();
     void push(const ValuePtr& value);
     ValuePtr peek(int distance = 0) const;
+    
+public:
+    // Debugging methods
+    void printStack() const;
+    
+private:
     void error(const std::string& message) const;
     
     // Instruction handlers

@@ -29,6 +29,7 @@ enum class Opcode {
     SUBTRACT,           // Subtract top value from second value
     MULTIPLY,           // Multiply top two values
     DIVIDE,             // Divide second value by top value
+    POWER,              // Raise second value to the power of top value
     MODULO,             // Modulo second value by top value
     NEGATE,             // Negate top value
 

@@ -201,7 +201,6 @@ ValuePtr VM::execute(const std::vector<Instruction>& bytecode) {
         std::cerr << "Runtime error: " << e.what() << std::endl;
         return memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
     }
-    
     return stack.empty() ? memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE) : stack.back();
 }
 void VM::registerNativeFunction(const std::string& name, std::function<ValuePtr(const std::vector<ValuePtr>&)> function) {
@@ -228,6 +227,23 @@ ValuePtr VM::peek(int distance) const {
     }
     
     return stack[stack.size() - 1 - distance];
+}
+
+void VM::printStack() const {
+    if (stack.empty()) {
+        std::cout << "Stack is empty" << std::endl;
+        return;
+    }
+    
+    std::cout << "=== Stack (" << stack.size() << " items) ===" << std::endl;
+    for (int i = stack.size() - 1; i >= 0; --i) {
+        std::cout << "[" << i << "]: " << stack[i]->toString();
+        if (stack[i]->type) {
+            std::cout << " (" << stack[i]->type->toString() << ")";
+        }
+        std::cout << std::endl;
+    }
+    std::cout << "====================" << std::endl;
 }
 
 void VM::error(const std::string& message) const {
