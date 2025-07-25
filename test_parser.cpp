@@ -8,6 +8,7 @@
 #include <sstream>
 #include <iomanip>
 #include <unordered_map>
+#include <algorithm>
 
 // Map opcode enum values to their string representations
 const std::unordered_map<Opcode, std::string> OPCODE_NAMES = {
@@ -45,6 +46,10 @@ const std::unordered_map<Opcode, std::string> OPCODE_NAMES = {
     {Opcode::LESS_EQUAL, "LESS_EQUAL"},
     {Opcode::GREATER, "GREATER"},
     {Opcode::GREATER_EQUAL, "GREATER_EQUAL"},
+    
+    // String operations
+    {Opcode::INTERPOLATE_STRING, "INTERPOLATE_STRING"},
+    {Opcode::CONCAT, "CONCAT"},
     
     // Logical operations
     {Opcode::AND, "AND"},
@@ -138,6 +143,28 @@ std::string getOpcodeName(Opcode opcode) {
         return it->second;
     }
     return "OP_" + std::to_string(static_cast<int>(opcode));
+}
+
+// Function to print all opcode values and names
+void printOpcodeValues() {
+    std::cout << "Opcode values and names:" << std::endl;
+    std::cout << "------------------------" << std::endl;
+    
+    // Create a vector of pairs to sort the opcodes by their numeric values
+    std::vector<std::pair<int, std::string>> opcodeList;
+    for (const auto& pair : OPCODE_NAMES) {
+        opcodeList.push_back({static_cast<int>(pair.first), pair.second});
+    }
+    
+    // Sort by opcode value
+    std::sort(opcodeList.begin(), opcodeList.end(), 
+        [](const auto& a, const auto& b) { return a.first < b.first; });
+    
+    // Print sorted opcodes
+    for (const auto& [value, name] : opcodeList) {
+        std::cout << std::setw(3) << value << ": " << name << std::endl;
+    }
+    std::cout << "------------------------" << std::endl;
 }
 
 int main(int argc, char* argv[]) {

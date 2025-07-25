@@ -34,6 +34,10 @@ enum class Opcode {
     MODULO,             // Modulo second value by top value
     NEGATE,             // Negate top value
 
+    // String operations
+    INTERPOLATE_STRING,   // String interpolation with embedded expressions
+    CONCAT,              // Concatenate two strings
+
     // Comparison operations
     EQUAL,              // Check if top two values are equal
     NOT_EQUAL,          // Check if top two values are not equal

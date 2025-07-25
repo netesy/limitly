@@ -96,6 +96,7 @@ public:
     std::shared_ptr<AST::Expression> call();
     std::shared_ptr<AST::Expression> primary();
     std::shared_ptr<AST::Expression> finishCall(std::shared_ptr<AST::Expression> callee);
+    std::shared_ptr<AST::InterpolatedStringExpr> interpolatedString();
 
     // Type annotation parsing
     std::shared_ptr<AST::TypeAnnotation> parseTypeAnnotation();

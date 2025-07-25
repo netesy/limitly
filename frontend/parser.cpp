@@ -1300,6 +1300,56 @@ std::shared_ptr<AST::Expression> Parser::finishCall(std::shared_ptr<AST::Express
     return callExpr;
 }
 
+std::shared_ptr<AST::InterpolatedStringExpr> Parser::interpolatedString() {
+    auto interpolated = std::make_shared<AST::InterpolatedStringExpr>();
+    interpolated->line = previous().line;
+    
+    // The scanner has already tokenized the string into parts
+    // We'll process the tokens until we find the closing quote
+    while (!isAtEnd() && !check(TokenType::STRING)) {
+        if (match({TokenType::INTERPOLATION})) {
+            // This is an interpolation start token
+            if (check(TokenType::INTERPOLATION) && peek().lexeme == "}") {
+                // Empty interpolation, skip it
+                advance();
+                continue;
+            }
+            
+            // Parse the expression inside the interpolation
+            auto expr = expression();
+            if (expr) {
+                interpolated->addExpressionPart(expr);
+            }
+            
+            // Consume the closing interpolation token
+            if (check(TokenType::INTERPOLATION) && peek().lexeme == "}") {
+                advance();
+            } else {
+                error("Expected '}' after expression in string interpolation.");
+            }
+        } else if (match({TokenType::STRING})) {
+            // This is a string literal part
+            auto str = previous().lexeme;
+            if (!str.empty()) {
+                interpolated->addStringPart(str);
+            }
+        } else {
+            // This shouldn't happen if the scanner is working correctly
+            error("Unexpected token in interpolated string.");
+            break;
+        }
+    }
+    
+    // Consume the closing quote if present
+    if (check(TokenType::STRING)) {
+        advance();
+    } else {
+        error("Unterminated interpolated string.");
+    }
+    
+    return interpolated;
+}
+
 std::shared_ptr<AST::Expression> Parser::primary() {
     if (match({TokenType::FALSE})) {
         auto literalExpr = std::make_shared<AST::LiteralExpr>();
@@ -1338,10 +1388,19 @@ std::shared_ptr<AST::Expression> Parser::primary() {
     }
 
     if (match({TokenType::STRING})) {
-        auto literalExpr = std::make_shared<AST::LiteralExpr>();
-        literalExpr->line = previous().line;
-        literalExpr->value = previous().lexeme;
-        return literalExpr;
+        // Check if this is an interpolated string (starts with a string followed by INTERPOLATION token)
+        if (check(TokenType::INTERPOLATION) || 
+            (peek().type == TokenType::STRING && current + 1 < scanner.tokens.size() && 
+             scanner.tokens[current + 1].type == TokenType::INTERPOLATION)) {
+            // This is an interpolated string
+            return interpolatedString();
+        } else {
+            // Regular string literal
+            auto literalExpr = std::make_shared<AST::LiteralExpr>();
+            literalExpr->line = previous().line;
+            literalExpr->value = previous().lexeme;
+            return literalExpr;
+        }
     }
 
     if (match({TokenType::IDENTIFIER})) {

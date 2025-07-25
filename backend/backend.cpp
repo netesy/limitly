@@ -3,6 +3,33 @@
 #include "value.hh"
 #include <iostream>
 
+void BytecodeGenerator::visitInterpolatedStringExpr(const std::shared_ptr<AST::InterpolatedStringExpr>& expr) {
+    // For each part of the interpolated string
+    for (const auto& part : expr->parts) {
+        std::visit(overloaded {
+            // Handle string literal parts
+            [&](const std::string& str) {
+                // Push the string literal onto the stack
+                emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, str);
+            },
+            // Handle expression parts
+            [&](const std::shared_ptr<AST::Expression>& expr) {
+                // Evaluate the expression
+                visitExpression(expr);
+                
+                // Convert the result to a string using CONCAT with an empty string
+                // This is a common pattern to convert any value to a string
+                emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, "");
+                emit(Opcode::CONCAT, expr->line);
+            }
+        }, part);
+    }
+    
+    // Now concatenate all parts using the INTERPOLATE_STRING opcode
+    // The number of parts is passed as an operand
+    emit(Opcode::INTERPOLATE_STRING, expr->line, static_cast<int32_t>(expr->parts.size()));
+}
+
 // BytecodeGenerator implementation
 void BytecodeGenerator::process(const std::shared_ptr<AST::Program>& program) {
     // Process each statement in the program
@@ -91,6 +118,8 @@ void BytecodeGenerator::visitExpression(const std::shared_ptr<AST::Expression>& 
     } else if (auto thisExpr = std::dynamic_pointer_cast<AST::ThisExpr>(expr)) {
         // Handle 'this' reference - load the current instance
         emit(Opcode::LOAD_THIS, expr->line);
+    } else if (auto interpolatedStr = std::dynamic_pointer_cast<AST::InterpolatedStringExpr>(expr)) {
+        visitInterpolatedStringExpr(interpolatedStr);
     } else {
         Debugger::error("Unknown expression type", expr->line, 0, InterpretationStage::BYTECODE, "", "", "");
     }

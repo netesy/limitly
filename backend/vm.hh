@@ -54,6 +54,7 @@ private:
     ValuePtr pop();
     void push(const ValuePtr& value);
     ValuePtr peek(int distance = 0) const;
+    std::string valueToString(const ValuePtr& value);
     
 public:
     // Debugging methods
@@ -91,6 +92,8 @@ private:
     void handleAnd(const Instruction& instruction);
     void handleOr(const Instruction& instruction);
     void handleNot(const Instruction& instruction);
+    void handleInterpolateString(const Instruction& instruction);
+    void handleConcat(const Instruction& instruction);
     void handleJump(const Instruction& instruction);
     void handleJumpIfTrue(const Instruction& instruction);
     void handleJumpIfFalse(const Instruction& instruction);
@@ -108,6 +111,7 @@ private:
     void handleCreateList(const Instruction& instruction);
     void handleListAppend(const Instruction& instruction);
     void handleCreateDict(const Instruction& instruction);
+    void handleCreateRange(const Instruction& instruction);
     void handleDictSet(const Instruction& instruction);
     void handleGetIndex(const Instruction& instruction);
     void handleSetIndex(const Instruction& instruction);
@@ -159,7 +163,8 @@ public:
         
         throw std::runtime_error("Undefined variable '" + name + "'");
     }
-    
+
+   
     void assign(const std::string& name, const ValuePtr& value) {
         auto it = values.find(name);
         if (it != values.end()) {
