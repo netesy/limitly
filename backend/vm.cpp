@@ -87,6 +87,12 @@ ValuePtr VM::execute(const std::vector<Instruction>& bytecode) {
         while (ip < bytecode.size()) {
             const Instruction& instruction = bytecode[ip];
             
+            // Debug output for opcode values
+            int opcodeValue = static_cast<int>(instruction.opcode);
+            if (opcodeValue >= 58) {
+                std::cerr << "Executing opcode: " << opcodeValue << " at IP: " << ip << " (line: " << instruction.line << ")" << std::endl;
+            }
+            
             switch (instruction.opcode) {
                 case Opcode::PUSH_INT:
                     handlePushInt(instruction);
@@ -172,6 +178,12 @@ ValuePtr VM::execute(const std::vector<Instruction>& bytecode) {
                 case Opcode::NOT:
                     handleNot(instruction);
                     break;
+                case Opcode::INTERPOLATE_STRING:
+                    handleInterpolateString(instruction);
+                    break;
+                case Opcode::CONCAT:
+                    handleConcat(instruction);
+                    break;
                 case Opcode::JUMP:
                     handleJump(instruction);
                     break;
@@ -189,6 +201,15 @@ ValuePtr VM::execute(const std::vector<Instruction>& bytecode) {
                     break;
                 case Opcode::PRINT:
                     handlePrint(instruction);
+                    break;
+                case Opcode::CREATE_RANGE:
+                    handleCreateRange(instruction);
+                    break;
+                case Opcode::BEGIN_SCOPE:
+                    // No action needed for BEGIN_SCOPE in this implementation
+                    break;
+                case Opcode::END_SCOPE:
+                    // No action needed for END_SCOPE in this implementation
                     break;
                 default:
                     error("Unknown opcode: " + std::to_string(static_cast<int>(instruction.opcode)));
@@ -834,26 +855,85 @@ void VM::handleOr(const Instruction& /*unused*/) {
 }
 
 void VM::handleNot(const Instruction& /*unused*/) {
-    ValuePtr a = pop();
+    if (stack.empty()) {
+        error("Stack underflow in NOT operation");
+        return;
+    }
+
+    ValuePtr value = pop();
     
-    bool aVal = false;
-    
-    // Convert to boolean
-    if (a->type->tag == TypeTag::Bool) {
-        aVal = std::get<bool>(a->data);
-    } else if (a->type->tag == TypeTag::Int) {
-        aVal = std::get<int32_t>(a->data) != 0;
-    } else if (a->type->tag == TypeTag::Float64) {
-        aVal = std::get<double>(a->data) != 0.0;
-    } else if (a->type->tag == TypeTag::String) {
-        aVal = !std::get<std::string>(a->data).empty();
-    } else if (a->type->tag == TypeTag::Nil) {
-        aVal = false;
+    // Convert value to boolean
+    bool boolValue = false;
+    if (std::holds_alternative<bool>(value->data)) {
+        boolValue = std::get<bool>(value->data);
+    } else if (std::holds_alternative<int32_t>(value->data)) {
+        boolValue = std::get<int32_t>(value->data) != 0;
+    } else if (std::holds_alternative<int64_t>(value->data)) {
+        boolValue = std::get<int64_t>(value->data) != 0;
+    } else if (std::holds_alternative<double>(value->data)) {
+        boolValue = std::get<double>(value->data) != 0.0;
+    } else if (std::holds_alternative<float>(value->data)) {
+        boolValue = std::get<float>(value->data) != 0.0f;
+    } else if (std::holds_alternative<std::string>(value->data)) {
+        boolValue = !std::get<std::string>(value->data).empty();
+    } else if (std::holds_alternative<std::monostate>(value->data)) {
+        boolValue = false; // null is falsy
     } else {
-        aVal = true; // Objects are truthy
+        error("Cannot perform NOT operation on type: " + typeTagToString(value->type->tag));
+        return;
     }
     
-    push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, !aVal));
+    auto result = memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, !boolValue);
+    push(result);
+}
+
+void VM::handleInterpolateString(const Instruction& instruction) {
+    // The number of parts is stored in the intValue field
+    int32_t numParts = instruction.intValue;
+    
+    if (stack.size() < static_cast<size_t>(numParts)) {
+        error("Stack underflow in string interpolation");
+        return;
+    }
+    
+    // Pop all parts from the stack
+    std::vector<ValuePtr> parts;
+    parts.reserve(numParts);
+    for (int i = 0; i < numParts; ++i) {
+        parts.push_back(pop());
+    }
+    
+    // Concatenate all parts in reverse order (since we popped them)
+    std::string result;
+    for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
+        result += valueToString(*it);
+    }
+    
+    // Push the result string onto the stack
+    auto resultValue = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, result);
+    push(resultValue);
+}
+
+void VM::handleConcat(const Instruction& /*unused*/) {
+    if (stack.size() < 2) {
+        error("Stack underflow in CONCAT operation");
+        return;
+    }
+    
+    // Pop the two top values
+    ValuePtr right = pop();
+    ValuePtr left = pop();
+    
+    // Convert both values to strings
+    std::string leftStr = valueToString(left);
+    std::string rightStr = valueToString(right);
+    
+    // Concatenate the strings
+    std::string result = leftStr + rightStr;
+    
+    // Push the result back onto the stack
+    auto resultValue = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, result);
+    push(resultValue);
 }
 
 void VM::handleJump(const Instruction& instruction) {
@@ -914,7 +994,31 @@ void VM::handleJumpIfFalse(const Instruction& instruction) {
 }
 
 void VM::handleCall(const Instruction& instruction) {
-    (void)instruction; // Mark as unused
+    // Get the function name from the instruction
+    const std::string& funcName = instruction.stringValue;
+    
+    // Check if it's a native function
+    auto nativeIt = nativeFunctions.find(funcName);
+    if (nativeIt != nativeFunctions.end()) {
+        // Get the number of arguments
+        int argCount = instruction.intValue;
+        
+        // Collect arguments from the stack
+        std::vector<ValuePtr> args;
+        args.reserve(argCount);
+        for (int i = 0; i < argCount; i++) {
+            args.push_back(pop());
+        }
+        
+        // Call the native function and push the result
+        push(nativeIt->second(args));
+        return;
+    }
+    
+    // For user-defined functions, we'd look up the function object here
+    // and set up a new call frame, but that's not implemented yet
+    
+    error("Function not found: " + funcName);
     // TODO: Implement function calls
     error("Function calls not implemented yet");
 }
@@ -930,18 +1034,22 @@ void VM::handlePrint(const Instruction& instruction) {
     int argCount = instruction.intValue;
     std::vector<ValuePtr> args;
     
+    // Pop all arguments from the stack
     for (int i = 0; i < argCount; ++i) {
         args.insert(args.begin(), pop());
     }
     
+    // Print all arguments separated by spaces
     for (size_t i = 0; i < args.size(); ++i) {
         if (i > 0) {
             std::cout << " ";
         }
-        std::cout << args[i]->toString();
+        std::cout << valueToString(args[i]);
     }
-    
     std::cout << std::endl;
+    
+    // Push nil as the result
+    push(memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
 }
 
 // Placeholder implementations for other handlers
@@ -954,8 +1062,68 @@ void VM::handleBeginClass(const Instruction& /*unused*/) { error("Not implemente
 void VM::handleEndClass(const Instruction& /*unused*/) { error("Not implemented"); }
 void VM::handleGetProperty(const Instruction& /*unused*/) { error("Not implemented"); }
 void VM::handleSetProperty(const Instruction& /*unused*/) { error("Not implemented"); }
-void VM::handleCreateList(const Instruction& /*unused*/) { error("Not implemented"); }
-void VM::handleListAppend(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleCreateList(const Instruction& /*unused*/) {
+    // TODO: Implement list creation
+    error("List creation not implemented yet");
+}
+
+void VM::handleListAppend(const Instruction& /*unused*/) {
+    // TODO: Implement list append
+    error("List append not implemented yet");
+}
+
+void VM::handleCreateRange(const Instruction& instruction) {
+    // Get the step value if specified (default is 1)
+    int step = instruction.intValue;
+    
+    // Pop the end value
+    ValuePtr endVal = pop();
+    
+    // Pop the start value
+    ValuePtr startVal = pop();
+    
+    // Convert values to integers
+    int start = 0, end = 0;
+    
+    if (startVal->type->tag == TypeTag::Int) {
+        start = std::get<int32_t>(startVal->data);
+    } else {
+        error("Range start must be an integer");
+        return;
+    }
+    
+    if (endVal->type->tag == TypeTag::Int) {
+        end = std::get<int32_t>(endVal->data);
+    } else {
+        error("Range end must be an integer");
+        return;
+    }
+    
+    // Create a new ListValue to hold the range elements
+    ListValue listValue;
+    
+    // Generate the range values and add them to the list
+    if (step > 0) {
+        for (int i = start; i < end; i += step) {
+            listValue.elements.push_back(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, i));
+        }
+    } else if (step < 0) {
+        for (int i = start; i > end; i += step) {
+            listValue.elements.push_back(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, i));
+        }
+    } else {
+        //if no step we increment the by 1
+        for (int i = start; i < end; i += 1) {
+            listValue.elements.push_back(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, i));
+        }
+    }
+    
+    // Create a new Value with the ListValue and push it onto the stack
+    ValuePtr rangeList = memoryManager.makeRef<Value>(*region, typeSystem->LIST_TYPE, listValue);
+    
+    push(rangeList);
+}
+
 void VM::handleIteratorNextKeyValue(const Instruction& /*unused*/) { error("Not implemented"); }
 void VM::handleBeginScope(const Instruction& /*unused*/) { error("Not implemented"); }
 void VM::handleEndScope(const Instruction& /*unused*/) { error("Not implemented"); }
@@ -975,17 +1143,12 @@ void VM::handleBeginEnum(const Instruction& /*unused*/) { error("Not implemented
 void VM::handleEndEnum(const Instruction& /*unused*/) { error("Not implemented"); }
 void VM::handleDefineEnumVariant(const Instruction& /*unused*/) { error("Not implemented"); }
 
-// ... (rest of the code remains the same)
-void VM::handleDebugPrint(const Instruction& /*unused*/) {
-    // Print the top value on the stack for debugging
+void VM::handleDebugPrint(const Instruction& instruction) {
+    (void)instruction; // Mark as unused
     if (stack.empty()) {
-        std::cout << "[DEBUG] Stack is empty" << std::endl;
-        return;
-    }
-    ValuePtr value = peek();
-    if (value) {
-        std::cout << "[DEBUG] " << value->toString() << std::endl;
+        std::cerr << "[DEBUG] Stack is empty" << std::endl;
     } else {
-        std::cout << "[DEBUG] (null value)" << std::endl;
+        ValuePtr value = stack.back(); // Peek at the top value without popping
+        std::cerr << "[DEBUG] Stack top: " << valueToString(value) << std::endl;
     }
 }

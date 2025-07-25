@@ -52,9 +52,10 @@ enum class TokenType {
     POWER,         // **
 
     // Group: Literals
-    IDENTIFIER, // variable/function names
-    STRING,     // string literals
-    NUMBER,     // numeric literals
+    IDENTIFIER,      // variable/function names
+    STRING,          // string literals
+    INTERPOLATION,   // interpolation expression within strings
+    NUMBER,          // numeric literals
 
     // Group: Types
     INT_TYPE,      // int

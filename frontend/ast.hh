@@ -136,6 +136,22 @@ namespace AST {
         std::shared_ptr<Expression> right;
     };
 
+    // Interpolated string expression (e.g., "Hello, {name}!")
+    struct InterpolatedStringExpr : public Expression {
+        // Each part is either a string literal or an expression
+        std::vector<std::variant<std::string, std::shared_ptr<Expression>>> parts;
+        
+        // Add a string part
+        void addStringPart(const std::string& str) {
+            parts.push_back(str);
+        }
+        
+        // Add an expression part
+        void addExpressionPart(std::shared_ptr<Expression> expr) {
+            parts.push_back(expr);
+        }
+    };
+
     // Literal values (numbers, strings, booleans, nil)
     struct LiteralExpr : public Expression {
         std::variant<int, double, std::string, bool, std::nullptr_t> value;
