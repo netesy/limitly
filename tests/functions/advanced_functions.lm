@@ -1,0 +1,50 @@
+// Test advanced function features (if implemented)
+print("=== Advanced Function Tests ===");
+
+// Function with optional parameters
+function greetWithDefault(name = "World") {
+    print("Hello, {name}!");
+}
+
+print("Optional parameters:");
+greetWithDefault();
+greetWithDefault("Alice");
+
+// Function with multiple optional parameters
+function createUser(name, age = 18, active = true) {
+    print("User: {name}, Age: {age}, Active: {active}");
+}
+
+print("Multiple optional parameters:");
+createUser("Bob");
+createUser("Charlie", 25);
+createUser("Diana", 30, false);
+
+// Higher-order functions (if implemented)
+function applyOperation(x, y, operation) {
+    return operation(x, y);
+}
+
+function multiply(a, b) {
+    return a * b;
+}
+
+print("Higher-order functions:");
+var result = applyOperation(6, 7, multiply);
+print("applyOperation(6, 7, multiply) = {result}");
+
+// Closures (if implemented)
+function createCounter() {
+    var count = 0;
+    function increment() {
+        count += 1;
+        return count;
+    }
+    return increment;
+}
+
+print("Closures:");
+var counter = createCounter();
+print("Counter: {counter()}");
+print("Counter: {counter()}");
+print("Counter: {counter()}");

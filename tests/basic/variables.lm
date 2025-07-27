@@ -1,0 +1,31 @@
+// Test variable declarations and assignments
+print("=== Variable Declaration Tests ===");
+
+// Basic variable declarations
+var x = 42;
+var y = 3.14;
+var name = "Limit";
+var isActive = true;
+
+print("Integer: {x}");
+print("Float: {y}");
+print("String: {name}");
+print("Boolean: {isActive}");
+
+// Variable reassignment
+x = 100;
+y = 2.71;
+name = "Language";
+isActive = false;
+
+print("After reassignment:");
+print("Integer: {x}");
+print("Float: {y}");
+print("String: {name}");
+print("Boolean: {isActive}");
+
+// Multiple declarations (separate statements since comma syntax not implemented)
+var a = 1;
+var b = 2; 
+var c = 3;
+print("Multiple declarations: a={a}, b={b}, c={c}");

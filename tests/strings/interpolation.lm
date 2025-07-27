@@ -1,0 +1,36 @@
+// Test string interpolation
+print("=== String Interpolation Tests ===");
+
+var name = "World";
+var age = 25;
+var pi = 3.14159;
+
+// Basic interpolation
+print("Hello, {name}!");
+print("Age: {age}");
+print("Pi: {pi}");
+
+// Expression interpolation
+print("Next year: {age + 1}");
+print("Area of circle: {pi * 2 * 2}");
+
+// Multiple interpolations
+print("Name: {name}, Age: {age}");
+print("{name} is {age} years old");
+
+// Interpolation at start
+print("{name} says hello");
+print("{age} is the age");
+
+// Complex expressions
+var x = 10;
+var y = 5;
+print("Math: {x} + {y} = {x + y}");
+print("Comparison: {x} > {y} is {x > y}");
+
+// Nested expressions
+print("Complex: {(x + y) * 2 - 1}");
+
+// String concatenation with interpolation
+var greeting = "Hello, {name}! You are {age}.";
+print(greeting);

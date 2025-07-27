@@ -1,0 +1,30 @@
+// Test arithmetic expressions
+print("=== Arithmetic Expression Tests ===");
+
+var a = 10;
+var b = 3;
+
+// Basic arithmetic
+print("Addition: {a} + {b} = {a + b}");
+print("Subtraction: {a} - {b} = {a - b}");
+print("Multiplication: {a} * {b} = {a * b}");
+print("Division: {a} / {b} = {a / b}");
+print("Modulo: {a} % {b} = {a % b}");
+
+// Unary operations
+print("Negation: -{a} = {-a}");
+print("Positive: +{a} = {+a}");
+
+// Complex expressions
+var result = (a + b) * 2 - a / b;
+print("Complex: ({a} + {b}) * 2 - {a} / {b} = {result}");
+
+// Operator precedence
+var precedence = a + b * 2;
+print("Precedence: {a} + {b} * 2 = {precedence}");
+
+// Float arithmetic
+var x = 3.14;
+var y = 2.0;
+print("Float arithmetic: {x} + {y} = {x + y}");
+print("Float division: {x} / {y} = {x / y}");

@@ -1,0 +1,52 @@
+// Test basic class declarations (if implemented)
+print("=== Basic Class Tests ===");
+
+// Simple class definition
+class Person {
+    function init(name, age) {
+        this.name = name;
+        this.age = age;
+    }
+    
+    function greet() {
+        print("Hello, I'm {this.name} and I'm {this.age} years old");
+    }
+    
+    function birthday() {
+        this.age += 1;
+        print("{this.name} is now {this.age} years old");
+    }
+}
+
+print("Creating Person objects:");
+var person1 = Person("Alice", 25);
+var person2 = Person("Bob", 30);
+
+print("Calling methods:");
+person1.greet();
+person2.greet();
+
+print("Birthday test:");
+person1.birthday();
+person1.greet();
+
+// Class with properties
+class Rectangle {
+    function init(width, height) {
+        this.width = width;
+        this.height = height;
+    }
+    
+    function area() {
+        return this.width * this.height;
+    }
+    
+    function perimeter() {
+        return 2 * (this.width + this.height);
+    }
+}
+
+print("Rectangle class:");
+var rect = Rectangle(5, 3);
+print("Area: {rect.area()}");
+print("Perimeter: {rect.perimeter()}");

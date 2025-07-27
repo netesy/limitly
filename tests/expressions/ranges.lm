@@ -1,0 +1,44 @@
+// Test range expressions
+print("=== Range Expression Tests ===");
+
+// Basic ranges
+print("Range 1..5:");
+iter (i in 1..5) {
+    print(i);
+}
+
+print("Range 0..3:");
+iter (j in 0..3) {
+    print(j);
+}
+
+// Range with variables
+var start = 5;
+var end = 8;
+print("Variable range {start}..{end}:");
+iter (k in start..end) {
+    print(k);
+}
+
+// Range with expressions
+var base = 2;
+print("Expression range {base}..{base + 3}:");
+iter (x in base..(base + 3)) {
+    print(x);
+}
+
+// Nested ranges
+print("Nested ranges:");
+iter (i in 1..3) {
+    print("Outer: {i}");
+    iter (j in (i * 10)..(i * 10 + 2)) {
+        print("  Inner: {j}");
+    }
+}
+
+// Empty range
+print("Empty range (5..5):");
+iter (empty in 5..5) {
+    print("This should not print: {empty}");
+}
+print("Empty range test complete");

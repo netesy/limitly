@@ -1,0 +1,71 @@
+// Comprehensive integration test
+print("=== Comprehensive Integration Test ===");
+
+// Test multiple features together
+print("Multi-feature test:");
+
+// Variables and expressions
+var name = "Limit";
+var version = 1.0;
+var isStable = true;
+
+print("Language: {name} v{version}");
+print("Stable: {isStable}");
+
+// Control flow with loops
+print("Feature matrix:");
+for (var feature = 1; feature <= 3; feature += 1) {
+    print("Feature {feature}:");
+    
+    if (feature == 1) {
+        print("  - Variables and expressions");
+        var x = 10;
+        var y = 5;
+        print("  - Example: {x} + {y} = {x + y}");
+    } else if (feature == 2) {
+        print("  - Control flow and loops");
+        iter (i in 1..4) {
+            print("  - Loop iteration {i}");
+        }
+    } else {
+        print("  - String interpolation");
+        var msg = "Hello, {name}!";
+        print("  - Message: {msg}");
+    }
+}
+
+// Nested structures
+print("Nested structure test:");
+for (var outer = 1; outer <= 2; outer += 1) {
+    print("Outer level {outer}:");
+    
+    iter (inner in (outer * 10)..(outer * 10 + 2)) {
+        if (inner % 2 == 0) {
+            print("  Even: {inner}");
+        } else {
+            print("  Odd: {inner}");
+        }
+    }
+}
+
+// Complex expressions
+print("Complex expression test:");
+var a = 5;
+var b = 3;
+var c = 2;
+
+var result = (a + b) * c - (a - b);
+print("({a} + {b}) * {c} - ({a} - {b}) = {result}");
+
+var condition = (a > b) && (b > c) || (a == 5);
+print("Complex condition: {condition}");
+
+// String operations
+print("String processing:");
+var words = ["Hello", "World", "from", "Limit"];
+for (var i = 0; i < 4; i += 1) {
+    var word = words[i];  // If array access is implemented
+    print("Word {i + 1}: {word}");
+}
+
+print("Integration test complete!");

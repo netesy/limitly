@@ -1,0 +1,31 @@
+// Test literal values
+print("=== Literal Value Tests ===");
+
+// Integer literals
+print("Integers:");
+print(0);
+print(42);
+print(-17);
+print(999999);
+
+// Float literals
+print("Floats:");
+print(0.0);
+print(3.14159);
+print(-2.71828);
+print(1.23e-4);
+
+// String literals
+print("Strings:");
+print("Hello, World!");
+print("");
+print("Special chars: \n\t\\\"");
+
+// Boolean literals
+print("Booleans:");
+print(true);
+print(false);
+
+// Null literal
+print("Null:");
+print(null);

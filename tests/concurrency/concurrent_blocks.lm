@@ -1,0 +1,59 @@
+// Test concurrent blocks (if implemented)
+print("=== Concurrent Block Tests ===");
+
+// Basic concurrent block
+print("Basic concurrent execution:");
+concurrent {
+    print("Concurrent task 1: Starting");
+    for (var i = 0; i < 3; i += 1) {
+        print("Concurrent task 1: Step {i}");
+    }
+    print("Concurrent task 1: Complete");
+} and {
+    print("Concurrent task 2: Starting");
+    for (var j = 0; j < 3; j += 1) {
+        print("Concurrent task 2: Step {j}");
+    }
+    print("Concurrent task 2: Complete");
+}
+
+print("Concurrent block finished");
+
+// Async/await pattern
+print("Async/await test:");
+async function fetchData(id) {
+    print("Fetching data for ID: {id}");
+    // Simulate async work
+    return "Data for {id}";
+}
+
+async function processData() {
+    var data1 = await fetchData(1);
+    var data2 = await fetchData(2);
+    print("Processed: {data1}, {data2}");
+}
+
+processData();
+
+// Concurrent with shared resources
+print("Concurrent with synchronization:");
+var counter = 0;
+var mutex = Mutex();
+
+concurrent {
+    for (var i = 0; i < 5; i += 1) {
+        mutex.lock();
+        counter += 1;
+        print("Task 1: counter = {counter}");
+        mutex.unlock();
+    }
+} and {
+    for (var i = 0; i < 5; i += 1) {
+        mutex.lock();
+        counter += 1;
+        print("Task 2: counter = {counter}");
+        mutex.unlock();
+    }
+}
+
+print("Final counter value: {counter}");

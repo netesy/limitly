@@ -1,0 +1,36 @@
+// Test logical expressions
+print("=== Logical Expression Tests ===");
+
+var t = true;
+var f = false;
+
+// Basic logical operations
+print("AND operations:");
+print("{t} && {t}: {t && t}");
+print("{t} && {f}: {t && f}");
+print("{f} && {t}: {f && t}");
+print("{f} && {f}: {f && f}");
+
+print("OR operations:");
+print("{t} || {t}: {t || t}");
+print("{t} || {f}: {t || f}");
+print("{f} || {t}: {f || t}");
+print("{f} || {f}: {f || f}");
+
+print("NOT operations:");
+print("!{t}: {!t}");
+print("!{f}: {!f}");
+
+// Complex logical expressions
+var a = 5;
+var b = 10;
+var result1 = (a < b) && (b > 0);
+var result2 = (a > b) || (a == 5);
+print("Complex: ({a} < {b}) && ({b} > 0) = {result1}");
+print("Complex: ({a} > {b}) || ({a} == 5) = {result2}");
+
+// Short-circuit evaluation
+print("Short-circuit tests:");
+var x = 0;
+var result3 = (x != 0) && (10 / x > 1);
+print("Safe division with &&: {result3}");

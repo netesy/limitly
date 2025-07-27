@@ -1,0 +1,32 @@
+// Test string operations
+print("=== String Operations Tests ===");
+
+var str1 = "Hello";
+var str2 = "World";
+var space = " ";
+
+// String concatenation (if implemented)
+// print("Concatenation: {str1} + {str2} = {str1 + str2}");
+
+// String comparison
+print("String comparisons:");
+print("{str1} == {str2}: {str1 == str2}");
+print("{str1} != {str2}: {str1 != str2}");
+
+// String with numbers
+var numStr = "42";
+var num = 42;
+print("String vs number: {numStr} == {num}: {numStr == num}");
+
+// Empty strings
+var empty = "";
+print("Empty string: '{empty}'");
+print("Empty length check: {empty == \"\"}");
+
+// Special characters
+var special = "Line 1\nLine 2\tTabbed";
+print("Special chars: {special}");
+
+// Quotes in strings
+var quoted = "He said \"Hello\"";
+print("Quoted: {quoted}");

@@ -1,0 +1,42 @@
+// Test for loops
+print("=== For Loop Tests ===");
+
+// Basic for loop
+print("Basic for loop (0 to 4):");
+for (var i = 0; i < 5; i += 1) {
+    print("i = {i}");
+}
+
+// For loop with different increment
+print("For loop with increment 2:");
+for (var j = 0; j < 10; j += 2) {
+    print("j = {j}");
+}
+
+// Countdown loop
+print("Countdown loop:");
+for (var k = 5; k > 0; k -= 1) {
+    print("k = {k}");
+}
+
+// For loop with complex condition
+print("Complex condition:");
+for (var x = 1; x * x < 20; x += 1) {
+    print("x = {x}, x² = {x * x}");
+}
+
+// Nested for loops
+print("Nested for loops (2x3 grid):");
+for (var row = 0; row < 2; row += 1) {
+    for (var col = 0; col < 3; col += 1) {
+        print("({row}, {col})");
+    }
+}
+
+// For loop with variable scope
+print("Variable scope test:");
+var outer = 100;
+for (var i = 0; i < 3; i += 1) {
+    var inner = i * 10;
+    print("outer: {outer}, inner: {inner}");
+}
