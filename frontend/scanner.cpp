@@ -284,122 +284,129 @@ bool Scanner::isAlphaNumeric(char c) const {
 void Scanner::string() {
     char quoteType = source[start]; // Store the opening quote type (' or ")
     std::string value;
-    size_t literalStart = start + 1; // Start after the opening quote
     current = start + 1; // Skip the opening quote
     
     std::cout << "[SCANNER] Starting string parsing at line " << line << " with quote: " << quoteType << std::endl;
     
+    // Parse string with interpolation support
     while (!isAtEnd() && peek() != quoteType) {
-        // Check for interpolation start
-        if (peek() == '{') {
-            // Check if this is an escaped brace
-            if (peekNext() == '{') {
-                // Escaped brace, add a single brace to the value
+        // Handle escape sequences
+        if (peek() == '\\') {
+            char nextChar = peekNext();
+            if (nextChar == quoteType || nextChar == '\\' || nextChar == '{' || nextChar == '}') {
+                // Skip the backslash and add the escaped character
+                advance();
                 value += peek();
-                advance(); // Skip the first {
-                advance(); // Skip the second {
-                literalStart = current;
-                continue;
+                advance();
+            } else {
+                // Regular backslash
+                value += peek();
+                advance();
             }
+        } else if (peek() == '{') {
+            // Check if this looks like interpolation (contains identifier/expression)
+            // vs regex quantifier like {2,} or {1,3}
+            size_t lookahead = current + 1;
+            bool isInterpolation = false;
             
-            // Add the literal part before the interpolation
-            if (current > literalStart) {
-                std::string literal = source.substr(literalStart, current - literalStart);
-                value += literal;
-            }
-            
-            // Add the string part before the interpolation
-            if (!value.empty()) {
-                addToken(TokenType::STRING, value);
-                value.clear();
-            }
-            
-            // Add the interpolation start token
-            std::cout << "[SCANNER] Found interpolation start at line " << line << std::endl;
-            addToken(TokenType::INTERPOLATION_START, "{");
-            advance(); // Consume the {
-            
-            // The expression will be handled by the main scanner loop
-            // We'll look for the matching }
-            int braceCount = 1;
-            while (!isAtEnd() && braceCount > 0) {
-                if (peek() == '{') {
-                    braceCount++;
-                } else if (peek() == '}') {
-                    braceCount--;
+            // Look ahead to see if this is likely interpolation
+            while (lookahead < source.size() && source[lookahead] != '}' && source[lookahead] != quoteType) {
+                char c = source[lookahead];
+                // If we find letters, it's likely an identifier (interpolation)
+                if (isAlpha(c) || c == '_') {
+                    isInterpolation = true;
+                    break;
                 }
+                // If we find only digits and commas, it's likely a regex quantifier
+                if (!isDigit(c) && c != ',' && c != ' ') {
+                    isInterpolation = true;
+                    break;
+                }
+                lookahead++;
+            }
+            
+            if (isInterpolation) {
+                // Found interpolation start
+                // Add the string part before interpolation if not empty
+                if (!value.empty()) {
+                    addToken(TokenType::STRING, value);
+                    value.clear();
+                }
+                
+                // Add interpolation start token
+                advance(); // consume '{'
+                addToken(TokenType::INTERPOLATION_START);
+                
+                // Parse the expression inside {}
+                int braceCount = 1;
+                size_t exprStart = current;
+                
+                while (!isAtEnd() && braceCount > 0) {
+                    if (peek() == '{') {
+                        braceCount++;
+                    } else if (peek() == '}') {
+                        braceCount--;
+                    }
+                    
+                    if (braceCount > 0) {
+                        advance();
+                    }
+                }
+                
+                if (isAtEnd()) {
+                    error("Unterminated string interpolation.");
+                    return;
+                }
+                
+                // Extract the expression content
+                std::string exprContent = source.substr(exprStart, current - exprStart);
+                
+                // Create a sub-scanner for the expression
+                Scanner exprScanner(exprContent);
+                auto exprTokens = exprScanner.scanTokens();
+                
+                // Add the expression tokens (excluding EOF)
+                for (const auto& token : exprTokens) {
+                    if (token.type != TokenType::EOF_TOKEN) {
+                        tokens.push_back({token.type, token.lexeme, line, static_cast<int>(current)});
+                    }
+                }
+                
+                // Add interpolation end token
+                advance(); // consume '}'
+                addToken(TokenType::INTERPOLATION_END);
+            } else {
+                // Regular brace, treat as normal character
+                value += peek();
                 advance();
             }
             
-            if (isAtEnd()) {
-                error("Unterminated interpolation expression.");
-                return;
-            }
+        } else {
+            // Regular character
+            value += peek();
             
-            // Add the interpolation end token
-            std::cout << "[SCANNER] Found interpolation end at line " << line << std::endl;
-            addToken(TokenType::INTERPOLATION_END, "}");
-            
-            // Reset for the next part of the string
-            literalStart = current;
-            continue;
-        }
-        
-        // Handle escape sequences
-        if (peek() == '\\') {
-            // Add any literal part before the escape sequence
-            if (current > literalStart) {
-                std::string literal = source.substr(literalStart, current - literalStart);
-                value += literal;
-            }
-            
-            // Handle the escape sequence
-            advance(); // Skip the backslash
-            if (isAtEnd()) break;
-            
-            switch (peek()) {
-                case 'n': value += '\n'; break;
-                case 't': value += '\t'; break;
-                case 'r': value += '\r'; break;
-                case '\\': value += '\\'; break;
-                case '"': value += '"'; break;
-                case '\'': value += '\''; break;
-                case '{': value += '{'; break;
-                case '}': value += '}'; break;
-                default:
-                    // Unknown escape sequence, just add the character as-is
-                    value += '\\';
-                    value += peek();
-                    break;
+            // Handle newlines in strings (for multi-line strings)
+            if (peek() == '\n') {
+                line++;
             }
             
             advance();
-            literalStart = current;
-            continue;
         }
-        
-        // Regular character
-        advance();
     }
     
+    // Unterminated string
     if (isAtEnd()) {
         error("Unterminated string.");
         return;
     }
     
-    // Add any remaining literal part
-    if (current > literalStart) {
-        std::string literal = source.substr(literalStart, current - literalStart);
-        value += literal;
-    }
-    
-    // The closing quote
-    advance();
-    
-    // Add the final string part if there is one
+    // Add the final string part if not empty
     if (!value.empty()) {
         addToken(TokenType::STRING, value);
     }
+    
+    // Skip the closing quote
+    advance();
 }
 
 void Scanner::number() {
