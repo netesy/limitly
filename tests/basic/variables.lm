@@ -24,8 +24,8 @@ print("Float: {y}");
 print("String: {name}");
 print("Boolean: {isActive}");
 
-// Multiple declarations (separate statements since comma syntax not implemented)
+// Multiple declarations
 var a = 1;
-var b = 2; 
+var b = 2;
 var c = 3;
 print("Multiple declarations: a={a}, b={b}, c={c}");

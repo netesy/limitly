@@ -64,7 +64,7 @@ cd tests
 - **Literals**: Integers, floats, strings, booleans, null
 - **Arithmetic**: +, -, *, /, %, unary operators
 - **Comparison**: ==, !=, <, >, <=, >=
-- **Logical**: &&, ||, !
+- **Logical**: and, or, !
 - **Control Flow**: if/else statements
 - **Loops**: for loops, iter loops with ranges
 - **String Interpolation**: {variable} syntax

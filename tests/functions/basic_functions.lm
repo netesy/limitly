@@ -2,7 +2,7 @@
 print("=== Basic Function Tests ===");
 
 // Simple function without parameters
-function greet() {
+fn greet() {
     print("Hello from function!");
 }
 
@@ -10,7 +10,7 @@ print("Calling greet():");
 greet();
 
 // Function with parameters
-function add(a, b) {
+fn add(a, b) {
     return a + b;
 }
 
@@ -19,7 +19,7 @@ var result = add(5, 3);
 print("add(5, 3) = {result}");
 
 // Function with return value
-function square(x) {
+fn square(x) {
     return x * x;
 }
 
@@ -28,7 +28,7 @@ print("square(4) = {square(4)}");
 print("square(7) = {square(7)}");
 
 // Function with local variables
-function calculate(x, y) {
+fn calculate(x, y) {
     var sum = x + y;
     var product = x * y;
     print("Local calculations: sum={sum}, product={product}");
@@ -40,7 +40,7 @@ var calc_result = calculate(3, 4);
 print("Result: {calc_result}");
 
 // Recursive function
-function factorial(n) {
+fn factorial(n) {
     if (n <= 1) {
         return 1;
     }

@@ -45,10 +45,10 @@ if (a > 10) {
 var isActive = true;
 var isValid = false;
 
-if (isActive && !isValid) {
+if (isActive and !isValid) {
     print("Active but not valid");
 }
 
-if (isActive || isValid) {
+if (isActive or isValid) {
     print("At least one is true");
 }

@@ -90,9 +90,6 @@ ValuePtr VM::execute(const std::vector<Instruction>& bytecode) {
             
             // Debug output for opcode values
             int opcodeValue = static_cast<int>(instruction.opcode);
-            if (opcodeValue >= 58) {
-                std::cerr << "Executing opcode: " << opcodeValue << " at IP: " << ip << " (line: " << instruction.line << ")" << std::endl;
-            }
             
             switch (instruction.opcode) {
                 case Opcode::PUSH_INT:
@@ -332,7 +329,7 @@ void VM::handleSwap(const Instruction& /*unused*/) {
 
 void VM::handleStoreVar(const Instruction& instruction) {
     (void)instruction; // Mark as unused
-    ValuePtr value = peek();
+    ValuePtr value = pop();
     environment->define(instruction.stringValue, value);
 }
 
@@ -1079,8 +1076,7 @@ void VM::handlePrint(const Instruction& instruction) {
     }
     std::cout << std::endl;
     
-    // Push nil as the result
-    push(memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
+    // Print is a statement, not an expression - don't push a result
 }
 
 // Placeholder implementations for other handlers

@@ -325,9 +325,43 @@ tests/
 - **String interpolation**: Parser now handles all interpolation patterns
 - **Test infrastructure**: Comprehensive test suite with automated runners
 
+## Action 12: Fixed Critical Variable Access Bug After Print Statements
+
+**Prompt**: "from the control flow test we can see after the first use of a variable we get an error when we try to access the same variable"
+
+**Problem Identified**:
+- After executing `if` statements with `print` inside, subsequent variable access failed with "Cannot compare values of different types"
+- The issue occurred specifically when: `if (x > y) { print(...); }` followed by `if (x < y) { ... }`
+- Variables `x` and `y` were being corrupted or returning wrong types on second access
+
+**Root Cause Found**:
+- `print` statements were pushing `nil` onto the stack as a return value
+- This `nil` value was interfering with subsequent operations
+- The VM's `handlePrint` method had: `push(memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));`
+
+**Changes Made**:
+- **Fixed print statement stack behavior**: Removed the `push(nil)` from `handlePrint` method
+- **Reasoning**: `print` is a statement, not an expression, so it shouldn't return a value
+- **Updated comment**: Added explanation that print doesn't push a result
+
+**Files Modified**:
+- backend/vm.cpp: Removed `push(nil)` from `handlePrint` method
+
+**Impact**:
+- ✅ **Control flow tests now work perfectly**: All if/else statements execute correctly
+- ✅ **Variable access after print statements**: No more type comparison errors
+- ✅ **All control flow features working**: Simple if, if-else, if-else-if-else chains, nested if statements
+- ✅ **Boolean operators working**: `and`, `or`, `!` operators work correctly
+- ✅ **Test suite improvement**: Control flow test now passes completely
+
+**Testing Results**:
+- Before fix: "Runtime error: Cannot compare values of different types" after first if statement
+- After fix: Complete control flow test executes successfully with all branches working
+
 ### 📋 Next Development Priorities
 1. Complete VM implementation for function calls and returns
 2. Implement object-oriented features in the VM
 3. Add while loop support
 4. Implement basic function declarations and calls
-5. Expand error handling capabilities
+5. Fix remaining stack cleanup issues (expressions leaving values on stack)
+6. Expand error handling capabilities

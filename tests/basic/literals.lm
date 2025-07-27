@@ -28,4 +28,4 @@ print(false);
 
 // Null literal
 print("Null:");
-print(null);
+print(nil);
