@@ -521,6 +521,64 @@ struct Value {
 
     friend std::ostream &operator<<(std::ostream &os, const Value &value);
 
+    // Get raw string representation for interpolation/concatenation (no quotes)
+    std::string getRawString() const {
+        std::ostringstream oss;
+        std::visit(overloaded{
+            [&](const std::monostate&) { oss << "nil"; },
+            [&](bool b) { oss << (b ? "true" : "false"); },
+            [&](int8_t i) { oss << static_cast<int>(i); },
+            [&](int16_t i) { oss << i; },
+            [&](int32_t i) { oss << i; },
+            [&](int64_t i) { oss << i; },
+            [&](uint8_t u) { oss << static_cast<unsigned>(u); },
+            [&](uint16_t u) { oss << u; },
+            [&](uint32_t u) { oss << u; },
+            [&](uint64_t u) { oss << u; },
+            [&](float f) { oss << f; },
+            [&](double d) { oss << d; },
+            [&](const std::string& s) { oss << s; }, // No quotes for raw string
+            [&](const ListValue& lv) {
+                oss << "[";
+                for (size_t i = 0; i < lv.elements.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << lv.elements[i]->getRawString();
+                }
+                oss << "]";
+            },
+            [&](const DictValue& dv) {
+                oss << "{";
+                bool first = true;
+                for (const auto& [key, value] : dv.elements) {
+                    if (!first) oss << ", ";
+                    first = false;
+                    oss << key->getRawString() << ": " << value->getRawString();
+                }
+                oss << "}";
+            },
+            [&](const SumValue& sv) {
+                oss << "Sum(" << sv.activeVariant << ", " << sv.value->getRawString() << ")";
+            },
+            [&](const EnumValue& ev) {
+                oss << ev.toString(); // Use existing enum toString
+            },
+            [&](const UserDefinedValue& udv) {
+                oss << udv.variantName << "{";
+                bool first = true;
+                for (const auto& [field, value] : udv.fields) {
+                    if (!first) oss << ", ";
+                    first = false;
+                    oss << field << ": " << value->getRawString();
+                }
+                oss << "}";
+            },
+            [&](const IteratorValuePtr&) {
+                oss << "<iterator>";
+            }
+        }, data);
+        return oss.str();
+    }
+
     std::string toString() const {
         std::ostringstream oss;
         std::visit(overloaded{
