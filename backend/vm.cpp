@@ -363,8 +363,8 @@ std::string VM::valueToString(const ValuePtr& value) {
     if (!value) {
         return "nil";
     }
-    // Use the Value's built-in toString() method which already handles all types correctly
-    return value->toString();
+    // Use the Value's getRawString() method for string operations (no quotes)
+    return value->getRawString();
 }
 
 void VM::handleAdd(const Instruction& /*unused*/) {
