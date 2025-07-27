@@ -878,6 +878,9 @@ void BytecodeGenerator::visitRangeExpr(const std::shared_ptr<AST::RangeExpr>& ex
 }
 
 void BytecodeGenerator::visitIterStatement(const std::shared_ptr<AST::IterStatement>& stmt) {
+    // Allocate a unique temporary variable for this iterator
+    int iteratorTempIndex = tempVarCounter++;
+    
     // Push the iterable onto the stack
     visitExpression(stmt->iterable);
     
@@ -885,13 +888,13 @@ void BytecodeGenerator::visitIterStatement(const std::shared_ptr<AST::IterStatem
     emit(Opcode::GET_ITERATOR, stmt->line);
     
     // Store the iterator in a temporary variable
-    emit(Opcode::STORE_TEMP, stmt->line, 0);
+    emit(Opcode::STORE_TEMP, stmt->line, iteratorTempIndex);
     
     // Start of loop
     size_t loopStart = bytecode.size();
     
     // Check if iterator has next value
-    emit(Opcode::LOAD_TEMP, stmt->line, 0);
+    emit(Opcode::LOAD_TEMP, stmt->line, iteratorTempIndex);
     emit(Opcode::ITERATOR_HAS_NEXT, stmt->line);
     
     // Jump to end of loop if no more items
@@ -899,7 +902,7 @@ void BytecodeGenerator::visitIterStatement(const std::shared_ptr<AST::IterStatem
     size_t jumpToEnd = bytecode.size() - 1;
     
     // Get next value from iterator
-    emit(Opcode::LOAD_TEMP, stmt->line, 0);
+    emit(Opcode::LOAD_TEMP, stmt->line, iteratorTempIndex);
     emit(Opcode::ITERATOR_NEXT, stmt->line);
     
     // Store the value in the loop variable
@@ -927,7 +930,7 @@ void BytecodeGenerator::visitIterStatement(const std::shared_ptr<AST::IterStatem
     bytecode[jumpToEnd].intValue = bytecode.size() - jumpToEnd - 1;
     
     // Clean up the temporary iterator
-    emit(Opcode::CLEAR_TEMP, stmt->line, 0);
+    emit(Opcode::CLEAR_TEMP, stmt->line, iteratorTempIndex);
 }
 
 void BytecodeGenerator::visitModuleDeclaration(const std::shared_ptr<AST::ModuleDeclaration>& stmt) {

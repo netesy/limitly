@@ -25,6 +25,7 @@ public:
     
 private:
     std::vector<Instruction> bytecode;
+    int tempVarCounter = 0;
     
     // Visitor methods for AST nodes
     void visitStatement(const std::shared_ptr<AST::Statement>& stmt);

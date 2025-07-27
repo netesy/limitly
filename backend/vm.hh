@@ -43,7 +43,7 @@ private:
     std::shared_ptr<Environment> globals;
     std::shared_ptr<Environment> environment;
     std::unordered_map<std::string, std::function<ValuePtr(const std::vector<ValuePtr>&)>> nativeFunctions;
-    ValuePtr tempValue;
+    std::vector<ValuePtr> tempValues;
     ValuePtr lastException;
     
     // Current execution state
