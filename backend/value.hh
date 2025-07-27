@@ -3,14 +3,25 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <iostream>
 #include <map>
 #include <memory>
-#include <stdexcept>
 #include <string>
 #include <variant>
 #include <vector>
+#include <stdexcept>
 #include <sstream>
+
+// Forward declarations
+struct Value;
+using ValuePtr = std::shared_ptr<Value>;
+
+// Forward declare ListValue and DictValue
+struct ListValue;
+struct DictValue;
+
+// Forward declare IteratorValue
+struct IteratorValue;
+using IteratorValuePtr = std::shared_ptr<IteratorValue>;
 
 enum class TypeTag {
     Nil,
@@ -387,7 +398,8 @@ struct Value {
                  DictValue,
                  SumValue,
                  EnumValue,
-                 UserDefinedValue>
+                 UserDefinedValue,
+                 IteratorValuePtr>
         data;
 
     // Default constructor
@@ -503,6 +515,10 @@ struct Value {
            
         }
 
+        // Constructor for IteratorValuePtr
+        Value(TypePtr t, const IteratorValuePtr& iter) : type(std::move(t)), data(iter) {
+        }
+
     friend std::ostream &operator<<(std::ostream &os, const Value &value);
 
     std::string toString() const {
@@ -552,6 +568,9 @@ struct Value {
                     oss << field << ": " << value->toString();
                 }
                 oss << "}";
+            },
+            [&](const IteratorValuePtr&) {
+                oss << "<iterator>";
             }
         }, data);
         return oss.str();
@@ -564,11 +583,71 @@ inline ValuePtr EnumValue::create(const std::string& variantName, const TypePtr&
     return value;
 }
 
+// Iterator for list and range values
+struct IteratorValue {
+    enum class IteratorType {
+        LIST,
+        RANGE
+    };
+
+    IteratorType type;
+    size_t index;
+    ValuePtr container;
+    
+    IteratorValue(IteratorType t, ValuePtr c) 
+        : type(t), index(0), container(std::move(c)) {}
+    
+    bool hasNext() {
+        if (!container) return false;
+        
+        if (type == IteratorType::LIST) {
+            // For LIST type, the data should be a ListValue
+            if (auto list = std::get_if<ListValue>(&container->data)) {
+                return index < list->elements.size();
+            }
+        } else { // RANGE
+            // For RANGE, we need to get the range bounds from the container
+            // First, check if the container has a ListValue (materialized range)
+            if (auto list = std::get_if<ListValue>(&container->data)) {
+                return index < list->elements.size();
+            }
+        }
+        return false;
+    }
+    
+    ValuePtr next() {
+        if (!hasNext()) {
+            throw std::runtime_error("No more elements in iterator");
+        }
+        
+        if (type == IteratorType::LIST) {
+            if (auto list = std::get_if<ListValue>(&container->data)) {
+                if (index < list->elements.size()) {
+                    return list->elements[index++];
+                }
+            }
+            throw std::runtime_error("Invalid list iterator state");
+        } else { // RANGE
+            // Handle both materialized (ListValue) and unmaterialized ranges
+            if (auto list = std::get_if<ListValue>(&container->data)) {
+                // If this is a materialized range (list of values)
+                if (index < list->elements.size()) {
+                    return list->elements[index++];
+                }
+            }
+            
+            throw std::runtime_error("Invalid range iterator state");
+        }
+    }
+};
+
 // Implementation of operator<< for Value
 inline std::ostream &operator<<(std::ostream &os, const Value &value) {
     os << value.toString();
     return os;
 }
+
+// Forward declare the rest of the Value class to fix circular dependency
 
 // Define the operator<< for ListValue
 inline std::ostream &operator<<(std::ostream &os, const ListValue &lv)

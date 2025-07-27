@@ -52,10 +52,12 @@ enum class TokenType {
     POWER,         // **
 
     // Group: Literals
-    IDENTIFIER,      // variable/function names
-    STRING,          // string literals
-    INTERPOLATION,   // interpolation expression within strings
-    NUMBER,          // numeric literals
+    IDENTIFIER,         // variable/function names
+    STRING,             // string literals
+    INTERPOLATION,      // interpolation expression within strings (legacy)
+    INTERPOLATION_START,// { for starting interpolation
+    INTERPOLATION_END,  // } for ending interpolation
+    NUMBER,             // numeric literals
 
     // Group: Types
     INT_TYPE,      // int
@@ -153,6 +155,16 @@ struct Token {
 class Scanner {
 public:
     explicit Scanner(const std::string& source) : source(source), start(0), current(0), line(1) {}
+    
+    // Constructor that takes pre-scanned tokens (for use in string interpolation)
+    explicit Scanner(const std::vector<Token>& preScannedTokens) 
+        : source(""),  // Empty source since we're using pre-scanned tokens
+          start(0), 
+          current(0), 
+          line(1) {
+        tokens = preScannedTokens;  // Assign tokens after initialization
+    }
+    
 
     std::vector<Token> scanTokens();
     void scanToken();
@@ -168,21 +180,27 @@ public:
     int getCurrent() const { return current; }
     std::string getLexeme() const { return source.substr(start, current - start); }
     const std::string& getSource() const { return source; }
-    size_t current;
-    int line;
 
     Token getToken();
     Token peekToken() const { return tokens.empty() ? Token{TokenType::EOF_TOKEN, "", line} : tokens[current]; }
     Token previousToken() const { return current > 0 ? tokens[current - 1] : Token{TokenType::EOF_TOKEN, "", line}; }
     Token getNextToken();
     Token getPrevToken();
-
-    std::vector<Token> tokens;
+    
+    // Token access methods
+    const std::vector<Token>& getTokens() const { return tokens; }
+    size_t getCurrentTokenIndex() const { return current; }
+    Token getTokenAt(size_t index) const { 
+        return index < tokens.size() ? tokens[index] : Token{TokenType::EOF_TOKEN, "", line}; 
+    }
 
 private:
-    const std::string& source;
+    std::string source;
     size_t start;
+    size_t current;
+    int line;
     Token currentToken;
+    std::vector<Token> tokens;
 
     void addToken(TokenType type);
     void addToken(TokenType type, const std::string& text);

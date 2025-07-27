@@ -4,11 +4,11 @@
 
 // Helper methods
 Token Parser::peek() {
-    return scanner.tokens[current];
+    return scanner.getTokens()[current];
 }
 
 Token Parser::previous() {
-    return scanner.tokens[current - 1];
+    return scanner.getTokens()[current - 1];
 }
 
 Token Parser::advance() {
@@ -72,7 +72,7 @@ void Parser::error(const std::string &message, bool suppressException) {
     int column = 0;
     std::string codeContext = "";
     
-    if (current < scanner.tokens.size()) {
+    if (current < scanner.getTokens().size()) {
         Token currentToken = peek();
         lexeme = currentToken.lexeme;
         line = currentToken.line;
@@ -99,9 +99,9 @@ void Parser::error(const std::string &message, bool suppressException) {
     
     // Check if this is an "Expected expression" error in a trait method
     if (message == "Expected expression." && 
-        (current > 0 && current < scanner.tokens.size() && 
-         scanner.tokens[current-1].type == TokenType::LEFT_BRACE && 
-         scanner.tokens[current].type == TokenType::RIGHT_BRACE)) {
+        (current > 0 && current < scanner.getTokens().size() && 
+         scanner.getTokens()[current-1].type == TokenType::LEFT_BRACE && 
+         scanner.getTokens()[current].type == TokenType::RIGHT_BRACE)) {
         // Let the debugger handle this common case
         Debugger::error(message, line, column, InterpretationStage::PARSING, "", lexeme, codeContext);
         return;
@@ -1390,8 +1390,8 @@ std::shared_ptr<AST::Expression> Parser::primary() {
     if (match({TokenType::STRING})) {
         // Check if this is an interpolated string (starts with a string followed by INTERPOLATION token)
         if (check(TokenType::INTERPOLATION) || 
-            (peek().type == TokenType::STRING && current + 1 < scanner.tokens.size() && 
-             scanner.tokens[current + 1].type == TokenType::INTERPOLATION)) {
+            (peek().type == TokenType::STRING && current + 1 < scanner.getTokens().size() && 
+             scanner.getTokens()[current + 1].type == TokenType::INTERPOLATION)) {
             // This is an interpolated string
             return interpolatedString();
         } else {
@@ -1472,9 +1472,9 @@ std::shared_ptr<AST::Expression> Parser::primary() {
     }
 
     // Check if we're in a trait method or other context where an empty expression might be valid
-    if (current > 0 && current < scanner.tokens.size() && 
-        scanner.tokens[current-1].type == TokenType::LEFT_BRACE && 
-        scanner.tokens[current].type == TokenType::RIGHT_BRACE) {
+    if (current > 0 && current < scanner.getTokens().size() && 
+        scanner.getTokens()[current-1].type == TokenType::LEFT_BRACE && 
+        scanner.getTokens()[current].type == TokenType::RIGHT_BRACE) {
         // This is likely an empty block, so we'll create a placeholder expression
         auto placeholderExpr = std::make_shared<AST::LiteralExpr>();
         placeholderExpr->line = peek().line;

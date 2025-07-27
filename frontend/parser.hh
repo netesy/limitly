@@ -82,6 +82,12 @@ public:
     std::shared_ptr<AST::Statement> contractStatement();
     std::shared_ptr<AST::Statement> comptimeStatement();
 
+    // Type parsing methods
+    std::shared_ptr<AST::TypeAnnotation> parseTypeAnnotation();
+    std::shared_ptr<AST::TypeAnnotation> parseStructuralType(const std::string& typeName = "");
+    bool isPrimitiveType(TokenType type);
+    std::string tokenTypeToString(TokenType type);
+
     // Parsing methods for expressions
     std::shared_ptr<AST::Expression> expression();
     std::shared_ptr<AST::Expression> assignment();
@@ -99,9 +105,6 @@ public:
     std::shared_ptr<AST::InterpolatedStringExpr> interpolatedString();
 
     // Type annotation parsing
-    std::shared_ptr<AST::TypeAnnotation> parseTypeAnnotation();
-    bool isPrimitiveType(TokenType type);
-    std::string tokenTypeToString(TokenType type);
 };
 
 #endif // PARSER_H
