@@ -1,0 +1,56 @@
+// Test error handling (if implemented)
+print("=== Error Handling Tests ===");
+
+// Try-catch blocks
+print("Try-catch test:");
+try {
+    var x = 10;
+    var y = 0;
+    var result = x / y;  // Division by zero
+    print("Result: {result}");
+} catch (error) {
+    print("Caught error: {error}");
+}
+
+// Attempt-handle blocks
+print("Attempt-handle test:");
+attempt {
+    var arr = [1, 2, 3];
+    var value = arr[10];  // Index out of bounds
+    print("Value: {value}");
+} handle IndexError as e {
+    print("Index error: {e}");
+} handle RuntimeError as e {
+    print("Runtime error: {e}");
+}
+
+// Custom exceptions
+print("Custom exception test:");
+function divide(a, b) {
+    if (b == 0) {
+        throw DivisionByZeroError("Cannot divide by zero");
+    }
+    return a / b;
+}
+
+try {
+    var result = divide(10, 0);
+    print("Result: {result}");
+} catch (DivisionByZeroError as e) {
+    print("Division error: {e}");
+} catch (error) {
+    print("Other error: {error}");
+}
+
+// Finally blocks
+print("Finally block test:");
+try {
+    print("In try block");
+    var x = 1 / 0;
+} catch (error) {
+    print("In catch block: {error}");
+} finally {
+    print("In finally block - always executes");
+}
+
+print("Error handling test complete");

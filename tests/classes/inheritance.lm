@@ -1,0 +1,65 @@
+// Test class inheritance (if implemented)
+print("=== Class Inheritance Tests ===");
+
+// Base class
+class Animal {
+    function init(name) {
+        this.name = name;
+    }
+    
+    function speak() {
+        print("{this.name} makes a sound");
+    }
+    
+    function info() {
+        print("This is {this.name}");
+    }
+}
+
+// Derived class
+class Dog extends Animal {
+    function init(name, breed) {
+        super.init(name);
+        this.breed = breed;
+    }
+    
+    function speak() {
+        print("{this.name} barks!");
+    }
+    
+    function wagTail() {
+        print("{this.name} wags tail happily");
+    }
+}
+
+// Another derived class
+class Cat extends Animal {
+    function speak() {
+        print("{this.name} meows");
+    }
+    
+    function purr() {
+        print("{this.name} purrs contentedly");
+    }
+}
+
+print("Inheritance test:");
+var dog = Dog("Buddy", "Golden Retriever");
+var cat = Cat("Whiskers");
+
+print("Dog methods:");
+dog.info();
+dog.speak();
+dog.wagTail();
+
+print("Cat methods:");
+cat.info();
+cat.speak();
+cat.purr();
+
+// Polymorphism test
+print("Polymorphism test:");
+var animals = [dog, cat];
+for (var animal in animals) {
+    animal.speak();
+}
