@@ -1,0 +1,9 @@
+// Test assignment expressions
+var x = 0;
+var y = (x = 42);  // Assignment expression should return the assigned value
+print("x = {x}");
+print("y = {y}");
+
+// Test compound assignment
+x += 10;
+print("x after += 10: {x}");

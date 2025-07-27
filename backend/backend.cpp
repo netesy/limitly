@@ -766,10 +766,9 @@ void BytecodeGenerator::visitAssignExpr(const std::shared_ptr<AST::AssignExpr>& 
         visitExpression(expr->value);
     }
     
-    // Duplicate value (for assignment expressions that return the assigned value)
+    // Store value in variable (STORE_VAR now pops the value)
+    // But assignment expressions should return the assigned value, so duplicate first
     emit(Opcode::DUP, expr->line);
-    
-    // Store value in variable
     emit(Opcode::STORE_VAR, expr->line, 0, 0.0f, false, expr->name);
 }
 

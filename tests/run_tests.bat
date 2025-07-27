@@ -3,7 +3,7 @@ echo ========================================
 echo Running Limit Language Test Suite
 echo ========================================
 
-set LIMITLY=..\bin\limitly.exe
+set LIMITLY=.\bin\limitly.exe
 set FAILED=0
 set PASSED=0
 

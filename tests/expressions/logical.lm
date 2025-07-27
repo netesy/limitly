@@ -6,16 +6,16 @@ var f = false;
 
 // Basic logical operations
 print("AND operations:");
-print("{t} && {t}: {t && t}");
-print("{t} && {f}: {t && f}");
-print("{f} && {t}: {f && t}");
-print("{f} && {f}: {f && f}");
+print("{t} and {t}: {t and t}");
+print("{t} and {f}: {t and f}");
+print("{f} and {t}: {f and t}");
+print("{f} and {f}: {f and f}");
 
 print("OR operations:");
-print("{t} || {t}: {t || t}");
-print("{t} || {f}: {t || f}");
-print("{f} || {t}: {f || t}");
-print("{f} || {f}: {f || f}");
+print("{t} or {t}: {t or t}");
+print("{t} or {f}: {t or f}");
+print("{f} or {t}: {f or t}");
+print("{f} or {f}: {f or f}");
 
 print("NOT operations:");
 print("!{t}: {!t}");
@@ -24,13 +24,13 @@ print("!{f}: {!f}");
 // Complex logical expressions
 var a = 5;
 var b = 10;
-var result1 = (a < b) && (b > 0);
-var result2 = (a > b) || (a == 5);
-print("Complex: ({a} < {b}) && ({b} > 0) = {result1}");
-print("Complex: ({a} > {b}) || ({a} == 5) = {result2}");
+var result1 = (a < b) and (b > 0);
+var result2 = (a > b) or (a == 5);
+print("Complex: ({a} < {b}) and ({b} > 0) = {result1}");
+print("Complex: ({a} > {b}) or ({a} == 5) = {result2}");
 
 // Short-circuit evaluation
 print("Short-circuit tests:");
 var x = 0;
-var result3 = (x != 0) && (10 / x > 1);
-print("Safe division with &&: {result3}");
+var result3 = (x != 0) and (10 / x > 1);
+print("Safe division with and: {result3}");
