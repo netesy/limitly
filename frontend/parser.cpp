@@ -1377,6 +1377,39 @@ std::shared_ptr<AST::Expression> Parser::primary() {
         }
     }
 
+    // Handle interpolated strings that start with interpolation (no initial string part)
+    if (match({TokenType::INTERPOLATION_START})) {
+        // This is an interpolated string starting with interpolation
+        // We need to "back up" and call interpolatedString with an empty initial string
+        current--; // Back up to before INTERPOLATION_START
+        
+        auto interpolated = std::make_shared<AST::InterpolatedStringExpr>();
+        interpolated->line = peek().line;
+        
+        // Add empty initial string part
+        interpolated->addStringPart("");
+        
+        // Parse interpolation parts
+        while (check(TokenType::INTERPOLATION_START)) {
+            advance(); // consume INTERPOLATION_START
+            
+            // Parse the expression inside the interpolation
+            auto expr = expression();
+            interpolated->addExpressionPart(expr);
+            
+            // Expect INTERPOLATION_END
+            consume(TokenType::INTERPOLATION_END, "Expected '}' after interpolation expression.");
+            
+            // Check if there's another string part after this interpolation
+            if (check(TokenType::STRING)) {
+                advance();
+                interpolated->addStringPart(previous().lexeme);
+            }
+        }
+        
+        return interpolated;
+    }
+
     if (match({TokenType::IDENTIFIER})) {
         auto token = previous();
         // Check if this is 'self' keyword
