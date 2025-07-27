@@ -42,7 +42,7 @@ void executeFile(const std::string& filename, bool printAst = false, bool printT
         // Print tokens if requested
         if (printTokens) {
             std::cout << "=== Tokens ===\n";
-            for (const auto& token : scanner.tokens) {
+            for (const auto& token : scanner.getTokens()) {
                 std::cout << scanner.tokenTypeToString(token.type) 
                           << ": '" << token.lexeme << "' (line " << token.line << ")\n";
             }

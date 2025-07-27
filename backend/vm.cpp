@@ -1,6 +1,7 @@
 #include "vm.hh"
 #include <iostream>
 #include <thread>
+#include <variant>
 
 // Helper function to convert TypeTag to string
 static std::string typeTagToString(TypeTag tag) {
@@ -202,8 +203,26 @@ ValuePtr VM::execute(const std::vector<Instruction>& bytecode) {
                 case Opcode::PRINT:
                     handlePrint(instruction);
                     break;
+                case Opcode::CREATE_LIST:
+                    handleCreateList(instruction);
+                    break;
+                case Opcode::LIST_APPEND:
+                    handleListAppend(instruction);
+                    break;
                 case Opcode::CREATE_RANGE:
                     handleCreateRange(instruction);
+                    break;
+                case Opcode::GET_ITERATOR:
+                    handleGetIterator(instruction);
+                    break;
+                case Opcode::ITERATOR_HAS_NEXT:
+                    handleIteratorHasNext(instruction);
+                    break;
+                case Opcode::ITERATOR_NEXT:
+                    handleIteratorNext(instruction);
+                    break;
+                case Opcode::ITERATOR_NEXT_KEY_VALUE:
+                    handleIteratorNextKeyValue(instruction);
                     break;
                 case Opcode::BEGIN_SCOPE:
                     // No action needed for BEGIN_SCOPE in this implementation
@@ -341,20 +360,11 @@ void VM::handleClearTemp(const Instruction& /*unused*/) {
 
 // Helper function to convert a value to its string representation
 std::string VM::valueToString(const ValuePtr& value) {
-    switch (value->type->tag) {
-        case TypeTag::String:
-            return std::get<std::string>(value->data);
-        case TypeTag::Int:
-            return std::to_string(std::get<int32_t>(value->data));
-        case TypeTag::Float64:
-            return std::to_string(std::get<double>(value->data));
-        case TypeTag::Bool:
-            return std::get<bool>(value->data) ? "true" : "false";
-        case TypeTag::Nil:
-            return "nil";
-        default:
-            return "[object " + typeTagToString(value->type->tag) + "]";
+    if (!value) {
+        return "nil";
     }
+    // Use the Value's built-in toString() method which already handles all types correctly
+    return value->toString();
 }
 
 void VM::handleAdd(const Instruction& /*unused*/) {
@@ -1062,9 +1072,26 @@ void VM::handleBeginClass(const Instruction& /*unused*/) { error("Not implemente
 void VM::handleEndClass(const Instruction& /*unused*/) { error("Not implemented"); }
 void VM::handleGetProperty(const Instruction& /*unused*/) { error("Not implemented"); }
 void VM::handleSetProperty(const Instruction& /*unused*/) { error("Not implemented"); }
-void VM::handleCreateList(const Instruction& /*unused*/) {
-    // TODO: Implement list creation
-    error("List creation not implemented yet");
+void VM::handleCreateList(const Instruction& instruction) {
+    // Get the number of elements to include in the list from the instruction
+    int32_t count = instruction.intValue;
+    
+    // Create a new list
+    auto list = memoryManager.makeRef<Value>(*region, typeSystem->LIST_TYPE);
+    auto listValue = ListValue();
+    
+    // Pop 'count' elements from the stack and add them to the list
+    for (int32_t i = 0; i < count; i++) {
+        ValuePtr element = pop();
+        listValue.elements.push_back(element);
+    }
+    
+    // Since we popped elements in reverse order, reverse the list to maintain the correct order
+    std::reverse(listValue.elements.begin(), listValue.elements.end());
+    
+    // Store the list in the value and push it onto the stack
+    list->data = listValue;
+    push(list);
 }
 
 void VM::handleListAppend(const Instruction& /*unused*/) {
@@ -1073,58 +1100,160 @@ void VM::handleListAppend(const Instruction& /*unused*/) {
 }
 
 void VM::handleCreateRange(const Instruction& instruction) {
-    // Get the step value if specified (default is 1)
-    int step = instruction.intValue;
+    // Get the step value (default is 1 if not specified)
+    int64_t step = 1;
+    if (instruction.intValue != 0) {
+        step = instruction.intValue;
+    }
+
+    // Get end value from stack
+    auto endVal = pop();
+    // Get start value from stack
+    auto startVal = pop();
+
+    // Extract integer values
+    int64_t start, end;
     
-    // Pop the end value
-    ValuePtr endVal = pop();
-    
-    // Pop the start value
-    ValuePtr startVal = pop();
-    
-    // Convert values to integers
-    int start = 0, end = 0;
-    
-    if (startVal->type->tag == TypeTag::Int) {
+    if (std::holds_alternative<int8_t>(startVal->data)) {
+        start = std::get<int8_t>(startVal->data);
+    } else if (std::holds_alternative<int16_t>(startVal->data)) {
+        start = std::get<int16_t>(startVal->data);
+    } else if (std::holds_alternative<int32_t>(startVal->data)) {
         start = std::get<int32_t>(startVal->data);
+    } else if (std::holds_alternative<int64_t>(startVal->data)) {
+        start = std::get<int64_t>(startVal->data);
     } else {
         error("Range start must be an integer");
         return;
     }
-    
-    if (endVal->type->tag == TypeTag::Int) {
+
+    if (std::holds_alternative<int8_t>(endVal->data)) {
+        end = std::get<int8_t>(endVal->data);
+    } else if (std::holds_alternative<int16_t>(endVal->data)) {
+        end = std::get<int16_t>(endVal->data);
+    } else if (std::holds_alternative<int32_t>(endVal->data)) {
         end = std::get<int32_t>(endVal->data);
+    } else if (std::holds_alternative<int64_t>(endVal->data)) {
+        end = std::get<int64_t>(endVal->data);
     } else {
         error("Range end must be an integer");
         return;
     }
+
+    // Create a list to hold the range values
+    ListValue rangeList;
     
-    // Create a new ListValue to hold the range elements
-    ListValue listValue;
-    
-    // Generate the range values and add them to the list
     if (step > 0) {
-        for (int i = start; i < end; i += step) {
-            listValue.elements.push_back(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, i));
+        for (int64_t i = start; i < end; i += step) {
+            auto val = memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, i);
+            rangeList.elements.push_back(val);
         }
     } else if (step < 0) {
-        for (int i = start; i > end; i += step) {
-            listValue.elements.push_back(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, i));
-        }
-    } else {
-        //if no step we increment the by 1
-        for (int i = start; i < end; i += 1) {
-            listValue.elements.push_back(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, i));
+        for (int64_t i = start; i > end; i += step) {
+            auto val = memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, i);
+            rangeList.elements.push_back(val);
         }
     }
     
-    // Create a new Value with the ListValue and push it onto the stack
-    ValuePtr rangeList = memoryManager.makeRef<Value>(*region, typeSystem->LIST_TYPE, listValue);
-    
-    push(rangeList);
+    // Push the range list onto the stack
+    auto result = memoryManager.makeRef<Value>(*region, typeSystem->LIST_TYPE, rangeList);
+    push(result);
 }
 
-void VM::handleIteratorNextKeyValue(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleGetIterator(const Instruction& /*unused*/) {
+    // Get the iterable from the stack
+    auto iterable = pop();
+    
+    // Create an iterator for the iterable
+    if (std::holds_alternative<ListValue>(iterable->data)) {
+        // For lists, create a list iterator
+        auto iterator = std::make_shared<IteratorValue>(
+            IteratorValue::IteratorType::LIST,
+            iterable
+        );
+        // Wrap the iterator in a Value and push it onto the stack
+        auto iteratorValue = memoryManager.makeRef<Value>(
+            *region,
+            typeSystem->ANY_TYPE,
+            iterator
+        );
+        push(iteratorValue);
+    } else if (std::holds_alternative<DictValue>(iterable->data)) {
+        // For dictionaries, we'll use the same approach as lists for now
+        // but with a different iterator type
+        auto iterator = std::make_shared<IteratorValue>(
+            IteratorValue::IteratorType::LIST, // TODO: Add DICT iterator type
+            iterable
+        );
+        // Wrap the iterator in a Value and push it onto the stack
+        auto iteratorValue = memoryManager.makeRef<Value>(
+            *region,
+            typeSystem->ANY_TYPE,
+            iterator
+        );
+        push(iteratorValue);
+    } else if (std::holds_alternative<IteratorValuePtr>(iterable->data)) {
+        // If it's already an iterator, just push it back
+        push(iterable);
+    } else {
+        error("Type is not iterable");
+    }
+}
+
+void VM::handleIteratorHasNext(const Instruction& /*unused*/) {
+    // Get the iterator from the stack
+    auto iteratorVal = pop();
+    
+    // Check if the value is an iterator
+    if (!std::holds_alternative<IteratorValuePtr>(iteratorVal->data)) {
+        error("Expected iterator value");
+        return;
+    }
+    
+    auto iterator = std::get<IteratorValuePtr>(iteratorVal->data);
+    bool hasNext = iterator->hasNext();
+    
+    // Push the result back onto the stack
+    auto result = memoryManager.makeRef<Value>(
+        *region,
+        typeSystem->BOOL_TYPE,
+        hasNext
+    );
+    push(result);
+}
+
+void VM::handleIteratorNext(const Instruction& /*unused*/) {
+    // Get the iterator from the stack
+    auto iteratorVal = pop();
+    
+    // Check if the value is an iterator
+    if (!std::holds_alternative<IteratorValuePtr>(iteratorVal->data)) {
+        error("Expected iterator value");
+        return;
+    }
+    
+    auto iterator = std::get<IteratorValuePtr>(iteratorVal->data);
+    
+    if (!iterator->hasNext()) {
+        error("No more elements in iterator");
+        return;
+    }
+    
+    // Get the next value and push it onto the stack
+    ValuePtr nextValue = iterator->next();
+    push(nextValue);
+}
+
+void VM::handleIteratorNextKeyValue(const Instruction& /*unused*/) {
+    // For now, we'll just call handleIteratorNext for both key and value
+    // In a real implementation, we would need to handle dictionary iteration differently
+    Instruction nextInstr;
+    nextInstr.opcode = Opcode::ITERATOR_NEXT;
+    nextInstr.intValue = 0;
+    nextInstr.boolValue = false;
+    handleIteratorNext(nextInstr);
+}
+
 void VM::handleBeginScope(const Instruction& /*unused*/) { error("Not implemented"); }
 void VM::handleEndScope(const Instruction& /*unused*/) { error("Not implemented"); }
 void VM::handleBeginTry(const Instruction& /*unused*/) { error("Not implemented"); }

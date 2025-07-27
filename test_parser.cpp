@@ -168,8 +168,15 @@ void printOpcodeValues() {
 }
 
 int main(int argc, char* argv[]) {
+    // Check for --list-opcodes flag
+    if (argc > 1 && std::string(argv[1]) == "--list-opcodes") {
+        printOpcodeValues();
+        return 0;
+    }
+    
     if (argc < 2) {
         std::cout << "Usage: " << argv[0] << " <source_file>" << std::endl;
+        std::cout << "       " << argv[0] << " --list-opcodes" << std::endl;
         return 1;
     }
     
@@ -196,7 +203,7 @@ int main(int argc, char* argv[]) {
         if (tokensFile.is_open()) {
             tokensFile << "Tokens for " << argv[1] << "\n";
             tokensFile << "========================================\n\n";
-            for (const auto& token : scanner.tokens) {
+            for (const auto& token : scanner.getTokens()) {
                 tokensFile << "Line " << token.line << ": " 
                           << scanner.tokenTypeToString(token.type) 
                           << " = '" << token.lexeme << "'\n";
