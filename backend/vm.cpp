@@ -346,16 +346,37 @@ void VM::handleLoadVar(const Instruction& instruction) {
     }
 }
 
-void VM::handleStoreTemp(const Instruction& /*unused*/) {
-    tempValue = peek();
+void VM::handleStoreTemp(const Instruction& instruction) {
+    // Store the top value in a temporary variable at the specified index
+    int index = instruction.intValue;
+    
+    // Ensure the tempValues vector is large enough
+    if (index >= static_cast<int>(tempValues.size())) {
+        tempValues.resize(index + 1, memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
+    }
+    
+    tempValues[index] = peek();
 }
 
-void VM::handleLoadTemp(const Instruction& /*unused*/) {
-    push(tempValue);
+void VM::handleLoadTemp(const Instruction& instruction) {
+    // Load the temporary value from the specified index onto the stack
+    int index = instruction.intValue;
+    
+    if (index < 0 || index >= static_cast<int>(tempValues.size())) {
+        error("Invalid temporary variable index: " + std::to_string(index));
+        return;
+    }
+    
+    push(tempValues[index]);
 }
 
-void VM::handleClearTemp(const Instruction& /*unused*/) {
-    tempValue = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
+void VM::handleClearTemp(const Instruction& instruction) {
+    // Clear the temporary value at the specified index
+    int index = instruction.intValue;
+    
+    if (index >= 0 && index < static_cast<int>(tempValues.size())) {
+        tempValues[index] = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
+    }
 }
 
 // Helper function to convert a value to its string representation
