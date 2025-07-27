@@ -1,7 +1,7 @@
 for (var i = 0; i < 10; i += 1) {
     print(i);
 }
-
+print("2 + 2 = {2 + 2}" );
 // Test range iteration
 print("Testing range iteration:")
 iter (i in 1..5) {
