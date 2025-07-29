@@ -26,8 +26,7 @@ type Age = uint;
 
 // === Option Type ===
 type Some = { kind: "Some", value: any };
-type None = nil;  // Or: type None = { kind: "None" };
-
+type None = nil;  
 type Option = Some | None;
 
 // Example usage:

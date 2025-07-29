@@ -970,24 +970,37 @@ void VM::handleJump(const Instruction& instruction) {
 }
 
 void VM::handleJumpIfTrue(const Instruction& instruction) {
-    (void)instruction; // Mark as unused
+    if (stack.empty()) {
+        error("Stack underflow in JUMP_IF_TRUE");
+        return;
+    }
+    
     ValuePtr condition = pop();
+    if (!condition || !condition->type) {
+        error("Invalid condition in JUMP_IF_TRUE");
+        return;
+    }
     
     bool condVal = false;
     
-    // Convert to boolean
-    if (condition->type->tag == TypeTag::Bool) {
-        condVal = std::get<bool>(condition->data);
-    } else if (condition->type->tag == TypeTag::Int) {
-        condVal = std::get<int32_t>(condition->data) != 0;
-    } else if (condition->type->tag == TypeTag::Float64) {
-        condVal = std::get<double>(condition->data) != 0.0;
-    } else if (condition->type->tag == TypeTag::String) {
-        condVal = !std::get<std::string>(condition->data).empty();
-    } else if (condition->type->tag == TypeTag::Nil) {
-        condVal = false;
-    } else {
-        condVal = true; // Objects are truthy
+    try {
+        // Convert to boolean
+        if (condition->type->tag == TypeTag::Bool) {
+            condVal = std::get<bool>(condition->data);
+        } else if (condition->type->tag == TypeTag::Int) {
+            condVal = std::get<int32_t>(condition->data) != 0;
+        } else if (condition->type->tag == TypeTag::Float64) {
+            condVal = std::get<double>(condition->data) != 0.0;
+        } else if (condition->type->tag == TypeTag::String) {
+            condVal = !std::get<std::string>(condition->data).empty();
+        } else if (condition->type->tag == TypeTag::Nil) {
+            condVal = false;
+        } else {
+            condVal = true; // Objects are truthy
+        }
+    } catch (const std::bad_variant_access&) {
+        error("Invalid data type in condition for JUMP_IF_TRUE");
+        return;
     }
     
     if (condVal) {
@@ -996,24 +1009,37 @@ void VM::handleJumpIfTrue(const Instruction& instruction) {
 }
 
 void VM::handleJumpIfFalse(const Instruction& instruction) {
-    (void)instruction; // Mark as unused
+    if (stack.empty()) {
+        error("Stack underflow in JUMP_IF_FALSE");
+        return;
+    }
+    
     ValuePtr condition = pop();
+    if (!condition || !condition->type) {
+        error("Invalid condition in JUMP_IF_FALSE");
+        return;
+    }
     
     bool condVal = false;
     
-    // Convert to boolean
-    if (condition->type->tag == TypeTag::Bool) {
-        condVal = std::get<bool>(condition->data);
-    } else if (condition->type->tag == TypeTag::Int) {
-        condVal = std::get<int32_t>(condition->data) != 0;
-    } else if (condition->type->tag == TypeTag::Float64) {
-        condVal = std::get<double>(condition->data) != 0.0;
-    } else if (condition->type->tag == TypeTag::String) {
-        condVal = !std::get<std::string>(condition->data).empty();
-    } else if (condition->type->tag == TypeTag::Nil) {
-        condVal = false;
-    } else {
-        condVal = true; // Objects are truthy
+    try {
+        // Convert to boolean
+        if (condition->type->tag == TypeTag::Bool) {
+            condVal = std::get<bool>(condition->data);
+        } else if (condition->type->tag == TypeTag::Int) {
+            condVal = std::get<int32_t>(condition->data) != 0;
+        } else if (condition->type->tag == TypeTag::Float64) {
+            condVal = std::get<double>(condition->data) != 0.0;
+        } else if (condition->type->tag == TypeTag::String) {
+            condVal = !std::get<std::string>(condition->data).empty();
+        } else if (condition->type->tag == TypeTag::Nil) {
+            condVal = false;
+        } else {
+            condVal = true; // Objects are truthy
+        }
+    } catch (const std::bad_variant_access&) {
+        error("Invalid data type in condition for JUMP_IF_FALSE");
+        return;
     }
     
     if (!condVal) {
@@ -1072,7 +1098,15 @@ void VM::handlePrint(const Instruction& instruction) {
         if (i > 0) {
             std::cout << " ";
         }
-        std::cout << valueToString(args[i]);
+        // Ensure the value is converted to a string
+        if (args[i] && args[i]->type && args[i]->type->tag == TypeTag::String) {
+            // If it's already a string, just print it
+            std::cout << valueToString(args[i]);
+        } else {
+            // Otherwise, convert it to a string first
+            std::string strValue = valueToString(args[i]);
+            std::cout << strValue;
+        }
     }
     std::cout << std::endl;
     
