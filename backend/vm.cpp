@@ -1157,6 +1157,34 @@ void VM::handleCreateList(const Instruction& instruction) {
     push(list);
 }
 
+// Helper function to compare two values for equality
+bool VM::valuesEqual(const ValuePtr& a, const ValuePtr& b) const {
+    if (!a && !b) return true;
+    if (!a || !b) return false;
+    
+    // Compare by type first
+    if (a->type->tag != b->type->tag) {
+        return false;
+    }
+    
+    // Compare by value content based on type
+    switch (a->type->tag) {
+        case TypeTag::Bool:
+            return std::get<bool>(a->data) == std::get<bool>(b->data);
+        case TypeTag::Int:
+            return std::get<int32_t>(a->data) == std::get<int32_t>(b->data);
+        case TypeTag::Float64:
+            return std::get<double>(a->data) == std::get<double>(b->data);
+        case TypeTag::String:
+            return std::get<std::string>(a->data) == std::get<std::string>(b->data);
+        case TypeTag::Nil:
+            return true; // All nil values are equal
+        default:
+            // For complex types, fall back to pointer comparison
+            return a.get() == b.get();
+    }
+}
+
 void VM::handleListAppend(const Instruction& /*unused*/) {
     // Pop the value to append
     ValuePtr value = pop();
@@ -1193,7 +1221,21 @@ void VM::handleCreateDict(const Instruction& instruction) {
     for (int32_t i = 0; i < count; i++) {
         ValuePtr value = pop();  // Pop value first (it's on top)
         ValuePtr key = pop();    // Then pop key
-        dictValue.elements[key] = value;
+        
+        // For now, we'll use the first key if there are duplicates
+        // In a real implementation, we might want to handle this differently
+        bool keyExists = false;
+        for (auto& [existingKey, existingValue] : dictValue.elements) {
+            if (valuesEqual(existingKey, key)) {
+                existingValue = value; // Update existing key
+                keyExists = true;
+                break;
+            }
+        }
+        
+        if (!keyExists) {
+            dictValue.elements[key] = value;
+        }
     }
     
     // Store the dictionary in the value and push it onto the stack
@@ -1220,8 +1262,19 @@ void VM::handleDictSet(const Instruction& /*unused*/) {
     // Get the dictionary data
     auto& dictData = std::get<DictValue>(dictVal->data);
     
-    // Set the key-value pair
-    dictData.elements[key] = value;
+    // Find existing key and update, or add new key
+    bool keyExists = false;
+    for (auto& [existingKey, existingValue] : dictData.elements) {
+        if (valuesEqual(existingKey, key)) {
+            existingValue = value; // Update existing key
+            keyExists = true;
+            break;
+        }
+    }
+    
+    if (!keyExists) {
+        dictData.elements[key] = value;
+    }
     
     // Push the modified dictionary back onto the stack
     push(dictVal);
@@ -1259,15 +1312,22 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
         // Handle dictionary indexing
         auto& dictData = std::get<DictValue>(container->data);
         
-        // Find the key in the dictionary
-        auto it = dictData.elements.find(index);
-        if (it == dictData.elements.end()) {
+        // Find the key in the dictionary by comparing values
+        ValuePtr foundValue = nullptr;
+        for (const auto& [key, value] : dictData.elements) {
+            if (valuesEqual(key, index)) {
+                foundValue = value;
+                break;
+            }
+        }
+        
+        if (!foundValue) {
             error("Key not found in dictionary");
             return;
         }
         
         // Push the value for the key
-        push(it->second);
+        push(foundValue);
         
     } else {
         error("Cannot index non-container value");
@@ -1309,8 +1369,19 @@ void VM::handleSetIndex(const Instruction& /*unused*/) {
         // Handle dictionary indexing
         auto& dictData = std::get<DictValue>(container->data);
         
-        // Set the key-value pair
-        dictData.elements[index] = value;
+        // Find existing key and update, or add new key
+        bool keyExists = false;
+        for (auto& [existingKey, existingValue] : dictData.elements) {
+            if (valuesEqual(existingKey, index)) {
+                existingValue = value; // Update existing key
+                keyExists = true;
+                break;
+            }
+        }
+        
+        if (!keyExists) {
+            dictData.elements[index] = value;
+        }
         
     } else {
         error("Cannot index non-container value");

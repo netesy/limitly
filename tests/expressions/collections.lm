@@ -1,0 +1,32 @@
+// Test collection operations (lists and dictionaries)
+print("=== Collection Operations Test ===");
+
+// List operations
+print("List operations:");
+var myList = [1, 2, 3, 4, 5];
+print("Initial list: " + myList);
+
+// List indexing
+print("myList[0] = " + myList[0]);
+print("myList[2] = " + myList[2]);
+print("myList[4] = " + myList[4]);
+
+// Dictionary operations
+print("Dictionary operations:");
+var myDict = {"name": "Alice", "age": 25, "city": "New York"};
+print("Initial dict: " + myDict);
+
+// Dictionary indexing
+print("myDict['name'] = " + myDict["name"]);
+print("myDict['age'] = " + myDict["age"]);
+print("myDict['city'] = " + myDict["city"]);
+
+// Mixed collections
+print("Mixed collections:");
+var mixedList = [1, "hello", true, {"key": "value"}];
+print("Mixed list: " + mixedList);
+
+var nestedDict = {"user": {"name": "Bob", "age": 30}, "active": true};
+print("Nested dict: " + nestedDict);
+print("nestedDict['user'] = " + nestedDict["user"]);
+print("nestedDict['active'] = " + nestedDict["active"]);

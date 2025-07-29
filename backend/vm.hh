@@ -121,6 +121,9 @@ private:
     void handleIteratorNextKeyValue(const Instruction& instruction);
     void handleBeginScope(const Instruction& instruction);
     void handleEndScope(const Instruction& instruction);
+    
+    // Helper function for value comparison
+    bool valuesEqual(const ValuePtr& a, const ValuePtr& b) const;
     void handleBeginTry(const Instruction& instruction);
     void handleEndTry(const Instruction& instruction);
     void handleBeginHandler(const Instruction& instruction);
