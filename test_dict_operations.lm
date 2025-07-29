@@ -1,0 +1,18 @@
+// Test dictionary operations
+print("=== Dictionary Operations Test ===");
+
+// Create a dictionary with initial elements
+var myDict = {"name": "John", "age": 30};
+print("Initial dict: " + myDict);
+
+// Test dictionary indexing
+print("myDict['name'] = " + myDict["name"]);
+print("myDict['age'] = " + myDict["age"]);
+
+// Test dictionary assignment
+myDict["age"] = 31;
+print("After myDict['age'] = 31: " + myDict);
+
+// Test adding new key-value pairs
+myDict["city"] = "New York";
+print("After myDict['city'] = 'New York': " + myDict);

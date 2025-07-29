@@ -1,0 +1,10 @@
+// Test simple dictionary operations
+print("=== Simple Dictionary Test ===");
+
+// Create a dictionary with initial elements
+var myDict = {"name": "John", "age": 30};
+print("Dict created: " + myDict);
+
+// Test dictionary indexing
+print("myDict['name'] = " + myDict["name"]);
+print("myDict['age'] = " + myDict["age"]);
