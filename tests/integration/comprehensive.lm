@@ -5,7 +5,7 @@ print("=== Comprehensive Integration Test ===");
 print("Multi-feature test:");
 
 // Variables and expressions
-var name = "Limit";
+var name = "Luminar";
 var version = 1.0;
 var isStable = true;
 

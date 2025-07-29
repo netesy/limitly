@@ -3,56 +3,20 @@ print("=== Parallel Block Tests ===");
 
 // Basic parallel block
 print("Basic parallel execution:");
-parallel {
-    print("Task 1: Starting");
-    for (var i = 0; i < 3; i += 1) {
-        print("Task 1: Step {i}");
-    }
-    print("Task 1: Complete");
-} and {
-    print("Task 2: Starting");
-    for (var j = 0; j < 3; j += 1) {
-        print("Task 2: Step {j}");
-    }
-    print("Task 2: Complete");
+fn spawn_task(id: int, ch: Channel): nil {
+    print("Executing parallel task {id}");
+    sleep(randint(1, 3));
+    ch.send("Task {id} completed");
 }
 
-print("Parallel block finished");
+var task_channel: Channel = Channel();
 
-// Parallel computation
-print("Parallel computation:");
-var result1 = 0;
-var result2 = 0;
-
-parallel {
-    // Compute sum of squares
-    for (var i = 1; i <= 10; i += 1) {
-        result1 += i * i;
+parallel(tasks, cores=Auto, on_error=Auto) {
+    iter (var i = 1; i <= 3; i++) {
+        spawn_task(i, task_channel);
     }
-    print("Sum of squares: {result1}");
-} and {
-    // Compute factorial
-    result2 = 1;
-    for (var i = 1; i <= 5; i += 1) {
-        result2 *= i;
-    }
-    print("Factorial: {result2}");
 }
 
-print("Both computations complete");
-
-// Nested parallel blocks
-print("Nested parallel blocks:");
-parallel {
-    print("Outer task 1");
-    parallel {
-        print("Inner task 1a");
-    } and {
-        print("Inner task 1b");
-    }
-} and {
-    print("Outer task 2");
-    for (var i = 0; i < 2; i += 1) {
-        print("Outer task 2: {i}");
-    }
+iter (message in task_channel) {
+    print("Received: {message}");
 }

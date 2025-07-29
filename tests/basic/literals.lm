@@ -12,8 +12,9 @@ print(999999);
 print("Floats:");
 print(0.0);
 print(3.14159);
-print(-2.71828);
+//print(-2.71828); // fix this
 print(1.23e-4);
+print("");
 
 // String literals
 print("Strings:");

@@ -3,18 +3,24 @@ print("=== Concurrent Block Tests ===");
 
 // Basic concurrent block
 print("Basic concurrent execution:");
-concurrent {
-    print("Concurrent task 1: Starting");
-    for (var i = 0; i < 3; i += 1) {
-        print("Concurrent task 1: Step {i}");
+cvar shared_counter: Atomic = Atomic(0);
+var counter_channel: Channel = Channel();
+
+fn run_task(id: int, ch: Channel): nil {
+    print("Executing concurrent task {id}");
+    sleep(randint(1, 3));
+    shared_counter.fetch_add(1);
+    ch.send(shared_counter.get());
+}
+
+concurrent(tasks, cores=Auto, on_error=Auto) {
+    iter (var i = 1; i <= 3; i++) {
+        run_task(i, counter_channel);
     }
-    print("Concurrent task 1: Complete");
-} and {
-    print("Concurrent task 2: Starting");
-    for (var j = 0; j < 3; j += 1) {
-        print("Concurrent task 2: Step {j}");
-    }
-    print("Concurrent task 2: Complete");
+}
+
+iter (count in counter_channel) {
+    print("Updated counter: {count}");
 }
 
 print("Concurrent block finished");
@@ -36,24 +42,21 @@ async function processData() {
 processData();
 
 // Concurrent with shared resources
-print("Concurrent with synchronization:");
-var counter = 0;
-var mutex = Mutex();
+var stream_channel: Channel = Channel();
 
-concurrent {
-    for (var i = 0; i < 5; i += 1) {
-        mutex.lock();
-        counter += 1;
-        print("Task 1: counter = {counter}");
-        mutex.unlock();
+fn stream_worker(event: StreamEvent, ch: Channel): nil {
+    var processed: ProcessedEvent = event.validate().normalize().enrich_with_metadata();
+    ch.send(processed);
+}
+
+concurrent(stream_tasks, cores=Auto, on_error=Auto) {
+    iter (event in kafka_stream.receive()) {
+        stream_worker(event, stream_channel);
     }
-} and {
-    for (var i = 0; i < 5; i += 1) {
-        mutex.lock();
-        counter += 1;
-        print("Task 2: counter = {counter}");
-        mutex.unlock();
-    }
+}
+
+iter (event in stream_channel) {
+    handle_processed_event(event);
 }
 
 print("Final counter value: {counter}");

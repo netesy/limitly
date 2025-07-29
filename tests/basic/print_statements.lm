@@ -22,7 +22,7 @@ print("The answer is {x}");
 // Print multiple types
 print(true);
 print(false);
-print(null);
+print(nil);
 print(0);
 print("");
 

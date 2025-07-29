@@ -235,16 +235,18 @@ void BytecodeGenerator::visitIfStatement(const std::shared_ptr<AST::IfStatement>
     size_t jumpOverElseIndex = bytecode.size();
     emit(Opcode::JUMP, stmt->line);
     
-    // Update jump to else branch instruction
-    bytecode[jumpToElseIndex].intValue = bytecode.size() - jumpToElseIndex;
+    // Update jump to else branch instruction - jump to start of else branch or end if no else
+    size_t elseStartIndex = bytecode.size();
+    bytecode[jumpToElseIndex].intValue = static_cast<int32_t>(elseStartIndex - jumpToElseIndex - 1);
     
     // Process else branch if it exists
     if (stmt->elseBranch) {
         visitStatement(stmt->elseBranch);
     }
     
-    // Update jump over else branch instruction
-    bytecode[jumpOverElseIndex].intValue = bytecode.size() - jumpOverElseIndex;
+    // Update jump over else branch instruction - jump to end of if statement
+    size_t endIndex = bytecode.size();
+    bytecode[jumpOverElseIndex].intValue = static_cast<int32_t>(endIndex - jumpOverElseIndex - 1);
 }
 
 void BytecodeGenerator::visitForStatement(const std::shared_ptr<AST::ForStatement>& stmt) {
@@ -288,10 +290,11 @@ void BytecodeGenerator::visitForStatement(const std::shared_ptr<AST::ForStatemen
         visitStatement(stmt->body);
         
         // Jump back to start of loop
-        emit(Opcode::JUMP, stmt->line, loopStartIndex - bytecode.size());
+        emit(Opcode::JUMP, stmt->line, static_cast<int32_t>(loopStartIndex) - static_cast<int32_t>(bytecode.size()) - 1);
         
         // Update jump to end instruction
-        bytecode[jumpToEndIndex].intValue = bytecode.size() - jumpToEndIndex;
+        size_t endIndex = bytecode.size();
+        bytecode[jumpToEndIndex].intValue = static_cast<int32_t>(endIndex - jumpToEndIndex - 1);
     } else {
         // Traditional for loop
         
@@ -325,10 +328,11 @@ void BytecodeGenerator::visitForStatement(const std::shared_ptr<AST::ForStatemen
         }
         
         // Jump back to start of loop
-        emit(Opcode::JUMP, stmt->line, loopStartIndex - bytecode.size());
+        emit(Opcode::JUMP, stmt->line, static_cast<int32_t>(loopStartIndex) - static_cast<int32_t>(bytecode.size()) - 1);
         
         // Update jump to end instruction
-        bytecode[jumpToEndIndex].intValue = bytecode.size() - jumpToEndIndex;
+        size_t endIndex = bytecode.size();
+        bytecode[jumpToEndIndex].intValue = static_cast<int32_t>(endIndex - jumpToEndIndex - 1);
     }
     
     // End loop scope
@@ -352,10 +356,11 @@ void BytecodeGenerator::visitWhileStatement(const std::shared_ptr<AST::WhileStat
     visitStatement(stmt->body);
     
     // Jump back to start of loop
-    emit(Opcode::JUMP, stmt->line, loopStartIndex - bytecode.size());
+    emit(Opcode::JUMP, stmt->line, static_cast<int32_t>(loopStartIndex) - static_cast<int32_t>(bytecode.size()) - 1);
     
     // Update jump to end instruction
-    bytecode[jumpToEndIndex].intValue = bytecode.size() - jumpToEndIndex;
+    size_t endIndex = bytecode.size();
+    bytecode[jumpToEndIndex].intValue = static_cast<int32_t>(endIndex - jumpToEndIndex - 1);
 }
 
 void BytecodeGenerator::visitReturnStatement(const std::shared_ptr<AST::ReturnStatement>& stmt) {
@@ -426,7 +431,8 @@ void BytecodeGenerator::visitAttemptStatement(const std::shared_ptr<AST::Attempt
     }
     
     // Update jump over handlers instruction
-    bytecode[jumpOverHandlersIndex].intValue = bytecode.size() - jumpOverHandlersIndex;
+    size_t endIndex = bytecode.size();
+    bytecode[jumpOverHandlersIndex].intValue = static_cast<int32_t>(endIndex - jumpOverHandlersIndex - 1);
     
     // End try block
     emit(Opcode::END_TRY, stmt->line);
@@ -518,12 +524,14 @@ void BytecodeGenerator::visitMatchStatement(const std::shared_ptr<AST::MatchStat
         emit(Opcode::JUMP, stmt->line);
         
         // Update jump to next case instruction
-        bytecode[jumpToNextCaseIndex].intValue = bytecode.size() - jumpToNextCaseIndex;
+        size_t nextCaseIndex = bytecode.size();
+        bytecode[jumpToNextCaseIndex].intValue = static_cast<int32_t>(nextCaseIndex - jumpToNextCaseIndex - 1);
     }
     
     // Update all jump to end instructions
+    size_t endIndex = bytecode.size();
     for (size_t index : jumpToEndIndices) {
-        bytecode[index].intValue = bytecode.size() - index;
+        bytecode[index].intValue = static_cast<int32_t>(endIndex - index - 1);
     }
     
     // Clean up temporary variable

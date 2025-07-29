@@ -2,7 +2,7 @@
 print("=== Advanced Function Tests ===");
 
 // Function with optional parameters
-function greetWithDefault(name = "World") {
+fn greetWithDefault(name = "World") {
     print("Hello, {name}!");
 }
 
@@ -11,7 +11,7 @@ greetWithDefault();
 greetWithDefault("Alice");
 
 // Function with multiple optional parameters
-function createUser(name, age = 18, active = true) {
+fn createUser(name, age = 18, active = true) {
     print("User: {name}, Age: {age}, Active: {active}");
 }
 
@@ -21,11 +21,11 @@ createUser("Charlie", 25);
 createUser("Diana", 30, false);
 
 // Higher-order functions (if implemented)
-function applyOperation(x, y, operation) {
+fn applyOperation(x, y, operation) {
     return operation(x, y);
 }
 
-function multiply(a, b) {
+fn multiply(a, b) {
     return a * b;
 }
 
@@ -34,7 +34,7 @@ var result = applyOperation(6, 7, multiply);
 print("applyOperation(6, 7, multiply) = {result}");
 
 // Closures (if implemented)
-function createCounter() {
+fn createCounter() {
     var count = 0;
     function increment() {
         count += 1;
