@@ -206,6 +206,18 @@ ValuePtr VM::execute(const std::vector<Instruction>& bytecode) {
                 case Opcode::LIST_APPEND:
                     handleListAppend(instruction);
                     break;
+                case Opcode::CREATE_DICT:
+                    handleCreateDict(instruction);
+                    break;
+                case Opcode::DICT_SET:
+                    handleDictSet(instruction);
+                    break;
+                case Opcode::GET_INDEX:
+                    handleGetIndex(instruction);
+                    break;
+                case Opcode::SET_INDEX:
+                    handleSetIndex(instruction);
+                    break;
                 case Opcode::CREATE_RANGE:
                     handleCreateRange(instruction);
                     break;
@@ -1146,8 +1158,166 @@ void VM::handleCreateList(const Instruction& instruction) {
 }
 
 void VM::handleListAppend(const Instruction& /*unused*/) {
-    // TODO: Implement list append
-    error("List append not implemented yet");
+    // Pop the value to append
+    ValuePtr value = pop();
+    
+    // Pop the list
+    ValuePtr listVal = pop();
+    
+    // Check if it's actually a list
+    if (!std::holds_alternative<ListValue>(listVal->data)) {
+        error("Cannot append to non-list value");
+        return;
+    }
+    
+    // Get the list data
+    auto& listData = std::get<ListValue>(listVal->data);
+    
+    // Append the value
+    listData.elements.push_back(value);
+    
+    // Push the modified list back onto the stack
+    push(listVal);
+}
+
+void VM::handleCreateDict(const Instruction& instruction) {
+    // Get the number of key-value pairs to include in the dictionary
+    int32_t count = instruction.intValue;
+    
+    // Create a new dictionary
+    auto dict = memoryManager.makeRef<Value>(*region, typeSystem->DICT_TYPE);
+    auto dictValue = DictValue();
+    
+    // Pop 'count' key-value pairs from the stack and add them to the dictionary
+    // Stack layout: [key1, value1, key2, value2, ..., keyN, valueN] (top)
+    for (int32_t i = 0; i < count; i++) {
+        ValuePtr value = pop();  // Pop value first (it's on top)
+        ValuePtr key = pop();    // Then pop key
+        dictValue.elements[key] = value;
+    }
+    
+    // Store the dictionary in the value and push it onto the stack
+    dict->data = dictValue;
+    push(dict);
+}
+
+void VM::handleDictSet(const Instruction& /*unused*/) {
+    // Pop the value to set
+    ValuePtr value = pop();
+    
+    // Pop the key
+    ValuePtr key = pop();
+    
+    // Pop the dictionary
+    ValuePtr dictVal = pop();
+    
+    // Check if it's actually a dictionary
+    if (!std::holds_alternative<DictValue>(dictVal->data)) {
+        error("Cannot set key on non-dictionary value");
+        return;
+    }
+    
+    // Get the dictionary data
+    auto& dictData = std::get<DictValue>(dictVal->data);
+    
+    // Set the key-value pair
+    dictData.elements[key] = value;
+    
+    // Push the modified dictionary back onto the stack
+    push(dictVal);
+}
+
+void VM::handleGetIndex(const Instruction& /*unused*/) {
+    // Pop the index
+    ValuePtr index = pop();
+    
+    // Pop the container (list or dictionary)
+    ValuePtr container = pop();
+    
+    if (std::holds_alternative<ListValue>(container->data)) {
+        // Handle list indexing
+        auto& listData = std::get<ListValue>(container->data);
+        
+        // Check if index is an integer
+        if (!std::holds_alternative<int32_t>(index->data)) {
+            error("List index must be an integer");
+            return;
+        }
+        
+        int32_t idx = std::get<int32_t>(index->data);
+        
+        // Check bounds
+        if (idx < 0 || idx >= static_cast<int32_t>(listData.elements.size())) {
+            error("List index out of bounds");
+            return;
+        }
+        
+        // Push the element at the index
+        push(listData.elements[idx]);
+        
+    } else if (std::holds_alternative<DictValue>(container->data)) {
+        // Handle dictionary indexing
+        auto& dictData = std::get<DictValue>(container->data);
+        
+        // Find the key in the dictionary
+        auto it = dictData.elements.find(index);
+        if (it == dictData.elements.end()) {
+            error("Key not found in dictionary");
+            return;
+        }
+        
+        // Push the value for the key
+        push(it->second);
+        
+    } else {
+        error("Cannot index non-container value");
+    }
+}
+
+void VM::handleSetIndex(const Instruction& /*unused*/) {
+    // Pop the value to set
+    ValuePtr value = pop();
+    
+    // Pop the index
+    ValuePtr index = pop();
+    
+    // Pop the container (list or dictionary)
+    ValuePtr container = pop();
+    
+    if (std::holds_alternative<ListValue>(container->data)) {
+        // Handle list indexing
+        auto& listData = std::get<ListValue>(container->data);
+        
+        // Check if index is an integer
+        if (!std::holds_alternative<int32_t>(index->data)) {
+            error("List index must be an integer");
+            return;
+        }
+        
+        int32_t idx = std::get<int32_t>(index->data);
+        
+        // Check bounds
+        if (idx < 0 || idx >= static_cast<int32_t>(listData.elements.size())) {
+            error("List index out of bounds");
+            return;
+        }
+        
+        // Set the element at the index
+        listData.elements[idx] = value;
+        
+    } else if (std::holds_alternative<DictValue>(container->data)) {
+        // Handle dictionary indexing
+        auto& dictData = std::get<DictValue>(container->data);
+        
+        // Set the key-value pair
+        dictData.elements[index] = value;
+        
+    } else {
+        error("Cannot index non-container value");
+    }
+    
+    // Push the modified container back onto the stack
+    push(container);
 }
 
 void VM::handleCreateRange(const Instruction& instruction) {
