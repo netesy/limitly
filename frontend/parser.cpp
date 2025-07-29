@@ -1296,6 +1296,7 @@ std::shared_ptr<AST::Expression> Parser::finishCall(std::shared_ptr<AST::Express
     auto callExpr = std::make_shared<AST::CallExpr>();
     callExpr->line = paren.line;
     callExpr->callee = callee;
+    callExpr->arguments = arguments;
     callExpr->namedArgs = namedArgs;
     return callExpr;
 }
