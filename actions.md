@@ -358,10 +358,95 @@ tests/
 - Before fix: "Runtime error: Cannot compare values of different types" after first if statement
 - After fix: Complete control flow test executes successfully with all branches working
 
+## Action 13: Fixed Jump Offset Issues in Control Statements
+
+**Prompt**: "fix the jump offset in the control statements"
+
+**Problem Identified**:
+- Control flow statements (if/else, while, for) were causing "Stack underflow" errors
+- Jump offset calculations were inconsistent between bytecode generation and VM execution
+- Some jump handlers were subtracting 1 while others weren't, causing execution to jump to wrong locations
+
+**Root Cause Analysis**:
+- **Inconsistent offset calculation**: Bytecode generator used `bytecode.size() - jumpIndex` instead of proper relative offset
+- **VM handler inconsistency**: Some jump handlers used `ip += offset - 1` while others used `ip += offset`
+- **Wrong relative addressing**: Jump targets were calculated incorrectly, causing execution flow errors
+
+**Changes Made**:
+- **Fixed bytecode generation**: Updated all control flow statements to use consistent offset calculation: `static_cast<int32_t>(targetIndex - jumpIndex - 1)`
+- **Standardized VM jump handlers**: All jump instructions now consistently use `ip += instruction.intValue`
+- **Fixed control structures**:
+  - `visitIfStatement`: Corrected both forward jumps (to else) and skip jumps (over else)
+  - `visitWhileStatement`: Fixed both forward jumps (to end) and backward jumps (to start)
+  - `visitForStatement`: Updated both traditional and iterable for loops
+  - `visitMatchStatement`: Fixed pattern matching jump offsets
+  - `visitAttemptStatement`: Corrected exception handling jumps
+
+**Files Modified**:
+- backend/backend.cpp: Updated all control flow statement jump calculations
+- backend/vm.cpp: Standardized jump instruction handlers (`handleJump`, `handleJumpIfTrue`, `handleJumpIfFalse`)
+
+**Impact**:
+- ✅ **All control flow statements work correctly**: if/else, while, for, nested structures
+- ✅ **No more stack underflow errors**: Proper execution flow maintained
+- ✅ **Consistent jump behavior**: All jump instructions use same offset calculation
+- ✅ **Complex nested control flow**: Nested if statements and loops work perfectly
+
+**Testing Results**:
+- Before fix: "Stack underflow" errors after control statements
+- After fix: All control flow tests pass, including complex nested scenarios
+
+## Action 14: Fixed Iterator Stack Cleanup Issue
+
+**Prompt**: "check why we have <iterator> at the end of iterators?"
+
+**Problem Identified**:
+- Iterator loops were leaving `<iterator>` output at the end of program execution
+- The issue was that iterator values were being left on the stack after loop completion
+- Main program was printing any non-nil values left on the stack, including iterator objects
+
+**Root Cause Analysis**:
+- **STORE_TEMP bug**: The `handleStoreTemp` method used `peek()` instead of `pop()`
+- **Stack pollution**: This left iterator values on the stack after `STORE_TEMP` operations
+- **Iterator cleanup**: Even though `CLEAR_TEMP` cleared temporary variables, the stack still had leftover iterator values
+
+**Changes Made**:
+- **Fixed STORE_TEMP implementation**: Changed `tempValues[index] = peek();` to `tempValues[index] = pop();`
+- **Proper stack management**: STORE_TEMP now properly removes values from stack while storing them in temp variables
+- **Clean iterator lifecycle**: Iterators are now properly managed without stack pollution
+
+**Files Modified**:
+- backend/vm.cpp: Fixed `handleStoreTemp` method to use `pop()` instead of `peek()`
+
+**Impact**:
+- ✅ **No more `<iterator>` output**: Iterator loops complete cleanly without extra output
+- ✅ **Proper stack management**: Stack is properly cleaned after iterator operations
+- ✅ **All iterator tests pass**: Simple and nested iterator loops work correctly
+- ✅ **Clean program termination**: Programs end without spurious output
+
+**Testing Results**:
+- Before fix: `<iterator>` appeared at end of iterator loop programs
+- After fix: Iterator loops complete with clean output, no extra text
+
+### 📋 Current Status Summary
+
+### ✅ Fully Working Features
+- **Control Flow**: if/else statements, while loops, for loops (all types)
+- **Iterators**: iter loops with ranges, nested iterations
+- **Variables**: Declaration, assignment, scoping
+- **Expressions**: Arithmetic, comparison, logical, string interpolation
+- **Print Statements**: Clean output without stack pollution
+- **Jump Instructions**: Consistent and correct execution flow
+
+### 🔧 Recently Fixed Critical Issues
+- **Jump offset calculations**: All control flow statements now execute correctly
+- **Iterator stack cleanup**: No more spurious `<iterator>` output
+- **Stack management**: Proper cleanup after all operations
+
 ### 📋 Next Development Priorities
 1. Complete VM implementation for function calls and returns
 2. Implement object-oriented features in the VM
-3. Add while loop support
+3. Add break/continue statements for loops
 4. Implement basic function declarations and calls
-5. Fix remaining stack cleanup issues (expressions leaving values on stack)
-6. Expand error handling capabilities
+5. Add exception handling (try/catch blocks)
+6. Expand standard library functions

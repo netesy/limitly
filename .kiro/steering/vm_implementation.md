@@ -108,10 +108,43 @@ The Limit VM is a stack-based virtual machine that executes bytecode generated f
 - Type specialization
 - Just-in-time compilation (future)
 
+## Recent VM Improvements ✅
+
+### Fixed Critical Issues
+- **Jump Offset Calculations**: Fixed inconsistent jump offset calculations in control flow statements
+  - All control flow statements (if/else, while, for, match) now execute correctly
+  - Standardized jump instruction handlers for consistent behavior
+  - Fixed both forward and backward jumps in loops
+
+- **Stack Management**: Improved stack cleanup and management
+  - Fixed STORE_TEMP to properly pop values from stack
+  - Eliminated spurious `<iterator>` output from iterator operations
+  - Clean program termination without stack pollution
+
+- **Iterator Support**: Enhanced iterator implementation
+  - Fixed nested iteration with indexed temporary variable system
+  - Proper iterator lifecycle management
+  - Support for complex nested iterator patterns
+
+### Working VM Features ✅
+- ✅ **Basic Operations**: Stack manipulation, arithmetic, logical operations
+- ✅ **Control Flow**: if/else statements, while loops, for loops (all types)
+- ✅ **Iterators**: Range-based iteration with proper nesting support
+- ✅ **Variables**: Declaration, assignment, scoping
+- ✅ **Expressions**: All expression types with proper evaluation
+- ✅ **String Operations**: String interpolation and concatenation
+- ✅ **Print Statements**: Clean output without stack side effects
+
 ## Implementation Priorities
 
-1. Complete basic VM operations
-2. Implement function calls and returns
-3. Add support for objects and classes
-4. Implement concurrency primitives
-5. Add optimization passes
+### Current Focus
+1. ✅ ~~Complete basic VM operations~~ **COMPLETED**
+2. **Implement function calls and returns** - IN PROGRESS
+3. **Add support for objects and classes** - NEXT
+4. **Implement break/continue statements** - NEXT
+5. **Add exception handling (try/catch)** - NEXT
+
+### Future Work
+6. Implement concurrency primitives
+7. Add optimization passes
+8. Implement JIT compilation features

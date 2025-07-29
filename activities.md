@@ -57,7 +57,10 @@ The project is organized into frontend and backend components:
 - [x] **Fixed nested iteration support** - Implemented indexed temp variable system
 - [x] **Fixed string interpolation parsing** - Handle expressions at string start
 - [x] **Comprehensive test suite** - 20+ test files covering all features
-- [ ] Complete VM implementation for complex operations
+- [x] **Fixed control flow jump offsets** - All control statements now execute correctly
+- [x] **Fixed iterator stack cleanup** - Eliminated spurious output from iterator operations
+- [x] **Complete control flow implementation** - if/else, while, for, nested structures all working
+- [ ] Complete VM implementation for complex operations (function calls, OOP features)
 - [ ] Implement bytecode optimization
 
 ### Phase 3: Language Features 🔄
@@ -100,13 +103,17 @@ The project is organized into frontend and backend components:
 - **String Interpolation Fix**: Fixed parser to handle interpolated strings that start with expressions (e.g., `"{var}, {var2}"`)
 - **Comprehensive Test Suite**: Created organized test suite with 20+ test files covering all implemented features
 - **Test Infrastructure**: Built test runners and documentation for systematic testing
+- **Fixed Control Flow Jump Offsets**: Resolved critical jump offset calculation issues in all control statements (if/else, while, for, match)
+- **Fixed Iterator Stack Cleanup**: Eliminated spurious `<iterator>` output by fixing STORE_TEMP stack management
+- **Complete Control Flow Support**: All control flow statements now work correctly including nested structures
 
 ## Current Focus
 - Completing the VM implementation for complex operations
 - Implementing function calls and returns in the VM
 - Implementing object-oriented features in the VM
-- Implementing concurrency primitives in the VM
-- Expanding test coverage and fixing identified issues
+- Implementing break/continue statements for loops
+- Adding exception handling (try/catch blocks)
+- Expanding standard library functions
 
 ## Future Work
 - Implement a JIT compiler for improved performance

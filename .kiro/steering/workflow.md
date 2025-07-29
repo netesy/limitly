@@ -3,16 +3,23 @@
 ## Development Phases
 
 ### Current Focus
-The project is currently in Phase 2 (Backend Development) with focus on:
+The project is currently in Phase 2 (Backend Development) with recent major achievements:
+- ✅ **Fixed critical control flow issues**: All jump offset calculations corrected
+- ✅ **Complete control flow support**: if/else, while, for, nested structures working
+- ✅ **Fixed iterator stack management**: Clean execution without spurious output
+- ✅ **Comprehensive test suite**: 20+ test files with automated runners
+
+**Current priorities**:
 - Completing VM implementation for complex operations
 - Implementing function calls and returns in the VM
 - Implementing object-oriented features in the VM
-- Implementing concurrency primitives in the VM
+- Adding break/continue statements for loops
+- Implementing exception handling (try/catch blocks)
 
 ### Next Steps
 - Complete Phase 2 (Backend Development)
-- Begin Phase 3 (Language Features)
-- Start work on Phase 4 (Tooling and Documentation)
+- Begin Phase 3 (Language Features) - generics, modules, standard library
+- Start work on Phase 4 (Tooling and Documentation) - IDE integration, debugger
 
 ## Feature Implementation Process
 
@@ -44,6 +51,24 @@ The project is currently in Phase 2 (Backend Development) with focus on:
 
 ## Testing Strategy
 
+### Comprehensive Test Suite
+The project now has a comprehensive test suite organized in `tests/` directory:
+- **8 test categories**: basic, expressions, strings, loops, functions, classes, concurrency, integration
+- **20+ test files**: Covering all implemented language features
+- **Automated test runners**: Both silent and verbose modes available
+
+### Test Execution
+```bash
+# Run all tests (silent mode)
+./tests/run_tests.bat
+
+# Run all tests (verbose mode)  
+./tests/run_tests_verbose.bat
+
+# Run specific test category
+./bin/limitly.exe tests/loops/for_loops.lm
+```
+
 ### Parser Testing
 Use `test_parser` to verify AST generation:
 ```bash
@@ -61,6 +86,13 @@ Execute sample programs and verify output:
 ```bash
 ./limitly sample.lm
 ```
+
+### Recent Test Improvements
+- ✅ All control flow tests pass (if/else, while, for loops)
+- ✅ All iterator tests pass (including nested iterations)
+- ✅ String interpolation tests pass (all patterns)
+- ✅ Expression and arithmetic tests pass
+- ✅ Clean program termination without spurious output
 
 ## Contribution Guidelines
 
