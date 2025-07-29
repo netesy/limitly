@@ -197,6 +197,21 @@ ValuePtr VM::execute(const std::vector<Instruction>& bytecode) {
                 case Opcode::RETURN:
                     handleReturn(instruction);
                     break;
+                case Opcode::BEGIN_FUNCTION:
+                    handleBeginFunction(instruction);
+                    break;
+                case Opcode::END_FUNCTION:
+                    handleEndFunction(instruction);
+                    break;
+                case Opcode::DEFINE_PARAM:
+                    handleDefineParam(instruction);
+                    break;
+                case Opcode::DEFINE_OPTIONAL_PARAM:
+                    handleDefineOptionalParam(instruction);
+                    break;
+                case Opcode::SET_DEFAULT_VALUE:
+                    handleSetDefaultValue(instruction);
+                    break;
                 case Opcode::PRINT:
                     handlePrint(instruction);
                     break;
@@ -1069,11 +1084,11 @@ void VM::handleCall(const Instruction& instruction) {
         // Get the number of arguments
         int argCount = instruction.intValue;
         
-        // Collect arguments from the stack
+        // Collect arguments from the stack (in reverse order)
         std::vector<ValuePtr> args;
         args.reserve(argCount);
         for (int i = 0; i < argCount; i++) {
-            args.push_back(pop());
+            args.insert(args.begin(), pop()); // Insert at beginning to maintain order
         }
         
         // Call the native function and push the result
@@ -1081,18 +1096,105 @@ void VM::handleCall(const Instruction& instruction) {
         return;
     }
     
-    // For user-defined functions, we'd look up the function object here
-    // and set up a new call frame, but that's not implemented yet
+    // Check if it's a user-defined function
+    auto userIt = userFunctions.find(funcName);
+    if (userIt != userFunctions.end()) {
+        const Function& func = userIt->second;
+        int argCount = instruction.intValue;
+        
+        // Create a new environment for the function
+        auto funcEnv = std::make_shared<Environment>(environment);
+        
+        // Collect arguments from the stack
+        std::vector<ValuePtr> args;
+        args.reserve(argCount);
+        for (int i = 0; i < argCount; i++) {
+            args.insert(args.begin(), pop()); // Insert at beginning to maintain order
+        }
+        
+        // Check argument count
+        size_t requiredParams = func.parameters.size();
+        size_t totalParams = requiredParams + func.optionalParameters.size();
+        
+        if (args.size() < requiredParams || args.size() > totalParams) {
+            error("Function " + funcName + " expects " + std::to_string(requiredParams) + 
+                  " to " + std::to_string(totalParams) + " arguments, got " + std::to_string(args.size()));
+            return;
+        }
+        
+        // Bind required parameters
+        for (size_t i = 0; i < requiredParams && i < args.size(); i++) {
+            funcEnv->define(func.parameters[i], args[i]);
+        }
+        
+        // Bind optional parameters
+        for (size_t i = 0; i < func.optionalParameters.size(); i++) {
+            const std::string& paramName = func.optionalParameters[i];
+            size_t argIndex = requiredParams + i;
+            
+            if (argIndex < args.size()) {
+                // Use provided argument
+                funcEnv->define(paramName, args[argIndex]);
+            } else {
+                // Use default value
+                auto defaultIt = func.defaultValues.find(paramName);
+                if (defaultIt != func.defaultValues.end()) {
+                    funcEnv->define(paramName, defaultIt->second);
+                } else {
+                    // No default value, use nil
+                    funcEnv->define(paramName, memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
+                }
+            }
+        }
+        
+        // Create call frame
+        CallFrame frame;
+        frame.functionName = funcName;
+        frame.returnAddress = ip; // Return to next instruction after call
+        frame.basePointer = stack.size();
+        frame.environment = environment;
+        
+        // Push call frame
+        callStack.push_back(frame);
+        
+        // Switch to function environment
+        environment = funcEnv;
+        
+        // Jump to function start
+        ip = func.startAddress - 1; // -1 because ip will be incremented
+        return;
+    }
     
     error("Function not found: " + funcName);
-    // TODO: Implement function calls
-    error("Function calls not implemented yet");
 }
 
-void VM::handleReturn(const Instruction& instruction) {
-    (void)instruction; // Mark as unused
-    // TODO: Implement function returns
-    error("Function returns not implemented yet");
+void VM::handleReturn(const Instruction& /*unused*/) {
+    if (callStack.empty()) {
+        error("RETURN outside of function call");
+        return;
+    }
+    
+    // The return value should already be on the stack
+    ValuePtr returnValue;
+    if (!stack.empty()) {
+        returnValue = pop();
+    } else {
+        // No explicit return value, use nil
+        returnValue = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
+    }
+    
+    // Pop the call frame and return to the caller
+    CallFrame frame = callStack.back();
+    callStack.pop_back();
+    
+    // Restore the environment
+    environment = frame.environment;
+    
+    // Push the return value
+    push(returnValue);
+    
+    // Return to the caller
+    ip = frame.returnAddress;
 }
 
 void VM::handlePrint(const Instruction& instruction) {
@@ -1125,12 +1227,116 @@ void VM::handlePrint(const Instruction& instruction) {
     // Print is a statement, not an expression - don't push a result
 }
 
-// Placeholder implementations for other handlers
-void VM::handleBeginFunction(const Instruction& /*unused*/) { error("Not implemented"); }
-void VM::handleEndFunction(const Instruction& /*unused*/) { error("Not implemented"); }
-void VM::handleDefineParam(const Instruction& /*unused*/) { error("Not implemented"); }
-void VM::handleDefineOptionalParam(const Instruction& /*unused*/) { error("Not implemented"); }
-void VM::handleSetDefaultValue(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleBeginFunction(const Instruction& instruction) {
+    // Create a new function definition
+    const std::string& funcName = instruction.stringValue;
+    
+    // Process parameter definitions immediately
+    size_t currentIp = ip + 1;
+    Function func(funcName, 0); // Will set start address later
+    
+    // Process DEFINE_PARAM and DEFINE_OPTIONAL_PARAM instructions
+    while (currentIp < bytecode->size()) {
+        const Instruction& inst = (*bytecode)[currentIp];
+        if (inst.opcode == Opcode::DEFINE_PARAM) {
+            func.parameters.push_back(inst.stringValue);
+            currentIp++;
+        } else if (inst.opcode == Opcode::DEFINE_OPTIONAL_PARAM) {
+            func.optionalParameters.push_back(inst.stringValue);
+            currentIp++;
+        } else if (inst.opcode == Opcode::SET_DEFAULT_VALUE) {
+            // Handle default value - for now, skip it
+            currentIp++;
+        } else {
+            // Found the start of the actual function body
+            break;
+        }
+    }
+    
+    // Set the function start address to the beginning of the actual body
+    func.startAddress = currentIp;
+    
+    // Store the function (will be completed in handleEndFunction)
+    userFunctions[funcName] = func;
+    
+    // Skip the function body during normal execution
+    // Find the matching END_FUNCTION and jump past it
+    int functionDepth = 1;
+    
+    while (currentIp < bytecode->size() && functionDepth > 0) {
+        const Instruction& inst = (*bytecode)[currentIp];
+        if (inst.opcode == Opcode::BEGIN_FUNCTION) {
+            functionDepth++;
+        } else if (inst.opcode == Opcode::END_FUNCTION) {
+            functionDepth--;
+        }
+        currentIp++;
+    }
+    
+    // Set the end address and jump past the function
+    userFunctions[funcName].endAddress = currentIp - 1;
+    ip = currentIp - 1; // -1 because ip will be incremented after this instruction
+}
+
+void VM::handleEndFunction(const Instruction& /*unused*/) {
+    // This should only be reached during function execution, not during function definition
+    // During function definition, we skip over this
+    // During function execution, this means we're returning from a function
+    
+    if (callStack.empty()) {
+        error("END_FUNCTION reached outside of function call");
+        return;
+    }
+    
+    // Pop the call frame and return to the caller
+    CallFrame frame = callStack.back();
+    callStack.pop_back();
+    
+    // Restore the environment
+    environment = frame.environment;
+    
+    // If there's no explicit return value on the stack, push nil
+    if (stack.empty()) {
+        push(memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
+    }
+    
+    // Return to the caller
+    ip = frame.returnAddress;
+}
+
+void VM::handleDefineParam(const Instruction& instruction) {
+    // This instruction should not be reached during normal execution
+    // Parameters are now processed in handleBeginFunction
+    error("DEFINE_PARAM instruction reached during execution - this should not happen");
+}
+
+void VM::handleDefineOptionalParam(const Instruction& instruction) {
+    // This instruction should not be reached during normal execution
+    // Optional parameters are now processed in handleBeginFunction
+    error("DEFINE_OPTIONAL_PARAM instruction reached during execution - this should not happen");
+}
+
+void VM::handleSetDefaultValue(const Instruction& /*unused*/) {
+    // Set default value for the last optional parameter
+    if (userFunctions.empty()) {
+        error("SET_DEFAULT_VALUE outside of function definition");
+        return;
+    }
+    
+    Function* currentFunc = nullptr;
+    for (auto& [name, func] : userFunctions) {
+        if (func.endAddress == 0) {
+            currentFunc = &func;
+            break;
+        }
+    }
+    
+    if (currentFunc && !currentFunc->optionalParameters.empty()) {
+        std::string paramName = currentFunc->optionalParameters.back();
+        ValuePtr defaultValue = pop();
+        currentFunc->defaultValues[paramName] = defaultValue;
+    }
+}
 void VM::handleBeginClass(const Instruction& /*unused*/) { error("Not implemented"); }
 void VM::handleEndClass(const Instruction& /*unused*/) { error("Not implemented"); }
 void VM::handleGetProperty(const Instruction& /*unused*/) { error("Not implemented"); }
@@ -1546,8 +1752,17 @@ void VM::handleIteratorNextKeyValue(const Instruction& /*unused*/) {
     handleIteratorNext(nextInstr);
 }
 
-void VM::handleBeginScope(const Instruction& /*unused*/) { error("Not implemented"); }
-void VM::handleEndScope(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleBeginScope(const Instruction& /*unused*/) {
+    // Create a new environment that extends the current one
+    environment = std::make_shared<Environment>(environment);
+}
+
+void VM::handleEndScope(const Instruction& /*unused*/) {
+    // Restore the previous environment
+    if (environment && environment->enclosing) {
+        environment = environment->enclosing;
+    }
+}
 void VM::handleBeginTry(const Instruction& /*unused*/) { error("Not implemented"); }
 void VM::handleBeginHandler(const Instruction& /*unused*/) { error("Not implemented"); }
 void VM::handleEndHandler(const Instruction& /*unused*/) { error("Not implemented"); }

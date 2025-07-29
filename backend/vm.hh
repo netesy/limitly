@@ -9,6 +9,7 @@
 #include <vector>
 #include <stack>
 #include <unordered_map>
+#include <map>
 #include <memory>
 #include <variant>
 #include <string>
@@ -18,6 +19,22 @@
 // Forward declarations
 class Environment;
 struct CallFrame;
+
+// Function definition for user-defined functions
+struct Function {
+    std::string name;
+    std::vector<std::string> parameters;
+    std::vector<std::string> optionalParameters;
+    std::map<std::string, ValuePtr> defaultValues;
+    size_t startAddress;
+    size_t endAddress;
+    TypePtr returnType;
+    
+    Function() : startAddress(0), endAddress(0), returnType(nullptr) {}
+    
+    Function(const std::string& n, size_t start) 
+        : name(n), startAddress(start), endAddress(0), returnType(nullptr) {}
+};
 
 // Virtual Machine class
 class VM {
@@ -43,6 +60,7 @@ private:
     std::shared_ptr<Environment> globals;
     std::shared_ptr<Environment> environment;
     std::unordered_map<std::string, std::function<ValuePtr(const std::vector<ValuePtr>&)>> nativeFunctions;
+    std::unordered_map<std::string, Function> userFunctions;
     std::vector<ValuePtr> tempValues;
     ValuePtr lastException;
     

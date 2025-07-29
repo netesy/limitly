@@ -2,7 +2,7 @@
 print("=== Advanced Function Tests ===");
 
 // Function with optional parameters
-fn greetWithDefault(name = "World") {
+fn greetWithDefault(name: str = "World"): void {
     print("Hello, {name}!");
 }
 
@@ -11,7 +11,7 @@ greetWithDefault();
 greetWithDefault("Alice");
 
 // Function with multiple optional parameters
-fn createUser(name, age = 18, active = true) {
+fn createUser(name: str, age: int = 18, active: bool = true): void {
     print("User: {name}, Age: {age}, Active: {active}");
 }
 
@@ -21,22 +21,22 @@ createUser("Charlie", 25);
 createUser("Diana", 30, false);
 
 // Higher-order functions (if implemented)
-fn applyOperation(x, y, operation) {
+fn applyOperation(x: int, y: int, operation: fn(int, int) -> int): int {
     return operation(x, y);
 }
 
-fn multiply(a, b) {
+fn multiply(a: int, b: int): int {
     return a * b;
 }
 
 print("Higher-order functions:");
-var result = applyOperation(6, 7, multiply);
+var result: int = applyOperation(6, 7, multiply);
 print("applyOperation(6, 7, multiply) = {result}");
 
 // Closures (if implemented)
-fn createCounter() {
-    var count = 0;
-    function increment() {
+fn createCounter(): fn(): int {
+    var count: int = 0;
+    fn increment(): int {
         count += 1;
         return count;
     }
@@ -44,7 +44,7 @@ fn createCounter() {
 }
 
 print("Closures:");
-var counter = createCounter();
+var counter: fn() -> int = createCounter();
 print("Counter: {counter()}");
 print("Counter: {counter()}");
 print("Counter: {counter()}");
