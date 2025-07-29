@@ -1,0 +1,23 @@
+print("=== For Loop Tests ===");
+
+// Traditional for loop
+print("Traditional for loop:");
+for (var i = 0; i < 3; i = i + 1) {
+    print("i = " + i);
+}
+
+print("For loop with condition:");
+var x = 0;
+for (; x < 2; x = x + 1) {
+    print("x = " + x);
+}
+
+print("Nested for loops:");
+for (var i = 0; i < 2; i = i + 1) {
+    print("Outer loop i = " + i);
+    for (var j = 0; j < 2; j = j + 1) {
+        print("  Inner loop j = " + j);
+    }
+}
+
+print("For loop tests completed");

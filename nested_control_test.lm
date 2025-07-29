@@ -1,0 +1,25 @@
+var x = 5;
+var y = 3;
+
+if (x > y) {
+    print("x is greater than y");
+    
+    var i = 0;
+    while (i < 2) {
+        print("Loop iteration: " + i);
+        
+        if (i == 1) {
+            print("This is the second iteration");
+        } else {
+            print("This is the first iteration");
+        }
+        
+        i = i + 1;
+    }
+    
+    print("Loop completed");
+} else {
+    print("x is not greater than y");
+}
+
+print("Program finished");

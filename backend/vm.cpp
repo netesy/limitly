@@ -352,7 +352,7 @@ void VM::handleStoreTemp(const Instruction& instruction) {
         tempValues.resize(index + 1, memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
     }
     
-    tempValues[index] = peek();
+    tempValues[index] = pop();
 }
 
 void VM::handleLoadTemp(const Instruction& instruction) {
