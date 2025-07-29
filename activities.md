@@ -60,6 +60,7 @@ The project is organized into frontend and backend components:
 - [x] **Fixed control flow jump offsets** - All control statements now execute correctly
 - [x] **Fixed iterator stack cleanup** - Eliminated spurious output from iterator operations
 - [x] **Complete control flow implementation** - if/else, while, for, nested structures all working
+- [x] **Implemented list and dictionary operations** - Full support for collections with proper indexing and value comparison
 - [ ] Complete VM implementation for complex operations (function calls, OOP features)
 - [ ] Implement bytecode optimization
 
@@ -75,6 +76,7 @@ The project is organized into frontend and backend components:
 - [x] Refined types with constraints
 - [x] Range expressions
 - [x] Compound assignment operators
+- [x] List and dictionary collections with indexing operations
 - [ ] Generics
 - [ ] Modules and imports
 - [ ] Standard library
@@ -106,11 +108,13 @@ The project is organized into frontend and backend components:
 - **Fixed Control Flow Jump Offsets**: Resolved critical jump offset calculation issues in all control statements (if/else, while, for, match)
 - **Fixed Iterator Stack Cleanup**: Eliminated spurious `<iterator>` output by fixing STORE_TEMP stack management
 - **Complete Control Flow Support**: All control flow statements now work correctly including nested structures
+- **Implemented Collection Operations**: Added full support for lists and dictionaries with proper indexing, value comparison, and append operations
 
 ## Current Focus
 - Completing the VM implementation for complex operations
 - Implementing function calls and returns in the VM
 - Implementing object-oriented features in the VM
+- Adding indexed assignment operations (myList[0] = value, myDict["key"] = value)
 - Implementing break/continue statements for loops
 - Adding exception handling (try/catch blocks)
 - Expanding standard library functions

@@ -179,6 +179,11 @@ void BytecodeGenerator::visitFunctionDeclaration(const std::shared_ptr<AST::Func
     // Process function body
     visitBlockStatement(stmt->body);
     
+    // If function doesn't end with an explicit return, add implicit nil return
+    // This ensures all functions return a value
+    emit(Opcode::PUSH_NULL, stmt->line);
+    emit(Opcode::RETURN, stmt->line);
+    
     // End function definition
     emit(Opcode::END_FUNCTION, stmt->line);
 }
@@ -722,22 +727,29 @@ void BytecodeGenerator::visitVariableExpr(const std::shared_ptr<AST::VariableExp
 void BytecodeGenerator::visitCallExpr(const std::shared_ptr<AST::CallExpr>& expr) {
     // Generate bytecode for function call expression
     
-    // Evaluate callee
-    visitExpression(expr->callee);
-    
-    // Evaluate positional arguments
+    // Evaluate positional arguments (push them onto stack)
     for (const auto& arg : expr->arguments) {
         visitExpression(arg);
     }
     
-    // Evaluate named arguments
-    for (const auto& [name, arg] : expr->namedArgs) {
-        emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, name);
-        visitExpression(arg);
+    // For now, we'll handle simple function calls where callee is a variable
+    // In the future, we might support more complex callees (method calls, etc.)
+    std::string functionName;
+    if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(expr->callee)) {
+        functionName = varExpr->name;
+    } else {
+        // For more complex callees, we'd need to evaluate them
+        // For now, just use a placeholder
+        functionName = "unknown";
+    }
+    
+    // TODO: Handle named arguments properly
+    if (!expr->namedArgs.empty()) {
+        Debugger::error("Named arguments not yet supported", expr->line, 0, InterpretationStage::BYTECODE, "", "", "");
     }
     
     // Call function
-    emit(Opcode::CALL, expr->line, expr->arguments.size(), 0.0f, false, std::to_string(expr->namedArgs.size()));
+    emit(Opcode::CALL, expr->line, static_cast<int32_t>(expr->arguments.size()), 0.0f, false, functionName);
 }
 
 void BytecodeGenerator::visitAssignExpr(const std::shared_ptr<AST::AssignExpr>& expr) {

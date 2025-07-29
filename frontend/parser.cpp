@@ -784,9 +784,11 @@ std::shared_ptr<AST::FunctionDeclaration> Parser::function(const std::string& ki
         do {
             auto paramName = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
 
-            // Parse parameter type
-            consume(TokenType::COLON, "Expected ':' after parameter name.");
-            auto paramType = parseTypeAnnotation();
+            // Parse optional parameter type
+            std::shared_ptr<AST::TypeAnnotation> paramType = nullptr;
+            if (match({TokenType::COLON})) {
+                paramType = parseTypeAnnotation();
+            }
 
             // Check if parameter is optional
             if (paramType->isOptional) {
