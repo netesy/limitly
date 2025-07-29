@@ -788,42 +788,26 @@ void BytecodeGenerator::visitGroupingExpr(const std::shared_ptr<AST::GroupingExp
 void BytecodeGenerator::visitListExpr(const std::shared_ptr<AST::ListExpr>& expr) {
     // Generate bytecode for list literal expression
     
-    // Create empty list
-    emit(Opcode::CREATE_LIST, expr->line);
-    
-    // Evaluate and add each element
+    // Evaluate each element and push onto stack
     for (const auto& element : expr->elements) {
-        // Duplicate list reference
-        emit(Opcode::DUP, expr->line);
-        
-        // Evaluate element
         visitExpression(element);
-        
-        // Add element to list
-        emit(Opcode::LIST_APPEND, expr->line);
     }
+    
+    // Create list with all elements on stack
+    emit(Opcode::CREATE_LIST, expr->line, static_cast<int32_t>(expr->elements.size()));
 }
 
 void BytecodeGenerator::visitDictExpr(const std::shared_ptr<AST::DictExpr>& expr) {
     // Generate bytecode for dictionary literal expression
     
-    // Create empty dictionary
-    emit(Opcode::CREATE_DICT, expr->line);
-    
-    // Evaluate and add each entry
+    // Evaluate each key-value pair and push onto stack
     for (const auto& [key, value] : expr->entries) {
-        // Duplicate dictionary reference
-        emit(Opcode::DUP, expr->line);
-        
-        // Evaluate key
         visitExpression(key);
-        
-        // Evaluate value
         visitExpression(value);
-        
-        // Add entry to dictionary
-        emit(Opcode::DICT_SET, expr->line);
     }
+    
+    // Create dictionary with all key-value pairs on stack
+    emit(Opcode::CREATE_DICT, expr->line, static_cast<int32_t>(expr->entries.size()));
 }
 
 void BytecodeGenerator::visitIndexExpr(const std::shared_ptr<AST::IndexExpr>& expr) {
