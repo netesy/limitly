@@ -1,0 +1,17 @@
+// Test simple function
+fn greet(name) {
+    return "Hello, " + name + "!";
+}
+
+fn add(a, b) {
+    return a + b;
+}
+
+fn sayHello() {
+    return "Hello, World!";
+}
+
+print("Testing functions:");
+print(greet("Alice"));
+print(add(5, 3));
+print(sayHello());
