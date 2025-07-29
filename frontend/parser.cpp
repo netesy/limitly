@@ -790,16 +790,16 @@ std::shared_ptr<AST::FunctionDeclaration> Parser::function(const std::string& ki
                 paramType = parseTypeAnnotation();
             }
 
-            // Check if parameter is optional
-            if (paramType->isOptional) {
-                // Parse default value if provided
-                std::shared_ptr<AST::Expression> defaultValue = nullptr;
-                if (match({TokenType::EQUAL})) {
-                    defaultValue = expression();
-                }
-
+            // Check if parameter has a default value (making it optional)
+            if (match({TokenType::EQUAL})) {
+                // This is an optional parameter with a default value
+                std::shared_ptr<AST::Expression> defaultValue = expression();
                 func->optionalParams.push_back({paramName, {paramType, defaultValue}});
+            } else if (paramType && paramType->isOptional) {
+                // This is an optional parameter with nullable type (no default value)
+                func->optionalParams.push_back({paramName, {paramType, nullptr}});
             } else {
+                // This is a required parameter
                 func->params.push_back({paramName, paramType});
             }
         } while (match({TokenType::COMMA}));
@@ -1345,6 +1345,13 @@ std::shared_ptr<AST::Expression> Parser::primary() {
     }
 
     if (match({TokenType::NONE})) {
+        auto literalExpr = std::make_shared<AST::LiteralExpr>();
+        literalExpr->line = previous().line;
+        literalExpr->value = nullptr;
+        return literalExpr;
+    }
+
+    if (match({TokenType::NIL})) {
         auto literalExpr = std::make_shared<AST::LiteralExpr>();
         literalExpr->line = previous().line;
         literalExpr->value = nullptr;

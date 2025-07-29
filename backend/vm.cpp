@@ -1245,7 +1245,63 @@ void VM::handleBeginFunction(const Instruction& instruction) {
             func.optionalParameters.push_back(inst.stringValue);
             currentIp++;
         } else if (inst.opcode == Opcode::SET_DEFAULT_VALUE) {
-            // Handle default value - for now, skip it
+            // The default value should be on the stack from the previous expression
+            // We need to evaluate the expression that was generated before this instruction
+            // For now, we'll handle this by executing the previous instructions
+            
+            // Go back to find the expression that generates the default value
+            size_t exprStart = currentIp - 1;
+            while (exprStart > 0) {
+                const Instruction& prevInst = (*bytecode)[exprStart];
+                if (prevInst.opcode == Opcode::DEFINE_OPTIONAL_PARAM) {
+                    exprStart++;
+                    break;
+                }
+                exprStart--;
+            }
+            
+            // Execute the expression instructions to get the default value
+            size_t savedIp = ip;
+            ip = exprStart;
+            
+            // Execute instructions until we reach SET_DEFAULT_VALUE
+            while (ip < currentIp) {
+                const Instruction& execInst = (*bytecode)[ip];
+                switch (execInst.opcode) {
+                    case Opcode::PUSH_INT:
+                        handlePushInt(execInst);
+                        break;
+                    case Opcode::PUSH_FLOAT:
+                        handlePushFloat(execInst);
+                        break;
+                    case Opcode::PUSH_STRING:
+                        handlePushString(execInst);
+                        break;
+                    case Opcode::PUSH_BOOL:
+                        handlePushBool(execInst);
+                        break;
+                    case Opcode::PUSH_NULL:
+                        handlePushNull(execInst);
+                        break;
+                    default:
+                        // For more complex expressions, we might need to handle more opcodes
+                        break;
+                }
+                ip++;
+            }
+            
+            // Get the default value from the stack
+            if (!stack.empty()) {
+                ValuePtr defaultValue = pop();
+                // Store it with the last optional parameter
+                if (!func.optionalParameters.empty()) {
+                    const std::string& paramName = func.optionalParameters.back();
+                    func.defaultValues[paramName] = defaultValue;
+                }
+            }
+            
+            // Restore the IP
+            ip = savedIp;
             currentIp++;
         } else {
             // Found the start of the actual function body

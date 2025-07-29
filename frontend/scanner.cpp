@@ -286,7 +286,6 @@ void Scanner::string() {
     std::string value;
     current = start + 1; // Skip the opening quote
     
-    std::cout << "[SCANNER] Starting string parsing at line " << line << " with quote: " << quoteType << std::endl;
     
     // Parse string with interpolation support
     while (!isAtEnd() && peek() != quoteType) {
