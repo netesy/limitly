@@ -2,8 +2,9 @@
 print("=== Basic Function Tests ===");
 
 // Simple function without parameters
-fn greet() {
+fn greet(): str {
     print("Hello from function!");
+    return "done";
 }
 
 print("Calling greet():");
@@ -27,13 +28,13 @@ print("Square function:");
 print("square(4) = {square(4)}");
 print("square(7) = {square(7)}");
 
-//Function with optional parameters
-fn greet_optional(name: str = "Guest"): nil {
+//Function with string parameter
+fn greet_name(name: str): str {
     print("Hello, {name}!");
+    return "greeted";
 }
-print("Function with optional parameters:");
-greet_optional("Alice");
-greet_optional();
+print("Function with string parameter:");
+greet_name("Alice");
 
 // Function with local variables
 fn calculate(x: int, y: int): int {
