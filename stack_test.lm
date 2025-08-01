@@ -1,5 +1,0 @@
-// Test to demonstrate stack buildup issue
-var x = 42;
-var y = 3.14;
-var z = "hello";
-print("Variables declared");

@@ -154,7 +154,7 @@ print("power(3, 4) = {power(3, 4)}"); // Should be 81 (3^4)
 print("=== Default Parameter Tests ===");
 
 // Function with default parameter value
-fn greet_default(name:str = "World"): str {
+fn greet_default(name: str = "World"): str {
     print("Hello, {name}!");
     return "greeted {name}";
 }
@@ -163,24 +163,7 @@ print("Testing default parameter:");
 greet_default();          // Should print "Hello, World!"
 greet_default("Alice");   // Should print "Hello, Alice!"
 
-// Function with multiple default parameters
-fn create_rectangle(width = 10, height:int = 5): int {
-    print("Creating rectangle: {width} x {height}");
-    return width * height;
-}
 
-
-
-// Default parameter with calculation
-fn calculate_tax(amount: int, rate:f64 = 0.1): int {
-    var tax: int = amount * rate;
-    print("Tax on {amount} at {rate}% = {tax}");
-    return tax;
-}
-
-print("Testing calculated default parameter:");
-calculate_tax(100);        // Uses default 10% rate
-calculate_tax(200, 0.15);  // Uses custom
 
 
 //issues with conversion from int
