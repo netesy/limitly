@@ -134,15 +134,18 @@ The Limit VM is a stack-based virtual machine that executes bytecode generated f
 - ✅ **Expressions**: All expression types with proper evaluation
 - ✅ **String Operations**: String interpolation and concatenation
 - ✅ **Print Statements**: Clean output without stack side effects
+- ✅ **Function Calls**: Basic function calls and returns with parameter binding
+- ✅ **Default Parameters**: Optional parameters with default values working correctly
 
 ## Implementation Priorities
 
 ### Current Focus
 1. ✅ ~~Complete basic VM operations~~ **COMPLETED**
-2. **Implement function calls and returns** - IN PROGRESS
-3. **Add support for objects and classes** - NEXT
-4. **Implement break/continue statements** - NEXT
-5. **Add exception handling (try/catch)** - NEXT
+2. ✅ ~~Implement function calls and returns~~ **COMPLETED**
+3. ✅ ~~Implement default parameters~~ **COMPLETED**
+4. **Add support for objects and classes** - NEXT
+5. **Implement break/continue statements** - NEXT
+6. **Add exception handling (try/catch)** - NEXT
 
 ### Future Work
 6. Implement concurrency primitives

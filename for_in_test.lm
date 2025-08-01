@@ -1,9 +1,0 @@
-print("=== For-In Loop Tests ===");
-
-// Test with range
-print("For-in with range:");
-for (var i in 0..3) {
-    print("Range value: " + i);
-}
-
-print("For-in tests completed");

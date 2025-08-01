@@ -1,0 +1,35 @@
+// Test optional and default parameters
+
+// Function with default parameter
+fn greet(name: str = "World"): str {
+    return "Hello, " + name + "!";
+}
+
+// Function with optional parameter (nullable)
+fn process(value: str?): str {
+    if (value == nil) {
+        return "No value provided";
+    }
+    return "Processing: " + value;
+}
+
+// Function with both required and optional parameters
+fn createUser(name: str, age: int = 18, active: bool? = true): str {
+    return "User: " + name + ", Age: " + age + ", Active: " + active;
+}
+
+print("=== Testing Optional and Default Parameters ===");
+
+print("Testing default parameters:");
+print(greet());           // Should use default "World"
+print(greet("Alice"));    // Should use provided "Alice"
+
+print("Testing optional parameters:");
+print(process());      // Should handle nil
+print(process("nelo"));      // Should handle nelo
+print(process("data"));   // Should process "data"
+
+print("Testing mixed parameters:");
+print(createUser("Bob"));                    // Use defaults for age and active
+print(createUser("Charlie", 25));            // Use default for active
+print(createUser("Diana", 30, false));       // All parameters provided

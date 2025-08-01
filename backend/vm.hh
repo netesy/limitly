@@ -23,9 +23,12 @@ struct CallFrame;
 // Function definition for user-defined functions
 struct Function {
     std::string name;
-    std::vector<std::string> parameters;
-    std::vector<std::string> optionalParameters;
-    std::map<std::string, ValuePtr> defaultValues;
+    // std::vector<std::string> parameters;
+    // std::vector<std::string> optionalParameters;
+    // std::map<std::string, ValuePtr> defaultValues;
+    std::vector<std::pair<std::string, TypePtr>> parameters;  // name and type
+    std::vector<std::pair<std::string, TypePtr>> optionalParameters;
+    std::map<std::string, std::pair<ValuePtr, TypePtr>> defaultValues;
     size_t startAddress;
     size_t endAddress;
     TypePtr returnType;
@@ -44,6 +47,12 @@ public:
     
     // Execute bytecode
     ValuePtr execute(const std::vector<Instruction>& bytecode);
+    
+    // Function to enable or disable debug output
+    void setDebug(bool enable) { 
+        debugMode = enable;
+        debugOutput = enable;
+    }
     
     // Register native function
     void registerNativeFunction(const std::string& name, std::function<ValuePtr(const std::vector<ValuePtr>&)> function);
@@ -67,6 +76,10 @@ private:
     // Current execution state
     const std::vector<Instruction>* bytecode;
     size_t ip; // Instruction pointer
+    bool debugMode;
+    bool debugOutput;
+    std::string currentFunctionBeingDefined; // Track which function is currently being defined
+    bool insideFunctionDefinition; // Track if we're currently inside a function definition
     
     // Helper methods
     ValuePtr pop();

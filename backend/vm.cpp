@@ -34,16 +34,18 @@ static std::string typeTagToString(TypeTag tag) {
 }
 
 // VM implementation
-VM::VM() : ip(0) {
-    // Initialize memory manager and region
-    region = std::make_unique<MemoryManager<>::Region>(memoryManager);
-    
-    // Initialize type system
-    typeSystem = new TypeSystem(memoryManager, *region);
-    
-    // Initialize environment
-    globals = std::make_shared<Environment>();
-    environment = globals;
+VM::VM()
+    : memoryManager(1024 * 1024), // 1MB initial memory
+      region(std::make_unique<MemoryManager<>::Region>(memoryManager)),
+      typeSystem(new TypeSystem(memoryManager, *region)),
+      globals(std::make_shared<Environment>()),
+      environment(globals),
+      bytecode(nullptr),
+      ip(0),
+      debugMode(false),
+      debugOutput(false),
+      currentFunctionBeingDefined(""),
+      insideFunctionDefinition(false) {
     
     // Register native functions
     registerNativeFunction("clock", [this](const std::vector<ValuePtr>&) -> ValuePtr {
@@ -87,6 +89,20 @@ ValuePtr VM::execute(const std::vector<Instruction>& bytecode) {
     try {
         while (ip < bytecode.size()) {
             const Instruction& instruction = bytecode[ip];
+            
+            // Check if we need to start skipping function body
+            if (!currentFunctionBeingDefined.empty() && !insideFunctionDefinition) {
+                auto funcIt = userFunctions.find(currentFunctionBeingDefined);
+                if (funcIt != userFunctions.end() && ip >= funcIt->second.startAddress) {
+                    insideFunctionDefinition = true;
+                }
+            }
+            
+            // Skip execution if we're inside a function definition (except for END_FUNCTION)
+            if (insideFunctionDefinition && instruction.opcode != Opcode::END_FUNCTION) {
+                ip++;
+                continue;
+            }
             
             // Debug output for opcode values
             int opcodeValue = static_cast<int>(instruction.opcode);
@@ -1124,12 +1140,12 @@ void VM::handleCall(const Instruction& instruction) {
         
         // Bind required parameters
         for (size_t i = 0; i < requiredParams && i < args.size(); i++) {
-            funcEnv->define(func.parameters[i], args[i]);
+            funcEnv->define(func.parameters[i].first, args[i]); // Get parameter name from pair
         }
         
         // Bind optional parameters
         for (size_t i = 0; i < func.optionalParameters.size(); i++) {
-            const std::string& paramName = func.optionalParameters[i];
+            const std::string& paramName = func.optionalParameters[i].first; // Get parameter name from pair
             size_t argIndex = requiredParams + i;
             
             if (argIndex < args.size()) {
@@ -1139,7 +1155,7 @@ void VM::handleCall(const Instruction& instruction) {
                 // Use default value
                 auto defaultIt = func.defaultValues.find(paramName);
                 if (defaultIt != func.defaultValues.end()) {
-                    funcEnv->define(paramName, defaultIt->second);
+                    funcEnv->define(paramName, defaultIt->second.first); // Get the ValuePtr from the pair
                 } else {
                     // No default value, use nil
                     funcEnv->define(paramName, memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
@@ -1230,79 +1246,29 @@ void VM::handlePrint(const Instruction& instruction) {
 void VM::handleBeginFunction(const Instruction& instruction) {
     // Create a new function definition
     const std::string& funcName = instruction.stringValue;
+    currentFunctionBeingDefined = funcName;
     
     // Process parameter definitions immediately
     size_t currentIp = ip + 1;
     Function func(funcName, 0); // Will set start address later
     
-    // Process DEFINE_PARAM and DEFINE_OPTIONAL_PARAM instructions
-    while (currentIp < bytecode->size()) {
-        const Instruction& inst = (*bytecode)[currentIp];
-        if (inst.opcode == Opcode::DEFINE_PARAM) {
-            func.parameters.push_back(inst.stringValue);
-            currentIp++;
-        } else if (inst.opcode == Opcode::DEFINE_OPTIONAL_PARAM) {
-            func.optionalParameters.push_back(inst.stringValue);
-            currentIp++;
-        } else if (inst.opcode == Opcode::SET_DEFAULT_VALUE) {
-            // The default value should be on the stack from the previous expression
-            // We need to evaluate the expression that was generated before this instruction
-            // For now, we'll handle this by executing the previous instructions
-            
-            // Go back to find the expression that generates the default value
-            size_t exprStart = currentIp - 1;
-            while (exprStart > 0) {
-                const Instruction& prevInst = (*bytecode)[exprStart];
-                if (prevInst.opcode == Opcode::DEFINE_OPTIONAL_PARAM) {
-                    exprStart++;
-                    break;
-                }
-                exprStart--;
-            }
-            
-            // Execute the expression instructions to get the default value
-            size_t savedIp = ip;
-            ip = exprStart;
-            
-            // Execute instructions until we reach SET_DEFAULT_VALUE
-            while (ip < currentIp) {
-                const Instruction& execInst = (*bytecode)[ip];
-                switch (execInst.opcode) {
-                    case Opcode::PUSH_INT:
-                        handlePushInt(execInst);
-                        break;
-                    case Opcode::PUSH_FLOAT:
-                        handlePushFloat(execInst);
-                        break;
-                    case Opcode::PUSH_STRING:
-                        handlePushString(execInst);
-                        break;
-                    case Opcode::PUSH_BOOL:
-                        handlePushBool(execInst);
-                        break;
-                    case Opcode::PUSH_NULL:
-                        handlePushNull(execInst);
-                        break;
-                    default:
-                        // For more complex expressions, we might need to handle more opcodes
-                        break;
-                }
-                ip++;
-            }
-            
-            // Get the default value from the stack
-            if (!stack.empty()) {
-                ValuePtr defaultValue = pop();
-                // Store it with the last optional parameter
-                if (!func.optionalParameters.empty()) {
-                    const std::string& paramName = func.optionalParameters.back();
-                    func.defaultValues[paramName] = defaultValue;
-                }
-            }
-            
-            // Restore the IP
-            ip = savedIp;
-            currentIp++;
+    // Store the function (parameters will be processed by normal execution)
+    userFunctions[funcName] = func;
+    
+    // Don't skip parameter definition instructions - let them execute normally
+    // Just find where the function body starts for later use
+    size_t bodyStart = ip + 1;
+    while (bodyStart < bytecode->size()) {
+        const Instruction& inst = (*bytecode)[bodyStart];
+        if (inst.opcode == Opcode::DEFINE_PARAM || 
+            inst.opcode == Opcode::DEFINE_OPTIONAL_PARAM ||
+            inst.opcode == Opcode::PUSH_STRING ||
+            inst.opcode == Opcode::PUSH_INT ||
+            inst.opcode == Opcode::PUSH_FLOAT ||
+            inst.opcode == Opcode::PUSH_BOOL ||
+            inst.opcode == Opcode::SET_DEFAULT_VALUE) {
+            // These are parameter definition instructions, continue
+            bodyStart++;
         } else {
             // Found the start of the actual function body
             break;
@@ -1310,35 +1276,28 @@ void VM::handleBeginFunction(const Instruction& instruction) {
     }
     
     // Set the function start address to the beginning of the actual body
-    func.startAddress = currentIp;
+    userFunctions[funcName].startAddress = bodyStart;
     
-    // Store the function (will be completed in handleEndFunction)
-    userFunctions[funcName] = func;
-    
-    // Skip the function body during normal execution
-    // Find the matching END_FUNCTION and jump past it
-    int functionDepth = 1;
-    
-    while (currentIp < bytecode->size() && functionDepth > 0) {
-        const Instruction& inst = (*bytecode)[currentIp];
-        if (inst.opcode == Opcode::BEGIN_FUNCTION) {
-            functionDepth++;
-        } else if (inst.opcode == Opcode::END_FUNCTION) {
-            functionDepth--;
-        }
-        currentIp++;
-    }
-    
-    // Set the end address and jump past the function
-    userFunctions[funcName].endAddress = currentIp - 1;
-    ip = currentIp - 1; // -1 because ip will be incremented after this instruction
+    // Continue with normal execution to process parameter definitions
+    // The function body will be skipped later when we encounter END_FUNCTION
+    return;
+
 }
 
 void VM::handleEndFunction(const Instruction& /*unused*/) {
-    // This should only be reached during function execution, not during function definition
-    // During function definition, we skip over this
-    // During function execution, this means we're returning from a function
+    // Check if we're currently defining a function
+    if (!currentFunctionBeingDefined.empty()) {
+        // This is the end of function definition, not function execution
+        auto funcIt = userFunctions.find(currentFunctionBeingDefined);
+        if (funcIt != userFunctions.end()) {
+            funcIt->second.endAddress = ip;
+        }
+        currentFunctionBeingDefined.clear();
+        insideFunctionDefinition = false;
+        return;
+    }
     
+    // This is during function execution - return from a function call
     if (callStack.empty()) {
         error("END_FUNCTION reached outside of function call");
         return;
@@ -1361,36 +1320,39 @@ void VM::handleEndFunction(const Instruction& /*unused*/) {
 }
 
 void VM::handleDefineParam(const Instruction& instruction) {
-    // This instruction should not be reached during normal execution
-    // Parameters are now processed in handleBeginFunction
-    error("DEFINE_PARAM instruction reached during execution - this should not happen");
+    // Add parameter to the current function being defined
+    if (!currentFunctionBeingDefined.empty()) {
+        auto funcIt = userFunctions.find(currentFunctionBeingDefined);
+        if (funcIt != userFunctions.end()) {
+            funcIt->second.parameters.push_back(std::make_pair(instruction.stringValue, nullptr));
+        }
+    }
 }
 
 void VM::handleDefineOptionalParam(const Instruction& instruction) {
-    // This instruction should not be reached during normal execution
-    // Optional parameters are now processed in handleBeginFunction
-    error("DEFINE_OPTIONAL_PARAM instruction reached during execution - this should not happen");
+    // Add optional parameter to the current function being defined
+    if (!currentFunctionBeingDefined.empty()) {
+        auto funcIt = userFunctions.find(currentFunctionBeingDefined);
+        if (funcIt != userFunctions.end()) {
+            funcIt->second.optionalParameters.push_back(std::make_pair(instruction.stringValue, nullptr));
+        }
+    }
 }
 
 void VM::handleSetDefaultValue(const Instruction& /*unused*/) {
     // Set default value for the last optional parameter
-    if (userFunctions.empty()) {
+    if (currentFunctionBeingDefined.empty()) {
         error("SET_DEFAULT_VALUE outside of function definition");
         return;
     }
     
-    Function* currentFunc = nullptr;
-    for (auto& [name, func] : userFunctions) {
-        if (func.endAddress == 0) {
-            currentFunc = &func;
-            break;
-        }
-    }
-    
-    if (currentFunc && !currentFunc->optionalParameters.empty()) {
-        std::string paramName = currentFunc->optionalParameters.back();
+    auto funcIt = userFunctions.find(currentFunctionBeingDefined);
+    if (funcIt != userFunctions.end() && !funcIt->second.optionalParameters.empty()) {
+        Function& currentFunc = funcIt->second;
+        std::string paramName = currentFunc.optionalParameters.back().first; // Get the parameter name from the pair
         ValuePtr defaultValue = pop();
-        currentFunc->defaultValues[paramName] = defaultValue;
+        TypePtr paramType = currentFunc.optionalParameters.back().second; // Get the parameter type
+        currentFunc.defaultValues[paramName] = std::make_pair(defaultValue, paramType);
     }
 }
 void VM::handleBeginClass(const Instruction& /*unused*/) { error("Not implemented"); }

@@ -1,4 +1,6 @@
-// Test simple function
+// Test that functions are working
+print("=== Function Tests ===");
+
 fn greet(name: str): str {
     return "Hello, " + name + "!";
 }
@@ -11,7 +13,13 @@ fn sayHello(): str {
     return "Hello, World!";
 }
 
-print("Testing functions:");
+print("Testing greet:");
 print(greet("Alice"));
+
+print("Testing add:");
 print(add(5, 3));
+
+print("Testing sayHello:");
 print(sayHello());
+
+print("All tests completed!");
