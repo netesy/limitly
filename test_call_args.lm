@@ -1,6 +1,0 @@
-// Simple test for function call arguments
-fn test(x:str):str {
-    return x;
-}
-
-print(test("hello"));

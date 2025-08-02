@@ -693,6 +693,9 @@ void BytecodeGenerator::visitUnaryExpr(const std::shared_ptr<AST::UnaryExpr>& ex
         case TokenType::MINUS:
             emit(Opcode::NEGATE, expr->line);
             break;
+        case TokenType::PLUS:
+            // Unary plus is a no-op, value is already on stack
+            break;
         case TokenType::BANG:
             emit(Opcode::NOT, expr->line);
             break;
