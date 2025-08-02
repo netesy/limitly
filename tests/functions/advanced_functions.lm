@@ -2,7 +2,7 @@
 print("=== Advanced Function Tests ===");
 
 // Function with optional parameters
-fn greetWithDefault(name: str = "World"): void {
+fn greetWithDefault(name: str = "World"): nil {
     print("Hello, {name}!");
 }
 

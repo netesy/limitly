@@ -48,6 +48,19 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
+:: Compile simple formatter
+g++ -std=c++17 -Wall -Wextra -pedantic -o bin\format_code.exe ^
+    format_code.cpp ^
+    frontend\scanner.cpp ^
+    frontend\parser.cpp ^
+    debugger.cpp ^
+    -I.
+
+if %ERRORLEVEL% NEQ 0 (
+    echo Failed to compile format_code.exe
+    exit /b 1
+)
+
 echo.
 echo Build completed successfully.
 echo.
@@ -56,4 +69,7 @@ echo   bin\limitly.exe
 echo.
 echo To run the test parser:
 echo   bin\test_parser.exe sample.lm
+echo.
+echo To run the code formatter:
+echo   bin\format_code.exe sample.lm
 echo.
