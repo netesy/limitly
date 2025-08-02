@@ -2,15 +2,34 @@
 #include <iostream>
 #include <iomanip>
 #include <algorithm>
+#include <sstream>
+#include <vector>
 
 CodeFormatter::CodeFormatter() {
     // Initialize with default settings
 }
 
 std::string CodeFormatter::format(const std::shared_ptr<AST::Program>& program) {
+    return format(program, "");
+}
+
+std::string CodeFormatter::format(const std::shared_ptr<AST::Program>& program, const std::string& sourceText) {
     output.str("");
     output.clear();
     currentIndent = 0;
+    
+    // Store the original source text for fallback formatting
+    originalSource = sourceText;
+    sourceLines.clear();
+    
+    // Split source into lines for easy access
+    if (!sourceText.empty()) {
+        std::istringstream stream(sourceText);
+        std::string line;
+        while (std::getline(stream, line)) {
+            sourceLines.push_back(line);
+        }
+    }
     
     if (!program) {
         return "";
@@ -63,46 +82,57 @@ void CodeFormatter::writeIndented(const std::string& text) {
 void CodeFormatter::formatStatement(const std::shared_ptr<AST::Statement>& stmt) {
     if (!stmt) return;
     
-    // Handle different statement types
-    if (auto varDecl = std::dynamic_pointer_cast<AST::VarDeclaration>(stmt)) {
-        formatVarDeclaration(varDecl);
-    } else if (auto funcDecl = std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt)) {
-        formatFunctionDeclaration(funcDecl);
-    } else if (auto classDecl = std::dynamic_pointer_cast<AST::ClassDeclaration>(stmt)) {
-        formatClassDeclaration(classDecl);
-    } else if (auto blockStmt = std::dynamic_pointer_cast<AST::BlockStatement>(stmt)) {
-        formatBlockStatement(blockStmt);
-    } else if (auto ifStmt = std::dynamic_pointer_cast<AST::IfStatement>(stmt)) {
-        formatIfStatement(ifStmt);
-    } else if (auto forStmt = std::dynamic_pointer_cast<AST::ForStatement>(stmt)) {
-        formatForStatement(forStmt);
-    } else if (auto whileStmt = std::dynamic_pointer_cast<AST::WhileStatement>(stmt)) {
-        formatWhileStatement(whileStmt);
-    } else if (auto iterStmt = std::dynamic_pointer_cast<AST::IterStatement>(stmt)) {
-        formatIterStatement(iterStmt);
-    } else if (auto returnStmt = std::dynamic_pointer_cast<AST::ReturnStatement>(stmt)) {
-        formatReturnStatement(returnStmt);
-    } else if (auto printStmt = std::dynamic_pointer_cast<AST::PrintStatement>(stmt)) {
-        formatPrintStatement(printStmt);
-    } else if (auto exprStmt = std::dynamic_pointer_cast<AST::ExprStatement>(stmt)) {
-        formatExprStatement(exprStmt);
-    } else if (auto attemptStmt = std::dynamic_pointer_cast<AST::AttemptStatement>(stmt)) {
-        formatAttemptStatement(attemptStmt);
-    } else if (auto parallelStmt = std::dynamic_pointer_cast<AST::ParallelStatement>(stmt)) {
-        formatParallelStatement(parallelStmt);
-    } else if (auto concurrentStmt = std::dynamic_pointer_cast<AST::ConcurrentStatement>(stmt)) {
-        formatConcurrentStatement(concurrentStmt);
-    } else if (auto matchStmt = std::dynamic_pointer_cast<AST::MatchStatement>(stmt)) {
-        formatMatchStatement(matchStmt);
-    } else if (auto enumDecl = std::dynamic_pointer_cast<AST::EnumDeclaration>(stmt)) {
-        formatEnumDeclaration(enumDecl);
+    try {
+        // Handle different statement types
+        if (auto varDecl = std::dynamic_pointer_cast<AST::VarDeclaration>(stmt)) {
+            formatVarDeclaration(varDecl);
+        } else if (auto funcDecl = std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt)) {
+            formatFunctionDeclaration(funcDecl);
+        } else if (auto classDecl = std::dynamic_pointer_cast<AST::ClassDeclaration>(stmt)) {
+            formatClassDeclaration(classDecl);
+        } else if (auto blockStmt = std::dynamic_pointer_cast<AST::BlockStatement>(stmt)) {
+            formatBlockStatement(blockStmt);
+        } else if (auto ifStmt = std::dynamic_pointer_cast<AST::IfStatement>(stmt)) {
+            formatIfStatement(ifStmt);
+        } else if (auto forStmt = std::dynamic_pointer_cast<AST::ForStatement>(stmt)) {
+            formatForStatement(forStmt);
+        } else if (auto whileStmt = std::dynamic_pointer_cast<AST::WhileStatement>(stmt)) {
+            formatWhileStatement(whileStmt);
+        } else if (auto iterStmt = std::dynamic_pointer_cast<AST::IterStatement>(stmt)) {
+            formatIterStatement(iterStmt);
+        } else if (auto returnStmt = std::dynamic_pointer_cast<AST::ReturnStatement>(stmt)) {
+            formatReturnStatement(returnStmt);
+        } else if (auto printStmt = std::dynamic_pointer_cast<AST::PrintStatement>(stmt)) {
+            formatPrintStatement(printStmt);
+        } else if (auto exprStmt = std::dynamic_pointer_cast<AST::ExprStatement>(stmt)) {
+            formatExprStatement(exprStmt);
+        } else if (auto attemptStmt = std::dynamic_pointer_cast<AST::AttemptStatement>(stmt)) {
+            formatAttemptStatement(attemptStmt);
+        } else if (auto parallelStmt = std::dynamic_pointer_cast<AST::ParallelStatement>(stmt)) {
+            formatParallelStatement(parallelStmt);
+        } else if (auto concurrentStmt = std::dynamic_pointer_cast<AST::ConcurrentStatement>(stmt)) {
+            formatConcurrentStatement(concurrentStmt);
+        } else if (auto matchStmt = std::dynamic_pointer_cast<AST::MatchStatement>(stmt)) {
+            formatMatchStatement(matchStmt);
+        } else if (auto enumDecl = std::dynamic_pointer_cast<AST::EnumDeclaration>(stmt)) {
+            formatEnumDeclaration(enumDecl);
+        } else {
+            // Unknown statement type - output original with comment
+            outputUnformattedStatement(stmt, "Unknown statement type");
+        }
+    } catch (const std::exception& e) {
+        // Formatting failed - output original with error comment
+        outputUnformattedStatement(stmt, std::string("Formatting error: ") + e.what());
+    } catch (...) {
+        // Unknown error - output original with generic comment
+        outputUnformattedStatement(stmt, "Unknown formatting error");
     }
 }
 
 void CodeFormatter::formatVarDeclaration(const std::shared_ptr<AST::VarDeclaration>& stmt) {
     writeIndented("var " + stmt->name);
     
-    if (stmt->type) {
+    if (stmt->type.has_value()) {
         write(": " + formatTypeAnnotation(stmt->type.value()));
     }
     
@@ -110,7 +140,8 @@ void CodeFormatter::formatVarDeclaration(const std::shared_ptr<AST::VarDeclarati
         write(" = " + formatExpression(stmt->initializer));
     }
     
-    writeLine(";");
+    write(";");
+    writeLine();
 }
 
 void CodeFormatter::formatFunctionDeclaration(const std::shared_ptr<AST::FunctionDeclaration>& stmt) {
@@ -267,7 +298,8 @@ void CodeFormatter::formatReturnStatement(const std::shared_ptr<AST::ReturnState
     if (stmt->value) {
         write(" " + formatExpression(stmt->value));
     }
-    writeLine(";");
+    write(";");
+    writeLine();
 }
 
 void CodeFormatter::formatPrintStatement(const std::shared_ptr<AST::PrintStatement>& stmt) {
@@ -283,7 +315,8 @@ void CodeFormatter::formatPrintStatement(const std::shared_ptr<AST::PrintStateme
 }
 
 void CodeFormatter::formatExprStatement(const std::shared_ptr<AST::ExprStatement>& stmt) {
-    writeIndented(formatExpression(stmt->expression) + ";");
+    writeIndented(formatExpression(stmt->expression));
+    write(";");
     writeLine();
 }
 
@@ -291,7 +324,7 @@ void CodeFormatter::formatAttemptStatement(const std::shared_ptr<AST::AttemptSta
     writeIndented("attempt {");
     writeLine();
     increaseIndent();
-    formatStatement(stmt->body);
+    formatStatement(stmt->tryBlock);
     decreaseIndent();
     
     for (const auto& handler : stmt->handlers) {
@@ -346,7 +379,10 @@ void CodeFormatter::formatEnumDeclaration(const std::shared_ptr<AST::EnumDeclara
     increaseIndent();
     
     for (size_t i = 0; i < stmt->variants.size(); ++i) {
-        writeIndented(stmt->variants[i]);
+        writeIndented(stmt->variants[i].first);
+        if (stmt->variants[i].second.has_value()) {
+            write(": " + formatTypeAnnotation(stmt->variants[i].second.value()));
+        }
         if (i < stmt->variants.size() - 1) {
             write(",");
         }
@@ -360,37 +396,48 @@ void CodeFormatter::formatEnumDeclaration(const std::shared_ptr<AST::EnumDeclara
 std::string CodeFormatter::formatExpression(const std::shared_ptr<AST::Expression>& expr) {
     if (!expr) return "";
     
-    if (auto binaryExpr = std::dynamic_pointer_cast<AST::BinaryExpr>(expr)) {
-        return formatBinaryExpr(binaryExpr);
-    } else if (auto unaryExpr = std::dynamic_pointer_cast<AST::UnaryExpr>(expr)) {
-        return formatUnaryExpr(unaryExpr);
-    } else if (auto literalExpr = std::dynamic_pointer_cast<AST::LiteralExpr>(expr)) {
-        return formatLiteralExpr(literalExpr);
-    } else if (auto variableExpr = std::dynamic_pointer_cast<AST::VariableExpr>(expr)) {
-        return formatVariableExpr(variableExpr);
-    } else if (auto callExpr = std::dynamic_pointer_cast<AST::CallExpr>(expr)) {
-        return formatCallExpr(callExpr);
-    } else if (auto assignExpr = std::dynamic_pointer_cast<AST::AssignExpr>(expr)) {
-        return formatAssignExpr(assignExpr);
-    } else if (auto ternaryExpr = std::dynamic_pointer_cast<AST::TernaryExpr>(expr)) {
-        return formatTernaryExpr(ternaryExpr);
-    } else if (auto groupingExpr = std::dynamic_pointer_cast<AST::GroupingExpr>(expr)) {
-        return formatGroupingExpr(groupingExpr);
-    } else if (auto indexExpr = std::dynamic_pointer_cast<AST::IndexExpr>(expr)) {
-        return formatIndexExpr(indexExpr);
-    } else if (auto memberExpr = std::dynamic_pointer_cast<AST::MemberExpr>(expr)) {
-        return formatMemberExpr(memberExpr);
-    } else if (auto listExpr = std::dynamic_pointer_cast<AST::ListExpr>(expr)) {
-        return formatListExpr(listExpr);
-    } else if (auto dictExpr = std::dynamic_pointer_cast<AST::DictExpr>(expr)) {
-        return formatDictExpr(dictExpr);
-    } else if (auto rangeExpr = std::dynamic_pointer_cast<AST::RangeExpr>(expr)) {
-        return formatRangeExpr(rangeExpr);
-    } else if (auto awaitExpr = std::dynamic_pointer_cast<AST::AwaitExpr>(expr)) {
-        return formatAwaitExpr(awaitExpr);
+    try {
+        if (auto binaryExpr = std::dynamic_pointer_cast<AST::BinaryExpr>(expr)) {
+            return formatBinaryExpr(binaryExpr);
+        } else if (auto unaryExpr = std::dynamic_pointer_cast<AST::UnaryExpr>(expr)) {
+            return formatUnaryExpr(unaryExpr);
+        } else if (auto literalExpr = std::dynamic_pointer_cast<AST::LiteralExpr>(expr)) {
+            return formatLiteralExpr(literalExpr);
+        } else if (auto variableExpr = std::dynamic_pointer_cast<AST::VariableExpr>(expr)) {
+            return formatVariableExpr(variableExpr);
+        } else if (auto callExpr = std::dynamic_pointer_cast<AST::CallExpr>(expr)) {
+            return formatCallExpr(callExpr);
+        } else if (auto assignExpr = std::dynamic_pointer_cast<AST::AssignExpr>(expr)) {
+            return formatAssignExpr(assignExpr);
+        } else if (auto ternaryExpr = std::dynamic_pointer_cast<AST::TernaryExpr>(expr)) {
+            return formatTernaryExpr(ternaryExpr);
+        } else if (auto groupingExpr = std::dynamic_pointer_cast<AST::GroupingExpr>(expr)) {
+            return formatGroupingExpr(groupingExpr);
+        } else if (auto indexExpr = std::dynamic_pointer_cast<AST::IndexExpr>(expr)) {
+            return formatIndexExpr(indexExpr);
+        } else if (auto memberExpr = std::dynamic_pointer_cast<AST::MemberExpr>(expr)) {
+            return formatMemberExpr(memberExpr);
+        } else if (auto listExpr = std::dynamic_pointer_cast<AST::ListExpr>(expr)) {
+            return formatListExpr(listExpr);
+        } else if (auto dictExpr = std::dynamic_pointer_cast<AST::DictExpr>(expr)) {
+            return formatDictExpr(dictExpr);
+        } else if (auto rangeExpr = std::dynamic_pointer_cast<AST::RangeExpr>(expr)) {
+            return formatRangeExpr(rangeExpr);
+        } else if (auto awaitExpr = std::dynamic_pointer_cast<AST::AwaitExpr>(expr)) {
+            return formatAwaitExpr(awaitExpr);
+        } else if (auto interpolatedStringExpr = std::dynamic_pointer_cast<AST::InterpolatedStringExpr>(expr)) {
+            return formatInterpolatedStringExpr(interpolatedStringExpr);
+        } else {
+            // Unknown expression type - return placeholder with type info
+            return getUnformattedExpression(expr, "Unknown expression type");
+        }
+    } catch (const std::exception& e) {
+        // Formatting failed - return placeholder with error info
+        return getUnformattedExpression(expr, std::string("Formatting error: ") + e.what());
+    } catch (...) {
+        // Unknown error - return placeholder with generic error
+        return getUnformattedExpression(expr, "Unknown formatting error");
     }
-    
-    return "<unknown expression>";
 }
 
 std::string CodeFormatter::formatBinaryExpr(const std::shared_ptr<AST::BinaryExpr>& expr) {
@@ -520,6 +567,23 @@ std::string CodeFormatter::formatAwaitExpr(const std::shared_ptr<AST::AwaitExpr>
     return "await " + formatExpression(expr->expression);
 }
 
+std::string CodeFormatter::formatInterpolatedStringExpr(const std::shared_ptr<AST::InterpolatedStringExpr>& expr) {
+    std::string result = "\"";
+    
+    for (const auto& part : expr->parts) {
+        if (std::holds_alternative<std::string>(part)) {
+            // String literal part - escape it properly
+            result += escapeString(std::get<std::string>(part));
+        } else if (std::holds_alternative<std::shared_ptr<AST::Expression>>(part)) {
+            // Expression part - format it within braces
+            result += "{" + formatExpression(std::get<std::shared_ptr<AST::Expression>>(part)) + "}";
+        }
+    }
+    
+    result += "\"";
+    return result;
+}
+
 std::string CodeFormatter::formatTypeAnnotation(const std::shared_ptr<AST::TypeAnnotation>& type) {
     if (!type) return "";
     
@@ -597,7 +661,7 @@ std::string CodeFormatter::tokenTypeToString(TokenType type) {
         case TokenType::MINUS: return "-";
         case TokenType::STAR: return "*";
         case TokenType::SLASH: return "/";
-        case TokenType::PERCENT: return "%";
+        case TokenType::MODULUS: return "%";
         case TokenType::EQUAL_EQUAL: return "==";
         case TokenType::BANG_EQUAL: return "!=";
         case TokenType::LESS: return "<";
@@ -637,4 +701,126 @@ int CodeFormatter::getOperatorPrecedence(const std::string& op) {
     if (op == "*" || op == "/" || op == "%") return 5;
     if (op == "!") return 6;
     return 0;
+}
+
+void CodeFormatter::outputUnformattedStatement(const std::shared_ptr<AST::Statement>& stmt, const std::string& reason) {
+    // Try to get original source text if available
+    std::string originalText = getOriginalText(stmt);
+    
+    if (originalText.empty()) {
+        // Fallback: generate a placeholder
+        originalText = generateStatementPlaceholder(stmt);
+    }
+    
+    // Output the original text
+    writeIndented(originalText);
+    writeLine();
+    
+    // Add explanatory comment
+    writeIndented("// FORMATTER: Could not format - " + reason);
+    writeLine();
+}
+
+std::string CodeFormatter::getUnformattedExpression(const std::shared_ptr<AST::Expression>& expr, const std::string& reason) {
+    // Try to get original source text if available
+    std::string originalText = getOriginalText(expr);
+    
+    if (originalText.empty()) {
+        // Fallback: generate a placeholder
+        originalText = generateExpressionPlaceholder(expr);
+    }
+    
+    // Return original text with inline comment
+    return originalText + " /* FORMATTER: Could not format - " + reason + " */";
+}
+
+std::string CodeFormatter::getOriginalText(const std::shared_ptr<AST::Node>& node) {
+    if (!node || sourceLines.empty()) {
+        return "";
+    }
+    
+    // Get the line number from the AST node (1-based)
+    int lineNumber = node->line;
+    
+    // Convert to 0-based index and check bounds
+    if (lineNumber < 1 || lineNumber > static_cast<int>(sourceLines.size())) {
+        return "";
+    }
+    
+    // Return the original line from the source
+    return sourceLines[lineNumber - 1];
+}
+
+std::string CodeFormatter::generateStatementPlaceholder(const std::shared_ptr<AST::Statement>& stmt) {
+    // Generate a descriptive placeholder based on statement type
+    if (std::dynamic_pointer_cast<AST::VarDeclaration>(stmt)) {
+        return "/* variable declaration */";
+    } else if (std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt)) {
+        return "/* function declaration */";
+    } else if (std::dynamic_pointer_cast<AST::ClassDeclaration>(stmt)) {
+        return "/* class declaration */";
+    } else if (std::dynamic_pointer_cast<AST::IfStatement>(stmt)) {
+        return "/* if statement */";
+    } else if (std::dynamic_pointer_cast<AST::ForStatement>(stmt)) {
+        return "/* for statement */";
+    } else if (std::dynamic_pointer_cast<AST::WhileStatement>(stmt)) {
+        return "/* while statement */";
+    } else if (std::dynamic_pointer_cast<AST::IterStatement>(stmt)) {
+        return "/* iter statement */";
+    } else if (std::dynamic_pointer_cast<AST::ReturnStatement>(stmt)) {
+        return "/* return statement */";
+    } else if (std::dynamic_pointer_cast<AST::PrintStatement>(stmt)) {
+        return "/* print statement */";
+    } else if (std::dynamic_pointer_cast<AST::ExprStatement>(stmt)) {
+        return "/* expression statement */";
+    } else if (std::dynamic_pointer_cast<AST::AttemptStatement>(stmt)) {
+        return "/* attempt statement */";
+    } else if (std::dynamic_pointer_cast<AST::ParallelStatement>(stmt)) {
+        return "/* parallel statement */";
+    } else if (std::dynamic_pointer_cast<AST::ConcurrentStatement>(stmt)) {
+        return "/* concurrent statement */";
+    } else if (std::dynamic_pointer_cast<AST::MatchStatement>(stmt)) {
+        return "/* match statement */";
+    } else if (std::dynamic_pointer_cast<AST::EnumDeclaration>(stmt)) {
+        return "/* enum declaration */";
+    } else if (std::dynamic_pointer_cast<AST::BlockStatement>(stmt)) {
+        return "/* block statement */";
+    }
+    
+    return "/* unknown statement */";
+}
+
+std::string CodeFormatter::generateExpressionPlaceholder(const std::shared_ptr<AST::Expression>& expr) {
+    // Generate a descriptive placeholder based on expression type
+    if (std::dynamic_pointer_cast<AST::BinaryExpr>(expr)) {
+        return "/* binary expression */";
+    } else if (std::dynamic_pointer_cast<AST::UnaryExpr>(expr)) {
+        return "/* unary expression */";
+    } else if (std::dynamic_pointer_cast<AST::LiteralExpr>(expr)) {
+        return "/* literal expression */";
+    } else if (std::dynamic_pointer_cast<AST::VariableExpr>(expr)) {
+        return "/* variable expression */";
+    } else if (std::dynamic_pointer_cast<AST::CallExpr>(expr)) {
+        return "/* call expression */";
+    } else if (std::dynamic_pointer_cast<AST::AssignExpr>(expr)) {
+        return "/* assignment expression */";
+    } else if (std::dynamic_pointer_cast<AST::TernaryExpr>(expr)) {
+        return "/* ternary expression */";
+    } else if (std::dynamic_pointer_cast<AST::GroupingExpr>(expr)) {
+        return "/* grouping expression */";
+    } else if (std::dynamic_pointer_cast<AST::IndexExpr>(expr)) {
+        return "/* index expression */";
+    } else if (std::dynamic_pointer_cast<AST::MemberExpr>(expr)) {
+        return "/* member expression */";
+    } else if (std::dynamic_pointer_cast<AST::ListExpr>(expr)) {
+        return "/* list expression */";
+    } else if (std::dynamic_pointer_cast<AST::DictExpr>(expr)) {
+        return "/* dictionary expression */";
+    } else if (std::dynamic_pointer_cast<AST::RangeExpr>(expr)) {
+        return "/* range expression */";
+    } else if (std::dynamic_pointer_cast<AST::AwaitExpr>(expr)) {
+        return "/* await expression */";
+    }
+    
+    return "/* unknown expression */";
 }

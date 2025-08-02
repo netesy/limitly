@@ -48,11 +48,12 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
-:: Compile simple formatter
+:: Compile code formatter
 g++ -std=c++17 -Wall -Wextra -pedantic -o bin\format_code.exe ^
     format_code.cpp ^
     frontend\scanner.cpp ^
     frontend\parser.cpp ^
+    backend\code_formatter.cpp ^
     debugger.cpp ^
     -I.
 

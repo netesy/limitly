@@ -4,6 +4,7 @@
 #include "../frontend/ast.hh"
 #include <string>
 #include <sstream>
+#include <vector>
 
 class CodeFormatter {
 public:
@@ -11,6 +12,7 @@ public:
     
     // Main formatting function
     std::string format(const std::shared_ptr<AST::Program>& program);
+    std::string format(const std::shared_ptr<AST::Program>& program, const std::string& sourceText);
     
     // Configuration options
     void setIndentSize(int size) { indentSize = size; }
@@ -24,6 +26,10 @@ private:
     bool useSpaces = true;
     int maxLineLength = 100;
     std::ostringstream output;
+    
+    // Source text for fallback formatting
+    std::string originalSource;
+    std::vector<std::string> sourceLines;
     
     // Helper methods
     std::string getIndent() const;
@@ -68,6 +74,7 @@ private:
     std::string formatDictExpr(const std::shared_ptr<AST::DictExpr>& expr);
     std::string formatRangeExpr(const std::shared_ptr<AST::RangeExpr>& expr);
     std::string formatAwaitExpr(const std::shared_ptr<AST::AwaitExpr>& expr);
+    std::string formatInterpolatedStringExpr(const std::shared_ptr<AST::InterpolatedStringExpr>& expr);
     
     // Type formatting
     std::string formatTypeAnnotation(const std::shared_ptr<AST::TypeAnnotation>& type);
@@ -77,6 +84,13 @@ private:
     std::string tokenTypeToString(TokenType type);
     bool needsParentheses(const std::shared_ptr<AST::Expression>& expr, const std::shared_ptr<AST::Expression>& parent);
     int getOperatorPrecedence(const std::string& op);
+    
+    // Fallback formatting methods
+    void outputUnformattedStatement(const std::shared_ptr<AST::Statement>& stmt, const std::string& reason);
+    std::string getUnformattedExpression(const std::shared_ptr<AST::Expression>& expr, const std::string& reason);
+    std::string getOriginalText(const std::shared_ptr<AST::Node>& node);
+    std::string generateStatementPlaceholder(const std::shared_ptr<AST::Statement>& stmt);
+    std::string generateExpressionPlaceholder(const std::shared_ptr<AST::Expression>& expr);
 };
 
 #endif // CODE_FORMATTER_HH

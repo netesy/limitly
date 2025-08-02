@@ -65,24 +65,6 @@ print(greeting);
 var processed:[int]=processData(numbers,3);
 print("Processed: {processed}");
 
-attempt {
-var division: int = 10 / 0;
-print("Division result: {division}");
-} handle DivisionByZeroError {
-print("Cannot divide by zero!");
-}
-
-parallel {
-print("This runs in parallel");
-var computation: int = 42 * 42;
-print("Computation: {computation}");
-}
-
-concurrent {
-print("This runs concurrently");
-await someAsyncOperation();
-}
-
 match (x) {
 case 5 => {
 print("x is five");
@@ -92,8 +74,3 @@ print("x is ten");
 }
 }
 
-enum Color {
-Red,
-Green,
-Blue
-}
