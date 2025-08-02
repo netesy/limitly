@@ -31,6 +31,7 @@ iter (x in base..(base + 3)) {
 print("Nested ranges:");
 iter (i in 1..3) {
     print("Outer: {i}");
+    //!fix here
     iter (j in (i * 10)..(i * 10 + 2)) {
         print("  Inner: {j}");
     }
