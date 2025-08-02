@@ -1,7 +1,0 @@
-// Test function with no arguments
-fn sayHello() {
-    return "Hello, World!";
-}
-
-print("Testing no-arg function:");
-print(sayHello());

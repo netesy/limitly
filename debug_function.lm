@@ -1,8 +1,0 @@
-// Simple function test for debugging
-fn test(x):str {
-    print("Parameter x = " + x);
-    return x;
-}
-
-print("Calling test function:");
-test("hello");

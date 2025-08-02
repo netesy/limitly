@@ -1209,7 +1209,7 @@ std::shared_ptr<AST::Expression> Parser::power() {
 }
 
 std::shared_ptr<AST::Expression> Parser::unary() {
-    if (match({TokenType::BANG, TokenType::MINUS})) {
+    if (match({TokenType::BANG, TokenType::MINUS, TokenType::PLUS})) {
         auto op = previous();
         auto right = unary();
 
