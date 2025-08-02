@@ -291,16 +291,68 @@ void Scanner::string() {
     while (!isAtEnd() && peek() != quoteType) {
         // Handle escape sequences
         if (peek() == '\\') {
-            char nextChar = peekNext();
-            if (nextChar == quoteType || nextChar == '\\' || nextChar == '{' || nextChar == '}') {
-                // Skip the backslash and add the escaped character
-                advance();
-                value += peek();
-                advance();
-            } else {
-                // Regular backslash
-                value += peek();
-                advance();
+            advance(); // consume the backslash
+            char nextChar = peek();
+            
+            switch (nextChar) {
+                case 'n':
+                    value += '\n';
+                    advance();
+                    break;
+                case 't':
+                    value += '\t';
+                    advance();
+                    break;
+                case 'r':
+                    value += '\r';
+                    advance();
+                    break;
+                case '\\':
+                    value += '\\';
+                    advance();
+                    break;
+                case '\'':
+                    value += '\'';
+                    advance();
+                    break;
+                case '\"':
+                    value += '\"';
+                    advance();
+                    break;
+                case '{':
+                    value += '{';
+                    advance();
+                    break;
+                case '}':
+                    value += '}';
+                    advance();
+                    break;
+                case '0':
+                    value += '\0';
+                    advance();
+                    break;
+                case 'a':
+                    value += '\a';
+                    advance();
+                    break;
+                case 'b':
+                    value += '\b';
+                    advance();
+                    break;
+                case 'f':
+                    value += '\f';
+                    advance();
+                    break;
+                case 'v':
+                    value += '\v';
+                    advance();
+                    break;
+                default:
+                    // Unknown escape sequence, treat as literal
+                    value += '\\';
+                    value += nextChar;
+                    advance();
+                    break;
             }
         } else if (peek() == '{') {
             // Check if this looks like interpolation (contains identifier/expression)
