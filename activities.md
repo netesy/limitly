@@ -61,6 +61,9 @@ The project is organized into frontend and backend components:
 - [x] **Fixed iterator stack cleanup** - Eliminated spurious output from iterator operations
 - [x] **Complete control flow implementation** - if/else, while, for, nested structures all working
 - [x] **Implemented list and dictionary operations** - Full support for collections with proper indexing and value comparison
+- [x] **Fixed unary plus operator** - Added support for `+` unary operator in parser and backend
+- [x] **Fixed float arithmetic** - Resolved type mismatch in float value handling causing runtime errors
+- [x] **Enhanced escape sequences** - Comprehensive escape sequence support in string literals
 - [ ] Complete VM implementation for complex operations (function calls, OOP features)
 - [ ] Implement bytecode optimization
 
@@ -109,6 +112,12 @@ The project is organized into frontend and backend components:
 - **Fixed Iterator Stack Cleanup**: Eliminated spurious `<iterator>` output by fixing STORE_TEMP stack management
 - **Complete Control Flow Support**: All control flow statements now work correctly including nested structures
 - **Implemented Collection Operations**: Added full support for lists and dictionaries with proper indexing, value comparison, and append operations
+
+## Recent Achievements ✅ (Latest Updates)
+- **Fixed Unary Plus Operator**: Added support for unary `+` operator in parser and backend
+- **Fixed Float Arithmetic**: Resolved type mismatch causing `std::get: wrong index for variant` errors in float operations
+- **Enhanced Escape Sequences**: Implemented comprehensive escape sequence handling in scanner (`\n`, `\t`, `\r`, `\\`, `\'`, `\"`, `\{`, `\}`, `\0`, `\a`, `\b`, `\f`, `\v`)
+- **All Tests Passing**: 21/21 tests now pass successfully with clean memory management
 
 ## Current Focus
 - Completing the VM implementation for complex operations

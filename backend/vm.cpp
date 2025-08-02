@@ -338,7 +338,7 @@ void VM::handlePushInt(const Instruction& instruction) {
 
 void VM::handlePushFloat(const Instruction& instruction) {
     (void)instruction; // Mark as unused
-    push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, instruction.floatValue));
+    push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, static_cast<double>(instruction.floatValue)));
 }
 
 void VM::handlePushString(const Instruction& instruction) {

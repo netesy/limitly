@@ -522,3 +522,116 @@ tests/
 4. Implement indexed assignment (myList[0] = value, myDict["key"] = value)
 5. Add exception handling (try/catch blocks)
 6. Expand standard library functions
+
+## Action 16: Fixed Unary Plus Operator Support
+
+**Prompt**: "from expression arithmetic check the issue with unary operations"
+
+**Problem Identified**:
+- Unary plus operator (`+10`) was causing syntax errors in string interpolation and expressions
+- Parser's `unary()` function only handled `TokenType::BANG` and `TokenType::MINUS`, missing `TokenType::PLUS`
+- Backend's `visitUnaryExpr()` function didn't have a case for handling unary plus operations
+
+**Root Cause Analysis**:
+- **Missing parser support**: `unary()` function in parser.cpp didn't include `TokenType::PLUS` in the match condition
+- **Missing backend support**: `visitUnaryExpr()` in backend.cpp didn't handle `TokenType::PLUS` case
+- **Syntax errors**: Expressions like `print("Positive: +{a} = {+a}")` were failing to parse
+
+**Changes Made**:
+- **Updated parser**: Added `TokenType::PLUS` to the unary operator matching in `Parser::unary()` method
+- **Updated backend**: Added `TokenType::PLUS` case in `BytecodeGenerator::visitUnaryExpr()` as a no-op (unary plus doesn't change the value)
+- **Proper implementation**: Unary plus leaves the value unchanged on the stack (no bytecode operation needed)
+
+**Files Modified**:
+- frontend/parser.cpp: Added `TokenType::PLUS` to unary operator matching
+- backend/backend.cpp: Added `TokenType::PLUS` case as no-op in unary expression handling
+
+**Impact**:
+- ✅ **Unary plus operator works**: `+10` evaluates correctly to `10`
+- ✅ **String interpolation with unary plus**: `"Positive: +{a} = {+a}"` works correctly
+- ✅ **All arithmetic expressions pass**: Comprehensive arithmetic test now passes completely
+- ✅ **Consistent unary operator support**: Both `+` and `-` unary operators work correctly
+
+**Testing Results**:
+- Before fix: `Expected expression` and `Expected '}' after interpolation expression` errors
+- After fix: `Positive: +10 = 10` displays correctly in arithmetic tests
+
+## Action 17: Fixed Float Arithmetic Type Mismatch
+
+**Prompt**: "we have an error in the float arithmetic"
+
+**Problem Identified**:
+- Float arithmetic operations were causing `Runtime error: std::get: wrong index for variant` errors
+- The issue occurred when performing operations like `3.14 + 2.0` or `3.14 / 2.0`
+- Type mismatch between `float` in Instruction struct and `double` expected by VM operations
+
+**Root Cause Analysis**:
+- **Type mismatch in instruction handling**: `Instruction.floatValue` is defined as `float` in opcodes.hh
+- **VM expects double**: `handlePushFloat()` stores values with `FLOAT64_TYPE` which expects `double` data
+- **std::get failure**: When arithmetic operations tried to access float values with `std::get<double>()`, it failed because the actual stored type was `float`
+
+**Changes Made**:
+- **Fixed type casting**: Updated `VM::handlePushFloat()` to cast `instruction.floatValue` from `float` to `double`
+- **Proper type alignment**: Ensured that all float values are stored as `double` in the Value variant to match `FLOAT64_TYPE`
+- **Consistent float handling**: All float operations now work with `double` internally for consistency
+
+**Files Modified**:
+- backend/vm.cpp: Updated `handlePushFloat()` to use `static_cast<double>(instruction.floatValue)`
+
+**Impact**:
+- ✅ **Float arithmetic works correctly**: `3.14 + 2 = 5.14` and `3.14 / 2 = 1.57` execute successfully
+- ✅ **No more variant access errors**: All float operations complete without `std::get` exceptions
+- ✅ **Mixed arithmetic works**: Operations between integers and floats work correctly with type promotion
+- ✅ **All arithmetic tests pass**: Complete arithmetic test suite now passes without errors
+
+**Testing Results**:
+- Before fix: `Runtime error: std::get: wrong index for variant` when performing float arithmetic
+- After fix: All float operations execute correctly with proper results displayed
+
+## Action 18: Enhanced Escape Sequence Support in Scanner
+
+**Prompt**: "in the scanner handle special characters in string like \n"
+
+**Problem Identified**:
+- String literals with escape sequences like `\n`, `\t`, `\"` were not being properly converted to their actual character values
+- The scanner was treating escape sequences as literal text instead of converting them to special characters
+- Test files showed escape sequences as literal text (e.g., `\n` instead of actual newlines)
+
+**Root Cause Analysis**:
+- **Incomplete escape handling**: Scanner's `string()` method had basic escape sequence detection but didn't convert them to actual characters
+- **Limited escape support**: Only handled quote escaping and braces, missing common escape sequences
+- **Literal storage**: Escape sequences were stored as literal backslash + character instead of the intended special character
+
+**Changes Made**:
+- **Comprehensive escape sequence implementation**: Enhanced scanner's `string()` method to handle all common escape sequences
+- **Added support for**: `\n` (newline), `\t` (tab), `\r` (carriage return), `\\` (backslash), `\'` (single quote), `\"` (double quote), `\{` and `\}` (literal braces), `\0` (null), `\a` (bell), `\b` (backspace), `\f` (form feed), `\v` (vertical tab)
+- **Proper character conversion**: Each escape sequence is now converted to its actual character value during scanning
+- **Fallback handling**: Unknown escape sequences are treated as literal backslash + character
+
+**Files Modified**:
+- frontend/scanner.cpp: Enhanced escape sequence handling in `string()` method with comprehensive switch statement
+
+**Implementation Details**:
+- **Switch-based conversion**: Uses switch statement on character after backslash for efficient conversion
+- **Proper character codes**: Each escape sequence maps to correct ASCII/Unicode character value
+- **String interpolation compatibility**: Escape sequences work correctly within interpolated strings
+- **Error resilience**: Unknown escape sequences don't cause scanner errors, treated as literals
+
+**Impact**:
+- ✅ **Newlines work correctly**: `\n` creates actual line breaks in output
+- ✅ **Tabs work correctly**: `\t` creates proper tab spacing in output  
+- ✅ **Quote escaping works**: `\"` allows literal quotes within strings
+- ✅ **All escape sequences functional**: Complete set of common escape sequences supported
+- ✅ **String interpolation enhanced**: Escape sequences work within interpolated strings
+- ✅ **Test output improved**: Print statements now show proper formatting with actual newlines and tabs
+
+**Testing Results**:
+- Before fix: `Line 1\nLine 2` and `Tab\tSeparated` displayed as literal text
+- After fix: `Line 1` and `Line 2` on separate lines, `Tab     Separated` with proper spacing
+- All 21 tests continue to pass with enhanced string formatting
+
+**Verification**:
+- ✅ Print statements test shows proper newlines and tab formatting
+- ✅ String operations test displays correct escape sequence handling
+- ✅ No regressions in existing functionality
+- ✅ Clean memory management maintained across all tests
