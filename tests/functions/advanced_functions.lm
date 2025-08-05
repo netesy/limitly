@@ -11,7 +11,7 @@ greetWithDefault();
 greetWithDefault("Alice");
 
 // Function with multiple optional parameters
-fn createUser(name: str, age: int = 18, active: bool = true): void {
+fn createUser(name: str, age: int = 18, active: bool = true): nil {
     print("User: {name}, Age: {age}, Active: {active}");
 }
 
@@ -21,7 +21,7 @@ createUser("Charlie", 25);
 createUser("Diana", 30, false);
 
 // Higher-order functions (if implemented)
-fn applyOperation(x: int, y: int, operation: fn(int, int) -> int): int {
+fn applyOperation(x: int, y: int, operation: fn(int, int): int): int {
     return operation(x, y);
 }
 
@@ -44,7 +44,7 @@ fn createCounter(): fn(): int {
 }
 
 print("Closures:");
-var counter: fn() -> int = createCounter();
+var counter: fn(): int = createCounter();
 print("Counter: {counter()}");
 print("Counter: {counter()}");
 print("Counter: {counter()}");
