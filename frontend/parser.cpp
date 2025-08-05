@@ -1420,10 +1420,16 @@ std::shared_ptr<AST::Expression> Parser::primary() {
         return interpolated;
     }
 
+    // if (match({TokenType::THIS})) {
+    //     auto thisExpr = std::make_shared<AST::ThisExpr>();
+    //     thisExpr->line = previous().line;
+    //     return thisExpr;
+    // }
+
     if (match({TokenType::IDENTIFIER})) {
         auto token = previous();
         // Check if this is 'self' keyword
-        if (token.lexeme == "self") {
+        if (token.lexeme == "self" || token.lexeme == "this" ) {
             auto thisExpr = std::make_shared<AST::ThisExpr>();
             thisExpr->line = token.line;
             return thisExpr;
@@ -1497,7 +1503,7 @@ std::shared_ptr<AST::Expression> Parser::primary() {
         placeholderExpr->line = peek().line;
         placeholderExpr->value = nullptr; // Use null as a placeholder
         return placeholderExpr;
-    } else if (match({TokenType::SELF})) {
+    } else if (match({TokenType::SELF, TokenType::THIS})) {
         // Handle 'self' as a special case
         auto thisExpr = std::make_shared<AST::ThisExpr>();
         thisExpr->line = previous().line;

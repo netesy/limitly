@@ -26,6 +26,7 @@ g++ -std=c++17 -Wall -Wextra -pedantic -o bin\limitly.exe ^
     backend\vm.cpp ^
     backend\ast_printer.cpp ^
     backend\functions.cpp ^
+    backend\classes.cpp ^
     debugger.cpp ^
     -I.
 
@@ -42,6 +43,7 @@ g++ -std=c++17 -Wall -Wextra -pedantic -o bin\test_parser.exe ^
     backend\backend.cpp ^
     backend\ast_printer.cpp ^
     backend\functions.cpp ^
+    backend\classes.cpp ^
     debugger.cpp ^
     -I.
 

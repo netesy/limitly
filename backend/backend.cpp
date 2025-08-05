@@ -735,13 +735,26 @@ void BytecodeGenerator::visitCallExpr(const std::shared_ptr<AST::CallExpr>& expr
         visitExpression(arg);
     }
     
-    // For now, we'll handle simple function calls where callee is a variable
-    // In the future, we might support more complex callees (method calls, etc.)
+    // Handle different types of callees
     std::string functionName;
     if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(expr->callee)) {
+        // Simple function call: functionName(args)
         functionName = varExpr->name;
+    } else if (auto memberExpr = std::dynamic_pointer_cast<AST::MemberExpr>(expr->callee)) {
+        // Method call: object.methodName(args)
+        // First evaluate the object
+        visitExpression(memberExpr->object);
+        
+        // Then call the method on the object
+        functionName = memberExpr->name;
+        
+        // For method calls, we need to use a different approach
+        // The object is already on the stack, so we need to handle this differently
+        // For now, emit a placeholder that the VM can recognize as a method call
+        emit(Opcode::CALL, expr->line, static_cast<int32_t>(expr->arguments.size() + 1), 0.0f, false, "method:" + functionName);
+        return;
     } else {
-        // For more complex callees, we'd need to evaluate them
+        // For other complex callees, we'd need to evaluate them
         // For now, just use a placeholder
         functionName = "unknown";
     }

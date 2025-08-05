@@ -3,43 +3,43 @@ print("=== Class Inheritance Tests ===");
 
 // Base class
 class Animal {
-    function init(name) {
-        this.name = name;
+    fn init(name) {
+        self.name = name;
     }
     
-    function speak() {
-        print("{this.name} makes a sound");
+    fn speak() {
+        print("{self.name} makes a sound");
     }
     
-    function info() {
-        print("This is {this.name}");
+    fn info() {
+        print("self is {self.name}");
     }
 }
 
 // Derived class
 class Dog extends Animal {
-    function init(name, breed) {
+    fn init(name, breed) {
         super.init(name);
-        this.breed = breed;
+        self.breed = breed;
     }
     
-    function speak() {
-        print("{this.name} barks!");
+    fn speak() {
+        print("{self.name} barks!");
     }
     
-    function wagTail() {
-        print("{this.name} wags tail happily");
+    fn wagTail() {
+        print("{self.name} wags tail happily");
     }
 }
 
 // Another derived class
 class Cat extends Animal {
-    function speak() {
-        print("{this.name} meows");
+    fn speak() {
+        print("{self.name} meows");
     }
     
-    function purr() {
-        print("{this.name} purrs contentedly");
+    fn purr() {
+        print("{self.name} purrs contentedly");
     }
 }
 

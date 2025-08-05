@@ -282,6 +282,21 @@ ValuePtr VM::execute(const std::vector<Instruction>& bytecode) {
                 case Opcode::ITERATOR_NEXT_KEY_VALUE:
                     handleIteratorNextKeyValue(instruction);
                     break;
+                case Opcode::BEGIN_CLASS:
+                    handleBeginClass(instruction);
+                    break;
+                case Opcode::END_CLASS:
+                    handleEndClass(instruction);
+                    break;
+                case Opcode::LOAD_THIS:
+                    handleLoadThis(instruction);
+                    break;
+                case Opcode::GET_PROPERTY:
+                    handleGetProperty(instruction);
+                    break;
+                case Opcode::SET_PROPERTY:
+                    handleSetProperty(instruction);
+                    break;
                 case Opcode::BEGIN_SCOPE:
                     // No action needed for BEGIN_SCOPE in this implementation
                     break;
@@ -1273,6 +1288,51 @@ void VM::handleCall(const Instruction& instruction) {
         args.insert(args.begin(), pop()); // Insert at beginning to maintain order
     }
     
+    // Check if this is a method call (function name starts with "method:")
+    if (funcName.substr(0, 7) == "method:") {
+        std::string methodName = funcName.substr(7); // Remove "method:" prefix
+        
+        // The object should be the last argument (pushed first due to our calling convention)
+        if (args.empty()) {
+            error("Method call without object");
+            return;
+        }
+        
+        // Get the object (last argument)
+        ValuePtr objectValue = args.back();
+        std::vector<ValuePtr> methodArgs(args.begin(), args.end() - 1); // Remove object from args
+        
+        // Check if the object is an ObjectInstance
+        if (std::holds_alternative<ObjectInstancePtr>(objectValue->data)) {
+            auto objectInstance = std::get<ObjectInstancePtr>(objectValue->data);
+            
+            // Call the method on the object
+            try {
+                ValuePtr result = objectInstance->callMethod(methodName, methodArgs);
+                push(result);
+                return;
+            } catch (const std::exception& e) {
+                error("Method call failed: " + std::string(e.what()));
+                return;
+            }
+        } else {
+            error("Cannot call method on non-object value");
+            return;
+        }
+    }
+    
+    // Check if this is a class constructor call
+    if (classRegistry.hasClass(funcName)) {
+        // Create instance of the class
+        auto instance = classRegistry.createInstance(funcName);
+        
+        // TODO: Call constructor method if it exists (e.g., "init")
+        // For now, just create the instance and push it
+        auto objectType = std::make_shared<Type>(TypeTag::Object);
+        push(memoryManager.makeRef<Value>(*region, objectType, instance));
+        return;
+    }
+    
     // Try to get function from the new registry first
     auto function = functionRegistry.getFunction(funcName);
     if (function) {
@@ -1595,10 +1655,54 @@ void VM::handleSetDefaultValue(const Instruction& /*unused*/) {
         currentFunc.defaultValues[paramName] = std::make_pair(defaultValue, paramType);
     }
 }
-void VM::handleBeginClass(const Instruction& /*unused*/) { error("Not implemented"); }
-void VM::handleEndClass(const Instruction& /*unused*/) { error("Not implemented"); }
-void VM::handleGetProperty(const Instruction& /*unused*/) { error("Not implemented"); }
-void VM::handleSetProperty(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleBeginClass(const Instruction& instruction) {
+    // Get the class name from the instruction
+    std::string className = instruction.stringValue;
+    
+    // Create a basic class definition
+    auto classDef = std::make_shared<backend::ClassDefinition>(className);
+    
+    // Register the class
+    classRegistry.registerClass(classDef);
+    
+    // TODO: We'll need to collect methods and fields as we encounter them
+    // For now, just register an empty class
+}
+void VM::handleEndClass(const Instruction& /*unused*/) {
+    // End of class definition
+    // TODO: Finalize class definition
+}
+void VM::handleLoadThis(const Instruction& /*unused*/) {
+    // Load 'this' reference onto the stack
+    // For now, we'll need to implement a way to track the current object instance
+    // This will be enhanced when we implement proper object instantiation
+    
+    // TODO: Get current object instance from call frame or context
+    // For now, push null as placeholder
+    push(memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
+}
+void VM::handleGetProperty(const Instruction& instruction) {
+    // Get property name from instruction
+    std::string propertyName = instruction.stringValue;
+    
+    // Pop the object from the stack
+    ValuePtr object = pop();
+    
+    // TODO: Implement proper property access
+    // For now, just push null as placeholder
+    push(memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
+}
+void VM::handleSetProperty(const Instruction& instruction) {
+    // Get property name from instruction
+    std::string propertyName = instruction.stringValue;
+    
+    // Pop the value and object from the stack
+    ValuePtr value = pop();
+    ValuePtr object = pop();
+    
+    // TODO: Implement proper property setting
+    // For now, just continue execution
+}
 void VM::handleCreateList(const Instruction& instruction) {
     // Get the number of elements to include in the list from the instruction
     int32_t count = instruction.intValue;

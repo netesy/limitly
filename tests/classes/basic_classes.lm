@@ -3,18 +3,18 @@ print("=== Basic Class Tests ===");
 
 // Simple class definition
 class Person {
-    function init(name, age) {
-        this.name = name;
-        this.age = age;
+    fn init(name, age) {
+        self.name = name;
+        self.age = age;
     }
     
-    function greet() {
-        print("Hello, I'm {this.name} and I'm {this.age} years old");
+    fn greet() {
+        print("Hello, I'm {self.name} and I'm {self.age} years old");
     }
     
-    function birthday() {
-        this.age += 1;
-        print("{this.name} is now {this.age} years old");
+    fn birthday() {
+        self.age += 1;
+        print("{self.name} is now {self.age} years old");
     }
 }
 
@@ -32,17 +32,17 @@ person1.greet();
 
 // Class with properties
 class Rectangle {
-    function init(width, height) {
-        this.width = width;
-        this.height = height;
+    fn init(width, height) {
+        self.width = width;
+        self.height = height;
     }
     
-    function area() {
-        return this.width * this.height;
+    fn area() {
+        return self.width * self.height;
     }
     
-    function perimeter() {
-        return 2 * (this.width + this.height);
+    fn perimeter() {
+        return 2 * (self.width + self.height);
     }
 }
 
@@ -50,3 +50,44 @@ print("Rectangle class:");
 var rect = Rectangle(5, 3);
 print("Area: {rect.area()}");
 print("Perimeter: {rect.perimeter()}");
+
+
+// Test file for self keyword and member access
+
+class BankAccount {
+    var balance: float = 0.0
+    
+    fn deposit(amount: float) : float {
+        self.balance = self.balance + amount;
+        return self.balance;
+    }
+    
+    fn withdraw(amount: float) : float {
+        if (amount > self.balance) {
+            print("Insufficient funds!")
+            return self.balance
+        }
+        self.balance = self.balance - amount;
+        return amount;
+    }
+}
+
+// Test the BankAccount
+fn test_bank_account() {
+    var account = BankAccount()
+    
+    // Test deposit
+    account.deposit(100.0)
+    print("Balance after deposit: {account.balance}")  // Should be 100.0
+    
+    // Test withdraw
+    var withdrawn = account.withdraw(30.0)
+    print("Withdrawn: {withdrawn}")  // Should be 30.0
+    print("Balance after withdrawal: {account.balance}")  // Should be 70.0
+    
+    // Test insufficient funds
+    var failed_withdraw = account.withdraw(100.0)  // Should print "Insufficient funds!"
+    print("Failed withdrawal: {failed_withdraw}")  // Should be 70.0 (unchanged)
+}
+
+test_bank_account()
