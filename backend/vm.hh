@@ -7,6 +7,7 @@
 #include "value.hh"
 #include "types.hh"
 #include "functions.hh"
+#include "classes.hh"
 #include <vector>
 #include <stack>
 #include <unordered_map>
@@ -58,6 +59,7 @@ private:
     std::unordered_map<std::string, std::function<ValuePtr(const std::vector<ValuePtr>&)>> nativeFunctions;
     // Removed duplicate userFunctions map - using functionRegistry instead
     backend::FunctionRegistry functionRegistry; // New function abstraction layer
+    backend::ClassRegistry classRegistry; // Class management
     std::unordered_map<std::string, backend::Function> userDefinedFunctions; // Use the proper Function struct
     std::vector<ValuePtr> tempValues;
     ValuePtr lastException;
@@ -126,6 +128,7 @@ private:
     void handleSetDefaultValue(const Instruction& instruction);
     void handleBeginClass(const Instruction& instruction);
     void handleEndClass(const Instruction& instruction);
+    void handleLoadThis(const Instruction& instruction);
     void handleGetProperty(const Instruction& instruction);
     void handleSetProperty(const Instruction& instruction);
     void handleCreateList(const Instruction& instruction);

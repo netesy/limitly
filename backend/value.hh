@@ -23,6 +23,12 @@ struct DictValue;
 struct IteratorValue;
 using IteratorValuePtr = std::shared_ptr<IteratorValue>;
 
+// Forward declare ObjectInstance from classes
+namespace backend {
+    class ObjectInstance;
+}
+using ObjectInstancePtr = std::shared_ptr<backend::ObjectInstance>;
+
 enum class TypeTag {
     Nil,
     Bool,
@@ -47,7 +53,8 @@ enum class TypeTag {
     Sum,
     Union,
     Range,
-    UserDefined
+    UserDefined,
+    Object
 };
 
 struct Type;
@@ -185,6 +192,8 @@ struct Type
             return "Union";
         case TypeTag::UserDefined:
             return "UserDefined";
+        case TypeTag::Object:
+            return "Object";
         default:
             return "Unknown";
         }
@@ -399,7 +408,8 @@ struct Value {
                  SumValue,
                  EnumValue,
                  UserDefinedValue,
-                 IteratorValuePtr>
+                 IteratorValuePtr,
+                 ObjectInstancePtr>
         data;
 
     // Default constructor
@@ -519,6 +529,10 @@ struct Value {
         Value(TypePtr t, const IteratorValuePtr& iter) : type(std::move(t)), data(iter) {
         }
 
+        // Constructor for ObjectInstancePtr
+        Value(TypePtr t, const ObjectInstancePtr& obj) : type(std::move(t)), data(obj) {
+        }
+
     friend std::ostream &operator<<(std::ostream &os, const Value &value);
 
     // Get raw string representation for interpolation/concatenation (no quotes)
@@ -574,6 +588,9 @@ struct Value {
             },
             [&](const IteratorValuePtr&) {
                 oss << "<iterator>";
+            },
+            [&](const ObjectInstancePtr& obj) {
+                oss << "<object>";
             }
         }, data);
         return oss.str();
@@ -629,6 +646,9 @@ struct Value {
             },
             [&](const IteratorValuePtr&) {
                 oss << "<iterator>";
+            },
+            [&](const ObjectInstancePtr& obj) {
+                oss << "<object>";
             }
         }, data);
         return oss.str();
