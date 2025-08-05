@@ -32,6 +32,9 @@ person1.greet();
 
 // Class with properties
 class Rectangle {
+    var width:int = 0;
+    var height:int = 0;
+
     fn init(width, height) {
         self.width = width;
         self.height = height;
@@ -65,7 +68,7 @@ class BankAccount {
     fn withdraw(amount: float) : float {
         if (amount > self.balance) {
             print("Insufficient funds!")
-            return self.balance
+            return self.balance;
         }
         self.balance = self.balance - amount;
         return amount;

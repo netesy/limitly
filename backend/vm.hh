@@ -71,6 +71,8 @@ private:
     bool debugOutput;
     std::string currentFunctionBeingDefined; // Track which function is currently being defined
     bool insideFunctionDefinition; // Track if we're currently inside a function definition
+    std::string currentClassBeingDefined; // Track which class is currently being defined
+    bool insideClassDefinition; // Track if we're currently inside a class definition
     
     // Helper methods
     ValuePtr pop();

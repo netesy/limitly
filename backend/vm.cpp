@@ -63,7 +63,9 @@ VM::VM()
       debugMode(false),
       debugOutput(false),
       currentFunctionBeingDefined(""),
-      insideFunctionDefinition(false) {
+      insideFunctionDefinition(false),
+      currentClassBeingDefined(""),
+      insideClassDefinition(false) {
     
     // Register native functions
     registerNativeFunction("clock", [this](const std::vector<ValuePtr>&) -> ValuePtr {
@@ -1305,14 +1307,44 @@ void VM::handleCall(const Instruction& instruction) {
         // Check if the object is an ObjectInstance
         if (std::holds_alternative<ObjectInstancePtr>(objectValue->data)) {
             auto objectInstance = std::get<ObjectInstancePtr>(objectValue->data);
+            std::string className = objectInstance->getClassName();
             
-            // Call the method on the object
-            try {
-                ValuePtr result = objectInstance->callMethod(methodName, methodArgs);
-                push(result);
+            // Look for the method in the VM's function registry
+            std::string methodKey = className + "::" + methodName;
+            auto methodIt = userDefinedFunctions.find(methodKey);
+            
+            if (methodIt != userDefinedFunctions.end()) {
+                // Found the method, execute it
+                const backend::Function& method = methodIt->second;
+                
+                // Create a new environment for the method
+                auto methodEnv = std::make_shared<Environment>(environment);
+                
+                // Bind 'this' parameter (implicit first parameter)
+                methodEnv->define("this", objectValue);
+                
+                // Bind method parameters
+                size_t paramIndex = 0;
+                for (const auto& param : method.parameters) {
+                    if (paramIndex < methodArgs.size()) {
+                        methodEnv->define(param.first, methodArgs[paramIndex]);
+                        paramIndex++;
+                    }
+                }
+                
+                // Create call frame
+                backend::CallFrame frame(methodKey, ip, nullptr);
+                frame.setPreviousEnvironment(environment);
+                callStack.push_back(frame);
+                
+                // Switch to method environment
+                environment = methodEnv;
+                
+                // Jump to method start
+                ip = method.startAddress - 1; // -1 because ip will be incremented
                 return;
-            } catch (const std::exception& e) {
-                error("Method call failed: " + std::string(e.what()));
+            } else {
+                error("Method call failed: Method '" + methodName + "' not found in class '" + className + "'");
                 return;
             }
         } else {
@@ -1572,8 +1604,25 @@ void VM::handleBeginFunction(const Instruction& instruction) {
     // Set the function start address to the beginning of the actual body
     func.startAddress = bodyStart;
     
-    // Store the function
-    userDefinedFunctions[funcName] = func;
+    // If we're inside a class definition, this is a method
+    if (insideClassDefinition && !currentClassBeingDefined.empty()) {
+        // This is a class method - we'll handle it differently
+        // For now, still store it as a regular function but mark it as a method
+        std::string methodKey = currentClassBeingDefined + "::" + funcName;
+        userDefinedFunctions[methodKey] = func;
+        
+        // Also add it to the class definition
+        auto classDef = classRegistry.getClass(currentClassBeingDefined);
+        if (classDef) {
+            // Create a method implementation
+            // For now, we'll create a placeholder - the actual method execution
+            // will be handled by the VM when the method is called
+            // TODO: Create proper method implementation
+        }
+    } else {
+        // Regular function
+        userDefinedFunctions[funcName] = func;
+    }
     
     // Continue with normal execution to process parameter definitions
     // The function body will be skipped later when we encounter END_FUNCTION
@@ -1659,18 +1708,20 @@ void VM::handleBeginClass(const Instruction& instruction) {
     // Get the class name from the instruction
     std::string className = instruction.stringValue;
     
+    // Track that we're now inside a class definition
+    currentClassBeingDefined = className;
+    insideClassDefinition = true;
+    
     // Create a basic class definition
     auto classDef = std::make_shared<backend::ClassDefinition>(className);
     
-    // Register the class
+    // Register the class (we'll add methods to it as we encounter them)
     classRegistry.registerClass(classDef);
-    
-    // TODO: We'll need to collect methods and fields as we encounter them
-    // For now, just register an empty class
 }
 void VM::handleEndClass(const Instruction& /*unused*/) {
     // End of class definition
-    // TODO: Finalize class definition
+    insideClassDefinition = false;
+    currentClassBeingDefined = "";
 }
 void VM::handleLoadThis(const Instruction& /*unused*/) {
     // Load 'this' reference onto the stack
