@@ -6,6 +6,7 @@
 #include "memory.hh"
 #include "value.hh"
 #include "types.hh"
+#include "functions.hh"
 #include <vector>
 #include <stack>
 #include <unordered_map>
@@ -19,25 +20,7 @@
 // Forward declarations
 class Environment;
 struct CallFrame;
-
-// Function definition for user-defined functions
-struct Function {
-    std::string name;
-    // std::vector<std::string> parameters;
-    // std::vector<std::string> optionalParameters;
-    // std::map<std::string, ValuePtr> defaultValues;
-    std::vector<std::pair<std::string, TypePtr>> parameters;  // name and type
-    std::vector<std::pair<std::string, TypePtr>> optionalParameters;
-    std::map<std::string, std::pair<ValuePtr, TypePtr>> defaultValues;
-    size_t startAddress;
-    size_t endAddress;
-    TypePtr returnType;
-    
-    Function() : startAddress(0), endAddress(0), returnType(nullptr) {}
-    
-    Function(const std::string& n, size_t start) 
-        : name(n), startAddress(start), endAddress(0), returnType(nullptr) {}
-};
+class VM;
 
 // Virtual Machine class
 class VM {
@@ -57,6 +40,10 @@ public:
     // Register native function
     void registerNativeFunction(const std::string& name, std::function<ValuePtr(const std::vector<ValuePtr>&)> function);
     
+    // Register user-defined function from AST
+    void registerUserFunction(const std::shared_ptr<AST::FunctionDeclaration>& decl);
+    void registerUserFunction(const std::shared_ptr<AST::AsyncFunctionDeclaration>& decl);
+    
 private:
     // Memory management
     MemoryManager<> memoryManager;
@@ -65,11 +52,13 @@ private:
     
     // VM state
     std::vector<ValuePtr> stack;
-    std::vector<CallFrame> callStack;
+    std::vector<backend::CallFrame> callStack; // Use the new CallFrame from functions.hh
     std::shared_ptr<Environment> globals;
     std::shared_ptr<Environment> environment;
     std::unordered_map<std::string, std::function<ValuePtr(const std::vector<ValuePtr>&)>> nativeFunctions;
-    std::unordered_map<std::string, Function> userFunctions;
+    // Removed duplicate userFunctions map - using functionRegistry instead
+    backend::FunctionRegistry functionRegistry; // New function abstraction layer
+    std::unordered_map<std::string, backend::Function> userDefinedFunctions; // Use the proper Function struct
     std::vector<ValuePtr> tempValues;
     ValuePtr lastException;
     
@@ -176,6 +165,26 @@ private:
     void handleDebugPrint(const Instruction& instruction);
 };
 
+// VM-specific user-defined function implementation
+class VMUserDefinedFunction : public backend::UserDefinedFunction {
+private:
+    VM* vm;
+    size_t startAddress;
+    size_t endAddress;
+    
+public:
+    VMUserDefinedFunction(VM* vmInstance, const std::shared_ptr<AST::FunctionDeclaration>& decl, 
+                         size_t start, size_t end);
+    VMUserDefinedFunction(VM* vmInstance, const std::shared_ptr<AST::AsyncFunctionDeclaration>& decl,
+                         size_t start, size_t end);
+    
+    ValuePtr execute(const std::vector<ValuePtr>& args) override;
+    
+    size_t getStartAddress() const { return startAddress; }
+    size_t getEndAddress() const { return endAddress; }
+    void setEndAddress(size_t end) { endAddress = end; }
+};
+
 // Environment for variable scopes
 class Environment {
 public:
@@ -220,8 +229,8 @@ private:
     std::unordered_map<std::string, ValuePtr> values;
 };
 
-// Call frame for function calls
-struct CallFrame {
+// Legacy call frame for backward compatibility during transition
+struct LegacyCallFrame {
     std::string functionName;
     size_t returnAddress;
     size_t basePointer;

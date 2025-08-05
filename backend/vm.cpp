@@ -34,6 +34,24 @@ static std::string typeTagToString(TypeTag tag) {
 }
 
 // VM implementation
+// VMUserDefinedFunction implementation
+VMUserDefinedFunction::VMUserDefinedFunction(VM* vmInstance, const std::shared_ptr<AST::FunctionDeclaration>& decl, 
+                                           size_t start, size_t end)
+    : backend::UserDefinedFunction(decl), vm(vmInstance), startAddress(start), endAddress(end) {
+}
+
+VMUserDefinedFunction::VMUserDefinedFunction(VM* vmInstance, const std::shared_ptr<AST::AsyncFunctionDeclaration>& decl,
+                                           size_t start, size_t end)
+    : backend::UserDefinedFunction(decl), vm(vmInstance), startAddress(start), endAddress(end) {
+}
+
+ValuePtr VMUserDefinedFunction::execute(const std::vector<ValuePtr>& args) {
+    // This will be called by the VM's function call mechanism
+    // The actual execution happens in the VM's handleCall method
+    // This is just a placeholder that shouldn't be called directly
+    return nullptr;
+}
+
 VM::VM()
     : memoryManager(1024 * 1024), // 1MB initial memory
       region(std::make_unique<MemoryManager<>::Region>(memoryManager)),
@@ -92,8 +110,8 @@ ValuePtr VM::execute(const std::vector<Instruction>& bytecode) {
             
             // Check if we need to start skipping function body
             if (!currentFunctionBeingDefined.empty() && !insideFunctionDefinition) {
-                auto funcIt = userFunctions.find(currentFunctionBeingDefined);
-                if (funcIt != userFunctions.end() && ip >= funcIt->second.startAddress) {
+                auto funcIt = userDefinedFunctions.find(currentFunctionBeingDefined);
+                if (funcIt != userDefinedFunctions.end() && ip >= funcIt->second.startAddress) {
                     insideFunctionDefinition = true;
                 }
             }
@@ -285,6 +303,18 @@ ValuePtr VM::execute(const std::vector<Instruction>& bytecode) {
 }
 void VM::registerNativeFunction(const std::string& name, std::function<ValuePtr(const std::vector<ValuePtr>&)> function) {
     nativeFunctions[name] = function;
+    
+    // Also register with the function registry for consistency
+    std::vector<backend::Parameter> params; // Empty for now, could be enhanced
+    functionRegistry.registerNativeFunction(name, params, std::nullopt, function);
+}
+
+void VM::registerUserFunction(const std::shared_ptr<AST::FunctionDeclaration>& decl) {
+    functionRegistry.registerFunction(decl);
+}
+
+void VM::registerUserFunction(const std::shared_ptr<AST::AsyncFunctionDeclaration>& decl) {
+    functionRegistry.registerFunction(decl);
 }
 
 ValuePtr VM::pop() {
@@ -1234,40 +1264,102 @@ void VM::handleJumpIfFalse(const Instruction& instruction) {
 void VM::handleCall(const Instruction& instruction) {
     // Get the function name from the instruction
     const std::string& funcName = instruction.stringValue;
+    int argCount = instruction.intValue;
     
-    // Check if it's a native function
-    auto nativeIt = nativeFunctions.find(funcName);
-    if (nativeIt != nativeFunctions.end()) {
-        // Get the number of arguments
-        int argCount = instruction.intValue;
+    // Collect arguments from the stack (in reverse order)
+    std::vector<ValuePtr> args;
+    args.reserve(argCount);
+    for (int i = 0; i < argCount; i++) {
+        args.insert(args.begin(), pop()); // Insert at beginning to maintain order
+    }
+    
+    // Try to get function from the new registry first
+    auto function = functionRegistry.getFunction(funcName);
+    if (function) {
+        const auto& signature = function->getSignature();
         
-        // Collect arguments from the stack (in reverse order)
-        std::vector<ValuePtr> args;
-        args.reserve(argCount);
-        for (int i = 0; i < argCount; i++) {
-            args.insert(args.begin(), pop()); // Insert at beginning to maintain order
+        // Validate arguments
+        if (!backend::FunctionUtils::validateArguments(signature, args)) {
+            error("Function " + funcName + " expects " + std::to_string(signature.getMinParamCount()) + 
+                  " to " + std::to_string(signature.getTotalParamCount()) + " arguments, got " + std::to_string(args.size()));
+            return;
         }
         
+        // Apply default values for missing optional parameters
+        auto adjustedArgs = backend::FunctionUtils::applyDefaults(signature, args);
+        
+        if (function->isNative()) {
+            // Execute native function directly
+            ValuePtr result = function->execute(adjustedArgs);
+            push(result);
+            return;
+        } else {
+            // User-defined function - need to execute in VM context
+            // Create a new environment for the function
+            auto funcEnv = std::make_shared<Environment>(environment);
+            
+            // Bind parameters to the environment
+            size_t paramIndex = 0;
+            
+            // Bind required parameters
+            for (const auto& param : signature.parameters) {
+                if (paramIndex < adjustedArgs.size()) {
+                    funcEnv->define(param.name, adjustedArgs[paramIndex]);
+                    paramIndex++;
+                }
+            }
+            
+            // Bind optional parameters
+            for (const auto& param : signature.optionalParameters) {
+                if (paramIndex < adjustedArgs.size()) {
+                    funcEnv->define(param.name, adjustedArgs[paramIndex]);
+                    paramIndex++;
+                } else if (param.defaultValue) {
+                    // TODO: Evaluate default value expression
+                    // For now, use nil as placeholder
+                    funcEnv->define(param.name, memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
+                }
+            }
+            
+            // Create call frame using the new CallFrame from functions.hh
+            backend::CallFrame frame(funcName, ip, function);
+            frame.bindParameters(adjustedArgs);
+            frame.setPreviousEnvironment(environment);
+            
+            // Push call frame
+            callStack.push_back(frame);
+            
+            // Switch to function environment
+            environment = funcEnv;
+            
+            // For user-defined functions, we need to find the start address
+            auto funcIt = userDefinedFunctions.find(funcName);
+            if (funcIt != userDefinedFunctions.end()) {
+                // Jump to function start
+                ip = funcIt->second.startAddress - 1; // -1 because ip will be incremented
+                return;
+            } else {
+                error("User-defined function " + funcName + " not found in bytecode");
+                return;
+            }
+        }
+    }
+    
+    // Fallback to legacy native function handling
+    auto nativeIt = nativeFunctions.find(funcName);
+    if (nativeIt != nativeFunctions.end()) {
         // Call the native function and push the result
         push(nativeIt->second(args));
         return;
     }
     
-    // Check if it's a user-defined function
-    auto userIt = userFunctions.find(funcName);
-    if (userIt != userFunctions.end()) {
-        const Function& func = userIt->second;
-        int argCount = instruction.intValue;
+    // Handle user-defined functions
+    auto funcIt = userDefinedFunctions.find(funcName);
+    if (funcIt != userDefinedFunctions.end()) {
+        const backend::Function& func = funcIt->second;
         
         // Create a new environment for the function
         auto funcEnv = std::make_shared<Environment>(environment);
-        
-        // Collect arguments from the stack
-        std::vector<ValuePtr> args;
-        args.reserve(argCount);
-        for (int i = 0; i < argCount; i++) {
-            args.insert(args.begin(), pop()); // Insert at beginning to maintain order
-        }
         
         // Check argument count
         size_t requiredParams = func.parameters.size();
@@ -1281,12 +1373,12 @@ void VM::handleCall(const Instruction& instruction) {
         
         // Bind required parameters
         for (size_t i = 0; i < requiredParams && i < args.size(); i++) {
-            funcEnv->define(func.parameters[i].first, args[i]); // Get parameter name from pair
+            funcEnv->define(func.parameters[i].first, args[i]); // Use .first for parameter name
         }
         
         // Bind optional parameters
         for (size_t i = 0; i < func.optionalParameters.size(); i++) {
-            const std::string& paramName = func.optionalParameters[i].first; // Get parameter name from pair
+            const std::string& paramName = func.optionalParameters[i].first; // Use .first for parameter name
             size_t argIndex = requiredParams + i;
             
             if (argIndex < args.size()) {
@@ -1294,9 +1386,10 @@ void VM::handleCall(const Instruction& instruction) {
                 funcEnv->define(paramName, args[argIndex]);
             } else {
                 // Use default value
+                // Use default value if available
                 auto defaultIt = func.defaultValues.find(paramName);
                 if (defaultIt != func.defaultValues.end()) {
-                    funcEnv->define(paramName, defaultIt->second.first); // Get the ValuePtr from the pair
+                    funcEnv->define(paramName, defaultIt->second.first); // Use .first for the ValuePtr
                 } else {
                     // No default value, use nil
                     funcEnv->define(paramName, memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
@@ -1304,12 +1397,9 @@ void VM::handleCall(const Instruction& instruction) {
             }
         }
         
-        // Create call frame
-        CallFrame frame;
-        frame.functionName = funcName;
-        frame.returnAddress = ip; // Return to next instruction after call
-        frame.basePointer = stack.size();
-        frame.environment = environment;
+        // Create legacy call frame
+        backend::CallFrame frame(funcName, ip, nullptr);
+        frame.setPreviousEnvironment(environment);
         
         // Push call frame
         callStack.push_back(frame);
@@ -1318,7 +1408,9 @@ void VM::handleCall(const Instruction& instruction) {
         environment = funcEnv;
         
         // Jump to function start
+        // Jump to function start
         ip = func.startAddress - 1; // -1 because ip will be incremented
+        return; // Exit early for user-defined functions
         return;
     }
     
@@ -1341,11 +1433,16 @@ void VM::handleReturn(const Instruction& /*unused*/) {
     }
     
     // Pop the call frame and return to the caller
-    CallFrame frame = callStack.back();
+    backend::CallFrame frame = callStack.back();
     callStack.pop_back();
     
     // Restore the environment
-    environment = frame.environment;
+    auto prevEnv = frame.getPreviousEnvironment<Environment>();
+    if (prevEnv) {
+        environment = prevEnv;
+    } else {
+        environment = globals; // Fallback
+    }
     
     // Push the return value
     push(returnValue);
@@ -1389,12 +1486,8 @@ void VM::handleBeginFunction(const Instruction& instruction) {
     const std::string& funcName = instruction.stringValue;
     currentFunctionBeingDefined = funcName;
     
-    // Process parameter definitions immediately
-    size_t currentIp = ip + 1;
-    Function func(funcName, 0); // Will set start address later
-    
-    // Store the function (parameters will be processed by normal execution)
-    userFunctions[funcName] = func;
+    // Create a new Function struct
+    backend::Function func(funcName, 0); // Will set start address later
     
     // Don't skip parameter definition instructions - let them execute normally
     // Just find where the function body starts for later use
@@ -1417,20 +1510,21 @@ void VM::handleBeginFunction(const Instruction& instruction) {
     }
     
     // Set the function start address to the beginning of the actual body
-    userFunctions[funcName].startAddress = bodyStart;
+    func.startAddress = bodyStart;
+    
+    // Store the function
+    userDefinedFunctions[funcName] = func;
     
     // Continue with normal execution to process parameter definitions
     // The function body will be skipped later when we encounter END_FUNCTION
-    return;
-
 }
 
 void VM::handleEndFunction(const Instruction& /*unused*/) {
     // Check if we're currently defining a function
     if (!currentFunctionBeingDefined.empty()) {
         // This is the end of function definition, not function execution
-        auto funcIt = userFunctions.find(currentFunctionBeingDefined);
-        if (funcIt != userFunctions.end()) {
+        auto funcIt = userDefinedFunctions.find(currentFunctionBeingDefined);
+        if (funcIt != userDefinedFunctions.end()) {
             funcIt->second.endAddress = ip;
         }
         currentFunctionBeingDefined.clear();
@@ -1445,11 +1539,16 @@ void VM::handleEndFunction(const Instruction& /*unused*/) {
     }
     
     // Pop the call frame and return to the caller
-    CallFrame frame = callStack.back();
+    backend::CallFrame frame = callStack.back();
     callStack.pop_back();
     
     // Restore the environment
-    environment = frame.environment;
+    auto prevEnv = frame.getPreviousEnvironment<Environment>();
+    if (prevEnv) {
+        environment = prevEnv;
+    } else {
+        environment = globals; // Fallback
+    }
     
     // If there's no explicit return value on the stack, push nil
     if (stack.empty()) {
@@ -1463,8 +1562,8 @@ void VM::handleEndFunction(const Instruction& /*unused*/) {
 void VM::handleDefineParam(const Instruction& instruction) {
     // Add parameter to the current function being defined
     if (!currentFunctionBeingDefined.empty()) {
-        auto funcIt = userFunctions.find(currentFunctionBeingDefined);
-        if (funcIt != userFunctions.end()) {
+        auto funcIt = userDefinedFunctions.find(currentFunctionBeingDefined);
+        if (funcIt != userDefinedFunctions.end()) {
             funcIt->second.parameters.push_back(std::make_pair(instruction.stringValue, nullptr));
         }
     }
@@ -1473,8 +1572,8 @@ void VM::handleDefineParam(const Instruction& instruction) {
 void VM::handleDefineOptionalParam(const Instruction& instruction) {
     // Add optional parameter to the current function being defined
     if (!currentFunctionBeingDefined.empty()) {
-        auto funcIt = userFunctions.find(currentFunctionBeingDefined);
-        if (funcIt != userFunctions.end()) {
+        auto funcIt = userDefinedFunctions.find(currentFunctionBeingDefined);
+        if (funcIt != userDefinedFunctions.end()) {
             funcIt->second.optionalParameters.push_back(std::make_pair(instruction.stringValue, nullptr));
         }
     }
@@ -1487,10 +1586,10 @@ void VM::handleSetDefaultValue(const Instruction& /*unused*/) {
         return;
     }
     
-    auto funcIt = userFunctions.find(currentFunctionBeingDefined);
-    if (funcIt != userFunctions.end() && !funcIt->second.optionalParameters.empty()) {
-        Function& currentFunc = funcIt->second;
-        std::string paramName = currentFunc.optionalParameters.back().first; // Get the parameter name from the pair
+    auto funcIt = userDefinedFunctions.find(currentFunctionBeingDefined);
+    if (funcIt != userDefinedFunctions.end() && !funcIt->second.optionalParameters.empty()) {
+        backend::Function& currentFunc = funcIt->second;
+        std::string paramName = currentFunc.optionalParameters.back().first; // Get the parameter name
         ValuePtr defaultValue = pop();
         TypePtr paramType = currentFunc.optionalParameters.back().second; // Get the parameter type
         currentFunc.defaultValues[paramName] = std::make_pair(defaultValue, paramType);
