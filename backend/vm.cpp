@@ -442,8 +442,8 @@ void VM::handleAdd(const Instruction& /*unused*/) {
     }
 
     // Check if either operand is a number for numeric addition
-    bool aIsNumeric = (a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Float64);
-    bool bIsNumeric = (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Float64);
+    bool aIsNumeric = (a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64 || a->type->tag == TypeTag::Float64);
+    bool bIsNumeric = (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64 || b->type->tag == TypeTag::Float64);
 
     if (aIsNumeric && bIsNumeric) {
         // Numeric addition - promote to double if either operand is double
@@ -461,17 +461,29 @@ void VM::handleAdd(const Instruction& /*unused*/) {
             double result = aVal + bVal;
             push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, result));
         } else {
-            // Integer addition with overflow check
-            int32_t aVal = std::get<int32_t>(a->data);
-            int32_t bVal = std::get<int32_t>(b->data);
+            // Integer addition with mixed int32/int64 support
+            int64_t aVal, bVal;
+            
+            // Convert both operands to int64_t
+            if (a->type->tag == TypeTag::Int) {
+                aVal = static_cast<int64_t>(std::get<int32_t>(a->data));
+            } else {
+                aVal = std::get<int64_t>(a->data);
+            }
+            
+            if (b->type->tag == TypeTag::Int) {
+                bVal = static_cast<int64_t>(std::get<int32_t>(b->data));
+            } else {
+                bVal = std::get<int64_t>(b->data);
+            }
 
             // Check for integer overflow using well-defined behavior
-            if ((bVal > 0 && aVal > std::numeric_limits<int32_t>::max() - bVal) ||
-                (bVal < 0 && aVal < std::numeric_limits<int32_t>::min() - bVal)) {
+            if ((bVal > 0 && aVal > std::numeric_limits<int64_t>::max() - bVal) ||
+                (bVal < 0 && aVal < std::numeric_limits<int64_t>::min() - bVal)) {
                 error("Integer addition overflow");
             }
 
-            push(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, aVal + bVal));
+            push(memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, aVal + bVal));
         }
     } else {
         // If we get here, the operands are not compatible for addition
@@ -486,8 +498,8 @@ void VM::handleSubtract(const Instruction& /*unused*/) {
     ValuePtr a = pop();
     
     // Check if either operand is a number for numeric subtraction
-    bool aIsNumeric = (a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Float64);
-    bool bIsNumeric = (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Float64);
+    bool aIsNumeric = (a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64 || a->type->tag == TypeTag::Float64);
+    bool bIsNumeric = (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64 || b->type->tag == TypeTag::Float64);
     
     if (!aIsNumeric || !bIsNumeric) {
         error("Both operands must be numbers for subtraction");
@@ -512,17 +524,29 @@ void VM::handleSubtract(const Instruction& /*unused*/) {
         
         push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, result));
     } else {
-        // Integer subtraction with overflow check
-        int32_t aVal = std::get<int32_t>(a->data);
-        int32_t bVal = std::get<int32_t>(b->data);
+        // Integer subtraction with mixed int32/int64 support
+        int64_t aVal, bVal;
+        
+        // Convert both operands to int64_t
+        if (a->type->tag == TypeTag::Int) {
+            aVal = static_cast<int64_t>(std::get<int32_t>(a->data));
+        } else {
+            aVal = std::get<int64_t>(a->data);
+        }
+        
+        if (b->type->tag == TypeTag::Int) {
+            bVal = static_cast<int64_t>(std::get<int32_t>(b->data));
+        } else {
+            bVal = std::get<int64_t>(b->data);
+        }
         
         // Check for integer overflow
-        if ((bVal > 0 && aVal < std::numeric_limits<int32_t>::min() + bVal) ||
-            (bVal < 0 && aVal > std::numeric_limits<int32_t>::max() + bVal)) {
+        if ((bVal > 0 && aVal < std::numeric_limits<int64_t>::min() + bVal) ||
+            (bVal < 0 && aVal > std::numeric_limits<int64_t>::max() + bVal)) {
             error("Integer subtraction overflow");
         }
         
-        push(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, aVal - bVal));
+        push(memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, aVal - bVal));
     }
 }
 
@@ -572,19 +596,34 @@ void VM::handleMultiply(const Instruction& /*unused*/) {
             static_cast<double>(std::get<int32_t>(b->data));
         
         push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, aVal * bVal));
-    } else if (a->type->tag == TypeTag::Int && b->type->tag == TypeTag::Int) {
-        // Integer multiplication with overflow check
-        int32_t aVal = std::get<int32_t>(a->data);
-        int32_t bVal = std::get<int32_t>(b->data);
-        int64_t result = static_cast<int64_t>(aVal) * static_cast<int64_t>(bVal);
+    } else if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && 
+               (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
+        // Integer multiplication with mixed int32/int64 support
+        int64_t aVal, bVal;
         
-        if (result > std::numeric_limits<int32_t>::max() || 
-            result < std::numeric_limits<int32_t>::min()) {
+        // Convert both operands to int64_t
+        if (a->type->tag == TypeTag::Int) {
+            aVal = static_cast<int64_t>(std::get<int32_t>(a->data));
+        } else {
+            aVal = std::get<int64_t>(a->data);
+        }
+        
+        if (b->type->tag == TypeTag::Int) {
+            bVal = static_cast<int64_t>(std::get<int32_t>(b->data));
+        } else {
+            bVal = std::get<int64_t>(b->data);
+        }
+        
+        int64_t result = aVal * bVal;
+        
+        // Check for overflow
+        if (result > std::numeric_limits<int64_t>::max() || 
+            result < std::numeric_limits<int64_t>::min()) {
             error("Integer multiplication overflow");
         }
         
-        push(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, 
-            static_cast<int32_t>(result)));
+        // Return as int64 to maintain precision
+        push(memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, result));
     } else {
         error("Invalid operands for multiplication");
     }
@@ -687,14 +726,34 @@ void VM::handleEqual(const Instruction& /*unused*/) {
     
     bool result = false;
     
-    // Compare based on types
-    if (a->type->tag != b->type->tag) {
-        result = false;
-    } else {
+    // Handle mixed integer types
+    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && 
+        (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
+        // Convert both to int64_t for comparison
+        int64_t aVal = (a->type->tag == TypeTag::Int) ? 
+            static_cast<int64_t>(std::get<int32_t>(a->data)) : 
+            std::get<int64_t>(a->data);
+        int64_t bVal = (b->type->tag == TypeTag::Int) ? 
+            static_cast<int64_t>(std::get<int32_t>(b->data)) : 
+            std::get<int64_t>(b->data);
+        result = aVal == bVal;
+    }
+    // Handle mixed integer/float comparisons
+    else if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && b->type->tag == TypeTag::Float64) {
+        int64_t aVal = (a->type->tag == TypeTag::Int) ? 
+            static_cast<int64_t>(std::get<int32_t>(a->data)) : 
+            std::get<int64_t>(a->data);
+        result = static_cast<double>(aVal) == std::get<double>(b->data);
+    }
+    else if (a->type->tag == TypeTag::Float64 && (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
+        int64_t bVal = (b->type->tag == TypeTag::Int) ? 
+            static_cast<int64_t>(std::get<int32_t>(b->data)) : 
+            std::get<int64_t>(b->data);
+        result = std::get<double>(a->data) == static_cast<double>(bVal);
+    }
+    // Handle same-type comparisons
+    else if (a->type->tag == b->type->tag) {
         switch (a->type->tag) {
-            case TypeTag::Int:
-                result = std::get<int32_t>(a->data) == std::get<int32_t>(b->data);
-                break;
             case TypeTag::Float64:
                 result = std::get<double>(a->data) == std::get<double>(b->data);
                 break;
@@ -712,6 +771,9 @@ void VM::handleEqual(const Instruction& /*unused*/) {
                 break;
         }
     }
+    else {
+        result = false; // Different types are not equal
+    }
     
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, result));
 }
@@ -722,14 +784,34 @@ void VM::handleNotEqual(const Instruction& /*unused*/) {
     
     bool result = true;
     
-    // Compare based on types
-    if (a->type->tag != b->type->tag) {
-        result = true;
-    } else {
+    // Handle mixed integer types
+    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && 
+        (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
+        // Convert both to int64_t for comparison
+        int64_t aVal = (a->type->tag == TypeTag::Int) ? 
+            static_cast<int64_t>(std::get<int32_t>(a->data)) : 
+            std::get<int64_t>(a->data);
+        int64_t bVal = (b->type->tag == TypeTag::Int) ? 
+            static_cast<int64_t>(std::get<int32_t>(b->data)) : 
+            std::get<int64_t>(b->data);
+        result = aVal != bVal;
+    }
+    // Handle mixed integer/float comparisons
+    else if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && b->type->tag == TypeTag::Float64) {
+        int64_t aVal = (a->type->tag == TypeTag::Int) ? 
+            static_cast<int64_t>(std::get<int32_t>(a->data)) : 
+            std::get<int64_t>(a->data);
+        result = static_cast<double>(aVal) != std::get<double>(b->data);
+    }
+    else if (a->type->tag == TypeTag::Float64 && (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
+        int64_t bVal = (b->type->tag == TypeTag::Int) ? 
+            static_cast<int64_t>(std::get<int32_t>(b->data)) : 
+            std::get<int64_t>(b->data);
+        result = std::get<double>(a->data) != static_cast<double>(bVal);
+    }
+    // Handle same-type comparisons
+    else if (a->type->tag == b->type->tag) {
         switch (a->type->tag) {
-            case TypeTag::Int:
-                result = std::get<int32_t>(a->data) != std::get<int32_t>(b->data);
-                break;
             case TypeTag::Float64:
                 result = std::get<double>(a->data) != std::get<double>(b->data);
                 break;
@@ -747,6 +829,9 @@ void VM::handleNotEqual(const Instruction& /*unused*/) {
                 break;
         }
     }
+    else {
+        result = true; // Different types are not equal
+    }
     
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, result));
 }
@@ -757,15 +842,29 @@ void VM::handleLess(const Instruction& /*unused*/) {
     
     bool result = false;
     
-    // Compare based on types
-    if (a->type->tag == TypeTag::Int && b->type->tag == TypeTag::Int) {
-        result = std::get<int32_t>(a->data) < std::get<int32_t>(b->data);
+    // Compare based on types - handle mixed integer types
+    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && 
+        (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
+        // Convert both to int64_t for comparison
+        int64_t aVal = (a->type->tag == TypeTag::Int) ? 
+            static_cast<int64_t>(std::get<int32_t>(a->data)) : 
+            std::get<int64_t>(a->data);
+        int64_t bVal = (b->type->tag == TypeTag::Int) ? 
+            static_cast<int64_t>(std::get<int32_t>(b->data)) : 
+            std::get<int64_t>(b->data);
+        result = aVal < bVal;
     } else if (a->type->tag == TypeTag::Float64 && b->type->tag == TypeTag::Float64) {
         result = std::get<double>(a->data) < std::get<double>(b->data);
-    } else if (a->type->tag == TypeTag::Int && b->type->tag == TypeTag::Float64) {
-        result = static_cast<double>(std::get<int32_t>(a->data)) < std::get<double>(b->data);
-    } else if (a->type->tag == TypeTag::Float64 && b->type->tag == TypeTag::Int) {
-        result = std::get<double>(a->data) < static_cast<double>(std::get<int32_t>(b->data));
+    } else if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && b->type->tag == TypeTag::Float64) {
+        int64_t aVal = (a->type->tag == TypeTag::Int) ? 
+            static_cast<int64_t>(std::get<int32_t>(a->data)) : 
+            std::get<int64_t>(a->data);
+        result = static_cast<double>(aVal) < std::get<double>(b->data);
+    } else if (a->type->tag == TypeTag::Float64 && (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
+        int64_t bVal = (b->type->tag == TypeTag::Int) ? 
+            static_cast<int64_t>(std::get<int32_t>(b->data)) : 
+            std::get<int64_t>(b->data);
+        result = std::get<double>(a->data) < static_cast<double>(bVal);
     } else if (a->type->tag == TypeTag::String && b->type->tag == TypeTag::String) {
         result = std::get<std::string>(a->data) < std::get<std::string>(b->data);
     } else {
@@ -781,15 +880,29 @@ void VM::handleLessEqual(const Instruction& /*unused*/) {
     
     bool result = false;
     
-    // Compare based on types
-    if (a->type->tag == TypeTag::Int && b->type->tag == TypeTag::Int) {
-        result = std::get<int32_t>(a->data) <= std::get<int32_t>(b->data);
+    // Compare based on types - handle mixed integer types
+    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && 
+        (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
+        // Convert both to int64_t for comparison
+        int64_t aVal = (a->type->tag == TypeTag::Int) ? 
+            static_cast<int64_t>(std::get<int32_t>(a->data)) : 
+            std::get<int64_t>(a->data);
+        int64_t bVal = (b->type->tag == TypeTag::Int) ? 
+            static_cast<int64_t>(std::get<int32_t>(b->data)) : 
+            std::get<int64_t>(b->data);
+        result = aVal <= bVal;
     } else if (a->type->tag == TypeTag::Float64 && b->type->tag == TypeTag::Float64) {
         result = std::get<double>(a->data) <= std::get<double>(b->data);
-    } else if (a->type->tag == TypeTag::Int && b->type->tag == TypeTag::Float64) {
-        result = static_cast<double>(std::get<int32_t>(a->data)) <= std::get<double>(b->data);
-    } else if (a->type->tag == TypeTag::Float64 && b->type->tag == TypeTag::Int) {
-        result = std::get<double>(a->data) <= static_cast<double>(std::get<int32_t>(b->data));
+    } else if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && b->type->tag == TypeTag::Float64) {
+        int64_t aVal = (a->type->tag == TypeTag::Int) ? 
+            static_cast<int64_t>(std::get<int32_t>(a->data)) : 
+            std::get<int64_t>(a->data);
+        result = static_cast<double>(aVal) <= std::get<double>(b->data);
+    } else if (a->type->tag == TypeTag::Float64 && (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
+        int64_t bVal = (b->type->tag == TypeTag::Int) ? 
+            static_cast<int64_t>(std::get<int32_t>(b->data)) : 
+            std::get<int64_t>(b->data);
+        result = std::get<double>(a->data) <= static_cast<double>(bVal);
     } else if (a->type->tag == TypeTag::String && b->type->tag == TypeTag::String) {
         result = std::get<std::string>(a->data) <= std::get<std::string>(b->data);
     } else {
@@ -805,15 +918,29 @@ void VM::handleGreater(const Instruction& /*unused*/) {
     
     bool result = false;
     
-    // Compare based on types
-    if (a->type->tag == TypeTag::Int && b->type->tag == TypeTag::Int) {
-        result = std::get<int32_t>(a->data) > std::get<int32_t>(b->data);
+    // Compare based on types - handle mixed integer types
+    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && 
+        (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
+        // Convert both to int64_t for comparison
+        int64_t aVal = (a->type->tag == TypeTag::Int) ? 
+            static_cast<int64_t>(std::get<int32_t>(a->data)) : 
+            std::get<int64_t>(a->data);
+        int64_t bVal = (b->type->tag == TypeTag::Int) ? 
+            static_cast<int64_t>(std::get<int32_t>(b->data)) : 
+            std::get<int64_t>(b->data);
+        result = aVal > bVal;
     } else if (a->type->tag == TypeTag::Float64 && b->type->tag == TypeTag::Float64) {
         result = std::get<double>(a->data) > std::get<double>(b->data);
-    } else if (a->type->tag == TypeTag::Int && b->type->tag == TypeTag::Float64) {
-        result = static_cast<double>(std::get<int32_t>(a->data)) > std::get<double>(b->data);
-    } else if (a->type->tag == TypeTag::Float64 && b->type->tag == TypeTag::Int) {
-        result = std::get<double>(a->data) > static_cast<double>(std::get<int32_t>(b->data));
+    } else if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && b->type->tag == TypeTag::Float64) {
+        int64_t aVal = (a->type->tag == TypeTag::Int) ? 
+            static_cast<int64_t>(std::get<int32_t>(a->data)) : 
+            std::get<int64_t>(a->data);
+        result = static_cast<double>(aVal) > std::get<double>(b->data);
+    } else if (a->type->tag == TypeTag::Float64 && (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
+        int64_t bVal = (b->type->tag == TypeTag::Int) ? 
+            static_cast<int64_t>(std::get<int32_t>(b->data)) : 
+            std::get<int64_t>(b->data);
+        result = std::get<double>(a->data) > static_cast<double>(bVal);
     } else if (a->type->tag == TypeTag::String && b->type->tag == TypeTag::String) {
         result = std::get<std::string>(a->data) > std::get<std::string>(b->data);
     } else {
@@ -829,15 +956,29 @@ void VM::handleGreaterEqual(const Instruction& /*unused*/) {
     
     bool result = false;
     
-    // Compare based on types
-    if (a->type->tag == TypeTag::Int && b->type->tag == TypeTag::Int) {
-        result = std::get<int32_t>(a->data) >= std::get<int32_t>(b->data);
+    // Compare based on types - handle mixed integer types
+    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && 
+        (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
+        // Convert both to int64_t for comparison
+        int64_t aVal = (a->type->tag == TypeTag::Int) ? 
+            static_cast<int64_t>(std::get<int32_t>(a->data)) : 
+            std::get<int64_t>(a->data);
+        int64_t bVal = (b->type->tag == TypeTag::Int) ? 
+            static_cast<int64_t>(std::get<int32_t>(b->data)) : 
+            std::get<int64_t>(b->data);
+        result = aVal >= bVal;
     } else if (a->type->tag == TypeTag::Float64 && b->type->tag == TypeTag::Float64) {
         result = std::get<double>(a->data) >= std::get<double>(b->data);
-    } else if (a->type->tag == TypeTag::Int && b->type->tag == TypeTag::Float64) {
-        result = static_cast<double>(std::get<int32_t>(a->data)) >= std::get<double>(b->data);
-    } else if (a->type->tag == TypeTag::Float64 && b->type->tag == TypeTag::Int) {
-        result = std::get<double>(a->data) >= static_cast<double>(std::get<int32_t>(b->data));
+    } else if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && b->type->tag == TypeTag::Float64) {
+        int64_t aVal = (a->type->tag == TypeTag::Int) ? 
+            static_cast<int64_t>(std::get<int32_t>(a->data)) : 
+            std::get<int64_t>(a->data);
+        result = static_cast<double>(aVal) >= std::get<double>(b->data);
+    } else if (a->type->tag == TypeTag::Float64 && (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
+        int64_t bVal = (b->type->tag == TypeTag::Int) ? 
+            static_cast<int64_t>(std::get<int32_t>(b->data)) : 
+            std::get<int64_t>(b->data);
+        result = std::get<double>(a->data) >= static_cast<double>(bVal);
     } else if (a->type->tag == TypeTag::String && b->type->tag == TypeTag::String) {
         result = std::get<std::string>(a->data) >= std::get<std::string>(b->data);
     } else {

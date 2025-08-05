@@ -5,7 +5,7 @@ var str1 = "Hello";
 var str2 = "World";
 var space = " ";
 
-// String concatenation (if implemented)
+// String concatenation 
 // print("Concatenation: {str1} + {str2} = {str1 + str2}");
 
 // String comparison
