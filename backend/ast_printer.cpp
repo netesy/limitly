@@ -141,7 +141,32 @@ void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
         }
     }
     else if (auto classDecl = std::dynamic_pointer_cast<AST::ClassDeclaration>(node)) {
-        std::cout << indentation << "ClassDeclaration: " << classDecl->name << std::endl;
+        std::cout << indentation << "ClassDeclaration: " << classDecl->name;
+        
+        // Show inheritance information
+        if (!classDecl->superClassName.empty()) {
+            std::cout << " : " << classDecl->superClassName;
+            if (!classDecl->superConstructorArgs.empty()) {
+                std::cout << "(";
+                for (size_t i = 0; i < classDecl->superConstructorArgs.size(); ++i) {
+                    if (i > 0) std::cout << ", ";
+                    std::cout << "arg" << i; // Simplified - could print actual expressions
+                }
+                std::cout << ")";
+            }
+        }
+        
+        // Show inline constructor parameters
+        if (classDecl->hasInlineConstructor && !classDecl->constructorParams.empty()) {
+            std::cout << " (inline constructor: ";
+            for (size_t i = 0; i < classDecl->constructorParams.size(); ++i) {
+                if (i > 0) std::cout << ", ";
+                std::cout << classDecl->constructorParams[i].first;
+            }
+            std::cout << ")";
+        }
+        
+        std::cout << std::endl;
         
         if (!classDecl->fields.empty()) {
             std::cout << indentation << "  Fields:" << std::endl;

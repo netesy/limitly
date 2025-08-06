@@ -103,12 +103,13 @@ class HybridPet : Animal {
         
         // Validation logic
         if (age < 0 || age > 30) {
-            panic("Invalid age for hybrid pet: {age}");
+            //use print later
+            print("Invalid age for hybrid pet: {age}");
         }
         
         // Check for valid species combinations
         if (species1 == species2) {
-            panic("Cannot create hybrid from same species: {species1}");
+            print("Cannot create hybrid from same species: {species1}");
         }
         
         self.species1 = species1;
@@ -247,11 +248,11 @@ for animal in animals {
 // Virtual class example (abstract-like behavior)
 class Shape {
     fn area() {
-        panic("Must override area()");
+        print("Must override area()");
     }
     
     fn perimeter() {
-        panic("Must override perimeter()");
+        print("Must override perimeter()");
     }
     
     fn describe() {
@@ -304,7 +305,7 @@ class Square(side: float) : Shape {
 class Ellipse(majorAxis: float, minorAxis: float) : Shape {
     fn area() {
         if (self.majorAxis <= 0 || self.minorAxis <= 0) {
-            panic("Axis lengths must be positive");
+            print("Axis lengths must be positive");
         }
         return 3.14159 * self.majorAxis * self.minorAxis;
     }
@@ -330,7 +331,7 @@ var shapes = [
     Ellipse(4.0, 3.0)
 ];
 
-for shape in shapes {
+iter( shape in shapes) {
     shape.describe();
 }
 
@@ -384,7 +385,7 @@ var allShapes = [
     blueCircle
 ];
 
-for shape in allShapes {
+iter( shape in allShapes) {
     shape.describe();
 }
 
