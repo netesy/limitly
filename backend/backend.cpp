@@ -196,7 +196,17 @@ void BytecodeGenerator::visitClassDeclaration(const std::shared_ptr<AST::ClassDe
     
     // Process fields
     for (const auto& field : stmt->fields) {
-        visitVarDeclaration(field);
+        // For class fields, generate DEFINE_FIELD instead of STORE_VAR
+        if (field->initializer) {
+            // Evaluate the default value
+            visitExpression(field->initializer);
+        } else {
+            // No default value, push null
+            emit(Opcode::PUSH_NULL, field->line);
+        }
+        
+        // Define the field
+        emit(Opcode::DEFINE_FIELD, field->line, 0, 0.0f, false, field->name);
     }
     
     // Process methods
@@ -771,41 +781,74 @@ void BytecodeGenerator::visitCallExpr(const std::shared_ptr<AST::CallExpr>& expr
 void BytecodeGenerator::visitAssignExpr(const std::shared_ptr<AST::AssignExpr>& expr) {
     // Generate bytecode for assignment expression
     
-    // For compound assignments (+=, -=, etc.), load the variable first
-    if (expr->op != TokenType::EQUAL) {
-        emit(Opcode::LOAD_VAR, expr->line, 0, 0.0f, false, expr->name);
+    // Check if this is a member assignment (obj.field = value)
+    if (expr->object && expr->member.has_value()) {
+        // Member assignment: obj.field = value
+        
+        // First evaluate the object
+        visitExpression(expr->object);
+        
+        // Then evaluate the value
         visitExpression(expr->value);
         
-        // Perform the operation based on the operator
-        switch (expr->op) {
-            case TokenType::PLUS_EQUAL:
-                emit(Opcode::ADD, expr->line);
-                break;
-            case TokenType::MINUS_EQUAL:
-                emit(Opcode::SUBTRACT, expr->line);
-                break;
-            case TokenType::STAR_EQUAL:
-                emit(Opcode::MULTIPLY, expr->line);
-                break;
-            case TokenType::SLASH_EQUAL:
-                emit(Opcode::DIVIDE, expr->line);
-                break;
-            case TokenType::MODULUS_EQUAL:
-                emit(Opcode::MODULO, expr->line);
-                break;
-            default:
-                Debugger::error("Unknown compound assignment operator", expr->line, 0, InterpretationStage::BYTECODE, "", "", "");
-                break;
-        }
-    } else {
-        // Regular assignment
-        visitExpression(expr->value);
+        // Set the property
+        emit(Opcode::SET_PROPERTY, expr->line, 0, 0.0f, false, expr->member.value());
+        
+        // Assignment expressions should return the assigned value
+        // SET_PROPERTY should leave the value on the stack for this
+        return;
     }
     
-    // Store value in variable (STORE_VAR now pops the value)
-    // But assignment expressions should return the assigned value, so duplicate first
-    emit(Opcode::DUP, expr->line);
-    emit(Opcode::STORE_VAR, expr->line, 0, 0.0f, false, expr->name);
+    // Check if this is an index assignment (arr[i] = value)
+    if (expr->object && expr->index) {
+        // Index assignment: arr[i] = value
+        // TODO: Implement index assignment
+        Debugger::error("Index assignment not yet implemented", expr->line, 0, InterpretationStage::BYTECODE, "", "", "");
+        return;
+    }
+    
+    // Variable assignment: name = value
+    if (!expr->name.empty()) {
+        // For compound assignments (+=, -=, etc.), load the variable first
+        if (expr->op != TokenType::EQUAL) {
+            emit(Opcode::LOAD_VAR, expr->line, 0, 0.0f, false, expr->name);
+            visitExpression(expr->value);
+            
+            // Perform the operation based on the operator
+            switch (expr->op) {
+                case TokenType::PLUS_EQUAL:
+                    emit(Opcode::ADD, expr->line);
+                    break;
+                case TokenType::MINUS_EQUAL:
+                    emit(Opcode::SUBTRACT, expr->line);
+                    break;
+                case TokenType::STAR_EQUAL:
+                    emit(Opcode::MULTIPLY, expr->line);
+                    break;
+                case TokenType::SLASH_EQUAL:
+                    emit(Opcode::DIVIDE, expr->line);
+                    break;
+                case TokenType::MODULUS_EQUAL:
+                    emit(Opcode::MODULO, expr->line);
+                    break;
+                default:
+                    Debugger::error("Unknown compound assignment operator", expr->line, 0, InterpretationStage::BYTECODE, "", "", "");
+                    break;
+            }
+        } else {
+            // Regular assignment
+            visitExpression(expr->value);
+        }
+        
+        // Store value in variable (STORE_VAR now pops the value)
+        // But assignment expressions should return the assigned value, so duplicate first
+        emit(Opcode::DUP, expr->line);
+        emit(Opcode::STORE_VAR, expr->line, 0, 0.0f, false, expr->name);
+        return;
+    }
+    
+    // If we get here, it's an invalid assignment
+    Debugger::error("Invalid assignment expression", expr->line, 0, InterpretationStage::BYTECODE, "", "", "");
 }
 
 void BytecodeGenerator::visitGroupingExpr(const std::shared_ptr<AST::GroupingExpr>& expr) {

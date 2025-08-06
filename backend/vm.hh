@@ -74,6 +74,9 @@ private:
     std::string currentClassBeingDefined; // Track which class is currently being defined
     bool insideClassDefinition; // Track if we're currently inside a class definition
     
+    // Map to store runtime default values for class fields
+    std::unordered_map<std::string, ValuePtr> fieldDefaultValues;
+    
     // Helper methods
     ValuePtr pop();
     void push(const ValuePtr& value);
@@ -130,6 +133,7 @@ private:
     void handleSetDefaultValue(const Instruction& instruction);
     void handleBeginClass(const Instruction& instruction);
     void handleEndClass(const Instruction& instruction);
+    void handleDefineField(const Instruction& instruction);
     void handleLoadThis(const Instruction& instruction);
     void handleGetProperty(const Instruction& instruction);
     void handleSetProperty(const Instruction& instruction);

@@ -152,23 +152,20 @@ ValuePtr ObjectInstance::getField(const std::string& fieldName) const {
         return std::make_shared<Value>(nullptr);
     }
     
+    // For dynamic fields that don't exist, throw an error
     throw std::runtime_error("Field '" + fieldName + "' not found in class '" + 
                             classDefinition->getName() + "'");
 }
 
 void ObjectInstance::setField(const std::string& fieldName, ValuePtr value) {
-    // Check if field exists in class definition
-    const ClassField* field = classDefinition->resolveField(fieldName);
-    if (!field) {
-        throw std::runtime_error("Field '" + fieldName + "' not found in class '" + 
-                                classDefinition->getName() + "'");
-    }
-    
+    // Allow dynamic field creation - just set the field value
     fieldValues[fieldName] = value;
 }
 
 bool ObjectInstance::hasField(const std::string& fieldName) const {
-    return classDefinition->resolveField(fieldName) != nullptr;
+    // Check both dynamic fields and class-defined fields
+    return fieldValues.find(fieldName) != fieldValues.end() || 
+           classDefinition->resolveField(fieldName) != nullptr;
 }
 
 std::shared_ptr<FunctionImplementation> ObjectInstance::getMethod(const std::string& methodName) const {
@@ -203,13 +200,8 @@ void ObjectInstance::initializeFields() {
     // Initialize all fields with default values
     const auto& fields = classDefinition->getFields();
     for (const auto& field : fields) {
-        if (field.defaultValue) {
-            // TODO: Evaluate default value expression
-            // For now, just set to null
-            fieldValues[field.name] = std::make_shared<Value>(nullptr);
-        } else {
-            fieldValues[field.name] = std::make_shared<Value>(nullptr);
-        }
+        // Initialize to null by default
+        fieldValues[field.name] = std::make_shared<Value>(nullptr);
     }
     
     // Initialize superclass fields
@@ -218,12 +210,7 @@ void ObjectInstance::initializeFields() {
         const auto& superFields = superClass->getFields();
         for (const auto& field : superFields) {
             if (fieldValues.find(field.name) == fieldValues.end()) {
-                if (field.defaultValue) {
-                    // TODO: Evaluate default value expression
-                    fieldValues[field.name] = std::make_shared<Value>(nullptr);
-                } else {
-                    fieldValues[field.name] = std::make_shared<Value>(nullptr);
-                }
+                fieldValues[field.name] = std::make_shared<Value>(nullptr);
             }
         }
     }
