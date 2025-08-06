@@ -290,6 +290,9 @@ ValuePtr VM::execute(const std::vector<Instruction>& bytecode) {
                 case Opcode::END_CLASS:
                     handleEndClass(instruction);
                     break;
+                case Opcode::DEFINE_FIELD:
+                    handleDefineField(instruction);
+                    break;
                 case Opcode::LOAD_THIS:
                     handleLoadThis(instruction);
                     break;
@@ -418,7 +421,6 @@ void VM::handleSwap(const Instruction& /*unused*/) {
 }
 
 void VM::handleStoreVar(const Instruction& instruction) {
-    (void)instruction; // Mark as unused
     ValuePtr value = pop();
     environment->define(instruction.stringValue, value);
 }
@@ -1357,12 +1359,61 @@ void VM::handleCall(const Instruction& instruction) {
     if (classRegistry.hasClass(funcName)) {
         // Create instance of the class
         auto instance = classRegistry.createInstance(funcName);
-        
-        // TODO: Call constructor method if it exists (e.g., "init")
-        // For now, just create the instance and push it
         auto objectType = std::make_shared<Type>(TypeTag::Object);
-        push(memoryManager.makeRef<Value>(*region, objectType, instance));
-        return;
+        auto objectValue = memoryManager.makeRef<Value>(*region, objectType, instance);
+        
+        // Initialize fields with default values
+        const auto& fields = instance->getClassDefinition()->getFields();
+        for (const auto& field : fields) {
+            std::string fieldKey = funcName + "::" + field.name;
+            auto defaultValueIt = fieldDefaultValues.find(fieldKey);
+            if (defaultValueIt != fieldDefaultValues.end()) {
+                instance->setField(field.name, defaultValueIt->second);
+            }
+        }
+        
+        // Check if the class has an "init" method (constructor)
+        std::string initMethodKey = funcName + "::init";
+        auto initMethodIt = userDefinedFunctions.find(initMethodKey);
+        
+        if (initMethodIt != userDefinedFunctions.end()) {
+            // Call the init method with the provided arguments
+            const backend::Function& initMethod = initMethodIt->second;
+            
+            // Create a new environment for the constructor
+            auto constructorEnv = std::make_shared<Environment>(environment);
+            
+            // Bind 'this' parameter (implicit first parameter)
+            constructorEnv->define("this", objectValue);
+            
+            // Bind constructor parameters
+            size_t paramIndex = 0;
+            for (const auto& param : initMethod.parameters) {
+                if (paramIndex < args.size()) {
+                    constructorEnv->define(param.first, args[paramIndex]);
+                    paramIndex++;
+                }
+            }
+            
+            // Create call frame for constructor
+            backend::CallFrame frame(initMethodKey, ip, nullptr);
+            frame.setPreviousEnvironment(environment);
+            callStack.push_back(frame);
+            
+            // Switch to constructor environment
+            environment = constructorEnv;
+            
+            // Jump to constructor start
+            ip = initMethod.startAddress - 1; // -1 because ip will be incremented
+            
+            // The constructor will return, and we need to make sure the object is on the stack
+            // We'll handle this in the return handler
+            return;
+        } else {
+            // No constructor, just return the instance
+            push(objectValue);
+            return;
+        }
     }
     
     // Try to get function from the new registry first
@@ -1515,18 +1566,38 @@ void VM::handleReturn(const Instruction& /*unused*/) {
         return;
     }
     
-    // The return value should already be on the stack
-    ValuePtr returnValue;
-    if (!stack.empty()) {
-        returnValue = pop();
-    } else {
-        // No explicit return value, use nil
-        returnValue = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
-    }
-    
-    // Pop the call frame and return to the caller
+    // Pop the call frame and get function info
     backend::CallFrame frame = callStack.back();
     callStack.pop_back();
+    
+    // Check if this is a constructor return
+    bool isConstructor = frame.functionName.find("::init") != std::string::npos;
+    
+    ValuePtr returnValue;
+    if (isConstructor) {
+        // For constructors, return the 'this' object instead of the return value
+        // Pop any explicit return value from the stack (constructors shouldn't return values)
+        if (!stack.empty()) {
+            pop(); // Discard explicit return value
+        }
+        
+        // Get the 'this' object from the environment
+        auto thisValue = environment->get("this");
+        if (thisValue) {
+            returnValue = thisValue;
+        } else {
+            error("Constructor missing 'this' reference");
+            return;
+        }
+    } else {
+        // Regular function return
+        if (!stack.empty()) {
+            returnValue = pop();
+        } else {
+            // No explicit return value, use nil
+            returnValue = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
+        }
+    }
     
     // Restore the environment
     auto prevEnv = frame.getPreviousEnvironment<Environment>();
@@ -1576,7 +1647,13 @@ void VM::handlePrint(const Instruction& instruction) {
 void VM::handleBeginFunction(const Instruction& instruction) {
     // Create a new function definition
     const std::string& funcName = instruction.stringValue;
-    currentFunctionBeingDefined = funcName;
+    
+    // If we're inside a class definition, use the full method key
+    if (insideClassDefinition && !currentClassBeingDefined.empty()) {
+        currentFunctionBeingDefined = currentClassBeingDefined + "::" + funcName;
+    } else {
+        currentFunctionBeingDefined = funcName;
+    }
     
     // Create a new Function struct
     backend::Function func(funcName, 0); // Will set start address later
@@ -1723,14 +1800,50 @@ void VM::handleEndClass(const Instruction& /*unused*/) {
     insideClassDefinition = false;
     currentClassBeingDefined = "";
 }
+
+void VM::handleDefineField(const Instruction& instruction) {
+    // Get the field name from the instruction
+    std::string fieldName = instruction.stringValue;
+    
+    // Pop the default value from the stack
+    ValuePtr defaultValue = pop();
+    
+    // Get the current class being defined
+    if (!insideClassDefinition || currentClassBeingDefined.empty()) {
+        error("DEFINE_FIELD outside of class definition");
+        return;
+    }
+    
+    auto classDef = classRegistry.getClass(currentClassBeingDefined);
+    if (!classDef) {
+        error("Class definition not found: " + currentClassBeingDefined);
+        return;
+    }
+    
+    // Create a class field
+    // Note: We need to convert the runtime value back to an AST expression
+    // For now, we'll create a simple literal expression
+    std::shared_ptr<AST::Expression> defaultExpr = nullptr;
+    
+    // TODO: Convert runtime value to AST expression
+    // This is a simplified approach - in a full implementation, we'd need
+    // to properly convert runtime values back to AST expressions
+    
+    backend::ClassField field(fieldName, nullptr, defaultExpr);
+    classDef->addField(field);
+    
+    // Store the runtime default value in a temporary map for object initialization
+    // We'll use this during object creation
+    fieldDefaultValues[currentClassBeingDefined + "::" + fieldName] = defaultValue;
+}
 void VM::handleLoadThis(const Instruction& /*unused*/) {
     // Load 'this' reference onto the stack
-    // For now, we'll need to implement a way to track the current object instance
-    // This will be enhanced when we implement proper object instantiation
-    
-    // TODO: Get current object instance from call frame or context
-    // For now, push null as placeholder
-    push(memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
+    try {
+        ValuePtr thisValue = environment->get("this");
+        push(thisValue);
+    } catch (const std::exception& e) {
+        error("'this' reference not available in current context");
+    }
 }
 void VM::handleGetProperty(const Instruction& instruction) {
     // Get property name from instruction
@@ -1739,9 +1852,19 @@ void VM::handleGetProperty(const Instruction& instruction) {
     // Pop the object from the stack
     ValuePtr object = pop();
     
-    // TODO: Implement proper property access
-    // For now, just push null as placeholder
-    push(memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
+    // Check if the object is an ObjectInstance
+    if (std::holds_alternative<ObjectInstancePtr>(object->data)) {
+        auto objectInstance = std::get<ObjectInstancePtr>(object->data);
+        
+        try {
+            ValuePtr propertyValue = objectInstance->getField(propertyName);
+            push(propertyValue);
+        } catch (const std::exception& e) {
+            error("Property access failed: " + std::string(e.what()));
+        }
+    } else {
+        error("Cannot access property on non-object value");
+    }
 }
 void VM::handleSetProperty(const Instruction& instruction) {
     // Get property name from instruction
@@ -1751,8 +1874,20 @@ void VM::handleSetProperty(const Instruction& instruction) {
     ValuePtr value = pop();
     ValuePtr object = pop();
     
-    // TODO: Implement proper property setting
-    // For now, just continue execution
+    // Check if the object is an ObjectInstance
+    if (std::holds_alternative<ObjectInstancePtr>(object->data)) {
+        auto objectInstance = std::get<ObjectInstancePtr>(object->data);
+        
+        try {
+            objectInstance->setField(propertyName, value);
+            // Push the assigned value back onto the stack for assignment expressions
+            push(value);
+        } catch (const std::exception& e) {
+            error("Property assignment failed: " + std::string(e.what()));
+        }
+    } else {
+        error("Cannot set property on non-object value");
+    }
 }
 void VM::handleCreateList(const Instruction& instruction) {
     // Get the number of elements to include in the list from the instruction

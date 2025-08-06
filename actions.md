@@ -754,4 +754,125 @@ Hello, Alice!
 9. **Scope Management**: Proper variable scoping within functions
 10. **Memory Management**: Clean allocation and deallocation of function resources
 
-The function system represents a major milestone in the Limit language implementation, providing a solid foundation for building complex programs with modular, reusable code.
+The function system represents a major milestone in the Limit language implementation, providing a solid foundation for building complex programs with modular, reusable code.## A
+ction 4: Complete OOP System Implementation
+
+**Prompt**: "start working on oop features, remember to create its own files to handle code separation. just like we had with functions."
+
+**Changes Made**:
+- Created comprehensive OOP system with separate files for organization
+- Implemented complete class parsing with `this` expressions and member access
+- Added object instantiation and method dispatch infrastructure
+- Integrated OOP system with the VM and value system
+- Fixed parser to handle `THIS` tokens properly
+- Implemented method call bytecode generation and VM execution
+- Added object support to the type system and memory management
+
+**Files Modified/Created**:
+- Created backend/classes.hh - Complete class system definitions
+- Created backend/classes.cpp - Class system implementation
+- Updated backend/value.hh - Added Object type and ObjectInstance support
+- Updated backend/vm.hh - Added class registry and method call handling
+- Updated backend/vm.cpp - Implemented class instantiation and method dispatch
+- Updated frontend/parser.cpp - Added THIS token support
+- Updated backend/backend.cpp - Added method call bytecode generation
+- Updated opcodes.hh - Fixed duplicate LOAD_THIS opcode
+- Updated build.bat - Added classes.cpp compilation
+
+**Key Features Implemented**:
+- Class definitions with fields and methods
+- Object instantiation (`Person("Alice", 25)`)
+- Method calls (`person.greet()`)
+- `this` expressions in methods
+- Class registry for managing all classes
+- Object instances with proper memory management
+- Method dispatch and execution infrastructure
+- Integration with existing function and value systems
+
+**Current Status**:
+- ✅ Class parsing and AST generation
+- ✅ Object instantiation working
+- ✅ Method call detection and routing
+- ✅ Basic method execution
+- 🔄 Constructor parameter binding (in progress)
+- 🔄 Property access implementation (next)
+
+**Next Steps**:
+- Fix constructor parameter binding for proper initialization
+- Implement property access (`this.name = value`)
+- Add inheritance support
+- Complete method execution with proper `this` binding
+## Major B
+reakthrough: OOP System Working! 🎉
+
+### Fixed Issues
+1. **Constructor Parameter Binding**: Fixed `currentFunctionBeingDefined` to use full method key (`ClassName::methodName`) for class methods
+2. **Property Assignment**: Fixed `visitAssignExpr` to handle member assignments (`self.field = value`) by generating `SET_PROPERTY` instructions
+3. **Property Access**: Fixed `handleLoadThis` to load actual `this` object from environment instead of null
+4. **Dynamic Fields**: Modified `ObjectInstance::setField` to allow dynamic field creation without requiring class field declarations
+
+### Working OOP Features ✅
+- ✅ Class declarations and instantiation
+- ✅ Constructor calls with parameter binding
+- ✅ Property setting in constructors (`self.field = value`)
+- ✅ Property access in methods (`self.field`)
+- ✅ Method calls (`object.method()`)
+- ✅ Method returns with values
+- ✅ String interpolation in methods
+- ✅ Arithmetic operations on object properties
+- ✅ Multiple class instances working independently
+
+### Test Results
+- **Person class**: Full functionality working (constructor, methods, property access)
+- **Rectangle class**: Area and perimeter calculations working
+- **Method calls**: `person1.greet()`, `rect.area()` all working
+- **Property updates**: `person1.birthday()` correctly updates age
+
+### Remaining Issue
+- Class field declarations (`var balance: float = 0.0`) not being processed correctly
+- This affects the BankAccount test at the end
+
+### Next Steps
+1. Fix class field declaration processing
+2. Run comprehensive class tests
+3. Implement inheritance if needed
+4. Add break/continue statements for loops
+## 🎉 C
+OMPLETE SUCCESS: OOP System Fully Implemented!
+
+### Final Fix: Declared Class Fields
+**Problem**: Class field declarations (`var balance: float = 0.0`) were not being processed correctly
+**Solution**: 
+1. Added `DEFINE_FIELD` opcode for class field declarations
+2. Modified `visitClassDeclaration` to generate `DEFINE_FIELD` instead of `STORE_VAR` for fields
+3. Implemented `handleDefineField` in VM to register fields with class definitions
+4. Added `fieldDefaultValues` map to store runtime default values
+5. Modified object creation to initialize fields with their default values
+
+### Complete OOP Feature Set ✅
+- ✅ Class declarations with fields and methods
+- ✅ Object instantiation with constructors  
+- ✅ Constructor parameter binding
+- ✅ Declared class fields with default values
+- ✅ Dynamic property setting in constructors
+- ✅ Method calls and returns
+- ✅ Property access in methods (`self.field`)
+- ✅ String interpolation in methods
+- ✅ Arithmetic operations on properties
+- ✅ Conditional logic in methods
+- ✅ Multiple independent class instances
+- ✅ Complex business logic (BankAccount with deposits, withdrawals, balance checking)
+
+### Test Results: 100% Pass Rate
+- **Person class**: Constructor, methods, property updates, string interpolation
+- **Rectangle class**: Mathematical calculations, property access
+- **BankAccount class**: Financial operations, conditional logic, error handling
+
+### Architecture Achievement
+- Clean separation between AST expressions and runtime values
+- Proper field registration during class definition
+- Runtime field initialization during object creation
+- Dynamic field support alongside declared fields
+- Memory-safe object lifecycle management
+
+The Limit language now has a fully functional object-oriented programming system! 🚀

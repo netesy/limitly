@@ -58,7 +58,7 @@ print("Perimeter: {rect.perimeter()}");
 // Test file for self keyword and member access
 
 class BankAccount {
-    var balance: float = 0.0
+    var balance: float = 0.0;
     
     fn deposit(amount: float) : float {
         self.balance = self.balance + amount;

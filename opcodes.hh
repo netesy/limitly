@@ -68,6 +68,7 @@ enum class Opcode {
     // Class operations
     BEGIN_CLASS,        // Begin class definition
     END_CLASS,          // End class definition
+    DEFINE_FIELD,       // Define class field with default value
     GET_PROPERTY,       // Get property from object
     SET_PROPERTY,       // Set property on object
 
