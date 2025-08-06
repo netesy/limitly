@@ -425,6 +425,17 @@ void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
     else if (auto literalExpr = std::dynamic_pointer_cast<AST::LiteralExpr>(node)) {
         std::cout << indentation << "Literal: " << valueToString(literalExpr->value) << std::endl;
     }
+    else if (auto interpolatedExpr = std::dynamic_pointer_cast<AST::InterpolatedStringExpr>(node)) {
+        std::cout << indentation << "InterpolatedString:" << std::endl;
+        for (size_t i = 0; i < interpolatedExpr->parts.size(); ++i) {
+            if (std::holds_alternative<std::string>(interpolatedExpr->parts[i])) {
+                std::cout << indentation << "  String: \"" << escapeString(std::get<std::string>(interpolatedExpr->parts[i])) << "\"" << std::endl;
+            } else {
+                std::cout << indentation << "  Expression:" << std::endl;
+                printNode(std::get<std::shared_ptr<AST::Expression>>(interpolatedExpr->parts[i]), indent + 2);
+            }
+        }
+    }
     else if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(node)) {
         std::cout << indentation << "Variable: " << varExpr->name << std::endl;
     }
@@ -638,6 +649,7 @@ std::string ASTPrinter::tokenTypeToString(TokenType type) const {
         case TokenType::MATCH: return "match";
         case TokenType::IF: return "if";
         case TokenType::IN: return "in";
+        case TokenType::ITER: return "iter";
         
         // Add more keywords as needed...
         

@@ -742,7 +742,13 @@ void BytecodeGenerator::visitLiteralExpr(const std::shared_ptr<AST::LiteralExpr>
 
 void BytecodeGenerator::visitVariableExpr(const std::shared_ptr<AST::VariableExpr>& expr) {
     // Generate bytecode for variable expression
-    emit(Opcode::LOAD_VAR, expr->line, 0, 0.0f, false, expr->name);
+    if (expr->name == "super") {
+        emit(Opcode::LOAD_SUPER, expr->line);
+    } else if (expr->name == "this" || expr->name == "self") {
+        emit(Opcode::LOAD_THIS, expr->line);
+    } else {
+        emit(Opcode::LOAD_VAR, expr->line, 0, 0.0f, false, expr->name);
+    }
 }
 
 void BytecodeGenerator::visitCallExpr(const std::shared_ptr<AST::CallExpr>& expr) {
@@ -766,10 +772,18 @@ void BytecodeGenerator::visitCallExpr(const std::shared_ptr<AST::CallExpr>& expr
         // Then call the method on the object
         functionName = memberExpr->name;
         
+        // Check if this is a super method call
+        bool isSuperCall = false;
+        if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(memberExpr->object)) {
+            if (varExpr->name == "super") {
+                isSuperCall = true;
+            }
+        }
+        
         // For method calls, we need to use a different approach
         // The object is already on the stack, so we need to handle this differently
-        // For now, emit a placeholder that the VM can recognize as a method call
-        emit(Opcode::CALL, expr->line, static_cast<int32_t>(expr->arguments.size() + 1), 0.0f, false, "method:" + functionName);
+        std::string callPrefix = isSuperCall ? "super:" : "method:";
+        emit(Opcode::CALL, expr->line, static_cast<int32_t>(expr->arguments.size() + 1), 0.0f, false, callPrefix + functionName);
         return;
     } else {
         // For other complex callees, we'd need to evaluate them
