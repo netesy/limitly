@@ -24,6 +24,7 @@ enum class Opcode {
     LOAD_TEMP,          // Load temporary variable onto stack
     CLEAR_TEMP,         // Clear temporary variable
     LOAD_THIS,          // Load 'this' reference onto stack
+    LOAD_SUPER,         // Load 'super' reference onto stack
    
     // Arithmetic operations
     ADD,                // Add top two values
@@ -68,6 +69,7 @@ enum class Opcode {
     // Class operations
     BEGIN_CLASS,        // Begin class definition
     END_CLASS,          // End class definition
+    SET_SUPERCLASS,     // Set superclass for inheritance
     DEFINE_FIELD,       // Define class field with default value
     GET_PROPERTY,       // Get property from object
     SET_PROPERTY,       // Set property on object

@@ -118,6 +118,9 @@ void BytecodeGenerator::visitExpression(const std::shared_ptr<AST::Expression>& 
     } else if (auto thisExpr = std::dynamic_pointer_cast<AST::ThisExpr>(expr)) {
         // Handle 'this' reference - load the current instance
         emit(Opcode::LOAD_THIS, expr->line);
+    } else if (auto superExpr = std::dynamic_pointer_cast<AST::SuperExpr>(expr)) {
+        // Handle 'super' reference - load the parent instance
+        emit(Opcode::LOAD_SUPER, expr->line);
     } else if (auto interpolatedStr = std::dynamic_pointer_cast<AST::InterpolatedStringExpr>(expr)) {
         visitInterpolatedStringExpr(interpolatedStr);
     } else {
@@ -193,6 +196,11 @@ void BytecodeGenerator::visitClassDeclaration(const std::shared_ptr<AST::ClassDe
     
     // Start class definition
     emit(Opcode::BEGIN_CLASS, stmt->line, 0, 0.0f, false, stmt->name);
+    
+    // Set superclass if there's inheritance
+    if (!stmt->superClassName.empty()) {
+        emit(Opcode::SET_SUPERCLASS, stmt->line, 0, 0.0f, false, stmt->superClassName);
+    }
     
     // Process fields
     for (const auto& field : stmt->fields) {

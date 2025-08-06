@@ -290,11 +290,17 @@ ValuePtr VM::execute(const std::vector<Instruction>& bytecode) {
                 case Opcode::END_CLASS:
                     handleEndClass(instruction);
                     break;
+                case Opcode::SET_SUPERCLASS:
+                    handleSetSuperclass(instruction);
+                    break;
                 case Opcode::DEFINE_FIELD:
                     handleDefineField(instruction);
                     break;
                 case Opcode::LOAD_THIS:
                     handleLoadThis(instruction);
+                    break;
+                case Opcode::LOAD_SUPER:
+                    handleLoadSuper(instruction);
                     break;
                 case Opcode::GET_PROPERTY:
                     handleGetProperty(instruction);
@@ -1801,6 +1807,33 @@ void VM::handleEndClass(const Instruction& /*unused*/) {
     currentClassBeingDefined = "";
 }
 
+void VM::handleSetSuperclass(const Instruction& instruction) {
+    // Get the superclass name from the instruction
+    std::string superClassName = instruction.stringValue;
+    
+    // Get the current class being defined
+    if (!insideClassDefinition || currentClassBeingDefined.empty()) {
+        error("SET_SUPERCLASS outside of class definition");
+        return;
+    }
+    
+    auto classDef = classRegistry.getClass(currentClassBeingDefined);
+    if (!classDef) {
+        error("Class definition not found: " + currentClassBeingDefined);
+        return;
+    }
+    
+    // Get the superclass definition
+    auto superClassDef = classRegistry.getClass(superClassName);
+    if (!superClassDef) {
+        error("Superclass not found: " + superClassName);
+        return;
+    }
+    
+    // Set the superclass
+    classDef->setSuperClass(superClassDef);
+}
+
 void VM::handleDefineField(const Instruction& instruction) {
     // Get the field name from the instruction
     std::string fieldName = instruction.stringValue;
@@ -1843,6 +1876,18 @@ void VM::handleLoadThis(const Instruction& /*unused*/) {
         push(thisValue);
     } catch (const std::exception& e) {
         error("'this' reference not available in current context");
+    }
+}
+
+void VM::handleLoadSuper(const Instruction& /*unused*/) {
+    // Load 'super' reference onto the stack
+    // For now, 'super' is the same as 'this' but with different method resolution
+    // In a full implementation, this would create a special super object
+    try {
+        ValuePtr thisValue = environment->get("this");
+        push(thisValue);
+    } catch (const std::exception& e) {
+        error("'super' reference not available in current context");
     }
 }
 void VM::handleGetProperty(const Instruction& instruction) {

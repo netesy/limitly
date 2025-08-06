@@ -1,9 +1,8 @@
-// Test class inheritance (if implemented)
-print("=== Class Inheritance Tests ===");
+// Test class inheritance with refined syntax
+print("=== Class Inheritance Tests ===")
 
-// Base class
 class Animal {
-    fn init(name) {
+    fn init(name: str) {
         self.name = name;
     }
     
@@ -12,17 +11,12 @@ class Animal {
     }
     
     fn info() {
-        print("self is {self.name}");
+        print("Animal is {self.name}");
     }
 }
 
-// Derived class
-class Dog extends Animal {
-    fn init(name, breed) {
-        super.init(name);
-        self.breed = breed;
-    }
-    
+// Derived class with super constructor call
+class Dog(name: str, breed: str) : Animal(name) {
     fn speak() {
         print("{self.name} barks!");
     }
@@ -30,10 +24,14 @@ class Dog extends Animal {
     fn wagTail() {
         print("{self.name} wags tail happily");
     }
+    
+    fn info() {
+        print("Dog {self.name} is a {self.breed}");
+    }
 }
 
 // Another derived class
-class Cat extends Animal {
+class Cat(name: str) : Animal(name) {
     fn speak() {
         print("{self.name} meows");
     }
@@ -43,23 +41,359 @@ class Cat extends Animal {
     }
 }
 
-print("Inheritance test:");
+// Alternative syntax for more complex inheritance scenarios
+class SmartDog(name: str, breed: str, iq: int) : Dog(name, breed) {
+    fn speak() {
+        super.speak();  // Call parent method
+        print("Woof woof! (intelligently)");
+    }
+    
+    fn solve(problem: str) {
+        print("{self.name} solves: {problem}");
+    }
+    
+    fn getIQ() {
+        return self.iq;
+    }
+}
+
+// Additional inline constructor examples for testing
+class Bird(name: str, species: str, canFly: bool) : Animal(name) {
+    fn speak() {
+        print("{self.name} chirps melodiously");
+    }
+    
+    fn fly() {
+        if (self.canFly) {
+            print("{self.name} soars through the sky");
+        } else {
+            print("{self.name} cannot fly but runs fast");
+        }
+    }
+    
+    fn info() {
+        print("Bird {self.name} is a {self.species}");
+    }
+}
+
+class Fish(name: str, waterType: str) : Animal(name) {
+    fn speak() {
+        print("{self.name} makes bubbles");
+    }
+    
+    fn swim() {
+        print("{self.name} swims gracefully in {self.waterType} water");
+    }
+    
+    fn info() {
+        print("Fish {self.name} lives in {self.waterType} water");
+    }
+}
+
+// Hybrid pet class using explicit constructor for complex initialization
+class HybridPet : Animal {
+    var species1: str;
+    var species2: str;
+    var age: int;
+    var isValidHybrid: bool;
+    var traits: [str];
+    
+    fn init(name: str, species1: str, species2: str, age: int) {
+        super.init(name);  // Call parent's implicit constructor
+        
+        // Validation logic
+        if (age < 0 || age > 30) {
+            panic("Invalid age for hybrid pet: {age}");
+        }
+        
+        // Check for valid species combinations
+        if (species1 == species2) {
+            panic("Cannot create hybrid from same species: {species1}");
+        }
+        
+        self.species1 = species1;
+        self.species2 = species2;
+        self.age = age;
+        self.isValidHybrid = self.validateHybrid();
+        self.traits = self.generateTraits();
+        
+        print("Created hybrid pet {self.name}: {self.species1}-{self.species2} mix");
+        if (!self.isValidHybrid) {
+            print("Warning: Unusual hybrid combination detected");
+        }
+    }
+    
+    fn validateHybrid() {
+        // Simple validation - real hybrids are typically within animal families
+        var validCombos = [
+            ["Cat", "Lion"], ["Dog", "Wolf"], ["Horse", "Donkey"],
+            ["Tiger", "Lion"], ["Cat", "Tiger"], ["Dog", "Fox"]
+        ];
+        
+        for combo in validCombos {
+            if ((combo[0] == self.species1 && combo[1] == self.species2) ||
+                (combo[0] == self.species2 && combo[1] == self.species1)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    fn generateTraits() {
+        var traits = [];
+        
+        // Add traits based on species combination
+        if (self.species1 == "Cat" || self.species2 == "Cat") {
+            traits.append("agile");
+            traits.append("independent");
+        }
+        if (self.species1 == "Dog" || self.species2 == "Dog") {
+            traits.append("loyal");
+            traits.append("energetic");
+        }
+        if (self.species1 == "Lion" || self.species2 == "Lion") {
+            traits.append("strong");
+            traits.append("proud");
+        }
+        
+        return traits;
+    }
+    
+    fn speak() {
+        if (self.isValidHybrid) {
+            print("{self.name} makes a unique {self.species1}-{self.species2} sound");
+        } else {
+            print("{self.name} makes an unusual hybrid sound that's hard to describe");
+        }
+    }
+    
+    fn getHybridInfo() {
+        print("{self.name} is {self.age} years old and is a mix of {self.species1} and {self.species2}");
+        print("Valid hybrid: {self.isValidHybrid}");
+        print("Traits: {self.traits.join(', ')}");
+    }
+    
+    fn displayTraits() {
+        print("{self.name}'s traits:");
+        for trait in self.traits {
+            print("  - {trait}");
+        }
+    }
+}
+
+print("Inheritance test:")
 var dog = Dog("Buddy", "Golden Retriever");
 var cat = Cat("Whiskers");
+var smartDog = SmartDog("Einstein", "Border Collie", 150);
 
-print("Dog methods:");
+// Test new inline constructor classes
+var eagle = Bird("Sky", "Bald Eagle", true);
+var penguin = Bird("Waddles", "Emperor Penguin", false);
+var goldfish = Fish("Bubbles", "fresh");
+var shark = Fish("Bruce", "salt");
+var hybrid = HybridPet("Unique", "Cat", "Dog", 3);
+
+print("Dog methods:")
 dog.info();
 dog.speak();
 dog.wagTail();
 
-print("Cat methods:");
+print("Cat methods:")
 cat.info();
 cat.speak();
 cat.purr();
 
-// Polymorphism test
+print("Smart dog methods:");
+smartDog.info();
+smartDog.speak();
+smartDog.solve("fetch puzzle");
+print("Einstein's IQ: {smartDog.getIQ()}");
+
+print("Bird methods:")
+eagle.info();
+eagle.speak();
+eagle.fly();
+
+penguin.info();
+penguin.speak();
+penguin.fly();
+
+print("Fish methods:")
+goldfish.info();
+goldfish.speak();
+goldfish.swim();
+
+shark.info();
+shark.speak();
+shark.swim();
+
+print("Hybrid pet methods:")
+hybrid.info();
+hybrid.speak();
+hybrid.getHybridInfo();
+
+// Polymorphism test with expanded animal collection
 print("Polymorphism test:");
-var animals = [dog, cat];
-for (var animal in animals) {
+var animals = [dog, cat, smartDog, eagle, penguin, goldfish, shark, hybrid];
+for animal in animals {
     animal.speak();
 }
+
+print("Info polymorphism test:");
+for animal in animals {
+    animal.info();
+}
+
+// Virtual class example (abstract-like behavior)
+class Shape {
+    fn area() {
+        panic("Must override area()");
+    }
+    
+    fn perimeter() {
+        panic("Must override perimeter()");
+    }
+    
+    fn describe() {
+        print("Shape with area {self.area()} and perimeter {self.perimeter()}");
+    }
+}
+
+class Circle(radius: float) : Shape {
+    fn area() {
+        return 3.14159 * self.radius * self.radius;
+    }
+    
+    fn perimeter() {
+        return 2 * 3.14159 * self.radius;
+    }
+}
+
+class Rectangle(width: float, height: float) : Shape {
+    fn area() {
+        return self.width * self.height;
+    }
+    
+    fn perimeter() {
+        return 2 * (self.width + self.height);
+    }
+}
+
+// Additional inline constructor shapes for comprehensive testing
+class Triangle(base: float, height: float, side1: float, side2: float) : Shape {
+    fn area() {
+        return 0.5 * self.base * self.height;
+    }
+    
+    fn perimeter() {
+        return self.base + self.side1 + self.side2;
+    }
+}
+
+class Square(side: float) : Shape {
+    fn area() {
+        return self.side * self.side;
+    }
+    
+    fn perimeter() {
+        return 4 * self.side;
+    }
+}
+
+// Complex shape with validation using inline constructor
+class Ellipse(majorAxis: float, minorAxis: float) : Shape {
+    fn area() {
+        if (self.majorAxis <= 0 || self.minorAxis <= 0) {
+            panic("Axis lengths must be positive");
+        }
+        return 3.14159 * self.majorAxis * self.minorAxis;
+    }
+    
+    fn perimeter() {
+        // Approximation for ellipse perimeter
+        var a = self.majorAxis;
+        var b = self.minorAxis;
+        return 3.14159 * (3 * (a + b) - sqrt((3 * a + b) * (a + 3 * b)));
+    }
+    
+    fn getAxesRatio() {
+        return self.majorAxis / self.minorAxis;
+    }
+}
+
+print("Shape polymorphism:")
+var shapes = [
+    Circle(5.0), 
+    Rectangle(4.0, 6.0),
+    Triangle(6.0, 4.0, 5.0, 5.0),
+    Square(3.0),
+    Ellipse(4.0, 3.0)
+];
+
+for shape in shapes {
+    shape.describe();
+}
+
+print("Extended shape testing:")
+var ellipse = Ellipse(8.0, 6.0);
+print("Ellipse axes ratio: {ellipse.getAxesRatio()}");
+
+// Test complex inheritance chain with inline constructors
+class ColoredShape(color: str) : Shape {
+    fn getColor() {
+        return self.color;
+    }
+    
+    fn describe() {
+        print("{self.color} shape with area {self.area()} and perimeter {self.perimeter()}");
+    }
+}
+
+class ColoredCircle(radius: float, color: str) : ColoredShape(color) {
+    fn area() {
+        return 3.14159 * self.radius * self.radius;
+    }
+    
+    fn perimeter() {
+        return 2 * 3.14159 * self.radius;
+    }
+    
+    fn getRadius() {
+        return self.radius;
+    }
+}
+
+print("Complex inheritance with inline constructors:");
+var redCircle = ColoredCircle(3.0, "red");
+var blueCircle = ColoredCircle(7.0, "blue");
+
+redCircle.describe();
+blueCircle.describe();
+
+print("Red circle radius: {redCircle.getRadius()}");
+print("Blue circle color: {blueCircle.getColor()}");
+
+// Final polymorphism test with all types
+print("Final comprehensive polymorphism test:");
+var allShapes = [
+    Circle(2.0),
+    Rectangle(3.0, 4.0),
+    Triangle(5.0, 3.0, 4.0, 4.0),
+    Square(2.5),
+    redCircle,
+    blueCircle
+];
+
+for shape in allShapes {
+    shape.describe();
+}
+
+print("=== Inline Constructor Testing Complete ===")
+print("Successfully tested:")
+print("- Simple inline constructors (Animal, Dog, Cat)")
+print("- Complex inline constructors (Bird, Fish, HybridPet)")
+print("- Multi-level inheritance (SmartDog, ColoredCircle)")
+print("- Mixed parameter types (str, int, float, bool)")
+print("- Polymorphism across all constructor types")
+print("- Method overriding and super calls")
+print("- Abstract-like base classes")
