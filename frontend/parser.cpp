@@ -846,6 +846,45 @@ std::shared_ptr<AST::ClassDeclaration> Parser::classDeclaration() {
     Token name = consume(TokenType::IDENTIFIER, "Expected class name.");
     classDecl->name = name.lexeme;
 
+    // Check for inline constructor parameters
+    if (check(TokenType::LEFT_PAREN)) {
+        classDecl->hasInlineConstructor = true;
+        advance(); // consume '('
+        
+        // Parse constructor parameters
+        if (!check(TokenType::RIGHT_PAREN)) {
+            do {
+                auto paramName = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
+                consume(TokenType::COLON, "Expected ':' after parameter name.");
+                auto paramType = parseTypeAnnotation();
+                classDecl->constructorParams.push_back({paramName, paramType});
+            } while (match({TokenType::COMMA}));
+        }
+        
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after constructor parameters.");
+    }
+
+    // Check for inheritance
+    if (match({TokenType::COLON})) {
+        // Parse superclass name
+        Token superName = consume(TokenType::IDENTIFIER, "Expected superclass name.");
+        classDecl->superClassName = superName.lexeme;
+        
+        // Check for super constructor call
+        if (check(TokenType::LEFT_PAREN)) {
+            advance(); // consume '('
+            
+            // Parse super constructor arguments
+            if (!check(TokenType::RIGHT_PAREN)) {
+                do {
+                    classDecl->superConstructorArgs.push_back(expression());
+                } while (match({TokenType::COMMA}));
+            }
+            
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after super constructor arguments.");
+        }
+    }
+
     consume(TokenType::LEFT_BRACE, "Expected '{' before class body.");
 
     // Parse class members
@@ -898,6 +937,86 @@ std::shared_ptr<AST::ClassDeclaration> Parser::classDeclaration() {
     }
 
     consume(TokenType::RIGHT_BRACE, "Expected '}' after class body.");
+
+    // Generate automatic init constructor if class has inline constructor parameters
+    if (classDecl->hasInlineConstructor) {
+        auto initMethod = std::make_shared<AST::FunctionDeclaration>();
+        initMethod->line = classDecl->line;
+        initMethod->name = "init";
+        
+        // Copy constructor parameters to init method
+        for (const auto& param : classDecl->constructorParams) {
+            initMethod->params.push_back(param);
+        }
+        
+        // Create constructor body
+        auto body = std::make_shared<AST::BlockStatement>();
+        body->line = classDecl->line;
+        
+        // Add super constructor call if there's inheritance
+        if (!classDecl->superClassName.empty()) {
+            // Create super.init() call
+            auto superCall = std::make_shared<AST::ExprStatement>();
+            superCall->line = classDecl->line;
+            
+            auto callExpr = std::make_shared<AST::CallExpr>();
+            callExpr->line = classDecl->line;
+            
+            // Create super.init member expression
+            auto memberExpr = std::make_shared<AST::MemberExpr>();
+            memberExpr->line = classDecl->line;
+            memberExpr->name = "init";
+            
+            auto superExpr = std::make_shared<AST::VariableExpr>();
+            superExpr->line = classDecl->line;
+            superExpr->name = "super";
+            memberExpr->object = superExpr;
+            
+            callExpr->callee = memberExpr;
+            
+            // Add super constructor arguments
+            for (const auto& arg : classDecl->superConstructorArgs) {
+                callExpr->arguments.push_back(arg);
+            }
+            
+            superCall->expression = callExpr;
+            body->statements.push_back(superCall);
+        }
+        
+        // Add automatic field assignments for constructor parameters
+        for (const auto& param : classDecl->constructorParams) {
+            auto assignment = std::make_shared<AST::ExprStatement>();
+            assignment->line = classDecl->line;
+            
+            auto assignExpr = std::make_shared<AST::AssignExpr>();
+            assignExpr->line = classDecl->line;
+            assignExpr->op = TokenType::EQUAL;
+            
+            // Create self.paramName member expression
+            auto memberExpr = std::make_shared<AST::MemberExpr>();
+            memberExpr->line = classDecl->line;
+            memberExpr->name = param.first;
+            
+            auto thisExpr = std::make_shared<AST::ThisExpr>();
+            thisExpr->line = classDecl->line;
+            memberExpr->object = thisExpr;
+            
+            assignExpr->object = memberExpr;
+            assignExpr->member = param.first;
+            
+            // Create parameter variable expression
+            auto paramExpr = std::make_shared<AST::VariableExpr>();
+            paramExpr->line = classDecl->line;
+            paramExpr->name = param.first;
+            
+            assignExpr->value = paramExpr;
+            assignment->expression = assignExpr;
+            body->statements.push_back(assignment);
+        }
+        
+        initMethod->body = body;
+        classDecl->methods.push_back(initMethod);
+    }
 
     return classDecl;
 }
@@ -1508,6 +1627,11 @@ std::shared_ptr<AST::Expression> Parser::primary() {
         auto thisExpr = std::make_shared<AST::ThisExpr>();
         thisExpr->line = previous().line;
         return thisExpr;
+    } else if (match({TokenType::SUPER})) {
+        // Handle 'super' for parent class access
+        auto superExpr = std::make_shared<AST::SuperExpr>();
+        superExpr->line = previous().line;
+        return superExpr;
     } else {
         // Only report error if we're not at the end of input or at a statement terminator
         if (!isAtEnd() && !check(TokenType::SEMICOLON) && !check(TokenType::RIGHT_BRACE) && 

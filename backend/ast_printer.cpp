@@ -431,6 +431,9 @@ void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
     else if (auto thisExpr = std::dynamic_pointer_cast<AST::ThisExpr>(node)) {
         std::cout << indentation << "This" << std::endl;
     }
+    else if (auto superExpr = std::dynamic_pointer_cast<AST::SuperExpr>(node)) {
+        std::cout << indentation << "Super" << std::endl;
+    }
     else if (auto assignExpr = std::dynamic_pointer_cast<AST::AssignExpr>(node)) {
         std::cout << indentation << "Assignment: " << tokenTypeToString(assignExpr->op) << std::endl;
         if (!assignExpr->name.empty()) {

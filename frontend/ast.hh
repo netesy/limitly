@@ -20,6 +20,7 @@ namespace AST {
     struct LiteralExpr;
     struct VariableExpr;
     struct ThisExpr;
+    struct SuperExpr;
     struct CallExpr;
     struct AssignExpr;
     struct TernaryExpr;
@@ -167,6 +168,11 @@ namespace AST {
         // No additional fields needed, just represents 'self'
     };
 
+    // 'super' reference for parent class access
+    struct SuperExpr : public Expression {
+        // No additional fields needed, just represents 'super'
+    };
+
     // Function call
     struct CallExpr : public Expression {
         std::shared_ptr<Expression> callee;
@@ -275,6 +281,14 @@ namespace AST {
         std::string name;
         std::vector<std::shared_ptr<VarDeclaration>> fields;
         std::vector<std::shared_ptr<FunctionDeclaration>> methods;
+        
+        // Inheritance support
+        std::string superClassName;  // Name of the parent class
+        std::vector<std::shared_ptr<Expression>> superConstructorArgs;  // Arguments for super constructor call
+        
+        // Inline constructor support
+        std::vector<std::pair<std::string, std::shared_ptr<TypeAnnotation>>> constructorParams;  // Constructor parameters
+        bool hasInlineConstructor = false;
     };
 
     // Block statement (sequence of statements)

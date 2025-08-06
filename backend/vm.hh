@@ -133,8 +133,10 @@ private:
     void handleSetDefaultValue(const Instruction& instruction);
     void handleBeginClass(const Instruction& instruction);
     void handleEndClass(const Instruction& instruction);
+    void handleSetSuperclass(const Instruction& instruction);
     void handleDefineField(const Instruction& instruction);
     void handleLoadThis(const Instruction& instruction);
+    void handleLoadSuper(const Instruction& instruction);
     void handleGetProperty(const Instruction& instruction);
     void handleSetProperty(const Instruction& instruction);
     void handleCreateList(const Instruction& instruction);
