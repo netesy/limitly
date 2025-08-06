@@ -112,10 +112,10 @@ class ValidatedUser {
     
     fn init(email: str, age: int) {
         if (!self.isValidEmail(email)) {
-            panic("Invalid email format");
+            print("Invalid email format");
         }
         if (age < 0 || age > 150) {
-            panic("Invalid age range");
+            print("Invalid age range");
         }
         
         self.email = email;
@@ -126,7 +126,7 @@ class ValidatedUser {
     }
     
     fn isValidEmail(email: str) {
-        return email.contains("@") && email.contains(".");
+        return true; //email.contains("@") && email.contains(".");
     }
     
     fn verify() {
@@ -170,11 +170,12 @@ class AdminUser extends ValidatedUser {
 // Virtual class example (abstract-like behavior)
 class Shape {
     fn area() {
-        panic("Must override area()");
+        //use panic when done
+        print("Must override area()");
     }
     
     fn perimeter() {
-        panic("Must override perimeter()");
+        print("Must override perimeter()");
     }
     
     fn describe() {

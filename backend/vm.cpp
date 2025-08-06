@@ -1298,6 +1298,82 @@ void VM::handleCall(const Instruction& instruction) {
         args.insert(args.begin(), pop()); // Insert at beginning to maintain order
     }
     
+    // Check if this is a super method call (function name starts with "super:")
+    if (funcName.substr(0, 6) == "super:") {
+        std::string methodName = funcName.substr(6); // Remove "super:" prefix
+        
+        // The object should be the last argument (pushed first due to our calling convention)
+        if (args.empty()) {
+            error("Super method call without object");
+            return;
+        }
+        
+        // Get the object (last argument)
+        ValuePtr objectValue = args.back();
+        std::vector<ValuePtr> methodArgs(args.begin(), args.end() - 1); // Remove object from args
+        
+        // Check if the object is an ObjectInstance
+        if (std::holds_alternative<ObjectInstancePtr>(objectValue->data)) {
+            auto objectInstance = std::get<ObjectInstancePtr>(objectValue->data);
+            std::string className = objectInstance->getClassName();
+            
+            // For super calls, we need to look in the superclass
+            auto classDef = classRegistry.getClass(className);
+            if (!classDef) {
+                error("Class definition not found: " + className);
+                return;
+            }
+            
+            auto superClass = classDef->getSuperClass();
+            if (!superClass) {
+                error("No superclass found for class: " + className);
+                return;
+            }
+            
+            std::string superClassName = superClass->getName();
+            std::string methodKey = superClassName + "::" + methodName;
+            auto methodIt = userDefinedFunctions.find(methodKey);
+            
+            if (methodIt != userDefinedFunctions.end()) {
+                // Found the super method, execute it
+                const backend::Function& method = methodIt->second;
+                
+                // Create a new environment for the method
+                auto methodEnv = std::make_shared<Environment>(environment);
+                
+                // Bind 'this' parameter (implicit first parameter)
+                methodEnv->define("this", objectValue);
+                
+                // Bind method parameters
+                size_t paramIndex = 0;
+                for (const auto& param : method.parameters) {
+                    if (paramIndex < methodArgs.size()) {
+                        methodEnv->define(param.first, methodArgs[paramIndex]);
+                        paramIndex++;
+                    }
+                }
+                
+                // Create call frame
+                backend::CallFrame frame(methodKey, ip, nullptr);
+                frame.setPreviousEnvironment(environment);
+                callStack.push_back(frame);
+                
+                // Switch to method environment
+                environment = methodEnv;
+                
+                // Jump to method start
+                ip = method.startAddress - 1; // -1 because ip will be incremented
+                return;
+            } else {
+                error("Super method not found: " + methodKey);
+                return;
+            }
+        } else {
+            error("Super method call on non-object");
+            return;
+        }
+    }
+    
     // Check if this is a method call (function name starts with "method:")
     if (funcName.substr(0, 7) == "method:") {
         std::string methodName = funcName.substr(7); // Remove "method:" prefix
@@ -1887,6 +1963,17 @@ void VM::handleLoadSuper(const Instruction& /*unused*/) {
         ValuePtr thisValue = environment->get("this");
         push(thisValue);
     } catch (const std::exception& e) {
+        // Try to find 'this' in parent environments
+        auto currentEnv = environment;
+        while (currentEnv != nullptr) {
+            try {
+                ValuePtr thisValue = currentEnv->get("this");
+                push(thisValue);
+                return;
+            } catch (const std::exception&) {
+                currentEnv = currentEnv->enclosing;
+            }
+        }
         error("'super' reference not available in current context");
     }
 }
