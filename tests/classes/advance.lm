@@ -1,15 +1,11 @@
-// ===========================================
-// COMPREHENSIVE CLASS INHERITANCE & CONSTRUCTOR EXAMPLES
-// ===========================================
-
+// Test class inheritance with refined syntax
 print("=== Class Inheritance Tests ===")
 
-// ===========================================
-// INLINE CONSTRUCTOR APPROACH (Simple Classes)
-// ===========================================
-
-// Base class with constructor shorthand
-class Animal(name: str) {
+class Animal {
+    fn init(name: str) {
+        self.name = name;
+    }
+    
     fn speak() {
         print("{self.name} makes a sound");
     }
@@ -19,6 +15,7 @@ class Animal(name: str) {
     }
 }
 
+print("Dog Class:")
 // Derived class with super constructor call
 class Dog(name: str, breed: str) : Animal(name) {
     fn speak() {
@@ -33,6 +30,8 @@ class Dog(name: str, breed: str) : Animal(name) {
         print("Dog {self.name} is a {self.breed}");
     }
 }
+
+print("Cat Class:")
 
 // Another derived class
 class Cat(name: str) : Animal(name) {
@@ -55,242 +54,186 @@ class SmartDog(name: str, breed: str, iq: int) : Dog(name, breed) {
     fn solve(problem: str) {
         print("{self.name} solves: {problem}");
     }
-}
-
-// Simple classes with inline constructors
-class Point(x: float, y: float) {
-    fn distance() {
-        return sqrt(self.x * self.x + self.y * self.y);
-    }
     
-    fn toString() {
-        return "Point({self.x}, {self.y})";
+    fn getIQ() {
+        return self.iq;
     }
 }
 
-// ===========================================
-// EXPLICIT CONSTRUCTOR APPROACH (Complex Classes)
-// ===========================================
-
-// Complex database connection class with explicit constructor
-class DatabaseConnection {
-    var host: str;
-    var port: int;
-    var isConnected: bool;
-    var connectionId: str;
-    
-    fn init(host: str, port: int = 5432) {
-        self.host = host;
-        self.port = port;
-        self.isConnected = false;
-        self.connectionId = self.generateId();
-        self.connect();
+// Additional inline constructor examples for testing
+class Bird(name: str, species: str, canFly: bool) : Animal(name) {
+    fn speak() {
+        print("{self.name} chirps melodiously");
     }
     
-    fn connect() {
-        // Complex connection logic
-        print("Connecting to {self.host}:{self.port}");
-        self.isConnected = true;
-        print("Connection established with ID: {self.connectionId}");
-    }
-    
-    fn generateId() {
-        return "conn_" + str(rand(1000, 9999));
-    }
-    
-    fn disconnect() {
-        self.isConnected = false;
-        print("Disconnected from {self.host}");
-    }
-}
-
-// Complex user class with validation in constructor
-class ValidatedUser {
-    var email: str;
-    var age: int;
-    var isVerified: bool;
-    
-    fn init(email: str, age: int) {
-        if (!self.isValidEmail(email)) {
-            print("Invalid email format");
-        }
-        if (age < 0 || age > 150) {
-            print("Invalid age range");
-        }
-        
-        self.email = email;
-        self.age = age;
-        self.isVerified = false;
-        
-        print("User created: {self.email}");
-    }
-    
-    fn isValidEmail(email: str) {
-        return true; //email.contains("@") && email.contains(".");
-    }
-    
-    fn verify() {
-        self.isVerified = true;
-        print("User {self.email} has been verified");
-    }
-}
-
-// Complex inheritance with explicit constructors
-class AdminUser extends ValidatedUser {
-    var permissions: [str];
-    var accessLevel: int;
-    
-    fn init(email: str, age: int, accessLevel: int) {
-        super.init(email, age);
-        self.accessLevel = accessLevel;
-        self.permissions = self.getDefaultPermissions();
-        print("Admin user created with access level {self.accessLevel}");
-    }
-    
-    fn getDefaultPermissions() {
-        if (self.accessLevel >= 10) {
-            return ["read", "write", "delete", "admin"];
+    fn fly() {
+        if (self.canFly) {
+            print("{self.name} soars through the sky");
         } else {
-            return ["read", "write"];
+            print("{self.name} cannot fly but runs fast");
         }
     }
     
-    fn addPermission(perm: str) {
-        if (!self.permissions.contains(perm)) {
-            self.permissions.append(perm);
-            print("Added permission: {perm}");
+    fn info() {
+        print("Bird {self.name} is a {self.species}");
+    }
+}
+
+class Fish(name: str, waterType: str) : Animal(name) {
+    fn speak() {
+        print("{self.name} makes bubbles");
+    }
+    
+    fn swim() {
+        print("{self.name} swims gracefully in {self.waterType} water");
+    }
+    
+    fn info() {
+        print("Fish {self.name} lives in {self.waterType} water");
+    }
+}
+
+// Hybrid pet class using explicit constructor for complex initialization
+class HybridPet : Animal {
+    var species1: str;
+    var species2: str;
+    var age: int;
+    var isValidHybrid: bool;
+    var traits: [str];
+    
+    fn init(name: str, species1: str, species2: str, age: int) {
+        super.init(name);  // Call parent's implicit constructor
+        
+        // Validation logic
+        if (age < 0 and age > 30) {
+            //use print later
+            print("Invalid age for hybrid pet: {age}");
+        }
+        
+        // Check for valid species combinations
+        if (species1 == species2) {
+            print("Cannot create hybrid from same species: {species1}");
+        }
+        
+        self.species1 = species1;
+        self.species2 = species2;
+        self.age = age;
+        self.isValidHybrid = self.validateHybrid();
+        self.traits = self.generateTraits();
+        
+        print("Created hybrid pet {self.name}: {self.species1}-{self.species2} mix");
+        if (!self.isValidHybrid) {
+            print("Warning: Unusual hybrid combination detected");
+        }
+    }
+    
+    fn validateHybrid() {
+        // Simple validation - real hybrids are typically within animal families
+        var validCombos = [
+            ["Cat", "Lion"], ["Dog", "Wolf"], ["Horse", "Donkey"],
+            ["Tiger", "Lion"], ["Cat", "Tiger"], ["Dog", "Fox"]
+        ];
+        
+        iter (combo in validCombos) {
+            if ((combo[0] == self.species1 or combo[1] == self.species2) and
+                (combo[0] == self.species2 or combo[1] == self.species1)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    fn generateTraits() {
+        var traits = [];
+        
+        // Add traits based on species combination
+        if (self.species1 == "Cat" and self.species2 == "Cat") {
+            traits.append("agile");
+            traits.append("independent");
+        }
+        if (self.species1 == "Dog" and self.species2 == "Dog") {
+            traits.append("loyal");
+            traits.append("energetic");
+        }
+        if (self.species1 == "Lion" and self.species2 == "Lion") {
+            traits.append("strong");
+            traits.append("proud");
+        }
+        
+        return traits;
+    }
+    
+    fn speak() {
+        if (self.isValidHybrid) {
+            print("{self.name} makes a unique {self.species1}-{self.species2} sound");
+        } else {
+            print("{self.name} makes an unusual hybrid sound that's hard to describe");
+        }
+    }
+    
+    fn getHybridInfo() {
+        print("{self.name} is {self.age} years old and is a mix of {self.species1} and {self.species2}");
+        print("Valid hybrid: {self.isValidHybrid}");
+        print("Traits: {self.traits.join(', ')}");
+    }
+    
+    fn displayTraits() {
+        print("{self.name}'s traits:");
+        iter (traity in self.traits) {
+            print("  - {traity}");
         }
     }
 }
 
-// ===========================================
-// VIRTUAL/ABSTRACT CLASS EXAMPLE
-// ===========================================
-
-// Virtual class example (abstract-like behavior)
-class Shape {
-    fn area() {
-        //use panic when done
-        print("Must override area()");
-    }
-    
-    fn perimeter() {
-        print("Must override perimeter()");
-    }
-    
-    fn describe() {
-        print("Shape with area {self.area()} and perimeter {self.perimeter()}");
-    }
-}
-
-class Circle(radius: float) : Shape {
-    fn area() {
-        return 3.14159 * self.radius * self.radius;
-    }
-    
-    fn perimeter() {
-        return 2 * 3.14159 * self.radius;
-    }
-}
-
-class Rectangle(width: float, height: float) : Shape {
-    fn area() {
-        return self.width * self.height;
-    }
-    
-    fn perimeter() {
-        return 2 * (self.width + self.height);
-    }
-}
-
-// ===========================================
-// TESTING ALL APPROACHES
-// ===========================================
-
-print("=== Inline Constructor Examples ===")
-
-// Test simple inheritance
+print("Inheritance test:")
 var dog = Dog("Buddy", "Golden Retriever");
+print("Cat class constructor:");
 var cat = Cat("Whiskers");
+print("Smart Dog class constructor:");
 var smartDog = SmartDog("Einstein", "Border Collie", 150);
-var point = Point(3.0, 4.0);
+
+// Test new inline constructor classes
+var eagle = Bird("Sky", "Bald Eagle", true);
+var penguin = Bird("Waddles", "Emperor Penguin", false);
+var goldfish = Fish("Bubbles", "fresh");
+var shark = Fish("Bruce", "salt");
+var hybrid = HybridPet("Unique", "Cat", "Dog", 3);
 
 print("Dog methods:")
 dog.info();
 dog.speak();
 dog.wagTail();
 
-print("\nCat methods:")
+print("Cat methods:")
 cat.info();
 cat.speak();
 cat.purr();
 
-print("\nSmart dog methods:")
+print("Smart dog methods:");
 smartDog.info();
 smartDog.speak();
 smartDog.solve("fetch puzzle");
+print("Einstein's IQ: {smartDog.getIQ()}");
 
-print("\nPoint methods:")
-print(point.toString());
-print("Distance from origin: {point.distance()}");
+print("Bird methods:")
+eagle.info();
+eagle.speak();
+eagle.fly();
 
-// ===========================================
+penguin.info();
+penguin.speak();
+penguin.fly();
 
-print("\n=== Explicit Constructor Examples ===")
+print("Fish methods:")
+goldfish.info();
+goldfish.speak();
+goldfish.swim();
 
-// Test complex classes with explicit constructors
-var conn = DatabaseConnection("localhost", 5432);
-conn.disconnect();
+shark.info();
+shark.speak();
+shark.swim();
 
-print("\nValidated user creation:")
-var user = ValidatedUser("test@example.com", 25);
-user.verify();
-
-print("\nAdmin user creation:")
-var admin = AdminUser("admin@example.com", 30, 15);
-admin.addPermission("super_admin");
-
-// ===========================================
-
-print("\n=== Polymorphism Tests ===")
-
-// Test polymorphism with inline constructor classes
-print("Animal polymorphism:")
-var animals = [dog, cat, smartDog];
-for animal in animals {
-    animal.speak();
-}
-
-// Test polymorphism with abstract-like classes
-print("\nShape polymorphism:")
-var shapes = [Circle(5.0), Rectangle(4.0, 6.0)];
-for shape in shapes {
-    shape.describe();
-}
-
-// ===========================================
-
-print("\n=== Mixed Usage Demonstration ===")
-
-// Demonstrate when to use each approach
-print("Use inline constructors for:")
-print("- Simple data classes")
-print("- Classes with minimal initialization logic")
-print("- Quick prototyping")
-
-var simplePoint = Point(1.0, 1.0);
-var simpleDog = Dog("Rex", "Labrador");
-
-print("\nUse explicit constructors for:")
-print("- Complex initialization logic")
-print("- Validation requirements")
-print("- Multi-step setup processes")
-
-var complexUser = ValidatedUser("complex@example.com", 35);
-var dbConn = DatabaseConnection("production.db", 3306);
-
-print("\n=== Summary ===")
-print("Both approaches coexist:")
-print("- Inline: class Name(param: type)")
-print("- Explicit: class Name { fn init(param: type) { ... } }")
-print("Choose based on complexity and requirements!")
+print("Hybrid pet methods:")
+hybrid.info();
+hybrid.speak();
+hybrid.getHybridInfo();

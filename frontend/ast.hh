@@ -348,10 +348,24 @@ namespace AST {
 
     // Concurrency constructs
     struct ParallelStatement : public Statement {
+        std::string channel;  // Channel name for communication
+        std::string mode;     // Execution mode (fork-join, etc.)
+        std::string cores;    // Number of cores to use (or "auto")
+        std::string onError;  // Error handling strategy
+        std::string timeout;  // Timeout duration
+        std::string grace;    // Grace period for cleanup
+        std::string onTimeout; // Action on timeout
         std::shared_ptr<BlockStatement> body;
     };
 
     struct ConcurrentStatement : public Statement {
+        std::string channel;  // Channel name for communication
+        std::string mode;     // Execution mode (batch, stream, async)
+        std::string cores;    // Number of cores to use (or "auto")
+        std::string onError;  // Error handling strategy
+        std::string timeout;  // Timeout duration
+        std::string grace;    // Grace period for cleanup
+        std::string onTimeout; // Action on timeout
         std::shared_ptr<BlockStatement> body;
     };
 
