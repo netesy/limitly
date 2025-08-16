@@ -1055,6 +1055,78 @@ std::shared_ptr<AST::Statement> Parser::parallelStatement() {
     auto stmt = std::make_shared<AST::ParallelStatement>();
     stmt->line = previous().line;
 
+    // Set default values
+    stmt->channel = "";
+    stmt->mode = "fork-join";  // Default mode for parallel blocks
+    stmt->cores = "auto";
+    stmt->onError = "stop";
+    stmt->timeout = "0";
+    stmt->grace = "0";
+    stmt->onTimeout = "partial";
+
+    // Parse parameters if they exist
+    if (match({TokenType::LEFT_PAREN})) {
+        while (!check(TokenType::RIGHT_PAREN) && !isAtEnd()) {
+            // Parse parameter name
+            std::string paramName = consume(TokenType::IDENTIFIER, "Expected parameter name").lexeme;
+            consume(TokenType::EQUAL, "Expected '=' after parameter name");
+            
+            // Parse parameter value
+            std::string paramValue;
+            if (check(TokenType::STRING)) {
+                paramValue = consume(TokenType::STRING, "Expected string value").lexeme;
+                // Remove quotes
+                if (paramValue.size() >= 2) {
+                    paramValue = paramValue.substr(1, paramValue.size() - 2);
+                }
+            } else if (check(TokenType::NUMBER)) {
+                // Get the number value
+                paramValue = consume(TokenType::NUMBER, "Expected number value").lexeme;
+                
+                // Check for time unit (s, ms, etc.)
+                if (check(TokenType::IDENTIFIER)) {
+                    std::string unit = peek().lexeme;
+                    if (unit == "s" || unit == "ms" || unit == "us" || unit == "ns") {
+                        advance();  // Consume the unit
+                        paramValue += unit;
+                    }
+                }
+            } else if (check(TokenType::IDENTIFIER)) {
+                paramValue = consume(TokenType::IDENTIFIER, "Expected identifier").lexeme;
+            } else {
+                error("Expected string, number, or identifier as parameter value");
+                break;
+            }
+
+            // Assign parameter value to the appropriate field
+            if (paramName == "ch") {
+                stmt->channel = paramValue;
+            } else if (paramName == "mode") {
+                stmt->mode = paramValue;
+            } else if (paramName == "cores") {
+                stmt->cores = paramValue;
+            } else if (paramName == "on_error") {
+                stmt->onError = paramValue;
+            } else if (paramName == "timeout") {
+                stmt->timeout = paramValue;
+            } else if (paramName == "grace") {
+                stmt->grace = paramValue;
+            } else if (paramName == "on_timeout") {
+                stmt->onTimeout = paramValue;
+            } else {
+                error("Unknown parameter: " + paramName);
+            }
+
+            // Check for comma or end of parameters
+            if (!match({TokenType::COMMA}) && !check(TokenType::RIGHT_PAREN)) {
+                error("Expected ',' or ')' after parameter");
+                break;
+            }
+        }
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after parameters");
+    }
+
+    // Parse the block
     consume(TokenType::LEFT_BRACE, "Expected '{' after 'parallel'.");
     stmt->body = block();
 
@@ -1065,6 +1137,78 @@ std::shared_ptr<AST::Statement> Parser::concurrentStatement() {
     auto stmt = std::make_shared<AST::ConcurrentStatement>();
     stmt->line = previous().line;
 
+    // Set default values
+    stmt->channel = "";
+    stmt->mode = "batch";
+    stmt->cores = "auto";
+    stmt->onError = "stop";
+    stmt->timeout = "0";
+    stmt->grace = "0";
+    stmt->onTimeout = "partial";
+
+    // Parse parameters if they exist
+    if (match({TokenType::LEFT_PAREN})) {
+        while (!check(TokenType::RIGHT_PAREN) && !isAtEnd()) {
+            // Parse parameter name
+            std::string paramName = consume(TokenType::IDENTIFIER, "Expected parameter name").lexeme;
+            consume(TokenType::EQUAL, "Expected '=' after parameter name");
+            
+            // Parse parameter value
+            std::string paramValue;
+            if (check(TokenType::STRING)) {
+                paramValue = consume(TokenType::STRING, "Expected string value").lexeme;
+                // Remove quotes
+                if (paramValue.size() >= 2) {
+                    paramValue = paramValue.substr(1, paramValue.size() - 2);
+                }
+            } else if (check(TokenType::NUMBER)) {
+                // Get the number value
+                paramValue = consume(TokenType::NUMBER, "Expected number value").lexeme;
+                
+                // Check for time unit (s, ms, etc.)
+                if (check(TokenType::IDENTIFIER)) {
+                    std::string unit = peek().lexeme;
+                    if (unit == "s" || unit == "ms" || unit == "us" || unit == "ns") {
+                        advance();  // Consume the unit
+                        paramValue += unit;
+                    }
+                }
+            } else if (check(TokenType::IDENTIFIER)) {
+                paramValue = consume(TokenType::IDENTIFIER, "Expected identifier").lexeme;
+            } else {
+                error("Expected string, number, or identifier as parameter value");
+                break;
+            }
+
+            // Assign parameter value to the appropriate field
+            if (paramName == "ch") {
+                stmt->channel = paramValue;
+            } else if (paramName == "mode") {
+                stmt->mode = paramValue;
+            } else if (paramName == "cores") {
+                stmt->cores = paramValue;
+            } else if (paramName == "on_error") {
+                stmt->onError = paramValue;
+            } else if (paramName == "timeout") {
+                stmt->timeout = paramValue;
+            } else if (paramName == "grace") {
+                stmt->grace = paramValue;
+            } else if (paramName == "on_timeout") {
+                stmt->onTimeout = paramValue;
+            } else {
+                error("Unknown parameter: " + paramName);
+            }
+
+            // Check for comma or end of parameters
+            if (!match({TokenType::COMMA}) && !check(TokenType::RIGHT_PAREN)) {
+                error("Expected ',' or ')' after parameter");
+                break;
+            }
+        }
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after parameters");
+    }
+
+    // Parse the block
     consume(TokenType::LEFT_BRACE, "Expected '{' after 'concurrent'.");
     stmt->body = block();
 

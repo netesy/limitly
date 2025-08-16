@@ -1297,6 +1297,40 @@ void VM::handleCall(const Instruction& instruction) {
     for (int i = 0; i < argCount; i++) {
         args.insert(args.begin(), pop()); // Insert at beginning to maintain order
     }
+
+    // Pop the callee
+    ValuePtr callee = pop();
+    
+    // Check if this is a constructor call (callee is a class definition)
+    if (callee->type->tag == TypeTag::Class) {
+        try {
+            // Get the class definition
+            auto classDef = std::get<std::shared_ptr<ClassDefinition>>(callee->data);
+            
+            // Create a new instance
+            auto instance = std::make_shared<ObjectInstance>(classDef);
+            
+            // Push 'this' onto the stack
+            auto thisValue = memoryManager.makeRef<Value>(*region, typeSystem->getType("object"));
+            thisValue->data = instance;
+            push(thisValue);
+            
+            // Look up and call the constructor if it exists
+            if (auto constructor = classDef->getMethod("init")) {
+                // Push 'this' as the first argument
+                args.insert(args.begin(), thisValue);
+                
+                // Call the constructor
+                constructor->execute(args);
+            }
+            
+            // Push the new instance onto the stack
+            push(thisValue);
+            return;
+        } catch (const std::exception& e) {
+            error("Error in constructor: " + std::string(e.what()));
+        }
+    }
     
     // Check if this is a super method call (function name starts with "super:")
     if (funcName.substr(0, 6) == "super:") {
@@ -2011,7 +2045,13 @@ void VM::handleSetProperty(const Instruction& instruction) {
         auto objectInstance = std::get<ObjectInstancePtr>(object->data);
         
         try {
-            objectInstance->setField(propertyName, value);
+            // If the property doesn't exist yet, create it
+            if (!objectInstance->hasField(propertyName)) {
+                objectInstance->defineField(propertyName, value);
+            } else {
+                objectInstance->setField(propertyName, value);
+            }
+            
             // Push the assigned value back onto the stack for assignment expressions
             push(value);
         } catch (const std::exception& e) {
@@ -2021,6 +2061,7 @@ void VM::handleSetProperty(const Instruction& instruction) {
         error("Cannot set property on non-object value");
     }
 }
+
 void VM::handleCreateList(const Instruction& instruction) {
     // Get the number of elements to include in the list from the instruction
     int32_t count = instruction.intValue;

@@ -204,17 +204,28 @@ void BytecodeGenerator::visitClassDeclaration(const std::shared_ptr<AST::ClassDe
     
     // Process fields
     for (const auto& field : stmt->fields) {
-        // For class fields, generate DEFINE_FIELD instead of STORE_VAR
         if (field->initializer) {
-            // Evaluate the default value
             visitExpression(field->initializer);
         } else {
-            // No default value, push null
             emit(Opcode::PUSH_NULL, field->line);
         }
-        
-        // Define the field
         emit(Opcode::DEFINE_FIELD, field->line, 0, 0.0f, false, field->name);
+    }
+    
+    // Generate constructor if this is a derived class
+    if (!stmt->superClassName.empty() && !stmt->hasInlineConstructor) {
+        // Generate constructor that calls parent's constructor
+        emit(Opcode::BEGIN_FUNCTION, stmt->line, 0, 0.0f, false, "init");
+        
+        // Call parent's constructor
+        emit(Opcode::LOAD_THIS, stmt->line);
+        emit(Opcode::LOAD_SUPER, stmt->line);
+        emit(Opcode::CALL, stmt->line, 1); // Call super with 1 argument (this)
+        
+        // End constructor
+        emit(Opcode::PUSH_NULL, stmt->line);
+        emit(Opcode::RETURN, stmt->line);
+        emit(Opcode::END_FUNCTION, stmt->line);
     }
     
     // Process methods
