@@ -25,6 +25,7 @@ enum class TokenType {
     RANGE,         // ..
     ELLIPSIS,      // ...
     AT_SIGN,       // @
+    UNDERSCORE,    // _
 
     // Group: Operators
     PLUS,          // +

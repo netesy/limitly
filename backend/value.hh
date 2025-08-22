@@ -54,6 +54,7 @@ enum class TypeTag {
     Union,
     Range,
     UserDefined,
+    Class,
     Object
 };
 
@@ -119,6 +120,8 @@ struct UnionType
 struct Type
 {
     TypeTag tag;
+    bool isList = false;
+    bool isDict = false;
     std::variant<std::monostate, ListType, DictType, EnumType, FunctionType, SumType, UnionType, UserDefinedType>
         extra;
 
@@ -194,6 +197,8 @@ struct Type
             return "UserDefined";
         case TypeTag::Object:
             return "Object";
+        case TypeTag::Class:
+            return "Class";
         default:
             return "Unknown";
         }
@@ -409,7 +414,8 @@ struct Value {
                  EnumValue,
                  UserDefinedValue,
                  IteratorValuePtr,
-                 ObjectInstancePtr>
+                 ObjectInstancePtr,
+                 std::shared_ptr<backend::ClassDefinition>>
         data;
 
     // Default constructor

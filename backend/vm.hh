@@ -17,6 +17,8 @@
 #include <string>
 #include <iostream>
 #include <functional>
+#include <thread>
+#include <mutex>
 
 // Forward declarations
 class Environment;
@@ -76,6 +78,10 @@ private:
     
     // Map to store runtime default values for class fields
     std::unordered_map<std::string, ValuePtr> fieldDefaultValues;
+
+    // Concurrency helpers
+    std::vector<std::thread> active_threads;
+    std::mutex threads_mutex;
     
     // Helper methods
     ValuePtr pop();
@@ -202,16 +208,19 @@ public:
     Environment(std::shared_ptr<Environment> enclosing = nullptr) : enclosing(enclosing) {}
     
     void define(const std::string& name, const ValuePtr& value) {
+        std::lock_guard<std::mutex> lock(mutex);
         values[name] = value;
     }
     
     ValuePtr get(const std::string& name) {
+        std::lock_guard<std::mutex> lock(mutex);
         auto it = values.find(name);
         if (it != values.end()) {
             return it->second;
         }
         
         if (enclosing) {
+            // The recursive call will lock the enclosing environment
             return enclosing->get(name);
         }
         
@@ -220,6 +229,7 @@ public:
 
    
     void assign(const std::string& name, const ValuePtr& value) {
+        std::lock_guard<std::mutex> lock(mutex);
         auto it = values.find(name);
         if (it != values.end()) {
             it->second = value;
@@ -227,6 +237,7 @@ public:
         }
         
         if (enclosing) {
+            // The recursive call will lock the enclosing environment
             enclosing->assign(name, value);
             return;
         }
@@ -238,6 +249,7 @@ public:
     
 private:
     std::unordered_map<std::string, ValuePtr> values;
+    std::mutex mutex;
 };
 
 // Legacy call frame for backward compatibility during transition

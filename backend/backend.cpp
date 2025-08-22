@@ -2,6 +2,7 @@
 #include "../debugger.hh"
 #include "value.hh"
 #include <iostream>
+#include <thread>
 
 void BytecodeGenerator::visitInterpolatedStringExpr(const std::shared_ptr<AST::InterpolatedStringExpr>& expr) {
     // For each part of the interpolated string
@@ -475,8 +476,21 @@ void BytecodeGenerator::visitAttemptStatement(const std::shared_ptr<AST::Attempt
 void BytecodeGenerator::visitParallelStatement(const std::shared_ptr<AST::ParallelStatement>& stmt) {
     // Generate bytecode for parallel statement
     
+    // Get cores value
+    int cores = 0; // Default value
+    if (stmt->cores == "auto") {
+        cores = std::thread::hardware_concurrency();
+    } else {
+        try {
+            cores = std::stoi(stmt->cores);
+        } catch (const std::invalid_argument& e) {
+            // Handle error: cores value is not a valid integer
+            // For now, we'll just use the default value
+        }
+    }
+
     // Start parallel block
-    emit(Opcode::BEGIN_PARALLEL, stmt->line);
+    emit(Opcode::BEGIN_PARALLEL, stmt->line, cores, 0.0f, false, stmt->mode);
     
     // Process parallel block body
     visitBlockStatement(stmt->body);
@@ -531,17 +545,31 @@ void BytecodeGenerator::visitMatchStatement(const std::shared_ptr<AST::MatchStat
     visitExpression(stmt->value);
     
     // Store the value in a temporary variable
-    emit(Opcode::STORE_TEMP, stmt->line);
+    int tempIndex = tempVarCounter++;
+    emit(Opcode::STORE_TEMP, stmt->line, tempIndex);
     
     // Process each case
     std::vector<size_t> jumpToEndIndices;
     
     for (const auto& matchCase : stmt->cases) {
         // Duplicate the value to match
-        emit(Opcode::LOAD_TEMP, stmt->line);
+        emit(Opcode::LOAD_TEMP, stmt->line, tempIndex);
         
         // Evaluate the pattern
-        visitExpression(matchCase.pattern);
+        if (auto literalExpr = std::dynamic_pointer_cast<AST::LiteralExpr>(matchCase.pattern)) {
+            if (std::holds_alternative<std::nullptr_t>(literalExpr->value)) {
+                // Wildcard pattern
+                emit(Opcode::PUSH_NULL, matchCase.pattern->line); // Pushing null to represent wildcard
+            } else {
+                visitExpression(matchCase.pattern);
+            }
+        } else if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(matchCase.pattern)) {
+            // This could be a type name. We'll push it as a string for the VM to handle.
+            emit(Opcode::PUSH_STRING, matchCase.pattern->line, 0, 0.0f, false, varExpr->name);
+        }
+        else {
+            visitExpression(matchCase.pattern);
+        }
         
         // Compare the value with the pattern
         emit(Opcode::MATCH_PATTERN, stmt->line);
@@ -569,7 +597,7 @@ void BytecodeGenerator::visitMatchStatement(const std::shared_ptr<AST::MatchStat
     }
     
     // Clean up temporary variable
-    emit(Opcode::CLEAR_TEMP, stmt->line);
+    emit(Opcode::CLEAR_TEMP, stmt->line, tempIndex);
 }
 
 // Expression visitors

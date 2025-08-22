@@ -118,6 +118,7 @@ public:
     // Field access
     ValuePtr getField(const std::string& fieldName) const;
     void setField(const std::string& fieldName, ValuePtr value);
+    void defineField(const std::string& fieldName, ValuePtr value);
     bool hasField(const std::string& fieldName) const;
     
     // Method calls

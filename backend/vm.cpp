@@ -314,6 +314,9 @@ ValuePtr VM::execute(const std::vector<Instruction>& bytecode) {
                 case Opcode::END_SCOPE:
                     // No action needed for END_SCOPE in this implementation
                     break;
+                case Opcode::MATCH_PATTERN:
+                    handleMatchPattern(instruction);
+                    break;
                 default:
                     error("Unknown opcode: " + std::to_string(static_cast<int>(instruction.opcode)));
                     break;
@@ -1305,13 +1308,13 @@ void VM::handleCall(const Instruction& instruction) {
     if (callee->type->tag == TypeTag::Class) {
         try {
             // Get the class definition
-            auto classDef = std::get<std::shared_ptr<ClassDefinition>>(callee->data);
+            auto classDef = std::get<std::shared_ptr<backend::ClassDefinition>>(callee->data);
             
             // Create a new instance
-            auto instance = std::make_shared<ObjectInstance>(classDef);
+            auto instance = std::make_shared<backend::ObjectInstance>(classDef);
             
             // Push 'this' onto the stack
-            auto thisValue = memoryManager.makeRef<Value>(*region, typeSystem->getType("object"));
+            auto thisValue = memoryManager.makeRef<Value>(*region, typeSystem->OBJECT_TYPE);
             thisValue->data = instance;
             push(thisValue);
             
@@ -1321,7 +1324,7 @@ void VM::handleCall(const Instruction& instruction) {
                 args.insert(args.begin(), thisValue);
                 
                 // Call the constructor
-                constructor->execute(args);
+                constructor->implementation->execute(args);
             }
             
             // Push the new instance onto the stack
@@ -2489,12 +2492,106 @@ void VM::handleBeginHandler(const Instruction& /*unused*/) { error("Not implemen
 void VM::handleEndHandler(const Instruction& /*unused*/) { error("Not implemented"); }
 void VM::handleThrow(const Instruction& /*unused*/) { error("Not implemented"); }
 void VM::handleStoreException(const Instruction& /*unused*/) { error("Not implemented"); }
-void VM::handleBeginParallel(const Instruction& /*unused*/) { error("Not implemented"); }
-void VM::handleEndParallel(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleBeginParallel(const Instruction& instruction) {
+    int num_threads = instruction.intValue > 0 ? instruction.intValue : 1;
+
+    // Find the end of the parallel block
+    size_t block_start_ip = ip + 1;
+    size_t block_end_ip = block_start_ip;
+    int nesting_level = 0;
+    while (block_end_ip < bytecode->size()) {
+        const auto& instr = (*bytecode)[block_end_ip];
+        if (instr.opcode == Opcode::BEGIN_PARALLEL) {
+            nesting_level++;
+        } else if (instr.opcode == Opcode::END_PARALLEL) {
+            if (nesting_level == 0) {
+                break;
+            }
+            nesting_level--;
+        }
+        block_end_ip++;
+    }
+
+    if (block_end_ip == bytecode->size()) {
+        error("Unmatched BEGIN_PARALLEL");
+        return;
+    }
+
+    // Extract the bytecode for the parallel block
+    std::vector<Instruction> block_bytecode(bytecode->begin() + block_start_ip, bytecode->begin() + block_end_ip);
+
+    {
+        std::lock_guard<std::mutex> lock(threads_mutex);
+        for (int i = 0; i < num_threads; ++i) {
+            active_threads.emplace_back([this, block_bytecode]() {
+                VM thread_vm;
+                // Copy the environment to the new VM. This is a shallow copy of the shared_ptr,
+                // so threads will share the same environment. This is unsafe without proper locking
+                // in the Environment class itself, but it's a starting point.
+                thread_vm.globals = this->globals;
+                thread_vm.environment = this->environment;
+                thread_vm.execute(block_bytecode);
+            });
+        }
+    }
+
+    // Skip the main VM's instruction pointer past the parallel block
+    ip = block_end_ip;
+}
+
+void VM::handleEndParallel(const Instruction& /*unused*/) {
+    std::lock_guard<std::mutex> lock(threads_mutex);
+    for (auto& t : active_threads) {
+        if (t.joinable()) {
+            t.join();
+        }
+    }
+    active_threads.clear();
+}
+
 void VM::handleBeginConcurrent(const Instruction& /*unused*/) { error("Not implemented"); }
 void VM::handleEndConcurrent(const Instruction& /*unused*/) { error("Not implemented"); }
 
-void VM::handleMatchPattern(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleMatchPattern(const Instruction& /*unused*/) {
+    ValuePtr pattern = pop();
+    ValuePtr value = pop();
+
+    bool match = false;
+
+    // Wildcard
+    if (pattern->type->tag == TypeTag::Nil) {
+        match = true;
+    }
+    // Type matching
+    else if (pattern->type->tag == TypeTag::String) {
+        std::string typeName = std::get<std::string>(pattern->data);
+        std::string valueTypeName;
+        switch(value->type->tag) {
+            case TypeTag::Int: valueTypeName = "int"; break;
+            case TypeTag::Float64: valueTypeName = "float"; break;
+            case TypeTag::String: valueTypeName = "string"; break;
+            case TypeTag::Bool: valueTypeName = "bool"; break;
+            case TypeTag::List: valueTypeName = "list"; break;
+            case TypeTag::Dict: valueTypeName = "dict"; break;
+            default: valueTypeName = "unknown"; break;
+        }
+
+        if (typeName == valueTypeName) {
+            match = true;
+        } else if (value->type->isList && typeName == "list<int>") { // Basic support for generic-like types
+            match = true;
+        } else if (value->type->isDict && typeName == "dict<string, int>") {
+            match = true;
+        }
+
+    }
+    // Value matching
+    else {
+        match = valuesEqual(pattern, value);
+    }
+
+    push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, match));
+}
 void VM::handleImport(const Instruction& /*unused*/) { error("Not implemented"); }
 void VM::handleBeginEnum(const Instruction& /*unused*/) { error("Not implemented"); }
 void VM::handleEndEnum(const Instruction& /*unused*/) { error("Not implemented"); }

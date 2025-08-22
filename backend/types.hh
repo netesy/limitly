@@ -225,6 +225,18 @@ public:
     const TypePtr DICT_TYPE = std::make_shared<Type>(TypeTag::Dict);
     const TypePtr ENUM_TYPE = std::make_shared<Type>(TypeTag::Enum);
     const TypePtr SUM_TYPE = std::make_shared<Type>(TypeTag::Sum);
+    const TypePtr OBJECT_TYPE = std::make_shared<Type>(TypeTag::Object);
+
+    TypePtr getType(const std::string& name) {
+        if (name == "int") return INT_TYPE;
+        if (name == "float") return FLOAT64_TYPE;
+        if (name == "string") return STRING_TYPE;
+        if (name == "bool") return BOOL_TYPE;
+        if (name == "list") return LIST_TYPE;
+        if (name == "dict") return DICT_TYPE;
+        if (name == "object") return OBJECT_TYPE;
+        return NIL_TYPE;
+    }
 
     ValuePtr createValue(TypePtr type)
     {
