@@ -604,6 +604,8 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "ELLIPSIS";
     case TokenType::AT_SIGN:
         return "AT_SIGN";
+    case TokenType::UNDERSCORE:
+        return "UNDERSCORE";
     case TokenType::PLUS:
         return "PLUS";
     case TokenType::PLUS_EQUAL:

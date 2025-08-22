@@ -1254,7 +1254,7 @@ std::shared_ptr<AST::EnumDeclaration> Parser::enumDeclaration() {
     return enumDecl;
 }
 
-// Parse match statement: match(value) { pattern => expr, ... }
+// Parse match statement: match(value) { pattern => statement, ... }
 std::shared_ptr<AST::Statement> Parser::matchStatement() {
     auto stmt = std::make_shared<AST::MatchStatement>();
     stmt->line = previous().line;
@@ -1265,15 +1265,30 @@ std::shared_ptr<AST::Statement> Parser::matchStatement() {
 
     consume(TokenType::LEFT_BRACE, "Expected '{' before match cases.");
 
-    // Parse match cases: pattern => expr, ...
+    // Parse match cases: pattern => statement, ...
     while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
         AST::MatchCase matchCase;
+
         // Parse pattern
-        matchCase.pattern = expression();
+        if (match({TokenType::DEFAULT})) {
+            // Wildcard pattern
+            auto pattern = std::make_shared<AST::LiteralExpr>();
+            pattern->line = previous().line;
+            pattern->value = nullptr; // Represent wildcard with null
+            matchCase.pattern = pattern;
+        } else if (isPrimitiveType(peek().type) || check(TokenType::IDENTIFIER)) {
+            // Type pattern or literal pattern
+            matchCase.pattern = expression();
+        } else {
+            error("Expected pattern in match case.");
+            break;
+        }
+
         consume(TokenType::ARROW, "Expected '=>' after match pattern.");
-        // Parse body as a single expression (not statement)
-        matchCase.body = std::make_shared<AST::ExprStatement>();
-        std::static_pointer_cast<AST::ExprStatement>(matchCase.body)->expression = expression();
+
+        // Parse body as a statement
+        matchCase.body = statement();
+
         // Optional comma between cases
         if (match({TokenType::COMMA})) {
             // Allow trailing comma before '}'
