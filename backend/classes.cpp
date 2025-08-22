@@ -162,6 +162,10 @@ void ObjectInstance::setField(const std::string& fieldName, ValuePtr value) {
     fieldValues[fieldName] = value;
 }
 
+void ObjectInstance::defineField(const std::string& fieldName, ValuePtr value) {
+    fieldValues[fieldName] = value;
+}
+
 bool ObjectInstance::hasField(const std::string& fieldName) const {
     // Check both dynamic fields and class-defined fields
     return fieldValues.find(fieldName) != fieldValues.end() || 
