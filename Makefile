@@ -2,8 +2,8 @@
 
 CXX       := g++
 CXXFLAGS  := -std=c++17 -Wall -Wextra -pedantic -I.
-PKGCONFIG := pkg-config
-LIBS      := $(shell $(PKGCONFIG) --libs libgccjit)
+LDFLAGS   += -L/usr/lib/gcc/x86_64-linux-gnu/12
+LIBS      := -lgccjit
 
 # Binaries
 BIN_DIR   := bin
@@ -31,21 +31,19 @@ all: check-deps $(TARGETS)
 # =============================
 check-deps:
 	@command -v $(CXX) >/dev/null || (echo "Error: g++ not found." && exit 1)
-	@command -v $(PKGCONFIG) >/dev/null || (echo "Error: pkg-config not found." && exit 1)
-	@$(PKGCONFIG) --exists libgccjit || (echo "Error: libgccjit not found. Install libgccjit-dev." && exit 1)
 	@echo "✅ Dependencies OK."
 
 # =============================
 # Build rules
 # =============================
 $(BIN_DIR)/limitly: $(MAIN_OBJS) | $(BIN_DIR)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 $(BIN_DIR)/test_parser: $(TEST_OBJS) | $(BIN_DIR)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 $(BIN_DIR)/format_code: $(FORMAT_OBJS) | $(BIN_DIR)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 $(OBJ_DIR)/%.o: %.cpp | $(OBJ_DIR)
 	@mkdir -p $(dir $@)

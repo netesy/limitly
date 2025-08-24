@@ -21,7 +21,8 @@ print("String vs number: {numStr} == {num}: {numStr == num}");
 // Empty strings
 var empty = "";
 print("Empty string: '{empty}'");
-print("Empty length check: {empty == \"\"}");
+var emptyStr = "";
+print("Empty length check: {empty == emptyStr}");
 
 // Special characters
 var special = "Line 1\nLine 2\tTabbed";
