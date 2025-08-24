@@ -24,7 +24,13 @@ void Scanner::scanToken() {
         addToken(TokenType::LEFT_BRACE);
         break;
     case '}':
-        addToken(TokenType::RIGHT_BRACE);
+        if (inStringInterpolation) {
+            inStringInterpolation = false;
+            addToken(TokenType::INTERPOLATION_END);
+            string();
+        } else {
+            addToken(TokenType::RIGHT_BRACE);
+        }
         break;
     case '[':
         addToken(TokenType::LEFT_BRACKET);
@@ -136,6 +142,7 @@ void Scanner::scanToken() {
         break;
     case '"':
     case '\'':
+        stringQuoteType = c;
         string();
         break;
     default:
@@ -282,182 +289,48 @@ bool Scanner::isAlphaNumeric(char c) const {
 }
 
 void Scanner::string() {
-    char quoteType = source[start]; // Store the opening quote type (' or ")
     std::string value;
-    current = start + 1; // Skip the opening quote
-    
-    
-    // Parse string with interpolation support
-    while (!isAtEnd() && peek() != quoteType) {
-        // Handle escape sequences
+    while (peek() != stringQuoteType && !isAtEnd()) {
+        if (peek() == '#' && peekNext() == '{') {
+            addToken(TokenType::STRING, value);
+            
+            advance(); // consume '#'
+            advance(); // consume '{'
+            
+            addToken(TokenType::INTERPOLATION_START);
+            inStringInterpolation = true;
+            return;
+        }
+
         if (peek() == '\\') {
-            advance(); // consume the backslash
-            char nextChar = peek();
-            
-            switch (nextChar) {
-                case 'n':
-                    value += '\n';
-                    advance();
-                    break;
-                case 't':
-                    value += '\t';
-                    advance();
-                    break;
-                case 'r':
-                    value += '\r';
-                    advance();
-                    break;
-                case '\\':
-                    value += '\\';
-                    advance();
-                    break;
-                case '\'':
-                    value += '\'';
-                    advance();
-                    break;
-                case '\"':
-                    value += '\"';
-                    advance();
-                    break;
-                case '{':
-                    value += '{';
-                    advance();
-                    break;
-                case '}':
-                    value += '}';
-                    advance();
-                    break;
-                case '0':
-                    value += '\0';
-                    advance();
-                    break;
-                case 'a':
-                    value += '\a';
-                    advance();
-                    break;
-                case 'b':
-                    value += '\b';
-                    advance();
-                    break;
-                case 'f':
-                    value += '\f';
-                    advance();
-                    break;
-                case 'v':
-                    value += '\v';
-                    advance();
-                    break;
-                default:
-                    // Unknown escape sequence, treat as literal
-                    value += '\\';
-                    value += nextChar;
-                    advance();
-                    break;
-            }
-        } else if (peek() == '{') {
-            // Check if this looks like interpolation (contains identifier/expression)
-            // vs regex quantifier like {2,} or {1,3}
-            size_t lookahead = current + 1;
-            bool isInterpolation = false;
-            
-            // Look ahead to see if this is likely interpolation
-            while (lookahead < source.size() && source[lookahead] != '}' && source[lookahead] != quoteType) {
-                char c = source[lookahead];
-                // If we find letters, it's likely an identifier (interpolation)
-                if (isAlpha(c) || c == '_') {
-                    isInterpolation = true;
-                    break;
-                }
-                // If we find only digits and commas, it's likely a regex quantifier
-                if (!isDigit(c) && c != ',' && c != ' ') {
-                    isInterpolation = true;
-                    break;
-                }
-                lookahead++;
-            }
-            
-            if (isInterpolation) {
-                // Found interpolation start
-                // Add the string part before interpolation if not empty
-                if (!value.empty()) {
-                    addToken(TokenType::STRING, value);
-                    value.clear();
-                }
-                
-                // Add interpolation start token
-                advance(); // consume '{'
-                addToken(TokenType::INTERPOLATION_START);
-                
-                // Parse the expression inside {}
-                int braceCount = 1;
-                size_t exprStart = current;
-                
-                while (!isAtEnd() && braceCount > 0) {
-                    if (peek() == '{') {
-                        braceCount++;
-                    } else if (peek() == '}') {
-                        braceCount--;
-                    }
-                    
-                    if (braceCount > 0) {
-                        advance();
-                    }
-                }
-                
-                if (isAtEnd()) {
-                    error("Unterminated string interpolation.");
-                    return;
-                }
-                
-                // Extract the expression content
-                std::string exprContent = source.substr(exprStart, current - exprStart);
-                
-                // Create a sub-scanner for the expression
-                Scanner exprScanner(exprContent);
-                auto exprTokens = exprScanner.scanTokens();
-                
-                // Add the expression tokens (excluding EOF)
-                for (const auto& token : exprTokens) {
-                    if (token.type != TokenType::EOF_TOKEN) {
-                        tokens.push_back({token.type, token.lexeme, line, static_cast<int>(current)});
-                    }
-                }
-                
-                // Add interpolation end token
-                advance(); // consume '}'
-                addToken(TokenType::INTERPOLATION_END);
-            } else {
-                // Regular brace, treat as normal character
-                value += peek();
-                advance();
-            }
-            
-        } else {
-            // Regular character
-            value += peek();
-            
-            // Handle newlines in strings (for multi-line strings)
-            if (peek() == '\n') {
-                line++;
-            }
-            
             advance();
+            if (isAtEnd()) { error("Unterminated string."); return; }
+            switch (peek()) {
+                case 'n': value += '\n'; break;
+                case 't': value += '\t'; break;
+                case '\\': value += '\\'; break;
+                case '\'': value += '\''; break;
+                case '"': value += '"'; break;
+                default: value += peek(); break;
+            }
+            advance();
+        } else {
+            if (peek() == '\n') line++;
+            value += advance();
         }
     }
-    
-    // Unterminated string
+
     if (isAtEnd()) {
         error("Unterminated string.");
+        stringQuoteType = 0; // Reset
         return;
     }
-    
-    // Add the final string part if not empty
-    if (!value.empty()) {
-        addToken(TokenType::STRING, value);
-    }
-    
-    // Skip the closing quote
+
+    // The closing quote.
     advance();
+
+    addToken(TokenType::STRING, value);
+    stringQuoteType = 0; // Reset
 }
 
 void Scanner::number() {
@@ -508,6 +381,8 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "concurrent") return TokenType::CONCURRENT;
     if (rest == "async") return TokenType::ASYNC;
     if (rest == "await") return TokenType::AWAIT;
+    if (rest == "break") return TokenType::BREAK;
+    if (rest == "continue") return TokenType::CONTINUE;
     if (rest == "import") return TokenType::IMPORT;
     if (rest == "throws") return TokenType::THROWS;
     if (rest == "match") return TokenType::MATCH;
@@ -547,7 +422,7 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "f32") return TokenType::FLOAT32_TYPE;
     if (rest == "f64") return TokenType::FLOAT64_TYPE;
     if (rest == "any") return TokenType::ANY_TYPE;
-    if (rest == "nil") return TokenType::NIL_TYPE;
+    if (rest == "nil") return TokenType::NIL;
     if (rest == "str") return TokenType::STR_TYPE;
     if (rest == "bool") return TokenType::BOOL_TYPE;
     if (rest == "list") return TokenType::LIST_TYPE;
@@ -742,6 +617,10 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "ASYNC";
     case TokenType::AWAIT:
         return "AWAIT";
+    case TokenType::BREAK:
+        return "BREAK";
+    case TokenType::CONTINUE:
+        return "CONTINUE";
     case TokenType::IMPORT:
         return "IMPORT";
     case TokenType::NONE:
@@ -836,4 +715,3 @@ void Scanner::error(const std::string& message) {
     std::string lexeme = getLexeme();
     Debugger::error(message, getLine(), static_cast<int>(getCurrent()), InterpretationStage::SCANNING, "", lexeme, "");
 }
-

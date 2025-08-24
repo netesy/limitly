@@ -26,6 +26,7 @@ using IteratorValuePtr = std::shared_ptr<IteratorValue>;
 // Forward declare ObjectInstance from classes
 namespace backend {
     class ObjectInstance;
+    class ClassDefinition;
 }
 using ObjectInstancePtr = std::shared_ptr<backend::ObjectInstance>;
 
@@ -415,7 +416,8 @@ struct Value {
                  UserDefinedValue,
                  IteratorValuePtr,
                  ObjectInstancePtr,
-                 std::shared_ptr<backend::ClassDefinition>>
+                 std::shared_ptr<backend::ClassDefinition>
+                >
         data;
 
     // Default constructor
@@ -597,6 +599,9 @@ struct Value {
             },
             [&](const ObjectInstancePtr& obj) {
                 oss << "<object>";
+            },
+            [&](const std::shared_ptr<backend::ClassDefinition>&) {
+                oss << "<class>";
             }
         }, data);
         return oss.str();
@@ -655,6 +660,9 @@ struct Value {
             },
             [&](const ObjectInstancePtr& obj) {
                 oss << "<object>";
+            },
+            [&](const std::shared_ptr<backend::ClassDefinition>&) {
+                oss << "<class>";
             }
         }, data);
         return oss.str();

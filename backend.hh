@@ -26,6 +26,9 @@ public:
 private:
     std::vector<Instruction> bytecode;
     int tempVarCounter = 0;
+    std::vector<size_t> loopStartAddresses;
+    std::vector<size_t> loopContinueAddresses;
+    std::vector<std::vector<size_t>> loopBreakPatches;
     
     // Visitor methods for AST nodes
     void visitStatement(const std::shared_ptr<AST::Statement>& stmt);
@@ -39,6 +42,8 @@ private:
     void visitIfStatement(const std::shared_ptr<AST::IfStatement>& stmt);
     void visitForStatement(const std::shared_ptr<AST::ForStatement>& stmt);
     void visitWhileStatement(const std::shared_ptr<AST::WhileStatement>& stmt);
+    void visitBreakStatement(const std::shared_ptr<AST::BreakStatement>& stmt);
+    void visitContinueStatement(const std::shared_ptr<AST::ContinueStatement>& stmt);
     void visitReturnStatement(const std::shared_ptr<AST::ReturnStatement>& stmt);
     void visitPrintStatement(const std::shared_ptr<AST::PrintStatement>& stmt);
     void visitExprStatement(const std::shared_ptr<AST::ExprStatement>& stmt);
