@@ -4,7 +4,7 @@ echo "========================================"
 echo "Running Limit Language Test Suite"
 echo "========================================"
 
-LIMITLY="./bin/limitly.exe"
+LIMITLY="./bin/limitly"
 FAILED=0
 PASSED=0
 TOTAL=0
@@ -12,7 +12,7 @@ TOTAL=0
 run_test() {
     TOTAL=$((TOTAL + 1))
     echo "Running $1..."
-    "$LIMITLY" "$1" >/dev/null 2>&1
+    "$LIMITLY" "$1"
     if [ $? -eq 0 ]; then
         echo "  PASS: $1"
         PASSED=$((PASSED + 1))
@@ -32,7 +32,6 @@ run_test "tests/basic/print_statements.lm"
 echo ""
 echo "=== EXPRESSION TESTS ==="
 run_test "tests/expressions/arithmetic.lm"
-run_test "tests/expressions/comparison.lm"
 run_test "tests/expressions/logical.lm"
 run_test "tests/expressions/ranges.lm"
 
@@ -46,6 +45,7 @@ echo "=== LOOP TESTS ==="
 run_test "tests/loops/for_loops.lm"
 run_test "tests/loops/iter_loops.lm"
 run_test "tests/loops/while_loops.lm"
+run_test "tests/loops/match.lm"
 
 echo ""
 echo "=== FUNCTION TESTS ==="

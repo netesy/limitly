@@ -56,6 +56,8 @@ enum class Opcode {
     JUMP,               // Jump to offset
     JUMP_IF_TRUE,       // Jump to offset if top value is true
     JUMP_IF_FALSE,      // Jump to offset if top value is false
+    BREAK,              // Break from loop
+    CONTINUE,           // Continue to next iteration of loop
     CALL,               // Call function
     RETURN,             // Return from function
 

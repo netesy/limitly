@@ -40,6 +40,8 @@ namespace AST {
     struct WhileStatement;
     struct IterStatement;
     struct ReturnStatement;
+    struct BreakStatement;
+    struct ContinueStatement;
     struct PrintStatement;
     struct AttemptStatement;
     struct HandleClause;
@@ -323,6 +325,12 @@ namespace AST {
         std::shared_ptr<Expression> condition;
         std::shared_ptr<Statement> body;
     };
+
+    // Break statement
+    struct BreakStatement : public Statement {};
+
+    // Continue statement
+    struct ContinueStatement : public Statement {};
 
     // Return statement
     struct ReturnStatement : public Statement {
