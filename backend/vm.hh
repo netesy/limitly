@@ -25,15 +25,34 @@ class Environment;
 struct CallFrame;
 class VM;
 
+// Holds the state of a single thread of execution within the VM.
+struct VMThreadContext {
+    std::vector<ValuePtr> stack;
+    std::vector<backend::CallFrame> callStack;
+    std::shared_ptr<Environment> environment;
+    const std::vector<Instruction>* bytecode;
+    size_t ip;
+    ValuePtr lastException;
+
+    VMThreadContext(std::shared_ptr<Environment> global_env)
+        : bytecode(nullptr), ip(0) {
+        environment = global_env;
+    }
+};
+
+
 // Virtual Machine class
 class VM {
 public:
     VM();
     ~VM();
     
-    // Execute bytecode
+    // Execute bytecode on the main thread
     ValuePtr execute(const std::vector<Instruction>& bytecode);
     
+    // Execute a task's bytecode in a worker thread
+    void execute_task(size_t task_ip, int context_id);
+
     // Function to enable or disable debug output
     void setDebug(bool enable) { 
         debugMode = enable;
@@ -53,38 +72,44 @@ private:
     std::unique_ptr<MemoryManager<>::Region> region;
     TypeSystem* typeSystem;
     
-    // VM state
-    std::vector<ValuePtr> stack;
-    std::vector<backend::CallFrame> callStack; // Use the new CallFrame from functions.hh
+    // Shared VM state
     std::shared_ptr<Environment> globals;
-    std::shared_ptr<Environment> environment;
     std::unordered_map<std::string, std::function<ValuePtr(const std::vector<ValuePtr>&)>> nativeFunctions;
-    // Removed duplicate userFunctions map - using functionRegistry instead
-    backend::FunctionRegistry functionRegistry; // New function abstraction layer
-    backend::ClassRegistry classRegistry; // Class management
-    std::unordered_map<std::string, backend::Function> userDefinedFunctions; // Use the proper Function struct
+    backend::FunctionRegistry functionRegistry;
+    backend::ClassRegistry classRegistry;
+    std::unordered_map<std::string, backend::Function> userDefinedFunctions;
     std::vector<ValuePtr> tempValues;
-    ValuePtr lastException;
-    
-    // Current execution state
-    const std::vector<Instruction>* bytecode;
-    size_t ip; // Instruction pointer
-    bool debugMode;
-    bool debugOutput;
-    static int matchCounter;
-    std::string currentFunctionBeingDefined; // Track which function is currently being defined
-    bool insideFunctionDefinition; // Track if we're currently inside a function definition
-    std::string currentClassBeingDefined; // Track which class is currently being defined
-    bool insideClassDefinition; // Track if we're currently inside a class definition
-    
-    // Map to store runtime default values for class fields
     std::unordered_map<std::string, ValuePtr> fieldDefaultValues;
+    
+    // Multi-threading state
+    std::vector<VMThreadContext> contexts_;
+    static thread_local int current_context_id_;
+    std::mutex shared_mutex_; // General mutex for protecting shared VM state
+    
+    // Execution state (shared between main and workers, but refers to different bytecode)
+    const std::vector<Instruction>* main_bytecode_;
 
     // Concurrency helpers
     std::vector<std::thread> active_threads;
     std::mutex threads_mutex;
+
+    // Debugging state
+    bool debugMode;
+    bool debugOutput;
+    static int matchCounter;
+
+    // State for bytecode generator (these should probably be moved out of the VM)
+    std::string currentFunctionBeingDefined;
+    bool insideFunctionDefinition;
+    std::string currentClassBeingDefined;
+    bool insideClassDefinition;
     
+    // Private run loop
+    void run_loop();
+
     // Helper methods
+    VMThreadContext& get_current_context();
+    const VMThreadContext& get_current_context() const;
     ValuePtr pop();
     void push(const ValuePtr& value);
     ValuePtr peek(int distance = 0) const;

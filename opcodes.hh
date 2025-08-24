@@ -107,6 +107,7 @@ enum class Opcode {
     // Concurrency operations
     BEGIN_PARALLEL,     // Begin parallel block
     END_PARALLEL,       // End parallel block
+    SUBMIT_TASK,        // Submit a task to the scheduler
     BEGIN_CONCURRENT,   // Begin concurrent block
     END_CONCURRENT,     // End concurrent block
     AWAIT,              // Await async result
