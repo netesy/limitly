@@ -7,7 +7,7 @@ LIBS      := -lgccjit
 
 # Binaries
 BIN_DIR   := bin
-TARGETS   := $(BIN_DIR)/limitly $(BIN_DIR)/test_parser $(BIN_DIR)/format_code
+TARGETS   := $(BIN_DIR)/limitly $(BIN_DIR)/test_parser $(BIN_DIR)/format_code $(BIN_DIR)/test_channel
 
 # Sources
 COMMON_SRCS := frontend/scanner.cpp frontend/parser.cpp debugger.cpp
@@ -15,12 +15,14 @@ BACKEND_COMMON_SRCS := backend/backend.cpp backend/functions.cpp backend/classes
 MAIN_SRCS   := main.cpp backend/vm.cpp $(BACKEND_COMMON_SRCS) $(COMMON_SRCS)
 TEST_SRCS   := test_parser.cpp $(BACKEND_COMMON_SRCS) $(COMMON_SRCS)
 FORMAT_SRCS := format_code.cpp backend/code_formatter.cpp $(COMMON_SRCS)
+CHANNEL_TEST_SRCS := tests/unit/test_channel.cpp
 
 # Objects
 OBJ_DIR    := obj
 MAIN_OBJS   := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(MAIN_SRCS))
 TEST_OBJS   := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(TEST_SRCS))
 FORMAT_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(FORMAT_SRCS))
+CHANNEL_TEST_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(CHANNEL_TEST_SRCS))
 
 .PHONY: all clean check-deps
 
@@ -44,6 +46,9 @@ $(BIN_DIR)/test_parser: $(TEST_OBJS) | $(BIN_DIR)
 
 $(BIN_DIR)/format_code: $(FORMAT_OBJS) | $(BIN_DIR)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
+
+$(BIN_DIR)/test_channel: $(CHANNEL_TEST_OBJS) | $(BIN_DIR)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS) -lpthread
 
 $(OBJ_DIR)/%.o: %.cpp | $(OBJ_DIR)
 	@mkdir -p $(dir $@)
