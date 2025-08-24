@@ -24,6 +24,16 @@ private:
     gcc_jit_function* strcmp_func;
     gcc_jit_function* asprintf_func;
     gcc_jit_function* malloc_func;
+
+    // Concurrency C-API functions
+    gcc_jit_function* scheduler_create_func_;
+    gcc_jit_function* scheduler_destroy_func_;
+    gcc_jit_function* scheduler_submit_func_;
+    gcc_jit_function* scheduler_shutdown_func_;
+    gcc_jit_function* thread_pool_create_func_;
+    gcc_jit_function* thread_pool_destroy_func_;
+    gcc_jit_function* thread_pool_start_func_;
+    gcc_jit_function* thread_pool_stop_func_;
     std::unordered_map<std::string, gcc_jit_struct*> class_structs;
     std::unordered_map<std::string, std::vector<gcc_jit_field*>> class_fields;
 
@@ -39,6 +49,8 @@ private:
     gcc_jit_block* visitForStatement(const std::shared_ptr<AST::ForStatement>& stmt, gcc_jit_function* func, gcc_jit_block* block);
     gcc_jit_block* visitWhileStatement(const std::shared_ptr<AST::WhileStatement>& stmt, gcc_jit_function* func, gcc_jit_block* block);
     gcc_jit_block* visitClassDeclaration(const std::shared_ptr<AST::ClassDeclaration>& stmt, gcc_jit_function* func, gcc_jit_block* block);
+    gcc_jit_block* visitParallelStatement(const std::shared_ptr<AST::ParallelStatement>& stmt, gcc_jit_function* func, gcc_jit_block* block);
+    gcc_jit_block* visitConcurrentStatement(const std::shared_ptr<AST::ConcurrentStatement>& stmt, gcc_jit_function* func, gcc_jit_block* block);
     gcc_jit_block* visitIterStatement(const std::shared_ptr<AST::IterStatement>& stmt, gcc_jit_function* func, gcc_jit_block* block);
     gcc_jit_block* visitReturnStatement(const std::shared_ptr<AST::ReturnStatement>& stmt, gcc_jit_function* func, gcc_jit_block* block);
     gcc_jit_block* visitPrintStatement(const std::shared_ptr<AST::PrintStatement>& stmt, gcc_jit_function* func, gcc_jit_block* block);

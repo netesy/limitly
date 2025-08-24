@@ -43,6 +43,60 @@ JitBackend::JitBackend() {
     malloc_func = gcc_jit_context_new_function(ctxt, nullptr, GCC_JIT_FUNCTION_IMPORTED,
                                               gcc_jit_context_get_type(ctxt, GCC_JIT_TYPE_VOID_PTR),
                                               "malloc", 1, &malloc_param, 0);
+
+    // --- Import Concurrency C-API ---
+    gcc_jit_type* void_ptr_type = gcc_jit_context_get_type(ctxt, GCC_JIT_TYPE_VOID_PTR);
+    gcc_jit_type* size_t_type = gcc_jit_context_get_type(ctxt, GCC_JIT_TYPE_SIZE_T);
+
+    // scheduler_create() -> Scheduler*
+    scheduler_create_func_ = gcc_jit_context_new_function(ctxt, nullptr, GCC_JIT_FUNCTION_IMPORTED,
+                                                       void_ptr_type, "scheduler_create", 0, nullptr, 0);
+
+    // scheduler_destroy(Scheduler*)
+    gcc_jit_param* p_sched_destroy = gcc_jit_context_new_param(ctxt, nullptr, void_ptr_type, "scheduler");
+    scheduler_destroy_func_ = gcc_jit_context_new_function(ctxt, nullptr, GCC_JIT_FUNCTION_IMPORTED,
+                                                        gcc_jit_context_get_type(ctxt, GCC_JIT_TYPE_VOID),
+                                                        "scheduler_destroy", 1, &p_sched_destroy, 0);
+
+    // scheduler_submit(Scheduler*, task_func_t)
+    gcc_jit_type* task_func_type = gcc_jit_context_new_function_ptr_type(ctxt, nullptr, gcc_jit_context_get_type(ctxt, GCC_JIT_TYPE_VOID), 0, nullptr, 0);
+    gcc_jit_param* p_sched_submit_1 = gcc_jit_context_new_param(ctxt, nullptr, void_ptr_type, "scheduler");
+    gcc_jit_param* p_sched_submit_2 = gcc_jit_context_new_param(ctxt, nullptr, task_func_type, "task");
+    gcc_jit_param* submit_params[] = {p_sched_submit_1, p_sched_submit_2};
+    scheduler_submit_func_ = gcc_jit_context_new_function(ctxt, nullptr, GCC_JIT_FUNCTION_IMPORTED,
+                                                       gcc_jit_context_get_type(ctxt, GCC_JIT_TYPE_VOID),
+                                                       "scheduler_submit", 2, submit_params, 0);
+
+    // scheduler_shutdown(Scheduler*)
+    gcc_jit_param* p_sched_shutdown = gcc_jit_context_new_param(ctxt, nullptr, void_ptr_type, "scheduler");
+    scheduler_shutdown_func_ = gcc_jit_context_new_function(ctxt, nullptr, GCC_JIT_FUNCTION_IMPORTED,
+                                                         gcc_jit_context_get_type(ctxt, GCC_JIT_TYPE_VOID),
+                                                         "scheduler_shutdown", 1, &p_sched_shutdown, 0);
+
+    // thread_pool_create(size_t, Scheduler*) -> ThreadPool*
+    gcc_jit_param* p_tp_create_1 = gcc_jit_context_new_param(ctxt, nullptr, size_t_type, "num_threads");
+    gcc_jit_param* p_tp_create_2 = gcc_jit_context_new_param(ctxt, nullptr, void_ptr_type, "scheduler");
+    gcc_jit_param* tp_create_params[] = {p_tp_create_1, p_tp_create_2};
+    thread_pool_create_func_ = gcc_jit_context_new_function(ctxt, nullptr, GCC_JIT_FUNCTION_IMPORTED,
+                                                         void_ptr_type, "thread_pool_create", 2, tp_create_params, 0);
+
+    // thread_pool_destroy(ThreadPool*)
+    gcc_jit_param* p_tp_destroy = gcc_jit_context_new_param(ctxt, nullptr, void_ptr_type, "pool");
+    thread_pool_destroy_func_ = gcc_jit_context_new_function(ctxt, nullptr, GCC_JIT_FUNCTION_IMPORTED,
+                                                          gcc_jit_context_get_type(ctxt, GCC_JIT_TYPE_VOID),
+                                                          "thread_pool_destroy", 1, &p_tp_destroy, 0);
+
+    // thread_pool_start(ThreadPool*)
+    gcc_jit_param* p_tp_start = gcc_jit_context_new_param(ctxt, nullptr, void_ptr_type, "pool");
+    thread_pool_start_func_ = gcc_jit_context_new_function(ctxt, nullptr, GCC_JIT_FUNCTION_IMPORTED,
+                                                        gcc_jit_context_get_type(ctxt, GCC_JIT_TYPE_VOID),
+                                                        "thread_pool_start", 1, &p_tp_start, 0);
+
+    // thread_pool_stop(ThreadPool*)
+    gcc_jit_param* p_tp_stop = gcc_jit_context_new_param(ctxt, nullptr, void_ptr_type, "pool");
+    thread_pool_stop_func_ = gcc_jit_context_new_function(ctxt, nullptr, GCC_JIT_FUNCTION_IMPORTED,
+                                                       gcc_jit_context_get_type(ctxt, GCC_JIT_TYPE_VOID),
+                                                       "thread_pool_stop", 1, &p_tp_stop, 0);
 }
 
 JitBackend::~JitBackend() {
@@ -208,6 +262,12 @@ gcc_jit_block* JitBackend::visitStatement(const std::shared_ptr<AST::Statement>&
     // Add other statement visitors here
     if (auto classDecl = std::dynamic_pointer_cast<AST::ClassDeclaration>(stmt)) {
         return visitClassDeclaration(classDecl, func, block);
+    }
+    if (auto parallelStmt = std::dynamic_pointer_cast<AST::ParallelStatement>(stmt)) {
+        return visitParallelStatement(parallelStmt, func, block);
+    }
+    if (auto concurrentStmt = std::dynamic_pointer_cast<AST::ConcurrentStatement>(stmt)) {
+        return visitConcurrentStatement(concurrentStmt, func, block);
     }
     return block;
 }
@@ -900,6 +960,66 @@ gcc_jit_rvalue* JitBackend::visitThisExpr(const std::shared_ptr<AST::ThisExpr>& 
         return nullptr;
     }
     return gcc_jit_lvalue_as_rvalue(it->second);
+}
+
+gcc_jit_block* JitBackend::visitParallelStatement(const std::shared_ptr<AST::ParallelStatement>& stmt, gcc_jit_function* func, gcc_jit_block* block) {
+    std::cout << "JIT: Visiting ParallelStatement" << std::endl;
+
+    // 1. Create the scheduler and thread pool
+    gcc_jit_rvalue* scheduler = gcc_jit_context_new_call(ctxt, nullptr, scheduler_create_func_, 0, nullptr);
+
+    // For now, hardcode the number of threads. In a real implementation, this would come from stmt->cores.
+    gcc_jit_rvalue* num_threads = gcc_jit_context_new_rvalue_from_int(ctxt, gcc_jit_context_get_type(ctxt, GCC_JIT_TYPE_SIZE_T), 4);
+    gcc_jit_rvalue* tp_create_args[] = {num_threads, scheduler};
+    gcc_jit_rvalue* pool = gcc_jit_context_new_call(ctxt, nullptr, thread_pool_create_func_, 2, tp_create_args);
+
+    // 2. Start the pool
+    gcc_jit_block_add_eval(block, nullptr, gcc_jit_context_new_call(ctxt, nullptr, thread_pool_start_func_, 1, &pool));
+
+    // 3. TODO: This is the hard part - generate and submit tasks.
+    // For now, we visit the body, but this is incorrect as the body contains
+    // special 'task' constructs that need to be compiled into separate functions.
+    // This requires a much more complex visitor logic.
+    block = visitStatement(stmt->body, func, block);
+
+
+    // 4. Stop and destroy the runtime
+    gcc_jit_block_add_eval(block, nullptr, gcc_jit_context_new_call(ctxt, nullptr, thread_pool_stop_func_, 1, &pool));
+    // In a real implementation with RAII, these destroy calls might not be necessary
+    // if the C++ destructors handle cleanup. But the C-API exposes them, so we call them.
+    gcc_jit_block_add_eval(block, nullptr, gcc_jit_context_new_call(ctxt, nullptr, thread_pool_destroy_func_, 1, &pool));
+    gcc_jit_block_add_eval(block, nullptr, gcc_jit_context_new_call(ctxt, nullptr, scheduler_destroy_func_, 1, &scheduler));
+
+    return block;
+}
+
+gcc_jit_block* JitBackend::visitConcurrentStatement(const std::shared_ptr<AST::ConcurrentStatement>& stmt, gcc_jit_function* func, gcc_jit_block* block) {
+    std::cout << "JIT: Visiting ConcurrentStatement (behaving like Parallel)" << std::endl;
+
+    // TODO: This is a stub implementation. A real implementation would use the EventLoop
+    // for I/O-bound tasks instead of just a general-purpose thread pool.
+    // For now, it behaves identically to a 'parallel' block.
+
+    // 1. Create the scheduler and thread pool
+    gcc_jit_rvalue* scheduler = gcc_jit_context_new_call(ctxt, nullptr, scheduler_create_func_, 0, nullptr);
+
+    // For now, hardcode the number of threads.
+    gcc_jit_rvalue* num_threads = gcc_jit_context_new_rvalue_from_int(ctxt, gcc_jit_context_get_type(ctxt, GCC_JIT_TYPE_SIZE_T), 4);
+    gcc_jit_rvalue* tp_create_args[] = {num_threads, scheduler};
+    gcc_jit_rvalue* pool = gcc_jit_context_new_call(ctxt, nullptr, thread_pool_create_func_, 2, tp_create_args);
+
+    // 2. Start the pool
+    gcc_jit_block_add_eval(block, nullptr, gcc_jit_context_new_call(ctxt, nullptr, thread_pool_start_func_, 1, &pool));
+
+    // 3. TODO: Generate and submit tasks
+    block = visitStatement(stmt->body, func, block);
+
+    // 4. Stop and destroy the runtime
+    gcc_jit_block_add_eval(block, nullptr, gcc_jit_context_new_call(ctxt, nullptr, thread_pool_stop_func_, 1, &pool));
+    gcc_jit_block_add_eval(block, nullptr, gcc_jit_context_new_call(ctxt, nullptr, thread_pool_destroy_func_, 1, &pool));
+    gcc_jit_block_add_eval(block, nullptr, gcc_jit_context_new_call(ctxt, nullptr, scheduler_destroy_func_, 1, &scheduler));
+
+    return block;
 }
 
 gcc_jit_rvalue* JitBackend::visitRangeExpr(const std::shared_ptr<AST::RangeExpr>& expr, gcc_jit_function* func, gcc_jit_block* block) {
