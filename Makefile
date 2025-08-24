@@ -7,6 +7,7 @@ LIBS      := -lgccjit
 
 # Binaries
 BIN_DIR   := bin
+
 TARGETS   := $(BIN_DIR)/limitly $(BIN_DIR)/test_parser $(BIN_DIR)/format_code
 
 # Sources
@@ -15,6 +16,7 @@ BACKEND_COMMON_SRCS := backend/backend.cpp backend/functions.cpp backend/classes
 MAIN_SRCS   := main.cpp backend/vm.cpp $(BACKEND_COMMON_SRCS) $(COMMON_SRCS)
 TEST_SRCS   := test_parser.cpp $(BACKEND_COMMON_SRCS) $(COMMON_SRCS)
 FORMAT_SRCS := format_code.cpp backend/code_formatter.cpp $(COMMON_SRCS)
+
 
 # Objects
 OBJ_DIR    := obj
@@ -44,6 +46,7 @@ $(BIN_DIR)/test_parser: $(TEST_OBJS) | $(BIN_DIR)
 
 $(BIN_DIR)/format_code: $(FORMAT_OBJS) | $(BIN_DIR)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
+
 
 $(OBJ_DIR)/%.o: %.cpp | $(OBJ_DIR)
 	@mkdir -p $(dir $@)
