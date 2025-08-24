@@ -12,13 +12,13 @@ TARGETS   := $(BIN_DIR)/limitly $(BIN_DIR)/test_parser $(BIN_DIR)/format_code $(
 # Sources
 COMMON_SRCS := frontend/scanner.cpp frontend/parser.cpp debugger.cpp
 BACKEND_COMMON_SRCS := backend/backend.cpp backend/functions.cpp backend/classes.cpp backend/ast_printer.cpp backend/jit_backend.cpp
-CONCURRENCY_SRCS := backend/concurrency/scheduler.cpp backend/concurrency/event_loop.cpp
+CONCURRENCY_SRCS := backend/concurrency/scheduler.cpp backend/concurrency/event_loop.cpp backend/concurrency/epoll_event_loop.cpp backend/concurrency/iocp_event_loop.cpp
 MAIN_SRCS   := main.cpp backend/vm.cpp $(BACKEND_COMMON_SRCS) $(CONCURRENCY_SRCS) $(COMMON_SRCS)
 TEST_SRCS   := test_parser.cpp $(BACKEND_COMMON_SRCS) $(COMMON_SRCS)
 FORMAT_SRCS := format_code.cpp backend/code_formatter.cpp $(COMMON_SRCS)
 CHANNEL_TEST_SRCS := tests/unit/test_channel.cpp
 SCHEDULER_TEST_SRCS := tests/unit/test_scheduler.cpp backend/concurrency/scheduler.cpp
-EVENT_LOOP_TEST_SRCS := tests/unit/test_event_loop.cpp backend/concurrency/event_loop.cpp
+EVENT_LOOP_TEST_SRCS := tests/unit/test_event_loop.cpp backend/concurrency/event_loop.cpp backend/concurrency/epoll_event_loop.cpp backend/concurrency/iocp_event_loop.cpp
 
 # Objects
 OBJ_DIR    := obj
