@@ -508,6 +508,8 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "concurrent") return TokenType::CONCURRENT;
     if (rest == "async") return TokenType::ASYNC;
     if (rest == "await") return TokenType::AWAIT;
+    if (rest == "break") return TokenType::BREAK;
+    if (rest == "continue") return TokenType::CONTINUE;
     if (rest == "import") return TokenType::IMPORT;
     if (rest == "throws") return TokenType::THROWS;
     if (rest == "match") return TokenType::MATCH;
@@ -547,7 +549,7 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "f32") return TokenType::FLOAT32_TYPE;
     if (rest == "f64") return TokenType::FLOAT64_TYPE;
     if (rest == "any") return TokenType::ANY_TYPE;
-    if (rest == "nil") return TokenType::NIL_TYPE;
+    if (rest == "nil") return TokenType::NIL;
     if (rest == "str") return TokenType::STR_TYPE;
     if (rest == "bool") return TokenType::BOOL_TYPE;
     if (rest == "list") return TokenType::LIST_TYPE;
@@ -742,6 +744,10 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "ASYNC";
     case TokenType::AWAIT:
         return "AWAIT";
+    case TokenType::BREAK:
+        return "BREAK";
+    case TokenType::CONTINUE:
+        return "CONTINUE";
     case TokenType::IMPORT:
         return "IMPORT";
     case TokenType::NONE:
@@ -836,4 +842,3 @@ void Scanner::error(const std::string& message) {
     std::string lexeme = getLexeme();
     Debugger::error(message, getLine(), static_cast<int>(getCurrent()), InterpretationStage::SCANNING, "", lexeme, "");
 }
-

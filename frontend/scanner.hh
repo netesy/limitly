@@ -119,6 +119,8 @@ enum class TokenType {
     CONCURRENT, // concurrent
     ASYNC,      // async
     AWAIT,      // await
+    BREAK,      // break
+    CONTINUE,   // continue
     IMPORT,     // import
     NONE,       // None
     THROWS,     // throws

@@ -64,6 +64,8 @@ public:
     std::shared_ptr<AST::BlockStatement> block();
     std::shared_ptr<AST::Statement> forStatement();
     std::shared_ptr<AST::Statement> whileStatement();
+    std::shared_ptr<AST::Statement> breakStatement();
+    std::shared_ptr<AST::Statement> continueStatement();
     std::shared_ptr<AST::FunctionDeclaration> function(const std::string &kind);
     std::shared_ptr<AST::Statement> returnStatement();
     std::shared_ptr<AST::ClassDeclaration> classDeclaration();

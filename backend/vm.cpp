@@ -33,6 +33,8 @@ static std::string typeTagToString(TypeTag tag) {
     }
 }
 
+int VM::matchCounter = 0;
+
 // VM implementation
 // VMUserDefinedFunction implementation
 VMUserDefinedFunction::VMUserDefinedFunction(VM* vmInstance, const std::shared_ptr<AST::FunctionDeclaration>& decl, 
@@ -109,6 +111,7 @@ ValuePtr VM::execute(const std::vector<Instruction>& bytecode) {
     try {
         while (ip < bytecode.size()) {
             const Instruction& instruction = bytecode[ip];
+            std::cout << "ip: " << ip << ", opcode: " << static_cast<int>(instruction.opcode) << std::endl;
             
             // Check if we need to start skipping function body
             if (!currentFunctionBeingDefined.empty() && !insideFunctionDefinition) {
@@ -2553,6 +2556,11 @@ void VM::handleBeginConcurrent(const Instruction& /*unused*/) { error("Not imple
 void VM::handleEndConcurrent(const Instruction& /*unused*/) { error("Not implemented"); }
 
 void VM::handleMatchPattern(const Instruction& /*unused*/) {
+    if (matchCounter++ > 40) {
+        error("Match operation limit exceeded. Possible infinite loop.");
+        return;
+    }
+
     ValuePtr pattern = pop();
     ValuePtr value = pop();
 

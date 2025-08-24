@@ -55,6 +55,10 @@ void BytecodeGenerator::visitStatement(const std::shared_ptr<AST::Statement>& st
         visitForStatement(forStmt);
     } else if (auto whileStmt = std::dynamic_pointer_cast<AST::WhileStatement>(stmt)) {
         visitWhileStatement(whileStmt);
+    } else if (auto breakStmt = std::dynamic_pointer_cast<AST::BreakStatement>(stmt)) {
+        visitBreakStatement(breakStmt);
+    } else if (auto continueStmt = std::dynamic_pointer_cast<AST::ContinueStatement>(stmt)) {
+        visitContinueStatement(continueStmt);
     } else if (auto returnStmt = std::dynamic_pointer_cast<AST::ReturnStatement>(stmt)) {
         visitReturnStatement(returnStmt);
     } else if (auto printStmt = std::dynamic_pointer_cast<AST::PrintStatement>(stmt)) {
@@ -289,6 +293,7 @@ void BytecodeGenerator::visitForStatement(const std::shared_ptr<AST::ForStatemen
     
     // Start loop scope
     emit(Opcode::BEGIN_SCOPE, stmt->line);
+    loopBreakPatches.emplace_back();
     
     if (stmt->isIterableLoop) {
         // Iterable-based for loop
@@ -301,7 +306,9 @@ void BytecodeGenerator::visitForStatement(const std::shared_ptr<AST::ForStatemen
         
         // Start of loop
         size_t loopStartIndex = bytecode.size();
-        
+        loopStartAddresses.push_back(loopStartIndex);
+        loopContinueAddresses.push_back(loopStartIndex); // Continue jumps to the loop condition check
+
         // Check if iterator has next
         emit(Opcode::ITERATOR_HAS_NEXT, stmt->line);
         
@@ -330,6 +337,11 @@ void BytecodeGenerator::visitForStatement(const std::shared_ptr<AST::ForStatemen
         // Update jump to end instruction
         size_t endIndex = bytecode.size();
         bytecode[jumpToEndIndex].intValue = static_cast<int32_t>(endIndex - jumpToEndIndex - 1);
+
+        // Patch break statements
+        for (size_t patchAddr : loopBreakPatches.back()) {
+            bytecode[patchAddr].intValue = endIndex - patchAddr - 1;
+        }
     } else {
         // Traditional for loop
         
@@ -340,6 +352,7 @@ void BytecodeGenerator::visitForStatement(const std::shared_ptr<AST::ForStatemen
         
         // Start of loop
         size_t loopStartIndex = bytecode.size();
+        loopStartAddresses.push_back(loopStartIndex);
         
         // Evaluate condition if it exists
         if (stmt->condition) {
@@ -353,24 +366,47 @@ void BytecodeGenerator::visitForStatement(const std::shared_ptr<AST::ForStatemen
         size_t jumpToEndIndex = bytecode.size();
         emit(Opcode::JUMP_IF_FALSE, stmt->line);
         
-        // Process loop body
-        visitStatement(stmt->body);
-        
+        // Jump to body, over increment
+        size_t jumpToBodyIndex = bytecode.size();
+        emit(Opcode::JUMP, stmt->line);
+
+        // Continue target: increment
+        size_t incrementStartIndex = bytecode.size();
+        loopContinueAddresses.push_back(incrementStartIndex);
+
         // Process increment if it exists
         if (stmt->increment) {
             visitExpression(stmt->increment);
             emit(Opcode::POP, stmt->line); // Discard result of increment expression
         }
-        
-        // Jump back to start of loop
+
+        // Jump back to loop start (condition check)
         emit(Opcode::JUMP, stmt->line, static_cast<int32_t>(loopStartIndex) - static_cast<int32_t>(bytecode.size()) - 1);
+
+        // Patch jump to body
+        size_t bodyStartIndex = bytecode.size();
+        bytecode[jumpToBodyIndex].intValue = bodyStartIndex - jumpToBodyIndex - 1;
+
+        // Process loop body
+        visitStatement(stmt->body);
+
+        // Jump to increment
+        emit(Opcode::JUMP, stmt->line, static_cast<int32_t>(incrementStartIndex) - static_cast<int32_t>(bytecode.size()) - 1);
         
         // Update jump to end instruction
         size_t endIndex = bytecode.size();
         bytecode[jumpToEndIndex].intValue = static_cast<int32_t>(endIndex - jumpToEndIndex - 1);
+
+        // Patch break statements
+        for (size_t patchAddr : loopBreakPatches.back()) {
+            bytecode[patchAddr].intValue = endIndex - patchAddr - 1;
+        }
     }
     
     // End loop scope
+    loopBreakPatches.pop_back();
+    loopStartAddresses.pop_back();
+    loopContinueAddresses.pop_back();
     emit(Opcode::END_SCOPE, stmt->line);
 }
 
@@ -379,7 +415,10 @@ void BytecodeGenerator::visitWhileStatement(const std::shared_ptr<AST::WhileStat
     
     // Start of loop
     size_t loopStartIndex = bytecode.size();
-    
+    loopStartAddresses.push_back(loopStartIndex);
+    loopContinueAddresses.push_back(loopStartIndex);
+    loopBreakPatches.emplace_back();
+
     // Evaluate condition
     visitExpression(stmt->condition);
     
@@ -396,6 +435,32 @@ void BytecodeGenerator::visitWhileStatement(const std::shared_ptr<AST::WhileStat
     // Update jump to end instruction
     size_t endIndex = bytecode.size();
     bytecode[jumpToEndIndex].intValue = static_cast<int32_t>(endIndex - jumpToEndIndex - 1);
+
+    // Patch break statements
+    for (size_t patchAddr : loopBreakPatches.back()) {
+        bytecode[patchAddr].intValue = endIndex - patchAddr - 1;
+    }
+    loopBreakPatches.pop_back();
+    loopStartAddresses.pop_back();
+}
+
+void BytecodeGenerator::visitBreakStatement(const std::shared_ptr<AST::BreakStatement>& stmt) {
+    if (loopBreakPatches.empty()) {
+        Debugger::error("'break' outside of loop", stmt->line, 0, InterpretationStage::BYTECODE, "", "", "");
+        return;
+    }
+    size_t jumpIndex = bytecode.size();
+    emit(Opcode::JUMP, stmt->line); // Placeholder
+    loopBreakPatches.back().push_back(jumpIndex);
+}
+
+void BytecodeGenerator::visitContinueStatement(const std::shared_ptr<AST::ContinueStatement>& stmt) {
+    if (loopStartAddresses.empty()) {
+        Debugger::error("'continue' outside of loop", stmt->line, 0, InterpretationStage::BYTECODE, "", "", "");
+        return;
+    }
+    size_t continueAddr = loopContinueAddresses.back();
+    emit(Opcode::JUMP, stmt->line, static_cast<int32_t>(continueAddr) - static_cast<int32_t>(bytecode.size()) - 1);
 }
 
 void BytecodeGenerator::visitReturnStatement(const std::shared_ptr<AST::ReturnStatement>& stmt) {
@@ -550,8 +615,13 @@ void BytecodeGenerator::visitMatchStatement(const std::shared_ptr<AST::MatchStat
     
     // Process each case
     std::vector<size_t> jumpToEndIndices;
+    size_t jumpToNextCaseIndex = 0;
     
     for (const auto& matchCase : stmt->cases) {
+        if (jumpToNextCaseIndex != 0) {
+            bytecode[jumpToNextCaseIndex].intValue = bytecode.size() - jumpToNextCaseIndex - 1;
+        }
+
         // Duplicate the value to match
         emit(Opcode::LOAD_TEMP, stmt->line, tempIndex);
         
@@ -575,7 +645,7 @@ void BytecodeGenerator::visitMatchStatement(const std::shared_ptr<AST::MatchStat
         emit(Opcode::MATCH_PATTERN, stmt->line);
         
         // Jump to next case if pattern doesn't match
-        size_t jumpToNextCaseIndex = bytecode.size();
+        jumpToNextCaseIndex = bytecode.size();
         emit(Opcode::JUMP_IF_FALSE, stmt->line);
         
         // Process case body
@@ -584,10 +654,10 @@ void BytecodeGenerator::visitMatchStatement(const std::shared_ptr<AST::MatchStat
         // Jump to end after executing case body
         jumpToEndIndices.push_back(bytecode.size());
         emit(Opcode::JUMP, stmt->line);
-        
-        // Update jump to next case instruction
-        size_t nextCaseIndex = bytecode.size();
-        bytecode[jumpToNextCaseIndex].intValue = static_cast<int32_t>(nextCaseIndex - jumpToNextCaseIndex - 1);
+    }
+
+    if (jumpToNextCaseIndex != 0) {
+        bytecode[jumpToNextCaseIndex].intValue = bytecode.size() - jumpToNextCaseIndex - 1;
     }
     
     // Update all jump to end instructions
@@ -602,6 +672,28 @@ void BytecodeGenerator::visitMatchStatement(const std::shared_ptr<AST::MatchStat
 
 // Expression visitors
 void BytecodeGenerator::visitBinaryExpr(const std::shared_ptr<AST::BinaryExpr>& expr) {
+    if (expr->op == TokenType::AND) {
+        visitExpression(expr->left);
+        emit(Opcode::DUP, expr->line);
+        size_t jumpToEndIndex = bytecode.size();
+        emit(Opcode::JUMP_IF_FALSE, expr->line);
+        emit(Opcode::POP, expr->line);
+        visitExpression(expr->right);
+        bytecode[jumpToEndIndex].intValue = bytecode.size() - jumpToEndIndex - 1;
+        return;
+    }
+
+    if (expr->op == TokenType::OR) {
+        visitExpression(expr->left);
+        emit(Opcode::DUP, expr->line);
+        size_t jumpToEndIndex = bytecode.size();
+        emit(Opcode::JUMP_IF_TRUE, expr->line);
+        emit(Opcode::POP, expr->line);
+        visitExpression(expr->right);
+        bytecode[jumpToEndIndex].intValue = bytecode.size() - jumpToEndIndex - 1;
+        return;
+    }
+
     // For compound assignment operators, we need to handle them specially
     // by first evaluating the left-hand side as an lvalue
     bool isCompoundAssignment = false;
@@ -691,12 +783,6 @@ void BytecodeGenerator::visitBinaryExpr(const std::shared_ptr<AST::BinaryExpr>& 
             break;
             
         // Logical operators
-        case TokenType::AND:
-            emit(Opcode::AND, expr->line);
-            break;
-        case TokenType::OR:
-            emit(Opcode::OR, expr->line);
-            break;
             
         // Bitwise operators
         // case TokenType::AMPERSAND:
