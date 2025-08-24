@@ -119,6 +119,8 @@ enum class TokenType {
     CONCURRENT, // concurrent
     ASYNC,      // async
     AWAIT,      // await
+    BREAK,      // break
+    CONTINUE,   // continue
     IMPORT,     // import
     NONE,       // None
     THROWS,     // throws
@@ -202,6 +204,9 @@ private:
     int line;
     Token currentToken;
     std::vector<Token> tokens;
+
+    bool inStringInterpolation = false;
+    char stringQuoteType = 0;
 
     void addToken(TokenType type);
     void addToken(TokenType type, const std::string& text);

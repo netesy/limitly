@@ -2,26 +2,12 @@ var x:int = 5;
 
 match (x) {
     5 => {
-    print("x is five");
-    }
+        print("x is five");
+    },
     10 => {
-    print("x is ten");
+        print("x is ten");
+    },
+    _ => {
+        print("x is something else");
     }
 }
-
-
-
-fn match_example(value: any): nil {
-    match(value) {
-        int => print("Integer: {value}"),
-        string => print("String: {value}"),
-        list<int> => print("List of integers: {value}"),
-        dict<string, int> => print("Dictionary: {value}"),
-        _ => print("Unknown type")
-    }
-}
-
-match_example(42);
-match_example("Hello, Luminar!");
-match_example([1, 2, 3]);
-match_example({ "a": 1, "b": 2 });
