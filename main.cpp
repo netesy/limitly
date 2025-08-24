@@ -3,6 +3,7 @@
 #include "backend.hh"
 #include "backend/ast_printer.hh"
 #include "backend/vm.hh"
+#include "backend/jit_backend.hh"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -30,7 +31,7 @@ std::string readFile(const std::string& filename) {
     return buffer.str();
 }
 
-void executeFile(const std::string& filename, bool printAst = false, bool printTokens = false, bool printBytecode = false) {
+void executeFile(const std::string& filename, bool printAst = false, bool printTokens = false, bool printBytecode = false, bool useJit = false) {
     try {
         // Read source file
         std::string source = readFile(filename);
@@ -60,29 +61,38 @@ void executeFile(const std::string& filename, bool printAst = false, bool printT
             printer.process(ast);
             std::cout << std::endl;
         }
-        
-        // Backend: Generate bytecode
-        BytecodeGenerator generator;
-        generator.process(ast);
-        
-        // Print bytecode if requested
-        if (printBytecode) {
-            std::cout << "=== Bytecode ===\n";
-            std::cout << "Generated " << generator.getBytecode().size() << " instructions\n";
-            // TODO: Implement bytecode disassembler and print instructions
-            std::cout << std::endl;
-        }
-        
-        // Execute bytecode using the virtual machine
-        VM vm;
-        try {
-            ValuePtr result = vm.execute(generator.getBytecode());
-            // Only print non-nil results
-            if (result && (!result->type || result->type->tag != TypeTag::Nil)) {
-                std::cout << result->toString() << std::endl;
+
+        if (useJit) {
+            std::cout << "=== JIT Backend ===\n";
+            JitBackend jit;
+            jit.process(ast);
+            const char* output_filename = "jit_output";
+            jit.compile(output_filename);
+            std::cout << "Compiled to " << output_filename << ". Run ./" << output_filename << " to see the result.\n";
+        } else {
+            // Backend: Generate bytecode
+            BytecodeGenerator generator;
+            generator.process(ast);
+
+            // Print bytecode if requested
+            if (printBytecode) {
+                std::cout << "=== Bytecode ===\n";
+                std::cout << "Generated " << generator.getBytecode().size() << " instructions\n";
+                // TODO: Implement bytecode disassembler and print instructions
+                std::cout << std::endl;
             }
-        } catch (const std::exception& e) {
-            std::cerr << "Error: " << e.what() << std::endl;
+
+            // Execute bytecode using the virtual machine
+            VM vm;
+            try {
+                ValuePtr result = vm.execute(generator.getBytecode());
+                // Only print non-nil results
+                if (result && (!result->type || result->type->tag != TypeTag::Nil)) {
+                    std::cout << result->toString() << std::endl;
+                }
+            } catch (const std::exception& e) {
+                std::cerr << "Error: " << e.what() << std::endl;
+            }
         }
         
     } catch (const std::exception& e) {
@@ -184,6 +194,8 @@ int main(int argc, char* argv[]) {
         executeFile(argv[2], false, true, false);
     } else if (arg == "-bytecode" && argc >= 3) {
         executeFile(argv[2], false, false, true);
+    } else if (arg == "-jit" && argc >= 3) {
+        executeFile(argv[2], false, false, false, true);
     } else if (arg[0] == '-') {
         std::cerr << "Unknown option: " << arg << std::endl;
         printUsage(argv[0]);
