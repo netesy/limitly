@@ -1,11 +1,8 @@
 #ifndef EVENT_LOOP_H
 #define EVENT_LOOP_H
 
-#include <functional>
-#include <map>
-#include <vector>
-
-using EventCallback = std::function<void()>;
+#include "event_loop_impl.hh"
+#include <memory>
 
 class EventLoop {
 public:
@@ -22,9 +19,7 @@ public:
     void stop();
 
 private:
-    int epoll_fd_;
-    bool running_;
-    std::map<int, EventCallback> callbacks_;
+    std::unique_ptr<EventLoopImpl> pimpl_;
 };
 
 #endif // EVENT_LOOP_H
