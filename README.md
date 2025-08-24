@@ -71,53 +71,59 @@ The project is organized into frontend and backend components:
 
 ## Example Code
 
+Here are some examples demonstrating the current features of the Limit language.
+
+### Basic Functions and Variables
 ```
-// Type aliases and refined types
-type PositiveInt = int where value > 0;
-type EmailString = str where matches(value, "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+// Declare a variable
+var x = 10;
 
-// Contract programming example
-fn sqrt(x: float): float {
-    contract(x >= 0, "Cannot compute sqrt of negative number"); // Precondition
-    var result = x ** 0.5;
-    contract(result >= 0, "Result must be non-negative"); // Postcondition
-    return result;
+// Declare a function with a type annotation
+fn square(n: int): int {
+    return n * n;
 }
 
-// Modern iteration
-iter (key, value in my_dict) {
-    print("{key}: {value}");
-}
+// Call the function and print the result using string interpolation
+var x_squared = square(x);
+print("The square of {x} is {x_squared}");
+```
 
-// Pattern matching example
-fn match_example(value: any): nil {
-    match value {
-        int => print("Integer: {value}"),
-        str => print("String: {value}"),
-        list<int> => print("List of integers: {value}"),
-        dict<str, int> => print("Dictionary: {value}"),
-        _ => print("Unknown type")
+### Classes and Methods
+```
+// Define a class with fields and methods
+class Greeter {
+    var name: str = "World";
+
+    // The 'init' method acts as the constructor
+    fn init(name_param: str) {
+        self.name = name_param;
+    }
+
+    // A method that uses the 'self' keyword to access instance fields
+    fn say_hello() {
+        print("Hello, {self.name}!");
     }
 }
 
-// Safe memory management with unsafe blocks
-unsafe {
-    var ptr = memory.allocate(1000, 8);
-    memory.set(ptr, 0, 1000);
-    memory.deallocate(ptr);
+// Create an instance of the class
+var greeter = Greeter("Jules");
+
+// Call a method on the instance
+greeter.say_hello();
+```
+
+### Loops
+```
+// A C-style 'for' loop
+print("For loop:");
+for (var i = 0; i < 3; i += 1) {
+    print("i = {i}");
 }
 
-// Concurrency example
-var task_channel: Channel<str> = Channel();
-parallel(tasks, cores=Auto, on_error=Auto) {
-    iter (var i = 1; i <= 3; i++) {
-        spawn_task(i, task_channel);
-    }
-}
-
-// Collect results
-iter (message in task_channel) {
-    print("Received: {message}");
+// An 'iter' loop over a range
+print("Iter loop:");
+iter (j in 5..8) {
+    print("j = {j}");
 }
 ```
 
