@@ -205,6 +205,9 @@ private:
     Token currentToken;
     std::vector<Token> tokens;
 
+    bool inStringInterpolation = false;
+    char stringQuoteType = 0;
+
     void addToken(TokenType type);
     void addToken(TokenType type, const std::string& text);
     bool match(char expected);
