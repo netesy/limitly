@@ -27,8 +27,13 @@ using IteratorValuePtr = std::shared_ptr<IteratorValue>;
 namespace backend {
     class ObjectInstance;
     class ClassDefinition;
+    struct Function; // Forward declare Function
 }
 using ObjectInstancePtr = std::shared_ptr<backend::ObjectInstance>;
+
+// Forward declare new closure types
+struct UpvalueObject;
+struct ClosureObject;
 
 enum class TypeTag {
     Nil,
@@ -50,6 +55,7 @@ enum class TypeTag {
     Dict,
     Enum,
     Function,
+    Closure, // New TypeTag for closures
     Any,
     Sum,
     Union,
@@ -57,6 +63,21 @@ enum class TypeTag {
     UserDefined,
     Class,
     Object
+};
+
+// ... after UserDefinedValue struct ...
+
+struct UpvalueObject {
+    ValuePtr* location; // Pointer to the value on the stack or in the upvalue itself
+    ValuePtr closed;    // Storage for the value when it's closed over
+    bool is_closed;
+
+    UpvalueObject(ValuePtr* loc) : location(loc), is_closed(false) {}
+};
+
+struct ClosureObject {
+    std::shared_ptr<backend::Function> func;
+    std::vector<std::shared_ptr<UpvalueObject>> upvalues;
 };
 
 struct Type;
@@ -416,7 +437,9 @@ struct Value {
                  UserDefinedValue,
                  IteratorValuePtr,
                  ObjectInstancePtr,
-                 std::shared_ptr<backend::ClassDefinition>
+                 std::shared_ptr<backend::ClassDefinition>,
+                 std::shared_ptr<backend::Function>,
+                 std::shared_ptr<ClosureObject>
                 >
         data;
 
@@ -602,6 +625,30 @@ struct Value {
             },
             [&](const std::shared_ptr<backend::ClassDefinition>&) {
                 oss << "<class>";
+            },
+            [&](const std::shared_ptr<backend::Function>&) {
+                oss << "<function>";
+            },
+            [&](const std::shared_ptr<ClosureObject>&) {
+                oss << "<closure>";
+            },
+            [&](const std::shared_ptr<backend::Function>&) {
+                oss << "<function>";
+            },
+            [&](const std::shared_ptr<ClosureObject>&) {
+                oss << "<closure>";
+            },
+            [&](const std::shared_ptr<backend::Function>&) {
+                oss << "<function>";
+            },
+            [&](const std::shared_ptr<ClosureObject>&) {
+                oss << "<closure>";
+            },
+            [&](const std::shared_ptr<backend::Function>&) {
+                oss << "<function>";
+            },
+            [&](const std::shared_ptr<ClosureObject>&) {
+                oss << "<closure>";
             }
         }, data);
         return oss.str();
@@ -663,6 +710,12 @@ struct Value {
             },
             [&](const std::shared_ptr<backend::ClassDefinition>&) {
                 oss << "<class>";
+            },
+            [&](const std::shared_ptr<backend::Function>&) {
+                oss << "<function>";
+            },
+            [&](const std::shared_ptr<ClosureObject>&) {
+                oss << "<closure>";
             }
         }, data);
         return oss.str();

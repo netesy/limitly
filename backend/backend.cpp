@@ -135,49 +135,36 @@ void BytecodeGenerator::visitExpression(const std::shared_ptr<AST::Expression>& 
 
 // Statement visitors
 void BytecodeGenerator::visitVarDeclaration(const std::shared_ptr<AST::VarDeclaration>& stmt) {
-    // Generate bytecode for variable declaration
-    
     // If there's an initializer, evaluate it
     if (stmt->initializer) {
         visitExpression(stmt->initializer);
     } else {
-        // Default initialization based on type
-        if (stmt->type && *stmt->type) {
-            if ((*stmt->type)->typeName == "int") {
-                emit(Opcode::PUSH_INT, stmt->line, 0);
-            } else if ((*stmt->type)->typeName == "float") {
-                emit(Opcode::PUSH_FLOAT, stmt->line, 0, 0.0f);
-            } else if ((*stmt->type)->typeName == "str") {
-                emit(Opcode::PUSH_STRING, stmt->line, 0, 0.0f, false, "");
-            } else if ((*stmt->type)->typeName == "bool") {
-                emit(Opcode::PUSH_BOOL, stmt->line, 0, 0.0f, false);
-            } else {
-                emit(Opcode::PUSH_NULL, stmt->line);
-            }
-        } else {
-            emit(Opcode::PUSH_NULL, stmt->line);
-        }
+        // Default initialize to null if no initializer
+        emit(Opcode::PUSH_NULL, stmt->line);
     }
     
-    // Store the value in a variable
+    // Declare and define the variable in the current scope.
+    declareVariable(stmt->name);
     emit(Opcode::STORE_VAR, stmt->line, 0, 0.0f, false, stmt->name);
 }
 
 void BytecodeGenerator::visitFunctionDeclaration(const std::shared_ptr<AST::FunctionDeclaration>& stmt) {
-    // Generate bytecode for function declaration
+    // TODO: This needs a full resolver pass to handle closures correctly.
+    // For now, we just manage the scope for the function's own parameters.
     
-    // Start function definition
     emit(Opcode::BEGIN_FUNCTION, stmt->line, 0, 0.0f, false, stmt->name);
     
-    // Process parameters
+    beginScope(); // New scope for the function body
+
+    // Process parameters and declare them in the new scope
     for (const auto& param : stmt->params) {
+        declareVariable(param.first);
         emit(Opcode::DEFINE_PARAM, stmt->line, 0, 0.0f, false, param.first);
     }
     
     for (const auto& param : stmt->optionalParams) {
+        declareVariable(param.first);
         emit(Opcode::DEFINE_OPTIONAL_PARAM, stmt->line, 0, 0.0f, false, param.first);
-        
-        // If there's a default value, evaluate it
         if (param.second.second) {
             visitExpression(param.second.second);
             emit(Opcode::SET_DEFAULT_VALUE, stmt->line);
@@ -187,12 +174,10 @@ void BytecodeGenerator::visitFunctionDeclaration(const std::shared_ptr<AST::Func
     // Process function body
     visitBlockStatement(stmt->body);
     
-    // If function doesn't end with an explicit return, add implicit nil return
-    // This ensures all functions return a value
     emit(Opcode::PUSH_NULL, stmt->line);
     emit(Opcode::RETURN, stmt->line);
     
-    // End function definition
+    endScope(); // End function scope
     emit(Opcode::END_FUNCTION, stmt->line);
 }
 
@@ -243,18 +228,11 @@ void BytecodeGenerator::visitClassDeclaration(const std::shared_ptr<AST::ClassDe
 }
 
 void BytecodeGenerator::visitBlockStatement(const std::shared_ptr<AST::BlockStatement>& stmt) {
-    // Generate bytecode for block statement
-    
-    // Start block scope
-    emit(Opcode::BEGIN_SCOPE, stmt->line);
-    
-    // Process each statement in the block
+    beginScope();
     for (const auto& statement : stmt->statements) {
         visitStatement(statement);
     }
-    
-    // End block scope
-    emit(Opcode::END_SCOPE, stmt->line);
+    endScope();
 }
 
 void BytecodeGenerator::visitIfStatement(const std::shared_ptr<AST::IfStatement>& stmt) {
@@ -1189,6 +1167,21 @@ void BytecodeGenerator::visitContractStatement(const std::shared_ptr<AST::Contra
     // Throw an exception with the message
     emit(Opcode::THROW, stmt->line);
 }
+
+// --- Scope Analysis Methods ---
+void BytecodeGenerator::beginScope() {
+    scopes.emplace_back();
+}
+
+void BytecodeGenerator::endScope() {
+    scopes.pop_back();
+}
+
+void BytecodeGenerator::declareVariable(const std::string& name) {
+    if (scopes.empty()) return;
+    scopes.back().locals.insert(name);
+}
+
 
 void BytecodeGenerator::emit(Opcode op, uint32_t lineNumber, int32_t intValue, float floatValue, bool boolValue, const std::string& stringValue) {
     // Create and push instruction onto bytecode vector

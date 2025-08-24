@@ -29,6 +29,16 @@ private:
     std::vector<size_t> loopStartAddresses;
     std::vector<size_t> loopContinueAddresses;
     std::vector<std::vector<size_t>> loopBreakPatches;
+
+    // --- Scope Analysis for Closures ---
+    struct Scope {
+        std::unordered_set<std::string> locals;
+    };
+    std::vector<Scope> scopes;
+    void beginScope();
+    void endScope();
+    void declareVariable(const std::string& name);
+    // TODO: Implement a full resolver pass.
     
     // Visitor methods for AST nodes
     void visitStatement(const std::shared_ptr<AST::Statement>& stmt);

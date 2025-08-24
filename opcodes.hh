@@ -68,6 +68,11 @@ enum class Opcode {
     DEFINE_OPTIONAL_PARAM, // Define optional function parameter
     SET_DEFAULT_VALUE,  // Set default value for optional parameter
 
+    // Closure operations
+    CLOSURE,            // Create a closure over a function
+    GET_UPVALUE,        // Get a captured variable
+    SET_UPVALUE,        // Set a captured variable
+
     // Class operations
     BEGIN_CLASS,        // Begin class definition
     END_CLASS,          // End class definition
