@@ -20,13 +20,6 @@ echo "Checking dependencies..."
 check_dep g++
 check_dep pkg-config
 
-# Check for libgccjit
-if ! pkg-config --exists libgccjit; then
-    echo "Error: libgccjit development package not found."
-    echo "Please install it (e.g. 'sudo apt install libgccjit-12-dev' or similar)."
-    exit 1
-fi
-
 echo "All dependencies found."
 
 # =============================
@@ -35,8 +28,8 @@ echo "All dependencies found."
 mkdir -p bin
 
 CXX=g++
-CXXFLAGS="-std=c++17 -Wall -Wextra -pedantic -I."
-LDFLAGS="$(pkg-config --libs libgccjit)"   # For future integration
+CXXFLAGS="-std=c++17 -Wall -Wextra -pedantic -I. -I/usr/lib/gcc/x86_64-linux-gnu/12/include"
+LDFLAGS="-L/usr/lib/gcc/x86_64-linux-gnu/12 -lgccjit"
 
 echo "Compiling with $CXX..."
 
@@ -87,6 +80,19 @@ $CXX $CXXFLAGS -o bin/format_code \
 echo "format_code built successfully."
 
 # =============================
+# Compiler
+# =============================
+$CXX $CXXFLAGS -o bin/compile \
+    compile.cpp \
+    frontend/scanner.cpp \
+    frontend/parser.cpp \
+    backend/jit_backend.cpp \
+    debugger.cpp \
+    $LDFLAGS
+
+echo "compile built successfully."
+
+# =============================
 # Summary
 # =============================
 echo
@@ -100,4 +106,7 @@ echo "  ./bin/test_parser sample.lm"
 echo
 echo "Run the code formatter:"
 echo "  ./bin/format_code sample.lm"
+echo
+echo "Run the AOT compiler:"
+echo "  ./bin/compile sample.lm sample.o"
 echo

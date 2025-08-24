@@ -261,6 +261,12 @@ std::shared_ptr<AST::Statement> Parser::statement() {
     if (match({TokenType::WHILE})) {
         return whileStatement();
     }
+    if (match({TokenType::BREAK})) {
+        return breakStatement();
+    }
+    if (match({TokenType::CONTINUE})) {
+        return continueStatement();
+    }
     if (match({TokenType::ITER})) {
         return iterStatement();
     }
@@ -535,6 +541,20 @@ std::shared_ptr<AST::Statement> Parser::iterStatement() {
     // Parse loop body
     stmt->body = statement();
 
+    return stmt;
+}
+
+std::shared_ptr<AST::Statement> Parser::breakStatement() {
+    auto stmt = std::make_shared<AST::BreakStatement>();
+    stmt->line = previous().line;
+    consume(TokenType::SEMICOLON, "Expected ';' after 'break'.");
+    return stmt;
+}
+
+std::shared_ptr<AST::Statement> Parser::continueStatement() {
+    auto stmt = std::make_shared<AST::ContinueStatement>();
+    stmt->line = previous().line;
+    consume(TokenType::SEMICOLON, "Expected ';' after 'continue'.");
     return stmt;
 }
 
