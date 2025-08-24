@@ -7,17 +7,18 @@ LIBS      := -lgccjit
 
 # Binaries
 BIN_DIR   := bin
-TARGETS   := $(BIN_DIR)/limitly $(BIN_DIR)/test_parser $(BIN_DIR)/format_code $(BIN_DIR)/test_channel $(BIN_DIR)/test_scheduler
+TARGETS   := $(BIN_DIR)/limitly $(BIN_DIR)/test_parser $(BIN_DIR)/format_code $(BIN_DIR)/test_channel $(BIN_DIR)/test_scheduler $(BIN_DIR)/test_event_loop
 
 # Sources
 COMMON_SRCS := frontend/scanner.cpp frontend/parser.cpp debugger.cpp
 BACKEND_COMMON_SRCS := backend/backend.cpp backend/functions.cpp backend/classes.cpp backend/ast_printer.cpp backend/jit_backend.cpp
-CONCURRENCY_SRCS := backend/concurrency/scheduler.cpp
+CONCURRENCY_SRCS := backend/concurrency/scheduler.cpp backend/concurrency/event_loop.cpp
 MAIN_SRCS   := main.cpp backend/vm.cpp $(BACKEND_COMMON_SRCS) $(CONCURRENCY_SRCS) $(COMMON_SRCS)
 TEST_SRCS   := test_parser.cpp $(BACKEND_COMMON_SRCS) $(COMMON_SRCS)
 FORMAT_SRCS := format_code.cpp backend/code_formatter.cpp $(COMMON_SRCS)
 CHANNEL_TEST_SRCS := tests/unit/test_channel.cpp
-SCHEDULER_TEST_SRCS := tests/unit/test_scheduler.cpp $(CONCURRENCY_SRCS)
+SCHEDULER_TEST_SRCS := tests/unit/test_scheduler.cpp backend/concurrency/scheduler.cpp
+EVENT_LOOP_TEST_SRCS := tests/unit/test_event_loop.cpp backend/concurrency/event_loop.cpp
 
 # Objects
 OBJ_DIR    := obj
@@ -26,6 +27,7 @@ TEST_OBJS   := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(TEST_SRCS))
 FORMAT_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(FORMAT_SRCS))
 CHANNEL_TEST_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(CHANNEL_TEST_SRCS))
 SCHEDULER_TEST_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(SCHEDULER_TEST_SRCS))
+EVENT_LOOP_TEST_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(EVENT_LOOP_TEST_SRCS))
 
 .PHONY: all clean check-deps
 
@@ -54,6 +56,9 @@ $(BIN_DIR)/test_channel: $(CHANNEL_TEST_OBJS) | $(BIN_DIR)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS) -lpthread
 
 $(BIN_DIR)/test_scheduler: $(SCHEDULER_TEST_OBJS) | $(BIN_DIR)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS) -lpthread
+
+$(BIN_DIR)/test_event_loop: $(EVENT_LOOP_TEST_OBJS) | $(BIN_DIR)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS) -lpthread
 
 $(OBJ_DIR)/%.o: %.cpp | $(OBJ_DIR)
