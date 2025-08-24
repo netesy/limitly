@@ -17,6 +17,7 @@ public:
 
 private:
     gcc_jit_context* ctxt;
+
     gcc_jit_function* printf_func;
     std::unordered_map<std::string, gcc_jit_function*> functions;
     std::unordered_map<std::string, gcc_jit_lvalue*> variables;
@@ -58,6 +59,7 @@ private:
     gcc_jit_block* visitBreakStatement(const std::shared_ptr<AST::BreakStatement>& stmt, gcc_jit_block* block);
     gcc_jit_block* visitContinueStatement(const std::shared_ptr<AST::ContinueStatement>& stmt, gcc_jit_block* block);
 
+
     // Expression visitors
     gcc_jit_rvalue* visitBinaryExpr(const std::shared_ptr<AST::BinaryExpr>& expr, gcc_jit_function* func, gcc_jit_block* block);
     gcc_jit_rvalue* visitUnaryExpr(const std::shared_ptr<AST::UnaryExpr>& expr, gcc_jit_function* func, gcc_jit_block* block);
@@ -65,6 +67,7 @@ private:
     gcc_jit_rvalue* visitVariableExpr(const std::shared_ptr<AST::VariableExpr>& expr, gcc_jit_function* func, gcc_jit_block* block);
     gcc_jit_rvalue* visitCallExpr(const std::shared_ptr<AST::CallExpr>& expr, gcc_jit_function* func, gcc_jit_block* block);
     gcc_jit_rvalue* visitAssignExpr(const std::shared_ptr<AST::AssignExpr>& expr, gcc_jit_function* func, gcc_jit_block* block);
+
     gcc_jit_rvalue* visitGroupingExpr(const std::shared_ptr<AST::GroupingExpr>& expr, gcc_jit_function* func, gcc_jit_block* block);
     gcc_jit_rvalue* visitRangeExpr(const std::shared_ptr<AST::RangeExpr>& expr, gcc_jit_function* func, gcc_jit_block* block);
     gcc_jit_rvalue* visitInterpolatedStringExpr(const std::shared_ptr<AST::InterpolatedStringExpr>& expr, gcc_jit_function* func, gcc_jit_block* block);
@@ -74,6 +77,6 @@ private:
     // Helper methods
     gcc_jit_type* to_jit_type(const std::shared_ptr<AST::TypeAnnotation>& type);
     void print_rvalue(gcc_jit_rvalue* rval, gcc_jit_block* block, bool with_newline);
-};
+
 
 #endif // JIT_BACKEND_H

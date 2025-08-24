@@ -10,6 +10,7 @@ JitBackend::JitBackend() {
     }
     // Set up options if needed
 
+
     // Import printf for use in print statements
     gcc_jit_type* int_type = gcc_jit_context_get_type(ctxt, GCC_JIT_TYPE_INT);
     gcc_jit_type* const_char_ptr_type = gcc_jit_context_get_type(ctxt, GCC_JIT_TYPE_CONST_CHAR_PTR);
@@ -97,6 +98,7 @@ JitBackend::JitBackend() {
     thread_pool_stop_func_ = gcc_jit_context_new_function(ctxt, nullptr, GCC_JIT_FUNCTION_IMPORTED,
                                                        gcc_jit_context_get_type(ctxt, GCC_JIT_TYPE_VOID),
                                                        "thread_pool_stop", 1, &p_tp_stop, 0);
+
 }
 
 JitBackend::~JitBackend() {
@@ -124,6 +126,7 @@ void JitBackend::process(const std::shared_ptr<AST::Program>& program) {
         if (auto funcDecl = std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt)) {
             visitFunctionDeclaration(funcDecl);
         } else {
+
             block = visitStatement(stmt, main_func, block);
         }
     }
@@ -137,7 +140,9 @@ void JitBackend::compile(const char* output_filename) {
     gcc_jit_context_compile_to_file(ctxt, GCC_JIT_OUTPUT_KIND_EXECUTABLE, output_filename);
 }
 
+
 #include <type_traits>
+
 
 gcc_jit_type* JitBackend::to_jit_type(const std::shared_ptr<AST::TypeAnnotation>& type) {
     if (!type) {
@@ -145,6 +150,7 @@ gcc_jit_type* JitBackend::to_jit_type(const std::shared_ptr<AST::TypeAnnotation>
     }
     if (type->typeName == "int") {
         return gcc_jit_context_get_type(ctxt, GCC_JIT_TYPE_INT);
+
     } else if (type->typeName == "float") {
         return gcc_jit_context_get_type(ctxt, GCC_JIT_TYPE_DOUBLE);
     } else if (type->typeName == "bool") {
@@ -161,6 +167,7 @@ gcc_jit_type* JitBackend::to_jit_type(const std::shared_ptr<AST::TypeAnnotation>
 
     // Add other type conversions here
     return gcc_jit_context_get_type(ctxt, GCC_JIT_TYPE_VOID_PTR);
+
 }
 
 void JitBackend::visitFunctionDeclaration(const std::shared_ptr<AST::FunctionDeclaration>& stmt) {
@@ -210,11 +217,13 @@ void JitBackend::visitFunctionDeclaration(const std::shared_ptr<AST::FunctionDec
 
     // --- Restore the previous scope ---
     variables = variables_backup;
+
 }
 
 // Other visitor implementations will go here
 
 gcc_jit_rvalue* JitBackend::visitExpression(const std::shared_ptr<AST::Expression>& expr, gcc_jit_function* func, gcc_jit_block* block) {
+
     if (auto binaryExpr = std::dynamic_pointer_cast<AST::BinaryExpr>(expr)) {
         return visitBinaryExpr(binaryExpr, func, block);
     } else if (auto unaryExpr = std::dynamic_pointer_cast<AST::UnaryExpr>(expr)) {
@@ -1025,4 +1034,5 @@ gcc_jit_block* JitBackend::visitConcurrentStatement(const std::shared_ptr<AST::C
 gcc_jit_rvalue* JitBackend::visitRangeExpr(const std::shared_ptr<AST::RangeExpr>& expr, gcc_jit_function* func, gcc_jit_block* block) {
     std::cerr << "JIT Warning: Range expression used outside of an iter-loop. This has no effect." << std::endl;
     return nullptr;
+
 }
