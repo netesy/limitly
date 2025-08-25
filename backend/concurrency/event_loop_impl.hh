@@ -3,7 +3,7 @@
 
 #include <functional>
 
-using EventCallback = std::function<void()>;
+using EventCallback = std::function<void(int)>;
 
 class EventLoopImpl {
 public:

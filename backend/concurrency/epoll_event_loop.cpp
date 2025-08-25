@@ -18,6 +18,11 @@ EpollEventLoop::~EpollEventLoop() {
 }
 
 void EpollEventLoop::register_event(int fd, EventCallback callback) {
+    if (fd == -1) {
+        // Immediate execution for non-fd-based tasks
+        callback(fd);
+        return;
+    }
     epoll_event event;
     event.data.fd = fd;
     event.events = EPOLLIN | EPOLLET; // Edge-triggered for input events
@@ -52,7 +57,7 @@ void EpollEventLoop::run() {
             int fd = events[i].data.fd;
             auto it = callbacks_.find(fd);
             if (it != callbacks_.end()) {
-                it->second(); // Execute the callback
+                it->second(fd); // Execute the callback, passing the fd
             }
         }
     }
