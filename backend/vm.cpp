@@ -54,7 +54,7 @@ ValuePtr VMUserDefinedFunction::execute(const std::vector<ValuePtr>& args) {
     return nullptr;
 }
 
-VM::VM()
+VM::VM(bool create_runtime)
     : memoryManager(1024 * 1024), // 1MB initial memory
       region(std::make_unique<MemoryManager<>::Region>(memoryManager)),
       typeSystem(new TypeSystem(memoryManager, *region)),
@@ -69,6 +69,15 @@ VM::VM()
       currentClassBeingDefined(""),
       insideClassDefinition(false) {
     
+    if (create_runtime) {
+        // Initialize and start the concurrency runtime
+        scheduler = std::make_shared<Scheduler>();
+        size_t num_threads = std::thread::hardware_concurrency();
+        thread_pool = std::make_shared<ThreadPool>(num_threads > 0 ? num_threads : 2, scheduler);
+        thread_pool->start();
+        event_loop = std::make_shared<EventLoop>();
+    }
+
     // Register native functions
     registerNativeFunction("clock", [this](const std::vector<ValuePtr>&) -> ValuePtr {
         auto result = memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, static_cast<double>(std::clock()) / CLOCKS_PER_SEC);
@@ -2496,8 +2505,6 @@ void VM::handleEndHandler(const Instruction& /*unused*/) { error("Not implemente
 void VM::handleThrow(const Instruction& /*unused*/) { error("Not implemented"); }
 void VM::handleStoreException(const Instruction& /*unused*/) { error("Not implemented"); }
 void VM::handleBeginParallel(const Instruction& instruction) {
-    int num_threads = instruction.intValue > 0 ? instruction.intValue : 1;
-
     // Find the end of the parallel block
     size_t block_start_ip = ip + 1;
     size_t block_end_ip = block_start_ip;
@@ -2515,45 +2522,101 @@ void VM::handleBeginParallel(const Instruction& instruction) {
         block_end_ip++;
     }
 
-    if (block_end_ip == bytecode->size()) {
+    if (block_end_ip >= bytecode->size()) {
         error("Unmatched BEGIN_PARALLEL");
         return;
     }
 
     // Extract the bytecode for the parallel block
-    std::vector<Instruction> block_bytecode(bytecode->begin() + block_start_ip, bytecode->begin() + block_end_ip);
+    std::vector<Instruction> block_bytecode(
+        bytecode->begin() + block_start_ip,
+        bytecode->begin() + block_end_ip
+    );
 
-    {
-        std::lock_guard<std::mutex> lock(threads_mutex);
-        for (int i = 0; i < num_threads; ++i) {
-            active_threads.emplace_back([this, block_bytecode]() {
-                VM thread_vm;
-                // Copy the environment to the new VM. This is a shallow copy of the shared_ptr,
-                // so threads will share the same environment. This is unsafe without proper locking
-                // in the Environment class itself, but it's a starting point.
-                thread_vm.globals = this->globals;
-                thread_vm.environment = this->environment;
-                thread_vm.execute(block_bytecode);
-            });
-        }
-    }
+    // Create a task to execute the parallel block in a new VM
+    Task task = [this, block_bytecode]() {
+        // Create a new VM for this task without creating a new runtime
+        VM task_vm(false);
+
+        // Share the concurrency runtime components
+        task_vm.scheduler = this->scheduler;
+        task_vm.thread_pool = this->thread_pool;
+        task_vm.event_loop = this->event_loop;
+
+        // Share the global environment.
+        task_vm.globals = this->globals;
+        task_vm.environment = std::make_shared<Environment>(this->globals);
+
+        // Execute the bytecode block
+        task_vm.execute(block_bytecode);
+    };
+
+    // Submit the task to the scheduler
+    scheduler->submit(std::move(task));
 
     // Skip the main VM's instruction pointer past the parallel block
     ip = block_end_ip;
 }
 
 void VM::handleEndParallel(const Instruction& /*unused*/) {
-    std::lock_guard<std::mutex> lock(threads_mutex);
-    for (auto& t : active_threads) {
-        if (t.joinable()) {
-            t.join();
-        }
-    }
-    active_threads.clear();
+    // This is now a no-op. The thread pool manages thread lifecycle.
 }
 
-void VM::handleBeginConcurrent(const Instruction& /*unused*/) { error("Not implemented"); }
-void VM::handleEndConcurrent(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleBeginConcurrent(const Instruction& instruction) {
+    // Find the end of the concurrent block
+    size_t block_start_ip = ip + 1;
+    size_t block_end_ip = block_start_ip;
+    int nesting_level = 0;
+    while (block_end_ip < bytecode->size()) {
+        const auto& instr = (*bytecode)[block_end_ip];
+        if (instr.opcode == Opcode::BEGIN_CONCURRENT) {
+            nesting_level++;
+        } else if (instr.opcode == Opcode::END_CONCURRENT) {
+            if (nesting_level == 0) {
+                break;
+            }
+            nesting_level--;
+        }
+        block_end_ip++;
+    }
+
+    if (block_end_ip >= bytecode->size()) {
+        error("Unmatched BEGIN_CONCURRENT");
+        return;
+    }
+
+    // Extract the bytecode for the concurrent block
+    std::vector<Instruction> block_bytecode(
+        bytecode->begin() + block_start_ip,
+        bytecode->begin() + block_end_ip
+    );
+
+    // Create a callback for the event loop
+    EventCallback callback = [this, block_bytecode](int fd) {
+        // Create a new VM for this task without creating a new runtime
+        VM task_vm(false);
+
+        // Share the concurrency runtime components
+        task_vm.scheduler = this->scheduler;
+        task_vm.thread_pool = this->thread_pool;
+        task_vm.event_loop = this->event_loop;
+
+        task_vm.globals = this->globals;
+        task_vm.environment = std::make_shared<Environment>(this->globals);
+        task_vm.execute(block_bytecode);
+    };
+
+    // For now, we'll just post the task to be executed immediately.
+    // We use a dummy file descriptor (-1) to indicate an immediate task.
+    event_loop->register_event(-1, std::move(callback));
+
+    // Skip the main VM's instruction pointer past the concurrent block
+    ip = block_end_ip;
+}
+
+void VM::handleEndConcurrent(const Instruction& /*unused*/) {
+    // This is a no-op, similar to handleEndParallel.
+}
 
 void VM::handleMatchPattern(const Instruction& /*unused*/) {
     if (matchCounter++ > 40) {
