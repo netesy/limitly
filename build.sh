@@ -28,8 +28,7 @@ echo "All dependencies found."
 mkdir -p bin
 
 CXX=g++
-CXXFLAGS="-std=c++17 -Wall -Wextra -pedantic -I. -I/usr/lib/gcc/x86_64-linux-gnu/12/include"
-LDFLAGS="-L/usr/lib/gcc/x86_64-linux-gnu/12 -lgccjit"
+CXXFLAGS="-std=c++17 -Wall -Wextra -pedantic -I."
 
 echo "Compiling with $CXX..."
 
@@ -45,8 +44,11 @@ $CXX $CXXFLAGS -o bin/limitly \
     backend/ast_printer.cpp \
     backend/functions.cpp \
     backend/classes.cpp \
-    debugger.cpp \
-    $LDFLAGS
+    backend/concurrency/scheduler.cpp \
+    backend/concurrency/thread_pool.cpp \
+    backend/concurrency/event_loop.cpp \
+    backend/concurrency/epoll_event_loop.cpp \
+    debugger.cpp
 
 echo "limitly built successfully."
 
@@ -61,8 +63,7 @@ $CXX $CXXFLAGS -o bin/test_parser \
     backend/ast_printer.cpp \
     backend/functions.cpp \
     backend/classes.cpp \
-    debugger.cpp \
-    $LDFLAGS
+    debugger.cpp
 
 echo "test_parser built successfully."
 
@@ -74,23 +75,9 @@ $CXX $CXXFLAGS -o bin/format_code \
     frontend/scanner.cpp \
     frontend/parser.cpp \
     backend/code_formatter.cpp \
-    debugger.cpp \
-    $LDFLAGS
+    debugger.cpp
 
 echo "format_code built successfully."
-
-# =============================
-# Compiler
-# =============================
-$CXX $CXXFLAGS -o bin/compile \
-    compile.cpp \
-    frontend/scanner.cpp \
-    frontend/parser.cpp \
-    backend/jit_backend.cpp \
-    debugger.cpp \
-    $LDFLAGS
-
-echo "compile built successfully."
 
 # =============================
 # Summary
