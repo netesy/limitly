@@ -1296,9 +1296,12 @@ std::shared_ptr<AST::Statement> Parser::matchStatement() {
             pattern->line = previous().line;
             pattern->value = nullptr; // Represent wildcard with null
             matchCase.pattern = pattern;
-        } else if (isPrimitiveType(peek().type) || check(TokenType::IDENTIFIER)) {
+        } else if (isPrimitiveType(peek().type) || check(TokenType::IDENTIFIER) ||
+                   check(TokenType::NUMBER) || check(TokenType::STRING) ||
+                   check(TokenType::TRUE) || check(TokenType::FALSE) ||
+                   check(TokenType::NIL)) {
             // Type pattern or literal pattern
-            matchCase.pattern = expression();
+            matchCase.pattern = primary();
         } else {
             error("Expected pattern in match case.");
             break;
@@ -1718,11 +1721,11 @@ std::shared_ptr<AST::Expression> Parser::primary() {
         return interpolated;
     }
 
-    // if (match({TokenType::THIS})) {
-    //     auto thisExpr = std::make_shared<AST::ThisExpr>();
-    //     thisExpr->line = previous().line;
-    //     return thisExpr;
-    // }
+    if (match({TokenType::THIS})) {
+        auto thisExpr = std::make_shared<AST::ThisExpr>();
+        thisExpr->line = previous().line;
+        return thisExpr;
+    }
 
     if (match({TokenType::IDENTIFIER})) {
         auto token = previous();
