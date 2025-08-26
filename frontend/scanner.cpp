@@ -86,7 +86,13 @@ void Scanner::scanToken() {
         addToken(match('=') ? TokenType::BANG_EQUAL : TokenType::BANG);
         break;
     case '=':
-        addToken(match('=') ? TokenType::EQUAL_EQUAL : TokenType::EQUAL);
+        if (match('=')) {
+            addToken(TokenType::EQUAL_EQUAL);
+        } else if (match('>')) {
+            addToken(TokenType::ARROW);
+        } else {
+            addToken(TokenType::EQUAL);
+        }
         break;
     case '<':
         addToken(match('=') ? TokenType::LESS_EQUAL : TokenType::LESS);
