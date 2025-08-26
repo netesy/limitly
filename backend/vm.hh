@@ -8,6 +8,9 @@
 #include "types.hh"
 #include "functions.hh"
 #include "classes.hh"
+#include "concurrency/scheduler.hh"
+#include "concurrency/thread_pool.hh"
+#include "concurrency/event_loop.hh"
 #include <vector>
 #include <stack>
 #include <unordered_map>
@@ -28,7 +31,7 @@ class VM;
 // Virtual Machine class
 class VM {
 public:
-    VM();
+    explicit VM(bool create_runtime = true);
     ~VM();
     
     // Execute bytecode
@@ -80,9 +83,10 @@ private:
     // Map to store runtime default values for class fields
     std::unordered_map<std::string, ValuePtr> fieldDefaultValues;
 
-    // Concurrency helpers
-    std::vector<std::thread> active_threads;
-    std::mutex threads_mutex;
+    // Concurrency runtime
+    std::shared_ptr<Scheduler> scheduler;
+    std::shared_ptr<ThreadPool> thread_pool;
+    std::shared_ptr<EventLoop> event_loop;
     
     // Helper methods
     ValuePtr pop();
