@@ -197,21 +197,14 @@ int main(int argc, char* argv[]) {
         Scanner scanner(source);
         scanner.scanTokens();
         
-        // Output tokens to file
-        std::string tokensFilename = std::string(argv[1]) + ".tokens.txt";
-        std::ofstream tokensFile(tokensFilename);
-        if (tokensFile.is_open()) {
-            tokensFile << "Tokens for " << argv[1] << "\n";
-            tokensFile << "========================================\n\n";
-            for (const auto& token : scanner.getTokens()) {
-                tokensFile << "Line " << token.line << ": " 
-                          << scanner.tokenTypeToString(token.type) 
-                          << " = '" << token.lexeme << "'\n";
-            }
-            std::cout << "Tokens output saved to " << tokensFilename << std::endl;
-        } else {
-            std::cerr << "Warning: Could not open " << tokensFilename << " for writing" << std::endl;
+        // Print tokens to stdout
+        std::cout << "=== Tokens ===\n";
+        for (const auto& token : scanner.getTokens()) {
+            std::cout << "Line " << token.line << ": "
+                      << scanner.tokenTypeToString(token.type)
+                      << " = '" << token.lexeme << "'\n";
         }
+        std::cout << std::endl;
         
         // Frontend: Syntax analysis (parsing)
         std::cout << "=== Parsing ===\n";

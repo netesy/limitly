@@ -28,13 +28,16 @@ echo "All dependencies found."
 mkdir -p bin
 
 CXX=g++
+
 CXXFLAGS="-std=c++17 -Wall -Wextra -pedantic -I."
+
 
 echo "Compiling with $CXX..."
 
 # =============================
 # Main executable
 # =============================
+
 $CXX $CXXFLAGS -o bin/limitly \
     main.cpp \
     frontend/scanner.cpp \
@@ -51,6 +54,7 @@ $CXX $CXXFLAGS -o bin/limitly \
     debugger.cpp
 
 echo "limitly built successfully."
+
 
 # =============================
 # Test parser
@@ -70,6 +74,7 @@ echo "test_parser built successfully."
 # =============================
 # Code formatter
 # =============================
+
 $CXX $CXXFLAGS -o bin/format_code \
     format_code.cpp \
     frontend/scanner.cpp \
@@ -77,7 +82,8 @@ $CXX $CXXFLAGS -o bin/format_code \
     backend/code_formatter.cpp \
     debugger.cpp
 
-echo "format_code built successfully."
+
+# echo "format_code built successfully."
 
 # =============================
 # Summary
@@ -85,15 +91,15 @@ echo "format_code built successfully."
 echo
 echo "✅ Build completed successfully."
 echo
-echo "Run the main executable:"
-echo "  ./bin/limitly"
-echo
+# echo "Run the main executable:"
+# echo "  ./bin/limitly"
+# echo
 echo "Run the test parser:"
 echo "  ./bin/test_parser sample.lm"
 echo
-echo "Run the code formatter:"
-echo "  ./bin/format_code sample.lm"
-echo
-echo "Run the AOT compiler:"
-echo "  ./bin/compile sample.lm sample.o"
-echo
+# echo "Run the code formatter:"
+# echo "  ./bin/format_code sample.lm"
+# echo
+# echo "Run the AOT compiler:"
+# echo "  ./bin/compile sample.lm sample.o"
+# echo
