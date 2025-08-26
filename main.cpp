@@ -62,14 +62,15 @@ void executeFile(const std::string& filename, bool printAst = false, bool printT
             std::cout << std::endl;
         }
 
-        if (useJit) {
-            // std::cout << "=== JIT Backend ===\n";
-            // JitBackend jit;
-            // jit.process(ast);
-            // const char* output_filename = "jit_output";
-            // jit.compile(output_filename);
-            // std::cout << "Compiled to " << output_filename << ". Run ./" << output_filename << " to see the result.\n";
-        } else {
+        // if (useJit) {
+        //     std::cout << "=== JIT Backend ===\n";
+        //     JitBackend jit;
+        //     jit.process(ast);
+        //     const char* output_filename = "jit_output";
+        //     jit.compile(output_filename);
+        //     std::cout << "Compiled to " << output_filename << ". Run ./" << output_filename << " to see the result.\n";
+        // } else {
+
             // Backend: Generate bytecode
             BytecodeGenerator generator;
             generator.process(ast);
@@ -93,7 +94,7 @@ void executeFile(const std::string& filename, bool printAst = false, bool printT
             } catch (const std::exception& e) {
                 std::cerr << "Error: " << e.what() << std::endl;
             }
-        }
+        // }
         
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;

@@ -28,27 +28,33 @@ echo "All dependencies found."
 mkdir -p bin
 
 CXX=g++
-CXXFLAGS="-std=c++17 -Wall -Wextra -pedantic -I. -I/usr/lib/gcc/x86_64-linux-gnu/13/include"
-LDFLAGS="-L/usr/lib/gcc/x86_64-linux-gnu/13 -lgccjit"
+
+CXXFLAGS="-std=c++17 -Wall -Wextra -pedantic -I."
+
 
 echo "Compiling with $CXX..."
 
 # =============================
 # Main executable
 # =============================
-# $CXX $CXXFLAGS -o bin/limitly \
-#     main.cpp \
-#     frontend/scanner.cpp \
-#     frontend/parser.cpp \
-#     backend/backend.cpp \
-#     backend/vm.cpp \
-#     backend/ast_printer.cpp \
-#     backend/functions.cpp \
-#     backend/classes.cpp \
-#     debugger.cpp \
-#     $LDFLAGS
 
-# echo "limitly built successfully."
+$CXX $CXXFLAGS -o bin/limitly \
+    main.cpp \
+    frontend/scanner.cpp \
+    frontend/parser.cpp \
+    backend/backend.cpp \
+    backend/vm.cpp \
+    backend/ast_printer.cpp \
+    backend/functions.cpp \
+    backend/classes.cpp \
+    backend/concurrency/scheduler.cpp \
+    backend/concurrency/thread_pool.cpp \
+    backend/concurrency/event_loop.cpp \
+    backend/concurrency/epoll_event_loop.cpp \
+    debugger.cpp
+
+echo "limitly built successfully."
+
 
 # =============================
 # Test parser
@@ -68,28 +74,16 @@ echo "test_parser built successfully."
 # =============================
 # Code formatter
 # =============================
-# $CXX $CXXFLAGS -o bin/format_code \
-#     format_code.cpp \
-#     frontend/scanner.cpp \
-#     frontend/parser.cpp \
-#     backend/code_formatter.cpp \
-#     debugger.cpp \
-#     $LDFLAGS
+
+$CXX $CXXFLAGS -o bin/format_code \
+    format_code.cpp \
+    frontend/scanner.cpp \
+    frontend/parser.cpp \
+    backend/code_formatter.cpp \
+    debugger.cpp
+
 
 # echo "format_code built successfully."
-
-# =============================
-# Compiler
-# =============================
-# $CXX $CXXFLAGS -o bin/compile \
-#     compile.cpp \
-#     frontend/scanner.cpp \
-#     frontend/parser.cpp \
-#     backend/jit_backend.cpp \
-#     debugger.cpp \
-#     $LDFLAGS
-
-# echo "compile built successfully."
 
 # =============================
 # Summary
