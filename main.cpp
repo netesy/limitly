@@ -70,6 +70,7 @@ void executeFile(const std::string& filename, bool printAst = false, bool printT
         //     jit.compile(output_filename);
         //     std::cout << "Compiled to " << output_filename << ". Run ./" << output_filename << " to see the result.\n";
         // } else {
+
             // Backend: Generate bytecode
             BytecodeGenerator generator;
             generator.process(ast);

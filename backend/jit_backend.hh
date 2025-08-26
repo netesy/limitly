@@ -77,6 +77,6 @@ private:
     // Helper methods
     gcc_jit_type* to_jit_type(const std::shared_ptr<AST::TypeAnnotation>& type);
     void print_rvalue(gcc_jit_rvalue* rval, gcc_jit_block* block, bool with_newline);
-
+};
 
 #endif // JIT_BACKEND_H

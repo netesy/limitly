@@ -1,0 +1,34 @@
+AST for tests/loops/match.lm
+========================================
+
+AST Dump:
+==========
+VarDeclaration: x
+  Type: int
+  Initializer:
+    Literal: 5
+MatchStatement:
+  Value:
+    Variable: x
+  Cases:
+    Case:
+      Pattern:
+      Literal: 5
+      Body:
+      BlockStatement:
+        PrintStatement:
+          Literal: "x is five"
+    Case:
+      Pattern:
+      Literal: 10
+      Body:
+      BlockStatement:
+        PrintStatement:
+          Literal: "x is ten"
+    Case:
+      Pattern:
+      Literal: nil
+      Body:
+      BlockStatement:
+        PrintStatement:
+          Literal: "x is something else"
