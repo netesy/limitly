@@ -20,6 +20,7 @@ public:
 private:
     Scanner &scanner;
     size_t current;
+    bool in_concurrent_block = false;
 
     struct ParseError {
         std::string message;
@@ -72,6 +73,8 @@ public:
     std::shared_ptr<AST::Statement> attemptStatement();
     std::shared_ptr<AST::Statement> parallelStatement();
     std::shared_ptr<AST::Statement> concurrentStatement();
+    std::shared_ptr<AST::Statement> taskStatement();
+    std::shared_ptr<AST::Statement> workerStatement();
     std::shared_ptr<AST::Statement> importStatement();
     std::shared_ptr<AST::EnumDeclaration> enumDeclaration();
     std::shared_ptr<AST::Statement> matchStatement();
