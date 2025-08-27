@@ -1,4 +1,4 @@
-AST for tests/loops/match.lm
+AST for ./tests/loops/match.lm
 ========================================
 
 AST Dump:
