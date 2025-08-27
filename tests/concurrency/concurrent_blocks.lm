@@ -104,3 +104,22 @@ parallel(events: FileChunks, ch=files_out, mode=stream, cores=Auto,
 iter (msg in files_out) {
     print(msg);
 }
+
+// ==========================================
+//  Concurrent block with no parameters
+// ==========================================
+concurrent {
+    task(i in 1..2) {
+        print("Task {i} with default parameters");
+    }
+}
+
+// ==========================================
+//  Parallel block with invalid parameter
+// ==========================================
+// This should be handled gracefully by the parser
+parallel(invalid_param="test") {
+    task(i in 1..2) {
+        print("This should not be executed");
+    }
+}
