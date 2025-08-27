@@ -87,6 +87,17 @@ public:
     std::shared_ptr<AST::Statement> contractStatement();
     std::shared_ptr<AST::Statement> comptimeStatement();
 
+    // Concurrency parsing helper
+    void parseConcurrencyParams(
+        std::string& channel,
+        std::string& mode,
+        std::string& cores,
+        std::string& onError,
+        std::string& timeout,
+        std::string& grace,
+        std::string& onTimeout
+    );
+
     // Type parsing methods
     std::shared_ptr<AST::TypeAnnotation> parseTypeAnnotation();
     std::shared_ptr<AST::TypeAnnotation> parseStructuralType(const std::string& typeName = "");

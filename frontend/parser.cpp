@@ -1130,20 +1130,15 @@ std::shared_ptr<AST::Statement> Parser::attemptStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> Parser::parallelStatement() {
-    auto stmt = std::make_shared<AST::ParallelStatement>();
-    stmt->line = previous().line;
-
-    // Set default values
-    stmt->channel = "";
-    stmt->mode = "fork-join";  // Default mode for parallel blocks
-    stmt->cores = "auto";
-    stmt->onError = "stop";
-    stmt->timeout = "0";
-    stmt->grace = "0";
-    stmt->onTimeout = "partial";
-
-    // Parse parameters if they exist
+void Parser::parseConcurrencyParams(
+    std::string& channel,
+    std::string& mode,
+    std::string& cores,
+    std::string& onError,
+    std::string& timeout,
+    std::string& grace,
+    std::string& onTimeout
+) {
     if (match({TokenType::LEFT_PAREN})) {
         while (!check(TokenType::RIGHT_PAREN) && !isAtEnd()) {
             // Parse parameter name
@@ -1179,19 +1174,19 @@ std::shared_ptr<AST::Statement> Parser::parallelStatement() {
 
             // Assign parameter value to the appropriate field
             if (paramName == "ch") {
-                stmt->channel = paramValue;
+                channel = paramValue;
             } else if (paramName == "mode") {
-                stmt->mode = paramValue;
+                mode = paramValue;
             } else if (paramName == "cores") {
-                stmt->cores = paramValue;
+                cores = paramValue;
             } else if (paramName == "on_error") {
-                stmt->onError = paramValue;
+                onError = paramValue;
             } else if (paramName == "timeout") {
-                stmt->timeout = paramValue;
+                timeout = paramValue;
             } else if (paramName == "grace") {
-                stmt->grace = paramValue;
+                grace = paramValue;
             } else if (paramName == "on_timeout") {
-                stmt->onTimeout = paramValue;
+                onTimeout = paramValue;
             } else {
                 error("Unknown parameter: " + paramName);
             }
@@ -1204,6 +1199,23 @@ std::shared_ptr<AST::Statement> Parser::parallelStatement() {
         }
         consume(TokenType::RIGHT_PAREN, "Expected ')' after parameters");
     }
+}
+
+std::shared_ptr<AST::Statement> Parser::parallelStatement() {
+    auto stmt = std::make_shared<AST::ParallelStatement>();
+    stmt->line = previous().line;
+
+    // Set default values
+    stmt->channel = "";
+    stmt->mode = "fork-join";  // Default mode for parallel blocks
+    stmt->cores = "auto";
+    stmt->onError = "stop";
+    stmt->timeout = "0";
+    stmt->grace = "0";
+    stmt->onTimeout = "partial";
+
+    // Parse parameters
+    parseConcurrencyParams(stmt->channel, stmt->mode, stmt->cores, stmt->onError, stmt->timeout, stmt->grace, stmt->onTimeout);
 
     // Parse the block
     consume(TokenType::LEFT_BRACE, "Expected '{' after 'parallel'.");
@@ -1227,67 +1239,8 @@ std::shared_ptr<AST::Statement> Parser::concurrentStatement() {
     stmt->grace = "0";
     stmt->onTimeout = "partial";
 
-    // Parse parameters if they exist
-    if (match({TokenType::LEFT_PAREN})) {
-        while (!check(TokenType::RIGHT_PAREN) && !isAtEnd()) {
-            // Parse parameter name
-            std::string paramName = consume(TokenType::IDENTIFIER, "Expected parameter name").lexeme;
-            consume(TokenType::EQUAL, "Expected '=' after parameter name");
-            
-            // Parse parameter value
-            std::string paramValue;
-            if (check(TokenType::STRING)) {
-                paramValue = consume(TokenType::STRING, "Expected string value").lexeme;
-                // Remove quotes
-                if (paramValue.size() >= 2) {
-                    paramValue = paramValue.substr(1, paramValue.size() - 2);
-                }
-            } else if (check(TokenType::NUMBER)) {
-                // Get the number value
-                paramValue = consume(TokenType::NUMBER, "Expected number value").lexeme;
-                
-                // Check for time unit (s, ms, etc.)
-                if (check(TokenType::IDENTIFIER)) {
-                    std::string unit = peek().lexeme;
-                    if (unit == "s" || unit == "ms" || unit == "us" || unit == "ns") {
-                        advance();  // Consume the unit
-                        paramValue += unit;
-                    }
-                }
-            } else if (check(TokenType::IDENTIFIER)) {
-                paramValue = consume(TokenType::IDENTIFIER, "Expected identifier").lexeme;
-            } else {
-                error("Expected string, number, or identifier as parameter value");
-                break;
-            }
-
-            // Assign parameter value to the appropriate field
-            if (paramName == "ch") {
-                stmt->channel = paramValue;
-            } else if (paramName == "mode") {
-                stmt->mode = paramValue;
-            } else if (paramName == "cores") {
-                stmt->cores = paramValue;
-            } else if (paramName == "on_error") {
-                stmt->onError = paramValue;
-            } else if (paramName == "timeout") {
-                stmt->timeout = paramValue;
-            } else if (paramName == "grace") {
-                stmt->grace = paramValue;
-            } else if (paramName == "on_timeout") {
-                stmt->onTimeout = paramValue;
-            } else {
-                error("Unknown parameter: " + paramName);
-            }
-
-            // Check for comma or end of parameters
-            if (!match({TokenType::COMMA}) && !check(TokenType::RIGHT_PAREN)) {
-                error("Expected ',' or ')' after parameter");
-                break;
-            }
-        }
-        consume(TokenType::RIGHT_PAREN, "Expected ')' after parameters");
-    }
+    // Parse parameters
+    parseConcurrencyParams(stmt->channel, stmt->mode, stmt->cores, stmt->onError, stmt->timeout, stmt->grace, stmt->onTimeout);
 
     // Parse the block
     consume(TokenType::LEFT_BRACE, "Expected '{' after 'concurrent'.");
@@ -1353,28 +1306,11 @@ std::shared_ptr<AST::Statement> Parser::matchStatement() {
         AST::MatchCase matchCase;
 
         // Parse pattern
-        if (match({TokenType::DEFAULT}) || (check(TokenType::IDENTIFIER) && peek().lexeme == "_")) {
-            if (previous().type != TokenType::DEFAULT) advance(); // consume '_' if it was an identifier
-            // Wildcard pattern
-            auto pattern = std::make_shared<AST::LiteralExpr>();
-            pattern->line = previous().line;
-            pattern->value = nullptr; // Represent wildcard with null
-            matchCase.pattern = pattern;
-        } else if (isPrimitiveType(peek().type) || (check(TokenType::IDENTIFIER) && (peek().lexeme == "list" || peek().lexeme == "dict"))) {
-            // Type pattern
-            auto typePattern = std::make_shared<AST::TypePatternExpr>();
-            typePattern->line = peek().line;
-            typePattern->type = parseTypeAnnotation();
-            matchCase.pattern = typePattern;
-        } else if (check(TokenType::IDENTIFIER) ||
-                   check(TokenType::NUMBER) || check(TokenType::STRING) ||
-                   check(TokenType::TRUE) || check(TokenType::FALSE) ||
-                   check(TokenType::NIL)) {
-            // literal pattern
-            matchCase.pattern = primary();
-        } else {
-            error("Expected pattern in match case.");
-            break;
+        matchCase.pattern = parsePattern();
+
+        // Parse optional guard
+        if (match({TokenType::IF})) {
+            matchCase.guard = expression();
         }
 
         consume(TokenType::ARROW, "Expected '=>' after match pattern.");
@@ -1393,6 +1329,75 @@ std::shared_ptr<AST::Statement> Parser::matchStatement() {
     consume(TokenType::RIGHT_BRACE, "Expected '}' after match cases.");
 
     return stmt;
+}
+
+std::shared_ptr<AST::Expression> Parser::parsePattern() {
+    // Wildcard pattern
+    if (match({TokenType::DEFAULT}) || (check(TokenType::IDENTIFIER) && peek().lexeme == "_")) {
+        if (previous().type != TokenType::DEFAULT) advance(); // consume '_' if it was an identifier
+        auto pattern = std::make_shared<AST::LiteralExpr>();
+        pattern->line = previous().line;
+        pattern->value = nullptr; // Represent wildcard with null
+        return pattern;
+    }
+
+    // List pattern
+    if (check(TokenType::LEFT_BRACKET)) {
+        return parseListPattern();
+    }
+
+    // Binding pattern (e.g. Some(x))
+    if (check(TokenType::IDENTIFIER) && scanner.getTokens()[current + 1].type == TokenType::LEFT_PAREN) {
+        return parseBindingPattern();
+    }
+
+    // Type pattern
+    if (isPrimitiveType(peek().type) || (check(TokenType::IDENTIFIER) && (peek().lexeme == "list" || peek().lexeme == "dict"))) {
+        auto typePattern = std::make_shared<AST::TypePatternExpr>();
+        typePattern->line = peek().line;
+        typePattern->type = parseTypeAnnotation();
+        return typePattern;
+    }
+
+    // Literal pattern
+    if (check(TokenType::IDENTIFIER) ||
+               check(TokenType::NUMBER) || check(TokenType::STRING) ||
+               check(TokenType::TRUE) || check(TokenType::FALSE) ||
+               check(TokenType::NIL)) {
+        return primary();
+    }
+
+    error("Expected pattern in match case.");
+    return makeErrorExpr();
+}
+
+std::shared_ptr<AST::Expression> Parser::parseBindingPattern() {
+    auto pattern = std::make_shared<AST::BindingPatternExpr>();
+    pattern->line = peek().line;
+    pattern->typeName = consume(TokenType::IDENTIFIER, "Expected type name in binding pattern.").lexeme;
+    consume(TokenType::LEFT_PAREN, "Expected '(' after type name in binding pattern.");
+    pattern->variableName = consume(TokenType::IDENTIFIER, "Expected variable name in binding pattern.").lexeme;
+    consume(TokenType::RIGHT_PAREN, "Expected ')' after variable name in binding pattern.");
+    return pattern;
+}
+
+std::shared_ptr<AST::Expression> Parser::parseListPattern() {
+    auto pattern = std::make_shared<AST::ListPatternExpr>();
+    pattern->line = peek().line;
+    consume(TokenType::LEFT_BRACKET, "Expected '[' at start of list pattern.");
+
+    if (!check(TokenType::RIGHT_BRACKET)) {
+        do {
+            if (match({TokenType::ELLIPSIS})) {
+                pattern->restElement = consume(TokenType::IDENTIFIER, "Expected identifier for rest element.").lexeme;
+                break;
+            }
+            pattern->elements.push_back(parsePattern());
+        } while (match({TokenType::COMMA}));
+    }
+
+    consume(TokenType::RIGHT_BRACKET, "Expected ']' at end of list pattern.");
+    return pattern;
 }
 
 // Expression parsing methods
