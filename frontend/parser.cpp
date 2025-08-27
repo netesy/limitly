@@ -336,6 +336,40 @@ std::shared_ptr<AST::Statement> Parser::printStatement() {
     return stmt;
 }
 
+std::shared_ptr<AST::Statement> Parser::taskStatement() {
+    auto stmt = std::make_shared<AST::TaskStatement>();
+    stmt->line = peek().line;
+
+    consume(TokenType::LEFT_PAREN, "Expected '(' after 'task'.");
+    stmt->loopVar = consume(TokenType::IDENTIFIER, "Expected loop variable name.").lexeme;
+    consume(TokenType::IN, "Expected 'in' after loop variable.");
+    stmt->iterable = expression();
+    consume(TokenType::RIGHT_PAREN, "Expected ')' after task arguments.");
+
+    consume(TokenType::LEFT_BRACE, "Expected '{' before task body.");
+    stmt->body = block();
+
+    return stmt;
+}
+
+std::shared_ptr<AST::Statement> Parser::workerStatement() {
+    auto stmt = std::make_shared<AST::WorkerStatement>();
+    stmt->line = peek().line;
+
+    consume(TokenType::LEFT_PAREN, "Expected '(' after 'worker'.");
+    if (check(TokenType::RIGHT_PAREN)) {
+        // No parameter
+    } else {
+        stmt->param = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
+    }
+    consume(TokenType::RIGHT_PAREN, "Expected ')' after worker arguments.");
+
+    consume(TokenType::LEFT_BRACE, "Expected '{' before worker body.");
+    stmt->body = block();
+
+    return stmt;
+}
+
 std::shared_ptr<AST::Statement> Parser::traitDeclaration() {
     // Create a new trait declaration statement
     auto traitDecl = std::make_shared<AST::TraitDeclaration>();
@@ -632,6 +666,31 @@ std::shared_ptr<AST::BlockStatement> Parser::block() {
 
     while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
         try {
+            if (in_concurrent_block) {
+                bool is_async = match({TokenType::ASYNC});
+                if (peek().type == TokenType::IDENTIFIER) {
+                    if (peek().lexeme == "task") {
+                        advance(); // consume 'task'
+                        auto stmt = taskStatement();
+                        auto task_stmt = std::dynamic_pointer_cast<AST::TaskStatement>(stmt);
+                        if (task_stmt) task_stmt->isAsync = is_async;
+                        block->statements.push_back(stmt);
+                        continue;
+                    }
+                    if (peek().lexeme == "worker") {
+                        advance(); // consume 'worker'
+                        auto stmt = workerStatement();
+                        auto worker_stmt = std::dynamic_pointer_cast<AST::WorkerStatement>(stmt);
+                        if (worker_stmt) worker_stmt->isAsync = is_async;
+                        block->statements.push_back(stmt);
+                        continue;
+                    }
+                }
+                if (is_async) {
+                    // if we matched 'async' but not 'task' or 'worker', it's an error.
+                    error("Expected 'task' or 'worker' after 'async' in this context.");
+                }
+            }
             // Try to parse a declaration
             auto declaration = this->declaration();
             if (declaration) {
@@ -1148,7 +1207,9 @@ std::shared_ptr<AST::Statement> Parser::parallelStatement() {
 
     // Parse the block
     consume(TokenType::LEFT_BRACE, "Expected '{' after 'parallel'.");
+    in_concurrent_block = true;
     stmt->body = block();
+    in_concurrent_block = false;
 
     return stmt;
 }
@@ -1230,7 +1291,9 @@ std::shared_ptr<AST::Statement> Parser::concurrentStatement() {
 
     // Parse the block
     consume(TokenType::LEFT_BRACE, "Expected '{' after 'concurrent'.");
+    in_concurrent_block = true;
     stmt->body = block();
+    in_concurrent_block = false;
 
     return stmt;
 }
@@ -1290,17 +1353,24 @@ std::shared_ptr<AST::Statement> Parser::matchStatement() {
         AST::MatchCase matchCase;
 
         // Parse pattern
-        if (match({TokenType::DEFAULT})) {
+        if (match({TokenType::DEFAULT}) || (check(TokenType::IDENTIFIER) && peek().lexeme == "_")) {
+            if (previous().type != TokenType::DEFAULT) advance(); // consume '_' if it was an identifier
             // Wildcard pattern
             auto pattern = std::make_shared<AST::LiteralExpr>();
             pattern->line = previous().line;
             pattern->value = nullptr; // Represent wildcard with null
             matchCase.pattern = pattern;
-        } else if (isPrimitiveType(peek().type) || check(TokenType::IDENTIFIER) ||
+        } else if (isPrimitiveType(peek().type) || (check(TokenType::IDENTIFIER) && (peek().lexeme == "list" || peek().lexeme == "dict"))) {
+            // Type pattern
+            auto typePattern = std::make_shared<AST::TypePatternExpr>();
+            typePattern->line = peek().line;
+            typePattern->type = parseTypeAnnotation();
+            matchCase.pattern = typePattern;
+        } else if (check(TokenType::IDENTIFIER) ||
                    check(TokenType::NUMBER) || check(TokenType::STRING) ||
                    check(TokenType::TRUE) || check(TokenType::FALSE) ||
                    check(TokenType::NIL)) {
-            // Type pattern or literal pattern
+            // literal pattern
             matchCase.pattern = primary();
         } else {
             error("Expected pattern in match case.");
