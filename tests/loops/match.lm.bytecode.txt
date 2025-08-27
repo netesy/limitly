@@ -1,4 +1,4 @@
-Bytecode for tests/loops/match.lm
+Bytecode for ./tests/loops/match.lm
 ========================================
 
 Total instructions: 32

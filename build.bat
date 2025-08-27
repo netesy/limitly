@@ -27,6 +27,10 @@ g++ -std=c++17 -Wall -Wextra -pedantic -o bin\limitly.exe ^
     backend\ast_printer.cpp ^
     backend\functions.cpp ^
     backend\classes.cpp ^
+    backend\concurrency\scheduler.cpp ^
+    backend\concurrency\thread_pool.cpp ^
+    backend\concurrency\event_loop.cpp ^
+    backend\concurrency\epoll_event_loop.cpp ^    
     debugger.cpp ^
     -I.
 

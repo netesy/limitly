@@ -1,6 +1,10 @@
 #include "epoll_event_loop.hh"
+#ifdef __linux__
 #include <sys/epoll.h>
 #include <unistd.h>
+
+
+
 #include <stdexcept>
 #include <iostream>
 
@@ -68,3 +72,4 @@ void EpollEventLoop::stop() {
     // As noted before, a more robust implementation would use an eventfd to wake up epoll_wait.
     // This simple flag is sufficient for the current design.
 }
+#endif
