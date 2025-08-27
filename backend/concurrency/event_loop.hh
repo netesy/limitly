@@ -3,6 +3,7 @@
 
 #include "event_loop_impl.hh"
 #include <memory>
+#include <atomic>
 
 class EventLoop {
 public:
@@ -17,9 +18,11 @@ public:
     void unregister_event(int fd);
     void run();
     void stop();
+    bool is_running() const;
 
 private:
     std::unique_ptr<EventLoopImpl> pimpl_;
+    std::atomic<bool> running_{false};
 };
 
 #endif // EVENT_LOOP_H

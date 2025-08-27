@@ -72,6 +72,18 @@ $CXX $CXXFLAGS -o bin/test_parser \
 echo "test_parser built successfully."
 
 # =============================
+# Unit tests
+# =============================
+$CXX $CXXFLAGS -o bin/test_event_loop \
+    tests/unit/test_event_loop.cpp \
+    backend/concurrency/event_loop.cpp \
+    backend/concurrency/epoll_event_loop.cpp \
+    backend/concurrency/kqueue_event_loop.cpp \
+    backend/concurrency/iocp_event_loop.cpp
+
+echo "test_event_loop built successfully."
+
+# =============================
 # Code formatter
 # =============================
 

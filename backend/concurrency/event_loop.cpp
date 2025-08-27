@@ -1,35 +1,66 @@
 #include "event_loop.hh"
+#include <stdexcept>
+#include <iostream>
 
 #ifdef __linux__
 #include "epoll_event_loop.hh"
+#elif _WIN32
+#include "iocp_event_loop.hh"
+#elif __APPLE__
+#include "kqueue_event_loop.hh"
 #else
-#include "iocp_event_loop.hh" // Or other platform
+#error "Unsupported platform"
 #endif
 
 EventLoop::EventLoop() {
 #ifdef __linux__
     pimpl_ = std::make_unique<EpollEventLoop>();
-#else
-    // For now, we only support Linux. Add other platforms here.
-    // On non-Linux, this will default to the stub implementation.
+#elif _WIN32
     pimpl_ = std::make_unique<IocpEventLoop>();
+#elif __APPLE__
+    pimpl_ = std::make_unique<KqueueEventLoop>();
 #endif
 }
 
-EventLoop::~EventLoop() = default; // unique_ptr will handle deletion
+EventLoop::~EventLoop() = default;
 
 void EventLoop::register_event(int fd, EventCallback callback) {
-    pimpl_->register_event(fd, std::move(callback));
+    try {
+        pimpl_->register_event(fd, std::move(callback));
+    } catch (const std::exception& e) {
+        std::cerr << "Error registering event: " << e.what() << std::endl;
+    }
 }
 
 void EventLoop::unregister_event(int fd) {
-    pimpl_->unregister_event(fd);
+    try {
+        pimpl_->unregister_event(fd);
+    } catch (const std::exception& e) {
+        std::cerr << "Error unregistering event: " << e.what() << std::endl;
+    }
 }
 
 void EventLoop::run() {
-    pimpl_->run();
+    if (running_.exchange(true)) {
+        return; // Already running
+    }
+
+    try {
+        pimpl_->run();
+    } catch (const std::exception& e) {
+        std::cerr << "Event loop error: " << e.what() << std::endl;
+    }
+
+    running_ = false;
 }
 
 void EventLoop::stop() {
+    if (!running_.load()) {
+        return; // Not running
+    }
     pimpl_->stop();
+}
+
+bool EventLoop::is_running() const {
+    return running_.load();
 }
