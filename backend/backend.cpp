@@ -128,6 +128,12 @@ void BytecodeGenerator::visitExpression(const std::shared_ptr<AST::Expression>& 
         emit(Opcode::LOAD_SUPER, expr->line);
     } else if (auto interpolatedStr = std::dynamic_pointer_cast<AST::InterpolatedStringExpr>(expr)) {
         visitInterpolatedStringExpr(interpolatedStr);
+    } else if (auto typePattern = std::dynamic_pointer_cast<AST::TypePatternExpr>(expr)) {
+        visitTypePatternExpr(typePattern);
+    } else if (auto bindingPattern = std::dynamic_pointer_cast<AST::BindingPatternExpr>(expr)) {
+        visitBindingPatternExpr(bindingPattern);
+    } else if (auto listPattern = std::dynamic_pointer_cast<AST::ListPatternExpr>(expr)) {
+        visitListPatternExpr(listPattern);
     } else {
         Debugger::error("Unknown expression type", expr->line, 0, InterpretationStage::BYTECODE, "", "", "");
     }
@@ -1188,6 +1194,36 @@ void BytecodeGenerator::visitContractStatement(const std::shared_ptr<AST::Contra
     
     // Throw an exception with the message
     emit(Opcode::THROW, stmt->line);
+}
+
+// Pattern expression visitors for match statements
+void BytecodeGenerator::visitTypePatternExpr(const std::shared_ptr<AST::TypePatternExpr>& expr) {
+    // For type patterns, we push the type name as a string
+    if (expr->type) {
+        emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, expr->type->typeName);
+    } else {
+        emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, "unknown");
+    }
+}
+
+void BytecodeGenerator::visitBindingPatternExpr(const std::shared_ptr<AST::BindingPatternExpr>& expr) {
+    // For binding patterns like Some(x), we push the type name
+    // The VM will handle the binding of the variable
+    emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, expr->typeName);
+}
+
+void BytecodeGenerator::visitListPatternExpr(const std::shared_ptr<AST::ListPatternExpr>& expr) {
+    // For list patterns, we create a special list pattern marker
+    // Push the number of elements expected
+    emit(Opcode::PUSH_INT, expr->line, static_cast<int32_t>(expr->elements.size()));
+    
+    // Push each pattern element
+    for (const auto& element : expr->elements) {
+        visitExpression(element);
+    }
+    
+    // Mark this as a list pattern
+    emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, "__list_pattern__");
 }
 
 void BytecodeGenerator::emit(Opcode op, uint32_t lineNumber, int32_t intValue, float floatValue, bool boolValue, const std::string& stringValue) {

@@ -16,7 +16,7 @@ match (x) {
 fn match_example(value: any) {
     match(value) {
         int => { print("Integer: {value}"); },
-        string => { print("String: {value}"); },
+        str => { print("String: {value}"); },
         list => { print("List of integers: {value}"); },
         dict => { print("Dictionary: {value}"); },
         _ => { print("Unknown type");

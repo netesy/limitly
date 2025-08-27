@@ -73,6 +73,11 @@ private:
     void visitRangeExpr(const std::shared_ptr<AST::RangeExpr>& expr);
     void visitInterpolatedStringExpr(const std::shared_ptr<AST::InterpolatedStringExpr>& expr);
     
+    // Pattern expression visitors for match statements
+    void visitTypePatternExpr(const std::shared_ptr<AST::TypePatternExpr>& expr);
+    void visitBindingPatternExpr(const std::shared_ptr<AST::BindingPatternExpr>& expr);
+    void visitListPatternExpr(const std::shared_ptr<AST::ListPatternExpr>& expr);
+    
     // Helper methods
     void emit(Opcode op, uint32_t lineNumber, 
               int32_t intValue = 0, 

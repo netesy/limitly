@@ -120,7 +120,11 @@ public:
     std::shared_ptr<AST::Expression> finishCall(std::shared_ptr<AST::Expression> callee);
     std::shared_ptr<AST::InterpolatedStringExpr> interpolatedString();
 
-    // Type annotation parsing
+    // Pattern parsing methods for match statements
+    std::shared_ptr<AST::Expression> parsePattern();
+    std::shared_ptr<AST::Expression> parseBindingPattern();
+    std::shared_ptr<AST::Expression> parseListPattern();
 };
+
 
 #endif // PARSER_H

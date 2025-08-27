@@ -27,7 +27,7 @@ print("Concurrent block finished");
 // ==========================================
 concurrent(ch=results, mode=batch, cores=Auto, on_error=Auto,
            timeout=20s, grace=500ms, on_timeout=partial) {
-    async task {
+    task() {
         var data = await fetchData();
         results.send(data);
     }
@@ -59,7 +59,7 @@ iter (msg in stream_out) {
 // ==========================================
 concurrent(events: StreamEvent, ch=async_out, mode=async, timeout=20s, grace=500ms,
            on_timeout=partial, on_error=Stop) {
-    async worker(event) {
+    worker(event) {
         var data = await fetchData(event.id);
         async_out.send("Processed {event.id} -> {data}");
     }
@@ -93,7 +93,7 @@ iter (message in messages) {
 //  Stream processing (CPU bound, retries)
 // ==========================================
 parallel(events: FileChunks, ch=files_out, mode=stream, cores=Auto,
-         on_error=Retry(attempts=3, delay=1s), timeout=60s,
+         on_error=Retry, timeout=60s,
          grace=500ms, on_timeout=partial) {
     worker(chunk) {
         process_chunk(chunk);
