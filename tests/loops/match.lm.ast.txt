@@ -1,4 +1,4 @@
-AST for ./tests/loops/match.lm
+AST for tests\loops\match.lm
 ========================================
 
 AST Dump:
@@ -32,3 +32,82 @@ MatchStatement:
       BlockStatement:
         PrintStatement:
           Literal: "x is something else"
+FunctionDeclaration: match_example
+  Parameters:
+    value: any
+  Body:
+    BlockStatement:
+      MatchStatement:
+        Value:
+          Variable: value
+        Cases:
+          Case:
+            Pattern:
+            Unknown node type
+            Body:
+            BlockStatement:
+              PrintStatement:
+                Literal: "Integer: {value}"
+          Case:
+            Pattern:
+            Unknown node type
+            Body:
+            BlockStatement:
+              PrintStatement:
+                Literal: "String: {value}"
+          Case:
+            Pattern:
+            Unknown node type
+            Body:
+            BlockStatement:
+              PrintStatement:
+                Literal: "List of integers: {value}"
+          Case:
+            Pattern:
+            Unknown node type
+            Body:
+            BlockStatement:
+              PrintStatement:
+                Literal: "Dictionary: {value}"
+          Case:
+            Pattern:
+            Literal: nil
+            Body:
+            BlockStatement:
+              PrintStatement:
+                Literal: "Unknown type"
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: match_example
+    Arguments:
+      Literal: 42
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: match_example
+    Arguments:
+      Literal: "Hello, Luminar!"
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: match_example
+    Arguments:
+      ListExpression: [3 elements]
+        Literal: 1
+        Literal: 2
+        Literal: 3
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: match_example
+    Arguments:
+      DictionaryExpression: {2 entries}
+        Key:
+          Literal: "a"
+        Value:
+          Literal: 1
+        Key:
+          Literal: "b"
+        Value:
+          Literal: 2

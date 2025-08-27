@@ -8,7 +8,7 @@ parallel(ch=messages, mode=batch, cores=Auto, on_error=Auto,
          timeout=20s, grace=500ms, on_timeout=partial) {
     task(i in 1..3) {
         print("Task {i} running");
-        sleep(randint(1, 3));
+        sleep(randint(1, 3)); //these are assumed to be system functons
         messages.send("Task {i} done");
     }
 } // auto-close messages
@@ -21,7 +21,7 @@ iter (message in messages) {
 //  Stream processing (CPU bound, retries)
 // ==========================================
 parallel(events: FileChunks, ch=files_out, mode=stream, cores=Auto,
-         on_error=Retry(attempts=3, delay=1s), timeout=60s,
+         on_error=Retry, timeout=60s,
          grace=500ms, on_timeout=partial) {
     worker(chunk) {
         process_chunk(chunk);

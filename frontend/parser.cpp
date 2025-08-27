@@ -1143,7 +1143,30 @@ void Parser::parseConcurrencyParams(
         while (!check(TokenType::RIGHT_PAREN) && !isAtEnd()) {
             // Parse parameter name
             std::string paramName = consume(TokenType::IDENTIFIER, "Expected parameter name").lexeme;
-            consume(TokenType::EQUAL, "Expected '=' after parameter name");
+            
+            // Check if this is type annotation (param: Type) or assignment (param = value)
+            if (match({TokenType::COLON})) {
+                // Type annotation syntax: param: Type
+                // For now, we'll skip the type and treat it as a parameter with the type name as value
+                std::string typeName = consume(TokenType::IDENTIFIER, "Expected type name after ':'").lexeme;
+                // Store the type name as the parameter value for now
+                if (paramName == "events") {
+                    // This is a special case for event type annotation
+                    // We can ignore it for now or store it for later use
+                }
+                // Continue to next parameter
+                if (!match({TokenType::COMMA}) && !check(TokenType::RIGHT_PAREN)) {
+                    error("Expected ',' or ')' after type annotation");
+                    break;
+                }
+                continue;
+            } else if (match({TokenType::EQUAL})) {
+                // Assignment syntax: param = value
+                // Continue with existing logic
+            } else {
+                error("Expected '=' or ':' after parameter name");
+                break;
+            }
             
             // Parse parameter value
             std::string paramValue;
@@ -1347,12 +1370,15 @@ std::shared_ptr<AST::Expression> Parser::parsePattern() {
     }
 
     // Binding pattern (e.g. Some(x))
-    if (check(TokenType::IDENTIFIER) && scanner.getTokens()[current + 1].type == TokenType::LEFT_PAREN) {
+    if (check(TokenType::IDENTIFIER) && current + 1 < scanner.getTokens().size() && 
+        scanner.getTokens()[current + 1].type == TokenType::LEFT_PAREN) {
         return parseBindingPattern();
     }
 
-    // Type pattern
-    if (isPrimitiveType(peek().type) || (check(TokenType::IDENTIFIER) && (peek().lexeme == "list" || peek().lexeme == "dict"))) {
+    // Type pattern - check for primitive types and collection types
+    if (isPrimitiveType(peek().type) || 
+        check(TokenType::LIST_TYPE) || check(TokenType::DICT_TYPE) ||
+        (check(TokenType::IDENTIFIER) && (peek().lexeme == "string" || peek().lexeme == "list" || peek().lexeme == "dict"))) {
         auto typePattern = std::make_shared<AST::TypePatternExpr>();
         typePattern->line = peek().line;
         typePattern->type = parseTypeAnnotation();
@@ -1815,6 +1841,14 @@ std::shared_ptr<AST::Expression> Parser::primary() {
             varExpr->name = token.lexeme;
             return varExpr;
         }
+    }
+
+    if (match({TokenType::SLEEP})) {
+        // Treat SLEEP as a function call
+        auto varExpr = std::make_shared<AST::VariableExpr>();
+        varExpr->line = previous().line;
+        varExpr->name = "sleep";
+        return varExpr;
     }
 
     if (match({TokenType::LEFT_PAREN})) {
