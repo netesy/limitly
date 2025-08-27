@@ -47,12 +47,15 @@ namespace AST {
     struct HandleClause;
     struct ParallelStatement;
     struct ConcurrentStatement;
+    struct TaskStatement;
+    struct WorkerStatement;
     struct AwaitExpr;
     struct AsyncFunctionDeclaration;
     struct ImportStatement;
     struct EnumDeclaration;
     struct MatchStatement;
     struct MatchCase;
+    struct TypePatternExpr;
     struct TypeAnnotation;
     struct StructuralTypeField;
     struct TypeDeclaration;
@@ -377,6 +380,21 @@ namespace AST {
         std::shared_ptr<BlockStatement> body;
     };
 
+    // Task statement inside a concurrent/parallel block
+    struct TaskStatement : public Statement {
+        bool isAsync = false;
+        std::string loopVar;
+        std::shared_ptr<Expression> iterable;
+        std::shared_ptr<BlockStatement> body;
+    };
+
+    // Worker statement inside a concurrent/parallel block
+    struct WorkerStatement : public Statement {
+        bool isAsync = false;
+        std::string param;
+        std::shared_ptr<BlockStatement> body;
+    };
+
     // Await expression
     struct AwaitExpr : public Expression {
         std::shared_ptr<Expression> expression;
@@ -402,6 +420,11 @@ namespace AST {
     struct MatchStatement : public Statement {
         std::shared_ptr<Expression> value;
         std::vector<MatchCase> cases;
+    };
+
+    // Type pattern in a match statement
+    struct TypePatternExpr : public Expression {
+        std::shared_ptr<TypeAnnotation> type;
     };
     
     // Type declaration (type aliases)

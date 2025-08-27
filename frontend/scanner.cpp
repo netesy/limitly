@@ -350,6 +350,22 @@ void Scanner::number() {
         while (isDigit(peek())) advance();
     }
 
+    // Check for time suffixes
+    if (isAlpha(peek())) {
+        if (peek() == 's' && !isAlphaNumeric(peekNext())) {
+            advance();
+        } else if (peek() == 'm' && peekNext() == 's' && !isAlphaNumeric(source[current+2])) {
+            advance();
+            advance();
+        } else if (peek() == 'u' && peekNext() == 's' && !isAlphaNumeric(source[current+2])) {
+            advance();
+            advance();
+        } else if (peek() == 'n' && peekNext() == 's' && !isAlphaNumeric(source[current+2])) {
+            advance();
+            advance();
+        }
+    }
+
     addToken(TokenType::NUMBER);
 }
 
