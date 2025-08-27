@@ -1,18 +1,14 @@
-#ifndef IOCP_EVENT_LOOP_H
-#define IOCP_EVENT_LOOP_H
+#ifndef KQUEUE_EVENT_LOOP_H
+#define KQUEUE_EVENT_LOOP_H
 
 #include "event_loop_impl.hh"
 #include <map>
 #include <vector>
 
-#ifdef _WIN32
-#include <winsock2.h>
-#endif
-
-class IocpEventLoop : public EventLoopImpl {
+class KqueueEventLoop : public EventLoopImpl {
 public:
-    IocpEventLoop();
-    ~IocpEventLoop() override;
+    KqueueEventLoop();
+    ~KqueueEventLoop() override;
 
     void register_event(int fd, EventCallback callback) override;
     void unregister_event(int fd) override;
@@ -20,11 +16,9 @@ public:
     void stop() override;
 
 private:
-#ifdef _WIN32
-    HANDLE iocp_handle_;
-#endif
+    int kqueue_fd_;
     bool running_;
     std::map<int, EventCallback> callbacks_;
 };
 
-#endif // IOCP_EVENT_LOOP_H
+#endif // KQUEUE_EVENT_LOOP_H
