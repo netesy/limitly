@@ -56,6 +56,8 @@ namespace AST {
     struct MatchStatement;
     struct MatchCase;
     struct TypePatternExpr;
+    struct BindingPatternExpr;
+    struct ListPatternExpr;
     struct TypeAnnotation;
     struct StructuralTypeField;
     struct TypeDeclaration;
@@ -412,8 +414,12 @@ namespace AST {
     };
 
     // Pattern matching
+    struct BindingPatternExpr;
+    struct ListPatternExpr;
+
     struct MatchCase {
         std::shared_ptr<Expression> pattern;
+        std::shared_ptr<Expression> guard;
         std::shared_ptr<Statement> body;
     };
 
@@ -425,6 +431,18 @@ namespace AST {
     // Type pattern in a match statement
     struct TypePatternExpr : public Expression {
         std::shared_ptr<TypeAnnotation> type;
+    };
+
+    // Binding pattern in a match statement (e.g., Some(x))
+    struct BindingPatternExpr : public Expression {
+        std::string typeName;
+        std::string variableName;
+    };
+
+    // List pattern in a match statement (e.g., [x, ...xs])
+    struct ListPatternExpr : public Expression {
+        std::vector<std::shared_ptr<Expression>> elements;
+        std::optional<std::string> restElement;
     };
     
     // Type declaration (type aliases)
