@@ -889,6 +889,7 @@ std::shared_ptr<AST::FunctionDeclaration> Parser::function(const std::string& ki
     // Parse return type
     if (match({TokenType::COLON})) {
         func->returnType = parseTypeAnnotation();
+
     }
 
     // Check if function throws
@@ -1658,6 +1659,24 @@ std::shared_ptr<AST::Expression> Parser::call() {
             indexExpr->index = index;
 
             expr = indexExpr;
+        } else if (match({TokenType::QUESTION})) {
+            // Handle fallible expression with ? operator
+            auto fallibleExpr = std::make_shared<AST::FallibleExpr>();
+            fallibleExpr->line = previous().line;
+            fallibleExpr->expression = expr;
+            
+            // Check for optional else handler
+            if (match({TokenType::ELSE})) {
+                // Parse optional error variable binding
+                if (check(TokenType::IDENTIFIER)) {
+                    fallibleExpr->elseVariable = consume(TokenType::IDENTIFIER, "Expected error variable name.").lexeme;
+                }
+                
+                // Parse else handler block or statement
+                fallibleExpr->elseHandler = statement();
+            }
+            
+            expr = fallibleExpr;
         } else {
             break;
         }
@@ -1849,6 +1868,43 @@ std::shared_ptr<AST::Expression> Parser::primary() {
         varExpr->line = previous().line;
         varExpr->name = "sleep";
         return varExpr;
+    }
+
+    // Handle error construction: err(ErrorType) or err(ErrorType(args))
+    if (match({TokenType::ERR})) {
+        auto errorExpr = std::make_shared<AST::ErrorConstructExpr>();
+        errorExpr->line = previous().line;
+        
+        consume(TokenType::LEFT_PAREN, "Expected '(' after 'err'.");
+        
+        // Parse error type
+        errorExpr->errorType = consume(TokenType::IDENTIFIER, "Expected error type name.").lexeme;
+        
+        // Check if there are constructor arguments
+        if (match({TokenType::LEFT_PAREN})) {
+            // Parse constructor arguments: err(ErrorType(arg1, arg2))
+            if (!check(TokenType::RIGHT_PAREN)) {
+                do {
+                    errorExpr->arguments.push_back(expression());
+                } while (match({TokenType::COMMA}));
+            }
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after error constructor arguments.");
+        }
+        
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after error construction.");
+        return errorExpr;
+    }
+
+    // Handle success construction: ok(value)
+    if (match({TokenType::OK})) {
+        auto okExpr = std::make_shared<AST::OkConstructExpr>();
+        okExpr->line = previous().line;
+        
+        consume(TokenType::LEFT_PAREN, "Expected '(' after 'ok'.");
+        okExpr->value = expression();
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after ok value.");
+        
+        return okExpr;
     }
 
     if (match({TokenType::LEFT_PAREN})) {
@@ -2486,9 +2542,26 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseTypeAnnotation() {
         }
     }
 
-    // Check for optional type
+    // Check for optional type or error union type
     if (match({TokenType::QUESTION})) {
-        type->isOptional = true;
+        // This could be either optional (Type?) or error union (Type?ErrorType1, ErrorType2)
+        if (check(TokenType::IDENTIFIER)) {
+            // This is an error union type: Type?ErrorType1, ErrorType2
+            type->isFallible = true;
+            
+            // Parse the first error type
+            std::string errorType = consume(TokenType::IDENTIFIER, "Expected error type after '?'.").lexeme;
+            type->errorTypes.push_back(errorType);
+            
+            // Parse additional error types separated by commas
+            while (match({TokenType::COMMA})) {
+                std::string additionalErrorType = consume(TokenType::IDENTIFIER, "Expected error type after ','.").lexeme;
+                type->errorTypes.push_back(additionalErrorType);
+            }
+        } else {
+            // This is a simple optional type: Type?
+            type->isOptional = true;
+        }
     }
 
     // Check for union types (e.g., int | float)

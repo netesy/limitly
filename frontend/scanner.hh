@@ -142,6 +142,8 @@ enum class TokenType {
     PROPERTY,   // property
     CACHE,      // cache
     SLEEP,      // sleep
+    ERR,        // err
+    OK,         // ok
 
     // Other
     UNDEFINED, // undefined token

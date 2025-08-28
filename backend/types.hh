@@ -19,6 +19,7 @@ class TypeSystem
 private:
     std::map<std::string, TypePtr> userDefinedTypes;
     std::map<std::string, TypePtr> typeAliases;
+    std::map<std::string, TypePtr> errorTypes;
     MemoryManager<> &memoryManager;
     MemoryManager<>::Region &region;
 
@@ -57,6 +58,45 @@ private:
             auto unionTypes = std::get<UnionType>(from->extra).types;
             return std::any_of(unionTypes.begin(), unionTypes.end(),
                                [&](TypePtr type) { return canConvert(type, to); });
+        }
+
+        // Error union type compatibility
+        if (from->tag == TypeTag::ErrorUnion && to->tag == TypeTag::ErrorUnion) {
+            auto fromErrorUnion = std::get<ErrorUnionType>(from->extra);
+            auto toErrorUnion = std::get<ErrorUnionType>(to->extra);
+            
+            // Success types must be compatible
+            if (!canConvert(fromErrorUnion.successType, toErrorUnion.successType)) {
+                return false;
+            }
+            
+            // If target is generic error (Type?), any error union is compatible
+            if (toErrorUnion.isGenericError) {
+                return true;
+            }
+            
+            // If source is generic error, it's only compatible with generic target
+            if (fromErrorUnion.isGenericError) {
+                return toErrorUnion.isGenericError;
+            }
+            
+            // Check that all source error types are in target error types
+            for (const auto& sourceError : fromErrorUnion.errorTypes) {
+                bool found = std::find(toErrorUnion.errorTypes.begin(), 
+                                     toErrorUnion.errorTypes.end(), 
+                                     sourceError) != toErrorUnion.errorTypes.end();
+                if (!found) {
+                    return false;
+                }
+            }
+            
+            return true;
+        }
+        
+        // Success type can be converted to error union if success types are compatible
+        if (to->tag == TypeTag::ErrorUnion) {
+            auto toErrorUnion = std::get<ErrorUnionType>(to->extra);
+            return canConvert(from, toErrorUnion.successType);
         }
 
         return false;
@@ -203,7 +243,9 @@ private:
 
 public:
     TypeSystem(MemoryManager<> &memManager, MemoryManager<>::Region &reg)
-        : memoryManager(memManager), region(reg) {}
+        : memoryManager(memManager), region(reg) {
+        registerBuiltinErrors();
+    }
 
     const TypePtr NIL_TYPE = std::make_shared<Type>(TypeTag::Nil);
     const TypePtr BOOL_TYPE = std::make_shared<Type>(TypeTag::Bool);
@@ -226,6 +268,16 @@ public:
     const TypePtr ENUM_TYPE = std::make_shared<Type>(TypeTag::Enum);
     const TypePtr SUM_TYPE = std::make_shared<Type>(TypeTag::Sum);
     const TypePtr OBJECT_TYPE = std::make_shared<Type>(TypeTag::Object);
+    const TypePtr ERROR_UNION_TYPE = std::make_shared<Type>(TypeTag::ErrorUnion);
+
+    // Built-in error types
+    const TypePtr DIVISION_BY_ZERO_ERROR = std::make_shared<Type>(TypeTag::UserDefined);
+    const TypePtr INDEX_OUT_OF_BOUNDS_ERROR = std::make_shared<Type>(TypeTag::UserDefined);
+    const TypePtr NULL_REFERENCE_ERROR = std::make_shared<Type>(TypeTag::UserDefined);
+    const TypePtr TYPE_CONVERSION_ERROR = std::make_shared<Type>(TypeTag::UserDefined);
+    const TypePtr IO_ERROR = std::make_shared<Type>(TypeTag::UserDefined);
+    const TypePtr PARSE_ERROR = std::make_shared<Type>(TypeTag::UserDefined);
+    const TypePtr NETWORK_ERROR = std::make_shared<Type>(TypeTag::UserDefined);
 
     TypePtr getType(const std::string& name) {
         if (name == "int") return INT_TYPE;
@@ -328,6 +380,14 @@ public:
                 throw std::runtime_error("Invalid union type");
             }
             break;
+        case TypeTag::ErrorUnion:
+            // For error union types, create a success value by default
+            if (const auto *errorUnionType = std::get_if<ErrorUnionType>(&type->extra)) {
+                value->data = createValue(errorUnionType->successType)->data;
+            } else {
+                throw std::runtime_error("Invalid error union type");
+            }
+            break;
         case TypeTag::UserDefined:
             value->data = UserDefinedValue{};
             break;
@@ -401,6 +461,43 @@ public:
             return typeAliases[alias];
         }
         throw std::runtime_error("Type alias not found: " + alias);
+    }
+
+    // Error type registry methods
+    void registerBuiltinErrors() {
+        errorTypes["DivisionByZero"] = DIVISION_BY_ZERO_ERROR;
+        errorTypes["IndexOutOfBounds"] = INDEX_OUT_OF_BOUNDS_ERROR;
+        errorTypes["NullReference"] = NULL_REFERENCE_ERROR;
+        errorTypes["TypeConversion"] = TYPE_CONVERSION_ERROR;
+        errorTypes["IOError"] = IO_ERROR;
+        errorTypes["ParseError"] = PARSE_ERROR;
+        errorTypes["NetworkError"] = NETWORK_ERROR;
+    }
+
+    void registerUserError(const std::string& name, TypePtr type) {
+        errorTypes[name] = type;
+    }
+
+    TypePtr getErrorType(const std::string& name) {
+        auto it = errorTypes.find(name);
+        if (it != errorTypes.end()) {
+            return it->second;
+        }
+        throw std::runtime_error("Error type not found: " + name);
+    }
+
+    bool isErrorType(const std::string& name) {
+        return errorTypes.find(name) != errorTypes.end();
+    }
+
+    // Create error union type
+    TypePtr createErrorUnionType(TypePtr successType, const std::vector<std::string>& errorTypeNames = {}, bool isGeneric = false) {
+        ErrorUnionType errorUnion;
+        errorUnion.successType = successType;
+        errorUnion.errorTypes = errorTypeNames;
+        errorUnion.isGenericError = isGeneric;
+        
+        return std::make_shared<Type>(TypeTag::ErrorUnion, errorUnion);
     }
 
     TypePtr inferType(const ValuePtr &value) { return value->type; }
@@ -504,6 +601,27 @@ public:
             }
             return false;
         }
+
+        // Handle ErrorUnion type separately
+        if (expectedType->tag == TypeTag::ErrorUnion) {
+            const auto &errorUnionType = std::get<ErrorUnionType>(expectedType->extra);
+            
+            // Check if value is an error
+            if (const auto *errorValue = std::get_if<ErrorValue>(&value->data)) {
+                // If it's a generic error union, any error is valid
+                if (errorUnionType.isGenericError) {
+                    return true;
+                }
+                // Check if the error type is in the allowed list
+                return std::find(errorUnionType.errorTypes.begin(), 
+                               errorUnionType.errorTypes.end(), 
+                               errorValue->errorType) != errorUnionType.errorTypes.end();
+            }
+            
+            // Check if value matches the success type
+            return checkType(value, errorUnionType.successType);
+        }
+
         return false; // Fallback for non-matching types
     }
 
