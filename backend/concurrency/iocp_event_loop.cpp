@@ -3,6 +3,7 @@
 #ifdef _WIN32
 #include <stdexcept>
 #include <iostream>
+#include <io.h>  // For _get_osfhandle
 
 IocpEventLoop::IocpEventLoop() : running_(false) {
     iocp_handle_ = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);

@@ -142,7 +142,7 @@ while (count < 3) {
 // === I/O Operations ===
 
 /// Writes string content to a file.
-fn write_to_file(filename: str, content: str): nil {
+fn write_to_file(filename: str, content: str) {
  //   var file = open(filename, "write");
  //   file.write(content);
  //   file.close();

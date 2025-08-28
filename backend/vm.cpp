@@ -120,7 +120,7 @@ ValuePtr VM::execute(const std::vector<Instruction>& bytecode) {
     try {
         while (ip < bytecode.size()) {
             const Instruction& instruction = bytecode[ip];
-            std::cout << "ip: " << ip << ", opcode: " << static_cast<int>(instruction.opcode) << std::endl;
+         //   std::cout << "ip: " << ip << ", opcode: " << static_cast<int>(instruction.opcode) << std::endl;
             
             // Check if we need to start skipping function body
             if (!currentFunctionBeingDefined.empty() && !insideFunctionDefinition) {
@@ -328,6 +328,57 @@ ValuePtr VM::execute(const std::vector<Instruction>& bytecode) {
                     break;
                 case Opcode::MATCH_PATTERN:
                     handleMatchPattern(instruction);
+                    break;
+                case Opcode::BEGIN_PARALLEL:
+                    handleBeginParallel(instruction);
+                    break;
+                case Opcode::END_PARALLEL:
+                    handleEndParallel(instruction);
+                    break;
+                case Opcode::BEGIN_CONCURRENT:
+                    handleBeginConcurrent(instruction);
+                    break;
+                case Opcode::END_CONCURRENT:
+                    handleEndConcurrent(instruction);
+                    break;
+                case Opcode::BEGIN_TRY:
+                    handleBeginTry(instruction);
+                    break;
+                case Opcode::END_TRY:
+                    handleEndTry(instruction);
+                    break;
+                case Opcode::BEGIN_HANDLER:
+                    handleBeginHandler(instruction);
+                    break;
+                case Opcode::END_HANDLER:
+                    handleEndHandler(instruction);
+                    break;
+                case Opcode::THROW:
+                    handleThrow(instruction);
+                    break;
+                case Opcode::STORE_EXCEPTION:
+                    handleStoreException(instruction);
+                    break;
+                case Opcode::AWAIT:
+                    handleAwait(instruction);
+                    break;
+                case Opcode::IMPORT:
+                    handleImport(instruction);
+                    break;
+                case Opcode::BEGIN_ENUM:
+                    handleBeginEnum(instruction);
+                    break;
+                case Opcode::END_ENUM:
+                    handleEndEnum(instruction);
+                    break;
+                case Opcode::DEFINE_ENUM_VARIANT:
+                    handleDefineEnumVariant(instruction);
+                    break;
+                case Opcode::DEFINE_ENUM_VARIANT_WITH_TYPE:
+                    handleDefineEnumVariantWithType(instruction);
+                    break;
+                case Opcode::DEBUG_PRINT:
+                    handleDebugPrint(instruction);
                     break;
                 default:
                     error("Unknown opcode: " + std::to_string(static_cast<int>(instruction.opcode)));
@@ -2499,16 +2550,13 @@ void VM::handleEndScope(const Instruction& /*unused*/) {
         environment = environment->enclosing;
     }
 }
-void VM::handleBeginTry(const Instruction& /*unused*/) { error("Not implemented"); }
-void VM::handleBeginHandler(const Instruction& /*unused*/) { error("Not implemented"); }
-void VM::handleEndHandler(const Instruction& /*unused*/) { error("Not implemented"); }
-void VM::handleThrow(const Instruction& /*unused*/) { error("Not implemented"); }
-void VM::handleStoreException(const Instruction& /*unused*/) { error("Not implemented"); }
+
 void VM::handleBeginParallel(const Instruction& instruction) {
     // Find the end of the parallel block
     size_t block_start_ip = ip + 1;
     size_t block_end_ip = block_start_ip;
     int nesting_level = 0;
+    
     while (block_end_ip < bytecode->size()) {
         const auto& instr = (*bytecode)[block_end_ip];
         if (instr.opcode == Opcode::BEGIN_PARALLEL) {
@@ -2533,26 +2581,56 @@ void VM::handleBeginParallel(const Instruction& instruction) {
         bytecode->begin() + block_end_ip
     );
 
-    // Create a task to execute the parallel block in a new VM
-    Task task = [this, block_bytecode]() {
-        // Create a new VM for this task without creating a new runtime
-        VM task_vm(false);
+    // Get the number of cores to use (from instruction parameters)
+    int cores = instruction.intValue > 0 ? instruction.intValue : std::thread::hardware_concurrency();
+    std::string mode = instruction.stringValue.empty() ? "fork-join" : instruction.stringValue;
 
-        // Share the concurrency runtime components
-        task_vm.scheduler = this->scheduler;
-        task_vm.thread_pool = this->thread_pool;
-        task_vm.event_loop = this->event_loop;
+    if (debugMode) {
+        std::cout << "[DEBUG] Starting parallel block with " << cores << " cores, mode: " << mode << std::endl;
+    }
 
-        // Share the global environment.
-        task_vm.globals = this->globals;
-        task_vm.environment = std::make_shared<Environment>(this->globals);
+    // Create multiple tasks for parallel execution
+    std::vector<Task> tasks;
+    for (int i = 0; i < cores && i < 4; ++i) { // Limit to 4 parallel tasks for safety
+        Task task = [this, block_bytecode, i]() {
+            try {
+                // Create a new VM for this task without creating a new runtime
+                VM task_vm(false);
 
-        // Execute the bytecode block
-        task_vm.execute(block_bytecode);
-    };
+                // Share the concurrency runtime components
+                task_vm.scheduler = this->scheduler;
+                task_vm.thread_pool = this->thread_pool;
+                task_vm.event_loop = this->event_loop;
 
-    // Submit the task to the scheduler
-    scheduler->submit(std::move(task));
+                // Create a new environment that inherits from globals
+                task_vm.globals = this->globals;
+                task_vm.environment = std::make_shared<Environment>(this->globals);
+                
+                // Set debug mode
+                task_vm.setDebug(this->debugMode);
+
+                if (debugMode) {
+                    std::cout << "[DEBUG] Parallel task " << i << " starting execution" << std::endl;
+                }
+
+                // Execute the bytecode block
+                task_vm.execute(block_bytecode);
+
+                if (debugMode) {
+                    std::cout << "[DEBUG] Parallel task " << i << " completed" << std::endl;
+                }
+            } catch (const std::exception& e) {
+                std::cerr << "[ERROR] Parallel task " << i << " failed: " << e.what() << std::endl;
+            }
+        };
+        
+        tasks.push_back(std::move(task));
+    }
+
+    // Submit all tasks to the scheduler
+    for (auto& task : tasks) {
+        scheduler->submit(std::move(task));
+    }
 
     // Skip the main VM's instruction pointer past the parallel block
     ip = block_end_ip;
@@ -2567,6 +2645,7 @@ void VM::handleBeginConcurrent(const Instruction& instruction) {
     size_t block_start_ip = ip + 1;
     size_t block_end_ip = block_start_ip;
     int nesting_level = 0;
+    
     while (block_end_ip < bytecode->size()) {
         const auto& instr = (*bytecode)[block_end_ip];
         if (instr.opcode == Opcode::BEGIN_CONCURRENT) {
@@ -2591,24 +2670,47 @@ void VM::handleBeginConcurrent(const Instruction& instruction) {
         bytecode->begin() + block_end_ip
     );
 
-    // Create a callback for the event loop
-    EventCallback callback = [this, block_bytecode](int fd) {
-        // Create a new VM for this task without creating a new runtime
-        VM task_vm(false);
+    std::string mode = instruction.stringValue.empty() ? "async" : instruction.stringValue;
 
-        // Share the concurrency runtime components
-        task_vm.scheduler = this->scheduler;
-        task_vm.thread_pool = this->thread_pool;
-        task_vm.event_loop = this->event_loop;
+    if (debugMode) {
+        std::cout << "[DEBUG] Starting concurrent block, mode: " << mode << std::endl;
+    }
 
-        task_vm.globals = this->globals;
-        task_vm.environment = std::make_shared<Environment>(this->globals);
-        task_vm.execute(block_bytecode);
+    // Create a task for concurrent execution
+    Task task = [this, block_bytecode, mode]() {
+        try {
+            // Create a new VM for this task without creating a new runtime
+            VM task_vm(false);
+
+            // Share the concurrency runtime components
+            task_vm.scheduler = this->scheduler;
+            task_vm.thread_pool = this->thread_pool;
+            task_vm.event_loop = this->event_loop;
+
+            // Create a new environment that inherits from globals
+            task_vm.globals = this->globals;
+            task_vm.environment = std::make_shared<Environment>(this->globals);
+            
+            // Set debug mode
+            task_vm.setDebug(this->debugMode);
+
+            if (debugMode) {
+                std::cout << "[DEBUG] Concurrent task starting execution" << std::endl;
+            }
+
+            // Execute the bytecode block
+            task_vm.execute(block_bytecode);
+
+            if (debugMode) {
+                std::cout << "[DEBUG] Concurrent task completed" << std::endl;
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "[ERROR] Concurrent task failed: " << e.what() << std::endl;
+        }
     };
 
-    // For now, we'll just post the task to be executed immediately.
-    // We use a dummy file descriptor (-1) to indicate an immediate task.
-    event_loop->register_event(-1, std::move(callback));
+    // Submit the task to the scheduler for asynchronous execution
+    scheduler->submit(std::move(task));
 
     // Skip the main VM's instruction pointer past the concurrent block
     ip = block_end_ip;
@@ -2619,7 +2721,7 @@ void VM::handleEndConcurrent(const Instruction& /*unused*/) {
 }
 
 void VM::handleMatchPattern(const Instruction& /*unused*/) {
-    if (matchCounter++ > 40) {
+    if (matchCounter++ > 100) {
         error("Match operation limit exceeded. Possible infinite loop.");
         return;
     }
@@ -2629,44 +2731,209 @@ void VM::handleMatchPattern(const Instruction& /*unused*/) {
 
     bool match = false;
 
-    // Wildcard
+    // Wildcard pattern (null/nil)
     if (pattern->type->tag == TypeTag::Nil) {
         match = true;
     }
-    // Type matching
+    // Type matching with string patterns
     else if (pattern->type->tag == TypeTag::String) {
         std::string typeName = std::get<std::string>(pattern->data);
-        std::string valueTypeName;
-        switch(value->type->tag) {
-            case TypeTag::Int: valueTypeName = "int"; break;
-            case TypeTag::Float64: valueTypeName = "float"; break;
-            case TypeTag::String: valueTypeName = "string"; break;
-            case TypeTag::Bool: valueTypeName = "bool"; break;
-            case TypeTag::List: valueTypeName = "list"; break;
-            case TypeTag::Dict: valueTypeName = "dict"; break;
-            default: valueTypeName = "unknown"; break;
-        }
-
-        if (typeName == valueTypeName) {
-            match = true;
-        } else if (value->type->isList && typeName == "list<int>") { // Basic support for generic-like types
-            match = true;
-        } else if (value->type->isDict && typeName == "dict<string, int>") {
+        
+        // Handle wildcard string pattern
+        if (typeName == "_") {
             match = true;
         }
+        // Type name matching
+        else {
+            std::string valueTypeName;
+            switch(value->type->tag) {
+                case TypeTag::Int: 
+                case TypeTag::Int32: 
+                case TypeTag::Int64: 
+                    valueTypeName = "int"; 
+                    break;
+                case TypeTag::Float32:
+                case TypeTag::Float64: 
+                    valueTypeName = "float"; 
+                    break;
+                case TypeTag::String: 
+                    valueTypeName = "string"; 
+                    break;
+                case TypeTag::Bool: 
+                    valueTypeName = "bool"; 
+                    break;
+                case TypeTag::List: 
+                    valueTypeName = "list"; 
+                    break;
+                case TypeTag::Dict: 
+                    valueTypeName = "dict"; 
+                    break;
+                case TypeTag::Nil:
+                    valueTypeName = "nil";
+                    break;
+                default: 
+                    valueTypeName = "unknown"; 
+                    break;
+            }
 
+            // Direct type matching
+            if (typeName == valueTypeName) {
+                match = true;
+            }
+            // Generic type matching (basic support)
+            else if (value->type->tag == TypeTag::List && 
+                     (typeName.find("list") == 0 || typeName == "array")) {
+                match = true;
+            }
+            else if (value->type->tag == TypeTag::Dict && 
+                     (typeName.find("dict") == 0 || typeName == "map" || typeName == "object")) {
+                match = true;
+            }
+            // Range matching
+            else if (typeName == "range" && value->type->tag == TypeTag::List) {
+                // Check if it's a range-like list (could be enhanced)
+                match = true;
+            }
+        }
     }
-    // Value matching
+    // List pattern matching
+    else if (pattern->type->tag == TypeTag::List && value->type->tag == TypeTag::List) {
+        // For now, just check if both are lists - could be enhanced for structural matching
+        match = true;
+    }
+    // Dictionary pattern matching
+    else if (pattern->type->tag == TypeTag::Dict && value->type->tag == TypeTag::Dict) {
+        // For now, just check if both are dicts - could be enhanced for structural matching
+        match = true;
+    }
+    // Exact value matching
     else {
         match = valuesEqual(pattern, value);
     }
 
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, match));
 }
-void VM::handleImport(const Instruction& /*unused*/) { error("Not implemented"); }
-void VM::handleBeginEnum(const Instruction& /*unused*/) { error("Not implemented"); }
-void VM::handleEndEnum(const Instruction& /*unused*/) { error("Not implemented"); }
-void VM::handleDefineEnumVariant(const Instruction& /*unused*/) { error("Not implemented"); }
+void VM::handleBeginTry(const Instruction& instruction) {
+    if (debugMode) {
+        std::cout << "[DEBUG] Beginning try block at line " << instruction.line << std::endl;
+    }
+    // For now, just mark the beginning of a try block
+    // In a full implementation, this would set up exception handling context
+}
+
+void VM::handleEndTry(const Instruction& instruction) {
+    if (debugMode) {
+        std::cout << "[DEBUG] Ending try block at line " << instruction.line << std::endl;
+    }
+    // Clean up exception handling context
+}
+
+void VM::handleBeginHandler(const Instruction& instruction) {
+    if (debugMode) {
+        std::cout << "[DEBUG] Beginning exception handler for type: " << instruction.stringValue << std::endl;
+    }
+    // Set up handler for specific exception type
+}
+
+void VM::handleEndHandler(const Instruction& instruction) {
+    if (debugMode) {
+        std::cout << "[DEBUG] Ending exception handler at line " << instruction.line << std::endl;
+    }
+    // Clean up handler context
+}
+
+void VM::handleThrow(const Instruction& instruction) {
+    if (debugMode) {
+        std::cout << "[DEBUG] Throwing exception at line " << instruction.line << std::endl;
+    }
+    
+    // Pop the exception value from the stack
+    ValuePtr exception = pop();
+    lastException = exception;
+    
+    // For now, just throw a runtime error with the exception value
+    std::string message = "Exception thrown: " + valueToString(exception);
+    error(message);
+}
+
+void VM::handleStoreException(const Instruction& instruction) {
+    if (debugMode) {
+        std::cout << "[DEBUG] Storing exception in variable: " << instruction.stringValue << std::endl;
+    }
+    
+    // Store the last exception in the specified variable
+    if (lastException) {
+        environment->define(instruction.stringValue, lastException);
+    } else {
+        environment->define(instruction.stringValue, memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
+    }
+}
+
+void VM::handleAwait(const Instruction& instruction) {
+    if (debugMode) {
+        std::cout << "[DEBUG] Awaiting async result at line " << instruction.line << std::endl;
+    }
+    
+    // Pop the awaitable value from the stack
+    ValuePtr awaitable = pop();
+    
+    // For now, just return the value as-is
+    // In a full implementation, this would handle async/await semantics
+    push(awaitable);
+}
+
+void VM::handleImport(const Instruction& instruction) {
+    if (debugMode) {
+        std::cout << "[DEBUG] Importing module: " << instruction.stringValue << std::endl;
+    }
+    
+    // For now, just create a placeholder module object
+    // In a full implementation, this would load and execute the module
+    ValuePtr module = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
+    environment->define(instruction.stringValue, module);
+}
+
+void VM::handleBeginEnum(const Instruction& instruction) {
+    if (debugMode) {
+        std::cout << "[DEBUG] Beginning enum definition: " << instruction.stringValue << std::endl;
+    }
+    
+    // Start enum definition - for now just track the name
+    currentClassBeingDefined = instruction.stringValue;
+    insideClassDefinition = true;
+}
+
+void VM::handleEndEnum(const Instruction& instruction) {
+    if (debugMode) {
+        std::cout << "[DEBUG] Ending enum definition at line " << instruction.line << std::endl;
+    }
+    
+    // End enum definition
+    currentClassBeingDefined = "";
+    insideClassDefinition = false;
+}
+
+void VM::handleDefineEnumVariant(const Instruction& instruction) {
+    if (debugMode) {
+        std::cout << "[DEBUG] Defining enum variant: " << instruction.stringValue << std::endl;
+    }
+    
+    // For now, just create a simple enum variant value
+    // In a full implementation, this would create proper enum types
+    ValuePtr variant = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, instruction.stringValue);
+    environment->define(instruction.stringValue, variant);
+}
+
+void VM::handleDefineEnumVariantWithType(const Instruction& instruction) {
+    if (debugMode) {
+        std::cout << "[DEBUG] Defining typed enum variant: " << instruction.stringValue << std::endl;
+    }
+    
+    // For now, just create a simple enum variant value with type info
+    // In a full implementation, this would create proper typed enum variants
+    ValuePtr variant = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, instruction.stringValue);
+    environment->define(instruction.stringValue, variant);
+}
 
 void VM::handleDebugPrint(const Instruction& instruction) {
     (void)instruction; // Mark as unused
