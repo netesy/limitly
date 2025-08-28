@@ -1,19 +1,39 @@
 # Implementation Plan
 
-- [ ] 1. Extend AST with error handling nodes
+- [x] 1. Extend AST with error handling nodes
+
+
+
+
+
+
+
+
   - Add FallibleExpr, ErrorConstructExpr, and OkConstructExpr to frontend/ast.hh
   - Extend TypeAnnotation struct to support error type annotations (isFallible, errorTypes fields)
   - Create unit tests for new AST node construction and validation
   - _Requirements: 1.1, 1.2, 2.1, 2.2_
 
-- [ ] 2. Add error union types to type system
+- [x] 2. Add error union types to type system
+
+
+
+
+
+
+
   - Extend backend/types.hh with ErrorUnionType struct and integration into Type::extra variant
   - Add error type constants and registry to TypeSystem class
   - Implement error union type compatibility checking in canConvert method
   - Write unit tests for error union type creation and compatibility
   - _Requirements: 1.1, 1.3, 5.2, 5.4_
 
-- [ ] 3. Extend scanner and parser for error syntax
+- [x] 3. Extend scanner and parser for error syntax
+
+
+
+
+
   - Add QUESTION token type to frontend/scanner.hh for ? operator
   - Add ERR and OK keywords to scanner for error/success construction
   - Extend parser to handle Type?ErrorList syntax in function return types

@@ -52,6 +52,9 @@ namespace AST {
     struct AwaitExpr;
     struct AsyncFunctionDeclaration;
     struct ImportStatement;
+    struct FallibleExpr;
+    struct ErrorConstructExpr;
+    struct OkConstructExpr;
     struct EnumDeclaration;
     struct MatchStatement;
     struct MatchCase;
@@ -124,6 +127,10 @@ namespace AST {
         std::shared_ptr<TypeAnnotation> elementType = nullptr;          // Element type for list types (e.g., [int])
         std::shared_ptr<TypeAnnotation> keyType = nullptr;              // Key type for dictionary types (e.g., {str: int})
         std::shared_ptr<TypeAnnotation> valueType = nullptr;            // Value type for dictionary types (e.g., {str: int})
+        
+        // Error handling support
+        bool isFallible = false;                                         // Whether this type can fail (Type?)
+        std::vector<std::string> errorTypes;                             // Specific error types (Type?Error1, Error2)
     };
 
     // Program - the root of our AST
@@ -494,6 +501,26 @@ namespace AST {
     // Compile-time statement
     struct ComptimeStatement : public Statement {
         std::shared_ptr<Statement> declaration;
+    };
+
+    // Error handling expressions
+    
+    // Fallible expression with ? operator
+    struct FallibleExpr : public Expression {
+        std::shared_ptr<Expression> expression;
+        std::shared_ptr<Statement> elseHandler;  // Optional else block
+        std::string elseVariable;                // Optional error variable name
+    };
+
+    // Error construction expression (err() calls)
+    struct ErrorConstructExpr : public Expression {
+        std::string errorType;                   // Error type name
+        std::vector<std::shared_ptr<Expression>> arguments;  // Constructor arguments
+    };
+
+    // Success value construction (ok() calls)
+    struct OkConstructExpr : public Expression {
+        std::shared_ptr<Expression> value;
     };
 }
 

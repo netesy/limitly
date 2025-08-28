@@ -53,6 +53,7 @@ enum class TypeTag {
     Any,
     Sum,
     Union,
+    ErrorUnion,
     Range,
     UserDefined,
     Class,
@@ -118,12 +119,19 @@ struct UnionType
     std::vector<TypePtr> types;
 };
 
+struct ErrorUnionType
+{
+    TypePtr successType;                     // The success value type
+    std::vector<std::string> errorTypes;     // Allowed error type names
+    bool isGenericError = false;             // True for Type?, false for Type?Error1, Error2
+};
+
 struct Type
 {
     TypeTag tag;
     bool isList = false;
     bool isDict = false;
-    std::variant<std::monostate, ListType, DictType, EnumType, FunctionType, SumType, UnionType, UserDefinedType>
+    std::variant<std::monostate, ListType, DictType, EnumType, FunctionType, SumType, UnionType, ErrorUnionType, UserDefinedType>
         extra;
 
     Type(TypeTag t)
@@ -137,6 +145,7 @@ struct Type
                             FunctionType,
                             SumType,
                             UnionType,
+                            ErrorUnionType,
                             UserDefinedType> &ex)
         : tag(t)
         , extra(ex)
@@ -194,6 +203,8 @@ struct Type
             return "Sum";
         case TypeTag::Union:
             return "Union";
+        case TypeTag::ErrorUnion:
+            return "ErrorUnion";
         case TypeTag::UserDefined:
             return "UserDefined";
         case TypeTag::Object:
@@ -311,6 +322,21 @@ struct EnumValue {
     }
 };
 
+struct ErrorValue {
+    std::string errorType;
+    std::string message;
+    std::vector<ValuePtr> arguments;
+    size_t sourceLocation = 0;      // For stack traces
+
+    ErrorValue() = default;
+
+    ErrorValue(const std::string& type, const std::string& msg = "", 
+               const std::vector<ValuePtr>& args = {}, size_t location = 0)
+        : errorType(type), message(msg), arguments(args), sourceLocation(location) {}
+
+    std::string toString() const;  // Declaration only, definition after Value struct
+};
+
 struct ListValue {
     std::vector<ValuePtr> elements;
 
@@ -413,6 +439,7 @@ struct Value {
                  DictValue,
                  SumValue,
                  EnumValue,
+                 ErrorValue,
                  UserDefinedValue,
                  IteratorValuePtr,
                  ObjectInstancePtr,
@@ -522,6 +549,11 @@ struct Value {
            
         }
 
+        // Constructor for ErrorValue
+        Value(TypePtr t, const ErrorValue& erv) : type(std::move(t)), data(erv) {
+           
+        }
+
         // Constructor for SumValue
         Value(TypePtr t, const SumValue& sv) : type(std::move(t)), data(sv) {
            
@@ -584,6 +616,9 @@ struct Value {
             [&](const EnumValue& ev) {
                 oss << ev.toString(); // Use existing enum toString
             },
+            [&](const ErrorValue& erv) {
+                oss << erv.toString();
+            },
             [&](const UserDefinedValue& udv) {
                 oss << udv.variantName << "{";
                 bool first = true;
@@ -645,6 +680,7 @@ struct Value {
                 oss << "Sum(" << sv.activeVariant << ", " << sv.value->toString() << ")";
             },
             [&](const EnumValue& ev) { oss << ev.toString(); },
+            [&](const ErrorValue& erv) { oss << erv.toString(); },
             [&](const UserDefinedValue& udv) {
                 oss << udv.variantName << "{";
                 bool first = true;
@@ -673,6 +709,25 @@ inline ValuePtr EnumValue::create(const std::string& variantName, const TypePtr&
     auto value = std::make_shared<Value>(enumType);
     value->data = EnumValue(variantName, enumType, associatedValue);
     return value;
+}
+
+// ErrorValue toString implementation (defined after Value struct)
+inline std::string ErrorValue::toString() const {
+    std::ostringstream oss;
+    oss << "Error(" << errorType;
+    if (!message.empty()) {
+        oss << ", \"" << message << "\"";
+    }
+    if (!arguments.empty()) {
+        oss << ", [";
+        for (size_t i = 0; i < arguments.size(); ++i) {
+            if (i > 0) oss << ", ";
+            oss << arguments[i]->toString();
+        }
+        oss << "]";
+    }
+    oss << ")";
+    return oss.str();
 }
 
 // Iterator for list and range values
@@ -803,6 +858,12 @@ inline std::ostream &operator<<(std::ostream &os, const std::monostate &)
 // Update the operator<< for EnumValue
 inline std::ostream &operator<<(std::ostream &os, const EnumValue &ev) {
     os << ev.toString();
+    return os;
+}
+
+// Define the operator<< for ErrorValue
+inline std::ostream &operator<<(std::ostream &os, const ErrorValue &erv) {
+    os << erv.toString();
     return os;
 }
 // Define the operator<< for ValuePtr

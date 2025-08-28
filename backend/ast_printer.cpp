@@ -25,7 +25,18 @@ namespace {
         if (!type) return "<unknown>";
         
         std::string result = type->typeName;
-        if (type->isOptional) {
+        
+
+        // Handle error union types
+        if (type->isFallible) {
+            result += "?";
+            if (!type->errorTypes.empty()) {
+                for (size_t i = 0; i < type->errorTypes.size(); ++i) {
+                    if (i > 0) result += ", ";
+                    result += type->errorTypes[i];
+                }
+            }
+        } else if (type->isOptional) {
             result += "?";
         }
         
@@ -128,7 +139,7 @@ void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
         }
         
         if (funcDecl->returnType) {
-            std::cout << indentation << "  ReturnType: " << typeToString(*funcDecl->returnType) << std::endl;
+            std::cout << indentation << "  ReturnType: " << typeToString(funcDecl->returnType.value()) << std::endl;
         }
         
         if (funcDecl->throws) {
@@ -658,6 +669,34 @@ void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
         for (const auto& element : listPatternExpr->elements) {
             printNode(element, indent + 1);
         }
+    }
+    else if (auto fallibleExpr = std::dynamic_pointer_cast<AST::FallibleExpr>(node)) {
+        std::cout << indentation << "FallibleExpression:" << std::endl;
+        std::cout << indentation << "  Expression:" << std::endl;
+        printNode(fallibleExpr->expression, indent + 2);
+        
+        if (fallibleExpr->elseHandler) {
+            std::cout << indentation << "  ElseHandler:" << std::endl;
+            if (!fallibleExpr->elseVariable.empty()) {
+                std::cout << indentation << "    ErrorVariable: " << fallibleExpr->elseVariable << std::endl;
+            }
+            printNode(fallibleExpr->elseHandler, indent + 2);
+        }
+    }
+    else if (auto errorExpr = std::dynamic_pointer_cast<AST::ErrorConstructExpr>(node)) {
+        std::cout << indentation << "ErrorConstruct: " << errorExpr->errorType << std::endl;
+        
+        if (!errorExpr->arguments.empty()) {
+            std::cout << indentation << "  Arguments:" << std::endl;
+            for (const auto& arg : errorExpr->arguments) {
+                printNode(arg, indent + 2);
+            }
+        }
+    }
+    else if (auto okExpr = std::dynamic_pointer_cast<AST::OkConstructExpr>(node)) {
+        std::cout << indentation << "OkConstruct:" << std::endl;
+        std::cout << indentation << "  Value:" << std::endl;
+        printNode(okExpr->value, indent + 2);
     }
     else {
         std::cout << indentation << "Unknown node type" << std::endl;
