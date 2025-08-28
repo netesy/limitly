@@ -1,0 +1,42 @@
+// Comprehensive test for error handling syntax
+
+// 1. Function with single error type
+fn divide(a: int, b: int): int?DivisionByZero {
+    if (b == 0) {
+        return err(DivisionByZero);
+    }
+    return ok(a / b);
+}
+
+// 2. Function with multiple error types
+fn parseAndDivide(s: str, divisor: int): int?ParseError, DivisionByZero {
+    var num = parseInt(s)?;
+    return divide(num, divisor)?;
+}
+
+// 3. Simple fallible expression
+fn testSimple() {
+    var result = divide(10, 2)?;
+    print(result);
+}
+
+// 4. Fallible expression with else handler
+fn testWithHandler() {
+    var result = divide(10, 0)? else error {
+        print("Error occurred: #{error}");
+        return;
+    };
+    print(result);
+}
+
+// 5. Error constructor with arguments
+fn createComplexError(): str?ComplexError {
+    return err(ComplexError("Something went wrong", 42));
+}
+
+// 6. Nested fallible expressions
+fn testNested(): int?ParseError, DivisionByZero, ComplexError {
+    var s = getStringInput()?;
+    var result = parseAndDivide(s, 2)?;
+    return ok(result * 2);
+}
