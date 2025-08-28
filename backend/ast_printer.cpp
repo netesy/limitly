@@ -548,6 +548,117 @@ void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
         std::cout << indentation << "AwaitExpression:" << std::endl;
         printNode(awaitExpr->expression, indent + 1);
     }
+    else if (auto breakStmt = std::dynamic_pointer_cast<AST::BreakStatement>(node)) {
+        std::cout << indentation << "BreakStatement" << std::endl;
+    }
+    else if (auto continueStmt = std::dynamic_pointer_cast<AST::ContinueStatement>(node)) {
+        std::cout << indentation << "ContinueStatement" << std::endl;
+    }
+    else if (auto taskStmt = std::dynamic_pointer_cast<AST::TaskStatement>(node)) {
+        std::cout << indentation << "TaskStatement";
+        if (taskStmt->isAsync) std::cout << " (async)";
+        std::cout << std::endl;
+        
+        if (!taskStmt->loopVar.empty()) {
+            std::cout << indentation << "  LoopVar: " << taskStmt->loopVar << std::endl;
+            if (taskStmt->iterable) {
+                std::cout << indentation << "  Iterable:" << std::endl;
+                printNode(taskStmt->iterable, indent + 2);
+            }
+        }
+        
+        if (taskStmt->body) {
+            std::cout << indentation << "  Body:" << std::endl;
+            printNode(taskStmt->body, indent + 2);
+        }
+    }
+    else if (auto workerStmt = std::dynamic_pointer_cast<AST::WorkerStatement>(node)) {
+        std::cout << indentation << "WorkerStatement";
+        if (workerStmt->isAsync) std::cout << " (async)";
+        std::cout << std::endl;
+        
+        if (!workerStmt->param.empty()) {
+            std::cout << indentation << "  Parameter: " << workerStmt->param << std::endl;
+        }
+        
+        if (workerStmt->body) {
+            std::cout << indentation << "  Body:" << std::endl;
+            printNode(workerStmt->body, indent + 2);
+        }
+    }
+    else if (auto asyncFuncDecl = std::dynamic_pointer_cast<AST::AsyncFunctionDeclaration>(node)) {
+        std::cout << indentation << "AsyncFunctionDeclaration: " << asyncFuncDecl->name << std::endl;
+        
+        if (!asyncFuncDecl->genericParams.empty()) {
+            std::cout << indentation << "  GenericParams: <";
+            for (size_t i = 0; i < asyncFuncDecl->genericParams.size(); ++i) {
+                if (i > 0) std::cout << ", ";
+                std::cout << asyncFuncDecl->genericParams[i];
+            }
+            std::cout << ">" << std::endl;
+        }
+        
+        if (!asyncFuncDecl->params.empty() || !asyncFuncDecl->optionalParams.empty()) {
+            std::cout << indentation << "  Parameters:" << std::endl;
+            
+            // Required parameters
+            for (const auto& [name, type] : asyncFuncDecl->params) {
+                std::cout << indentation << "    " << name;
+                if (type) {
+                    std::cout << ": " << typeToString(type);
+                }
+                std::cout << std::endl;
+            }
+            
+            // Optional parameters
+            for (const auto& [name, param] : asyncFuncDecl->optionalParams) {
+                std::cout << indentation << "    " << name << " (optional)";
+                if (param.first) {
+                    std::cout << ": " << typeToString(param.first);
+                }
+                std::cout << std::endl;
+                
+                if (param.second) {
+                    std::cout << indentation << "      Default value:" << std::endl;
+                    printNode(param.second, indent + 3);
+                }
+            }
+        }
+        
+        if (asyncFuncDecl->returnType) {
+            std::cout << indentation << "  ReturnType: " << typeToString(*asyncFuncDecl->returnType) << std::endl;
+        }
+        
+        if (asyncFuncDecl->throws) {
+            std::cout << indentation << "  Throws: true" << std::endl;
+        }
+        
+        if (asyncFuncDecl->body) {
+            std::cout << indentation << "  Body:" << std::endl;
+            printNode(asyncFuncDecl->body, indent + 2);
+        }
+    }
+    else if (auto typePatternExpr = std::dynamic_pointer_cast<AST::TypePatternExpr>(node)) {
+        std::cout << indentation << "TypePattern: " << typeToString(typePatternExpr->type) << std::endl;
+    }
+    else if (auto bindingPatternExpr = std::dynamic_pointer_cast<AST::BindingPatternExpr>(node)) {
+        std::cout << indentation << "BindingPattern: " << bindingPatternExpr->typeName;
+        if (!bindingPatternExpr->variableName.empty()) {
+            std::cout << "(" << bindingPatternExpr->variableName << ")";
+        }
+        std::cout << std::endl;
+    }
+    else if (auto listPatternExpr = std::dynamic_pointer_cast<AST::ListPatternExpr>(node)) {
+        std::cout << indentation << "ListPattern: [" << listPatternExpr->elements.size() << " elements";
+        if (listPatternExpr->restElement) {
+            std::cout << ", ..." << *listPatternExpr->restElement;
+        }
+        std::cout << "]" << std::endl;
+        
+        for (const auto& element : listPatternExpr->elements) {
+            printNode(element, indent + 1);
+        }
+    }
     else {
         std::cout << indentation << "Unknown node type" << std::endl;
     }

@@ -2,7 +2,7 @@
 print("=== Advanced Function Tests ===");
 
 // Function with optional parameters
-fn greetWithDefault(name: str = "World"): nil {
+fn greetWithDefault(name: str = "World") {
     print("Hello, {name}!");
 }
 
@@ -11,7 +11,7 @@ greetWithDefault();
 greetWithDefault("Alice");
 
 // Function with multiple optional parameters
-fn createUser(name: str, age: int = 18, active: bool = true): nil {
+fn createUser(name: str, age: int = 18, active: bool = true) {
     print("User: {name}, Age: {age}, Active: {active}");
 }
 

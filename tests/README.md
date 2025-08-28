@@ -66,22 +66,36 @@ cd tests
 - **Comparison**: ==, !=, <, >, <=, >=
 - **Logical**: and, or, !
 - **Control Flow**: if/else statements
-- **Loops**: for loops, iter loops with ranges
+- **Loops**: for loops, iter loops with ranges, while loop, match
+- **Patterns**: Pattern matching and destructuring
 - **String Interpolation**: {variable} syntax
 - **Print Statements**: Output functionality
 - **Ranges**: 1..5 syntax for iteration
+- **Concurrency**: Parallel/concurrent blocks
+- **Functions**: Function
 
 ### 🚧 Partially Implemented Features
-- **Functions**: Basic structure exists, needs testing
 - **Classes**: Framework exists, needs implementation
 - **Error Handling**: Basic error reporting
 
 ### ❌ Not Yet Implemented Features
-- **While Loops**: Planned feature
 - **Arrays/Lists**: Collection types
 - **Advanced Functions**: Closures, higher-order functions
-- **Concurrency**: Parallel/concurrent blocks
 - **Exception Handling**: try/catch/finally blocks
+- **Inheritance**: Class inheritance and polymorphism
+- **Modules**: Import/export statements
+- **Generics**: Generic types and type constraints
+
+- **Async/Await**: Async/await syntax and implementation
+- **Generators**: Yield statements and generators
+- **Reflection**: Runtime type introspection
+- **Traits**: Trait implementation and composition
+- **Macros**: Macro system and implementation
+- **Meta Programming**: Runtime code generation and reflection
+- **Reflection**: Runtime type introspection
+- **Traits**: Trait implementation and composition
+- **Macros**: Macro system and implementation
+- **Meta Programming**: Runtime code generation and reflection
 
 ## Test Results Interpretation
 

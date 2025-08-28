@@ -84,10 +84,10 @@ await someAsyncOperation();
 }
 
 match (x) {
-case 5 => {
+ 5 => {
 print("x is five");
 }
-case 10 => {
+ 10 => {
 print("x is ten");
 }
 }

@@ -2322,6 +2322,9 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseTypeAnnotation() {
     } else if (match({TokenType::NIL_TYPE})) {
         type->typeName = "nil";
         type->isPrimitive = true;
+    } else if (match({TokenType::NIL})) {
+        type->typeName = "nil";
+        type->isPrimitive = true;
     } else if (match({TokenType::LIST_TYPE})) {
         type->typeName = "list";
         type->isList = true;

@@ -9,16 +9,23 @@ if not exist "%MSYS2_PATH%" (
     exit /b 1
 )
 
-:: Add MSYS2 MinGW64 to PATH temporarily
-set PATH=%MSYS2_PATH%\mingw64\bin;%PATH%
-
 :: Create output directory
 if not exist "bin" mkdir bin
 
 echo Compiling with g++...
 
+:: Compile debugger first as a separate object file to ensure it's available
+echo Compiling debugger...
+"%MSYS2_PATH%\mingw64\bin\g++.exe" -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -c -o bin\debugger.o debugger.cpp -I.
+
+if %ERRORLEVEL% NEQ 0 (
+    echo Failed to compile debugger.cpp
+    exit /b 1
+)
+
 :: Compile main executable
-g++ -std=c++17 -Wall -Wextra -pedantic -o bin\limitly.exe ^
+echo Compiling main executable...
+"%MSYS2_PATH%\mingw64\bin\g++.exe" -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -o bin\limitly.exe ^
     main.cpp ^
     frontend\scanner.cpp ^
     frontend\parser.cpp ^
@@ -30,9 +37,9 @@ g++ -std=c++17 -Wall -Wextra -pedantic -o bin\limitly.exe ^
     backend\concurrency\scheduler.cpp ^
     backend\concurrency\thread_pool.cpp ^
     backend\concurrency\event_loop.cpp ^
-    backend\concurrency\epoll_event_loop.cpp ^    
-    debugger.cpp ^
-    -I.
+    backend\concurrency\iocp_event_loop.cpp ^
+    bin\debugger.o ^
+    -I. -lws2_32 -static-libgcc -static-libstdc++
 
 if %ERRORLEVEL% NEQ 0 (
     echo Failed to compile limitly.exe
@@ -40,7 +47,8 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 :: Compile test parser
-g++ -std=c++17 -Wall -Wextra -pedantic -o bin\test_parser.exe ^
+echo Compiling test parser...
+"%MSYS2_PATH%\mingw64\bin\g++.exe" -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -o bin\test_parser.exe ^
     test_parser.cpp ^
     frontend\scanner.cpp ^
     frontend\parser.cpp ^
@@ -48,37 +56,48 @@ g++ -std=c++17 -Wall -Wextra -pedantic -o bin\test_parser.exe ^
     backend\ast_printer.cpp ^
     backend\functions.cpp ^
     backend\classes.cpp ^
-    debugger.cpp ^
-    -I.
+    bin\debugger.o ^
+    -I. -static-libgcc -static-libstdc++
 
 if %ERRORLEVEL% NEQ 0 (
     echo Failed to compile test_parser.exe
     exit /b 1
 )
 
-:: Compile code formatter
-g++ -std=c++17 -Wall -Wextra -pedantic -o bin\format_code.exe ^
-    format_code.cpp ^
-    frontend\scanner.cpp ^
-    frontend\parser.cpp ^
-    backend\code_formatter.cpp ^
-    debugger.cpp ^
-    -I.
-
-if %ERRORLEVEL% NEQ 0 (
-    echo Failed to compile format_code.exe
-    exit /b 1
+:: Compile code formatter (optional)
+if exist "format_code.cpp" (
+    echo Compiling code formatter...
+    "%MSYS2_PATH%\mingw64\bin\g++.exe" -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -o bin\format_code.exe ^
+        format_code.cpp ^
+        frontend\scanner.cpp ^
+        frontend\parser.cpp ^
+        backend\code_formatter.cpp ^
+        bin\debugger.o ^
+        -I. -static-libgcc -static-libstdc++
+    
+    if %ERRORLEVEL% EQU 0 (
+        echo Code formatter compiled successfully.
+    ) else (
+        echo Warning: Failed to compile code formatter.
+    )
 )
 
+:: Clean up object file
+del bin\debugger.o
+
 echo.
-echo Build completed successfully.
+echo ========================================
+echo Build completed successfully!
+echo ========================================
 echo.
-echo To run the main executable:
-echo   bin\limitly.exe
+echo Available executables:
+echo   bin\limitly.exe      - Main language interpreter
+echo   bin\test_parser.exe  - Parser testing utility
+if exist "bin\format_code.exe" echo   bin\format_code.exe  - Code formatter
 echo.
-echo To run the test parser:
+echo Usage examples:
+echo   bin\limitly.exe test_match_concurrent.lm
+echo   bin\limitly.exe -ast sample.lm
+echo   bin\limitly.exe -bytecode sample.lm
 echo   bin\test_parser.exe sample.lm
-echo.
-echo To run the code formatter:
-echo   bin\format_code.exe sample.lm
 echo.
