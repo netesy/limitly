@@ -640,8 +640,20 @@ void BytecodeGenerator::visitMatchStatement(const std::shared_ptr<AST::MatchStat
                 visitExpression(matchCase.pattern);
             }
         } else if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(matchCase.pattern)) {
-            // This could be a type name. We'll push it as a string for the VM to handle.
-            emit(Opcode::PUSH_STRING, matchCase.pattern->line, 0, 0.0f, false, varExpr->name);
+            // This is a variable binding, unless the variable is '_'
+            if (varExpr->name == "_") {
+                // Wildcard pattern
+                emit(Opcode::PUSH_NULL, matchCase.pattern->line);
+            } else {
+                // Bind the value to the variable name.
+                // The value is already on the stack from the LOAD_TEMP
+                // We just need to store it in a new variable.
+                emit(Opcode::STORE_VAR, matchCase.pattern->line, 0, 0.0f, false, varExpr->name);
+                // For the match to succeed, we need to push a true value.
+                // The STORE_VAR doesn't leave the value on the stack, so we need to load it again if we want to use it.
+                // The pattern for variable binding should always match. We'll push a string that the VM will recognize as a "match-all" for binding.
+                emit(Opcode::PUSH_STRING, matchCase.pattern->line, 0, 0.0f, false, "_");
+            }
         }
         else {
             visitExpression(matchCase.pattern);
