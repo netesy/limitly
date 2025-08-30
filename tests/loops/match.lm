@@ -12,16 +12,37 @@ match (x) {
     }
 }
 
+var value = false;
+match (value) {
+        int => {
+             print("Integer: {value}");
+             },
+        str => {
+             print("String: {value}");
+             },
+        list => {
+             print("List of integers: {value}"); },
+        dict => { print("Dictionary: {value}"); },
+        _ => { print("Unknown type");
+    }
+}
 
-fn match_example(value: any) {
-    match(value) {
+
+    match(8) {
+        x if x > 10 => { print("{x} is greater than 10"); },
+        x if x < 10 => { print("{x} is less than 10"); },
+        x => { print("{x} is 10"); }
+    }
+
+fn match_example(value) {
+    match (value) {
         int => { print("Integer: {value}"); },
         str => { print("String: {value}"); },
         list => { print("List of integers: {value}"); },
         dict => { print("Dictionary: {value}"); },
         _ => { print("Unknown type");
     }
-    }
+   }
 }
 
 match_example(42);
