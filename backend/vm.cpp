@@ -2721,7 +2721,7 @@ void VM::handleEndConcurrent(const Instruction& /*unused*/) {
 }
 
 void VM::handleMatchPattern(const Instruction& /*unused*/) {
-    if (matchCounter++ > 100) {
+    if (matchCounter++ > 1000) {
         error("Match operation limit exceeded. Possible infinite loop.");
         return;
     }
@@ -2731,82 +2731,85 @@ void VM::handleMatchPattern(const Instruction& /*unused*/) {
 
     bool match = false;
 
-    // Wildcard pattern (null/nil)
-    if (pattern->type->tag == TypeTag::Nil) {
-        match = true;
-    }
-    // Type matching with string patterns
-    else if (pattern->type->tag == TypeTag::String) {
-        std::string typeName = std::get<std::string>(pattern->data);
+    if (pattern->type->tag == TypeTag::String && std::get<std::string>(pattern->data) == "__binding_pattern__") {
+        ValuePtr varNameVal = pop();
+        ValuePtr typeNameVal = pop();
+        std::string varName = std::get<std::string>(varNameVal->data);
+        std::string typeName = std::get<std::string>(typeNameVal->data);
         
-        // Handle wildcard string pattern
-        if (typeName == "_") {
-            match = true;
-        }
-        // Type name matching
-        else {
-            std::string valueTypeName;
-            switch(value->type->tag) {
-                case TypeTag::Int: 
-                case TypeTag::Int32: 
-                case TypeTag::Int64: 
-                    valueTypeName = "int"; 
-                    break;
-                case TypeTag::Float32:
-                case TypeTag::Float64: 
-                    valueTypeName = "float"; 
-                    break;
-                case TypeTag::String: 
-                    valueTypeName = "str"; 
-                    break;
-                case TypeTag::Bool: 
-                    valueTypeName = "bool"; 
-                    break;
-                case TypeTag::List: 
-                    valueTypeName = "list"; 
-                    break;
-                case TypeTag::Dict: 
-                    valueTypeName = "dict"; 
-                    break;
-                case TypeTag::Nil:
-                    valueTypeName = "nil";
-                    break;
-                default: 
-                    valueTypeName = "unknown"; 
-                    break;
-            }
-
-            // Direct type matching
-            if (typeName == valueTypeName) {
-                match = true;
-            }
-            // Generic type matching (basic support)
-            else if (value->type->tag == TypeTag::List && 
-                     (typeName.find("list") == 0 || typeName == "array")) {
-                match = true;
-            }
-            else if (value->type->tag == TypeTag::Dict && 
-                     (typeName.find("dict") == 0 || typeName == "map" || typeName == "object")) {
-                match = true;
-            }
-            // Range matching
-            else if (typeName == "range" && value->type->tag == TypeTag::List) {
-                // Check if it's a range-like list (could be enhanced)
-                match = true;
-            }
+        if (value->type->tag == TypeTag::Object) {
+             auto obj = std::get<ObjectInstancePtr>(value->data);
+             if (obj->getClassDefinition()->getName() == typeName) {
+                // This is a simplification. We assume the object has a single field 'value'.
+                try {
+                    ValuePtr innerValue = obj->getField("value");
+                    environment->define(varName, innerValue);
+                    match = true;
+                } catch (const std::exception& e) {
+                    match = false;
+                }
+             }
         }
     }
-    // List pattern matching
     else if (pattern->type->tag == TypeTag::List && value->type->tag == TypeTag::List) {
-        // For now, just check if both are lists - could be enhanced for structural matching
-        match = true;
+        auto& pList = std::get<ListValue>(pattern->data);
+        auto& vList = std::get<ListValue>(value->data);
+
+        bool hasRest = false;
+        std::string restVar;
+        size_t pSize = pList.elements.size();
+
+        if (pSize > 0 && pList.elements.back()->type->tag == TypeTag::String) {
+            const std::string& last = std::get<std::string>(pList.elements.back()->data);
+            if (last.rfind("...", 0) == 0) {
+                hasRest = true;
+                restVar = last.substr(3);
+                pSize--;
+            }
+        }
+
+        if (hasRest) {
+            if (vList.elements.size() < pSize) {
+                match = false;
+            } else {
+                match = true;
+                for (size_t i = 0; i < pSize; ++i) {
+                    ValuePtr subPattern = pList.elements[i];
+                    ValuePtr subValue = vList.elements[i];
+                    if (subPattern->type->tag == TypeTag::String) {
+                        environment->define(std::get<std::string>(subPattern->data), subValue);
+                    } else if (!valuesEqual(subValue, subPattern)) {
+                        match = false;
+                        break;
+                    }
+                }
+
+                if (match) {
+                    auto restListValue = memoryManager.makeRef<Value>(*region, typeSystem->LIST_TYPE);
+                    ListValue rest;
+                    rest.elements.assign(vList.elements.begin() + pSize, vList.elements.end());
+                    restListValue->data = rest;
+                    environment->define(restVar, restListValue);
+                }
+            }
+        } else {
+            if (vList.elements.size() != pSize) {
+                match = false;
+            } else {
+                match = true;
+                for (size_t i = 0; i < pSize; ++i) {
+                    ValuePtr subPattern = pList.elements[i];
+                    ValuePtr subValue = vList.elements[i];
+                    if (subPattern->type->tag == TypeTag::String) {
+                        environment->define(std::get<std::string>(subPattern->data), subValue);
+                    } else if (!valuesEqual(subValue, subPattern)) {
+                        match = false;
+                        break;
+                    }
+                }
+            }
+        }
     }
-    // Dictionary pattern matching
-    else if (pattern->type->tag == TypeTag::Dict && value->type->tag == TypeTag::Dict) {
-        // For now, just check if both are dicts - could be enhanced for structural matching
-        match = true;
-    }
-    // Exact value matching
     else {
         match = valuesEqual(pattern, value);
     }
