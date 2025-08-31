@@ -2727,7 +2727,7 @@ void VM::handleMatchPattern(const Instruction& /*unused*/) {
     }
 
     ValuePtr pattern = pop();
-    ValuePtr value = pop();
+    ValuePtr value = peek();
 
     bool match = false;
 
@@ -2757,7 +2757,7 @@ void VM::handleMatchPattern(const Instruction& /*unused*/) {
                     valueTypeName = "float"; 
                     break;
                 case TypeTag::String: 
-                    valueTypeName = "string"; 
+                    valueTypeName = "str"; 
                     break;
                 case TypeTag::Bool: 
                     valueTypeName = "bool"; 
