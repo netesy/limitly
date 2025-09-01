@@ -98,6 +98,8 @@ public:
     // Debugging methods
     void printStack() const;
     
+    std::shared_ptr<ThreadPool> getThreadPool() { return thread_pool; }
+
 private:
     void error(const std::string& message) const;
     

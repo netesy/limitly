@@ -380,6 +380,8 @@ ValuePtr VM::execute(const std::vector<Instruction>& bytecode) {
                 case Opcode::DEBUG_PRINT:
                     handleDebugPrint(instruction);
                     break;
+                case Opcode::HALT:
+                    return stack.empty() ? memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE) : stack.back();
                 default:
                     error("Unknown opcode: " + std::to_string(static_cast<int>(instruction.opcode)));
                     break;

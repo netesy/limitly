@@ -1,4 +1,4 @@
-AST for tests\loops\match.lm
+AST for tests/loops/match.lm
 ========================================
 
 AST Dump:
@@ -32,9 +32,100 @@ MatchStatement:
       BlockStatement:
         PrintStatement:
           Literal: "x is something else"
+VarDeclaration: value
+  Initializer:
+    Literal: false
+MatchStatement:
+  Value:
+    Variable: value
+  Cases:
+    Case:
+      Pattern:
+      TypePattern: int
+      Body:
+      BlockStatement:
+        PrintStatement:
+          InterpolatedString:
+            String: "Integer: "
+            Expression:
+              Variable: value
+    Case:
+      Pattern:
+      TypePattern: str
+      Body:
+      BlockStatement:
+        PrintStatement:
+          InterpolatedString:
+            String: "String: "
+            Expression:
+              Variable: value
+    Case:
+      Pattern:
+      TypePattern: list
+      Body:
+      BlockStatement:
+        PrintStatement:
+          InterpolatedString:
+            String: "List of integers: "
+            Expression:
+              Variable: value
+    Case:
+      Pattern:
+      TypePattern: dict
+      Body:
+      BlockStatement:
+        PrintStatement:
+          InterpolatedString:
+            String: "Dictionary: "
+            Expression:
+              Variable: value
+    Case:
+      Pattern:
+      Literal: nil
+      Body:
+      BlockStatement:
+        PrintStatement:
+          Literal: "Unknown type"
+MatchStatement:
+  Value:
+    Literal: 8
+  Cases:
+    Case:
+      Pattern:
+      Variable: x
+      Body:
+      BlockStatement:
+        PrintStatement:
+          InterpolatedString:
+            String: ""
+            Expression:
+              Variable: x
+            String: " is greater than 10"
+    Case:
+      Pattern:
+      Variable: x
+      Body:
+      BlockStatement:
+        PrintStatement:
+          InterpolatedString:
+            String: ""
+            Expression:
+              Variable: x
+            String: " is less than 10"
+    Case:
+      Pattern:
+      Variable: x
+      Body:
+      BlockStatement:
+        PrintStatement:
+          InterpolatedString:
+            String: ""
+            Expression:
+              Variable: x
+            String: " is 10"
 FunctionDeclaration: match_example
   Parameters:
-    value: any
+    value
   Body:
     BlockStatement:
       MatchStatement:
@@ -43,32 +134,44 @@ FunctionDeclaration: match_example
         Cases:
           Case:
             Pattern:
-            Unknown node type
+            TypePattern: int
             Body:
             BlockStatement:
               PrintStatement:
-                Literal: "Integer: {value}"
+                InterpolatedString:
+                  String: "Integer: "
+                  Expression:
+                    Variable: value
           Case:
             Pattern:
-            Unknown node type
+            TypePattern: str
             Body:
             BlockStatement:
               PrintStatement:
-                Literal: "String: {value}"
+                InterpolatedString:
+                  String: "String: "
+                  Expression:
+                    Variable: value
           Case:
             Pattern:
-            Unknown node type
+            TypePattern: list
             Body:
             BlockStatement:
               PrintStatement:
-                Literal: "List of integers: {value}"
+                InterpolatedString:
+                  String: "List of integers: "
+                  Expression:
+                    Variable: value
           Case:
             Pattern:
-            Unknown node type
+            TypePattern: dict
             Body:
             BlockStatement:
               PrintStatement:
-                Literal: "Dictionary: {value}"
+                InterpolatedString:
+                  String: "Dictionary: "
+                  Expression:
+                    Variable: value
           Case:
             Pattern:
             Literal: nil
