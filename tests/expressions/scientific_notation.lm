@@ -1,0 +1,39 @@
+// Test scientific notation parsing and evaluation
+
+// Test basic scientific notation
+var small: f64 = 1.23e-10;
+var large: f64 = 4.56e+15;
+var negative: f64 = -7.89e-5;
+
+print("Scientific notation test:");
+print("Small:", small);
+print("Large:", large);
+print("Negative:", negative);
+
+// Test with capital E
+var capitalE: f64 = 2.5E+8;
+var capitalENeg: f64 = 3.14E-3;
+
+print("Capital E notation:");
+print("Capital E positive:", capitalE);
+print("Capital E negative:", capitalENeg);
+
+// Test integer scientific notation (should be treated as float)
+var intScientific: f64 = 5e10;
+var intScientificNeg: f64 = 2e-6;
+
+print("Integer scientific notation:");
+print("Int scientific:", intScientific);
+print("Int scientific negative:", intScientificNeg);
+
+// Test edge cases
+var zero: f64 = 0e0;
+var one: f64 = 1e0;
+
+print("Edge cases:");
+print("Zero:", zero);
+print("One:", one);
+
+// Test in expressions
+var result: f64 = 1.5e3 + 2.5e2;
+print("Expression result:", result);
