@@ -1,17 +1,14 @@
 print("=== Advanced Match Statement Tests ===");
 
-// Test case 1: Variable binding
-fn test_binding(value) {
+// Test case 1: Record destructuring
+fn test_record_destructuring(value) {
     match(value) {
-        Some(x) => { print("Some: {x}"); },
-        None => { print("None"); }
+        {name, age} => { print("Name: {name}, Age: {age}"); },
+        {name, age, city} => { print("Name: {name}, Age: {age}, City: {city}"); }
     }
 }
-
-// Assuming 'Some' and 'None' are defined as enums or classes
-// For now, we are just testing the parser
-// test_binding(Some(10));
-// test_binding(None);
+test_record_destructuring({name: "John", age: 30});
+test_record_destructuring({name: "Joan", age: 26, city: "New York"});
 
 
 // Test case 2: List destructuring
@@ -33,8 +30,8 @@ test_list_destructuring([1, 2, 3]);
 // Test case 3: Guards
 fn test_guards(value) {
     match(value) {
-        x if x > 10 => { print("{x} is greater than 10"); },
-        x if x < 10 => { print("{x} is less than 10"); },
+        x where x > 10 => { print("{x} is greater than 10"); },
+        x where x < 10 => { print("{x} is less than 10"); },
         x => { print("{x} is 10"); }
     }
 }
@@ -44,15 +41,3 @@ test_guards(10);
 test_guards(15);
 
 
-// Test case 4: Combined features
-fn test_combined(value) {
-    match(value) {
-        Some(x) if x > 100 => { print("Large some: {x}"); },
-        Some(x) => { print("Small some: {x}"); },
-        None => { print("None"); }
-    }
-}
-
-// test_combined(Some(200));
-// test_combined(Some(50));
-// test_combined(None);

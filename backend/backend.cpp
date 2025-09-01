@@ -623,12 +623,14 @@ void BytecodeGenerator::visitMatchStatement(const std::shared_ptr<AST::MatchStat
     
     // Process each case
     std::vector<size_t> jumpToEndIndices;
-    size_t jumpToNextCaseIndex = 0;
+    std::vector<size_t> jumpToNextCaseIndices;
     
     for (const auto& matchCase : stmt->cases) {
-        if (jumpToNextCaseIndex != 0) {
-            bytecode[jumpToNextCaseIndex].intValue = bytecode.size() - jumpToNextCaseIndex - 1;
+        // Update all previous jumps to point to this case
+        for (size_t jumpIndex : jumpToNextCaseIndices) {
+            bytecode[jumpIndex].intValue = bytecode.size() - jumpIndex - 1;
         }
+        jumpToNextCaseIndices.clear();
 
         // Duplicate the value to match
         emit(Opcode::LOAD_TEMP, stmt->line, tempIndex);
@@ -649,10 +651,10 @@ void BytecodeGenerator::visitMatchStatement(const std::shared_ptr<AST::MatchStat
             } else {
                 // Bind the value to the variable name.
                 // The value is already on the stack from the LOAD_TEMP
-                // We just need to store it in a new variable.
+                // We need to duplicate it before storing so one copy remains for MATCH_PATTERN
+                emit(Opcode::DUP, matchCase.pattern->line);
                 emit(Opcode::STORE_VAR, matchCase.pattern->line, 0, 0.0f, false, varExpr->name);
                 // For the match to succeed, we need to push a true value.
-                // The STORE_VAR doesn't leave the value on the stack, so we need to load it again if we want to use it.
                 // The pattern for variable binding should always match. We'll push a string that the VM will recognize as a "match-all" for binding.
                 emit(Opcode::PUSH_STRING, matchCase.pattern->line, 0, 0.0f, false, "_");
             }
@@ -665,8 +667,33 @@ void BytecodeGenerator::visitMatchStatement(const std::shared_ptr<AST::MatchStat
         emit(Opcode::MATCH_PATTERN, stmt->line);
         
         // Jump to next case if pattern doesn't match
-        jumpToNextCaseIndex = bytecode.size();
+        size_t patternJumpIndex = bytecode.size();
         emit(Opcode::JUMP_IF_FALSE, stmt->line);
+        jumpToNextCaseIndices.push_back(patternJumpIndex);
+        
+        // If there's a guard clause, evaluate it
+        if (matchCase.guard) {
+            // For variable binding patterns, we need to make the bound variable available
+            if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(matchCase.pattern)) {
+                if (varExpr->name != "_") {
+                    // The variable is already stored, now evaluate the guard
+                    visitExpression(matchCase.guard);
+                    
+                    // Jump to next case if guard fails
+                    size_t guardJumpIndex = bytecode.size();
+                    emit(Opcode::JUMP_IF_FALSE, stmt->line);
+                    jumpToNextCaseIndices.push_back(guardJumpIndex);
+                }
+            } else {
+                // For other patterns, evaluate the guard with the matched value
+                visitExpression(matchCase.guard);
+                
+                // Jump to next case if guard fails
+                size_t guardJumpIndex = bytecode.size();
+                emit(Opcode::JUMP_IF_FALSE, stmt->line);
+                jumpToNextCaseIndices.push_back(guardJumpIndex);
+            }
+        }
         
         // Process case body
         visitStatement(matchCase.body);
@@ -676,8 +703,9 @@ void BytecodeGenerator::visitMatchStatement(const std::shared_ptr<AST::MatchStat
         emit(Opcode::JUMP, stmt->line);
     }
 
-    if (jumpToNextCaseIndex != 0) {
-        bytecode[jumpToNextCaseIndex].intValue = bytecode.size() - jumpToNextCaseIndex - 1;
+    // Update any remaining jumps to point to the end
+    for (size_t jumpIndex : jumpToNextCaseIndices) {
+        bytecode[jumpIndex].intValue = bytecode.size() - jumpIndex - 1;
     }
     
     // Update all jump to end instructions

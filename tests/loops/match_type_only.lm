@@ -1,0 +1,9 @@
+print("=== Type Pattern Test ===");
+
+var value = 42;
+match(value) {
+    int => { print("It's an integer"); },
+    _ => { print("It's something else"); }
+}
+
+print("=== Test completed ===");

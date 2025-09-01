@@ -1,0 +1,51 @@
+
+print("=== Advanced Match Statement Tests ===");
+
+// Test case 1: Guards with different values
+fn test_guards(value) {
+    match(value) {
+        x where x > 10 => { print("{x} is greater than 10"); },
+        x where x < 10 => { print("{x} is less than 10"); },
+        x => { print("{x} is exactly 10"); }
+    }
+}
+
+test_guards(5);
+test_guards(10);
+test_guards(15);
+
+// Test case 2: Type matching
+fn test_types(value) {
+    match(value) {
+        int => { print("Integer: {value}"); },
+        str => { print("String: {value}"); },
+        list => { print("List: {value}"); },
+        dict => { print("Dictionary: {value}"); },
+        _ => { print("Unknown type: {value}"); }
+    }
+}
+
+test_types(42);
+test_types("hello");
+test_types([1, 2, 3]);
+test_types({"key": "value"});
+test_types(true);
+
+// Test case 3: Value matching with guards
+fn test_value_guards(value) {
+    match(value) {
+        0 => { print("Zero"); },
+        x where x > 0 and x < 10 => { print("Single digit positive: {x}"); },
+        x where x >= 10 and x < 100 => { print("Double digit: {x}"); },
+        x where x < 0 => { print("Negative: {x}"); },
+        _ => { print("Large number: {value}"); }
+    }
+}
+
+test_value_guards(0);
+test_value_guards(5);
+test_value_guards(42);
+test_value_guards(-3);
+test_value_guards(150);
+
+print("=== All tests completed ===");

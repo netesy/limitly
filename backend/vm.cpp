@@ -2729,7 +2729,7 @@ void VM::handleMatchPattern(const Instruction& /*unused*/) {
     }
 
     ValuePtr pattern = pop();
-    ValuePtr value = peek();
+    ValuePtr value = pop();
 
     bool match = false;
 
