@@ -125,6 +125,7 @@ const std::unordered_map<Opcode, std::string> OPCODE_NAMES = {
     
     // I/O operations
     {Opcode::PRINT, "PRINT"},
+    {Opcode::HALT, "HALT"},
     
     // Debug operations
     {Opcode::DEBUG_PRINT, "DEBUG_PRINT"},
@@ -259,9 +260,41 @@ int main(int argc, char* argv[]) {
                 bytecodeFile << std::setw(4) << count++ << ": "
                            << std::setw(20) << std::left << getOpcodeName(instruction.opcode)
                            << " (line " << instruction.line << ")";
-                
-                // Add any additional instruction details here if available
-                // Note: Instruction operand access removed as it's not part of the Instruction struct
+
+                switch (instruction.opcode) {
+                    case Opcode::PUSH_INT:
+                        bytecodeFile << " " << instruction.intValue;
+                        break;
+                    case Opcode::PUSH_FLOAT:
+                        bytecodeFile << " " << instruction.floatValue;
+                        break;
+                    case Opcode::PUSH_STRING:
+                        bytecodeFile << " \"" << instruction.stringValue << "\"";
+                        break;
+                    case Opcode::PUSH_BOOL:
+                        bytecodeFile << " " << (instruction.boolValue ? "true" : "false");
+                        break;
+                    case Opcode::STORE_VAR:
+                    case Opcode::LOAD_VAR:
+                    case Opcode::DEFINE_PARAM:
+                    case Opcode::DEFINE_OPTIONAL_PARAM:
+                    case Opcode::GET_PROPERTY:
+                    case Opcode::SET_PROPERTY:
+                    case Opcode::IMPORT:
+                        bytecodeFile << " " << instruction.stringValue;
+                        break;
+                    case Opcode::JUMP:
+                    case Opcode::JUMP_IF_TRUE:
+                    case Opcode::JUMP_IF_FALSE:
+                    case Opcode::CALL:
+                    case Opcode::CREATE_LIST:
+                    case Opcode::CREATE_DICT:
+                        bytecodeFile << " " << instruction.intValue;
+                        break;
+                    default:
+                        // No operand to print for other opcodes
+                        break;
+                }
                 
                 bytecodeFile << "\n";
             }

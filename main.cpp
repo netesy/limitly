@@ -91,6 +91,9 @@ void executeFile(const std::string& filename, bool printAst = false, bool printT
                 if (result && (!result->type || result->type->tag != TypeTag::Nil)) {
                     std::cout << result->toString() << std::endl;
                 }
+                if (vm.getThreadPool()) {
+                    vm.getThreadPool()->stop();
+                }
             } catch (const std::exception& e) {
                 std::cerr << "Error: " << e.what() << std::endl;
             }

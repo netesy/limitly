@@ -37,6 +37,8 @@ void BytecodeGenerator::process(const std::shared_ptr<AST::Program>& program) {
     for (const auto& stmt : program->statements) {
         visitStatement(stmt);
     }
+    // TODO: Add line number from the last statement
+    emit(Opcode::HALT, 0);
 }
 
 void BytecodeGenerator::visitStatement(const std::shared_ptr<AST::Statement>& stmt) {

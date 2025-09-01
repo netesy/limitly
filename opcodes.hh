@@ -125,6 +125,7 @@ enum class Opcode {
 
     // I/O operations
     PRINT,              // Print values
+    HALT,               // Halt execution
 
     // Debug operations
     DEBUG_PRINT,        // Print debug information

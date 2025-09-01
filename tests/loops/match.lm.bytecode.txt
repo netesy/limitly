@@ -1,111 +1,242 @@
-Bytecode for tests\loops\match.lm
+Bytecode for tests/loops/match.lm
 ========================================
 
-Total instructions: 106
+Total instructions: 237
 
-   1: PUSH_INT             (line 1)
-2   : STORE_VAR            (line 1)
-3   : LOAD_VAR             (line 3)
+   1: PUSH_INT             (line 1) 5
+2   : STORE_VAR            (line 1) x
+3   : LOAD_VAR             (line 3) x
 4   : STORE_TEMP           (line 3)
 5   : LOAD_TEMP            (line 3)
-6   : PUSH_INT             (line 4)
+6   : PUSH_INT             (line 4) 5
 7   : MATCH_PATTERN        (line 3)
-8   : JUMP_IF_FALSE        (line 3)
+8   : JUMP_IF_FALSE        (line 3) 5
 9   : BEGIN_SCOPE          (line 4)
-10  : PUSH_STRING          (line 5)
+10  : PUSH_STRING          (line 5) "x is five"
 11  : PRINT                (line 5)
 12  : END_SCOPE            (line 4)
-13  : JUMP                 (line 3)
+13  : JUMP                 (line 3) 18
 14  : LOAD_TEMP            (line 3)
-15  : PUSH_INT             (line 7)
+15  : PUSH_INT             (line 7) 10
 16  : MATCH_PATTERN        (line 3)
-17  : JUMP_IF_FALSE        (line 3)
+17  : JUMP_IF_FALSE        (line 3) 5
 18  : BEGIN_SCOPE          (line 7)
-19  : PUSH_STRING          (line 8)
+19  : PUSH_STRING          (line 8) "x is ten"
 20  : PRINT                (line 8)
 21  : END_SCOPE            (line 7)
-22  : JUMP                 (line 3)
+22  : JUMP                 (line 3) 9
 23  : LOAD_TEMP            (line 3)
 24  : PUSH_NULL            (line 10)
 25  : MATCH_PATTERN        (line 3)
-26  : JUMP_IF_FALSE        (line 3)
+26  : JUMP_IF_FALSE        (line 3) 5
 27  : BEGIN_SCOPE          (line 10)
-28  : PUSH_STRING          (line 11)
+28  : PUSH_STRING          (line 11) "x is something else"
 29  : PRINT                (line 11)
 30  : END_SCOPE            (line 10)
-31  : JUMP                 (line 3)
+31  : JUMP                 (line 3) 0
 32  : CLEAR_TEMP           (line 3)
-33  : BEGIN_FUNCTION       (line 16)
-34  : DEFINE_PARAM         (line 16)
-35  : BEGIN_SCOPE          (line 16)
-36  : LOAD_VAR             (line 17)
-37  : STORE_TEMP           (line 17)
-38  : LOAD_TEMP            (line 17)
-39  : PUSH_STRING          (line 18)
-40  : MATCH_PATTERN        (line 17)
-41  : JUMP_IF_FALSE        (line 17)
-42  : BEGIN_SCOPE          (line 18)
-43  : PUSH_STRING          (line 18)
-44  : PRINT                (line 18)
-45  : END_SCOPE            (line 18)
-46  : JUMP                 (line 17)
-47  : LOAD_TEMP            (line 17)
-48  : PUSH_STRING          (line 19)
-49  : MATCH_PATTERN        (line 17)
-50  : JUMP_IF_FALSE        (line 17)
-51  : BEGIN_SCOPE          (line 19)
-52  : PUSH_STRING          (line 19)
-53  : PRINT                (line 19)
-54  : END_SCOPE            (line 19)
-55  : JUMP                 (line 17)
-56  : LOAD_TEMP            (line 17)
-57  : PUSH_STRING          (line 20)
-58  : MATCH_PATTERN        (line 17)
-59  : JUMP_IF_FALSE        (line 17)
-60  : BEGIN_SCOPE          (line 20)
-61  : PUSH_STRING          (line 20)
-62  : PRINT                (line 20)
-63  : END_SCOPE            (line 20)
-64  : JUMP                 (line 17)
-65  : LOAD_TEMP            (line 17)
-66  : PUSH_STRING          (line 21)
-67  : MATCH_PATTERN        (line 17)
-68  : JUMP_IF_FALSE        (line 17)
-69  : BEGIN_SCOPE          (line 21)
-70  : PUSH_STRING          (line 21)
-71  : PRINT                (line 21)
-72  : END_SCOPE            (line 21)
-73  : JUMP                 (line 17)
-74  : LOAD_TEMP            (line 17)
-75  : PUSH_NULL            (line 22)
-76  : MATCH_PATTERN        (line 17)
-77  : JUMP_IF_FALSE        (line 17)
-78  : BEGIN_SCOPE          (line 22)
-79  : PUSH_STRING          (line 22)
-80  : PRINT                (line 22)
-81  : END_SCOPE            (line 22)
-82  : JUMP                 (line 17)
-83  : CLEAR_TEMP           (line 17)
-84  : END_SCOPE            (line 16)
-85  : PUSH_NULL            (line 16)
-86  : RETURN               (line 16)
-87  : END_FUNCTION         (line 16)
-88  : PUSH_INT             (line 27)
-89  : CALL                 (line 27)
-90  : POP                  (line 27)
-91  : PUSH_STRING          (line 28)
-92  : CALL                 (line 28)
-93  : POP                  (line 28)
-94  : PUSH_INT             (line 29)
-95  : PUSH_INT             (line 29)
-96  : PUSH_INT             (line 29)
-97  : CREATE_LIST          (line 29)
-98  : CALL                 (line 29)
-99  : POP                  (line 29)
-100 : PUSH_STRING          (line 30)
-101 : PUSH_INT             (line 30)
-102 : PUSH_STRING          (line 30)
-103 : PUSH_INT             (line 30)
-104 : CREATE_DICT          (line 30)
-105 : CALL                 (line 30)
-106 : POP                  (line 30)
+33  : PUSH_BOOL            (line 15) false
+34  : STORE_VAR            (line 15) value
+35  : LOAD_VAR             (line 16) value
+36  : STORE_TEMP           (line 16)
+37  : LOAD_TEMP            (line 16)
+38  : PUSH_STRING          (line 17) "int"
+39  : MATCH_PATTERN        (line 16)
+40  : JUMP_IF_FALSE        (line 16) 9
+41  : BEGIN_SCOPE          (line 17)
+42  : PUSH_STRING          (line 18) "Integer: "
+43  : LOAD_VAR             (line 18) value
+44  : PUSH_STRING          (line 18) ""
+45  : CONCAT               (line 18)
+46  : INTERPOLATE_STRING   (line 18)
+47  : PRINT                (line 18)
+48  : END_SCOPE            (line 17)
+49  : JUMP                 (line 16) 48
+50  : LOAD_TEMP            (line 16)
+51  : PUSH_STRING          (line 20) "str"
+52  : MATCH_PATTERN        (line 16)
+53  : JUMP_IF_FALSE        (line 16) 9
+54  : BEGIN_SCOPE          (line 20)
+55  : PUSH_STRING          (line 21) "String: "
+56  : LOAD_VAR             (line 21) value
+57  : PUSH_STRING          (line 21) ""
+58  : CONCAT               (line 21)
+59  : INTERPOLATE_STRING   (line 21)
+60  : PRINT                (line 21)
+61  : END_SCOPE            (line 20)
+62  : JUMP                 (line 16) 35
+63  : LOAD_TEMP            (line 16)
+64  : PUSH_STRING          (line 23) "list"
+65  : MATCH_PATTERN        (line 16)
+66  : JUMP_IF_FALSE        (line 16) 9
+67  : BEGIN_SCOPE          (line 23)
+68  : PUSH_STRING          (line 24) "List of integers: "
+69  : LOAD_VAR             (line 24) value
+70  : PUSH_STRING          (line 24) ""
+71  : CONCAT               (line 24)
+72  : INTERPOLATE_STRING   (line 24)
+73  : PRINT                (line 24)
+74  : END_SCOPE            (line 23)
+75  : JUMP                 (line 16) 22
+76  : LOAD_TEMP            (line 16)
+77  : PUSH_STRING          (line 25) "dict"
+78  : MATCH_PATTERN        (line 16)
+79  : JUMP_IF_FALSE        (line 16) 9
+80  : BEGIN_SCOPE          (line 25)
+81  : PUSH_STRING          (line 25) "Dictionary: "
+82  : LOAD_VAR             (line 25) value
+83  : PUSH_STRING          (line 25) ""
+84  : CONCAT               (line 25)
+85  : INTERPOLATE_STRING   (line 25)
+86  : PRINT                (line 25)
+87  : END_SCOPE            (line 25)
+88  : JUMP                 (line 16) 9
+89  : LOAD_TEMP            (line 16)
+90  : PUSH_NULL            (line 26)
+91  : MATCH_PATTERN        (line 16)
+92  : JUMP_IF_FALSE        (line 16) 5
+93  : BEGIN_SCOPE          (line 26)
+94  : PUSH_STRING          (line 26) "Unknown type"
+95  : PRINT                (line 26)
+96  : END_SCOPE            (line 26)
+97  : JUMP                 (line 16) 0
+98  : CLEAR_TEMP           (line 16)
+99  : PUSH_INT             (line 31) 8
+100 : STORE_TEMP           (line 31)
+101 : LOAD_TEMP            (line 31)
+102 : STORE_VAR            (line 32) x
+103 : PUSH_STRING          (line 32) "_"
+104 : MATCH_PATTERN        (line 31)
+105 : JUMP_IF_FALSE        (line 31) 10
+106 : BEGIN_SCOPE          (line 32)
+107 : PUSH_STRING          (line 32) ""
+108 : LOAD_VAR             (line 32) x
+109 : PUSH_STRING          (line 32) ""
+110 : CONCAT               (line 32)
+111 : PUSH_STRING          (line 32) " is greater than 10"
+112 : INTERPOLATE_STRING   (line 32)
+113 : PRINT                (line 32)
+114 : END_SCOPE            (line 32)
+115 : JUMP                 (line 31) 30
+116 : LOAD_TEMP            (line 31)
+117 : STORE_VAR            (line 33) x
+118 : PUSH_STRING          (line 33) "_"
+119 : MATCH_PATTERN        (line 31)
+120 : JUMP_IF_FALSE        (line 31) 10
+121 : BEGIN_SCOPE          (line 33)
+122 : PUSH_STRING          (line 33) ""
+123 : LOAD_VAR             (line 33) x
+124 : PUSH_STRING          (line 33) ""
+125 : CONCAT               (line 33)
+126 : PUSH_STRING          (line 33) " is less than 10"
+127 : INTERPOLATE_STRING   (line 33)
+128 : PRINT                (line 33)
+129 : END_SCOPE            (line 33)
+130 : JUMP                 (line 31) 15
+131 : LOAD_TEMP            (line 31)
+132 : STORE_VAR            (line 34) x
+133 : PUSH_STRING          (line 34) "_"
+134 : MATCH_PATTERN        (line 31)
+135 : JUMP_IF_FALSE        (line 31) 10
+136 : BEGIN_SCOPE          (line 34)
+137 : PUSH_STRING          (line 34) ""
+138 : LOAD_VAR             (line 34) x
+139 : PUSH_STRING          (line 34) ""
+140 : CONCAT               (line 34)
+141 : PUSH_STRING          (line 34) " is 10"
+142 : INTERPOLATE_STRING   (line 34)
+143 : PRINT                (line 34)
+144 : END_SCOPE            (line 34)
+145 : JUMP                 (line 31) 0
+146 : CLEAR_TEMP           (line 31)
+147 : BEGIN_FUNCTION       (line 37)
+148 : DEFINE_PARAM         (line 37) value
+149 : BEGIN_SCOPE          (line 37)
+150 : LOAD_VAR             (line 38) value
+151 : STORE_TEMP           (line 38)
+152 : LOAD_TEMP            (line 38)
+153 : PUSH_STRING          (line 39) "int"
+154 : MATCH_PATTERN        (line 38)
+155 : JUMP_IF_FALSE        (line 38) 9
+156 : BEGIN_SCOPE          (line 39)
+157 : PUSH_STRING          (line 39) "Integer: "
+158 : LOAD_VAR             (line 39) value
+159 : PUSH_STRING          (line 39) ""
+160 : CONCAT               (line 39)
+161 : INTERPOLATE_STRING   (line 39)
+162 : PRINT                (line 39)
+163 : END_SCOPE            (line 39)
+164 : JUMP                 (line 38) 48
+165 : LOAD_TEMP            (line 38)
+166 : PUSH_STRING          (line 40) "str"
+167 : MATCH_PATTERN        (line 38)
+168 : JUMP_IF_FALSE        (line 38) 9
+169 : BEGIN_SCOPE          (line 40)
+170 : PUSH_STRING          (line 40) "String: "
+171 : LOAD_VAR             (line 40) value
+172 : PUSH_STRING          (line 40) ""
+173 : CONCAT               (line 40)
+174 : INTERPOLATE_STRING   (line 40)
+175 : PRINT                (line 40)
+176 : END_SCOPE            (line 40)
+177 : JUMP                 (line 38) 35
+178 : LOAD_TEMP            (line 38)
+179 : PUSH_STRING          (line 41) "list"
+180 : MATCH_PATTERN        (line 38)
+181 : JUMP_IF_FALSE        (line 38) 9
+182 : BEGIN_SCOPE          (line 41)
+183 : PUSH_STRING          (line 41) "List of integers: "
+184 : LOAD_VAR             (line 41) value
+185 : PUSH_STRING          (line 41) ""
+186 : CONCAT               (line 41)
+187 : INTERPOLATE_STRING   (line 41)
+188 : PRINT                (line 41)
+189 : END_SCOPE            (line 41)
+190 : JUMP                 (line 38) 22
+191 : LOAD_TEMP            (line 38)
+192 : PUSH_STRING          (line 42) "dict"
+193 : MATCH_PATTERN        (line 38)
+194 : JUMP_IF_FALSE        (line 38) 9
+195 : BEGIN_SCOPE          (line 42)
+196 : PUSH_STRING          (line 42) "Dictionary: "
+197 : LOAD_VAR             (line 42) value
+198 : PUSH_STRING          (line 42) ""
+199 : CONCAT               (line 42)
+200 : INTERPOLATE_STRING   (line 42)
+201 : PRINT                (line 42)
+202 : END_SCOPE            (line 42)
+203 : JUMP                 (line 38) 9
+204 : LOAD_TEMP            (line 38)
+205 : PUSH_NULL            (line 43)
+206 : MATCH_PATTERN        (line 38)
+207 : JUMP_IF_FALSE        (line 38) 5
+208 : BEGIN_SCOPE          (line 43)
+209 : PUSH_STRING          (line 43) "Unknown type"
+210 : PRINT                (line 43)
+211 : END_SCOPE            (line 43)
+212 : JUMP                 (line 38) 0
+213 : CLEAR_TEMP           (line 38)
+214 : END_SCOPE            (line 37)
+215 : PUSH_NULL            (line 37)
+216 : RETURN               (line 37)
+217 : END_FUNCTION         (line 37)
+218 : PUSH_INT             (line 48) 42
+219 : CALL                 (line 48) 1
+220 : POP                  (line 48)
+221 : PUSH_STRING          (line 49) "Hello, Luminar!"
+222 : CALL                 (line 49) 1
+223 : POP                  (line 49)
+224 : PUSH_INT             (line 50) 1
+225 : PUSH_INT             (line 50) 2
+226 : PUSH_INT             (line 50) 3
+227 : CREATE_LIST          (line 50) 3
+228 : CALL                 (line 50) 1
+229 : POP                  (line 50)
+230 : PUSH_STRING          (line 51) "a"
+231 : PUSH_INT             (line 51) 1
+232 : PUSH_STRING          (line 51) "b"
+233 : PUSH_INT             (line 51) 2
+234 : CREATE_DICT          (line 51) 2
+235 : CALL                 (line 51) 1
+236 : POP                  (line 51)
+237 : HALT                 (line 0)
