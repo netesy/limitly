@@ -1,0 +1,17 @@
+print("=== Function Match Test ===");
+
+// Simple function with match
+fn test_simple(value) {
+    print("Testing value: {value}");
+    match(value) {
+        5 => { print("It's five"); },
+        10 => { print("It's ten"); },
+        _ => { print("It's something else"); }
+    }
+}
+
+test_simple(5);
+test_simple(10);
+test_simple(7);
+
+print("=== Test completed ===");

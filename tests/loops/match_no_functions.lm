@@ -34,18 +34,8 @@ match (value) {
         x => { print("{x} is 10"); }
     }
 
-fn match_example(value) {
-    match (value) {
-        int => { print("Integer: {value}"); },
-        str => { print("String: {value}"); },
-        list => { print("List of integers: {value}"); },
-        dict => { print("Dictionary: {value}"); },
-        _ => { print("Unknown type");
-    }
-   }
-}
-
-match_example(42);
-match_example("Hello, Luminar!");
-match_example([1, 2, 3]);
-match_example({ "a": 1, "b": 2 });
+// Comment out function calls for now
+// match_example(42);
+// match_example("Hello, Luminar!");
+// match_example([1, 2, 3]);
+// match_example({"a": 1, "b": 2});

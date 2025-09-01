@@ -1333,7 +1333,7 @@ std::shared_ptr<AST::Statement> Parser::matchStatement() {
         matchCase.pattern = parsePattern();
 
         // Parse optional guard
-        if (match({TokenType::IF})) {
+        if (match({TokenType::WHERE})) {
             matchCase.guard = expression();
         }
 

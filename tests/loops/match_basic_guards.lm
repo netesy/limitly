@@ -1,0 +1,25 @@
+print("=== Basic Guard Tests ===");
+
+// Test simple guards without function calls
+var value = 5;
+match(value) {
+    x where x > 10 => { print("{x} is greater than 10"); },
+    x where x < 10 => { print("{x} is less than 10"); },
+    x => { print("{x} is exactly 10"); }
+}
+
+var value2 = 15;
+match(value2) {
+    x where x > 10 => { print("{x} is greater than 10"); },
+    x where x < 10 => { print("{x} is less than 10"); },
+    x => { print("{x} is exactly 10"); }
+}
+
+var value3 = 10;
+match(value3) {
+    x where x > 10 => { print("{x} is greater than 10"); },
+    x where x < 10 => { print("{x} is less than 10"); },
+    x => { print("{x} is exactly 10"); }
+}
+
+print("=== Tests completed ===");
