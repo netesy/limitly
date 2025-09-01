@@ -48,6 +48,11 @@ call :run_test "concurrency\parallel_blocks.lm"
 call :run_test "concurrency\concurrent_blocks.lm"
 
 echo.
+echo === TYPE TESTS ===
+call :run_test "types\basic_type_aliases.lm"
+call :run_test "types\primitive_type_aliases.lm"
+
+echo.
 echo === INTEGRATION TESTS ===
 call :run_test "integration\comprehensive.lm"
 call :run_test "integration\error_handling.lm"

@@ -1,0 +1,85 @@
+// Test various type declaration syntax patterns - Requirements 1.1, 1.2
+// Basic type aliases with different primitive types
+type Count = int;
+type Index = uint;
+type Ratio = float;
+type Flag = bool;
+type Label = str;
+
+// Test with different integer sizes
+type ByteValue = i8;
+type ShortValue = i16;
+type IntValue = i32;
+type LongValue = i64;
+
+type UByteValue = u8;
+type UShortValue = u16;
+type UIntValue = u32;
+type ULongValue = u64;
+
+// Test with different float sizes
+type SinglePrecision = f32;
+type DoublePrecision = f64;
+
+// Test semicolon variations (optional semicolons)
+type WithSemicolon = int;
+type WithoutSemicolon = str
+
+// Test multiple declarations
+type A = int;
+type B = str;
+type C = bool;
+
+// Use all the declared types
+var count: Count = 10;
+var index: Index = 5;
+var ratio: Ratio = 0.75;
+var flag: Flag = true;
+var label: Label = "test";
+
+var byteVal: ByteValue = 100;
+var shortVal: ShortValue = 1000;
+var intVal: IntValue = 100000;
+var longVal: LongValue = 1000000000;
+
+var ubyteVal: UByteValue = 200;
+var ushortVal: UShortValue = 2000;
+var uintVal: UIntValue = 200000;
+var ulongVal: ULongValue = 2000000000;
+
+var singleVal: SinglePrecision = 3.14;
+var doubleVal: DoublePrecision = 2.718281828;
+
+var withSemi: WithSemicolon = 42;
+var withoutSemi: WithoutSemicolon = "no semicolon";
+
+var a: A = 1;
+var b: B = "hello";
+var c: C = false;
+
+// Print all values
+print("Count:", count);
+print("Index:", index);
+print("Ratio:", ratio);
+print("Flag:", flag);
+print("Label:", label);
+
+print("Byte:", byteVal);
+print("Short:", shortVal);
+print("Int:", intVal);
+print("Long:", longVal);
+
+print("UByte:", ubyteVal);
+print("UShort:", ushortVal);
+print("UInt:", uintVal);
+print("ULong:", ulongVal);
+
+print("Single:", singleVal);
+print("Double:", doubleVal);
+
+print("With Semi:", withSemi);
+print("Without Semi:", withoutSemi);
+
+print("A:", a);
+print("B:", b);
+print("C:", c);
