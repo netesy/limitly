@@ -124,6 +124,8 @@ public:
     std::shared_ptr<AST::Expression> parsePattern();
     std::shared_ptr<AST::Expression> parseBindingPattern();
     std::shared_ptr<AST::Expression> parseListPattern();
+    std::shared_ptr<AST::Expression> parseDictPattern();
+    std::shared_ptr<AST::Expression> parseTuplePattern();
 };
 
 

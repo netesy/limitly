@@ -670,6 +670,31 @@ void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
             printNode(element, indent + 1);
         }
     }
+    else if (auto dictPatternExpr = std::dynamic_pointer_cast<AST::DictPatternExpr>(node)) {
+        std::cout << indentation << "DictPattern: {" << dictPatternExpr->fields.size() << " fields";
+        if (dictPatternExpr->hasRestElement) {
+            std::cout << ", ...";
+            if (dictPatternExpr->restBinding) {
+                std::cout << *dictPatternExpr->restBinding;
+            }
+        }
+        std::cout << "}" << std::endl;
+        
+        for (const auto& field : dictPatternExpr->fields) {
+            std::cout << indentation << "  Field: " << field.key;
+            if (field.binding && field.binding != field.key) {
+                std::cout << " -> " << *field.binding;
+            }
+            std::cout << std::endl;
+        }
+    }
+    else if (auto tuplePatternExpr = std::dynamic_pointer_cast<AST::TuplePatternExpr>(node)) {
+        std::cout << indentation << "TuplePattern: (" << tuplePatternExpr->elements.size() << " elements)" << std::endl;
+        
+        for (const auto& element : tuplePatternExpr->elements) {
+            printNode(element, indent + 1);
+        }
+    }
     else if (auto fallibleExpr = std::dynamic_pointer_cast<AST::FallibleExpr>(node)) {
         std::cout << indentation << "FallibleExpression:" << std::endl;
         std::cout << indentation << "  Expression:" << std::endl;

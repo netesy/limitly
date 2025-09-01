@@ -76,6 +76,8 @@ private:
     // Pattern expression visitors for match statements
     void visitTypePatternExpr(const std::shared_ptr<AST::TypePatternExpr>& expr);
     void visitBindingPatternExpr(const std::shared_ptr<AST::BindingPatternExpr>& expr);
+    void visitDictPatternExpr(const std::shared_ptr<AST::DictPatternExpr>& expr);
+    void visitTuplePatternExpr(const std::shared_ptr<AST::TuplePatternExpr>& expr);
     void visitListPatternExpr(const std::shared_ptr<AST::ListPatternExpr>& expr);
     
     // Helper methods

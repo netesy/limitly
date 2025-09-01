@@ -1370,6 +1370,16 @@ std::shared_ptr<AST::Expression> Parser::parsePattern() {
         return parseListPattern();
     }
 
+    // Dictionary/Record destructuring pattern
+    if (check(TokenType::LEFT_BRACE)) {
+        return parseDictPattern();
+    }
+
+    // Tuple destructuring pattern
+    if (check(TokenType::LEFT_PAREN)) {
+        return parseTuplePattern();
+    }
+
     // Binding pattern (e.g. Some(x))
     if (check(TokenType::IDENTIFIER) && current + 1 < scanner.getTokens().size() && 
         scanner.getTokens()[current + 1].type == TokenType::LEFT_PAREN) {
@@ -1424,6 +1434,58 @@ std::shared_ptr<AST::Expression> Parser::parseListPattern() {
     }
 
     consume(TokenType::RIGHT_BRACKET, "Expected ']' at end of list pattern.");
+    return pattern;
+}
+
+std::shared_ptr<AST::Expression> Parser::parseDictPattern() {
+    auto pattern = std::make_shared<AST::DictPatternExpr>();
+    pattern->line = peek().line;
+    consume(TokenType::LEFT_BRACE, "Expected '{' at start of dict pattern.");
+
+    if (!check(TokenType::RIGHT_BRACE)) {
+        do {
+            if (match({TokenType::ELLIPSIS})) {
+                // Rest pattern: ...rest
+                pattern->hasRestElement = true;
+                if (check(TokenType::IDENTIFIER)) {
+                    pattern->restBinding = advance().lexeme;
+                }
+                break;
+            }
+
+            // Parse field pattern: key or key: binding
+            std::string key = consume(TokenType::IDENTIFIER, "Expected field name in dict pattern.").lexeme;
+            AST::DictPatternExpr::Field field;
+            field.key = key;
+
+            if (match({TokenType::COLON})) {
+                // Explicit binding: key: binding
+                field.binding = consume(TokenType::IDENTIFIER, "Expected binding name after ':' in dict pattern.").lexeme;
+            } else {
+                // Shorthand: key (binding is same as key)
+                field.binding = key;
+            }
+
+            pattern->fields.push_back(field);
+        } while (match({TokenType::COMMA}));
+    }
+
+    consume(TokenType::RIGHT_BRACE, "Expected '}' at end of dict pattern.");
+    return pattern;
+}
+
+std::shared_ptr<AST::Expression> Parser::parseTuplePattern() {
+    auto pattern = std::make_shared<AST::TuplePatternExpr>();
+    pattern->line = peek().line;
+    consume(TokenType::LEFT_PAREN, "Expected '(' at start of tuple pattern.");
+
+    if (!check(TokenType::RIGHT_PAREN)) {
+        do {
+            pattern->elements.push_back(parsePattern());
+        } while (match({TokenType::COMMA}));
+    }
+
+    consume(TokenType::RIGHT_PAREN, "Expected ')' at end of tuple pattern.");
     return pattern;
 }
 

@@ -136,6 +136,10 @@ void BytecodeGenerator::visitExpression(const std::shared_ptr<AST::Expression>& 
         visitBindingPatternExpr(bindingPattern);
     } else if (auto listPattern = std::dynamic_pointer_cast<AST::ListPatternExpr>(expr)) {
         visitListPatternExpr(listPattern);
+    } else if (auto dictPattern = std::dynamic_pointer_cast<AST::DictPatternExpr>(expr)) {
+        visitDictPatternExpr(dictPattern);
+    } else if (auto tuplePattern = std::dynamic_pointer_cast<AST::TuplePatternExpr>(expr)) {
+        visitTuplePatternExpr(tuplePattern);
     } else {
         Debugger::error("Unknown expression type", expr->line, 0, InterpretationStage::BYTECODE, "", "", "");
     }
@@ -658,6 +662,15 @@ void BytecodeGenerator::visitMatchStatement(const std::shared_ptr<AST::MatchStat
                 // The pattern for variable binding should always match. We'll push a string that the VM will recognize as a "match-all" for binding.
                 emit(Opcode::PUSH_STRING, matchCase.pattern->line, 0, 0.0f, false, "_");
             }
+        }
+        else if (auto dictPattern = std::dynamic_pointer_cast<AST::DictPatternExpr>(matchCase.pattern)) {
+            visitDictPatternExpr(dictPattern);
+        }
+        else if (auto listPattern = std::dynamic_pointer_cast<AST::ListPatternExpr>(matchCase.pattern)) {
+            visitListPatternExpr(listPattern);
+        }
+        else if (auto tuplePattern = std::dynamic_pointer_cast<AST::TuplePatternExpr>(matchCase.pattern)) {
+            visitTuplePatternExpr(tuplePattern);
         }
         else {
             visitExpression(matchCase.pattern);
@@ -1266,6 +1279,56 @@ void BytecodeGenerator::visitListPatternExpr(const std::shared_ptr<AST::ListPatt
     
     // Mark this as a list pattern
     emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, "__list_pattern__");
+}
+
+void BytecodeGenerator::visitDictPatternExpr(const std::shared_ptr<AST::DictPatternExpr>& expr) {
+    // Stack layout expected by VM (from top to bottom when popping):
+    // 1. pattern marker ("__dict_pattern__") [popped by handleMatchPattern]
+    // 2. rest binding name [pop()]
+    // 3. has rest element (bool) [pop()]  
+    // 4. number of fields [pop()]
+    // 5. for each field: binding name [pop()], key name [pop()]
+    //
+    // So we need to push in reverse order:
+    
+    // Push field patterns first (in reverse order since we pop binding then key)
+    for (auto it = expr->fields.rbegin(); it != expr->fields.rend(); ++it) {
+        const auto& field = *it;
+        // Push key first, then binding (so binding is popped first)
+        emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, field.key);
+        std::string binding = field.binding.value_or(field.key);
+        emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, binding);
+    }
+    
+    // Push number of fields
+    emit(Opcode::PUSH_INT, expr->line, static_cast<int32_t>(expr->fields.size()));
+    
+    // Push rest element info
+    if (expr->hasRestElement) {
+        emit(Opcode::PUSH_BOOL, expr->line, 0, 0.0f, true);
+        std::string restBinding = expr->restBinding.value_or("__rest__");
+        emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, restBinding);
+    } else {
+        emit(Opcode::PUSH_BOOL, expr->line, 0, 0.0f, false);
+        emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, "");
+    }
+    
+    // Mark this as a dict pattern (will be popped first by handleMatchPattern)
+    emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, "__dict_pattern__");
+}
+
+void BytecodeGenerator::visitTuplePatternExpr(const std::shared_ptr<AST::TuplePatternExpr>& expr) {
+    // For tuple patterns, we create a special tuple pattern marker
+    // Push the number of elements expected
+    emit(Opcode::PUSH_INT, expr->line, static_cast<int32_t>(expr->elements.size()));
+    
+    // Push each pattern element
+    for (const auto& element : expr->elements) {
+        visitExpression(element);
+    }
+    
+    // Mark this as a tuple pattern
+    emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, "__tuple_pattern__");
 }
 
 void BytecodeGenerator::emit(Opcode op, uint32_t lineNumber, int32_t intValue, float floatValue, bool boolValue, const std::string& stringValue) {
