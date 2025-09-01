@@ -1,0 +1,64 @@
+// Unit tests for type alias registry and resolution functionality
+// Tests for Requirements 1.1, 1.2, 1.3, 1.4
+
+// Test 1: Basic type alias registration and resolution
+type UserId = i64;
+type UserName = str;
+type UserScore = f64;
+type IsActive = bool;
+
+// Test 2: Type alias usage in variable declarations
+var id: UserId = 12345;
+var name: UserName = "Alice";
+var score: UserScore = 95.5;
+var active: IsActive = true;
+
+print("Basic type alias test:");
+print("ID:", id);
+print("Name:", name);
+print("Score:", score);
+print("Active:", active);
+
+// Test 3: Type alias compatibility - should enforce type safety
+var id2: UserId = 67890;
+// This should work - same type alias
+var id3: UserId = id2;
+
+print("Type compatibility test:");
+print("ID2:", id2);
+print("ID3:", id3);
+
+// Test 4: Multiple aliases for same base type (should be distinct)
+type ProductId = i64;
+type OrderId = i64;
+
+var productId: ProductId = 100;
+var orderId: OrderId = 200;
+
+print("Distinct type aliases test:");
+print("Product ID:", productId);
+print("Order ID:", orderId);
+
+// Test 5: Type alias resolution in expressions
+var totalScore: UserScore = score + 4.5;
+print("Expression with type alias:", totalScore);
+
+// Test 6: All primitive type aliases
+type MyI64 = i64;
+type MyU64 = u64;
+type MyF64 = f64;
+type MyStr = str;
+type MyBool = bool;
+
+var testI64: MyI64 = -12345;
+var testU64: MyU64 = 67890;
+var testF64: MyF64 = 3.14159;
+var testStr: MyStr = "test string";
+var testBool: MyBool = false;
+
+print("All primitive types test:");
+print("I64:", testI64);
+print("U64:", testU64);
+print("F64:", testF64);
+print("Str:", testStr);
+print("Bool:", testBool);

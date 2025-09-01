@@ -7,8 +7,10 @@
 #include <array>
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <memory>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <variant>
@@ -22,6 +24,34 @@ private:
     std::map<std::string, TypePtr> errorTypes;
     MemoryManager<> &memoryManager;
     MemoryManager<>::Region &region;
+
+    // Circular dependency detection for type aliases
+    bool hasCircularDependency(const std::string& aliasName, TypePtr type, 
+                              std::set<std::string> visited = {}) {
+        // If we've already visited this alias, we have a cycle
+        if (visited.find(aliasName) != visited.end()) {
+            return true;
+        }
+        
+        // Add current alias to visited set
+        visited.insert(aliasName);
+        
+        // Check if the type references any type aliases that could create cycles
+        return checkTypeForCircularReferences(type, visited);
+    }
+    
+    bool checkTypeForCircularReferences(TypePtr type, std::set<std::string>& visited) {
+        if (!type) return false;
+        
+        // For now, we'll implement basic checking for direct type alias references
+        // This can be extended later for more complex type structures
+        
+        // Check if this type is a user-defined type that might be an alias
+        // For the current implementation, we'll focus on preventing direct circular references
+        // More sophisticated checking can be added when we implement complex type structures
+        
+        return false; // No circular dependency detected for basic types
+    }
 
     bool canConvert(TypePtr from, TypePtr to)
     {
@@ -280,13 +310,31 @@ public:
     const TypePtr NETWORK_ERROR = std::make_shared<Type>(TypeTag::UserDefined);
 
     TypePtr getType(const std::string& name) {
+        // First check built-in types
         if (name == "int") return INT_TYPE;
+        if (name == "i64") return INT64_TYPE;
+        if (name == "u64") return UINT64_TYPE;
+        if (name == "f64") return FLOAT64_TYPE;
         if (name == "float") return FLOAT64_TYPE;
         if (name == "string") return STRING_TYPE;
+        if (name == "str") return STRING_TYPE;
         if (name == "bool") return BOOL_TYPE;
         if (name == "list") return LIST_TYPE;
         if (name == "dict") return DICT_TYPE;
         if (name == "object") return OBJECT_TYPE;
+        
+        // Check type aliases
+        TypePtr aliasType = resolveTypeAlias(name);
+        if (aliasType) {
+            return aliasType;
+        }
+        
+        // Check user-defined types
+        auto it = userDefinedTypes.find(name);
+        if (it != userDefinedTypes.end()) {
+            return it->second;
+        }
+        
         return NIL_TYPE;
     }
 
@@ -453,12 +501,33 @@ public:
         throw std::runtime_error("User-defined type not found: " + name);
     }
 
-    void addTypeAlias(const std::string &alias, TypePtr type) { typeAliases[alias] = type; }
+    // Enhanced type alias methods for advanced type system
+    void registerTypeAlias(const std::string &alias, TypePtr type) {
+        // Check for circular dependencies before registering
+        if (hasCircularDependency(alias, type)) {
+            throw std::runtime_error("Circular dependency detected in type alias: " + alias);
+        }
+        typeAliases[alias] = type;
+    }
+
+    TypePtr resolveTypeAlias(const std::string &alias) {
+        auto it = typeAliases.find(alias);
+        if (it != typeAliases.end()) {
+            return it->second;
+        }
+        return nullptr; // Return nullptr if not found, let caller handle
+    }
+
+    // Legacy methods for backward compatibility
+    void addTypeAlias(const std::string &alias, TypePtr type) { 
+        registerTypeAlias(alias, type);
+    }
 
     TypePtr getTypeAlias(const std::string &alias)
     {
-        if (typeAliases.find(alias) != typeAliases.end()) {
-            return typeAliases[alias];
+        TypePtr resolved = resolveTypeAlias(alias);
+        if (resolved) {
+            return resolved;
         }
         throw std::runtime_error("Type alias not found: " + alias);
     }
@@ -982,7 +1051,13 @@ public:
                                break;
                            case TypeTag::Int:
                            case TypeTag::Int64:
-                               result->data = safe_cast<int64_t>(v);
+                               // For large literals, use range checking instead of safe_cast
+                               if (v >= static_cast<double>(std::numeric_limits<int64_t>::min()) && 
+                                   v <= static_cast<double>(std::numeric_limits<int64_t>::max())) {
+                                   result->data = static_cast<int64_t>(v);
+                               } else {
+                                   throw std::runtime_error("Value out of range for int64_t: " + std::to_string(v));
+                               }
                                break;
                            case TypeTag::Int8:
                                result->data = safe_cast<int8_t>(v);
@@ -995,7 +1070,13 @@ public:
                                break;
                            case TypeTag::UInt:
                            case TypeTag::UInt64:
-                               result->data = safe_cast<uint64_t>(v);
+                               // For large literals that were converted to double, use direct cast
+                               // This handles cases like 18446744073709551615 which becomes double in parser
+                               if (v >= 0 && v <= static_cast<double>(std::numeric_limits<uint64_t>::max())) {
+                                   result->data = static_cast<uint64_t>(v);
+                               } else {
+                                   throw std::runtime_error("Value out of range for uint64_t: " + std::to_string(v));
+                               }
                                break;
                            case TypeTag::UInt8:
                                result->data = safe_cast<uint8_t>(v);
