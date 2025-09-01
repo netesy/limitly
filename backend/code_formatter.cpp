@@ -468,7 +468,7 @@ std::string CodeFormatter::formatUnaryExpr(const std::shared_ptr<AST::UnaryExpr>
 std::string CodeFormatter::formatLiteralExpr(const std::shared_ptr<AST::LiteralExpr>& expr) {
     return std::visit([this](const auto& value) -> std::string {
         using T = std::decay_t<decltype(value)>;
-        if constexpr (std::is_same_v<T, int>) {
+        if constexpr (std::is_same_v<T, long long>) {
             return std::to_string(value);
         } else if constexpr (std::is_same_v<T, double>) {
             return std::to_string(value);

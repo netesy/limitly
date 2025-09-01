@@ -913,8 +913,8 @@ void BytecodeGenerator::visitLiteralExpr(const std::shared_ptr<AST::LiteralExpr>
     // Generate bytecode for literal expression
     
     // Push literal value onto stack based on its type
-    if (std::holds_alternative<int>(expr->value)) {
-        emit(Opcode::PUSH_INT, expr->line, std::get<int>(expr->value));
+    if (std::holds_alternative<long long>(expr->value)) {
+        emit(Opcode::PUSH_INT, expr->line, std::get<long long>(expr->value));
     } else if (std::holds_alternative<double>(expr->value)) {
         emit(Opcode::PUSH_FLOAT, expr->line, 0, std::get<double>(expr->value));
     } else if (std::holds_alternative<std::string>(expr->value)) {
@@ -1331,7 +1331,7 @@ void BytecodeGenerator::visitTuplePatternExpr(const std::shared_ptr<AST::TuplePa
     emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, "__tuple_pattern__");
 }
 
-void BytecodeGenerator::emit(Opcode op, uint32_t lineNumber, int32_t intValue, float floatValue, bool boolValue, const std::string& stringValue) {
+void BytecodeGenerator::emit(Opcode op, uint32_t lineNumber, int64_t intValue, float floatValue, bool boolValue, const std::string& stringValue) {
     // Create and push instruction onto bytecode vector
     Instruction instruction;
     instruction.opcode = op;

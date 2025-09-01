@@ -1,0 +1,29 @@
+// Test all primitive type aliases
+type MyInt = int;
+type MyUInt = uint;
+type MyI8 = i8;
+type MyI16 = i16;
+type MyI32 = i32;
+type MyI64 = i64;
+type MyU8 = u8;
+type MyU16 = u16;
+type MyU32 = u32;
+type MyU64 = u64;
+type MyFloat = float;
+type MyF32 = f32;
+type MyF64 = f64;
+type MyStr = str;
+type MyBool = bool;
+
+// Test variable declarations with type aliases
+var intVal: MyInt = 42;
+var uintVal: MyUInt = 100;
+var strVal: MyStr = "hello";
+var boolVal: MyBool = true;
+var floatVal: MyFloat = 3.14;
+
+print("Int:", intVal);
+print("UInt:", uintVal);
+print("String:", strVal);
+print("Bool:", boolVal);
+print("Float:", floatVal);

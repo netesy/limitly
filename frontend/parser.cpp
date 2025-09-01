@@ -1850,7 +1850,7 @@ std::shared_ptr<AST::Expression> Parser::primary() {
         if (token.lexeme.find('.') != std::string::npos) {
             literalExpr->value = std::stod(token.lexeme);
         } else {
-            literalExpr->value = std::stoi(token.lexeme);
+            literalExpr->value = std::stoll(token.lexeme);
         }
 
         return literalExpr;
