@@ -2764,8 +2764,18 @@ void VM::handleMatchPattern(const Instruction& /*unused*/) {
     else if (pattern->type->tag == TypeTag::String) {
         std::string typeName = std::get<std::string>(pattern->data);
         
+        // Handle special destructuring patterns
+        if (typeName == "__dict_pattern__") {
+            match = handleDictPatternMatch(value);
+        }
+        else if (typeName == "__list_pattern__") {
+            match = handleListPatternMatch(value);
+        }
+        else if (typeName == "__tuple_pattern__") {
+            match = handleTuplePatternMatch(value);
+        }
         // Handle wildcard string pattern
-        if (typeName == "_") {
+        else if (typeName == "_") {
             match = true;
         }
         // Type name matching
@@ -2838,6 +2848,181 @@ void VM::handleMatchPattern(const Instruction& /*unused*/) {
 
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, match));
 }
+
+bool VM::handleDictPatternMatch(const ValuePtr& value) {
+    // Stack layout (from top to bottom):
+    // - pattern marker ("__dict_pattern__") [already popped]
+    // - rest binding name
+    // - has rest element (bool)
+    // - field binding names and keys (pairs)
+    // - number of fields
+    
+    if (value->type->tag != TypeTag::Dict) {
+        // Clear the pattern data from stack and return false
+        clearDictPatternFromStack();
+        return false;
+    }
+    
+    // Pop rest element info
+    ValuePtr restBindingName = pop();
+    ValuePtr hasRestElement = pop();
+    
+    // Pop number of fields
+    ValuePtr numFieldsValue = pop();
+    int numFields = std::get<int32_t>(numFieldsValue->data);
+    
+    // Get the dictionary data
+    auto dictData = std::get<DictValue>(value->data);
+    
+    // Pop and process field patterns
+    std::vector<std::pair<std::string, std::string>> fieldPatterns;
+    for (int i = 0; i < numFields; i++) {
+        ValuePtr bindingName = pop();
+        ValuePtr keyName = pop();
+        fieldPatterns.push_back({
+            std::get<std::string>(keyName->data),
+            std::get<std::string>(bindingName->data)
+        });
+    }
+    
+    // Check if all required fields exist
+    for (const auto& [key, binding] : fieldPatterns) {
+        // Create a string key value for lookup
+        auto keyValue = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, key);
+        auto foundValue = dictData.get(keyValue);
+        
+        if (!foundValue) {
+            return false; // Required field missing
+        }
+        
+        // Bind the field value to the binding name
+        environment->define(binding, foundValue);
+    }
+    
+    // Handle rest element if present
+    if (std::get<bool>(hasRestElement->data)) {
+        std::string restBinding = std::get<std::string>(restBindingName->data);
+        
+        // Create a new dictionary with remaining fields
+        DictValue restDict;
+        for (const auto& [keyPtr, val] : dictData.elements) {
+            // Check if this key was matched
+            bool isMatched = false;
+            if (keyPtr->type->tag == TypeTag::String) {
+                std::string keyStr = std::get<std::string>(keyPtr->data);
+                for (const auto& [patternKey, _] : fieldPatterns) {
+                    if (keyStr == patternKey) {
+                        isMatched = true;
+                        break;
+                    }
+                }
+            }
+            if (!isMatched) {
+                restDict.elements[keyPtr] = val;
+            }
+        }
+        
+        // Create and bind the rest dictionary
+        auto restValue = memoryManager.makeRef<Value>(*region, typeSystem->DICT_TYPE, restDict);
+        environment->define(restBinding, restValue);
+    }
+    
+    return true;
+}
+
+bool VM::handleListPatternMatch(const ValuePtr& value) {
+    // Stack layout (from top to bottom):
+    // - pattern marker ("__list_pattern__") [already popped]
+    // - pattern elements
+    // - number of elements
+    
+    if (value->type->tag != TypeTag::List) {
+        // Clear the pattern data from stack and return false
+        clearListPatternFromStack();
+        return false;
+    }
+    
+    // Pop number of elements
+    ValuePtr numElementsValue = pop();
+    int numElements = std::get<int32_t>(numElementsValue->data);
+    
+    // Get the list data
+    auto listData = std::get<ListValue>(value->data);
+    
+    // Check if list has the expected number of elements
+    if (static_cast<int>(listData.elements.size()) != numElements) {
+        // Clear remaining pattern elements from stack
+        for (int i = 0; i < numElements; i++) {
+            pop();
+        }
+        return false;
+    }
+    
+    // Pop and match pattern elements (in reverse order)
+    std::vector<ValuePtr> patterns;
+    for (int i = 0; i < numElements; i++) {
+        patterns.insert(patterns.begin(), pop());
+    }
+    
+    // Match each element
+    for (int i = 0; i < numElements; i++) {
+        ValuePtr pattern = patterns[i];
+        ValuePtr element = listData.elements[i];
+        
+        // Handle variable binding patterns
+        if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(
+            std::reinterpret_pointer_cast<AST::Expression>(pattern))) {
+            // This is a simplified check - in a full implementation,
+            // we'd need to track pattern types differently
+            // For now, assume string patterns are variable bindings
+            if (pattern->type->tag == TypeTag::String) {
+                std::string varName = std::get<std::string>(pattern->data);
+                if (varName != "_") {
+                    environment->define(varName, element);
+                }
+            }
+        }
+        // For other patterns, we'd need recursive matching
+    }
+    
+    return true;
+}
+
+bool VM::handleTuplePatternMatch(const ValuePtr& value) {
+    // Stack layout (from top to bottom):
+    // - pattern marker ("__tuple_pattern__") [already popped]
+    // - pattern elements
+    // - number of elements
+    
+    // For now, treat tuples as lists
+    // In a full implementation, tuples would be a separate type
+    return handleListPatternMatch(value);
+}
+
+void VM::clearDictPatternFromStack() {
+    // Clear dict pattern data from stack when match fails
+    ValuePtr restBindingName = pop();
+    ValuePtr hasRestElement = pop();
+    ValuePtr numFieldsValue = pop();
+    int numFields = std::get<int32_t>(numFieldsValue->data);
+    
+    // Pop field patterns
+    for (int i = 0; i < numFields * 2; i++) {
+        pop();
+    }
+}
+
+void VM::clearListPatternFromStack() {
+    // Clear list pattern data from stack when match fails
+    ValuePtr numElementsValue = pop();
+    int numElements = std::get<int32_t>(numElementsValue->data);
+    
+    // Pop pattern elements
+    for (int i = 0; i < numElements; i++) {
+        pop();
+    }
+}
+
 void VM::handleBeginTry(const Instruction& instruction) {
     if (debugMode) {
         std::cout << "[DEBUG] Beginning try block at line " << instruction.line << std::endl;

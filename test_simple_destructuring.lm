@@ -1,0 +1,20 @@
+print("=== Simple Destructuring Test ===");
+
+// Test basic match patterns that should work
+var person: dict = {name: "John", age: 30};
+
+match(person) {
+    _ => {
+        print("Matched dictionary with wildcard");
+    }
+}
+
+var numbers: list = [1, 2, 3];
+
+match(numbers) {
+    _ => {
+        print("Matched list with wildcard");
+    }
+}
+
+print("=== Basic Match Tests Complete ===");

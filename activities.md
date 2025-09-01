@@ -29,6 +29,7 @@ The project is organized into frontend and backend components:
 - **Complete Frontend**: Scanner, parser, and AST generation for all language features
 - **Complete VM**: Stack-based virtual machine with all core operations
 - **Control Flow**: All control structures (if/else, while, for, nested) working perfectly
+- **Loop Control**: break/continue statements for loops (complete)
 - **Functions**: Complete function system with parameters, return values, recursion, optional parameters, default parameters
 - **OOP System**: Complete object-oriented programming with classes, objects, constructors, methods, field declarations, property access
 - **Collections**: Lists and dictionaries with indexing, creation, and value operations
@@ -37,8 +38,8 @@ The project is organized into frontend and backend components:
 - **Test Suite**: 20+ comprehensive test files with automated runners (100% pass rate)
 
 ### Current Work 🔄
-- **Advanced Language Features**: Exception handling (try/catch blocks)
-- **Loop Control**: break/continue statements for loops
+- **Pattern Matching**: Destructuring patterns for match statements (parser complete, VM implementation in progress)
+- **Advanced Language Features**: Exception handling 
 - **Concurrency**: parallel/concurrent blocks implementation
 - **Standard Library**: Core library functions and modules
 
@@ -92,8 +93,8 @@ The project is organized into frontend and backend components:
 - [x] **Enhanced escape sequences** - Comprehensive escape sequence support in string literals
 - [x] **Complete function implementation** - Full support for function declarations, calls, parameters, return values, recursion, optional parameters, and default parameters
 - [x] **Complete OOP implementation** - Full object-oriented programming with classes, objects, constructors, methods, field declarations, property access
-- [ ] Implement break/continue statements for loops
-- [ ] Implement exception handling (try/catch blocks)
+- [x] Implement break/continue statements for loops
+- [ ] Implement exception handling 
 - [ ] Implement concurrency primitives (parallel/concurrent blocks)
 - [ ] Implement bytecode optimization
 
@@ -154,11 +155,11 @@ The project is organized into frontend and backend components:
 - **Memory Safety**: Clean memory management with no leaks across all language features
 
 ## Current Focus
-- Implementing break/continue statements for loops
+- **Pattern Matching**: Completing destructuring patterns for match statements (dict, list, tuple patterns)
 - Adding indexed assignment operations (myList[0] = value, myDict["key"] = value)
-- Implementing exception handling (try/catch blocks)
+- Implementing exception handling
 - Implementing concurrency primitives (parallel/concurrent blocks)
-- Adding generics and advanced type features
+- Adding advanced type features
 - Expanding standard library functions
 - Implementing modules and import system
 

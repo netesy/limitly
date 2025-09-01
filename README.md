@@ -140,12 +140,12 @@ mkdir build && cd build
 cmake ..
 make
 
-# Using Zig (alternative build system)
-zig build
-zig build run
 
 # Using Windows Batch (MSYS2/MinGW64)
 build.bat
+
+# Using Unix Shell
+./build.sh
 ```
 
 ### Running
@@ -176,20 +176,21 @@ build.bat
 - **Expressions**: Arithmetic, comparison, logical operations with proper precedence
 - **String Features**: String interpolation with all patterns (`"text {expr} more"`)
 - **Functions**: Complete function system with parameters, return values, recursion, optional parameters, default parameters
+- **Loop Control**: break/continue statements for loops (complete)
 - **Collections**: List and dictionary literals with indexing operations
 - **Print Statements**: Clean output without side effects
 - **Memory Management**: Integrated memory manager with region-based allocation
 
 ### 🔄 In Development
-- **Object-Oriented Features**: Class instantiation and method calls (syntax complete, VM implementation in progress)
-- **Exception Handling**: try/catch blocks (syntax complete, VM implementation pending)
+- **Pattern Matching**: Destructuring patterns for match statements (syntax complete, VM implementation in progress)
+- **Exception Handling**:  (syntax complete, VM implementation pending)
 - **Concurrency**: parallel/concurrent blocks (syntax complete, VM implementation pending)
 
 ### 📋 Planned Features
-- Generics and advanced type features
+- Advanced type features
 - Modules and import system
 - Standard library
-- JIT compilation
+- JIT compilation/AOT compilation
 - IDE integration and tooling
 
 ### Development Quality
@@ -205,10 +206,10 @@ The project includes a comprehensive test suite organized in the `tests/` direct
 
 ```bash
 # Run all tests (silent mode)
-./tests/run_tests.bat
+./run_tests.bat
 
 # Run all tests (verbose mode)  
-./tests/run_tests_verbose.bat
+./run_tests_verbose.bat
 
 # Run specific test category
 ./bin/limitly.exe tests/loops/for_loops.lm

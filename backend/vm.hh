@@ -180,6 +180,14 @@ private:
     void handleEndConcurrent(const Instruction& instruction);
     void handleAwait(const Instruction& instruction);
     void handleMatchPattern(const Instruction& instruction);
+    
+    // Destructuring pattern helpers
+    bool handleDictPatternMatch(const ValuePtr& value);
+    bool handleListPatternMatch(const ValuePtr& value);
+    bool handleTuplePatternMatch(const ValuePtr& value);
+    void clearDictPatternFromStack();
+    void clearListPatternFromStack();
+    
     void handleImport(const Instruction& instruction);
     void handleBeginEnum(const Instruction& instruction);
     void handleEndEnum(const Instruction& instruction);

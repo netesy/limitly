@@ -1,0 +1,60 @@
+print("=== Testing Destructuring Patterns ===");
+
+// Test dictionary destructuring
+fn test_dict_destructuring() {
+    var person: dict = {name: "John", age: 30, city: "NYC"};
+    
+    match(person) {
+        {name, age} => {
+            print("Name: {name}, Age: {age}");
+        },
+        _ => {
+            print("No match");
+        }
+    }
+}
+
+// Test list destructuring
+fn test_list_destructuring() {
+    var numbers: list = [1, 2, 3];
+    
+    match(numbers) {
+        [x, y, z] => {
+            print("Three numbers: {x}, {y}, {z}");
+        },
+        [x, y] => {
+            print("Two numbers: {x}, {y}");
+        },
+        [] => {
+            print("Empty list");
+        },
+        _ => {
+            print("Other list");
+        }
+    }
+}
+
+// Test tuple destructuring (treated as list for now)
+fn test_tuple_destructuring() {
+    var point: list = [10, 20];
+    
+    match(point) {
+        (x, y) => {
+            print("Point: ({x}, {y})");
+        },
+        _ => {
+            print("Not a point");
+        }
+    }
+}
+
+print("Testing dictionary destructuring:");
+test_dict_destructuring();
+
+print("Testing list destructuring:");
+test_list_destructuring();
+
+print("Testing tuple destructuring:");
+test_tuple_destructuring();
+
+print("=== Destructuring Tests Complete ===");

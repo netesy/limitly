@@ -61,6 +61,8 @@ namespace AST {
     struct TypePatternExpr;
     struct BindingPatternExpr;
     struct ListPatternExpr;
+    struct DictPatternExpr;
+    struct TuplePatternExpr;
     struct TypeAnnotation;
     struct StructuralTypeField;
     struct TypeDeclaration;
@@ -450,6 +452,22 @@ namespace AST {
     struct ListPatternExpr : public Expression {
         std::vector<std::shared_ptr<Expression>> elements;
         std::optional<std::string> restElement;
+    };
+
+    // Dictionary/Record destructuring pattern (e.g., {name, age} or {name: x, age: y})
+    struct DictPatternExpr : public Expression {
+        struct Field {
+            std::string key;
+            std::optional<std::string> binding; // If empty, use key as binding name
+        };
+        std::vector<Field> fields;
+        bool hasRestElement = false;
+        std::optional<std::string> restBinding;
+    };
+
+    // Tuple destructuring pattern (e.g., (x, y, z))
+    struct TuplePatternExpr : public Expression {
+        std::vector<std::shared_ptr<Expression>> elements;
     };
     
     // Type declaration (type aliases)
