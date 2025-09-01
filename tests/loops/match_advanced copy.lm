@@ -1,0 +1,62 @@
+print("=== Advanced Match Statement Tests ===");
+
+
+type Some = { kind: "Some", value: any };
+type None = nil;  
+
+// Test case 1: Variable binding
+fn test_binding(value) {
+    match(value) {
+        Some(x) => { print("Some: {x}"); },
+        None => { print("None"); }
+    }
+}
+
+// Assuming 'Some' and 'None' are defined as enums or classes
+// For now, we are just testing the parser
+// test_binding(Some(10));
+// test_binding(None);
+
+
+// Test case 2: List destructuring
+fn test_list_destructuring(value) {
+    match(value) {
+        [] => { print("Empty list"); },
+        [x] => { print("One element: {x}"); },
+        [x, y] => { print("Two elements: {x}, {y}"); },
+        [head, ...tail] => { print("Head: {head}, Tail: {tail}"); }
+    }
+}
+
+test_list_destructuring([]);
+test_list_destructuring([1]);
+test_list_destructuring([1, 2]);
+test_list_destructuring([1, 2, 3]);
+
+
+// Test case 3: Guards
+fn test_guards(value) {
+    match(value) {
+        x where x > 10 => { print("{x} is greater than 10"); },
+        x where x < 10 => { print("{x} is less than 10"); },
+        x => { print("{x} is 10"); }
+    }
+}
+
+test_guards(5);
+test_guards(10);
+test_guards(15);
+
+
+// Test case 4: Combined features
+fn test_combined(value) {
+    match(value) {
+        Some(x) where x > 100 => { print("Large some: {x}"); },
+        Some(x) => { print("Small some: {x}"); },
+        None => { print("None"); }
+    }
+}
+
+// test_combined(Some(200));
+// test_combined(Some(50));
+// test_combined(None);
