@@ -1362,15 +1362,38 @@ void VM::handleCall(const Instruction& instruction) {
     // Collect arguments from the stack (in reverse order)
     std::vector<ValuePtr> args;
     args.reserve(argCount);
-    for (int i = 0; i < argCount; i++) {
-        args.insert(args.begin(), pop()); // Insert at beginning to maintain order
+    
+    // Only pop arguments if there are any
+    if (argCount > 0) {
+        // Check if we have enough values on the stack
+        if (static_cast<int>(stack.size()) < argCount) {
+            error("Not enough arguments on stack for function call: expected " + 
+                  std::to_string(argCount) + ", got " + std::to_string(stack.size()));
+            return;
+        }
+        
+        for (int i = 0; i < argCount; i++) {
+            args.insert(args.begin(), pop()); // Insert at beginning to maintain order
+        }
     }
 
-    // Pop the callee
-    ValuePtr callee = pop();
+    // For method calls and constructor calls, the callee is on the stack
+    // For simple function calls, the function name is in the instruction
+    ValuePtr callee = nullptr;
+    if (funcName.substr(0, 7) == "method:" || funcName.substr(0, 6) == "super:") {
+        // Method call - callee is on the stack
+        if (stack.empty()) {
+            error("Stack underflow: expected callee for method call");
+            return;
+        }
+        callee = pop();
+    } else {
+        // Simple function call - look up function by name
+        // We'll handle this case below
+    }
     
     // Check if this is a constructor call (callee is a class definition)
-    if (callee->type->tag == TypeTag::Class) {
+    if (callee && callee->type && callee->type->tag == TypeTag::Class) {
         try {
             // Get the class definition
             auto classDef = std::get<std::shared_ptr<backend::ClassDefinition>>(callee->data);
