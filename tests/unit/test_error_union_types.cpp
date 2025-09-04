@@ -1,5 +1,5 @@
-#include "../../backend/types.hh"
-#include "../../backend/memory.hh"
+#include "backend/types.hh"
+#include "backend/memory.hh"
 #include <cassert>
 #include <iostream>
 

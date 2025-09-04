@@ -100,8 +100,13 @@ public:
 
     // Type parsing methods
     std::shared_ptr<AST::TypeAnnotation> parseTypeAnnotation();
+    std::shared_ptr<AST::TypeAnnotation> parseUnionType();
+    std::shared_ptr<AST::TypeAnnotation> parseBasicType();
+    std::shared_ptr<AST::TypeAnnotation> parseBraceType();
+    std::shared_ptr<AST::TypeAnnotation> parseDictionaryType();
     std::shared_ptr<AST::TypeAnnotation> parseStructuralType(const std::string& typeName = "");
     bool isPrimitiveType(TokenType type);
+    bool isKnownTypeName(const std::string& name);
     std::string tokenTypeToString(TokenType type);
 
     // Parsing methods for expressions

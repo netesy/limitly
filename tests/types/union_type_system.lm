@@ -1,0 +1,54 @@
+// Union Type System Tests
+// Testing the TypeSystem union type functionality
+
+// Test 1: Basic union type creation and usage
+type NumberOrString = int | str;
+
+// Test 2: Multi-variant union types
+type Color = Red | Green | Blue | Yellow;
+type Status = Success | Warning | Error | Info;
+
+// Test 3: Union with primitive types
+type Value = int | f64 | str | bool;
+
+// Test 4: Nested union types (should be flattened)
+type InnerUnion = int | str;
+type OuterUnion = InnerUnion | bool;  // Should flatten to int | str | bool
+
+// Test 5: Union with structured types
+type Some = { kind: "Some", value: any };
+type None = { kind: "None" };
+type Option = Some | None;
+
+// Test 6: Union with container types
+type ListOrValue = [int] | int;
+type DictOrValue = {str: int} | int;
+
+// Test 7: Complex union with multiple structured types
+type Response = { status: "ok", data: any } | { status: "error", message: str } | { status: "pending" };
+
+// Test 8: Union type compatibility testing
+// These should work if union type compatibility is implemented correctly
+
+// Variable declarations with union types
+var numberOrString: NumberOrString;
+var colorValue: Color;
+var statusValue: Status;
+var mixedValue: Value;
+
+// Test assignments (should be compatible)
+numberOrString = 42;        // int should be compatible with int | str
+numberOrString = "hello";   // str should be compatible with int | str
+
+mixedValue = 123;           // int should be compatible with int | f64 | str | bool
+mixedValue = 3.14;          // f64 should be compatible with int | f64 | str | bool
+mixedValue = "test";        // str should be compatible with int | f64 | str | bool
+mixedValue = true;          // bool should be compatible with int | f64 | str | bool
+
+// Test union type flattening
+var flattenedValue: OuterUnion;
+flattenedValue = 42;        // int should work (from flattened int | str | bool)
+flattenedValue = "text";    // str should work (from flattened int | str | bool)
+flattenedValue = false;     // bool should work (from flattened int | str | bool)
+
+print("Union type system tests completed successfully");

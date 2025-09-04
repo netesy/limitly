@@ -1,0 +1,44 @@
+// Unit tests for structural type parsing
+// Tests Requirements: 5.1, 5.2, 5.3, 5.4
+
+// Test 5.1: Basic structural types with named fields
+type Some = { kind: "Some", value: any };
+type None = { kind: "None" };
+
+// Test 5.2: Complex structural types with multiple field types
+type Person = { name: str, age: int, active: bool };
+type Address = { street: str, city: str, zipCode: int };
+
+// Test 5.3: Nested structural types
+type Employee = { person: Person, address: Address, salary: float };
+
+// Test 5.4: Structural types with extensible records
+type BaseRecord = { id: int, created: str };
+type ExtendedRecord = { ...BaseRecord, name: str, active: bool };
+
+// Test mixed field types
+type MixedType = { 
+    stringField: str, 
+    intField: int, 
+    boolField: bool, 
+    floatField: float,
+    literalField: "literal_value",
+    nestedField: Person
+};
+
+// Test string literal field names
+type QuotedFields = { 
+    "quoted-field": str, 
+    "another_field": int,
+    normalField: bool
+};
+
+// Variable declarations to test type usage
+var someValue: Some;
+var noneValue: None;
+var person: Person;
+var employee: Employee;
+var mixed: MixedType;
+var quoted: QuotedFields;
+
+print("Structural type parsing tests completed successfully");

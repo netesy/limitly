@@ -2202,7 +2202,22 @@ std::shared_ptr<AST::Statement> Parser::typeDeclaration() {
                 }
                 
                 // Parse field name
-                std::string fieldName = consume(TokenType::IDENTIFIER, "Expected field name.").lexeme;
+                std::string fieldName;
+                if (check(TokenType::IDENTIFIER)) {
+                    fieldName = consume(TokenType::IDENTIFIER, "Expected field name.").lexeme;
+                } else if (check(TokenType::STRING)) {
+                    // Handle string literals as field names (e.g., { "kind": "Some" })
+                    Token stringToken = consume(TokenType::STRING, "Expected field name.");
+                    fieldName = stringToken.lexeme;
+                    // Remove quotes if present
+                    if (fieldName.size() >= 2 && (fieldName[0] == '"' || fieldName[0] == '\'') && 
+                        (fieldName[fieldName.size()-1] == '"' || fieldName[fieldName.size()-1] == '\'')) {
+                        fieldName = fieldName.substr(1, fieldName.size() - 2);
+                    }
+                } else {
+                    error("Expected field name.");
+                    return typeDecl;
+                }
                 
                 // Parse field type
                 consume(TokenType::COLON, "Expected ':' after field name.");
@@ -2287,6 +2302,112 @@ std::shared_ptr<AST::Statement> Parser::typeDeclaration() {
             
 // Type annotation parsing
 std::shared_ptr<AST::TypeAnnotation> Parser::parseTypeAnnotation() {
+    // Parse the base type first
+    auto type = parseBasicType();
+    
+    // Check for union types (e.g., int | float)
+    if (check(TokenType::PIPE)) {
+        // This is a union type - create a union and add the first type
+        auto unionType = std::make_shared<AST::TypeAnnotation>();
+        unionType->typeName = "union";
+        unionType->isUnion = true;
+        unionType->unionTypes.push_back(type);
+        
+        // Parse the remaining union types
+        while (match({TokenType::PIPE})) {
+            auto nextType = parseBasicType();
+            unionType->unionTypes.push_back(nextType);
+        }
+        
+        return unionType;
+    }
+    
+    // Check for intersection types (e.g., HasName and HasAge)
+    if (check(TokenType::AND)) {
+        // This is an intersection type
+        auto intersectionType = std::make_shared<AST::TypeAnnotation>();
+        intersectionType->typeName = "intersection";
+        intersectionType->isIntersection = true;
+        intersectionType->unionTypes.push_back(type); // Reuse unionTypes for intersection types
+
+        // Parse the right side of the intersection
+        while (match({TokenType::AND})) {
+            auto nextType = parseBasicType();
+            intersectionType->unionTypes.push_back(nextType);
+        }
+
+        return intersectionType;
+    }
+
+    // Check for refined types (e.g., int where value > 0)
+    if (match({TokenType::WHERE})) {
+        // This is a refined type with a constraint
+        type->isRefined = true;
+        
+        // Parse the refinement condition
+        // For example: "value > 0" or "matches(value, pattern)"
+        type->refinementCondition = expression();
+    }
+
+    return type;
+}
+
+
+// Helper method to check if a token type is a primitive type
+bool Parser::isPrimitiveType(TokenType type) {
+    return type == TokenType::INT_TYPE || type == TokenType::INT8_TYPE || type == TokenType::INT16_TYPE ||
+           type == TokenType::INT32_TYPE || type == TokenType::INT64_TYPE || type == TokenType::UINT_TYPE ||
+           type == TokenType::UINT8_TYPE || type == TokenType::UINT16_TYPE || type == TokenType::UINT32_TYPE ||
+           type == TokenType::UINT64_TYPE || type == TokenType::FLOAT_TYPE || type == TokenType::FLOAT32_TYPE ||
+           type == TokenType::FLOAT64_TYPE || type == TokenType::STR_TYPE || type == TokenType::BOOL_TYPE ||
+           type == TokenType::ANY_TYPE || type == TokenType::NIL_TYPE;
+}
+
+// Helper method to convert a token type to a string
+std::string Parser::tokenTypeToString(TokenType type) {
+    switch (type) {
+        case TokenType::INT_TYPE: return "int";
+        case TokenType::INT8_TYPE: return "i8";
+        case TokenType::INT16_TYPE: return "i16";
+        case TokenType::INT32_TYPE: return "i32";
+        case TokenType::INT64_TYPE: return "i64";
+        case TokenType::UINT_TYPE: return "uint";
+        case TokenType::UINT8_TYPE: return "u8";
+        case TokenType::UINT16_TYPE: return "u16";
+        case TokenType::UINT32_TYPE: return "u32";
+        case TokenType::UINT64_TYPE: return "u64";
+        case TokenType::FLOAT_TYPE: return "float";
+        case TokenType::FLOAT32_TYPE: return "f32";
+        case TokenType::FLOAT64_TYPE: return "f64";
+        case TokenType::STR_TYPE: return "str";
+        case TokenType::BOOL_TYPE: return "bool";
+        case TokenType::ANY_TYPE: return "any";
+        case TokenType::NIL_TYPE: return "nil";
+        default: return "unknown";
+    }
+}
+
+// Parse union type (e.g., Some | None, int | str | bool)
+std::shared_ptr<AST::TypeAnnotation> Parser::parseUnionType() {
+    auto unionType = std::make_shared<AST::TypeAnnotation>();
+    unionType->typeName = "union";
+    unionType->isUnion = true;
+    
+    // Parse the first type in the union (call parseBasicType to avoid recursion)
+    auto firstType = parseBasicType();
+    unionType->unionTypes.push_back(firstType);
+    
+    // Parse additional types separated by PIPE tokens
+    while (match({TokenType::PIPE})) {
+        auto nextType = parseBasicType();
+        unionType->unionTypes.push_back(nextType);
+    }
+    
+    return unionType;
+}
+
+// Parse a basic type without union/intersection logic (to avoid recursion)
+std::shared_ptr<AST::TypeAnnotation> Parser::parseBasicType() {
     auto type = std::make_shared<AST::TypeAnnotation>();
 
     // Check for list types (e.g., [int], [str], [Person])
@@ -2297,7 +2418,7 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseTypeAnnotation() {
         // Parse element type (e.g., int in [int])
         if (!check(TokenType::RIGHT_BRACKET)) {
             // Parse the element type
-            type->elementType = parseTypeAnnotation();
+            type->elementType = parseBasicType();
         } else {
             // Default to any if no element type is specified
             auto anyType = std::make_shared<AST::TypeAnnotation>();
@@ -2310,85 +2431,12 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseTypeAnnotation() {
         return type;
     }
     
-    // Check for structural types (e.g., { name: str, age: int, ...baseRecord })
+    // Check for dictionary types (e.g., {str: int}) or structural types (e.g., { name: str, age: int })
     if (match({TokenType::LEFT_BRACE})) {
-        // This could be either a structural type or a dictionary type
-        
-        // For now, treat all { ... } in type declarations as structural types
-        // Dictionary types should be explicitly declared with dict<K, V> syntax
-        
-        // If we get here, it's a structural type
-        type->isStructural = true;
-        type->typeName = "struct";
-
-        // Parse fields until we hit a closing brace
-        while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
-            // Check for rest parameter (...) or extensible record (...baseRecord)
-            if (match({TokenType::ELLIPSIS})) {
-                type->hasRest = true;
-                
-                // Check if there's a base record identifier after ...
-                if (check(TokenType::IDENTIFIER)) {
-                    // This is an extensible record with a base record
-                    std::string baseRecordName = consume(TokenType::IDENTIFIER, "Expected base record name after '...'.").lexeme;
-                    
-                    // Store the base record name
-                    if (type->baseRecord.empty()) {
-                        type->baseRecord = baseRecordName;
-                    }
-                    
-                    // Also add to the list of base records for multiple inheritance
-                    type->baseRecords.push_back(baseRecordName);
-                }
-                
-                // Check for comma to continue with more fields
-                if (check(TokenType::COMMA)) {
-                    consume(TokenType::COMMA, "Expected ',' after rest parameter.");
-                    continue;
-                } else if (check(TokenType::RIGHT_BRACE)) {
-                    // End of record definition
-                    break;
-                } else {
-                    error("Expected ',' or '}' after rest parameter.");
-                }
-            }
-
-            // Parse field name
-            std::string fieldName;
-            if (check(TokenType::IDENTIFIER)) {
-                fieldName = consume(TokenType::IDENTIFIER, "Expected field name.").lexeme;
-            } else if (check(TokenType::STRING)) {
-                // Handle string literals as field names (e.g., { "kind": "Some" })
-                Token stringToken = consume(TokenType::STRING, "Expected field name.");
-                fieldName = stringToken.lexeme;
-                // Remove quotes if present
-                if (fieldName.size() >= 2 && (fieldName[0] == '"' || fieldName[0] == '\'') && 
-                    (fieldName[fieldName.size()-1] == '"' || fieldName[fieldName.size()-1] == '\'')) {
-                    fieldName = fieldName.substr(1, fieldName.size() - 2);
-                }
-            } else {
-                error("Expected field name.");
-                break;
-            }
-
-            // Parse field type
-            consume(TokenType::COLON, "Expected ':' after field name.");
-            auto fieldType = parseTypeAnnotation();
-
-            // Add field to structural type
-            type->structuralFields.push_back({fieldName, fieldType});
-
-            // Check for comma or end of struct
-            if (!check(TokenType::RIGHT_BRACE)) {
-                match({TokenType::COMMA}); // Optional comma
-            }
-        }
-
-        consume(TokenType::RIGHT_BRACE, "Expected '}' after structural type.");
-        return type;
+        return parseBraceType();
     }
 
-    // Parse the base type
+    // Parse primitive and user-defined types
     if (match({TokenType::INT_TYPE})) {
         type->typeName = "int";
         type->isPrimitive = true;
@@ -2470,6 +2518,16 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseTypeAnnotation() {
     } else if (match({TokenType::UNION_TYPE})) {
         type->typeName = "union";
         type->isUnion = true;
+    } else if (match({TokenType::STRING})) {
+        // Handle string literals as literal types (e.g., "Some", "None")
+        std::string literalValue = previous().lexeme;
+        // Remove quotes if present
+        if (literalValue.size() >= 2 && (literalValue[0] == '"' || literalValue[0] == '\'') && 
+            (literalValue[literalValue.size()-1] == '"' || literalValue[literalValue.size()-1] == '\'')) {
+            literalValue = literalValue.substr(1, literalValue.size() - 2);
+        }
+        type->typeName = "\"" + literalValue + "\""; // Keep quotes to indicate it's a literal type
+        type->isPrimitive = true; // Treat literal types as primitive
     } else {
         // Handle user-defined types
         if (check(TokenType::IDENTIFIER)) {
@@ -2477,126 +2535,6 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseTypeAnnotation() {
             std::string typeName = consume(TokenType::IDENTIFIER, "Expected type name.").lexeme;
             type->typeName = typeName;
             type->isUserDefined = true;
-            
-            // Check if this is a list-like type (e.g., ListOfX)
-            if (typeName.substr(0, 4) == "List" && typeName.length() > 4) {
-                type->isList = true;
-                
-                // Create a default element type
-                auto elementType = std::make_shared<AST::TypeAnnotation>();
-                elementType->typeName = "any"; // Default to any
-                elementType->isPrimitive = true;
-                
-                // Try to infer element type from name pattern
-                if (typeName.substr(4, 2) == "Of" && typeName.length() > 6) {
-                    std::string elementTypeName = typeName.substr(6);
-                    
-                    // Handle common primitive type names in the suffix
-                    if (elementTypeName == "Any") {
-                        elementType->typeName = "any";
-                        elementType->isPrimitive = true;
-                    } else if (elementTypeName == "String") {
-                        elementType->typeName = "str";
-                        elementType->isPrimitive = true;
-                    } else if (elementTypeName == "Int") {
-                        elementType->typeName = "int";
-                        elementType->isPrimitive = true;
-                    } else {
-                        // Assume it's a user-defined type
-                        elementType->typeName = elementTypeName;
-                        elementType->isUserDefined = true;
-                    }
-                }
-                
-                type->elementType = elementType;
-            }
-            // Check if this is a dictionary-like type (e.g., DictOfX or DictOfXToY)
-            else if (typeName.substr(0, 4) == "Dict" && typeName.length() > 4) {
-                type->isDict = true;
-                
-                // Create default key and value types
-                auto keyType = std::make_shared<AST::TypeAnnotation>();
-                keyType->typeName = "any";
-                keyType->isPrimitive = true;
-                
-                auto valueType = std::make_shared<AST::TypeAnnotation>();
-                valueType->typeName = "any";
-                valueType->isPrimitive = true;
-                
-                // Try to infer key and value types from name pattern
-                if (typeName.substr(4, 2) == "Of" && typeName.length() > 6) {
-                    std::string remainder = typeName.substr(6);
-                    size_t toPos = remainder.find("To");
-                    
-                    if (toPos != std::string::npos && toPos + 2 < remainder.length()) {
-                        // Extract key and value type names (e.g., DictOfStrToInt)
-                        std::string keyTypeName = remainder.substr(0, toPos);
-                        std::string valueTypeName = remainder.substr(toPos + 2);
-                        
-                        // Handle common primitive type names for keys
-                        if (keyTypeName == "Str") {
-                            keyType->typeName = "str";
-                            keyType->isPrimitive = true;
-                        } else if (keyTypeName == "Int") {
-                            keyType->typeName = "int";
-                            keyType->isPrimitive = true;
-                        } else if (keyTypeName == "Any") {
-                            keyType->typeName = "any";
-                            keyType->isPrimitive = true;
-                        } else {
-                            // Assume it's a user-defined type
-                            keyType->typeName = keyTypeName;
-                            keyType->isUserDefined = true;
-                        }
-                        
-                        // Handle common primitive type names for values
-                        if (valueTypeName == "Int") {
-                            valueType->typeName = "int";
-                            valueType->isPrimitive = true;
-                        } else if (valueTypeName == "Str") {
-                            valueType->typeName = "str";
-                            valueType->isPrimitive = true;
-                        } else if (valueTypeName == "Any") {
-                            valueType->typeName = "any";
-                            valueType->isPrimitive = true;
-                        } else {
-                            // Assume it's a user-defined type
-                            valueType->typeName = valueTypeName;
-                            valueType->isUserDefined = true;
-                        }
-                    } else {
-                        // Handle cases like DictOfAny, DictOfString
-                        std::string typeName = remainder;
-                        
-                        // Handle common primitive type names
-                        if (typeName == "Any") {
-                            keyType->typeName = "any";
-                            keyType->isPrimitive = true;
-                            valueType->typeName = "any";
-                            valueType->isPrimitive = true;
-                        } else if (typeName == "String") {
-                            keyType->typeName = "str";
-                            keyType->isPrimitive = true;
-                            valueType->typeName = "str";
-                            valueType->isPrimitive = true;
-                        } else if (typeName == "Int") {
-                            keyType->typeName = "int";
-                            keyType->isPrimitive = true;
-                            valueType->typeName = "int";
-                            valueType->isPrimitive = true;
-                        } else {
-                            // Assume it's a user-defined type
-                            keyType->typeName = typeName;
-                            keyType->isUserDefined = true;
-                            valueType->typeName = typeName;
-                            valueType->isUserDefined = true;
-                        }
-                    }
-                }
-                
-                type->keyType = keyType;
-                type->valueType = valueType;
-            }
         } else {
             // Fall back to identifier for user-defined types
             type->typeName = consume(TokenType::IDENTIFIER, "Expected type name for definition.").lexeme;
@@ -2626,104 +2564,151 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseTypeAnnotation() {
         }
     }
 
-    // Check for union types (e.g., int | float)
-    if (match({TokenType::PIPE})) {
-        // This is a union type
-        auto unionType = std::make_shared<AST::TypeAnnotation>();
-        unionType->typeName = "union";
-        unionType->isUnion = true;
-        unionType->unionTypes.push_back(type);
-
-        // Parse the right side of the union
-        do {
-            // Check if this is a user-defined type that might itself be a union type
-            if (check(TokenType::IDENTIFIER)) {
-                Token typeToken = peek();
-                std::string typeName = typeToken.lexeme;
-                
-                // If it's a user-defined type, parse it normally
-                auto rightType = parseTypeAnnotation();
-                unionType->unionTypes.push_back(rightType);
-            } else {
-                // Regular type annotation
-                unionType->unionTypes.push_back(parseTypeAnnotation());
-            }
-        } while (match({TokenType::PIPE}));
-
-        return unionType;
-    }
-
-    // Check for intersection types (e.g., HasName and HasAge)
-    if (match({TokenType::AND})) {
-        // This is an intersection type
-        auto intersectionType = std::make_shared<AST::TypeAnnotation>();
-        intersectionType->typeName = "intersection";
-        intersectionType->isIntersection = true;
-        intersectionType->unionTypes.push_back(type); // Reuse unionTypes for intersection types
-
-        // Parse the right side of the intersection
-        do {
-            // Check if this is a user-defined type that might itself be a structural type
-            if (check(TokenType::IDENTIFIER)) {
-                Token typeToken = peek();
-                std::string typeName = typeToken.lexeme;
-                
-                // If it's a user-defined type, parse it normally
-                auto rightType = parseTypeAnnotation();
-                intersectionType->unionTypes.push_back(rightType);
-            } else {
-                // Regular type annotation
-                intersectionType->unionTypes.push_back(parseTypeAnnotation());
-            }
-        } while (match({TokenType::AND}));
-
-        return intersectionType;
-    }
-
-    // Check for refined types (e.g., int where value > 0)
-    if (match({TokenType::WHERE})) {
-        // This is a refined type with a constraint
-        type->isRefined = true;
-        
-        // Parse the refinement condition
-        // For example: "value > 0" or "matches(value, pattern)"
-        type->refinementCondition = expression();
-    }
-
     return type;
 }
 
-
-// Helper method to check if a token type is a primitive type
-bool Parser::isPrimitiveType(TokenType type) {
-    return type == TokenType::INT_TYPE || type == TokenType::INT8_TYPE || type == TokenType::INT16_TYPE ||
-           type == TokenType::INT32_TYPE || type == TokenType::INT64_TYPE || type == TokenType::UINT_TYPE ||
-           type == TokenType::UINT8_TYPE || type == TokenType::UINT16_TYPE || type == TokenType::UINT32_TYPE ||
-           type == TokenType::UINT64_TYPE || type == TokenType::FLOAT_TYPE || type == TokenType::FLOAT32_TYPE ||
-           type == TokenType::FLOAT64_TYPE || type == TokenType::STR_TYPE || type == TokenType::BOOL_TYPE ||
-           type == TokenType::ANY_TYPE || type == TokenType::NIL_TYPE;
+// Parse brace type - either dictionary {keyType: valueType} or structural {field: type, ...}
+std::shared_ptr<AST::TypeAnnotation> Parser::parseBraceType() {
+    // Look ahead to determine if this is a dictionary type or structural type
+    size_t savedCurrent = current;
+    bool isDictionary = false;
+    
+    // Check the pattern to distinguish dictionary from structural type
+    if (check(TokenType::IDENTIFIER) || isPrimitiveType(peek().type)) {
+        Token firstToken = peek();
+        advance();
+        
+        if (match({TokenType::COLON})) {
+            // We have a colon, check what comes after
+            // Dictionary types can have complex value types like [int] or {str: int}
+            if (check(TokenType::IDENTIFIER) || isPrimitiveType(peek().type) || 
+                check(TokenType::LEFT_BRACKET) || check(TokenType::LEFT_BRACE)) {
+                
+                // If the first token is a primitive type, it's likely a dictionary
+                if (isPrimitiveType(firstToken.type)) {
+                    isDictionary = true;
+                } else {
+                    // For identifiers, check if it's a known type name
+                    if (isKnownTypeName(firstToken.lexeme)) {
+                        isDictionary = true;
+                    } else {
+                        // Look at the value type to make a decision
+                        if (check(TokenType::LEFT_BRACKET) || check(TokenType::LEFT_BRACE) ||
+                            isPrimitiveType(peek().type) || isKnownTypeName(peek().lexeme)) {
+                            isDictionary = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Reset parser position
+    current = savedCurrent;
+    
+    if (isDictionary) {
+        return parseDictionaryType();
+    } else {
+        return parseStructuralType();
+    }
 }
 
-// Helper method to convert a token type to a string
-std::string Parser::tokenTypeToString(TokenType type) {
-    switch (type) {
-        case TokenType::INT_TYPE: return "int";
-        case TokenType::INT8_TYPE: return "i8";
-        case TokenType::INT16_TYPE: return "i16";
-        case TokenType::INT32_TYPE: return "i32";
-        case TokenType::INT64_TYPE: return "i64";
-        case TokenType::UINT_TYPE: return "uint";
-        case TokenType::UINT8_TYPE: return "u8";
-        case TokenType::UINT16_TYPE: return "u16";
-        case TokenType::UINT32_TYPE: return "u32";
-        case TokenType::UINT64_TYPE: return "u64";
-        case TokenType::FLOAT_TYPE: return "float";
-        case TokenType::FLOAT32_TYPE: return "f32";
-        case TokenType::FLOAT64_TYPE: return "f64";
-        case TokenType::STR_TYPE: return "str";
-        case TokenType::BOOL_TYPE: return "bool";
-        case TokenType::ANY_TYPE: return "any";
-        case TokenType::NIL_TYPE: return "nil";
-        default: return "unknown";
+// Parse dictionary type {keyType: valueType}
+std::shared_ptr<AST::TypeAnnotation> Parser::parseDictionaryType() {
+    auto type = std::make_shared<AST::TypeAnnotation>();
+    type->isDict = true;
+    type->typeName = "dict";
+    
+    // Parse key type
+    auto keyType = parseBasicType();
+    consume(TokenType::COLON, "Expected ':' in dictionary type.");
+    
+    // Parse value type
+    auto valueType = parseBasicType();
+    
+    type->keyType = keyType;
+    type->valueType = valueType;
+    
+    consume(TokenType::RIGHT_BRACE, "Expected '}' after dictionary type.");
+    return type;
+}
+
+// Helper method to check if a lexeme is a known type name
+bool Parser::isKnownTypeName(const std::string& name) {
+    return name == "any" || name == "str" || name == "int" || name == "float" || 
+           name == "bool" || name == "list" || name == "dict" || name == "option" || 
+           name == "result";
+}
+
+// Parse structural type (e.g., { name: str, age: int, ...baseRecord })
+std::shared_ptr<AST::TypeAnnotation> Parser::parseStructuralType(const std::string& typeName) {
+    auto type = std::make_shared<AST::TypeAnnotation>();
+    type->isStructural = true;
+    type->typeName = typeName.empty() ? "struct" : typeName;
+
+    // Parse fields until we hit a closing brace
+    while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
+        // Check for rest parameter (...) or extensible record (...baseRecord)
+        if (match({TokenType::ELLIPSIS})) {
+            type->hasRest = true;
+            
+            // Check if there's a base record identifier after ...
+            if (check(TokenType::IDENTIFIER)) {
+                // This is an extensible record with a base record
+                std::string baseRecordName = consume(TokenType::IDENTIFIER, "Expected base record name after '...'.").lexeme;
+                
+                // Store the base record name
+                if (type->baseRecord.empty()) {
+                    type->baseRecord = baseRecordName;
+                }
+                
+                // Also add to the list of base records for multiple inheritance
+                type->baseRecords.push_back(baseRecordName);
+            }
+            
+            // Check for comma to continue with more fields
+            if (check(TokenType::COMMA)) {
+                consume(TokenType::COMMA, "Expected ',' after rest parameter.");
+                continue;
+            } else if (check(TokenType::RIGHT_BRACE)) {
+                // End of record definition
+                break;
+            } else {
+                error("Expected ',' or '}' after rest parameter.");
+            }
+        }
+
+        // Parse field name
+        std::string fieldName;
+        if (check(TokenType::IDENTIFIER)) {
+            fieldName = consume(TokenType::IDENTIFIER, "Expected field name.").lexeme;
+        } else if (check(TokenType::STRING)) {
+            // Handle string literals as field names (e.g., { "kind": "Some" })
+            Token stringToken = consume(TokenType::STRING, "Expected field name.");
+            fieldName = stringToken.lexeme;
+            // Remove quotes if present
+            if (fieldName.size() >= 2 && (fieldName[0] == '"' || fieldName[0] == '\'') && 
+                (fieldName[fieldName.size()-1] == '"' || fieldName[fieldName.size()-1] == '\'')) {
+                fieldName = fieldName.substr(1, fieldName.size() - 2);
+            }
+        } else {
+            error("Expected field name.");
+            break;
+        }
+
+        // Parse field type
+        consume(TokenType::COLON, "Expected ':' after field name.");
+        auto fieldType = parseBasicType();
+
+        // Add field to structural type
+        type->structuralFields.push_back({fieldName, fieldType});
+
+        // Check for comma or end of struct
+        if (!check(TokenType::RIGHT_BRACE)) {
+            match({TokenType::COMMA}); // Optional comma
+        }
     }
+
+    consume(TokenType::RIGHT_BRACE, "Expected '}' after structural type.");
+    return type;
 }

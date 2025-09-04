@@ -1,0 +1,15 @@
+// Test typed container parsing
+
+// Type aliases with typed containers
+type ListOfInt = [int];
+type ListOfString = [str];
+type DictOfIntToFloat = {int: float};
+type DictOfStringToInt = {str: int};
+
+// Variable declarations with typed containers
+var numbers: [int] = [1, 2, 3];
+var names: [str] = ["Alice", "Bob"];
+var scores: {str: int} = {"Alice": 95, "Bob": 87};
+var prices: {int: float} = {1: 9.99, 2: 19.99};
+
+print("Typed containers test");
