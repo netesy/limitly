@@ -11,11 +11,11 @@ BIN_DIR   := bin
 TARGETS   := $(BIN_DIR)/limitly $(BIN_DIR)/test_parser $(BIN_DIR)/format_code
 
 # Sources
-COMMON_SRCS := frontend/scanner.cpp frontend/parser.cpp debugger.cpp
-BACKEND_COMMON_SRCS := backend/backend.cpp backend/functions.cpp backend/classes.cpp backend/ast_printer.cpp
-MAIN_SRCS   := main.cpp backend/vm.cpp $(BACKEND_COMMON_SRCS) $(COMMON_SRCS)
-TEST_SRCS   := test_parser.cpp $(BACKEND_COMMON_SRCS) $(COMMON_SRCS)
-FORMAT_SRCS := format_code.cpp backend/code_formatter.cpp $(COMMON_SRCS)
+COMMON_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp src/debugger.cpp
+BACKEND_COMMON_SRCS := src/backend/backend.cpp src/backend/functions.cpp src/backend/classes.cpp src/backend/ast_printer.cpp
+MAIN_SRCS   := src/main.cpp arc/backend/vm.cpp $(BACKEND_COMMON_SRCS) $(COMMON_SRCS)
+TEST_SRCS   := src/test_parser.cpp $(BACKEND_COMMON_SRCS) $(COMMON_SRCS)
+FORMAT_SRCS := src/format_code.cpp backend/code_formatter.cpp $(COMMON_SRCS)
 
 
 # Objects

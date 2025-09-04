@@ -16,28 +16,28 @@ echo Compiling with g++...
 
 :: Compile debugger first as a separate object file to ensure it's available
 echo Compiling debugger...
-"%MSYS2_PATH%\mingw64\bin\g++.exe" -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -c -o bin\debugger.o debugger.cpp -I.
+"%MSYS2_PATH%\mingw64\bin\g++.exe" -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -c -o bin\debugger.o src\debugger.cpp -I.
 
 if %ERRORLEVEL% NEQ 0 (
-    echo Failed to compile debugger.cpp
+    echo Failed to compile src\debugger.cpp
     exit /b 1
 )
 
 :: Compile main executable
 echo Compiling main executable...
 "%MSYS2_PATH%\mingw64\bin\g++.exe" -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -o bin\limitly.exe ^
-    main.cpp ^
-    frontend\scanner.cpp ^
-    frontend\parser.cpp ^
-    backend\backend.cpp ^
-    backend\vm.cpp ^
-    backend\ast_printer.cpp ^
-    backend\functions.cpp ^
-    backend\classes.cpp ^
-    backend\concurrency\scheduler.cpp ^
-    backend\concurrency\thread_pool.cpp ^
-    backend\concurrency\event_loop.cpp ^
-    backend\concurrency\iocp_event_loop.cpp ^
+    src\main.cpp ^
+    src\frontend\scanner.cpp ^
+    src\frontend\parser.cpp ^
+    src\backend\backend.cpp ^
+    src\backend\vm.cpp ^
+    src\backend\ast_printer.cpp ^
+    src\backend\functions.cpp ^
+    src\backend\classes.cpp ^
+    src\backend\concurrency\scheduler.cpp ^
+    src\backend\concurrency\thread_pool.cpp ^
+    src\backend\concurrency\event_loop.cpp ^
+    src\backend\concurrency\iocp_event_loop.cpp ^
     bin\debugger.o ^
     -I. -lws2_32 -static-libgcc -static-libstdc++
 
@@ -49,13 +49,13 @@ if %ERRORLEVEL% NEQ 0 (
 :: Compile test parser
 echo Compiling test parser...
 "%MSYS2_PATH%\mingw64\bin\g++.exe" -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -o bin\test_parser.exe ^
-    test_parser.cpp ^
-    frontend\scanner.cpp ^
-    frontend\parser.cpp ^
-    backend\backend.cpp ^
-    backend\ast_printer.cpp ^
-    backend\functions.cpp ^
-    backend\classes.cpp ^
+    src\test_parser.cpp ^
+    src\frontend\scanner.cpp ^
+    src\frontend\parser.cpp ^
+    src\backend\backend.cpp ^
+    src\backend\ast_printer.cpp ^
+    src\backend\functions.cpp ^
+    src\backend\classes.cpp ^
     bin\debugger.o ^
     -I. -static-libgcc -static-libstdc++
 
@@ -68,10 +68,10 @@ if %ERRORLEVEL% NEQ 0 (
 if exist "format_code.cpp" (
     echo Compiling code formatter...
     "%MSYS2_PATH%\mingw64\bin\g++.exe" -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -o bin\format_code.exe ^
-        format_code.cpp ^
-        frontend\scanner.cpp ^
-        frontend\parser.cpp ^
-        backend\code_formatter.cpp ^
+        src\format_code.cpp ^
+        src\frontend\scanner.cpp ^
+        src\frontend\parser.cpp ^
+        src\backend\code_formatter.cpp ^
         bin\debugger.o ^
         -I. -static-libgcc -static-libstdc++
     

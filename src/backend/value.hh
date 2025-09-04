@@ -337,6 +337,128 @@ struct ErrorValue {
     std::string toString() const;  // Declaration only, definition after Value struct
 };
 
+// ErrorUnion helper class for efficient tagged union operations
+class ErrorUnion {
+public:
+    enum class Tag : uint8_t { SUCCESS, ERROR };
+
+private:
+    Tag tag_;
+    union {
+        ValuePtr successValue_;
+        ErrorValue errorValue_;
+    };
+
+public:
+    // Constructors
+    ErrorUnion(ValuePtr success) : tag_(Tag::SUCCESS), successValue_(success) {}
+    
+    ErrorUnion(const ErrorValue& error) : tag_(Tag::ERROR) {
+        new (&errorValue_) ErrorValue(error);
+    }
+    
+    ErrorUnion(const std::string& errorType, const std::string& message = "", 
+               const std::vector<ValuePtr>& args = {}, size_t location = 0) 
+        : tag_(Tag::ERROR) {
+        new (&errorValue_) ErrorValue(errorType, message, args, location);
+    }
+
+    // Copy constructor
+    ErrorUnion(const ErrorUnion& other) : tag_(other.tag_) {
+        if (tag_ == Tag::SUCCESS) {
+            successValue_ = other.successValue_;
+        } else {
+            new (&errorValue_) ErrorValue(other.errorValue_);
+        }
+    }
+
+    // Move constructor
+    ErrorUnion(ErrorUnion&& other) noexcept : tag_(other.tag_) {
+        if (tag_ == Tag::SUCCESS) {
+            successValue_ = std::move(other.successValue_);
+        } else {
+            new (&errorValue_) ErrorValue(std::move(other.errorValue_));
+        }
+    }
+
+    // Assignment operators
+    ErrorUnion& operator=(const ErrorUnion& other) {
+        if (this != &other) {
+            this->~ErrorUnion();
+            new (this) ErrorUnion(other);
+        }
+        return *this;
+    }
+
+    ErrorUnion& operator=(ErrorUnion&& other) noexcept {
+        if (this != &other) {
+            this->~ErrorUnion();
+            new (this) ErrorUnion(std::move(other));
+        }
+        return *this;
+    }
+
+    // Destructor
+    ~ErrorUnion() {
+        if (tag_ == Tag::ERROR) {
+            errorValue_.~ErrorValue();
+        }
+    }
+
+    // Inspection methods
+    bool isSuccess() const { return tag_ == Tag::SUCCESS; }
+    bool isError() const { return tag_ == Tag::ERROR; }
+    Tag getTag() const { return tag_; }
+
+    // Value access methods
+    ValuePtr getSuccessValue() const {
+        if (tag_ != Tag::SUCCESS) {
+            throw std::runtime_error("Attempted to get success value from error union");
+        }
+        return successValue_;
+    }
+
+    const ErrorValue& getErrorValue() const {
+        if (tag_ != Tag::ERROR) {
+            throw std::runtime_error("Attempted to get error value from success union");
+        }
+        return errorValue_;
+    }
+
+    // Safe access methods
+    ValuePtr getSuccessValueOr(ValuePtr defaultValue) const {
+        return isSuccess() ? successValue_ : defaultValue;
+    }
+
+    std::string getErrorType() const {
+        return isError() ? errorValue_.errorType : "";
+    }
+
+    std::string getErrorMessage() const {
+        return isError() ? errorValue_.message : "";
+    }
+
+    // Conversion to Value
+    ValuePtr toValue(TypePtr errorUnionType) const;  // Declaration, definition after Value struct
+
+    // Static factory methods
+    static ErrorUnion success(ValuePtr value) {
+        return ErrorUnion(value);
+    }
+
+    static ErrorUnion error(const std::string& errorType, const std::string& message = "", 
+                           const std::vector<ValuePtr>& args = {}, size_t location = 0) {
+        return ErrorUnion(errorType, message, args, location);
+    }
+
+    static ErrorUnion error(const ErrorValue& errorValue) {
+        return ErrorUnion(errorValue);
+    }
+
+    // String representation
+    std::string toString() const;  // Declaration only, definition after Value struct
+};
+
 struct ListValue {
     std::vector<ValuePtr> elements;
 
@@ -728,6 +850,144 @@ inline std::string ErrorValue::toString() const {
     }
     oss << ")";
     return oss.str();
+}
+
+// ErrorUnion toValue implementation (defined after Value struct)
+inline ValuePtr ErrorUnion::toValue(TypePtr errorUnionType) const {
+    auto value = std::make_shared<Value>(errorUnionType);
+    
+    if (isSuccess()) {
+        // For success values, store the actual success data
+        value->data = successValue_->data;
+    } else {
+        // For error values, store the ErrorValue
+        value->data = errorValue_;
+    }
+    
+    return value;
+}
+
+// ErrorUnion toString implementation (defined after Value struct)
+inline std::string ErrorUnion::toString() const {
+    if (isSuccess()) {
+        return "Success(" + (successValue_ ? successValue_->toString() : "null") + ")";
+    } else {
+        return "Error(" + errorValue_.toString() + ")";
+    }
+}
+
+// Error value construction and inspection utility functions
+namespace ErrorUtils {
+    // Create an error value
+    inline ValuePtr createError(const std::string& errorType, const std::string& message = "", 
+                               const std::vector<ValuePtr>& args = {}, size_t location = 0) {
+        auto errorValue = std::make_shared<Value>();
+        errorValue->type = std::make_shared<Type>(TypeTag::UserDefined); // Error types are user-defined
+        errorValue->data = ErrorValue(errorType, message, args, location);
+        return errorValue;
+    }
+
+    // Create a success value wrapped in an error union
+    inline ValuePtr createSuccess(ValuePtr successValue, TypePtr errorUnionType) {
+        auto value = std::make_shared<Value>(errorUnionType);
+        value->data = successValue->data;
+        return value;
+    }
+
+    // Create an error union value from ErrorUnion helper
+    inline ValuePtr createErrorUnionValue(const ErrorUnion& errorUnion, TypePtr errorUnionType) {
+        return errorUnion.toValue(errorUnionType);
+    }
+
+    // Check if a value is an error
+    inline bool isError(const ValuePtr& value) {
+        return std::holds_alternative<ErrorValue>(value->data);
+    }
+
+    // Check if a value is a success value (not an error)
+    inline bool isSuccess(const ValuePtr& value) {
+        return !isError(value);
+    }
+
+    // Extract error value from a Value (throws if not an error)
+    inline const ErrorValue& getError(const ValuePtr& value) {
+        if (auto errorValue = std::get_if<ErrorValue>(&value->data)) {
+            return *errorValue;
+        }
+        throw std::runtime_error("Value is not an error");
+    }
+
+    // Extract error value safely (returns nullptr if not an error)
+    inline const ErrorValue* getErrorSafe(const ValuePtr& value) {
+        return std::get_if<ErrorValue>(&value->data);
+    }
+
+    // Get error type from a value (empty string if not an error)
+    inline std::string getErrorType(const ValuePtr& value) {
+        if (auto errorValue = std::get_if<ErrorValue>(&value->data)) {
+            return errorValue->errorType;
+        }
+        return "";
+    }
+
+    // Get error message from a value (empty string if not an error)
+    inline std::string getErrorMessage(const ValuePtr& value) {
+        if (auto errorValue = std::get_if<ErrorValue>(&value->data)) {
+            return errorValue->message;
+        }
+        return "";
+    }
+
+    // Get error arguments from a value (empty vector if not an error)
+    inline std::vector<ValuePtr> getErrorArguments(const ValuePtr& value) {
+        if (auto errorValue = std::get_if<ErrorValue>(&value->data)) {
+            return errorValue->arguments;
+        }
+        return {};
+    }
+
+    // Get source location from an error value (0 if not an error)
+    inline size_t getErrorLocation(const ValuePtr& value) {
+        if (auto errorValue = std::get_if<ErrorValue>(&value->data)) {
+            return errorValue->sourceLocation;
+        }
+        return 0;
+    }
+
+    // Convert a regular value to an error union success value
+    inline ValuePtr wrapAsSuccess(ValuePtr value, TypePtr errorUnionType) {
+        auto wrappedValue = std::make_shared<Value>(errorUnionType);
+        wrappedValue->data = value->data;
+        return wrappedValue;
+    }
+
+    // Convert an error to an error union error value
+    inline ValuePtr wrapAsError(const ErrorValue& errorValue, TypePtr errorUnionType) {
+        auto wrappedValue = std::make_shared<Value>(errorUnionType);
+        wrappedValue->data = errorValue;
+        return wrappedValue;
+    }
+
+    // Unwrap success value from error union (throws if error)
+    inline ValuePtr unwrapSuccess(ValuePtr errorUnionValue, TypePtr successType) {
+        if (isError(errorUnionValue)) {
+            throw std::runtime_error("Cannot unwrap success value from error union containing error");
+        }
+        auto successValue = std::make_shared<Value>(successType);
+        successValue->data = errorUnionValue->data;
+        return successValue;
+    }
+
+    // Safely unwrap success value from error union (returns nullptr if error)
+    inline ValuePtr unwrapSuccessSafe(ValuePtr errorUnionValue, TypePtr successType) {
+        if (isError(errorUnionValue)) {
+            return nullptr;
+        }
+        auto successValue = std::make_shared<Value>(successType);
+        successValue->data = errorUnionValue->data;
+        return successValue;
+    }
+
 }
 
 // Iterator for list and range values

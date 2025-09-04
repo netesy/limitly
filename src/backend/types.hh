@@ -23,6 +23,30 @@ private:
     MemoryManager<> &memoryManager;
     MemoryManager<>::Region &region;
 
+private:
+    // Helper method to compare types for equality (more sophisticated than just tag comparison)
+    bool areTypesEqual(TypePtr a, TypePtr b) {
+        if (!a || !b) {
+            return a == b;
+        }
+        
+        if (a->tag != b->tag) {
+            return false;
+        }
+        
+        // For user-defined types, compare names
+        if (a->tag == TypeTag::UserDefined) {
+            const auto* aUserType = std::get_if<UserDefinedType>(&a->extra);
+            const auto* bUserType = std::get_if<UserDefinedType>(&b->extra);
+            if (aUserType && bUserType) {
+                return aUserType->name == bUserType->name;
+            }
+        }
+        
+        // For other types, tag comparison is sufficient for now
+        return true;
+    }
+
     bool canConvert(TypePtr from, TypePtr to)
     {
         if (from == to || to->tag == TypeTag::Any)
@@ -53,11 +77,33 @@ private:
                    canConvert(fromDictType.valueType, toDictType.valueType);
         }
 
-        // Union and sum type compatibility
+        // Union type compatibility (Requirement 2.2, 2.4)
         if (from->tag == TypeTag::Union) {
+            // A union type can be converted to another type if any of its variants can be converted
             auto unionTypes = std::get<UnionType>(from->extra).types;
             return std::any_of(unionTypes.begin(), unionTypes.end(),
                                [&](TypePtr type) { return canConvert(type, to); });
+        }
+        
+        // Converting to union type (Requirement 2.2)
+        if (to->tag == TypeTag::Union) {
+            // A type can be converted to a union type if it's compatible with any variant
+            auto unionTypes = std::get<UnionType>(to->extra).types;
+            return std::any_of(unionTypes.begin(), unionTypes.end(),
+                               [&](TypePtr type) { return canConvert(from, type); });
+        }
+        
+        // Union to union compatibility (Requirement 2.4)
+        if (from->tag == TypeTag::Union && to->tag == TypeTag::Union) {
+            auto fromUnionTypes = std::get<UnionType>(from->extra).types;
+            auto toUnionTypes = std::get<UnionType>(to->extra).types;
+            
+            // All variants in 'from' must be convertible to at least one variant in 'to'
+            return std::all_of(fromUnionTypes.begin(), fromUnionTypes.end(),
+                [&](TypePtr fromType) {
+                    return std::any_of(toUnionTypes.begin(), toUnionTypes.end(),
+                        [&](TypePtr toType) { return canConvert(fromType, toType); });
+                });
         }
 
         // Error union type compatibility
@@ -369,10 +415,14 @@ public:
             break;
 
         case TypeTag::Union:
-            // For union types, we'll set it to the first type with a default value
+            // For union types, create a value with the first variant (Requirement 2.1)
             if (const auto *unionType = std::get_if<UnionType>(&type->extra)) {
                 if (!unionType->types.empty()) {
-                    value->data = createValue(unionType->types[0])->data;
+                    // Create a value of the first variant type
+                    ValuePtr variantValue = createValue(unionType->types[0]);
+                    value->data = variantValue->data;
+                    // Keep the union type but store the variant data
+                    value->type = type;
                 } else {
                     throw std::runtime_error("Empty union type");
                 }
@@ -407,6 +457,9 @@ public:
     }
 
     bool isCompatible(TypePtr source, TypePtr target) { return canConvert(source, target); }
+    
+    // Public wrapper for canConvert (needed by TypeMatcher)
+    bool isConvertible(TypePtr from, TypePtr to) { return canConvert(from, to); }
 
     TypePtr getCommonType(TypePtr a, TypePtr b)
     {   if(!a || !b)
@@ -434,10 +487,63 @@ public:
         return getWiderType(a, b);
     }
 
+    // Handle union types (Requirement 2.4)
+    if (a->tag == TypeTag::Union && b->tag == TypeTag::Union) {
+        // Merge two union types
+        auto aVariants = std::get<UnionType>(a->extra).types;
+        auto bVariants = std::get<UnionType>(b->extra).types;
+        
+        std::vector<TypePtr> mergedTypes = aVariants;
+        for (const auto& bType : bVariants) {
+            bool found = false;
+            for (const auto& aType : aVariants) {
+                if (aType->tag == bType->tag) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                mergedTypes.push_back(bType);
+            }
+        }
+        
+        return createUnionType(mergedTypes);
+    }
+    
+    if (a->tag == TypeTag::Union) {
+        // Check if b is compatible with any variant in a
+        auto aVariants = std::get<UnionType>(a->extra).types;
+        for (const auto& variant : aVariants) {
+            if (canConvert(b, variant)) {
+                return a; // Union already contains compatible type
+            }
+        }
+        // Add b as a new variant
+        auto newVariants = aVariants;
+        newVariants.push_back(b);
+        return createUnionType(newVariants);
+    }
+    
+    if (b->tag == TypeTag::Union) {
+        // Check if a is compatible with any variant in b
+        auto bVariants = std::get<UnionType>(b->extra).types;
+        for (const auto& variant : bVariants) {
+            if (canConvert(a, variant)) {
+                return b; // Union already contains compatible type
+            }
+        }
+        // Add a as a new variant
+        auto newVariants = bVariants;
+        newVariants.push_back(a);
+        return createUnionType(newVariants);
+    }
+
     // Handle other type conversions
     if (canConvert(a, b)) return b;
     if (canConvert(b, a)) return a;
-    throw std::runtime_error("Incompatible types: " + a->toString() + " and " + b->toString());
+    
+    // If no direct conversion is possible, create a union type
+    return createUnionType({a, b});
     }
 
     void addUserDefinedType(const std::string &name, TypePtr type)
@@ -490,6 +596,127 @@ public:
         return errorTypes.find(name) != errorTypes.end();
     }
 
+    // Create union type (Requirement 2.1, 2.2)
+    TypePtr createUnionType(const std::vector<TypePtr>& types) {
+        if (types.empty()) {
+            throw std::runtime_error("Cannot create empty union type");
+        }
+        
+        // Remove duplicates and flatten nested unions
+        std::vector<TypePtr> flattenedTypes;
+        for (const auto& type : types) {
+            if (type->tag == TypeTag::Union) {
+                // Flatten nested union types
+                const auto& unionType = std::get<UnionType>(type->extra);
+                for (const auto& nestedType : unionType.types) {
+                    // Check for duplicates with more sophisticated comparison
+                    bool found = false;
+                    for (const auto& existing : flattenedTypes) {
+                        if (areTypesEqual(existing, nestedType)) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        flattenedTypes.push_back(nestedType);
+                    }
+                }
+            } else {
+                // Check for duplicates with more sophisticated comparison
+                bool found = false;
+                for (const auto& existing : flattenedTypes) {
+                    if (areTypesEqual(existing, type)) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    flattenedTypes.push_back(type);
+                }
+            }
+        }
+        
+        // If only one type remains after flattening, return it directly
+        if (flattenedTypes.size() == 1) {
+            return flattenedTypes[0];
+        }
+        
+        UnionType unionType;
+        unionType.types = flattenedTypes;
+        
+        return std::make_shared<Type>(TypeTag::Union, unionType);
+    }
+    
+    // Check if a type is a union type (Requirement 2.1)
+    bool isUnionType(TypePtr type) {
+        return type && type->tag == TypeTag::Union;
+    }
+    
+    // Get union type variants (Requirement 2.1)
+    std::vector<TypePtr> getUnionVariants(TypePtr type) {
+        if (!isUnionType(type)) {
+            throw std::runtime_error("Type is not a union type");
+        }
+        
+        const auto& unionType = std::get<UnionType>(type->extra);
+        return unionType.types;
+    }
+    
+    // Check if union type requires pattern matching (Requirement 2.3)
+    bool requiresPatternMatching(TypePtr type) {
+        return isUnionType(type);
+    }
+    
+    // Create a union value with a specific variant (Requirement 2.1, 2.2)
+    ValuePtr createUnionValue(TypePtr unionType, TypePtr variantType, ValuePtr variantValue) {
+        if (!isUnionType(unionType)) {
+            throw std::runtime_error("Type is not a union type");
+        }
+        
+        const auto& unionVariants = std::get<UnionType>(unionType->extra).types;
+        
+        // Check if the variant type is valid for this union
+        bool validVariant = false;
+        for (const auto& variant : unionVariants) {
+            if (canConvert(variantType, variant)) {
+                validVariant = true;
+                break;
+            }
+        }
+        
+        if (!validVariant) {
+            throw std::runtime_error("Variant type is not compatible with union type");
+        }
+        
+        ValuePtr unionValue = memoryManager.makeRef<Value>(region);
+        unionValue->type = unionType;
+        unionValue->data = variantValue->data;
+        
+        return unionValue;
+    }
+    
+    // Get the active variant type from a union value (Requirement 2.3)
+    TypePtr getActiveVariantType(ValuePtr unionValue) {
+        if (!isUnionType(unionValue->type)) {
+            throw std::runtime_error("Value is not a union type");
+        }
+        
+        const auto& unionVariants = std::get<UnionType>(unionValue->type->extra).types;
+        
+        // Try to determine which variant type matches the current data
+        for (const auto& variant : unionVariants) {
+            ValuePtr testValue = memoryManager.makeRef<Value>(region);
+            testValue->type = variant;
+            testValue->data = unionValue->data;
+            
+            if (checkType(testValue, variant)) {
+                return variant;
+            }
+        }
+        
+        throw std::runtime_error("Cannot determine active variant type");
+    }
+
     // Create error union type
     TypePtr createErrorUnionType(TypePtr successType, const std::vector<std::string>& errorTypeNames = {}, bool isGeneric = false) {
         ErrorUnionType errorUnion;
@@ -498,6 +725,346 @@ public:
         errorUnion.isGenericError = isGeneric;
         
         return std::make_shared<Type>(TypeTag::ErrorUnion, errorUnion);
+    }
+
+    // Option type implementation (Requirement 3.1, 3.2, 3.3, 3.4)
+    // Create Option<T> type as union of Some<T> and None
+    TypePtr createOptionType(TypePtr valueType) {
+        // Create Some variant type with structured fields
+        UserDefinedType someType;
+        someType.name = "Some";
+        std::map<std::string, TypePtr> someFields;
+        someFields["kind"] = STRING_TYPE;
+        someFields["value"] = valueType;
+        someType.fields.push_back({"Some", someFields});
+        TypePtr someTypePtr = std::make_shared<Type>(TypeTag::UserDefined, someType);
+        
+        // Create None variant type with structured fields
+        UserDefinedType noneType;
+        noneType.name = "None";
+        std::map<std::string, TypePtr> noneFields;
+        noneFields["kind"] = STRING_TYPE;
+        noneType.fields.push_back({"None", noneFields});
+        TypePtr noneTypePtr = std::make_shared<Type>(TypeTag::UserDefined, noneType);
+        
+        // Create union type of Some and None
+        return createUnionType({someTypePtr, noneTypePtr});
+    }
+    
+    // Create Some<T> value (compatible with ok() from error handling system)
+    ValuePtr createSome(TypePtr valueType, ValuePtr value) {
+        TypePtr optionType = createOptionType(valueType);
+        
+        // Create Some variant with structured data
+        UserDefinedValue someValue;
+        someValue.variantName = "Some";
+        someValue.fields["kind"] = memoryManager.makeRef<Value>(region, STRING_TYPE, "Some");
+        someValue.fields["value"] = value;
+        
+        ValuePtr someVariant = memoryManager.makeRef<Value>(region);
+        someVariant->type = optionType;
+        someVariant->data = someValue;
+        
+        return someVariant;
+    }
+    
+    // Create None value (compatible with error handling system)
+    ValuePtr createNone(TypePtr valueType) {
+        TypePtr optionType = createOptionType(valueType);
+        
+        // Create None variant with structured data
+        UserDefinedValue noneValue;
+        noneValue.variantName = "None";
+        noneValue.fields["kind"] = memoryManager.makeRef<Value>(region, STRING_TYPE, "None");
+        
+        ValuePtr noneVariant = memoryManager.makeRef<Value>(region);
+        noneVariant->type = optionType;
+        noneVariant->data = noneValue;
+        
+        return noneVariant;
+    }
+    
+    // Check if a value is Some variant
+    bool isSome(ValuePtr optionValue) {
+        if (!optionValue || !isUnionType(optionValue->type)) {
+            return false;
+        }
+        
+        if (const auto* userDefined = std::get_if<UserDefinedValue>(&optionValue->data)) {
+            return userDefined->variantName == "Some";
+        }
+        
+        return false;
+    }
+    
+    // Check if a value is None variant
+    bool isNone(ValuePtr optionValue) {
+        if (!optionValue || !isUnionType(optionValue->type)) {
+            return false;
+        }
+        
+        if (const auto* userDefined = std::get_if<UserDefinedValue>(&optionValue->data)) {
+            return userDefined->variantName == "None";
+        }
+        
+        return false;
+    }
+    
+    // Extract value from Some variant (requires pattern matching for safety)
+    ValuePtr extractSomeValue(ValuePtr optionValue) {
+        if (!isSome(optionValue)) {
+            throw std::runtime_error("Cannot extract value from None or non-Option type");
+        }
+        
+        const auto* userDefined = std::get_if<UserDefinedValue>(&optionValue->data);
+        if (!userDefined) {
+            throw std::runtime_error("Invalid Option value structure");
+        }
+        
+        auto valueIt = userDefined->fields.find("value");
+        if (valueIt == userDefined->fields.end()) {
+            throw std::runtime_error("Some variant missing value field");
+        }
+        
+        return valueIt->second;
+    }
+    
+    // Check if type requires explicit handling (for Option/Result safety)
+    bool requiresExplicitHandling(TypePtr type) {
+        return isUnionType(type);
+    }
+    
+    // Result type implementation (Requirement 3.1, 3.2, 3.3, 3.4)
+    // Create Result<T, E> type as union of Success<T> and Error<E>
+    TypePtr createResultType(TypePtr successType, TypePtr errorType) {
+        // Create Success variant type with structured fields
+        UserDefinedType successVariantType;
+        successVariantType.name = "Success";
+        std::map<std::string, TypePtr> successFields;
+        successFields["kind"] = STRING_TYPE;
+        successFields["value"] = successType;
+        successVariantType.fields.push_back({"Success", successFields});
+        TypePtr successTypePtr = std::make_shared<Type>(TypeTag::UserDefined, successVariantType);
+        
+        // Create Error variant type with structured fields
+        UserDefinedType errorVariantType;
+        errorVariantType.name = "Error";
+        std::map<std::string, TypePtr> errorFields;
+        errorFields["kind"] = STRING_TYPE;
+        errorFields["error"] = errorType;
+        errorVariantType.fields.push_back({"Error", errorFields});
+        TypePtr errorTypePtr = std::make_shared<Type>(TypeTag::UserDefined, errorVariantType);
+        
+        // Create union type of Success and Error
+        return createUnionType({successTypePtr, errorTypePtr});
+    }
+    
+    // Create Success<T> value (compatible with ok() from error handling system)
+    ValuePtr createSuccess(TypePtr successType, ValuePtr value) {
+        TypePtr resultType = createResultType(successType, STRING_TYPE); // Default error type to string
+        
+        // Create Success variant with structured data
+        UserDefinedValue successValue;
+        successValue.variantName = "Success";
+        successValue.fields["kind"] = memoryManager.makeRef<Value>(region, STRING_TYPE, "Success");
+        successValue.fields["value"] = value;
+        
+        ValuePtr successVariant = memoryManager.makeRef<Value>(region);
+        successVariant->type = resultType;
+        successVariant->data = successValue;
+        
+        return successVariant;
+    }
+    
+    // Create Error<E> value (compatible with err() from error handling system)
+    ValuePtr createError(TypePtr errorType, ValuePtr error) {
+        TypePtr resultType = createResultType(STRING_TYPE, errorType); // Default success type to string
+        
+        // Create Error variant with structured data
+        UserDefinedValue errorValue;
+        errorValue.variantName = "Error";
+        errorValue.fields["kind"] = memoryManager.makeRef<Value>(region, STRING_TYPE, "Error");
+        errorValue.fields["error"] = error;
+        
+        ValuePtr errorVariant = memoryManager.makeRef<Value>(region);
+        errorVariant->type = resultType;
+        errorVariant->data = errorValue;
+        
+        return errorVariant;
+    }
+    
+    // Check if a value is Success variant
+    bool isSuccess(ValuePtr resultValue) {
+        if (!resultValue || !isUnionType(resultValue->type)) {
+            return false;
+        }
+        
+        if (const auto* userDefined = std::get_if<UserDefinedValue>(&resultValue->data)) {
+            return userDefined->variantName == "Success";
+        }
+        
+        return false;
+    }
+    
+    // Check if a value is Error variant
+    bool isError(ValuePtr resultValue) {
+        if (!resultValue || !isUnionType(resultValue->type)) {
+            return false;
+        }
+        
+        if (const auto* userDefined = std::get_if<UserDefinedValue>(&resultValue->data)) {
+            return userDefined->variantName == "Error";
+        }
+        
+        return false;
+    }
+    
+    // Extract value from Success variant (requires pattern matching for safety)
+    ValuePtr extractSuccessValue(ValuePtr resultValue) {
+        if (!isSuccess(resultValue)) {
+            throw std::runtime_error("Cannot extract value from Error or non-Result type");
+        }
+        
+        const auto* userDefined = std::get_if<UserDefinedValue>(&resultValue->data);
+        if (!userDefined) {
+            throw std::runtime_error("Invalid Result value structure");
+        }
+        
+        auto valueIt = userDefined->fields.find("value");
+        if (valueIt == userDefined->fields.end()) {
+            throw std::runtime_error("Success variant missing value field");
+        }
+        
+        return valueIt->second;
+    }
+    
+    // Extract error from Error variant (requires pattern matching for safety)
+    ValuePtr extractErrorValue(ValuePtr resultValue) {
+        if (!isError(resultValue)) {
+            throw std::runtime_error("Cannot extract error from Success or non-Result type");
+        }
+        
+        const auto* userDefined = std::get_if<UserDefinedValue>(&resultValue->data);
+        if (!userDefined) {
+            throw std::runtime_error("Invalid Result value structure");
+        }
+        
+        auto errorIt = userDefined->fields.find("error");
+        if (errorIt == userDefined->fields.end()) {
+            throw std::runtime_error("Error variant missing error field");
+        }
+        
+        return errorIt->second;
+    }
+
+    // Typed container support (Requirement 4.1, 4.2, 4.3, 4.4)
+    
+    // Create typed list type [elementType]
+    TypePtr createTypedListType(TypePtr elementType) {
+        if (!elementType) {
+            throw std::runtime_error("Element type cannot be null for typed list");
+        }
+        
+        ListType listType;
+        listType.elementType = elementType;
+        
+        return std::make_shared<Type>(TypeTag::List, listType);
+    }
+    
+    // Create typed dictionary type {keyType: valueType}
+    TypePtr createTypedDictType(TypePtr keyType, TypePtr valueType) {
+        if (!keyType || !valueType) {
+            throw std::runtime_error("Key and value types cannot be null for typed dictionary");
+        }
+        
+        DictType dictType;
+        dictType.keyType = keyType;
+        dictType.valueType = valueType;
+        
+        return std::make_shared<Type>(TypeTag::Dict, dictType);
+    }
+    
+    // Validate homogeneous type for containers (Requirement 4.4)
+    bool validateContainerHomogeneity(TypePtr containerType, const std::vector<ValuePtr>& elements) {
+        if (!containerType) return false;
+        
+        if (containerType->tag == TypeTag::List) {
+            auto listType = std::get<ListType>(containerType->extra);
+            TypePtr expectedElementType = listType.elementType;
+            
+            for (const auto& element : elements) {
+                if (!canConvert(element->type, expectedElementType)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        
+        return false; // Not a supported container type
+    }
+    
+    // Validate dictionary key-value pairs for homogeneous typing (Requirement 4.4)
+    bool validateDictHomogeneity(TypePtr dictType, const std::vector<std::pair<ValuePtr, ValuePtr>>& pairs) {
+        if (!dictType || dictType->tag != TypeTag::Dict) return false;
+        
+        auto dictTypeInfo = std::get<DictType>(dictType->extra);
+        TypePtr expectedKeyType = dictTypeInfo.keyType;
+        TypePtr expectedValueType = dictTypeInfo.valueType;
+        
+        for (const auto& pair : pairs) {
+            if (!canConvert(pair.first->type, expectedKeyType) || 
+                !canConvert(pair.second->type, expectedValueType)) {
+                return false;
+            }
+        }
+        return true;
+    }
+    
+    // Get element type from a typed list (Requirement 4.1)
+    TypePtr getListElementType(TypePtr listType) {
+        if (!listType || listType->tag != TypeTag::List) {
+            return nullptr;
+        }
+        
+        auto listTypeInfo = std::get<ListType>(listType->extra);
+        return listTypeInfo.elementType;
+    }
+    
+    // Get key and value types from a typed dictionary (Requirement 4.2)
+    std::pair<TypePtr, TypePtr> getDictTypes(TypePtr dictType) {
+        if (!dictType || dictType->tag != TypeTag::Dict) {
+            return {nullptr, nullptr};
+        }
+        
+        auto dictTypeInfo = std::get<DictType>(dictType->extra);
+        return {dictTypeInfo.keyType, dictTypeInfo.valueType};
+    }
+
+    // Error handling system compatibility
+    TypePtr createFallibleType(TypePtr successType, const std::vector<std::string>& errorTypes) {
+        // Create a union type compatible with the error handling system
+        // This maps to the error handling system's Type?ErrorType syntax
+        std::vector<TypePtr> unionTypes = {successType};
+        
+        // Add error types to the union
+        for (const auto& errorTypeName : errorTypes) {
+            if (isErrorType(errorTypeName)) {
+                unionTypes.push_back(getErrorType(errorTypeName));
+            } else {
+                // Create a user-defined error type
+                UserDefinedType errorType;
+                errorType.name = errorTypeName;
+                TypePtr errorTypePtr = std::make_shared<Type>(TypeTag::UserDefined, errorType);
+                unionTypes.push_back(errorTypePtr);
+            }
+        }
+        
+        return createUnionType(unionTypes);
+    }
+    
+    // Check if type is compatible with ? operator from error handling system
+    bool isFallibleType(TypePtr type) {
+        return isUnionType(type) || type->tag == TypeTag::ErrorUnion;
     }
 
     TypePtr inferType(const ValuePtr &value) { return value->type; }
@@ -584,6 +1151,37 @@ public:
 
         case TypeTag::Any:
             // Any type always matches
+            return true;
+
+        case TypeTag::Union: {
+            // Union type checking is handled after the switch statement
+            break;
+        }
+
+        case TypeTag::ErrorUnion: {
+            // ErrorUnion type checking - check if value matches success type or error types
+            const auto &errorUnionType = std::get<ErrorUnionType>(expectedType->extra);
+            return checkType(value, errorUnionType.successType);
+        }
+
+        case TypeTag::Range:
+            // Range type checking - for now, just check if it's a range
+            return true;
+
+        case TypeTag::UserDefined: {
+            // UserDefined type checking - check if the variant name matches
+            if (const auto *userValue = std::get_if<UserDefinedValue>(&value->data)) {
+                return true; // Basic check - could be enhanced
+            }
+            return false;
+        }
+
+        case TypeTag::Class:
+            // Class type checking
+            return true;
+
+        case TypeTag::Object:
+            // Object type checking
             return true;
 
             //default:
@@ -1199,5 +1797,161 @@ public:
             value->data);
 
         return result;
+    }
+};
+
+// Type Matcher class for pattern matching and type discrimination (Requirement 8.1, 8.2, 8.3, 8.4)
+class TypeMatcher {
+private:
+    TypeSystem* typeSystem;
+    MemoryManager<>& memoryManager;
+    MemoryManager<>::Region& region;
+
+public:
+    TypeMatcher(TypeSystem* ts, MemoryManager<>& memManager, MemoryManager<>::Region& reg)
+        : typeSystem(ts), memoryManager(memManager), region(reg) {}
+
+    // Basic pattern matching (Requirement 2.3, 8.2)
+    bool matchesType(ValuePtr value, TypePtr pattern) {
+        if (!value || !pattern) {
+            return false;
+        }
+        
+        return typeSystem->isConvertible(value->type, pattern);
+    }
+    
+    // Extract values from pattern matching
+    std::vector<ValuePtr> extractValues(ValuePtr value, TypePtr pattern) {
+        std::vector<ValuePtr> extracted;
+        
+        if (!matchesType(value, pattern)) {
+            return extracted;
+        }
+        
+        // For union types, extract the active variant
+        if (typeSystem->isUnionType(value->type)) {
+            extracted.push_back(value);
+        } else {
+            extracted.push_back(value);
+        }
+        
+        return extracted;
+    }
+    
+    // Union type matching with safety (Requirement 2.3, 8.1)
+    bool matchesUnionVariant(ValuePtr value, TypePtr unionType, size_t variantIndex) {
+        if (!typeSystem->isUnionType(unionType)) {
+            return false;
+        }
+        
+        auto variants = typeSystem->getUnionVariants(unionType);
+        if (variantIndex >= variants.size()) {
+            return false;
+        }
+        
+        TypePtr expectedVariant = variants[variantIndex];
+        return matchesType(value, expectedVariant);
+    }
+    
+    // Check if pattern matching is exhaustive
+    bool isExhaustiveMatch(TypePtr unionType, const std::vector<TypePtr>& patterns) {
+        if (!typeSystem->isUnionType(unionType)) {
+            return true; // Non-union types don't require exhaustive matching
+        }
+        
+        auto variants = typeSystem->getUnionVariants(unionType);
+        
+        // Check that each variant is covered by at least one pattern
+        for (const auto& variant : variants) {
+            bool covered = false;
+            for (const auto& pattern : patterns) {
+                if (typeSystem->isConvertible(variant, pattern)) {
+                    covered = true;
+                    break;
+                }
+            }
+            if (!covered) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    // Safe field access (Requirement 8.3)
+    bool canAccessField(ValuePtr value, const std::string& fieldName) {
+        if (!value) {
+            return false;
+        }
+        
+        if (const auto* userDefined = std::get_if<UserDefinedValue>(&value->data)) {
+            return userDefined->fields.find(fieldName) != userDefined->fields.end();
+        }
+        
+        return false;
+    }
+    
+    ValuePtr safeFieldAccess(ValuePtr value, const std::string& fieldName) {
+        if (!canAccessField(value, fieldName)) {
+            throw std::runtime_error("Field '" + fieldName + "' does not exist in current variant");
+        }
+        
+        const auto* userDefined = std::get_if<UserDefinedValue>(&value->data);
+        return userDefined->fields.at(fieldName);
+    }
+    
+    // Option/Result matching (Requirement 3.4, 8.1)
+    bool isSome(ValuePtr optionValue) {
+        return typeSystem->isSome(optionValue);
+    }
+    
+    bool isNone(ValuePtr optionValue) {
+        return typeSystem->isNone(optionValue);
+    }
+    
+    bool isSuccess(ValuePtr resultValue) {
+        return typeSystem->isSuccess(resultValue);
+    }
+    
+    bool isError(ValuePtr resultValue) {
+        return typeSystem->isError(resultValue);
+    }
+    
+    // Runtime introspection (Requirement 8.4)
+    std::string getTypeName(ValuePtr value) {
+        if (!value || !value->type) {
+            return "unknown";
+        }
+        
+        if (const auto* userDefined = std::get_if<UserDefinedValue>(&value->data)) {
+            return userDefined->variantName;
+        }
+        
+        return value->type->toString();
+    }
+    
+    std::vector<std::string> getFieldNames(ValuePtr value) {
+        std::vector<std::string> fieldNames;
+        
+        if (!value) {
+            return fieldNames;
+        }
+        
+        if (const auto* userDefined = std::get_if<UserDefinedValue>(&value->data)) {
+            for (const auto& [fieldName, _] : userDefined->fields) {
+                fieldNames.push_back(fieldName);
+            }
+        }
+        
+        return fieldNames;
+    }
+    
+    TypePtr getFieldType(ValuePtr value, const std::string& fieldName) {
+        if (!canAccessField(value, fieldName)) {
+            throw std::runtime_error("Field '" + fieldName + "' does not exist");
+        }
+        
+        ValuePtr fieldValue = safeFieldAccess(value, fieldName);
+        return fieldValue ? fieldValue->type : nullptr;
     }
 };

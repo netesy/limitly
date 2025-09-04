@@ -39,19 +39,19 @@ echo "Compiling with $CXX..."
 # =============================
 
 $CXX $CXXFLAGS -o bin/limitly \
-    main.cpp \
-    frontend/scanner.cpp \
-    frontend/parser.cpp \
-    backend/backend.cpp \
-    backend/vm.cpp \
-    backend/ast_printer.cpp \
-    backend/functions.cpp \
-    backend/classes.cpp \
-    backend/concurrency/scheduler.cpp \
-    backend/concurrency/thread_pool.cpp \
-    backend/concurrency/event_loop.cpp \
-    backend/concurrency/epoll_event_loop.cpp \
-    debugger.cpp
+    src/main.cpp \
+    src/frontend/scanner.cpp \
+    src/frontend/parser.cpp \
+    src/backend/backend.cpp \
+    src/backend/vm.cpp \
+    src/backend/ast_printer.cpp \
+    src/backend/functions.cpp \
+    src/backend/classes.cpp \
+    src/backend/concurrency/scheduler.cpp \
+    src/backend/concurrency/thread_pool.cpp \
+    src/backend/concurrency/event_loop.cpp \
+    src/backend/concurrency/epoll_event_loop.cpp \
+    src/debugger.cpp
 
 echo "limitly built successfully."
 
@@ -60,14 +60,14 @@ echo "limitly built successfully."
 # Test parser
 # =============================
 $CXX $CXXFLAGS -o bin/test_parser \
-    test_parser.cpp \
-    frontend/scanner.cpp \
-    frontend/parser.cpp \
-    backend/backend.cpp \
-    backend/ast_printer.cpp \
-    backend/functions.cpp \
-    backend/classes.cpp \
-    debugger.cpp
+    src/test_parser.cpp \
+    src/frontend/scanner.cpp \
+    src/frontend/parser.cpp \
+    src/backend/backend.cpp \
+    src/backend/ast_printer.cpp \
+    src/backend/functions.cpp \
+    src/backend/classes.cpp \
+    src/debugger.cpp
 
 echo "test_parser built successfully."
 
@@ -76,10 +76,10 @@ echo "test_parser built successfully."
 # =============================
 $CXX $CXXFLAGS -o bin/test_event_loop \
     tests/unit/test_event_loop.cpp \
-    backend/concurrency/event_loop.cpp \
-    backend/concurrency/epoll_event_loop.cpp \
-    backend/concurrency/kqueue_event_loop.cpp \
-    backend/concurrency/iocp_event_loop.cpp
+    src/backend/concurrency/event_loop.cpp \
+    src/backend/concurrency/epoll_event_loop.cpp \
+    src/backend/concurrency/kqueue_event_loop.cpp \
+    src/backend/concurrency/iocp_event_loop.cpp
 
 echo "test_event_loop built successfully."
 
@@ -88,14 +88,14 @@ echo "test_event_loop built successfully."
 # =============================
 
 $CXX $CXXFLAGS -o bin/format_code \
-    format_code.cpp \
-    frontend/scanner.cpp \
-    frontend/parser.cpp \
-    backend/code_formatter.cpp \
-    debugger.cpp
+    src/format_code.cpp \
+    src/frontend/scanner.cpp \
+    src/frontend/parser.cpp \
+    src/backend/code_formatter.cpp \
+    src/debugger.cpp
 
 
-# echo "format_code built successfully."
+echo "format_code built successfully."
 
 # =============================
 # Summary
@@ -103,15 +103,15 @@ $CXX $CXXFLAGS -o bin/format_code \
 echo
 echo "✅ Build completed successfully."
 echo
-# echo "Run the main executable:"
-# echo "  ./bin/limitly"
-# echo
+echo "Run the main executable:"
+echo "  ./bin/limitly"
+echo
 echo "Run the test parser:"
 echo "  ./bin/test_parser sample.lm"
 echo
-# echo "Run the code formatter:"
-# echo "  ./bin/format_code sample.lm"
-# echo
-# echo "Run the AOT compiler:"
-# echo "  ./bin/compile sample.lm sample.o"
-# echo
+echo "Run the code formatter:"
+echo "  ./bin/format_code sample.lm"
+echo
+echo "Run the AOT compiler:"
+echo "  ./bin/compile sample.lm sample.o"
+echo

@@ -41,7 +41,21 @@
   - Parse err() and ok() constructor expressions
   - _Requirements: 1.2, 1.3, 2.1, 2.2, 3.1_
 
-- [ ] 4. Implement error value representation in VM
+- [-] 4. Implement error value representation in VM
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   - Add ErrorValue struct to backend/value.hh with error type, message, and arguments
   - Extend Value variant to include ErrorValue and error union representations
   - Add ErrorUnion helper class for efficient tagged union operations
