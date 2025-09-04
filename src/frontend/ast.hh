@@ -171,7 +171,7 @@ namespace AST {
 
     // Literal values (numbers, strings, booleans, nil)
     struct LiteralExpr : public Expression {
-        std::variant<int, double, std::string, bool, std::nullptr_t> value;
+        std::variant<long long, double, std::string, bool, std::nullptr_t> value;
     };
 
     // Variable reference

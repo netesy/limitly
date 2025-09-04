@@ -484,8 +484,31 @@ void Scanner::number() {
         while (isDigit(peek())) advance();
     }
 
-    // Check for time suffixes
-    if (isAlpha(peek())) {
+    // Look for scientific notation (e.g., 1.23e+10, 4.56E-7)
+    if (peek() == 'e' || peek() == 'E') {
+        advance(); // consume 'e' or 'E'
+        
+        // Handle optional + or - after e/E
+        if (peek() == '+' || peek() == '-') {
+            advance();
+        }
+        
+        // Must have at least one digit after e/E (and optional +/-)
+        if (!isDigit(peek())) {
+            // Invalid scientific notation - this is an error
+            // For now, we'll just continue without consuming the 'e'
+            current--; // back up to before the 'e'
+            if (peek() == '+' || peek() == '-') {
+                current--; // back up past the +/- too
+            }
+        } else {
+            // Consume the exponent digits
+            while (isDigit(peek())) advance();
+        }
+    }
+
+    // Check for time suffixes (only if we don't have scientific notation)
+    if (isAlpha(peek()) && peek() != 'e' && peek() != 'E') {
         if (peek() == 's' && !isAlphaNumeric(peekNext())) {
             advance();
         } else if (peek() == 'm' && peekNext() == 's' && !isAlphaNumeric(source[current+2])) {

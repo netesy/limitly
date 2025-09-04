@@ -1,6 +1,7 @@
 # Implementation Plan
 
 - [x] 1. Implement basic type declaration parsing in frontend
+
   - Add TYPE token to scanner for `type` keyword recognition
   - Implement parseTypeDeclaration() method in Parser class
   - Add TypeDeclaration AST node support to parser statement parsing
@@ -14,93 +15,42 @@
   - Create unit tests for type alias registration and resolution
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-- [x] 3. Implement union type syntax parsing
-
-
-
-
+- [ ] 3. Implement union type syntax parsing
   - Add PIPE token to scanner for `|` union operator
   - Implement parseUnionType() method in Parser class
   - Extend TypeAnnotation to support union types with unionTypes vector
   - Create unit tests for union type parsing (type Option = Some | None)
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
-- [x] 4. Implement union type support in TypeSystem
-
-
-
-
-
-
-
-
-
+- [ ] 4. Implement union type support in TypeSystem
   - Add createUnionType() method to TypeSystem class
   - Implement union type compatibility checking in canConvert()
   - Add union type support to createValue() method
   - Create unit tests for union type creation and compatibility
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
-- [x] 5. Implement structured type parsing for complex type definitions
-
-
-
-
-
-
-
-
-
-
-
-
-
+- [ ] 5. Implement structured type parsing for complex type definitions
   - Add parsing support for structured types with named fields
   - Implement parseStructuralType() method in Parser class
   - Add StructuralTypeField support to TypeAnnotation
   - Create unit tests for structured type parsing ({ kind: "Some", value: any })
   - _Requirements: 5.1, 5.2, 5.3, 5.4_
 
-- [x] 6. Implement Option type as built-in union type with error handling compatibility
-
-
-
-
-
-
-
-
-
-
-
-
-
+- [ ] 6. Implement Option type as built-in union type with error handling compatibility
   - Create OptionType struct and related value constructors
   - Implement createSome() and createNone() helper functions compatible with ok()/err()
   - Add Option type pattern matching support
   - Create unit tests for Option type creation and manipulation
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [x] 7. Implement Result type as built-in union type with error handling compatibility
-
-
-
-
-
+- [ ] 7. Implement Result type as built-in union type with error handling compatibility
   - Create ResultType struct and related value constructors
   - Implement createSuccess() and createError() helper functions compatible with ok()/err()
   - Add Result type pattern matching support compatible with error handling system
   - Create unit tests for Result type creation and manipulation
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [-] 8. Implement typed container parsing and support
-
-
-
-
-
-
-
+- [ ] 8. Implement typed container parsing and support
   - Add parsing for typed list syntax [elementType] and dict syntax {keyType: valueType}
   - Implement createTypedListType() and createTypedDictType() methods
   - Add homogeneous type validation for containers
