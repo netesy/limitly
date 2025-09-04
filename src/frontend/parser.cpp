@@ -1,6 +1,7 @@
 #include "parser.hh"
 #include "../debugger.hh"
 #include <stdexcept>
+#include <limits>
 
 // Helper methods
 Token Parser::peek() {
@@ -1847,10 +1848,45 @@ std::shared_ptr<AST::Expression> Parser::primary() {
         literalExpr->line = token.line;
 
         // Check if the number is an integer or a float
-        if (token.lexeme.find('.') != std::string::npos) {
-            literalExpr->value = std::stod(token.lexeme);
+        // Numbers with decimal points or scientific notation are treated as floats
+        if (token.lexeme.find('.') != std::string::npos || 
+            token.lexeme.find('e') != std::string::npos || 
+            token.lexeme.find('E') != std::string::npos) {
+            try {
+                literalExpr->value = std::stod(token.lexeme);
+            } catch (const std::exception& e) {
+                error("Invalid floating-point number: " + token.lexeme);
+                literalExpr->value = 0.0;
+            }
         } else {
-            literalExpr->value = std::stoi(token.lexeme);
+            try {
+                // Try to parse as signed long long first
+                literalExpr->value = std::stoll(token.lexeme);
+            } catch (const std::out_of_range& e) {
+                try {
+                    // If that fails, try unsigned long long and convert to double if needed
+                    unsigned long long ullValue = std::stoull(token.lexeme);
+                    
+                    // If the value fits in long long, use it as long long
+                    if (ullValue <= static_cast<unsigned long long>(std::numeric_limits<long long>::max())) {
+                        literalExpr->value = static_cast<long long>(ullValue);
+                    } else {
+                        // Otherwise, convert to double (may lose precision for very large values)
+                        literalExpr->value = static_cast<double>(ullValue);
+                    }
+                } catch (const std::exception& e2) {
+                    // If both fail, treat as double
+                    try {
+                        literalExpr->value = std::stod(token.lexeme);
+                    } catch (const std::exception& e3) {
+                        error("Invalid number: " + token.lexeme);
+                        literalExpr->value = 0LL;
+                    }
+                }
+            } catch (const std::exception& e) {
+                error("Invalid integer number: " + token.lexeme);
+                literalExpr->value = 0LL;
+            }
         }
 
         return literalExpr;

@@ -832,9 +832,9 @@ std::string ASTPrinter::tokenTypeToString(TokenType type) const {
     }
 }
 
-std::string ASTPrinter::valueToString(const std::variant<int, double, std::string, bool, std::nullptr_t>& value) const {
-    if (std::holds_alternative<int>(value)) {
-        return std::to_string(std::get<int>(value));
+std::string ASTPrinter::valueToString(const std::variant<long long, double, std::string, bool, std::nullptr_t>& value) const {
+    if (std::holds_alternative<long long>(value)) {
+        return std::to_string(std::get<long long>(value));
     } else if (std::holds_alternative<double>(value)) {
         std::ostringstream ss;
         ss << std::setprecision(15) << std::get<double>(value);

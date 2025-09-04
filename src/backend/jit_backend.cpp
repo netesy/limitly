@@ -431,8 +431,8 @@ gcc_jit_rvalue* JitBackend::visitUnaryExpr(const std::shared_ptr<AST::UnaryExpr>
 gcc_jit_rvalue* JitBackend::visitLiteralExpr(const std::shared_ptr<AST::LiteralExpr>& expr, gcc_jit_function* func, gcc_jit_block* block) {
     return std::visit([this](auto&& arg) -> gcc_jit_rvalue* {
         using T = std::decay_t<decltype(arg)>;
-        if constexpr (std::is_same_v<T, int>) {
-            return gcc_jit_context_new_rvalue_from_int(ctxt, gcc_jit_context_get_type(ctxt, GCC_JIT_TYPE_INT), arg);
+        if constexpr (std::is_same_v<T, long long>) {
+            return gcc_jit_context_new_rvalue_from_long(ctxt, gcc_jit_context_get_type(ctxt, GCC_JIT_TYPE_LONG_LONG), arg);
         } else if constexpr (std::is_same_v<T, double>) {
             return gcc_jit_context_new_rvalue_from_double(ctxt, gcc_jit_context_get_type(ctxt, GCC_JIT_TYPE_DOUBLE), arg);
         } else if constexpr (std::is_same_v<T, bool>) {

@@ -1,0 +1,49 @@
+// Test type alias compatibility and distinctness - Requirements 1.3, 1.4
+type UserId = int;
+type ProductId = int;
+type CategoryId = int;
+
+// Test that type aliases create distinct types
+var userId: UserId = 100;
+var productId: ProductId = 200;
+var categoryId: CategoryId = 300;
+
+// Test assignment within same type alias
+var anotherUserId: UserId = 101;
+var anotherProductId: ProductId = 201;
+
+// Test that values can be used in expressions
+var totalIds: int = userId + productId + categoryId;
+
+print("User ID:", userId);
+print("Product ID:", productId);
+print("Category ID:", categoryId);
+print("Another User ID:", anotherUserId);
+print("Another Product ID:", anotherProductId);
+print("Total IDs:", totalIds);
+
+// Test string type aliases
+type FirstName = str;
+type LastName = str;
+type Email = str;
+
+var firstName: FirstName = "John";
+var lastName: LastName = "Doe";
+var email: Email = "john.doe@example.com";
+
+print("First Name:", firstName);
+print("Last Name:", lastName);
+print("Email:", email);
+
+// Test boolean type aliases
+type IsAdmin = bool;
+type IsActive = bool;
+type HasPermission = bool;
+
+var isAdmin: IsAdmin = true;
+var isActive: IsActive = false;
+var hasPermission: HasPermission = true;
+
+print("Is Admin:", isAdmin);
+print("Is Active:", isActive);
+print("Has Permission:", hasPermission);

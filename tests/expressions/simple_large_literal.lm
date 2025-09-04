@@ -1,0 +1,3 @@
+// Simple test for large literal
+var test: u64 = 18446744073709551615;
+print("Test:", test);
