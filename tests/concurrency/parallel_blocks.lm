@@ -6,13 +6,16 @@ print("=== Parallel Block Tests ===");
 // ==========================================
 parallel(ch=messages, mode=batch, cores=Auto, on_error=Auto,
          timeout=20s, grace=500ms, on_timeout=partial) {
+    
+    // Task statement for parallel execution
     task(i in 1..3) {
         print("Task {i} running");
-        sleep(randint(1, 3)); //these are assumed to be system functons
+        sleep(randint(1, 3)); // these are assumed to be system functions
         messages.send("Task {i} done");
     }
 } // auto-close messages
 
+// Process messages from parallel tasks
 iter (message in messages) {
     print("Received: {message}");
 }
@@ -23,12 +26,16 @@ iter (message in messages) {
 parallel(events: FileChunks, ch=files_out, mode=stream, cores=Auto,
          on_error=Retry, timeout=60s,
          grace=500ms, on_timeout=partial) {
+    
+    // Worker definition for processing chunks
     worker(chunk) {
+        // Process the chunk and send result
         process_chunk(chunk);
         files_out.send("Chunk {chunk.id} processed");
     }
 } // auto-close files_out
 
+// Process output from workers
 iter (msg in files_out) {
     print(msg);
 }

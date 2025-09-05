@@ -381,19 +381,39 @@ public:
         }
     }
 
-    // Assignment operators
+    // Assignment operators - use copy-and-swap idiom
     ErrorUnion& operator=(const ErrorUnion& other) {
         if (this != &other) {
-            this->~ErrorUnion();
-            new (this) ErrorUnion(other);
+            // Destroy current content
+            if (tag_ == Tag::ERROR) {
+                errorValue_.~ErrorValue();
+            }
+            
+            // Copy new content
+            tag_ = other.tag_;
+            if (tag_ == Tag::SUCCESS) {
+                successValue_ = other.successValue_;
+            } else {
+                new (&errorValue_) ErrorValue(other.errorValue_);
+            }
         }
         return *this;
     }
 
     ErrorUnion& operator=(ErrorUnion&& other) noexcept {
         if (this != &other) {
-            this->~ErrorUnion();
-            new (this) ErrorUnion(std::move(other));
+            // Destroy current content
+            if (tag_ == Tag::ERROR) {
+                errorValue_.~ErrorValue();
+            }
+            
+            // Move new content
+            tag_ = other.tag_;
+            if (tag_ == Tag::SUCCESS) {
+                successValue_ = std::move(other.successValue_);
+            } else {
+                new (&errorValue_) ErrorValue(std::move(other.errorValue_));
+            }
         }
         return *this;
     }
@@ -946,7 +966,7 @@ namespace ErrorUtils {
         return {};
     }
 
-    // Get source location from an error value (0 if not an error)
+    // Get error source location from a value (0 if not an error)
     inline size_t getErrorLocation(const ValuePtr& value) {
         if (auto errorValue = std::get_if<ErrorValue>(&value->data)) {
             return errorValue->sourceLocation;
@@ -954,40 +974,63 @@ namespace ErrorUtils {
         return 0;
     }
 
-    // Convert a regular value to an error union success value
-    inline ValuePtr wrapAsSuccess(ValuePtr value, TypePtr errorUnionType) {
-        auto wrappedValue = std::make_shared<Value>(errorUnionType);
-        wrappedValue->data = value->data;
-        return wrappedValue;
+    // Wrap a success value in an error union type
+    inline ValuePtr wrapAsSuccess(ValuePtr successValue, TypePtr errorUnionType) {
+        auto value = std::make_shared<Value>(errorUnionType);
+        value->data = successValue->data;
+        return value;
     }
 
-    // Convert an error to an error union error value
+    // Wrap an error value in an error union type
     inline ValuePtr wrapAsError(const ErrorValue& errorValue, TypePtr errorUnionType) {
-        auto wrappedValue = std::make_shared<Value>(errorUnionType);
-        wrappedValue->data = errorValue;
-        return wrappedValue;
+        auto value = std::make_shared<Value>(errorUnionType);
+        value->data = errorValue;
+        return value;
     }
 
-    // Unwrap success value from error union (throws if error)
-    inline ValuePtr unwrapSuccess(ValuePtr errorUnionValue, TypePtr successType) {
-        if (isError(errorUnionValue)) {
-            throw std::runtime_error("Cannot unwrap success value from error union containing error");
+    // Create an error union value from ErrorUnion helper
+    inline ValuePtr createErrorUnion(const ErrorUnion& errorUnion, TypePtr errorUnionType) {
+        return errorUnion.toValue(errorUnionType);
+    }
+
+    // Unwrap success value (throws if error)
+    inline ValuePtr unwrapSuccess(const ValuePtr& value) {
+        if (isError(value)) {
+            throw std::runtime_error("Attempted to unwrap error as success");
         }
-        auto successValue = std::make_shared<Value>(successType);
-        successValue->data = errorUnionValue->data;
-        return successValue;
+        return value;
     }
 
-    // Safely unwrap success value from error union (returns nullptr if error)
-    inline ValuePtr unwrapSuccessSafe(ValuePtr errorUnionValue, TypePtr successType) {
-        if (isError(errorUnionValue)) {
-            return nullptr;
-        }
-        auto successValue = std::make_shared<Value>(successType);
-        successValue->data = errorUnionValue->data;
-        return successValue;
+    // Unwrap success value safely (returns nullptr if error)
+    inline ValuePtr unwrapSuccessSafe(const ValuePtr& value) {
+        return isError(value) ? nullptr : value;
     }
 
+    // Built-in error creation functions
+    inline ValuePtr createDivisionByZeroError(const std::string& message = "Division by zero") {
+        return createError("DivisionByZero", message);
+    }
+
+    inline ValuePtr createIndexOutOfBoundsError(const std::string& message = "Index out of bounds") {
+        return createError("IndexOutOfBounds", message);
+    }
+
+    inline ValuePtr createNullReferenceError(const std::string& message = "Null reference access") {
+        return createError("NullReference", message);
+    }
+
+    inline ValuePtr createTypeConversionError(const std::string& message = "Type conversion failed") {
+        return createError("TypeConversion", message);
+    }
+
+    inline ValuePtr createIOError(const std::string& message = "I/O operation failed") {
+        return createError("IOError", message);
+    }
+
+    // Error type compatibility checking
+    inline bool areErrorTypesCompatible(const std::string& errorType1, const std::string& errorType2) {
+        return errorType1 == errorType2;
+    }
 }
 
 // Iterator for list and range values

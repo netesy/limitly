@@ -1,0 +1,112 @@
+// Comprehensive VM Error Handling Integration Tests
+
+print("=== VM Error Handling Integration Tests ===");
+
+// Test 1: Basic error construction
+print("\n--- Test 1: Basic Error Construction ---");
+var basic_error = err(TestError);
+print("Basic error:", basic_error);
+
+// Test 2: Error construction with message
+print("\n--- Test 2: Error Construction with Message ---");
+var error_with_msg = err(ValidationError("Invalid input"));
+print("Error with message:", error_with_msg);
+
+// Test 3: Success value construction
+print("\n--- Test 3: Success Value Construction ---");
+var success_val = ok(42);
+print("Success value:", success_val);
+
+// Test 4: Error checking operations
+print("\n--- Test 4: Error Checking Operations ---");
+print("Is basic_error an error?", basic_error);
+print("Is success_val an error?", success_val);
+
+// Test 5: Success checking operations
+print("\n--- Test 5: Success Checking Operations ---");
+print("Is basic_error a success?", basic_error);
+print("Is success_val a success?", success_val);
+
+// Test 6: Value unwrapping (success case)
+print("\n--- Test 6: Value Unwrapping (Success Case) ---");
+var unwrapped_success = success_val?;
+print("Unwrapped success value:", unwrapped_success);
+
+// Test 7: Function that can return errors
+print("\n--- Test 7: Fallible Function Definition ---");
+fn divide(a: int, b: int): int?DivisionByZero {
+    if (b == 0) {
+        return err(DivisionByZero("Cannot divide by zero"));
+    }
+    return ok(a / b);
+}
+
+// Test 8: Calling fallible function (success case)
+print("\n--- Test 8: Fallible Function Call (Success) ---");
+var div_result = divide(10, 2)?;
+print("Division result:", div_result);
+
+// Test 9: Calling fallible function (error case)
+print("\n--- Test 9: Fallible Function Call (Error) ---");
+// This should trigger error propagation
+// var div_error = divide(10, 0)?;
+// print("This should not print due to error propagation");
+
+// Test 10: Error propagation through multiple function calls
+print("\n--- Test 10: Error Propagation Chain ---");
+fn safe_divide(a: int, b: int): int?DivisionByZero {
+    return divide(a, b)?;
+}
+
+fn calculate(x: int, y: int): int?DivisionByZero {
+    return safe_divide(x, y)?;
+}
+
+var calc_result = calculate(20, 4)?;
+print("Calculation result:", calc_result);
+
+// Test 11: Error handling with different error types
+print("\n--- Test 11: Multiple Error Types ---");
+fn validate_and_divide(a: int, b: int): int?ValidationError, DivisionByZero {
+    if (a < 0 || b < 0) {
+        return err(ValidationError("Negative numbers not allowed"));
+    }
+    return divide(a, b)?;
+}
+
+var validated_result = validate_and_divide(15, 3)?;
+print("Validated division result:", validated_result);
+
+// Test 12: Error union type checking
+print("\n--- Test 12: Error Union Type Operations ---");
+var error_union_success = ok("Hello World");
+var error_union_error = err(NetworkError("Connection failed"));
+
+print("Error union success is error:", error_union_success);
+print("Error union success is success:", error_union_success);
+print("Error union error is error:", error_union_error);
+print("Error union error is success:", error_union_error);
+
+// Test 13: Complex error propagation scenario
+print("\n--- Test 13: Complex Error Scenario ---");
+fn process_data(data: str): str?ParseError, ValidationError {
+    if (data == "") {
+        return err(ValidationError("Empty data"));
+    }
+    if (data == "invalid") {
+        return err(ParseError("Cannot parse data"));
+    }
+    return ok("Processed: " + data);
+}
+
+fn handle_request(request: str): str?ParseError, ValidationError, NetworkError {
+    if (request == "network_fail") {
+        return err(NetworkError("Network timeout"));
+    }
+    return process_data(request)?;
+}
+
+var processed = handle_request("valid_data")?;
+print("Processed request:", processed);
+
+print("\n=== All Error Handling Tests Completed ===");

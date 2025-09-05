@@ -89,6 +89,14 @@ void BytecodeGenerator::visitStatement(const std::shared_ptr<AST::Statement>& st
         visitModuleDeclaration(moduleDecl);
     } else if (auto contractStmt = std::dynamic_pointer_cast<AST::ContractStatement>(stmt)) {
         visitContractStatement(contractStmt);
+    } else if (auto taskStmt = std::dynamic_pointer_cast<AST::TaskStatement>(stmt)) {
+        // Task statements are handled within parallel blocks by the VM
+        // Just process the body as a normal block
+        visitBlockStatement(taskStmt->body);
+    } else if (auto workerStmt = std::dynamic_pointer_cast<AST::WorkerStatement>(stmt)) {
+        // Worker statements are handled within parallel blocks by the VM
+        // Just process the body as a normal block
+        visitBlockStatement(workerStmt->body);
     } else {
         Debugger::error("Unknown statement type", stmt->line, 0, InterpretationStage::BYTECODE, "", "", "");
     }
@@ -140,6 +148,12 @@ void BytecodeGenerator::visitExpression(const std::shared_ptr<AST::Expression>& 
         visitDictPatternExpr(dictPattern);
     } else if (auto tuplePattern = std::dynamic_pointer_cast<AST::TuplePatternExpr>(expr)) {
         visitTuplePatternExpr(tuplePattern);
+    } else if (auto fallibleExpr = std::dynamic_pointer_cast<AST::FallibleExpr>(expr)) {
+        visitFallibleExpr(fallibleExpr);
+    } else if (auto errorConstructExpr = std::dynamic_pointer_cast<AST::ErrorConstructExpr>(expr)) {
+        visitErrorConstructExpr(errorConstructExpr);
+    } else if (auto okConstructExpr = std::dynamic_pointer_cast<AST::OkConstructExpr>(expr)) {
+        visitOkConstructExpr(okConstructExpr);
     } else {
         Debugger::error("Unknown expression type", expr->line, 0, InterpretationStage::BYTECODE, "", "", "");
     }
@@ -550,6 +564,34 @@ void BytecodeGenerator::visitAttemptStatement(const std::shared_ptr<AST::Attempt
     emit(Opcode::END_TRY, stmt->line);
 }
 
+void BytecodeGenerator::visitTaskStatement(const std::shared_ptr<AST::TaskStatement>& stmt) {
+    // Emit BEGIN_TASK opcode with isAsync flag and loop variable name (if any)
+    emit(Opcode::BEGIN_TASK, stmt->line, stmt->isAsync ? 1 : 0, 0.0f, false, stmt->loopVar);
+    
+    // If there's an iterable, evaluate it and store it for the task
+    if (stmt->iterable) {
+        visitExpression(stmt->iterable);
+        emit(Opcode::STORE_ITERABLE, stmt->line);
+    }
+    
+    // Process the task body
+    visitBlockStatement(stmt->body);
+    
+    // Emit END_TASK opcode
+    emit(Opcode::END_TASK, stmt->line);
+}
+
+void BytecodeGenerator::visitWorkerStatement(const std::shared_ptr<AST::WorkerStatement>& stmt) {
+    // Emit BEGIN_WORKER opcode with isAsync flag and parameter name (if any)
+    emit(Opcode::BEGIN_WORKER, stmt->line, stmt->isAsync ? 1 : 0, 0.0f, false, stmt->param);
+    
+    // Process the worker body
+    visitBlockStatement(stmt->body);
+    
+    // Emit END_WORKER opcode
+    emit(Opcode::END_WORKER, stmt->line);
+}
+
 void BytecodeGenerator::visitParallelStatement(const std::shared_ptr<AST::ParallelStatement>& stmt) {
     // Generate bytecode for parallel statement
     
@@ -566,10 +608,10 @@ void BytecodeGenerator::visitParallelStatement(const std::shared_ptr<AST::Parall
         }
     }
 
-    // Start parallel block
+    // Start parallel block with mode and cores
     emit(Opcode::BEGIN_PARALLEL, stmt->line, cores, 0.0f, false, stmt->mode);
     
-    // Process parallel block body
+    // Process parallel block body (which may contain task and worker statements)
     visitBlockStatement(stmt->body);
     
     // End parallel block
@@ -1329,6 +1371,83 @@ void BytecodeGenerator::visitTuplePatternExpr(const std::shared_ptr<AST::TuplePa
     
     // Mark this as a tuple pattern
     emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, "__tuple_pattern__");
+}
+
+// Error handling expression visitors
+void BytecodeGenerator::visitFallibleExpr(const std::shared_ptr<AST::FallibleExpr>& expr) {
+    // Generate bytecode for fallible expression with ? operator
+    
+    // Evaluate the expression that might fail
+    visitExpression(expr->expression);
+    
+    // Check if the result is an error
+    emit(Opcode::CHECK_ERROR, expr->line);
+    
+    // If it's an error, either handle it or propagate it
+    if (expr->elseHandler) {
+        // Jump to else handler if error
+        size_t jumpToElseIndex = bytecode.size();
+        emit(Opcode::JUMP_IF_TRUE, expr->line);
+        
+        // If not an error, unwrap the success value
+        emit(Opcode::UNWRAP_VALUE, expr->line);
+        
+        // Jump over else handler
+        size_t jumpOverElseIndex = bytecode.size();
+        emit(Opcode::JUMP, expr->line);
+        
+        // Update jump to else handler
+        size_t elseStartIndex = bytecode.size();
+        bytecode[jumpToElseIndex].intValue = static_cast<int32_t>(elseStartIndex - jumpToElseIndex - 1);
+        
+        // Store error in variable if specified
+        if (!expr->elseVariable.empty()) {
+            emit(Opcode::STORE_VAR, expr->line, 0, 0.0f, false, expr->elseVariable);
+        }
+        
+        // Process else handler
+        visitStatement(expr->elseHandler);
+        
+        // Update jump over else handler
+        size_t endIndex = bytecode.size();
+        bytecode[jumpOverElseIndex].intValue = static_cast<int32_t>(endIndex - jumpOverElseIndex - 1);
+    } else {
+        // No else handler, propagate error if present
+        size_t jumpOverPropagateIndex = bytecode.size();
+        emit(Opcode::JUMP_IF_FALSE, expr->line);
+        
+        // Propagate the error
+        emit(Opcode::PROPAGATE_ERROR, expr->line);
+        
+        // Update jump - if not error, unwrap value
+        size_t unwrapIndex = bytecode.size();
+        bytecode[jumpOverPropagateIndex].intValue = static_cast<int32_t>(unwrapIndex - jumpOverPropagateIndex - 1);
+        
+        // Unwrap the success value
+        emit(Opcode::UNWRAP_VALUE, expr->line);
+    }
+}
+
+void BytecodeGenerator::visitErrorConstructExpr(const std::shared_ptr<AST::ErrorConstructExpr>& expr) {
+    // Generate bytecode for error construction (err() calls)
+    
+    // Evaluate constructor arguments
+    for (const auto& arg : expr->arguments) {
+        visitExpression(arg);
+    }
+    
+    // Construct error value with type and arguments
+    emit(Opcode::CONSTRUCT_ERROR, expr->line, static_cast<int32_t>(expr->arguments.size()), 0.0f, false, expr->errorType);
+}
+
+void BytecodeGenerator::visitOkConstructExpr(const std::shared_ptr<AST::OkConstructExpr>& expr) {
+    // Generate bytecode for success value construction (ok() calls)
+    
+    // Evaluate the success value
+    visitExpression(expr->value);
+    
+    // Construct success value
+    emit(Opcode::CONSTRUCT_OK, expr->line);
 }
 
 void BytecodeGenerator::emit(Opcode op, uint32_t lineNumber, int64_t intValue, float floatValue, bool boolValue, const std::string& stringValue) {

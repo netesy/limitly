@@ -1,0 +1,110 @@
+// Test task and worker statements in Limit Language
+print("=== Task and Worker Tests ===");
+
+// ==========================================
+//  Simple task statement
+// ==========================================
+print("\nTesting simple task statement...");
+
+// Create a channel for task communication
+ch = channel();
+
+// Run tasks in parallel
+task(i in 1..3) {
+    result = i * i;
+    ch.send("Task ${i} result: ${result}");
+}
+
+// Close the channel after all tasks complete
+ch.close();
+
+// Print results
+iter (msg in ch) {
+    print(msg);
+}
+
+// ==========================================
+//  Task with custom iterable
+// ==========================================
+print("\nTesting task with custom iterable...");
+
+items = ["apple", "banana", "cherry"];
+results = [];
+
+// Run tasks with custom iterable
+task(item in items) {
+    results.push(item.to_upper());
+}
+
+// Results should be collected in parallel
+print("Uppercased items:", results);
+
+// ==========================================
+//  Worker with channel communication
+// ==========================================
+print("\nTesting worker with channel communication...");
+
+// Create input and output channels
+input_ch = channel();
+output_ch = channel();
+
+// Start worker
+worker(item) {
+    // Process item (e.g., make it uppercase and add index)
+    processed = "${item.to_upper()}_processed";
+    output_ch.send(processed);
+}
+
+// Send data to worker
+input_ch.send("first");
+input_ch.send("second");
+input_ch.send("third");
+input_ch.close();
+
+// Process results
+iter (result in output_ch) {
+    print("Processed:", result);
+}
+
+// ==========================================
+//  Nested tasks and workers
+// ==========================================
+print("\nTesting nested tasks and workers...");
+
+// Outer task
+task(i in 1..2) {
+    print("Outer task", i);
+    
+    // Inner worker
+    worker(x) {
+        return x * 10;
+    }
+    
+    // Use the worker
+    result = worker(i);
+    print("Worker result:", result);
+    
+    // Nested task
+    task(j in 1..2) {
+        print("  Nested task", i, j);
+        return i * 100 + j;
+    }
+}
+
+// ==========================================
+//  Error handling in tasks
+// ==========================================
+print("\nTesting error handling in tasks...");
+
+try {
+    task(i in 1..3) {
+        if (i == 2) {
+            throw "Error in task ${i}";
+        }
+        print("Task", i, "completed successfully");
+    }
+} catch (e) {
+    print("Caught error:", e);
+}
+
+print("\n=== Task and Worker Tests Complete ===");

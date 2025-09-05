@@ -19,7 +19,7 @@ Limit is designed with the following principles in mind:
 
 ### Type Hierarchy
 - Primitive types: `int`, `uint`, `float`, `bool`, `str`
-- Composite types: `list<T>`, `dict<K,V>`, `tuple<T...>`
+- Composite types: `list`, `dict`, `tuple`
 - User-defined types: classes, enums, interfaces
 - Union types: `T | U`
 - Refined types: `T where condition`
@@ -27,7 +27,7 @@ Limit is designed with the following principles in mind:
 ## Memory Model
 
 ### Memory Safety
-- No null pointers by default (use `Option<T>` instead)
+- No null pointers by default (use `Union instead)
 - No dangling references (ownership system)
 - No uninitialized variables
 

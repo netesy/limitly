@@ -41,12 +41,7 @@
   - Parse err() and ok() constructor expressions
   - _Requirements: 1.2, 1.3, 2.1, 2.2, 3.1_
 
-- [-] 4. Implement error value representation in VM
-
-
-
-
-
+- [x] 4. Implement error value representation in VM
 
 
 
@@ -63,7 +58,12 @@
   - Write unit tests for error value creation and manipulation
   - _Requirements: 2.1, 2.2, 7.1, 7.2_
 
-- [ ] 5. Add error handling bytecode operations
+- [x] 5. Add error handling bytecode operations
+
+
+
+
+
   - Extend opcodes.hh with CHECK_ERROR, PROPAGATE_ERROR, CONSTRUCT_ERROR, CONSTRUCT_OK opcodes
   - Add IS_ERROR, IS_SUCCESS, UNWRAP_VALUE opcodes for error union operations
   - Implement bytecode generation for fallible expressions in backend/backend.cpp
@@ -71,6 +71,13 @@
   - _Requirements: 3.1, 3.2, 7.5_
 
 - [ ] 6. Implement VM error handling runtime
+
+
+
+
+
+
+
   - Add error propagation logic to backend/vm.cpp for new error opcodes
   - Implement stack-based error frame management for efficient propagation
   - Add error checking and unwrapping operations in VM execution loop

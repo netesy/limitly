@@ -244,12 +244,13 @@ Token Scanner::getToken() {
 
 Token Scanner::getNextToken() {
     // Return next token or EOF if at end
-    size_t nextIndex = current + 1;
+    size_t nextIndex = static_cast<size_t>(current) + 1;
     if (nextIndex < tokens.size()) {
         return tokens[nextIndex];
     } else {
         // Handle end of tokens
-        return {TokenType::EOF_TOKEN, "", line, static_cast<int>(current)};
+        return {TokenType::EOF_TOKEN, "", line, current};
+
     }
 }
 
@@ -432,7 +433,8 @@ void Scanner::string() {
                 // Add the expression tokens (excluding EOF)
                 for (const auto& token : exprTokens) {
                     if (token.type != TokenType::EOF_TOKEN) {
-                        tokens.push_back({token.type, token.lexeme, line, static_cast<int>(current)});
+                        tokens.push_back({token.type, token.lexeme, line, current});
+
                     }
                 }
                 

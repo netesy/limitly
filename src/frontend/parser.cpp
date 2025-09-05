@@ -342,11 +342,19 @@ std::shared_ptr<AST::Statement> Parser::taskStatement() {
     stmt->line = peek().line;
 
     consume(TokenType::LEFT_PAREN, "Expected '(' after 'task'.");
-    stmt->loopVar = consume(TokenType::IDENTIFIER, "Expected loop variable name.").lexeme;
-    consume(TokenType::IN, "Expected 'in' after loop variable.");
+    
+    // Parse loop variable if present
+    if (check(TokenType::IDENTIFIER)) {
+        stmt->loopVar = consume(TokenType::IDENTIFIER, "Expected loop variable name.").lexeme;
+        consume(TokenType::IN, "Expected 'in' after loop variable.");
+    }
+    
+    // Parse the iterable expression (could be a range, list, etc.)
     stmt->iterable = expression();
+    
     consume(TokenType::RIGHT_PAREN, "Expected ')' after task arguments.");
 
+    // Parse the task body
     consume(TokenType::LEFT_BRACE, "Expected '{' before task body.");
     stmt->body = block();
 

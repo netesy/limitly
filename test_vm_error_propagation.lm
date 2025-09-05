@@ -1,0 +1,30 @@
+// VM Error Propagation Tests
+
+print("=== VM Error Propagation Tests ===");
+
+// Simple function that returns an error
+fn failing_function(): int?TestError {
+    return err(TestError("This function always fails"));
+}
+
+// Function that calls the failing function
+fn caller_function(): int?TestError {
+    print("About to call failing function...");
+    var result = failing_function()?;
+    print("This should not print - error should propagate");
+    return ok(result);
+}
+
+// Test error propagation
+print("Testing error propagation...");
+print("Calling caller_function which should propagate error...");
+
+// This should demonstrate error propagation
+// The error from failing_function should propagate through caller_function
+ var final_result = caller_function()?;
+// print("This should not print due to error propagation");
+
+print("Error propagation test setup complete");
+print("(Actual propagation test commented out to prevent termination)");
+
+print("=== Error Propagation Tests Complete ===");

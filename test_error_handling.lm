@@ -1,0 +1,29 @@
+// Test error handling bytecode operations
+
+// Test error construction
+var error_result = err(DivisionByZero);
+print("Error result:", error_result);
+
+// Test success construction  
+var success_result = ok(42);
+print("Success result:", success_result);
+
+// Test fallible expression with propagation
+fn divide(a: int, b: int): int?DivisionByZero {
+    if (b == 0) {
+        return err(DivisionByZero);
+    }
+    return ok(a / b);
+}
+
+// Test calling fallible function
+var result = divide(10, 2)?;
+print("Division result:", result);
+
+// Test error propagation
+fn safe_divide(a: int, b: int): int?DivisionByZero {
+    return divide(a, b)?;
+}
+
+var safe_result = safe_divide(20, 4)?;
+print("Safe division result:", safe_result);

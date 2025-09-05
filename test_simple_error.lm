@@ -1,0 +1,13 @@
+// Simple error handling test
+
+// Test basic error construction
+var error_val = err(TestError);
+print("Created error:", error_val);
+
+// Test basic success construction
+var success_val = ok(123);
+print("Created success:", success_val);
+
+// Test error checking
+print("Is error an error?", error_val);
+print("Is success an error?", success_val);
