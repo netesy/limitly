@@ -140,8 +140,8 @@ public:
 class ClassMethodImplementation : public FunctionImplementation {
 private:
     FunctionSignature signature;
-    std::shared_ptr<AST::BlockStatement> body;
     std::shared_ptr<ClassDefinition> ownerClass;
+    std::shared_ptr<AST::BlockStatement> body;
     
 public:
     ClassMethodImplementation(const std::shared_ptr<AST::FunctionDeclaration>& decl,

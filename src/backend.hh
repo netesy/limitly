@@ -49,6 +49,8 @@ private:
     void visitExprStatement(const std::shared_ptr<AST::ExprStatement>& stmt);
     void visitAttemptStatement(const std::shared_ptr<AST::AttemptStatement>& stmt);
     void visitParallelStatement(const std::shared_ptr<AST::ParallelStatement>& stmt);
+    void visitTaskStatement(const std::shared_ptr<AST::TaskStatement>& stmt);
+    void visitWorkerStatement(const std::shared_ptr<AST::WorkerStatement>& stmt);
     void visitConcurrentStatement(const std::shared_ptr<AST::ConcurrentStatement>& stmt);
     void visitImportStatement(const std::shared_ptr<AST::ImportStatement>& stmt);
     void visitEnumDeclaration(const std::shared_ptr<AST::EnumDeclaration>& stmt);
@@ -72,6 +74,11 @@ private:
     void visitAwaitExpr(const std::shared_ptr<AST::AwaitExpr>& expr);
     void visitRangeExpr(const std::shared_ptr<AST::RangeExpr>& expr);
     void visitInterpolatedStringExpr(const std::shared_ptr<AST::InterpolatedStringExpr>& expr);
+    
+    // Error handling expression visitors
+    void visitFallibleExpr(const std::shared_ptr<AST::FallibleExpr>& expr);
+    void visitErrorConstructExpr(const std::shared_ptr<AST::ErrorConstructExpr>& expr);
+    void visitOkConstructExpr(const std::shared_ptr<AST::OkConstructExpr>& expr);
     
     // Pattern expression visitors for match statements
     void visitTypePatternExpr(const std::shared_ptr<AST::TypePatternExpr>& expr);

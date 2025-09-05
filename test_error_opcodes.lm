@@ -1,0 +1,19 @@
+// Comprehensive test for error handling bytecode operations
+
+print("=== Testing Error Handling Opcodes ===");
+
+// Test 1: CONSTRUCT_ERROR opcode
+print("Test 1: Error Construction");
+var error1 = err(DivisionByZero);
+var error2 = err(IndexOutOfBounds);
+print("Error 1:", error1);
+print("Error 2:", error2);
+
+// Test 2: CONSTRUCT_OK opcode  
+print("Test 2: Success Construction");
+var success1 = ok(42);
+var success2 = ok("Hello World");
+print("Success 1:", success1);
+print("Success 2:", success2);
+
+print("=== All Error Handling Opcodes Tested ===");

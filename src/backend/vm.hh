@@ -61,6 +61,15 @@ private:
     std::vector<backend::CallFrame> callStack; // Use the new CallFrame from functions.hh
     std::shared_ptr<Environment> globals;
     std::shared_ptr<Environment> environment;
+    
+    // Error handling state
+    struct ErrorFrame {
+        size_t handlerAddress;      // Bytecode address of error handler
+        size_t stackBase;           // Stack position when frame created
+        TypePtr expectedErrorType;  // Expected error type for this frame
+        std::string functionName;   // Function name for debugging
+    };
+    std::vector<ErrorFrame> errorFrames;
     std::unordered_map<std::string, std::function<ValuePtr(const std::vector<ValuePtr>&)>> nativeFunctions;
     // Removed duplicate userFunctions map - using functionRegistry instead
     backend::FunctionRegistry functionRegistry; // New function abstraction layer
@@ -93,6 +102,13 @@ private:
     void push(const ValuePtr& value);
     ValuePtr peek(int distance = 0) const;
     std::string valueToString(const ValuePtr& value);
+    
+    // Error handling helper methods
+    void pushErrorFrame(size_t handlerAddr, TypePtr errorType, const std::string& functionName = "");
+    void popErrorFrame();
+    bool propagateError(ValuePtr errorValue);
+    ValuePtr handleError(ValuePtr errorValue, const std::string& expectedType = "");
+    bool functionCanFail(const std::string& functionName) const;
     
 public:
     // Debugging methods
@@ -195,6 +211,15 @@ private:
     void handleDefineEnumVariantWithType(const Instruction& instruction);
     void handlePrint(const Instruction& instruction);
     void handleDebugPrint(const Instruction& instruction);
+    
+    // Error handling instruction handlers
+    void handleCheckError(const Instruction& instruction);
+    void handlePropagateError(const Instruction& instruction);
+    void handleConstructError(const Instruction& instruction);
+    void handleConstructOk(const Instruction& instruction);
+    void handleIsError(const Instruction& instruction);
+    void handleIsSuccess(const Instruction& instruction);
+    void handleUnwrapValue(const Instruction& instruction);
 };
 
 // VM-specific user-defined function implementation

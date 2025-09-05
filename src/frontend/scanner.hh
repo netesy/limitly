@@ -153,8 +153,8 @@ enum class TokenType {
 struct Token {
     TokenType type;
     std::string lexeme;
-    int line;
-    int start = 0;
+    size_t line;
+    size_t start = 0;
 };
 
 class Scanner {
@@ -181,8 +181,8 @@ public:
     char peekNext() const;
     char peekPrevious() const;
     std::string tokenTypeToString(TokenType type) const;
-    int getLine() const { return line; }
-    int getCurrent() const { return current; }
+    size_t getLine() const { return line; }
+    size_t getCurrent() const { return current; }
     std::string getLexeme() const { return source.substr(start, current - start); }
     const std::string& getSource() const { return source; }
 
@@ -203,7 +203,7 @@ private:
     std::string source;
     size_t start;
     size_t current;
-    int line;
+    size_t line;
     Token currentToken;
     std::vector<Token> tokens;
 

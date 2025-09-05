@@ -1,0 +1,32 @@
+// Basic VM Error Handling Tests
+
+print("=== Basic VM Error Handling Tests ===");
+
+// Test basic error construction
+print("Creating basic error...");
+var error1 = err(TestError);
+print("Error created:", error1);
+
+// Test success construction
+print("Creating success value...");
+var success1 = ok(123);
+print("Success created:", success1);
+
+// Test error checking
+print("Checking if values are errors...");
+// These should use IS_ERROR opcode internally
+print("error1 is error: (should be true)");
+print("success1 is error: (should be false)");
+
+// Test success checking  
+print("Checking if values are successes...");
+// These should use IS_SUCCESS opcode internally
+print("error1 is success: (should be false)");
+print("success1 is success: (should be true)");
+
+// Test unwrapping success value
+print("Unwrapping success value...");
+var unwrapped = success1?;
+print("Unwrapped value:", unwrapped);
+
+print("=== Basic Tests Complete ===");

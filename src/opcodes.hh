@@ -107,6 +107,11 @@ enum class Opcode {
     // Concurrency operations
     BEGIN_PARALLEL,     // Begin parallel block
     END_PARALLEL,       // End parallel block
+    BEGIN_TASK,         // Begin task block
+    END_TASK,           // End task block
+    BEGIN_WORKER,       // Begin worker block
+    END_WORKER,         // End worker block
+    STORE_ITERABLE,     // Store iterable for task
     BEGIN_CONCURRENT,   // Begin concurrent block
     END_CONCURRENT,     // End concurrent block
     AWAIT,              // Await async result
@@ -129,6 +134,15 @@ enum class Opcode {
 
     // Debug operations
     DEBUG_PRINT,        // Print debug information
+
+    // Error handling operations
+    CHECK_ERROR,        // Check if value is error, jump if true
+    PROPAGATE_ERROR,    // Propagate error up the call stack
+    CONSTRUCT_ERROR,    // Construct error value
+    CONSTRUCT_OK,       // Construct success value
+    IS_ERROR,           // Check if union contains error
+    IS_SUCCESS,         // Check if union contains success value
+    UNWRAP_VALUE,       // Extract value from success union
 
     // Memory operations
     LOAD_CONST,         // Load constant onto stack
