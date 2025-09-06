@@ -86,6 +86,9 @@
   - _Requirements: 3.1, 3.2, 3.4, 7.1, 7.2_
 
 - [ ] 7. Add compile-time error type checking
+
+
+
   - Extend type checker to validate error union compatibility in function calls
   - Implement unhandled fallible expression detection (require ? or match)
   - Add error type propagation validation in function signatures

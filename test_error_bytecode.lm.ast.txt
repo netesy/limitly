@@ -1,0 +1,395 @@
+AST for test_error_bytecode.lm
+========================================
+
+AST Dump:
+==========
+FunctionDeclaration: test_error_construction
+  Body:
+    BlockStatement:
+      VarDeclaration: error_val
+        Initializer:
+          ErrorConstruct: DivisionByZero
+      PrintStatement:
+        Literal: "Error construction test:"
+        Variable: error_val
+FunctionDeclaration: test_success_construction
+  Body:
+    BlockStatement:
+      VarDeclaration: success_val
+        Initializer:
+          OkConstruct:
+            Value:
+              Literal: 42
+      VarDeclaration: success_str
+        Initializer:
+          OkConstruct:
+            Value:
+              Literal: "success"
+      PrintStatement:
+        Literal: "Success construction test:"
+        Variable: success_val
+        Variable: success_str
+FunctionDeclaration: divide
+  Parameters:
+    a: int
+    b: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      IfStatement:
+        Condition:
+          BinaryExpression: ==
+            Left:
+              Variable: b
+            Operator: ==
+            Right:
+              Literal: 0
+        Then:
+          BlockStatement:
+            ReturnStatement:
+              Value:
+                ErrorConstruct: DivisionByZero
+      ReturnStatement:
+        Value:
+          OkConstruct:
+            Value:
+              BinaryExpression: /
+                Left:
+                  Variable: a
+                Operator: /
+                Right:
+                  Variable: b
+FunctionDeclaration: parse_number
+  Parameters:
+    s: string
+  ReturnType: int
+  Body:
+    BlockStatement:
+      ReturnStatement:
+        Value:
+          OkConstruct:
+            Value:
+              Literal: 0
+FunctionDeclaration: test_error_propagation
+  Body:
+    BlockStatement:
+      VarDeclaration: result
+        Initializer:
+          FallibleExpression:
+            Expression:
+              CallExpression:
+                Callee:
+                  Variable: divide
+                Arguments:
+                  Literal: 10
+                  Literal: 2
+      PrintStatement:
+        Literal: "Division result:"
+        Variable: result
+      VarDeclaration: error_result
+        Initializer:
+          FallibleExpression:
+            Expression:
+              CallExpression:
+                Callee:
+                  Variable: divide
+                Arguments:
+                  Literal: 10
+                  Literal: 0
+      PrintStatement:
+        Literal: "This should not print due to error propagation"
+FunctionDeclaration: test_error_handling
+  Body:
+    BlockStatement:
+      VarDeclaration: result
+        Initializer:
+          FallibleExpression:
+            Expression:
+              CallExpression:
+                Callee:
+                  Variable: divide
+                Arguments:
+                  Literal: 10
+                  Literal: 0
+            ElseHandler:
+              ErrorVariable: error
+              BlockStatement:
+                PrintStatement:
+                  Literal: "Caught error:"
+                  Variable: error
+                ReturnStatement:
+                  Value:
+                    UnaryExpression: -
+                      Operand:
+                        Literal: 1
+      VarDeclaration: parsed
+        Initializer:
+          FallibleExpression:
+            Expression:
+              CallExpression:
+                Callee:
+                  Variable: parse_number
+                Arguments:
+                  Literal: "123"
+            ElseHandler:
+              ErrorVariable: error
+              BlockStatement:
+                IfStatement:
+                  Condition:
+                    BinaryExpression: ==
+                      Left:
+                        Variable: error
+                      Operator: ==
+                      Right:
+                        Literal: "InvalidNumber"
+                  Then:
+                    BlockStatement:
+                      PrintStatement:
+                        Literal: "Invalid number format"
+                  Else:
+                    IfStatement:
+                      Condition:
+                        BinaryExpression: ==
+                          Left:
+                            Variable: error
+                          Operator: ==
+                          Right:
+                            Literal: "Overflow"
+                      Then:
+                        BlockStatement:
+                          PrintStatement:
+                            Literal: "Number too large"
+                ReturnStatement:
+                  Value:
+                    UnaryExpression: -
+                      Operand:
+                        Literal: 1
+      PrintStatement:
+        Literal: "Result after error handling:"
+        Variable: result
+FunctionDeclaration: test_error_checking
+  Body:
+    BlockStatement:
+      VarDeclaration: success_val
+        Initializer:
+          OkConstruct:
+            Value:
+              Literal: 42
+      VarDeclaration: error_val
+        Initializer:
+          ErrorConstruct: TestError
+      IfStatement:
+        Condition:
+          CallExpression:
+            Callee:
+              Variable: is_error
+            Arguments:
+              Variable: success_val
+        Then:
+          BlockStatement:
+            PrintStatement:
+              Literal: "Success value incorrectly identified as error"
+        Else:
+          BlockStatement:
+            PrintStatement:
+              Literal: "Success value correctly identified"
+      IfStatement:
+        Condition:
+          CallExpression:
+            Callee:
+              Variable: is_error
+            Arguments:
+              Variable: error_val
+        Then:
+          BlockStatement:
+            PrintStatement:
+              Literal: "Error value correctly identified"
+        Else:
+          BlockStatement:
+            PrintStatement:
+              Literal: "Error value incorrectly identified as success"
+FunctionDeclaration: process_data
+  Parameters:
+    data: string
+  ReturnType: string
+  Body:
+    BlockStatement:
+      IfStatement:
+        Condition:
+          BinaryExpression: ==
+            Left:
+              Variable: data
+            Operator: ==
+            Right:
+              Literal: nil
+        Then:
+          BlockStatement:
+            ReturnStatement:
+              Value:
+                ErrorConstruct: ParseError
+      ReturnStatement:
+        Value:
+          OkConstruct:
+            Value:
+              BinaryExpression: +
+                Left:
+                  Literal: "processed_"
+                Operator: +
+                Right:
+                  Variable: data
+FunctionDeclaration: process_and_divide
+  Parameters:
+    s: string
+    divisor: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      VarDeclaration: processed
+        Initializer:
+          FallibleExpression:
+            Expression:
+              CallExpression:
+                Callee:
+                  Variable: process_data
+                Arguments:
+                  Variable: s
+      ReturnStatement:
+        Value:
+          FallibleExpression:
+            Expression:
+              CallExpression:
+                Callee:
+                  Variable: divide
+                Arguments:
+                  MemberExpression: .length
+                    Object:
+                      Variable: processed
+                  Variable: divisor
+FunctionDeclaration: test_error_composition
+  Body:
+    BlockStatement:
+      VarDeclaration: result
+        Initializer:
+          FallibleExpression:
+            Expression:
+              CallExpression:
+                Callee:
+                  Variable: process_and_divide
+                Arguments:
+                  Literal: "test"
+                  Literal: 2
+            ElseHandler:
+              ErrorVariable: error
+              BlockStatement:
+                IfStatement:
+                  Condition:
+                    BinaryExpression: ==
+                      Left:
+                        Variable: error
+                      Operator: ==
+                      Right:
+                        Literal: "DivisionByZero"
+                  Then:
+                    BlockStatement:
+                      PrintStatement:
+                        Literal: "Cannot divide by zero"
+                  Else:
+                    IfStatement:
+                      Condition:
+                        BinaryExpression: ==
+                          Left:
+                            Variable: error
+                          Operator: ==
+                          Right:
+                            Literal: "ParseError"
+                      Then:
+                        BlockStatement:
+                          PrintStatement:
+                            Literal: "Failed to parse input"
+                      Else:
+                        IfStatement:
+                          Condition:
+                            BinaryExpression: ==
+                              Left:
+                                Variable: error
+                              Operator: ==
+                              Right:
+                                Literal: "IOError"
+                          Then:
+                            BlockStatement:
+                              PrintStatement:
+                                Literal: "IO error occurred"
+                ReturnStatement:
+                  Value:
+                    UnaryExpression: -
+                      Operand:
+                        Literal: 1
+      PrintStatement:
+        Literal: "Processed result:"
+        Variable: result
+FunctionDeclaration: test_type_inference
+  Body:
+    BlockStatement:
+      VarDeclaration: maybe_num
+        Type: int?
+        Initializer:
+          CallExpression:
+            Callee:
+              Variable: divide
+            Arguments:
+              Literal: 10
+              Literal: 2
+      VarDeclaration: inferred
+        Initializer:
+          CallExpression:
+            Callee:
+              Variable: divide
+            Arguments:
+              Literal: 10
+              Literal: 2
+      VarDeclaration: wrong_type
+        Type: string?
+        Initializer:
+          CallExpression:
+            Callee:
+              Variable: divide
+            Arguments:
+              Literal: 10
+              Literal: 2
+      VarDeclaration: with_errors
+        Type: int
+        Initializer:
+          CallExpression:
+            Callee:
+              Variable: divide
+            Arguments:
+              Literal: 10
+              Literal: 2
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: test_error_construction
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: test_success_construction
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: test_error_propagation
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: test_error_handling
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: test_error_checking
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: test_error_composition
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: test_type_inference

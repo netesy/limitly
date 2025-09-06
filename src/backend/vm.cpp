@@ -1,7 +1,39 @@
 #include "vm.hh"
+#include "value.hh"  // For Value and ErrorValue definitions
+
+// Forward declare ErrorValue from the global namespace
+struct ErrorValue;
 #include <iostream>
 #include <thread>
 #include <variant>
+#include <limits>
+#include <string>
+#include <memory>
+#include <functional>
+#include <cstdint>
+#include <stdexcept>
+#include <chrono>
+#include <vector>
+#include <cstdlib>
+#include <cstring>
+#include <algorithm>
+#include <sstream>
+#include <iomanip>
+#include <type_traits>
+#include <cassert>
+
+// Enable C++17 features
+#if __cplusplus < 201703L
+#error "This code requires C++17 or later"
+#endif
+
+// Required for std::get with variants
+#if __cplusplus >= 201703L
+namespace std {
+    template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+    template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+}
+#endif
 
 // Helper function to convert TypeTag to string
 static std::string typeTagToString(TypeTag tag) {
@@ -78,10 +110,13 @@ VM::VM(bool create_runtime)
         event_loop = std::make_shared<EventLoop>();
     }
 
-    // Register native functions
-    registerNativeFunction("clock", [this](const std::vector<ValuePtr>&) -> ValuePtr {
-        auto result = memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, static_cast<double>(std::clock()) / CLOCKS_PER_SEC);
-        return result;
+    // Register native functions with correct signature
+    registerNativeFunction("clock", [this](const std::vector<ValuePtr>& args) -> ValuePtr {
+        if (args.size() != 0) {
+            throw std::runtime_error("clock() takes no arguments");
+        }
+        return memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, 
+            static_cast<double>(std::clock()) / CLOCKS_PER_SEC);
     });
     
     registerNativeFunction("sleep", [this](const std::vector<ValuePtr>& args) -> ValuePtr {
@@ -89,38 +124,36 @@ VM::VM(bool create_runtime)
             throw std::runtime_error("sleep() takes exactly one number argument");
         }
         
+        // Convert the argument to a double value
         double seconds = 0.0;
-        
-        // Extract the seconds value based on the type
-        if (std::holds_alternative<double>(args[0]->data)) {
-            seconds = std::get<double>(args[0]->data);
-        } else if (std::holds_alternative<float>(args[0]->data)) {
-            seconds = std::get<float>(args[0]->data);
-        } else if (std::holds_alternative<int32_t>(args[0]->data)) {
-            seconds = std::get<int32_t>(args[0]->data);
-        } else if (std::holds_alternative<int64_t>(args[0]->data)) {
-            seconds = std::get<int64_t>(args[0]->data);
+        if (args[0]->type->tag == TypeTag::Float64) {
+            seconds = *reinterpret_cast<const double*>(&args[0]->data);
+        } else if (args[0]->type->tag == TypeTag::Int) {
+            int32_t val = *reinterpret_cast<const int32_t*>(&args[0]->data);
+            seconds = static_cast<double>(val);
         } else {
-            throw std::runtime_error("sleep() argument must be a number");
+            throw std::runtime_error("sleep() argument must be a number (int or float)");
         }
         
-        std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(seconds * 1000)));
+        // Sleep for the specified number of seconds
+        std::this_thread::sleep_for(std::chrono::milliseconds(
+            static_cast<int>(seconds * 1000)));
+            
         return memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
     });
-}
 
 VM::~VM() {
     delete typeSystem;
 }
 
-ValuePtr VM::execute(const std::vector<Instruction>& bytecode) {
-    this->bytecode = &bytecode;
+ValuePtr VM::execute(const std::vector<Instruction>& code) {
+    this->bytecode = &code;
     ip = 0;
+    const std::vector<Instruction>& bytecodeRef = *this->bytecode;
     
     try {
-        while (ip < bytecode.size()) {
-            const Instruction& instruction = bytecode[ip];
-         //   std::cout << "ip: " << ip << ", opcode: " << static_cast<int>(instruction.opcode) << std::endl;
+        while (ip < bytecodeRef.size()) {
+            const Instruction& instruction = bytecodeRef[ip];
             
             // Check if we need to start skipping function body
             if (!currentFunctionBeingDefined.empty() && !insideFunctionDefinition) {
@@ -139,290 +172,359 @@ ValuePtr VM::execute(const std::vector<Instruction>& bytecode) {
             // Debug output for opcode values
             int opcodeValue = static_cast<int>(instruction.opcode);
             
-            switch (instruction.opcode) {
-                case Opcode::PUSH_INT:
-                    handlePushInt(instruction);
-                    break;
-                case Opcode::PUSH_FLOAT:
-                    handlePushFloat(instruction);
-                    break;
-                case Opcode::PUSH_STRING:
-                    handlePushString(instruction);
-                    break;
-                case Opcode::PUSH_BOOL:
-                    handlePushBool(instruction);
-                    break;
-                case Opcode::PUSH_NULL:
-                    handlePushNull(instruction);
-                    break;
-                case Opcode::POP:
-                    handlePop(instruction);
-                    break;
-                case Opcode::DUP:
-                    handleDup(instruction);
-                    break;
-                case Opcode::SWAP:
-                    handleSwap(instruction);
-                    break;
-                case Opcode::STORE_VAR:
-                    handleStoreVar(instruction);
-                    break;
-                case Opcode::LOAD_VAR:
-                    handleLoadVar(instruction);
-                    break;
-                case Opcode::STORE_TEMP:
-                    handleStoreTemp(instruction);
-                    break;
-                case Opcode::LOAD_TEMP:
-                    handleLoadTemp(instruction);
-                    break;
-                case Opcode::CLEAR_TEMP:
-                    handleClearTemp(instruction);
-                    break;
-                case Opcode::ADD:
-                    handleAdd(instruction);
-                    break;
-                case Opcode::SUBTRACT:
-                    handleSubtract(instruction);
-                    break;
-                case Opcode::MULTIPLY:
-                    handleMultiply(instruction);
-                    break;
-                case Opcode::DIVIDE:
-                    handleDivide(instruction);
-                    break;
-                case Opcode::MODULO:
-                    handleModulo(instruction);
-                    break;
-                case Opcode::NEGATE:
-                    handleNegate(instruction);
-                    break;
-                case Opcode::EQUAL:
-                    handleEqual(instruction);
-                    break;
-                case Opcode::NOT_EQUAL:
-                    handleNotEqual(instruction);
-                    break;
-                case Opcode::LESS:
-                    handleLess(instruction);
-                    break;
-                case Opcode::LESS_EQUAL:
-                    handleLessEqual(instruction);
-                    break;
-                case Opcode::GREATER:
-                    handleGreater(instruction);
-                    break;
-                case Opcode::GREATER_EQUAL:
-                    handleGreaterEqual(instruction);
-                    break;
-                case Opcode::AND:
-                    handleAnd(instruction);
-                    break;
-                case Opcode::OR:
-                    handleOr(instruction);
-                    break;
-                case Opcode::NOT:
-                    handleNot(instruction);
-                    break;
-                case Opcode::INTERPOLATE_STRING:
-                    handleInterpolateString(instruction);
-                    break;
-                case Opcode::CONCAT:
-                    handleConcat(instruction);
-                    break;
-                case Opcode::JUMP:
-                    handleJump(instruction);
-                    break;
-                case Opcode::JUMP_IF_TRUE:
-                    handleJumpIfTrue(instruction);
-                    break;
-                case Opcode::JUMP_IF_FALSE:
-                    handleJumpIfFalse(instruction);
-                    break;
-                case Opcode::CALL:
-                    handleCall(instruction);
-                    break;
-                case Opcode::RETURN:
-                    handleReturn(instruction);
-                    break;
-                case Opcode::BEGIN_FUNCTION:
-                    handleBeginFunction(instruction);
-                    break;
-                case Opcode::END_FUNCTION:
-                    handleEndFunction(instruction);
-                    break;
-                case Opcode::DEFINE_PARAM:
-                    handleDefineParam(instruction);
-                    break;
-                case Opcode::DEFINE_OPTIONAL_PARAM:
-                    handleDefineOptionalParam(instruction);
-                    break;
-                case Opcode::SET_DEFAULT_VALUE:
-                    handleSetDefaultValue(instruction);
-                    break;
-                case Opcode::PRINT:
-                    handlePrint(instruction);
-                    break;
-                case Opcode::CREATE_LIST:
-                    handleCreateList(instruction);
-                    break;
-                case Opcode::LIST_APPEND:
-                    handleListAppend(instruction);
-                    break;
-                case Opcode::CREATE_DICT:
-                    handleCreateDict(instruction);
-                    break;
-                case Opcode::DICT_SET:
-                    handleDictSet(instruction);
-                    break;
-                case Opcode::GET_INDEX:
-                    handleGetIndex(instruction);
-                    break;
-                case Opcode::SET_INDEX:
-                    handleSetIndex(instruction);
-                    break;
-                case Opcode::CREATE_RANGE:
-                    handleCreateRange(instruction);
-                    break;
-                case Opcode::GET_ITERATOR:
-                    handleGetIterator(instruction);
-                    break;
-                case Opcode::ITERATOR_HAS_NEXT:
-                    handleIteratorHasNext(instruction);
-                    break;
-                case Opcode::ITERATOR_NEXT:
-                    handleIteratorNext(instruction);
-                    break;
-                case Opcode::ITERATOR_NEXT_KEY_VALUE:
-                    handleIteratorNextKeyValue(instruction);
-                    break;
-                case Opcode::BEGIN_CLASS:
-                    handleBeginClass(instruction);
-                    break;
-                case Opcode::END_CLASS:
-                    handleEndClass(instruction);
-                    break;
-                case Opcode::SET_SUPERCLASS:
-                    handleSetSuperclass(instruction);
-                    break;
-                case Opcode::DEFINE_FIELD:
-                    handleDefineField(instruction);
-                    break;
-                case Opcode::LOAD_THIS:
-                    handleLoadThis(instruction);
-                    break;
-                case Opcode::LOAD_SUPER:
-                    handleLoadSuper(instruction);
-                    break;
-                case Opcode::GET_PROPERTY:
-                    handleGetProperty(instruction);
-                    break;
-                case Opcode::SET_PROPERTY:
-                    handleSetProperty(instruction);
-                    break;
-                case Opcode::BEGIN_SCOPE:
-                    // No action needed for BEGIN_SCOPE in this implementation
-                    break;
-                case Opcode::END_SCOPE:
-                    // No action needed for END_SCOPE in this implementation
-                    break;
-                case Opcode::MATCH_PATTERN:
-                    handleMatchPattern(instruction);
-                    break;
-                case Opcode::BEGIN_PARALLEL:
-                    handleBeginParallel(instruction);
-                    break;
-                case Opcode::END_PARALLEL:
-                    handleEndParallel(instruction);
-                    break;
-                case Opcode::BEGIN_CONCURRENT:
-                    handleBeginConcurrent(instruction);
-                    break;
-                case Opcode::END_CONCURRENT:
-                    handleEndConcurrent(instruction);
-                    break;
-                case Opcode::BEGIN_TRY:
-                    handleBeginTry(instruction);
-                    break;
-                case Opcode::END_TRY:
-                    handleEndTry(instruction);
-                    break;
-                case Opcode::BEGIN_HANDLER:
-                    handleBeginHandler(instruction);
-                    break;
-                case Opcode::END_HANDLER:
-                    handleEndHandler(instruction);
-                    break;
-                case Opcode::THROW:
-                    handleThrow(instruction);
-                    break;
-                case Opcode::STORE_EXCEPTION:
-                    handleStoreException(instruction);
-                    break;
-                case Opcode::AWAIT:
-                    handleAwait(instruction);
-                    break;
-                case Opcode::IMPORT:
-                    handleImport(instruction);
-                    break;
-                case Opcode::BEGIN_ENUM:
-                    handleBeginEnum(instruction);
-                    break;
-                case Opcode::END_ENUM:
-                    handleEndEnum(instruction);
-                    break;
-                case Opcode::DEFINE_ENUM_VARIANT:
-                    handleDefineEnumVariant(instruction);
-                    break;
-                case Opcode::DEFINE_ENUM_VARIANT_WITH_TYPE:
-                    handleDefineEnumVariantWithType(instruction);
-                    break;
-                case Opcode::DEBUG_PRINT:
-                    handleDebugPrint(instruction);
-                    break;
-                case Opcode::CHECK_ERROR:
-                    handleCheckError(instruction);
-                    break;
-                case Opcode::PROPAGATE_ERROR:
-                    handlePropagateError(instruction);
-                    break;
-                case Opcode::CONSTRUCT_ERROR:
-                    handleConstructError(instruction);
-                    break;
-                case Opcode::CONSTRUCT_OK:
-                    handleConstructOk(instruction);
-                    break;
-                case Opcode::IS_ERROR:
-                    handleIsError(instruction);
-                    break;
-                case Opcode::IS_SUCCESS:
-                    handleIsSuccess(instruction);
-                    break;
-                case Opcode::UNWRAP_VALUE:
-                    handleUnwrapValue(instruction);
-                    break;
-                case Opcode::HALT:
-                    return stack.empty() ? memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE) : stack.back();
-                default:
-                    error("Unknown opcode: " + std::to_string(static_cast<int>(instruction.opcode)));
-                    break;
+            try {
+                // Check if the top of the stack is an error before executing the next instruction
+                if (!stack.empty()) {
+                    ValuePtr top = stack.back();
+                    if (top && top->type && 
+                        (top->type->tag == TypeTag::ErrorUnion || std::holds_alternative<ErrorValue>(top->data))) {
+                        // We have an error value on the stack, propagate it
+                        if (!errorFrames.empty()) {
+                            // If we have an error frame, propagate the error
+                            if (!propagateError(top)) {
+                                // If propagation failed, clear the error frame and continue
+                                errorFrames.clear();
+                            }
+                        } else {
+                            // No error frame, just report the error
+                            if (auto errorVal = std::get_if<ErrorValue>(&top->data)) {
+                                error("Unhandled error: " + errorVal->errorType + 
+                                     (errorVal->message.empty() ? "" : " - " + errorVal->message));
+                            } else {
+                                error("Unhandled error: " + valueToString(top));
+                            }
+                        }
+                        // Remove the error value from the stack
+                        stack.pop_back();
+                    }
+                }
+                
+                switch (instruction.opcode) {
+                    case Opcode::PUSH_INT:
+                        handlePushInt(instruction);
+                        break;
+                    case Opcode::PUSH_FLOAT:
+                        handlePushFloat(instruction);
+                        break;
+                    case Opcode::PUSH_STRING:
+                        handlePushString(instruction);
+                        break;
+                    case Opcode::PUSH_BOOL:
+                        handlePushBool(instruction);
+                        break;
+                    case Opcode::PUSH_NULL:
+                        handlePushNull(instruction);
+                        break;
+                    case Opcode::POP:
+                        handlePop(instruction);
+                        break;
+                    case Opcode::DUP:
+                        handleDup(instruction);
+                        break;
+                    case Opcode::SWAP:
+                        handleSwap(instruction);
+                        break;
+                    case Opcode::STORE_VAR:
+                        handleStoreVar(instruction);
+                        break;
+                    case Opcode::LOAD_VAR:
+                        handleLoadVar(instruction);
+                        break;
+                    case Opcode::STORE_TEMP:
+                        handleStoreTemp(instruction);
+                        break;
+                    case Opcode::LOAD_TEMP:
+                        handleLoadTemp(instruction);
+                        break;
+                    case Opcode::CLEAR_TEMP:
+                        handleClearTemp(instruction);
+                        break;
+                    case Opcode::ADD:
+                        handleAdd(instruction);
+                        break;
+                    case Opcode::SUBTRACT:
+                        handleSubtract(instruction);
+                        break;
+                    case Opcode::MULTIPLY:
+                        handleMultiply(instruction);
+                        break;
+                    case Opcode::DIVIDE:
+                        handleDivide(instruction);
+                        break;
+                    case Opcode::MODULO:
+                        handleModulo(instruction);
+                        break;
+                    case Opcode::NEGATE:
+                        handleNegate(instruction);
+                        break;
+                    case Opcode::EQUAL:
+                        handleEqual(instruction);
+                        break;
+                    case Opcode::NOT_EQUAL:
+                        handleNotEqual(instruction);
+                        break;
+                    case Opcode::LESS:
+                        handleLess(instruction);
+                        break;
+                    case Opcode::LESS_EQUAL:
+                        handleLessEqual(instruction);
+                        break;
+                    case Opcode::GREATER:
+                        handleGreater(instruction);
+                        break;
+                    case Opcode::GREATER_EQUAL:
+                        handleGreaterEqual(instruction);
+                        break;
+                    case Opcode::AND:
+                        handleAnd(instruction);
+                        break;
+                    case Opcode::OR:
+                        handleOr(instruction);
+                        break;
+                    case Opcode::NOT:
+                        handleNot(instruction);
+                        break;
+                    case Opcode::INTERPOLATE_STRING:
+                        handleInterpolateString(instruction);
+                        break;
+                    case Opcode::CONCAT:
+                        handleConcat(instruction);
+                        break;
+                    case Opcode::JUMP:
+                        handleJump(instruction);
+                        break;
+                    case Opcode::JUMP_IF_TRUE:
+                        handleJumpIfTrue(instruction);
+                        break;
+                    case Opcode::JUMP_IF_FALSE:
+                        handleJumpIfFalse(instruction);
+                        break;
+                    case Opcode::CALL:
+                        handleCall(instruction);
+                        break;
+                    case Opcode::RETURN:
+                        handleReturn(instruction);
+                        break;
+                    case Opcode::BEGIN_FUNCTION:
+                        handleBeginFunction(instruction);
+                        break;
+                    case Opcode::END_FUNCTION:
+                        handleEndFunction(instruction);
+                        break;
+                    case Opcode::DEFINE_PARAM:
+                        handleDefineParam(instruction);
+                        break;
+                    case Opcode::DEFINE_OPTIONAL_PARAM:
+                        handleDefineOptionalParam(instruction);
+                        break;
+                    case Opcode::SET_DEFAULT_VALUE:
+                        handleSetDefaultValue(instruction);
+                        break;
+                    case Opcode::PRINT:
+                        handlePrint(instruction);
+                        break;
+                    case Opcode::CREATE_LIST:
+                        handleCreateList(instruction);
+                        break;
+                    case Opcode::LIST_APPEND:
+                        handleListAppend(instruction);
+                        break;
+                    case Opcode::CREATE_DICT:
+                        handleCreateDict(instruction);
+                        break;
+                    case Opcode::DICT_SET:
+                        handleDictSet(instruction);
+                        break;
+                    case Opcode::GET_INDEX:
+                        handleGetIndex(instruction);
+                        break;
+                    case Opcode::SET_INDEX:
+                        handleSetIndex(instruction);
+                        break;
+                    case Opcode::CREATE_RANGE:
+                        handleCreateRange(instruction);
+                        break;
+                    case Opcode::GET_ITERATOR:
+                        handleGetIterator(instruction);
+                        break;
+                    case Opcode::ITERATOR_HAS_NEXT:
+                        handleIteratorHasNext(instruction);
+                        break;
+                    case Opcode::ITERATOR_NEXT:
+                        handleIteratorNext(instruction);
+                        break;
+                    case Opcode::ITERATOR_NEXT_KEY_VALUE:
+                        handleIteratorNextKeyValue(instruction);
+                        break;
+                    case Opcode::BEGIN_CLASS:
+                        handleBeginClass(instruction);
+                        break;
+                    case Opcode::END_CLASS:
+                        handleEndClass(instruction);
+                        break;
+                    case Opcode::SET_SUPERCLASS:
+                        handleSetSuperclass(instruction);
+                        break;
+                    case Opcode::DEFINE_FIELD:
+                        handleDefineField(instruction);
+                        break;
+                    case Opcode::LOAD_THIS:
+                        handleLoadThis(instruction);
+                        break;
+                    case Opcode::LOAD_SUPER:
+                        handleLoadSuper(instruction);
+                        break;
+                    case Opcode::GET_PROPERTY:
+                        handleGetProperty(instruction);
+                        break;
+                    case Opcode::SET_PROPERTY:
+                        handleSetProperty(instruction);
+                        break;
+                    case Opcode::BEGIN_SCOPE:
+                        // No action needed for BEGIN_SCOPE in this implementation
+                        break;
+                    case Opcode::END_SCOPE:
+                        // No action needed for END_SCOPE in this implementation
+                        break;
+                    case Opcode::MATCH_PATTERN:
+                        handleMatchPattern(instruction);
+                        break;
+                    case Opcode::BEGIN_PARALLEL:
+                        handleBeginParallel(instruction);
+                        break;
+                    case Opcode::END_PARALLEL:
+                        handleEndParallel(instruction);
+                        break;
+                    case Opcode::BEGIN_CONCURRENT:
+                        handleBeginConcurrent(instruction);
+                        break;
+                    case Opcode::END_CONCURRENT:
+                        handleEndConcurrent(instruction);
+                        break;
+                        case Opcode::BEGIN_TRY:
+                            handleBeginTry(instruction);
+                            break;
+                        case Opcode::END_TRY:
+                            handleEndTry(instruction);
+                            break;
+                        case Opcode::BEGIN_HANDLER:
+                            handleBeginHandler(instruction);
+                            break;
+                        case Opcode::END_HANDLER:
+                            handleEndHandler(instruction);
+                            break;
+                        case Opcode::THROW:
+                            handleThrow(instruction);
+                            break;
+                        case Opcode::STORE_EXCEPTION:
+                            handleStoreException(instruction);
+                            break;
+                        case Opcode::AWAIT:
+                            handleAwait(instruction);
+                            break;
+                        case Opcode::IMPORT:
+                            handleImport(instruction);
+                            break;
+                        case Opcode::BEGIN_ENUM:
+                            handleBeginEnum(instruction);
+                            break;
+                        case Opcode::END_ENUM:
+                            handleEndEnum(instruction);
+                            break;
+                        case Opcode::DEFINE_ENUM_VARIANT:
+                            handleDefineEnumVariant(instruction);
+                            break;
+                        case Opcode::DEFINE_ENUM_VARIANT_WITH_TYPE:
+                            handleDefineEnumVariantWithType(instruction);
+                            break;
+                        case Opcode::DEBUG_PRINT:
+                            handleDebugPrint(instruction);
+                            break;
+                        case Opcode::CHECK_ERROR:
+                            handleCheckError(instruction);
+                            break;
+                        case Opcode::PROPAGATE_ERROR:
+                            handlePropagateError(instruction);
+                            break;
+                        case Opcode::CONSTRUCT_ERROR:
+                            handleConstructError(instruction);
+                            break;
+                        case Opcode::CONSTRUCT_OK:
+                            handleConstructOk(instruction);
+                            break;
+                        case Opcode::IS_ERROR:
+                            handleIsError(instruction);
+                            break;
+                        case Opcode::IS_SUCCESS:
+                             handleIsSuccess(instruction);
+                             break;    
+                        case Opcode::UNWRAP_VALUE:
+                             handleUnwrapValue(instruction);
+                              break;         
+                        case Opcode::BREAK:
+                          //  handleBreak(instruction);
+                            break;
+                        case Opcode::CONTINUE:
+                         //   handleContinue(instruction);
+                            break;    
+                        case Opcode::SET_RANGE_STEP:
+                           // handleSetRangeStep(instruction);
+                            break;
+                        case Opcode::BEGIN_TASK:
+                           // handleBeginTask(instruction);
+                            break;    
+                        case Opcode::END_TASK:
+                          //  handleEndTask(instruction);
+                            break;    
+                        case Opcode::BEGIN_WORKER:
+                           // handleBeginWorker(instruction);
+                            break;    
+                        case Opcode::END_WORKER:
+                           // handleEndWorker(instruction);
+                            break;    
+                        case Opcode::STORE_ITERABLE:
+                            //handleStoreIterable(instruction);
+                            break;    
+                        case Opcode::LOAD_CONST :
+                           // handleLoadConst(instruction);
+                            break;      
+                        case Opcode::STORE_CONST:
+                           // handleStoreConst(instruction);
+                            break;      
+                        case Opcode::LOAD_MEMBER:
+                            //handleLoadMember(instruction);
+                            break;      
+                        case Opcode::STORE_MEMBER:
+                          //  handleStoreMember(instruction);
+                            break;
+                         
+                        case Opcode::HALT:
+                            return stack.empty() ? memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE) : stack.back();
+                        default:
+                            error("Unknown opcode: " + std::to_string(static_cast<int>(instruction.opcode)));
+                            break;        
+     
+                }
+            } catch (const std::exception& e) {
+                // Handle any exceptions that occur during instruction execution
+                error("Error executing instruction: " + std::string(e.what()));
             }
-            
             ip++;
         }
     } catch (const std::exception& e) {
-        std::cerr << "Runtime error: " << e.what() << std::endl;
-        return memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
+        // Handle any exceptions that occur during execution
+        error("Error executing bytecode: " + std::string(e.what()));
     }
-    return stack.empty() ? memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE) : stack.back();
+    return nullptr;
 }
-void VM::registerNativeFunction(const std::string& name, std::function<ValuePtr(const std::vector<ValuePtr>&)> function) {
-    nativeFunctions[name] = function;
+
+
+//     nativeFunctions[name] = function;
     
-    // Also register with the function registry for consistency
-    std::vector<backend::Parameter> params; // Empty for now, could be enhanced
-    functionRegistry.registerNativeFunction(name, params, std::nullopt, function);
-}
+//     // Also register with the function registry for consistency
+//     std::vector<backend::Parameter> params; // Empty for now, could be enhanced
+//     functionRegistry.registerNativeFunction(name, params, std::nullopt, function);
+// }
 
 void VM::registerUserFunction(const std::shared_ptr<AST::FunctionDeclaration>& decl) {
     functionRegistry.registerFunction(decl);
@@ -492,29 +594,54 @@ void VM::popErrorFrame() {
 }
 
 bool VM::propagateError(ValuePtr errorValue) {
-    if (errorFrames.empty()) {
-        // No error handler, let the error bubble up
+    if (!errorValue) {
         return false;
     }
     
-    // Get the most recent error frame
-    ErrorFrame& frame = errorFrames.back();
-    
-    // Restore stack to the error frame's base
-    while (stack.size() > frame.stackBase) {
-        stack.pop_back();
+    // Get error type from the error value
+    std::string errorType;
+    if (auto errorVal = std::get_if<ErrorValue>(&errorValue->data)) {
+        errorType = errorVal->errorType;
+    } else if (errorValue->type->tag == TypeTag::ErrorUnion) {
+        if (auto errorVal = std::get_if<ErrorValue>(&errorValue->data)) {
+            errorType = errorVal->errorType;
+        } else {
+            return false; // Not an error value
+        }
+    } else {
+        return false; // Not an error value
     }
     
-    // Push the error value onto the stack
-    push(errorValue);
+    // Find matching error handler
+    while (!errorFrames.empty()) {
+        ErrorFrame& frame = errorFrames.back();
+        
+        // Check if this frame can handle the error type
+        if (frame.expectedErrorType) {
+            // If the frame expects a specific error type, check compatibility
+            if (frame.expectedErrorType->tag == TypeTag::ErrorUnion) {
+                // Frame can handle any error
+                ip = frame.handlerAddress;
+                // Restore stack
+                while (stack.size() > frame.stackBase) {
+                    stack.pop_back();
+                }
+                return true;
+            } else if (frame.expectedErrorType->name == errorType) {
+                // Exact type match
+                ip = frame.handlerAddress;
+                while (stack.size() > frame.stackBase) {
+                    stack.pop_back();
+                }
+                return true;
+            }
+        }
+        
+        // This frame can't handle the error, pop it and continue
+        errorFrames.pop_back();
+    }
     
-    // Jump to the error handler
-    ip = frame.handlerAddress;
-    
-    // Pop the error frame
-    popErrorFrame();
-    
-    return true;
+    return false; // No matching handler found
 }
 
 ValuePtr VM::handleError(ValuePtr errorValue, const std::string& expectedType) {
@@ -884,7 +1011,13 @@ void VM::handleDivide(const Instruction& /*unused*/) {
     bool bIsNumeric = (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Float64);
     
     if (!aIsNumeric || !bIsNumeric) {
-        error("Both operands must be numbers for division");
+        // Create and push error value
+        auto errorType = typeSystem->getType("DivisionByZero");
+        auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
+        ErrorValue errorVal("TypeError", "Both operands must be numbers for division");
+        errorValue->data = errorVal;
+        push(errorValue);
+        return;
     }
     
     // Check for division by zero with better error message
@@ -902,7 +1035,13 @@ void VM::handleDivide(const Instruction& /*unused*/) {
     }
     
     if (isZero) {
-        error("Division by " + zeroType + " is not allowed");
+        // Create and push error value
+        auto errorType = typeSystem->getType("DivisionByZero");
+        auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
+        ErrorValue errorVal("DivisionByZero", "Division by " + zeroType + " is not allowed");
+        errorValue->data = errorVal;
+        push(errorValue);
+        return;
     }
     
     // Numeric division - always promote to double if either operand is double
@@ -917,7 +1056,13 @@ void VM::handleDivide(const Instruction& /*unused*/) {
         
         // Check for floating-point edge cases
         if (std::isinf(aVal / bVal)) {
-            error("Floating-point division resulted in infinity");
+            // Create and push error value
+            auto errorType = typeSystem->getType("ArithmeticError");
+            auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
+            ErrorValue errorVal("ArithmeticError", "Floating-point division resulted in infinity");
+            errorValue->data = errorVal;
+            push(errorValue);
+            return;
         }
         
         push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, aVal / bVal));
@@ -927,7 +1072,13 @@ void VM::handleDivide(const Instruction& /*unused*/) {
         int32_t bVal = std::get<int32_t>(b->data);
         
         if (aVal == std::numeric_limits<int32_t>::min() && bVal == -1) {
-            error("Integer division overflow");
+            // Create and push error value
+            auto errorType = typeSystem->getType("ArithmeticError");
+            auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
+            ErrorValue errorVal("ArithmeticError", "Integer division overflow");
+            errorValue->data = errorVal;
+            push(errorValue);
+            return;
         }
         
         push(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, aVal / bVal));
@@ -1503,6 +1654,17 @@ void VM::handleCall(const Instruction& instruction) {
     // For method calls and constructor calls, the callee is on the stack
     // For simple function calls, the function name is in the instruction
     ValuePtr callee = nullptr;
+    
+    // Check if this function can fail and push an error frame if needed
+    bool canFail = functionCanFail(funcName);
+    size_t errorHandlerAddress = 0;
+    if (canFail) {
+        // The error handler address is the next instruction after the call
+        errorHandlerAddress = ip + 1;
+        // Push an error frame with the handler address
+        pushErrorFrame(errorHandlerAddress, typeSystem->getType("Error"), funcName);
+    }
+    
     if (funcName.substr(0, 7) == "method:" || funcName.substr(0, 6) == "super:") {
         // Method call - callee is on the stack
         if (stack.empty()) {
@@ -1536,9 +1698,18 @@ void VM::handleCall(const Instruction& instruction) {
                 
                 // Call the constructor
                 constructor->implementation->execute(args);
+                
+                // If we get here, the constructor succeeded
+                if (canFail) {
+                    popErrorFrame();
+                }
+                
+                // Push the new instance onto the stack
+                push(thisValue);
+                return;
             }
             
-            // Push the new instance onto the stack
+            // If no constructor is found, just push the new instance onto the stack
             push(thisValue);
             return;
         } catch (const std::exception& e) {
@@ -3311,35 +3482,133 @@ void VM::handleCheckError(const Instruction& instruction) {
 
 void VM::handlePropagateError(const Instruction& instruction) {
     (void)instruction; // Mark as unused
+    
+    ValuePtr error_value;
     if (stack.empty()) {
-        error("Stack underflow in PROPAGATE_ERROR");
+        if (lastException) {
+            // Use the last exception if available
+            error_value = lastException;
+            lastException = nullptr;
+            
+            if (debugOutput) {
+                std::cerr << "[DEBUG] Using last exception: " << valueToString(error_value) << std::endl;
+            }
+        } else {
+            if (debugOutput) {
+                std::cerr << "[DEBUG] No error value to propagate and no last exception available" << std::endl;
+            }
+            return; // No error to propagate, just return
+        }
+    } else {
+        error_value = stack.back(); // Peek at the top value
+        
+        if (debugOutput) {
+            std::cerr << "[DEBUG] Found error value on stack: " << valueToString(error_value) << std::endl;
+        }
+    }
+    
+    if (!error_value) {
+        if (debugOutput) {
+            std::cerr << "[DEBUG] Attempted to propagate null error value" << std::endl;
+        }
         return;
     }
     
-    ValuePtr errorValue = pop();
-    
     // Verify this is actually an error value
-    bool isActualError = false;
-    if (errorValue->type->tag == TypeTag::ErrorUnion && std::holds_alternative<ErrorValue>(errorValue->data)) {
-        isActualError = true;
-    } else if (std::holds_alternative<ErrorValue>(errorValue->data)) {
-        isActualError = true;
+    bool isError = false;
+    std::string errorType;
+    
+    if (error_value->type) {
+        if (error_value->type->tag == TypeTag::ErrorUnion) {
+            // For error unions, we consider them errors if they contain an error
+            if (error_value->isError()) {
+                isError = true;
+                // Try to get error type if possible
+                if (auto errorVal = error_value->getErrorValue()) {
+                    errorType = errorVal->errorType;
+                } else {
+                    errorType = "UnknownError";
+                }
+                }
+            }
+        } else {
+            try {
+                if (auto errorVal = std::get_if<::ErrorValue>(&error_value->data)) {
+                    isActualError = true;
+                    errorType = errorVal->errorType;
+                    
+                    if (debugOutput) {
+                        std::cerr << "[DEBUG] Found direct ErrorValue with type: " << errorType << std::endl;
+                    }
+                }
+            } catch (const std::bad_variant_access&) {
+                if (debugOutput) {
+                    std::cerr << "[DEBUG] Value is not a direct ErrorValue" << std::endl;
+                }
+            }
+        }
     }
     
     if (!isActualError) {
-        error("Attempted to propagate non-error value");
-        return;
+        if (debugOutput) {
+            std::cerr << "[DEBUG] Not an error value, not propagating: " << valueToString(error_value) << std::endl;
+        }
+        return; // Not an error value, don't propagate
     }
     
+    // If we got here, we have a valid error value to propagate
+    if (debugOutput) {
+        std::cerr << "[DEBUG] Propagating error: " << valueToString(error_value) << std::endl;
+    }
+    
+    // Remove the error value from the stack if it was there
+    if (!stack.empty() && stack.back() == error_value) {
+        stack.pop_back();
+    }
+    
+    // Clear any previous exception since we're handling it now
+    lastException = nullptr;
+    
     // Try to propagate the error using the error frame stack
-    if (!propagateError(errorValue)) {
-        // No error handler found, terminate with error
-        if (auto errorVal = std::get_if<ErrorValue>(&errorValue->data)) {
-            error("Unhandled error: " + errorVal->errorType + 
-                  (errorVal->message.empty() ? "" : " - " + errorVal->message));
-        } else {
-            error("Unhandled error: " + valueToString(errorValue));
+    if (errorFrames.empty()) {
+        if (debugOutput) {
+            std::cerr << "[DEBUG] No error frame available for error: " << errorType << std::endl;
         }
+        
+        // If no error frame, create one that will handle any error type
+        ErrorFrame frame;
+        frame.handlerAddress = ip + 1; // Default to next instruction
+        frame.stackBase = stack.size();
+        frame.expectedErrorType = typeSystem->getType("Any"); // Accept any error type
+        frame.functionName = "<global error handler>";
+        errorFrames.push_back(frame);
+        
+        if (debugOutput) {
+            std::cerr << "[DEBUG] Created default error frame at IP: " << ip + 1 << std::endl;
+        }
+    }
+    
+    // Now propagate the error
+    if (!propagateError(error_value)) {
+        // If propagation failed, try to get error information
+        std::string errorMsg = "Unhandled error";
+        
+        try {
+            if (auto errorVal = std::get_if<::ErrorValue>(&error_value->data)) {
+                errorMsg = "Unhandled error: " + errorVal->errorType;
+                if (!errorVal->message.empty()) {
+                    errorMsg += " - " + errorVal->message;
+                }
+            }
+        } catch (const std::exception& e) {
+            if (debugOutput) {
+                std::cerr << "[DEBUG] Error getting error details: " << e.what() << std::endl;
+            }
+        }
+        
+        error(errorMsg);
+    } else if (debugOutput) {
+        std::cerr << "[DEBUG] Error propagated successfully, new IP: " << ip << std::endl;
     }
     // If propagation succeeded, execution will continue at the error handler
 }
@@ -3353,39 +3622,47 @@ void VM::handleConstructError(const Instruction& instruction) {
         return;
     }
     
-    // Pop arguments from stack (in reverse order to maintain correct order)
+    // Pop arguments from stack
     std::vector<ValuePtr> args;
+    args.reserve(argCount);
     for (int i = 0; i < argCount; i++) {
-        args.insert(args.begin(), pop());
+        args.push_back(pop());
+    }
+    std::reverse(args.begin(), args.end());  // Maintain correct order
+    
+    // Create error message
+    std::string errorMessage;
+    if (!args.empty() && args[0]->type->tag == TypeTag::String) {
+        errorMessage = std::get<std::string>(args[0]->data);
+    } else {
+        errorMessage = "Error occurred";
     }
     
-    // Create error message from arguments
-    std::string errorMessage = "";
-    if (!args.empty()) {
-        // First argument is typically the message
-        if (args[0]->type->tag == TypeTag::String) {
-            errorMessage = std::get<std::string>(args[0]->data);
-        } else {
-            errorMessage = valueToString(args[0]);
-        }
+    // Look up error type in the type system
+    TypePtr errorTypePtr = typeSystem->getType(errorType);
+    if (!errorTypePtr) {
+        error("Unknown error type: " + errorType);
+        return;
     }
     
-    // Create ErrorValue with proper structure
-    ErrorValue errorVal(errorType, errorMessage, args, ip); // Include source location
+    // Create error value with proper type information
+    ErrorValue errorVal(errorType, errorMessage, args, ip);
+    ValuePtr errorValue = memoryManager.makeRef<Value>(*region, errorTypePtr);
+    errorValue->data = errorVal;
     
-    // Create error union type for the result
+    // Create error union type
     auto errorUnionType = memoryManager.makeRef<Type>(*region, TypeTag::ErrorUnion);
     ErrorUnionType errorUnionDetails;
-    errorUnionDetails.successType = typeSystem->NIL_TYPE; // Default success type
+    errorUnionDetails.successType = typeSystem->NIL_TYPE;
     errorUnionDetails.errorTypes = {errorType};
     errorUnionDetails.isGenericError = false;
     errorUnionType->extra = errorUnionDetails;
     
-    // Create the error value
-    ValuePtr errorValue = memoryManager.makeRef<Value>(*region, errorUnionType);
-    errorValue->data = errorVal;
+    // Create the final value with the error union type
+    ValuePtr result = memoryManager.makeRef<Value>(*region, errorUnionType);
+    result->data = errorVal;
     
-    push(errorValue);
+    push(result);
 }
 
 void VM::handleConstructOk(const Instruction& instruction) {

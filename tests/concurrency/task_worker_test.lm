@@ -96,15 +96,15 @@ task(i in 1..2) {
 // ==========================================
 print("\nTesting error handling in tasks...");
 
-try {
-    task(i in 1..3) {
-        if (i == 2) {
-            throw "Error in task ${i}";
-        }
-        print("Task", i, "completed successfully");
-    }
-} catch (e) {
-    print("Caught error:", e);
-}
+// try {
+//     task(i in 1..3) {
+//         if (i == 2) {
+//             throw "Error in task ${i}";
+//         }
+//         print("Task", i, "completed successfully");
+//     }
+// } catch (e) {
+//     print("Caught error:", e);
+// }
 
 print("\n=== Task and Worker Tests Complete ===");

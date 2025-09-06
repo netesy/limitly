@@ -1,0 +1,26 @@
+Bytecode for tests\loops\simple_function_test.lm
+========================================
+
+Total instructions: 21
+
+   1: PUSH_STRING          (line 1) "=== Simple Function Test ==="
+2   : PRINT                (line 1)
+3   : BEGIN_FUNCTION       (line 3)
+4   : DEFINE_PARAM         (line 3) x
+5   : BEGIN_SCOPE          (line 3)
+6   : PUSH_STRING          (line 4) "Function called with: "
+7   : LOAD_VAR             (line 4) x
+8   : PUSH_STRING          (line 4) ""
+9   : CONCAT               (line 4)
+10  : INTERPOLATE_STRING   (line 4)
+11  : PRINT                (line 4)
+12  : END_SCOPE            (line 3)
+13  : PUSH_NULL            (line 3)
+14  : RETURN               (line 3)
+15  : END_FUNCTION         (line 3)
+16  : PUSH_INT             (line 7) 42
+17  : CALL                 (line 7) 1
+18  : POP                  (line 7)
+19  : PUSH_STRING          (line 8) "=== Test completed ==="
+20  : PRINT                (line 8)
+21  : HALT                 (line 0)

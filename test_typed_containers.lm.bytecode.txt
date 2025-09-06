@@ -1,0 +1,29 @@
+Bytecode for test_typed_containers.lm
+========================================
+
+Total instructions: 24
+
+   1: PUSH_INT             (line 10) 1
+2   : PUSH_INT             (line 10) 2
+3   : PUSH_INT             (line 10) 3
+4   : CREATE_LIST          (line 10) 3
+5   : STORE_VAR            (line 10) numbers
+6   : PUSH_STRING          (line 11) "Alice"
+7   : PUSH_STRING          (line 11) "Bob"
+8   : CREATE_LIST          (line 11) 2
+9   : STORE_VAR            (line 11) names
+10  : PUSH_STRING          (line 12) "Alice"
+11  : PUSH_INT             (line 12) 95
+12  : PUSH_STRING          (line 12) "Bob"
+13  : PUSH_INT             (line 12) 87
+14  : CREATE_DICT          (line 12) 2
+15  : STORE_VAR            (line 12) scores
+16  : PUSH_INT             (line 13) 1
+17  : PUSH_FLOAT           (line 13) 9.99
+18  : PUSH_INT             (line 13) 2
+19  : PUSH_FLOAT           (line 13) 19.99
+20  : CREATE_DICT          (line 13) 2
+21  : STORE_VAR            (line 13) prices
+22  : PUSH_STRING          (line 15) "Typed containers test"
+23  : PRINT                (line 15)
+24  : HALT                 (line 0)

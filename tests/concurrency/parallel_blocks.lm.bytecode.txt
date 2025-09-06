@@ -1,0 +1,50 @@
+Bytecode for .\tests\concurrency\parallel_blocks.lm
+========================================
+
+Total instructions: 45
+
+   1: PUSH_STRING          (line 2) "=== Parallel Block Tests ==="
+2   : PRINT                (line 2)
+3   : BEGIN_PARALLEL       (line 7)
+4   : BEGIN_SCOPE          (line 8)
+5   : END_SCOPE            (line 8)
+6   : END_PARALLEL         (line 7)
+7   : LOAD_VAR             (line 19) messages
+8   : GET_ITERATOR         (line 19)
+9   : STORE_TEMP           (line 19)
+10  : LOAD_TEMP            (line 19)
+11  : ITERATOR_HAS_NEXT    (line 19)
+12  : JUMP_IF_FALSE        (line 19) 12
+13  : LOAD_TEMP            (line 19)
+14  : ITERATOR_NEXT        (line 19)
+15  : STORE_VAR            (line 19) message
+16  : BEGIN_SCOPE          (line 19)
+17  : PUSH_STRING          (line 20) "Received: "
+18  : LOAD_VAR             (line 20) message
+19  : PUSH_STRING          (line 20) ""
+20  : CONCAT               (line 20)
+21  : INTERPOLATE_STRING   (line 20)
+22  : PRINT                (line 20)
+23  : END_SCOPE            (line 19)
+24  : JUMP                 (line 19) -15
+25  : CLEAR_TEMP           (line 19)
+26  : BEGIN_PARALLEL       (line 26)
+27  : BEGIN_SCOPE          (line 28)
+28  : END_SCOPE            (line 28)
+29  : END_PARALLEL         (line 26)
+30  : LOAD_VAR             (line 39) files_out
+31  : GET_ITERATOR         (line 39)
+32  : STORE_TEMP           (line 39)
+33  : LOAD_TEMP            (line 39)
+34  : ITERATOR_HAS_NEXT    (line 39)
+35  : JUMP_IF_FALSE        (line 39) 8
+36  : LOAD_TEMP            (line 39)
+37  : ITERATOR_NEXT        (line 39)
+38  : STORE_VAR            (line 39) msg
+39  : BEGIN_SCOPE          (line 39)
+40  : LOAD_VAR             (line 40) msg
+41  : PRINT                (line 40)
+42  : END_SCOPE            (line 39)
+43  : JUMP                 (line 39) -11
+44  : CLEAR_TEMP           (line 39)
+45  : HALT                 (line 0)
