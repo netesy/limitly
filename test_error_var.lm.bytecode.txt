@@ -1,0 +1,7 @@
+Bytecode for test_error_var.lm
+========================================
+
+Total instructions: 2
+
+   1: PUSH_INT             (line 2)
+2   : STORE_VAR            (line 2)

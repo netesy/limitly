@@ -1,0 +1,113 @@
+AST for tests\types\primitive_type_aliases.lm
+========================================
+
+AST Dump:
+==========
+TypeDeclaration: UserId = i64
+TypeDeclaration: ProductId = u64
+TypeDeclaration: Price = f64
+TypeDeclaration: IsEnabled = bool
+TypeDeclaration: Description = str
+TypeDeclaration: SmallInt = i8
+TypeDeclaration: MediumInt = i16
+TypeDeclaration: RegularInt = i32
+TypeDeclaration: LargeInt = i64
+TypeDeclaration: SmallUInt = u8
+TypeDeclaration: MediumUInt = u16
+TypeDeclaration: RegularUInt = u32
+TypeDeclaration: LargeUInt = u64
+TypeDeclaration: SmallFloat = f32
+TypeDeclaration: LargeFloat = f64
+VarDeclaration: userId
+  Type: UserId
+  Initializer:
+    Literal: 1001
+VarDeclaration: productId
+  Type: ProductId
+  Initializer:
+    Literal: 2002
+VarDeclaration: price
+  Type: Price
+  Initializer:
+    Literal: 29.99
+VarDeclaration: isEnabled
+  Type: IsEnabled
+  Initializer:
+    Literal: true
+VarDeclaration: description
+  Type: Description
+  Initializer:
+    Literal: "Test Product"
+VarDeclaration: smallInt
+  Type: SmallInt
+  Initializer:
+    Literal: 127
+VarDeclaration: mediumInt
+  Type: MediumInt
+  Initializer:
+    Literal: 32767
+VarDeclaration: regularInt
+  Type: RegularInt
+  Initializer:
+    Literal: 2147483647
+VarDeclaration: smallUInt
+  Type: SmallUInt
+  Initializer:
+    Literal: 255
+VarDeclaration: mediumUInt
+  Type: MediumUInt
+  Initializer:
+    Literal: 65535
+VarDeclaration: smallFloat
+  Type: SmallFloat
+  Initializer:
+    Literal: 3.14
+VarDeclaration: largeFloat
+  Type: LargeFloat
+  Initializer:
+    Literal: 2.71828182845905
+PrintStatement:
+  Literal: "User ID:"
+  Variable: userId
+PrintStatement:
+  Literal: "Product ID:"
+  Variable: productId
+PrintStatement:
+  Literal: "Price:"
+  Variable: price
+PrintStatement:
+  Literal: "Is Enabled:"
+  Variable: isEnabled
+PrintStatement:
+  Literal: "Description:"
+  Variable: description
+PrintStatement:
+  Literal: "Small Int:"
+  Variable: smallInt
+PrintStatement:
+  Literal: "Medium Int:"
+  Variable: mediumInt
+PrintStatement:
+  Literal: "Regular Int:"
+  Variable: regularInt
+PrintStatement:
+  Literal: "Large Int:"
+  Variable: largeInt
+PrintStatement:
+  Literal: "Small UInt:"
+  Variable: smallUInt
+PrintStatement:
+  Literal: "Medium UInt:"
+  Variable: mediumUInt
+PrintStatement:
+  Literal: "Regular UInt:"
+  Variable: regularUInt
+PrintStatement:
+  Literal: "Large UInt:"
+  Variable: largeUInt
+PrintStatement:
+  Literal: "Small Float:"
+  Variable: smallFloat
+PrintStatement:
+  Literal: "Large Float:"
+  Variable: largeFloat

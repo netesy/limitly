@@ -1,0 +1,25 @@
+AST for tests\loops\simple_function_test.lm
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+  Literal: "=== Simple Function Test ==="
+FunctionDeclaration: test_function
+  Parameters:
+    x
+  Body:
+    BlockStatement:
+      PrintStatement:
+        InterpolatedString:
+          String: "Function called with: "
+          Expression:
+            Variable: x
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: test_function
+    Arguments:
+      Literal: 42
+PrintStatement:
+  Literal: "=== Test completed ==="

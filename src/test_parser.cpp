@@ -130,11 +130,23 @@ const std::unordered_map<Opcode, std::string> OPCODE_NAMES = {
     // Debug operations
     {Opcode::DEBUG_PRINT, "DEBUG_PRINT"},
 
+        // Error handling operations
+    {Opcode::CHECK_ERROR, "CHECK_ERROR"},        // Check if value is error, jump if true
+        {Opcode::PROPAGATE_ERROR, "PROPAGATE_ERROR"},    // Propagate error up the call stack
+        {Opcode::CONSTRUCT_ERROR, "CONSTRUCT_ERROR"},    // Construct error value
+        {Opcode::CONSTRUCT_OK, "CONSTRUCT_OK"},       // Construct success value
+        {Opcode::IS_ERROR, "IS_ERROR"},           // Check if union contains error
+        {Opcode::IS_SUCCESS, "IS_SUCCESS"},         // Check if union contains success value
+        {Opcode::UNWRAP_VALUE, "UNWRAP_VALUE"},    // Extract value from success union
+
     // Memory operations
     {Opcode::LOAD_CONST, "LOAD_CONST"},
     {Opcode::STORE_CONST, "STORE_CONST"},
     {Opcode::LOAD_MEMBER, "LOAD_MEMBER"},
-    {Opcode::STORE_MEMBER, "STORE_MEMBER"}
+    {Opcode::STORE_MEMBER, "STORE_MEMBER"},
+    {Opcode::LOAD_SUPER, "LOAD_SUPER"},
+     
+ 
 };
 
 // Helper function to get opcode name

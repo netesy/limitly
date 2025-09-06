@@ -1,0 +1,161 @@
+// Test file for error handling bytecode operations with compile-time checks
+
+// Test 1: Basic error construction with type checking
+fn test_error_construction() {
+    // Valid error construction
+    var error_val = err(DivisionByZero);
+    print("Error construction test:", error_val);
+    
+    // Compile-time error: Unknown error type
+    // var unknown_error = err("NonExistentError");
+    
+    // Compile-time error: Missing error type
+    // var missing_error = err();
+}
+
+// Test 2: Success value construction with type checking
+fn test_success_construction() {
+    // Valid success values
+    var success_val = ok(42);
+    var success_str = ok("success");
+    print("Success construction test:", success_val, success_str);
+    
+    // Compile-time error: ok() requires exactly one argument
+    // var invalid_ok = ok();
+    // var too_many_args = ok(1, 2);
+}
+
+// Test 3: Fallible expression with error propagation and type checking
+fn divide(a: int, b: int): int?DivisionByZero {
+    if (b == 0) {
+        return err(DivisionByZero);
+    }
+    return ok(a / b);
+}
+
+
+fn test_error_propagation() {
+    // Valid usage
+    var result = divide(10, 2)?;
+    print("Division result:", result);
+    
+    // Error propagation
+    var error_result = divide(10, 0)?;  // Will propagate DivisionByZero
+    print("This should not print due to error propagation");
+    
+    // Compile-time error: Unhandled error type 'Overflow'
+    // var unhandled = parse_number("123")?;
+}
+
+// Test 4: Fallible expression with error handling and type checking
+fn test_error_handling() {
+    // Valid error handling
+    var result = divide(10, 0)? else error {
+        print("Caught error:", error);
+        return -1;
+    };
+    
+    // Type checking in error handler
+    var parsed = parse_number("123")? else error {
+        // Compile-time error: Type mismatch in error handling
+        // if (error == "DivisionByZero") { ... }
+        
+        // Valid type checking
+        if (error == "InvalidNumber") {
+            print("Invalid number format");
+        } else if (error == "Overflow") {
+            print("Number too large");
+        }
+        return -1;
+    };
+    
+    print("Result after error handling:", result);
+}
+
+// Test 5: Error type checking and pattern matching
+fn test_error_checking() {
+    var success_val = ok(42);
+    var error_val = err(TestError);
+    
+    // Type checking with is_error/is_success
+    if (is_error(success_val)) {
+        print("Success value incorrectly identified as error");
+    } else {
+        print("Success value correctly identified");
+    }
+    
+    if (is_error(error_val)) {
+        print("Error value correctly identified");
+    } else {
+        print("Error value incorrectly identified as success");
+    }
+    
+    // Pattern matching with match expression
+    // match (divide(10, 0)) {
+    //     val(x) => {print("Got value:", x); },
+    //     err(e) => { print("Got error:", e); },
+    // }
+    
+    // Compile-time error: Non-exhaustive match
+    // match divide(10, 2) {
+    //     val(x) => print("Got value:", x)
+    // }
+}
+
+// Test 6: Error type composition
+fn process_data(data: string): string?IOError, ParseError {
+    // Simulate processing that can fail
+    if (data == "") {
+        return err(ParseError);
+    }
+    return ok("processed_" + data);
+}
+
+    // Function that composes multiple fallible operations
+    fn process_and_divide(s: string, divisor: int): int?IOError, ParseError, DivisionByZero {
+        var processed = process_data(s)?;
+        return divide(processed.length, divisor)?;
+    }
+
+fn test_error_composition() {
+
+    
+    // Valid usage with all error types handled
+    var result = process_and_divide("test", 2)? else error {
+        if (error == "DivisionByZero") {
+            print("Cannot divide by zero");
+        } else if (error == "ParseError") {
+            print("Failed to parse input");
+        } else if (error == "IOError") {
+            print("IO error occurred");
+        }
+        return -1;
+    };
+    
+    print("Processed result:", result);
+}
+
+// Test 7: Error type inference
+fn test_type_inference() {
+    // Type inference for error unions
+    var maybe_num: int? = divide(10, 2);  // Explicit type
+    var inferred = divide(10, 2);          // Inferred as int?DivisionByZero
+    
+    // Compile-time error: Type mismatch
+    var wrong_type: string? = divide(10, 2);
+    
+    // Explicit error type annotation
+    var with_errors: int?DivisionByZero = divide(10, 2);
+    
+    // Compile-time error: Missing error type
+    // var missing_error: int? = err("SomeError");
+}
+
+// Run tests
+test_error_construction();
+test_success_construction();
+test_error_propagation();
+test_error_handling();
+test_error_checking();
+test_error_composition();
+test_type_inference();

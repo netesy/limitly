@@ -1,0 +1,193 @@
+Bytecode for test_destructuring.lm
+========================================
+
+Total instructions: 188
+
+   1: PUSH_STRING          (line 1) "=== Testing Destructuring Patterns ==="
+2   : PRINT                (line 1)
+3   : BEGIN_FUNCTION       (line 4)
+4   : BEGIN_SCOPE          (line 4)
+5   : LOAD_VAR             (line 5) name
+6   : PUSH_STRING          (line 5) "John"
+7   : LOAD_VAR             (line 5) age
+8   : PUSH_INT             (line 5) 30
+9   : LOAD_VAR             (line 5) city
+10  : PUSH_STRING          (line 5) "NYC"
+11  : CREATE_DICT          (line 5) 3
+12  : STORE_VAR            (line 5) person
+13  : LOAD_VAR             (line 7) person
+14  : STORE_TEMP           (line 7)
+15  : LOAD_TEMP            (line 7)
+16  : PUSH_INT             (line 8) 2
+17  : PUSH_STRING          (line 8) "name"
+18  : PUSH_STRING          (line 8) "name"
+19  : PUSH_STRING          (line 8) "age"
+20  : PUSH_STRING          (line 8) "age"
+21  : PUSH_BOOL            (line 8) false
+22  : PUSH_STRING          (line 8) ""
+23  : PUSH_STRING          (line 8) "__dict_pattern__"
+24  : MATCH_PATTERN        (line 7)
+25  : JUMP_IF_FALSE        (line 7) 13
+26  : BEGIN_SCOPE          (line 8)
+27  : PUSH_STRING          (line 9) "Name: "
+28  : LOAD_VAR             (line 9) name
+29  : PUSH_STRING          (line 9) ""
+30  : CONCAT               (line 9)
+31  : PUSH_STRING          (line 9) ", Age: "
+32  : LOAD_VAR             (line 9) age
+33  : PUSH_STRING          (line 9) ""
+34  : CONCAT               (line 9)
+35  : INTERPOLATE_STRING   (line 9)
+36  : PRINT                (line 9)
+37  : END_SCOPE            (line 8)
+38  : JUMP                 (line 7) 9
+39  : LOAD_TEMP            (line 7)
+40  : PUSH_NULL            (line 11)
+41  : MATCH_PATTERN        (line 7)
+42  : JUMP_IF_FALSE        (line 7) 5
+43  : BEGIN_SCOPE          (line 11)
+44  : PUSH_STRING          (line 12) "No match"
+45  : PRINT                (line 12)
+46  : END_SCOPE            (line 11)
+47  : JUMP                 (line 7) 0
+48  : CLEAR_TEMP           (line 7)
+49  : END_SCOPE            (line 4)
+50  : PUSH_NULL            (line 4)
+51  : RETURN               (line 4)
+52  : END_FUNCTION         (line 4)
+53  : BEGIN_FUNCTION       (line 18)
+54  : BEGIN_SCOPE          (line 18)
+55  : PUSH_INT             (line 19) 1
+56  : PUSH_INT             (line 19) 2
+57  : PUSH_INT             (line 19) 3
+58  : CREATE_LIST          (line 19) 3
+59  : STORE_VAR            (line 19) numbers
+60  : LOAD_VAR             (line 21) numbers
+61  : STORE_TEMP           (line 21)
+62  : LOAD_TEMP            (line 21)
+63  : PUSH_INT             (line 22) 3
+64  : LOAD_VAR             (line 22) x
+65  : LOAD_VAR             (line 22) y
+66  : LOAD_VAR             (line 22) z
+67  : PUSH_STRING          (line 22) "__list_pattern__"
+68  : MATCH_PATTERN        (line 21)
+69  : JUMP_IF_FALSE        (line 21) 17
+70  : BEGIN_SCOPE          (line 22)
+71  : PUSH_STRING          (line 23) "Three numbers: "
+72  : LOAD_VAR             (line 23) x
+73  : PUSH_STRING          (line 23) ""
+74  : CONCAT               (line 23)
+75  : PUSH_STRING          (line 23) ", "
+76  : LOAD_VAR             (line 23) y
+77  : PUSH_STRING          (line 23) ""
+78  : CONCAT               (line 23)
+79  : PUSH_STRING          (line 23) ", "
+80  : LOAD_VAR             (line 23) z
+81  : PUSH_STRING          (line 23) ""
+82  : CONCAT               (line 23)
+83  : INTERPOLATE_STRING   (line 23)
+84  : PRINT                (line 23)
+85  : END_SCOPE            (line 22)
+86  : JUMP                 (line 21) 39
+87  : LOAD_TEMP            (line 21)
+88  : PUSH_INT             (line 25) 2
+89  : LOAD_VAR             (line 25) x
+90  : LOAD_VAR             (line 25) y
+91  : PUSH_STRING          (line 25) "__list_pattern__"
+92  : MATCH_PATTERN        (line 21)
+93  : JUMP_IF_FALSE        (line 21) 13
+94  : BEGIN_SCOPE          (line 25)
+95  : PUSH_STRING          (line 26) "Two numbers: "
+96  : LOAD_VAR             (line 26) x
+97  : PUSH_STRING          (line 26) ""
+98  : CONCAT               (line 26)
+99  : PUSH_STRING          (line 26) ", "
+100 : LOAD_VAR             (line 26) y
+101 : PUSH_STRING          (line 26) ""
+102 : CONCAT               (line 26)
+103 : INTERPOLATE_STRING   (line 26)
+104 : PRINT                (line 26)
+105 : END_SCOPE            (line 25)
+106 : JUMP                 (line 21) 19
+107 : LOAD_TEMP            (line 21)
+108 : PUSH_INT             (line 28) 0
+109 : PUSH_STRING          (line 28) "__list_pattern__"
+110 : MATCH_PATTERN        (line 21)
+111 : JUMP_IF_FALSE        (line 21) 5
+112 : BEGIN_SCOPE          (line 28)
+113 : PUSH_STRING          (line 29) "Empty list"
+114 : PRINT                (line 29)
+115 : END_SCOPE            (line 28)
+116 : JUMP                 (line 21) 9
+117 : LOAD_TEMP            (line 21)
+118 : PUSH_NULL            (line 31)
+119 : MATCH_PATTERN        (line 21)
+120 : JUMP_IF_FALSE        (line 21) 5
+121 : BEGIN_SCOPE          (line 31)
+122 : PUSH_STRING          (line 32) "Other list"
+123 : PRINT                (line 32)
+124 : END_SCOPE            (line 31)
+125 : JUMP                 (line 21) 0
+126 : CLEAR_TEMP           (line 21)
+127 : END_SCOPE            (line 18)
+128 : PUSH_NULL            (line 18)
+129 : RETURN               (line 18)
+130 : END_FUNCTION         (line 18)
+131 : BEGIN_FUNCTION       (line 38)
+132 : BEGIN_SCOPE          (line 38)
+133 : PUSH_INT             (line 39) 10
+134 : PUSH_INT             (line 39) 20
+135 : CREATE_LIST          (line 39) 2
+136 : STORE_VAR            (line 39) point
+137 : LOAD_VAR             (line 41) point
+138 : STORE_TEMP           (line 41)
+139 : LOAD_TEMP            (line 41)
+140 : PUSH_INT             (line 42) 2
+141 : LOAD_VAR             (line 42) x
+142 : LOAD_VAR             (line 42) y
+143 : PUSH_STRING          (line 42) "__tuple_pattern__"
+144 : MATCH_PATTERN        (line 41)
+145 : JUMP_IF_FALSE        (line 41) 14
+146 : BEGIN_SCOPE          (line 42)
+147 : PUSH_STRING          (line 43) "Point: ("
+148 : LOAD_VAR             (line 43) x
+149 : PUSH_STRING          (line 43) ""
+150 : CONCAT               (line 43)
+151 : PUSH_STRING          (line 43) ", "
+152 : LOAD_VAR             (line 43) y
+153 : PUSH_STRING          (line 43) ""
+154 : CONCAT               (line 43)
+155 : PUSH_STRING          (line 43) ")"
+156 : INTERPOLATE_STRING   (line 43)
+157 : PRINT                (line 43)
+158 : END_SCOPE            (line 42)
+159 : JUMP                 (line 41) 9
+160 : LOAD_TEMP            (line 41)
+161 : PUSH_NULL            (line 45)
+162 : MATCH_PATTERN        (line 41)
+163 : JUMP_IF_FALSE        (line 41) 5
+164 : BEGIN_SCOPE          (line 45)
+165 : PUSH_STRING          (line 46) "Not a point"
+166 : PRINT                (line 46)
+167 : END_SCOPE            (line 45)
+168 : JUMP                 (line 41) 0
+169 : CLEAR_TEMP           (line 41)
+170 : END_SCOPE            (line 38)
+171 : PUSH_NULL            (line 38)
+172 : RETURN               (line 38)
+173 : END_FUNCTION         (line 38)
+174 : PUSH_STRING          (line 51) "Testing dictionary destructuring:"
+175 : PRINT                (line 51)
+176 : CALL                 (line 52) 0
+177 : POP                  (line 52)
+178 : PUSH_STRING          (line 54) "Testing list destructuring:"
+179 : PRINT                (line 54)
+180 : CALL                 (line 55) 0
+181 : POP                  (line 55)
+182 : PUSH_STRING          (line 57) "Testing tuple destructuring:"
+183 : PRINT                (line 57)
+184 : CALL                 (line 58) 0
+185 : POP                  (line 58)
+186 : PUSH_STRING          (line 60) "=== Destructuring Tests Complete ==="
+187 : PRINT                (line 60)
+188 : HALT                 (line 0)

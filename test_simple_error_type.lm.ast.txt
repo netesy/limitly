@@ -1,0 +1,14 @@
+AST for test_simple_error_type.lm
+========================================
+
+AST Dump:
+==========
+FunctionDeclaration: test
+  ReturnType: int
+  Body:
+    BlockStatement:
+      ReturnStatement:
+        Value:
+          OkConstruct:
+            Value:
+              Literal: 42

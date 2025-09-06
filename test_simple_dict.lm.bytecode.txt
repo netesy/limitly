@@ -1,0 +1,46 @@
+Bytecode for test_simple_dict.lm
+========================================
+
+Total instructions: 41
+
+   1: PUSH_STRING          (line 1) "=== Simple Dict Pattern Test ==="
+2   : PRINT                (line 1)
+3   : LOAD_VAR             (line 3) name
+4   : PUSH_STRING          (line 3) "John"
+5   : LOAD_VAR             (line 3) age
+6   : PUSH_INT             (line 3) 30
+7   : CREATE_DICT          (line 3) 2
+8   : STORE_VAR            (line 3) person
+9   : LOAD_VAR             (line 5) person
+10  : STORE_TEMP           (line 5)
+11  : LOAD_TEMP            (line 5)
+12  : PUSH_STRING          (line 6) "name"
+13  : PUSH_STRING          (line 6) "name"
+14  : PUSH_INT             (line 6) 1
+15  : PUSH_BOOL            (line 6) false
+16  : PUSH_STRING          (line 6) ""
+17  : PUSH_STRING          (line 6) "__dict_pattern__"
+18  : MATCH_PATTERN        (line 5)
+19  : JUMP_IF_FALSE        (line 5) 9
+20  : BEGIN_SCOPE          (line 6)
+21  : PUSH_STRING          (line 7) "Found name: "
+22  : LOAD_VAR             (line 7) name
+23  : PUSH_STRING          (line 7) ""
+24  : CONCAT               (line 7)
+25  : INTERPOLATE_STRING   (line 7)
+26  : PRINT                (line 7)
+27  : END_SCOPE            (line 6)
+28  : JUMP                 (line 5) 9
+29  : LOAD_TEMP            (line 5)
+30  : PUSH_NULL            (line 9)
+31  : MATCH_PATTERN        (line 5)
+32  : JUMP_IF_FALSE        (line 5) 5
+33  : BEGIN_SCOPE          (line 9)
+34  : PUSH_STRING          (line 10) "No match"
+35  : PRINT                (line 10)
+36  : END_SCOPE            (line 9)
+37  : JUMP                 (line 5) 0
+38  : CLEAR_TEMP           (line 5)
+39  : PUSH_STRING          (line 14) "=== Test Complete ==="
+40  : PRINT                (line 14)
+41  : HALT                 (line 0)
