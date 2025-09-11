@@ -715,6 +715,21 @@ struct Value {
         Value(TypePtr t, const ObjectInstancePtr& obj) : type(std::move(t)), data(obj) {
         }
 
+    bool isError() const {
+        // An error can be a direct ErrorValue or an ErrorUnion holding an ErrorValue.
+        if (type && type->tag == TypeTag::ErrorUnion) {
+            return std::holds_alternative<ErrorValue>(data);
+        }
+        return std::holds_alternative<ErrorValue>(data);
+    }
+
+    const ErrorValue* getErrorValue() const {
+        if (isError()) {
+            return std::get_if<ErrorValue>(&data);
+        }
+        return nullptr;
+    }
+
     friend std::ostream &operator<<(std::ostream &os, const Value &value);
 
     // Get raw string representation for interpolation/concatenation (no quotes)

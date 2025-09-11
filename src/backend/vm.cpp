@@ -141,6 +141,7 @@ VM::VM(bool create_runtime)
             
         return memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
     });
+}
 
 VM::~VM() {
     delete typeSystem;
@@ -3515,45 +3516,16 @@ void VM::handlePropagateError(const Instruction& instruction) {
     }
     
     // Verify this is actually an error value
-    bool isError = false;
-    std::string errorType;
-    
-    if (error_value->type) {
-        if (error_value->type->tag == TypeTag::ErrorUnion) {
-            // For error unions, we consider them errors if they contain an error
-            if (error_value->isError()) {
-                isError = true;
-                // Try to get error type if possible
-                if (auto errorVal = error_value->getErrorValue()) {
-                    errorType = errorVal->errorType;
-                } else {
-                    errorType = "UnknownError";
-                }
-                }
-            }
-        } else {
-            try {
-                if (auto errorVal = std::get_if<::ErrorValue>(&error_value->data)) {
-                    isActualError = true;
-                    errorType = errorVal->errorType;
-                    
-                    if (debugOutput) {
-                        std::cerr << "[DEBUG] Found direct ErrorValue with type: " << errorType << std::endl;
-                    }
-                }
-            } catch (const std::bad_variant_access&) {
-                if (debugOutput) {
-                    std::cerr << "[DEBUG] Value is not a direct ErrorValue" << std::endl;
-                }
-            }
-        }
-    }
-    
-    if (!isActualError) {
+    if (!error_value->isError()) {
         if (debugOutput) {
             std::cerr << "[DEBUG] Not an error value, not propagating: " << valueToString(error_value) << std::endl;
         }
         return; // Not an error value, don't propagate
+    }
+
+    std::string errorType = "UnknownError";
+    if (const auto* errorVal = error_value->getErrorValue()) {
+        errorType = errorVal->errorType;
     }
     
     // If we got here, we have a valid error value to propagate
