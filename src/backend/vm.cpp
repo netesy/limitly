@@ -147,6 +147,15 @@ VM::~VM() {
     delete typeSystem;
 }
 
+// Register a native function both in the VM native map and the backend function registry
+void VM::registerNativeFunction(const std::string& name, std::function<ValuePtr(const std::vector<ValuePtr>&)> function) {
+    nativeFunctions[name] = function;
+
+    // Register in the backend function registry with no parameters for now.
+    std::vector<backend::Parameter> params;
+    functionRegistry.registerNativeFunction(name, params, std::nullopt, function);
+}
+
 ValuePtr VM::execute(const std::vector<Instruction>& code) {
     this->bytecode = &code;
     ip = 0;
@@ -628,13 +637,35 @@ bool VM::propagateError(ValuePtr errorValue) {
                     stack.pop_back();
                 }
                 return true;
-            } else if (frame.expectedErrorType->name == errorType) {
-                // Exact type match
-                ip = frame.handlerAddress;
-                while (stack.size() > frame.stackBase) {
-                    stack.pop_back();
+            } else {
+                // Try to match by resolved name for user-defined types or by string representation
+                bool matched = false;
+                if (frame.expectedErrorType->tag == TypeTag::UserDefined) {
+                    // extract name from extra
+                    if (std::holds_alternative<UserDefinedType>(frame.expectedErrorType->extra)) {
+                        const UserDefinedType& ud = std::get<UserDefinedType>(frame.expectedErrorType->extra);
+                        if (ud.name == errorType) matched = true;
+                    }
+                } else if (frame.expectedErrorType->tag == TypeTag::ErrorUnion) {
+                    // If expected is an ErrorUnion, it can explicitly list error names
+                    if (std::holds_alternative<ErrorUnionType>(frame.expectedErrorType->extra)) {
+                        const ErrorUnionType& eut = std::get<ErrorUnionType>(frame.expectedErrorType->extra);
+                        for (const auto& name : eut.errorTypes) {
+                            if (name == errorType) { matched = true; break; }
+                        }
+                    }
+                } else {
+                    // Fallback: compare textual representation
+                    if (frame.expectedErrorType->toString() == errorType) matched = true;
                 }
-                return true;
+
+                if (matched) {
+                    ip = frame.handlerAddress;
+                    while (stack.size() > frame.stackBase) {
+                        stack.pop_back();
+                    }
+                    return true;
+                }
             }
         }
         
