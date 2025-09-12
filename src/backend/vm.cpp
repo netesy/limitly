@@ -94,8 +94,8 @@ VM::VM(bool create_runtime)
       environment(globals),
       bytecode(nullptr),
       ip(0),
-      debugMode(false),
-      debugOutput(false),
+      debugMode(true),
+      debugOutput(true),
       currentFunctionBeingDefined(""),
       insideFunctionDefinition(false),
       currentClassBeingDefined(""),
@@ -181,34 +181,14 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
             
             // Debug output for opcode values
             int opcodeValue = static_cast<int>(instruction.opcode);
+            if (debugOutput) {
+                std::cerr << "[TRACE] ip=" << ip << " opcode=" << opcodeValue;
+                if (!instruction.stringValue.empty()) std::cerr << " str='" << instruction.stringValue << "'";
+                if (instruction.intValue != 0) std::cerr << " int=" << instruction.intValue;
+                std::cerr << std::endl;
+            }
             
             try {
-                // Check if the top of the stack is an error before executing the next instruction
-                if (!stack.empty()) {
-                    ValuePtr top = stack.back();
-                    if (top && top->type && 
-                        (top->type->tag == TypeTag::ErrorUnion || std::holds_alternative<ErrorValue>(top->data))) {
-                        // We have an error value on the stack, propagate it
-                        if (!errorFrames.empty()) {
-                            // If we have an error frame, propagate the error
-                            if (!propagateError(top)) {
-                                // If propagation failed, clear the error frame and continue
-                                errorFrames.clear();
-                            }
-                        } else {
-                            // No error frame, just report the error
-                            if (auto errorVal = std::get_if<ErrorValue>(&top->data)) {
-                                error("Unhandled error: " + errorVal->errorType + 
-                                     (errorVal->message.empty() ? "" : " - " + errorVal->message));
-                            } else {
-                                error("Unhandled error: " + valueToString(top));
-                            }
-                        }
-                        // Remove the error value from the stack
-                        stack.pop_back();
-                    }
-                }
-                
                 switch (instruction.opcode) {
                     case Opcode::PUSH_INT:
                         handlePushInt(instruction);
@@ -595,6 +575,12 @@ void VM::pushErrorFrame(size_t handlerAddr, TypePtr errorType, const std::string
     frame.expectedErrorType = errorType;
     frame.functionName = functionName;
     errorFrames.push_back(frame);
+    if (debugOutput) {
+        std::cerr << "[DEBUG] pushErrorFrame: handler=" << handlerAddr
+                  << " stackBase=" << frame.stackBase
+                  << " expected=" << (errorType ? errorType->toString() : std::string("(wildcard)"))
+                  << " func=" << functionName << std::endl;
+    }
 }
 
 void VM::popErrorFrame() {
@@ -622,57 +608,77 @@ bool VM::propagateError(ValuePtr errorValue) {
         return false; // Not an error value
     }
     
-    // Find matching error handler
+    // If there are no error frames, propagation cannot succeed here.
+    if (errorFrames.empty()) {
+        if (debugOutput) {
+            std::cerr << "[DEBUG] No error frame available for error: " << errorType << std::endl;
+        }
+        return false;
+    }
+    if (debugOutput) {
+        std::cerr << "[DEBUG] propagateError: incoming errorType='" << errorType << "', frames=" << errorFrames.size() << std::endl;
+    }
+
+    // Walk the error frame stack from top to bottom looking for a handler
     while (!errorFrames.empty()) {
         ErrorFrame& frame = errorFrames.back();
-        
-        // Check if this frame can handle the error type
-        if (frame.expectedErrorType) {
-            // If the frame expects a specific error type, check compatibility
-            if (frame.expectedErrorType->tag == TypeTag::ErrorUnion) {
-                // Frame can handle any error
-                ip = frame.handlerAddress;
-                // Restore stack
-                while (stack.size() > frame.stackBase) {
-                    stack.pop_back();
-                }
-                return true;
-            } else {
-                // Try to match by resolved name for user-defined types or by string representation
-                bool matched = false;
-                if (frame.expectedErrorType->tag == TypeTag::UserDefined) {
-                    // extract name from extra
-                    if (std::holds_alternative<UserDefinedType>(frame.expectedErrorType->extra)) {
-                        const UserDefinedType& ud = std::get<UserDefinedType>(frame.expectedErrorType->extra);
-                        if (ud.name == errorType) matched = true;
-                    }
-                } else if (frame.expectedErrorType->tag == TypeTag::ErrorUnion) {
-                    // If expected is an ErrorUnion, it can explicitly list error names
-                    if (std::holds_alternative<ErrorUnionType>(frame.expectedErrorType->extra)) {
-                        const ErrorUnionType& eut = std::get<ErrorUnionType>(frame.expectedErrorType->extra);
-                        for (const auto& name : eut.errorTypes) {
-                            if (name == errorType) { matched = true; break; }
-                        }
-                    }
-                } else {
-                    // Fallback: compare textual representation
-                    if (frame.expectedErrorType->toString() == errorType) matched = true;
-                }
-
-                if (matched) {
-                    ip = frame.handlerAddress;
-                    while (stack.size() > frame.stackBase) {
-                        stack.pop_back();
-                    }
-                    return true;
-                }
-            }
+        if (debugOutput) {
+            std::cerr << "[DEBUG] Checking frame: handler=" << frame.handlerAddress
+                      << " stackBase=" << frame.stackBase
+                      << " expected=" << (frame.expectedErrorType ? frame.expectedErrorType->toString() : std::string("(wildcard)"))
+                      << " func=" << frame.functionName << std::endl;
         }
-        
-        // This frame can't handle the error, pop it and continue
+
+        // A null expectedErrorType matches any error (wildcard)
+        if (!frame.expectedErrorType) {
+            if (debugOutput) std::cerr << "[DEBUG] frame matches (wildcard). Jumping to " << frame.handlerAddress << std::endl;
+                    ip = frame.handlerAddress - 1;
+                size_t before = stack.size();
+                while (stack.size() > frame.stackBase) stack.pop_back();
+                // Ensure the error value is available to the handler on the stack
+                push(errorValue);
+                if (debugOutput) std::cerr << "[DEBUG] propagateError: popped " << (before - stack.size() + 1) << " values to restore stackBase=" << frame.stackBase << " and pushed error back" << std::endl;
+                return true;
+        }
+
+        // If the frame expects an ErrorUnion, treat it as matching any error as well
+        if (frame.expectedErrorType->tag == TypeTag::ErrorUnion) {
+            if (debugOutput) std::cerr << "[DEBUG] frame matches (ErrorUnion). Jumping to " << frame.handlerAddress << std::endl;
+            ip = frame.handlerAddress - 1;
+            size_t before = stack.size();
+            while (stack.size() > frame.stackBase) stack.pop_back();
+            push(errorValue);
+            if (debugOutput) std::cerr << "[DEBUG] propagateError: popped " << (before - stack.size() + 1) << " values to restore stackBase=" << frame.stackBase << " and pushed error back" << std::endl;
+            return true;
+        }
+
+        // Otherwise try to match the expected type to the error type string
+        bool matched = false;
+        if (frame.expectedErrorType->tag == TypeTag::UserDefined) {
+            if (std::holds_alternative<UserDefinedType>(frame.expectedErrorType->extra)) {
+                const UserDefinedType& ud = std::get<UserDefinedType>(frame.expectedErrorType->extra);
+                if (ud.name == errorType) matched = true;
+            }
+        } else {
+            if (frame.expectedErrorType->toString() == errorType) matched = true;
+        }
+
+        if (matched) {
+            if (debugOutput) std::cerr << "[DEBUG] frame matches by name. Jumping to " << frame.handlerAddress << std::endl;
+            ip = frame.handlerAddress - 1;
+            size_t before = stack.size();
+            while (stack.size() > frame.stackBase) stack.pop_back();
+            push(errorValue);
+            if (debugOutput) std::cerr << "[DEBUG] propagateError: popped " << (before - stack.size() + 1) << " values to restore stackBase=" << frame.stackBase << " and pushed error back" << std::endl;
+            return true;
+        }
+
+        if (debugOutput) std::cerr << "[DEBUG] frame did not match; popping frame" << std::endl;
+        // No match: pop this frame and continue searching
         errorFrames.pop_back();
     }
-    
+
+    if (debugOutput) std::cerr << "[DEBUG] No matching error frame found for: " << errorType << std::endl;
     return false; // No matching handler found
 }
 
@@ -1693,8 +1699,9 @@ void VM::handleCall(const Instruction& instruction) {
     if (canFail) {
         // The error handler address is the next instruction after the call
         errorHandlerAddress = ip + 1;
-        // Push an error frame with the handler address
-        pushErrorFrame(errorHandlerAddress, typeSystem->getType("Error"), funcName);
+        // Push an error frame with the handler address. Use nullptr to indicate
+        // a wildcard expectedErrorType so this frame will accept any error.
+        pushErrorFrame(errorHandlerAddress, nullptr, funcName);
     }
     
     if (funcName.substr(0, 7) == "method:" || funcName.substr(0, 6) == "super:") {
@@ -2004,6 +2011,10 @@ void VM::handleCall(const Instruction& instruction) {
             
             // Push call frame
             callStack.push_back(frame);
+
+            if (debugOutput) {
+                std::cerr << "[DEBUG] handleCall: pushed call frame for '" << funcName << "' callStack_size=" << callStack.size() << " ip=" << ip << std::endl;
+            }
             
             // Switch to function environment
             environment = funcEnv;
@@ -2095,13 +2106,21 @@ void VM::handleCall(const Instruction& instruction) {
 
 void VM::handleReturn(const Instruction& /*unused*/) {
     if (callStack.empty()) {
-        error("RETURN outside of function call");
+        if (debugOutput) {
+            std::cerr << "[DEBUG] RETURN outside of function call - treating as no-op (push nil) ip=" << ip << std::endl;
+        }
+        // Push nil as a safe fallback and continue execution
+        push(memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
         return;
     }
     
     // Pop the call frame and get function info
     backend::CallFrame frame = callStack.back();
     callStack.pop_back();
+
+    if (debugOutput) {
+        std::cerr << "[DEBUG] handleReturn: popped call frame for '" << frame.functionName << "' new_callStack_size=" << callStack.size() << " ip=" << ip << std::endl;
+    }
     
     // Check if this is a constructor return
     bool isConstructor = frame.functionName.find("::init") != std::string::npos;
@@ -2141,8 +2160,36 @@ void VM::handleReturn(const Instruction& /*unused*/) {
     }
     
     // Push the return value
+    if (debugOutput) {
+        std::cerr << "[DEBUG] handleReturn: pushing return value (stack before push=" << stack.size() << ") -> " << (returnValue ? returnValue->toString() : std::string("<nil>")) << std::endl;
+    }
     push(returnValue);
     
+    // If an error frame was pushed for this function call, decide whether to pop it.
+    // We should only pop the frame on a *successful* return. If the function
+    // returned an error union (or direct ErrorValue), keep the frame so the
+    // caller can inspect/propagate the error.
+    bool returnedError = false;
+    if (returnValue) {
+        if (returnValue->isError()) returnedError = true;
+        else if (returnValue->type && returnValue->type->tag == TypeTag::ErrorUnion) {
+            // If the ErrorUnion actually contains an ErrorValue, treat as error
+            if (std::holds_alternative<ErrorValue>(returnValue->data)) returnedError = true;
+        }
+    }
+
+    if (!errorFrames.empty()) {
+        ErrorFrame& top = errorFrames.back();
+        if (top.functionName == frame.functionName) {
+            if (returnedError) {
+                if (debugOutput) std::cerr << "[DEBUG] handleReturn: function returned error; keeping error frame for function='" << frame.functionName << "'" << std::endl;
+            } else {
+                if (debugOutput) std::cerr << "[DEBUG] handleReturn: popping error frame for function='" << frame.functionName << "'" << std::endl;
+                popErrorFrame();
+            }
+        }
+    }
+
     // Return to the caller
     ip = frame.returnAddress;
 }
@@ -2260,6 +2307,10 @@ void VM::handleEndFunction(const Instruction& /*unused*/) {
     // Pop the call frame and return to the caller
     backend::CallFrame frame = callStack.back();
     callStack.pop_back();
+
+    if (debugOutput) {
+        std::cerr << "[DEBUG] handleEndFunction: popped call frame for '" << frame.functionName << "' new_callStack_size=" << callStack.size() << " ip=" << ip << std::endl;
+    }
     
     // Restore the environment
     auto prevEnv = frame.getPreviousEnvironment<Environment>();
@@ -3488,28 +3539,29 @@ void VM::handleCheckError(const Instruction& instruction) {
         return;
     }
     
+    // Peek the top value without consuming it. CHECK_ERROR should push a boolean
+    // indicating whether the value is an error union / error value. The bytecode
+    // typically uses CHECK_ERROR followed by JUMP_IF_FALSE to decide whether to
+    // handle/propagate the error while leaving the original union on the stack
+    // for later UNWRAP_VALUE or PROPAGATE_ERROR.
     ValuePtr value = peek();
-    
-    // Check if the value is an error
+
     bool isError = false;
-    if (value->type->tag == TypeTag::ErrorUnion) {
-        // Check if the value contains an ErrorValue
-        isError = std::holds_alternative<ErrorValue>(value->data);
-    } else if (std::holds_alternative<ErrorValue>(value->data)) {
-        // Direct error value
-        isError = true;
-    }
-    
-    if (isError) {
-        // Jump to the address specified in the instruction (error handler)
-        size_t jumpAddress = static_cast<size_t>(instruction.intValue);
-        if (jumpAddress < bytecode->size()) {
-            ip = jumpAddress - 1; // -1 because ip will be incremented after this handler
-        } else {
-            error("Invalid jump address in CHECK_ERROR: " + std::to_string(jumpAddress));
+    if (value && value->type) {
+        if (value->type->tag == TypeTag::ErrorUnion) {
+            isError = std::holds_alternative<ErrorValue>(value->data);
+        } else if (std::holds_alternative<ErrorValue>(value->data)) {
+            isError = true;
         }
     }
-    // If not an error, continue normal execution (no jump)
+
+    if (debugOutput) {
+        std::cerr << "[DEBUG] handleCheckError: top_is_error=" << (isError ? "true" : "false")
+                  << " ip=" << ip << std::endl;
+    }
+
+    // Push the boolean result onto the stack for the subsequent JUMP_IF_FALSE
+    push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, isError));
 }
 
 void VM::handlePropagateError(const Instruction& instruction) {
@@ -3579,11 +3631,11 @@ void VM::handlePropagateError(const Instruction& instruction) {
         }
         
         // If no error frame, create one that will handle any error type
-        ErrorFrame frame;
-        frame.handlerAddress = ip + 1; // Default to next instruction
-        frame.stackBase = stack.size();
-        frame.expectedErrorType = typeSystem->getType("Any"); // Accept any error type
-        frame.functionName = "<global error handler>";
+    ErrorFrame frame;
+    frame.handlerAddress = ip + 1; // Default to next instruction
+    frame.stackBase = stack.size();
+    frame.expectedErrorType = nullptr; // Accept any error type (wildcard)
+    frame.functionName = "<global error handler>";
         errorFrames.push_back(frame);
         
         if (debugOutput) {
@@ -3665,6 +3717,10 @@ void VM::handleConstructError(const Instruction& instruction) {
     ValuePtr result = memoryManager.makeRef<Value>(*region, errorUnionType);
     result->data = errorVal;
     
+    if (debugOutput) {
+        std::cerr << "[DEBUG] handleConstructError: created error '" << errorType << "' message='" << errorMessage << "'" << std::endl;
+    }
+
     push(result);
 }
 
@@ -3688,7 +3744,10 @@ void VM::handleConstructOk(const Instruction& instruction) {
     // Create a new value with the error union type but containing the success data
     ValuePtr okValue = memoryManager.makeRef<Value>(*region, errorUnionType);
     okValue->data = successValue->data; // Copy the success value's data
-    
+    if (debugOutput) {
+        std::cerr << "[DEBUG] handleConstructOk: created ok value of type " << (successValue->type ? successValue->type->toString() : "(unknown)") << std::endl;
+    }
+
     push(okValue);
 }
 
@@ -3745,6 +3804,9 @@ void VM::handleIsSuccess(const Instruction& instruction) {
 void VM::handleUnwrapValue(const Instruction& instruction) {
     (void)instruction; // Mark as unused
     if (stack.empty()) {
+        if (debugOutput) {
+            std::cerr << "[DEBUG] UNWRAP_VALUE underflow: callStack=" << callStack.size() << " errorFrames=" << errorFrames.size() << " ip=" << ip << std::endl;
+        }
         error("Stack underflow in UNWRAP_VALUE");
         return;
     }
@@ -3756,6 +3818,9 @@ void VM::handleUnwrapValue(const Instruction& instruction) {
         if (std::holds_alternative<ErrorValue>(value->data)) {
             // This is an error - propagate it
             push(value); // Put the error back on stack for propagation
+            if (debugOutput) {
+                std::cerr << "[DEBUG] handleUnwrapValue: found error, attempting propagate: " << valueToString(value) << std::endl;
+            }
             if (!propagateError(value)) {
                 // No error handler found
                 if (auto errorVal = std::get_if<ErrorValue>(&value->data)) {

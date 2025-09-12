@@ -1,0 +1,110 @@
+Bytecode for tests/errors/basic.lm
+========================================
+
+Total instructions: 105
+
+   1: PUSH_STRING          (line 3) "=== Testing Error Handling Opcodes ==="
+2   : PRINT                (line 3)
+3   : PUSH_STRING          (line 8) "Test 1: Error Construction"
+4   : PRINT                (line 8)
+5   : CONSTRUCT_ERROR      (line 9)
+6   : STORE_VAR            (line 9) error1
+7   : CONSTRUCT_ERROR      (line 10)
+8   : STORE_VAR            (line 10) error2
+9   : PUSH_STRING          (line 11) "Error 1:"
+10  : LOAD_VAR             (line 11) error1
+11  : PRINT                (line 11)
+12  : PUSH_STRING          (line 12) "Error 2:"
+13  : LOAD_VAR             (line 12) error2
+14  : PRINT                (line 12)
+15  : PUSH_STRING          (line 15) "Test 2: Success Construction"
+16  : PRINT                (line 15)
+17  : PUSH_INT             (line 16) 42
+18  : CONSTRUCT_OK         (line 16)
+19  : STORE_VAR            (line 16) success1
+20  : PUSH_STRING          (line 17) "Hello World"
+21  : CONSTRUCT_OK         (line 17)
+22  : STORE_VAR            (line 17) success2
+23  : PUSH_STRING          (line 18) "Success 1:"
+24  : LOAD_VAR             (line 18) success1
+25  : PRINT                (line 18)
+26  : PUSH_STRING          (line 19) "Success 2:"
+27  : LOAD_VAR             (line 19) success2
+28  : PRINT                (line 19)
+29  : BEGIN_FUNCTION       (line 23)
+30  : DEFINE_PARAM         (line 23) a
+31  : DEFINE_PARAM         (line 23) b
+32  : BEGIN_SCOPE          (line 23)
+33  : LOAD_VAR             (line 24) b
+34  : PUSH_INT             (line 24) 0
+35  : EQUAL                (line 24)
+36  : JUMP_IF_FALSE        (line 24) 5
+37  : BEGIN_SCOPE          (line 24)
+38  : CONSTRUCT_ERROR      (line 25)
+39  : RETURN               (line 25)
+40  : END_SCOPE            (line 24)
+41  : JUMP                 (line 24) 0
+42  : LOAD_VAR             (line 27) a
+43  : LOAD_VAR             (line 27) b
+44  : DIVIDE               (line 27)
+45  : CONSTRUCT_OK         (line 27)
+46  : RETURN               (line 27)
+47  : END_SCOPE            (line 23)
+48  : PUSH_NULL            (line 23)
+49  : RETURN               (line 23)
+50  : END_FUNCTION         (line 23)
+51  : BEGIN_FUNCTION       (line 31)
+52  : DEFINE_PARAM         (line 31) s
+53  : DEFINE_PARAM         (line 31) divisor
+54  : BEGIN_SCOPE          (line 31)
+55  : LOAD_VAR             (line 32) s
+56  : CALL                 (line 32) 1
+57  : CHECK_ERROR          (line 32)
+58  : JUMP_IF_FALSE        (line 32) 1
+59  : PROPAGATE_ERROR      (line 32)
+60  : UNWRAP_VALUE         (line 32)
+61  : STORE_VAR            (line 32) num
+62  : LOAD_VAR             (line 33) num
+63  : LOAD_VAR             (line 33) divisor
+64  : CALL                 (line 33) 2
+65  : CHECK_ERROR          (line 33)
+66  : JUMP_IF_FALSE        (line 33) 1
+67  : PROPAGATE_ERROR      (line 33)
+68  : UNWRAP_VALUE         (line 33)
+69  : RETURN               (line 33)
+70  : END_SCOPE            (line 31)
+71  : PUSH_NULL            (line 31)
+72  : RETURN               (line 31)
+73  : END_FUNCTION         (line 31)
+74  : PUSH_INT             (line 37) 10
+75  : PUSH_INT             (line 37) 2
+76  : CALL                 (line 37) 2
+77  : CHECK_ERROR          (line 37)
+78  : JUMP_IF_FALSE        (line 37) 1
+79  : PROPAGATE_ERROR      (line 37)
+80  : UNWRAP_VALUE         (line 37)
+81  : STORE_VAR            (line 37) result
+82  : LOAD_VAR             (line 38) result
+83  : PRINT                (line 38)
+84  : PUSH_INT             (line 40) 10
+85  : PUSH_INT             (line 40) 0
+86  : CALL                 (line 40) 2
+87  : CHECK_ERROR          (line 40)
+88  : JUMP_IF_TRUE         (line 40) 2
+89  : UNWRAP_VALUE         (line 40)
+90  : JUMP                 (line 40) 11
+91  : STORE_VAR            (line 40) error
+92  : BEGIN_SCOPE          (line 40)
+93  : PUSH_STRING          (line 41) "Division failed: #"
+94  : LOAD_VAR             (line 41) error
+95  : PUSH_STRING          (line 41) ""
+96  : CONCAT               (line 41)
+97  : INTERPOLATE_STRING   (line 41)
+98  : PRINT                (line 41)
+99  : PUSH_NULL            (line 42)
+100 : RETURN               (line 42)
+101 : END_SCOPE            (line 40)
+102 : STORE_VAR            (line 40) result2
+103 : PUSH_STRING          (line 45) "=== All Error Handling Opcodes Tested ==="
+104 : PRINT                (line 45)
+105 : HALT                 (line 0)
