@@ -21,10 +21,11 @@ check_dep g++
 check_dep pkg-config
 
 echo "All dependencies found."
-
-# =============================
-# Build setup
-# =============================
+        src/backend/concurrency/scheduler.cpp \
+        src/backend/concurrency/thread_pool.cpp \
+        src/backend/concurrency/event_loop.cpp \
+        src/backend/concurrency/epoll_event_loop.cpp \
+        src/debugger.cpp
 mkdir -p bin
 
 CXX=g++
@@ -96,22 +97,20 @@ $CXX $CXXFLAGS -o bin/format_code \
 
 
 echo "format_code built successfully."
+# Note: embedding workflow is currently disabled.
+# The project contains a `lembed` generator and `tools/make_embedded.*` helpers
+# to produce standalone interpreter binaries with embedded bytecode. Those
+# steps are intentionally not run as part of the default build because earlier
+# automated embedding attempts caused linker and generator issues.
 
-# =============================
-# Summary
-# =============================
 echo
 echo "✅ Build completed successfully."
 echo
-echo "Run the main executable:"
-echo "  ./bin/limitly"
+echo "Embedding tools are present but disabled from this default build."
+echo "To generate an embedded interpreter, build the project then run the lembed"
+echo "generator and the make_embedded helper scripts manually:"
 echo
-echo "Run the test parser:"
-echo "  ./bin/test_parser sample.lm"
-echo
-echo "Run the code formatter:"
-echo "  ./bin/format_code sample.lm"
-echo
-echo "Run the AOT compiler:"
-echo "  ./bin/compile sample.lm sample.o"
+echo "  ./bin/lembed -embed-source <src> <name> -build"
+echo "  OR"
+echo "  python tools/goembed.py <bytecode.txt> <name> src/lembed_generated && tools/make_embedded.sh <name>"
 echo

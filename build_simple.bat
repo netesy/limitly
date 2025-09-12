@@ -38,6 +38,10 @@ if %ERRORLEVEL% EQU 0 (
             frontend\parser.cpp ^
             backend\backend.cpp ^
             backend\vm.cpp ^
+            lembed.cpp ^
+            lembed_builtin.cpp ^
+            ^
+            if exist src\lembed_generated.cpp ( src\lembed_generated.cpp ^ )
             debugger.cpp ^
             -I.
             

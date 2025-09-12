@@ -12,7 +12,6 @@
 
 // Map opcode enum values to their string representations
 const std::unordered_map<Opcode, std::string> OPCODE_NAMES = {
-    // Stack operations
     {Opcode::PUSH_INT, "PUSH_INT"},
     {Opcode::PUSH_FLOAT, "PUSH_FLOAT"},
     {Opcode::PUSH_STRING, "PUSH_STRING"},
@@ -21,16 +20,13 @@ const std::unordered_map<Opcode, std::string> OPCODE_NAMES = {
     {Opcode::POP, "POP"},
     {Opcode::DUP, "DUP"},
     {Opcode::SWAP, "SWAP"},
-    
-    // Variable operations
     {Opcode::STORE_VAR, "STORE_VAR"},
     {Opcode::LOAD_VAR, "LOAD_VAR"},
     {Opcode::STORE_TEMP, "STORE_TEMP"},
     {Opcode::LOAD_TEMP, "LOAD_TEMP"},
     {Opcode::CLEAR_TEMP, "CLEAR_TEMP"},
     {Opcode::LOAD_THIS, "LOAD_THIS"},
-    
-    // Arithmetic operations
+    {Opcode::LOAD_SUPER, "LOAD_SUPER"},
     {Opcode::ADD, "ADD"},
     {Opcode::SUBTRACT, "SUBTRACT"},
     {Opcode::MULTIPLY, "MULTIPLY"},
@@ -38,45 +34,35 @@ const std::unordered_map<Opcode, std::string> OPCODE_NAMES = {
     {Opcode::POWER, "POWER"},
     {Opcode::MODULO, "MODULO"},
     {Opcode::NEGATE, "NEGATE"},
-    
-    // Comparison operations
+    {Opcode::INTERPOLATE_STRING, "INTERPOLATE_STRING"},
+    {Opcode::CONCAT, "CONCAT"},
     {Opcode::EQUAL, "EQUAL"},
     {Opcode::NOT_EQUAL, "NOT_EQUAL"},
     {Opcode::LESS, "LESS"},
     {Opcode::LESS_EQUAL, "LESS_EQUAL"},
     {Opcode::GREATER, "GREATER"},
     {Opcode::GREATER_EQUAL, "GREATER_EQUAL"},
-    
-    // String operations
-    {Opcode::INTERPOLATE_STRING, "INTERPOLATE_STRING"},
-    {Opcode::CONCAT, "CONCAT"},
-    
-    // Logical operations
     {Opcode::AND, "AND"},
     {Opcode::OR, "OR"},
     {Opcode::NOT, "NOT"},
-    
-    // Control flow operations
     {Opcode::JUMP, "JUMP"},
     {Opcode::JUMP_IF_TRUE, "JUMP_IF_TRUE"},
     {Opcode::JUMP_IF_FALSE, "JUMP_IF_FALSE"},
+    {Opcode::BREAK, "BREAK"},
+    {Opcode::CONTINUE, "CONTINUE"},
     {Opcode::CALL, "CALL"},
     {Opcode::RETURN, "RETURN"},
-    
-    // Function operations
     {Opcode::BEGIN_FUNCTION, "BEGIN_FUNCTION"},
     {Opcode::END_FUNCTION, "END_FUNCTION"},
     {Opcode::DEFINE_PARAM, "DEFINE_PARAM"},
     {Opcode::DEFINE_OPTIONAL_PARAM, "DEFINE_OPTIONAL_PARAM"},
     {Opcode::SET_DEFAULT_VALUE, "SET_DEFAULT_VALUE"},
-    
-    // Class operations
     {Opcode::BEGIN_CLASS, "BEGIN_CLASS"},
     {Opcode::END_CLASS, "END_CLASS"},
+    {Opcode::SET_SUPERCLASS, "SET_SUPERCLASS"},
+    {Opcode::DEFINE_FIELD, "DEFINE_FIELD"},
     {Opcode::GET_PROPERTY, "GET_PROPERTY"},
     {Opcode::SET_PROPERTY, "SET_PROPERTY"},
-    
-    // Collection operations
     {Opcode::CREATE_LIST, "CREATE_LIST"},
     {Opcode::LIST_APPEND, "LIST_APPEND"},
     {Opcode::CREATE_DICT, "CREATE_DICT"},
@@ -85,68 +71,48 @@ const std::unordered_map<Opcode, std::string> OPCODE_NAMES = {
     {Opcode::DICT_SET, "DICT_SET"},
     {Opcode::GET_INDEX, "GET_INDEX"},
     {Opcode::SET_INDEX, "SET_INDEX"},
-    
-    // Iterator operations
     {Opcode::GET_ITERATOR, "GET_ITERATOR"},
     {Opcode::ITERATOR_HAS_NEXT, "ITERATOR_HAS_NEXT"},
     {Opcode::ITERATOR_NEXT, "ITERATOR_NEXT"},
     {Opcode::ITERATOR_NEXT_KEY_VALUE, "ITERATOR_NEXT_KEY_VALUE"},
-    
-    // Scope operations
     {Opcode::BEGIN_SCOPE, "BEGIN_SCOPE"},
     {Opcode::END_SCOPE, "END_SCOPE"},
-    
-    // Exception handling operations
     {Opcode::BEGIN_TRY, "BEGIN_TRY"},
     {Opcode::END_TRY, "END_TRY"},
     {Opcode::BEGIN_HANDLER, "BEGIN_HANDLER"},
     {Opcode::END_HANDLER, "END_HANDLER"},
     {Opcode::THROW, "THROW"},
     {Opcode::STORE_EXCEPTION, "STORE_EXCEPTION"},
-    
-    // Concurrency operations
     {Opcode::BEGIN_PARALLEL, "BEGIN_PARALLEL"},
     {Opcode::END_PARALLEL, "END_PARALLEL"},
+    {Opcode::BEGIN_TASK, "BEGIN_TASK"},
+    {Opcode::END_TASK, "END_TASK"},
+    {Opcode::BEGIN_WORKER, "BEGIN_WORKER"},
+    {Opcode::END_WORKER, "END_WORKER"},
+    {Opcode::STORE_ITERABLE, "STORE_ITERABLE"},
     {Opcode::BEGIN_CONCURRENT, "BEGIN_CONCURRENT"},
     {Opcode::END_CONCURRENT, "END_CONCURRENT"},
     {Opcode::AWAIT, "AWAIT"},
-    
-    // Pattern matching operations
     {Opcode::MATCH_PATTERN, "MATCH_PATTERN"},
-    
-    // Module operations
     {Opcode::IMPORT, "IMPORT"},
-    
-    // Enum operations
     {Opcode::BEGIN_ENUM, "BEGIN_ENUM"},
     {Opcode::END_ENUM, "END_ENUM"},
     {Opcode::DEFINE_ENUM_VARIANT, "DEFINE_ENUM_VARIANT"},
     {Opcode::DEFINE_ENUM_VARIANT_WITH_TYPE, "DEFINE_ENUM_VARIANT_WITH_TYPE"},
-    
-    // I/O operations
     {Opcode::PRINT, "PRINT"},
     {Opcode::HALT, "HALT"},
-    
-    // Debug operations
     {Opcode::DEBUG_PRINT, "DEBUG_PRINT"},
-
-        // Error handling operations
-    {Opcode::CHECK_ERROR, "CHECK_ERROR"},        // Check if value is error, jump if true
-        {Opcode::PROPAGATE_ERROR, "PROPAGATE_ERROR"},    // Propagate error up the call stack
-        {Opcode::CONSTRUCT_ERROR, "CONSTRUCT_ERROR"},    // Construct error value
-        {Opcode::CONSTRUCT_OK, "CONSTRUCT_OK"},       // Construct success value
-        {Opcode::IS_ERROR, "IS_ERROR"},           // Check if union contains error
-        {Opcode::IS_SUCCESS, "IS_SUCCESS"},         // Check if union contains success value
-        {Opcode::UNWRAP_VALUE, "UNWRAP_VALUE"},    // Extract value from success union
-
-    // Memory operations
+    {Opcode::CHECK_ERROR, "CHECK_ERROR"},
+    {Opcode::PROPAGATE_ERROR, "PROPAGATE_ERROR"},
+    {Opcode::CONSTRUCT_ERROR, "CONSTRUCT_ERROR"},
+    {Opcode::CONSTRUCT_OK, "CONSTRUCT_OK"},
+    {Opcode::IS_ERROR, "IS_ERROR"},
+    {Opcode::IS_SUCCESS, "IS_SUCCESS"},
+    {Opcode::UNWRAP_VALUE, "UNWRAP_VALUE"},
     {Opcode::LOAD_CONST, "LOAD_CONST"},
     {Opcode::STORE_CONST, "STORE_CONST"},
     {Opcode::LOAD_MEMBER, "LOAD_MEMBER"},
     {Opcode::STORE_MEMBER, "STORE_MEMBER"},
-    {Opcode::LOAD_SUPER, "LOAD_SUPER"},
-     
- 
 };
 
 // Helper function to get opcode name
