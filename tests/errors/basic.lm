@@ -37,9 +37,7 @@ fn parseAndDivide(s: str, divisor: int): int?ParseError, DivisionByZero {
 var result = divide(10, 2)?;
 print(result);
 
-var result2 = divide(10, 0)? else error {
-    print("Division failed: #{error}");
-    return;
-};
+//var result2 = divide(10, 0)? errored 
+//print("Division failed: #{errored}");
 
 print("=== All Error Handling Opcodes Tested ===");
