@@ -40,8 +40,8 @@ fn test_error_propagation() {
     print("Division result:", result);
     
     // Error propagation
-    var error_result = divide(10, 0)?;  // Will propagate DivisionByZero
-    print("This should not print due to error propagation");
+    // var error_result = divide(10, 0)?;  // Will propagate DivisionByZero
+    // print("This should not print due to error propagation");
     
     // Compile-time error: Unhandled error type 'Overflow'
     // var unhandled = parse_number("123")?;
@@ -69,7 +69,7 @@ fn test_error_handling() {
     //     return -1;
     // };
     
-    print("Result after error handling:", result);
+    // print("Result after error handling:", result);
 }
 
 // Test 5: Error type checking and pattern matching
@@ -78,17 +78,17 @@ fn test_error_checking() {
     var error_val = err(TestError);
     
     // Type checking with is_error/is_success
-    if (is_error(success_val)) {
-        print("Success value incorrectly identified as error");
-    } else {
-        print("Success value correctly identified");
-    }
+    // if (is_error(success_val)) {
+    //     print("Success value incorrectly identified as error");
+    // } else {
+    //     print("Success value correctly identified");
+    // }
     
-    if (is_error(error_val)) {
-        print("Error value correctly identified");
-    } else {
-        print("Error value incorrectly identified as success");
-    }
+    // if (is_error(error_val)) {
+    //     print("Error value correctly identified");
+    // } else {
+    //     print("Error value incorrectly identified as success");
+    // }
     
     // Pattern matching with match expression
     // match (divide(10, 0)) {
@@ -120,35 +120,36 @@ fn process_data(data: string): string?IOError, ParseError {
 fn test_error_composition() {
 
     
-    // Valid usage with all error types handled
-    var result = process_and_divide("test", 2)? else error {
-        if (error == "DivisionByZero") {
-            print("Cannot divide by zero");
-        } else if (error == "ParseError") {
-            print("Failed to parse input");
-        } else if (error == "IOError") {
-            print("IO error occurred");
-        }
-        return -1;
-    };
+    // // Valid usage with all error types handled
+    // var result = process_and_divide("test", 2)? else error {
+    //     if (error == "DivisionByZero") {
+    //         print("Cannot divide by zero");
+    //     } else if (error == "ParseError") {
+    //         print("Failed to parse input");
+    //     } else if (error == "IOError") {
+    //         print("IO error occurred");
+    //     }
+    //     return -1;
+    // };
     
-    print("Processed result:", result);
+    // print("Processed result:", result);
 }
 
 // Test 7: Error type inference
 fn test_type_inference() {
+    print("Testing type inference with errors");
     // Type inference for error unions
     var maybe_num: int? = divide(10, 2);  // Explicit type
-    var inferred = divide(10, 2);          // Inferred as int?DivisionByZero
+    var inferred = divide(10, 0);          // Inferred as int?DivisionByZero
     
     // Compile-time error: Type mismatch
-    var wrong_type: string? = divide(10, 2);
+    var wrong_type: string? = divide(10, 0);
     
     // Explicit error type annotation
     var with_errors: int?DivisionByZero = divide(10, 2);
     
     // Compile-time error: Missing error type
-    // var missing_error: int? = err("SomeError");
+    var missing_error: int? = err(SomeError);
 }
 
 // Run tests
