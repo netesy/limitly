@@ -1,0 +1,78 @@
+=== Concurrency Smoke Test ===
+[DEBUG] Starting concurrent block, mode: async
+[DEBUG] Concurrent task starting execution
+[DEBUG] Cannot call method: funcName='method:send' method='send' heldType=channel stackSize=0 argsSize=1
+[DEBUG] objectValue.toString(): <channel> (Any)
+[DEBUG] methodArgs (count=1): [0] 1(Int64)
+[DEBUG] VM stack snapshot:
+Stack is empty
+[DEBUG] Concurrent task completed
+
+ 
+
+
+=== Memory Usage Report ===
+
+Memory Manager Statistics:
+  Current Total Allocated: 0.00 B
+  Peak Memory Usage: 240.00 B
+  Number of Allocations: 3
+  Number of Deallocations: 3
+  Largest Allocation: 120.00 B
+  Active Regions: 0
+  Active References: 0
+  Active Linears: 0
+  Average Allocation Size: 0.00 B
+
+=== Memory Analysis ===
+Overall Health Score: 92.9/100
+
+Performance Warnings:
+--------------------
+- High average allocation time: 170.666667 us
+
+Allocation Size Distribution:
+--------------------Value from channel: 1
+
+No allocations recorded
+
+Temporal Analysis:
+--------------------
+Peak Allocation Rate: 3.0 allocs/sec
+Average Allocation Lifetime: 0.0 ms
+
+Allocation Hotspots:
+- allocate at line 296
+
+Thread Analysis:
+--------------------
+Thread 2:
+  Total Allocations: 3
+  Active Allocations: 0
+  Peak Memory Usage: 120.00 B
+
+Cache Performance:
+--------------------
+Cache Hit Rate: 0.0%
+Cache Hits: 0
+Cache Misses: 0
+Average Access Time: 1.0 ns
+
+Memory Access Patterns:
+--------------------
+No access patterns recorded
+
+Recommendations:
+--------------------
+- High allocation times detected. Consider using a memory pool or pre-allocation strategy
+- Detected many short-lived allocations. Consider using an object pool or stack allocation
+
+Health Score Breakdown:
+--------------------
+Memory Fragmentation: 100.0/100
+Allocation Efficiency: 100.0/100
+Cache Utilization: 100.0/100
+Memory Safety: 100.0/100
+
+==================================================
+^C

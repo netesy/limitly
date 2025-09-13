@@ -1,0 +1,51 @@
+Bytecode for tests/concurrency/concurrency_smoke.lm
+========================================
+
+Total instructions: 46
+
+   1: PUSH_STRING          (line 2) "=== Concurrency Smoke Test ==="
+2   : PRINT                (line 2)
+3   : PUSH_INT             (line 5) 0
+4   : OP_9                 (line 5)
+5   : CALL                 (line 8) 0
+6   : DUP                  (line 8)
+7   : STORE_VAR            (line 8) ch
+8   : POP                  (line 8)
+9   : BEGIN_CONCURRENT     (line 11)
+10  : BEGIN_SCOPE          (line 11)
+11  : BEGIN_SCOPE          (line 12)
+12  : LOAD_VAR             (line 14) counter
+13  : PUSH_INT             (line 14) 1
+14  : ADD                  (line 14)
+15  : DUP                  (line 14)
+16  : STORE_VAR            (line 14) counter
+17  : POP                  (line 14)
+18  : LOAD_VAR             (line 15) counter
+19  : LOAD_VAR             (line 15) ch
+20  : CALL                 (line 15) 2
+21  : POP                  (line 15)
+22  : END_SCOPE            (line 12)
+23  : END_SCOPE            (line 11)
+24  : END_CONCURRENT       (line 11)
+25  : LOAD_VAR             (line 20) ch
+26  : GET_ITERATOR         (line 20)
+27  : STORE_TEMP           (line 20)
+28  : LOAD_TEMP            (line 20)
+29  : ITERATOR_HAS_NEXT    (line 20)
+30  : JUMP_IF_FALSE        (line 20) 12
+31  : LOAD_TEMP            (line 20)
+32  : ITERATOR_NEXT        (line 20)
+33  : STORE_VAR            (line 20) v
+34  : BEGIN_SCOPE          (line 20)
+35  : PUSH_STRING          (line 21) "Value from channel: "
+36  : LOAD_VAR             (line 21) v
+37  : PUSH_STRING          (line 21) ""
+38  : CONCAT               (line 21)
+39  : INTERPOLATE_STRING   (line 21)
+40  : PRINT                (line 21)
+41  : END_SCOPE            (line 20)
+42  : JUMP                 (line 20) -15
+43  : CLEAR_TEMP           (line 20)
+44  : PUSH_STRING          (line 24) "Smoke test finished"
+45  : PRINT                (line 24)
+46  : HALT                 (line 0)

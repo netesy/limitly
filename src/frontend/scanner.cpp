@@ -614,9 +614,10 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "option") return TokenType::OPTION_TYPE;
     // Always treat "result" as an identifier to avoid conflicts with variable names
     if (rest == "result") return TokenType::IDENTIFIER;
-    if (rest == "channel") return TokenType::CHANNEL_TYPE;
-    if (rest == "atomic") return TokenType::ATOMIC_TYPE;
+    if (rest == "channel") return TokenType::IDENTIFIER;
+    if (rest == "atomic") return TokenType::IDENTIFIER;
     if (rest == "function") return TokenType::FUNCTION_TYPE;
+    if (rest == "events") return TokenType::IDENTIFIER;
 
     return TokenType::IDENTIFIER;
 }

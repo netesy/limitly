@@ -1,0 +1,32 @@
+
+ ----------------DEBUG----------------
+Line 7 (Syntax Error): Expected expression.
+Expected value: var messages = channel();
+Time: Sat Sep 13 07:46:38 2025
+
+
+Suggestion: Ensure the correct syntax is followed. Expected expression.
+Sample Solution: Ensure the correct syntax is followed. Expected expression.
+ ----------------END----------------
+
+
+ ----------------DEBUG----------------
+Line 27 (Syntax Error): Expected expression.
+Expected value: var files_out = channel();
+Time: Sat Sep 13 07:46:38 2025
+
+
+Suggestion: Ensure the correct syntax is followed. Expected expression.
+Sample Solution: Ensure the correct syntax is followed. Expected expression.
+ ----------------END----------------
+
+
+--- Syntax Errors ---
+[Line 7, Col 209]: Expected expression.
+    var messages = channel();
+[Line 27, Col 848]: Expected expression.
+    var files_out = channel();
+---------------------
+=== Parallel Block Tests ===
+Error: Error executing bytecode: Error executing instruction: Function not found: unknown
+^C

@@ -1,0 +1,57 @@
+AST for tests/concurrency/concurrency_smoke.lm
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+  Literal: "=== Concurrency Smoke Test ==="
+VarDeclaration: counter
+  Type: atomic
+  Initializer:
+    Literal: 0
+ExpressionStatement:
+  Assignment: =
+    Target: ch
+    Value:
+    CallExpression:
+      Callee:
+        Variable: channel
+ConcurrentStatement:
+  BlockStatement:
+    TaskStatement
+      LoopVar: i
+      Iterable:
+        RangeExpression:
+          Start:
+            Literal: 1
+          End:
+            Literal: 4
+          Inclusive: true
+      Body:
+        BlockStatement:
+          ExpressionStatement:
+            Assignment: +=
+              Target: counter
+              Value:
+              Literal: 1
+          ExpressionStatement:
+            CallExpression:
+              Callee:
+                MemberExpression: .send
+                  Object:
+                    Variable: ch
+              Arguments:
+                Variable: counter
+IterStatement:
+  Variables: v
+  Iterable:
+    Variable: ch
+  Body:
+    BlockStatement:
+      PrintStatement:
+        InterpolatedString:
+          String: "Value from channel: "
+          Expression:
+            Variable: v
+PrintStatement:
+  Literal: "Smoke test finished"
