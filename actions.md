@@ -1042,3 +1042,21 @@ The language is ready for real-world use cases and continued development of adva
 ---
 
 *This completes the core language implementation phase. All fundamental programming language features are now fully functional and thoroughly tested.*
+
+## Action 21: Comprehensive Documentation Creation
+
+**Prompt**: "Update the Readme for this and using the code in the tests folder and the code base a doc folder teaching about this language, it should be a step by step guide and be detailed."
+**Follow-up Prompt**: "create a comparison between limit and python and also update the activities.md and actions.md based on the current code base. in the doc folder create a zen.md that talks about the zen of the language."
+
+**Changes Made**:
+- **Created `doc` folder**: A new directory for all documentation.
+- **Created `doc/guide.md`**: A comprehensive, step-by-step guide to the Limit language, covering all features from basic syntax to advanced concurrency.
+- **Created `doc/zen.md`**: A document outlining the core philosophy of the Limit language.
+- **Created `doc/limit_vs_python.md`**: A comparison document highlighting the key differences between Limit and Python.
+- **Refactored `README.md`**: Updated the main `README.md` to be a concise overview with a prominent link to the new guide.
+- **Updated `activities.md`**: Marked documentation tasks as complete.
+
+**Impact**:
+- ✅ The project now has comprehensive documentation for new users.
+- ✅ The `README.md` is cleaner and more focused.
+- ✅ The language's philosophy and its comparison to a popular language are now documented.
