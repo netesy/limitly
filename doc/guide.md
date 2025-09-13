@@ -688,20 +688,56 @@ match (result) {
 
 ### The `?` Operator
 
-The `?` operator provides a convenient way to propagate errors. When you append `?` to a function call that returns a `Result` or an `Option`:
+The `?` operator provides a convenient way to **propagate** errors. When you append `?` to an expression that returns a `Result` or an `Option`:
 
-*   If the result is a `Success` or `Some`, the operator unwraps the value and the program continues.
-*   If the result is an `Error` or `None`, the operator will immediately return the `Error` or `None` from the current function.
+*   If the value is a `Success` or `Some`, the operator unwraps the value and the program continues.
+*   If the value is an `Error` or `None`, the `?` operator will cause the current function to immediately return that `Error` or `None`.
 
-This simplifies error handling code significantly.
+This allows you to write cleaner code by avoiding deeply nested `match` statements when you simply want to pass an error up the call stack.
 
 ```
-fn process_data(): Result {
-    var data = fetch_data()?; // If this fails, process_data returns the error
-    var result = parse_data(data)?; // If this fails, process_data returns the error
-    return Success { value: result };
+// Assume this function exists and can fail
+fn to_int(s: str): Result<int, str> {
+    // ... implementation ...
 }
+
+// This function uses '?' to propagate the error from to_int
+fn get_number_from_string(s: str): Result<int, str> {
+    var number: int = to_int(s)?; // If to_int returns an Error, this function also returns it.
+
+    // This code only runs if to_int was successful
+    print("Parsing was successful!");
+    return Success(number * 2);
+}
+
+// Example usage:
+var result1 = get_number_from_string("10"); // result1 will be Success(20)
+var result2 = get_number_from_string("abc"); // result2 will be Error(...)
 ```
+
+### Inline Error Handling with `? else`
+
+The `? else error` construct provides a concise way to handle an error inline, providing a fallback value or executing a block of code without a full `match` statement.
+
+The expression to the left of the `?` is evaluated. If it is a `Success` or `Some`, the value is unwrapped and assigned. If it is an `Error` or `None`, the `else` block is executed. The `error` variable inside the block is bound to the error value. The value returned from the `else` block is then used as the result of the entire expression.
+
+```limit
+fn divide(a: int, b: int): Result<int, str> {
+    if (b == 0) {
+        return Error("DivisionByZero");
+    }
+    return Success(a / b);
+}
+
+// Use `? else` to provide a default value on failure.
+var value: int = divide(10, 0)? else err {
+    print("An error occurred: {err}");
+    return 0; // Default value
+};
+// `value` will be 0.
+```
+
+This syntax is particularly useful for providing default values or for logging an error while allowing the program to continue with a sensible fallback.
 
 ## Concurrency
 

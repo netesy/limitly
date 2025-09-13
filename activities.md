@@ -128,7 +128,9 @@ The project is organized into frontend and backend components:
   - [x] Beginner's guide (`learn.md`)
   - [x] Language philosophy document (`doc/zen.md`)
   - [x] Language comparison document (`doc/limit_vs_python.md`)
-  - [x] Corrected all code examples to use explicit type annotations and demonstrate error handling.
+  - [x] Corrected all code examples to use explicit type annotations.
+  - [x] Clarified and demonstrated error propagation vs. handling in guides.
+  - [x] Documented the `? else error` syntax for inline error handling.
 - [ ] Create a standard library
 - [ ] Implement a package manager
 - [ ] Implement a code linter

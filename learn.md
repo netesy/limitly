@@ -266,22 +266,68 @@ iter (color: str in colors) {
 
 ## 🧪 Errors and Debugging
 
-When you're programming, you'll inevitably run into errors. Don't worry, it's a normal part of the process!
+In Limit, errors are not seen as crashes, but as a normal part of a program's flow that you should plan for. The language gives you powerful tools to handle situations where things might go wrong, like a user entering text when you expect a number.
 
-**What happens when you make a mistake?**
-If you make a syntax error (like forgetting a semicolon or a closing brace), the Limit interpreter will usually give you an error message that tells you what went wrong and on which line.
+There are two main ways to deal with potential errors: **handling** them immediately with a `match` statement, or **propagating** (passing) them up to the function that called your function.
 
-For example, if you forget the closing parenthesis in a `print` statement:
+### Handling Errors with `match`
+
+When you have a function that returns a `Result` (like `Success` or `Error`), you can use a `match` statement to handle both possibilities right away. You'll see this in our mini-project below.
+
+### Propagating Errors with `?`
+
+Sometimes, a function doesn't know how to handle an error. In that case, it can pass the error up to the calling function. The `?` operator is a shortcut for this.
+
+Imagine a function `do_something` that calls a function `might_fail`.
+
 ```limit
-print("hello"
-```
-You might see an error like:
-`Syntax error: Expected ')' after arguments.`
+fn might_fail(): Result<int, str> {
+    // This function might return a Success or an Error
+    return Error("Something went wrong!");
+}
 
-**Basic debugging tips:**
-*   **Read the error message carefully.** It often contains valuable clues about what's wrong.
-*   **Print statements are your best friend.** If you're not sure what a variable's value is at a certain point in your program, add a `print()` statement to find out.
-*   **Start small.** If you're having trouble with a large piece of code, try to break it down into smaller parts and test each part individually.
+fn do_something(): Result<int, str> {
+    // We call might_fail() and add a '?' at the end.
+    // If might_fail() returns an Error, the '?' will immediately
+    // stop do_something() and return that same Error.
+    // If it's a Success, the '?' will unwrap the value and continue.
+    var result: int = might_fail()?;
+
+    // This part only runs if might_fail() was a success
+    print("It worked!");
+    return Success(result);
+}
+
+// Let's see what happens when we call it:
+var final_result = do_something();
+// do_something() will return the Error from might_fail().
+// The "It worked!" message will never be printed.
+```
+The `?` operator helps you write cleaner code by avoiding nested `match` statements when you just want to pass an error along.
+
+### Inline Error Handling with `? else`
+
+What if you want to handle an error right where it happens, but without writing a full `match` block? Limit provides a handy `? else error { ... }` syntax for this.
+
+It works like this: try the operation on the left of the `?`. If it succeeds, give me the value. If it fails, execute the `else` block.
+
+```limit
+fn divide(a: int, b: int): Result<int, str> {
+    if (b == 0) {
+        return Error("Cannot divide by zero!");
+    }
+    return Success(a / b);
+}
+
+// We'll provide a default value of -1 if the division fails.
+var result: int = divide(10, 0)? else err {
+    print("Caught an error: {err}");
+    return -1; // The value to use instead
+};
+
+print("The final result is: {result}"); // Output: The final result is: -1
+```
+This is a very concise way to provide a fallback value or run some code when an operation fails, without stopping the entire function.
 
 ## 🚀 Mini Project: Number Guessing Game
 
@@ -334,10 +380,7 @@ loop { // An infinite loop
 ```
 
 **How it works:**
-*   **Error Handling:** The `to_int` function doesn't just return a number. It returns a `Result`. A `Result` can be either a `Success` containing the number, or an `Error` containing a parsing error.
-*   **`match` Statement:** We use a `match` statement to check which variant of the `Result` we got.
-    *   If it's a `Success(guess)`, we can safely use the `guess` variable.
-    *   If it's an `Error(err)`, we print a friendly message instead of crashing.
+*   **Error Handling with `match`:** The `to_int` function returns a `Result`. We use a `match` statement to **handle** the error immediately. We do this because if the user enters bad input, we don't want the game to crash; we just want to print a message and let them try again. This is a perfect example of handling an error at the point where it occurs.
 *   **Looping:** The `loop` creates an infinite loop. The `break` keyword is used to exit the loop once the correct number has been guessed.
 
 **Your Challenge:**
