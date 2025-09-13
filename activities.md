@@ -125,6 +125,7 @@ The project is organized into frontend and backend components:
 - [x] **Test Documentation** - Complete README with test guidelines
 - [x] **Create language documentation**
   - [x] Comprehensive, step-by-step guide (`doc/guide.md`)
+  - [x] Beginner's guide (`learn.md`)
   - [x] Language philosophy document (`doc/zen.md`)
   - [x] Language comparison document (`doc/limit_vs_python.md`)
 - [ ] Create a standard library

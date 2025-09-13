@@ -1060,3 +1060,18 @@ The language is ready for real-world use cases and continued development of adva
 - ✅ The project now has comprehensive documentation for new users.
 - ✅ The `README.md` is cleaner and more focused.
 - ✅ The language's philosophy and its comparison to a popular language are now documented.
+
+## Action 22: Create Beginner's Guide
+
+**Prompt**: "create a learn.md based on 🧭 Beginner’s Guide (Getting Started Guide)..."
+
+**Changes Made**:
+- **Created `learn.md`**: A new, beginner-friendly guide in the root directory, following a detailed, user-provided structure.
+- **Adapted Content**: Rewrote content from the more technical `doc/guide.md` to have a friendly and tutorial-like tone.
+- **Added Mini-Project**: Created a number guessing game example to provide a hands-on challenge for new learners.
+- **Updated `activities.md`**: Added the new `learn.md` to the list of completed documentation tasks.
+
+**Impact**:
+- ✅ The project now has a dedicated learning resource for absolute beginners.
+- ✅ The guide provides a clear, step-by-step path from installation to writing a small project.
+- ✅ The friendly tone and practical examples make the language more approachable.
