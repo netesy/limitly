@@ -1075,3 +1075,18 @@ The language is ready for real-world use cases and continued development of adva
 - ✅ The project now has a dedicated learning resource for absolute beginners.
 - ✅ The guide provides a clear, step-by-step path from installation to writing a small project.
 - ✅ The friendly tone and practical examples make the language more approachable.
+
+## Action 23: Correct Documentation Examples
+
+**Prompt**: "show error handling in the example code and the correct types . as limiltly does not work withoiut types."
+
+**Changes Made**:
+- **Reviewed `learn.md` and `doc/guide.md`**: Went through all documentation files to identify examples that were missing type annotations or could be improved with error handling demonstrations.
+- **Added Type Annotations**: Updated all code examples in both `learn.md` and `doc/guide.md` to include explicit type annotations (e.g., `var x: int = 10;`).
+- **Demonstrated Error Handling**: Rewrote the "Number Guessing Game" in `learn.md` to use a `Result` type and a `match` statement to handle potential parsing errors from user input.
+- **Updated `activities.md`**: Logged the correction of the documentation examples.
+
+**Impact**:
+- ✅ The documentation is now more accurate and reflects the statically-typed nature of the Limit language.
+- ✅ The examples now serve as better models for writing robust, type-safe Limit code.
+- ✅ The beginner's guide now includes a practical demonstration of one of Limit's core strengths: explicit error handling.

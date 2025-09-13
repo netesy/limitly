@@ -84,29 +84,33 @@ Now that you've written your first program, let's learn some of the basic buildi
 
 ### Variables and Types
 
-A variable is a name that refers to a value. You can create a variable using the `var` keyword.
+A variable is a name that refers to a value. You can create a variable using the `var` keyword. While Limit can sometimes infer the type, it's good practice to be explicit by adding a type annotation.
 
 ```limit
-var my_age = 28;
-var my_name = "Jules";
+var my_age: int = 28;
+var my_name: str = "Jules";
 ```
 
-Limit is a statically-typed language, which means that every variable has a type that is known when you write the code. In the example above, `my_age` is an `int` (integer) and `my_name` is a `str` (string). Other basic types include `float` (for decimal numbers) and `bool` (for `true` or `false`).
+Limit is a statically-typed language, which means that every variable has a type that is known when you write the code. The basic types are:
+*   **`int`**: for integers (e.g., `10`, `-5`).
+*   **`float`**: for decimal numbers (e.g., `3.14`).
+*   **`bool`**: for `true` or `false`.
+*   **`str`**: for strings of text (e.g., `"Hello"`).
 
 ### Printing to Console
 
 As you saw in the "Hello, world!" example, you can use the `print()` function to display output. You can also print the value of variables.
 
 ```limit
-var planet = "Earth";
+var planet: str = "Earth";
 print(planet); // Output: Earth
 ```
 
 You can even embed variables directly into strings using curly braces `{}`. This is called **string interpolation**.
 
 ```limit
-var name = "Alice";
-var age = 30;
+var name: str = "Alice";
+var age: int = 30;
 print("My name is {name} and I am {age} years old.");
 // Output: My name is Alice and I am 30 years old.
 ```
@@ -192,22 +196,22 @@ say_hello();
 ```
 
 **Parameters and return values:**
-Functions can take inputs, called **parameters**, and produce an output, called a **return value**.
+Functions can take inputs, called **parameters**, and produce an output, called a **return value**. You must specify the type of each parameter and the type of the return value.
 
 ```limit
-// This function takes a 'name' as a parameter
+// This function takes a 'name' of type str as a parameter
 fn greet(name: str) {
     print("Hello, {name}!");
 }
 
 greet("Bob"); // Output: Hello, Bob!
 
-// This function takes two numbers and returns their sum
+// This function takes two integers and returns an integer
 fn add(a: int, b: int): int {
     return a + b;
 }
 
-var result = add(5, 7);
+var result: int = add(5, 7);
 print("The result is {result}"); // Output: The result is 12
 ```
 
@@ -217,10 +221,10 @@ Collections are data structures that can hold multiple values. Limit has two mai
 
 ### Lists/Arrays
 
-A **list** is an ordered collection of items. You can create a list using square brackets `[]`.
+A **list** is an ordered collection of items. You can create a list using square brackets `[]`. It's good practice to specify the type of items the list will hold.
 
 ```limit
-var fruits = ["apple", "banana", "cherry"];
+var fruits: [str] = ["apple", "banana", "cherry"];
 print(fruits);
 ```
 
@@ -236,7 +240,7 @@ print(fruits[2]); // Output: cherry
 A **dictionary** (or map) is a collection of key-value pairs. You can create a dictionary using curly braces `{}`.
 
 ```limit
-var person = {
+var person: {str: any} = {
     "name": "Alice",
     "age": 30
 };
@@ -253,9 +257,9 @@ print(person["name"]); // Output: Alice
 You can use the `iter` loop to go through each item in a collection.
 
 ```limit
-var colors = ["red", "green", "blue"];
+var colors: [str] = ["red", "green", "blue"];
 
-iter (color in colors) {
+iter (color: str in colors) {
     print("Color: {color}");
 }
 ```
@@ -281,59 +285,64 @@ You might see an error like:
 
 ## 🚀 Mini Project: Number Guessing Game
 
-Now it's time to put everything you've learned together! Let's build a simple number guessing game.
+Now it's time to put everything you've learned together! Let's build a simple number guessing game. This example will also show you how to handle potential errors gracefully.
 
-The goal is for the user to guess a secret number. The program will tell them if their guess is too high or too low until they guess the correct number.
+The goal is for the user to guess a secret number. The program will tell them if their guess is too high or too low. If they enter something that isn't a number, our program will handle it without crashing.
 
 ```limit
 // --- Number Guessing Game ---
 
-// Let's pretend we have a way to get a random number.
-// For now, we'll just "hardcode" it to a specific value.
-var secret_number = 7;
+// Let's assume the language provides these built-in functions.
+// fn randint(min: int, max: int): int { ... }
+// fn read_line(): str { ... }
+// fn to_int(s: str): Result<int, ParseError> { ... }
 
-print("I'm thinking of a number between 1 and 10.");
-print("Can you guess what it is?");
+// --- The Game Code ---
 
-var guess = 0;
-var attempts = 0;
+var secret_number: int = 7; // In a real game, you'd use randint(1, 100)
+print("I'm thinking of a number between 1 and 100. Guess what it is!");
 
-while (guess != secret_number) {
-    attempts += 1;
+loop { // An infinite loop
+    print("Please input your guess:");
 
-    // In a real program, you would get user input here.
-    // For this example, we'll simulate a few guesses.
-    if (attempts == 1) {
-        guess = 3;
-        print("Your guess: 3");
-    } else if (attempts == 2) {
-        guess = 8;
-        print("Your guess: 8");
-    } else {
-        guess = 7;
-        print("Your guess: 7");
+    // For this example, we'll simulate user input.
+    // In a real program, you would use: var input_str: str = read_line();
+    var input_str: str = "7"; // Let's pretend the user guessed "7"
+
+    var guess_result: Result<int, ParseError> = to_int(input_str);
+
+    match (guess_result) {
+        Success(guess) => {
+            print("You guessed: {guess}");
+            if (guess < secret_number) {
+                print("Too low!");
+            } else if (guess > secret_number) {
+                print("Too high!");
+            } else {
+                print("You win!");
+                break; // Exit the loop
+            }
+        },
+        Error(err) => {
+            print("That's not a number! Please try again.");
+        }
     }
 
-    // Check the guess
-    if (guess < secret_number) {
-        print("Too low! Try again.");
-    } else if (guess > secret_number) {
-        print("Too high! Try again.");
-    }
+    // In a real game, we'd loop again. For this example, we'll just break.
+    break;
 }
-
-print("You got it! The secret number was {secret_number}.");
-print("It took you {attempts} attempts.");
 ```
 
 **How it works:**
-*   We use a `while` loop to keep the game going until the `guess` matches the `secret_number`.
-*   Inside the loop, we use `if/else if` statements to check if the guess is too low or too high and print a message to the user.
-*   Once the correct number is guessed, the loop condition becomes false, and the program prints a success message.
+*   **Error Handling:** The `to_int` function doesn't just return a number. It returns a `Result`. A `Result` can be either a `Success` containing the number, or an `Error` containing a parsing error.
+*   **`match` Statement:** We use a `match` statement to check which variant of the `Result` we got.
+    *   If it's a `Success(guess)`, we can safely use the `guess` variable.
+    *   If it's an `Error(err)`, we print a friendly message instead of crashing.
+*   **Looping:** The `loop` creates an infinite loop. The `break` keyword is used to exit the loop once the correct number has been guessed.
 
 **Your Challenge:**
-*   Can you modify the code to change the secret number?
-*   Can you add a limit to the number of attempts the user has? (Hint: you'll need another condition in your `while` loop).
+*   Can you modify the code to get a random number instead of using a fixed one? You'll have to imagine a `randint(min, max)` function exists.
+*   Can you remove the `break` at the end of the `match` statement to allow the user to guess multiple times?
 
 ## 📎 Next Steps / Resources
 

@@ -121,11 +121,11 @@ This section covers the fundamental syntax of the Limit language.
 
 ### Variables
 
-Variables are declared using the `var` keyword. They can be reassigned a new value.
+Variables are declared using the `var` keyword. While the compiler can infer types, it is good practice to use explicit type annotations.
 
 ```
-// Declare a variable
-var x = 10;
+// Declare a variable with a type annotation
+var x: int = 10;
 print(x); // Output: 10
 
 // Reassign the variable
@@ -136,9 +136,9 @@ print(x); // Output: 20
 You can also declare multiple variables in a sequence.
 
 ```
-var a = 1;
-var b = 2;
-var c = 3;
+var a: int = 1;
+var b: int = 2;
+var c: int = 3;
 ```
 
 ### Primitive Types
@@ -153,11 +153,11 @@ Limit has several built-in primitive types:
 *   **`nil`**: A special value representing "nothing" or "null".
 
 ```
-var my_integer = 42;
-var my_float = 3.14;
-var my_boolean = true;
-var my_string = "Hello, Limit!";
-var my_nil = nil;
+var my_integer: int = 42;
+var my_float: float = 3.14;
+var my_boolean: bool = true;
+var my_string: str = "Hello, Limit!";
+var my_nil: nil = nil;
 ```
 
 ### Comments
@@ -411,7 +411,7 @@ fn add(a: int, b: int): int {
     return a + b;
 }
 
-var sum = add(5, 10);
+var sum: int = add(5, 10);
 print(sum); // Output: 15
 ```
 
@@ -459,7 +459,7 @@ fn multiply(a: int, b: int): int {
     return a * b;
 }
 
-var result = apply(10, 5, multiply);
+var result: int = apply(10, 5, multiply);
 print(result); // Output: 50
 ```
 
@@ -469,7 +469,7 @@ A function can be defined inside another function. This inner function "captures
 
 ```
 fn createCounter(): fn(): int {
-    var count = 0;
+    var count: int = 0;
     fn increment(): int {
         count += 1;
         return count;
@@ -477,7 +477,7 @@ fn createCounter(): fn(): int {
     return increment;
 }
 
-var counter = createCounter();
+var counter: fn(): int = createCounter();
 print(counter()); // Output: 1
 print(counter()); // Output: 2
 print(counter()); // Output: 3
@@ -493,14 +493,14 @@ Classes are defined using the `class` keyword.
 
 ```
 class Greeter {
-    var name = "World";
+    var name: str = "World";
 
     fn say_hello() {
         print("Hello, {self.name}!");
     }
 }
 
-var greeter = Greeter();
+var greeter: Greeter = Greeter();
 greeter.say_hello(); // Output: Hello, World!
 ```
 
@@ -527,7 +527,7 @@ class Person {
     }
 }
 
-var person = Person("Jules", 28);
+var person: Person = Person("Jules", 28);
 person.introduce(); // Output: Hi, I'm Jules and I'm 28 years old.
 ```
 
@@ -550,7 +550,7 @@ class Dog : Animal {
     // Dog inherits the speak() method from Animal
 }
 
-var my_dog = Dog();
+var my_dog: Dog = Dog();
 my_dog.speak(); // Output: The animal makes a sound.
 ```
 
@@ -565,7 +565,7 @@ class Cat : Animal {
     }
 }
 
-var my_cat = Cat();
+var my_cat: Cat = Cat();
 my_cat.speak(); // Output: The cat meows.
 ```
 
@@ -581,7 +581,7 @@ class SmartDog : Dog {
     }
 }
 
-var smart_dog = SmartDog();
+var smart_dog: SmartDog = SmartDog();
 smart_dog.speak();
 // Output:
 // The animal makes a sound.
@@ -593,8 +593,8 @@ smart_dog.speak();
 Polymorphism allows you to treat objects of different classes as objects of a common parent class.
 
 ```
-var animals = [Dog(), Cat(), Animal()];
-iter (animal in animals) {
+var animals: [Animal] = [Dog(), Cat(), Animal()];
+iter (animal: Animal in animals) {
     animal.speak();
 }
 // Output:
