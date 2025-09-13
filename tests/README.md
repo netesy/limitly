@@ -57,6 +57,10 @@ cd tests
 ..\bin\limitly.exe basic\variables.lm
 ```
 
+# Quick regression runners
+
+- `run_common_test.bat`: runs `..\bin\limitly.exe tests\errors\common.lm` and stores output in `tests\common_out.txt`. Use this to validate error propagation behavior.
+
 ## Test Categories
 
 ### ✅ Currently Implemented Features

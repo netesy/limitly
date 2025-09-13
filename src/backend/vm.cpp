@@ -94,8 +94,8 @@ VM::VM(bool create_runtime)
       environment(globals),
       bytecode(nullptr),
       ip(0),
-      debugMode(true),
-      debugOutput(true),
+    debugMode(true),
+    debugOutput(false),
       currentFunctionBeingDefined(""),
       insideFunctionDefinition(false),
       currentClassBeingDefined(""),
@@ -162,6 +162,7 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
     const std::vector<Instruction>& bytecodeRef = *this->bytecode;
     
     try {
+        bool verboseTracing = false; // set true manually for full opcode traces
         while (ip < bytecodeRef.size()) {
             const Instruction& instruction = bytecodeRef[ip];
             
@@ -181,12 +182,7 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
             
             // Debug output for opcode values
             int opcodeValue = static_cast<int>(instruction.opcode);
-            if (debugOutput) {
-                std::cerr << "[TRACE] ip=" << ip << " opcode=" << opcodeValue;
-                if (!instruction.stringValue.empty()) std::cerr << " str='" << instruction.stringValue << "'";
-                if (instruction.intValue != 0) std::cerr << " int=" << instruction.intValue;
-                std::cerr << std::endl;
-            }
+            // Tracing is disabled by default to keep runtime output clean.
             
             try {
                 switch (instruction.opcode) {
@@ -575,12 +571,7 @@ void VM::pushErrorFrame(size_t handlerAddr, TypePtr errorType, const std::string
     frame.expectedErrorType = errorType;
     frame.functionName = functionName;
     errorFrames.push_back(frame);
-    if (debugOutput) {
-        std::cerr << "[DEBUG] pushErrorFrame: handler=" << handlerAddr
-                  << " stackBase=" << frame.stackBase
-                  << " expected=" << (errorType ? errorType->toString() : std::string("(wildcard)"))
-                  << " func=" << functionName << std::endl;
-    }
+    // debug: pushErrorFrame logging removed to reduce noise
 }
 
 void VM::popErrorFrame() {
@@ -590,96 +581,74 @@ void VM::popErrorFrame() {
 }
 
 bool VM::propagateError(ValuePtr errorValue) {
-    if (!errorValue) {
-        return false;
-    }
-    
-    // Get error type from the error value
+    if (!errorValue) return false;
+
+    // Extract error type string
     std::string errorType;
-    if (auto errorVal = std::get_if<ErrorValue>(&errorValue->data)) {
-        errorType = errorVal->errorType;
-    } else if (errorValue->type->tag == TypeTag::ErrorUnion) {
-        if (auto errorVal = std::get_if<ErrorValue>(&errorValue->data)) {
-            errorType = errorVal->errorType;
-        } else {
-            return false; // Not an error value
-        }
+    if (auto ev = errorValue->getErrorValue()) {
+        errorType = ev->errorType;
+    } else if (errorValue->type && errorValue->type->tag == TypeTag::ErrorUnion) {
+        if (auto ev = errorValue->getErrorValue()) errorType = ev->errorType;
+        else return false;
     } else {
-        return false; // Not an error value
-    }
-    
-    // If there are no error frames, propagation cannot succeed here.
-    if (errorFrames.empty()) {
-        if (debugOutput) {
-            std::cerr << "[DEBUG] No error frame available for error: " << errorType << std::endl;
-        }
         return false;
     }
-    if (debugOutput) {
-        std::cerr << "[DEBUG] propagateError: incoming errorType='" << errorType << "', frames=" << errorFrames.size() << std::endl;
+
+    if (errorFrames.empty()) {
+        // No error frames available
+        return false;
     }
 
-    // Walk the error frame stack from top to bottom looking for a handler
+    // Walk frames from top to bottom
     while (!errorFrames.empty()) {
-        ErrorFrame& frame = errorFrames.back();
-        if (debugOutput) {
-            std::cerr << "[DEBUG] Checking frame: handler=" << frame.handlerAddress
-                      << " stackBase=" << frame.stackBase
-                      << " expected=" << (frame.expectedErrorType ? frame.expectedErrorType->toString() : std::string("(wildcard)"))
-                      << " func=" << frame.functionName << std::endl;
-        }
+        ErrorFrame frame = errorFrames.back();
 
-        // A null expectedErrorType matches any error (wildcard)
+    // checking frame
+
+        // Wildcard frame matches any error
         if (!frame.expectedErrorType) {
-            if (debugOutput) std::cerr << "[DEBUG] frame matches (wildcard). Jumping to " << frame.handlerAddress << std::endl;
-                    ip = frame.handlerAddress - 1;
-                size_t before = stack.size();
-                while (stack.size() > frame.stackBase) stack.pop_back();
-                // Ensure the error value is available to the handler on the stack
-                push(errorValue);
-                if (debugOutput) std::cerr << "[DEBUG] propagateError: popped " << (before - stack.size() + 1) << " values to restore stackBase=" << frame.stackBase << " and pushed error back" << std::endl;
-                return true;
-        }
-
-        // If the frame expects an ErrorUnion, treat it as matching any error as well
-        if (frame.expectedErrorType->tag == TypeTag::ErrorUnion) {
-            if (debugOutput) std::cerr << "[DEBUG] frame matches (ErrorUnion). Jumping to " << frame.handlerAddress << std::endl;
+            // Consume the frame so it won't be reused
+            errorFrames.pop_back();
             ip = frame.handlerAddress - 1;
-            size_t before = stack.size();
             while (stack.size() > frame.stackBase) stack.pop_back();
             push(errorValue);
-            if (debugOutput) std::cerr << "[DEBUG] propagateError: popped " << (before - stack.size() + 1) << " values to restore stackBase=" << frame.stackBase << " and pushed error back" << std::endl;
             return true;
         }
 
-        // Otherwise try to match the expected type to the error type string
+        // ErrorUnion expected type treats as wildcard
+        if (frame.expectedErrorType->tag == TypeTag::ErrorUnion) {
+            errorFrames.pop_back();
+            ip = frame.handlerAddress - 1;
+            while (stack.size() > frame.stackBase) stack.pop_back();
+            push(errorValue);
+            return true;
+        }
+
+        // Try to match user-defined or named type
         bool matched = false;
         if (frame.expectedErrorType->tag == TypeTag::UserDefined) {
             if (std::holds_alternative<UserDefinedType>(frame.expectedErrorType->extra)) {
                 const UserDefinedType& ud = std::get<UserDefinedType>(frame.expectedErrorType->extra);
                 if (ud.name == errorType) matched = true;
             }
-        } else {
-            if (frame.expectedErrorType->toString() == errorType) matched = true;
+        } else if (frame.expectedErrorType->toString() == errorType) {
+            matched = true;
         }
 
         if (matched) {
-            if (debugOutput) std::cerr << "[DEBUG] frame matches by name. Jumping to " << frame.handlerAddress << std::endl;
+            errorFrames.pop_back();
             ip = frame.handlerAddress - 1;
-            size_t before = stack.size();
             while (stack.size() > frame.stackBase) stack.pop_back();
             push(errorValue);
-            if (debugOutput) std::cerr << "[DEBUG] propagateError: popped " << (before - stack.size() + 1) << " values to restore stackBase=" << frame.stackBase << " and pushed error back" << std::endl;
             return true;
         }
 
-        if (debugOutput) std::cerr << "[DEBUG] frame did not match; popping frame" << std::endl;
-        // No match: pop this frame and continue searching
+        // No match: pop and continue
+    // frame did not match; popping frame
         errorFrames.pop_back();
     }
 
-    if (debugOutput) std::cerr << "[DEBUG] No matching error frame found for: " << errorType << std::endl;
-    return false; // No matching handler found
+    return false;
 }
 
 ValuePtr VM::handleError(ValuePtr errorValue, const std::string& expectedType) {
@@ -2012,9 +1981,7 @@ void VM::handleCall(const Instruction& instruction) {
             // Push call frame
             callStack.push_back(frame);
 
-            if (debugOutput) {
-                std::cerr << "[DEBUG] handleCall: pushed call frame for '" << funcName << "' callStack_size=" << callStack.size() << " ip=" << ip << std::endl;
-            }
+            // call frame pushed (debug output removed)
             
             // Switch to function environment
             environment = funcEnv;
@@ -2106,9 +2073,7 @@ void VM::handleCall(const Instruction& instruction) {
 
 void VM::handleReturn(const Instruction& /*unused*/) {
     if (callStack.empty()) {
-        if (debugOutput) {
-            std::cerr << "[DEBUG] RETURN outside of function call - treating as no-op (push nil) ip=" << ip << std::endl;
-        }
+        // RETURN outside of function call - treated as no-op (debug output removed)
         // Push nil as a safe fallback and continue execution
         push(memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
         return;
@@ -2118,9 +2083,7 @@ void VM::handleReturn(const Instruction& /*unused*/) {
     backend::CallFrame frame = callStack.back();
     callStack.pop_back();
 
-    if (debugOutput) {
-        std::cerr << "[DEBUG] handleReturn: popped call frame for '" << frame.functionName << "' new_callStack_size=" << callStack.size() << " ip=" << ip << std::endl;
-    }
+    // handleReturn: popped call frame (debug output removed)
     
     // Check if this is a constructor return
     bool isConstructor = frame.functionName.find("::init") != std::string::npos;
@@ -2160,9 +2123,7 @@ void VM::handleReturn(const Instruction& /*unused*/) {
     }
     
     // Push the return value
-    if (debugOutput) {
-        std::cerr << "[DEBUG] handleReturn: pushing return value (stack before push=" << stack.size() << ") -> " << (returnValue ? returnValue->toString() : std::string("<nil>")) << std::endl;
-    }
+    // handleReturn: pushing return value (debug output removed)
     push(returnValue);
     
     // If an error frame was pushed for this function call, decide whether to pop it.
@@ -3524,12 +3485,7 @@ void VM::handleDefineEnumVariantWithType(const Instruction& instruction) {
 
 void VM::handleDebugPrint(const Instruction& instruction) {
     (void)instruction; // Mark as unused
-    if (stack.empty()) {
-        std::cerr << "[DEBUG] Stack is empty" << std::endl;
-    } else {
-        ValuePtr value = stack.back(); // Peek at the top value without popping
-        std::cerr << "[DEBUG] Stack top: " << valueToString(value) << std::endl;
-    }
+    // debug print removed
 }
 
 // Error handling instruction implementations
@@ -3555,10 +3511,7 @@ void VM::handleCheckError(const Instruction& instruction) {
         }
     }
 
-    if (debugOutput) {
-        std::cerr << "[DEBUG] handleCheckError: top_is_error=" << (isError ? "true" : "false")
-                  << " ip=" << ip << std::endl;
-    }
+    // handleCheckError debug output removed
 
     // Push the boolean result onto the stack for the subsequent JUMP_IF_FALSE
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, isError));
@@ -3574,35 +3527,25 @@ void VM::handlePropagateError(const Instruction& instruction) {
             error_value = lastException;
             lastException = nullptr;
             
-            if (debugOutput) {
-                std::cerr << "[DEBUG] Using last exception: " << valueToString(error_value) << std::endl;
-            }
+            // using last exception
         } else {
-            if (debugOutput) {
-                std::cerr << "[DEBUG] No error value to propagate and no last exception available" << std::endl;
-            }
+            // no error value to propagate
             return; // No error to propagate, just return
         }
     } else {
         error_value = stack.back(); // Peek at the top value
         
-        if (debugOutput) {
-            std::cerr << "[DEBUG] Found error value on stack: " << valueToString(error_value) << std::endl;
-        }
+        // found error value on stack
     }
     
     if (!error_value) {
-        if (debugOutput) {
-            std::cerr << "[DEBUG] Attempted to propagate null error value" << std::endl;
-        }
+        // attempted to propagate null error value
         return;
     }
     
     // Verify this is actually an error value
     if (!error_value->isError()) {
-        if (debugOutput) {
-            std::cerr << "[DEBUG] Not an error value, not propagating: " << valueToString(error_value) << std::endl;
-        }
+        // not an error value; not propagating
         return; // Not an error value, don't propagate
     }
 
@@ -3612,9 +3555,7 @@ void VM::handlePropagateError(const Instruction& instruction) {
     }
     
     // If we got here, we have a valid error value to propagate
-    if (debugOutput) {
-        std::cerr << "[DEBUG] Propagating error: " << valueToString(error_value) << std::endl;
-    }
+    // propagating error (log suppressed)
     
     // Remove the error value from the stack if it was there
     if (!stack.empty() && stack.back() == error_value) {
@@ -3625,23 +3566,7 @@ void VM::handlePropagateError(const Instruction& instruction) {
     lastException = nullptr;
     
     // Try to propagate the error using the error frame stack
-    if (errorFrames.empty()) {
-        if (debugOutput) {
-            std::cerr << "[DEBUG] No error frame available for error: " << errorType << std::endl;
-        }
-        
-        // If no error frame, create one that will handle any error type
-    ErrorFrame frame;
-    frame.handlerAddress = ip + 1; // Default to next instruction
-    frame.stackBase = stack.size();
-    frame.expectedErrorType = nullptr; // Accept any error type (wildcard)
-    frame.functionName = "<global error handler>";
-        errorFrames.push_back(frame);
-        
-        if (debugOutput) {
-            std::cerr << "[DEBUG] Created default error frame at IP: " << ip + 1 << std::endl;
-        }
-    }
+    // If no error frame exists, let propagateError return false and treat as unhandled
     
     // Now propagate the error
     if (!propagateError(error_value)) {
@@ -3656,14 +3581,10 @@ void VM::handlePropagateError(const Instruction& instruction) {
                 }
             }
         } catch (const std::exception& e) {
-            if (debugOutput) {
-                std::cerr << "[DEBUG] Error getting error details: " << e.what() << std::endl;
-            }
+            // suppress diagnostic here
         }
         
         error(errorMsg);
-    } else if (debugOutput) {
-        std::cerr << "[DEBUG] Error propagated successfully, new IP: " << ip << std::endl;
     }
     // If propagation succeeded, execution will continue at the error handler
 }
@@ -3804,9 +3725,8 @@ void VM::handleIsSuccess(const Instruction& instruction) {
 void VM::handleUnwrapValue(const Instruction& instruction) {
     (void)instruction; // Mark as unused
     if (stack.empty()) {
-        if (debugOutput) {
-            std::cerr << "[DEBUG] UNWRAP_VALUE underflow: callStack=" << callStack.size() << " errorFrames=" << errorFrames.size() << " ip=" << ip << std::endl;
-        }
+        // Always emit this diagnostic; it's critical when debugging unwrap/value errors
+        std::cerr << "[DEBUG] UNWRAP_VALUE underflow: callStack=" << callStack.size() << " errorFrames=" << errorFrames.size() << " ip=" << ip << std::endl;
         error("Stack underflow in UNWRAP_VALUE");
         return;
     }

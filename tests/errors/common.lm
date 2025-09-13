@@ -25,5 +25,58 @@ fn safe_divide(a: int, b: int): int?DivisionByZero {
     return divide(a, b)?;
 }
 
-var safe_result = safe_divide(20, 4)?;
+var safe_result = safe_divide(20, 2)?;
 print("Safe division result:", safe_result);
+
+
+fn test_error_propagation() {
+    // Valid usage
+    var result = divide(10, 2)?;
+    print("Division result:", result);
+    
+    // Error propagation
+    // var error_result = divide(10, 0)?;  // Will propagate DivisionByZero
+    // print("This should not print due to error propagation");
+    
+    // Compile-time error: Unhandled error type 'Overflow'
+    // var unhandled = parse_number("123")?;
+}
+
+fn parse_number(n:int):int?{
+    // Simplified parser for tests: accept an integer input and return it as ok(n).
+    // Original placeholder compared a value to a type which caused a syntax error.
+    return ok(n);
+}
+
+
+// Test 4: Fallible expression with error handling and type checking
+fn test_error_handling() {
+    // Valid error handling
+    var result = divide(10, 0)? else error {
+        print("Caught error:", error);
+        return -1;
+    };
+    
+    // Type checking in error handler
+    //  var parsed = parse_number("123")? else error {
+    //      // Compile-time error: Type mismatch in error handling
+    //      // if (error == "DivisionByZero") { ... }
+        
+    //     //  // Valid type checking
+    //     //  if (error == "InvalidNumber") {
+    //     //      print("Invalid number format");
+    //     //  } else if (error == "Overflow") {
+    //     //      print("Number too large");
+    //     //  }
+    //     //  return -1;
+    //  };
+    
+    // print("Result after error handling:", result);
+}
+
+
+test_error_propagation();
+test_error_handling();
+
+var safe_result = safe_divide(20, 0);
+print("Safe division result again :", safe_result);
