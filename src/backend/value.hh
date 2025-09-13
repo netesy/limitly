@@ -10,6 +10,8 @@
 #include <vector>
 #include <stdexcept>
 #include <sstream>
+#include "concurrency/channel.hh"
+#include <atomic>
 
 // Forward declarations
 struct Value;
@@ -57,6 +59,7 @@ enum class TypeTag {
     Range,
     UserDefined,
     Class,
+    Channel,
     Object
 };
 
@@ -337,6 +340,13 @@ struct ErrorValue {
     std::string toString() const;  // Declaration only, definition after Value struct
 };
 
+// Atomic wrapper for integer primitives
+struct AtomicValue {
+    std::shared_ptr<std::atomic<int64_t>> inner;
+    AtomicValue() : inner(std::make_shared<std::atomic<int64_t>>(0)) {}
+    AtomicValue(int64_t v) : inner(std::make_shared<std::atomic<int64_t>>(v)) {}
+};
+
 // ErrorUnion helper class for efficient tagged union operations
 class ErrorUnion {
 public:
@@ -564,7 +574,7 @@ struct DictValue {
 // Add toString method to Value struct
 struct Value {
     TypePtr type;
-    std::variant<std::monostate,
+                 std::variant<std::monostate,
                  bool,
                  int8_t,
                  int16_t,
@@ -586,6 +596,8 @@ struct Value {
                  IteratorValuePtr,
                  ObjectInstancePtr,
                  std::shared_ptr<backend::ClassDefinition>
+    , std::shared_ptr<Channel<ValuePtr>>
+    , AtomicValue
                 >
         data;
 
@@ -711,6 +723,13 @@ struct Value {
         Value(TypePtr t, const IteratorValuePtr& iter) : type(std::move(t)), data(iter) {
         }
 
+    // Constructor for Channel pointer
+    Value(TypePtr t, const std::shared_ptr<Channel<ValuePtr>>& ch) : type(std::move(t)), data(ch) {
+    }
+
+    // Constructor for AtomicValue
+    Value(TypePtr t, const AtomicValue& av) : type(std::move(t)), data(av) {}
+
         // Constructor for ObjectInstancePtr
         Value(TypePtr t, const ObjectInstancePtr& obj) : type(std::move(t)), data(obj) {
         }
@@ -789,6 +808,17 @@ struct Value {
             [&](const IteratorValuePtr&) {
                 oss << "<iterator>";
             },
+            [&](const std::shared_ptr<Channel<ValuePtr>>&){
+                oss << "<channel>";
+            },
+            [&](const AtomicValue& av) {
+                // Print the current atomic integer value
+                if (av.inner) {
+                    oss << av.inner->load();
+                } else {
+                    oss << "<atomic(nil)>";
+                }
+            },
             [&](const ObjectInstancePtr& obj) {
                 oss << "<object>";
             },
@@ -850,6 +880,16 @@ struct Value {
             },
             [&](const IteratorValuePtr&) {
                 oss << "<iterator>";
+            },
+            [&](const std::shared_ptr<Channel<ValuePtr>>&){
+                oss << "<channel>";
+            },
+            [&](const AtomicValue& av) {
+                if (av.inner) {
+                    oss << av.inner->load();
+                } else {
+                    oss << "<atomic(nil)>";
+                }
             },
             [&](const ObjectInstancePtr& obj) {
                 oss << "<object>";
@@ -1052,12 +1092,16 @@ namespace ErrorUtils {
 struct IteratorValue {
     enum class IteratorType {
         LIST,
-        RANGE
+        RANGE,
+        CHANNEL
     };
 
     IteratorType type;
     size_t index;
     ValuePtr container;
+    // For channel iterators: a buffered value received by hasNext()
+    bool hasBuffered = false;
+    ValuePtr bufferedValue;
     
     IteratorValue(IteratorType t, ValuePtr c) 
         : type(t), index(0), container(std::move(c)) {}
@@ -1070,11 +1114,30 @@ struct IteratorValue {
             if (auto list = std::get_if<ListValue>(&container->data)) {
                 return index < list->elements.size();
             }
-        } else { // RANGE
+        } else if (type == IteratorType::RANGE) { // RANGE
             // For RANGE, we need to get the range bounds from the container
             // First, check if the container has a ListValue (materialized range)
             if (auto list = std::get_if<ListValue>(&container->data)) {
                 return index < list->elements.size();
+            }
+        } else if (type == IteratorType::CHANNEL) {
+            // If we already buffered a value, we have next
+            if (hasBuffered) return true;
+
+            // Attempt to receive from the channel (this will block until value or closed)
+            try {
+                if (auto chPtr = std::get_if<std::shared_ptr<Channel<ValuePtr>>>(&container->data)) {
+                    ValuePtr v;
+                    bool ok = (*chPtr)->receive(v);
+                    if (ok) {
+                        bufferedValue = v;
+                        hasBuffered = true;
+                        return true;
+                    }
+                    return false; // channel closed and no value
+                }
+            } catch (...) {
+                return false;
             }
         }
         return false;
@@ -1092,7 +1155,7 @@ struct IteratorValue {
                 }
             }
             throw std::runtime_error("Invalid list iterator state");
-        } else { // RANGE
+        } else if (type == IteratorType::RANGE) { // RANGE
             // Handle both materialized (ListValue) and unmaterialized ranges
             if (auto list = std::get_if<ListValue>(&container->data)) {
                 // If this is a materialized range (list of values)
@@ -1102,6 +1165,21 @@ struct IteratorValue {
             }
             
             throw std::runtime_error("Invalid range iterator state");
+        } else if (type == IteratorType::CHANNEL) {
+            if (hasBuffered) {
+                auto res = bufferedValue;
+                bufferedValue = nullptr;
+                hasBuffered = false;
+                return res;
+            }
+            // As a fallback, try to receive directly
+            if (auto chPtr = std::get_if<std::shared_ptr<Channel<ValuePtr>>>(&container->data)) {
+                ValuePtr v;
+                bool ok = (*chPtr)->receive(v);
+                if (ok) return v;
+                throw std::runtime_error("No more elements in iterator");
+            }
+            throw std::runtime_error("Invalid channel iterator state");
         }
     }
 };

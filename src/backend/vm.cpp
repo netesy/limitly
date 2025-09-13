@@ -141,6 +141,50 @@ VM::VM(bool create_runtime)
             
         return memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
     });
+    
+        // Register a native function for channel creation
+        registerNativeFunction("channel", [this](const std::vector<ValuePtr>& args) -> ValuePtr {
+                // Create a new Channel<ValuePtr> and wrap it in a VM value
+                auto ch = std::make_shared<Channel<ValuePtr>>();
+                // Use ANY_TYPE for now as channel's type
+                return memoryManager.makeRef<Value>(*region, typeSystem->ANY_TYPE, ch);
+        });
+
+        // Register free functions for channel operations
+        registerNativeFunction("send", [this](const std::vector<ValuePtr>& args) -> ValuePtr {
+            if (args.size() != 2) throw std::runtime_error("send(channel, value) expects 2 args");
+            auto chVal = args[0];
+            if (!std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(chVal->data)) {
+                throw std::runtime_error("First argument to send must be a channel");
+            }
+            auto ch = std::get<std::shared_ptr<Channel<ValuePtr>>>(chVal->data);
+            ch->send(args[1]);
+            return memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
+        });
+
+        registerNativeFunction("receive", [this](const std::vector<ValuePtr>& args) -> ValuePtr {
+            if (args.size() != 1) throw std::runtime_error("receive(channel) expects 1 arg");
+            auto chVal = args[0];
+            if (!std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(chVal->data)) {
+                throw std::runtime_error("Argument to receive must be a channel");
+            }
+            auto ch = std::get<std::shared_ptr<Channel<ValuePtr>>>(chVal->data);
+            ValuePtr v;
+            bool ok = ch->receive(v);
+            if (!ok) return memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
+            return v;
+        });
+
+        registerNativeFunction("close", [this](const std::vector<ValuePtr>& args) -> ValuePtr {
+            if (args.size() != 1) throw std::runtime_error("close(channel) expects 1 arg");
+            auto chVal = args[0];
+            if (!std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(chVal->data)) {
+                throw std::runtime_error("Argument to close must be a channel");
+            }
+            auto ch = std::get<std::shared_ptr<Channel<ValuePtr>>>(chVal->data);
+            ch->close();
+            return memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
+        });
 }
 
 VM::~VM() {
@@ -353,6 +397,9 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                         break;
                     case Opcode::DEFINE_FIELD:
                         handleDefineField(instruction);
+                        break;
+                    case Opcode::DEFINE_ATOMIC:
+                        handleDefineAtomic(instruction);
                         break;
                     case Opcode::LOAD_THIS:
                         handleLoadThis(instruction);
@@ -753,7 +800,50 @@ void VM::handleSwap(const Instruction& /*unused*/) {
 
 void VM::handleStoreVar(const Instruction& instruction) {
     ValuePtr value = pop();
+    // If variable already exists and is an AtomicValue, perform atomic store
+    try {
+        ValuePtr existing = environment->get(instruction.stringValue);
+        // Detect AtomicValue stored inside Value::data
+        if (std::holds_alternative<AtomicValue>(existing->data)) {
+            // Expect the incoming value to be an integer
+            int64_t incoming = 0;
+            if (value->type && (value->type->tag == TypeTag::Int || value->type->tag == TypeTag::Int64)) {
+                if (value->type->tag == TypeTag::Int) incoming = static_cast<int64_t>(std::get<int32_t>(value->data));
+                else incoming = std::get<int64_t>(value->data);
+            } else {
+                error("Cannot store non-integer into atomic variable");
+            }
+            AtomicValue& av = std::get<AtomicValue>(existing->data);
+            av.inner->store(incoming);
+            return;
+        }
+    } catch (...) {
+        // variable doesn't exist yet; fallthrough to define
+    }
+
     environment->define(instruction.stringValue, value);
+}
+
+void VM::handleDefineAtomic(const Instruction& instruction) {
+    // Pop the initializer value and create an AtomicValue wrapper
+    ValuePtr initVal = pop();
+    int64_t initial = 0;
+    if (initVal && initVal->type && (initVal->type->tag == TypeTag::Int || initVal->type->tag == TypeTag::Int64)) {
+        if (initVal->type->tag == TypeTag::Int) initial = static_cast<int64_t>(std::get<int32_t>(initVal->data));
+        else initial = std::get<int64_t>(initVal->data);
+    } else if (initVal && initVal->type && initVal->type->tag == TypeTag::Float64) {
+        // allow float to be truncated
+        initial = static_cast<int64_t>(std::get<double>(initVal->data));
+    } else if (!initVal) {
+        initial = 0;
+    } else {
+        error("Invalid initializer for atomic variable");
+    }
+
+    AtomicValue av(initial);
+    // Wrap in a VM Value with ANY_TYPE (no dedicated atomic type yet)
+    auto v = memoryManager.makeRef<Value>(*region, typeSystem->ANY_TYPE, av);
+    environment->define(instruction.stringValue, v);
 }
 
 void VM::handleLoadVar(const Instruction& instruction) {
@@ -811,6 +901,19 @@ std::string VM::valueToString(const ValuePtr& value) {
 void VM::handleAdd(const Instruction& /*unused*/) {
     ValuePtr b = pop();
     ValuePtr a = pop();
+
+    // Atomic-aware addition: if left operand is an AtomicValue, perform atomic fetch_add
+    if (std::holds_alternative<AtomicValue>(a->data)) {
+        if (!(b->type && (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64))) {
+            error("Cannot add non-integer to atomic variable");
+        }
+        int64_t bVal = (b->type->tag == TypeTag::Int) ? static_cast<int64_t>(std::get<int32_t>(b->data)) : std::get<int64_t>(b->data);
+        AtomicValue& av = std::get<AtomicValue>(a->data);
+        int64_t prev = av.inner->fetch_add(bVal);
+        int64_t result = prev + bVal;
+        push(memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, result));
+        return;
+    }
 
     // String concatenation (if either operand is a string, convert the other to string)
     if (a->type->tag == TypeTag::String || b->type->tag == TypeTag::String) {
@@ -876,6 +979,19 @@ void VM::handleAdd(const Instruction& /*unused*/) {
 void VM::handleSubtract(const Instruction& /*unused*/) {
     ValuePtr b = pop();
     ValuePtr a = pop();
+
+    // Atomic-aware subtraction
+    if (std::holds_alternative<AtomicValue>(a->data)) {
+        if (!(b->type && (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64))) {
+            error("Cannot subtract non-integer from atomic variable");
+        }
+        int64_t bVal = (b->type->tag == TypeTag::Int) ? static_cast<int64_t>(std::get<int32_t>(b->data)) : std::get<int64_t>(b->data);
+        AtomicValue& av = std::get<AtomicValue>(a->data);
+        int64_t prev = av.inner->fetch_sub(bVal);
+        int64_t result = prev - bVal;
+        push(memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, result));
+        return;
+    }
     
     // Check if either operand is a number for numeric subtraction
     bool aIsNumeric = (a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64 || a->type->tag == TypeTag::Float64);
@@ -1640,27 +1756,55 @@ void VM::handleCall(const Instruction& instruction) {
     const std::string& funcName = instruction.stringValue;
     int argCount = instruction.intValue;
     
-    // Collect arguments from the stack (in reverse order)
+    // Determine if this is a method-like call so we can extract the callee
+    bool isMethodLike = (funcName.substr(0, 7) == "method:" || funcName.substr(0, 6) == "super:");
+
+    // Potential callee (may be recovered from stack or args)
+    ValuePtr callee = nullptr;
+
+    // Collect arguments from the stack (in reverse order). For method calls
+    // the callee may be located below the arguments on the stack. If the
+    // stack layout allows, extract the callee first without destroying the
+    // argument order; otherwise fall back to the legacy pop-then-recover
+    // approach.
     std::vector<ValuePtr> args;
     args.reserve(argCount);
-    
-    // Only pop arguments if there are any
-    if (argCount > 0) {
-        // Check if we have enough values on the stack
-        if (static_cast<int>(stack.size()) < argCount) {
-            error("Not enough arguments on stack for function call: expected " + 
-                  std::to_string(argCount) + ", got " + std::to_string(stack.size()));
-            return;
+
+    if (isMethodLike && stack.size() >= static_cast<size_t>(argCount) + 1) {
+        // Callee is directly beneath the arguments: located at
+        // stack[stack.size() - argCount - 1]. Extract it and remove that
+        // element while preserving the rest of the stack for argument pops.
+        size_t calleeIndex = stack.size() - argCount - 1;
+        callee = stack[calleeIndex];
+
+        // Erase the callee from the stack
+        stack.erase(stack.begin() + calleeIndex);
+
+        // Now pop arguments normally (they were above the callee)
+        for (int i = 0; i < argCount; ++i) {
+            args.insert(args.begin(), pop());
         }
-        
-        for (int i = 0; i < argCount; i++) {
-            args.insert(args.begin(), pop()); // Insert at beginning to maintain order
+    } else {
+        // Only pop arguments if there are any
+        if (argCount > 0) {
+            // Check if we have enough values on the stack
+            if (static_cast<int>(stack.size()) < argCount) {
+                error("Not enough arguments on stack for function call: expected " + 
+                      std::to_string(argCount) + ", got " + std::to_string(stack.size()));
+                return;
+            }
+            
+            for (int i = 0; i < argCount; i++) {
+                args.insert(args.begin(), pop()); // Insert at beginning to maintain order
+            }
         }
     }
 
-    // For method calls and constructor calls, the callee is on the stack
-    // For simple function calls, the function name is in the instruction
-    ValuePtr callee = nullptr;
+    // For method calls and constructor calls, the callee may be on the stack
+    // or (in some call conventions) included as the last argument. We'll
+    // attempt to recover it from either location so the VM tolerates both
+    // conventions.
+   // ValuePtr callee = nullptr;
     
     // Check if this function can fail and push an error frame if needed
     bool canFail = functionCanFail(funcName);
@@ -1674,15 +1818,26 @@ void VM::handleCall(const Instruction& instruction) {
     }
     
     if (funcName.substr(0, 7) == "method:" || funcName.substr(0, 6) == "super:") {
-        // Method call - callee is on the stack
-        if (stack.empty()) {
-            error("Stack underflow: expected callee for method call");
+        // Method or super call - the object may be provided as a separate
+        // callee value on the stack, or some compilers place the object as
+        // the last argument. Try both: prefer an explicit callee on the
+        // stack, otherwise recover from args.back().
+        if (!stack.empty()) {
+            // Prefer an explicit callee left on the stack
+            callee = pop();
+        } else if (!args.empty()) {
+            // Recover callee from the last argument (common alternate convention)
+            callee = args.back();
+            args.pop_back();
+        } else {
+            if (debugMode) {
+                std::cerr << "[DEBUG] method call without callee: funcName='" << funcName << "' stackSize=" << stack.size() << " argsSize=" << args.size() << std::endl;
+            }
+            error("Method call without object");
             return;
         }
-        callee = pop();
     } else {
-        // Simple function call - look up function by name
-        // We'll handle this case below
+        // Simple function call - no callee required
     }
     
     // Check if this is a constructor call (callee is a class definition)
@@ -1729,16 +1884,52 @@ void VM::handleCall(const Instruction& instruction) {
     if (funcName.substr(0, 6) == "super:") {
         std::string methodName = funcName.substr(6); // Remove "super:" prefix
         
-        // The object should be the last argument (pushed first due to our calling convention)
-        if (args.empty()) {
-            error("Super method call without object");
-            return;
+        // Determine the object value. Prefer an explicitly recovered callee
+        // (extracted above) when available, otherwise fall back to the
+        // last-argument convention.
+        ValuePtr objectValue = nullptr;
+        std::vector<ValuePtr> methodArgs;
+        if (callee) {
+            objectValue = callee;
+            methodArgs = args; // args were already extracted (callee removed earlier)
+        } else {
+            if (args.empty()) {
+                error("Super method call without object");
+                return;
+            }
+            objectValue = args.back();
+            methodArgs = std::vector<ValuePtr>(args.begin(), args.end() - 1); // Remove object from args
         }
         
-        // Get the object (last argument)
-        ValuePtr objectValue = args.back();
-        std::vector<ValuePtr> methodArgs(args.begin(), args.end() - 1); // Remove object from args
-        
+        // If the object is a Channel, provide native channel methods (send/receive/close)
+        if (std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(objectValue->data)) {
+            auto ch = std::get<std::shared_ptr<Channel<ValuePtr>>>(objectValue->data);
+            if (methodName == "send") {
+                if (methodArgs.size() < 1) {
+                    error("Channel.send expects 1 argument");
+                    return;
+                }
+                ch->send(methodArgs[0]);
+                push(memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
+                if (canFail) popErrorFrame();
+                return;
+            } else if (methodName == "close") {
+                ch->close();
+                push(memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
+                if (canFail) popErrorFrame();
+                return;
+            } else if (methodName == "receive") {
+                ValuePtr v;
+                bool ok = ch->receive(v);
+                if (!ok) push(memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
+                else push(v);
+                if (canFail) popErrorFrame();
+                return;
+            } else {
+                error("Unknown channel method: " + methodName);
+                return;
+            }
+        }
         // Check if the object is an ObjectInstance
         if (std::holds_alternative<ObjectInstancePtr>(objectValue->data)) {
             auto objectInstance = std::get<ObjectInstancePtr>(objectValue->data);
@@ -1805,15 +1996,22 @@ void VM::handleCall(const Instruction& instruction) {
     if (funcName.substr(0, 7) == "method:") {
         std::string methodName = funcName.substr(7); // Remove "method:" prefix
         
-        // The object should be the last argument (pushed first due to our calling convention)
-        if (args.empty()) {
-            error("Method call without object");
-            return;
+        // Determine the object value. Prefer an explicitly recovered callee
+        // (extracted above) when available, otherwise fall back to the
+        // last-argument convention.
+        ValuePtr objectValue = nullptr;
+        std::vector<ValuePtr> methodArgs;
+        if (callee) {
+            objectValue = callee;
+            methodArgs = args; // args were already extracted (callee removed earlier)
+        } else {
+            if (args.empty()) {
+                error("Method call without object");
+                return;
+            }
+            objectValue = args.back();
+            methodArgs = std::vector<ValuePtr>(args.begin(), args.end() - 1); // Remove object from args
         }
-        
-        // Get the object (last argument)
-        ValuePtr objectValue = args.back();
-        std::vector<ValuePtr> methodArgs(args.begin(), args.end() - 1); // Remove object from args
         
         // Check if the object is an ObjectInstance
         if (std::holds_alternative<ObjectInstancePtr>(objectValue->data)) {
@@ -1859,6 +2057,28 @@ void VM::handleCall(const Instruction& instruction) {
                 return;
             }
         } else {
+            if (debugMode) {
+                std::cerr << "[DEBUG] Cannot call method '" << methodName << "' on non-object value" << std::endl;
+            }
+            // Fallback: if this is a channel-like value and methodName matches
+            // our native channel functions, call the free-function variant so
+            // member-style syntax 'ch.send(x)' works.
+            if (std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(objectValue->data)) {
+                if (methodName == "send" || methodName == "receive" || methodName == "close") {
+                    // Prepare args: channel as first parameter followed by methodArgs
+                    std::vector<ValuePtr> nativeArgs;
+                    nativeArgs.push_back(objectValue);
+                    for (auto &a : methodArgs) nativeArgs.push_back(a);
+
+                    auto nativeIt = nativeFunctions.find(methodName);
+                    if (nativeIt != nativeFunctions.end()) {
+                        ValuePtr res = nativeIt->second(nativeArgs);
+                        push(res);
+                        if (canFail) popErrorFrame();
+                        return;
+                    }
+                }
+            }
             error("Cannot call method on non-object value");
             return;
         }
@@ -2843,6 +3063,18 @@ void VM::handleGetIterator(const Instruction& /*unused*/) {
     } else if (std::holds_alternative<IteratorValuePtr>(iterable->data)) {
         // If it's already an iterator, just push it back
         push(iterable);
+    } else if (std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(iterable->data)) {
+        // Create a channel-backed iterator
+        auto iterator = std::make_shared<IteratorValue>(
+            IteratorValue::IteratorType::CHANNEL,
+            iterable
+        );
+        auto iteratorValue = memoryManager.makeRef<Value>(
+            *region,
+            typeSystem->ANY_TYPE,
+            iterator
+        );
+        push(iteratorValue);
     } else {
         error("Type is not iterable");
     }

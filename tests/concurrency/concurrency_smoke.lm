@@ -1,0 +1,25 @@
+// Concurrency smoke test — exercises channels, atomic and simple tasks
+print("=== Concurrency Smoke Test ===");
+
+// Atomic counter
+var counter: atomic = 0;
+
+// Channel for results
+ch = channel();
+
+// Start a simple concurrent block that increments the counter and sends values
+concurrent(ch=ch, mode=batch, cores=2, on_error=Stop) {
+    task(i in 1..4) {
+        // increment atomically
+        counter += 1;
+     //   ch.send(counter);
+        send(counter, ch);
+    }
+}
+
+// Consume channel
+iter (v in ch) {
+    print("Value from channel: {v}");
+}
+
+print("Smoke test finished");

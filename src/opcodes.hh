@@ -19,6 +19,7 @@ enum class Opcode {
 
     // Variable operations
     STORE_VAR,          // Store value in variable
+    DEFINE_ATOMIC,      // Define an atomic variable (initialize atomic wrapper)
     LOAD_VAR,           // Load variable onto stack
     STORE_TEMP,         // Store value in temporary variable
     LOAD_TEMP,          // Load temporary variable onto stack

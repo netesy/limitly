@@ -4,6 +4,7 @@ print("=== Parallel Block Tests ===");
 // ==========================================
 //  Batch parallel block (CPU bound)
 // ==========================================
+var messages = channel();
 parallel(ch=messages, mode=batch, cores=Auto, on_error=Auto,
          timeout=20s, grace=500ms, on_timeout=partial) {
     
@@ -23,6 +24,7 @@ iter (message in messages) {
 // ==========================================
 //  Stream processing (CPU bound, retries)
 // ==========================================
+var files_out = channel();
 parallel(events: FileChunks, ch=files_out, mode=stream, cores=Auto,
          on_error=Retry, timeout=60s,
          grace=500ms, on_timeout=partial) {

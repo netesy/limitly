@@ -3,6 +3,16 @@
     "files.associations": {
         "iostream": "cpp",
         "charconv": "cpp",
-        "vector": "cpp"
+        "vector": "cpp",
+        "chrono": "cpp",
+        "xlocale": "cpp",
+        "*.lm": "cpp",
+        "atomic": "cpp",
+        "memory": "cpp",
+        "system_error": "cpp",
+        "iterator": "cpp",
+        "array": "cpp",
+        "xstring": "cpp",
+        "xutility": "cpp"
     }
 }

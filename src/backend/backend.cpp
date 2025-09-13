@@ -185,8 +185,13 @@ void BytecodeGenerator::visitVarDeclaration(const std::shared_ptr<AST::VarDeclar
         }
     }
     
-    // Store the value in a variable
-    emit(Opcode::STORE_VAR, stmt->line, 0, 0.0f, false, stmt->name);
+    // If the declared type is 'atomic' emit DEFINE_ATOMIC so the VM can create
+    // an atomic wrapper. Otherwise store the value normally.
+    if (stmt->type && *stmt->type && (*stmt->type)->typeName == "atomic") {
+        emit(Opcode::DEFINE_ATOMIC, stmt->line, 0, 0.0f, false, stmt->name);
+    } else {
+        emit(Opcode::STORE_VAR, stmt->line, 0, 0.0f, false, stmt->name);
+    }
 }
 
 void BytecodeGenerator::visitFunctionDeclaration(const std::shared_ptr<AST::FunctionDeclaration>& stmt) {

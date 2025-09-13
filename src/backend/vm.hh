@@ -211,6 +211,7 @@ private:
     void handleDefineEnumVariantWithType(const Instruction& instruction);
     void handlePrint(const Instruction& instruction);
     void handleDebugPrint(const Instruction& instruction);
+    void handleDefineAtomic(const Instruction& instruction);
     
     // Error handling instruction handlers
     void handleCheckError(const Instruction& instruction);
