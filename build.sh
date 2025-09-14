@@ -21,11 +21,6 @@ check_dep g++
 check_dep pkg-config
 
 echo "All dependencies found."
-        src/backend/concurrency/scheduler.cpp \
-        src/backend/concurrency/thread_pool.cpp \
-        src/backend/concurrency/event_loop.cpp \
-        src/backend/concurrency/epoll_event_loop.cpp \
-        src/debugger.cpp
 mkdir -p bin
 
 CXX=g++

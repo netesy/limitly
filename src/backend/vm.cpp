@@ -188,6 +188,9 @@ VM::VM(bool create_runtime)
 }
 
 VM::~VM() {
+    if (thread_pool) {
+        thread_pool->stop();
+    }
     delete typeSystem;
 }
 
@@ -3197,9 +3200,11 @@ void VM::handleBeginParallel(const Instruction& instruction) {
                 task_vm.thread_pool = this->thread_pool;
                 task_vm.event_loop = this->event_loop;
 
-                // Create a new environment that inherits from globals
+                // Each task gets a new memory region and environment.
+                // The VM constructor creates a new region.
+                // The new environment inherits from the current environment to capture local variables.
                 task_vm.globals = this->globals;
-                task_vm.environment = std::make_shared<Environment>(this->globals);
+                task_vm.environment = std::make_shared<Environment>(this->environment);
                 
                 // Set debug mode
                 task_vm.setDebug(this->debugMode);
@@ -3282,9 +3287,11 @@ void VM::handleBeginConcurrent(const Instruction& instruction) {
             task_vm.thread_pool = this->thread_pool;
             task_vm.event_loop = this->event_loop;
 
-            // Create a new environment that inherits from globals
+            // Each task gets a new memory region and environment.
+            // The VM constructor creates a new region.
+            // The new environment inherits from the current environment to capture local variables.
             task_vm.globals = this->globals;
-            task_vm.environment = std::make_shared<Environment>(this->globals);
+            task_vm.environment = std::make_shared<Environment>(this->environment);
             
             // Set debug mode
             task_vm.setDebug(this->debugMode);
