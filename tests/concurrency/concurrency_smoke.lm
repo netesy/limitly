@@ -1,4 +1,4 @@
-// Concurrency smoke test — exercises channels, atomic and simple tasks
+// Concurrency smoke test - exercises channels, atomic and simple tasks
 print("=== Concurrency Smoke Test ===");
 
 // Atomic counter
@@ -9,11 +9,12 @@ ch = channel();
 
 // Start a simple concurrent block that increments the counter and sends values
 concurrent(ch=ch, mode=batch, cores=2, on_error=Stop) {
-    task(i in 1..4) {
+    task(i in 1 .. 4) {
         // increment atomically
         counter += 1;
-     //   ch.send(counter);
-        send(counter, ch);
+        print("task counter: {counter}");
+        // Use functional syntax instead of method syntax to avoid concurrency issues
+        send(ch, counter);
     }
 }
 
