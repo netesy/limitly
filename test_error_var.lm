@@ -1,2 +1,0 @@
-// Test error union type in variable declaration
-var result: int?MyError;

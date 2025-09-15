@@ -268,7 +268,7 @@ public:
 
     ~MemoryManager()
     {
-        analyzeMemoryUsage();
+        //analyzeMemoryUsage();
     }
 
     void setAuditMode(bool enable)

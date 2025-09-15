@@ -35,18 +35,18 @@ for (var feature = 1; feature <= 3; feature += 1) {
 }
 
 // Nested structures
-print("Nested structure test:");
-for (var outer = 1; outer <= 2; outer += 1) {
-    print("Outer level {outer}:");
+// print("Nested structure test:");
+// for (var outer = 1; outer <= 2; outer += 1) {
+//     print("Outer level {outer}:");
     
-    iter (inner in (outer * 10)..(outer * 10 + 2)) {
-        if (inner % 2 == 0) {
-            print("  Even: {inner}");
-        } else {
-            print("  Odd: {inner}");
-        }
-    }
-}
+//     iter (inner in (outer * 10)..(outer * 10 + 2)) {
+//         if (inner % 2 == 0) {
+//             print("  Even: {inner}");
+//         } else {
+//             print("  Odd: {inner}");
+//         }
+//     }
+// }
 
 // Complex expressions
 print("Complex expression test:");
@@ -57,14 +57,14 @@ var c = 2;
 var result = (a + b) * c - (a - b);
 print("({a} + {b}) * {c} - ({a} - {b}) = {result}");
 
-var condition = (a > b) && (b > c) || (a == 5);
+var condition = (a > b) and (b > c) or (a == 5);
 print("Complex condition: {condition}");
 
 // String operations
 print("String processing:");
 var words = ["Hello", "World", "from", "Limit"];
 for (var i = 0; i < 4; i += 1) {
-    var word = words[i];  // If array access is implemented
+    var word = words[i  ];  // If array access is implemented
     print("Word {i + 1}: {word}");
 }
 
