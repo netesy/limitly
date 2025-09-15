@@ -78,6 +78,10 @@ private:
     std::vector<ValuePtr> tempValues;
     ValuePtr lastException;
     
+    // Task iteration state
+    std::string currentTaskLoopVar;
+    ValuePtr currentTaskIterable;
+    
     // Current execution state
     const std::vector<Instruction>* bytecode;
     size_t ip; // Instruction pointer
@@ -118,6 +122,11 @@ public:
 
 private:
     void error(const std::string& message) const;
+    
+    // Helper function for iterator creation
+    std::shared_ptr<IteratorValue> createIterator(ValuePtr iterable);
+    bool hasNext(std::shared_ptr<IteratorValue> iterator);
+    ValuePtr next(std::shared_ptr<IteratorValue> iterator);
     
     // Instruction handlers
     void handlePushInt(const Instruction& instruction);
@@ -176,6 +185,7 @@ private:
     void handleGetIndex(const Instruction& instruction);
     void handleSetIndex(const Instruction& instruction);
     void handleGetIterator(const Instruction& instruction);
+    void handleIteratorCreate(const Instruction& instruction);
     void handleIteratorHasNext(const Instruction& instruction);
     void handleIteratorNext(const Instruction& instruction);
     void handleIteratorNextKeyValue(const Instruction& instruction);
@@ -194,6 +204,9 @@ private:
     void handleEndParallel(const Instruction& instruction);
     void handleBeginConcurrent(const Instruction& instruction);
     void handleEndConcurrent(const Instruction& instruction);
+    void handleBeginTask(const Instruction& instruction);
+    void handleEndTask(const Instruction& instruction);
+    void handleStoreIterable(const Instruction& instruction);
     void handleAwait(const Instruction& instruction);
     void handleMatchPattern(const Instruction& instruction);
     

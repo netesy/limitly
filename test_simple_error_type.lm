@@ -1,4 +1,0 @@
-// Simple test for error union type parsing
-fn test(): int?MyError {
-    return ok(42);
-}

@@ -2680,6 +2680,23 @@ void VM::handleGetProperty(const Instruction& instruction) {
         } catch (const std::exception& e) {
             error("Property access failed: " + std::string(e.what()));
         }
+    } 
+    // Check if the object is an ErrorValue
+    else if (std::holds_alternative<ErrorValue>(object->data)) {
+        auto errorValue = std::get<ErrorValue>(object->data);
+        
+        // Handle special properties for ErrorValue
+        if (propertyName == "message") {
+            // Return the error message as a string value
+            auto messageValue = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, errorValue.message);
+            push(messageValue);
+        } else if (propertyName == "type") {
+            // Return the error type as a string value
+            auto typeValue = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, errorValue.errorType);
+            push(typeValue);
+        } else {
+            error("ErrorValue does not have property: " + propertyName);
+        }
     } else {
         error("Cannot access property on non-object value");
     }

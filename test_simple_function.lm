@@ -1,7 +1,0 @@
-fn simple() {
-    print("hello");
-}
-
-fn withParam(name: str) {
-    print(name);
-}

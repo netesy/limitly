@@ -90,13 +90,9 @@ void BytecodeGenerator::visitStatement(const std::shared_ptr<AST::Statement>& st
     } else if (auto contractStmt = std::dynamic_pointer_cast<AST::ContractStatement>(stmt)) {
         visitContractStatement(contractStmt);
     } else if (auto taskStmt = std::dynamic_pointer_cast<AST::TaskStatement>(stmt)) {
-        // Task statements are handled within parallel blocks by the VM
-        // Just process the body as a normal block
-        visitBlockStatement(taskStmt->body);
+        visitTaskStatement(taskStmt);
     } else if (auto workerStmt = std::dynamic_pointer_cast<AST::WorkerStatement>(stmt)) {
-        // Worker statements are handled within parallel blocks by the VM
-        // Just process the body as a normal block
-        visitBlockStatement(workerStmt->body);
+        visitWorkerStatement(workerStmt);
     } else {
         Debugger::error("Unknown statement type", stmt->line, 0, InterpretationStage::BYTECODE, "", "", "");
     }

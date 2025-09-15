@@ -1,4 +1,0 @@
-// Simple test to verify basic functionality works
-// Error handling syntax is not yet implemented in parser
-var x = 42;
-print("Basic test:", x);

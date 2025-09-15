@@ -1,0 +1,130 @@
+Bytecode for tests/integration/error_handling.lm
+========================================
+
+Total instructions: 125
+
+   1: BEGIN_FUNCTION       (line 5)
+2   : DEFINE_PARAM         (line 5) a
+3   : DEFINE_PARAM         (line 5) b
+4   : BEGIN_SCOPE          (line 5)
+5   : LOAD_VAR             (line 6) b
+6   : PUSH_INT             (line 6) 0
+7   : EQUAL                (line 6)
+8   : JUMP_IF_FALSE        (line 6) 6
+9   : BEGIN_SCOPE          (line 6)
+10  : PUSH_STRING          (line 7) "Cannot divide by zero"
+11  : CONSTRUCT_ERROR      (line 7)
+12  : RETURN               (line 7)
+13  : END_SCOPE            (line 6)
+14  : JUMP                 (line 6) 0
+15  : LOAD_VAR             (line 9) a
+16  : LOAD_VAR             (line 9) b
+17  : DIVIDE               (line 9)
+18  : CONSTRUCT_OK         (line 9)
+19  : RETURN               (line 9)
+20  : END_SCOPE            (line 5)
+21  : PUSH_NULL            (line 5)
+22  : RETURN               (line 5)
+23  : END_FUNCTION         (line 5)
+24  : BEGIN_FUNCTION       (line 13)
+25  : DEFINE_PARAM         (line 13) x
+26  : DEFINE_PARAM         (line 13) y
+27  : BEGIN_SCOPE          (line 13)
+28  : LOAD_VAR             (line 14) x
+29  : LOAD_VAR             (line 14) y
+30  : CALL                 (line 14) 2
+31  : CHECK_ERROR          (line 14)
+32  : JUMP_IF_FALSE        (line 14) 1
+33  : PROPAGATE_ERROR      (line 14)
+34  : UNWRAP_VALUE         (line 14)
+35  : STORE_VAR            (line 14) result
+36  : LOAD_VAR             (line 15) result
+37  : PUSH_INT             (line 15) 2
+38  : MULTIPLY             (line 15)
+39  : CONSTRUCT_OK         (line 15)
+40  : RETURN               (line 15)
+41  : END_SCOPE            (line 13)
+42  : PUSH_NULL            (line 13)
+43  : RETURN               (line 13)
+44  : END_FUNCTION         (line 13)
+45  : BEGIN_FUNCTION       (line 19)
+46  : DEFINE_PARAM         (line 19) a
+47  : DEFINE_PARAM         (line 19) b
+48  : BEGIN_SCOPE          (line 19)
+49  : LOAD_VAR             (line 20) a
+50  : LOAD_VAR             (line 20) b
+51  : CALL                 (line 20) 2
+52  : CHECK_ERROR          (line 20)
+53  : JUMP_IF_TRUE         (line 20) 2
+54  : UNWRAP_VALUE         (line 20)
+55  : JUMP                 (line 20) 14
+56  : STORE_VAR            (line 20) error
+57  : BEGIN_SCOPE          (line 20)
+58  : PUSH_STRING          (line 21) "Division failed: "
+59  : LOAD_VAR             (line 21) error
+60  : ADD                  (line 21)
+61  : PRINT                (line 21)
+62  : PUSH_STRING          (line 22) "Division failed message: "
+63  : LOAD_VAR             (line 22) error
+64  : GET_PROPERTY         (line 22) message
+65  : ADD                  (line 22)
+66  : PRINT                (line 22)
+67  : PUSH_INT             (line 23) 0
+68  : RETURN               (line 23)
+69  : END_SCOPE            (line 20)
+70  : STORE_VAR            (line 20) result
+71  : LOAD_VAR             (line 25) result
+72  : RETURN               (line 25)
+73  : END_SCOPE            (line 19)
+74  : PUSH_NULL            (line 19)
+75  : RETURN               (line 19)
+76  : END_FUNCTION         (line 19)
+77  : BEGIN_FUNCTION       (line 29)
+78  : DEFINE_PARAM         (line 29) numStr
+79  : DEFINE_PARAM         (line 29) divisor
+80  : BEGIN_SCOPE          (line 29)
+81  : LOAD_VAR             (line 30) numStr
+82  : CALL                 (line 30) 1
+83  : CHECK_ERROR          (line 30)
+84  : JUMP_IF_FALSE        (line 30) 1
+85  : PROPAGATE_ERROR      (line 30)
+86  : UNWRAP_VALUE         (line 30)
+87  : STORE_VAR            (line 30) num
+88  : LOAD_VAR             (line 31) num
+89  : LOAD_VAR             (line 31) divisor
+90  : CALL                 (line 31) 2
+91  : CHECK_ERROR          (line 31)
+92  : JUMP_IF_FALSE        (line 31) 1
+93  : PROPAGATE_ERROR      (line 31)
+94  : UNWRAP_VALUE         (line 31)
+95  : STORE_VAR            (line 31) result
+96  : LOAD_VAR             (line 32) result
+97  : CONSTRUCT_OK         (line 32)
+98  : RETURN               (line 32)
+99  : END_SCOPE            (line 29)
+100 : PUSH_NULL            (line 29)
+101 : RETURN               (line 29)
+102 : END_FUNCTION         (line 29)
+103 : PUSH_STRING          (line 36) "Testing error handling AST nodes"
+104 : PRINT                (line 36)
+105 : PUSH_INT             (line 39) 10
+106 : PUSH_INT             (line 39) 2
+107 : CALL                 (line 39) 2
+108 : CHECK_ERROR          (line 39)
+109 : JUMP_IF_FALSE        (line 39) 1
+110 : PROPAGATE_ERROR      (line 39)
+111 : UNWRAP_VALUE         (line 39)
+112 : STORE_VAR            (line 39) success
+113 : PUSH_STRING          (line 40) "10 / 2 = "
+114 : LOAD_VAR             (line 40) success
+115 : ADD                  (line 40)
+116 : PRINT                (line 40)
+117 : PUSH_INT             (line 43) 10
+118 : PUSH_INT             (line 43) 0
+119 : CALL                 (line 43) 2
+120 : STORE_VAR            (line 43) withFallback
+121 : PUSH_STRING          (line 44) "Division with fallback result: "
+122 : LOAD_VAR             (line 44) withFallback
+123 : ADD                  (line 44)
+124 : PRINT                (line 44)
+125 : HALT                 (line 0)

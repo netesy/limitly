@@ -1,0 +1,365 @@
+AST for tests\integration\comprehensive.lm
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+  Literal: "=== Comprehensive Integration Test ==="
+PrintStatement:
+  Literal: "Multi-feature test:"
+VarDeclaration: name
+  Initializer:
+    Literal: "Luminar"
+VarDeclaration: version
+  Initializer:
+    Literal: 1
+VarDeclaration: isStable
+  Initializer:
+    Literal: true
+PrintStatement:
+  InterpolatedString:
+    String: "Language: "
+    Expression:
+      Variable: name
+    String: " v"
+    Expression:
+      Variable: version
+PrintStatement:
+  InterpolatedString:
+    String: "Stable: "
+    Expression:
+      Variable: isStable
+PrintStatement:
+  Literal: "Feature matrix:"
+ForStatement (traditional):
+  Initializer:
+    VarDeclaration: feature
+      Initializer:
+        Literal: 1
+  Condition:
+    BinaryExpression: <=
+      Left:
+        Variable: feature
+      Operator: <=
+      Right:
+        Literal: 3
+  Increment:
+    Assignment: +=
+      Target: feature
+      Value:
+      Literal: 1
+  Body:
+    BlockStatement:
+      PrintStatement:
+        InterpolatedString:
+          String: "Feature "
+          Expression:
+            Variable: feature
+          String: ":"
+      IfStatement:
+        Condition:
+          BinaryExpression: ==
+            Left:
+              Variable: feature
+            Operator: ==
+            Right:
+              Literal: 1
+        Then:
+          BlockStatement:
+            PrintStatement:
+              Literal: "  - Variables and expressions"
+            VarDeclaration: x
+              Initializer:
+                Literal: 10
+            VarDeclaration: y
+              Initializer:
+                Literal: 5
+            PrintStatement:
+              InterpolatedString:
+                String: "  - Example: "
+                Expression:
+                  Variable: x
+                String: " + "
+                Expression:
+                  Variable: y
+                String: " = "
+                Expression:
+                  BinaryExpression: +
+                    Left:
+                      Variable: x
+                    Operator: +
+                    Right:
+                      Variable: y
+        Else:
+          IfStatement:
+            Condition:
+              BinaryExpression: ==
+                Left:
+                  Variable: feature
+                Operator: ==
+                Right:
+                  Literal: 2
+            Then:
+              BlockStatement:
+                PrintStatement:
+                  Literal: "  - Control flow and loops"
+                IterStatement:
+                  Variables: i
+                  Iterable:
+                    RangeExpression:
+                      Start:
+                        Literal: 1
+                      End:
+                        Literal: 4
+                      Inclusive: true
+                  Body:
+                    BlockStatement:
+                      PrintStatement:
+                        InterpolatedString:
+                          String: "  - Loop iteration "
+                          Expression:
+                            Variable: i
+            Else:
+              BlockStatement:
+                PrintStatement:
+                  Literal: "  - String interpolation"
+                VarDeclaration: msg
+                  Initializer:
+                    InterpolatedString:
+                      String: "Hello, "
+                      Expression:
+                        Variable: name
+                      String: "!"
+                PrintStatement:
+                  InterpolatedString:
+                    String: "  - Message: "
+                    Expression:
+                      Variable: msg
+PrintStatement:
+  Literal: "Nested structure test:"
+ForStatement (traditional):
+  Initializer:
+    VarDeclaration: outer
+      Initializer:
+        Literal: 1
+  Condition:
+    BinaryExpression: <=
+      Left:
+        Variable: outer
+      Operator: <=
+      Right:
+        Literal: 2
+  Increment:
+    Assignment: +=
+      Target: outer
+      Value:
+      Literal: 1
+  Body:
+    BlockStatement:
+      PrintStatement:
+        InterpolatedString:
+          String: "Outer level "
+          Expression:
+            Variable: outer
+          String: ":"
+      IterStatement:
+        Variables: inner
+        Iterable:
+          RangeExpression:
+            Start:
+              Grouping:
+                BinaryExpression: *
+                  Left:
+                    Variable: outer
+                  Operator: *
+                  Right:
+                    Literal: 10
+            End:
+              Grouping:
+                BinaryExpression: +
+                  Left:
+                    BinaryExpression: *
+                      Left:
+                        Variable: outer
+                      Operator: *
+                      Right:
+                        Literal: 10
+                  Operator: +
+                  Right:
+                    Literal: 2
+            Inclusive: true
+        Body:
+          BlockStatement:
+            IfStatement:
+              Condition:
+                BinaryExpression: ==
+                  Left:
+                    BinaryExpression: %
+                      Left:
+                        Variable: inner
+                      Operator: %
+                      Right:
+                        Literal: 2
+                  Operator: ==
+                  Right:
+                    Literal: 0
+              Then:
+                BlockStatement:
+                  PrintStatement:
+                    InterpolatedString:
+                      String: "  Even: "
+                      Expression:
+                        Variable: inner
+              Else:
+                BlockStatement:
+                  PrintStatement:
+                    InterpolatedString:
+                      String: "  Odd: "
+                      Expression:
+                        Variable: inner
+PrintStatement:
+  Literal: "Complex expression test:"
+VarDeclaration: a
+  Initializer:
+    Literal: 5
+VarDeclaration: b
+  Initializer:
+    Literal: 3
+VarDeclaration: c
+  Initializer:
+    Literal: 2
+VarDeclaration: result
+  Initializer:
+    BinaryExpression: -
+      Left:
+        BinaryExpression: *
+          Left:
+            Grouping:
+              BinaryExpression: +
+                Left:
+                  Variable: a
+                Operator: +
+                Right:
+                  Variable: b
+          Operator: *
+          Right:
+            Variable: c
+      Operator: -
+      Right:
+        Grouping:
+          BinaryExpression: -
+            Left:
+              Variable: a
+            Operator: -
+            Right:
+              Variable: b
+PrintStatement:
+  InterpolatedString:
+    String: "("
+    Expression:
+      Variable: a
+    String: " + "
+    Expression:
+      Variable: b
+    String: ") * "
+    Expression:
+      Variable: c
+    String: " - ("
+    Expression:
+      Variable: a
+    String: " - "
+    Expression:
+      Variable: b
+    String: ") = "
+    Expression:
+      Variable: result
+VarDeclaration: condition
+  Initializer:
+    Grouping:
+      BinaryExpression: >
+        Left:
+          Variable: a
+        Operator: >
+        Right:
+          Variable: b
+ExpressionStatement:
+  Literal: nil
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Literal: nil
+    Arguments:
+      BinaryExpression: >
+        Left:
+          Variable: b
+        Operator: >
+        Right:
+          Variable: c
+ExpressionStatement:
+  Literal: nil
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Literal: nil
+    Arguments:
+      BinaryExpression: ==
+        Left:
+          Variable: a
+        Operator: ==
+        Right:
+          Literal: 5
+PrintStatement:
+  InterpolatedString:
+    String: "Complex condition: "
+    Expression:
+      Variable: condition
+PrintStatement:
+  Literal: "String processing:"
+VarDeclaration: words
+  Initializer:
+    ListExpression: [4 elements]
+      Literal: "Hello"
+      Literal: "World"
+      Literal: "from"
+      Literal: "Limit"
+ForStatement (traditional):
+  Initializer:
+    VarDeclaration: i
+      Initializer:
+        Literal: 0
+  Condition:
+    BinaryExpression: <
+      Left:
+        Variable: i
+      Operator: <
+      Right:
+        Literal: 4
+  Increment:
+    Assignment: +=
+      Target: i
+      Value:
+      Literal: 1
+  Body:
+    BlockStatement:
+      VarDeclaration: word
+        Initializer:
+          IndexExpression:
+            Object:
+              Variable: words
+            Index:
+              Variable: i
+      PrintStatement:
+        InterpolatedString:
+          String: "Word "
+          Expression:
+            BinaryExpression: +
+              Left:
+                Variable: i
+              Operator: +
+              Right:
+                Literal: 1
+          String: ": "
+          Expression:
+            Variable: word
+PrintStatement:
+  Literal: "Integration test complete!"

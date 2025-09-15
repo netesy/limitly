@@ -1,0 +1,9 @@
+var counters: atomic = 0;
+concurrent(mode=batch, cores=Auto, on_error=Auto) {
+    
+    // Task statement for parallel execution
+    task(i in 1..3) {
+        counters += 1;
+        print("Task {counters} running");
+    }
+} 

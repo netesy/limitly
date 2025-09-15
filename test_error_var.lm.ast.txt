@@ -1,7 +1,0 @@
-AST for test_error_var.lm
-========================================
-
-AST Dump:
-==========
-VarDeclaration: result
-  Type: int

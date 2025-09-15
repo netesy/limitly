@@ -116,14 +116,21 @@ The project is organized into frontend and backend components:
 - [ ] Modules and imports
 - [ ] Standard library
 
-### Phase 4: Tooling and Documentation 🔄
+### Phase 4: Tooling and Documentation ✅
 - [x] Implement AST visualization for debugging
 - [x] Integrate the VM with the main execution pipeline
 - [x] Create a REPL (Read-Eval-Print Loop) with VM execution
 - [x] **Comprehensive Test Suite** - Organized test structure with 8 categories
 - [x] **Test Infrastructure** - Automated test runners (silent and verbose modes)
 - [x] **Test Documentation** - Complete README with test guidelines
-- [ ] Create language documentation
+- [x] **Create language documentation**
+  - [x] Comprehensive, step-by-step guide (`doc/guide.md`)
+  - [x] Beginner's guide (`learn.md`)
+  - [x] Language philosophy document (`doc/zen.md`)
+  - [x] Language comparison document (`doc/limit_vs_python.md`)
+  - [x] Corrected all code examples to use explicit type annotations.
+  - [x] Clarified and demonstrated error propagation vs. handling in guides.
+  - [x] Documented the `? else error` syntax for inline error handling.
 - [ ] Create a standard library
 - [ ] Implement a package manager
 - [ ] Implement a code linter

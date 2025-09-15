@@ -1,56 +1,44 @@
-// Test error handling (if implemented)
-print("=== Error Handling Tests ===");
+// Test file for error handling AST nodes
+// This file demonstrates the syntax that should be parseable with the new AST nodes
 
-// Try-catch blocks
-print("Try-catch test:");
-try {
-    var x = 10;
-    var y = 0;
-    var result = x / y;  // Division by zero
-    print("Result: {result}");
-} catch (error) {
-    print("Caught error: {error}");
-}
-
-// Attempt-handle blocks
-print("Attempt-handle test:");
-attempt {
-    var arr = [1, 2, 3];
-    var value = arr[10];  // Index out of bounds
-    print("Value: {value}");
-} handle IndexError as e {
-    print("Index error: {e}");
-} handle RuntimeError as e {
-    print("Runtime error: {e}");
-}
-
-// Custom exceptions
-print("Custom exception test:");
-function divide(a, b) {
+// Function that can return errors
+fn divide(a: int, b: int): int?DivisionByZero {
     if (b == 0) {
-        throw DivisionByZeroError("Cannot divide by zero");
+        return err(DivisionByZero("Cannot divide by zero"));
     }
-    return a / b;
+    return ok(a / b);
 }
 
-try {
-    var result = divide(10, 0);
-    print("Result: {result}");
-} catch (DivisionByZeroError as e) {
-    print("Division error: {e}");
-} catch (error) {
-    print("Other error: {error}");
+// Function using fallible expressions with ? operator
+fn safeDivision(x: int, y: int): int?DivisionByZero {
+    var result = divide(x, y)?;
+    return ok(result * 2);
 }
 
-// Finally blocks
-print("Finally block test:");
-try {
-    print("In try block");
-    var x = 1 / 0;
-} catch (error) {
-    print("In catch block: {error}");
-} finally {
-    print("In finally block - always executes");
+// Function with error handling using else clause
+fn divisionWithFallback(a: int, b: int): int {
+    var result = divide(a, b)? else error {
+       print("Division failed: " + error);
+        print("Division failed message: " + error.message);
+        return 0;
+    };
+    return result;
 }
 
-print("Error handling test complete");
+// Function demonstrating multiple error types
+fn parseAndDivide(numStr: str, divisor: int): int?ParseError, DivisionByZero {
+    var num = parseInt(numStr)?;  // Could return ParseError
+    var result = divide(num, divisor)?;  // Could return DivisionByZero
+    return ok(result);
+}
+
+// Test the error handling
+print("Testing error handling AST nodes");
+
+// This should work
+var success = divide(10, 2)?;
+print("10 / 2 = " + success);
+
+// This should trigger error handling
+var withFallback = divisionWithFallback(10, 0);
+print("Division with fallback result: " + withFallback);

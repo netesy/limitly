@@ -655,18 +655,22 @@ public:
             // Any type always matches
             return true;
 
-            case TypeTag::Union:
-            case TypeTag::ErrorUnion:
-            case TypeTag::Range:
-            case TypeTag::UserDefined:
-            case TypeTag::Class:
-            case TypeTag::Object:
-                // TODO: implement checks for these
-                return false;
+        case TypeTag::Channel:
+            // Channel types match by tag alone for now
+            return true;
 
-            //default:
-            //    throw std::runtime_error("Unsupported type tag: "
-            //                             + std::to_string(static_cast<int>(expectedType->tag)));
+        case TypeTag::Union:
+        case TypeTag::ErrorUnion:
+        case TypeTag::Range:
+        case TypeTag::UserDefined:
+        case TypeTag::Class:
+        case TypeTag::Object:
+            // TODO: implement checks for these
+            return false;
+
+        //default:
+        //    throw std::runtime_error("Unsupported type tag: "
+        //                             + std::to_string(static_cast<int>(expectedType->tag)));
         }
 
         // Handle Union type separately, as it can match multiple types

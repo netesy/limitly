@@ -1,0 +1,14 @@
+print("=== Task Iteration Test ===");
+
+// Test the fix for concurrent task iteration deadlock issue
+var counters: atomic = 0;
+concurrent(mode=batch, cores=Auto, on_error=Auto) {
+    // Task statement for parallel execution
+    task(i in 1..3) {
+        counters += 1;
+        print("Task {counters} running with i={i}");
+    }
+}
+
+print("Task iteration test completed");
+print("Final counter value: {counters}");

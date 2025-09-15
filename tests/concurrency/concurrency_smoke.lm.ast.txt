@@ -1,4 +1,4 @@
-AST for tests/concurrency/concurrency_smoke.lm
+AST for tests\concurrency\concurrency_smoke.lm
 ========================================
 
 AST Dump:
@@ -9,13 +9,62 @@ VarDeclaration: counter
   Type: atomic
   Initializer:
     Literal: 0
-ExpressionStatement:
-  Assignment: =
-    Target: ch
-    Value:
-    CallExpression:
-      Callee:
-        Variable: channel
+ConcurrentStatement:
+  BlockStatement:
+    TaskStatement
+      Body:
+        BlockStatement:
+          ExpressionStatement:
+            Assignment: +=
+              Target: counter
+              Value:
+              Literal: 1
+          PrintStatement:
+            InterpolatedString:
+              String: "Task 1 completed with counter value: "
+              Expression:
+                Variable: counter
+    TaskStatement
+      Body:
+        BlockStatement:
+          ExpressionStatement:
+            Assignment: +=
+              Target: counter
+              Value:
+              Literal: 1
+          PrintStatement:
+            InterpolatedString:
+              String: "Task 2 completed with counter value: "
+              Expression:
+                Variable: counter
+    TaskStatement
+      Body:
+        BlockStatement:
+          ExpressionStatement:
+            Assignment: +=
+              Target: counter
+              Value:
+              Literal: 1
+          PrintStatement:
+            InterpolatedString:
+              String: "Task 3 completed with counter value: "
+              Expression:
+                Variable: counter
+    TaskStatement
+      Body:
+        BlockStatement:
+          ExpressionStatement:
+            Assignment: +=
+              Target: counter
+              Value:
+              Literal: 1
+          PrintStatement:
+            InterpolatedString:
+              String: "Task 4 completed with counter value: "
+              Expression:
+                Variable: counter
+PrintStatement:
+  Literal: "Tasks Iteration Tests"
 ConcurrentStatement:
   BlockStatement:
     TaskStatement
@@ -25,33 +74,45 @@ ConcurrentStatement:
           Start:
             Literal: 1
           End:
-            Literal: 4
+            Literal: 3
           Inclusive: true
       Body:
         BlockStatement:
-          ExpressionStatement:
-            Assignment: +=
-              Target: counter
-              Value:
-              Literal: 1
-          ExpressionStatement:
-            CallExpression:
-              Callee:
-                MemberExpression: .send
-                  Object:
-                    Variable: ch
-              Arguments:
-                Variable: counter
-IterStatement:
-  Variables: v
-  Iterable:
-    Variable: ch
-  Body:
-    BlockStatement:
-      PrintStatement:
-        InterpolatedString:
-          String: "Value from channel: "
-          Expression:
-            Variable: v
+          PrintStatement:
+            InterpolatedString:
+              String: "Task "
+              Expression:
+                Variable: i
+              String: " running"
+PrintStatement:
+  Literal: "end Task tests"
+PrintStatement:
+  InterpolatedString:
+    String: "Final counter value: "
+    Expression:
+      Variable: counter
 PrintStatement:
   Literal: "Smoke test finished"
+PrintStatement:
+  Literal: "=== Test Concurrent Iteration ==="
+ConcurrentStatement:
+  BlockStatement:
+    TaskStatement
+      LoopVar: i
+      Iterable:
+        RangeExpression:
+          Start:
+            Literal: 1
+          End:
+            Literal: 2
+          Inclusive: true
+      Body:
+        BlockStatement:
+          PrintStatement:
+            InterpolatedString:
+              String: "Task "
+              Expression:
+                Variable: i
+              String: " with default parameters"
+PrintStatement:
+  Literal: "Test finished"
