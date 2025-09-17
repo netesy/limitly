@@ -73,6 +73,7 @@ void executeFile(const std::string& filename, bool printAst = false, bool printT
         // } else {
 
             // Backend: Generate bytecode
+            VM vm;
             BytecodeGenerator generator;
             generator.process(ast);
 
@@ -85,7 +86,6 @@ void executeFile(const std::string& filename, bool printAst = false, bool printT
             }
 
             // Execute bytecode using the virtual machine
-            VM vm;
             try {
                 ValuePtr result = vm.execute(generator.getBytecode());
                 // Only print non-nil results

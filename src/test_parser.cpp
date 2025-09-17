@@ -2,6 +2,7 @@
 #include "frontend/scanner.hh"
 #include "frontend/parser.hh"
 #include "backend.hh"
+#include "backend/vm.hh"
 #include "opcodes.hh"
 #include <iostream>
 #include <fstream>
@@ -94,7 +95,12 @@ const std::unordered_map<Opcode, std::string> OPCODE_NAMES = {
     {Opcode::END_CONCURRENT, "END_CONCURRENT"},
     {Opcode::AWAIT, "AWAIT"},
     {Opcode::MATCH_PATTERN, "MATCH_PATTERN"},
-    {Opcode::IMPORT, "IMPORT"},
+    {Opcode::IMPORT_MODULE, "IMPORT_MODULE"},
+    {Opcode::IMPORT_ALIAS, "IMPORT_ALIAS"},
+    {Opcode::IMPORT_FILTER_SHOW, "IMPORT_FILTER_SHOW"},
+    {Opcode::IMPORT_FILTER_HIDE, "IMPORT_FILTER_HIDE"},
+    {Opcode::IMPORT_ADD_IDENTIFIER, "IMPORT_ADD_IDENTIFIER"},
+    {Opcode::IMPORT_EXECUTE, "IMPORT_EXECUTE"},
     {Opcode::BEGIN_ENUM, "BEGIN_ENUM"},
     {Opcode::END_ENUM, "END_ENUM"},
     {Opcode::DEFINE_ENUM_VARIANT, "DEFINE_ENUM_VARIANT"},
@@ -258,7 +264,9 @@ int main(int argc, char* argv[]) {
                     case Opcode::DEFINE_OPTIONAL_PARAM:
                     case Opcode::GET_PROPERTY:
                     case Opcode::SET_PROPERTY:
-                    case Opcode::IMPORT:
+                    case Opcode::IMPORT_MODULE:
+                    case Opcode::IMPORT_ALIAS:
+                    case Opcode::IMPORT_ADD_IDENTIFIER:
                         bytecodeFile << " " << instruction.stringValue;
                         break;
                     case Opcode::JUMP:

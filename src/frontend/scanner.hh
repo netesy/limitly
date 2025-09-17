@@ -93,6 +93,7 @@ enum class TokenType {
 
     // Group: Keywords
     AND,        // and
+    AS,         // as
     CLASS,      // class
     FALSE,      // false
     FN,         // fn
@@ -108,6 +109,8 @@ enum class TokenType {
     DEFAULT,    // default
     PRINT,      // print
     RETURN,     // return
+    SHOW,       // show
+    HIDE,       // hide
     SUPER,      // super
     THIS,       // this
     SELF,       // self

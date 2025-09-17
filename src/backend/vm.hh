@@ -2,6 +2,7 @@
 #define VM_H
 
 #include "../opcodes.hh"
+#include "../frontend/ast.hh"
 #include "../debugger.hh"
 #include "memory.hh"
 #include "value.hh"
@@ -96,6 +97,16 @@ private:
     // Map to store runtime default values for class fields
     std::unordered_map<std::string, ValuePtr> fieldDefaultValues;
 
+    // Module loading state
+    struct ImportState {
+        std::string modulePath;
+        std::optional<std::string> alias;
+        std::optional<AST::ImportFilterType> filterType;
+        std::vector<std::string> filterIdentifiers;
+    };
+    ImportState currentImportState;
+    std::unordered_map<std::string, ValuePtr> loadedModules;
+
     // Concurrency runtime
     std::shared_ptr<Scheduler> scheduler;
     std::shared_ptr<ThreadPool> thread_pool;
@@ -169,6 +180,7 @@ private:
     void handleDefineParam(const Instruction& instruction);
     void handleDefineOptionalParam(const Instruction& instruction);
     void handleSetDefaultValue(const Instruction& instruction);
+    void handlePushFunction(const Instruction& instruction);
     void handleBeginClass(const Instruction& instruction);
     void handleEndClass(const Instruction& instruction);
     void handleSetSuperclass(const Instruction& instruction);
@@ -217,7 +229,13 @@ private:
     void clearDictPatternFromStack();
     void clearListPatternFromStack();
     
-    void handleImport(const Instruction& instruction);
+    void handleImportModule(const Instruction& instruction);
+    void handleImportAlias(const Instruction& instruction);
+    void handleImportFilterShow(const Instruction& instruction);
+    void handleImportFilterHide(const Instruction& instruction);
+    void handleImportAddIdentifier(const Instruction& instruction);
+    void handleImportExecute(const Instruction& instruction);
+    void executeFunction(ValuePtr functionValue, const std::vector<ValuePtr>& args);
     void handleBeginEnum(const Instruction& instruction);
     void handleEndEnum(const Instruction& instruction);
     void handleDefineEnumVariant(const Instruction& instruction);
@@ -238,6 +256,7 @@ private:
 
 // VM-specific user-defined function implementation
 class VMUserDefinedFunction : public backend::UserDefinedFunction {
+    friend class VM;
 private:
     VM* vm;
     size_t startAddress;

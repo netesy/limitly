@@ -25,7 +25,7 @@ mkdir -p bin
 
 CXX=g++
 
-CXXFLAGS="-std=c++17 -Wall -Wextra -pedantic -I."
+CXXFLAGS="-std=c++17 -Wall -Wextra -pedantic -I. -Isrc/"
 
 
 echo "Compiling with $CXX..."

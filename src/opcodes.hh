@@ -63,6 +63,7 @@ enum class Opcode {
     RETURN,             // Return from function
 
     // Function operations
+    PUSH_FUNCTION,      // Push function onto stack
     BEGIN_FUNCTION,     // Begin function definition
     END_FUNCTION,       // End function definition
     DEFINE_PARAM,       // Define function parameter
@@ -121,7 +122,12 @@ enum class Opcode {
     MATCH_PATTERN,      // Match value against pattern
 
     // Module operations
-    IMPORT,             // Import module
+    IMPORT_MODULE,      // Import a module with a given path
+    IMPORT_ALIAS,       // Set an alias for the last imported module
+    IMPORT_FILTER_SHOW, // Set the import filter to "show"
+    IMPORT_FILTER_HIDE, // Set the import filter to "hide"
+    IMPORT_ADD_IDENTIFIER, // Add an identifier to the current import filter
+    IMPORT_EXECUTE,     // Execute the import operation
 
     // Enum operations
     BEGIN_ENUM,         // Begin enum definition

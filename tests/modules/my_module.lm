@@ -1,0 +1,6 @@
+// This is a test module.
+var message = "Hello from my_module!";
+
+fn greet() {
+    print(message);
+}

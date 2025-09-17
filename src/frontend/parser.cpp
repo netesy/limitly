@@ -1288,8 +1288,50 @@ std::shared_ptr<AST::Statement> Parser::importStatement() {
     auto stmt = std::make_shared<AST::ImportStatement>();
     stmt->line = previous().line;
 
-    stmt->module = consume(TokenType::IDENTIFIER, "Expected module name after 'import'.").lexeme;
-    consume(TokenType::SEMICOLON, "Expected ';' after import statement.");
+    // Parse module path
+    if (check(TokenType::IDENTIFIER) || check(TokenType::MODULE)) {
+        stmt->modulePath = advance().lexeme;
+        while (match({TokenType::DOT})) {
+            if (check(TokenType::IDENTIFIER) || check(TokenType::MODULE)) {
+                stmt->modulePath += "." + advance().lexeme;
+            } else {
+                error("Expected module path component.");
+                return nullptr;
+            }
+        }
+    } else if (match({TokenType::LEFT_PAREN})) {
+        stmt->isStringLiteralPath = true;
+        stmt->modulePath = consume(TokenType::STRING, "Expected string literal for module path.").lexeme;
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after module path string.");
+    } else {
+        error("Expected module path or string literal after 'import'.");
+        return nullptr;
+    }
+
+    // Parse optional alias
+    if (match({TokenType::AS})) {
+        stmt->alias = consume(TokenType::IDENTIFIER, "Expected alias name.").lexeme;
+    }
+
+    // Parse optional filter
+    if (match({TokenType::SHOW, TokenType::HIDE})) {
+        AST::ImportFilter filter;
+        filter.type = previous().type == TokenType::SHOW ? AST::ImportFilterType::Show : AST::ImportFilterType::Hide;
+
+        do {
+            if (check(TokenType::IDENTIFIER) || check(TokenType::MODULE)) {
+                filter.identifiers.push_back(advance().lexeme);
+            } else {
+                error("Expected identifier in filter list.");
+                return nullptr;
+            }
+        } while (match({TokenType::COMMA}));
+
+        stmt->filter = filter;
+    }
+
+    // Make semicolon optional
+    match({TokenType::SEMICOLON});
 
     return stmt;
 }

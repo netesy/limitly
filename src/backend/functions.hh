@@ -21,6 +21,7 @@ class Environment;
 // Function definition for user-defined functions
 struct Function {
     std::string name;
+    std::shared_ptr<AST::FunctionDeclaration> declaration;
     // std::vector<std::string> parameters;
     // std::vector<std::string> optionalParameters;
     // std::map<std::string, ValuePtr> defaultValues;

@@ -541,6 +541,7 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     // Check if the identifier matches a reserved keyword.
     if (rest == "interface") return TokenType::INTERFACE;
     if (rest == "and") return TokenType::AND;
+    if (rest == "as") return TokenType::AS;
     if (rest == "class") return TokenType::CLASS;
     if (rest == "else") return TokenType::ELSE;
     if (rest == "false") return TokenType::FALSE;
@@ -550,6 +551,8 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "or") return TokenType::OR;
     if (rest == "print") return TokenType::PRINT;
     if (rest == "return") return TokenType::RETURN;
+    if (rest == "show") return TokenType::SHOW;
+    if (rest == "hide") return TokenType::HIDE;
     if (rest == "super") return TokenType::SUPER;
     if (rest == "this") return TokenType::THIS;
     if (rest == "self") return TokenType::SELF;
@@ -749,6 +752,8 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "ATOMIC_TYPE";
     case TokenType::AND:
         return "AND";
+    case TokenType::AS:
+        return "AS";
     case TokenType::CLASS:
         return "CLASS";
     case TokenType::FALSE:
@@ -779,6 +784,10 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "PRINT";
     case TokenType::RETURN:
         return "RETURN";
+    case TokenType::SHOW:
+        return "SHOW";
+    case TokenType::HIDE:
+        return "HIDE";
     case TokenType::SUPER:
         return "SUPER";
     case TokenType::THIS:

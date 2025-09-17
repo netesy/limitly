@@ -38,7 +38,13 @@ Welcome to the official guide for the Limit programming language. This document 
     *   [Method Overriding](#method-overriding)
     *   [The `super` Keyword](#the-super-keyword)
     *   [Polymorphism](#polymorphism)
-7.  [The Type System](#the-type-system)
+7.  [Modules and Imports](#modules-and-imports)
+    *   [Defining a Module](#defining-a-module)
+    *   [Importing a Module](#importing-a-module)
+    *   [Import with an Alias](#import-with-an-alias)
+    *   [Importing Specific Symbols](#importing-specific-symbols)
+    *   [Hiding Imported Symbols](#hiding-imported-symbols)
+8.  [The Type System](#the-type-system)
     *   [Type Aliases](#type-aliases)
     *   [Union Types](#union-types)
 8.  [Error Handling](#error-handling)
@@ -601,6 +607,66 @@ iter (animal: Animal in animals) {
 // The animal makes a sound.
 // The cat meows.
 // The animal makes a sound.
+```
+
+## Modules and Imports
+
+Limit supports a module system that allows you to organize your code into separate files and reuse code across your project.
+
+### Defining a Module
+
+A module is simply a Limit source file. For example, you could have a file named `my_module.lm` with the following content:
+
+```limit
+// my_module.lm
+fn greet() {
+    print("Hello from my_module!");
+}
+
+var my_variable = 123;
+```
+
+### Importing a Module
+
+You can import a module using the `import` statement. The module path is specified using dot notation, and it corresponds to the file path. For example, to import `my_module.lm` from the same directory, you would write:
+
+```limit
+import my_module;
+
+my_module.greet(); // Output: Hello from my_module!
+print(my_module.my_variable); // Output: 123
+```
+
+### Import with an Alias
+
+You can provide an alias for an imported module to make it easier to reference.
+
+```limit
+import my_module as mod;
+
+mod.greet();
+```
+
+### Importing Specific Symbols
+
+If you only need specific functions or variables from a module, you can use the `show` keyword to import only them into the current scope.
+
+```limit
+import my_module show greet, my_variable;
+
+greet(); // Directly accessible
+print(my_variable);
+```
+
+### Hiding Imported Symbols
+
+Conversely, you can use the `hide` keyword to import all symbols from a module *except* for the ones specified.
+
+```limit
+import my_module hide my_variable;
+
+greet(); // greet is imported
+// my_variable is not imported
 ```
 
 ## The Type System

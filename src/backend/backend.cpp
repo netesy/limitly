@@ -1,6 +1,7 @@
 #include "../backend.hh"
 #include "../debugger.hh"
 #include "value.hh"
+#include "vm.hh"
 #include <iostream>
 #include <thread>
 
@@ -195,7 +196,10 @@ void BytecodeGenerator::visitFunctionDeclaration(const std::shared_ptr<AST::Func
     
     // Start function definition
     emit(Opcode::BEGIN_FUNCTION, stmt->line, 0, 0.0f, false, stmt->name);
-    
+    // Store the declaration in the function object
+    // This is a bit of a hack. A better way would be to have a proper function object
+    // that is created here and then stored in the environment.
+    // For now, we'll just store the declaration and look it up in the VM.
     // Process parameters
     for (const auto& param : stmt->params) {
         emit(Opcode::DEFINE_PARAM, stmt->line, 0, 0.0f, false, param.first);
@@ -221,6 +225,10 @@ void BytecodeGenerator::visitFunctionDeclaration(const std::shared_ptr<AST::Func
     
     // End function definition
     emit(Opcode::END_FUNCTION, stmt->line);
+
+    // Define a variable for the function
+    emit(Opcode::PUSH_FUNCTION, stmt->line, 0, 0.0f, false, stmt->name);
+    emit(Opcode::STORE_VAR, stmt->line, 0, 0.0f, false, stmt->name);
 }
 
 void BytecodeGenerator::visitClassDeclaration(const std::shared_ptr<AST::ClassDeclaration>& stmt) {
@@ -634,7 +642,24 @@ void BytecodeGenerator::visitConcurrentStatement(const std::shared_ptr<AST::Conc
 
 void BytecodeGenerator::visitImportStatement(const std::shared_ptr<AST::ImportStatement>& stmt) {
     // Generate bytecode for import statement
-    emit(Opcode::IMPORT, stmt->line, 0, 0.0f, false, stmt->module);
+    emit(Opcode::IMPORT_MODULE, stmt->line, 0, 0.0f, false, stmt->modulePath);
+
+    if (stmt->alias) {
+        emit(Opcode::IMPORT_ALIAS, stmt->line, 0, 0.0f, false, *stmt->alias);
+    }
+
+    if (stmt->filter) {
+        if (stmt->filter->type == AST::ImportFilterType::Show) {
+            emit(Opcode::IMPORT_FILTER_SHOW, stmt->line);
+        } else {
+            emit(Opcode::IMPORT_FILTER_HIDE, stmt->line);
+        }
+        for (const auto& identifier : stmt->filter->identifiers) {
+            emit(Opcode::IMPORT_ADD_IDENTIFIER, stmt->line, 0, 0.0f, false, identifier);
+        }
+    }
+
+    emit(Opcode::IMPORT_EXECUTE, stmt->line);
 }
 
 void BytecodeGenerator::visitEnumDeclaration(const std::shared_ptr<AST::EnumDeclaration>& stmt) {
@@ -998,21 +1023,15 @@ void BytecodeGenerator::visitCallExpr(const std::shared_ptr<AST::CallExpr>& expr
         // First evaluate the object
         visitExpression(memberExpr->object);
         
-        // Then call the method on the object
-        functionName = memberExpr->name;
+        // Then call the method on the object. We assume the method is a property of the object.
+        // The VM will handle the call.
+        emit(Opcode::GET_PROPERTY, expr->line, 0, 0.0f, false, memberExpr->name);
         
-        // Check if this is a super method call
-        bool isSuperCall = false;
-        if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(memberExpr->object)) {
-            if (varExpr->name == "super") {
-                isSuperCall = true;
-            }
-        }
-        
-        // For method calls, we need to use a different approach
-        // The object is already on the stack, so we need to handle this differently
-        std::string callPrefix = isSuperCall ? "super:" : "method:";
-        emit(Opcode::CALL, expr->line, static_cast<int32_t>(expr->arguments.size() + 1), 0.0f, false, callPrefix + functionName);
+        // Now, we have the function on the stack, so we just need to call it.
+        // The arguments are already on the stack.
+        // We need to tell the call instruction to not look for a function by name.
+        // We can do this by passing an empty function name.
+        emit(Opcode::CALL, expr->line, static_cast<int32_t>(expr->arguments.size()), 0.0f, false, "");
         return;
     } else {
         // For other complex callees, we'd need to evaluate them

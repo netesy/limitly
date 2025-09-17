@@ -1,0 +1,12 @@
+AST for tests/modules/import_syntax.lm
+========================================
+
+AST Dump:
+==========
+ImportStatement: tests.modules.my_module
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      MemberExpression: .greet
+        Object:
+          Variable: my_module
