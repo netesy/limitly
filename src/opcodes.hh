@@ -117,6 +117,7 @@ enum class Opcode {
     BEGIN_CONCURRENT,   // Begin concurrent block
     END_CONCURRENT,     // End concurrent block
     AWAIT,              // Await async result
+    SPAWN_ITERATING_TASKS, // Spawn tasks for an iteration
 
     // Pattern matching operations
     MATCH_PATTERN,      // Match value against pattern
