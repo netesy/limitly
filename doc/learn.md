@@ -215,6 +215,32 @@ var result: int = add(5, 7);
 print("The result is {result}"); // Output: The result is 12
 ```
 
+## 📦 Organizing Your Code with Modules
+
+As your programs grow larger, you'll want to split your code into multiple files. Limit's module system makes this easy.
+
+A module is just a separate `.lm` file. You can use the `import` keyword to use functions and variables from one file in another.
+
+**Example:**
+
+Let's say you have a file named `greetings.lm`:
+```limit
+// greetings.lm
+fn say_hi() {
+    print("Hi there!");
+}
+```
+
+In your main file, you can import and use the `say_hi` function:
+```limit
+// main.lm
+import greetings;
+
+greetings.say_hi(); // Output: Hi there!
+```
+
+This is just a brief introduction. The module system also supports aliasing, and importing or hiding specific parts of a module. To learn more, check out the [**Modules and Imports**](./guide.md#modules-and-imports) section in the full language guide.
+
 ## 🧺 Working with Collections
 
 Collections are data structures that can hold multiple values. Limit has two main types of collections: lists and dictionaries.

@@ -76,4 +76,5 @@ CMakeLists.txt.user*
 *.exe
 
 /build
+/bin
 .cache

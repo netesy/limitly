@@ -411,9 +411,24 @@ namespace AST {
         std::shared_ptr<Expression> expression;
     };
 
+    // Import statement filter type
+    enum class ImportFilterType {
+        Show,
+        Hide
+    };
+
+    // Import statement filter
+    struct ImportFilter {
+        ImportFilterType type;
+        std::vector<std::string> identifiers;
+    };
+
     // Import statement
     struct ImportStatement : public Statement {
-        std::string module;
+        std::string modulePath;
+        bool isStringLiteralPath = false;
+        std::optional<std::string> alias;
+        std::optional<ImportFilter> filter;
     };
 
     // Enum declaration

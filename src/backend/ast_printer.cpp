@@ -287,7 +287,21 @@ void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
         printNode(concurrentStmt->body, indent + 1);
     }
     else if (auto importStmt = std::dynamic_pointer_cast<AST::ImportStatement>(node)) {
-        std::cout << indentation << "ImportStatement: " << importStmt->module << std::endl;
+        std::cout << indentation << "ImportStatement: " << importStmt->modulePath;
+        if (importStmt->alias) {
+            std::cout << " as " << *importStmt->alias;
+        }
+        if (importStmt->filter) {
+            if (importStmt->filter->type == AST::ImportFilterType::Show) {
+                std::cout << " show ";
+            } else {
+                std::cout << " hide ";
+            }
+            for (size_t i = 0; i < importStmt->filter->identifiers.size(); ++i) {
+                std::cout << importStmt->filter->identifiers[i] << (i < importStmt->filter->identifiers.size() - 1 ? ", " : "");
+            }
+        }
+        std::cout << std::endl;
     }
     else if (auto enumDecl = std::dynamic_pointer_cast<AST::EnumDeclaration>(node)) {
         std::cout << indentation << "EnumDeclaration: " << enumDecl->name << std::endl;

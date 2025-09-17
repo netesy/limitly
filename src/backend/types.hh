@@ -297,7 +297,9 @@ public:
     const TypePtr DICT_TYPE = std::make_shared<Type>(TypeTag::Dict);
     const TypePtr ENUM_TYPE = std::make_shared<Type>(TypeTag::Enum);
     const TypePtr SUM_TYPE = std::make_shared<Type>(TypeTag::Sum);
+    const TypePtr FUNCTION_TYPE = std::make_shared<Type>(TypeTag::Function);
     const TypePtr OBJECT_TYPE = std::make_shared<Type>(TypeTag::Object);
+    const TypePtr MODULE_TYPE = std::make_shared<Type>(TypeTag::Module);
     const TypePtr ERROR_UNION_TYPE = std::make_shared<Type>(TypeTag::ErrorUnion);
 
     // Built-in error types
@@ -322,6 +324,7 @@ public:
         if (name == "list") return LIST_TYPE;
         if (name == "dict") return DICT_TYPE;
         if (name == "object") return OBJECT_TYPE;
+        if (name == "module") return MODULE_TYPE;
         
         // Check type aliases
         TypePtr aliasType = resolveTypeAlias(name);
@@ -665,6 +668,7 @@ public:
         case TypeTag::UserDefined:
         case TypeTag::Class:
         case TypeTag::Object:
+        case TypeTag::Module:
             // TODO: implement checks for these
             return false;
 

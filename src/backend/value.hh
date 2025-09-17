@@ -10,6 +10,7 @@
 #include <vector>
 #include <stdexcept>
 #include <sstream>
+#include "../opcodes.hh"
 #include "concurrency/channel.hh"
 #include <atomic>
 
@@ -29,8 +30,17 @@ using IteratorValuePtr = std::shared_ptr<IteratorValue>;
 namespace backend {
     class ObjectInstance;
     class ClassDefinition;
+    class UserDefinedFunction;
 }
 using ObjectInstancePtr = std::shared_ptr<backend::ObjectInstance>;
+
+// Forward declare Environment
+class Environment;
+
+struct ModuleValue {
+    std::shared_ptr<Environment> env;
+    std::vector<Instruction> bytecode;
+};
 
 enum class TypeTag {
     Nil,
@@ -60,7 +70,8 @@ enum class TypeTag {
     UserDefined,
     Class,
     Channel,
-    Object
+    Object,
+    Module
 };
 
 struct Type;
@@ -214,6 +225,8 @@ struct Type
             return "Object";
         case TypeTag::Class:
             return "Class";
+        case TypeTag::Module:
+            return "Module";
         default:
             return "Unknown";
         }
@@ -598,6 +611,8 @@ struct Value {
                  std::shared_ptr<backend::ClassDefinition>
     , std::shared_ptr<Channel<ValuePtr>>
     , AtomicValue
+    , ModuleValue
+    , std::shared_ptr<backend::UserDefinedFunction>
                 >
         data;
 
@@ -734,6 +749,9 @@ struct Value {
         Value(TypePtr t, const ObjectInstancePtr& obj) : type(std::move(t)), data(obj) {
         }
 
+        // Constructor for UserDefinedFunction
+        Value(TypePtr t, const std::shared_ptr<backend::UserDefinedFunction>& func) : type(std::move(t)), data(func) {}
+
     bool isError() const {
         // An error can be a direct ErrorValue or an ErrorUnion holding an ErrorValue.
         if (type && type->tag == TypeTag::ErrorUnion) {
@@ -824,6 +842,12 @@ struct Value {
             },
             [&](const std::shared_ptr<backend::ClassDefinition>&) {
                 oss << "<class>";
+            },
+            [&](const ModuleValue&) {
+                oss << "<module>";
+            },
+            [&](const std::shared_ptr<backend::UserDefinedFunction>&) {
+                oss << "<function>";
             }
         }, data);
         return oss.str();
@@ -896,6 +920,12 @@ struct Value {
             },
             [&](const std::shared_ptr<backend::ClassDefinition>&) {
                 oss << "<class>";
+            },
+            [&](const ModuleValue&) {
+                oss << "<module>";
+            },
+            [&](const std::shared_ptr<backend::UserDefinedFunction>&) {
+                oss << "<function>";
             }
         }, data);
         return oss.str();

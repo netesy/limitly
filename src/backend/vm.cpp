@@ -1,5 +1,8 @@
 #include "vm.hh"
 #include "value.hh"  // For Value and ErrorValue definitions
+#include "../frontend/scanner.hh"
+#include "../frontend/parser.hh"
+#include "../backend.hh"
 
 // Forward declare ErrorValue from the global namespace
 struct ErrorValue;
@@ -353,6 +356,9 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                     case Opcode::SET_DEFAULT_VALUE:
                         handleSetDefaultValue(instruction);
                         break;
+                    case Opcode::PUSH_FUNCTION:
+                        handlePushFunction(instruction);
+                        break;
                     case Opcode::PRINT:
                         handlePrint(instruction);
                         break;
@@ -458,8 +464,23 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                         case Opcode::AWAIT:
                             handleAwait(instruction);
                             break;
-                        case Opcode::IMPORT:
-                            handleImport(instruction);
+                        case Opcode::IMPORT_MODULE:
+                            handleImportModule(instruction);
+                            break;
+                        case Opcode::IMPORT_ALIAS:
+                            handleImportAlias(instruction);
+                            break;
+                        case Opcode::IMPORT_FILTER_SHOW:
+                            handleImportFilterShow(instruction);
+                            break;
+                        case Opcode::IMPORT_FILTER_HIDE:
+                            handleImportFilterHide(instruction);
+                            break;
+                        case Opcode::IMPORT_ADD_IDENTIFIER:
+                            handleImportAddIdentifier(instruction);
+                            break;
+                        case Opcode::IMPORT_EXECUTE:
+                            handleImportExecute(instruction);
                             break;
                         case Opcode::BEGIN_ENUM:
                             handleBeginEnum(instruction);
@@ -1843,8 +1864,20 @@ void VM::handleCall(const Instruction& instruction) {
         // Simple function call - no callee required
     }
     
-    // Check if this is a constructor call (callee is a class definition)
-    if (callee && callee->type && callee->type->tag == TypeTag::Class) {
+    // Check if this is a module property call
+    if (callee && callee->type && callee->type->tag == TypeTag::Module) {
+        auto& moduleData = std::get<ModuleValue>(callee->data);
+        auto moduleEnv = moduleData.env;
+        std::string methodName = funcName.substr(funcName.find(":") + 1);
+        try {
+            ValuePtr funcValue = moduleEnv->get(methodName);
+            //executeFunction(funcValue, args);
+            push(memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
+            return;
+        } catch (const std::runtime_error& e) {
+            error("Function '" + methodName + "' not found in module.");
+        }
+    } else if (callee && callee->type && callee->type->tag == TypeTag::Class) {
         try {
             // Get the class definition
             auto classDef = std::get<std::shared_ptr<backend::ClassDefinition>>(callee->data);
@@ -2549,6 +2582,18 @@ void VM::handleSetDefaultValue(const Instruction& /*unused*/) {
         currentFunc.defaultValues[paramName] = std::make_pair(defaultValue, paramType);
     }
 }
+
+void VM::handlePushFunction(const Instruction& instruction) {
+    const std::string& funcName = instruction.stringValue;
+    auto it = userDefinedFunctions.find(funcName);
+    if (it != userDefinedFunctions.end()) {
+        auto func = std::make_shared<VMUserDefinedFunction>(this, it->second.declaration, it->second.startAddress, it->second.endAddress);
+        push(memoryManager.makeRef<Value>(*region, typeSystem->FUNCTION_TYPE, func));
+    } else {
+        error("Function not found: " + funcName);
+    }
+}
+
 void VM::handleBeginClass(const Instruction& instruction) {
     // Get the class name from the instruction
     std::string className = instruction.stringValue;
@@ -2680,7 +2725,16 @@ void VM::handleGetProperty(const Instruction& instruction) {
         } catch (const std::exception& e) {
             error("Property access failed: " + std::string(e.what()));
         }
-    } 
+    } else if (std::holds_alternative<ModuleValue>(object->data)) {
+        auto& moduleData = std::get<ModuleValue>(object->data);
+        auto moduleEnv = moduleData.env;
+        try {
+            ValuePtr propertyValue = moduleEnv->get(propertyName);
+            push(propertyValue);
+        } catch (const std::runtime_error& e) {
+            error("Property '" + propertyName + "' not found in module.");
+        }
+    }
     // Check if the object is an ErrorValue
     else if (std::holds_alternative<ErrorValue>(object->data)) {
         auto errorValue = std::get<ErrorValue>(object->data);
@@ -3686,15 +3740,182 @@ void VM::handleAwait(const Instruction& instruction) {
     push(awaitable);
 }
 
-void VM::handleImport(const Instruction& instruction) {
-    if (debugMode) {
-        std::cout << "[DEBUG] Importing module: " << instruction.stringValue << std::endl;
+void VM::handleImportModule(const Instruction& instruction) {
+    currentImportState = {}; // Reset state
+    currentImportState.modulePath = instruction.stringValue;
+}
+
+void VM::handleImportAlias(const Instruction& instruction) {
+    currentImportState.alias = instruction.stringValue;
+}
+
+void VM::handleImportFilterShow(const Instruction& instruction) {
+    currentImportState.filterType = AST::ImportFilterType::Show;
+}
+
+void VM::handleImportFilterHide(const Instruction& instruction) {
+    currentImportState.filterType = AST::ImportFilterType::Hide;
+}
+
+void VM::handleImportAddIdentifier(const Instruction& instruction) {
+    if (currentImportState.filterType) {
+        currentImportState.filterIdentifiers.push_back(instruction.stringValue);
     }
-    
-    // For now, just create a placeholder module object
-    // In a full implementation, this would load and execute the module
-    ValuePtr module = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
-    environment->define(instruction.stringValue, module);
+}
+
+// Helper function to resolve module path to file path
+std::string resolveModulePath(const std::string& modulePath) {
+    std::string filePath = modulePath;
+    // Replace dots with slashes
+    size_t pos = 0;
+    while ((pos = filePath.find('.', pos)) != std::string::npos) {
+        filePath.replace(pos, 1, "/");
+        pos += 1;
+    }
+    // Append .lm extension
+    filePath += ".lm";
+    return filePath;
+}
+
+/*
+void VM::executeFunction(ValuePtr functionValue, const std::vector<ValuePtr>& args) {
+    if (functionValue->type->tag != TypeTag::Function) {
+        error("Cannot call non-function value.");
+        return;
+    }
+
+    if (auto* userFunc = std::get_if<std::shared_ptr<backend::UserDefinedFunction>>(&functionValue->data)) {
+        auto vmUserFunc = dynamic_cast<VMUserDefinedFunction*>((*userFunc).get());
+        if (!vmUserFunc) {
+            error("Cannot call non-VM function.");
+            return;
+        }
+
+        // Save current execution context
+        const auto* savedBytecode = this->bytecode;
+        size_t savedIp = this->ip;
+
+        // Switch to module's context if necessary
+        if (vmUserFunc->vm != this) {
+            this->bytecode = vmUserFunc->vm->bytecode;
+        }
+
+        // Set up new call frame
+        backend::CallFrame frame(vmUserFunc->getSignature().name, savedIp, *userFunc);
+        auto funcEnv = std::make_shared<Environment>(vmUserFunc->vm->environment);
+
+        // Bind arguments
+        size_t argIndex = 0;
+        for (const auto& param : vmUserFunc->getSignature().parameters) {
+            if (argIndex < args.size()) {
+                funcEnv->define(param.name, args[argIndex]);
+                argIndex++;
+            } else {
+                // Handle missing arguments for optional parameters later
+            }
+        }
+
+        frame.setPreviousEnvironment(this->environment);
+        this->callStack.push_back(frame);
+        this->environment = funcEnv;
+        this->ip = vmUserFunc->getStartAddress() -1;
+
+        // The main execution loop will now take over.
+        // When the function returns, the context will be restored in handleReturn.
+    } else if (auto* nativeFunc = std::get_if<std::function<ValuePtr(const std::vector<ValuePtr>&)>>(&functionValue->data)) {
+        push((*nativeFunc)(args));
+    } else {
+        error("Invalid function value.");
+    }
+}
+*/
+
+void VM::handleImportExecute(const Instruction& instruction) {
+    std::string modulePath = currentImportState.modulePath;
+    std::string filePath = resolveModulePath(modulePath);
+
+    ValuePtr moduleValue;
+
+    if (loadedModules.count(modulePath)) {
+        moduleValue = loadedModules[modulePath];
+    } else {
+        std::ifstream file(filePath);
+        if (!file.is_open()) {
+            error("Could not open module file: " + filePath);
+            return;
+        }
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        std::string source = buffer.str();
+
+        // Create a new VM to execute the module in isolation
+        VM moduleVm(false); // false = don't create new runtime
+        moduleVm.globals = std::make_shared<Environment>(this->globals); // Inherit globals
+        moduleVm.environment = moduleVm.globals;
+
+        // Compile and execute the module's code
+        Scanner scanner(source);
+        scanner.scanTokens();
+        Parser parser(scanner);
+        auto ast = parser.parse();
+        BytecodeGenerator generator;
+        generator.process(ast);
+        auto bytecode = generator.getBytecode();
+        moduleVm.execute(bytecode);
+
+        // Create a module object from the module's environment
+        auto moduleData = ModuleValue{moduleVm.environment, bytecode};
+        moduleValue = memoryManager.makeRef<Value>(*region, typeSystem->MODULE_TYPE);
+        moduleValue->data = moduleData;
+        loadedModules[modulePath] = moduleValue;
+    }
+
+    // Handle import scoping
+    if (currentImportState.filterType) {
+        auto& moduleData = std::get<ModuleValue>(moduleValue->data);
+        auto moduleEnv = moduleData.env;
+        if (*currentImportState.filterType == AST::ImportFilterType::Show) {
+            for (const auto& id : currentImportState.filterIdentifiers) {
+                try {
+                    ValuePtr symbol = moduleEnv->get(id);
+                    environment->define(id, symbol);
+                } catch (const std::runtime_error& e) {
+                    error("Symbol '" + id + "' not found in module '" + modulePath + "'");
+                }
+            }
+        } else { // Hide
+            // This is more complex. For now, we'll just import the whole module.
+            // A proper implementation would need to create a proxy module object.
+            std::string varName;
+            if (currentImportState.alias) {
+                varName = *currentImportState.alias;
+            } else {
+                size_t lastDot = modulePath.rfind('.');
+                if (lastDot != std::string::npos) {
+                    varName = modulePath.substr(lastDot + 1);
+                } else {
+                    varName = modulePath;
+                }
+            }
+            environment->define(varName, moduleValue);
+        }
+    } else {
+        std::string varName;
+        if (currentImportState.alias) {
+            varName = *currentImportState.alias;
+        } else {
+            size_t lastDot = modulePath.rfind('.');
+            if (lastDot != std::string::npos) {
+                varName = modulePath.substr(lastDot + 1);
+            } else {
+                varName = modulePath;
+            }
+        }
+        environment->define(varName, moduleValue);
+    }
+
+    // Reset the import state
+    currentImportState = {};
 }
 
 void VM::handleBeginEnum(const Instruction& instruction) {

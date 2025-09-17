@@ -6,6 +6,8 @@
 #include <vector>
 #include <memory>
 
+class VM; // Forward declaration
+
 // Backend interface - base class for different backend implementations
 class Backend {
 public:
