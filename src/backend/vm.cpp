@@ -220,12 +220,14 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
             if (!currentFunctionBeingDefined.empty() && !insideFunctionDefinition) {
                 auto funcIt = userDefinedFunctions.find(currentFunctionBeingDefined);
                 if (funcIt != userDefinedFunctions.end() && ip >= funcIt->second.startAddress) {
+                    std::cout << "[DEBUG] Starting to skip function body at IP " << ip << " (startAddress: " << funcIt->second.startAddress << ")" << std::endl;
                     insideFunctionDefinition = true;
                 }
             }
             
             // Skip execution if we're inside a function definition (except for END_FUNCTION)
             if (insideFunctionDefinition && instruction.opcode != Opcode::END_FUNCTION) {
+                std::cout << "[DEBUG] Skipping instruction at IP " << ip << ": " << static_cast<int>(instruction.opcode) << std::endl;
                 ip++;
                 continue;
             }
@@ -1780,6 +1782,95 @@ void VM::handleCall(const Instruction& instruction) {
     const std::string& funcName = instruction.stringValue;
     int argCount = instruction.intValue;
     
+    std::cout << "[DEBUG] CALL: Looking for function: " << funcName << std::endl;
+    std::cout << "[DEBUG] Available functions: ";
+    for (const auto& pair : userDefinedFunctions) {
+        std::cout << pair.first << " ";
+    }
+    std::cout << std::endl;
+    
+    // Handle case where function is on the stack (from property access)
+    if (funcName.empty()) {
+        // Function should be on top of the stack, above the arguments
+        if (stack.size() < static_cast<size_t>(argCount + 1)) {
+            error("Not enough values on stack for function call");
+            return;
+        }
+        
+        // Get the function from the stack (it's above the arguments)
+        ValuePtr functionValue = stack[stack.size() - argCount - 1];
+        
+        // Remove the function from the stack
+        stack.erase(stack.begin() + (stack.size() - argCount - 1));
+        
+        // Check if it's a function value (stored as string name)
+        if (std::holds_alternative<std::string>(functionValue->data)) {
+            std::string funcName = std::get<std::string>(functionValue->data);
+            
+            // Collect arguments
+            std::vector<ValuePtr> args;
+            for (int i = 0; i < argCount; i++) {
+                args.insert(args.begin(), pop());
+            }
+            
+            // Find the function in userDefinedFunctions
+            auto funcIt = userDefinedFunctions.find(funcName);
+            if (funcIt != userDefinedFunctions.end()) {
+                const backend::Function& func = funcIt->second;
+                
+                // Create a new environment for the function
+                auto funcEnv = std::make_shared<Environment>(environment);
+                
+                // Check argument count
+                size_t requiredParams = func.parameters.size();
+                size_t totalParams = requiredParams + func.optionalParameters.size();
+                
+                if (args.size() < requiredParams || args.size() > totalParams) {
+                    error("Function " + funcName + " expects " + std::to_string(requiredParams) + 
+                          " to " + std::to_string(totalParams) + " arguments, got " + std::to_string(args.size()));
+                    return;
+                }
+                
+                // Bind required parameters
+                for (size_t i = 0; i < requiredParams && i < args.size(); i++) {
+                    funcEnv->define(func.parameters[i].first, args[i]);
+                }
+                
+                // Bind optional parameters
+                for (size_t i = 0; i < func.optionalParameters.size(); i++) {
+                    const std::string& paramName = func.optionalParameters[i].first;
+                    size_t argIndex = requiredParams + i;
+                    
+                    if (argIndex < args.size()) {
+                        funcEnv->define(paramName, args[argIndex]);
+                    } else {
+                        auto defaultIt = func.defaultValues.find(paramName);
+                        if (defaultIt != func.defaultValues.end()) {
+                            funcEnv->define(paramName, defaultIt->second.first);
+                        } else {
+                            auto nilValue = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
+                            funcEnv->define(paramName, nilValue);
+                        }
+                    }
+                }
+                
+                // Save current environment and set function environment
+                auto savedEnv = environment;
+                environment = funcEnv;
+                
+                // Jump to function start
+                ip = func.startAddress - 1; // -1 because ip will be incremented
+                return;
+            } else {
+                error("Function " + funcName + " not found in bytecode");
+                return;
+            }
+        } else {
+            error("Value on stack is not a function");
+            return;
+        }
+    }
+    
     // Determine if this is a method-like call so we can extract the callee
     bool isMethodLike = (funcName.substr(0, 7) == "method:" || funcName.substr(0, 6) == "super:");
 
@@ -2264,8 +2355,16 @@ void VM::handleCall(const Instruction& instruction) {
     }
     
     // Handle user-defined functions
+    std::cout << "[DEBUG] CALL: Looking for function: " << funcName << std::endl;
+    std::cout << "[DEBUG] Available functions: ";
+    for (const auto& pair : userDefinedFunctions) {
+        std::cout << pair.first << " ";
+    }
+    std::cout << std::endl;
+    
     auto funcIt = userDefinedFunctions.find(funcName);
     if (funcIt != userDefinedFunctions.end()) {
+        std::cout << "[DEBUG] Found function: " << funcName << " with start address: " << funcIt->second.startAddress << std::endl;
         const backend::Function& func = funcIt->second;
         
         // Create a new environment for the function
@@ -2445,12 +2544,16 @@ void VM::handleBeginFunction(const Instruction& instruction) {
     // Create a new function definition
     const std::string& funcName = instruction.stringValue;
     
+    std::cout << "[DEBUG] BEGIN_FUNCTION: " << funcName << " at IP " << ip << std::endl;
+    
     // If we're inside a class definition, use the full method key
     if (insideClassDefinition && !currentClassBeingDefined.empty()) {
         currentFunctionBeingDefined = currentClassBeingDefined + "::" + funcName;
     } else {
         currentFunctionBeingDefined = funcName;
     }
+    
+    std::cout << "[DEBUG] Current function being defined: " << currentFunctionBeingDefined << std::endl;
     
     // Create a new Function struct
     backend::Function func(funcName, 0); // Will set start address later
@@ -2496,7 +2599,10 @@ void VM::handleBeginFunction(const Instruction& instruction) {
     } else {
         // Regular function
         userDefinedFunctions[funcName] = func;
+        std::cout << "[DEBUG] Stored function: " << funcName << " with start address: " << func.startAddress << std::endl;
     }
+    
+    std::cout << "[DEBUG] Total functions stored: " << userDefinedFunctions.size() << std::endl;
     
     // Continue with normal execution to process parameter definitions
     // The function body will be skipped later when we encounter END_FUNCTION
@@ -2506,12 +2612,14 @@ void VM::handleEndFunction(const Instruction& /*unused*/) {
     // Check if we're currently defining a function
     if (!currentFunctionBeingDefined.empty()) {
         // This is the end of function definition, not function execution
+        std::cout << "[DEBUG] END_FUNCTION: Ending definition of " << currentFunctionBeingDefined << " at IP " << ip << std::endl;
         auto funcIt = userDefinedFunctions.find(currentFunctionBeingDefined);
         if (funcIt != userDefinedFunctions.end()) {
             funcIt->second.endAddress = ip;
         }
         currentFunctionBeingDefined.clear();
         insideFunctionDefinition = false;
+        std::cout << "[DEBUG] END_FUNCTION: Resuming normal execution" << std::endl;
         return;
     }
     
@@ -2585,11 +2693,19 @@ void VM::handleSetDefaultValue(const Instruction& /*unused*/) {
 
 void VM::handlePushFunction(const Instruction& instruction) {
     const std::string& funcName = instruction.stringValue;
+    std::cout << "[DEBUG] PUSH_FUNCTION: " << funcName << std::endl;
     auto it = userDefinedFunctions.find(funcName);
     if (it != userDefinedFunctions.end()) {
-        auto func = std::make_shared<VMUserDefinedFunction>(this, it->second.declaration, it->second.startAddress, it->second.endAddress);
-        push(memoryManager.makeRef<Value>(*region, typeSystem->FUNCTION_TYPE, func));
+        std::cout << "[DEBUG] PUSH_FUNCTION: Found function " << funcName << std::endl;
+        // For now, just push a simple function value without creating VMUserDefinedFunction
+        // The actual function execution will be handled by CALL instruction
+        auto funcValue = memoryManager.makeRef<Value>(*region, typeSystem->FUNCTION_TYPE);
+        // Store the function name in the value for later lookup
+        funcValue->data = funcName;
+        push(funcValue);
+        std::cout << "[DEBUG] PUSH_FUNCTION: Successfully pushed function to stack" << std::endl;
     } else {
+        std::cout << "[DEBUG] PUSH_FUNCTION: Function not found: " << funcName << std::endl;
         error("Function not found: " + funcName);
     }
 }

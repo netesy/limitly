@@ -1,0 +1,20 @@
+Bytecode for test_module_call.lm
+========================================
+
+=== Bytecode ===
+Generated 13 instructions
+
+[000] BEGIN_FUNCTION000000 "test" (line 2)
+[001] BEGIN_SCOPE000000000 (line 2)
+[002] PUSH_STRING000000000 "Hello from test function!" (line 3)
+[003] PRINT000000000000000 1 (line 3)
+[004] END_SCOPE00000000000 (line 2)
+[005] PUSH_NULL00000000000 (line 2)
+[006] RETURN00000000000000 (line 2)
+[007] END_FUNCTION00000000 (line 2)
+[008] PUSH_FUNCTION0000000 "test" (line 2)
+[009] STORE_VAR00000000000 "test" (line 2)
+[010] CALL0000000000000000 "test" (line 6)
+[011] POP00000000000000000 (line 6)
+[012] HALT0000000000000000 (line 0)
+

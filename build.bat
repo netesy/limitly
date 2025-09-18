@@ -32,6 +32,7 @@ echo Compiling main executable...
     src\backend\backend.cpp ^
     src\backend\vm.cpp ^
     src\backend\ast_printer.cpp ^
+    src\backend\bytecode_printer.cpp ^
     src\backend\functions.cpp ^
     src\backend\classes.cpp ^
     src\backend\concurrency\scheduler.cpp ^
@@ -59,6 +60,7 @@ echo Compiling test parser...
     src\frontend\parser.cpp ^
     src\backend\backend.cpp ^
     src\backend\ast_printer.cpp ^
+    src\backend\bytecode_printer.cpp ^
     src\backend\functions.cpp ^
     src\backend\classes.cpp ^
     bin\debugger.o ^

@@ -2,6 +2,7 @@
 #include "frontend/parser.hh"
 #include "backend.hh"
 #include "backend/ast_printer.hh"
+#include "backend/bytecode_printer.hh"
 #include "backend/vm.hh"
 // #include "backend/jit_backend.hh"
 #include <iostream>
@@ -79,10 +80,7 @@ void executeFile(const std::string& filename, bool printAst = false, bool printT
 
             // Print bytecode if requested
             if (printBytecode) {
-                std::cout << "=== Bytecode ===\n";
-                std::cout << "Generated " << generator.getBytecode().size() << " instructions\n";
-                // TODO: Implement bytecode disassembler and print instructions
-                std::cout << std::endl;
+                BytecodePrinter::print(generator.getBytecode());
             }
 
             // Execute bytecode using the virtual machine
