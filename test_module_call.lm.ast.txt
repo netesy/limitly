@@ -1,0 +1,14 @@
+AST for test_module_call.lm
+========================================
+
+AST Dump:
+==========
+FunctionDeclaration: test
+  Body:
+    BlockStatement:
+      PrintStatement:
+        Literal: "Hello from test function!"
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: test
