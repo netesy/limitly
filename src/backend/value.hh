@@ -1211,7 +1211,9 @@ struct IteratorValue {
             }
             throw std::runtime_error("Invalid channel iterator state");
         }
+        throw std::runtime_error("Invalid iterator type");
     }
+    
 };
 
 

@@ -1,0 +1,5 @@
+import tests.modules.my_module;
+
+print("About to call module function");
+my_module.greet();
+print("Function call completed");

@@ -4,3 +4,8 @@ var message = "Hello from my_module!";
 fn greet() {
     print(message);
 }
+
+
+fn ask(){
+    print("Did you say hello?");
+}

@@ -106,6 +106,15 @@ private:
     };
     ImportState currentImportState;
     std::unordered_map<std::string, ValuePtr> loadedModules;
+    
+    // Module function handling
+    struct ModuleFunctionInfo {
+        backend::Function functionInfo;
+        std::shared_ptr<Environment> moduleEnv;
+        std::vector<Instruction> moduleBytecode;
+    };
+    std::unordered_map<Environment*, std::unordered_map<std::string, backend::Function>> moduleUserDefinedFunctions;
+    std::unordered_map<std::string, ModuleFunctionInfo> moduleFunctions_;
 
     // Concurrency runtime
     std::shared_ptr<Scheduler> scheduler;
@@ -316,6 +325,21 @@ public:
         }
         
         throw std::runtime_error("Undefined variable '" + name + "'");
+    }
+    
+    std::unordered_map<std::string, ValuePtr> getAllSymbols() {
+        std::lock_guard<std::mutex> lock(mutex);
+        return values; // Return a copy
+    }
+    
+    void remove(const std::string& name) {
+        std::lock_guard<std::mutex> lock(mutex);
+        auto it = values.find(name);
+        if (it != values.end()) {
+            values.erase(it);
+        } else {
+            throw std::runtime_error("Symbol '" + name + "' not found");
+        }
     }
     
     std::shared_ptr<Environment> enclosing;

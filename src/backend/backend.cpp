@@ -2,8 +2,12 @@
 #include "../debugger.hh"
 #include "value.hh"
 #include "vm.hh"
+#include "../frontend/scanner.hh"
+#include "../frontend/parser.hh"
 #include <iostream>
 #include <thread>
+#include <fstream>
+#include <sstream>
 
 void BytecodeGenerator::visitInterpolatedStringExpr(const std::shared_ptr<AST::InterpolatedStringExpr>& expr) {
     // For each part of the interpolated string
@@ -641,25 +645,106 @@ void BytecodeGenerator::visitConcurrentStatement(const std::shared_ptr<AST::Conc
 }
 
 void BytecodeGenerator::visitImportStatement(const std::shared_ptr<AST::ImportStatement>& stmt) {
-    // Generate bytecode for import statement
-    emit(Opcode::IMPORT_MODULE, stmt->line, 0, 0.0f, false, stmt->modulePath);
-
-    if (stmt->alias) {
-        emit(Opcode::IMPORT_ALIAS, stmt->line, 0, 0.0f, false, *stmt->alias);
+    // Resolve imports at compile time instead of runtime
+    std::string modulePath = stmt->modulePath;
+    std::string filePath = resolveModulePath(modulePath);
+    
+    // Load and parse the module
+    std::ifstream file(filePath);
+    if (!file.is_open()) {
+        throw std::runtime_error("Could not open module file: " + filePath);
     }
-
+    
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string source = buffer.str();
+    
+    // Parse the module
+    Scanner scanner(source);
+    scanner.scanTokens();
+    Parser parser(scanner);
+    auto moduleAst = parser.parse();
+    
+    // Collect the names of functions and variables defined in the module
+    std::vector<std::string> allModuleSymbols;
+    
+    // Generate bytecode for the module's statements
+    // This will include all function definitions and variable declarations
+    for (const auto& moduleStmt : moduleAst->statements) {
+        // Skip import statements in modules to avoid circular imports
+        if (std::dynamic_pointer_cast<AST::ImportStatement>(moduleStmt)) {
+            continue;
+        }
+        
+        // Track symbols being defined
+        if (auto varDecl = std::dynamic_pointer_cast<AST::VarDeclaration>(moduleStmt)) {
+            allModuleSymbols.push_back(varDecl->name);
+        } else if (auto funcDecl = std::dynamic_pointer_cast<AST::FunctionDeclaration>(moduleStmt)) {
+            allModuleSymbols.push_back(funcDecl->name);
+        }
+        
+        visitStatement(moduleStmt);
+    }
+    
+    // Apply import filters to determine which symbols to include in the module object
+    std::vector<std::string> moduleSymbols;
     if (stmt->filter) {
         if (stmt->filter->type == AST::ImportFilterType::Show) {
-            emit(Opcode::IMPORT_FILTER_SHOW, stmt->line);
-        } else {
-            emit(Opcode::IMPORT_FILTER_HIDE, stmt->line);
+            // Only include symbols that are explicitly shown
+            for (const std::string& identifier : stmt->filter->identifiers) {
+                if (std::find(allModuleSymbols.begin(), allModuleSymbols.end(), identifier) != allModuleSymbols.end()) {
+                    moduleSymbols.push_back(identifier);
+                }
+            }
+        } else { // Hide
+            // Include all symbols except those that are hidden
+            for (const std::string& symbol : allModuleSymbols) {
+                if (std::find(stmt->filter->identifiers.begin(), stmt->filter->identifiers.end(), symbol) == stmt->filter->identifiers.end()) {
+                    moduleSymbols.push_back(symbol);
+                }
+            }
         }
-        for (const auto& identifier : stmt->filter->identifiers) {
-            emit(Opcode::IMPORT_ADD_IDENTIFIER, stmt->line, 0, 0.0f, false, identifier);
-        }
+    } else {
+        // No filter - include all symbols
+        moduleSymbols = allModuleSymbols;
     }
-
-    emit(Opcode::IMPORT_EXECUTE, stmt->line);
+    
+    // Create a module object that contains references to the imported symbols
+    std::string varName = stmt->alias ? *stmt->alias : getModuleNameFromPath(modulePath);
+    
+    // Create a dictionary to represent the module, but mark functions specially
+    emit(Opcode::CREATE_DICT, stmt->line);
+    
+    // Add each symbol to the module dictionary
+    for (const std::string& symbol : moduleSymbols) {
+        // Push the symbol name as key
+        emit(Opcode::PUSH_STRING, stmt->line, 0, 0.0f, false, symbol);
+        
+        // Check if this symbol is a function
+        bool isFunction = false;
+        for (const auto& moduleStmt : moduleAst->statements) {
+            if (auto funcDecl = std::dynamic_pointer_cast<AST::FunctionDeclaration>(moduleStmt)) {
+                if (funcDecl->name == symbol) {
+                    isFunction = true;
+                    break;
+                }
+            }
+        }
+        
+        if (isFunction) {
+            // For functions, create a special module function reference
+            emit(Opcode::PUSH_STRING, stmt->line, 0, 0.0f, false, "module_function:" + symbol);
+        } else {
+            // Load the symbol value normally for variables
+            emit(Opcode::LOAD_VAR, stmt->line, 0, 0.0f, false, symbol);
+        }
+        
+        // Set the dictionary entry
+        emit(Opcode::DICT_SET, stmt->line);
+    }
+    
+    // Store the module dictionary in the module variable
+    emit(Opcode::STORE_VAR, stmt->line, 0, 0.0f, false, varName);
 }
 
 void BytecodeGenerator::visitEnumDeclaration(const std::shared_ptr<AST::EnumDeclaration>& stmt) {
@@ -1483,5 +1568,31 @@ void BytecodeGenerator::emit(Opcode op, uint32_t lineNumber, int64_t intValue, f
     instruction.stringValue = stringValue;
     
     bytecode.push_back(instruction);
+}
+
+std::string BytecodeGenerator::resolveModulePath(const std::string& modulePath) {
+    // Convert module path (e.g., "tests.modules.my_module") to file path
+    std::string filePath = modulePath;
+    
+    // Replace dots with directory separators
+    for (char& c : filePath) {
+        if (c == '.') {
+            c = '/';
+        }
+    }
+    
+    // Add .lm extension
+    filePath += ".lm";
+    
+    return filePath;
+}
+
+std::string BytecodeGenerator::getModuleNameFromPath(const std::string& modulePath) {
+    // Extract the last component of the module path as the module name
+    size_t lastDot = modulePath.find_last_of('.');
+    if (lastDot != std::string::npos) {
+        return modulePath.substr(lastDot + 1);
+    }
+    return modulePath;
 }
 

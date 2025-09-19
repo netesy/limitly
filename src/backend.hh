@@ -95,6 +95,10 @@ private:
               float floatValue = 0.0f, 
               bool boolValue = false, 
               const std::string& stringValue = "");
+    
+    // Module resolution helpers
+    std::string resolveModulePath(const std::string& modulePath);
+    std::string getModuleNameFromPath(const std::string& modulePath);
 };
 
 // AST Printer has been moved to ast_printer.hh

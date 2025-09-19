@@ -1,3 +1,7 @@
-import tests.modules.my_module;
+import tests.modules.my_module as m hide greet;
 
-my_module.greet();
+print(m.message); //this should not show when hidden
+
+m.ask(); 
+m.greet();
+

@@ -1791,6 +1791,14 @@ void VM::handleCall(const Instruction& instruction) {
     
     // Handle case where function is on the stack (from property access)
     if (funcName.empty()) {
+        if (debugMode) {
+            std::cout << "[DEBUG] CALL: Function name is empty, looking for function on stack" << std::endl;
+            std::cout << "[DEBUG] CALL: Stack size: " << stack.size() << ", argCount: " << argCount << std::endl;
+            if (!stack.empty()) {
+                std::cout << "[DEBUG] CALL: Top stack value type: " << static_cast<int>(stack.back()->type->tag) << std::endl;
+            }
+        }
+        
         // Function should be on top of the stack, above the arguments
         if (stack.size() < static_cast<size_t>(argCount + 1)) {
             error("Not enough values on stack for function call");
@@ -1799,6 +1807,13 @@ void VM::handleCall(const Instruction& instruction) {
         
         // Get the function from the stack (it's above the arguments)
         ValuePtr functionValue = stack[stack.size() - argCount - 1];
+        
+        if (debugMode) {
+            std::cout << "[DEBUG] CALL: Function value type: " << static_cast<int>(functionValue->type->tag) << std::endl;
+            if (std::holds_alternative<std::string>(functionValue->data)) {
+                std::cout << "[DEBUG] CALL: Function name from stack: " << std::get<std::string>(functionValue->data) << std::endl;
+            }
+        }
         
         // Remove the function from the stack
         stack.erase(stack.begin() + (stack.size() - argCount - 1));
@@ -1811,6 +1826,81 @@ void VM::handleCall(const Instruction& instruction) {
             std::vector<ValuePtr> args;
             for (int i = 0; i < argCount; i++) {
                 args.insert(args.begin(), pop());
+            }
+            
+            // Check if this is a module function reference
+            if (std::holds_alternative<std::string>(functionValue->data)) {
+                std::string storedFuncName = std::get<std::string>(functionValue->data);
+                
+                if (debugMode) {
+                    std::cout << "[DEBUG] CALL: Function from stack has name: " << storedFuncName << std::endl;
+                }
+                
+                // Check if this is a module function reference (starts with "module_function:")
+                if (storedFuncName.substr(0, 16) == "module_function:") {
+                    std::string actualFuncName = storedFuncName.substr(16);
+                    
+                    if (debugMode) {
+                        std::cout << "[DEBUG] CALL: Executing module function: " << actualFuncName << std::endl;
+                    }
+                    
+                    // Find the function in userDefinedFunctions (it was compiled into the main bytecode)
+                    auto funcIt = userDefinedFunctions.find(actualFuncName);
+                    if (funcIt != userDefinedFunctions.end()) {
+                        const backend::Function& func = funcIt->second;
+                        
+                        if (debugMode) {
+                            std::cout << "[DEBUG] CALL: Found module function definition for: " << actualFuncName << std::endl;
+                        }
+                        
+                        // Create a new environment for the function
+                        auto funcEnv = std::make_shared<Environment>(environment);
+                        
+                        // Check argument count
+                        size_t requiredParams = func.parameters.size();
+                        size_t totalParams = requiredParams + func.optionalParameters.size();
+                        
+                        if (args.size() < requiredParams || args.size() > totalParams) {
+                            error("Module function " + actualFuncName + " expects " + std::to_string(requiredParams) + 
+                                  " to " + std::to_string(totalParams) + " arguments, got " + std::to_string(args.size()));
+                            return;
+                        }
+                        
+                        // Bind required parameters
+                        for (size_t i = 0; i < requiredParams && i < args.size(); i++) {
+                            funcEnv->define(func.parameters[i].first, args[i]);
+                        }
+                        
+                        // Bind optional parameters
+                        for (size_t i = 0; i < func.optionalParameters.size(); i++) {
+                            const std::string& paramName = func.optionalParameters[i].first;
+                            size_t argIndex = requiredParams + i;
+                            
+                            if (argIndex < args.size()) {
+                                funcEnv->define(paramName, args[argIndex]);
+                            } else {
+                                auto defaultIt = func.defaultValues.find(paramName);
+                                if (defaultIt != func.defaultValues.end()) {
+                                    funcEnv->define(paramName, defaultIt->second.first);
+                                } else {
+                                    auto nilValue = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
+                                    funcEnv->define(paramName, nilValue);
+                                }
+                            }
+                        }
+                        
+                        // Save current environment and set function environment
+                        auto savedEnv = environment;
+                        environment = funcEnv;
+                        
+                        // Jump to function start
+                        ip = func.startAddress - 1; // -1 because ip will be incremented
+                        return;
+                    } else {
+                        error("Module function '" + actualFuncName + "' not found in bytecode");
+                        return;
+                    }
+                }
             }
             
             // Find the function in userDefinedFunctions
@@ -2346,6 +2436,101 @@ void VM::handleCall(const Instruction& instruction) {
         }
     }
     
+    // Check for module functions
+    auto moduleIt = moduleFunctions_.find(funcName);
+    if (moduleIt != moduleFunctions_.end()) {
+        const ModuleFunctionInfo& moduleFunc = moduleIt->second;
+        
+        if (debugMode) {
+            std::cout << "[DEBUG] CALL: Executing module function: " << funcName << std::endl;
+        }
+        
+        // Create a new VM to execute the function in the module's context
+        VM moduleVm(false);
+        moduleVm.environment = moduleFunc.moduleEnv;
+        moduleVm.userDefinedFunctions.clear();
+        
+        // Execute the module bytecode to populate function definitions
+        try {
+            moduleVm.execute(moduleFunc.moduleBytecode);
+        } catch (const std::exception& e) {
+            error("Failed to execute module for function call: " + std::string(e.what()));
+            return;
+        }
+        
+        // Extract the function name from the module qualified name
+        std::string actualFuncName = funcName.substr(funcName.find_last_of('_') + 1);
+        
+        // Find the function in the module VM
+        auto funcIt = moduleVm.userDefinedFunctions.find(actualFuncName);
+        if (funcIt != moduleVm.userDefinedFunctions.end()) {
+            const backend::Function& func = funcIt->second;
+            
+            // Create a new environment for the function in the module context
+            auto funcEnv = std::make_shared<Environment>(moduleFunc.moduleEnv);
+            
+            // Check argument count
+            size_t requiredParams = func.parameters.size();
+            size_t totalParams = requiredParams + func.optionalParameters.size();
+            
+            if (args.size() < requiredParams || args.size() > totalParams) {
+                error("Module function " + actualFuncName + " expects " + std::to_string(requiredParams) + 
+                      " to " + std::to_string(totalParams) + " arguments, got " + std::to_string(args.size()));
+                return;
+            }
+            
+            // Bind required parameters
+            for (size_t i = 0; i < requiredParams && i < args.size(); i++) {
+                funcEnv->define(func.parameters[i].first, args[i]);
+            }
+            
+            // Bind optional parameters
+            for (size_t i = 0; i < func.optionalParameters.size(); i++) {
+                const std::string& paramName = func.optionalParameters[i].first;
+                size_t argIndex = requiredParams + i;
+                
+                if (argIndex < args.size()) {
+                    funcEnv->define(paramName, args[argIndex]);
+                } else {
+                    auto defaultIt = func.defaultValues.find(paramName);
+                    if (defaultIt != func.defaultValues.end()) {
+                        funcEnv->define(paramName, defaultIt->second.first);
+                    } else {
+                        funcEnv->define(paramName, memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
+                    }
+                }
+            }
+            
+            // Set the module VM's environment and execute the function
+            moduleVm.environment = funcEnv;
+            moduleVm.ip = func.startAddress;
+            
+            // Execute the function in the module context
+            try {
+                moduleVm.execute(moduleFunc.moduleBytecode);
+                
+                // Get the result from the module VM's stack
+                if (!moduleVm.stack.empty()) {
+                    push(moduleVm.stack.back());
+                } else {
+                    push(memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
+                }
+                
+                if (debugMode) {
+                    std::cout << "[DEBUG] CALL: Module function executed successfully" << std::endl;
+                }
+                
+                return;
+            } catch (const std::exception& e) {
+                error("Error executing module function: " + std::string(e.what()));
+                return;
+            }
+        } else {
+            error("Module function " + actualFuncName + " not found in module bytecode");
+            return;
+        }
+    }
+    
     // Fallback to legacy native function handling
     auto nativeIt = nativeFunctions.find(funcName);
     if (nativeIt != nativeFunctions.end()) {
@@ -2691,25 +2876,6 @@ void VM::handleSetDefaultValue(const Instruction& /*unused*/) {
     }
 }
 
-void VM::handlePushFunction(const Instruction& instruction) {
-    const std::string& funcName = instruction.stringValue;
-    std::cout << "[DEBUG] PUSH_FUNCTION: " << funcName << std::endl;
-    auto it = userDefinedFunctions.find(funcName);
-    if (it != userDefinedFunctions.end()) {
-        std::cout << "[DEBUG] PUSH_FUNCTION: Found function " << funcName << std::endl;
-        // For now, just push a simple function value without creating VMUserDefinedFunction
-        // The actual function execution will be handled by CALL instruction
-        auto funcValue = memoryManager.makeRef<Value>(*region, typeSystem->FUNCTION_TYPE);
-        // Store the function name in the value for later lookup
-        funcValue->data = funcName;
-        push(funcValue);
-        std::cout << "[DEBUG] PUSH_FUNCTION: Successfully pushed function to stack" << std::endl;
-    } else {
-        std::cout << "[DEBUG] PUSH_FUNCTION: Function not found: " << funcName << std::endl;
-        error("Function not found: " + funcName);
-    }
-}
-
 void VM::handleBeginClass(const Instruction& instruction) {
     // Get the class name from the instruction
     std::string className = instruction.stringValue;
@@ -2824,104 +2990,6 @@ void VM::handleLoadSuper(const Instruction& /*unused*/) {
         error("'super' reference not available in current context");
     }
 }
-void VM::handleGetProperty(const Instruction& instruction) {
-    // Get property name from instruction
-    std::string propertyName = instruction.stringValue;
-    
-    // Pop the object from the stack
-    ValuePtr object = pop();
-    
-    // Check if the object is an ObjectInstance
-    if (std::holds_alternative<ObjectInstancePtr>(object->data)) {
-        auto objectInstance = std::get<ObjectInstancePtr>(object->data);
-        
-        try {
-            ValuePtr propertyValue = objectInstance->getField(propertyName);
-            push(propertyValue);
-        } catch (const std::exception& e) {
-            error("Property access failed: " + std::string(e.what()));
-        }
-    } else if (std::holds_alternative<ModuleValue>(object->data)) {
-        auto& moduleData = std::get<ModuleValue>(object->data);
-        auto moduleEnv = moduleData.env;
-        try {
-            ValuePtr propertyValue = moduleEnv->get(propertyName);
-            push(propertyValue);
-        } catch (const std::runtime_error& e) {
-            error("Property '" + propertyName + "' not found in module.");
-        }
-    }
-    // Check if the object is an ErrorValue
-    else if (std::holds_alternative<ErrorValue>(object->data)) {
-        auto errorValue = std::get<ErrorValue>(object->data);
-        
-        // Handle special properties for ErrorValue
-        if (propertyName == "message") {
-            // Return the error message as a string value
-            auto messageValue = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, errorValue.message);
-            push(messageValue);
-        } else if (propertyName == "type") {
-            // Return the error type as a string value
-            auto typeValue = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, errorValue.errorType);
-            push(typeValue);
-        } else {
-            error("ErrorValue does not have property: " + propertyName);
-        }
-    } else {
-        error("Cannot access property on non-object value");
-    }
-}
-void VM::handleSetProperty(const Instruction& instruction) {
-    // Get property name from instruction
-    std::string propertyName = instruction.stringValue;
-    
-    // Pop the value and object from the stack
-    ValuePtr value = pop();
-    ValuePtr object = pop();
-    
-    // Check if the object is an ObjectInstance
-    if (std::holds_alternative<ObjectInstancePtr>(object->data)) {
-        auto objectInstance = std::get<ObjectInstancePtr>(object->data);
-        
-        try {
-            // If the property doesn't exist yet, create it
-            if (!objectInstance->hasField(propertyName)) {
-                objectInstance->defineField(propertyName, value);
-            } else {
-                objectInstance->setField(propertyName, value);
-            }
-            
-            // Push the assigned value back onto the stack for assignment expressions
-            push(value);
-        } catch (const std::exception& e) {
-            error("Property assignment failed: " + std::string(e.what()));
-        }
-    } else {
-        error("Cannot set property on non-object value");
-    }
-}
-
-void VM::handleCreateList(const Instruction& instruction) {
-    // Get the number of elements to include in the list from the instruction
-    int32_t count = instruction.intValue;
-    
-    // Create a new list
-    auto list = memoryManager.makeRef<Value>(*region, typeSystem->LIST_TYPE);
-    auto listValue = ListValue();
-    
-    // Pop 'count' elements from the stack and add them to the list
-    for (int32_t i = 0; i < count; i++) {
-        ValuePtr element = pop();
-        listValue.elements.push_back(element);
-    }
-    
-    // Since we popped elements in reverse order, reverse the list to maintain the correct order
-    std::reverse(listValue.elements.begin(), listValue.elements.end());
-    
-    // Store the list in the value and push it onto the stack
-    list->data = listValue;
-    push(list);
-}
 
 // Helper function to compare two values for equality
 bool VM::valuesEqual(const ValuePtr& a, const ValuePtr& b) const {
@@ -3019,6 +3087,10 @@ void VM::handleDictSet(const Instruction& /*unused*/) {
     // Pop the dictionary
     ValuePtr dictVal = pop();
     
+    if (debugMode) {
+        std::cout << "[DEBUG] DICT_SET: Setting key '" << key->toString() << "' to value '" << value->toString() << "'" << std::endl;
+    }
+    
     // Check if it's actually a dictionary
     if (!std::holds_alternative<DictValue>(dictVal->data)) {
         error("Cannot set key on non-dictionary value");
@@ -3040,6 +3112,17 @@ void VM::handleDictSet(const Instruction& /*unused*/) {
     
     if (!keyExists) {
         dictData.elements[key] = value;
+        if (debugMode) {
+            std::cout << "[DEBUG] DICT_SET: Added new key '" << key->toString() << "'" << std::endl;
+        }
+    } else {
+        if (debugMode) {
+            std::cout << "[DEBUG] DICT_SET: Updated existing key '" << key->toString() << "'" << std::endl;
+        }
+    }
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] DICT_SET: Dictionary now has " << dictData.elements.size() << " elements" << std::endl;
     }
     
     // Push the modified dictionary back onto the stack
@@ -3950,88 +4033,220 @@ void VM::handleImportExecute(const Instruction& instruction) {
     std::string modulePath = currentImportState.modulePath;
     std::string filePath = resolveModulePath(modulePath);
 
+    if (debugMode) {
+        std::cout << "[DEBUG] handleImportExecute: Starting import execution" << std::endl;
+        std::cout << "[DEBUG] handleImportExecute: Module path: " << modulePath << std::endl;
+        std::cout << "[DEBUG] handleImportExecute: Resolved file path: " << filePath << std::endl;
+        std::cout << "[DEBUG] handleImportExecute: Current import state alias: " 
+                  << (currentImportState.alias ? *currentImportState.alias : "none") << std::endl;
+        std::cout << "[DEBUG] handleImportExecute: Filter type: " 
+                  << (currentImportState.filterType ? 
+                      (*currentImportState.filterType == AST::ImportFilterType::Show ? "Show" : "Hide") : 
+                      "none") << std::endl;
+    }
+
     ValuePtr moduleValue;
 
     if (loadedModules.count(modulePath)) {
+        if (debugMode) {
+            std::cout << "[DEBUG] handleImportExecute: Module already loaded, using cached version" << std::endl;
+        }
         moduleValue = loadedModules[modulePath];
     } else {
+        if (debugMode) {
+            std::cout << "[DEBUG] handleImportExecute: Module not cached, loading from file" << std::endl;
+        }
         std::ifstream file(filePath);
         if (!file.is_open()) {
+            if (debugMode) {
+                std::cout << "[DEBUG] handleImportExecute: ERROR - Could not open module file: " << filePath << std::endl;
+            }
             error("Could not open module file: " + filePath);
             return;
+        }
+        if (debugMode) {
+            std::cout << "[DEBUG] handleImportExecute: Successfully opened module file" << std::endl;
         }
         std::stringstream buffer;
         buffer << file.rdbuf();
         std::string source = buffer.str();
+        if (debugMode) {
+            std::cout << "[DEBUG] handleImportExecute: Read " << source.length() << " characters from module file" << std::endl;
+        }
 
         // Create a new VM to execute the module in isolation
+        if (debugMode) {
+            std::cout << "[DEBUG] handleImportExecute: Creating new VM for module execution" << std::endl;
+        }
         VM moduleVm(false); // false = don't create new runtime
         moduleVm.globals = std::make_shared<Environment>(this->globals); // Inherit globals
         moduleVm.environment = moduleVm.globals;
 
         // Compile and execute the module's code
+        if (debugMode) {
+            std::cout << "[DEBUG] handleImportExecute: Starting module compilation" << std::endl;
+        }
         Scanner scanner(source);
         scanner.scanTokens();
+        if (debugMode) {
+            std::cout << "[DEBUG] handleImportExecute: Scanning completed, " << scanner.getTokens().size() << " tokens found" << std::endl;
+        }
         Parser parser(scanner);
         auto ast = parser.parse();
+        if (debugMode) {
+            std::cout << "[DEBUG] handleImportExecute: Parsing completed" << std::endl;
+        }
         BytecodeGenerator generator;
         generator.process(ast);
         auto bytecode = generator.getBytecode();
+        if (debugMode) {
+            std::cout << "[DEBUG] handleImportExecute: Bytecode generation completed, " << bytecode.size() << " instructions" << std::endl;
+            std::cout << "[DEBUG] handleImportExecute: Executing module bytecode" << std::endl;
+        }
         moduleVm.execute(bytecode);
+        if (debugMode) {
+            std::cout << "[DEBUG] handleImportExecute: Module execution completed" << std::endl;
+        }
 
         // Create a module object from the module's environment
+        if (debugMode) {
+            std::cout << "[DEBUG] handleImportExecute: Creating module value object" << std::endl;
+            auto allSymbols = moduleVm.environment->getAllSymbols();
+            std::cout << "[DEBUG] handleImportExecute: Module environment has " << allSymbols.size() << " symbols:" << std::endl;
+            for (const auto& [name, value] : allSymbols) {
+                std::cout << "[DEBUG] handleImportExecute:   - " << name << std::endl;
+            }
+        }
         auto moduleData = ModuleValue{moduleVm.environment, bytecode};
         moduleValue = memoryManager.makeRef<Value>(*region, typeSystem->MODULE_TYPE);
         moduleValue->data = moduleData;
         loadedModules[modulePath] = moduleValue;
+        if (debugMode) {
+            std::cout << "[DEBUG] handleImportExecute: Module cached for future imports" << std::endl;
+        }
     }
 
-    // Handle import scoping
+    // Handle import scoping - all imports are module-scoped
+    // Show/Hide filters control which symbols are accessible, but don't change scoping
+    
+    std::string varName;
+    if (currentImportState.alias) {
+        varName = *currentImportState.alias;
+    } else {
+        size_t lastDot = modulePath.rfind('.');
+        if (lastDot != std::string::npos) {
+            varName = modulePath.substr(lastDot + 1);
+        } else {
+            varName = modulePath;
+        }
+    }
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] handleImportExecute: Module will be imported as variable: " << varName << std::endl;
+    }
+    
+    // If we have filters, create a filtered module view
     if (currentImportState.filterType) {
+        if (debugMode) {
+            std::cout << "[DEBUG] handleImportExecute: Applying import filters" << std::endl;
+        }
         auto& moduleData = std::get<ModuleValue>(moduleValue->data);
         auto moduleEnv = moduleData.env;
+        
+        // Create a new filtered environment
+        auto filteredEnv = std::make_shared<Environment>();
+        
         if (*currentImportState.filterType == AST::ImportFilterType::Show) {
+            if (debugMode) {
+                std::cout << "[DEBUG] handleImportExecute: Applying SHOW filter for symbols: ";
+                for (const auto& id : currentImportState.filterIdentifiers) {
+                    std::cout << id << " ";
+                }
+                std::cout << std::endl;
+            }
+            // Only include specified symbols
             for (const auto& id : currentImportState.filterIdentifiers) {
                 try {
                     ValuePtr symbol = moduleEnv->get(id);
-                    environment->define(id, symbol);
+                    filteredEnv->define(id, symbol);
+                    if (debugMode) {
+                        std::cout << "[DEBUG] handleImportExecute: Successfully included symbol: " << id << std::endl;
+                    }
                 } catch (const std::runtime_error& e) {
+                    if (debugMode) {
+                        std::cout << "[DEBUG] handleImportExecute: ERROR - Symbol not found: " << id << std::endl;
+                    }
                     error("Symbol '" + id + "' not found in module '" + modulePath + "'");
+                    return;
                 }
             }
         } else { // Hide
-            // This is more complex. For now, we'll just import the whole module.
-            // A proper implementation would need to create a proxy module object.
-            std::string varName;
-            if (currentImportState.alias) {
-                varName = *currentImportState.alias;
-            } else {
-                size_t lastDot = modulePath.rfind('.');
-                if (lastDot != std::string::npos) {
-                    varName = modulePath.substr(lastDot + 1);
-                } else {
-                    varName = modulePath;
+            if (debugMode) {
+                std::cout << "[DEBUG] handleImportExecute: Applying HIDE filter for symbols: ";
+                for (const auto& id : currentImportState.filterIdentifiers) {
+                    std::cout << id << " ";
+                }
+                std::cout << std::endl;
+            }
+            // Include all symbols except specified ones
+            // First, we need to iterate through all symbols in the module
+            // For now, we'll implement a simple version that copies all and removes hidden ones
+            // This is a simplified implementation - a full implementation would need
+            // access to the module's symbol table
+            
+            // Copy all symbols first (this is a simplified approach)
+            auto allSymbols = moduleEnv->getAllSymbols();
+            if (debugMode) {
+                std::cout << "[DEBUG] handleImportExecute: Copying " << allSymbols.size() << " symbols before hiding" << std::endl;
+            }
+            for (const auto& [name, value] : allSymbols) {
+                filteredEnv->define(name, value);
+            }
+            
+            // Remove hidden symbols
+            for (const auto& id : currentImportState.filterIdentifiers) {
+                try {
+                    filteredEnv->remove(id);
+                    if (debugMode) {
+                        std::cout << "[DEBUG] handleImportExecute: Successfully hid symbol: " << id << std::endl;
+                    }
+                } catch (const std::runtime_error& e) {
+                    if (debugMode) {
+                        std::cout << "[DEBUG] handleImportExecute: Symbol not found to hide (not an error): " << id << std::endl;
+                    }
+                    // Symbol not found to hide - this is not an error
                 }
             }
-            environment->define(varName, moduleValue);
         }
+        
+        // Create filtered module value
+        auto filteredModuleData = ModuleValue{filteredEnv, std::get<ModuleValue>(moduleValue->data).bytecode};
+        auto filteredModuleValue = memoryManager.makeRef<Value>(*region, typeSystem->MODULE_TYPE);
+        filteredModuleValue->data = filteredModuleData;
+        
+        if (debugMode) {
+            auto finalSymbols = filteredEnv->getAllSymbols();
+            std::cout << "[DEBUG] handleImportExecute: Filtered module has " << finalSymbols.size() << " symbols" << std::endl;
+        }
+        
+        environment->define(varName, filteredModuleValue);
     } else {
-        std::string varName;
-        if (currentImportState.alias) {
-            varName = *currentImportState.alias;
-        } else {
-            size_t lastDot = modulePath.rfind('.');
-            if (lastDot != std::string::npos) {
-                varName = modulePath.substr(lastDot + 1);
-            } else {
-                varName = modulePath;
-            }
+        if (debugMode) {
+            std::cout << "[DEBUG] handleImportExecute: No filters applied, importing whole module" << std::endl;
         }
+        // No filters - import the whole module
         environment->define(varName, moduleValue);
+    }
+
+    if (debugMode) {
+        std::cout << "[DEBUG] handleImportExecute: Module '" << varName << "' successfully imported into current environment" << std::endl;
     }
 
     // Reset the import state
     currentImportState = {};
+    if (debugMode) {
+        std::cout << "[DEBUG] handleImportExecute: Import state reset, import execution complete" << std::endl;
+    }
 }
 
 void VM::handleBeginEnum(const Instruction& instruction) {
@@ -4372,3 +4587,294 @@ void VM::handleUnwrapValue(const Instruction& instruction) {
         push(value);
     }
 }
+
+void VM::handlePushFunction(const Instruction& instruction) {
+    std::string functionName = instruction.stringValue;
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] PUSH_FUNCTION: " << functionName << std::endl;
+    }
+    
+    // Check if the function exists in userDefinedFunctions
+    auto funcIt = userDefinedFunctions.find(functionName);
+    if (funcIt != userDefinedFunctions.end()) {
+        if (debugMode) {
+            std::cout << "[DEBUG] PUSH_FUNCTION: Found function " << functionName << std::endl;
+        }
+        
+        // Create a function value that stores the function name
+        // This will be used later when the function is called
+        ValuePtr functionValue = memoryManager.makeRef<Value>(*region, typeSystem->FUNCTION_TYPE, functionName);
+        
+        if (debugMode) {
+            std::cout << "[DEBUG] PUSH_FUNCTION: Successfully pushed function to stack" << std::endl;
+        }
+        
+        push(functionValue);
+        return;
+    }
+    
+    // Check if it's a native function
+    auto nativeIt = nativeFunctions.find(functionName);
+    if (nativeIt != nativeFunctions.end()) {
+        if (debugMode) {
+            std::cout << "[DEBUG] PUSH_FUNCTION: Found native function " << functionName << std::endl;
+        }
+        
+        // Create a function value for native function
+        ValuePtr functionValue = memoryManager.makeRef<Value>(*region, typeSystem->FUNCTION_TYPE, functionName);
+        push(functionValue);
+        return;
+    }
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] PUSH_FUNCTION: Function " << functionName << " not found" << std::endl;
+    }
+    
+    error("Function not found: " + functionName);
+}
+
+void VM::handleGetProperty(const Instruction& instruction) {
+    if (stack.empty()) {
+        error("Stack underflow in GET_PROPERTY");
+        return;
+    }
+
+    ValuePtr object = pop();
+    std::string propertyName = instruction.stringValue;
+
+    if (debugMode) {
+        std::cout << "[DEBUG] GET_PROPERTY: Accessing property '" << propertyName << "'" << std::endl;
+        if (object->type) {
+            std::cout << "[DEBUG] GET_PROPERTY: Object type tag: " << static_cast<int>(object->type->tag) << std::endl;
+        }
+    }
+
+    // --- Handle Module property access ---
+    if (object->type && object->type->tag == TypeTag::Module) {
+        if (std::holds_alternative<ModuleValue>(object->data)) {
+            auto& moduleData = std::get<ModuleValue>(object->data);
+            auto moduleEnv = moduleData.env;
+
+            if (debugMode) {
+                std::cout << "[DEBUG] GET_PROPERTY: Accessing module property '" << propertyName << "'" << std::endl;
+                auto allSymbols = moduleEnv->getAllSymbols();
+                std::cout << "[DEBUG] GET_PROPERTY: Module has " << allSymbols.size() << " symbols:" << std::endl;
+                for (const auto& [name, value] : allSymbols) {
+                    std::cout << "[DEBUG] GET_PROPERTY:   - " << name << std::endl;
+                }
+            }
+
+            try {
+                ValuePtr property = moduleEnv->get(propertyName);
+
+                // Special handling if property is a function
+                if (property->type && property->type->tag == TypeTag::Function) {
+                    if (std::holds_alternative<std::string>(property->data)) {
+                        std::string functionName = std::get<std::string>(property->data);
+
+                        if (debugMode) {
+                            std::cout << "[DEBUG] GET_PROPERTY: Property is a function: " << functionName << std::endl;
+                        }
+
+                        // Create a special module function reference
+                        // Store both the function name and module environment reference
+                        std::string moduleQualifiedName = "module:" + std::to_string(reinterpret_cast<uintptr_t>(moduleEnv.get())) + ":" + functionName;
+                        
+                        // Store the module environment for later lookup
+                        ModuleFunctionInfo moduleFunc;
+                        moduleFunc.moduleEnv = moduleEnv;
+                        moduleFunc.moduleBytecode = moduleData.bytecode;
+                        moduleFunctions_[moduleQualifiedName] = moduleFunc;
+                        
+                        // Create a function value that references this module function
+                        auto moduleFunctionValue = memoryManager.makeRef<Value>(*region, typeSystem->FUNCTION_TYPE, moduleQualifiedName);
+                        
+                        if (debugMode) {
+                            std::cout << "[DEBUG] GET_PROPERTY: Created module function reference: " << moduleQualifiedName << std::endl;
+                        }
+                        
+                        push(moduleFunctionValue);
+                        return;
+                    }
+                }
+
+                push(property);
+                return;
+            } catch (const std::runtime_error& e) {
+                error("Property '" + propertyName + "' not found in module");
+                return;
+            }
+        } else {
+            error("Invalid module object");
+            return;
+        }
+    }
+
+    // --- Handle Object property access ---
+    if (std::holds_alternative<ObjectInstancePtr>(object->data)) {
+        auto objectInstance = std::get<ObjectInstancePtr>(object->data);
+        try {
+            ValuePtr property = objectInstance->getField(propertyName);
+            if (debugMode) {
+                std::cout << "[DEBUG] GET_PROPERTY: Found object property '" << propertyName << "'" << std::endl;
+            }
+            push(property);
+            return;
+        } catch (const std::runtime_error& e) {
+            error("Property '" + propertyName + "' not found in object");
+            return;
+        }
+    }
+
+    // --- Handle Dictionary property access ---
+    if (std::holds_alternative<DictValue>(object->data)) {
+        auto& dictData = std::get<DictValue>(object->data);
+        auto keyValue = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, propertyName);
+
+        if (debugMode) {
+            std::cout << "[DEBUG] GET_PROPERTY: Looking for dictionary property '" << propertyName << "'" << std::endl;
+            std::cout << "[DEBUG] GET_PROPERTY: Dictionary has " << dictData.elements.size() << " elements" << std::endl;
+        }
+
+        // Use valuesEqual() to find the key, same as in DICT_SET
+        for (const auto& [existingKey, value] : dictData.elements) {
+            if (valuesEqual(existingKey, keyValue)) {
+                if (debugMode) {
+                    std::cout << "[DEBUG] GET_PROPERTY: Found dictionary property '" << propertyName << "'" << std::endl;
+                }
+                push(value);
+                return;
+            }
+        }
+        
+        if (debugMode) {
+            std::cout << "[DEBUG] GET_PROPERTY: Available keys in dictionary:" << std::endl;
+            for (const auto& [key, value] : dictData.elements) {
+                std::cout << "[DEBUG] GET_PROPERTY:   - " << key->toString() << std::endl;
+            }
+        }
+        
+        error("Property '" + propertyName + "' not found in dictionary");
+        return;
+    }
+
+    // --- Handle ErrorValue special properties ---
+    if (std::holds_alternative<ErrorValue>(object->data)) {
+        auto errorValue = std::get<ErrorValue>(object->data);
+
+        if (propertyName == "message") {
+            auto messageValue = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, errorValue.message);
+            push(messageValue);
+            return;
+        } else if (propertyName == "type") {
+            auto typeValue = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, errorValue.errorType);
+            push(typeValue);
+            return;
+        } else {
+            error("ErrorValue does not have property: " + propertyName);
+            return;
+        }
+    }
+
+    error("Cannot access property '" + propertyName + "' on non-object value");
+}
+
+void VM::handleSetProperty(const Instruction& instruction) {
+    if (stack.size() < 2) {
+        error("Stack underflow in SET_PROPERTY");
+        return;
+    }
+
+    ValuePtr value = pop();
+    ValuePtr object = pop();
+    std::string propertyName = instruction.stringValue;
+
+    if (debugMode) {
+        std::cout << "[DEBUG] SET_PROPERTY: Setting property '" << propertyName << "' on object" << std::endl;
+    }
+
+    // --- Handle Module property assignment ---
+    if (object->type && object->type->tag == TypeTag::Module) {
+        if (std::holds_alternative<ModuleValue>(object->data)) {
+            auto& moduleData = std::get<ModuleValue>(object->data);
+            auto moduleEnv = moduleData.env;
+
+            moduleEnv->define(propertyName, value);
+            if (debugMode) {
+                std::cout << "[DEBUG] SET_PROPERTY: Set module property '" << propertyName << "'" << std::endl;
+            }
+            push(value);
+            return;
+        } else {
+            error("Invalid module object");
+            return;
+        }
+    }
+
+    // --- Handle Object property assignment ---
+    if (std::holds_alternative<ObjectInstancePtr>(object->data)) {
+        auto objectInstance = std::get<ObjectInstancePtr>(object->data);
+
+        if (!objectInstance->hasField(propertyName)) {
+            objectInstance->defineField(propertyName, value);
+        } else {
+            objectInstance->setField(propertyName, value);
+        }
+
+        if (debugMode) {
+            std::cout << "[DEBUG] SET_PROPERTY: Set object property '" << propertyName << "'" << std::endl;
+        }
+        push(value);
+        return;
+    }
+
+    // --- Handle Dictionary property assignment ---
+    if (std::holds_alternative<DictValue>(object->data)) {
+        auto& dictData = std::get<DictValue>(object->data);
+        auto keyValue = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, propertyName);
+
+        dictData.elements[keyValue] = value;
+        if (debugMode) {
+            std::cout << "[DEBUG] SET_PROPERTY: Set dictionary property '" << propertyName << "'" << std::endl;
+        }
+        push(value);
+        return;
+    }
+
+    error("Cannot set property '" + propertyName + "' on non-object value");
+}
+void VM::handleCreateList(const Instruction& instruction) {
+    int32_t elementCount = instruction.intValue;
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] CREATE_LIST: Creating list with " << elementCount << " elements" << std::endl;
+    }
+    
+    if (stack.size() < static_cast<size_t>(elementCount)) {
+        error("Stack underflow in CREATE_LIST");
+        return;
+    }
+    
+    // Create a new list value
+    ListValue listData;
+    listData.elements.reserve(elementCount);
+    
+    // Pop elements from stack in reverse order (they were pushed in forward order)
+    for (int32_t i = 0; i < elementCount; i++) {
+        ValuePtr element = pop();
+        listData.elements.insert(listData.elements.begin(), element);
+    }
+    
+    // Create the list value
+    auto listType = std::make_shared<Type>(TypeTag::List);
+    ValuePtr listValue = memoryManager.makeRef<Value>(*region, listType);
+    listValue->data = listData;
+    
+    push(listValue);
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] CREATE_LIST: Created list with " << listData.elements.size() << " elements" << std::endl;
+    }
+}
+
