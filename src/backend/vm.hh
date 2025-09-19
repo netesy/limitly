@@ -215,6 +215,14 @@ private:
     
     // Helper function for value comparison
     bool valuesEqual(const ValuePtr& a, const ValuePtr& b) const;
+    
+    // Helper function for parameter binding in function calls
+    bool bindFunctionParameters(const backend::Function& func, const std::vector<ValuePtr>& args, 
+                               std::shared_ptr<Environment> funcEnv, const std::string& funcName);
+    
+    // Helper function for consistent call frame management
+    void createAndPushCallFrame(const std::string& funcName, size_t returnAddress, 
+                               std::shared_ptr<Environment> funcEnv);
     void handleBeginTry(const Instruction& instruction);
     void handleEndTry(const Instruction& instruction);
     void handleBeginHandler(const Instruction& instruction);

@@ -1,0 +1,19 @@
+// String utilities module
+var greeting = "Hello";
+var farewell = "Goodbye";
+
+fn say_hello(name) {
+    return greeting + ", " + name + "!";
+}
+
+fn say_goodbye(name) {
+    return farewell + ", " + name + "!";
+}
+
+fn repeat_string(text, times) {
+    var result = "";
+    iter (i in 1..times) {
+        result = result + text;
+    }
+    return result;
+}

@@ -1,0 +1,5 @@
+import tests.modules.basic_module as basic;
+
+print("Testing module function with no parameters:");
+var result = basic.getModuleVar();
+print("Result: " + result);

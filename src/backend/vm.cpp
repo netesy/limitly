@@ -97,7 +97,7 @@ VM::VM(bool create_runtime)
       environment(globals),
       bytecode(nullptr),
       ip(0),
-    debugMode(true),
+    debugMode(false),
     debugOutput(false),
       currentFunctionBeingDefined(""),
       insideFunctionDefinition(false),
@@ -220,14 +220,18 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
             if (!currentFunctionBeingDefined.empty() && !insideFunctionDefinition) {
                 auto funcIt = userDefinedFunctions.find(currentFunctionBeingDefined);
                 if (funcIt != userDefinedFunctions.end() && ip >= funcIt->second.startAddress) {
+                    if (debugMode) {
                     std::cout << "[DEBUG] Starting to skip function body at IP " << ip << " (startAddress: " << funcIt->second.startAddress << ")" << std::endl;
+                  }
                     insideFunctionDefinition = true;
                 }
             }
             
             // Skip execution if we're inside a function definition (except for END_FUNCTION)
             if (insideFunctionDefinition && instruction.opcode != Opcode::END_FUNCTION) {
+                if (debugMode) {
                 std::cout << "[DEBUG] Skipping instruction at IP " << ip << ": " << static_cast<int>(instruction.opcode) << std::endl;
+                            }
                 ip++;
                 continue;
             }
@@ -825,7 +829,21 @@ void VM::handleSwap(const Instruction& /*unused*/) {
 }
 
 void VM::handleStoreVar(const Instruction& instruction) {
+    if (debugMode) {
+        std::cout << "[DEBUG] STORE_VAR: Storing variable '" << instruction.stringValue << "'" << std::endl;
+        std::cout << "[DEBUG] STORE_VAR: Stack size before pop: " << stack.size() << std::endl;
+    }
+    
+    if (stack.empty()) {
+        error("Stack underflow in STORE_VAR for variable '" + instruction.stringValue + "'");
+        return;
+    }
+    
     ValuePtr value = pop();
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] STORE_VAR: Popped value of type: " << static_cast<int>(value->type->tag) << std::endl;
+    }
     // If variable already exists and is an AtomicValue, perform atomic store
     try {
         ValuePtr existing = environment->get(instruction.stringValue);
@@ -1782,13 +1800,6 @@ void VM::handleCall(const Instruction& instruction) {
     const std::string& funcName = instruction.stringValue;
     int argCount = instruction.intValue;
     
-    std::cout << "[DEBUG] CALL: Looking for function: " << funcName << std::endl;
-    std::cout << "[DEBUG] Available functions: ";
-    for (const auto& pair : userDefinedFunctions) {
-        std::cout << pair.first << " ";
-    }
-    std::cout << std::endl;
-    
     // Handle case where function is on the stack (from property access)
     if (funcName.empty()) {
         if (debugMode) {
@@ -1805,8 +1816,8 @@ void VM::handleCall(const Instruction& instruction) {
             return;
         }
         
-        // Get the function from the stack (it's above the arguments)
-        ValuePtr functionValue = stack[stack.size() - argCount - 1];
+        // Get the function from the stack (it's at the top, above the arguments)
+        ValuePtr functionValue = stack.back();
         
         if (debugMode) {
             std::cout << "[DEBUG] CALL: Function value type: " << static_cast<int>(functionValue->type->tag) << std::endl;
@@ -1815,12 +1826,16 @@ void VM::handleCall(const Instruction& instruction) {
             }
         }
         
-        // Remove the function from the stack
-        stack.erase(stack.begin() + (stack.size() - argCount - 1));
+        // Remove the function from the stack (it's at the top)
+        stack.pop_back();
         
         // Check if it's a function value (stored as string name)
         if (std::holds_alternative<std::string>(functionValue->data)) {
-            std::string funcName = std::get<std::string>(functionValue->data);
+            std::string storedFuncName = std::get<std::string>(functionValue->data);
+            
+            if (debugMode) {
+                std::cout << "[DEBUG] CALL: Function from stack has name: " << storedFuncName << std::endl;
+            }
             
             // Collect arguments
             std::vector<ValuePtr> args;
@@ -1828,132 +1843,84 @@ void VM::handleCall(const Instruction& instruction) {
                 args.insert(args.begin(), pop());
             }
             
-            // Check if this is a module function reference
-            if (std::holds_alternative<std::string>(functionValue->data)) {
-                std::string storedFuncName = std::get<std::string>(functionValue->data);
-                
+            // Extract the actual function name (handle module function references)
+            std::string actualFuncName = storedFuncName;
+            if (storedFuncName.substr(0, 16) == "module_function:") {
+                actualFuncName = storedFuncName.substr(16);
                 if (debugMode) {
-                    std::cout << "[DEBUG] CALL: Function from stack has name: " << storedFuncName << std::endl;
+                    std::cout << "[DEBUG] CALL: Module function call, using function name: " << actualFuncName << std::endl;
                 }
-                
-                // Check if this is a module function reference (starts with "module_function:")
-                if (storedFuncName.substr(0, 16) == "module_function:") {
-                    std::string actualFuncName = storedFuncName.substr(16);
+            }
+            
+            // For module functions, we need to find the module environment and execute there
+            // First, try to find which module this function belongs to
+            std::shared_ptr<Environment> moduleEnv = nullptr;
+            backend::Function moduleFunc;
+            bool foundInModule = false;
+            
+            // Search through loaded modules to find the function
+            for (const auto& [modulePath, moduleValue] : loadedModules) {
+                if (std::holds_alternative<ModuleValue>(moduleValue->data)) {
+                    auto& modVal = std::get<ModuleValue>(moduleValue->data);
+                    auto modEnv = modVal.env;
                     
-                    if (debugMode) {
-                        std::cout << "[DEBUG] CALL: Executing module function: " << actualFuncName << std::endl;
-                    }
-                    
-                    // Find the function in userDefinedFunctions (it was compiled into the main bytecode)
-                    auto funcIt = userDefinedFunctions.find(actualFuncName);
-                    if (funcIt != userDefinedFunctions.end()) {
-                        const backend::Function& func = funcIt->second;
-                        
-                        if (debugMode) {
-                            std::cout << "[DEBUG] CALL: Found module function definition for: " << actualFuncName << std::endl;
-                        }
-                        
-                        // Create a new environment for the function
-                        auto funcEnv = std::make_shared<Environment>(environment);
-                        
-                        // Check argument count
-                        size_t requiredParams = func.parameters.size();
-                        size_t totalParams = requiredParams + func.optionalParameters.size();
-                        
-                        if (args.size() < requiredParams || args.size() > totalParams) {
-                            error("Module function " + actualFuncName + " expects " + std::to_string(requiredParams) + 
-                                  " to " + std::to_string(totalParams) + " arguments, got " + std::to_string(args.size()));
-                            return;
-                        }
-                        
-                        // Bind required parameters
-                        for (size_t i = 0; i < requiredParams && i < args.size(); i++) {
-                            funcEnv->define(func.parameters[i].first, args[i]);
-                        }
-                        
-                        // Bind optional parameters
-                        for (size_t i = 0; i < func.optionalParameters.size(); i++) {
-                            const std::string& paramName = func.optionalParameters[i].first;
-                            size_t argIndex = requiredParams + i;
-                            
-                            if (argIndex < args.size()) {
-                                funcEnv->define(paramName, args[argIndex]);
-                            } else {
-                                auto defaultIt = func.defaultValues.find(paramName);
-                                if (defaultIt != func.defaultValues.end()) {
-                                    funcEnv->define(paramName, defaultIt->second.first);
-                                } else {
-                                    auto nilValue = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
-                                    funcEnv->define(paramName, nilValue);
-                                }
+                    // Check if this module has the function in its userDefinedFunctions
+                    auto moduleUserFuncs = moduleUserDefinedFunctions.find(modEnv.get());
+                    if (moduleUserFuncs != moduleUserDefinedFunctions.end()) {
+                        auto funcIt = moduleUserFuncs->second.find(actualFuncName);
+                        if (funcIt != moduleUserFuncs->second.end()) {
+                            moduleEnv = modEnv;
+                            moduleFunc = funcIt->second;
+                            foundInModule = true;
+                            if (debugMode) {
+                                std::cout << "[DEBUG] CALL: Found module function '" << actualFuncName 
+                                          << "' in module: " << modulePath << std::endl;
                             }
+                            break;
                         }
-                        
-                        // Save current environment and set function environment
-                        auto savedEnv = environment;
-                        environment = funcEnv;
-                        
-                        // Jump to function start
-                        ip = func.startAddress - 1; // -1 because ip will be incremented
-                        return;
-                    } else {
-                        error("Module function '" + actualFuncName + "' not found in bytecode");
-                        return;
                     }
                 }
             }
             
-            // Find the function in userDefinedFunctions
-            auto funcIt = userDefinedFunctions.find(funcName);
-            if (funcIt != userDefinedFunctions.end()) {
-                const backend::Function& func = funcIt->second;
+            if (foundInModule && moduleEnv) {
+                // Create a new environment for the function in the module context
+                auto funcEnv = std::make_shared<Environment>(moduleEnv);
                 
-                // Create a new environment for the function
-                auto funcEnv = std::make_shared<Environment>(environment);
-                
-                // Check argument count
-                size_t requiredParams = func.parameters.size();
-                size_t totalParams = requiredParams + func.optionalParameters.size();
-                
-                if (args.size() < requiredParams || args.size() > totalParams) {
-                    error("Function " + funcName + " expects " + std::to_string(requiredParams) + 
-                          " to " + std::to_string(totalParams) + " arguments, got " + std::to_string(args.size()));
-                    return;
+                // Check argument count and bind parameters
+                if (!bindFunctionParameters(moduleFunc, args, funcEnv, actualFuncName)) {
+                    return; // Error already reported
                 }
                 
-                // Bind required parameters
-                for (size_t i = 0; i < requiredParams && i < args.size(); i++) {
-                    funcEnv->define(func.parameters[i].first, args[i]);
-                }
-                
-                // Bind optional parameters
-                for (size_t i = 0; i < func.optionalParameters.size(); i++) {
-                    const std::string& paramName = func.optionalParameters[i].first;
-                    size_t argIndex = requiredParams + i;
-                    
-                    if (argIndex < args.size()) {
-                        funcEnv->define(paramName, args[argIndex]);
-                    } else {
-                        auto defaultIt = func.defaultValues.find(paramName);
-                        if (defaultIt != func.defaultValues.end()) {
-                            funcEnv->define(paramName, defaultIt->second.first);
-                        } else {
-                            auto nilValue = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
-                            funcEnv->define(paramName, nilValue);
-                        }
-                    }
-                }
-                
-                // Save current environment and set function environment
-                auto savedEnv = environment;
-                environment = funcEnv;
+                // Create call frame and switch environment
+                createAndPushCallFrame(actualFuncName, ip + 1, funcEnv);
                 
                 // Jump to function start
-                ip = func.startAddress - 1; // -1 because ip will be incremented
+                ip = moduleFunc.startAddress - 1; // -1 because ip will be incremented
                 return;
             } else {
-                error("Function " + funcName + " not found in bytecode");
-                return;
+                // Fallback: try to find in current VM's functions
+                auto funcIt = userDefinedFunctions.find(actualFuncName);
+                if (funcIt != userDefinedFunctions.end()) {
+                    const backend::Function& func = funcIt->second;
+                    
+                    // Create a new environment for the function
+                    auto funcEnv = std::make_shared<Environment>(environment);
+                    
+                    // Check argument count and bind parameters
+                    if (!bindFunctionParameters(func, args, funcEnv, actualFuncName)) {
+                        return; // Error already reported
+                    }
+                    
+                    // Create call frame and switch environment
+                    createAndPushCallFrame(actualFuncName, ip + 1, funcEnv);
+                    
+                    // Jump to function start
+                    ip = func.startAddress - 1; // -1 because ip will be incremented
+                    return;
+                } else {
+                    error("Function " + actualFuncName + " not found in any loaded module or current context");
+                    return;
+                }
             }
         } else {
             error("Value on stack is not a function");
@@ -2410,18 +2377,13 @@ void VM::handleCall(const Instruction& instruction) {
                 }
             }
             
-            // Create call frame using the new CallFrame from functions.hh
-            backend::CallFrame frame(funcName, ip, function);
-            frame.bindParameters(adjustedArgs);
-            frame.setPreviousEnvironment(environment);
+            // Create call frame and switch environment
+            createAndPushCallFrame(funcName, ip, funcEnv);
             
-            // Push call frame
-            callStack.push_back(frame);
-
-            // call frame pushed (debug output removed)
-            
-            // Switch to function environment
-            environment = funcEnv;
+            // Bind parameters for the new function registry
+            if (function) {
+                callStack.back().bindParameters(adjustedArgs);
+            }
             
             // For user-defined functions, we need to find the start address
             auto funcIt = userDefinedFunctions.find(funcName);
@@ -2469,36 +2431,9 @@ void VM::handleCall(const Instruction& instruction) {
             // Create a new environment for the function in the module context
             auto funcEnv = std::make_shared<Environment>(moduleFunc.moduleEnv);
             
-            // Check argument count
-            size_t requiredParams = func.parameters.size();
-            size_t totalParams = requiredParams + func.optionalParameters.size();
-            
-            if (args.size() < requiredParams || args.size() > totalParams) {
-                error("Module function " + actualFuncName + " expects " + std::to_string(requiredParams) + 
-                      " to " + std::to_string(totalParams) + " arguments, got " + std::to_string(args.size()));
-                return;
-            }
-            
-            // Bind required parameters
-            for (size_t i = 0; i < requiredParams && i < args.size(); i++) {
-                funcEnv->define(func.parameters[i].first, args[i]);
-            }
-            
-            // Bind optional parameters
-            for (size_t i = 0; i < func.optionalParameters.size(); i++) {
-                const std::string& paramName = func.optionalParameters[i].first;
-                size_t argIndex = requiredParams + i;
-                
-                if (argIndex < args.size()) {
-                    funcEnv->define(paramName, args[argIndex]);
-                } else {
-                    auto defaultIt = func.defaultValues.find(paramName);
-                    if (defaultIt != func.defaultValues.end()) {
-                        funcEnv->define(paramName, defaultIt->second.first);
-                    } else {
-                        funcEnv->define(paramName, memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
-                    }
-                }
+            // Check argument count and bind parameters
+            if (!bindFunctionParameters(func, args, funcEnv, actualFuncName)) {
+                return; // Error already reported
             }
             
             // Set the module VM's environment and execute the function
@@ -2540,66 +2475,20 @@ void VM::handleCall(const Instruction& instruction) {
     }
     
     // Handle user-defined functions
-    std::cout << "[DEBUG] CALL: Looking for function: " << funcName << std::endl;
-    std::cout << "[DEBUG] Available functions: ";
-    for (const auto& pair : userDefinedFunctions) {
-        std::cout << pair.first << " ";
-    }
-    std::cout << std::endl;
-    
     auto funcIt = userDefinedFunctions.find(funcName);
     if (funcIt != userDefinedFunctions.end()) {
-        std::cout << "[DEBUG] Found function: " << funcName << " with start address: " << funcIt->second.startAddress << std::endl;
         const backend::Function& func = funcIt->second;
         
         // Create a new environment for the function
         auto funcEnv = std::make_shared<Environment>(environment);
         
-        // Check argument count
-        size_t requiredParams = func.parameters.size();
-        size_t totalParams = requiredParams + func.optionalParameters.size();
-        
-        if (args.size() < requiredParams || args.size() > totalParams) {
-            error("Function " + funcName + " expects " + std::to_string(requiredParams) + 
-                  " to " + std::to_string(totalParams) + " arguments, got " + std::to_string(args.size()));
-            return;
+        // Check argument count and bind parameters
+        if (!bindFunctionParameters(func, args, funcEnv, funcName)) {
+            return; // Error already reported
         }
         
-        // Bind required parameters
-        for (size_t i = 0; i < requiredParams && i < args.size(); i++) {
-            funcEnv->define(func.parameters[i].first, args[i]); // Use .first for parameter name
-        }
-        
-        // Bind optional parameters
-        for (size_t i = 0; i < func.optionalParameters.size(); i++) {
-            const std::string& paramName = func.optionalParameters[i].first; // Use .first for parameter name
-            size_t argIndex = requiredParams + i;
-            
-            if (argIndex < args.size()) {
-                // Use provided argument
-                funcEnv->define(paramName, args[argIndex]);
-            } else {
-                // Use default value
-                // Use default value if available
-                auto defaultIt = func.defaultValues.find(paramName);
-                if (defaultIt != func.defaultValues.end()) {
-                    funcEnv->define(paramName, defaultIt->second.first); // Use .first for the ValuePtr
-                } else {
-                    // No default value, use nil
-                    funcEnv->define(paramName, memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
-                }
-            }
-        }
-        
-        // Create legacy call frame
-        backend::CallFrame frame(funcName, ip, nullptr);
-        frame.setPreviousEnvironment(environment);
-        
-        // Push call frame
-        callStack.push_back(frame);
-        
-        // Switch to function environment
-        environment = funcEnv;
+        // Create call frame and switch environment
+        createAndPushCallFrame(funcName, ip, funcEnv);
         
         // Jump to function start
         // Jump to function start
@@ -2612,7 +2501,16 @@ void VM::handleCall(const Instruction& instruction) {
 }
 
 void VM::handleReturn(const Instruction& /*unused*/) {
+    if (debugMode) {
+        std::cout << "[DEBUG] RETURN: Processing return instruction" << std::endl;
+        std::cout << "[DEBUG] RETURN: Call stack size: " << callStack.size() << std::endl;
+        std::cout << "[DEBUG] RETURN: Stack size: " << stack.size() << std::endl;
+    }
+    
     if (callStack.empty()) {
+        if (debugMode) {
+            std::cout << "[DEBUG] RETURN: No call stack, treating as no-op" << std::endl;
+        }
         // RETURN outside of function call - treated as no-op (debug output removed)
         // Push nil as a safe fallback and continue execution
         push(memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
@@ -2728,18 +2626,18 @@ void VM::handlePrint(const Instruction& instruction) {
 void VM::handleBeginFunction(const Instruction& instruction) {
     // Create a new function definition
     const std::string& funcName = instruction.stringValue;
-    
+                            if (debugMode) {
     std::cout << "[DEBUG] BEGIN_FUNCTION: " << funcName << " at IP " << ip << std::endl;
-    
+    }
     // If we're inside a class definition, use the full method key
     if (insideClassDefinition && !currentClassBeingDefined.empty()) {
         currentFunctionBeingDefined = currentClassBeingDefined + "::" + funcName;
     } else {
         currentFunctionBeingDefined = funcName;
     }
-    
+                            if (debugMode) {
     std::cout << "[DEBUG] Current function being defined: " << currentFunctionBeingDefined << std::endl;
-    
+    }
     // Create a new Function struct
     backend::Function func(funcName, 0); // Will set start address later
     
@@ -2784,11 +2682,11 @@ void VM::handleBeginFunction(const Instruction& instruction) {
     } else {
         // Regular function
         userDefinedFunctions[funcName] = func;
+         if (debugMode) {
         std::cout << "[DEBUG] Stored function: " << funcName << " with start address: " << func.startAddress << std::endl;
-    }
-    
     std::cout << "[DEBUG] Total functions stored: " << userDefinedFunctions.size() << std::endl;
-    
+    }
+    }
     // Continue with normal execution to process parameter definitions
     // The function body will be skipped later when we encounter END_FUNCTION
 }
@@ -2796,15 +2694,18 @@ void VM::handleBeginFunction(const Instruction& instruction) {
 void VM::handleEndFunction(const Instruction& /*unused*/) {
     // Check if we're currently defining a function
     if (!currentFunctionBeingDefined.empty()) {
+                                if (debugMode) {
         // This is the end of function definition, not function execution
-        std::cout << "[DEBUG] END_FUNCTION: Ending definition of " << currentFunctionBeingDefined << " at IP " << ip << std::endl;
+        std::cout << "[DEBUG] END_FUNCTION: Ending definition of " << currentFunctionBeingDefined << " at IP " << ip << std::endl;}
         auto funcIt = userDefinedFunctions.find(currentFunctionBeingDefined);
         if (funcIt != userDefinedFunctions.end()) {
             funcIt->second.endAddress = ip;
         }
         currentFunctionBeingDefined.clear();
         insideFunctionDefinition = false;
+                                if (debugMode) {
         std::cout << "[DEBUG] END_FUNCTION: Resuming normal execution" << std::endl;
+        }
         return;
     }
     
@@ -3017,6 +2918,59 @@ bool VM::valuesEqual(const ValuePtr& a, const ValuePtr& b) const {
             // For complex types, fall back to pointer comparison
             return a.get() == b.get();
     }
+}
+
+// Helper function for parameter binding in function calls
+bool VM::bindFunctionParameters(const backend::Function& func, const std::vector<ValuePtr>& args, 
+                               std::shared_ptr<Environment> funcEnv, const std::string& funcName) {
+    // Check argument count
+    size_t requiredParams = func.parameters.size();
+    size_t totalParams = requiredParams + func.optionalParameters.size();
+    
+    if (args.size() < requiredParams || args.size() > totalParams) {
+        error("Function " + funcName + " expects " + std::to_string(requiredParams) + 
+              " to " + std::to_string(totalParams) + " arguments, got " + std::to_string(args.size()));
+        return false;
+    }
+    
+    // Bind required parameters
+    for (size_t i = 0; i < requiredParams && i < args.size(); i++) {
+        funcEnv->define(func.parameters[i].first, args[i]);
+    }
+    
+    // Bind optional parameters
+    for (size_t i = 0; i < func.optionalParameters.size(); i++) {
+        const std::string& paramName = func.optionalParameters[i].first;
+        size_t argIndex = requiredParams + i;
+        
+        if (argIndex < args.size()) {
+            funcEnv->define(paramName, args[argIndex]);
+        } else {
+            auto defaultIt = func.defaultValues.find(paramName);
+            if (defaultIt != func.defaultValues.end()) {
+                funcEnv->define(paramName, defaultIt->second.first);
+            } else {
+                auto nilValue = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
+                funcEnv->define(paramName, nilValue);
+            }
+        }
+    }
+    
+    return true;
+}
+
+// Helper function for consistent call frame management
+void VM::createAndPushCallFrame(const std::string& funcName, size_t returnAddress, 
+                               std::shared_ptr<Environment> funcEnv) {
+    // Create call frame
+    backend::CallFrame frame(funcName, returnAddress, nullptr);
+    frame.setPreviousEnvironment(environment);
+    
+    // Push call frame
+    callStack.push_back(frame);
+    
+    // Switch to function environment
+    environment = funcEnv;
 }
 
 void VM::handleListAppend(const Instruction& /*unused*/) {
@@ -4107,6 +4061,15 @@ void VM::handleImportExecute(const Instruction& instruction) {
         if (debugMode) {
             std::cout << "[DEBUG] handleImportExecute: Module execution completed" << std::endl;
         }
+        
+        // Store the module's function definitions for later access
+        if (!moduleVm.userDefinedFunctions.empty()) {
+            moduleUserDefinedFunctions[moduleVm.environment.get()] = moduleVm.userDefinedFunctions;
+            if (debugMode) {
+                std::cout << "[DEBUG] handleImportExecute: Stored " << moduleVm.userDefinedFunctions.size() 
+                          << " function definitions from module" << std::endl;
+            }
+        }
 
         // Create a module object from the module's environment
         if (debugMode) {
@@ -4677,15 +4640,8 @@ void VM::handleGetProperty(const Instruction& instruction) {
                             std::cout << "[DEBUG] GET_PROPERTY: Property is a function: " << functionName << std::endl;
                         }
 
-                        // Create a special module function reference
-                        // Store both the function name and module environment reference
-                        std::string moduleQualifiedName = "module:" + std::to_string(reinterpret_cast<uintptr_t>(moduleEnv.get())) + ":" + functionName;
-                        
-                        // Store the module environment for later lookup
-                        ModuleFunctionInfo moduleFunc;
-                        moduleFunc.moduleEnv = moduleEnv;
-                        moduleFunc.moduleBytecode = moduleData.bytecode;
-                        moduleFunctions_[moduleQualifiedName] = moduleFunc;
+                        // Create a module function reference using the expected format
+                        std::string moduleQualifiedName = "module_function:" + functionName;
                         
                         // Create a function value that references this module function
                         auto moduleFunctionValue = memoryManager.makeRef<Value>(*region, typeSystem->FUNCTION_TYPE, moduleQualifiedName);

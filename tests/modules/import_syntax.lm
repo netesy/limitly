@@ -1,7 +1,7 @@
 import tests.modules.my_module as m hide greet;
 
-print(m.message); //this should not show when hidden
+print(m.message); 
 
 m.ask(); 
-m.greet();
+m.greet(); //this should not show when hidden
 
