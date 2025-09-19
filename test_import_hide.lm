@@ -1,0 +1,5 @@
+// Test import with hide filter - should hide message variable
+import tests.modules.my_module hide message;
+
+my_module.greet();
+// This should fail: my_module.message;

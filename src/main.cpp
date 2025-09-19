@@ -19,6 +19,7 @@ void printUsage(const char* programName) {
     std::cout << "  " << programName << " -ast <source_file> - Print the AST for a source file" << std::endl;
     std::cout << "  " << programName << " -tokens <source_file> - Print the tokens for a source file" << std::endl;
     std::cout << "  " << programName << " -bytecode <source_file> - Print the bytecode for a source file" << std::endl;
+    std::cout << "  " << programName << " -debug <source_file> - Execute with debug output enabled" << std::endl;
     std::cout << "  " << programName << " -repl           - Start the REPL (interactive mode)" << std::endl;
 }
 
@@ -33,7 +34,7 @@ std::string readFile(const std::string& filename) {
     return buffer.str();
 }
 
-void executeFile(const std::string& filename, bool printAst = false, bool printTokens = false, bool printBytecode = false, bool useJit = false) {
+void executeFile(const std::string& filename, bool printAst = false, bool printTokens = false, bool printBytecode = false, bool useJit = false, bool enableDebug = false) {
     try {
         // Read source file
         std::string source = readFile(filename);
@@ -75,6 +76,12 @@ void executeFile(const std::string& filename, bool printAst = false, bool printT
 
             // Backend: Generate bytecode
             VM vm;
+            
+            // Enable debug mode if requested
+            if (enableDebug) {
+                vm.setDebug(true);
+            }
+            
             BytecodeGenerator generator;
             generator.process(ast);
 
@@ -200,6 +207,8 @@ int main(int argc, char* argv[]) {
         executeFile(argv[2], false, true, false);
     } else if (arg == "-bytecode" && argc >= 3) {
         executeFile(argv[2], false, false, true);
+    } else if (arg == "-debug" && argc >= 3) {
+        executeFile(argv[2], false, false, false, false, true);
     // } else if (arg == "-jit" && argc >= 3) {
     //     executeFile(argv[2], false, false, false, true);
     } else if (arg[0] == '-') {
