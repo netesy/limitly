@@ -1,0 +1,23 @@
+// Test 6: Multiple module imports
+print("=== Multiple Imports Test ===");
+
+import tests.modules.basic_module as basic;
+import tests.modules.math_module as math;
+import tests.modules.string_module as strings;
+
+print("Test 6.1: Use first module");
+basic.greet();
+
+print("Test 6.2: Use second module");
+var squared = math.square(4);
+print("4 squared = " + squared);
+
+print("Test 6.3: Use third module");
+var greeting = strings.say_hello("Multiple Modules");
+print(greeting);
+
+print("Test 6.4: Combine results from multiple modules");
+var sum = basic.add(math.square(3), 1);
+print("square(3) + 1 = " + sum);
+
+print("=== Multiple Imports Test Complete ===");

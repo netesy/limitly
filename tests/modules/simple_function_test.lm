@@ -1,0 +1,7 @@
+// Simple function call test
+print("=== Simple Function Test ===");
+
+import tests.modules.basic_module as basic;
+
+print("Test: Call simple function");
+basic.greet();

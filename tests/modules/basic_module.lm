@@ -1,0 +1,15 @@
+// Basic module for testing
+var moduleVar = "Hello from basic module";
+var number = 42;
+
+fn greet() {
+    print("Greetings from basic module!");
+}
+
+fn add(a, b) {
+    return a + b;
+}
+
+fn getModuleVar() {
+    return moduleVar;
+}

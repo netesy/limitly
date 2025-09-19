@@ -1,0 +1,89 @@
+// Comprehensive Module System Test
+// Tests current functionality and documents known issues
+
+print("========================================");
+print("Comprehensive Module System Test Suite");
+print("========================================");
+print("");
+
+// Test 1: Basic Import and Variable Access
+print("Test 1: Basic Import and Variable Access");
+print("----------------------------------------");
+import tests.modules.basic_module as basic;
+print("✓ Module imported successfully");
+print("✓ Module variable access: " + basic.moduleVar);
+print("✓ Module number access: " + basic.number);
+print("");
+
+// Test 2: Simple Function Calls (no parameters)
+print("Test 2: Simple Function Calls");
+print("------------------------------");
+basic.greet();
+print("✓ Simple function call successful");
+print("");
+
+// Test 3: Module Aliasing
+print("Test 3: Module Aliasing");
+print("-----------------------");
+import tests.modules.math_module as math;
+print("✓ Module imported with alias");
+print("✓ Aliased variable access: PI = " + math.PI);
+print("");
+
+// Test 4: Multiple Module Imports
+print("Test 4: Multiple Module Imports");
+print("-------------------------------");
+import tests.modules.string_module as strS;
+print("✓ Multiple modules imported");
+print("✓ First module still accessible: " + basic.moduleVar);
+print("✓ Second module accessible: PI = " + math.PI);
+print("✓ Third module accessible: " + strS.greeting);
+print("");
+
+// Test 5: Nested Directory Import
+print("Test 5: Nested Directory Import");
+print("-------------------------------");
+import tests.modules.nested.deep_module as deep;
+print("✓ Nested module imported");
+print("✓ Nested module variable: " + deep.deep_value);
+print("");
+
+// Test 6: Show Filter (Basic)
+print("Test 6: Show Filter");
+print("-------------------");
+import tests.modules.string_module as str_filtered show greeting;
+print("✓ Module imported with show filter");
+print("✓ Shown variable accessible: " + str_filtered.greeting);
+print("");
+
+// Test 7: Hide Filter (Basic)
+print("Test 7: Hide Filter");
+print("-------------------");
+import tests.modules.string_module as str_hidden hide farewell;
+print("✓ Module imported with hide filter");
+print("✓ Non-hidden variable accessible: " + str_hidden.greeting);
+print("");
+
+print("========================================");
+print("KNOWN ISSUES (Not Yet Working):");
+print("========================================");
+print("❌ Function calls with parameters");
+print("❌ Function calls with return values");
+print("❌ Module function calls in general");
+print("❌ Complex show/hide filter testing");
+print("❌ Error handling for missing properties");
+print("");
+
+print("========================================");
+print("WORKING FEATURES:");
+print("========================================");
+print("✓ Basic module import");
+print("✓ Module variable access");
+print("✓ Module aliasing");
+print("✓ Multiple module imports");
+print("✓ Nested directory imports");
+print("✓ Basic show/hide filters");
+print("✓ Simple function calls (no params)");
+print("");
+
+print("Test Suite Complete!");

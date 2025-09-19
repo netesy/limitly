@@ -70,7 +70,10 @@
   - Generate bytecode for error construction (err/ok) expressions
   - _Requirements: 3.1, 3.2, 7.5_
 
-- [ ] 6. Implement VM error handling runtime
+- [-] 6. Implement VM error handling runtime
+
+
+
 
 
 

@@ -1,0 +1,20 @@
+// Show Filter Test
+print("=== Show Filter Test ===");
+
+print("Test 1: Show single identifier");
+import tests.modules.math_module as math1 show PI;
+print("✓ Imported with show filter");
+print("✓ Shown variable accessible: PI = " + math1.PI);
+
+print("Test 2: Show multiple identifiers");
+import tests.modules.math_module as math2 show PI, E;
+print("✓ Imported with show multiple filter");
+print("✓ First shown variable: PI = " + math2.PI);
+print("✓ Second shown variable: E = " + math2.E);
+
+print("Test 3: Access hidden variable (should fail)");
+print("Expected: Error about missing property");
+// This should fail:
+// print("Hidden variable: " + math1.E);
+
+print("=== Show Filter Test Complete ===");

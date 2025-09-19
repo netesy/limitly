@@ -9,3 +9,4 @@ fn greet() {
 fn ask(){
     print("Did you say hello?");
 }
+

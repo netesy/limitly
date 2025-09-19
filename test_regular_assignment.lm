@@ -1,0 +1,7 @@
+fn getValue() {
+    return 42;
+}
+
+print("Testing regular function assignment:");
+var result = getValue();
+print("Result: " + result);

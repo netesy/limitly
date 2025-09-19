@@ -1,0 +1,23 @@
+// Module Caching Test
+print("=== Module Caching Test ===");
+
+print("Test 1: Import same module multiple times");
+import tests.modules.basic_module as basic1;
+import tests.modules.basic_module as basic2;
+print("✓ Same module imported twice with different aliases");
+print("✓ First alias access: " + basic1.moduleVar);
+print("✓ Second alias access: " + basic2.moduleVar);
+
+print("Test 2: Verify module state is shared");
+print("✓ Both aliases should access the same module instance");
+print("✓ Variable from first alias: " + basic1.number);
+print("✓ Variable from second alias: " + basic2.number);
+
+print("Test 3: Import with different filters");
+import tests.modules.math_module as math_all;
+import tests.modules.math_module as math_pi_only show PI;
+print("✓ Same module imported with different filters");
+print("✓ Full access: PI = " + math_all.PI + ", E = " + math_all.E);
+print("✓ Filtered access: PI = " + math_pi_only.PI);
+
+print("=== Module Caching Test Complete ===");

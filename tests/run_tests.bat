@@ -53,6 +53,16 @@ call :run_test "types\basic_type_aliases.lm"
 call :run_test "types\primitive_type_aliases.lm"
 
 echo.
+echo === MODULE TESTS ===
+call :run_test "modules\basic_import_test.lm"
+call :run_test "modules\comprehensive_module_test.lm"
+call :run_test "modules\show_filter_test.lm"
+call :run_test "modules\hide_filter_test.lm"
+call :run_test "modules\module_caching_test.lm"
+call :run_test "modules\error_cases_test.lm"
+call :run_test "modules\function_params_test.lm"
+
+echo.
 echo === INTEGRATION TESTS ===
 call :run_test "integration\comprehensive.lm"
 call :run_test "integration\error_handling.lm"

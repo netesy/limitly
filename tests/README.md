@@ -32,6 +32,19 @@ tests/
 ├── concurrency/       # Concurrent programming
 │   ├── parallel_blocks.lm   # Parallel execution blocks
 │   └── concurrent_blocks.lm # Concurrent execution and async/await
+├── modules/           # Module system features
+│   ├── basic_import_test.lm      # Basic module import and variable access
+│   ├── comprehensive_module_test.lm # Complete module system test
+│   ├── show_filter_test.lm       # Show filter functionality
+│   ├── hide_filter_test.lm       # Hide filter functionality
+│   ├── module_caching_test.lm    # Module caching behavior
+│   ├── error_cases_test.lm       # Error handling in modules
+│   ├── function_params_test.lm   # Function calls with parameters (known issues)
+│   ├── basic_module.lm           # Test module with variables and functions
+│   ├── math_module.lm            # Math utilities module
+│   ├── string_module.lm          # String utilities module
+│   └── nested/                   # Nested directory modules
+│       └── deep_module.lm        # Module in nested directory
 └── integration/       # Integration tests
     ├── comprehensive.lm # Multi-feature integration test
     └── error_handling.lm # Error handling and exceptions
@@ -76,25 +89,25 @@ cd tests
 - **Print Statements**: Output functionality
 - **Ranges**: 1..5 syntax for iteration
 - **Concurrency**: Parallel/concurrent blocks
-- **Functions**: Function
+- **Functions**: Function declarations and basic calls
+- **Modules**: Import/export with aliasing and filtering
 
 ### 🚧 Partially Implemented Features
 - **Classes**: Framework exists, needs implementation
 - **Error Handling**: Basic error reporting
+
+### 🚧 Partially Implemented Features
+- **Module Functions**: Function calls with parameters and return values
+- **Module Error Handling**: Proper error messages for missing modules/properties
 
 ### ❌ Not Yet Implemented Features
 - **Arrays/Lists**: Collection types
 - **Advanced Functions**: Closures, higher-order functions
 - **Exception Handling**: try/catch/finally blocks
 - **Inheritance**: Class inheritance and polymorphism
-- **Modules**: Import/export statements
 - **Generics**: Generic types and type constraints
 - **Async/Await**: Async/await syntax and implementation
 - **Generators**: Yield statements and generators
-- **Reflection**: Runtime type introspection
-- **Traits**: Trait implementation and composition
-- **Macros**: Macro system and implementation
-- **Meta Programming**: Runtime code generation and reflection
 - **Reflection**: Runtime type introspection
 - **Traits**: Trait implementation and composition
 - **Macros**: Macro system and implementation

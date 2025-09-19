@@ -1,0 +1,8 @@
+import tests.modules.basic_module as basic;
+
+print("Testing module function return values:");
+
+print("Calling basic.add(5, 3):");
+var result:int;
+result = basic.add(5, 3);
+print("Result: " + result);

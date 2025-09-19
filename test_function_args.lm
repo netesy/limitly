@@ -1,0 +1,40 @@
+// Test function calls with different argument counts
+
+// Function with no parameters
+fn greet() {
+    print("Hello World!");
+}
+
+// Function with one parameter
+fn greetName(name) {
+    print("Hello " + name + "!");
+}
+
+// Function with two parameters
+fn greetFull(first, last) {
+    print("Hello " + first + " " + last + "!");
+}
+
+// Function with optional parameter
+fn greetOptional(name, greeting = "Hello") {
+    print(greeting + " " + name + "!");
+}
+
+print("=== Testing Function Calls ===");
+
+print("Test 1: No parameters");
+greet();
+
+print("Test 2: One parameter");
+greetName("Alice");
+
+print("Test 3: Two parameters");
+greetFull("John", "Doe");
+
+print("Test 4: Optional parameter (default)");
+greetOptional("Bob");
+
+print("Test 5: Optional parameter (provided)");
+greetOptional("Charlie", "Hi");
+
+print("=== All tests complete ===");
