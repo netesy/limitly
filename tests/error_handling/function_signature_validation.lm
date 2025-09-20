@@ -1,0 +1,68 @@
+// Test function signature error type validation
+
+// 1. Function with error type annotation in return type
+fn divide(a: int, b: int): int?DivisionByZero {
+    if (b == 0) {
+        return err(DivisionByZero);
+    }
+    return a / b;
+}
+
+// 2. Function with multiple error types
+fn parseAndDivide(s: str, divisor: int): int?ParseError, DivisionByZero {
+    var num = parseInt(s)?;
+    return divide(num, divisor)?;
+}
+
+// 3. Function that calls fallible function and propagates errors
+fn safeDivision(x: int, y: int): int?DivisionByZero {
+    return divide(x, y)?;
+}
+
+// 4. Function that handles errors explicitly (no error propagation)
+fn handleDivision(x: int, y: int): int {
+    var result = divide(x, y)?else err => {
+        print("Division failed: " + err);
+        return -1;
+    };
+    return result;
+}
+
+// 5. Function using legacy throws syntax
+fn legacyDivide(a: int, b: int): int throws DivisionByZero {
+    if (b == 0) {
+        return err(DivisionByZero);
+    }
+    return a / b;
+}
+
+// 6. Function that should infer error types but doesn't declare them (should cause error)
+fn badFunction(x: int): int {
+    return divide(x, 0)?; // This should cause a compile error
+}
+
+// 7. Function with incompatible error types (should cause error)
+fn incompatibleFunction(x: int): int?ParseError {
+    return divide(x, 2)?; // DivisionByZero is not compatible with ParseError
+}
+
+// Test the functions
+print("Testing function signature error type validation");
+
+// Test successful division
+var result1 = safeDivision(10, 2)?else err => {
+    print("Error: " + err);
+    return -1;
+};
+print("Result 1: " + result1);
+
+// Test division by zero
+var result2 = safeDivision(10, 0)?else err => {
+    print("Caught error: " + err);
+    return -1;
+};
+print("Result 2: " + result2);
+
+// Test handled division
+var result3 = handleDivision(10, 0);
+print("Result 3: " + result3);

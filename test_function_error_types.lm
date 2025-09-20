@@ -1,0 +1,17 @@
+// Simple test for function error type validation
+
+// Basic function with error type declaration
+fn testDivision(a: int, b: int): int ? DivisionByZero {
+    if (b == 0) {
+        return err(DivisionByZero);
+    }
+    return a / b;
+}
+
+// Function that calls the fallible function
+fn callTest(): int ? DivisionByZero {
+    return testDivision(10, 2)?;
+}
+
+print("Testing function error types");
+print(callTest());

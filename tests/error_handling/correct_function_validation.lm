@@ -1,0 +1,44 @@
+// Test correct function signature error type validation
+
+// 1. Function with error type annotation in return type
+fn divide(a: int, b: int): int?DivisionByZero {
+    if (b == 0) {
+        return err(DivisionByZero);
+    }
+    return a / b;
+}
+
+// 2. Function that correctly propagates errors
+fn safeDivision(x: int, y: int): int?DivisionByZero {
+    return divide(x, y)?;
+}
+
+// 3. Function with multiple error types
+fn multipleErrors(x: int): int?ErrorA, ErrorB {
+    if (x < 0) {
+        return err(ErrorA);
+    }
+    if (x == 0) {
+        return err(ErrorB);
+    }
+    return x * 2;
+}
+
+// 4. Function that calls multiple fallible functions
+fn callMultiple(a: int, b: int): int?DivisionByZero, ErrorA, ErrorB {
+    var result1 = divide(a, b)?;
+    var result2 = multipleErrors(result1)?;
+    return result2;
+}
+
+// 5. Function with generic error type
+fn genericError(x: int): int? {
+    if (x < 0) {
+        return err(GenericError);
+    }
+    return divide(x, 2)?;
+}
+
+print("Testing correct function signature error type validation");
+print("All functions should compile without errors");
+print("Result: " + safeDivision(10, 2));

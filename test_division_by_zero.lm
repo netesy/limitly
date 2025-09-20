@@ -1,0 +1,6 @@
+// Division by zero test
+print("Testing division by zero");
+var a = 10;
+var b = 0;
+var result = a / b;
+print("Result:", result);

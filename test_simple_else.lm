@@ -1,0 +1,19 @@
+// Simple test for ?else syntax
+
+fn divide(a: int, b: int): int?DivisionByZero {
+    if (b == 0) {
+        return err(DivisionByZero);
+    }
+    return ok(a / b);
+}
+
+fn test_simple() {
+    // Test with else handler - should not require function to be fallible
+    var result = divide(10, 0)? else error {
+        print("Caught error:", error);
+        42  // Return a value from the else block
+    };
+    print("Result:", result);
+}
+
+test_simple();

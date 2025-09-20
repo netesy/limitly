@@ -1,0 +1,19 @@
+// Simple test for error handling optimizations
+
+fn test_success_path() : int {
+    var sum = 0;
+    iter (i in 1..100) {
+        sum = sum + i;
+    }
+    return sum;
+}
+
+fn test_error_handling() : int {
+    var result = test_success_path();
+    print("Success path result: " + result);
+    return result;
+}
+
+// Run the test
+var final_result = test_error_handling();
+print("Final result: " + final_result);

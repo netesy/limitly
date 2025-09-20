@@ -35,17 +35,14 @@ echo Compiling main executable...
     src\backend\bytecode_printer.cpp ^
     src\backend\functions.cpp ^
     src\backend\classes.cpp ^
+    src\backend\type_checker.cpp ^
     src\backend\concurrency\scheduler.cpp ^
     src\backend\concurrency\thread_pool.cpp ^
     src\backend\concurrency\event_loop.cpp ^
     src\backend\concurrency\iocp_event_loop.cpp ^
     bin\debugger.o ^
     -I. -lws2_32 -static-libgcc -static-libstdc++
-:: Building embedded interpreters is disabled in the default build.
-echo Note: the lembed generator and embedding targets are disabled by default.
-echo To generate embedded interpreters, use the `lembed` generator and the
-echo `tools\make_embedded.bat` / `tools/make_embedded.sh` helpers manually.
-echo
+
 
 if %ERRORLEVEL% NEQ 0 (
     echo Failed to compile limitly.exe
@@ -58,6 +55,7 @@ echo Compiling test parser...
     src\test_parser.cpp ^
     src\frontend\scanner.cpp ^
     src\frontend\parser.cpp ^
+    src\backend\type_checker.cpp ^
     src\backend\backend.cpp ^
     src\backend\ast_printer.cpp ^
     src\backend\bytecode_printer.cpp ^
@@ -104,4 +102,9 @@ if exist "bin\format_code.exe" echo   bin\format_code.exe  - Code formatter
 echo.
 echo Note: embedding targets are intentionally disabled from this build.
 echo Use the generator and tools in `tools/` to produce embedded interpreters.
+echo
+:: Building embedded interpreters is disabled in the default build.
+echo Note: the lembed generator and embedding targets are disabled by default.
+echo To generate embedded interpreters, use the `lembed` generator and the
+echo `tools\make_embedded.bat` / `tools/make_embedded.sh` helpers manually.
 echo

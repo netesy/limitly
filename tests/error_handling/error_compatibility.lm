@@ -1,0 +1,84 @@
+// Test error type compatibility between caller and callee functions
+
+// Base functions with different error types
+fn canFailWithA(): int?ErrorA {
+    return err(ErrorA);
+}
+
+fn canFailWithB(): int?ErrorB {
+    return err(ErrorB);
+}
+
+fn canFailWithBoth(): int?ErrorA, ErrorB {
+    if (someCondition()) {
+        return err(ErrorA);
+    }
+    return err(ErrorB);
+}
+
+// 1. Compatible: caller can handle all callee errors
+fn compatibleCaller(): int?ErrorA, ErrorB {
+    var result1 = canFailWithA()?;  // OK: ErrorA is declared
+    var result2 = canFailWithB()?;  // OK: ErrorB is declared
+    var result3 = canFailWithBoth()?; // OK: both ErrorA and ErrorB are declared
+    return result1 + result2 + result3;
+}
+
+// 2. Incompatible: caller can't handle all callee errors
+fn incompatibleCaller(): int?ErrorA {
+    return canFailWithB()?; // ERROR: caller only declares ErrorA but callee can produce ErrorB
+}
+
+// 3. Subset compatibility: caller declares superset of callee errors
+fn supersetCaller(): int?ErrorA, ErrorB, ErrorC {
+    return canFailWithA()?; // OK: caller can handle ErrorA (and more)
+}
+
+// 4. Generic error compatibility: caller with generic errors can handle any specific errors
+fn genericCaller(): int? {
+    var result1 = canFailWithA()?;    // OK: generic error can handle ErrorA
+    var result2 = canFailWithBoth()?; // OK: generic error can handle ErrorA, ErrorB
+    return result1 + result2;
+}
+
+// 5. Incompatible: specific caller can't handle generic callee
+fn specificCaller(): int?ErrorA {
+    return genericCaller()?; // ERROR: specific ErrorA can't handle generic errors
+}
+
+// 6. Chain of compatible calls
+fn chainedCompatible(): int?ErrorA, ErrorB {
+    var step1 = compatibleCaller()?;  // OK: same error types
+    var step2 = supersetCaller()?;    // ERROR: supersetCaller can produce ErrorC
+    return step1 + step2;
+}
+
+// 7. Function that handles errors explicitly (no propagation needed)
+fn explicitHandler(): int {
+    var result = canFailWithBoth()?else err => {
+        match (err) {
+            ErrorA => return -1,
+            ErrorB => return -2,
+            _ => return -3
+        }
+    };
+    return result;
+}
+
+// Helper function for testing
+fn someCondition(): bool {
+    return true;
+}
+
+print("Testing error type compatibility");
+
+// Test compatible caller
+var result1 = compatibleCaller()?else err => {
+    print("Error in compatible caller: " + err);
+    return -1;
+};
+print("Compatible result: " + result1);
+
+// Test explicit handler
+var result2 = explicitHandler();
+print("Explicit handler result: " + result2);

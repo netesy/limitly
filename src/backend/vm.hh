@@ -63,14 +63,140 @@ private:
     std::shared_ptr<Environment> globals;
     std::shared_ptr<Environment> environment;
     
-    // Error handling state
+    // Error handling state - optimized for zero-cost success path
     struct ErrorFrame {
         size_t handlerAddress;      // Bytecode address of error handler
         size_t stackBase;           // Stack position when frame created
         TypePtr expectedErrorType;  // Expected error type for this frame
         std::string functionName;   // Function name for debugging
+        
+        // Optimization: pack small data for better cache efficiency
+        ErrorFrame(size_t addr, size_t base, TypePtr type, const std::string& name = "")
+            : handlerAddress(addr), stackBase(base), expectedErrorType(type), functionName(name) {}
     };
+    
+    // Optimized error frame stack - use small vector optimization for common case
+    static constexpr size_t INLINE_ERROR_FRAMES = 8;  // Most functions have shallow error nesting
     std::vector<ErrorFrame> errorFrames;
+    
+    // Performance counters for zero-cost validation
+    struct ErrorHandlingStats {
+        size_t successPathExecutions = 0;
+        size_t errorPathExecutions = 0;
+        size_t errorFramePushes = 0;
+        size_t errorFramePops = 0;
+        size_t errorValueAllocations = 0;
+        size_t errorValuePoolHits = 0;
+        size_t errorValuePoolMisses = 0;
+        
+        void reset() {
+            successPathExecutions = 0;
+            errorPathExecutions = 0;
+            errorFramePushes = 0;
+            errorFramePops = 0;
+            errorValueAllocations = 0;
+            errorValuePoolHits = 0;
+            errorValuePoolMisses = 0;
+        }
+        
+        double getSuccessPathRatio() const {
+            size_t total = successPathExecutions + errorPathExecutions;
+            return total > 0 ? static_cast<double>(successPathExecutions) / total : 0.0;
+        }
+        
+        double getPoolHitRatio() const {
+            size_t total = errorValuePoolHits + errorValuePoolMisses;
+            return total > 0 ? static_cast<double>(errorValuePoolHits) / total : 0.0;
+        }
+    };
+    mutable ErrorHandlingStats errorStats;
+    
+    // Error value pool for reducing allocations - optimized for performance
+    struct ErrorValuePool {
+        std::vector<std::unique_ptr<ErrorValue>> pool;
+        std::vector<bool> inUse;  // Track which slots are in use
+        size_t nextFreeIndex = 0;
+        static constexpr size_t POOL_SIZE = 64;  // Increased pool size for better performance
+        static constexpr size_t POOL_GROWTH_SIZE = 16;  // Grow pool in chunks
+        
+        ErrorValuePool() {
+            pool.reserve(POOL_SIZE);
+            inUse.reserve(POOL_SIZE);
+        }
+        
+        ErrorValue* acquire() {
+            // Fast path: check if we have a free slot at nextFreeIndex
+            if (nextFreeIndex < pool.size() && !inUse[nextFreeIndex]) {
+                inUse[nextFreeIndex] = true;
+                return pool[nextFreeIndex++].get();
+            }
+            
+            // Slower path: find first free slot
+            for (size_t i = 0; i < pool.size(); ++i) {
+                if (!inUse[i]) {
+                    inUse[i] = true;
+                    nextFreeIndex = i + 1;
+                    return pool[i].get();
+                }
+            }
+            
+            // No free slots, grow the pool
+            if (pool.size() < POOL_SIZE) {
+                size_t oldSize = pool.size();
+                size_t newSize = std::min(POOL_SIZE, oldSize + POOL_GROWTH_SIZE);
+                
+                pool.resize(newSize);
+                inUse.resize(newSize, false);
+                
+                for (size_t i = oldSize; i < newSize; ++i) {
+                    pool[i] = std::make_unique<ErrorValue>();
+                }
+                
+                inUse[oldSize] = true;
+                nextFreeIndex = oldSize + 1;
+                return pool[oldSize].get();
+            }
+            
+            // Pool exhausted, allocate new (fallback)
+            return new ErrorValue();
+        }
+        
+        void release(ErrorValue* error) {
+            if (!error) return;
+            
+            // Find the error in our pool
+            for (size_t i = 0; i < pool.size(); ++i) {
+                if (pool[i].get() == error) {
+                    // Reset the error value for reuse
+                    error->errorType.clear();
+                    error->message.clear();
+                    error->arguments.clear();
+                    error->sourceLocation = 0;
+                    
+                    inUse[i] = false;
+                    nextFreeIndex = std::min(nextFreeIndex, i);
+                    return;
+                }
+            }
+            
+            // Not from our pool, delete it
+            delete error;
+        }
+        
+        void clear() {
+            std::fill(inUse.begin(), inUse.end(), false);
+            nextFreeIndex = 0;
+        }
+        
+        size_t getUsedCount() const {
+            return std::count(inUse.begin(), inUse.end(), true);
+        }
+        
+        size_t getTotalCount() const {
+            return pool.size();
+        }
+    };
+    ErrorValuePool errorPool;
     std::unordered_map<std::string, std::function<ValuePtr(const std::vector<ValuePtr>&)>> nativeFunctions;
     // Removed duplicate userFunctions map - using functionRegistry instead
     backend::FunctionRegistry functionRegistry; // New function abstraction layer
@@ -134,9 +260,46 @@ private:
     ValuePtr handleError(ValuePtr errorValue, const std::string& expectedType = "");
     bool functionCanFail(const std::string& functionName) const;
     
+    // Error value creation helpers - optimized for performance
+    ValuePtr createErrorValue(const std::string& errorType, const std::string& message = "", 
+                             const std::vector<ValuePtr>& args = {});
+    ValuePtr createSuccessValue(ValuePtr value);
+    bool isErrorFrame(size_t frameIndex) const;
+    
+    // Zero-cost success path optimizations
+    inline bool hasErrorFrames() const noexcept { return !errorFrames.empty(); }
+    inline bool isSuccessPath() const noexcept { return errorFrames.empty(); }
+    
+    // Fast error checking without virtual calls - optimized for branch prediction
+    inline bool isErrorValue(const ValuePtr& value) const noexcept {
+        // Most values are not errors, so optimize for the success case
+        if (!value) [[unlikely]] return false;
+        if (!value->type) [[unlikely]] return false;
+        
+        // Fast path for non-error union types
+        if (value->type->tag != TypeTag::ErrorUnion) [[likely]] {
+            return std::holds_alternative<ErrorValue>(value->data);
+        }
+        
+        // Error union path
+        return std::holds_alternative<ErrorValue>(value->data);
+    }
+    
+    // Optimized error union operations
+    ValuePtr createOptimizedErrorUnion(ValuePtr successValue, const std::string& errorType = "");
+    ValuePtr createPooledErrorValue(const std::string& errorType, const std::string& message = "");
+    void releasePooledError(ValuePtr errorValue);
+    
+    // Performance monitoring methods
+    void recordSuccessPath() const { ++errorStats.successPathExecutions; }
+    void recordErrorPath() const { ++errorStats.errorPathExecutions; }
+    const ErrorHandlingStats& getErrorStats() const { return errorStats; }
+    void resetErrorStats() { errorStats.reset(); }
+    
 public:
     // Debugging methods
     void printStack() const;
+    void printErrorStats() const;
     
     std::shared_ptr<ThreadPool> getThreadPool() { return thread_pool; }
 
@@ -245,6 +408,11 @@ private:
     bool handleTuplePatternMatch(const ValuePtr& value);
     void clearDictPatternFromStack();
     void clearListPatternFromStack();
+    
+    // Error pattern matching helpers
+    bool handleValPatternMatch(const ValuePtr& value);
+    bool handleErrPatternMatch(const ValuePtr& value);
+    bool handleErrorTypePatternMatch(const ValuePtr& value);
     
     void handleImportModule(const Instruction& instruction);
     void handleImportAlias(const Instruction& instruction);

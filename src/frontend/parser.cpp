@@ -898,12 +898,26 @@ std::shared_ptr<AST::FunctionDeclaration> Parser::function(const std::string& ki
     // Parse return type
     if (match({TokenType::COLON})) {
         func->returnType = parseTypeAnnotation();
-
+        
+        // Extract error type information from return type annotation
+        if (func->returnType && (*func->returnType)->isFallible) {
+            func->canFail = true;
+            func->declaredErrorTypes = (*func->returnType)->errorTypes;
+        }
     }
 
-    // Check if function throws
+    // Check if function throws and parse error types (legacy syntax)
     if (match({TokenType::THROWS})) {
         func->throws = true;
+        func->canFail = true;
+        
+        // Parse specific error types if provided
+        if (!check(TokenType::LEFT_BRACE)) {
+            do {
+                Token errorType = consume(TokenType::IDENTIFIER, "Expected error type name after 'throws'.");
+                func->declaredErrorTypes.push_back(errorType.lexeme);
+            } while (match({TokenType::COMMA}));
+        }
     }
 
     // Parse function body
@@ -1407,6 +1421,21 @@ std::shared_ptr<AST::Statement> Parser::matchStatement() {
 }
 
 std::shared_ptr<AST::Expression> Parser::parsePattern() {
+    // Error pattern matching: val identifier
+    if (check(TokenType::VAL)) {
+        return parseValPattern();
+    }
+
+    // Error pattern matching: err identifier or err ErrorType
+    if (check(TokenType::ERR)) {
+        return parseErrPattern();
+    }
+
+    // Specific error type pattern: ErrorType or ErrorType(params)
+    if (check(TokenType::IDENTIFIER) && isErrorType(peek().lexeme)) {
+        return parseErrorTypePattern();
+    }
+
     // Wildcard pattern
     if (match({TokenType::DEFAULT}) || (check(TokenType::IDENTIFIER) && peek().lexeme == "_")) {
         if (previous().type != TokenType::DEFAULT) advance(); // consume '_' if it was an identifier
@@ -2798,3 +2827,73 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseStructuralType(const std::stri
     consume(TokenType::RIGHT_BRACE, "Expected '}' after structural type.");
     return type;
 }
+// Error pattern parsing methods
+
+// Parse val pattern: val identifier
+std::shared_ptr<AST::Expression> Parser::parseValPattern() {
+    auto pattern = std::make_shared<AST::ValPatternExpr>();
+    pattern->line = peek().line;
+    
+    consume(TokenType::VAL, "Expected 'val' keyword.");
+    pattern->variableName = consume(TokenType::IDENTIFIER, "Expected variable name after 'val'.").lexeme;
+    
+    return pattern;
+}
+
+// Parse err pattern: err identifier or err ErrorType
+std::shared_ptr<AST::Expression> Parser::parseErrPattern() {
+    auto pattern = std::make_shared<AST::ErrPatternExpr>();
+    pattern->line = peek().line;
+    
+    consume(TokenType::ERR, "Expected 'err' keyword.");
+    
+    // Check if this is a specific error type pattern or generic error pattern
+    if (check(TokenType::IDENTIFIER)) {
+        std::string identifier = consume(TokenType::IDENTIFIER, "Expected identifier after 'err'.").lexeme;
+        
+        // Check if this identifier is an error type or a variable name
+        if (isErrorType(identifier)) {
+            // This is a specific error type pattern: err ErrorType
+            pattern->errorType = identifier;
+            pattern->variableName = identifier; // Use error type as variable name by default
+        } else {
+            // This is a generic error pattern: err variable
+            pattern->variableName = identifier;
+        }
+    } else {
+        error("Expected identifier after 'err'.");
+    }
+    
+    return pattern;
+}
+
+// Parse specific error type pattern: ErrorType or ErrorType(params)
+std::shared_ptr<AST::Expression> Parser::parseErrorTypePattern() {
+    auto pattern = std::make_shared<AST::ErrorTypePatternExpr>();
+    pattern->line = peek().line;
+    
+    pattern->errorType = consume(TokenType::IDENTIFIER, "Expected error type name.").lexeme;
+    
+    // Check for parameter extraction: ErrorType(param1, param2, ...)
+    if (match({TokenType::LEFT_PAREN})) {
+        if (!check(TokenType::RIGHT_PAREN)) {
+            do {
+                std::string paramName = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
+                pattern->parameterNames.push_back(paramName);
+            } while (match({TokenType::COMMA}));
+        }
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after error type parameters.");
+    }
+    
+    return pattern;
+}
+
+// Helper method to check if an identifier is an error type
+bool Parser::isErrorType(const std::string& name) {
+    // Built-in error types
+    return name == "DivisionByZero" || name == "IndexOutOfBounds" || 
+           name == "NullReference" || name == "TypeConversion" || 
+           name == "IOError" || name == "ParseError" || name == "NetworkError" ||
+           name == "Error"; // Generic error type
+}
+

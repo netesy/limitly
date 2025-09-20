@@ -1,0 +1,6 @@
+// Simple division test
+print("Testing division");
+var a = 10;
+var b = 2;
+var result = a / b;
+print("Result:", result);

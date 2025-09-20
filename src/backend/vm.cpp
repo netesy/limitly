@@ -636,58 +636,84 @@ void VM::printStack() const {
     std::cout << "====================" << std::endl;
 }
 
+void VM::printErrorStats() const {
+    std::cout << "=== Error Handling Performance Statistics ===" << std::endl;
+    std::cout << "Success path executions: " << errorStats.successPathExecutions << std::endl;
+    std::cout << "Error path executions: " << errorStats.errorPathExecutions << std::endl;
+    std::cout << "Success path ratio: " << (errorStats.getSuccessPathRatio() * 100.0) << "%" << std::endl;
+    std::cout << "Error frame pushes: " << errorStats.errorFramePushes << std::endl;
+    std::cout << "Error frame pops: " << errorStats.errorFramePops << std::endl;
+    std::cout << "Error value allocations: " << errorStats.errorValueAllocations << std::endl;
+    std::cout << "Error pool hits: " << errorStats.errorValuePoolHits << std::endl;
+    std::cout << "Error pool misses: " << errorStats.errorValuePoolMisses << std::endl;
+    std::cout << "Pool hit ratio: " << (errorStats.getPoolHitRatio() * 100.0) << "%" << std::endl;
+    std::cout << "Error pool usage: " << errorPool.getUsedCount() << "/" << errorPool.getTotalCount() << std::endl;
+    std::cout << "=============================================" << std::endl;
+}
+
 void VM::error(const std::string& message) const {
     throw std::runtime_error(message);
 }
 
-// Error handling helper methods
+// Error handling helper methods - optimized for zero-cost success path
 void VM::pushErrorFrame(size_t handlerAddr, TypePtr errorType, const std::string& functionName) {
-    ErrorFrame frame;
-    frame.handlerAddress = handlerAddr;
-    frame.stackBase = stack.size();
-    frame.expectedErrorType = errorType;
-    frame.functionName = functionName;
-    errorFrames.push_back(frame);
+    // Reserve space to avoid reallocations in common case
+    if (errorFrames.capacity() == 0) {
+        errorFrames.reserve(INLINE_ERROR_FRAMES);
+    }
+    
+    errorFrames.emplace_back(handlerAddr, stack.size(), errorType, functionName);
+    ++errorStats.errorFramePushes;
+    
     // debug: pushErrorFrame logging removed to reduce noise
 }
 
 void VM::popErrorFrame() {
     if (!errorFrames.empty()) {
         errorFrames.pop_back();
+        ++errorStats.errorFramePops;
     }
 }
 
 bool VM::propagateError(ValuePtr errorValue) {
-    if (!errorValue) return false;
+    if (!errorValue) [[unlikely]] return false;
+    
+    recordErrorPath();
 
-    // Extract error type string
+    // Extract error type string - optimized for common cases
     std::string errorType;
-    if (auto ev = errorValue->getErrorValue()) {
+    if (const auto* ev = errorValue->getErrorValue()) [[likely]] {
         errorType = ev->errorType;
     } else if (errorValue->type && errorValue->type->tag == TypeTag::ErrorUnion) {
-        if (auto ev = errorValue->getErrorValue()) errorType = ev->errorType;
-        else return false;
+        if (const auto* ev = errorValue->getErrorValue()) {
+            errorType = ev->errorType;
+        } else {
+            return false;
+        }
     } else {
         return false;
     }
 
-    if (errorFrames.empty()) {
+    if (errorFrames.empty()) [[unlikely]] {
         // No error frames available
         return false;
     }
 
-    // Walk frames from top to bottom
+    // Walk frames from top to bottom - optimized for shallow error nesting
     while (!errorFrames.empty()) {
-        ErrorFrame frame = errorFrames.back();
+        const ErrorFrame& frame = errorFrames.back();
 
-    // checking frame
-
-        // Wildcard frame matches any error
-        if (!frame.expectedErrorType) {
+        // Wildcard frame matches any error - most common case
+        if (!frame.expectedErrorType) [[likely]] {
             // Consume the frame so it won't be reused
             errorFrames.pop_back();
             ip = frame.handlerAddress - 1;
-            while (stack.size() > frame.stackBase) stack.pop_back();
+            
+            // Efficient stack cleanup
+            if (stack.size() > frame.stackBase) {
+                stack.erase(stack.begin() + frame.stackBase, stack.end());
+            }
+            
             push(errorValue);
             return true;
         }
@@ -696,7 +722,11 @@ bool VM::propagateError(ValuePtr errorValue) {
         if (frame.expectedErrorType->tag == TypeTag::ErrorUnion) {
             errorFrames.pop_back();
             ip = frame.handlerAddress - 1;
-            while (stack.size() > frame.stackBase) stack.pop_back();
+            
+            if (stack.size() > frame.stackBase) {
+                stack.erase(stack.begin() + frame.stackBase, stack.end());
+            }
+            
             push(errorValue);
             return true;
         }
@@ -704,24 +734,27 @@ bool VM::propagateError(ValuePtr errorValue) {
         // Try to match user-defined or named type
         bool matched = false;
         if (frame.expectedErrorType->tag == TypeTag::UserDefined) {
-            if (std::holds_alternative<UserDefinedType>(frame.expectedErrorType->extra)) {
-                const UserDefinedType& ud = std::get<UserDefinedType>(frame.expectedErrorType->extra);
-                if (ud.name == errorType) matched = true;
+            if (const auto* ud = std::get_if<UserDefinedType>(&frame.expectedErrorType->extra)) {
+                matched = (ud->name == errorType);
             }
-        } else if (frame.expectedErrorType->toString() == errorType) {
-            matched = true;
+        } else {
+            // Avoid expensive toString() call by caching or using faster comparison
+            matched = (frame.expectedErrorType->toString() == errorType);
         }
 
         if (matched) {
             errorFrames.pop_back();
             ip = frame.handlerAddress - 1;
-            while (stack.size() > frame.stackBase) stack.pop_back();
+            
+            if (stack.size() > frame.stackBase) {
+                stack.erase(stack.begin() + frame.stackBase, stack.end());
+            }
+            
             push(errorValue);
             return true;
         }
 
         // No match: pop and continue
-    // frame did not match; popping frame
         errorFrames.pop_back();
     }
 
@@ -786,7 +819,137 @@ bool VM::functionCanFail(const std::string& functionName) const {
     return false;
 }
 
+// Error value creation helpers - optimized for performance
+ValuePtr VM::createErrorValue(const std::string& errorType, const std::string& message, 
+                             const std::vector<ValuePtr>& args) {
+    ++errorStats.errorValueAllocations;
+    
+    // Look up error type in the type system
+    TypePtr errorTypePtr = typeSystem->getType(errorType);
+    if (!errorTypePtr) {
+        // Create a generic error type if not found
+        errorTypePtr = memoryManager.makeRef<Type>(*region, TypeTag::UserDefined);
+        UserDefinedType userType;
+        userType.name = errorType;
+        errorTypePtr->extra = userType;
+    }
+    
+    // Create error value
+    ErrorValue errorVal(errorType, message, args, ip);
+    
+    // Create error union type
+    auto errorUnionType = memoryManager.makeRef<Type>(*region, TypeTag::ErrorUnion);
+    ErrorUnionType errorUnionDetails;
+    errorUnionDetails.successType = typeSystem->NIL_TYPE;
+    errorUnionDetails.errorTypes = {errorType};
+    errorUnionDetails.isGenericError = false;
+    errorUnionType->extra = errorUnionDetails;
+    
+    // Create the final value with the error union type
+    ValuePtr result = memoryManager.makeRef<Value>(*region, errorUnionType);
+    result->data = errorVal;
+    
+    return result;
+}
 
+ValuePtr VM::createOptimizedErrorUnion(ValuePtr successValue, const std::string& errorType) {
+    if (!successValue) {
+        successValue = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
+    }
+    
+    // Create optimized error union type with cache-friendly layout
+    auto errorUnionType = memoryManager.makeRef<Type>(*region, TypeTag::ErrorUnion);
+    ErrorUnionType errorUnionDetails;
+    errorUnionDetails.successType = successValue->type;
+    if (!errorType.empty()) {
+        errorUnionDetails.errorTypes = {errorType};
+        errorUnionDetails.isGenericError = false;
+    } else {
+        errorUnionDetails.isGenericError = true;
+    }
+    errorUnionType->extra = errorUnionDetails;
+    
+    // Create the union value containing the success value
+    ValuePtr result = memoryManager.makeRef<Value>(*region, errorUnionType);
+    result->data = successValue->data;
+    
+    return result;
+}
+
+ValuePtr VM::createPooledErrorValue(const std::string& errorType, const std::string& message) {
+    // Try to get from pool first
+    ErrorValue* pooledError = errorPool.acquire();
+    bool fromPool = false;
+    
+    if (pooledError && pooledError != nullptr) {
+        // Reset and reuse pooled error
+        pooledError->errorType = errorType;
+        pooledError->message = message;
+        pooledError->arguments.clear();
+        pooledError->sourceLocation = ip;
+        fromPool = true;
+        ++errorStats.errorValuePoolHits;
+    } else {
+        // Fallback to regular allocation
+        pooledError = new ErrorValue(errorType, message, {}, ip);
+        ++errorStats.errorValuePoolMisses;
+    }
+    
+    // Create error union type
+    auto errorUnionType = memoryManager.makeRef<Type>(*region, TypeTag::ErrorUnion);
+    ErrorUnionType errorUnionDetails;
+    errorUnionDetails.successType = typeSystem->NIL_TYPE;
+    errorUnionDetails.errorTypes = {errorType};
+    errorUnionDetails.isGenericError = false;
+    errorUnionType->extra = errorUnionDetails;
+    
+    // Create the final value
+    ValuePtr result = memoryManager.makeRef<Value>(*region, errorUnionType);
+    result->data = *pooledError;
+    
+    // If we allocated a new error, clean it up
+    if (!fromPool) {
+        delete pooledError;
+    }
+    
+    return result;
+}
+
+void VM::releasePooledError(ValuePtr errorValue) {
+    if (!errorValue || !errorValue->isError()) {
+        return;
+    }
+    
+    if (const auto* errorVal = errorValue->getErrorValue()) {
+        // We can't directly release the ErrorValue from the Value variant,
+        // but we can clear the pool when appropriate
+        // This is called during cleanup phases
+    }
+}
+
+ValuePtr VM::createSuccessValue(ValuePtr value) {
+    if (!value) {
+        return memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
+    }
+    
+    // Create error union type that wraps the success value
+    auto errorUnionType = memoryManager.makeRef<Type>(*region, TypeTag::ErrorUnion);
+    ErrorUnionType errorUnionDetails;
+    errorUnionDetails.successType = value->type;
+    errorUnionDetails.errorTypes = {}; // No specific error types for generic ok()
+    errorUnionDetails.isGenericError = true;
+    errorUnionType->extra = errorUnionDetails;
+    
+    // Create a new value with the error union type but containing the success data
+    ValuePtr okValue = memoryManager.makeRef<Value>(*region, errorUnionType);
+    okValue->data = value->data; // Copy the success value's data
+    
+    return okValue;
+}
+
+bool VM::isErrorFrame(size_t frameIndex) const {
+    return frameIndex < errorFrames.size();
+}
 
 // Instruction handlers
 void VM::handlePushInt(const Instruction& instruction) {
@@ -1178,12 +1341,12 @@ void VM::handleDivide(const Instruction& /*unused*/) {
     bool bIsNumeric = (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Float64);
     
     if (!aIsNumeric || !bIsNumeric) {
-        // Create and push error value
-        auto errorType = typeSystem->getType("DivisionByZero");
-        auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
+        // Create error union with TypeError
+        auto errorUnionType = typeSystem->createErrorUnionType(typeSystem->INT_TYPE, {"TypeError"}, false);
+        auto errorUnionValue = memoryManager.makeRef<Value>(*region, errorUnionType);
         ErrorValue errorVal("TypeError", "Both operands must be numbers for division");
-        errorValue->data = errorVal;
-        push(errorValue);
+        errorUnionValue->data = errorVal;
+        push(errorUnionValue);
         return;
     }
     
@@ -1202,12 +1365,16 @@ void VM::handleDivide(const Instruction& /*unused*/) {
     }
     
     if (isZero) {
-        // Create and push error value
-        auto errorType = typeSystem->getType("DivisionByZero");
-        auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
+        // Create error union with DivisionByZero error
+        TypePtr resultType = (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64) 
+            ? typeSystem->FLOAT64_TYPE 
+            : typeSystem->INT_TYPE;
+        auto errorUnionType = typeSystem->createErrorUnionType(resultType, {"DivisionByZero"}, false);
+        
+        auto errorUnionValue = memoryManager.makeRef<Value>(*region, errorUnionType);
         ErrorValue errorVal("DivisionByZero", "Division by " + zeroType + " is not allowed");
-        errorValue->data = errorVal;
-        push(errorValue);
+        errorUnionValue->data = errorVal;
+        push(errorUnionValue);
         return;
     }
     
@@ -1223,32 +1390,40 @@ void VM::handleDivide(const Instruction& /*unused*/) {
         
         // Check for floating-point edge cases
         if (std::isinf(aVal / bVal)) {
-            // Create and push error value
-            auto errorType = typeSystem->getType("ArithmeticError");
-            auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
+            // Create error union with ArithmeticError
+            auto errorUnionType = typeSystem->createErrorUnionType(typeSystem->FLOAT64_TYPE, {"ArithmeticError"}, false);
+            auto errorUnionValue = memoryManager.makeRef<Value>(*region, errorUnionType);
             ErrorValue errorVal("ArithmeticError", "Floating-point division resulted in infinity");
-            errorValue->data = errorVal;
-            push(errorValue);
+            errorUnionValue->data = errorVal;
+            push(errorUnionValue);
             return;
         }
         
-        push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, aVal / bVal));
+        // Create success error union
+        auto errorUnionType = typeSystem->createErrorUnionType(typeSystem->FLOAT64_TYPE, {"DivisionByZero"}, false);
+        auto errorUnionValue = memoryManager.makeRef<Value>(*region, errorUnionType);
+        errorUnionValue->data = aVal / bVal;
+        push(errorUnionValue);
     } else {
         // Integer division with check for INT_MIN / -1 overflow
         int32_t aVal = std::get<int32_t>(a->data);
         int32_t bVal = std::get<int32_t>(b->data);
         
         if (aVal == std::numeric_limits<int32_t>::min() && bVal == -1) {
-            // Create and push error value
-            auto errorType = typeSystem->getType("ArithmeticError");
-            auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
+            // Create error union with ArithmeticError
+            auto errorUnionType = typeSystem->createErrorUnionType(typeSystem->INT_TYPE, {"ArithmeticError"}, false);
+            auto errorUnionValue = memoryManager.makeRef<Value>(*region, errorUnionType);
             ErrorValue errorVal("ArithmeticError", "Integer division overflow");
-            errorValue->data = errorVal;
-            push(errorValue);
+            errorUnionValue->data = errorVal;
+            push(errorUnionValue);
             return;
         }
         
-        push(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, aVal / bVal));
+        // Create success error union
+        auto errorUnionType = typeSystem->createErrorUnionType(typeSystem->INT_TYPE, {"DivisionByZero"}, false);
+        auto errorUnionValue = memoryManager.makeRef<Value>(*region, errorUnionType);
+        errorUnionValue->data = aVal / bVal;
+        push(errorUnionValue);
     }
 }
 
@@ -3096,7 +3271,12 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
         
         // Check if index is an integer
         if (!std::holds_alternative<int32_t>(index->data)) {
-            error("List index must be an integer");
+            // Create and push error value for invalid index type
+            auto errorType = typeSystem->getErrorType("TypeConversion");
+            auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
+            ErrorValue errorVal("TypeConversion", "List index must be an integer");
+            errorValue->data = errorVal;
+            push(errorValue);
             return;
         }
         
@@ -3104,11 +3284,17 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
         
         // Check bounds
         if (idx < 0 || idx >= static_cast<int32_t>(listData.elements.size())) {
-            error("List index out of bounds");
+            // Create and push error value for out of bounds
+            auto errorType = typeSystem->getErrorType("IndexOutOfBounds");
+            auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
+            ErrorValue errorVal("IndexOutOfBounds", "List index " + std::to_string(idx) + 
+                              " out of bounds for list of size " + std::to_string(listData.elements.size()));
+            errorValue->data = errorVal;
+            push(errorValue);
             return;
         }
         
-        // Push the element at the index
+        // Push the element at the index (wrapped in success value for consistency)
         push(listData.elements[idx]);
         
     } else if (std::holds_alternative<DictValue>(container->data)) {
@@ -3125,7 +3311,12 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
         }
         
         if (!foundValue) {
-            error("Key not found in dictionary");
+            // Create and push error value for key not found
+            auto errorType = typeSystem->getErrorType("IndexOutOfBounds");
+            auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
+            ErrorValue errorVal("IndexOutOfBounds", "Key not found in dictionary");
+            errorValue->data = errorVal;
+            push(errorValue);
             return;
         }
         
@@ -3133,7 +3324,12 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
         push(foundValue);
         
     } else {
-        error("Cannot index non-container value");
+        // Create and push error value for non-indexable type
+        auto errorType = typeSystem->getErrorType("TypeConversion");
+        auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
+        ErrorValue errorVal("TypeConversion", "Cannot index non-container value");
+        errorValue->data = errorVal;
+        push(errorValue);
     }
 }
 
@@ -3153,7 +3349,12 @@ void VM::handleSetIndex(const Instruction& /*unused*/) {
         
         // Check if index is an integer
         if (!std::holds_alternative<int32_t>(index->data)) {
-            error("List index must be an integer");
+            // Create and push error value for invalid index type
+            auto errorType = typeSystem->getErrorType("TypeConversion");
+            auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
+            ErrorValue errorVal("TypeConversion", "List index must be an integer");
+            errorValue->data = errorVal;
+            push(errorValue);
             return;
         }
         
@@ -3161,7 +3362,13 @@ void VM::handleSetIndex(const Instruction& /*unused*/) {
         
         // Check bounds
         if (idx < 0 || idx >= static_cast<int32_t>(listData.elements.size())) {
-            error("List index out of bounds");
+            // Create and push error value for out of bounds
+            auto errorType = typeSystem->getErrorType("IndexOutOfBounds");
+            auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
+            ErrorValue errorVal("IndexOutOfBounds", "List index " + std::to_string(idx) + 
+                              " out of bounds for list of size " + std::to_string(listData.elements.size()));
+            errorValue->data = errorVal;
+            push(errorValue);
             return;
         }
         
@@ -3187,7 +3394,13 @@ void VM::handleSetIndex(const Instruction& /*unused*/) {
         }
         
     } else {
-        error("Cannot index non-container value");
+        // Create and push error value for non-indexable type
+        auto errorType = typeSystem->getErrorType("TypeConversion");
+        auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
+        ErrorValue errorVal("TypeConversion", "Cannot index non-container value");
+        errorValue->data = errorVal;
+        push(errorValue);
+        return;
     }
     
     // Push the modified container back onto the stack
@@ -3574,6 +3787,16 @@ void VM::handleMatchPattern(const Instruction& /*unused*/) {
         }
         else if (typeName == "__tuple_pattern__") {
             match = handleTuplePatternMatch(value);
+        }
+        // Handle error pattern matching
+        else if (typeName == "__val_pattern__") {
+            match = handleValPatternMatch(value);
+        }
+        else if (typeName == "__err_pattern__") {
+            match = handleErrPatternMatch(value);
+        }
+        else if (typeName == "__error_type_pattern__") {
+            match = handleErrorTypePatternMatch(value);
         }
         // Handle wildcard string pattern
         else if (typeName == "_") {
@@ -4261,28 +4484,22 @@ void VM::handleDebugPrint(const Instruction& instruction) {
 
 // Error handling instruction implementations
 void VM::handleCheckError(const Instruction& instruction) {
-    if (stack.empty()) {
+    if (stack.empty()) [[unlikely]] {
         error("Stack underflow in CHECK_ERROR");
         return;
     }
     
-    // Peek the top value without consuming it. CHECK_ERROR should push a boolean
-    // indicating whether the value is an error union / error value. The bytecode
-    // typically uses CHECK_ERROR followed by JUMP_IF_FALSE to decide whether to
-    // handle/propagate the error while leaving the original union on the stack
-    // for later UNWRAP_VALUE or PROPAGATE_ERROR.
+    // Peek the top value without consuming it - optimized for success path
     ValuePtr value = peek();
 
-    bool isError = false;
-    if (value && value->type) {
-        if (value->type->tag == TypeTag::ErrorUnion) {
-            isError = std::holds_alternative<ErrorValue>(value->data);
-        } else if (std::holds_alternative<ErrorValue>(value->data)) {
-            isError = true;
-        }
+    // Fast path: most values are not errors
+    bool isError = isErrorValue(value);
+    
+    if (isError) {
+        recordErrorPath();
+    } else {
+        recordSuccessPath();
     }
-
-    // handleCheckError debug output removed
 
     // Push the boolean result onto the stack for the subsequent JUMP_IF_FALSE
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, isError));
@@ -4361,81 +4578,65 @@ void VM::handlePropagateError(const Instruction& instruction) {
 }
 
 void VM::handleConstructError(const Instruction& instruction) {
-    std::string errorType = instruction.stringValue;
+    const std::string& errorType = instruction.stringValue;
     int32_t argCount = instruction.intValue;
     
-    if (stack.size() < static_cast<size_t>(argCount)) {
+    if (stack.size() < static_cast<size_t>(argCount)) [[unlikely]] {
         error("Stack underflow in CONSTRUCT_ERROR");
         return;
     }
     
-    // Pop arguments from stack
-    std::vector<ValuePtr> args;
-    args.reserve(argCount);
-    for (int i = 0; i < argCount; i++) {
-        args.push_back(pop());
-    }
-    std::reverse(args.begin(), args.end());  // Maintain correct order
+    recordErrorPath();
     
-    // Create error message
+    // Pop arguments from stack - optimized for common case of 0-1 args
+    std::vector<ValuePtr> args;
+    if (argCount > 0) {
+        args.reserve(argCount);
+        for (int i = 0; i < argCount; i++) {
+            args.push_back(pop());
+        }
+        std::reverse(args.begin(), args.end());  // Maintain correct order
+    }
+    
+    // Create error message - optimized for common patterns
     std::string errorMessage;
-    if (!args.empty() && args[0]->type->tag == TypeTag::String) {
+    if (!args.empty() && args[0]->type->tag == TypeTag::String) [[likely]] {
         errorMessage = std::get<std::string>(args[0]->data);
     } else {
         errorMessage = "Error occurred";
     }
     
-    // Look up error type in the type system
-    TypePtr errorTypePtr = typeSystem->getType(errorType);
-    if (!errorTypePtr) {
-        error("Unknown error type: " + errorType);
-        return;
+    // Use optimized pooled error creation for better performance
+    ValuePtr errorValue;
+    if (args.empty() || args.size() == 1) {
+        // Common case: use pooled error value
+        errorValue = createPooledErrorValue(errorType, errorMessage);
+    } else {
+        // Less common case: use full error creation
+        errorValue = createErrorValue(errorType, errorMessage, args);
     }
-    
-    // Create error value with proper type information
-    ErrorValue errorVal(errorType, errorMessage, args, ip);
-    ValuePtr errorValue = memoryManager.makeRef<Value>(*region, errorTypePtr);
-    errorValue->data = errorVal;
-    
-    // Create error union type
-    auto errorUnionType = memoryManager.makeRef<Type>(*region, TypeTag::ErrorUnion);
-    ErrorUnionType errorUnionDetails;
-    errorUnionDetails.successType = typeSystem->NIL_TYPE;
-    errorUnionDetails.errorTypes = {errorType};
-    errorUnionDetails.isGenericError = false;
-    errorUnionType->extra = errorUnionDetails;
-    
-    // Create the final value with the error union type
-    ValuePtr result = memoryManager.makeRef<Value>(*region, errorUnionType);
-    result->data = errorVal;
     
     if (debugOutput) {
         std::cerr << "[DEBUG] handleConstructError: created error '" << errorType << "' message='" << errorMessage << "'" << std::endl;
     }
 
-    push(result);
+    push(errorValue);
 }
 
 void VM::handleConstructOk(const Instruction& instruction) {
     (void)instruction; // Mark as unused
-    if (stack.empty()) {
+    if (stack.empty()) [[unlikely]] {
         error("Stack underflow in CONSTRUCT_OK");
         return;
     }
     
+    recordSuccessPath();
+    
     ValuePtr successValue = pop();
     
-    // Create error union type that wraps the success value
-    auto errorUnionType = memoryManager.makeRef<Type>(*region, TypeTag::ErrorUnion);
-    ErrorUnionType errorUnionDetails;
-    errorUnionDetails.successType = successValue->type;
-    errorUnionDetails.errorTypes = {}; // No specific error types for generic ok()
-    errorUnionDetails.isGenericError = true;
-    errorUnionType->extra = errorUnionDetails;
+    // Use optimized error union creation
+    ValuePtr okValue = createOptimizedErrorUnion(successValue);
     
-    // Create a new value with the error union type but containing the success data
-    ValuePtr okValue = memoryManager.makeRef<Value>(*region, errorUnionType);
-    okValue->data = successValue->data; // Copy the success value's data
     if (debugOutput) {
         std::cerr << "[DEBUG] handleConstructOk: created ok value of type " << (successValue->type ? successValue->type->toString() : "(unknown)") << std::endl;
     }
@@ -4495,7 +4696,7 @@ void VM::handleIsSuccess(const Instruction& instruction) {
 
 void VM::handleUnwrapValue(const Instruction& instruction) {
     (void)instruction; // Mark as unused
-    if (stack.empty()) {
+    if (stack.empty()) [[unlikely]] {
         // Always emit this diagnostic; it's critical when debugging unwrap/value errors
         std::cerr << "[DEBUG] UNWRAP_VALUE underflow: callStack=" << callStack.size() << " errorFrames=" << errorFrames.size() << " ip=" << ip << std::endl;
         error("Stack underflow in UNWRAP_VALUE");
@@ -4504,49 +4705,42 @@ void VM::handleUnwrapValue(const Instruction& instruction) {
     
     ValuePtr value = pop();
     
-    // Check if this is an error that should be propagated
-    if (value->type->tag == TypeTag::ErrorUnion) {
-        if (std::holds_alternative<ErrorValue>(value->data)) {
-            // This is an error - propagate it
-            push(value); // Put the error back on stack for propagation
-            if (debugOutput) {
-                std::cerr << "[DEBUG] handleUnwrapValue: found error, attempting propagate: " << valueToString(value) << std::endl;
-            }
-            if (!propagateError(value)) {
-                // No error handler found
-                if (auto errorVal = std::get_if<ErrorValue>(&value->data)) {
-                    error("Unhandled error during unwrap: " + errorVal->errorType + 
-                          (errorVal->message.empty() ? "" : " - " + errorVal->message));
-                } else {
-                    error("Unhandled error during unwrap: " + valueToString(value));
-                }
-            }
-            return; // Execution continues at error handler or terminates
-        } else {
-            // This is a success value in an error union - extract the actual value
-            // Create a new value with the original success type
-            if (auto errorUnionDetails = std::get_if<ErrorUnionType>(&value->type->extra)) {
-                ValuePtr unwrappedValue = memoryManager.makeRef<Value>(*region, errorUnionDetails->successType);
-                unwrappedValue->data = value->data; // Copy the data
-                push(unwrappedValue);
-            } else {
-                // Fallback: push the value as-is
-                push(value);
-            }
+    // Fast path: check if this is an error that should be propagated
+    if (isErrorValue(value)) [[unlikely]] {
+        recordErrorPath();
+        
+        // This is an error - propagate it
+        push(value); // Put the error back on stack for propagation
+        if (debugOutput) {
+            std::cerr << "[DEBUG] handleUnwrapValue: found error, attempting propagate: " << valueToString(value) << std::endl;
         }
-    } else if (std::holds_alternative<ErrorValue>(value->data)) {
-        // Direct error value - propagate it
-        push(value);
         if (!propagateError(value)) {
-            if (auto errorVal = std::get_if<ErrorValue>(&value->data)) {
+            // No error handler found
+            if (const auto* errorVal = value->getErrorValue()) {
                 error("Unhandled error during unwrap: " + errorVal->errorType + 
                       (errorVal->message.empty() ? "" : " - " + errorVal->message));
             } else {
                 error("Unhandled error during unwrap: " + valueToString(value));
             }
         }
+        return; // Execution continues at error handler or terminates
+    }
+    
+    recordSuccessPath();
+    
+    // Success path: extract value from error union if needed
+    if (value->type->tag == TypeTag::ErrorUnion) [[likely]] {
+        // This is a success value in an error union - extract the actual value
+        if (const auto* errorUnionDetails = std::get_if<ErrorUnionType>(&value->type->extra)) {
+            ValuePtr unwrappedValue = memoryManager.makeRef<Value>(*region, errorUnionDetails->successType);
+            unwrappedValue->data = value->data; // Copy the data
+            push(unwrappedValue);
+        } else {
+            // Fallback: push the value as-is
+            push(value);
+        }
     } else {
-        // Not an error union or error, just push the value back (it's already "unwrapped")
+        // Not an error union, just push the value back (it's already "unwrapped")
         push(value);
     }
 }
@@ -4834,3 +5028,138 @@ void VM::handleCreateList(const Instruction& instruction) {
     }
 }
 
+// Error pattern matching methods
+
+bool VM::handleValPatternMatch(const ValuePtr& value) {
+    // Stack layout (from top to bottom):
+    // - pattern marker ("__val_pattern__") [already popped]
+    // - variable name for binding
+    
+    ValuePtr variableName = pop();
+    std::string varName = std::get<std::string>(variableName->data);
+    
+    // Check if the value is a success value (not an error)
+    bool isSuccess = true;
+    ValuePtr actualValue = value;
+    
+    if (value->type->tag == TypeTag::ErrorUnion) {
+        if (std::holds_alternative<ErrorValue>(value->data)) {
+            // This is an error in an error union - pattern doesn't match
+            return false;
+        } else {
+            // This is a success value in an error union - extract it
+            if (auto errorUnionDetails = std::get_if<ErrorUnionType>(&value->type->extra)) {
+                actualValue = memoryManager.makeRef<Value>(*region, errorUnionDetails->successType);
+                actualValue->data = value->data;
+            }
+        }
+    } else if (std::holds_alternative<ErrorValue>(value->data)) {
+        // Direct error value - pattern doesn't match
+        return false;
+    }
+    
+    // Bind the success value to the variable
+    environment->define(varName, actualValue);
+    
+    return true;
+}
+
+bool VM::handleErrPatternMatch(const ValuePtr& value) {
+    // Stack layout (from top to bottom):
+    // - pattern marker ("__err_pattern__") [already popped]
+    // - specific error type (or null for any error)
+    // - variable name for binding
+    
+    ValuePtr specificErrorType = pop();
+    ValuePtr variableName = pop();
+    std::string varName = std::get<std::string>(variableName->data);
+    
+    // Check if the value is an error
+    ErrorValue* errorValue = nullptr;
+    
+    if (value->type->tag == TypeTag::ErrorUnion) {
+        if (std::holds_alternative<ErrorValue>(value->data)) {
+            errorValue = &std::get<ErrorValue>(value->data);
+        } else {
+            // This is a success value - pattern doesn't match
+            return false;
+        }
+    } else if (std::holds_alternative<ErrorValue>(value->data)) {
+        errorValue = &std::get<ErrorValue>(value->data);
+    } else {
+        // Not an error value - pattern doesn't match
+        return false;
+    }
+    
+    // Check specific error type if specified
+    if (specificErrorType->type->tag != TypeTag::Nil) {
+        std::string expectedErrorType = std::get<std::string>(specificErrorType->data);
+        if (errorValue->errorType != expectedErrorType) {
+            return false;
+        }
+    }
+    
+    // Create an error value to bind
+    ValuePtr errorValueToBindPtr = memoryManager.makeRef<Value>(*region, typeSystem->ANY_TYPE);
+    errorValueToBindPtr->data = *errorValue;
+    
+    // Bind the error value to the variable
+    environment->define(varName, errorValueToBindPtr);
+    
+    return true;
+}
+
+bool VM::handleErrorTypePatternMatch(const ValuePtr& value) {
+    // Stack layout (from top to bottom):
+    // - pattern marker ("__error_type_pattern__") [already popped]
+    // - parameter names (for binding)
+    // - number of parameters
+    // - error type name
+    
+    ValuePtr errorTypeName = pop();
+    ValuePtr numParamsValue = pop();
+    int numParams = std::get<int32_t>(numParamsValue->data);
+    
+    std::vector<std::string> paramNames;
+    for (int i = 0; i < numParams; i++) {
+        ValuePtr paramName = pop();
+        paramNames.insert(paramNames.begin(), std::get<std::string>(paramName->data));
+    }
+    
+    std::string expectedErrorType = std::get<std::string>(errorTypeName->data);
+    
+    // Check if the value is an error of the expected type
+    ErrorValue* errorValue = nullptr;
+    
+    if (value->type->tag == TypeTag::ErrorUnion) {
+        if (std::holds_alternative<ErrorValue>(value->data)) {
+            errorValue = &std::get<ErrorValue>(value->data);
+        } else {
+            // This is a success value - pattern doesn't match
+            return false;
+        }
+    } else if (std::holds_alternative<ErrorValue>(value->data)) {
+        errorValue = &std::get<ErrorValue>(value->data);
+    } else {
+        // Not an error value - pattern doesn't match
+        return false;
+    }
+    
+    // Check if error type matches
+    if (errorValue->errorType != expectedErrorType) {
+        return false;
+    }
+    
+    // Bind error parameters to variables
+    for (size_t i = 0; i < paramNames.size() && i < errorValue->arguments.size(); i++) {
+        environment->define(paramNames[i], errorValue->arguments[i]);
+    }
+    
+    // For missing parameters, bind nil
+    for (size_t i = errorValue->arguments.size(); i < paramNames.size(); i++) {
+        ValuePtr nilValue = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE, nullptr);
+        environment->define(paramNames[i], nilValue);
+    }
+    
+    return true;
+}

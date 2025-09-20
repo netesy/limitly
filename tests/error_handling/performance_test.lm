@@ -1,0 +1,99 @@
+// Error Handling Performance Test
+// This test validates zero-cost abstractions for error handling
+
+// Test 1: Success path performance - should have minimal overhead
+fn success_path_test(iterations: int) : int {
+    var sum = 0;
+    iter (i in 1..iterations) {
+        var result = safe_add(i, 1)?;
+        sum = sum + result;
+    }
+    return sum;
+}
+
+// Test 2: Error path performance - should be efficient when errors occur
+fn error_path_test(iterations: int) : int?DivisionByZero {
+    var sum = 0;
+    iter (i in 1..iterations) {
+        var result = safe_divide(i, 0)?;
+        sum = sum + result;
+    }
+    return sum;
+}
+
+// Test 3: Mixed path performance - realistic scenario
+fn mixed_path_test(iterations: int) : int {
+    var sum = 0;
+    iter (i in 1..iterations) {
+        if (i % 10 == 0) {
+            // Error case - should be handled efficiently
+            var result = safe_divide(i, 0) ?else {
+                continue;
+            };
+            sum = sum + result;
+        } else {
+            // Success case - should be zero-cost
+            var result = safe_add(i, 1)?;
+            sum = sum + result;
+        }
+    }
+    return sum;
+}
+
+// Helper functions that can fail
+fn safe_add(a: int, b: int) : int {
+    return a + b;
+}
+
+fn safe_divide(a: int, b: int) : int?DivisionByZero {
+    if (b == 0) {
+        return err(DivisionByZero("Division by zero"));
+    }
+    return a / b;
+}
+
+// Performance benchmark
+fn benchmark_error_handling() {
+    var iterations = 10000;
+    
+    print("Running error handling performance tests...");
+    
+    // Test success path
+    var start_time = clock();
+    var success_result = success_path_test(iterations) ?else {
+        print("Unexpected error in success path test");
+        return;
+    };
+    var success_time = clock() - start_time;
+    
+    print("Success path test compvared in " + success_time + " seconds");
+    print("Result: " + success_result);
+    
+    // Test mixed path
+    var mixed_start = clock();
+    var mixed_result = mixed_path_test(iterations);
+    var mixed_time = clock() - mixed_start;
+    
+    print("Mixed path test compvared in " + mixed_time + " seconds");
+    print("Result: " + mixed_result);
+    
+    // Calculate performance metrics
+    var success_ops_per_sec = iterations / success_time;
+    var mixed_ops_per_sec = iterations / mixed_time;
+    
+    print("Success path: " + success_ops_per_sec + " operations/second");
+    print("Mixed path: " + mixed_ops_per_sec + " operations/second");
+    
+    // Validate zero-cost abstraction
+    var overhead_ratio = mixed_time / success_time;
+    print("Overhead ratio: " + overhead_ratio);
+    
+    if (overhead_ratio < 1.5) {
+        print("✓ Zero-cost abstraction validated - low overhead");
+    } else {
+        print("⚠ High overhead detected - optimization needed");
+    }
+}
+
+// Run the benchmark
+benchmark_error_handling();

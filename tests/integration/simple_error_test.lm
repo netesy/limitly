@@ -1,0 +1,34 @@
+print("=== Simple Error Handling Test ===")
+
+
+fn add(a: int, b: int) : int {
+    return a + b;
+}
+
+
+fn test_basic_operations() {
+    print("Testing basic operations...")
+    
+    var x: int = 10;
+    var y: int = 2;
+    var result: int = x / y;
+    print("10 / 2 = " + result);
+    
+    var zero: int = 0;
+    if (zero == 0) {
+        print("Division by zero would be an error");
+    }
+}
+
+fn test_function_calls() {
+    print("Testing function calls...");
+    
+   
+    var sum: int = add(5, 3);
+    print("5 + 3 = " + sum);
+}
+
+test_basic_operations()
+test_function_calls()
+
+print("=== Error Handling Test Compvare ===")

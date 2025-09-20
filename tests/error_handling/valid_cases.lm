@@ -1,0 +1,68 @@
+// Test cases that should compile successfully without errors
+
+// Basic fallible function
+fn safeDivide(a: int, b: int): int?DivisionByZero {
+    return ok(a / b);
+}
+
+// Function that properly propagates compatible errors
+fn chainedDivision(x: int, y: int, z: int): int?DivisionByZero {
+    var step1 = safeDivide(x, y)?;  // OK: Compatible error types
+    var step2 = safeDivide(step1, z)?;  // OK: Compatible error types
+    return ok(step2);
+}
+
+// Function with generic error type
+fn maybeError(flag: bool): int? {
+    if (flag) {
+        return err(DivisionByZero);
+    }
+    return ok(42);
+}
+
+// Function that narrows from generic to specific
+fn narrowError(flag: bool): int?DivisionByZero {
+    var result = maybeError(flag)?;  // OK: Generic can be narrowed to specific
+    return ok(result);
+}
+
+// Function with multiple error types
+fn multiError(x: int): int?DivisionByZero, IndexOutOfBounds {
+    if (x < 0) {
+        return err(DivisionByZero);  // OK: DivisionByZero is in signature
+    }
+    if (x > 100) {
+        return err(IndexOutOfBounds);  // OK: IndexOutOfBounds is in signature
+    }
+    return ok(x);
+}
+
+// Proper variable assignments
+fn validAssignments(): nil {
+    var success: int?DivisionByZero = ok(42);
+    var error: int?DivisionByZero = err(DivisionByZero);
+    var generic: int? = ok(100);
+}
+
+// Function calls with correct argument types
+fn correctCalls(): nil {
+    var result1 = safeDivide(10, 2);  // OK: int, int arguments
+    var result2 = chainedDivision(20, 4, 2);  // OK: int, int, int arguments
+}
+
+// Non-fallible function that doesn't use error propagation
+fn nonFallibleCorrect(x: int, y: int): int {
+    return x + y;  // OK: No error propagation
+}
+
+fn main(): nil {
+    print("Valid error handling cases test");
+    
+    // All these should work without errors
+    var r1 = chainedDivision(100, 10, 2);
+    var r2 = narrowError(false);
+    var r3 = multiError(50);
+    var r4 = nonFallibleCorrect(5, 3);
+    
+    print("All valid cases compiled successfully!");
+}

@@ -41,35 +41,35 @@ fn test_error_propagation() {
     
     // Error propagation
     // var error_result = divide(10, 0)?;  // Will propagate DivisionByZero
-    // print("This should not print due to error propagation");
+    print("This should not print due to error propagation");
     
-    // Compile-time error: Unhandled error type 'Overflow'
-    // var unhandled = parse_number("123")?;
+  //  Compile-time error: Unhandled error type 'Overflow'
+    var unhandled = parse_number("123")?;
 }
 
 // Test 4: Fallible expression with error handling and type checking
 fn test_error_handling() {
     // Valid error handling
-//    var result = divide(10, 0)? else error {
-//        print("Caught error:", error);
-//        return -1;
-//    };
+   var result = divide(10, 0)? else error {
+       print("Caught error:", error);
+       return -1;
+   };
     
     // Type checking in error handler
-    // var parsed = parse_number("123")? else error {
-    //     // Compile-time error: Type mismatch in error handling
-    //     // if (error == "DivisionByZero") { ... }
+    var parsed = parse_number("123")? else error {
+        // Compile-time error: Type mismatch in error handling
+        // if (error == "DivisionByZero") { ... }
         
-    //     // Valid type checking
-    //     if (error == "InvalidNumber") {
-    //         print("Invalid number format");
-    //     } else if (error == "Overflow") {
-    //         print("Number too large");
-    //     }
-    //     return -1;
-    // };
+        // Valid type checking
+        if (error == "InvalidNumber") {
+            print("Invalid number format");
+        } else if (error == "Overflow") {
+            print("Number too large");
+        }
+        return -1;
+    };
     
-    // print("Result after error handling:", result);
+    print("Result after error handling:", result);
 }
 
 // Test 5: Error type checking and pattern matching
@@ -78,28 +78,28 @@ fn test_error_checking() {
     var error_val = err(TestError);
     
     // Type checking with is_error/is_success
-    // if (is_error(success_val)) {
-    //     print("Success value incorrectly identified as error");
-    // } else {
-    //     print("Success value correctly identified");
-    // }
+    if (is_error(success_val)) {
+        print("Success value incorrectly identified as error");
+    } else {
+        print("Success value correctly identified");
+    }
     
-    // if (is_error(error_val)) {
-    //     print("Error value correctly identified");
-    // } else {
-    //     print("Error value incorrectly identified as success");
-    // }
+    if (is_error(error_val)) {
+        print("Error value correctly identified");
+    } else {
+        print("Error value incorrectly identified as success");
+    }
     
     // Pattern matching with match expression
-    // match (divide(10, 0)) {
-    //     val(x) => {print("Got value:", x); },
-    //     err(e) => { print("Got error:", e); },
-    // }
+    match (divide(10, 0)) {
+        val(x) => {print("Got value:", x); },
+        err(e) => { print("Got error:", e); },
+    }
     
     // Compile-time error: Non-exhaustive match
-    // match divide(10, 2) {
-    //     val(x) => print("Got value:", x)
-    // }
+    match (divide(10, 2)) {
+        val(x) => print("Got value:", x)
+    }
 }
 
 // Test 6: Error type composition
@@ -121,18 +121,18 @@ fn test_error_composition() {
 
     
     // // Valid usage with all error types handled
-    // var result = process_and_divide("test", 2)? else error {
-    //     if (error == "DivisionByZero") {
-    //         print("Cannot divide by zero");
-    //     } else if (error == "ParseError") {
-    //         print("Failed to parse input");
-    //     } else if (error == "IOError") {
-    //         print("IO error occurred");
-    //     }
-    //     return -1;
-    // };
+    var result = process_and_divide("test", 2)? else error {
+        if (error == "DivisionByZero") {
+            print("Cannot divide by zero");
+        } else if (error == "ParseError") {
+            print("Failed to parse input");
+        } else if (error == "IOError") {
+            print("IO error occurred");
+        }
+        return -1;
+    };
     
-    // print("Processed result:", result);
+    print("Processed result:", result);
 }
 
 // Test 7: Error type inference

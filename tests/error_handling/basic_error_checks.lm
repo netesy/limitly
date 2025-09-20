@@ -1,0 +1,88 @@
+// Basic compile-time error type checking tests
+
+// Test 1: Function with error union return type
+fn divide(a: int, b: int): int?DivisionByZero {
+    if (b == 0) {
+        return err(DivisionByZero);
+    }
+    return ok(a / b);
+}
+
+// Test 2: Function that propagates errors correctly
+fn safeDivide(x: int, y: int): int?DivisionByZero {
+    var result = divide(x, y)?;  // Should work - compatible error types
+    return ok(result);
+}
+
+// Test 3: Function that tries to propagate incompatible error types (should fail)
+fn incompatiblePropagate(x: int, y: int): int?IndexOutOfBounds {
+    var result = divide(x, y)?;  // Should fail - DivisionByZero not compatible with IndexOutOfBounds
+    return ok(result);
+}
+
+// Test 4: Non-fallible function trying to use ? operator (should fail)
+fn nonFallibleWithPropagation(x: int, y: int): int {
+    var result = divide(x, y)?;  // Should fail - cannot propagate in non-fallible function
+    return result;
+}
+
+// Test 5: Unhandled fallible expression (should fail)
+fn unhandledFallible(x: int, y: int): nil {
+    divide(x, y);  // Should fail - fallible expression not handled
+}
+
+// Test 6: Function with generic error type
+fn genericError(flag: bool): int? {
+    if (flag) {
+        return err(DivisionByZero);
+    }
+    return ok(42);
+}
+
+// Test 7: Function that can propagate from generic error
+fn propagateGeneric(flag: bool): int?DivisionByZero {
+    var result = genericError(flag)?;  // Should work - generic can be narrowed
+    return ok(result);
+}
+
+// Test 8: Multiple error types in function signature
+fn multipleErrors(x: int): int?DivisionByZero, IndexOutOfBounds {
+    if (x < 0) {
+        return err(DivisionByZero);
+    }
+    if (x > 100) {
+        return err(IndexOutOfBounds);
+    }
+    return ok(x);
+}
+
+// Test 9: Error construction with unknown error type (should fail)
+fn unknownErrorType(): int?UnknownError {
+    return err(UnknownError);  // Should fail - UnknownError not defined
+}
+
+// Test 10: Type mismatch in error union assignment
+fn typeMismatch(): nil {
+    var x: int?DivisionByZero = "hello";  // Should fail - string not compatible with int?DivisionByZero
+}
+
+// Test 11: Correct error union assignment
+fn correctAssignment(): nil {
+    var x: int?DivisionByZero = ok(42);  // Should work
+    var y: int?DivisionByZero = err(DivisionByZero);  // Should work
+}
+
+// Test 12: Function call with wrong argument types
+fn wrongArguments(): nil {
+    divide("hello", "world");  // Should fail - string arguments not compatible with int parameters
+}
+
+// Main function to test the error handling
+
+    print("Testing basic compile-time error checking");
+    
+    // These should work
+    var result1 = safeDivide(10, 2);
+    var result2 = propagateGeneric(false);
+    
+    print("Basic error checking test completed");

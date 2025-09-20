@@ -592,6 +592,7 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "enum") return TokenType::ENUM;
     if (rest == "err") return TokenType::ERR;
     if (rest == "ok") return TokenType::OK;
+    if (rest == "val") return TokenType::VAL;
 
     // Check if the identifier matches a type keyword
     if (rest == "int") return TokenType::INT_TYPE;
@@ -902,6 +903,8 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "ERR";
     case TokenType::OK:
         return "OK";
+    case TokenType::VAL:
+        return "VAL";
         break;
     }
     return "UNKNOWN";

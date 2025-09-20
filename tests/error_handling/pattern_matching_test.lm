@@ -1,0 +1,127 @@
+// Test error pattern matching in match expressions
+
+fn divide(a: int, b: int): int?DivisionByZero {
+    if (b == 0) {
+        return err(DivisionByZero("Cannot divide by zero"));
+    }
+    return ok(a / b);
+}
+
+fn processResult(result: int?DivisionByZero): str {
+    match (result) {
+        val x => "Success: " + x,
+        err e => "Error: " + e.message
+    }
+}
+
+fn processResultSpecific(result: int?DivisionByZero): str {
+    match (result) {
+        val x => "Success: " + x,
+        DivisionByZero(msg) => "Division error: " + msg
+    }
+}
+
+fn processMultipleErrors(result: int?DivisionByZero, IndexOutOfBounds): str {
+    match (result) {
+        val x => "Success: " + x,
+        DivisionByZero(msg) => "Division error: " + msg,
+        IndexOutOfBounds(msg) => "Index error: " + msg
+    }
+}
+
+fn testGenericErrorPattern() {
+    var result1 = divide(10, 2);
+    var result2 = divide(10, 0);
+    
+    print(processResult(result1)); // Should print: Success: 5
+    print(processResult(result2)); // Should print: Error: Cannot divide by zero
+}
+
+fn testSpecificErrorPattern() {
+    var result1 = divide(10, 2);
+    var result2 = divide(10, 0);
+    
+    print(processResultSpecific(result1)); // Should print: Success: 5
+    print(processResultSpecific(result2)); // Should print: Division error: Cannot divide by zero
+}
+
+fn testNestedErrorPatterns() {
+    fn processNested(outer: int?DivisionByZero): str {
+        match (outer) {
+            val x => {
+                var inner = divide(x, 2);
+                match (inner) {
+                    val y => "Nested success: " + y,
+                    err e => "Nested error: " + e.message
+                }
+            },
+            err e => "Outer error: " + e.message
+        }
+    }
+    
+    var result1 = divide(10, 2);
+    var result2 = divide(10, 0);
+    
+    print(processNested(result1)); // Should print: Nested success: 2
+    print(processNested(result2)); // Should print: Outer error: Cannot divide by zero
+}
+
+fn testErrorPatternWithGuards() {
+    fn processWithGuard(result: int?DivisionByZero): str {
+        match (result) {
+            val x where x > 5 => "Large success: " + x,
+            val x => "Small success: " + x,
+            err e => "Error: " + e.message
+        }
+    }
+    
+    var result1 = divide(20, 2);  // 10
+    var result2 = divide(6, 2);   // 3
+    var result3 = divide(10, 0);  // Error
+    
+    print(processWithGuard(result1)); // Should print: Large success: 10
+    print(processWithGuard(result2)); // Should print: Small success: 3
+    print(processWithGuard(result3)); // Should print: Error: Cannot divide by zero
+}
+
+// Test exhaustive matching validation
+fn testExhaustiveMatching() {
+    // This should compile fine - exhaustive
+    fn exhaustive(result: int?DivisionByZero): str {
+        match (result) {
+            val x => "Success: " + x,
+            err e => "Error: " + e.message
+        }
+    }
+    
+    // This should cause a compile error - not exhaustive (missing error case)
+    /*
+    fn notExhaustive1(result: int?DivisionByZero): str {
+        match (result) {
+            val x => "Success: " + x
+        }
+    }
+    */
+    
+    // This should cause a compile error - not exhaustive (missing success case)
+    /*
+    fn notExhaustive2(result: int?DivisionByZero): str {
+        match (result) {
+            err e => "Error: " + e.message
+        }
+    }
+    */
+}
+
+// Main test function
+fn main() {
+    print("Testing error pattern matching...");
+    
+    testGenericErrorPattern();
+    testSpecificErrorPattern();
+    testNestedErrorPatterns();
+    testErrorPatternWithGuards();
+    testExhaustiveMatching();
+    
+    print("Error pattern matching tests completed!");
+}
