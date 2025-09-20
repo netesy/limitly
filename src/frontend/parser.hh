@@ -131,6 +131,12 @@ public:
     std::shared_ptr<AST::Expression> parseListPattern();
     std::shared_ptr<AST::Expression> parseDictPattern();
     std::shared_ptr<AST::Expression> parseTuplePattern();
+    std::shared_ptr<AST::Expression> parseValPattern();
+    std::shared_ptr<AST::Expression> parseErrPattern();
+    std::shared_ptr<AST::Expression> parseErrorTypePattern();
+    
+    // Helper methods for error pattern matching
+    bool isErrorType(const std::string& name);
 };
 
 

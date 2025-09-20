@@ -147,6 +147,7 @@ enum class TokenType {
     SLEEP,      // sleep
     ERR,        // err
     OK,         // ok
+    VAL,        // val
 
     // Other
     UNDEFINED, // undefined token

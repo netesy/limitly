@@ -132,9 +132,14 @@ tests/
 ### Planned Test Coverage
 - [ ] Function declarations and calls
 - [ ] Classes and objects
-- [ ] Error handling (try/catch)
+- [ ] Error handling 
 - [ ] Concurrency primitives
 - [ ] Advanced type features
+- [ ] Modules System
+- [ ] Traits
+- [ ] Pattern Matching
+- [ ] Reflection
+
 
 ### Edge Cases Tested
 - ✅ **Nested control structures**: Multiple levels of nesting

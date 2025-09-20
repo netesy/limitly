@@ -16,27 +16,16 @@
 
 ### Task 1.3: Debug Function Execution
 - [ ] Add debug output to function execution path
-- [ ] Verify jump to function start address works
-- [ ] Check if function body instructions execute
-- [ ] Verify return handling works correctly
-
-## Phase 2: Fix Function Call System
-
-### Task 2.1: Fix Function Definition
-- [ ] Ensure `handleBeginFunction` correctly stores function metadata
-- [ ] Fix function start address calculation
-- [ ] Ensure function parameters are stored correctly
-- [ ] Test function definition with various parameter types
+   -  Verify jump to function start address works
+   -  Check if function body instructions execute
+   -  Verify return handling works correctly
+   - Ensure `handleBeginFunction` correctly stores function metadata
+   -  Fix function start address calculation
+   -  Ensure function parameters are stored correctly
+   -  Test function definition with various parameter types
 
 ### Task 2.2: Fix Function Call Resolution
 - [ ] Ensure function lookup works in `handleCall`
-
-
-
-
-
-
-
 
   -  Fix parameter binding in function environment
   -  Ensure call stack management works correctly
@@ -46,6 +35,7 @@
 - [ ] Ensure jump to function start works correctly
   -  Fix function body execution
   -  Ensure return statement handling works
+  -  Ensure Module function return statement handling works
   -  Test nested function calls
 
 ## Phase 3: Fix Module System

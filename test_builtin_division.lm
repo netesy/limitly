@@ -1,0 +1,18 @@
+// Test built-in division error handling
+
+fn test_builtin_division() {
+    print("Testing built-in division by zero");
+    
+    // This should return an error union, not crash
+    var result = 10 / 0;
+    print("Division result type:", result);
+    
+    // We should be able to handle it with ?else
+    var handled = (10 / 0)? else error {
+        print("Caught division by zero:", error);
+        -1
+    };
+    print("Handled result:", handled);
+}
+
+test_builtin_division();

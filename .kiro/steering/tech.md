@@ -15,14 +15,7 @@
    make
    ```
 
-2. **Zig Build** (alternative build system)
-   ```bash
-   zig build
-   zig build run
-   zig build test-parser
-   ```
-
-3. **Windows Batch** (MSYS2/MinGW64)
+2. **Windows Batch** (MSYS2/MinGW64)
    ```cmd
    build.bat
    ```

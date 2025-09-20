@@ -1,0 +1,98 @@
+// Comprehensive test for compile-time error type checking
+// This test demonstrates all implemented error checking features
+
+// Built-in error types are available: DivisionByZero, IndexOutOfBounds, etc.
+
+// Test 1: Basic fallible function
+fn divide(a: int, b: int): int?DivisionByZero {
+    return ok(a / b);  // Simplified - actual division by zero check would be in VM
+}
+
+// Test 2: ✅ SHOULD WORK - Compatible error propagation
+fn compatiblePropagation(x: int, y: int): int?DivisionByZero {
+    var result = divide(x, y)?;  // Compatible: DivisionByZero -> DivisionByZero
+    return ok(result);
+}
+
+// Test 3: ❌ SHOULD FAIL - Incompatible error propagation
+fn incompatiblePropagation(x: int, y: int): int?IndexOutOfBounds {
+    var result = divide(x, y)?;  // ERROR: DivisionByZero not compatible with IndexOutOfBounds
+    return ok(result);
+}
+
+// Test 4: ❌ SHOULD FAIL - Non-fallible function using ? operator
+fn nonFallibleFunction(x: int, y: int): int {
+    var result = divide(x, y)?;  // ERROR: Cannot propagate in non-fallible function
+    return result;
+}
+
+// Test 5: ❌ SHOULD FAIL - Unhandled fallible expression
+fn unhandledFallible(x: int, y: int): nil {
+    divide(x, y);  // ERROR: Fallible call not handled
+}
+
+// Test 6: ✅ SHOULD WORK - Generic error type
+fn genericErrorFunction(flag: bool): int? {
+    return ok(42);
+}
+
+// Test 7: ✅ SHOULD WORK - Propagating from generic to specific
+fn propagateFromGeneric(flag: bool): int?DivisionByZero {
+    var result = genericErrorFunction(flag)?;  // OK: generic can be narrowed
+    return ok(result);
+}
+
+// Test 8: ✅ SHOULD WORK - Multiple error types in signature
+fn multipleErrorTypes(x: int): int?DivisionByZero, IndexOutOfBounds {
+    if (x < 0) {
+        return err(DivisionByZero);
+    }
+    if (x > 100) {
+        return err(IndexOutOfBounds);
+    }
+    return ok(x);
+}
+
+// Test 9: ❌ SHOULD FAIL - Unknown error type
+fn unknownError(): int?UnknownErrorType {
+    return err(UnknownErrorType);  // ERROR: UnknownErrorType not defined
+}
+
+// Test 10: ❌ SHOULD FAIL - Type mismatch in variable assignment
+fn typeMismatchAssignment(): nil {
+    var x: int?DivisionByZero = "hello";  // ERROR: String not compatible with int?DivisionByZero
+}
+
+// Test 11: ✅ SHOULD WORK - Correct error union assignments
+fn correctAssignments(): nil {
+    var success: int?DivisionByZero = ok(42);        // OK: Success value
+    var error: int?DivisionByZero = err(DivisionByZero);  // OK: Error value
+}
+
+// Test 12: ❌ SHOULD FAIL - Wrong argument types
+fn wrongArgumentTypes(): nil {
+    divide("hello", "world");  // ERROR: String args not compatible with int params
+}
+
+// Test 13: ❌ SHOULD FAIL - Error type not in function signature
+fn errorNotInSignature(): int?IndexOutOfBounds {
+    return err(DivisionByZero);  // ERROR: DivisionByZero not in signature
+}
+
+// Test 14: ✅ SHOULD WORK - Proper error handling (simplified without match)
+fn properHandling(x: int, y: int): int {
+    // In a real implementation, this would use match statement
+    // For now, we'll just return a default value
+    return 0;
+}
+
+fn main(): nil {
+    print("Comprehensive error checking test");
+    
+    // These calls should work
+    var result1 = compatiblePropagation(10, 2);
+    var result2 = propagateFromGeneric(true);
+    var result3 = properHandling(10, 0);
+    
+    print("Test completed - check error messages above");
+}

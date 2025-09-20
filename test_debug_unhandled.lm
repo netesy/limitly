@@ -1,0 +1,15 @@
+// Debug test for unhandled fallible expression detection
+
+fn divide(a: int, b: int): int?DivisionByZero {
+    if (b == 0) {
+        return err(DivisionByZero);
+    }
+    return ok(a / b);
+}
+
+fn test_debug() {
+    // This should be detected as unhandled fallible expression
+    divide(10, 2);
+}
+
+test_debug();

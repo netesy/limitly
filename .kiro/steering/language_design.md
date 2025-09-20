@@ -55,11 +55,6 @@ Limit is designed with the following principles in mind:
 
 ## Error Handling
 
-### Attempt-Handle Pattern
-- `attempt` blocks for operations that might fail
-- `handle` clauses for different error types
-- No uncaught exceptions
-
 ### Result Types
 - `Result<T, E>` for operations that might fail
 - `Option<T>` for values that might be absent

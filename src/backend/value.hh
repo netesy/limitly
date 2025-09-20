@@ -217,8 +217,21 @@ struct Type
             return "Sum";
         case TypeTag::Union:
             return "Union";
-        case TypeTag::ErrorUnion:
+        case TypeTag::ErrorUnion: {
+            if (const auto* errorUnion = std::get_if<ErrorUnionType>(&extra)) {
+                std::string result = errorUnion->successType->toString() + "?";
+                if (!errorUnion->isGenericError && !errorUnion->errorTypes.empty()) {
+                    result += "{";
+                    for (size_t i = 0; i < errorUnion->errorTypes.size(); ++i) {
+                        if (i > 0) result += ", ";
+                        result += errorUnion->errorTypes[i];
+                    }
+                    result += "}";
+                }
+                return result;
+            }
             return "ErrorUnion";
+        }
         case TypeTag::UserDefined:
             return "UserDefined";
         case TypeTag::Object:
@@ -360,21 +373,24 @@ struct AtomicValue {
     AtomicValue(int64_t v) : inner(std::make_shared<std::atomic<int64_t>>(v)) {}
 };
 
-// ErrorUnion helper class for efficient tagged union operations
+// ErrorUnion helper class for efficient tagged union operations - optimized for cache efficiency
 class ErrorUnion {
 public:
     enum class Tag : uint8_t { SUCCESS, ERROR };
 
 private:
-    Tag tag_;
-    union {
+    // Optimize memory layout for cache efficiency
+    alignas(8) Tag tag_;  // Align to 8 bytes for better cache performance
+    
+    // Use a more cache-friendly layout
+    union alignas(8) {
         ValuePtr successValue_;
         ErrorValue errorValue_;
     };
 
 public:
-    // Constructors
-    ErrorUnion(ValuePtr success) : tag_(Tag::SUCCESS), successValue_(success) {}
+    // Constructors - optimized for common cases
+    ErrorUnion(ValuePtr success) noexcept : tag_(Tag::SUCCESS), successValue_(success) {}
     
     ErrorUnion(const ErrorValue& error) : tag_(Tag::ERROR) {
         new (&errorValue_) ErrorValue(error);
@@ -386,35 +402,35 @@ public:
         new (&errorValue_) ErrorValue(errorType, message, args, location);
     }
 
-    // Copy constructor
+    // Copy constructor - optimized for success path
     ErrorUnion(const ErrorUnion& other) : tag_(other.tag_) {
-        if (tag_ == Tag::SUCCESS) {
+        if (tag_ == Tag::SUCCESS) [[likely]] {
             successValue_ = other.successValue_;
         } else {
             new (&errorValue_) ErrorValue(other.errorValue_);
         }
     }
 
-    // Move constructor
+    // Move constructor - optimized for success path
     ErrorUnion(ErrorUnion&& other) noexcept : tag_(other.tag_) {
-        if (tag_ == Tag::SUCCESS) {
+        if (tag_ == Tag::SUCCESS) [[likely]] {
             successValue_ = std::move(other.successValue_);
         } else {
             new (&errorValue_) ErrorValue(std::move(other.errorValue_));
         }
     }
 
-    // Assignment operators - use copy-and-swap idiom
+    // Assignment operators - optimized with likely/unlikely hints
     ErrorUnion& operator=(const ErrorUnion& other) {
-        if (this != &other) {
+        if (this != &other) [[likely]] {
             // Destroy current content
-            if (tag_ == Tag::ERROR) {
+            if (tag_ == Tag::ERROR) [[unlikely]] {
                 errorValue_.~ErrorValue();
             }
             
             // Copy new content
             tag_ = other.tag_;
-            if (tag_ == Tag::SUCCESS) {
+            if (tag_ == Tag::SUCCESS) [[likely]] {
                 successValue_ = other.successValue_;
             } else {
                 new (&errorValue_) ErrorValue(other.errorValue_);
@@ -424,15 +440,15 @@ public:
     }
 
     ErrorUnion& operator=(ErrorUnion&& other) noexcept {
-        if (this != &other) {
+        if (this != &other) [[likely]] {
             // Destroy current content
-            if (tag_ == Tag::ERROR) {
+            if (tag_ == Tag::ERROR) [[unlikely]] {
                 errorValue_.~ErrorValue();
             }
             
             // Move new content
             tag_ = other.tag_;
-            if (tag_ == Tag::SUCCESS) {
+            if (tag_ == Tag::SUCCESS) [[likely]] {
                 successValue_ = std::move(other.successValue_);
             } else {
                 new (&errorValue_) ErrorValue(std::move(other.errorValue_));
@@ -441,60 +457,60 @@ public:
         return *this;
     }
 
-    // Destructor
+    // Destructor - optimized for success path
     ~ErrorUnion() {
-        if (tag_ == Tag::ERROR) {
+        if (tag_ == Tag::ERROR) [[unlikely]] {
             errorValue_.~ErrorValue();
         }
     }
 
-    // Inspection methods
-    bool isSuccess() const { return tag_ == Tag::SUCCESS; }
-    bool isError() const { return tag_ == Tag::ERROR; }
-    Tag getTag() const { return tag_; }
+    // Inspection methods - inlined for performance
+    [[nodiscard]] inline bool isSuccess() const noexcept { return tag_ == Tag::SUCCESS; }
+    [[nodiscard]] inline bool isError() const noexcept { return tag_ == Tag::ERROR; }
+    [[nodiscard]] inline Tag getTag() const noexcept { return tag_; }
 
-    // Value access methods
-    ValuePtr getSuccessValue() const {
-        if (tag_ != Tag::SUCCESS) {
+    // Value access methods - optimized with likely/unlikely hints
+    [[nodiscard]] ValuePtr getSuccessValue() const {
+        if (tag_ != Tag::SUCCESS) [[unlikely]] {
             throw std::runtime_error("Attempted to get success value from error union");
         }
         return successValue_;
     }
 
-    const ErrorValue& getErrorValue() const {
-        if (tag_ != Tag::ERROR) {
+    [[nodiscard]] const ErrorValue& getErrorValue() const {
+        if (tag_ != Tag::ERROR) [[unlikely]] {
             throw std::runtime_error("Attempted to get error value from success union");
         }
         return errorValue_;
     }
 
-    // Safe access methods
-    ValuePtr getSuccessValueOr(ValuePtr defaultValue) const {
+    // Safe access methods - optimized for success path
+    [[nodiscard]] ValuePtr getSuccessValueOr(ValuePtr defaultValue) const noexcept {
         return isSuccess() ? successValue_ : defaultValue;
     }
 
-    std::string getErrorType() const {
+    [[nodiscard]] std::string getErrorType() const {
         return isError() ? errorValue_.errorType : "";
     }
 
-    std::string getErrorMessage() const {
+    [[nodiscard]] std::string getErrorMessage() const {
         return isError() ? errorValue_.message : "";
     }
 
     // Conversion to Value
     ValuePtr toValue(TypePtr errorUnionType) const;  // Declaration, definition after Value struct
 
-    // Static factory methods
-    static ErrorUnion success(ValuePtr value) {
+    // Static factory methods - optimized for common patterns
+    [[nodiscard]] static ErrorUnion success(ValuePtr value) noexcept {
         return ErrorUnion(value);
     }
 
-    static ErrorUnion error(const std::string& errorType, const std::string& message = "", 
+    [[nodiscard]] static ErrorUnion error(const std::string& errorType, const std::string& message = "", 
                            const std::vector<ValuePtr>& args = {}, size_t location = 0) {
         return ErrorUnion(errorType, message, args, location);
     }
 
-    static ErrorUnion error(const ErrorValue& errorValue) {
+    [[nodiscard]] static ErrorUnion error(const ErrorValue& errorValue) {
         return ErrorUnion(errorValue);
     }
 

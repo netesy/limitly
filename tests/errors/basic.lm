@@ -24,7 +24,7 @@ fn divide(a: int, b: int): int?DivisionByZero {
     if (b == 0) {
         return err(DivisionByZero);
     }
-    return ok(a / b);
+    return a / b;
 }
 
 // Function with multiple error types

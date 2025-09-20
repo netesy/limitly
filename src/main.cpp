@@ -194,9 +194,6 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
-    // Note: embed registration and utilities have been moved to the separate
-    // "lembed" tool executable. The main interpreter no longer auto-registers
-    // embeds at startup. Use the `lembed` tool to list and run embedded modules.
     std::string arg = argv[1];
     
     if (arg == "-repl") {

@@ -1,0 +1,51 @@
+// Comprehensive test for function signature error type validation
+
+// 1. Basic function with error type annotation
+fn divide(a: int, b: int): int?DivisionByZero {
+    if (b == 0) {
+        return err(DivisionByZero);
+    }
+    return a / b;
+}
+
+// 2. Function that correctly propagates errors
+fn safeDivision(x: int, y: int): int?DivisionByZero {
+    return divide(x, y)?;
+}
+
+// 3. Function with legacy throws syntax
+fn legacyDivide(a: int, b: int): int throws DivisionByZero {
+    if (b == 0) {
+        return err(DivisionByZero);
+    }
+    return a / b;
+}
+
+// 4. Function that handles errors explicitly (no propagation)
+fn handleErrors(x: int, y: int): int {
+    match (divide(x, y)) {
+        val result => return result,
+        err error => return -1
+    }
+}
+
+print("=== Function Signature Error Type Validation Test ===");
+print("Testing correct error type propagation...");
+
+// Test successful case
+match (safeDivision(10, 2)) {
+    val result => print("Success: 10 / 2 = " + result),
+    err error => print("Unexpected error")
+}
+
+// Test error case
+match (safeDivision(10, 0)) {
+    val result => print("Unexpected success: " + result),
+    err error => print("Expected error: Division by zero caught")
+}
+
+// Test error handling
+var handled = handleErrors(10, 0);
+print("Handled error result: " + handled);
+
+print("=== Test completed successfully ===");

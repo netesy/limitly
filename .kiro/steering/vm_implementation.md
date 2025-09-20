@@ -84,10 +84,9 @@ The Limit VM is a stack-based virtual machine that executes bytecode generated f
 - Channels for communication
 
 ## Error Handling
-
-### Exception Mechanism
-- Try/catch blocks in bytecode
-- Exception objects
+- Result types
+- Error Propogation
+- Error Handling Mechanism
 - Stack unwinding
 
 ### Runtime Checks
@@ -144,8 +143,8 @@ The Limit VM is a stack-based virtual machine that executes bytecode generated f
 2. ✅ ~~Implement function calls and returns~~ **COMPLETED**
 3. ✅ ~~Implement default parameters~~ **COMPLETED**
 4. **Add support for objects and classes** - NEXT
-5. **Implement break/continue statements** - NEXT
-6. **Add exception handling (try/catch)** - NEXT
+5. ✅  ~~Implement break/continue statements~~ **COMPLETED**
+6. **Add error handling (?else)** - NEXT
 
 ### Future Work
 6. Implement concurrency primitives

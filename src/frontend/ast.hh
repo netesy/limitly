@@ -63,6 +63,9 @@ namespace AST {
     struct ListPatternExpr;
     struct DictPatternExpr;
     struct TuplePatternExpr;
+    struct ValPatternExpr;
+    struct ErrPatternExpr;
+    struct ErrorTypePatternExpr;
     struct TypeAnnotation;
     struct StructuralTypeField;
     struct TypeDeclaration;
@@ -272,6 +275,10 @@ namespace AST {
         std::shared_ptr<BlockStatement> body;
         std::vector<std::string> genericParams;
         bool throws = false;
+        
+        // Error type annotations for function signature
+        bool canFail = false;                                    // Whether function can return errors
+        std::vector<std::string> declaredErrorTypes;             // Specific error types function can return
     };
 
     // Async function declaration
@@ -483,6 +490,25 @@ namespace AST {
     // Tuple destructuring pattern (e.g., (x, y, z))
     struct TuplePatternExpr : public Expression {
         std::vector<std::shared_ptr<Expression>> elements;
+    };
+
+    // Error pattern matching expressions
+    
+    // Success value pattern (val identifier)
+    struct ValPatternExpr : public Expression {
+        std::string variableName;
+    };
+
+    // Error pattern (err identifier)
+    struct ErrPatternExpr : public Expression {
+        std::string variableName;
+        std::optional<std::string> errorType;  // Optional specific error type
+    };
+
+    // Specific error type pattern (ErrorType or ErrorType(params))
+    struct ErrorTypePatternExpr : public Expression {
+        std::string errorType;
+        std::vector<std::string> parameterNames;  // For extracting error parameters
     };
     
     // Type declaration (type aliases)

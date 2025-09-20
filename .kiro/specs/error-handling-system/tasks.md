@@ -70,9 +70,7 @@
   - Generate bytecode for error construction (err/ok) expressions
   - _Requirements: 3.1, 3.2, 7.5_
 
-- [-] 6. Implement VM error handling runtime
-
-
+- [x] 6. Implement VM error handling runtime
 
 
 
@@ -88,7 +86,7 @@
   - Write integration tests for VM error handling execution
   - _Requirements: 3.1, 3.2, 3.4, 7.1, 7.2_
 
-- [ ] 7. Add compile-time error type checking
+- [x] 7. Add compile-time error type checking
 
 
 
@@ -99,7 +97,15 @@
   - Write tests for compile-time error detection and validation
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
 
-- [ ] 8. Implement built-in error types
+- [x] 8. Implement built-in error types
+
+
+
+
+
+
+  - Fix compile time error check to not fail incorrectly and handle other tests like all the test in the basic which were passing previously
+  - extend unhandled fallible expression detection ( ?else ) to all the test cases
   - Add standard error types (DivisionByZero, IndexOutOfBounds, etc.) to type system
   - Modify arithmetic operations to return error unions for division by zero
   - Update array/dict indexing to return error unions for bounds violations
@@ -107,7 +113,12 @@
   - Create comprehensive tests for built-in error scenarios
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
 
-- [ ] 9. Extend pattern matching for error handling
+- [x] 9. Extend pattern matching for error handling
+
+
+
+
+
   - Add val/err pattern support to existing match statement parsing
   - Extend MatchCase AST nodes to handle error pattern matching
   - Generate bytecode for error pattern matching in match expressions
@@ -116,20 +127,35 @@
   - Write tests for comprehensive error pattern matching scenarios
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
-- [ ] 10. Add function signature error type validation
-  - Extend FunctionDeclaration AST to include error type annotations
+- [x] 10. Add function signature error type validation
+
+
+
+
+  - Extend FunctionDeclaration AST to include error type annotations(fn myFunction() : Type ? ErrorType1, ErrorType2)
   - Validate that function bodies can produce declared error types
   - Check error type compatibility between caller and callee functions
   - Implement error type inference for functions using ? operator
   - Create tests for function signature error type validation
   - _Requirements: 1.4, 5.1, 5.2, 5.3_
 
-- [ ] 11. Implement error propagation optimization
+
+- [x] 11. Implement error propagation optimization
+
+
+
+
+
+
+
+
+
   - Add zero-cost success path optimization in VM execution
   - Implement efficient error frame stack management
   - Add error value pooling to reduce memory allocations
   - Optimize error union type layout for cache efficiency
   - Write performance tests to validate zero-cost abstractions
+  - Update the doc folder with more information about the complete error system
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
 - [ ] 12. Create comprehensive error handling test suite

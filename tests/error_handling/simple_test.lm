@@ -1,0 +1,32 @@
+// Simple test for compile-time error checking
+
+// Function that can fail
+fn divide(a: int, b: int): int?DivisionByZero {
+    return a / b;
+}
+
+// Test 1: This should work - compatible error types
+fn goodPropagation(x: int, y: int): int?DivisionByZero {
+    var result = divide(x, y)?;
+    return result;
+}
+
+// Test 2: This should fail - incompatible error types
+fn badPropagation(x: int, y: int): int?IndexOutOfBounds {
+    var result = divide(x, y)?;  // Should fail
+    return result;
+}
+
+// Test 3: This should fail - non-fallible function using ?
+fn nonFallible(x: int, y: int): int {
+    var result = divide(x, y)?;  // Should fail
+    return result;
+}
+
+// Test 4: This should fail - unhandled fallible call
+fn unhandled(x: int, y: int): nil {
+    divide(x, y);  // Should fail
+}
+
+
+    print("Simple error checking test");

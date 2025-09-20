@@ -1,0 +1,19 @@
+// Debug test for else handler
+
+fn divide(a: int, b: int): int?DivisionByZero {
+    if (b == 0) {
+        return err(DivisionByZero);
+    }
+    return ok(a / b);
+}
+
+fn test_debug() {
+    // Simple else handler that should return a value
+    var result = divide(10, 0)? else error {
+        print("In else handler");
+        42
+    };
+    print("Result should be 42:", result);
+}
+
+test_debug();

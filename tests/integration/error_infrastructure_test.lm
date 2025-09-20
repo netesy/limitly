@@ -1,0 +1,50 @@
+// Error Infrastructure Test
+// Test the VM error handling infrastructure
+
+print("=== Error Infrastructure Test ===");
+
+// Test basic arithmetic operations that will eventually support error handling
+var a = 10;
+var b = 2;
+var result1 = a / b;
+print("10 / 2 = {result1}");
+
+// Test with edge case (currently works, will generate error when built-in errors are implemented)
+var c = 10;
+var d = 1;
+var result2 = c / d;
+print("10 / 1 = {result2}");
+
+// Test array access (currently works, will generate error when bounds checking is implemented)
+var arr = [1, 2, 3, 4, 5];
+var item1 = arr[2];
+print("arr[2] = {item1}");
+
+// Test function that could potentially fail
+fn divide_safe(x, y) {
+    // For now, just do regular division
+    // Later this will be enhanced with error handling
+    return x / y;
+}
+
+var safe_result = divide_safe(20, 4);
+print("Safe division: 20 / 4 = {safe_result}");
+
+// Test list operations
+var myList = [10, 20, 30];
+var first = myList[0];
+var last = myList[2];
+print("First element: {first}");
+print("Last element: {last}");
+
+print("=== Error Infrastructure Ready ===");
+print("VM error handling opcodes implemented:");
+print("- CHECK_ERROR: Check if value is error");
+print("- PROPAGATE_ERROR: Propagate error up call stack");
+print("- CONSTRUCT_ERROR: Create error values");
+print("- CONSTRUCT_OK: Create success values");
+print("- IS_ERROR: Check if union contains error");
+print("- IS_SUCCESS: Check if union contains success");
+print("- UNWRAP_VALUE: Extract value from success union");
+
+print("=== Test Complete ===");

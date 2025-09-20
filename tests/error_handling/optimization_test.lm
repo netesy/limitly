@@ -1,0 +1,112 @@
+// Error Handling Optimization Test
+// Tests various optimization scenarios for error handling
+
+// Test error value pooling efficiency
+fn test_error_pooling() {
+    print("Testing error value pooling...");
+    
+    // Create many errors to test pooling
+    iter (i in 1..100) {
+        var error_result = create_test_error("TestError", "Message " + i);
+        // Errors should be pooled and reused efficiently
+    }
+    
+    print("Error pooling test compvared");
+}
+
+// Test error frame stack efficiency
+fn test_error_frame_efficiency() {
+    print("Testing error frame stack efficiency...");
+    
+    // Test nested error handling
+    var result = deeply_nested_function(5) ?else {
+        print("Caught error from deeply nested function");
+        return;
+    };
+    
+    print("Nested function result: " + result);
+}
+
+// Test zero-cost success path
+fn test_zero_cost_success() {
+    print("Testing zero-cost success path...");
+    
+    var iterations = 1000;
+    var start_time = clock();
+    
+    iter (i in 1..iterations) {
+        var result = simple_success_function(i)?;
+        // This should have minimal overhead
+    }
+    
+    var end_time = clock();
+    var duration = end_time - start_time;
+    
+    print("Zero-cost success test compvared in " + duration + " seconds");
+    print("Average time per operation: " + (duration / iterations) + " seconds");
+}
+
+// Test error union type layout efficiency
+fn test_error_union_layout() {
+    print("Testing error union type layout...");
+    
+    // Create various error union types
+    var success_union = ok(42);
+    var error_union = err(TestError("Test error message"));
+    
+    // Test type checking efficiency
+    iter (i in 1..100) {
+        if (is_error(success_union)) {
+            print("Unexpected error in success union");
+        }
+        
+        if (is_success(error_union)) {
+            print("Unexpected success in error union");
+        }
+    }
+    
+    print("Error union layout test compvared");
+}
+
+// Helper functions for testing
+
+fn create_test_error(error_type: str, message: str) : int?TestError {
+    return err(TestError(message));
+}
+
+fn deeply_nested_function(depth: int) : int?NestedError {
+    if (depth <= 0) {
+        return err(NestedError("Reached maximum depth"));
+    }
+    
+    var result = deeply_nested_function(depth - 1)?;
+    return result + 1;
+}
+
+fn simple_success_function(value: int) : int {
+    return value * 2;
+}
+
+// Error types for testing
+enum TestError {
+    TestError(str)
+}
+
+enum NestedError {
+    NestedError(str)
+}
+
+// Main test runner
+fn run_optimization_tests() {
+    print("=== Error Handling Optimization Tests ===");
+    
+    test_error_pooling();
+    test_error_frame_efficiency();
+    test_zero_cost_success();
+    test_error_union_layout();
+    
+    print("=== All optimization tests compvared ===");
+}
+
+// Run the tests
+run_optimization_tests();

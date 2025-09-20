@@ -1,0 +1,32 @@
+// Simple test for function signature error type validation
+
+// 1. Function with error type annotation in return type
+fn divide(a: int, b: int): int?DivisionByZero {
+    if (b == 0) {
+        return err(DivisionByZero);
+    }
+    return a / b;
+}
+
+// 2. Function that calls fallible function and propagates errors
+fn safeDivision(x: int, y: int): int?DivisionByZero {
+    return divide(x, y)?;
+}
+
+// 3. Function that should cause error - uses ? but doesn't declare error types
+fn badFunction(x: int): int {
+    return divide(x, 0)?; // This should cause a compile error
+}
+
+// 4. Function with incompatible error types
+fn incompatibleFunction(x: int): int?ParseError {
+    return divide(x, 2)?; // DivisionByZero is not compatible with ParseError
+}
+
+// 5. Function that declares error types but body can't produce them
+fn declaredButNotProduced(x: int): int?UnusedError {
+    return x * 2; // Should cause error: declares UnusedError but can't produce it
+}
+
+print("Testing function signature error type validation");
+print("If you see this message, the basic parsing worked correctly");

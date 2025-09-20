@@ -33,7 +33,7 @@ Limit is a modern programming language designed with static typing, concurrency 
 ### 🔄 In Development
 - **Function System**: Basic function declarations (syntax complete, VM implementation in progress)
 - **Object-Oriented Features**: Class declarations (syntax complete, VM implementation pending)
-- **Exception Handling**: try/catch blocks (syntax complete, VM implementation pending)
+- **Exception Handling**: result types and error propogation blocks (syntax complete, VM implementation pending)
 - **Concurrency**: parallel/concurrent blocks (syntax complete, VM implementation pending)
 
 ### 📋 Planned Features

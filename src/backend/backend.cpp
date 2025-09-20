@@ -2,12 +2,29 @@
 #include "../debugger.hh"
 #include "value.hh"
 #include "vm.hh"
+#include "memory.hh"
+#include "type_checker.hh"
 #include "../frontend/scanner.hh"
 #include "../frontend/parser.hh"
 #include <iostream>
 #include <thread>
 #include <fstream>
 #include <sstream>
+
+// Constructor
+BytecodeGenerator::BytecodeGenerator() {
+    // Initialize memory manager and type system
+    static MemoryManager<> memoryManager;
+    static MemoryManager<>::Region region(MemoryManager<>::getInstance()); 
+    
+    typeSystem = std::make_unique<TypeSystem>(memoryManager, region);
+    typeChecker = std::make_unique<TypeChecker>(*typeSystem);
+}
+
+// Type checking integration
+std::vector<TypeCheckError> BytecodeGenerator::performTypeChecking(const std::shared_ptr<AST::Program>& program) {
+    return typeChecker->checkProgram(program);
+}
 
 void BytecodeGenerator::visitInterpolatedStringExpr(const std::shared_ptr<AST::InterpolatedStringExpr>& expr) {
     // For each part of the interpolated string
@@ -38,6 +55,20 @@ void BytecodeGenerator::visitInterpolatedStringExpr(const std::shared_ptr<AST::I
 
 // BytecodeGenerator implementation
 void BytecodeGenerator::process(const std::shared_ptr<AST::Program>& program) {
+    // Perform compile-time type checking first
+    std::vector<TypeCheckError> typeErrors = performTypeChecking(program);
+    
+    // Report type checking errors but continue with bytecode generation for now
+    // This allows testing of error handling features while still reporting issues
+    if (!typeErrors.empty()) {
+        for (const auto& error : typeErrors) {
+            Debugger::error(error.message, error.line, error.column, 
+                          InterpretationStage::BYTECODE, "", "", error.context);
+        }
+        // Continue with bytecode generation to allow testing
+        // TODO: Make this configurable or more selective about which errors are fatal
+    }
+    
     // Process each statement in the program
     for (const auto& stmt : program->statements) {
         visitStatement(stmt);
@@ -149,6 +180,12 @@ void BytecodeGenerator::visitExpression(const std::shared_ptr<AST::Expression>& 
         visitDictPatternExpr(dictPattern);
     } else if (auto tuplePattern = std::dynamic_pointer_cast<AST::TuplePatternExpr>(expr)) {
         visitTuplePatternExpr(tuplePattern);
+    } else if (auto valPattern = std::dynamic_pointer_cast<AST::ValPatternExpr>(expr)) {
+        visitValPatternExpr(valPattern);
+    } else if (auto errPattern = std::dynamic_pointer_cast<AST::ErrPatternExpr>(expr)) {
+        visitErrPatternExpr(errPattern);
+    } else if (auto errorTypePattern = std::dynamic_pointer_cast<AST::ErrorTypePatternExpr>(expr)) {
+        visitErrorTypePatternExpr(errorTypePattern);
     } else if (auto fallibleExpr = std::dynamic_pointer_cast<AST::FallibleExpr>(expr)) {
         visitFallibleExpr(fallibleExpr);
     } else if (auto errorConstructExpr = std::dynamic_pointer_cast<AST::ErrorConstructExpr>(expr)) {
@@ -824,6 +861,15 @@ void BytecodeGenerator::visitMatchStatement(const std::shared_ptr<AST::MatchStat
         }
         else if (auto tuplePattern = std::dynamic_pointer_cast<AST::TuplePatternExpr>(matchCase.pattern)) {
             visitTuplePatternExpr(tuplePattern);
+        }
+        else if (auto valPattern = std::dynamic_pointer_cast<AST::ValPatternExpr>(matchCase.pattern)) {
+            visitValPatternExpr(valPattern);
+        }
+        else if (auto errPattern = std::dynamic_pointer_cast<AST::ErrPatternExpr>(matchCase.pattern)) {
+            visitErrPatternExpr(errPattern);
+        }
+        else if (auto errorTypePattern = std::dynamic_pointer_cast<AST::ErrorTypePatternExpr>(matchCase.pattern)) {
+            visitErrorTypePatternExpr(errorTypePattern);
         }
         else {
             visitExpression(matchCase.pattern);
@@ -1512,8 +1558,36 @@ void BytecodeGenerator::visitFallibleExpr(const std::shared_ptr<AST::FallibleExp
             emit(Opcode::STORE_VAR, expr->line, 0, 0.0f, false, expr->elseVariable);
         }
         
-        // Process else handler
-        visitStatement(expr->elseHandler);
+        // Process else handler - ensure it produces a value
+        if (auto blockStmt = std::dynamic_pointer_cast<AST::BlockStatement>(expr->elseHandler)) {
+            // For block statements, we need to handle the last statement specially
+            // to ensure it leaves a value on the stack
+            emit(Opcode::BEGIN_SCOPE, expr->line);
+            
+            // Process all statements except the last one
+            for (size_t i = 0; i < blockStmt->statements.size(); ++i) {
+                if (i == blockStmt->statements.size() - 1) {
+                    // For the last statement, if it's an expression statement, 
+                    // visit the expression directly to leave value on stack
+                    if (auto exprStmt = std::dynamic_pointer_cast<AST::ExprStatement>(blockStmt->statements[i])) {
+                        visitExpression(exprStmt->expression);
+                    } else {
+                        // If last statement is not an expression, visit it normally
+                        // and push nil as the result
+                        visitStatement(blockStmt->statements[i]);
+                        emit(Opcode::PUSH_NULL, expr->line);
+                    }
+                } else {
+                    visitStatement(blockStmt->statements[i]);
+                }
+            }
+            
+            emit(Opcode::END_SCOPE, expr->line);
+        } else {
+            // For non-block statements, visit normally and push nil
+            visitStatement(expr->elseHandler);
+            emit(Opcode::PUSH_NULL, expr->line);
+        }
         
         // Update jump over else handler
         size_t endIndex = bytecode.size();
@@ -1596,3 +1670,52 @@ std::string BytecodeGenerator::getModuleNameFromPath(const std::string& modulePa
     return modulePath;
 }
 
+// Error pattern expression visitors
+
+void BytecodeGenerator::visitValPatternExpr(const std::shared_ptr<AST::ValPatternExpr>& expr) {
+    // Generate bytecode for val pattern matching
+    // This pattern matches success values in error unions
+    
+    // Push pattern type marker
+    emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, "__val_pattern__");
+    
+    // Push variable name for binding
+    emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, expr->variableName);
+}
+
+void BytecodeGenerator::visitErrPatternExpr(const std::shared_ptr<AST::ErrPatternExpr>& expr) {
+    // Generate bytecode for err pattern matching
+    // This pattern matches error values in error unions
+    
+    // Push pattern type marker
+    emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, "__err_pattern__");
+    
+    // Push variable name for binding
+    emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, expr->variableName);
+    
+    // Push specific error type if specified
+    if (expr->errorType.has_value()) {
+        emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, expr->errorType.value());
+    } else {
+        emit(Opcode::PUSH_NULL, expr->line); // Any error type
+    }
+}
+
+void BytecodeGenerator::visitErrorTypePatternExpr(const std::shared_ptr<AST::ErrorTypePatternExpr>& expr) {
+    // Generate bytecode for specific error type pattern matching
+    // This pattern matches specific error types with optional parameter extraction
+    
+    // Push pattern type marker
+    emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, "__error_type_pattern__");
+    
+    // Push error type name
+    emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, expr->errorType);
+    
+    // Push number of parameters to extract
+    emit(Opcode::PUSH_INT, expr->line, static_cast<int32_t>(expr->parameterNames.size()));
+    
+    // Push parameter names for binding
+    for (const auto& paramName : expr->parameterNames) {
+        emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, paramName);
+    }
+}
