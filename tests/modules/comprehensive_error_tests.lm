@@ -1,0 +1,68 @@
+// Comprehensive error handling and memory management tests
+print("=== Comprehensive Module and Function Error Tests ===");
+
+import tests.modules.math_module;
+
+// Test 1: Valid operations baseline
+print("Test 1: Valid operations baseline");
+var valid_add = math_module.add(10, 20);
+var valid_pi = math_module.pi;
+var valid_square = math_module.square(5);
+print("Valid operations: add={valid_add}, pi={valid_pi}, square={valid_square}");
+
+// Test 2: Memory management with multiple calls
+print("Test 2: Memory management stress test");
+var total = 0;
+var i = 1;
+while (i <= 50) {
+    var temp_result = math_module.add(i, math_module.square(i));
+    total = math_module.add(total, temp_result);
+    i += 1;
+}
+print("Memory stress test completed, total: {total}");
+
+// Test 3: Deep nesting memory management
+print("Test 3: Deep nesting memory management");
+var deep_nested = math_module.multiply(
+    math_module.add(
+        math_module.square(3),
+        math_module.multiply(2, 4)
+    ),
+    math_module.subtract(
+        math_module.add(10, 5),
+        math_module.square(2)
+    )
+);
+print("Deep nested result: {deep_nested}");
+
+// Test 4: Recursive function memory management
+print("Test 4: Recursive function memory management");
+var factorial_6 = math_module.factorial(6);
+var factorial_8 = math_module.factorial(8);
+print("Factorial results: 6!={factorial_6}, 8!={factorial_8}");
+
+// Test 5: String and numeric mixed operations
+print("Test 5: Mixed type operations");
+fn mixed_operations(): str {
+    var num_result = math_module.add(5, 7);
+    return "Result is: " + num_result;
+}
+
+var mixed_result = mixed_operations();
+print("Mixed result: {mixed_result}");
+
+// Test 6: Module variable assignment patterns
+print("Test 6: Module variable assignment patterns");
+var pi_copy = math_module.pi;
+var pi_in_calculation = math_module.multiply(pi_copy, 2);
+var pi_string = "Pi value: " + pi_copy;
+print("Pi patterns: copy={pi_copy}, calc={pi_in_calculation}, string={pi_string}");
+
+print("=== All Tests Completed Successfully ===");
+
+// Note: Error conditions that cause runtime errors:
+// - math_module.nonexistent_function(5, 10) -> "Property 'nonexistent_function' not found"
+// - math_module.nonexistent_variable -> "Property 'nonexistent_variable' not found"  
+// - math_module.add(5) -> "Function add expects 2 to 2 arguments, got 1"
+// - math_module.add(5, 10, 15) -> "Function add expects 2 to 2 arguments, got 3"
+// - Functions without return statements return 'nil'

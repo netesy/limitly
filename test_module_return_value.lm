@@ -1,0 +1,9 @@
+// Test module function with return value
+import tests.modules.math_module;
+
+print("Testing module function return values");
+var sum = math_module.add(5, 3);
+print("5 + 3 = " + sum);
+
+var product = math_module.multiply(4, 6);
+print("4 * 6 = " + product);

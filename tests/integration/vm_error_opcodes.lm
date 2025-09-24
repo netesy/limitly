@@ -17,9 +17,9 @@ print("10 / 2 = " + result);
 
 // Test with zero (this should work for now, but will generate error when built-in errors are implemented)
 var c = 10;  
-var d = 1;
-var result2 = c / d;
-print("10 / 1 = " + result2);
+var d = 0;
+var result2 = (c / d) ?else{ 0 };
+print("10 / 0 = " + result2);
 
 print("Basic VM error opcode infrastructure is ready")
 print("Full error handling will be tested when compiler integration is compvare")

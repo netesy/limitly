@@ -1,0 +1,54 @@
+// Test error handling for function calls
+print("=== Function Error Handling Tests ===");
+
+// Test 1: Missing function call
+print("Test 1: Missing function call");
+try {
+    // This should cause an error - function doesn't exist
+    var result = nonexistent_function(5, 10);
+    print("ERROR: Should not reach this line");
+} catch {
+    print("PASS: Caught missing function error as expected");
+}
+
+// Test 2: Function with wrong parameter count
+print("Test 2: Wrong parameter count");
+
+fn test_function(a: int, b: int): int {
+    return a + b;
+}
+
+try {
+    // test_function expects 2 parameters, giving 1
+    var result = test_function(5);
+    print("ERROR: Should not reach this line");
+} catch {
+    print("PASS: Caught wrong parameter count error as expected");
+}
+
+// Test 3: Function with too many parameters
+print("Test 3: Too many parameters");
+try {
+    // test_function expects 2 parameters, giving 3
+    var result = test_function(5, 10, 15);
+    print("ERROR: Should not reach this line");
+} catch {
+    print("PASS: Caught too many parameters error as expected");
+}
+
+// Test 4: Function with missing return value
+print("Test 4: Missing return value");
+
+fn function_without_return(): int {
+    var x = 5;
+    // Missing return statement
+}
+
+try {
+    var result = function_without_return();
+    print("Result: {result}"); // Should handle missing return gracefully
+} catch {
+    print("PASS: Caught missing return value error as expected");
+}
+
+print("=== Function Error Handling Tests Complete ===");

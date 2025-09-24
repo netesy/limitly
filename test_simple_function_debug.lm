@@ -1,0 +1,10 @@
+// Simple function test for debugging
+print("Starting function test");
+
+fn test() {
+    print("Inside function test");
+}
+
+print("About to call function");
+test();
+print("Function call completed");

@@ -105,12 +105,8 @@ VM::VM(bool create_runtime)
       insideClassDefinition(false) {
     
     if (create_runtime) {
-        // Initialize and start the concurrency runtime
-        scheduler = std::make_shared<Scheduler>();
-        size_t num_threads = std::thread::hardware_concurrency();
-        thread_pool = std::make_shared<ThreadPool>(num_threads > 0 ? num_threads : 2, scheduler);
-        thread_pool->start();
-        event_loop = std::make_shared<EventLoop>();
+        // Initialize concurrency state with integrated runtime
+        concurrency_state = std::make_unique<ConcurrencyState>();
     }
 
     // Register native functions with correct signature
@@ -191,9 +187,7 @@ VM::VM(bool create_runtime)
 }
 
 VM::~VM() {
-    if (thread_pool) {
-        thread_pool->stop();
-    }
+    // Concurrency state will clean up automatically in its destructor
     delete typeSystem;
 }
 
@@ -213,8 +207,24 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
     
     try {
         bool verboseTracing = false; // set true manually for full opcode traces
+        int executionCount = 0;
         while (ip < bytecodeRef.size()) {
             const Instruction& instruction = bytecodeRef[ip];
+            
+            // Add debug output for function execution
+            if (debugMode && (instruction.opcode == Opcode::CALL || instruction.opcode == Opcode::RETURN || 
+                             instruction.opcode == Opcode::BEGIN_FUNCTION || instruction.opcode == Opcode::END_FUNCTION)) {
+                std::cout << "[DEBUG] EXEC: IP=" << ip << " Opcode=" << static_cast<int>(instruction.opcode) 
+                          << " CallStack=" << callStack.size() << " ExecutionCount=" << executionCount << std::endl;
+            }
+            
+            executionCount++;
+            // if (executionCount > 200) {
+            //     std::cerr << "[ERROR] Execution count exceeded 200, possible infinite loop at IP " << ip << std::endl;
+            //     break;
+            // }
+            
+
             
             // Check if we need to start skipping function body
             if (!currentFunctionBeingDefined.empty() && !insideFunctionDefinition) {
@@ -1006,6 +1016,7 @@ void VM::handleStoreVar(const Instruction& instruction) {
     
     if (debugMode) {
         std::cout << "[DEBUG] STORE_VAR: Popped value of type: " << static_cast<int>(value->type->tag) << std::endl;
+        std::cout << "[DEBUG] STORE_VAR: Popped value: " << value->toString() << std::endl;
     }
     // If variable already exists and is an AtomicValue, perform atomic store
     try {
@@ -1029,6 +1040,10 @@ void VM::handleStoreVar(const Instruction& instruction) {
     }
 
     environment->define(instruction.stringValue, value);
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] STORE_VAR: Successfully stored variable '" << instruction.stringValue << "'" << std::endl;
+    }
 }
 
 void VM::handleDefineAtomic(const Instruction& instruction) {
@@ -2033,15 +2048,32 @@ void VM::handleCall(const Instruction& instruction) {
             backend::Function moduleFunc;
             bool foundInModule = false;
             
+            if (debugMode) {
+                std::cout << "[DEBUG] CALL: Looking for module function '" << actualFuncName << "'" << std::endl;
+                std::cout << "[DEBUG] CALL: Have " << loadedModules.size() << " loaded modules" << std::endl;
+                std::cout << "[DEBUG] CALL: Have " << moduleUserDefinedFunctions.size() << " module function maps" << std::endl;
+            }
+            
             // Search through loaded modules to find the function
             for (const auto& [modulePath, moduleValue] : loadedModules) {
                 if (std::holds_alternative<ModuleValue>(moduleValue->data)) {
                     auto& modVal = std::get<ModuleValue>(moduleValue->data);
                     auto modEnv = modVal.env;
                     
+                    if (debugMode) {
+                        std::cout << "[DEBUG] CALL: Checking module: " << modulePath << std::endl;
+                    }
+                    
                     // Check if this module has the function in its userDefinedFunctions
                     auto moduleUserFuncs = moduleUserDefinedFunctions.find(modEnv.get());
                     if (moduleUserFuncs != moduleUserDefinedFunctions.end()) {
+                        if (debugMode) {
+                            std::cout << "[DEBUG] CALL: Module has " << moduleUserFuncs->second.size() << " functions" << std::endl;
+                            for (const auto& [fname, func] : moduleUserFuncs->second) {
+                                std::cout << "[DEBUG] CALL:   - " << fname << std::endl;
+                            }
+                        }
+                        
                         auto funcIt = moduleUserFuncs->second.find(actualFuncName);
                         if (funcIt != moduleUserFuncs->second.end()) {
                             moduleEnv = modEnv;
@@ -2052,6 +2084,10 @@ void VM::handleCall(const Instruction& instruction) {
                                           << "' in module: " << modulePath << std::endl;
                             }
                             break;
+                        }
+                    } else {
+                        if (debugMode) {
+                            std::cout << "[DEBUG] CALL: No function map found for module environment" << std::endl;
                         }
                     }
                 }
@@ -2070,13 +2106,18 @@ void VM::handleCall(const Instruction& instruction) {
                 createAndPushCallFrame(actualFuncName, ip + 1, funcEnv);
                 
                 // Jump to function start
-                ip = moduleFunc.startAddress - 1; // -1 because ip will be incremented
+                ip = moduleFunc.startAddress; // Set directly since we return early
                 return;
             } else {
-                // Fallback: try to find in current VM's functions
+                // Fallback: try to find in current VM's functions (for dictionary-based modules)
                 auto funcIt = userDefinedFunctions.find(actualFuncName);
                 if (funcIt != userDefinedFunctions.end()) {
                     const backend::Function& func = funcIt->second;
+                    
+                    if (debugMode) {
+                        std::cout << "[DEBUG] CALL: Found function '" << actualFuncName 
+                                  << "' in current VM, start address: " << func.startAddress << std::endl;
+                    }
                     
                     // Create a new environment for the function
                     auto funcEnv = std::make_shared<Environment>(environment);
@@ -2087,12 +2128,30 @@ void VM::handleCall(const Instruction& instruction) {
                     }
                     
                     // Create call frame and switch environment
+                    if (debugMode) {
+                        std::cout << "[DEBUG] CALL: Creating call frame with return address: " << (ip + 1) << std::endl;
+                        std::cout << "[DEBUG] CALL: Function start address: " << func.startAddress << std::endl;
+                        std::cout << "[DEBUG] CALL: Function end address: " << func.endAddress << std::endl;
+                        std::cout << "[DEBUG] CALL: Current IP: " << ip << std::endl;
+                    }
                     createAndPushCallFrame(actualFuncName, ip + 1, funcEnv);
                     
                     // Jump to function start
-                    ip = func.startAddress - 1; // -1 because ip will be incremented
+                    ip = func.startAddress; // Set directly since we return early
+                    
+                    if (debugMode) {
+                        std::cout << "[DEBUG] CALL: Jumping to function start at IP " << func.startAddress << " (set IP to " << (func.startAddress - 1) << ")" << std::endl;
+                        std::cout << "[DEBUG] CALL: Call stack size after push: " << callStack.size() << std::endl;
+                    }
                     return;
                 } else {
+                    if (debugMode) {
+                        std::cout << "[DEBUG] CALL: Function '" << actualFuncName << "' not found in userDefinedFunctions" << std::endl;
+                        std::cout << "[DEBUG] CALL: Available functions:" << std::endl;
+                        for (const auto& [name, func] : userDefinedFunctions) {
+                            std::cout << "[DEBUG] CALL:   - " << name << std::endl;
+                        }
+                    }
                     error("Function " + actualFuncName + " not found in any loaded module or current context");
                     return;
                 }
@@ -2331,7 +2390,7 @@ void VM::handleCall(const Instruction& instruction) {
                 }
                 
                 // Create call frame
-                backend::CallFrame frame(methodKey, ip, nullptr);
+                backend::CallFrame frame(methodKey, ip + 1, nullptr);
                 frame.setPreviousEnvironment(environment);
                 callStack.push_back(frame);
                 
@@ -2401,7 +2460,7 @@ void VM::handleCall(const Instruction& instruction) {
                 }
                 
                 // Create call frame
-                backend::CallFrame frame(methodKey, ip, nullptr);
+                backend::CallFrame frame(methodKey, ip + 1, nullptr);
                 frame.setPreviousEnvironment(environment);
                 callStack.push_back(frame);
                 
@@ -2484,7 +2543,7 @@ void VM::handleCall(const Instruction& instruction) {
             }
             
             // Create call frame for constructor
-            backend::CallFrame frame(initMethodKey, ip, nullptr);
+            backend::CallFrame frame(initMethodKey, ip + 1, nullptr);
             frame.setPreviousEnvironment(environment);
             callStack.push_back(frame);
             
@@ -2492,7 +2551,7 @@ void VM::handleCall(const Instruction& instruction) {
             environment = constructorEnv;
             
             // Jump to constructor start
-            ip = initMethod.startAddress - 1; // -1 because ip will be incremented
+            ip = initMethod.startAddress; // Set directly since we return early
             
             // The constructor will return, and we need to make sure the object is on the stack
             // We'll handle this in the return handler
@@ -2564,7 +2623,7 @@ void VM::handleCall(const Instruction& instruction) {
             auto funcIt = userDefinedFunctions.find(funcName);
             if (funcIt != userDefinedFunctions.end()) {
                 // Jump to function start
-                ip = funcIt->second.startAddress - 1; // -1 because ip will be incremented
+                ip = funcIt->second.startAddress; // Set directly since we return early
                 return;
             } else {
                 error("User-defined function " + funcName + " not found in bytecode");
@@ -2663,13 +2722,11 @@ void VM::handleCall(const Instruction& instruction) {
         }
         
         // Create call frame and switch environment
-        createAndPushCallFrame(funcName, ip, funcEnv);
+        createAndPushCallFrame(funcName, ip + 1, funcEnv);
         
         // Jump to function start
-        // Jump to function start
-        ip = func.startAddress - 1; // -1 because ip will be incremented
+        ip = func.startAddress; // Set directly since we return early
         return; // Exit early for user-defined functions
-        return;
     }
     
     error("Function not found: " + funcName);
@@ -2765,7 +2822,14 @@ void VM::handleReturn(const Instruction& /*unused*/) {
     }
 
     // Return to the caller
-    ip = frame.returnAddress;
+    if (debugMode) {
+        std::cout << "[DEBUG] RETURN: Returning to IP " << frame.returnAddress << std::endl;
+        std::cout << "[DEBUG] RETURN: Stack size after return: " << stack.size() << std::endl;
+        if (!stack.empty()) {
+            std::cout << "[DEBUG] RETURN: Top stack value: " << stack.back()->toString() << std::endl;
+        }
+    }
+    ip = frame.returnAddress - 1; // -1 because ip will be incremented at the end of the loop
 }
 
 void VM::handlePrint(const Instruction& instruction) {
@@ -2801,8 +2865,10 @@ void VM::handlePrint(const Instruction& instruction) {
 void VM::handleBeginFunction(const Instruction& instruction) {
     // Create a new function definition
     const std::string& funcName = instruction.stringValue;
-                            if (debugMode) {
-    std::cout << "[DEBUG] BEGIN_FUNCTION: " << funcName << " at IP " << ip << std::endl;
+    if (debugMode) {
+        std::cout << "[DEBUG] BEGIN_FUNCTION: " << funcName << " at IP " << ip << std::endl;
+        std::cout << "[DEBUG] BEGIN_FUNCTION: Current function being defined: " << currentFunctionBeingDefined << std::endl;
+        std::cout << "[DEBUG] BEGIN_FUNCTION: Inside function definition: " << insideFunctionDefinition << std::endl;
     }
     // If we're inside a class definition, use the full method key
     if (insideClassDefinition && !currentClassBeingDefined.empty()) {
@@ -2857,10 +2923,10 @@ void VM::handleBeginFunction(const Instruction& instruction) {
     } else {
         // Regular function
         userDefinedFunctions[funcName] = func;
-         if (debugMode) {
-        std::cout << "[DEBUG] Stored function: " << funcName << " with start address: " << func.startAddress << std::endl;
-    std::cout << "[DEBUG] Total functions stored: " << userDefinedFunctions.size() << std::endl;
-    }
+        if (debugMode) {
+            std::cout << "[DEBUG] Stored function: " << funcName << " with start address: " << func.startAddress << std::endl;
+            std::cout << "[DEBUG] Total functions stored: " << userDefinedFunctions.size() << std::endl;
+        }
     }
     // Continue with normal execution to process parameter definitions
     // The function body will be skipped later when we encounter END_FUNCTION
@@ -2869,17 +2935,21 @@ void VM::handleBeginFunction(const Instruction& instruction) {
 void VM::handleEndFunction(const Instruction& /*unused*/) {
     // Check if we're currently defining a function
     if (!currentFunctionBeingDefined.empty()) {
-                                if (debugMode) {
-        // This is the end of function definition, not function execution
-        std::cout << "[DEBUG] END_FUNCTION: Ending definition of " << currentFunctionBeingDefined << " at IP " << ip << std::endl;}
+        if (debugMode) {
+            // This is the end of function definition, not function execution
+            std::cout << "[DEBUG] END_FUNCTION: Ending definition of " << currentFunctionBeingDefined << " at IP " << ip << std::endl;
+        }
         auto funcIt = userDefinedFunctions.find(currentFunctionBeingDefined);
         if (funcIt != userDefinedFunctions.end()) {
             funcIt->second.endAddress = ip;
+            if (debugMode) {
+                std::cout << "[DEBUG] END_FUNCTION: Set end address for " << currentFunctionBeingDefined << " to " << ip << std::endl;
+            }
         }
         currentFunctionBeingDefined.clear();
         insideFunctionDefinition = false;
-                                if (debugMode) {
-        std::cout << "[DEBUG] END_FUNCTION: Resuming normal execution" << std::endl;
+        if (debugMode) {
+            std::cout << "[DEBUG] END_FUNCTION: Resuming normal execution" << std::endl;
         }
         return;
     }
@@ -3147,6 +3217,7 @@ void VM::createAndPushCallFrame(const std::string& funcName, size_t returnAddres
     // Switch to function environment
     environment = funcEnv;
 }
+
 
 void VM::handleListAppend(const Instruction& /*unused*/) {
     // Pop the value to append
@@ -3632,10 +3703,10 @@ void VM::handleBeginParallel(const Instruction& instruction) {
                 // Create a new VM for this task without creating a new runtime
                 VM task_vm(false);
 
-                // Share the concurrency runtime components
-                task_vm.scheduler = this->scheduler;
-                task_vm.thread_pool = this->thread_pool;
-                task_vm.event_loop = this->event_loop;
+                // Share the concurrency runtime components through concurrency state
+                // Task VMs should share the same runtime components for coordination
+                task_vm.concurrency_state = std::make_unique<ConcurrencyState>();
+                // Don't start a new runtime - we'll access the parent's runtime when needed
 
                 // Each task gets a new memory region and environment.
                 // The VM constructor creates a new region.
@@ -3664,9 +3735,9 @@ void VM::handleBeginParallel(const Instruction& instruction) {
         tasks.push_back(std::move(task));
     }
 
-    // Submit all tasks to the scheduler
+    // Submit all tasks to the scheduler through concurrency state
     for (auto& task : tasks) {
-        scheduler->submit(std::move(task));
+        concurrency_state->runtime->getScheduler()->submit(std::move(task));
     }
 
     // Skip the main VM's instruction pointer past the parallel block
@@ -3678,85 +3749,82 @@ void VM::handleEndParallel(const Instruction& /*unused*/) {
 }
 
 void VM::handleBeginConcurrent(const Instruction& instruction) {
-    // Find the end of the concurrent block
-    size_t block_start_ip = ip + 1;
-    size_t block_end_ip = block_start_ip;
-    int nesting_level = 0;
-    
-    while (block_end_ip < bytecode->size()) {
-        const auto& instr = (*bytecode)[block_end_ip];
-        if (instr.opcode == Opcode::BEGIN_CONCURRENT) {
-            nesting_level++;
-        } else if (instr.opcode == Opcode::END_CONCURRENT) {
-            if (nesting_level == 0) {
-                break;
-            }
-            nesting_level--;
-        }
-        block_end_ip++;
+    if (debugMode) {
+        std::cout << "[DEBUG] Beginning concurrent block with parameters: " << instruction.stringValue << std::endl;
     }
 
-    if (block_end_ip >= bytecode->size()) {
-        error("Unmatched BEGIN_CONCURRENT");
+    // Create new block execution state
+    auto state = std::make_unique<BlockExecutionState>(BlockType::Concurrent);
+    
+    // Parse concurrent block parameters from instruction string
+    parseBlockParameters(instruction.stringValue, *state);
+    
+    // Set up output channel if specified in parameters
+    if (!state->output_channel_name.empty()) {
+        state->output_channel = concurrency_state->runtime->getChannelManager().createChannel(state->output_channel_name);
+        
+        // Define the channel in the current environment
+        auto channelValue = memoryManager.makeRef<Value>(*region, typeSystem->ANY_TYPE, state->output_channel);
+        environment->define(state->output_channel_name, channelValue);
+        
+        if (debugMode) {
+            std::cout << "[DEBUG] Created output channel: " << state->output_channel_name << std::endl;
+        }
+    }
+    
+    // Initialize error handling strategy and timeout configuration
+    concurrency_state->runtime->setErrorHandlingStrategy(state->error_strategy);
+    
+    if (state->timeout.count() > 0) {
+        state->setTimeout(state->timeout);
+        if (debugMode) {
+            std::cout << "[DEBUG] Set timeout: " << state->timeout.count() << "ms" << std::endl;
+        }
+    }
+    
+    // Push state onto concurrency stack
+    concurrency_state->pushBlock(std::move(state));
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] Concurrent block state created and pushed to stack" << std::endl;
+    }
+}
+
+void VM::handleEndConcurrent(const Instruction& instruction) {
+    if (debugMode) {
+        std::cout << "[DEBUG] Ending concurrent block" << std::endl;
+    }
+
+    // Get current block state
+    auto state = concurrency_state->popBlock();
+    if (!state) {
+        error("END_CONCURRENT without matching BEGIN_CONCURRENT");
         return;
     }
 
-    // Extract the bytecode for the concurrent block
-    std::vector<Instruction> block_bytecode(
-        bytecode->begin() + block_start_ip,
-        bytecode->begin() + block_end_ip
-    );
-
-    std::string mode = instruction.stringValue.empty() ? "async" : instruction.stringValue;
-
-    if (debugMode) {
-        std::cout << "[DEBUG] Starting concurrent block, mode: " << mode << std::endl;
-    }
-
-    // Create a task for concurrent execution
-    Task task = [this, block_bytecode, mode]() {
-        try {
-            // Create a new VM for this task without creating a new runtime
-            VM task_vm(false);
-
-            // Share the concurrency runtime components
-            task_vm.scheduler = this->scheduler;
-            task_vm.thread_pool = this->thread_pool;
-            task_vm.event_loop = this->event_loop;
-
-            // Each task gets a new memory region and environment.
-            // The VM constructor creates a new region.
-            // The new environment inherits from the current environment to capture local variables.
-            task_vm.globals = this->globals;
-            task_vm.environment = std::make_shared<Environment>(this->environment);
-            
-            // Set debug mode
-            task_vm.setDebug(this->debugMode);
-
-            if (debugMode) {
-                std::cout << "[DEBUG] Concurrent task starting execution" << std::endl;
-            }
-
-            // Execute the bytecode block
-            task_vm.execute(block_bytecode);
-
-            if (debugMode) {
-                std::cout << "[DEBUG] Concurrent task completed" << std::endl;
-            }
-        } catch (const std::exception& e) {
-            std::cerr << "[ERROR] Concurrent task failed: " << e.what() << std::endl;
+    // Wait for all tasks in current block to complete
+    waitForTasksToComplete(*state);
+    
+    // Collect results from tasks and handle any errors according to strategy
+    collectTaskResults(*state);
+    
+    // Handle any collected errors according to the error strategy
+    handleCollectedErrors(*state);
+    
+    // Close output channel and propagate final results
+    if (state->output_channel) {
+        state->output_channel->close();
+        if (debugMode) {
+            std::cout << "[DEBUG] Closed output channel: " << state->output_channel_name << std::endl;
         }
-    };
-
-    // Submit the task to the scheduler for asynchronous execution
-    scheduler->submit(std::move(task));
-
-    // Skip the main VM's instruction pointer past the concurrent block
-    ip = block_end_ip;
-}
-
-void VM::handleEndConcurrent(const Instruction& /*unused*/) {
-    // This is a no-op, similar to handleEndParallel.
+    }
+    
+    // Clean up block resources
+    cleanupBlockResources(*state);
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] Concurrent block completed successfully" << std::endl;
+    }
 }
 
 void VM::handleMatchPattern(const Instruction& /*unused*/) {
@@ -4393,45 +4461,256 @@ void VM::handleImportExecute(const Instruction& instruction) {
             for (const auto& id : currentImportState.filterIdentifiers) {
                 try {
                     filteredEnv->remove(id);
-                    if (debugMode) {
-                        std::cout << "[DEBUG] handleImportExecute: Successfully hid symbol: " << id << std::endl;
-                    }
                 } catch (const std::runtime_error& e) {
+                    // Symbol not found, which is fine for hide filter
                     if (debugMode) {
-                        std::cout << "[DEBUG] handleImportExecute: Symbol not found to hide (not an error): " << id << std::endl;
+                        std::cout << "[DEBUG] handleImportExecute: Symbol to hide not found: " << id << std::endl;
                     }
-                    // Symbol not found to hide - this is not an error
                 }
             }
         }
         
         // Create filtered module value
-        auto filteredModuleData = ModuleValue{filteredEnv, std::get<ModuleValue>(moduleValue->data).bytecode};
+        auto filteredModuleData = ModuleValue{filteredEnv, moduleData.bytecode};
         auto filteredModuleValue = memoryManager.makeRef<Value>(*region, typeSystem->MODULE_TYPE);
         filteredModuleValue->data = filteredModuleData;
+        moduleValue = filteredModuleValue;
+    }
+    
+    // Define the module in the current environment
+    environment->define(varName, moduleValue);
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] handleImportExecute: Module successfully imported as: " << varName << std::endl;
+    }
+}
+
+// Concurrency helper method implementations
+void VM::parseBlockParameters(const std::string& paramString, BlockExecutionState& state) {
+    if (paramString.empty()) {
+        // Use default values
+        return;
+    }
+    
+    // Parse parameter string format: "ch=output,mode=batch,cores=4,on_error=Stop,timeout=5000,grace=1000"
+    std::istringstream iss(paramString);
+    std::string param;
+    
+    while (std::getline(iss, param, ',')) {
+        // Trim whitespace
+        param.erase(0, param.find_first_not_of(" \t"));
+        param.erase(param.find_last_not_of(" \t") + 1);
         
-        if (debugMode) {
-            auto finalSymbols = filteredEnv->getAllSymbols();
-            std::cout << "[DEBUG] handleImportExecute: Filtered module has " << finalSymbols.size() << " symbols" << std::endl;
+        size_t eq_pos = param.find('=');
+        if (eq_pos == std::string::npos) continue;
+        
+        std::string key = param.substr(0, eq_pos);
+        std::string value = param.substr(eq_pos + 1);
+        
+        // Trim key and value
+        key.erase(0, key.find_first_not_of(" \t"));
+        key.erase(key.find_last_not_of(" \t") + 1);
+        value.erase(0, value.find_first_not_of(" \t"));
+        value.erase(value.find_last_not_of(" \t") + 1);
+        
+        if (key == "ch" || key == "channel") {
+            state.output_channel_name = value;
+        } else if (key == "mode") {
+            if (value == "batch") {
+                state.mode = ExecutionMode::Batch;
+            } else if (value == "stream") {
+                state.mode = ExecutionMode::Stream;
+            } else if (value == "async") {
+                state.mode = ExecutionMode::Async;
+            }
+        } else if (key == "cores") {
+            if (value == "Auto" || value == "auto") {
+                state.cores = 0; // 0 means auto-detect
+            } else {
+                state.cores = std::stoul(value);
+            }
+        } else if (key == "on_error") {
+            if (value == "Stop") {
+                state.error_strategy = ErrorHandlingStrategy::Stop;
+            } else if (value == "Auto") {
+                state.error_strategy = ErrorHandlingStrategy::Auto;
+            } else if (value == "Retry") {
+                state.error_strategy = ErrorHandlingStrategy::Retry;
+            }
+        } else if (key == "timeout") {
+            state.timeout = std::chrono::milliseconds(std::stoul(value));
+        } else if (key == "grace") {
+            state.grace_period = std::chrono::milliseconds(std::stoul(value));
+        } else if (key == "on_timeout") {
+            if (value == "partial") {
+                state.timeout_action = TimeoutAction::Partial;
+            } else if (value == "error") {
+                state.timeout_action = TimeoutAction::Error;
+            }
+        }
+    }
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] Parsed block parameters:" << std::endl;
+        std::cout << "[DEBUG]   mode: " << (state.mode == ExecutionMode::Batch ? "batch" : 
+                                           state.mode == ExecutionMode::Stream ? "stream" : "async") << std::endl;
+        std::cout << "[DEBUG]   cores: " << state.cores << std::endl;
+        std::cout << "[DEBUG]   error_strategy: " << (state.error_strategy == ErrorHandlingStrategy::Stop ? "Stop" :
+                                                     state.error_strategy == ErrorHandlingStrategy::Auto ? "Auto" : "Retry") << std::endl;
+        std::cout << "[DEBUG]   timeout: " << state.timeout.count() << "ms" << std::endl;
+        std::cout << "[DEBUG]   grace_period: " << state.grace_period.count() << "ms" << std::endl;
+        std::cout << "[DEBUG]   output_channel: " << state.output_channel_name << std::endl;
+    }
+}
+
+void VM::waitForTasksToComplete(BlockExecutionState& state) {
+    if (debugMode) {
+        std::cout << "[DEBUG] Waiting for " << state.total_tasks.load() << " tasks to complete" << std::endl;
+    }
+    
+    auto start_time = std::chrono::steady_clock::now();
+    bool timeout_reached = false;
+    
+    while (!state.allTasksCompleted() && !timeout_reached) {
+        // Check for timeout
+        if (state.timeout.count() > 0 && state.isTimedOut()) {
+            timeout_reached = true;
+            concurrency_state->stats.timeouts_occurred.fetch_add(1);
+            
+            if (debugMode) {
+                std::cout << "[DEBUG] Timeout reached, initiating graceful shutdown" << std::endl;
+            }
+            
+            // Initiate graceful shutdown - allow grace period for tasks to complete
+            auto grace_start = std::chrono::steady_clock::now();
+            auto grace_deadline = grace_start + state.grace_period;
+            
+            while (!state.allTasksCompleted() && std::chrono::steady_clock::now() < grace_deadline) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+            
+            if (!state.allTasksCompleted()) {
+                if (debugMode) {
+                    std::cout << "[DEBUG] Grace period expired, forcefully terminating remaining tasks" << std::endl;
+                }
+                // Force termination of remaining tasks would go here
+                // For now, we'll just break out of the loop
+            }
+            break;
         }
         
-        environment->define(varName, filteredModuleValue);
-    } else {
-        if (debugMode) {
-            std::cout << "[DEBUG] handleImportExecute: No filters applied, importing whole module" << std::endl;
+        // Brief sleep to avoid busy waiting
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    
+    auto end_time = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] Task completion wait finished in " << duration.count() << "ms" << std::endl;
+        std::cout << "[DEBUG] Completed tasks: " << state.completed_tasks.load() << "/" << state.total_tasks.load() << std::endl;
+        std::cout << "[DEBUG] Failed tasks: " << state.failed_tasks.load() << std::endl;
+    }
+}
+
+void VM::collectTaskResults(BlockExecutionState& state) {
+    if (debugMode) {
+        std::cout << "[DEBUG] Collecting results from " << state.tasks.size() << " tasks" << std::endl;
+    }
+    
+    // Results are already collected in state.results by individual tasks
+    // This method can perform additional result processing if needed
+    
+    auto results = state.getResults();
+    if (debugMode) {
+        std::cout << "[DEBUG] Collected " << results.size() << " results" << std::endl;
+    }
+    
+    // If there's an output channel, send results to it
+    if (state.output_channel) {
+        for (const auto& result : results) {
+            state.output_channel->send(result);
         }
-        // No filters - import the whole module
-        environment->define(varName, moduleValue);
+        if (debugMode) {
+            std::cout << "[DEBUG] Sent " << results.size() << " results to output channel" << std::endl;
+        }
     }
+}
 
-    if (debugMode) {
-        std::cout << "[DEBUG] handleImportExecute: Module '" << varName << "' successfully imported into current environment" << std::endl;
+void VM::handleCollectedErrors(BlockExecutionState& state) {
+    auto& errorCollector = concurrency_state->runtime->getErrorCollector();
+    
+    if (!errorCollector.hasErrors()) {
+        if (debugMode) {
+            std::cout << "[DEBUG] No errors to handle" << std::endl;
+        }
+        return;
     }
-
-    // Reset the import state
-    currentImportState = {};
+    
+    auto errors = errorCollector.getErrors();
     if (debugMode) {
-        std::cout << "[DEBUG] handleImportExecute: Import state reset, import execution complete" << std::endl;
+        std::cout << "[DEBUG] Handling " << errors.size() << " collected errors" << std::endl;
+    }
+    
+    switch (state.error_strategy) {
+        case ErrorHandlingStrategy::Stop:
+            // For Stop strategy, throw the first error
+            if (!errors.empty()) {
+                error("Task failed: " + errors[0].message);
+            }
+            break;
+            
+        case ErrorHandlingStrategy::Auto:
+            // For Auto strategy, log errors but continue
+            for (const auto& err : errors) {
+                std::cerr << "[ERROR] Task error (" << err.errorType << "): " << err.message << std::endl;
+            }
+            concurrency_state->stats.errors_handled.fetch_add(errors.size());
+            break;
+            
+        case ErrorHandlingStrategy::Retry:
+            // For Retry strategy, errors should have been handled during task execution
+            // Any remaining errors are final failures
+            for (const auto& err : errors) {
+                std::cerr << "[ERROR] Task failed after retries (" << err.errorType << "): " << err.message << std::endl;
+            }
+            concurrency_state->stats.errors_handled.fetch_add(errors.size());
+            break;
+    }
+    
+    // Clear collected errors
+    errorCollector.clear();
+}
+
+void VM::cleanupBlockResources(BlockExecutionState& state) {
+    if (debugMode) {
+        std::cout << "[DEBUG] Cleaning up block resources" << std::endl;
+    }
+    
+    // Clear task contexts
+    state.tasks.clear();
+    
+    // Clear results
+    {
+        std::lock_guard<std::mutex> lock(state.results_mutex);
+        state.results.clear();
+    }
+    
+    // Remove output channel from environment if it was defined
+    if (!state.output_channel_name.empty()) {
+        try {
+            // Note: We don't remove from environment as it might be used elsewhere
+            // The channel manager will handle cleanup
+            concurrency_state->runtime->getChannelManager().removeChannel(state.output_channel_name);
+        } catch (const std::exception& e) {
+            if (debugMode) {
+                std::cout << "[DEBUG] Error cleaning up channel: " << e.what() << std::endl;
+            }
+        }
+    }
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] Block resource cleanup completed" << std::endl;
     }
 }
 

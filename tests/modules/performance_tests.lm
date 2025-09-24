@@ -1,0 +1,67 @@
+// Test performance with nested calls and modules
+print("=== Performance Tests ===");
+
+import tests.modules.math_module;
+
+// Test 1: Deep nesting performance
+print("Test 1: Deep nesting performance");
+var deep_result = math_module.add(
+    math_module.multiply(
+        math_module.add(1, 2),
+        math_module.subtract(10, 5)
+    ),
+    math_module.square(
+        math_module.add(3, 4)
+    )
+);
+print("Deep nesting result: {deep_result}"); // ((1+2) * (10-5)) + (3+4)^2 = (3*5) + 7^2 = 15 + 49 = 64
+
+// Test 2: Loop with module function calls
+print("Test 2: Loop performance");
+var sum = 0;
+var i = 1;
+while (i <= 50) {
+    sum = math_module.add(sum, i);
+    i += 1;
+}
+print("Sum 1-50: {sum}"); // Should be 1275
+
+// Test 3: Recursive performance
+print("Test 3: Recursive performance");
+var fib_result = math_module.factorial(12);
+print("Factorial(12): {fib_result}");
+
+// Test 4: Multiple module imports performance
+print("Test 4: Multiple module operations");
+var operations = 0;
+var j = 1;
+while (j <= 20) {
+    var square_result = math_module.square(j);
+    var add_result = math_module.add(j, 1);
+    
+    if (square_result > 10) {
+        operations += 1;
+    }
+    if (add_result > 5) {
+        operations += 1;
+    }
+    
+    j += 1;
+}
+print("Operations completed: {operations}");
+
+// Test 5: Complex expression with module functions
+print("Test 5: Complex expressions");
+var complex_result = math_module.multiply(
+    math_module.add(
+        math_module.square(5),
+        math_module.factorial(4)
+    ),
+    math_module.subtract(
+        math_module.multiply(3, 7),
+        math_module.add(2, 8)
+    )
+);
+print("Complex result: {complex_result}"); // ((5^2 + 4!) * (3*7 - (2+8))) = ((25 + 24) * (21 - 10)) = 49 * 11 = 539
+
+print("=== Performance Tests Complete ===");

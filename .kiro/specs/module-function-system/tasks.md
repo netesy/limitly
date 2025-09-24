@@ -3,23 +3,26 @@
 ## Phase 1: Diagnose Function Call Issues
 
 ### Task 1.1: Debug Function Definition Storage
-- [ ] Add debug output to `handleBeginFunction` to verify function storage
-- [ ] Check if functions are being added to `userDefinedFunctions` map
-- [ ] Verify function start/end addresses are calculated correctly
-- [ ] Test with simple function definition
+- [x] Add debug output to `handleBeginFunction` to verify function storage
+- [x] Check if functions are being added to `userDefinedFunctions` map
+- [x] Verify function start/end addresses are calculated correctly
+- [x] Test with simple function definition
 
 ### Task 1.2: Debug Function Call Resolution
-- [ ] Add debug output to `handleCall` to trace function lookup
-- [ ] Verify function name is passed correctly to VM
-- [ ] Check if function is found in `userDefinedFunctions` map
-- [ ] Test function call bytecode generation
+- [x] Add debug output to `handleCall` to trace function lookup
+- [x] Verify function name is passed correctly to VM
+- [x] Check if function is found in `userDefinedFunctions` map
+- [x] Test function call bytecode generation
 
 ### Task 1.3: Debug Function Execution
 - [ ] Add debug output to function execution path
+
+
+
    -  Verify jump to function start address works
    -  Check if function body instructions execute
    -  Verify return handling works correctly
-   - Ensure `handleBeginFunction` correctly stores function metadata
+   -  Ensure `handleBeginFunction` correctly stores function metadata
    -  Fix function start address calculation
    -  Ensure function parameters are stored correctly
    -  Test function definition with various parameter types
@@ -28,15 +31,30 @@
 - [ ] Ensure function lookup works in `handleCall`
 
   -  Fix parameter binding in function environment
+  -  Check the type hinting and binding for functions and parameters
   -  Ensure call stack management works correctly
   -  Test function calls with different argument counts
+  -  Verify return handling works correctly
+  -  Check tests/functions/basic_functions.lm and fix the issues 
+
 
 ### Task 2.3: Fix Function Execution
-- [ ] Ensure jump to function start works correctly
-  -  Fix function body execution
-  -  Ensure return statement handling works
-  -  Ensure Module function return statement handling works
-  -  Test nested function calls
+- [x] Ensure jump to function start works correctly
+
+
+
+
+
+
+
+
+  - [x] Fix function body execution
+  - [x] Ensure return statement handling works
+  - [x] Test nested function calls
+  - [x] Verify module return handling is placed correctly on the stack 
+  - [x] Verify that module return value from function can be used for a new variable assignment    
+  - [x] Verify that assignment from module works
+
 
 ## Phase 3: Fix Module System
 
@@ -100,7 +118,15 @@
     -  Add new tests to automated test suite
 
 ### Task 4.3: Performance and Error Handling
-- [ ] Test error handling for missing functions
+- [ ] Ensure variable assignment and declaration from module  works
+
+
+
+
+
+
+
+    -  Test error handling for missing functions
     -  Test error handling for missing parameters
     -  Test error handling for missing return values
     -  Test error handling for missing variables

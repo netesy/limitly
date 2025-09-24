@@ -1,0 +1,10 @@
+// Test missing return value
+fn function_without_return(): int {
+    var x = 5;
+    print("Inside function without return");
+    // Missing return statement
+}
+
+print("Testing missing return value...");
+var result = function_without_return();
+print("Result: {result}");

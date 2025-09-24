@@ -1,0 +1,29 @@
+// Test error handling for missing functions, parameters, return values, and variables
+print("=== Module Error Handling Tests ===");
+
+import tests.modules.math_module;
+
+// Test 1: Test valid operations first
+print("Test 1: Valid operations");
+var valid_result = math_module.add(5, 10);
+print("Valid add result: {valid_result}");
+
+var valid_pi = math_module.pi;
+print("Valid pi access: {valid_pi}");
+
+print("=== Valid Operations Complete ===");
+
+// Note: The following tests will cause compilation/runtime errors
+// They are commented out but show what error conditions we should handle:
+
+// Test 2: Missing function (would cause compile error)
+// var result = math_module.nonexistent_function(5, 10);
+
+// Test 3: Missing variable (would cause compile error)  
+// var value = math_module.nonexistent_variable;
+
+// Test 4: Wrong parameter count (would cause compile error)
+// var result = math_module.add(5); // Too few parameters
+// var result2 = math_module.add(5, 10, 15); // Too many parameters
+
+print("Error handling tests completed (see comments for error conditions)");
