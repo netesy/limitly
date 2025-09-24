@@ -1,0 +1,5 @@
+// Test module function call
+import tests.modules.my_module as my_mod;
+
+print("Calling module function:");
+my_mod.greet();

@@ -40,6 +40,7 @@ echo Compiling main executable...
     src\backend\concurrency\thread_pool.cpp ^
     src\backend\concurrency\event_loop.cpp ^
     src\backend\concurrency\iocp_event_loop.cpp ^
+    src\backend\concurrency\concurrency_runtime.cpp ^
     bin\debugger.o ^
     -I. -lws2_32 -static-libgcc -static-libstdc++
 

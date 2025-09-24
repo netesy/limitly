@@ -1,0 +1,15 @@
+// Test nested function calls
+fn inner() {
+    print("Inside inner function");
+    return "inner_result";
+}
+
+fn outer() {
+    print("Inside outer function");
+    var result = inner();
+    print("Got from inner: " + result);
+    return "outer_result";
+}
+
+var final_result = outer();
+print("Final result: " + final_result);

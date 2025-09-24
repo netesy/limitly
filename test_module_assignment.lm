@@ -1,0 +1,10 @@
+// Test module variable assignment
+import tests.modules.math_module;
+
+print("Testing module variable assignment");
+var pi_value = math_module.pi;
+print("Pi from module: " + pi_value);
+
+var sum = math_module.add(10, 20);
+var product = math_module.multiply(sum, 2);
+print("(10 + 20) * 2 = " + product);

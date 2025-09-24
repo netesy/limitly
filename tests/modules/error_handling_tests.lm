@@ -1,0 +1,45 @@
+// Test error handling for missing functions, parameters, return values, and variables
+print("=== Module Error Handling Tests ===");
+
+// Test 1: Missing function error handling
+print("Test 1: Missing function call");
+import tests.modules.math_module;
+try {
+    // This should cause an error - function doesn't exist
+    var result = math_module.nonexistent_function(5, 10);
+    print("ERROR: Should not reach this line");
+} catch {
+    print("PASS: Caught missing function error as expected");
+}
+
+// Test 2: Missing variable error handling  
+print("Test 2: Missing variable access");
+try {
+    // This should cause an error - variable doesn't exist
+    var value = math_module.nonexistent_variable;
+    print("ERROR: Should not reach this line");
+} catch {
+    print("PASS: Caught missing variable error as expected");
+}
+
+// Test 3: Function with wrong parameter count
+print("Test 3: Wrong parameter count");
+try {
+    // add function expects 2 parameters, giving 1
+    var result = math_module.add(5);
+    print("ERROR: Should not reach this line");
+} catch {
+    print("PASS: Caught wrong parameter count error as expected");
+}
+
+// Test 4: Function with wrong parameter count (too many)
+print("Test 4: Too many parameters");
+try {
+    // add function expects 2 parameters, giving 3
+    var result = math_module.add(5, 10, 15);
+    print("ERROR: Should not reach this line");
+} catch {
+    print("PASS: Caught too many parameters error as expected");
+}
+
+print("=== Error Handling Tests Complete ===");

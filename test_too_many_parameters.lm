@@ -1,0 +1,6 @@
+// Test too many parameters
+import tests.modules.math_module;
+
+print("Testing too many parameters...");
+var result = math_module.add(5, 10, 15); // Too many parameters
+print("This should not print");

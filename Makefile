@@ -13,7 +13,7 @@ TARGETS   := limitly test_parser format_code
 # Sources
 COMMON_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp src/debugger.cpp
 BACKEND_COMMON_SRCS := src/backend/backend.cpp src/backend/functions.cpp src/backend/classes.cpp src/backend/ast_printer.cpp
-MAIN_SRCS   := src/main.cpp src/backend/vm.cpp $(BACKEND_COMMON_SRCS) $(COMMON_SRCS) src/backend/concurrency/scheduler.cpp src/backend/concurrency/thread_pool.cpp src/backend/concurrency/event_loop.cpp src/backend/concurrency/epoll_event_loop.cpp
+MAIN_SRCS   := src/main.cpp src/backend/vm.cpp $(BACKEND_COMMON_SRCS) $(COMMON_SRCS) src/backend/concurrency/scheduler.cpp src/backend/concurrency/thread_pool.cpp src/backend/concurrency/event_loop.cpp src/backend/concurrency/epoll_event_loop.cpp src/backend/concurrency/concurrency_runtime.cpp
 TEST_SRCS   := src/test_parser.cpp $(BACKEND_COMMON_SRCS) $(COMMON_SRCS)
 FORMAT_SRCS := src/format_code.cpp src/backend/code_formatter.cpp $(COMMON_SRCS)
 

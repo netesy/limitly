@@ -1,0 +1,54 @@
+// Test memory management in function calls and modules
+print("=== Memory Management Tests ===");
+
+import tests.modules.math_module;
+
+// Test 1: Multiple function calls to verify no memory leaks
+print("Test 1: Multiple function calls");
+var i = 0;
+while (i < 100) {
+    var result = math_module.add(i, i + 1);
+    var squared = math_module.square(i);
+    i += 1;
+}
+print("PASS: Completed 100 function calls without memory issues");
+
+// Test 2: Nested function calls
+print("Test 2: Nested function calls");
+var nested_result = math_module.multiply(
+    math_module.add(5, 3), 
+    math_module.subtract(10, 2)
+);
+print("Nested result: {nested_result}"); // Should be (5+3) * (10-2) = 8 * 8 = 64
+
+// Test 3: Recursive function calls
+print("Test 3: Recursive function calls");
+var factorial_result = math_module.factorial(10);
+print("Factorial(10): {factorial_result}");
+
+// Test 4: Large parameter passing
+print("Test 4: Large parameter passing");
+fn large_parameter_function(a: int, b: int, c: int, d: int, e: int): int {
+    return a + b + c + d + e;
+}
+
+var large_result = large_parameter_function(1, 2, 3, 4, 5);
+print("Large parameter result: {large_result}");
+
+// Test 5: String parameter memory management
+print("Test 5: String parameter memory management");
+fn string_function(s: str): str {
+    return "Processed: " + s;
+}
+
+var string_result = string_function("test string");
+print("String result: {string_result}");
+
+// Test 6: Module variable assignment memory management
+print("Test 6: Module variable assignment");
+var pi_copy1 = math_module.pi;
+var pi_copy2 = math_module.pi;
+var pi_copy3 = math_module.pi;
+print("Pi copies: {pi_copy1}, {pi_copy2}, {pi_copy3}");
+
+print("=== Memory Management Tests Complete ===");

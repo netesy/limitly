@@ -1,0 +1,6 @@
+// Test missing function error
+import tests.modules.math_module;
+
+print("Testing missing function call...");
+var result = math_module.nonexistent_function(5, 10);
+print("This should not print");

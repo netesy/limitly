@@ -1,0 +1,6 @@
+// Test missing variable error
+import tests.modules.math_module;
+
+print("Testing missing variable access...");
+var value = math_module.nonexistent_variable;
+print("This should not print");

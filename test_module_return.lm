@@ -1,8 +1,6 @@
-import tests.modules.basic_module as basic;
+// Test module function with return value
+import tests.modules.my_module;
 
-print("Testing module function return values:");
-
-print("Calling basic.add(5, 3):");
-var result:int;
-result = basic.add(5, 3);
-print("Result: " + result);
+print("Testing module function return value");
+var result = my_module.greet();
+print("Result from module function: " + result);

@@ -1149,7 +1149,8 @@ void BytecodeGenerator::visitCallExpr(const std::shared_ptr<AST::CallExpr>& expr
     if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(expr->callee)) {
         // Simple function call: functionName(args)
         functionName = varExpr->name;
-        std::cout << "[DEBUG] CallExpr: Function name = " << functionName << std::endl;
+
+      //  std::cout << "[DEBUG] CallExpr: Function name = " << functionName << std::endl;
     } else if (auto memberExpr = std::dynamic_pointer_cast<AST::MemberExpr>(expr->callee)) {
         // Method call: object.methodName(args)
         // First evaluate the object
@@ -1177,7 +1178,7 @@ void BytecodeGenerator::visitCallExpr(const std::shared_ptr<AST::CallExpr>& expr
     }
     
     // Call function
-    std::cout << "[DEBUG] CallExpr: Emitting CALL with function name = '" << functionName << "' and " << expr->arguments.size() << " arguments" << std::endl;
+   // std::cout << "[DEBUG] CallExpr: Emitting CALL with function name = '" << functionName << "' and " << expr->arguments.size() << " arguments" << std::endl;
     emit(Opcode::CALL, expr->line, static_cast<int32_t>(expr->arguments.size()), 0.0f, false, functionName);
 }
 

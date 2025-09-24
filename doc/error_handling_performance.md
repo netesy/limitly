@@ -13,9 +13,9 @@ The error handling system is designed to have minimal impact on the success path
 ```limit
 # This code has near-zero overhead compared to non-fallible equivalent
 fn fast_computation(data: List<int>) : int {
-    let sum = 0;
+    var sum = 0;
     iter (value in data) {
-        let processed = process_value(value)?;  # Zero-cost when successful
+        var processed = process_value(value)?;  # Zero-cost when successful
         sum = sum + processed;
     }
     return sum;
@@ -120,17 +120,17 @@ std::cout << "Pool hit ratio: " << stats.getPoolHitRatio() << std::endl;
 ```limit
 # Enable performance monitoring
 fn profile_error_handling() {
-    let iterations = 10000;
-    let start_time = clock();
+    var iterations = 10000;
+    var start_time = clock();
     
     iter (i in 1..iterations) {
-        let result = potentially_failing_operation(i)?;
+        var result = potentially_failing_operation(i)?;
         process_result(result);
     }
     
-    let end_time = clock();
-    let duration = end_time - start_time;
-    let ops_per_second = iterations / duration;
+    var end_time = clock();
+    var duration = end_time - start_time;
+    var ops_per_second = iterations / duration;
     
     print("Operations per second: " + ops_per_second);
 }
@@ -154,7 +154,7 @@ fn safe_divide(a: int, b: int) : int?DivisionByZero {
 # Avoid: Complex error logic in hot paths
 fn inefficient_divide(a: int, b: int) : int?DivisionByZero {
     try {
-        let result = complex_calculation(a, b);
+        var result = complex_calculation(a, b);
         if (is_invalid(result)) {
             return err(DivisionByZero("Complex error"));
         }
@@ -170,9 +170,9 @@ fn inefficient_divide(a: int, b: int) : int?DivisionByZero {
 Prefer specific error types over generic ones:
 
 ```limit
-# Good: Specific error types
+// Good: Specific error types
 fn parse_number(text: str) : int?ParseError {
-    # Specific error handling
+    // Specific error handling
 }
 
 # Less optimal: Generic error types
@@ -188,10 +188,10 @@ Handle errors close to their source when possible:
 ```limit
 # Good: Local error handling
 fn process_data(data: List<str>) : List<int> {
-    let results = [];
+    var results = [];
     iter (item in data) {
-        let parsed = parse_int(item) ?else {
-            continue;  # Handle locally
+        var parsed = parse_int(item) ?else {
+            continue;  // Handle locally
         };
         results.append(parsed);
     }
@@ -200,9 +200,9 @@ fn process_data(data: List<str>) : List<int> {
 
 # Less optimal: Propagating all errors
 fn process_data(data: List<str>) : List<int>?ParseError {
-    let results = [];
+    var results = [];
     iter (item in data) {
-        let parsed = parse_int(item)?;  # Propagates all errors
+        var parsed = parse_int(item)?;  // Propagates all errors
         results.append(parsed);
     }
     return results;
@@ -223,7 +223,7 @@ enum NetworkError {
 
 # Less optimal: Heavy error data
 enum NetworkError {
-    Timeout(str, List<str>, Dict<str, str>),  # Too much data
+    Timeout(str, List<str>, Dict<str, str>),  // Too much data
     ConnectionRefused(ComplexObject),
     InvalidResponse(str, List<ComplexObject>)
 }
@@ -236,30 +236,30 @@ enum NetworkError {
 ```limit
 # Performance test framework
 fn benchmark_error_handling() {
-    let test_cases = [
+    var test_cases = [
         ("success_heavy", test_success_heavy),
         ("error_heavy", test_error_heavy),
         ("mixed_workload", test_mixed_workload)
     ];
     
     iter ((name, test_fn) in test_cases) {
-        let start_time = clock();
+        var start_time = clock();
         test_fn();
-        let duration = clock() - start_time;
+        var duration = clock() - start_time;
         print(name + ": " + duration + " seconds");
     }
 }
 
 fn test_success_heavy() {
     iter (i in 1..10000) {
-        let result = always_succeeds(i)?;
+        var result = always_succeeds(i)?;
         process_result(result);
     }
 }
 
 fn test_error_heavy() {
     iter (i in 1..1000) {
-        let result = always_fails(i) ?else {
+        var result = always_fails(i) ?else {
             continue;
         };
         process_result(result);
@@ -268,7 +268,7 @@ fn test_error_heavy() {
 
 fn test_mixed_workload() {
     iter (i in 1..5000) {
-        let result = sometimes_fails(i) ?else {
+        var result = sometimes_fails(i) ?else {
             continue;
         };
         process_result(result);
@@ -328,9 +328,9 @@ enum SimpleError {
 ```limit
 # Avoid: Propagating every error
 fn process_items(items: List<Item>) : List<Result>?Error {
-    let results = [];
+    var results = [];
     iter (item in items) {
-        let result = process_item(item)?;  # Stops on first error
+        var result = process_item(item)?;  # Stops on first error
         results.append(result);
     }
     return results;
@@ -338,9 +338,9 @@ fn process_items(items: List<Item>) : List<Result>?Error {
 
 # Prefer: Collect errors or handle locally
 fn process_items(items: List<Item>) : List<Result> {
-    let results = [];
+    var results = [];
     iter (item in items) {
-        let result = process_item(item) ?else {
+        var result = process_item(item) ?else {
             continue;  # Skip failed items
         };
         results.append(result);

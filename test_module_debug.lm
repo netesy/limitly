@@ -1,7 +1,6 @@
-import tests.modules.basic_module as basic;
+// Test module function call
+import tests.modules.my_module;
 
-print("Testing module function return values:");
-print("About to call basic.add(5, 3)");
-basic.add(5, 3);
-print("Function call completed");
-print("About to assign result");
+print("Before module function call");
+my_module.greet();
+print("After module function call");

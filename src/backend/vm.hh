@@ -12,6 +12,7 @@
 #include "concurrency/scheduler.hh"
 #include "concurrency/thread_pool.hh"
 #include "concurrency/event_loop.hh"
+#include "concurrency/concurrency_state.hh"
 #include <vector>
 #include <stack>
 #include <unordered_map>
@@ -242,10 +243,8 @@ private:
     std::unordered_map<Environment*, std::unordered_map<std::string, backend::Function>> moduleUserDefinedFunctions;
     std::unordered_map<std::string, ModuleFunctionInfo> moduleFunctions_;
 
-    // Concurrency runtime
-    std::shared_ptr<Scheduler> scheduler;
-    std::shared_ptr<ThreadPool> thread_pool;
-    std::shared_ptr<EventLoop> event_loop;
+    // Concurrency runtime - replaced with integrated state
+    std::unique_ptr<ConcurrencyState> concurrency_state;
     
     // Helper methods
     ValuePtr pop();
@@ -301,7 +300,15 @@ public:
     void printStack() const;
     void printErrorStats() const;
     
-    std::shared_ptr<ThreadPool> getThreadPool() { return thread_pool; }
+    std::shared_ptr<ThreadPool> getThreadPool() { 
+        return concurrency_state ? concurrency_state->runtime->getThreadPool() : nullptr; 
+    }
+    
+    // Additional concurrency accessors
+    ConcurrencyState* getConcurrencyState() { return concurrency_state.get(); }
+    ConcurrencyRuntime* getConcurrencyRuntime() { 
+        return concurrency_state ? concurrency_state->runtime.get() : nullptr; 
+    }
 
 private:
     void error(const std::string& message) const;
@@ -386,6 +393,13 @@ private:
     // Helper function for consistent call frame management
     void createAndPushCallFrame(const std::string& funcName, size_t returnAddress, 
                                std::shared_ptr<Environment> funcEnv);
+    
+    // Concurrency helper methods
+    void parseBlockParameters(const std::string& paramString, BlockExecutionState& state);
+    void waitForTasksToComplete(BlockExecutionState& state);
+    void collectTaskResults(BlockExecutionState& state);
+    void handleCollectedErrors(BlockExecutionState& state);
+    void cleanupBlockResources(BlockExecutionState& state);
     void handleBeginTry(const Instruction& instruction);
     void handleEndTry(const Instruction& instruction);
     void handleBeginHandler(const Instruction& instruction);
