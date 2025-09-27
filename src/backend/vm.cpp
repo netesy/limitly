@@ -2,7 +2,9 @@
 #include "value.hh"  // For Value and ErrorValue definitions
 #include "../frontend/scanner.hh"
 #include "../frontend/parser.hh"
-#include "../backend.hh"
+#include "../common/backend.hh"
+#include "concurrency/task_vm.hh"
+#include "bytecode_printer.hh"  // For opcodeToString function
 
 // Forward declare ErrorValue from the global namespace
 struct ErrorValue;
@@ -102,7 +104,8 @@ VM::VM(bool create_runtime)
       currentFunctionBeingDefined(""),
       insideFunctionDefinition(false),
       currentClassBeingDefined(""),
-      insideClassDefinition(false) {
+      insideClassDefinition(false),
+      insideTaskDefinition(false) {
     
     if (create_runtime) {
         // Initialize concurrency state with integrated runtime
@@ -245,6 +248,9 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                 ip++;
                 continue;
             }
+            
+            // Don't skip task definition instructions - let them execute normally in main thread
+            // The tasks will execute the same bytecode but with their own loop variables
             
             // Debug output for opcode values
             int opcodeValue = static_cast<int>(instruction.opcode);
@@ -544,10 +550,10 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                            // handleSetRangeStep(instruction);
                             break;
                         case Opcode::BEGIN_TASK:
-                           // handleBeginTask(instruction);
+                            handleBeginTask(instruction);
                             break;    
                         case Opcode::END_TASK:
-                          //  handleEndTask(instruction);
+                            handleEndTask(instruction);
                             break;    
                         case Opcode::BEGIN_WORKER:
                            // handleBeginWorker(instruction);
@@ -556,7 +562,7 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                            // handleEndWorker(instruction);
                             break;    
                         case Opcode::STORE_ITERABLE:
-                            //handleStoreIterable(instruction);
+                            handleStoreIterable(instruction);
                             break;    
                         case Opcode::LOAD_CONST :
                            // handleLoadConst(instruction);
@@ -609,7 +615,11 @@ void VM::registerUserFunction(const std::shared_ptr<AST::AsyncFunctionDeclaratio
 
 ValuePtr VM::pop() {
     if (stack.empty()) {
-        error("Stack underflow");
+        int line = 1;
+        if (ip < bytecode->size()) {
+            line = (*bytecode)[ip].line;
+        }
+        error("Stack underflow - attempted to pop from empty stack", line, 0, "stack operation", "valid expression or statement that pushes a value onto the stack");
     }
     
     ValuePtr value = stack.back();
@@ -623,7 +633,12 @@ void VM::push(const ValuePtr& value) {
 
 ValuePtr VM::peek(int distance) const {
     if (stack.size() <= static_cast<size_t>(distance)) {
-        error("Stack underflow");
+        int line = 1;
+        if (ip < bytecode->size()) {
+            line = (*bytecode)[ip].line;
+        }
+        error("Stack underflow - attempted to peek at distance " + std::to_string(distance) + " but stack only has " + std::to_string(stack.size()) + " elements", 
+              line, 0, "", "expression that provides enough values on the stack");
     }
     
     return stack[stack.size() - 1 - distance];
@@ -662,7 +677,79 @@ void VM::printErrorStats() const {
 }
 
 void VM::error(const std::string& message) const {
-    throw std::runtime_error(message);
+    // Use enhanced error reporting if source information is available
+    if (!sourceCode.empty() && !filePath.empty()) {
+        // Try to get current instruction line if available
+        int line = 1;
+        int column = 0;
+        std::string lexeme = "";
+        std::string expectedValue = "";
+        
+        if (ip < bytecode->size()) {
+            line = (*bytecode)[ip].line;
+            // Try to extract more context from the current instruction
+            const auto& instruction = (*bytecode)[ip];
+            
+            // Get lexeme from instruction context if available
+            if (instruction.opcode == Opcode::LOAD_VAR || 
+                instruction.opcode == Opcode::STORE_VAR ||
+                instruction.opcode == Opcode::CALL) {
+                // For variable/function operations, try to get the name
+                // if (instruction.opcode < constants.size()) {
+                //     auto constant = constants[instruction.opcode];
+                //     if (std::holds_alternative<std::string>(constant->data)) {
+                //         lexeme = std::get<std::string>(constant->data);
+                //     }
+                // }
+            }
+            
+            // Provide expected values based on operation type
+            switch (instruction.opcode) {
+                case Opcode::ADD:
+                case Opcode::SUBTRACT:
+                case Opcode::MULTIPLY:
+                case Opcode::DIVIDE:
+                case Opcode::MODULO:
+                    expectedValue = "numeric operands (int or float)";
+                    break;
+                case Opcode::EQUAL:
+                case Opcode::NOT_EQUAL:
+                case Opcode::LESS:
+                case Opcode::LESS_EQUAL:
+                case Opcode::GREATER:
+                case Opcode::GREATER_EQUAL:
+                    expectedValue = "comparable values of the same type";
+                    break;
+                case Opcode::AND:
+                case Opcode::OR:
+                    expectedValue = "boolean operands";
+                    break;
+                case Opcode::JUMP_IF_FALSE:
+                    expectedValue = "boolean condition";
+                    break;
+                default:
+                    expectedValue = "valid operand for " + BytecodePrinter::opcodeToString(instruction.opcode);
+                    break;
+            }
+        }
+        
+        Debugger::error(message, line, column, InterpretationStage::INTERPRETING, 
+                       sourceCode, filePath, lexeme, expectedValue);
+    } else {
+        // Fall back to runtime error for backward compatibility
+        throw std::runtime_error(message);
+    }
+}
+
+void VM::error(const std::string& message, int line, int column, const std::string& lexeme, const std::string& expectedValue) const {
+    // Enhanced error reporting with specific context
+    if (!sourceCode.empty() && !filePath.empty()) {
+        Debugger::error(message, line, column, InterpretationStage::INTERPRETING, 
+                       sourceCode, filePath, lexeme, expectedValue);
+    } else {
+        // Fall back to runtime error for backward compatibility
+        throw std::runtime_error(message);
+    }
 }
 
 // Error handling helper methods - optimized for zero-cost success path
@@ -712,6 +799,12 @@ bool VM::propagateError(ValuePtr errorValue) {
     // Walk frames from top to bottom - optimized for shallow error nesting
     while (!errorFrames.empty()) {
         const ErrorFrame& frame = errorFrames.back();
+
+        // Validate frame is properly initialized (silence compiler warning)
+        if (frame.handlerAddress == 0) [[unlikely]] {
+            errorFrames.pop_back();
+            continue;
+        }
 
         // Wildcard frame matches any error - most common case
         if (!frame.expectedErrorType) [[likely]] {
@@ -1008,7 +1101,8 @@ void VM::handleStoreVar(const Instruction& instruction) {
     }
     
     if (stack.empty()) {
-        error("Stack underflow in STORE_VAR for variable '" + instruction.stringValue + "'");
+        error("Stack underflow in STORE_VAR for variable '" + instruction.stringValue + "'", 
+              instruction.line, 0, instruction.stringValue, "expression that produces a value to store");
         return;
     }
     
@@ -1074,7 +1168,8 @@ void VM::handleLoadVar(const Instruction& instruction) {
         ValuePtr value = environment->get(instruction.stringValue);
         push(value);
     } catch (const std::exception& e) {
-        error("Undefined variable '" + instruction.stringValue + "'");
+        error("Undefined variable '" + instruction.stringValue + "'", 
+              instruction.line, 0, instruction.stringValue, "declared variable or function parameter");
     }
 }
 
@@ -1442,7 +1537,7 @@ void VM::handleDivide(const Instruction& /*unused*/) {
     }
 }
 
-void VM::handleModulo(const Instruction& /*unused*/) {
+void VM::handleModulo(const Instruction& instruction) {
     ValuePtr b = pop();
     ValuePtr a = pop();
     
@@ -1454,7 +1549,7 @@ void VM::handleModulo(const Instruction& /*unused*/) {
     // Check for modulo by zero
     int32_t bVal = std::get<int32_t>(b->data);
     if (bVal == 0) {
-        error("Modulo by zero");
+        error("Modulo by zero", instruction.line, 0, "0", "non-zero integer divisor");
     }
     
     // Integer modulo
@@ -1590,7 +1685,7 @@ void VM::handleNotEqual(const Instruction& /*unused*/) {
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, result));
 }
 
-void VM::handleLess(const Instruction& /*unused*/) {
+void VM::handleLess(const Instruction& instruction) {
     ValuePtr b = pop();
     ValuePtr a = pop();
     
@@ -1622,7 +1717,7 @@ void VM::handleLess(const Instruction& /*unused*/) {
     } else if (a->type->tag == TypeTag::String && b->type->tag == TypeTag::String) {
         result = std::get<std::string>(a->data) < std::get<std::string>(b->data);
     } else {
-        error("Cannot compare values of different types");
+        error("Cannot compare values of different types in less-than operation", instruction.line, 0, "< operator", "values of the same comparable type (int, float, string, or bool)");
     }
     
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, result));
@@ -3744,9 +3839,7 @@ void VM::handleBeginParallel(const Instruction& instruction) {
     ip = block_end_ip;
 }
 
-void VM::handleEndParallel(const Instruction& /*unused*/) {
-    // This is now a no-op. The thread pool manages thread lifecycle.
-}
+// handleEndParallel implementation moved to end of file
 
 void VM::handleBeginConcurrent(const Instruction& instruction) {
     if (debugMode) {
@@ -3824,6 +3917,166 @@ void VM::handleEndConcurrent(const Instruction& instruction) {
     
     if (debugMode) {
         std::cout << "[DEBUG] Concurrent block completed successfully" << std::endl;
+    }
+}
+
+void VM::handleBeginTask(const Instruction& instruction) {
+    if (debugMode) {
+        std::cout << "[DEBUG] BEGIN_TASK handler called with parameters: " << instruction.stringValue << std::endl;
+    }
+
+    // Get current block state
+    auto* state = concurrency_state->getCurrentBlock();
+    if (!state) {
+        error("BEGIN_TASK outside of concurrent/parallel block");
+        return;
+    }
+
+    // Parse task parameters (loop variable and iterable)
+    // The instruction string contains the loop variable name
+    std::string loopVar = instruction.stringValue;
+    
+    // Store the loop variable for later use
+    concurrency_state->current_task_loop_var = loopVar;
+    
+    // Store the task body AST (we'll get this from the backend)
+    // For now, we'll create it in handleEndTask when we have all the information
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] Stored task loop variable: " << loopVar << std::endl;
+    }
+}
+
+void VM::handleEndTask(const Instruction& instruction) {
+    if (debugMode) {
+        std::cout << "[DEBUG] END_TASK handler called" << std::endl;
+    }
+
+    // Get current block state
+    auto* state = concurrency_state->getCurrentBlock();
+    if (!state) {
+        error("END_TASK outside of concurrent/parallel block");
+        return;
+    }
+
+    if (state->tasks.empty()) {
+        if (debugMode) {
+            std::cout << "[DEBUG] No tasks to execute" << std::endl;
+        }
+        return;
+    }
+
+    // Submit all tasks to the scheduler for execution
+    // The TaskVM will handle its own task body compilation and execution
+    for (auto& context : state->tasks) {
+        try {
+            if (debugMode) {
+                std::cout << "[DEBUG] Submitting task with loop var '" << context->loop_var 
+                          << "' = " << context->iteration_value->toString() << std::endl;
+            }
+            
+            // Create TaskVM for this context
+            auto task_vm = createTaskVM(std::move(context));
+            
+            // Submit to scheduler
+            submitTaskToScheduler(std::move(task_vm));
+            
+        } catch (const std::exception& e) {
+            if (debugMode) {
+                std::cout << "[DEBUG] Error submitting task: " << e.what() << std::endl;
+            }
+            
+            // Handle task submission error
+            ErrorValue error;
+            error.errorType = "TaskSubmissionError";
+            error.message = e.what();
+            
+            if (concurrency_state->runtime) {
+                concurrency_state->runtime->getErrorCollector().addError(error);
+            }
+        }
+    }
+
+    if (debugMode) {
+        std::cout << "[DEBUG] Submitted " << state->tasks.size() << " tasks to scheduler" << std::endl;
+    }
+}
+
+void VM::handleStoreIterable(const Instruction& instruction) {
+    if (debugMode) {
+        std::cout << "[DEBUG] STORE_ITERABLE handler called" << std::endl;
+    }
+
+    // Pop the iterable from the stack
+    ValuePtr iterable = pop();
+    
+    // Store it in the current task iteration state
+    currentTaskIterable = iterable;
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] Stored iterable: " << iterable->toString() << std::endl;
+    }
+    
+    // Get current block state
+    auto* state = concurrency_state->getCurrentBlock();
+    if (!state) {
+        if (debugMode) {
+            std::cout << "[DEBUG] No current block for task creation" << std::endl;
+        }
+        return;
+    }
+    
+    // Get the loop variable that was stored in BEGIN_TASK
+    std::string loopVar = concurrency_state->current_task_loop_var;
+    if (loopVar.empty()) {
+        if (debugMode) {
+            std::cout << "[DEBUG] No loop variable stored for task creation" << std::endl;
+        }
+        return;
+    }
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] Creating tasks for loop variable: " << loopVar << std::endl;
+    }
+
+    // Create task contexts for each iteration value
+    auto iterator = createIterator(iterable);
+    if (!iterator) {
+        error("Cannot create iterator for task iterable");
+        return;
+    }
+
+    size_t task_count = 0;
+    while (hasNext(iterator)) {
+        ValuePtr iterationValue = next(iterator);
+        
+        if (debugMode) {
+            std::cout << "[DEBUG] Creating task for iteration value: " << iterationValue->toString() << std::endl;
+        }
+        
+        // Create task context for this iteration
+        auto context = createTaskContext(loopVar, iterationValue);
+        
+        // Copy current error frames to task context
+        for (const auto& frame : errorFrames) {
+            context->error_frames.emplace_back(
+                frame.handlerAddress,
+                frame.stackBase,
+                frame.expectedErrorType,
+                frame.functionName
+            );
+        }
+        
+        // Add task to the current block
+        state->tasks.push_back(std::move(context));
+        task_count++;
+    }
+    
+    // Update total task count
+    state->total_tasks.store(task_count);
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] Created " << task_count << " task contexts" << std::endl;
     }
 }
 
@@ -4613,106 +4866,11 @@ void VM::waitForTasksToComplete(BlockExecutionState& state) {
     }
 }
 
-void VM::collectTaskResults(BlockExecutionState& state) {
-    if (debugMode) {
-        std::cout << "[DEBUG] Collecting results from " << state.tasks.size() << " tasks" << std::endl;
-    }
-    
-    // Results are already collected in state.results by individual tasks
-    // This method can perform additional result processing if needed
-    
-    auto results = state.getResults();
-    if (debugMode) {
-        std::cout << "[DEBUG] Collected " << results.size() << " results" << std::endl;
-    }
-    
-    // If there's an output channel, send results to it
-    if (state.output_channel) {
-        for (const auto& result : results) {
-            state.output_channel->send(result);
-        }
-        if (debugMode) {
-            std::cout << "[DEBUG] Sent " << results.size() << " results to output channel" << std::endl;
-        }
-    }
-}
+// collectTaskResults implementation moved to end of file
 
-void VM::handleCollectedErrors(BlockExecutionState& state) {
-    auto& errorCollector = concurrency_state->runtime->getErrorCollector();
-    
-    if (!errorCollector.hasErrors()) {
-        if (debugMode) {
-            std::cout << "[DEBUG] No errors to handle" << std::endl;
-        }
-        return;
-    }
-    
-    auto errors = errorCollector.getErrors();
-    if (debugMode) {
-        std::cout << "[DEBUG] Handling " << errors.size() << " collected errors" << std::endl;
-    }
-    
-    switch (state.error_strategy) {
-        case ErrorHandlingStrategy::Stop:
-            // For Stop strategy, throw the first error
-            if (!errors.empty()) {
-                error("Task failed: " + errors[0].message);
-            }
-            break;
-            
-        case ErrorHandlingStrategy::Auto:
-            // For Auto strategy, log errors but continue
-            for (const auto& err : errors) {
-                std::cerr << "[ERROR] Task error (" << err.errorType << "): " << err.message << std::endl;
-            }
-            concurrency_state->stats.errors_handled.fetch_add(errors.size());
-            break;
-            
-        case ErrorHandlingStrategy::Retry:
-            // For Retry strategy, errors should have been handled during task execution
-            // Any remaining errors are final failures
-            for (const auto& err : errors) {
-                std::cerr << "[ERROR] Task failed after retries (" << err.errorType << "): " << err.message << std::endl;
-            }
-            concurrency_state->stats.errors_handled.fetch_add(errors.size());
-            break;
-    }
-    
-    // Clear collected errors
-    errorCollector.clear();
-}
+// handleCollectedErrors implementation moved to end of file
 
-void VM::cleanupBlockResources(BlockExecutionState& state) {
-    if (debugMode) {
-        std::cout << "[DEBUG] Cleaning up block resources" << std::endl;
-    }
-    
-    // Clear task contexts
-    state.tasks.clear();
-    
-    // Clear results
-    {
-        std::lock_guard<std::mutex> lock(state.results_mutex);
-        state.results.clear();
-    }
-    
-    // Remove output channel from environment if it was defined
-    if (!state.output_channel_name.empty()) {
-        try {
-            // Note: We don't remove from environment as it might be used elsewhere
-            // The channel manager will handle cleanup
-            concurrency_state->runtime->getChannelManager().removeChannel(state.output_channel_name);
-        } catch (const std::exception& e) {
-            if (debugMode) {
-                std::cout << "[DEBUG] Error cleaning up channel: " << e.what() << std::endl;
-            }
-        }
-    }
-    
-    if (debugMode) {
-        std::cout << "[DEBUG] Block resource cleanup completed" << std::endl;
-    }
-}
+// cleanupBlockResources implementation moved to end of file
 
 void VM::handleBeginEnum(const Instruction& instruction) {
     if (debugMode) {
@@ -5441,4 +5599,290 @@ bool VM::handleErrorTypePatternMatch(const ValuePtr& value) {
     }
     
     return true;
+}
+// Task Management Methods Implementation
+
+std::unique_ptr<TaskContext> VM::createTaskContext(const std::string& loopVar, ValuePtr iterationValue) {
+    // Generate unique task ID
+    static std::atomic<size_t> task_id_counter{0};
+    size_t task_id = task_id_counter.fetch_add(1);
+    
+    // Create task context
+    auto context = std::make_unique<TaskContext>(task_id, loopVar, iterationValue);
+    
+    // Set error handling strategy from current block
+    if (concurrency_state && concurrency_state->getCurrentBlock()) {
+        context->error_strategy = concurrency_state->getCurrentBlock()->error_strategy;
+    } else {
+        context->error_strategy = ErrorHandlingStrategy::Stop;
+    }
+    
+    // Copy current error frames to task context
+    for (const auto& frame : errorFrames) {
+        context->error_frames.emplace_back(
+            frame.handlerAddress,
+            frame.stackBase,
+            frame.expectedErrorType,
+            frame.functionName
+        );
+    }
+    
+    return context;
+}
+
+std::unique_ptr<TaskContext> VM::createTaskContextWithBytecode(
+    const std::string& loopVar, 
+    ValuePtr iterationValue,
+    const std::vector<Instruction>& bytecode,
+    size_t start_ip,
+    size_t end_ip) {
+    
+    // Create base task context
+    auto context = createTaskContext(loopVar, iterationValue);
+    
+    // Extract bytecode for this task
+    if (start_ip < bytecode.size() && end_ip <= bytecode.size() && start_ip < end_ip) {
+        context->task_bytecode.clear();
+        context->task_bytecode.reserve(end_ip - start_ip);
+        
+        for (size_t i = start_ip; i < end_ip; ++i) {
+            context->task_bytecode.push_back(bytecode[i]);
+        }
+    }
+    
+    return context;
+}
+
+std::unique_ptr<TaskVM> VM::createTaskVM(std::unique_ptr<TaskContext> context) {
+    if (!concurrency_state || !concurrency_state->runtime) {
+        throw std::runtime_error("Concurrency runtime not available");
+    }
+    
+    // Get shared components from concurrency runtime
+    auto error_collector = std::make_shared<ConcurrentErrorCollector>();
+    std::shared_ptr<Channel<ValuePtr>> result_channel = nullptr;
+    std::shared_ptr<Channel<ErrorValue>> error_channel = nullptr;
+    
+    // Get output channel from current block if available
+    if (concurrency_state->getCurrentBlock() && 
+        concurrency_state->getCurrentBlock()->output_channel) {
+        result_channel = concurrency_state->getCurrentBlock()->output_channel;
+    }
+    
+    // Create TaskVM using factory
+    return TaskVMFactory::createTaskVM(
+        std::move(context),
+        error_collector,
+        result_channel,
+        error_channel
+    );
+}
+
+void VM::submitTaskToScheduler(std::unique_ptr<TaskVM> task_vm) {
+    if (!concurrency_state || !concurrency_state->runtime) {
+        throw std::runtime_error("Concurrency runtime not available");
+    }
+    
+    auto scheduler = concurrency_state->runtime->getScheduler();
+    if (!scheduler) {
+        throw std::runtime_error("Scheduler not available");
+    }
+    
+    // Get current block state for completion tracking
+    auto* current_block = concurrency_state->getCurrentBlock();
+    if (!current_block) {
+        throw std::runtime_error("No current block for task execution");
+    }
+    
+    // Set up completion callback to update block state
+    task_vm->setCompletionCallback([current_block](size_t task_id, ValuePtr result, bool success) {
+        if (success && result) {
+            current_block->addResult(result);
+        }
+        
+        // Update completion counters
+        current_block->completed_tasks.fetch_add(1);
+        if (!success) {
+            current_block->failed_tasks.fetch_add(1);
+        }
+    });
+    
+    // Convert unique_ptr to shared_ptr for lambda capture
+    std::shared_ptr<TaskVM> shared_task_vm = std::move(task_vm);
+    
+    // Create a task function that executes the TaskVM
+    auto task_function = [shared_task_vm]() {
+        try {
+            ValuePtr result = shared_task_vm->executeTask();
+            // Result and completion are handled by the TaskVM and completion callback
+        } catch (const std::exception& e) {
+            // Handle task execution error
+            ErrorValue error;
+            error.errorType = "TaskExecutionError";
+            error.message = e.what();
+            shared_task_vm->handleTaskError(error);
+            
+            // Complete task with error
+            shared_task_vm->completeTask(nullptr);
+        }
+    };
+    
+    // Submit task to scheduler
+    scheduler->submit(std::move(task_function));
+}
+
+void VM::executeTaskInThread(std::unique_ptr<TaskContext> context) {
+    // Create TaskVM for this context
+    auto task_vm = createTaskVM(std::move(context));
+    
+    // Submit to scheduler for execution
+    submitTaskToScheduler(std::move(task_vm));
+}
+// Iterator helper methods implementation
+std::shared_ptr<IteratorValue> VM::createIterator(ValuePtr iterable) {
+    if (!iterable) {
+        return nullptr;
+    }
+    
+    if (std::holds_alternative<ListValue>(iterable->data)) {
+        // For lists, create a list iterator
+        return std::make_shared<IteratorValue>(
+            IteratorValue::IteratorType::LIST,
+            iterable
+        );
+    } else if (std::holds_alternative<DictValue>(iterable->data)) {
+        // For dictionaries
+        return std::make_shared<IteratorValue>(
+            IteratorValue::IteratorType::LIST, // TODO: Add DICT iterator type
+            iterable
+        );
+    } else if (std::holds_alternative<IteratorValuePtr>(iterable->data)) {
+        // If it's already an iterator, return it
+        return std::get<IteratorValuePtr>(iterable->data);
+    } else if (std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(iterable->data)) {
+        // Create a channel-backed iterator
+        return std::make_shared<IteratorValue>(
+            IteratorValue::IteratorType::CHANNEL,
+            iterable
+        );
+    }
+    
+    return nullptr;
+}
+
+bool VM::hasNext(std::shared_ptr<IteratorValue> iterator) {
+    if (!iterator) {
+        return false;
+    }
+    
+    return iterator->hasNext();
+}
+
+ValuePtr VM::next(std::shared_ptr<IteratorValue> iterator) {
+    if (!iterator || !iterator->hasNext()) {
+        return nullptr;
+    }
+    
+    return iterator->next();
+}
+
+// Parallel block execution handlers
+
+// Missing method implementations for concurrency support
+
+void VM::collectTaskResults(BlockExecutionState& state) {
+    // Collect results from completed tasks
+    if (!concurrency_state) {
+        return;
+    }
+    
+    auto* current_block = concurrency_state->getCurrentBlock();
+    if (!current_block) {
+        return;
+    }
+    
+    // Wait for all tasks to complete
+    while (current_block->completed_tasks.load() < current_block->total_tasks) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    
+    // Collect all results
+    state.results = current_block->getResults();
+}
+
+void VM::handleCollectedErrors(BlockExecutionState& state) {
+    // Handle any errors that occurred during task execution
+    if (!concurrency_state) {
+        return;
+    }
+    
+    auto* current_block = concurrency_state->getCurrentBlock();
+    if (!current_block) {
+        return;
+    }
+    
+    // Check if any tasks failed
+    if (current_block->failed_tasks.load() > 0) {
+        // Create an error value for failed tasks
+        std::string errorMsg = "One or more tasks failed during parallel execution";
+        ValuePtr errorValue = createErrorValue("ParallelExecutionError", errorMsg);
+        
+        // Propagate the error if we're in an error handling context
+        if (hasErrorFrames()) {
+            propagateError(errorValue);
+        } else {
+            // Otherwise, just log the error
+            std::cerr << "Warning: " << errorMsg << std::endl;
+        }
+    }
+}
+
+void VM::cleanupBlockResources(BlockExecutionState& state) {
+    // Clean up resources used by the block execution
+    if (!concurrency_state) {
+        return;
+    }
+    
+    // Pop the current block from the stack
+    concurrency_state->popBlock();
+    
+    // Clear any temporary state
+    state.results.clear();
+    state.tasks.clear();
+}
+
+void VM::handleEndParallel(const Instruction& instruction) {
+    // Handle the end of a parallel block
+    if (!concurrency_state) {
+        error("Concurrency state not initialized for parallel block");
+        return;
+    }
+    
+    auto* current_block = concurrency_state->getCurrentBlock();
+    if (!current_block) {
+        error("No current parallel block to end");
+        return;
+    }
+    
+    // Create block execution state
+    BlockExecutionState state(BlockType::Parallel);
+    
+    // Wait for all tasks to complete and collect results
+    collectTaskResults(state);
+    
+    // Handle any errors that occurred
+    handleCollectedErrors(state);
+    
+    // Clean up resources
+    cleanupBlockResources(state);
+    
+    // Push results onto the stack if any
+    if (!state.results.empty()) {
+        // For now, just push the first result
+        // TODO: Implement proper result aggregation
+        push(state.results[0]);
+    } else {
+        // Push nil if no results
+        push(memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
+    }
 }

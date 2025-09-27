@@ -15,7 +15,7 @@
 - [x] Test function call bytecode generation
 
 ### Task 1.3: Debug Function Execution
-- [ ] Add debug output to function execution path
+- [x] Add debug output to function execution path
 
 
 
@@ -28,7 +28,7 @@
    -  Test function definition with various parameter types
 
 ### Task 2.2: Fix Function Call Resolution
-- [ ] Ensure function lookup works in `handleCall`
+- [x] Ensure function lookup works in `handleCall`
 
   -  Fix parameter binding in function environment
   -  Check the type hinting and binding for functions and parameters
@@ -40,11 +40,6 @@
 
 ### Task 2.3: Fix Function Execution
 - [x] Ensure jump to function start works correctly
-
-
-
-
-
 
 
 
@@ -63,18 +58,12 @@
 
 
 
-
-
-
   -  Verify module file loading works
   -  Check module compilation and execution
   -  Verify module environment creation
 
 ### Task 3.2: Debug Module Property Access
 - [x] Fix module property access for modules
-
-
-
 
 
 
@@ -118,10 +107,7 @@
     -  Add new tests to automated test suite
 
 ### Task 4.3: Performance and Error Handling
-- [ ] Ensure variable assignment and declaration from module  works
-
-
-
+- [x] Ensure variable assignment and declaration from module  works
 
 
 

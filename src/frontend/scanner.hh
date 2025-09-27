@@ -163,11 +163,13 @@ struct Token {
 
 class Scanner {
 public:
-    explicit Scanner(const std::string& source) : source(source), start(0), current(0), line(1) {}
+    explicit Scanner(const std::string& source, const std::string& filePath = "") 
+        : source(source), filePath(filePath), start(0), current(0), line(1) {}
     
     // Constructor that takes pre-scanned tokens (for use in string interpolation)
     explicit Scanner(const std::vector<Token>& preScannedTokens) 
         : source(""),  // Empty source since we're using pre-scanned tokens
+          filePath(""),
           start(0), 
           current(0), 
           line(1) {
@@ -189,6 +191,7 @@ public:
     size_t getCurrent() const { return current; }
     std::string getLexeme() const { return source.substr(start, current - start); }
     const std::string& getSource() const { return source; }
+    const std::string& getFilePath() const { return filePath; }
 
     Token getToken();
     Token peekToken() const { return tokens.empty() ? Token{TokenType::EOF_TOKEN, "", line} : tokens[current]; }
@@ -205,6 +208,7 @@ public:
 
 private:
     std::string source;
+    std::string filePath;
     size_t start;
     size_t current;
     size_t line;
@@ -224,7 +228,7 @@ private:
     void number();
     void identifier();
     void annotation();
-    void error(const std::string& message);
+    void error(const std::string& message, const std::string& expectedValue = "");
     TokenType checkKeyword(size_t start,
                            size_t length,
                            const std::string &rest,

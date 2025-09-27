@@ -16,7 +16,7 @@ echo Compiling with g++...
 
 :: Compile debugger first as a separate object file to ensure it's available
 echo Compiling debugger...
-"%MSYS2_PATH%\mingw64\bin\g++.exe" -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -c -o bin\debugger.o src\debugger.cpp -I.
+"%MSYS2_PATH%\mingw64\bin\g++.exe" -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -c -o bin\debugger.o src\common\debugger.cpp -I.
 
 if %ERRORLEVEL% NEQ 0 (
     echo Failed to compile src\debugger.cpp
@@ -41,6 +41,13 @@ echo Compiling main executable...
     src\backend\concurrency\event_loop.cpp ^
     src\backend\concurrency\iocp_event_loop.cpp ^
     src\backend\concurrency\concurrency_runtime.cpp ^
+    src\backend\concurrency\task_vm.cpp ^
+    src\error\error_formatter.cpp ^
+    src\error\error_code_generator.cpp ^
+    src\error\contextual_hint_provider.cpp ^
+    src\error\source_code_formatter.cpp ^
+    src\error\console_formatter.cpp ^
+    src\error\error_catalog.cpp ^
     bin\debugger.o ^
     -I. -lws2_32 -static-libgcc -static-libstdc++
 
@@ -62,6 +69,12 @@ echo Compiling test parser...
     src\backend\bytecode_printer.cpp ^
     src\backend\functions.cpp ^
     src\backend\classes.cpp ^
+    src\error\error_formatter.cpp ^
+    src\error\error_code_generator.cpp ^
+    src\error\contextual_hint_provider.cpp ^
+    src\error\source_code_formatter.cpp ^
+    src\error\console_formatter.cpp ^
+    src\error\error_catalog.cpp ^
     bin\debugger.o ^
     -I. -static-libgcc -static-libstdc++
 

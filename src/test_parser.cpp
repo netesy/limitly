@@ -2,9 +2,9 @@
 #include "backend/bytecode_printer.hh"
 #include "frontend/scanner.hh"
 #include "frontend/parser.hh"
-#include "backend.hh"
+#include "common/backend.hh"
 #include "backend/vm.hh"
-#include "opcodes.hh"
+#include "common/opcodes.hh"
 #include <iostream>
 #include <fstream>
 #include <sstream>

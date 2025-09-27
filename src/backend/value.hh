@@ -10,7 +10,7 @@
 #include <vector>
 #include <stdexcept>
 #include <sstream>
-#include "../opcodes.hh"
+#include "../common/opcodes.hh"
 #include "concurrency/channel.hh"
 #include <atomic>
 

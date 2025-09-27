@@ -9,6 +9,18 @@ void TypeChecker::addError(const std::string& message, int line, int column, con
     errors.emplace_back(message, line, column, context);
 }
 
+void TypeChecker::addError(const std::string& message, int line, int column, const std::string& context, const std::string& lexeme, const std::string& expectedValue) {
+    // Enhanced error with lexeme and expected value information
+    std::string enhancedMessage = message;
+    if (!lexeme.empty()) {
+        enhancedMessage += " (at '" + lexeme + "')";
+    }
+    if (!expectedValue.empty()) {
+        enhancedMessage += " - expected: " + expectedValue;
+    }
+    errors.emplace_back(enhancedMessage, line, column, context);
+}
+
 void TypeChecker::enterScope() {
     currentScope = std::make_shared<Scope>(currentScope);
 }
@@ -74,7 +86,7 @@ std::vector<TypeCheckError> TypeChecker::checkProgram(const std::shared_ptr<AST:
 
 TypePtr TypeChecker::resolveTypeAnnotation(const std::shared_ptr<AST::TypeAnnotation>& annotation) {
     if (!annotation) {
-        return typeSystem.ANY_TYPE;
+        return typeSystem.NIL_TYPE;
     }
     
     // Handle basic types
@@ -259,7 +271,7 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
     } else if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(expr)) {
         TypePtr varType = currentScope->getVariableType(varExpr->name);
         if (!varType) {
-            addError("Undefined variable: " + varExpr->name, expr->line);
+            addError("Undefined variable", expr->line, 0, "Variable lookup", varExpr->name, "declared variable name");
             return typeSystem.ANY_TYPE;
         }
         return varType;
@@ -508,15 +520,15 @@ void TypeChecker::checkFunctionCall(const std::shared_ptr<AST::CallExpr>& expr) 
     if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(expr->callee)) {
         FunctionSignature* signature = currentScope->getFunctionSignature(varExpr->name);
         if (!signature) {
-            addError("Undefined function: " + varExpr->name, expr->line);
+            addError("Undefined function", expr->line, 0, "Function call", varExpr->name, "declared function name");
             return;
         }
         
         // Check argument count
         if (argTypes.size() != signature->paramTypes.size()) {
-            addError("Function " + signature->name + " expects " + 
-                    std::to_string(signature->paramTypes.size()) + " arguments, got " + 
-                    std::to_string(argTypes.size()), expr->line);
+            addError("Function argument count mismatch", expr->line, 0, "Function call", 
+                    signature->name, 
+                    std::to_string(signature->paramTypes.size()) + " arguments, got " + std::to_string(argTypes.size()));
             return;
         }
         

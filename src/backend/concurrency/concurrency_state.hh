@@ -3,6 +3,7 @@
 
 #include "concurrency_runtime.hh"
 #include "../value.hh"
+#include "../../frontend/ast.hh"
 #include <memory>
 #include <stack>
 #include <vector>
@@ -53,6 +54,9 @@ struct TaskContext {
     ValuePtr iteration_value;
     std::shared_ptr<Environment> task_env;
     std::vector<Instruction> task_bytecode;
+    
+    // Task body AST for compilation in TaskVM
+    std::shared_ptr<AST::BlockStatement> task_body;
     
     // Error handling context
     std::vector<struct ErrorFrame> error_frames;

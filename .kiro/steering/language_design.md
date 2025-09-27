@@ -17,19 +17,23 @@ Limit is designed with the following principles in mind:
 - Explicit type annotations for function signatures
 - Generics for type-safe containers and algorithms
 
-### Type Hierarchy
-- Primitive types: `int`, `uint`, `float`, `bool`, `str`
-- Composite types: `list`, `dict`, `tuple`
-- User-defined types: classes, enums, interfaces
-- Union types: `T | U`
-- Refined types: `T where condition`
+### Type Hierarchy ✅ IMPLEMENTED
+- Primitive types: `int`, `uint`, `float`, `bool`, `str` ✅
+- Type aliases: `type Id = uint;` ✅
+- Union types: `T | U` ✅
+- Option types: `Some | None` ✅
+- Optional parameters: `str?`, `int?` ✅
+- Composite types: `list`, `dict`, `tuple` (planned)
+- User-defined types: classes, enums, interfaces (in progress)
+- Refined types: `T where condition` (planned)
 
 ## Memory Model
 
-### Memory Safety
-- No null pointers by default (use `Union instead)
-- No dangling references (ownership system)
-- No uninitialized variables
+### Memory Safety ✅ IMPLEMENTED
+- No null pointers by default (use Option types instead) ✅
+- Region-based memory management ✅
+- No uninitialized variables (compile-time checking) ✅
+- No dangling references (ownership system) - in progress
 
 ### Controlled Unsafe Operations
 - Unsafe blocks for low-level memory operations
@@ -55,17 +59,20 @@ Limit is designed with the following principles in mind:
 
 ## Error Handling
 
-### Result Types
-- `Result<T, E>` for operations that might fail
-- `Option<T>` for values that might be absent
-- Pattern matching for handling different outcomes
+### Result Types ✅ SYNTAX IMPLEMENTED
+- `int?ErrorType` for operations that might fail ✅
+- `Option<T>` (Some | None) for values that might be absent ✅
+- `?` operator for error propagation ✅
+- Pattern matching for handling different outcomes (syntax exists, VM pending)
 
 ## Code Organization
 
-### Modules and Imports
-- Module system for code organization
-- Explicit imports for dependencies
-- Visibility controls (`@public`, `@private`, `@protected`)
+### Modules and Imports ✅ IMPLEMENTED
+- Module system for code organization ✅
+- Explicit imports: `import module as alias` ✅
+- Import filtering: `show`, `hide` filters ✅
+- Module caching and error handling ✅
+- Visibility controls (`@public`, `@private`, `@protected`) - planned
 
 ### Interfaces and Traits
 - Interfaces for defining behavior contracts
@@ -79,8 +86,9 @@ Limit is designed with the following principles in mind:
 - Semicolons for statement termination
 - Type annotations after identifiers (`name: type`)
 
-### Expressiveness
-- Pattern matching with `match` expressions
-- String interpolation with `{variable}`
-- Named arguments for function calls
-- Optional parameters with default values
+### Expressiveness ✅ MOSTLY IMPLEMENTED
+- String interpolation with `{variable}` ✅
+- Optional parameters: `fn greet(name: str?)` ✅
+- Default parameter values: `fn greet(name: str = "World")` ✅
+- Pattern matching with `match` expressions (syntax exists, VM pending)
+- Named arguments for function calls (planned)

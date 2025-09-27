@@ -81,6 +81,7 @@ private:
     
     // Helper methods
     void addError(const std::string& message, int line, int column = 0, const std::string& context = "");
+    void addError(const std::string& message, int line, int column, const std::string& context, const std::string& lexeme, const std::string& expectedValue);
     void enterScope();
     void exitScope();
     TypePtr resolveTypeAnnotation(const std::shared_ptr<AST::TypeAnnotation>& annotation);

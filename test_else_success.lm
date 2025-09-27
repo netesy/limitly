@@ -18,7 +18,7 @@ fn test_success() {
     // Test error case - should execute else handler
     var error_result = divide(10, 0)? else error {
         print("Caught error:", error);
-        99
+        0
     };
     print("Error result:", error_result);
 }

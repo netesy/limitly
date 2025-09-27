@@ -1,7 +1,7 @@
 #ifndef BYTECODE_PRINTER_H
 #define BYTECODE_PRINTER_H
 
-#include "../opcodes.hh"
+#include "../common/opcodes.hh"
 #include <vector>
 #include <iostream>
 #include <string>
@@ -13,10 +13,11 @@ public:
     
     // Print bytecode instructions to a stream
     static void print(const std::vector<Instruction>& bytecode, std::ostream& out);
+        // Convert opcode to string representation
+    static std::string opcodeToString(Opcode opcode);
     
 private:
-    // Convert opcode to string representation
-    static std::string opcodeToString(Opcode opcode);
+
     
     // Format instruction for display
     static std::string formatInstruction(const Instruction& instruction, size_t index);

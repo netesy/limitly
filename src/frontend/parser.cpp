@@ -1,5 +1,5 @@
 #include "parser.hh"
-#include "../debugger.hh"
+#include "../common/debugger.hh"
 #include <stdexcept>
 #include <limits>
 
@@ -104,14 +104,35 @@ void Parser::error(const std::string &message, bool suppressException) {
          scanner.getTokens()[current-1].type == TokenType::LEFT_BRACE && 
          scanner.getTokens()[current].type == TokenType::RIGHT_BRACE)) {
         // Let the debugger handle this common case
-        Debugger::error(message, line, column, InterpretationStage::PARSING, "", lexeme, codeContext);
+        Debugger::error(message, line, column, InterpretationStage::PARSING, scanner.getSource(), scanner.getFilePath(), lexeme, codeContext);
         return;
     }
     
-    Debugger::error(message, line, column, InterpretationStage::PARSING, "", lexeme, codeContext);
+    // Check for block-related errors and add "Caused by" information
+    std::string enhancedMessage = message;
+    if ((message.find("Expected '}'") != std::string::npos || 
+         message.find("Unexpected closing brace") != std::string::npos ||
+         message.find("Expected '}' after") != std::string::npos) && 
+        !blockStack.empty()) {
+        
+        // Find the most relevant block context (the most recent unclosed block)
+        auto blockContext = getCurrentBlockContext();
+        if (blockContext.has_value()) {
+            std::string causedBy = generateCausedByMessage(blockContext.value());
+            enhancedMessage += "\n" + causedBy;
+        }
+    }
+    
+    // Use enhanced error reporting with block context if available
+    auto blockContext = getCurrentBlockContext();
+    if (blockContext.has_value()) {
+        Debugger::error(enhancedMessage, line, column, InterpretationStage::PARSING, scanner.getSource(), scanner.getFilePath(), blockContext, lexeme, codeContext);
+    } else {
+        Debugger::error(enhancedMessage, line, column, InterpretationStage::PARSING, scanner.getSource(), scanner.getFilePath(), lexeme, codeContext);
+    }
 
     // Collect error for multi-error reporting
-    errors.push_back(ParseError{message, line, column, codeContext});
+    errors.push_back(ParseError{enhancedMessage, line, column, codeContext});
     if (errors.size() >= MAX_ERRORS) {
         throw std::runtime_error("Too many syntax errors; aborting parse.");
     }
@@ -648,16 +669,18 @@ std::shared_ptr<AST::Statement> Parser::comptimeStatement() {
 
 std::shared_ptr<AST::Statement> Parser::ifStatement() {
     auto stmt = std::make_shared<AST::IfStatement>();
-    stmt->line = previous().line;
+    Token ifToken = previous();
+    stmt->line = ifToken.line;
 
     consume(TokenType::LEFT_PAREN, "Expected '(' after 'if'.");
     stmt->condition = expression();
     consume(TokenType::RIGHT_PAREN, "Expected ')' after if condition.");
 
-    stmt->thenBranch = statement();
+    stmt->thenBranch = parseStatementWithContext("if", ifToken);
 
     if (match({TokenType::ELSE})) {
-        stmt->elseBranch = statement();
+        Token elseToken = previous();
+        stmt->elseBranch = parseStatementWithContext("else", elseToken);
     }
 
     return stmt;
@@ -665,7 +688,8 @@ std::shared_ptr<AST::Statement> Parser::ifStatement() {
 
 std::shared_ptr<AST::BlockStatement> Parser::block() {
     auto block = std::make_shared<AST::BlockStatement>();
-    block->line = previous().line;
+    Token leftBrace = previous();
+    block->line = leftBrace.line;
 
     // Handle empty blocks
     if (check(TokenType::RIGHT_BRACE)) {
@@ -717,7 +741,8 @@ std::shared_ptr<AST::BlockStatement> Parser::block() {
 
 std::shared_ptr<AST::Statement> Parser::forStatement() {
     auto stmt = std::make_shared<AST::ForStatement>();
-    stmt->line = previous().line;
+    Token forToken = previous();
+    stmt->line = forToken.line;
 
     consume(TokenType::LEFT_PAREN, "Expected '(' after 'for'.");
 
@@ -830,20 +855,22 @@ std::shared_ptr<AST::Statement> Parser::forStatement() {
     }
 
     consume(TokenType::RIGHT_PAREN, "Expected ')' after for clauses.");
-    stmt->body = statement();
+    
+    stmt->body = parseStatementWithContext("for", forToken);
 
     return stmt;
 }
 
 std::shared_ptr<AST::Statement> Parser::whileStatement() {
     auto stmt = std::make_shared<AST::WhileStatement>();
-    stmt->line = previous().line;
+    Token whileToken = previous();
+    stmt->line = whileToken.line;
 
     consume(TokenType::LEFT_PAREN, "Expected '(' after 'while'.");
     stmt->condition = expression();
     consume(TokenType::RIGHT_PAREN, "Expected ')' after while condition.");
 
-    stmt->body = statement();
+    stmt->body = parseStatementWithContext("while", whileToken);
 
     return stmt;
 }
@@ -921,8 +948,10 @@ std::shared_ptr<AST::FunctionDeclaration> Parser::function(const std::string& ki
     }
 
     // Parse function body
-    consume(TokenType::LEFT_BRACE, "Expected '{' before " + kind + " body.");
+    Token leftBrace = consume(TokenType::LEFT_BRACE, "Expected '{' before " + kind + " body.");
+    pushBlockContext("function", leftBrace);
     func->body = block();
+    popBlockContext();
 
     return func;
 }
@@ -988,7 +1017,8 @@ std::shared_ptr<AST::ClassDeclaration> Parser::classDeclaration() {
         }
     }
 
-    consume(TokenType::LEFT_BRACE, "Expected '{' before class body.");
+    Token leftBrace = consume(TokenType::LEFT_BRACE, "Expected '{' before class body.");
+    pushBlockContext("class", leftBrace);
 
     // Parse class members
     while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
@@ -1040,6 +1070,7 @@ std::shared_ptr<AST::ClassDeclaration> Parser::classDeclaration() {
     }
 
     consume(TokenType::RIGHT_BRACE, "Expected '}' after class body.");
+    popBlockContext();
 
     // Generate automatic init constructor if class has inline constructor parameters
     if (classDecl->hasInlineConstructor) {
@@ -2897,3 +2928,49 @@ bool Parser::isErrorType(const std::string& name) {
            name == "Error"; // Generic error type
 }
 
+
+// Block context tracking methods implementation
+
+void Parser::pushBlockContext(const std::string& blockType, const Token& startToken) {
+    ErrorHandling::BlockContext context(blockType, startToken.line, startToken.start, startToken.lexeme);
+    blockStack.push(context);
+}
+
+void Parser::popBlockContext() {
+    if (!blockStack.empty()) {
+        blockStack.pop();
+    }
+}
+
+std::optional<ErrorHandling::BlockContext> Parser::getCurrentBlockContext() const {
+    if (blockStack.empty()) {
+        return std::nullopt;
+    }
+    return blockStack.top();
+}
+
+std::string Parser::generateCausedByMessage(const ErrorHandling::BlockContext& context) const {
+    std::string message = "Caused by: Unterminated " + context.blockType + " starting at line " + 
+                         std::to_string(context.startLine) + ":";
+    message += "\n" + std::to_string(context.startLine) + " | " + context.startLexeme;
+    if (context.blockType == "function" || context.blockType == "class") {
+        message += " - unclosed " + context.blockType + " starts here";
+    } else {
+        message += " - unclosed block starts here";
+    }
+    
+
+    
+    return message;
+}
+
+std::shared_ptr<AST::Statement> Parser::parseStatementWithContext(const std::string& blockType, const Token& contextToken) {
+    if (check(TokenType::LEFT_BRACE)) {
+        pushBlockContext(blockType, contextToken);
+        auto stmt = statement();
+        popBlockContext();
+        return stmt;
+    } else {
+        return statement();
+    }
+}

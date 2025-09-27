@@ -1,5 +1,5 @@
 #include "lembed.hh"
-#include "opcodes.hh"
+#include "common/opcodes.hh"
 #include <string>
 #include <vector>
 

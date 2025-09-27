@@ -1,0 +1,10 @@
+// Simple task test to debug loop variable issue
+print("=== Simple Task Test ===");
+
+concurrent {
+    task(i in 1..4) {
+        print("Task with i = {i}");
+    }
+}
+
+print("Test finished");

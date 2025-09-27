@@ -1,6 +1,6 @@
 #include "functions.hh"
 #include "types.hh"
-#include "../debugger.hh"
+#include "../common/debugger.hh"
 
 namespace backend {
 

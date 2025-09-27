@@ -11,14 +11,14 @@ fn test_else_handler() {
     // Test successful case
     var result1 = divide(10, 2)? else error {
         print("Error occurred:", error);
-        return nil;
-    };
+        0
+        };
     print("Success result:", result1);
     
     // Test error case
     var result2 = divide(10, 0)? else error {
         print("Caught error:", error);
-        return nil;
+        0
     };
     print("Error result:", result2);
     return nil;
