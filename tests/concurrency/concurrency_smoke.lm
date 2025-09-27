@@ -2,39 +2,15 @@
 print("=== Concurrency Smoke Test ===");
 
 // Atomic counter
-var counter: atomic = 0;
-
-// // Start a simple concurrent block that increments the counter and prints values
-// concurrent(mode=batch, cores=2, on_error=Stop) {
-//     task() {
-//         // increment atomically
-//         counter += 1;
-//         print("Task 1 completed with counter value: {counter}");
-//     }
-//     task() {
-//         // increment atomically
-//         counter += 1;
-//         print("Task 2 completed with counter value: {counter}");
-//     }
-//     task() {
-//         // increment atomically
-//         counter += 1;
-//         print("Task 3 completed with counter value: {counter}");
-//     }
-//     task() {
-//         // increment atomically
-//         counter += 1;
-//         print("Task 4 completed with counter value: {counter}");
-//     }
-// }
+var counter: int = 0;
 
 print("Tasks Iteration Tests");
 
 // Fixed iteration block - using the correct syntax that should work
 concurrent(mode=batch, cores=2, on_error=Stop) {
-    task(i in 1..3) {
+    task(i in 1..4) {
         counter += 1;
-        print("Task {counter} running");
+        print("Task running with counter {counter}");
     }
 }
 

@@ -1,5 +1,5 @@
 #include "scanner.hh"
-#include "../debugger.hh"
+#include "../common/debugger.hh"
 
 std::vector<Token> Scanner::scanTokens() {
     while (!isAtEnd()) {
@@ -157,7 +157,9 @@ void Scanner::scanToken() {
         } else if (isAlpha(c)) {
             identifier();
         } else {
-            this->error("Unexpected character.");
+            // Get the unexpected character for better error reporting
+            std::string unexpectedChar = std::string(1, peek());
+            this->error("Unexpected character '" + unexpectedChar + "'", "valid identifier, number, string, or operator");
         }
         break;
     }
@@ -419,7 +421,7 @@ void Scanner::string() {
                 }
                 
                 if (isAtEnd()) {
-                    error("Unterminated string interpolation.");
+                    error("Unterminated string interpolation", "closing '}' for interpolation expression");
                     return;
                 }
                 
@@ -462,7 +464,7 @@ void Scanner::string() {
     
     // Unterminated string
     if (isAtEnd()) {
-        error("Unterminated string.");
+        error("Unterminated string", "closing quote (\") to end string literal");
         return;
     }
     
@@ -910,8 +912,8 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
     return "UNKNOWN";
 }
 
-void Scanner::error(const std::string& message) {
+void Scanner::error(const std::string& message, const std::string& expectedValue) {
     // Get the current lexeme for better error reporting
     std::string lexeme = getLexeme();
-    Debugger::error(message, getLine(), static_cast<int>(getCurrent()), InterpretationStage::SCANNING, "", lexeme, "");
+    Debugger::error(message, getLine(), static_cast<int>(getCurrent()), InterpretationStage::SCANNING, source, filePath, lexeme, expectedValue);
 }

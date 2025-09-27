@@ -1,9 +1,9 @@
 #ifndef VM_H
 #define VM_H
 
-#include "../opcodes.hh"
+#include "../common/opcodes.hh"
 #include "../frontend/ast.hh"
-#include "../debugger.hh"
+#include "../common/debugger.hh"
 #include "memory.hh"
 #include "value.hh"
 #include "types.hh"
@@ -29,15 +29,23 @@
 class Environment;
 struct CallFrame;
 class VM;
+class TaskVM;
 
 // Virtual Machine class
 class VM {
+    friend class TaskVM;  // Allow TaskVM to access private members
 public:
     explicit VM(bool create_runtime = true);
     ~VM();
     
     // Execute bytecode
     ValuePtr execute(const std::vector<Instruction>& bytecode);
+    
+    // Set source information for enhanced error reporting
+    void setSourceInfo(const std::string& sourceCode, const std::string& filePath) {
+        this->sourceCode = sourceCode;
+        this->filePath = filePath;
+    }
     
     // Function to enable or disable debug output
     void setDebug(bool enable) { 
@@ -63,6 +71,10 @@ private:
     std::vector<backend::CallFrame> callStack; // Use the new CallFrame from functions.hh
     std::shared_ptr<Environment> globals;
     std::shared_ptr<Environment> environment;
+    
+    // Source information for enhanced error reporting
+    std::string sourceCode;
+    std::string filePath;
     
     // Error handling state - optimized for zero-cost success path
     struct ErrorFrame {
@@ -220,6 +232,7 @@ private:
     bool insideFunctionDefinition; // Track if we're currently inside a function definition
     std::string currentClassBeingDefined; // Track which class is currently being defined
     bool insideClassDefinition; // Track if we're currently inside a class definition
+    bool insideTaskDefinition; // Track if we're currently inside a task definition
     
     // Map to store runtime default values for class fields
     std::unordered_map<std::string, ValuePtr> fieldDefaultValues;
@@ -312,6 +325,7 @@ public:
 
 private:
     void error(const std::string& message) const;
+    void error(const std::string& message, int line, int column, const std::string& lexeme = "", const std::string& expectedValue = "") const;
     
     // Helper function for iterator creation
     std::shared_ptr<IteratorValue> createIterator(ValuePtr iterable);
@@ -400,6 +414,24 @@ private:
     void collectTaskResults(BlockExecutionState& state);
     void handleCollectedErrors(BlockExecutionState& state);
     void cleanupBlockResources(BlockExecutionState& state);
+    
+    // Task management methods
+    std::unique_ptr<TaskContext> createTaskContext(const std::string& loopVar, 
+                                                   ValuePtr iterationValue);
+    std::unique_ptr<TaskContext> createTaskContextWithBytecode(
+        const std::string& loopVar, 
+        ValuePtr iterationValue,
+        const std::vector<Instruction>& bytecode,
+        size_t start_ip,
+        size_t end_ip);
+    std::unique_ptr<TaskVM> createTaskVM(std::unique_ptr<TaskContext> context);
+    void submitTaskToScheduler(std::unique_ptr<TaskVM> task_vm);
+    void executeTaskInThread(std::unique_ptr<TaskContext> context);
+    
+    // Work distribution methods for parallel tasks
+    void distributeParallelTasks(BlockExecutionState& state);
+    void balanceParallelWorkload(BlockExecutionState& state);
+    void handleTaskCompletionSynchronization(BlockExecutionState& state);
     void handleBeginTry(const Instruction& instruction);
     void handleEndTry(const Instruction& instruction);
     void handleBeginHandler(const Instruction& instruction);

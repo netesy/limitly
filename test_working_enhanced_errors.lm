@@ -1,0 +1,11 @@
+// Test with current working syntax
+
+// Test 1: Basic working code
+var x = 42;
+print(x);
+
+// Test 2: Undefined variable (should show enhanced error)
+print(undefinedVar);
+
+// Test 3: Division by zero (should show enhanced runtime error)  
+var result = x / 0;

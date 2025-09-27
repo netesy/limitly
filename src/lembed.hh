@@ -1,7 +1,7 @@
 #ifndef LEMBED_H
 #define LEMBED_H
 
-#include "opcodes.hh"
+#include "common/opcodes.hh"
 #include <string>
 #include <vector>
 #include <unordered_map>

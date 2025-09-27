@@ -1,5 +1,5 @@
 #include "lembed.hh"
-#include "opcodes.hh"
+#include "common/opcodes.hh"
 
 // A tiny helper to build an Instruction
 static Instruction I(Opcode op, uint32_t line = 0, int64_t iv = 0, float fv = 0.0f, bool bv = false, const std::string& sv = "") {

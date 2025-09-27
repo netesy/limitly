@@ -1,6 +1,6 @@
 #include "frontend/scanner.hh"
 #include "frontend/parser.hh"
-#include "backend.hh"
+#include "common/backend.hh"
 #include "backend/ast_printer.hh"
 #include "backend/bytecode_printer.hh"
 #include "backend/vm.hh"
@@ -40,7 +40,7 @@ void executeFile(const std::string& filename, bool printAst = false, bool printT
         std::string source = readFile(filename);
         
         // Frontend: Lexical analysis (scanning)
-        Scanner scanner(source);
+        Scanner scanner(source, filename);
         scanner.scanTokens();
         
         // Print tokens if requested
@@ -84,6 +84,7 @@ void executeFile(const std::string& filename, bool printAst = false, bool printT
             
             BytecodeGenerator generator;
             generator.process(ast);
+            generator.setSourceContext(source, filename);
 
             // Print bytecode if requested
             if (printBytecode) {
@@ -92,6 +93,8 @@ void executeFile(const std::string& filename, bool printAst = false, bool printT
 
             // Execute bytecode using the virtual machine
             try {
+                // Set source information for enhanced error reporting
+                vm.setSourceInfo(source, filename);
                 ValuePtr result = vm.execute(generator.getBytecode());
                 // Only print non-nil results
                 if (result && (!result->type || result->type->tag != TypeTag::Nil)) {
@@ -156,6 +159,9 @@ void startRepl() {
                 bool oldDebug = Debugger::getInstance().isEnabled();
                 Debugger::getInstance().setEnabled(debugMode);
                 #endif
+                
+                // Set source information for enhanced error reporting
+                vm.setSourceInfo(line, "<repl>");
                 
                 // Execute the bytecode
                 ValuePtr result = vm.execute(generator.getBytecode());

@@ -1,0 +1,46 @@
+// Test cases for block context tracking and error correlation
+
+// Test 1: Unclosed function block
+fn testFunction() {
+    var x = 5;
+    print(x);
+// Missing closing brace - should show "Caused by: Unterminated function starting at line 3"
+
+// Test 2: Unclosed if block  
+fn anotherFunction() {
+    if (true) {
+        print("hello");
+    // Missing closing brace for if - should show "Caused by: Unterminated if starting at line 9"
+}
+
+// Test 3: Unclosed while loop
+fn loopFunction() {
+    while (true) {
+        print("loop");
+    // Missing closing brace for while - should show "Caused by: Unterminated while starting at line 16"
+}
+
+// Test 4: Unclosed for loop
+fn forFunction() {
+    for (var i = 0; i < 10; i++) {
+        print(i);
+    // Missing closing brace for for - should show "Caused by: Unterminated for starting at line 23"
+}
+
+// Test 5: Nested unclosed blocks
+fn nestedFunction() {
+    if (true) {
+        while (true) {
+            print("nested");
+        // Missing closing brace for while - should show "Caused by: Unterminated while starting at line 31"
+    }
+}
+
+// Test 6: Unclosed class
+class TestClass {
+    var field: int;
+    
+    fn method() {
+        print("method");
+    }
+// Missing closing brace for class - should show "Caused by: Unterminated class starting at line 39"

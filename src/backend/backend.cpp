@@ -1,5 +1,5 @@
-#include "../backend.hh"
-#include "../debugger.hh"
+#include "../common/backend.hh"
+#include "../common/debugger.hh"
 #include "value.hh"
 #include "vm.hh"
 #include "memory.hh"
@@ -19,6 +19,11 @@ BytecodeGenerator::BytecodeGenerator() {
     
     typeSystem = std::make_unique<TypeSystem>(memoryManager, region);
     typeChecker = std::make_unique<TypeChecker>(*typeSystem);
+}
+
+void BytecodeGenerator::setSourceContext(const std::string& source, const std::string& filePath) {
+    this->sourceCode = source;
+    this->filePath = filePath;
 }
 
 // Type checking integration
@@ -62,8 +67,37 @@ void BytecodeGenerator::process(const std::shared_ptr<AST::Program>& program) {
     // This allows testing of error handling features while still reporting issues
     if (!typeErrors.empty()) {
         for (const auto& error : typeErrors) {
-            Debugger::error(error.message, error.line, error.column, 
-                          InterpretationStage::BYTECODE, "", "", error.context);
+            // Extract lexeme and expected value from enhanced error messages
+            std::string lexeme = "";
+            std::string expectedValue = "";
+            
+            // Parse enhanced error message format: "message (at 'lexeme') - expected: expectedValue"
+            std::string message = error.message;
+            size_t lexemeStart = message.find("(at '");
+            if (lexemeStart != std::string::npos) {
+                lexemeStart += 5; // Skip "(at '"
+                size_t lexemeEnd = message.find("')", lexemeStart);
+                if (lexemeEnd != std::string::npos) {
+                    lexeme = message.substr(lexemeStart, lexemeEnd - lexemeStart);
+                }
+            }
+            
+            size_t expectedStart = message.find(" - expected: ");
+            if (expectedStart != std::string::npos) {
+                expectedStart += 13; // Skip " - expected: "
+                expectedValue = message.substr(expectedStart);
+                // Clean up the message by removing the expected part
+                message = message.substr(0, message.find(" - expected: "));
+            }
+            
+            // Clean up the message by removing the lexeme part
+            size_t lexemePartStart = message.find(" (at '");
+            if (lexemePartStart != std::string::npos) {
+                message = message.substr(0, lexemePartStart);
+            }
+            
+            Debugger::error(message, error.line, error.column, 
+                          InterpretationStage::SEMANTIC, sourceCode, filePath, lexeme, expectedValue);
         }
         // Continue with bytecode generation to allow testing
         // TODO: Make this configurable or more selective about which errors are fatal
@@ -130,7 +164,14 @@ void BytecodeGenerator::visitStatement(const std::shared_ptr<AST::Statement>& st
     } else if (auto workerStmt = std::dynamic_pointer_cast<AST::WorkerStatement>(stmt)) {
         visitWorkerStatement(workerStmt);
     } else {
-        Debugger::error("Unknown statement type", stmt->line, 0, InterpretationStage::BYTECODE, "", "", "");
+        // Get the actual statement type name for better error reporting
+        std::string actualType = "unknown statement";
+        if (stmt) {
+            actualType = typeid(*stmt).name(); // This will give us the actual type
+        }
+        
+        Debugger::error("Unsupported statement type in bytecode generation", stmt->line, 0, InterpretationStage::BYTECODE, 
+                       sourceCode, filePath, actualType, "variable declaration, function declaration, class declaration, if statement, while loop, for loop, return statement, break statement, continue statement, or expression statement");
     }
 }
 
@@ -193,7 +234,14 @@ void BytecodeGenerator::visitExpression(const std::shared_ptr<AST::Expression>& 
     } else if (auto okConstructExpr = std::dynamic_pointer_cast<AST::OkConstructExpr>(expr)) {
         visitOkConstructExpr(okConstructExpr);
     } else {
-        Debugger::error("Unknown expression type", expr->line, 0, InterpretationStage::BYTECODE, "", "", "");
+        // Get the actual expression type name for better error reporting
+        std::string actualType = "unknown expression";
+        if (expr) {
+            actualType = typeid(*expr).name(); // This will give us the actual type
+        }
+        
+        Debugger::error("Unsupported expression type in bytecode generation", expr->line, 0, InterpretationStage::BYTECODE, 
+                       sourceCode, filePath, actualType, "binary expression, unary expression, literal, variable, function call, assignment, member access, index access, list, dictionary, range, or grouping expression");
     }
 }
 
@@ -522,7 +570,8 @@ void BytecodeGenerator::visitWhileStatement(const std::shared_ptr<AST::WhileStat
 
 void BytecodeGenerator::visitBreakStatement(const std::shared_ptr<AST::BreakStatement>& stmt) {
     if (loopBreakPatches.empty()) {
-        Debugger::error("'break' outside of loop", stmt->line, 0, InterpretationStage::BYTECODE, "", "", "");
+        Debugger::error("'break' statement used outside of loop context", stmt->line, 0, InterpretationStage::BYTECODE, 
+                       sourceCode, filePath, "break", "break statement inside a loop body (while, for, or iter loop)");
         return;
     }
     size_t jumpIndex = bytecode.size();
@@ -532,7 +581,8 @@ void BytecodeGenerator::visitBreakStatement(const std::shared_ptr<AST::BreakStat
 
 void BytecodeGenerator::visitContinueStatement(const std::shared_ptr<AST::ContinueStatement>& stmt) {
     if (loopStartAddresses.empty()) {
-        Debugger::error("'continue' outside of loop", stmt->line, 0, InterpretationStage::BYTECODE, "", "", "");
+        Debugger::error("'continue' statement used outside of loop context", stmt->line, 0, InterpretationStage::BYTECODE, 
+                       sourceCode, filePath, "continue", "continue statement inside a loop body (while, for, or iter loop)");
         return;
     }
     size_t continueAddr = loopContinueAddresses.back();
@@ -615,6 +665,9 @@ void BytecodeGenerator::visitAttemptStatement(const std::shared_ptr<AST::Attempt
 }
 
 void BytecodeGenerator::visitTaskStatement(const std::shared_ptr<AST::TaskStatement>& stmt) {
+    // Store the task body AST in the backend for later retrieval
+    current_task_body = stmt->body;
+    
     // Emit BEGIN_TASK opcode with isAsync flag and loop variable name (if any)
     emit(Opcode::BEGIN_TASK, stmt->line, stmt->isAsync ? 1 : 0, 0.0f, false, stmt->loopVar);
     
@@ -624,8 +677,7 @@ void BytecodeGenerator::visitTaskStatement(const std::shared_ptr<AST::TaskStatem
         emit(Opcode::STORE_ITERABLE, stmt->line);
     }
     
-    // Process the task body
-    visitBlockStatement(stmt->body);
+    // Don't generate bytecode for the task body here - it will be compiled in TaskVM
     
     // Emit END_TASK opcode
     emit(Opcode::END_TASK, stmt->line);
@@ -1062,7 +1114,8 @@ void BytecodeGenerator::visitBinaryExpr(const std::shared_ptr<AST::BinaryExpr>& 
         //     break;
             
         default:
-            Debugger::error("Unsupported binary operator", expr->line, 0, InterpretationStage::BYTECODE, "", "", "");
+            Debugger::error("Unsupported binary operator", expr->line, 0, InterpretationStage::BYTECODE, 
+                           sourceCode, filePath, "operator", "supported binary operator (+, -, *, /, %, ==, !=, <, >, <=, >=, &&, ||)");
             return;
     }
     
@@ -1103,7 +1156,8 @@ void BytecodeGenerator::visitUnaryExpr(const std::shared_ptr<AST::UnaryExpr>& ex
             emit(Opcode::NOT, expr->line);
             break;
         default:
-            Debugger::error("Unknown unary operator", expr->line, 0, InterpretationStage::BYTECODE, "", "", "");
+            Debugger::error("Unknown unary operator", expr->line, 0, InterpretationStage::BYTECODE, 
+                           sourceCode, filePath, "operator", "supported unary operator (-, !)");
             break;
     }
 }
@@ -1174,7 +1228,8 @@ void BytecodeGenerator::visitCallExpr(const std::shared_ptr<AST::CallExpr>& expr
     
     // TODO: Handle named arguments properly
     if (!expr->namedArgs.empty()) {
-        Debugger::error("Named arguments not yet supported", expr->line, 0, InterpretationStage::BYTECODE, "", "", "");
+        Debugger::error("Named arguments not yet supported", expr->line, 0, InterpretationStage::BYTECODE, 
+                       sourceCode, filePath, "named arguments", "positional arguments only (for now)");
     }
     
     // Call function
@@ -1207,7 +1262,8 @@ void BytecodeGenerator::visitAssignExpr(const std::shared_ptr<AST::AssignExpr>& 
     if (expr->object && expr->index) {
         // Index assignment: arr[i] = value
         // TODO: Implement index assignment
-        Debugger::error("Index assignment not yet implemented", expr->line, 0, InterpretationStage::BYTECODE, "", "", "");
+        Debugger::error("Index assignment not yet implemented", expr->line, 0, InterpretationStage::BYTECODE, 
+                       sourceCode, filePath, "index assignment", "simple variable assignment (variable = value)");
         return;
     }
     
@@ -1236,7 +1292,8 @@ void BytecodeGenerator::visitAssignExpr(const std::shared_ptr<AST::AssignExpr>& 
                     emit(Opcode::MODULO, expr->line);
                     break;
                 default:
-                    Debugger::error("Unknown compound assignment operator", expr->line, 0, InterpretationStage::BYTECODE, "", "", "");
+                    Debugger::error("Unknown compound assignment operator", expr->line, 0, InterpretationStage::BYTECODE, 
+                                   sourceCode, filePath, "compound operator", "supported compound assignment (+=, -=, *=, /=, %=)");
                     break;
             }
         } else {
@@ -1252,7 +1309,8 @@ void BytecodeGenerator::visitAssignExpr(const std::shared_ptr<AST::AssignExpr>& 
     }
     
     // If we get here, it's an invalid assignment
-    Debugger::error("Invalid assignment expression", expr->line, 0, InterpretationStage::BYTECODE, "", "", "");
+    Debugger::error("Invalid assignment expression", expr->line, 0, InterpretationStage::BYTECODE, 
+                   sourceCode, filePath, "assignment", "valid assignment (variable = value, variable += value, etc.)");
 }
 
 void BytecodeGenerator::visitGroupingExpr(const std::shared_ptr<AST::GroupingExpr>& expr) {

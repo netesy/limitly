@@ -1,6 +1,8 @@
 // debugger.cpp
 
 #include "debugger.hh"
+#include "../error/error_formatter.hh"
+#include "../error/console_formatter.hh"
 #include <string>
 #include <vector>
 #include <chrono>
@@ -12,6 +14,7 @@
 
 std::vector<std::string> Debugger::sourceCodez;
 bool Debugger::hadError = false;
+bool Debugger::useEnhancedFormatting = true;
 
 void Debugger::error(const std::string &errorMessage,
                      int line,
@@ -21,9 +24,109 @@ void Debugger::error(const std::string &errorMessage,
                      const std::string &lexeme,
                      const std::string &expectedValue)
 {
-    sourceCodez = splitLines(code);
-    debugConsole(errorMessage, line, column, stage, lexeme, expectedValue);
-    debugLog(errorMessage, line, column, stage, lexeme, expectedValue);
+    hadError = true;
+    
+    if (useEnhancedFormatting) {
+        // Use enhanced error formatting
+        ErrorHandling::ErrorMessage enhancedError = createEnhancedErrorMessage(
+            errorMessage, line, column, stage, code, "", lexeme, expectedValue
+        );
+        debugConsole(enhancedError);
+        debugLog(enhancedError);
+    } else {
+        // Fall back to legacy formatting
+        sourceCodez = splitLines(code);
+        debugConsole(errorMessage, line, column, stage, lexeme, expectedValue);
+        debugLog(errorMessage, line, column, stage, lexeme, expectedValue);
+    }
+}
+
+void Debugger::error(const std::string &errorMessage,
+                     int line,
+                     int column,
+                     InterpretationStage stage,
+                     const std::string &code,
+                     const std::string &filePath,
+                     const std::string &lexeme,
+                     const std::string &expectedValue)
+{
+    hadError = true;
+    
+    if (useEnhancedFormatting) {
+        // Use enhanced error formatting with file path
+        ErrorHandling::ErrorMessage enhancedError = createEnhancedErrorMessage(
+            errorMessage, line, column, stage, code, filePath, lexeme, expectedValue
+        );
+        debugConsole(enhancedError);
+        debugLog(enhancedError);
+    } else {
+        // Fall back to legacy formatting
+       // sourceCodez = splitLines(code);
+       // debugConsole(errorMessage, line, column, stage, lexeme, expectedValue);
+       // debugLog(errorMessage, line, column, stage, lexeme, expectedValue);
+    }
+}
+
+void Debugger::error(const std::string &errorMessage,
+                     int line,
+                     int column,
+                     InterpretationStage stage,
+                     const std::string &code,
+                     const std::string &filePath,
+                     const std::optional<ErrorHandling::BlockContext> &blockContext,
+                     const std::string &lexeme,
+                     const std::string &expectedValue)
+{
+    hadError = true;
+    
+    if (useEnhancedFormatting) {
+        // Use enhanced error formatting with block context
+        ErrorHandling::ErrorMessage enhancedError = createEnhancedErrorMessage(
+            errorMessage, line, column, stage, code, filePath, lexeme, expectedValue, blockContext
+        );
+        debugConsole(enhancedError);
+        debugLog(enhancedError);
+    } else {
+        // Fall back to legacy formatting
+        sourceCodez = splitLines(code);
+        debugConsole(errorMessage, line, column, stage, lexeme, expectedValue);
+        debugLog(errorMessage, line, column, stage, lexeme, expectedValue);
+    }
+}
+
+void Debugger::error(const ErrorHandling::ErrorMessage &errorMessage)
+{
+    hadError = true;
+    debugConsole(errorMessage);
+    debugLog(errorMessage);
+}
+
+void Debugger::debugConsole(const ErrorHandling::ErrorMessage &errorMessage)
+{
+    // Use the enhanced ConsoleFormatter for human-readable output
+    ErrorHandling::ConsoleFormatter::ConsoleOptions options = 
+        ErrorHandling::ConsoleFormatter::getDefaultOptions();
+    
+    // Write the formatted error message to stderr
+    std::cerr << ErrorHandling::ConsoleFormatter::formatErrorMessage(errorMessage, options) << std::endl;
+}
+
+
+void Debugger::debugLog(const ErrorHandling::ErrorMessage &errorMessage)
+{
+    // Use the enhanced ConsoleFormatter for human-readable output
+    ErrorHandling::ConsoleFormatter::ConsoleOptions options = 
+        ErrorHandling::ConsoleFormatter::getDefaultOptions();
+    
+
+    // Write the formatted error message to stderr
+    std::ofstream logfile("debug_log.log", std::ios_base::app); // Open log file for appending
+    if (!logfile.is_open()) {
+        std::cerr << "Failed to open log file." << std::endl;
+        return;
+    }
+    logfile << ErrorHandling::ConsoleFormatter::formatErrorMessage(errorMessage, options) << std::endl;
+    logfile.close(); // Close the log file
 }
 
 void Debugger::debugConsole(const std::string &errorMessage,
@@ -289,3 +392,20 @@ std::string Debugger::stageToString(InterpretationStage stage)
     }
 }
 
+// Helper method to create enhanced error message
+ErrorHandling::ErrorMessage Debugger::createEnhancedErrorMessage(
+    const std::string &errorMessage,
+    int line,
+    int column,
+    InterpretationStage stage,
+    const std::string &code,
+    const std::string &filePath,
+    const std::string &lexeme,
+    const std::string &expectedValue,
+    const std::optional<ErrorHandling::BlockContext> &blockContext)
+{
+    // Use ErrorFormatter to create the enhanced error message
+    return ErrorHandling::ErrorFormatter::createErrorMessage(
+        errorMessage, line, column, stage, code, lexeme, expectedValue, filePath
+    );
+}

@@ -1,9 +1,9 @@
 #ifndef BACKEND_H
 #define BACKEND_H
 
-#include "frontend/ast.hh"
+#include "../frontend/ast.hh"
 #include "opcodes.hh"
-#include "backend/type_checker.hh"
+#include "../backend/type_checker.hh"
 #include <vector>
 #include <memory>
 
@@ -23,6 +23,13 @@ public:
     
     void process(const std::shared_ptr<AST::Program>& program) override;
     
+    // Set source context for error reporting
+    void setSourceContext(const std::string& source, const std::string& filePath);
+    
+    // Get source context
+    const std::string& getSourceCode() const { return sourceCode; }
+    const std::string& getFilePath() const { return filePath; }
+    
     // Type checking integration
     std::vector<TypeCheckError> performTypeChecking(const std::shared_ptr<AST::Program>& program);
     
@@ -35,6 +42,10 @@ private:
     std::vector<size_t> loopStartAddresses;
     std::vector<size_t> loopContinueAddresses;
     std::vector<std::vector<size_t>> loopBreakPatches;
+    
+    // Source context for error reporting
+    std::string sourceCode;
+    std::string filePath;
 
     //MemoryManager
     std::unique_ptr<MemoryManager<>> memoryManager;
@@ -43,6 +54,9 @@ private:
     // Type checking components
     std::unique_ptr<TypeSystem> typeSystem;
     std::unique_ptr<TypeChecker> typeChecker;
+    
+    // Current task body being processed
+    std::shared_ptr<AST::BlockStatement> current_task_body;
     
     // Visitor methods for AST nodes
     void visitStatement(const std::shared_ptr<AST::Statement>& stmt);

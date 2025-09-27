@@ -7,8 +7,10 @@
 #include <variant>
 #include <optional>
 #include <unordered_map>
+#include <stack>
 #include "scanner.hh"
 #include "ast.hh"
+#include "../error/error_message.hh"
 
 // Frontend parser class - responsible for parsing tokens into AST
 class Parser {
@@ -21,6 +23,9 @@ private:
     Scanner &scanner;
     size_t current;
     bool in_concurrent_block = false;
+    
+    // Block context tracking for enhanced error messages
+    std::stack<ErrorHandling::BlockContext> blockStack;
 
     struct ParseError {
         std::string message;
@@ -54,6 +59,13 @@ public:
     void synchronize();
     void error(const std::string &message, bool suppressException = false);
     std::vector<Token> collectAnnotations();
+    
+    // Block context tracking methods
+    void pushBlockContext(const std::string& blockType, const Token& startToken);
+    void popBlockContext();
+    std::optional<ErrorHandling::BlockContext> getCurrentBlockContext() const;
+    std::string generateCausedByMessage(const ErrorHandling::BlockContext& context) const;
+    std::shared_ptr<AST::Statement> parseStatementWithContext(const std::string& blockType, const Token& contextToken);
 
     // Parsing methods for statements
     std::shared_ptr<AST::Statement> declaration();
