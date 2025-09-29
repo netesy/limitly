@@ -1,9 +1,14 @@
 # Implementation Plan
 
 - [ ] 1. Extend Value system with closure support
+
+
+
+
   - Add ClosureValue struct to value.hh with function reference and captured environment
   - Update Value variant to include ClosureValue type
   - Implement ClosureValue constructor and execution methods
+  - Create a proper function Object that we can use in the backend.cpp and vm.cpp   
   - Add TypeTag::Closure to type system
   - _Requirements: 1.1, 1.2, 1.3_
 
