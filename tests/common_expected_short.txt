@@ -1,9 +1,0 @@
-Error result: Error(DivisionByZero, "Error occurred")
-Success result: 42
-Division result: 5
-Safe division result: 10
-Division result: 5
-Caught error: Error(DivisionByZero, "Error occurred")
-
-Error: Error executing bytecode: Error executing instruction: Unhandled error during unwrap: DivisionByZero - Error occurred
-

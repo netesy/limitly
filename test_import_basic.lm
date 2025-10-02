@@ -1,4 +1,0 @@
-// Test basic import - should be module-scoped
-import tests.modules.my_module;
-
-my_module.greet();

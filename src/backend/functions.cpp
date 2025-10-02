@@ -1,6 +1,7 @@
 #include "functions.hh"
 #include "types.hh"
 #include "../common/debugger.hh"
+#include <sstream>
 
 namespace backend {
 
@@ -19,6 +20,19 @@ ValuePtr UserDefinedFunction::execute(const std::vector<ValuePtr>& args) {
     // The VM will override this to execute the function body
     // C codegen will generate C code for this function
     return nullptr;
+}
+
+ValuePtr UserDefinedFunction::createClosure(std::shared_ptr<::Environment> capturedEnv,
+                                           const std::vector<std::string>& capturedVars) const {
+    // Create a shared pointer to this function for the closure
+    auto sharedThis = std::const_pointer_cast<UserDefinedFunction>(
+        std::static_pointer_cast<const UserDefinedFunction>(shared_from_this()));
+    
+    // Create closure type
+    auto closureType = std::make_shared<Type>(TypeTag::Closure);
+   
+    // Use the ClosureValue factory method
+    return ClosureValueFactory::createClosure(sharedThis, capturedEnv, capturedVars, closureType);
 }
 
 // NativeFunction implementation
@@ -62,6 +76,15 @@ void CallFrame::bindParameters(const std::vector<ValuePtr>& args) {
 }
 
 ValuePtr CallFrame::getVariable(const std::string& name) const {
+    // For closures, check captured variables first
+    if (isClosureCall) {
+        auto capturedIt = capturedVariables.find(name);
+        if (capturedIt != capturedVariables.end()) {
+            return capturedIt->second;
+        }
+    }
+    
+    // Then check local variables
     auto it = localVariables.find(name);
     return (it != localVariables.end()) ? it->second : nullptr;
 }

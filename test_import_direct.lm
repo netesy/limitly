@@ -1,4 +1,0 @@
-// Test import with show filter - should still be module-scoped but only show greet
-import tests.modules.my_module show greet;
-
-my_module.greet();

@@ -1,7 +1,0 @@
-// Test file for enhanced error reporting - simpler version
-
-// Test 1: Undefined variable
-print(undefinedVariable);
-
-// Test 2: Division by zero
-let result = 10 / 0;

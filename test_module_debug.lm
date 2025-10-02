@@ -1,6 +1,0 @@
-// Test module function call
-import tests.modules.my_module;
-
-print("Before module function call");
-my_module.greet();
-print("After module function call");

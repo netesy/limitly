@@ -1,0 +1,21 @@
+AST for test_simple_lambda.lm
+========================================
+
+AST Dump:
+==========
+VarDeclaration: add
+  Initializer:
+    LambdaExpression:
+      Parameters:
+        x: int
+        y: int
+      ReturnType: int
+      Body:
+        BlockStatement:
+          ExpressionStatement:
+            BinaryExpression: +
+              Left:
+                Variable: x
+              Operator: +
+              Right:
+                Variable: y

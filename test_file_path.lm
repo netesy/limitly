@@ -1,2 +1,0 @@
-// Test file with syntax error
-var x:int = "@invalid_token";

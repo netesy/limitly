@@ -7,6 +7,7 @@
 #include <optional>
 #include <unordered_map>
 #include <functional>
+#include <algorithm>
 #include "../frontend/ast.hh"
 #include "value.hh"
 
@@ -95,7 +96,7 @@ public:
 };
 
 // User-defined function implementation
-class UserDefinedFunction : public FunctionImplementation {
+class UserDefinedFunction : public FunctionImplementation, public std::enable_shared_from_this<UserDefinedFunction> {
 private:
     FunctionSignature signature;
     std::shared_ptr<AST::BlockStatement> body;
@@ -108,6 +109,13 @@ public:
     ValuePtr execute(const std::vector<ValuePtr>& args) override;
     bool isNative() const override { return false; }
     std::shared_ptr<AST::BlockStatement> getBody() const override { return body; }
+    
+    // Closure support methods
+    bool canBeClosure() const { return true; }
+    
+    // Create a closure from this function
+    ValuePtr createClosure(std::shared_ptr<::Environment> capturedEnv,
+                          const std::vector<std::string>& capturedVars) const;
 };
 
 // Native function implementation (C++ functions)
@@ -130,9 +138,6 @@ public:
     bool isNative() const override { return true; }
 };
 
-// Forward declaration for Environment
-class Environment;
-
 // Call frame for function execution
 class CallFrame {
 public:
@@ -142,18 +147,49 @@ public:
     std::shared_ptr<FunctionImplementation> function;
     std::shared_ptr<void> previousEnvironment; // Generic pointer to previous environment
     
+    // Closure support
+    std::shared_ptr<Environment> closureEnvironment;
+    std::unordered_map<std::string, ValuePtr> capturedVariables;
+    bool isClosureCall = false;
+    
     CallFrame(const std::string& name, size_t retAddr, 
               std::shared_ptr<FunctionImplementation> func)
-        : functionName(name), returnAddress(retAddr), function(func), previousEnvironment(nullptr) {}
+        : functionName(name), returnAddress(retAddr), function(func), 
+          previousEnvironment(nullptr), isClosureCall(false) {}
+    
+    // Constructor for closure calls
+    CallFrame(const std::string& name, size_t retAddr, 
+              std::shared_ptr<FunctionImplementation> func,
+              std::shared_ptr<Environment> closureEnv,
+              const std::unordered_map<std::string, ValuePtr>& captured)
+        : functionName(name), returnAddress(retAddr), function(func), 
+          previousEnvironment(nullptr), closureEnvironment(closureEnv),
+          capturedVariables(captured), isClosureCall(true) {}
     
     // Bind parameters to arguments
     void bindParameters(const std::vector<ValuePtr>& args);
     
-    // Get local variable
+    // Get local variable (checks captured variables first for closures)
     ValuePtr getVariable(const std::string& name) const;
     
     // Set local variable
     void setVariable(const std::string& name, ValuePtr value);
+    
+    // Closure-specific methods
+    bool isClosure() const { return isClosureCall; }
+    
+    ValuePtr getCapturedVariable(const std::string& name) const {
+        auto it = capturedVariables.find(name);
+        return (it != capturedVariables.end()) ? it->second : nullptr;
+    }
+    
+    void setCapturedVariable(const std::string& name, ValuePtr value) {
+        capturedVariables[name] = value;
+    }
+    
+    bool hasCapture(const std::string& name) const {
+        return capturedVariables.find(name) != capturedVariables.end();
+    }
     
     // Set previous environment (VM-specific)
     template<typename EnvType>

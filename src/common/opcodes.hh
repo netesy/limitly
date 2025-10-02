@@ -152,6 +152,16 @@ enum class Opcode {
     IS_SUCCESS,         // Check if union contains success value
     UNWRAP_VALUE,       // Extract value from success union
 
+    // Closure operations
+    CREATE_CLOSURE,     // Create closure with captured variables
+    CAPTURE_VAR,        // Capture variable in closure
+    PUSH_LAMBDA,        // Push lambda function onto stack
+    CALL_CLOSURE,       // Call closure with captured environment
+    
+    // Higher-order function operations
+    PUSH_FUNCTION_REF,  // Push function reference onto stack
+    CALL_HIGHER_ORDER,  // Call function with function parameters
+
     // Memory operations
     LOAD_CONST,         // Load constant onto stack
     STORE_CONST,        // Store constant onto stack

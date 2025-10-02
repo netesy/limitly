@@ -1,5 +1,0 @@
-// Test import with debug
-print("Before import");
-import tests.modules.math_module;
-print("After import");
-print("Module type: " + math_module);

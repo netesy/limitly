@@ -1,3 +1,0 @@
-let x = 5;
-let y = 0;
-let z = x / y;

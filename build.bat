@@ -34,6 +34,7 @@ echo Compiling main executable...
     src\backend\ast_printer.cpp ^
     src\backend\bytecode_printer.cpp ^
     src\backend\functions.cpp ^
+    src\backend\closure_impl.cpp ^
     src\backend\classes.cpp ^
     src\backend\type_checker.cpp ^
     src\backend\concurrency\scheduler.cpp ^
@@ -68,6 +69,7 @@ echo Compiling test parser...
     src\backend\ast_printer.cpp ^
     src\backend\bytecode_printer.cpp ^
     src\backend\functions.cpp ^
+    src\backend\closure_impl.cpp ^
     src\backend\classes.cpp ^
     src\error\error_formatter.cpp ^
     src\error\error_code_generator.cpp ^

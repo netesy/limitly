@@ -1,6 +1,16 @@
 # Implementation Plan
 
-- [ ] 1. Extend Value system with closure support
+- [x] 1. Extend Value system with closure support
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -8,31 +18,53 @@
   - Add ClosureValue struct to value.hh with function reference and captured environment
   - Update Value variant to include ClosureValue type
   - Implement ClosureValue constructor and execution methods
-  - Create a proper function Object that we can use in the backend.cpp and vm.cpp   
+  - Create a proper function Object in functions.cpp that we can use in the backend.cpp and vm.cpp   
   - Add TypeTag::Closure to type system
   - _Requirements: 1.1, 1.2, 1.3_
 
-- [ ] 2. Add closure opcodes to VM instruction set
+- [x] 2. Add closure opcodes to VM instruction set
+
+
+
+
+
+
+  - Add suport for lambda, closure and higher order functions to the parser using our syntax : for types not ->
   - Add CREATE_CLOSURE, CAPTURE_VAR, PUSH_LAMBDA, CALL_CLOSURE opcodes to opcodes.hh
   - Add PUSH_FUNCTION_REF and CALL_HIGHER_ORDER opcodes for higher-order functions
   - Update Instruction struct to handle closure-specific data
   - _Requirements: 1.1, 2.1, 3.1_
 
-- [ ] 3. Implement lambda expression AST support
+- [x] 3. Implement lambda expression AST support
+
+
+
+
+
   - Add LambdaExpr struct to ast.hh with parameters, body, and captured variables
   - Update Expression variant to include LambdaExpr
-  - Add lambda parsing support to parser for syntax like `|x, y| x + y`
+  - Add lambda parsing support to parser for syntax like `fn(x, y) {x + y}`
   - Implement lambda tokenization in scanner for lambda operators
   - _Requirements: 6.1, 6.2, 6.4_
 
-- [ ] 4. Enhance Environment class for closure variable capture
+- [x] 4. Enhance Environment class for closure variable capture
+
+
+
+
+
+
   - Add capturedVariables set and closureParent pointer to Environment class
   - Implement createClosureEnvironment method for creating closure scopes
   - Add captureVariable and isVariableCaptured methods
   - Update variable lookup to check captured variables first
   - _Requirements: 1.1, 1.2, 6.5_
 
-- [ ] 5. Implement closure creation in bytecode generator
+- [-] 5. Implement closure creation in bytecode generator
+
+
+
+  - Named arguments for function calls
   - Add visitLambdaExpr method to BytecodeGenerator
   - Implement variable capture analysis during lambda compilation
   - Generate CREATE_CLOSURE and CAPTURE_VAR instructions

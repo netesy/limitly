@@ -1,4 +1,0 @@
-// Test import with alias - should shorten module name
-import tests.modules.my_module as mod;
-
-mod.greet();

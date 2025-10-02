@@ -82,6 +82,10 @@ private:
         size_t stackBase;           // Stack position when frame created
         TypePtr expectedErrorType;  // Expected error type for this frame
         std::string functionName;   // Function name for debugging
+
+         // Default constructor (safe values)
+        ErrorFrame()
+            : handlerAddress(0), stackBase(0), expectedErrorType(nullptr), functionName("") {}
         
         // Optimization: pack small data for better cache efficiency
         ErrorFrame(size_t addr, size_t base, TypePtr type, const std::string& name = "")
@@ -507,7 +511,7 @@ public:
 };
 
 // Environment for variable scopes
-class Environment {
+class Environment : public std::enable_shared_from_this<Environment> {
 public:
     Environment(std::shared_ptr<Environment> enclosing = nullptr) : enclosing(enclosing) {}
     
@@ -518,9 +522,26 @@ public:
     
     ValuePtr get(const std::string& name) {
         std::lock_guard<std::mutex> lock(mutex);
+        
+        // Check captured variables first for closures
+        auto capturedIt = capturedVariables.find(name);
+        if (capturedIt != capturedVariables.end()) {
+            return capturedIt->second;
+        }
+        
+        // Check local variables
         auto it = values.find(name);
         if (it != values.end()) {
             return it->second;
+        }
+        
+        // Check closure parent if this is a closure environment
+        if (closureParent) {
+            try {
+                return closureParent->get(name);
+            } catch (const std::runtime_error&) {
+                // Continue to check enclosing environment
+            }
         }
         
         if (enclosing) {
@@ -534,10 +555,29 @@ public:
    
     void assign(const std::string& name, const ValuePtr& value) {
         std::lock_guard<std::mutex> lock(mutex);
+        
+        // Check captured variables first for closures
+        auto capturedIt = capturedVariables.find(name);
+        if (capturedIt != capturedVariables.end()) {
+            capturedIt->second = value;
+            return;
+        }
+        
+        // Check local variables
         auto it = values.find(name);
         if (it != values.end()) {
             it->second = value;
             return;
+        }
+        
+        // Check closure parent if this is a closure environment
+        if (closureParent) {
+            try {
+                closureParent->assign(name, value);
+                return;
+            } catch (const std::runtime_error&) {
+                // Continue to check enclosing environment
+            }
         }
         
         if (enclosing) {
@@ -564,11 +604,43 @@ public:
         }
     }
     
+    // Closure support methods
+    std::shared_ptr<Environment> createClosureEnvironment(
+        const std::vector<std::string>& capturedVars) {
+        auto closureEnv = std::make_shared<Environment>();
+        closureEnv->closureParent = shared_from_this();
+        
+        // Capture specified variables
+        for (const auto& varName : capturedVars) {
+            try {
+                ValuePtr value = get(varName);
+                closureEnv->captureVariable(varName, value);
+            } catch (const std::runtime_error&) {
+                // Variable not found, skip it
+                // This allows for forward references or optional captures
+            }
+        }
+        
+        return closureEnv;
+    }
+    
+    void captureVariable(const std::string& name, ValuePtr value) {
+        std::lock_guard<std::mutex> lock(mutex);
+        capturedVariables[name] = value;
+    }
+    
+    bool isVariableCaptured(const std::string& name) const {
+        std::lock_guard<std::mutex> lock(mutex);
+        return capturedVariables.find(name) != capturedVariables.end();
+    }
+    
     std::shared_ptr<Environment> enclosing;
     
 private:
     std::unordered_map<std::string, ValuePtr> values;
-    std::mutex mutex;
+    std::unordered_map<std::string, ValuePtr> capturedVariables;  // Captured variables for closures
+    std::shared_ptr<Environment> closureParent;  // Parent environment for closures
+    mutable std::mutex mutex;
 };
 
 // Legacy call frame for backward compatibility during transition

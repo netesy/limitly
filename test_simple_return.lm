@@ -1,8 +1,0 @@
-// Test simple function return
-fn getValue() {
-    return 42;
-}
-
-print("Testing simple return");
-var result = getValue();
-print("Result: " + result);

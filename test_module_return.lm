@@ -1,6 +1,0 @@
-// Test module function with return value
-import tests.modules.my_module;
-
-print("Testing module function return value");
-var result = my_module.greet();
-print("Result from module function: " + result);

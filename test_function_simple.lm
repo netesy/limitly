@@ -1,6 +1,0 @@
-// Test simple function with parameters
-fn greet(name) {
-    print("Hello, " + name + "!");
-}
-
-greet("World");

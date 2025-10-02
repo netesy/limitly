@@ -66,6 +66,7 @@ namespace AST {
     struct ValPatternExpr;
     struct ErrPatternExpr;
     struct ErrorTypePatternExpr;
+    struct LambdaExpr;
     struct TypeAnnotation;
     struct StructuralTypeField;
     struct TypeDeclaration;
@@ -580,6 +581,16 @@ namespace AST {
     // Success value construction (ok() calls)
     struct OkConstructExpr : public Expression {
         std::shared_ptr<Expression> value;
+    };
+
+    // Lambda expression (e.g., fn(x, y) {x + y})
+    struct LambdaExpr : public Expression {
+        std::vector<std::pair<std::string, std::shared_ptr<TypeAnnotation>>> params;
+        std::shared_ptr<BlockStatement> body;  // Block body
+        std::optional<std::shared_ptr<TypeAnnotation>> returnType;
+        
+        // Captured variables (determined during analysis)
+        std::vector<std::string> capturedVars;
     };
 }
 

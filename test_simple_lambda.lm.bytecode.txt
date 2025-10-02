@@ -1,0 +1,9 @@
+Bytecode for test_simple_lambda.lm
+========================================
+
+=== Bytecode ===
+Generated 2 instructions
+
+   0: STORE_VAR            "add"
+   1: HALT                
+

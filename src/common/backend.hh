@@ -120,12 +120,24 @@ private:
     void visitErrPatternExpr(const std::shared_ptr<AST::ErrPatternExpr>& expr);
     void visitErrorTypePatternExpr(const std::shared_ptr<AST::ErrorTypePatternExpr>& expr);
     
+    // Lambda expression visitor
+    void visitLambdaExpr(const std::shared_ptr<AST::LambdaExpr>& expr);
+    
     // Helper methods
     void emit(Opcode op, uint32_t lineNumber, 
               int64_t intValue = 0, 
               float floatValue = 0.0f, 
               bool boolValue = false, 
               const std::string& stringValue = "");
+    
+    // Variable capture analysis for closures
+    std::vector<std::string> analyzeVariableCapture(const std::shared_ptr<AST::LambdaExpr>& lambda);
+    void findCapturedVariables(const std::shared_ptr<AST::Expression>& expr, 
+                              const std::vector<std::string>& localVars,
+                              std::set<std::string>& capturedVars);
+    void findCapturedVariables(const std::shared_ptr<AST::Statement>& stmt,
+                              const std::vector<std::string>& localVars,
+                              std::set<std::string>& capturedVars);
     
     // Module resolution helpers
     std::string resolveModulePath(const std::string& modulePath);
