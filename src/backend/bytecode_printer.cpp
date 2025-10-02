@@ -112,6 +112,17 @@ std::string BytecodePrinter::opcodeToString(Opcode opcode) {
         case Opcode::IS_ERROR: return "IS_ERROR";
         case Opcode::IS_SUCCESS: return "IS_SUCCESS";
         case Opcode::UNWRAP_VALUE: return "UNWRAP_VALUE";
+        
+        // Closure operations
+        case Opcode::CREATE_CLOSURE: return "CREATE_CLOSURE";
+        case Opcode::CAPTURE_VAR: return "CAPTURE_VAR";
+        case Opcode::PUSH_LAMBDA: return "PUSH_LAMBDA";
+        case Opcode::CALL_CLOSURE: return "CALL_CLOSURE";
+        
+        // Higher-order function operations
+        case Opcode::PUSH_FUNCTION_REF: return "PUSH_FUNCTION_REF";
+        case Opcode::CALL_HIGHER_ORDER: return "CALL_HIGHER_ORDER";
+        
         case Opcode::BREAK: return "BREAK";
         case Opcode::CONTINUE: return "CONTINUE";
         case Opcode::SET_RANGE_STEP: return "SET_RANGE_STEP";
@@ -164,8 +175,22 @@ std::string BytecodePrinter::formatInstruction(const Instruction& instruction, s
         case Opcode::SET_PROPERTY:
         case Opcode::BEGIN_CLASS:
         case Opcode::DEFINE_FIELD:
+        case Opcode::CAPTURE_VAR:
+        case Opcode::PUSH_FUNCTION_REF:
             if (!instruction.stringValue.empty()) {
                 oss << " \"" << instruction.stringValue << "\"";
+            }
+            break;
+            
+        case Opcode::CREATE_CLOSURE:
+        case Opcode::CALL_CLOSURE:
+        case Opcode::CALL_HIGHER_ORDER:
+            // These might have both int and string values
+            if (!instruction.stringValue.empty()) {
+                oss << " \"" << instruction.stringValue << "\"";
+            }
+            if (instruction.intValue != 0) {
+                oss << " " << instruction.intValue;
             }
             break;
             

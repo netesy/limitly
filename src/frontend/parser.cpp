@@ -2115,6 +2115,11 @@ std::shared_ptr<AST::Expression> Parser::primary() {
         return okExpr;
     }
 
+    // Check for lambda expression: fn(param1, param2): returnType {body}
+    if (check(TokenType::FN)) {
+        return lambdaExpression();
+    }
+
     if (match({TokenType::LEFT_PAREN})) {
         auto expr = expression();
         consume(TokenType::RIGHT_PAREN, "Expected ')' after expression.");
@@ -2657,6 +2662,34 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseBasicType() {
     } else if (match({TokenType::FUNCTION_TYPE})) {
         type->typeName = "function";
         type->isFunction = true;
+        
+        // Check for function signature: (param1: Type1, param2: Type2): ReturnType
+        if (match({TokenType::LEFT_PAREN})) {
+            // Parse parameter types
+            if (!check(TokenType::RIGHT_PAREN)) {
+                do {
+                    // Skip parameter name if present (we only care about types)
+                    if (check(TokenType::IDENTIFIER) && peek().lexeme != "int" && peek().lexeme != "str" && 
+                        peek().lexeme != "bool" && peek().lexeme != "float") {
+                        advance(); // consume parameter name
+                        if (match({TokenType::COLON})) {
+                            // Parse parameter type
+                            type->functionParams.push_back(parseTypeAnnotation());
+                        }
+                    } else {
+                        // Just a type without parameter name
+                        type->functionParams.push_back(parseTypeAnnotation());
+                    }
+                } while (match({TokenType::COMMA}));
+            }
+            
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after function parameters.");
+            
+            // Check for return type
+            if (match({TokenType::COLON})) {
+                type->returnType = parseTypeAnnotation();
+            }
+        }
     } else if (match({TokenType::ENUM_TYPE})) {
         type->typeName = "enum";
     } else if (match({TokenType::SUM_TYPE})) {
@@ -2973,4 +3006,55 @@ std::shared_ptr<AST::Statement> Parser::parseStatementWithContext(const std::str
     } else {
         return statement();
     }
+}
+
+// Parse lambda expression: fn(param1, param2): returnType {body}
+std::shared_ptr<AST::LambdaExpr> Parser::lambdaExpression() {
+    auto lambda = std::make_shared<AST::LambdaExpr>();
+    lambda->line = peek().line;
+    
+    // Consume 'fn'
+    consume(TokenType::FN, "Expected 'fn' at start of lambda expression.");
+    
+    // Consume opening (
+    consume(TokenType::LEFT_PAREN, "Expected '(' after 'fn'.");
+    
+    // Parse parameters
+    if (!check(TokenType::RIGHT_PAREN)) {
+        do {
+            std::string paramName = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
+            
+            // Check for type annotation
+            std::shared_ptr<AST::TypeAnnotation> paramType = nullptr;
+            if (match({TokenType::COLON})) {
+                paramType = parseTypeAnnotation();
+            }
+            
+            lambda->params.push_back({paramName, paramType});
+        } while (match({TokenType::COMMA}));
+    }
+    
+    // Consume closing )
+    consume(TokenType::RIGHT_PAREN, "Expected ')' after lambda parameters.");
+    
+    // Check for return type annotation
+    if (match({TokenType::COLON})) {
+        lambda->returnType = parseTypeAnnotation();
+    }
+    
+    // Parse lambda body (block statement)
+    consume(TokenType::LEFT_BRACE, "Expected '{' before lambda body.");
+    
+    auto lambdaBody = std::make_shared<AST::BlockStatement>();
+    lambdaBody->line = previous().line;
+    
+    // Parse statements in the lambda body
+    while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
+        lambdaBody->statements.push_back(declaration());
+    }
+    
+    consume(TokenType::RIGHT_BRACE, "Expected '}' after lambda body.");
+    lambda->body = lambdaBody;
+    
+    return lambda;
 }

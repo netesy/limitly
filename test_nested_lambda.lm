@@ -1,0 +1,13 @@
+// Test nested lambda expressions
+
+var x = 5;
+
+// Outer lambda that captures x and returns inner lambda
+var outer = fn(y) {
+    var z = 10;
+    return fn(w) {
+        return x + y + z + w;
+    };
+};
+
+print("Nested lambda test");

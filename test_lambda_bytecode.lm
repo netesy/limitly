@@ -1,0 +1,14 @@
+// Test lambda expression bytecode generation
+
+// Simple lambda without captures
+var simple = fn(x) { return x + 1; };
+
+// Lambda with variable capture
+var y = 10;
+var capturing = fn(x) { return x + y; };
+
+// Lambda used in function call
+var numbers = [1, 2, 3];
+// map(numbers, fn(x) { return x * 2; });
+
+print("Lambda bytecode test");

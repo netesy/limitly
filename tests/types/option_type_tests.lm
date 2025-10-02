@@ -25,12 +25,12 @@ var noneValue = None { kind: "None" };
 
 // Test 6: Pattern matching on Option types (basic syntax)
 // This tests the requirement for explicit handling of Option variants
-match someValue {
+match (someValue) {
     Some(x) => print("Got value: " + x),
     None => print("No value")
 }
 
-match noneValue {
+match (noneValue) {
     Some(x) => print("Got value: " + x),
     None => print("No value")
 }
@@ -39,12 +39,12 @@ match noneValue {
 var someString = Some { kind: "Some", value: "hello" };
 var someBoolean = Some { kind: "Some", value: true };
 
-match someString {
+match (someString) {
     Some(s) => print("String value: " + s),
     None => print("No string")
 }
 
-match someBoolean {
+match (someBoolean) {
     Some(b) => print("Boolean value: " + b),
     None => print("No boolean")
 }
@@ -53,9 +53,9 @@ match someBoolean {
 type NestedOption = Some | None;
 var nestedSome = Some { kind: "Some", value: Some { kind: "Some", value: 123 } };
 
-match nestedSome {
+match (nestedSome) {
     Some(inner) => {
-        match inner {
+        match (inner) {
             Some(value) => print("Nested value: " + value),
             None => print("Inner is None")
         }

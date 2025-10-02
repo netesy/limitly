@@ -1,6 +1,0 @@
-// Test direct function call
-fn test() {
-    print("Hello from test function!");
-}
-
-test();

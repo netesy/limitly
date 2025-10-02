@@ -298,6 +298,7 @@ public:
     const TypePtr ENUM_TYPE = std::make_shared<Type>(TypeTag::Enum);
     const TypePtr SUM_TYPE = std::make_shared<Type>(TypeTag::Sum);
     const TypePtr FUNCTION_TYPE = std::make_shared<Type>(TypeTag::Function);
+    const TypePtr CLOSURE_TYPE = std::make_shared<Type>(TypeTag::Closure);
     const TypePtr OBJECT_TYPE = std::make_shared<Type>(TypeTag::Object);
     const TypePtr MODULE_TYPE = std::make_shared<Type>(TypeTag::Module);
     const TypePtr ERROR_UNION_TYPE = std::make_shared<Type>(TypeTag::ErrorUnion);
@@ -445,6 +446,9 @@ public:
         case TypeTag::Function:
             // Functions are typically not instantiated as values
             throw std::runtime_error("Cannot create a value for Function type");
+        case TypeTag::Closure:
+            // Closures are typically not instantiated as default values
+            throw std::runtime_error("Cannot create a default value for Closure type");
         case TypeTag::Any:
             // For Any type, we'll use std::monostate as a placeholder
             value->data = std::monostate{};
@@ -653,6 +657,10 @@ public:
             // Function type checking might involve checking the signature
             // This is a placeholder and might need more complex logic
             return true;
+
+        case TypeTag::Closure:
+            // Closure type checking - for now, just check if it's a closure
+            return std::holds_alternative<ClosureValue>(value->data);
 
         case TypeTag::Any:
             // Any type always matches

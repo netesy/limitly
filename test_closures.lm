@@ -1,0 +1,13 @@
+// Test basic closure functionality
+fn outer(x: int) -> fn(int) -> int {
+    fn inner(y: int) -> int {
+        return x + y;  // Captures x from outer scope
+    }
+    return inner;
+}
+
+fn main() {
+    let closure = outer(10);
+    let result = closure(5);
+    print("Result: " + result);  // Should print 15
+}

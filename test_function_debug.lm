@@ -1,9 +1,0 @@
-// Test function definition and call
-fn testFunction() {
-    print("Inside testFunction");
-    return 42;
-}
-
-print("Before function call");
-var result = testFunction();
-print("After function call, result: " + result);

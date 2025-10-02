@@ -136,6 +136,7 @@ public:
     std::shared_ptr<AST::Expression> primary();
     std::shared_ptr<AST::Expression> finishCall(std::shared_ptr<AST::Expression> callee);
     std::shared_ptr<AST::InterpolatedStringExpr> interpolatedString();
+    std::shared_ptr<AST::LambdaExpr> lambdaExpression();
 
     // Pattern parsing methods for match statements
     std::shared_ptr<AST::Expression> parsePattern();

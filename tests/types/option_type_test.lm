@@ -18,7 +18,7 @@ match someValue {
     None => print("Got None")
 }
 
-match noneValue {
+match (noneValue) {
     Some(x) => print("Got Some with value:", x),
     None => print("Got None")
 }
@@ -33,11 +33,11 @@ print("String None:", noneString);
 
 // Test error handling compatibility
 // Option types should be compatible with the ? operator
-func maybeGetValue(): IntOption {
+fn maybeGetValue(): IntOption {
     return Some { kind: "Some", value: 100 };
 }
 
-func maybeGetNone(): IntOption {
+fn maybeGetNone(): IntOption {
     return None { kind: "None" };
 }
 

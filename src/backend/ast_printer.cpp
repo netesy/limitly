@@ -737,6 +737,37 @@ void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
         std::cout << indentation << "  Value:" << std::endl;
         printNode(okExpr->value, indent + 2);
     }
+    else if (auto lambdaExpr = std::dynamic_pointer_cast<AST::LambdaExpr>(node)) {
+        std::cout << indentation << "LambdaExpression:" << std::endl;
+        
+        if (!lambdaExpr->params.empty()) {
+            std::cout << indentation << "  Parameters:" << std::endl;
+            for (const auto& [name, type] : lambdaExpr->params) {
+                std::cout << indentation << "    " << name;
+                if (type) {
+                    std::cout << ": " << typeToString(type);
+                }
+                std::cout << std::endl;
+            }
+        }
+        
+        if (lambdaExpr->returnType) {
+            std::cout << indentation << "  ReturnType: " << typeToString(*lambdaExpr->returnType) << std::endl;
+        }
+        
+        if (lambdaExpr->body) {
+            std::cout << indentation << "  Body:" << std::endl;
+            printNode(lambdaExpr->body, indent + 2);
+        }
+        
+        if (!lambdaExpr->capturedVars.empty()) {
+            std::cout << indentation << "  CapturedVars:";
+            for (const auto& var : lambdaExpr->capturedVars) {
+                std::cout << " " << var;
+            }
+            std::cout << std::endl;
+        }
+    }
     else {
         std::cout << indentation << "Unknown node type" << std::endl;
     }

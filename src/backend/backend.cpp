@@ -10,6 +10,8 @@
 #include <thread>
 #include <fstream>
 #include <sstream>
+#include <set>
+#include <algorithm>
 
 // Constructor
 BytecodeGenerator::BytecodeGenerator() {
@@ -233,6 +235,8 @@ void BytecodeGenerator::visitExpression(const std::shared_ptr<AST::Expression>& 
         visitErrorConstructExpr(errorConstructExpr);
     } else if (auto okConstructExpr = std::dynamic_pointer_cast<AST::OkConstructExpr>(expr)) {
         visitOkConstructExpr(okConstructExpr);
+    } else if (auto lambdaExpr = std::dynamic_pointer_cast<AST::LambdaExpr>(expr)) {
+        visitLambdaExpr(lambdaExpr);
     } else {
         // Get the actual expression type name for better error reporting
         std::string actualType = "unknown expression";
@@ -1226,10 +1230,22 @@ void BytecodeGenerator::visitCallExpr(const std::shared_ptr<AST::CallExpr>& expr
         functionName = "unknown";
     }
     
-    // TODO: Handle named arguments properly
+    // Handle named arguments
     if (!expr->namedArgs.empty()) {
-        Debugger::error("Named arguments not yet supported", expr->line, 0, InterpretationStage::BYTECODE, 
-                       sourceCode, filePath, "named arguments", "positional arguments only (for now)");
+        // Push named arguments onto stack
+        for (const auto& namedArg : expr->namedArgs) {
+            // Push argument name
+            emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, namedArg.first);
+            // Push argument value
+            visitExpression(namedArg.second);
+        }
+        
+        // Emit special call instruction for named arguments
+        emit(Opcode::CALL, expr->line, 
+             static_cast<int32_t>(expr->arguments.size()), 
+             static_cast<float>(expr->namedArgs.size()), 
+             false, functionName);
+        return;
     }
     
     // Call function
@@ -1777,4 +1793,218 @@ void BytecodeGenerator::visitErrorTypePatternExpr(const std::shared_ptr<AST::Err
     for (const auto& paramName : expr->parameterNames) {
         emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, paramName);
     }
+}
+void
+ BytecodeGenerator::visitLambdaExpr(const std::shared_ptr<AST::LambdaExpr>& expr) {
+    // Generate bytecode for lambda expression
+    
+    // Perform variable capture analysis
+    std::vector<std::string> capturedVars = analyzeVariableCapture(expr);
+    
+    // Also use any pre-analyzed captured variables from the AST
+    if (!expr->capturedVars.empty()) {
+        for (const auto& var : expr->capturedVars) {
+            if (std::find(capturedVars.begin(), capturedVars.end(), var) == capturedVars.end()) {
+                capturedVars.push_back(var);
+            }
+        }
+    }
+    
+    // Generate a unique lambda name for debugging
+    std::string lambdaName = "__lambda_" + std::to_string(expr->line) + "_" + std::to_string(bytecode.size());
+    
+    // Start lambda function definition
+    emit(Opcode::BEGIN_FUNCTION, expr->line, 0, 0.0f, false, lambdaName);
+    
+    // Process parameters
+    for (const auto& param : expr->params) {
+        emit(Opcode::DEFINE_PARAM, expr->line, 0, 0.0f, false, param.first);
+    }
+    
+    // Process lambda body
+    visitBlockStatement(expr->body);
+    
+    // If lambda doesn't end with an explicit return, add implicit return
+    // For single expression lambdas, the last expression is the return value
+    if (!expr->body->statements.empty()) {
+        auto lastStmt = expr->body->statements.back();
+        if (!std::dynamic_pointer_cast<AST::ReturnStatement>(lastStmt)) {
+            // If the last statement is an expression statement, return its value
+            if (auto exprStmt = std::dynamic_pointer_cast<AST::ExprStatement>(lastStmt)) {
+                // The expression value is already on the stack from visitExprStatement
+                // We need to undo the POP from visitExprStatement and add a RETURN
+                // For now, we'll add a null return - this needs refinement
+                emit(Opcode::PUSH_NULL, expr->line);
+            } else {
+                emit(Opcode::PUSH_NULL, expr->line);
+            }
+            emit(Opcode::RETURN, expr->line);
+        }
+    } else {
+        // Empty lambda body returns null
+        emit(Opcode::PUSH_NULL, expr->line);
+        emit(Opcode::RETURN, expr->line);
+    }
+    
+    // End lambda function definition
+    emit(Opcode::END_FUNCTION, expr->line);
+    
+    // Create closure with captured variables
+    if (!capturedVars.empty()) {
+        // Capture each variable
+        for (const auto& varName : capturedVars) {
+            emit(Opcode::LOAD_VAR, expr->line, 0, 0.0f, false, varName);
+            emit(Opcode::CAPTURE_VAR, expr->line, 0, 0.0f, false, varName);
+        }
+        
+        // Create closure with captured variables
+        emit(Opcode::CREATE_CLOSURE, expr->line, static_cast<int32_t>(capturedVars.size()), 0.0f, false, lambdaName);
+    } else {
+        // Simple lambda without captures - just push the function reference
+        emit(Opcode::PUSH_FUNCTION_REF, expr->line, 0, 0.0f, false, lambdaName);
+    }
+}
+std::vector
+<std::string> BytecodeGenerator::analyzeVariableCapture(const std::shared_ptr<AST::LambdaExpr>& lambda) {
+    // Analyze which variables are captured by the lambda
+    std::set<std::string> capturedVars;
+    
+    // Get parameter names - these are local to the lambda
+    std::vector<std::string> localVars;
+    for (const auto& param : lambda->params) {
+        localVars.push_back(param.first);
+    }
+    
+    // Analyze the lambda body for variable references
+    findCapturedVariables(lambda->body, localVars, capturedVars);
+    
+    // Convert set to vector
+    return std::vector<std::string>(capturedVars.begin(), capturedVars.end());
+}
+
+void BytecodeGenerator::findCapturedVariables(const std::shared_ptr<AST::Expression>& expr,
+                                            const std::vector<std::string>& localVars,
+                                            std::set<std::string>& capturedVars) {
+    if (!expr) return;
+    
+    if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(expr)) {
+        // Check if this variable is not local to the lambda
+        bool isLocal = std::find(localVars.begin(), localVars.end(), varExpr->name) != localVars.end();
+        if (!isLocal) {
+            capturedVars.insert(varExpr->name);
+        }
+    } else if (auto binaryExpr = std::dynamic_pointer_cast<AST::BinaryExpr>(expr)) {
+        findCapturedVariables(binaryExpr->left, localVars, capturedVars);
+        findCapturedVariables(binaryExpr->right, localVars, capturedVars);
+    } else if (auto unaryExpr = std::dynamic_pointer_cast<AST::UnaryExpr>(expr)) {
+        findCapturedVariables(unaryExpr->right, localVars, capturedVars);
+    } else if (auto callExpr = std::dynamic_pointer_cast<AST::CallExpr>(expr)) {
+        findCapturedVariables(callExpr->callee, localVars, capturedVars);
+        for (const auto& arg : callExpr->arguments) {
+            findCapturedVariables(arg, localVars, capturedVars);
+        }
+        for (const auto& namedArg : callExpr->namedArgs) {
+            findCapturedVariables(namedArg.second, localVars, capturedVars);
+        }
+    } else if (auto assignExpr = std::dynamic_pointer_cast<AST::AssignExpr>(expr)) {
+        findCapturedVariables(assignExpr->value, localVars, capturedVars);
+        if (assignExpr->object) {
+            findCapturedVariables(assignExpr->object, localVars, capturedVars);
+        }
+        if (assignExpr->index) {
+            findCapturedVariables(assignExpr->index, localVars, capturedVars);
+        }
+    } else if (auto groupingExpr = std::dynamic_pointer_cast<AST::GroupingExpr>(expr)) {
+        findCapturedVariables(groupingExpr->expression, localVars, capturedVars);
+    } else if (auto listExpr = std::dynamic_pointer_cast<AST::ListExpr>(expr)) {
+        for (const auto& element : listExpr->elements) {
+            findCapturedVariables(element, localVars, capturedVars);
+        }
+    } else if (auto dictExpr = std::dynamic_pointer_cast<AST::DictExpr>(expr)) {
+        for (const auto& entry : dictExpr->entries) {
+            findCapturedVariables(entry.first, localVars, capturedVars);
+            findCapturedVariables(entry.second, localVars, capturedVars);
+        }
+    } else if (auto indexExpr = std::dynamic_pointer_cast<AST::IndexExpr>(expr)) {
+        findCapturedVariables(indexExpr->object, localVars, capturedVars);
+        findCapturedVariables(indexExpr->index, localVars, capturedVars);
+    } else if (auto memberExpr = std::dynamic_pointer_cast<AST::MemberExpr>(expr)) {
+        findCapturedVariables(memberExpr->object, localVars, capturedVars);
+    } else if (auto rangeExpr = std::dynamic_pointer_cast<AST::RangeExpr>(expr)) {
+        findCapturedVariables(rangeExpr->start, localVars, capturedVars);
+        findCapturedVariables(rangeExpr->end, localVars, capturedVars);
+        if (rangeExpr->step) {
+            findCapturedVariables(rangeExpr->step, localVars, capturedVars);
+        }
+    } else if (auto interpolatedStr = std::dynamic_pointer_cast<AST::InterpolatedStringExpr>(expr)) {
+        for (const auto& part : interpolatedStr->parts) {
+            if (std::holds_alternative<std::shared_ptr<AST::Expression>>(part)) {
+                findCapturedVariables(std::get<std::shared_ptr<AST::Expression>>(part), localVars, capturedVars);
+            }
+        }
+    } else if (auto lambdaExpr = std::dynamic_pointer_cast<AST::LambdaExpr>(expr)) {
+        // Nested lambda - need to handle its own scope
+        std::vector<std::string> nestedLocalVars = localVars;
+        for (const auto& param : lambdaExpr->params) {
+            nestedLocalVars.push_back(param.first);
+        }
+        findCapturedVariables(lambdaExpr->body, nestedLocalVars, capturedVars);
+    }
+    // Add more expression types as needed
+}
+
+void BytecodeGenerator::findCapturedVariables(const std::shared_ptr<AST::Statement>& stmt,
+                                            const std::vector<std::string>& localVars,
+                                            std::set<std::string>& capturedVars) {
+    if (!stmt) return;
+    
+    if (auto blockStmt = std::dynamic_pointer_cast<AST::BlockStatement>(stmt)) {
+        std::vector<std::string> blockLocalVars = localVars;
+        
+        for (const auto& statement : blockStmt->statements) {
+            // Add any new variable declarations to local scope
+            if (auto varDecl = std::dynamic_pointer_cast<AST::VarDeclaration>(statement)) {
+                blockLocalVars.push_back(varDecl->name);
+                if (varDecl->initializer) {
+                    findCapturedVariables(varDecl->initializer, localVars, capturedVars);
+                }
+            } else {
+                findCapturedVariables(statement, blockLocalVars, capturedVars);
+            }
+        }
+    } else if (auto exprStmt = std::dynamic_pointer_cast<AST::ExprStatement>(stmt)) {
+        findCapturedVariables(exprStmt->expression, localVars, capturedVars);
+    } else if (auto ifStmt = std::dynamic_pointer_cast<AST::IfStatement>(stmt)) {
+        findCapturedVariables(ifStmt->condition, localVars, capturedVars);
+        findCapturedVariables(ifStmt->thenBranch, localVars, capturedVars);
+        if (ifStmt->elseBranch) {
+            findCapturedVariables(ifStmt->elseBranch, localVars, capturedVars);
+        }
+    } else if (auto whileStmt = std::dynamic_pointer_cast<AST::WhileStatement>(stmt)) {
+        findCapturedVariables(whileStmt->condition, localVars, capturedVars);
+        findCapturedVariables(whileStmt->body, localVars, capturedVars);
+    } else if (auto forStmt = std::dynamic_pointer_cast<AST::ForStatement>(stmt)) {
+        if (forStmt->initializer) {
+            findCapturedVariables(forStmt->initializer, localVars, capturedVars);
+        }
+        if (forStmt->condition) {
+            findCapturedVariables(forStmt->condition, localVars, capturedVars);
+        }
+        if (forStmt->increment) {
+            findCapturedVariables(forStmt->increment, localVars, capturedVars);
+        }
+        if (forStmt->iterable) {
+            findCapturedVariables(forStmt->iterable, localVars, capturedVars);
+        }
+        findCapturedVariables(forStmt->body, localVars, capturedVars);
+    } else if (auto returnStmt = std::dynamic_pointer_cast<AST::ReturnStatement>(stmt)) {
+        if (returnStmt->value) {
+            findCapturedVariables(returnStmt->value, localVars, capturedVars);
+        }
+    } else if (auto printStmt = std::dynamic_pointer_cast<AST::PrintStatement>(stmt)) {
+        for (const auto& arg : printStmt->arguments) {
+            findCapturedVariables(arg, localVars, capturedVars);
+        }
+    }
+    // Add more statement types as needed
 }
