@@ -1,0 +1,52 @@
+// Test to verify current closure implementation status
+
+print("=== Higher-Order Functions Status ===");
+
+// ✅ WORKING: Function parameters
+fn apply_func(f: function(int): int, x: int): int {
+    return f(x);
+}
+
+fn double_it(x: int): int {
+    return x * 2;
+}
+
+var result1 = apply_func(double_it, 5);
+print("✅ Function parameters work:", result1);
+
+// ✅ WORKING: Function assignment
+var my_double = double_it;
+var result2 = my_double(7);
+print("✅ Function assignment works:", result2);
+
+// ✅ WORKING: Function composition
+fn compose_funcs(f: function(int): int, g: function(int): int, x: int): int {
+    return f(g(x));
+}
+
+fn add_one(x: int): int {
+    return x + 1;
+}
+
+var result3 = compose_funcs(double_it, add_one, 3);
+print("✅ Function composition works:", result3);
+
+print("=== Closure/Lambda Status ===");
+
+// ❌ NOT WORKING: Lambda expressions
+// var lambda_double = fn(x: int): int { return x * 2; };
+// print("❌ Lambda expressions not working");
+
+// ❌ NOT WORKING: Closures with variable capture
+// fn make_multiplier(factor: int): function(int): int {
+//     return fn(x: int): int { return x * factor; };
+// }
+// print("❌ Closures with variable capture not working");
+
+print("=== Summary ===");
+print("✅ Higher-order functions: WORKING");
+print("✅ Function parameters: WORKING");
+print("✅ Function assignment: WORKING");
+print("✅ Function composition: WORKING");
+print("❌ Lambda expressions: NOT WORKING");
+print("❌ Closures with capture: NOT WORKING");

@@ -129,6 +129,27 @@ private:
             return canConvert(from, toErrorUnion.successType);
         }
 
+        // Function type compatibility
+        if (from->tag == TypeTag::Function && to->tag == TypeTag::Function) {
+            auto fromFuncType = std::get<FunctionType>(from->extra);
+            auto toFuncType = std::get<FunctionType>(to->extra);
+            
+            // Check parameter count
+            if (fromFuncType.paramTypes.size() != toFuncType.paramTypes.size()) {
+                return false;
+            }
+            
+            // Check parameter types (contravariant)
+            for (size_t i = 0; i < fromFuncType.paramTypes.size(); ++i) {
+                if (!canConvert(toFuncType.paramTypes[i], fromFuncType.paramTypes[i])) {
+                    return false;
+                }
+            }
+            
+            // Check return type (covariant)
+            return canConvert(fromFuncType.returnType, toFuncType.returnType);
+        }
+
         return false;
     }
     TypePtr getWiderType(TypePtr a, TypePtr b) {
@@ -574,6 +595,15 @@ public:
         errorUnion.isGenericError = isGeneric;
         
         return std::make_shared<Type>(TypeTag::ErrorUnion, errorUnion);
+    }
+
+    // Create function type
+    TypePtr createFunctionType(const std::vector<TypePtr>& paramTypes, TypePtr returnType) {
+        FunctionType functionType;
+        functionType.paramTypes = paramTypes;
+        functionType.returnType = returnType;
+        
+        return std::make_shared<Type>(TypeTag::Function, functionType);
     }
 
     TypePtr inferType(const ValuePtr &value) { return value->type; }

@@ -1,0 +1,20 @@
+// Test higher-order functions
+
+// Define a simple function that takes another function as parameter
+fn apply_twice(func: function(int): int, x: int): int {
+    return func(func(x));
+}
+
+// Define a simple function to use as parameter
+fn add_one(x: int): int {
+    return x + 1;
+}
+
+// Test function parameters (this should work)
+var result1 = apply_twice(add_one, 5);
+print("apply_twice(add_one, 5) =", result1);
+
+// Test simple function assignment and call
+var my_func = add_one;
+var result2 = my_func(10);
+print("my_func(10) =", result2);

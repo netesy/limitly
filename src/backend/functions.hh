@@ -9,46 +9,37 @@
 #include <functional>
 #include <algorithm>
 #include "../frontend/ast.hh"
-#include "value.hh"
+
+// Forward declarations
+struct Value;
+using ValuePtr = std::shared_ptr<Value>;
+struct Type;
+using TypePtr = std::shared_ptr<Type>;
+class Environment;  // Global Environment class
 
 namespace backend {
 
 // Forward declarations
 class FunctionRegistry;
 class CallFrame;
-class Environment;
+struct Function;  // Defined in value.hh
 
 
-// Function definition for user-defined functions
-struct Function {
-    std::string name;
-    std::shared_ptr<AST::FunctionDeclaration> declaration;
-    // std::vector<std::string> parameters;
-    // std::vector<std::string> optionalParameters;
-    // std::map<std::string, ValuePtr> defaultValues;
-    std::vector<std::pair<std::string, TypePtr>> parameters;  // name and type
-    std::vector<std::pair<std::string, TypePtr>> optionalParameters;
-    std::map<std::string, std::pair<ValuePtr, TypePtr>> defaultValues;
-    size_t startAddress;
-    size_t endAddress;
-    TypePtr returnType;
-    
-    Function() : startAddress(0), endAddress(0), returnType(nullptr) {}
-    
-    Function(const std::string& n, size_t start) 
-        : name(n), startAddress(start), endAddress(0), returnType(nullptr) {}
-};
+
 
 // Function parameter information
 struct Parameter {
     std::string name;
     std::shared_ptr<AST::TypeAnnotation> type;
     bool isOptional = false;
+    bool hasDefaultValue = false;
     std::shared_ptr<AST::Expression> defaultValue = nullptr;
+    
+    Parameter() : isOptional(false), hasDefaultValue(false) {}
     
     Parameter(const std::string& n, std::shared_ptr<AST::TypeAnnotation> t, 
               bool optional = false, std::shared_ptr<AST::Expression> def = nullptr)
-        : name(n), type(t), isOptional(optional), defaultValue(def) {}
+        : name(n), type(t), isOptional(optional), hasDefaultValue(def != nullptr), defaultValue(def) {}
 };
 
 // Function signature information
@@ -148,7 +139,7 @@ public:
     std::shared_ptr<void> previousEnvironment; // Generic pointer to previous environment
     
     // Closure support
-    std::shared_ptr<Environment> closureEnvironment;
+    std::shared_ptr<::Environment> closureEnvironment;
     std::unordered_map<std::string, ValuePtr> capturedVariables;
     bool isClosureCall = false;
     
@@ -160,7 +151,7 @@ public:
     // Constructor for closure calls
     CallFrame(const std::string& name, size_t retAddr, 
               std::shared_ptr<FunctionImplementation> func,
-              std::shared_ptr<Environment> closureEnv,
+              std::shared_ptr<::Environment> closureEnv,
               const std::unordered_map<std::string, ValuePtr>& captured)
         : functionName(name), returnAddress(retAddr), function(func), 
           previousEnvironment(nullptr), closureEnvironment(closureEnv),

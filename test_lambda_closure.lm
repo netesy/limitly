@@ -1,0 +1,26 @@
+// Test lambda expressions and closures
+
+// Test basic lambda expression
+fn make_adder(x: int): function(int): int {
+    return fn(y: int): int {
+        return x + y;  // Captures x from outer scope
+    };
+}
+
+// Test lambda closure
+print("Testing lambda closures:");
+var add_five = make_adder(5);
+var result1 = add_five(10);
+print("add_five(10) =", result1);  // Should be 15
+
+var add_three = make_adder(3);
+var result2 = add_three(7);
+print("add_three(7) =", result2);  // Should be 10
+
+// Test lambda as direct parameter
+fn apply_lambda(f: function(int): int, value: int): int {
+    return f(value);
+}
+
+var result3 = apply_lambda(fn(x: int): int { return x * 2; }, 6);
+print("apply_lambda(double, 6) =", result3);  // Should be 12

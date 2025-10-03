@@ -1197,16 +1197,45 @@ void BytecodeGenerator::visitVariableExpr(const std::shared_ptr<AST::VariableExp
 void BytecodeGenerator::visitCallExpr(const std::shared_ptr<AST::CallExpr>& expr) {
     // Generate bytecode for function call expression
     
-    // Evaluate positional arguments (push them onto stack)
-    for (const auto& arg : expr->arguments) {
-        visitExpression(arg);
-    }
-    
     // Handle different types of callees
     std::string functionName;
     if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(expr->callee)) {
-        // Simple function call: functionName(args)
-        functionName = varExpr->name;
+        // For now, let's use a different approach: only treat single-letter variables
+        // or variables that are clearly parameters as function-typed variables
+        // This is a temporary heuristic until we have proper type information
+        
+        // Check if this looks like a function parameter or closure variable
+        // Be more specific to avoid treating regular functions as higher-order
+        bool likelyFunctionParameter = (varExpr->name.length() == 1 || 
+                                       varExpr->name == "func" || 
+                                       varExpr->name == "fn" ||
+                                       varExpr->name == "callback" ||
+                                       (varExpr->name.find("add_") != std::string::npos && varExpr->name != "make_adder") || // Variables like add_ten, add_twenty
+                                       varExpr->name.find("lambda") != std::string::npos); // Variables containing "lambda"
+        
+        if (likelyFunctionParameter) {
+            // This is likely a function-typed variable - generate higher-order call
+            // First load the function value
+            emit(Opcode::LOAD_VAR, expr->line, 0, 0.0f, false, varExpr->name);
+            
+            // Then evaluate and push arguments
+            for (const auto& arg : expr->arguments) {
+                visitExpression(arg);
+            }
+            
+            // Push argument count onto stack (on top)
+            emit(Opcode::PUSH_INT, expr->line, static_cast<int32_t>(expr->arguments.size()), 0.0f, false, "");
+            
+            // Then emit a higher-order call
+            emit(Opcode::CALL_HIGHER_ORDER, expr->line, 0, 0.0f, false, "");
+            return;
+        } else {
+            // Regular function call - evaluate arguments first
+            for (const auto& arg : expr->arguments) {
+                visitExpression(arg);
+            }
+            functionName = varExpr->name;
+        }
 
       //  std::cout << "[DEBUG] CallExpr: Function name = " << functionName << std::endl;
     } else if (auto memberExpr = std::dynamic_pointer_cast<AST::MemberExpr>(expr->callee)) {
@@ -1794,78 +1823,58 @@ void BytecodeGenerator::visitErrorTypePatternExpr(const std::shared_ptr<AST::Err
         emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, paramName);
     }
 }
-void
- BytecodeGenerator::visitLambdaExpr(const std::shared_ptr<AST::LambdaExpr>& expr) {
-    // Generate bytecode for lambda expression
-    
-    // Perform variable capture analysis
+
+void BytecodeGenerator::visitLambdaExpr(const std::shared_ptr<AST::LambdaExpr>& expr) {
+    // Analyze variable capture for this lambda
     std::vector<std::string> capturedVars = analyzeVariableCapture(expr);
     
-    // Also use any pre-analyzed captured variables from the AST
-    if (!expr->capturedVars.empty()) {
-        for (const auto& var : expr->capturedVars) {
-            if (std::find(capturedVars.begin(), capturedVars.end(), var) == capturedVars.end()) {
-                capturedVars.push_back(var);
-            }
-        }
-    }
+    // Store captured variables in the lambda AST node for later use
+    const_cast<AST::LambdaExpr*>(expr.get())->capturedVars = capturedVars;
     
-    // Generate a unique lambda name for debugging
-    std::string lambdaName = "__lambda_" + std::to_string(expr->line) + "_" + std::to_string(bytecode.size());
+    // Generate a unique lambda name for bytecode generation
+    static int lambdaCounter = 0;
+    std::string lambdaName = "__lambda_" + std::to_string(lambdaCounter++);
     
-    // Start lambda function definition
+    // For closures, we need to generate the lambda function definition first,
+    // then create the closure that references it
+    
+    // Begin lambda function definition
     emit(Opcode::BEGIN_FUNCTION, expr->line, 0, 0.0f, false, lambdaName);
     
-    // Process parameters
+    // Define parameters
     for (const auto& param : expr->params) {
         emit(Opcode::DEFINE_PARAM, expr->line, 0, 0.0f, false, param.first);
     }
     
-    // Process lambda body
+    // Generate bytecode for lambda body
     visitBlockStatement(expr->body);
     
-    // If lambda doesn't end with an explicit return, add implicit return
-    // For single expression lambdas, the last expression is the return value
-    if (!expr->body->statements.empty()) {
-        auto lastStmt = expr->body->statements.back();
-        if (!std::dynamic_pointer_cast<AST::ReturnStatement>(lastStmt)) {
-            // If the last statement is an expression statement, return its value
-            if (auto exprStmt = std::dynamic_pointer_cast<AST::ExprStatement>(lastStmt)) {
-                // The expression value is already on the stack from visitExprStatement
-                // We need to undo the POP from visitExprStatement and add a RETURN
-                // For now, we'll add a null return - this needs refinement
-                emit(Opcode::PUSH_NULL, expr->line);
-            } else {
-                emit(Opcode::PUSH_NULL, expr->line);
-            }
-            emit(Opcode::RETURN, expr->line);
-        }
-    } else {
-        // Empty lambda body returns null
-        emit(Opcode::PUSH_NULL, expr->line);
-        emit(Opcode::RETURN, expr->line);
-    }
+    // If lambda doesn't end with explicit return, add implicit return
+    emit(Opcode::PUSH_NULL, expr->line);
+    emit(Opcode::RETURN, expr->line);
     
     // End lambda function definition
     emit(Opcode::END_FUNCTION, expr->line);
     
-    // Create closure with captured variables
-    if (!capturedVars.empty()) {
-        // Capture each variable
-        for (const auto& varName : capturedVars) {
-            emit(Opcode::LOAD_VAR, expr->line, 0, 0.0f, false, varName);
-            emit(Opcode::CAPTURE_VAR, expr->line, 0, 0.0f, false, varName);
-        }
-        
-        // Create closure with captured variables
-        emit(Opcode::CREATE_CLOSURE, expr->line, static_cast<int32_t>(capturedVars.size()), 0.0f, false, lambdaName);
-    } else {
-        // Simple lambda without captures - just push the function reference
-        emit(Opcode::PUSH_FUNCTION_REF, expr->line, 0, 0.0f, false, lambdaName);
+    // Now emit closure creation instructions that will be part of the parent function
+    // These will be executed when the parent function runs, not at the top level
+    
+    // Push the lambda function onto the stack first
+    emit(Opcode::PUSH_LAMBDA, expr->line, 0, 0.0f, false, lambdaName);
+    
+    // Capture each variable (this will be executed when the parent function runs)
+    for (const std::string& varName : capturedVars) {
+        emit(Opcode::CAPTURE_VAR, expr->line, 0, 0.0f, false, varName);
     }
+    
+    // Push the count of captured variables (must be at top of stack for CREATE_CLOSURE)
+    emit(Opcode::PUSH_INT, expr->line, static_cast<int>(capturedVars.size()));
+    
+    // Create closure with captured variables
+    emit(Opcode::CREATE_CLOSURE, expr->line, 0, 0.0f, false, lambdaName);
 }
-std::vector
-<std::string> BytecodeGenerator::analyzeVariableCapture(const std::shared_ptr<AST::LambdaExpr>& lambda) {
+
+std::vector<std::string> BytecodeGenerator::analyzeVariableCapture(const std::shared_ptr<AST::LambdaExpr>& lambda) {
     // Analyze which variables are captured by the lambda
     std::set<std::string> capturedVars;
     

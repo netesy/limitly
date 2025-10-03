@@ -41,6 +41,9 @@ public:
     // Execute bytecode
     ValuePtr execute(const std::vector<Instruction>& bytecode);
     
+    // Pre-process bytecode to register lambda functions
+    void preProcessBytecode(const std::vector<Instruction>& bytecode);
+    
     // Set source information for enhanced error reporting
     void setSourceInfo(const std::string& sourceCode, const std::string& filePath) {
         this->sourceCode = sourceCode;
@@ -231,6 +234,7 @@ private:
     size_t ip; // Instruction pointer
     bool debugMode;
     bool debugOutput;
+    bool isPreProcessing; // Track if we're in pre-processing mode
     static int matchCounter;
     std::string currentFunctionBeingDefined; // Track which function is currently being defined
     bool insideFunctionDefinition; // Track if we're currently inside a function definition
@@ -478,6 +482,14 @@ private:
     void handlePrint(const Instruction& instruction);
     void handleDebugPrint(const Instruction& instruction);
     void handleDefineAtomic(const Instruction& instruction);
+    
+    // Closure instruction handlers
+    void handleCreateClosure(const Instruction& instruction);
+    void handleCaptureVar(const Instruction& instruction);
+    void handleCallClosure(const Instruction& instruction);
+    void handlePushLambda(const Instruction& instruction);
+    void handlePushFunctionRef(const Instruction& instruction);
+    void handleCallHigherOrder(const Instruction& instruction);
     
     // Error handling instruction handlers
     void handleCheckError(const Instruction& instruction);

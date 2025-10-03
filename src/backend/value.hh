@@ -14,9 +14,17 @@
 #include "concurrency/channel.hh"
 #include <atomic>
 
+// Forward declarations for AST types
+namespace AST {
+    class FunctionDeclaration;
+}
+
 // Forward declarations
 struct Value;
 using ValuePtr = std::shared_ptr<Value>;
+
+struct Type;
+using TypePtr = std::shared_ptr<Type>;
 
 // Forward declare ListValue and DictValue
 struct ListValue;
@@ -31,6 +39,24 @@ namespace backend {
     class ObjectInstance;
     class ClassDefinition;
     class UserDefinedFunction;
+    
+    // Function definition for user-defined functions
+    struct Function {
+        std::string name;
+        std::shared_ptr<AST::FunctionDeclaration> declaration;
+        std::vector<std::pair<std::string, TypePtr>> parameters;  // name and type
+        std::vector<std::pair<std::string, TypePtr>> optionalParameters;
+        std::map<std::string, std::pair<ValuePtr, TypePtr>> defaultValues;
+        size_t startAddress;
+        size_t endAddress;
+        TypePtr returnType;
+        bool isLambda = false;  // Flag to indicate if this is a lambda function
+        
+        Function() : startAddress(0), endAddress(0), returnType(nullptr), isLambda(false) {}
+        
+        Function(const std::string& n, size_t start) 
+            : name(n), startAddress(start), endAddress(0), returnType(nullptr), isLambda(false) {}
+    };
 }
 using ObjectInstancePtr = std::shared_ptr<backend::ObjectInstance>;
 
@@ -44,33 +70,38 @@ struct ModuleValue {
 
 // Closure value for capturing variables from enclosing scope
 struct ClosureValue {
-    std::shared_ptr<backend::UserDefinedFunction> function;  // The function being closed over
-    std::shared_ptr<Environment> capturedEnvironment;        // Environment with captured variables
+    std::string functionName;                                // Name of the lambda function
+    size_t startAddress;                                     // Bytecode start address
+    size_t endAddress;                                       // Bytecode end address
+    std::shared_ptr<::Environment> capturedEnvironment;        // Environment with captured variables
     std::vector<std::string> capturedVariables;             // Names of captured variables
     
     // Constructor
-    ClosureValue() = default;
+    ClosureValue() : startAddress(0), endAddress(0) {}
     
-    ClosureValue(std::shared_ptr<backend::UserDefinedFunction> func,
+    ClosureValue(const std::string& funcName, size_t start, size_t end,
                  std::shared_ptr<::Environment> capturedEnv,
                  const std::vector<std::string>& capturedVars)
-        : function(func), capturedEnvironment(capturedEnv), capturedVariables(capturedVars) {}
+        : functionName(funcName), startAddress(start), endAddress(end),
+          capturedEnvironment(capturedEnv), capturedVariables(capturedVars) {}
     
     // Copy constructor
     ClosureValue(const ClosureValue& other)
-        : function(other.function), capturedEnvironment(other.capturedEnvironment), 
-          capturedVariables(other.capturedVariables) {}
+        : functionName(other.functionName), startAddress(other.startAddress), endAddress(other.endAddress),
+          capturedEnvironment(other.capturedEnvironment), capturedVariables(other.capturedVariables) {}
     
     // Move constructor
     ClosureValue(ClosureValue&& other) noexcept
-        : function(std::move(other.function)), 
+        : functionName(std::move(other.functionName)), startAddress(other.startAddress), endAddress(other.endAddress),
           capturedEnvironment(std::move(other.capturedEnvironment)),
           capturedVariables(std::move(other.capturedVariables)) {}
     
     // Assignment operators
     ClosureValue& operator=(const ClosureValue& other) {
         if (this != &other) {
-            function = other.function;
+            functionName = other.functionName;
+            startAddress = other.startAddress;
+            endAddress = other.endAddress;
             capturedEnvironment = other.capturedEnvironment;
             capturedVariables = other.capturedVariables;
         }
@@ -79,33 +110,32 @@ struct ClosureValue {
     
     ClosureValue& operator=(ClosureValue&& other) noexcept {
         if (this != &other) {
-            function = std::move(other.function);
+            functionName = std::move(other.functionName);
+            startAddress = other.startAddress;
+            endAddress = other.endAddress;
             capturedEnvironment = std::move(other.capturedEnvironment);
             capturedVariables = std::move(other.capturedVariables);
         }
         return *this;
     }
     
+    // Utility methods
+    bool isValid() const {
+        return !functionName.empty() && startAddress < endAddress;
+    }
+    
     // Execute the closure with given arguments
     ValuePtr execute(const std::vector<ValuePtr>& args) {
         // This will be implemented by the VM when executing closures
         // For now, return nullptr as a placeholder
-        if (!function) {
-            throw std::runtime_error("Cannot execute closure: function is null");
+        if (functionName.empty()) {
+            throw std::runtime_error("Cannot execute closure: function name is empty");
         }
         
         // The actual execution will be handled by the VM's closure execution mechanism
         // This is just a placeholder that will be called by the VM
         return nullptr;
     }
-    
-    // Check if closure is valid
-    bool isValid() const {
-        return function != nullptr;
-    }
-    
-    // Get function name
-    std::string getFunctionName() const;
     
     // Get captured variable count
     size_t getCapturedVariableCount() const {
@@ -118,12 +148,17 @@ struct ClosureValue {
                != capturedVariables.end();
     }
     
+    // Get function name
+    std::string getFunctionName() const {
+        return functionName;
+    }
+    
     // String representation
     std::string toString() const;
     
     // Static factory method for creating closures (defined later after factory namespace)
     static ValuePtr create(std::shared_ptr<backend::UserDefinedFunction> func,
-                          std::shared_ptr<Environment> capturedEnv,
+                          std::shared_ptr<::Environment> capturedEnv,
                           const std::vector<std::string>& capturedVars);
 };
 
@@ -160,13 +195,10 @@ enum class TypeTag {
     Module
 };
 
-struct Type;
-using TypePtr = std::shared_ptr<Type>;
-
 // Forward declaration for ClosureValue factory method with proper TypePtr
 namespace ClosureValueFactory {
     ValuePtr createClosure(std::shared_ptr<backend::UserDefinedFunction> func,
-                          std::shared_ptr<Environment> capturedEnv,
+                          std::shared_ptr<::Environment> capturedEnv,
                           const std::vector<std::string>& capturedVars,
                           TypePtr closureType = nullptr);
 }
@@ -725,6 +757,7 @@ struct Value {
     , AtomicValue
     , ModuleValue
     , std::shared_ptr<backend::UserDefinedFunction>
+    , backend::Function
     , ClosureValue
                 >
         data;
@@ -865,6 +898,9 @@ struct Value {
         // Constructor for UserDefinedFunction
         Value(TypePtr t, const std::shared_ptr<backend::UserDefinedFunction>& func) : type(std::move(t)), data(func) {}
 
+        // Constructor for backend::Function
+        Value(TypePtr t, const backend::Function& func) : type(std::move(t)), data(func) {}
+
         // Constructor for ClosureValue
         Value(TypePtr t, const ClosureValue& closure) : type(std::move(t)), data(closure) {}
 
@@ -965,6 +1001,9 @@ struct Value {
             [&](const std::shared_ptr<backend::UserDefinedFunction>&) {
                 oss << "<function>";
             },
+            [&](const backend::Function& func) {
+                oss << "<function:" << func.name << ">";
+            },
             [&](const ClosureValue& closure) {
                 oss << closure.toString();
             }
@@ -1045,6 +1084,9 @@ struct Value {
             },
             [&](const std::shared_ptr<backend::UserDefinedFunction>&) {
                 oss << "<function>";
+            },
+            [&](const backend::Function& func) {
+                oss << "<function:" << func.name << ">";
             },
             [&](const ClosureValue& closure) {
                 oss << closure.toString();
@@ -1429,7 +1471,7 @@ inline std::ostream &operator<<(std::ostream &os, const ValuePtr &valuePtr)
 // ClosureValue factory method implementation
 namespace ClosureValueFactory {
     inline ValuePtr createClosure(std::shared_ptr<backend::UserDefinedFunction> func,
-                                 std::shared_ptr<Environment> capturedEnv,
+                                 std::shared_ptr<::Environment> capturedEnv,
                                  const std::vector<std::string>& capturedVars,
                                  TypePtr closureType) {
         if (!func) {
@@ -1441,8 +1483,9 @@ namespace ClosureValueFactory {
             closureType = std::make_shared<Type>(TypeTag::Closure);
         }
         
-        // Create the closure value
-        ClosureValue closure(func, capturedEnv, capturedVars);
+        // Create the closure value - for now use placeholder values since this factory
+        // is used for backward compatibility. The VM will create closures directly.
+        ClosureValue closure("closure", 0, 0, capturedEnv, capturedVars);
         
         // Return as ValuePtr
         return std::make_shared<Value>(closureType, closure);
@@ -1455,5 +1498,6 @@ namespace ClosureValueFactory {
 inline ValuePtr ClosureValue::create(std::shared_ptr<backend::UserDefinedFunction> func,
                                     std::shared_ptr<Environment> capturedEnv,
                                     const std::vector<std::string>& capturedVars) {
-    return ClosureValueFactory::createClosure(func, capturedEnv, capturedVars);
+    TypePtr closureType = std::make_shared<Type>(TypeTag::Closure);
+    return ClosureValueFactory::createClosure(func, capturedEnv, capturedVars, closureType);
 }
