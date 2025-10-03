@@ -73,21 +73,6 @@
 - [ ] 8. Fix lambda function registration timing for closure support
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   - Implement bytecode pre-processing phase to register all lambda functions before execution
   - Add VM::preProcessBytecode method to scan for BEGIN_FUNCTION/END_FUNCTION pairs
   - Register lambda functions (__lambda_*) in userDefinedFunctions during pre-processing
