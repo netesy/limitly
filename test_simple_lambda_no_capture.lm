@@ -1,0 +1,11 @@
+// Test simple lambda without variable capture
+
+// Function that takes a lambda and applies it
+fn apply_func(f: function(int): int, value: int): int {
+    return f(value);
+}
+
+// Test with simple lambda
+print("Testing lambdas without capture:");
+var result = apply_func(fn(x: int): int { return x * 2; }, 5);
+print("apply_func(double, 5) =", result);  // Should print 10

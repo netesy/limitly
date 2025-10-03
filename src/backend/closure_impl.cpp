@@ -1,5 +1,6 @@
 #include "value.hh"
 #include "functions.hh"
+#include "types.hh"
 
 // ClosureValue method implementations
 
@@ -12,14 +13,10 @@
 //     throw std::runtime_error("Cannot execute closure: no function defined");
 // }
 
-std::string ClosureValue::getFunctionName() const {
-    return function ? function->getSignature().name : "<anonymous>";
-}
-
 std::string ClosureValue::toString() const {
     std::string result = "<closure";
-    if (function) {
-        result += ":" + function->getSignature().name;
+    if (!functionName.empty()) {
+        result += ":" + functionName;
     }
     if (!capturedVariables.empty()) {
         result += " captures[";
@@ -32,3 +29,4 @@ std::string ClosureValue::toString() const {
     result += ">";
     return result;
 }
+// ClosureValueFactory implementation is in value.hh as inline functions

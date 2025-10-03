@@ -89,6 +89,22 @@ TypePtr TypeChecker::resolveTypeAnnotation(const std::shared_ptr<AST::TypeAnnota
         return typeSystem.NIL_TYPE;
     }
     
+    // Handle function types
+    if (annotation->isFunction) {
+        // Create function type with parameter types and return type
+        std::vector<TypePtr> paramTypes;
+        for (const auto& param : annotation->functionParams) {
+            paramTypes.push_back(resolveTypeAnnotation(param));
+        }
+        
+        TypePtr returnType = typeSystem.NIL_TYPE;
+        if (annotation->returnType) {
+            returnType = resolveTypeAnnotation(annotation->returnType);
+        }
+        
+        return typeSystem.createFunctionType(paramTypes, returnType);
+    }
+    
     // Handle basic types
     TypePtr baseType = typeSystem.getType(annotation->typeName);
     
@@ -270,20 +286,38 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
         
     } else if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(expr)) {
         TypePtr varType = currentScope->getVariableType(varExpr->name);
-        if (!varType) {
-            addError("Undefined variable", expr->line, 0, "Variable lookup", varExpr->name, "declared variable name");
-            return typeSystem.ANY_TYPE;
+        if (varType) {
+            return varType;
         }
-        return varType;
+        
+        // Check if it's a function being referenced (not called)
+        FunctionSignature* signature = currentScope->getFunctionSignature(varExpr->name);
+        if (signature) {
+            // Return a function type for the function reference
+            return typeSystem.createFunctionType(signature->paramTypes, signature->returnType);
+        }
+        
+        addError("Undefined variable", expr->line, 0, "Variable lookup", varExpr->name, "declared variable name");
+        return typeSystem.ANY_TYPE;
         
     } else if (auto callExpr = std::dynamic_pointer_cast<AST::CallExpr>(expr)) {
         checkFunctionCall(callExpr);
         
-        // Get function signature to determine return type
+        // Get function signature or function type to determine return type
         if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(callExpr->callee)) {
+            // First check if it's a regular function
             FunctionSignature* signature = currentScope->getFunctionSignature(varExpr->name);
             if (signature) {
                 return signature->returnType;
+            }
+            
+            // Check if it's a function-typed variable
+            TypePtr varType = currentScope->getVariableType(varExpr->name);
+            if (varType && varType->tag == TypeTag::Function) {
+                if (std::holds_alternative<FunctionType>(varType->extra)) {
+                    auto funcType = std::get<FunctionType>(varType->extra);
+                    return funcType.returnType;
+                }
             }
         }
         return typeSystem.ANY_TYPE;
@@ -371,6 +405,41 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
         }
         
         return valueType;
+        
+    } else if (auto lambdaExpr = std::dynamic_pointer_cast<AST::LambdaExpr>(expr)) {
+        // Handle lambda expressions
+        enterScope(); // Create new scope for lambda parameters
+        
+        // Process parameters and add them to the scope
+        std::vector<TypePtr> paramTypes;
+        for (const auto& param : lambdaExpr->params) {
+            TypePtr paramType = typeSystem.ANY_TYPE;
+            if (param.second) {
+                paramType = resolveTypeAnnotation(param.second);
+            }
+            paramTypes.push_back(paramType);
+            currentScope->variables[param.first] = paramType;
+        }
+        
+        // Determine return type
+        TypePtr returnType = typeSystem.ANY_TYPE;
+        if (lambdaExpr->returnType.has_value()) {
+            returnType = resolveTypeAnnotation(lambdaExpr->returnType.value());
+        } else {
+            // Try to infer return type from body if possible
+            // For now, use ANY_TYPE - could be enhanced with return type inference
+            returnType = typeSystem.ANY_TYPE;
+        }
+        
+        // Check the lambda body
+        if (lambdaExpr->body) {
+            checkStatement(lambdaExpr->body);
+        }
+        
+        exitScope(); // Exit lambda scope
+        
+        // Create and return function type
+        return typeSystem.createFunctionType(paramTypes, returnType);
     }
     
     // Default case for other expression types
@@ -516,45 +585,86 @@ void TypeChecker::checkFunctionCall(const std::shared_ptr<AST::CallExpr>& expr) 
         argTypes.push_back(checkExpression(arg));
     }
     
-    // Get function signature
+    // Get function signature or check if it's a function-typed variable
     if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(expr->callee)) {
+        // First check if it's a regular function
         FunctionSignature* signature = currentScope->getFunctionSignature(varExpr->name);
-        if (!signature) {
-            addError("Undefined function", expr->line, 0, "Function call", varExpr->name, "declared function name");
+        if (signature) {
+            // Handle regular function call
+            checkRegularFunctionCall(signature, argTypes, expr);
             return;
         }
         
+        // Check if it's a function-typed variable (like a function parameter)
+        TypePtr varType = currentScope->getVariableType(varExpr->name);
+        if (varType && varType->tag == TypeTag::Function) {
+            // Handle higher-order function call
+            checkHigherOrderFunctionCall(varType, argTypes, expr);
+            return;
+        }
+        
+        addError("Undefined function", expr->line, 0, "Function call", varExpr->name, "declared function name");
+        return;
+    }
+}
+
+void TypeChecker::checkRegularFunctionCall(FunctionSignature* signature, const std::vector<TypePtr>& argTypes, const std::shared_ptr<AST::CallExpr>& expr) {
+    // Check argument count
+    if (argTypes.size() != signature->paramTypes.size()) {
+        addError("Function argument count mismatch", expr->line, 0, "Function call", 
+                signature->name, 
+                std::to_string(signature->paramTypes.size()) + " arguments, got " + std::to_string(argTypes.size()));
+        return;
+    }
+    
+    // Check argument types
+    for (size_t i = 0; i < argTypes.size(); ++i) {
+        if (!typeSystem.isCompatible(argTypes[i], signature->paramTypes[i])) {
+            addError("Argument " + std::to_string(i + 1) + " type mismatch: expected " + 
+                    signature->paramTypes[i]->toString() + ", got " + argTypes[i]->toString(), 
+                    expr->line);
+        }
+    }
+    
+    // Enhanced error union compatibility checking for function calls
+    if (signature->canFail) {
+        // Check if the function call is being handled properly
+        // This will be checked at the expression statement level
+        
+        // Validate error union compatibility if this call is part of error propagation
+        if (currentFunction && currentFunction->canFail) {
+            if (!isErrorUnionCompatible(signature->returnType, currentFunction->returnType)) {
+                addError("Function call returns incompatible error types. Expected error types: [" +
+                        joinErrorTypes(currentFunction->errorTypes) + "], but function returns: [" +
+                        joinErrorTypes(signature->errorTypes) + "]", expr->line);
+            }
+        }
+    }
+}
+
+void TypeChecker::checkHigherOrderFunctionCall(TypePtr functionType, const std::vector<TypePtr>& argTypes, const std::shared_ptr<AST::CallExpr>& expr) {
+    // Extract function type information
+    if (std::holds_alternative<FunctionType>(functionType->extra)) {
+        auto funcType = std::get<FunctionType>(functionType->extra);
+        
         // Check argument count
-        if (argTypes.size() != signature->paramTypes.size()) {
-            addError("Function argument count mismatch", expr->line, 0, "Function call", 
-                    signature->name, 
-                    std::to_string(signature->paramTypes.size()) + " arguments, got " + std::to_string(argTypes.size()));
+        if (argTypes.size() != funcType.paramTypes.size()) {
+            addError("Function argument count mismatch", expr->line, 0, "Higher-order function call", 
+                    "", 
+                    std::to_string(funcType.paramTypes.size()) + " arguments, got " + std::to_string(argTypes.size()));
             return;
         }
         
         // Check argument types
         for (size_t i = 0; i < argTypes.size(); ++i) {
-            if (!typeSystem.isCompatible(argTypes[i], signature->paramTypes[i])) {
+            if (!typeSystem.isCompatible(argTypes[i], funcType.paramTypes[i])) {
                 addError("Argument " + std::to_string(i + 1) + " type mismatch: expected " + 
-                        signature->paramTypes[i]->toString() + ", got " + argTypes[i]->toString(), 
+                        funcType.paramTypes[i]->toString() + ", got " + argTypes[i]->toString(), 
                         expr->line);
             }
         }
-        
-        // Enhanced error union compatibility checking for function calls
-        if (signature->canFail) {
-            // Check if the function call is being handled properly
-            // This will be checked at the expression statement level
-            
-            // Validate error union compatibility if this call is part of error propagation
-            if (currentFunction && currentFunction->canFail) {
-                if (!isErrorUnionCompatible(signature->returnType, currentFunction->returnType)) {
-                    addError("Function call returns incompatible error types. Expected error types: [" +
-                            joinErrorTypes(currentFunction->errorTypes) + "], but function returns: [" +
-                            joinErrorTypes(signature->errorTypes) + "]", expr->line);
-                }
-            }
-        }
+    } else {
+        addError("Invalid function type in higher-order function call", expr->line);
     }
 }
 

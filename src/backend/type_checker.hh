@@ -96,6 +96,8 @@ private:
     void checkErrorConstructExpression(const std::shared_ptr<AST::ErrorConstructExpr>& expr);
     void checkOkConstructExpression(const std::shared_ptr<AST::OkConstructExpr>& expr);
     void checkFunctionCall(const std::shared_ptr<AST::CallExpr>& expr);
+    void checkRegularFunctionCall(FunctionSignature* signature, const std::vector<TypePtr>& argTypes, const std::shared_ptr<AST::CallExpr>& expr);
+    void checkHigherOrderFunctionCall(TypePtr functionType, const std::vector<TypePtr>& argTypes, const std::shared_ptr<AST::CallExpr>& expr);
     void checkFunctionDeclaration(const std::shared_ptr<AST::FunctionDeclaration>& stmt);
     
     // Error type compatibility checking

@@ -1,3 +1,19 @@
-var add = fn(x: int, y: int): int {
-    x + y
-};
+// Test simple lambda expressions without variable capture
+
+// Test lambda as direct parameter
+fn apply_lambda(f: function(int): int, value: int): int {
+    return f(value);
+}
+
+// Test simple lambda without capture
+print("Testing simple lambdas:");
+var result1 = apply_lambda(fn(x: int): int { return x * 2; }, 6);
+print("apply_lambda(double, 6) =", result1);  // Should be 12
+
+var result2 = apply_lambda(fn(x: int): int { return x + 10; }, 5);
+print("apply_lambda(add_ten, 5) =", result2);  // Should be 15
+
+// Test lambda assigned to variable
+var square_lambda = fn(x: int): int { return x * x; };
+var result3 = apply_lambda(square_lambda, 4);
+print("apply_lambda(square_lambda, 4) =", result3);  // Should be 16

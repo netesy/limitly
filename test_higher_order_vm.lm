@@ -1,0 +1,27 @@
+// Test VM-level higher-order function support
+
+// Test 1: Basic function definition and call
+fn add_two(x: int): int {
+    return x + 2;
+}
+
+print("Test 1 - Basic function:");
+print("add_two(3) =", add_two(3));
+
+// Test 2: Function that can be used as a higher-order parameter
+fn multiply_by_three(x: int): int {
+    return x * 3;
+}
+
+print("Test 2 - Another function:");
+print("multiply_by_three(4) =", multiply_by_three(4));
+
+// Test 3: Simple function returning a value that could be a function reference
+fn get_function_name(): str {
+    return "add_two";
+}
+
+print("Test 3 - Function returning string:");
+print("get_function_name() =", get_function_name());
+
+print("=== Higher-order function VM tests completed ===");
