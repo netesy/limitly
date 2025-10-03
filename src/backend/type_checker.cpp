@@ -254,6 +254,8 @@ void TypeChecker::checkStatement(const std::shared_ptr<AST::Statement>& stmt) {
             if (returnStmt->value) {
                 // Pass expected return type as context for better type inference
                 returnType = checkExpression(returnStmt->value, currentFunction->returnType);
+                
+
             }
             
             // Check return type compatibility
@@ -431,15 +433,27 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
             returnType = typeSystem.ANY_TYPE;
         }
         
+        // Set up function context for the lambda
+        FunctionSignature* prevFunction = currentFunction;
+        FunctionSignature lambdaFunction("__lambda", paramTypes, returnType, false, {}, 0);
+        currentFunction = &lambdaFunction;
+        
         // Check the lambda body
         if (lambdaExpr->body) {
             checkStatement(lambdaExpr->body);
         }
         
+        // Restore previous function context
+        currentFunction = prevFunction;
+        
         exitScope(); // Exit lambda scope
         
         // Create and return function type
-        return typeSystem.createFunctionType(paramTypes, returnType);
+        TypePtr functionType = typeSystem.createFunctionType(paramTypes, returnType);
+        
+
+        
+        return functionType;
     }
     
     // Default case for other expression types
