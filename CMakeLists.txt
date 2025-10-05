@@ -44,6 +44,7 @@ add_executable(limitly
     src/frontend/ast.cpp
     src/frontend/lexer.cpp
     src/frontend/parser.cpp
+    src/common/builtin_functions.cpp
     src/backend.hh
     src/compile.cpp
     src/constants.hh

@@ -1,0 +1,41 @@
+// Test search functions individually
+
+print("=== Search Functions Test ===");
+
+// Test data
+var numbers = [1, 2, 3, 4, 5];
+var odds = [1, 3, 5];
+var positives = [1, 2, 3];
+var withNegative = [-1, 2, 3];
+
+print("Test data:");
+print("numbers: " + numbers);
+print("odds: " + odds);
+print("positives: " + positives);
+print("withNegative: " + withNegative);
+
+// Test find function
+print("\n=== Testing find function ===");
+var foundEven = find(nil, numbers);
+print("First even in numbers: " + foundEven);
+
+var foundEvenInOdds = find(nil, odds);
+print("First even in odds: " + foundEvenInOdds);
+
+// Test some function
+print("\n=== Testing some function ===");
+var hasEven = some(nil, numbers);
+print("Numbers has even: " + hasEven);
+
+var oddsHasEven = some(nil, odds);
+print("Odds has even: " + oddsHasEven);
+
+// Test every function
+print("\n=== Testing every function ===");
+var allPositive = every(nil, positives);
+print("All positive in positives: " + allPositive);
+
+var allPositiveWithNeg = every(nil, withNegative);
+print("All positive in withNegative: " + allPositiveWithNeg);
+
+print("\n=== Search functions test completed! ===");

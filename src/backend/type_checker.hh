@@ -30,6 +30,9 @@ struct FunctionSignature {
     std::vector<std::string> errorTypes;
     int line;
     
+    // Default constructor for use in containers
+    FunctionSignature() : name(""), paramTypes(), returnType(nullptr), canFail(false), errorTypes(), line(0) {}
+    
     FunctionSignature(const std::string& n, const std::vector<TypePtr>& params, 
                      TypePtr ret, bool fail = false, 
                      const std::vector<std::string>& errors = {}, int ln = 0)
@@ -79,6 +82,10 @@ private:
     // Current function context for error propagation validation
     FunctionSignature* currentFunction = nullptr;
     
+    // Source context for error reporting
+    std::string sourceCode;
+    std::string filePath;
+    
     // Helper methods
     void addError(const std::string& message, int line, int column = 0, const std::string& context = "");
     void addError(const std::string& message, int line, int column, const std::string& context, const std::string& lexeme, const std::string& expectedValue);
@@ -125,8 +132,26 @@ private:
     std::vector<std::string> inferFunctionErrorTypes(const std::shared_ptr<AST::Statement>& body);
     std::vector<std::string> inferExpressionErrorTypes(const std::shared_ptr<AST::Expression>& expr);
     
+    // Register builtin functions for semantic analysis
+    void registerBuiltinFunctions();
+    
+    // Contract and assert validation
+    void checkContractStatement(const std::shared_ptr<AST::ContractStatement>& stmt);
+    void checkAssertCall(const std::shared_ptr<AST::CallExpr>& expr);
+    
+    // Helper method to get code context for error reporting
+    std::string getCodeContext(int line);
+    
 public:
-    TypeChecker(TypeSystem& ts) : typeSystem(ts), currentScope(std::make_shared<Scope>()) {}
+    TypeChecker(TypeSystem& ts) : typeSystem(ts), currentScope(std::make_shared<Scope>()) {
+        registerBuiltinFunctions();
+    }
+    
+    // Set source context for error reporting
+    void setSourceContext(const std::string& source, const std::string& filePath) {
+        this->sourceCode = source;
+        this->filePath = filePath;
+    }
     
     // Main type checking entry point
     std::vector<TypeCheckError> checkProgram(const std::shared_ptr<AST::Program>& program);

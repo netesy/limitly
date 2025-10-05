@@ -3,6 +3,7 @@
 #include "../frontend/scanner.hh"
 #include "../frontend/parser.hh"
 #include "../common/backend.hh"
+#include "../common/builtin_functions.hh"  // For builtin functions
 #include "concurrency/task_vm.hh"
 #include "bytecode_printer.hh"  // For opcodeToString function
 
@@ -113,37 +114,7 @@ VM::VM(bool create_runtime)
         concurrency_state = std::make_unique<ConcurrencyState>();
     }
 
-    // Register native functions with correct signature
-    registerNativeFunction("clock", [this](const std::vector<ValuePtr>& args) -> ValuePtr {
-        if (args.size() != 0) {
-            throw std::runtime_error("clock() takes no arguments");
-        }
-        return memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, 
-            static_cast<double>(std::clock()) / CLOCKS_PER_SEC);
-    });
-    
-    registerNativeFunction("sleep", [this](const std::vector<ValuePtr>& args) -> ValuePtr {
-        if (args.size() != 1) {
-            throw std::runtime_error("sleep() takes exactly one number argument");
-        }
-        
-        // Convert the argument to a double value
-        double seconds = 0.0;
-        if (args[0]->type->tag == TypeTag::Float64) {
-            seconds = *reinterpret_cast<const double*>(&args[0]->data);
-        } else if (args[0]->type->tag == TypeTag::Int) {
-            int32_t val = *reinterpret_cast<const int32_t*>(&args[0]->data);
-            seconds = static_cast<double>(val);
-        } else {
-            throw std::runtime_error("sleep() argument must be a number (int or float)");
-        }
-        
-        // Sleep for the specified number of seconds
-        std::this_thread::sleep_for(std::chrono::milliseconds(
-            static_cast<int>(seconds * 1000)));
-            
-        return memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
-    });
+
     
         // Register a native function for channel creation
         registerNativeFunction("channel", [this](const std::vector<ValuePtr>& args) -> ValuePtr {
@@ -188,6 +159,35 @@ VM::VM(bool create_runtime)
             ch->close();
             return memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
         });
+    
+    // Register builtin functions with enhanced error handling and performance optimization
+    try {
+        builtin::BuiltinFunctions::registerAll(this);
+        
+        // Ensure builtin functions are available in global environment
+        // This makes them accessible without explicit imports
+        auto builtinNames = builtin::BuiltinFunctions::getInstance().getBuiltinFunctionNames();
+        for (const auto& name : builtinNames) {
+            // Create a function value that can be called from the language
+            auto funcType = std::make_shared<Type>(TypeTag::Function);
+            auto funcValue = memoryManager.makeRef<Value>(*region, funcType, name);
+            globals->define(name, funcValue);
+        }
+        
+        if (debugMode) {
+            std::cout << "[DEBUG] Successfully registered " << builtinNames.size() 
+                      << " builtin functions in global environment" << std::endl;
+        }
+    } catch (const std::exception& e) {
+        // Enhanced error handling - provide more context
+        std::cerr << "Error: Failed to register builtin functions: " << e.what() << std::endl;
+        std::cerr << "This may cause runtime errors when calling builtin functions." << std::endl;
+        
+        // Don't fail VM initialization, but log the issue for debugging
+        if (debugMode) {
+            std::cerr << "[DEBUG] VM will continue without builtin functions" << std::endl;
+        }
+    }
 }
 
 VM::~VM() {
@@ -202,6 +202,65 @@ void VM::registerNativeFunction(const std::string& name, std::function<ValuePtr(
     // Register in the backend function registry with no parameters for now.
     std::vector<backend::Parameter> params;
     functionRegistry.registerNativeFunction(name, params, std::nullopt, function);
+}
+
+// Register builtin function (bypasses parameter validation in function registry)
+void VM::registerBuiltinFunction(const std::string& name, std::function<ValuePtr(const std::vector<ValuePtr>&)> function) {
+    // Performance optimization: wrap builtin functions with error handling integration
+    auto optimizedFunction = [this, name, function](const std::vector<ValuePtr>& args) -> ValuePtr {
+        try {
+            // Record success path for performance monitoring
+            if (debugMode) {
+                recordSuccessPath();
+            }
+            
+            // Call the actual builtin function
+            ValuePtr result = function(args);
+            
+            return result;
+        } catch (const std::exception& e) {
+            if (debugMode) {
+                recordErrorPath();
+            }
+            
+            // Special handling for assert and contract functions - let them terminate execution
+            if (name == "assert" || name == "contract") {
+                std::string errorMsg = "Builtin function '" + name + "' failed: " + e.what();
+                throw std::runtime_error(errorMsg);
+            }
+            
+            // For other functions, create proper error union values for error propagation
+            std::string errorMsg = e.what();
+            std::string errorType = "BuiltinFunctionError";
+            
+            // Log the error for debugging
+            if (debugMode) {
+                std::cerr << "[DEBUG] Builtin error in " << name << ": " << errorMsg << std::endl;
+            }
+            
+            // Create proper error value using the VM's error system
+            ValuePtr errorValue = createErrorValue(errorType, errorMsg);
+            
+            // Integrate with error handling system for proper propagation
+            if (hasErrorFrames()) {
+                return handleError(errorValue, "builtin function error");
+            }
+            
+            // Return the error value for proper error propagation
+            return errorValue;
+        }
+    };
+    
+    nativeFunctions[name] = optimizedFunction;
+    // Don't register in function registry to bypass parameter validation
+}
+
+// Register VM-aware builtin function (for functions that need VM context)
+void VM::registerVMBuiltinFunction(const std::string& name, std::function<ValuePtr(VM*, const std::vector<ValuePtr>&)> function) {
+    // Wrap the VM-aware function to match the expected signature
+    nativeFunctions[name] = [this, function](const std::vector<ValuePtr>& args) -> ValuePtr {
+        return function(this, args);
+    };
 }
 
 ValuePtr VM::execute(const std::vector<Instruction>& code) {
@@ -388,6 +447,9 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                         break;
                     case Opcode::PRINT:
                         handlePrint(instruction);
+                        break;
+                    case Opcode::CONTRACT:
+                        handleContract(instruction);
                         break;
                     case Opcode::CREATE_LIST:
                         handleCreateList(instruction);
@@ -611,13 +673,25 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
      
                 }
             } catch (const std::exception& e) {
-                // Handle any exceptions that occur during instruction execution
+                // Check if this is an assertion failure or contract violation - let them propagate to terminate execution
+                std::string errorMsg = e.what();
+                if (errorMsg.find("Assertion failed:") != std::string::npos || 
+                    errorMsg.find("Contract violation:") != std::string::npos) {
+                    throw; // Re-throw assertion failures and contract violations to terminate execution
+                }
+                // Handle other exceptions that occur during instruction execution
                 error("Error executing instruction: " + std::string(e.what()));
             }
             ip++;
         }
     } catch (const std::exception& e) {
-        // Handle any exceptions that occur during execution
+        // Check if this is an assertion failure or contract violation - let them propagate to terminate execution
+        std::string errorMsg = e.what();
+        if (errorMsg.find("Assertion failed:") != std::string::npos || 
+            errorMsg.find("Contract violation:") != std::string::npos) {
+            throw; // Re-throw assertion failures and contract violations to terminate execution
+        }
+        // Handle other exceptions that occur during execution
         error("Error executing bytecode: " + std::string(e.what()));
     }
     return nullptr;
@@ -748,6 +822,9 @@ ValuePtr VM::pop() {
             line = (*bytecode)[ip].line;
         }
         error("Stack underflow - attempted to pop from empty stack", line, 0, "stack operation", "valid expression or statement that pushes a value onto the stack");
+        // Return a nil value to prevent undefined behavior
+        auto nilType = std::make_shared<Type>(TypeTag::Nil);
+        return std::make_shared<Value>(nilType);
     }
     
     ValuePtr value = stack.back();
@@ -3038,7 +3115,9 @@ void VM::handleCall(const Instruction& instruction) {
     auto nativeIt = nativeFunctions.find(funcName);
     if (nativeIt != nativeFunctions.end()) {
         // Call the native function and push the result
-        push(nativeIt->second(args));
+        // Let exceptions propagate to terminate execution for assert failures
+        ValuePtr result = nativeIt->second(args);
+        push(result);
         return;
     }
     
@@ -3247,6 +3326,38 @@ void VM::handlePrint(const Instruction& instruction) {
     std::cout << std::endl;
     
     // Print is a statement, not an expression - don't push a result
+}
+
+void VM::handleContract(const Instruction& instruction) {
+    (void)instruction; // Mark as unused
+    
+    // Contract expects exactly 2 arguments: condition (bool) and message (string)
+    if (stack.size() < 2) {
+        throw std::runtime_error("Contract statement requires 2 arguments: condition and message");
+    }
+    
+    // Pop message first (it was pushed last)
+    ValuePtr message = pop();
+    ValuePtr condition = pop();
+    
+    // Validate condition argument
+    if (!condition || !condition->type || condition->type->tag != TypeTag::Bool) {
+        throw std::runtime_error("Contract condition must be a boolean value");
+    }
+    
+    // Validate message argument
+    if (!message || !message->type || message->type->tag != TypeTag::String) {
+        throw std::runtime_error("Contract message must be a string value");
+    }
+    
+    // Check the condition
+    bool conditionValue = std::get<bool>(condition->data);
+    if (!conditionValue) {
+        std::string messageValue = std::get<std::string>(message->data);
+        throw std::runtime_error("Contract violation: " + messageValue);
+    }
+    
+    // Contract is a statement, not an expression - don't push a result
 }
 
 void VM::handleBeginFunction(const Instruction& instruction) {

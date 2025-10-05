@@ -1,0 +1,55 @@
+// Comprehensive test for core collection builtin functions
+
+print("=== Core Collection Functions Test ===");
+
+// Test with integers
+var integers = [1, 2, 3, 4, 5, 6];
+print("Original integers: " + integers);
+
+// Test map function (doubles numbers)
+var doubled = map(nil, integers);
+print("Map (doubled): " + doubled);
+
+// Test filter function (keeps even numbers)
+var evens = filter(nil, integers);
+print("Filter (evens): " + evens);
+
+// Test reduce function (sums numbers)
+var sum = reduce(nil, integers, 0);
+print("Reduce (sum): " + sum);
+
+// Test reduce without initial value
+var sumNoInit = reduce(nil, integers);
+print("Reduce (no init): " + sumNoInit);
+
+// Test forEach function
+print("ForEach output:");
+forEach(nil, integers);
+
+// Test with empty list
+var empty = [];
+print("Empty list: " + empty);
+
+var emptyMapped = map(nil, empty);
+print("Map on empty: " + emptyMapped);
+
+var emptyFiltered = filter(nil, empty);
+print("Filter on empty: " + emptyFiltered);
+
+var emptySum = reduce(nil, empty, 42);
+print("Reduce on empty with init: " + emptySum);
+
+// Test with single element
+var single = [7];
+print("Single element: " + single);
+
+var singleMapped = map(nil, single);
+print("Map on single: " + singleMapped);
+
+var singleFiltered = filter(nil, single);
+print("Filter on single: " + singleFiltered);
+
+var singleSum = reduce(nil, single);
+print("Reduce on single: " + singleSum);
+
+print("=== All collection function tests completed successfully! ===");

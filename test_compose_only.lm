@@ -1,0 +1,21 @@
+// Test compose function only
+
+print("=== Compose Function Test ===");
+
+// Define simple functions for testing
+fn add(x: int, y: int) : int {
+    return x + y;
+}
+
+fn double(x: int) : int {
+    return x * 2;
+}
+
+print("Functions defined successfully");
+
+// Test compose function
+print("Testing compose function...");
+var composed = compose(double, add);
+print("Compose completed");
+
+print("=== Test completed ===");

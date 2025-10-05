@@ -138,6 +138,7 @@ enum class Opcode {
 
     // I/O operations
     PRINT,              // Print values
+    CONTRACT,           // Contract assertion
     HALT,               // Halt execution
 
     // Debug operations

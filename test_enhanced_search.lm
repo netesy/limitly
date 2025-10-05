@@ -1,0 +1,62 @@
+// Test enhanced search functions with multiple predicate types
+
+print("=== Enhanced Search Functions Test ===");
+
+// Test data
+var numbers = [1, 2, 3, 4, 5, 6, -1, 0];
+print("Test data: " + numbers);
+
+print("\n=== Testing find function with different predicates ===");
+
+// Test find with different string predicates
+var firstEven = find("even", numbers);
+print("First even: " + firstEven);
+
+var firstOdd = find("odd", numbers);
+print("First odd: " + firstOdd);
+
+var firstPositive = find("positive", numbers);
+print("First positive: " + firstPositive);
+
+var firstNegative = find("negative", numbers);
+print("First negative: " + firstNegative);
+
+var firstZero = find("zero", numbers);
+print("First zero: " + firstZero);
+
+print("\n=== Testing some function with different predicates ===");
+
+var hasEven = some("even", numbers);
+print("Has even: " + hasEven);
+
+var hasOdd = some("odd", numbers);
+print("Has odd: " + hasOdd);
+
+var hasNegative = some("negative", numbers);
+print("Has negative: " + hasNegative);
+
+print("\n=== Testing every function with different predicates ===");
+
+var allPositive = every("positive", numbers);
+print("All positive: " + allPositive);
+
+var allEven = every("even", numbers);
+print("All even: " + allEven);
+
+// Test with a list of all positive numbers
+var positiveOnly = [1, 2, 3, 4, 5];
+var allPositiveInPositiveList = every("positive", positiveOnly);
+print("All positive in [1,2,3,4,5]: " + allPositiveInPositiveList);
+
+print("\n=== Testing default behavior (nil predicate) ===");
+
+var defaultFind = find(nil, numbers);
+print("Default find (even): " + defaultFind);
+
+var defaultSome = some(nil, numbers);
+print("Default some (even): " + defaultSome);
+
+var defaultEvery = every(nil, numbers);
+print("Default every (positive): " + defaultEvery);
+
+print("\n=== Enhanced search functions test completed! ===");

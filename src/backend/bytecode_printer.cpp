@@ -60,6 +60,7 @@ std::string BytecodePrinter::opcodeToString(Opcode opcode) {
         case Opcode::SET_DEFAULT_VALUE: return "SET_DEFAULT_VALUE";
         case Opcode::PUSH_FUNCTION: return "PUSH_FUNCTION";
         case Opcode::PRINT: return "PRINT";
+        case Opcode::CONTRACT: return "CONTRACT";
         case Opcode::CREATE_LIST: return "CREATE_LIST";
         case Opcode::LIST_APPEND: return "LIST_APPEND";
         case Opcode::CREATE_DICT: return "CREATE_DICT";

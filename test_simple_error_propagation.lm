@@ -1,0 +1,40 @@
+// Simple test for builtin function error propagation
+
+print("Testing builtin function error propagation...");
+
+// Test 1: Valid inputs (should work)
+print("Test 1: len with valid string");
+var validResult = len("Hello");
+print("Result: " + validResult);
+
+// Test 2: Invalid inputs (should return error values)
+print("Test 2: len with nil (should return error)");
+var errorResult1 = len(nil);
+print("Result: " + errorResult1);
+
+print("Test 3: len with number (should return error)");
+var errorResult2 = len(42);
+print("Result: " + errorResult2);
+
+print("Test 4: round with string (should return error)");
+var errorResult3 = round("hello", 2);
+print("Result: " + errorResult3);
+
+// Test 5: typeOf should always work
+print("Test 5: typeOf with various inputs (should always work)");
+var type1 = typeOf("hello");
+var type2 = typeOf(42);
+var type3 = typeOf(nil);
+var type4 = typeOf(true);
+print("String type: " + type1);
+print("Number type: " + type2);
+print("Nil type: " + type3);
+print("Bool type: " + type4);
+
+// Test 6: debug function should always work
+print("Test 6: debug function (should always work)");
+debug("Debug test");
+debug(123);
+debug(nil);
+
+print("Simple error propagation tests completed!");
