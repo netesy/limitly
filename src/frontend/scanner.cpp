@@ -590,7 +590,6 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "where") return TokenType::WHERE;
     if (rest == "property") return TokenType::PROPERTY;
     if (rest == "cache") return TokenType::CACHE;
-    if (rest == "sleep") return TokenType::SLEEP;
     if (rest == "enum") return TokenType::ENUM;
     if (rest == "err") return TokenType::ERR;
     if (rest == "ok") return TokenType::OK;
@@ -624,6 +623,8 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "atomic") return TokenType::IDENTIFIER;
     if (rest == "function") return TokenType::FUNCTION_TYPE;
     if (rest == "events") return TokenType::IDENTIFIER;
+    if (rest == "sleep") return TokenType::IDENTIFIER;
+    if (rest == "assert") return TokenType::IDENTIFIER;
 
     return TokenType::IDENTIFIER;
 }

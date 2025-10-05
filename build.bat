@@ -43,6 +43,7 @@ echo Compiling main executable...
     src\backend\concurrency\iocp_event_loop.cpp ^
     src\backend\concurrency\concurrency_runtime.cpp ^
     src\backend\concurrency\task_vm.cpp ^
+    src\common\builtin_functions.cpp ^
     src\error\error_formatter.cpp ^
     src\error\error_code_generator.cpp ^
     src\error\contextual_hint_provider.cpp ^

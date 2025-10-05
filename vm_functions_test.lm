@@ -1,0 +1,21 @@
+// Test VM-implemented functions (sleep and contract)
+
+print("Testing VM-implemented functions...");
+
+// Test contract function (should pass)
+print("Testing contract - should pass:");
+contract(5 > 3, "Five should be greater than three");
+print("Contract passed!");
+
+// Test sleep function
+print("Testing sleep - sleeping for 0.1 seconds...");
+sleep(0.1);
+print("Sleep completed!");
+
+// Test builtin functions that should still work
+print("Testing builtin functions:");
+print("Length of 'Hello': " + len("Hello"));
+print("Type of 42: " + typeOf(42));
+print("Current timestamp: " + time());
+
+print("All tests completed successfully!");

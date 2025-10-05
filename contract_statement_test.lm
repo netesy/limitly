@@ -1,0 +1,26 @@
+// Test contract as a system statement
+
+print("Testing contract statement...");
+
+// Test 1: Contract that should pass
+print("Test 1: Contract should pass");
+contract(5 > 3, "Five should be greater than three");
+print("Contract passed!");
+
+// Test 2: Contract that should fail (commented out to avoid stopping execution)
+// print("Test 2: Contract should fail");
+// contract(5 < 3, "Five should not be less than three");
+// print("This should not print");
+
+// Test builtin functions
+print("Testing builtin functions:");
+print("Length of 'Hello': " + len("Hello"));
+print("Type of 42: " + typeOf(42));
+print("Current time: " + clock());
+
+// Test sleep function
+print("Testing sleep...");
+sleep(0.1);
+print("Sleep completed!");
+
+print("All tests completed successfully!");

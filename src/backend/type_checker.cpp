@@ -264,6 +264,8 @@ void TypeChecker::checkStatement(const std::shared_ptr<AST::Statement>& stmt) {
                         ", got " + returnType->toString(), returnStmt->line);
             }
         }
+    } else if (auto contractStmt = std::dynamic_pointer_cast<AST::ContractStatement>(stmt)) {
+        checkContractStatement(contractStmt);
     }
     
     // Handle other statement types as needed
@@ -601,6 +603,12 @@ void TypeChecker::checkFunctionCall(const std::shared_ptr<AST::CallExpr>& expr) 
     
     // Get function signature or check if it's a function-typed variable
     if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(expr->callee)) {
+        // Special handling for assert function
+        if (varExpr->name == "assert") {
+            checkAssertCall(expr);
+            return;
+        }
+        
         // First check if it's a regular function
         FunctionSignature* signature = currentScope->getFunctionSignature(varExpr->name);
         if (signature) {
@@ -1104,4 +1112,161 @@ std::vector<std::string> TypeChecker::inferExpressionErrorTypes(const std::share
     errorTypes.erase(std::unique(errorTypes.begin(), errorTypes.end()), errorTypes.end());
     
     return errorTypes;
+}
+void TypeChecker::registerBuiltinFunctions() {
+    // Register builtin functions so they're recognized during semantic analysis
+    
+    // Core utility functions
+    currentScope->functions["len"] = FunctionSignature(
+        "len", {typeSystem.ANY_TYPE}, typeSystem.INT_TYPE, false, {}, 0);
+    
+    currentScope->functions["typeOf"] = FunctionSignature(
+        "typeOf", {typeSystem.ANY_TYPE}, typeSystem.STRING_TYPE, false, {}, 0);
+    
+    currentScope->functions["time"] = FunctionSignature(
+        "time", {}, typeSystem.INT64_TYPE, false, {}, 0);
+    
+    currentScope->functions["date"] = FunctionSignature(
+        "date", {}, typeSystem.STRING_TYPE, false, {}, 0);
+    
+    currentScope->functions["now"] = FunctionSignature(
+        "now", {}, typeSystem.STRING_TYPE, false, {}, 0);
+    
+    currentScope->functions["clock"] = FunctionSignature(
+        "clock", {}, typeSystem.FLOAT64_TYPE, false, {}, 0);
+    
+    currentScope->functions["sleep"] = FunctionSignature(
+        "sleep", {typeSystem.FLOAT64_TYPE}, typeSystem.NIL_TYPE, false, {}, 0);
+    
+    currentScope->functions["round"] = FunctionSignature(
+        "round", {typeSystem.FLOAT64_TYPE, typeSystem.INT_TYPE}, typeSystem.FLOAT64_TYPE, false, {}, 0);
+    
+    currentScope->functions["debug"] = FunctionSignature(
+        "debug", {typeSystem.ANY_TYPE}, typeSystem.NIL_TYPE, false, {}, 0);
+    
+    currentScope->functions["input"] = FunctionSignature(
+        "input", {typeSystem.STRING_TYPE}, typeSystem.STRING_TYPE, false, {}, 0);
+    
+    currentScope->functions["assert"] = FunctionSignature(
+        "assert", {typeSystem.BOOL_TYPE, typeSystem.STRING_TYPE}, typeSystem.NIL_TYPE, false, {}, 0);
+    
+    // Higher-order functions
+    currentScope->functions["map"] = FunctionSignature(
+        "map", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0);
+    
+    currentScope->functions["filter"] = FunctionSignature(
+        "filter", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0);
+    
+    currentScope->functions["reduce"] = FunctionSignature(
+        "reduce", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0);
+    
+    currentScope->functions["forEach"] = FunctionSignature(
+        "forEach", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0);
+    
+    currentScope->functions["find"] = FunctionSignature(
+        "find", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0);
+    
+    currentScope->functions["some"] = FunctionSignature(
+        "some", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.BOOL_TYPE, false, {}, 0);
+    
+    currentScope->functions["every"] = FunctionSignature(
+        "every", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.BOOL_TYPE, false, {}, 0);
+    
+    currentScope->functions["compose"] = FunctionSignature(
+        "compose", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0);
+    
+    currentScope->functions["curry"] = FunctionSignature(
+        "curry", {typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0);
+    
+    currentScope->functions["partial"] = FunctionSignature(
+        "partial", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0);
+    
+    // Channel functions (VM-implemented)
+    currentScope->functions["channel"] = FunctionSignature(
+        "channel", {}, typeSystem.ANY_TYPE, false, {}, 0);
+    
+    currentScope->functions["send"] = FunctionSignature(
+        "send", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.NIL_TYPE, false, {}, 0);
+    
+    currentScope->functions["receive"] = FunctionSignature(
+        "receive", {typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0);
+    
+    currentScope->functions["close"] = FunctionSignature(
+        "close", {typeSystem.ANY_TYPE}, typeSystem.NIL_TYPE, false, {}, 0);
+    
+    // Register assert function (contract is a statement, not a function)
+    currentScope->functions["assert"] = FunctionSignature(
+        "assert", {typeSystem.BOOL_TYPE, typeSystem.STRING_TYPE}, typeSystem.NIL_TYPE, false, {}, 0);
+}
+
+void TypeChecker::checkContractStatement(const std::shared_ptr<AST::ContractStatement>& stmt) {
+    if (!stmt->condition) {
+        addError("contract statement missing condition", stmt->line, 0, 
+                getCodeContext(stmt->line), "contract", "contract(condition, message)");
+        return;
+    }
+    
+    if (!stmt->message) {
+        addError("contract statement missing message", stmt->line, 0, 
+                getCodeContext(stmt->line), "contract", "contract(condition, message)");
+        return;
+    }
+    
+    // Check condition is boolean
+    TypePtr conditionType = checkExpression(stmt->condition);
+    if (conditionType != typeSystem.BOOL_TYPE && conditionType != typeSystem.ANY_TYPE) {
+        addError("contract condition must be boolean, got " + conditionType->toString(), 
+                stmt->line, 0, getCodeContext(stmt->line), "condition", "boolean expression");
+    }
+    
+    // Check message is string
+    TypePtr messageType = checkExpression(stmt->message);
+    if (messageType != typeSystem.STRING_TYPE && messageType != typeSystem.ANY_TYPE) {
+        addError("contract message must be string, got " + messageType->toString(), 
+                stmt->line, 0, getCodeContext(stmt->line), "message", "string literal or expression");
+    }
+}
+
+void TypeChecker::checkAssertCall(const std::shared_ptr<AST::CallExpr>& expr) {
+    if (expr->arguments.size() != 2) {
+        addError("assert() expects exactly 2 arguments: condition (bool) and message (string), got " + 
+                std::to_string(expr->arguments.size()), expr->line, 0, 
+                getCodeContext(expr->line), "assert(...)", "assert(condition, message)");
+        return;
+    }
+    
+    // Check first argument (condition) is boolean
+    TypePtr conditionType = checkExpression(expr->arguments[0]);
+    if (conditionType != typeSystem.BOOL_TYPE && conditionType != typeSystem.ANY_TYPE) {
+        addError("assert() first argument must be boolean, got " + conditionType->toString(), 
+                expr->line, 0, getCodeContext(expr->line), "condition", "boolean expression");
+    }
+    
+    // Check second argument (message) is string
+    TypePtr messageType = checkExpression(expr->arguments[1]);
+    if (messageType != typeSystem.STRING_TYPE && messageType != typeSystem.ANY_TYPE) {
+        addError("assert() second argument must be string, got " + messageType->toString(), 
+                expr->line, 0, getCodeContext(expr->line), "message", "string literal or expression");
+    }
+}
+
+std::string TypeChecker::getCodeContext(int line) {
+    if (sourceCode.empty() || line <= 0) {
+        return "";
+    }
+    
+    std::istringstream stream(sourceCode);
+    std::string currentLine;
+    int currentLineNumber = 1;
+    
+    // Find the target line
+    while (std::getline(stream, currentLine) && currentLineNumber < line) {
+        currentLineNumber++;
+    }
+    
+    if (currentLineNumber == line) {
+        return currentLine;
+    }
+    
+    return "";
 }

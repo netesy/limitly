@@ -31,9 +31,14 @@ struct CallFrame;
 class VM;
 class TaskVM;
 
+namespace builtin {
+    class BuiltinFunctions;
+}
+
 // Virtual Machine class
 class VM {
     friend class TaskVM;  // Allow TaskVM to access private members
+    friend class builtin::BuiltinFunctions;  // Allow BuiltinFunctions to access private members
 public:
     explicit VM(bool create_runtime = true);
     ~VM();
@@ -58,6 +63,12 @@ public:
     
     // Register native function
     void registerNativeFunction(const std::string& name, std::function<ValuePtr(const std::vector<ValuePtr>&)> function);
+    
+    // Register builtin function (bypasses parameter validation)
+    void registerBuiltinFunction(const std::string& name, std::function<ValuePtr(const std::vector<ValuePtr>&)> function);
+    
+    // Register VM-aware builtin function (for functions that need VM context)
+    void registerVMBuiltinFunction(const std::string& name, std::function<ValuePtr(VM*, const std::vector<ValuePtr>&)> function);
     
     // Register user-defined function from AST
     void registerUserFunction(const std::shared_ptr<AST::FunctionDeclaration>& decl);
@@ -480,6 +491,7 @@ private:
     void handleDefineEnumVariant(const Instruction& instruction);
     void handleDefineEnumVariantWithType(const Instruction& instruction);
     void handlePrint(const Instruction& instruction);
+    void handleContract(const Instruction& instruction);
     void handleDebugPrint(const Instruction& instruction);
     void handleDefineAtomic(const Instruction& instruction);
     

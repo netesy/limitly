@@ -1,0 +1,17 @@
+// Test partial function only
+
+print("Starting partial test...");
+
+fn add(x: int, y: int) : int {
+    return x + y;
+}
+
+print("Function defined");
+
+// Test partial function
+print("Calling partial...");
+var partialAdd5 = partial(add, 5);
+print("Partial result: " + partialAdd5);
+print("Partial result type: " + typeOf(partialAdd5));
+
+print("Test completed");

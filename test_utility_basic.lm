@@ -1,0 +1,80 @@
+// Basic test for search and utility builtin functions
+
+print("=== Basic Search and Utility Functions Test ===");
+
+// Test data
+var numbers = [1, 2, 3, 4, 5, 6];
+var odds = [1, 3, 5, 7];
+var positives = [1, 2, 3, 4];
+var withNegative = [-1, 2, 3];
+
+print("Test data:");
+print("numbers: " + numbers);
+print("odds: " + odds);
+print("positives: " + positives);
+print("withNegative: " + withNegative);
+
+// Test find function (finds first even number - hardcoded predicate)
+print("\n=== Testing find function ===");
+var foundEven = find(nil, numbers);  // Should find 2 (first even)
+print("First even number in numbers: " + foundEven);
+
+var foundEvenInOdds = find(nil, odds);  // Should find nil
+print("First even number in odds: " + foundEvenInOdds);
+
+// Test some function (checks if any element is even - hardcoded predicate)
+print("\n=== Testing some function ===");
+var hasEven = some(nil, numbers);  // Should be true
+print("Numbers has even elements: " + hasEven);
+
+var oddsHasEven = some(nil, odds);  // Should be false
+print("Odds has even elements: " + oddsHasEven);
+
+// Test every function (checks if all elements are positive - hardcoded predicate)
+print("\n=== Testing every function ===");
+var allPositive = every(nil, positives);  // Should be true
+print("All elements in positives are positive: " + allPositive);
+
+var allPositiveWithNeg = every(nil, withNegative);  // Should be false
+print("All elements in withNegative are positive: " + allPositiveWithNeg);
+
+// Test empty list cases
+var empty = [];
+print("\n=== Testing with empty list ===");
+var findEmpty = find(nil, empty);
+print("Find in empty list: " + findEmpty);
+
+var someEmpty = some(nil, empty);
+print("Some in empty list: " + someEmpty);
+
+var everyEmpty = every(nil, empty);
+print("Every in empty list: " + everyEmpty);
+
+// Test utility functions (placeholder implementations)
+print("\n=== Testing utility functions ===");
+
+// Define simple functions for testing
+fn add(x: int, y: int) : int {
+    return x + y;
+}
+
+fn double(x: int) : int {
+    return x * 2;
+}
+
+// Test compose function (returns placeholder)
+print("Testing compose function...");
+var composed = compose(double, add);
+print("Composed function type: " + typeOf(composed));
+
+// Test curry function (returns placeholder)
+print("Testing curry function...");
+var curried = curry(add);
+print("Curried function type: " + typeOf(curried));
+
+// Test partial function (returns placeholder)
+print("Testing partial function...");
+var partialAdd5 = partial(add, 5);
+print("Partial function type: " + typeOf(partialAdd5));
+
+print("\n=== Basic search and utility function tests completed! ===");

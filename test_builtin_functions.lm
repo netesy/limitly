@@ -1,0 +1,54 @@
+// Test builtin utility functions
+
+// Test len function
+var strs = "Hello World";
+print("Length of '{strs}' : { len(strs) } ");
+
+var numbers = [1, 2, 3, 4, 5];
+print("Length of numbers array: " + len(numbers));
+
+// Test type function
+print("Type of str: " + typeOf(strs));
+print("Type of numbers: " + typeOf(numbers));
+print("Type of 42: " + typeOf(42));
+print("Type of 3.14: " + typeOf(3.14));
+print("Type of true: " + typeOf(true));
+
+// Test debug function
+debug(strs);
+debug(numbers);
+debug(42);
+
+// Test time function
+var timestamp = time();
+print("Current timestamp: " + timestamp);
+
+// Test date and now functions
+var currentDate = date();
+var currentDateTime = now();
+print("Current date: " + currentDate);
+print("Current date/time: " + currentDateTime);
+
+// Test round function
+var pi = 3.14159265359;
+print("Pi rounded to 2 decimals: " + round(pi, 2));
+print("Pi rounded to 0 decimals: " + round(pi, 0));
+
+// Test assert function (should pass)
+assert(true, "This assertion should pass");
+print("Assert test passed");
+
+// Test contract function (should pass)
+contract(5 > 3, "Five should be greater than three");
+print("Contract test passed");
+
+// Test input function (commented out for automated testing)
+// var userInput = input("Enter your name: ");
+// print("Hello, " + userInput + "!");
+
+// Test sleep function (short sleep)
+print("Sleeping for 0.1 seconds...");
+sleep(0.1);
+print("Sleep completed");
+
+print("All builtin function tests completed successfully!");

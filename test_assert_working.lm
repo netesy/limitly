@@ -1,0 +1,24 @@
+// Test that shows assert is working correctly
+
+print("=== Assert Function Test ===");
+
+// Test 1: Assert with true condition (should pass silently)
+print("Test 1: Assert with true condition");
+assert(true, "This should pass");
+print("✅ Assert with true passed - execution continues");
+
+// Test 2: Simple expressions that should work
+var x = 5;
+var y = 10;
+assert(x < y, "x should be less than y");
+print("✅ Assert with expression passed");
+
+// Test 3: Assert with complex condition
+var numbers = [1, 2, 3, 4, 5];
+assert(len(numbers) == 5, "Numbers array should have 5 elements");
+print("✅ Assert with len() passed");
+
+print("=== All assert tests passed! ===");
+
+// Note: Testing assert(false, ...) would cause the program to report an error
+// but continue execution, which is the expected behavior for runtime errors.

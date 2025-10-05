@@ -30,6 +30,8 @@ void BytecodeGenerator::setSourceContext(const std::string& source, const std::s
 
 // Type checking integration
 std::vector<TypeCheckError> BytecodeGenerator::performTypeChecking(const std::shared_ptr<AST::Program>& program) {
+    // Set source context for the type checker
+    typeChecker->setSourceContext(sourceCode, filePath);
     return typeChecker->checkProgram(program);
 }
 
@@ -1529,14 +1531,11 @@ void BytecodeGenerator::visitModuleDeclaration(const std::shared_ptr<AST::Module
 }
 
 void BytecodeGenerator::visitContractStatement(const std::shared_ptr<AST::ContractStatement>& stmt) {
-    // Contracts are typically used for preconditions, postconditions, and invariants
-    // In the bytecode, we'll generate code to check the condition and possibly throw an exception if it fails
+    // Contracts are used for preconditions, postconditions, and invariants
+    // Generate bytecode to evaluate condition and message, then execute contract check
     
-    // Evaluate the condition
+    // Evaluate the condition (should result in a boolean)
     visitExpression(stmt->condition);
-    
-    // If the condition is false, throw an exception with the message
-    emit(Opcode::JUMP_IF_TRUE, stmt->line, 5); // Skip the next 5 instructions if condition is true
     
     // Evaluate the message expression (should result in a string)
     if (stmt->message) {
@@ -1546,8 +1545,8 @@ void BytecodeGenerator::visitContractStatement(const std::shared_ptr<AST::Contra
         emit(Opcode::PUSH_STRING, stmt->line, 0, 0.0f, false, "Contract violation");
     }
     
-    // Throw an exception with the message
-    emit(Opcode::THROW, stmt->line);
+    // Execute contract check (pops condition and message, throws if condition is false)
+    emit(Opcode::CONTRACT, stmt->line);
 }
 
 // Pattern expression visitors for match statements

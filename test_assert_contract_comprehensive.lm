@@ -1,0 +1,32 @@
+// Comprehensive test for both assert and contract functionality
+
+print("=== Assert and Contract Comprehensive Test ===");
+
+// Test 1: Assert with true condition (should pass)
+print("Test 1: Assert with true condition");
+assert(true, "This assertion should pass");
+print("✅ Assert with true passed");
+
+// Test 2: Contract with true condition (should pass)
+print("Test 2: Contract with true condition");
+contract(5 > 3, "Five should be greater than three");
+print("✅ Contract with true passed");
+
+// Test 3: Complex expressions
+var x = 10;
+var y = 5;
+assert(x > y, "x should be greater than y");
+contract(x + y == 15, "x + y should equal 15");
+print("✅ Complex expressions passed");
+
+// Test 4: Working with arrays
+var numbers = [1, 2, 3, 4, 5];
+assert(len(numbers) == 5, "Array should have 5 elements");
+contract(len(numbers) > 0, "Array should not be empty");
+print("✅ Array tests passed");
+
+print("=== All assert and contract tests passed! ===");
+
+// Note: The following would terminate execution if uncommented:
+// assert(false, "This would fail");
+// contract(false, "This would also fail");
