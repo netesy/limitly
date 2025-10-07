@@ -1,0 +1,10 @@
+AST for tests\cst\parser\simple_interp.lm
+Parser mode: CST
+========================================
+
+AST Dump:
+==========
+VarDeclaration: <missing>
+PrintStatement:
+ExpressionStatement:
+  Literal: "!"

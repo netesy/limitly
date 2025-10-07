@@ -57,5 +57,56 @@ add_executable(limitly
     src/utf8.hh
 )
 
+# Add test_parser executable
+add_executable(test_parser
+    src/test_parser.cpp
+    src/frontend/scanner.cpp
+    src/frontend/cst_parser.cpp
+    src/frontend/cst.cpp
+    src/frontend/ast_builder.cpp
+    src/backend/ast_printer.cpp
+    src/backend/bytecode_printer.cpp
+    src/backend/vm.cpp
+    src/backend/value.cpp
+    src/backend/function.cpp
+    src/backend/instruction.cpp
+    src/backend/opcodes.cpp
+    src/backend/type_system.cpp
+    src/backend/type_checker.cpp
+    src/backend/scope.cpp
+    src/backend/compiler.cpp
+    src/backend/constant_pool.cpp
+    src/backend/interpreter.cpp
+    src/backend/module.cpp
+    src/backend/imports.cpp
+    src/backend/stack_trace.cpp
+    src/backend/error_handling.cpp
+    src/backend/debugger.cpp
+    src/backend/debugger_ui.cpp
+    src/common/builtin_functions.cpp
+    src/common/debugger.cpp
+    src/error/error_handling.cpp
+    src/error/error_formatter.cpp
+    src/error/contextual_hint_provider.cpp
+    src/frontend/ast.cpp
+    src/frontend/parser.cpp
+    src/frontend/lexer.cpp
+)
+
+# Add scanner test executable
+add_executable(test_scanner
+    src/test_scanner.cpp
+    src/frontend/scanner.cpp
+    src/common/debugger.cpp
+    src/error/error_handling.cpp
+    src/error/error_formatter.cpp
+    src/error/contextual_hint_provider.cpp
+    src/frontend/ast.cpp
+    src/frontend/parser.cpp
+    src/frontend/lexer.cpp
+)
+
 # Link libraries
 target_link_libraries(limitly PRIVATE Threads::Threads)
+target_link_libraries(test_parser PRIVATE Threads::Threads)
+target_link_libraries(test_scanner PRIVATE Threads::Threads)

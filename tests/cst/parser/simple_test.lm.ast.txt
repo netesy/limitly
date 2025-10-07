@@ -1,0 +1,23 @@
+AST for tests\cst\parser\simple_test.lm
+Parser mode: CST
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+PrintStatement:
+VarDeclaration: <missing>
+VarDeclaration: <missing>
+IfStatement:
+  Condition:
+    (null)
+  Then:
+    (null)
+FunctionDeclaration: <missing>
+  Body:
+    BlockStatement:
+      ReturnStatement
+VarDeclaration: <missing>
+PrintStatement:
+ExpressionStatement:
+  Literal: "\"Result: {result}"

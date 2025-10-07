@@ -1,0 +1,46 @@
+AST for tests\basic\control_flow.lm
+Parser mode: CST
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+PrintStatement:
+VarDeclaration: <missing>
+VarDeclaration: <missing>
+PrintStatement:
+IfStatement:
+  Condition:
+    (null)
+  Then:
+    (null)
+IfStatement:
+  Condition:
+    (null)
+  Then:
+    (null)
+VarDeclaration: <missing>
+PrintStatement:
+IfStatement:
+  Condition:
+    (null)
+  Then:
+    (null)
+PrintStatement:
+VarDeclaration: <missing>
+IfStatement:
+  Condition:
+    (null)
+  Then:
+    (null)
+VarDeclaration: <missing>
+VarDeclaration: <missing>
+IfStatement:
+  Condition:
+    (null)
+  Then:
+    (null)
+IfStatement:
+  Condition:
+    (null)
+  Then:

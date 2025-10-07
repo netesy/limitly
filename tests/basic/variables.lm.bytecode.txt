@@ -3,7 +3,7 @@ Parser mode: CST
 ========================================
 
 === Bytecode ===
-Generated 35 instructions
+Generated 53 instructions
 
    0: PRINT               
    1: PRINT               
@@ -16,28 +16,46 @@ Generated 35 instructions
    8: PUSH_NULL           
    9: STORE_VAR            "<missing>"
   10: PRINT               
-  11: PRINT               
-  12: PRINT               
+  11: PUSH_STRING          ""Integer: {x}"
+  12: POP                 
   13: PRINT               
-  14: POP                 
+  14: PUSH_STRING          ""Float: {y}"
   15: POP                 
-  16: POP                 
-  17: POP                 
-  18: PRINT               
+  16: PRINT               
+  17: PUSH_STRING          ""String: {name}"
+  18: POP                 
   19: PRINT               
-  20: PRINT               
-  21: PRINT               
-  22: PRINT               
-  23: PUSH_NULL           
-  24: STORE_VAR            "<missing>"
-  25: PUSH_NULL           
-  26: STORE_VAR            "<missing>"
-  27: PUSH_NULL           
-  28: STORE_VAR            "<missing>"
-  29: PRINT               
-  30: LOAD_VAR             "b"
-  31: POP                 
-  32: LOAD_VAR             "c"
-  33: POP                 
-  34: HALT                
+  20: PUSH_STRING          ""Boolean: {isActive}"
+  21: POP                 
+  22: POP                 
+  23: POP                 
+  24: POP                 
+  25: POP                 
+  26: PRINT               
+  27: PRINT               
+  28: PUSH_STRING          ""Integer: {x}"
+  29: POP                 
+  30: PRINT               
+  31: PUSH_STRING          ""Float: {y}"
+  32: POP                 
+  33: PRINT               
+  34: PUSH_STRING          ""String: {name}"
+  35: POP                 
+  36: PRINT               
+  37: PUSH_STRING          ""Boolean: {isActive}"
+  38: POP                 
+  39: PUSH_NULL           
+  40: STORE_VAR            "<missing>"
+  41: PUSH_NULL           
+  42: STORE_VAR            "<missing>"
+  43: PUSH_NULL           
+  44: STORE_VAR            "<missing>"
+  45: PRINT               
+  46: LOAD_VAR             "b"
+  47: POP                 
+  48: LOAD_VAR             "c"
+  49: POP                 
+  50: PUSH_STRING          ""Multiple declarations: a={a}, b={b}, c={c}"
+  51: POP                 
+  52: HALT                
 

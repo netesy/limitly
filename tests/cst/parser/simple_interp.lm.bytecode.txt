@@ -1,0 +1,14 @@
+Bytecode for tests\cst\parser\simple_interp.lm
+Parser mode: CST
+========================================
+
+=== Bytecode ===
+Generated 6 instructions
+
+   0: PUSH_NULL           
+   1: STORE_VAR            "<missing>"
+   2: PRINT               
+   3: PUSH_STRING          "!"
+   4: POP                 
+   5: HALT                
+
