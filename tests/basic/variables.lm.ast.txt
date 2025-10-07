@@ -11,9 +11,17 @@ VarDeclaration: <missing>
 VarDeclaration: <missing>
 VarDeclaration: <missing>
 PrintStatement:
+ExpressionStatement:
+  Literal: "\"Integer: {x}"
 PrintStatement:
+ExpressionStatement:
+  Literal: "\"Float: {y}"
 PrintStatement:
+ExpressionStatement:
+  Literal: "\"String: {name}"
 PrintStatement:
+ExpressionStatement:
+  Literal: "\"Boolean: {isActive}"
 ExpressionStatement:
   Assignment: =
     Value:
@@ -32,9 +40,17 @@ ExpressionStatement:
     (null)
 PrintStatement:
 PrintStatement:
+ExpressionStatement:
+  Literal: "\"Integer: {x}"
 PrintStatement:
+ExpressionStatement:
+  Literal: "\"Float: {y}"
 PrintStatement:
+ExpressionStatement:
+  Literal: "\"String: {name}"
 PrintStatement:
+ExpressionStatement:
+  Literal: "\"Boolean: {isActive}"
 VarDeclaration: <missing>
 VarDeclaration: <missing>
 VarDeclaration: <missing>
@@ -43,3 +59,5 @@ ExpressionStatement:
   Variable: b
 ExpressionStatement:
   Variable: c
+ExpressionStatement:
+  Literal: "\"Multiple declarations: a={a}, b={b}, c={c}"

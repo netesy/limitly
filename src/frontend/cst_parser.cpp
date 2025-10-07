@@ -2137,12 +2137,13 @@ namespace CST {
         // Handle literals
         if (check(TokenType::TRUE) || check(TokenType::FALSE) || check(TokenType::NIL) ||
             check(TokenType::NUMBER) || check(TokenType::STRING)) {
+            // Check if this is the start of an interpolated string
+            if (check(TokenType::STRING) && peekAhead(1).type == TokenType::INTERPOLATION_START) {
+                // Consume the STRING token first
+                advance();
+                return parseInterpolatedString();
+            }
             return parseLiteralExpr();
-        }
-        
-        // Handle interpolated strings
-        if (check(TokenType::INTERPOLATION_START)) {
-            return parseInterpolatedString();
         }
         
         // Handle variables
@@ -2475,7 +2476,7 @@ namespace CST {
     }
     
     std::unique_ptr<Node> CSTParser::parseFunctionDeclaration() {
-        // Parse: fn name(param1: type1, param2: type2) -> returnType { body }
+        // Parse: fn name(param1: type1, param2: type2): returnType { body }
         Token startToken = peek();
         auto fnNode = createNode(NodeKind::FUNCTION_DECLARATION);
         
@@ -2516,9 +2517,19 @@ namespace CST {
             // Parse parameters
             if (!check(TokenType::RIGHT_PAREN)) {
                 do {
+                    // Consume trivia before parameter
+                    if (recoveryConfig.preserveTrivia) {
+                        consumeTrivia();
+                    }
+                    
                     auto param = parseParameter();
                     if (param) {
                         fnNode->addNode(std::move(param));
+                    }
+                    
+                    // Consume trivia after parameter
+                    if (recoveryConfig.preserveTrivia) {
+                        consumeTrivia();
                     }
                 } while (match(TokenType::COMMA));
             }
@@ -2565,9 +2576,14 @@ namespace CST {
             consumeTrivia();
         }
         
-        // Parse optional return type
+        // Parse optional return type (using ':' instead of '->')
         if (match(TokenType::COLON)) {
             fnNode->addToken(previous()); // ':'
+            
+            // Consume trivia after colon
+            if (recoveryConfig.preserveTrivia) {
+                consumeTrivia();
+            }
             
             if (isTypeStart(peek().type)) {
                 auto returnType = parseType();
@@ -4230,33 +4246,41 @@ namespace CST {
     }
     
     std::unique_ptr<Node> CSTParser::parseInterpolatedString() {
-        auto startToken = previous(); // INTERPOLATION_START token
+        // Handle interpolated strings properly
+        // The scanner generates: STRING INTERPOLATION_START expression INTERPOLATION_END STRING ...
         auto node = createNode(NodeKind::INTERPOLATION_EXPR);
         
-        // Add the INTERPOLATION_START token (contains the string part before interpolation)
-        node->addToken(startToken);
+        // Add the initial string part (we've already confirmed it exists and consumed the STRING token)
+        auto stringNode = createNode(NodeKind::LITERAL_EXPR);
+        stringNode->addToken(previous()); // The STRING token that was consumed to get here
+        node->addNode(std::move(stringNode));
         
-        // Parse the content inside the interpolation
-        while (!isAtEnd() && !check(TokenType::INTERPOLATION_END)) {
-            if (check(TokenType::IDENTIFIER)) {
-                // This is the interpolated variable/expression
-                auto expr = parseExpression();
-                if (expr) {
-                    node->addChild(std::move(expr));
-                }
-            } else {
-                // Add other tokens directly
-                node->addToken(peek());
-                advance();
+        // Handle interpolation parts
+        while (check(TokenType::INTERPOLATION_START)) {
+            // Consume INTERPOLATION_START
+            node->addToken(advance());
+            
+            // Parse expression inside interpolation
+            auto expr = parseExpression();
+            if (expr) {
+                node->addNode(std::move(expr));
             }
-        }
-        
-        // Add the INTERPOLATION_END token if present
-        if (match(TokenType::INTERPOLATION_END)) {
-            node->addToken(previous());
+            
+            // Expect INTERPOLATION_END
+            if (check(TokenType::INTERPOLATION_END)) {
+                node->addToken(advance());
+            } else {
+                reportError("Expected '}' after interpolation expression", TokenType::INTERPOLATION_END, peek().type);
+            }
+            
+            // Check if there's another string part after this interpolation
+            if (check(TokenType::STRING)) {
+                auto stringNode = createNode(NodeKind::LITERAL_EXPR);
+                stringNode->addToken(advance());
+                node->addNode(std::move(stringNode));
+            }
         }
         
         return node;
     }
-
 } // namespace CST

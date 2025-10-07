@@ -1,0 +1,45 @@
+AST for tests\cst\parser\interpolation_test.lm
+Parser mode: CST
+========================================
+
+AST Dump:
+==========
+VarDeclaration: <missing>
+VarDeclaration: <missing>
+PrintStatement:
+ExpressionStatement:
+  Variable: name
+ExpressionStatement:
+  Literal: "!"
+VarDeclaration: <missing>
+PrintStatement:
+ExpressionStatement:
+  Variable: x
+ExpressionStatement:
+  Literal: "\"The value is {x}"
+PrintStatement:
+ExpressionStatement:
+  BinaryExpression: *
+    Left:
+      Variable: x
+    Operator: *
+    Right:
+      Literal: 2
+ExpressionStatement:
+  Literal: "\"Double value: {x * 2}"
+VarDeclaration: <missing>
+VarDeclaration: <missing>
+PrintStatement:
+ExpressionStatement:
+  Variable: a
+ExpressionStatement:
+  Variable: b
+ExpressionStatement:
+  BinaryExpression: +
+    Left:
+      Variable: a
+    Operator: +
+    Right:
+      Variable: b
+ExpressionStatement:
+  Literal: "\"a={a}, b={b}, sum={a + b}"

@@ -1,0 +1,14 @@
+// Test interpolated strings
+var name = "World";
+print("Hello, {name}!");
+
+var x = 42;
+print("The value is {x}");
+
+// Test with expressions
+print("Double value: {x * 2}");
+
+// Test with multiple interpolations
+var a = 10;
+var b = 20;
+print("a={a}, b={b}, sum={a + b}");

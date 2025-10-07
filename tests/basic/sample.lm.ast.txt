@@ -1,0 +1,77 @@
+AST for tests\basic\sample.lm
+Parser mode: CST
+========================================
+
+AST Dump:
+==========
+TypeDeclaration:  = <unknown>
+TypeDeclaration:  = <unknown>
+TypeDeclaration:  = <unknown>
+TypeDeclaration:  = <unknown>
+TypeDeclaration:  = <unknown>
+TypeDeclaration:  = <unknown>
+TypeDeclaration:  = <unknown>
+TypeDeclaration:  = <unknown>
+TypeDeclaration:  = <unknown>
+TypeDeclaration:  = <unknown>
+TypeDeclaration:  = <unknown>
+TypeDeclaration:  = <unknown>
+BlockStatement:
+  ExpressionStatement:
+    Variable: kind
+  ExpressionStatement:
+    Variable: SomeKind
+  ExpressionStatement:
+    Variable: value
+  ExpressionStatement:
+    Variable: <invalid>
+TypeDeclaration:  = <unknown>
+ExpressionStatement:
+  Literal: nil
+TypeDeclaration:  = <unknown>
+ExpressionStatement:
+  Variable: epty
+TypeDeclaration:  = <unknown>
+TypeDeclaration:  = <unknown>
+TypeDeclaration:  = <unknown>
+TypeDeclaration:  = <unknown>
+BlockStatement:
+  ExpressionStatement:
+    Variable: kind
+  ExpressionStatement:
+    Variable: ResultKind
+  ExpressionStatement:
+    Variable: value
+  ExpressionStatement:
+    Variable: <invalid>
+TypeDeclaration:  = <unknown>
+BlockStatement:
+  ExpressionStatement:
+    Variable: kind
+  ExpressionStatement:
+    Variable: ResultKind
+  ExpressionStatement:
+    Variable: message
+  ExpressionStatement:
+    Variable: <invalid>
+TypeDeclaration:  = <unknown>
+ExpressionStatement:
+  Variable: Error
+TypeDeclaration:  = <unknown>
+TypeDeclaration:  = <unknown>
+TypeDeclaration:  = <unknown>
+ExpressionStatement:
+  Variable: Person
+TypeDeclaration:  = <unknown>
+BlockStatement:
+TypeDeclaration:  = <unknown>
+BlockStatement:
+TypeDeclaration:  = <unknown>
+BlockStatement:
+  ExpressionStatement:
+    Variable: User
+TypeDeclaration:  = <unknown>
+TypeDeclaration:  = <unknown>
+ExpressionStatement:
+  Variable: NumberType
+TypeDeclaration:  = <unknown>

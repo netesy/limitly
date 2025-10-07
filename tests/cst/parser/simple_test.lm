@@ -1,0 +1,18 @@
+// Simple test file for CST parser validation
+print("Hello, World!");
+
+var x = 42;
+var y = x + 10;
+
+if (x > 0) {
+    print("x is positive: {x}");
+} else {
+    print("x is not positive: {x}");
+}
+
+fn add(a: int, b: int): int {
+    return a + b;
+}
+
+var result = add(x, y);
+print("Result: {result}");

@@ -1,0 +1,64 @@
+AST for tests\basic\print_statements.lm
+Parser mode: CST
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+PrintStatement:
+PrintStatement:
+VarDeclaration: <missing>
+VarDeclaration: <missing>
+PrintStatement:
+PrintStatement:
+PrintStatement:
+PrintStatement:
+PrintStatement:
+VarDeclaration: <missing>
+PrintStatement:
+ExpressionStatement:
+  Literal: "\"The answer is {x}"
+PrintStatement:
+PrintStatement:
+PrintStatement:
+PrintStatement:
+PrintStatement:
+VarDeclaration: <missing>
+VarDeclaration: <missing>
+PrintStatement:
+ExpressionStatement:
+  Variable: b
+ExpressionStatement:
+  BinaryExpression: +
+    Left:
+      Variable: a
+    Operator: +
+    Right:
+      Variable: b
+ExpressionStatement:
+  Literal: "\"Math: {a} + {b} = {a + b}"
+PrintStatement:
+ExpressionStatement:
+  Variable: b
+ExpressionStatement:
+  BinaryExpression: >
+    Left:
+      Variable: a
+    Operator: >
+    Right:
+      Variable: b
+ExpressionStatement:
+  Literal: "\"Logic: {a} > {b} is {a > b}"
+PrintStatement:
+ForStatement (traditional):
+  Body:
+    (null)
+ExpressionStatement:
+  Literal: 1
+BlockStatement:
+  PrintStatement:
+  ExpressionStatement:
+    Literal: "\"Number: {i}"
+PrintStatement:
+PrintStatement:
+PrintStatement:

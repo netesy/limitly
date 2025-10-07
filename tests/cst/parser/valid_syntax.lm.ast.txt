@@ -1,0 +1,64 @@
+AST for tests\cst\parser\valid_syntax.lm
+Parser mode: CST
+========================================
+
+AST Dump:
+==========
+FunctionDeclaration: <missing>
+  Body:
+    BlockStatement:
+FunctionDeclaration: <missing>
+  Body:
+    BlockStatement:
+      VarDeclaration: <missing>
+        Type: int
+      VarDeclaration: <missing>
+        Type: str
+      VarDeclaration: <missing>
+        Type: bool
+      IfStatement:
+        Condition:
+          (null)
+        Then:
+          (null)
+      ForStatement (traditional):
+        Body:
+          (null)
+      ExpressionStatement:
+        Variable: <invalid>
+      ExpressionStatement:
+        Literal: 1
+      ExpressionStatement:
+        Literal: 10
+      BlockStatement:
+        IfStatement:
+          Condition:
+            (null)
+          Then:
+            (null)
+      ExpressionStatement:
+        CallExpression:
+          Callee:
+            (null)
+      VarDeclaration: <missing>
+      VarDeclaration: <missing>
+      ExpressionStatement:
+        Literal: nil
+      ExpressionStatement:
+        Literal: 0
+      PrintStatement:
+      ExpressionStatement:
+        Variable: complex
+      ExpressionStatement:
+        Literal: "\"Result: {result}, Complex: {complex}"
+FunctionDeclaration: <missing>
+  Body:
+    BlockStatement:
+      PrintStatement:
+      ExpressionStatement:
+        Literal: "!"
+FunctionDeclaration: <missing>
+  Body:
+    BlockStatement:
+BlockStatement:
+  ReturnStatement
