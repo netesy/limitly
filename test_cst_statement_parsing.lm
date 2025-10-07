@@ -1,0 +1,113 @@
+// Test file for CST statement parsing with error recovery
+
+// Valid variable declaration
+var x: int = 42;
+
+// Variable declaration with missing semicolon
+var y: str = "hello"
+
+// Variable declaration with missing type
+var z = 100;
+
+// Variable declaration with missing initializer
+var w: bool;
+
+// Function declaration with parameters
+fn add(a: int, b: int): int {
+    return a + b;
+}
+
+// Function declaration with missing parameter list
+fn broken_func {
+    print "This function has no parameters";
+}
+
+// Function declaration with missing body
+fn incomplete_func(x: int);
+
+// If statement with condition
+if (x > 0) {
+    print "positive";
+} else {
+    print "not positive";
+}
+
+// If statement with missing condition
+if () {
+    print "empty condition";
+}
+
+// If statement with missing braces
+if (true)
+    print "no braces";
+
+// For loop
+for (var i: int = 0; i < 10; i = i + 1) {
+    print i;
+}
+
+// For loop with missing parts
+for (;;) {
+    break;
+}
+
+// While loop
+while (x > 0) {
+    x = x - 1;
+}
+
+// While loop with missing condition
+while () {
+    break;
+}
+
+// Iter statement
+iter (i in 1..10) {
+    print i;
+}
+
+// Iter statement with missing parts
+iter () {
+    print "empty iter";
+}
+
+// Match statement
+match (x) {
+    1 => print "one";
+    2 => print "two";
+    default => print "other";
+}
+
+// Match statement with missing expression
+match () {
+    default => print "empty match";
+}
+
+// Class declaration
+class Person {
+    var name: str;
+    var age: int;
+    
+    fn getName(): str {
+        return this.name;
+    }
+}
+
+// Class declaration with missing body
+class EmptyClass;
+
+// Type declaration
+type UserId = int;
+
+// Type declaration with missing type
+type BrokenType = ;
+
+// Trait declaration
+trait Drawable {
+    fn draw();
+}
+
+// Interface declaration
+interface Serializable {
+    fn serialize(): str;
+}

@@ -1,0 +1,39 @@
+// Test file for CST error recovery with various syntax errors
+
+// Missing semicolon
+var x = 5
+var y = 10;
+
+// Missing closing parenthesis
+fn test(a: int, b: str {
+    return a + 1;
+}
+
+// Missing closing brace
+if (x > 0) {
+    print("positive");
+    if (y > 5) {
+        print("y is big");
+    // missing closing brace for inner if
+// missing closing brace for outer if
+
+// Invalid expression
+var z = 5 + + 3;
+
+// Missing function body
+fn incomplete()
+
+// Incomplete variable declaration
+var
+
+// Mixed valid and invalid code
+fn valid() {
+    return 42;
+}
+
+var invalid_syntax $$$ more_invalid;
+
+fn another_valid() {
+    var local = "hello";
+    return local;
+}

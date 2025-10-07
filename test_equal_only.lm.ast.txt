@@ -1,0 +1,6 @@
+AST for test_equal_only.lm
+Parser mode: CST
+========================================
+
+AST Dump:
+==========

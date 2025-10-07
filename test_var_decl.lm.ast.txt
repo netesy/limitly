@@ -1,0 +1,7 @@
+AST for test_var_decl.lm
+Parser mode: CST
+========================================
+
+AST Dump:
+==========
+VarDeclaration: <missing>

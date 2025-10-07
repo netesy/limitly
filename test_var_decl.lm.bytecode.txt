@@ -1,0 +1,11 @@
+Bytecode for test_var_decl.lm
+Parser mode: CST
+========================================
+
+=== Bytecode ===
+Generated 3 instructions
+
+   0: PUSH_NULL           
+   1: STORE_VAR            "<missing>"
+   2: HALT                
+

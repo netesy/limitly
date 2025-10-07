@@ -227,6 +227,8 @@ void ErrorCodeGenerator::initializeMessageMapping() {
     messageToCodeMap["Stack overflow"] = "E415";
     messageToCodeMap["Null reference"] = "E416";
     messageToCodeMap["Out of bounds access"] = "E417";
+    messageToCodeMap["Assertion failed"] = "E418";
+    messageToCodeMap["Contract violation"] = "E419";
     
     // Bytecode generation errors (E500-E599)
     messageToCodeMap["Invalid bytecode instruction"] = "E500";

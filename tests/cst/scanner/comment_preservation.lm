@@ -1,0 +1,32 @@
+// Test comment preservation in CST scanner
+// This file tests that comments are preserved as tokens
+
+/* 
+ * Multi-line block comment
+ * with various formatting
+ */
+
+fn main() {
+    // Inline comment before statement
+    var x = 42; // Trailing comment
+    
+    /* Block comment in middle */ var y = 24;
+    
+    // Test nested comments and edge cases
+    var z = /* comment */ x + y /* another comment */;
+    
+    /*
+     * Documentation-style comment
+     * @param none
+     * @return void
+     */
+    print("Value: {z}");
+    
+    // Comment at end of block
+}
+
+// Final comment
+
+/*
+Final block comment
+*/

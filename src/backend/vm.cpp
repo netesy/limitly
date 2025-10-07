@@ -223,11 +223,22 @@ void VM::registerBuiltinFunction(const std::string& name, std::function<ValuePtr
                 recordErrorPath();
             }
             
-            // Special handling for assert and contract functions - let them terminate execution
-            if (name == "assert" || name == "contract") {
-                std::string errorMsg = "Builtin function '" + name + "' failed: " + e.what();
-                throw std::runtime_error(errorMsg);
+            // Special handling for assert function - create proper error with context
+            if (name == "assert") {
+                std::string errorMsg = e.what();
+                // Remove "Assertion failed: " prefix if present to avoid duplication
+                if (errorMsg.find("Assertion failed: ") == 0) {
+                    errorMsg = errorMsg.substr(18); // Remove "Assertion failed: "
+                }
+                
+                // Use VM::error for consistent error reporting
+                error("Assertion failed: " + errorMsg);
+                
+                // For assertions, we want to terminate execution
+                throw std::runtime_error("Assertion failed: " + errorMsg);
             }
+            
+
             
             // For other functions, create proper error union values for error propagation
             std::string errorMsg = e.what();
@@ -264,7 +275,9 @@ void VM::registerVMBuiltinFunction(const std::string& name, std::function<ValueP
 }
 
 ValuePtr VM::execute(const std::vector<Instruction>& code) {
+                if (debugMode) {
     std::cout << "[DEBUG] VM::execute() called with " << code.size() << " instructions" << std::endl;
+    }
     this->bytecode = &code;
     ip = 0;
     const std::vector<Instruction>& bytecodeRef = *this->bytecode;
@@ -699,9 +712,10 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
 
 void VM::preProcessBytecode(const std::vector<Instruction>& code) {
     isPreProcessing = true; // Set pre-processing flag
+    if (debugMode) {    
     std::cout << "[DEBUG] ===== PRE-PROCESSING BYTECODE =====" << std::endl;
     std::cout << "[DEBUG] Total bytecode instructions: " << code.size() << std::endl;
-    
+    }
     size_t i = 0;
     while (i < code.size()) {
         const Instruction& instruction = code[i];
@@ -792,10 +806,11 @@ void VM::preProcessBytecode(const std::vector<Instruction>& code) {
         }
         i++;
     }
-    
+    if (debugMode) {    
     std::cout << "[DEBUG] Pre-processing complete. Registered " 
               << userDefinedFunctions.size() << " functions total." << std::endl;
     std::cout << "[DEBUG] ===== END PRE-PROCESSING =====" << std::endl;
+    }
     isPreProcessing = false; // Clear pre-processing flag
 }
 
@@ -882,79 +897,70 @@ void VM::printErrorStats() const {
 }
 
 void VM::error(const std::string& message) const {
-    // Use enhanced error reporting if source information is available
-    if (!sourceCode.empty() && !filePath.empty()) {
-        // Try to get current instruction line if available
-        int line = 1;
-        int column = 0;
-        std::string lexeme = "";
-        std::string expectedValue = "";
+    // Always use enhanced error reporting through Debugger::error
+    // Try to get current instruction line if available
+    int line = 1;
+    int column = 0;
+    std::string lexeme = "";
+    std::string expectedValue = "";
+    
+    if (ip < bytecode->size()) {
+        line = (*bytecode)[ip].line;
+        // Try to extract more context from the current instruction
+        const auto& instruction = (*bytecode)[ip];
         
-        if (ip < bytecode->size()) {
-            line = (*bytecode)[ip].line;
-            // Try to extract more context from the current instruction
-            const auto& instruction = (*bytecode)[ip];
-            
-            // Get lexeme from instruction context if available
-            if (instruction.opcode == Opcode::LOAD_VAR || 
-                instruction.opcode == Opcode::STORE_VAR ||
-                instruction.opcode == Opcode::CALL) {
-                // For variable/function operations, try to get the name
-                // if (instruction.opcode < constants.size()) {
-                //     auto constant = constants[instruction.opcode];
-                //     if (std::holds_alternative<std::string>(constant->data)) {
-                //         lexeme = std::get<std::string>(constant->data);
-                //     }
-                // }
-            }
-            
-            // Provide expected values based on operation type
-            switch (instruction.opcode) {
-                case Opcode::ADD:
-                case Opcode::SUBTRACT:
-                case Opcode::MULTIPLY:
-                case Opcode::DIVIDE:
-                case Opcode::MODULO:
-                    expectedValue = "numeric operands (int or float)";
-                    break;
-                case Opcode::EQUAL:
-                case Opcode::NOT_EQUAL:
-                case Opcode::LESS:
-                case Opcode::LESS_EQUAL:
-                case Opcode::GREATER:
-                case Opcode::GREATER_EQUAL:
-                    expectedValue = "comparable values of the same type";
-                    break;
-                case Opcode::AND:
-                case Opcode::OR:
-                    expectedValue = "boolean operands";
-                    break;
-                case Opcode::JUMP_IF_FALSE:
-                    expectedValue = "boolean condition";
-                    break;
-                default:
-                    expectedValue = "valid operand for " + BytecodePrinter::opcodeToString(instruction.opcode);
-                    break;
-            }
+        // Get lexeme from instruction context if available
+        if (instruction.opcode == Opcode::LOAD_VAR || 
+            instruction.opcode == Opcode::STORE_VAR ||
+            instruction.opcode == Opcode::CALL) {
+            // For variable/function operations, try to get the name
+            // if (instruction.opcode < constants.size()) {
+            //     auto constant = constants[instruction.opcode];
+            //     if (std::holds_alternative<std::string>(constant->data)) {
+            //         lexeme = std::get<std::string>(constant->data);
+            //     }
+            // }
         }
         
-        Debugger::error(message, line, column, InterpretationStage::INTERPRETING, 
-                       sourceCode, filePath, lexeme, expectedValue);
-    } else {
-        // Fall back to runtime error for backward compatibility
-        throw std::runtime_error(message);
+        // Provide expected values based on operation type
+        switch (instruction.opcode) {
+            case Opcode::ADD:
+            case Opcode::SUBTRACT:
+            case Opcode::MULTIPLY:
+            case Opcode::DIVIDE:
+            case Opcode::MODULO:
+                expectedValue = "numeric operands (int or float)";
+                break;
+            case Opcode::EQUAL:
+            case Opcode::NOT_EQUAL:
+            case Opcode::LESS:
+            case Opcode::LESS_EQUAL:
+            case Opcode::GREATER:
+            case Opcode::GREATER_EQUAL:
+                expectedValue = "comparable values of the same type";
+                break;
+            case Opcode::AND:
+            case Opcode::OR:
+                expectedValue = "boolean operands";
+                break;
+            case Opcode::JUMP_IF_FALSE:
+                expectedValue = "boolean condition";
+                break;
+            default:
+                expectedValue = "valid operand for " + BytecodePrinter::opcodeToString(instruction.opcode);
+                break;
+        }
     }
+    
+    // Always use Debugger::error - no runtime fallback
+    Debugger::error(message, line, column, InterpretationStage::INTERPRETING, 
+                   sourceCode, filePath, lexeme, expectedValue);
 }
 
 void VM::error(const std::string& message, int line, int column, const std::string& lexeme, const std::string& expectedValue) const {
-    // Enhanced error reporting with specific context
-    if (!sourceCode.empty() && !filePath.empty()) {
-        Debugger::error(message, line, column, InterpretationStage::INTERPRETING, 
-                       sourceCode, filePath, lexeme, expectedValue);
-    } else {
-        // Fall back to runtime error for backward compatibility
-        throw std::runtime_error(message);
-    }
+    // Always use Debugger::error - no runtime fallback
+    Debugger::error(message, line, column, InterpretationStage::INTERPRETING, 
+                   sourceCode, filePath, lexeme, expectedValue);
 }
 
 // Error handling helper methods - optimized for zero-cost success path
@@ -1003,7 +1009,8 @@ bool VM::propagateError(ValuePtr errorValue) {
 
     // Walk frames from top to bottom - optimized for shallow error nesting
     while (!errorFrames.empty()) {
-        const ErrorFrame& frame = errorFrames.back();
+        //const ErrorFrame& frame = errorFrames.back();
+        ErrorFrame frame = errorFrames.back();
 
         // Validate frame is properly initialized (silence compiler warning)
         if (frame.handlerAddress == 0) [[unlikely]] {
@@ -1015,6 +1022,7 @@ bool VM::propagateError(ValuePtr errorValue) {
         if (!frame.expectedErrorType) [[likely]] {
             // Consume the frame so it won't be reused
             errorFrames.pop_back();
+            
             ip = frame.handlerAddress - 1;
             
             // Efficient stack cleanup
@@ -3354,6 +3362,16 @@ void VM::handleContract(const Instruction& instruction) {
     bool conditionValue = std::get<bool>(condition->data);
     if (!conditionValue) {
         std::string messageValue = std::get<std::string>(message->data);
+        
+        // Record error path for performance monitoring
+        if (debugMode) {
+            recordErrorPath();
+        }
+        
+        // Use VM::error for consistent error reporting
+        error("Contract violation: " + messageValue);
+        
+        // Contract violations should terminate execution
         throw std::runtime_error("Contract violation: " + messageValue);
     }
     

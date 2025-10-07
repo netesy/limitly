@@ -1,0 +1,10 @@
+AST for test_paren_assignment.lm
+Parser mode: CST
+========================================
+
+AST Dump:
+==========
+ExpressionStatement:
+  Variable: x
+ExpressionStatement:
+  Literal: 100

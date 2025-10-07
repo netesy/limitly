@@ -1,0 +1,45 @@
+AST for tests\basic\variables.lm
+Parser mode: CST
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+PrintStatement:
+VarDeclaration: <missing>
+VarDeclaration: <missing>
+VarDeclaration: <missing>
+VarDeclaration: <missing>
+PrintStatement:
+PrintStatement:
+PrintStatement:
+PrintStatement:
+ExpressionStatement:
+  Assignment: =
+    Value:
+    (null)
+ExpressionStatement:
+  Assignment: =
+    Value:
+    (null)
+ExpressionStatement:
+  Assignment: =
+    Value:
+    (null)
+ExpressionStatement:
+  Assignment: =
+    Value:
+    (null)
+PrintStatement:
+PrintStatement:
+PrintStatement:
+PrintStatement:
+PrintStatement:
+VarDeclaration: <missing>
+VarDeclaration: <missing>
+VarDeclaration: <missing>
+PrintStatement:
+ExpressionStatement:
+  Variable: b
+ExpressionStatement:
+  Variable: c

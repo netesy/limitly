@@ -97,6 +97,7 @@ enum class TokenType {
     CLASS,      // class
     FALSE,      // false
     FN,         // fn
+    ELIF,       // else if
     ELSE,       // else
     FOR,        // for
     WHILE,      // while
@@ -149,6 +150,14 @@ enum class TokenType {
     OK,         // ok
     VAL,        // val
 
+    // CST Support - Trivia tokens
+    WHITESPACE,     // spaces, tabs
+    NEWLINE,        // line breaks
+    COMMENT_LINE,   // // comments
+    COMMENT_BLOCK,  // /* */ comments
+    ERROR,          // invalid/unrecognized input
+    MISSING,        // placeholder for missing tokens
+
     // Other
     UNDEFINED, // undefined token
     EOF_TOKEN  // end of file token
@@ -159,6 +168,19 @@ struct Token {
     std::string lexeme;
     size_t line;
     size_t start = 0;
+    
+    // CST enhancements (backward compatible)
+    size_t end = 0;                           // End position for precise spans
+    std::vector<Token> leadingTrivia;         // Optional trivia attachment
+    std::vector<Token> trailingTrivia;        // Optional trivia attachment
+};
+
+// Configuration for CST trivia preservation
+struct CSTConfig {
+    bool preserveWhitespace = true;
+    bool preserveComments = true;
+    bool emitErrorTokens = true;
+    bool attachTrivia = false;      // Attach trivia to meaningful tokens
 };
 
 class Scanner {
@@ -179,6 +201,10 @@ public:
 
     std::vector<Token> scanTokens();
     void scanToken();
+    
+    // CST-enhanced methods (purely additive)
+    std::vector<Token> scanAllTokens(const CSTConfig& config = {});
+    void scanTokenCST(const CSTConfig& config);
     bool isAtEnd() const;
 
     std::string toString() const;
@@ -194,8 +220,8 @@ public:
     const std::string& getFilePath() const { return filePath; }
 
     Token getToken();
-    Token peekToken() const { return tokens.empty() ? Token{TokenType::EOF_TOKEN, "", line} : tokens[current]; }
-    Token previousToken() const { return current > 0 ? tokens[current - 1] : Token{TokenType::EOF_TOKEN, "", line}; }
+    Token peekToken() const { return tokens.empty() ? Token{TokenType::EOF_TOKEN, "", line, 0, 0, {}, {}} : tokens[current]; }
+    Token previousToken() const { return current > 0 ? tokens[current - 1] : Token{TokenType::EOF_TOKEN, "", line, 0, 0, {}, {}}; }
     Token getNextToken();
     Token getPrevToken();
     
@@ -203,7 +229,7 @@ public:
     const std::vector<Token>& getTokens() const { return tokens; }
     size_t getCurrentTokenIndex() const { return current; }
     Token getTokenAt(size_t index) const { 
-        return index < tokens.size() ? tokens[index] : Token{TokenType::EOF_TOKEN, "", line}; 
+        return index < tokens.size() ? tokens[index] : Token{TokenType::EOF_TOKEN, "", line, 0, 0, {}, {}}; 
     }
 
 private:
@@ -217,6 +243,10 @@ private:
 
     bool inStringInterpolation = false;
     char stringQuoteType = 0;
+    
+    // CST support
+    CSTConfig cstConfig;
+    std::vector<Token> triviaBuffer;  // Buffer for collecting trivia
 
     void addToken(TokenType type);
     void addToken(TokenType type, const std::string& text);
@@ -234,6 +264,12 @@ private:
                            const std::string &rest,
                            TokenType type) const;
     Token getTokenFromChar(char c);
+    
+    // CST-specific methods
+    void scanWhitespace();
+    void scanComment();
+    Token createErrorToken(const std::string& message);
+    void attachTrivia(Token& token, const CSTConfig& config);
 };
 
 #endif // SCANNER_H
