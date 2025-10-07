@@ -1,0 +1,14 @@
+// Test contract failure with enhanced error reporting
+
+print("Testing contract failure with source context...");
+
+var x = 5;
+var y = 10;
+
+// This contract should pass
+contract(x < y, "x should be less than y");
+print("First contract passed");
+
+// This contract should fail and show source context
+contract(x > y, "x should be greater than y - this will fail");
+print("This should not be reached");

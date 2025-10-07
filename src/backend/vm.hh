@@ -92,7 +92,7 @@ private:
     
     // Error handling state - optimized for zero-cost success path
     struct ErrorFrame {
-        size_t handlerAddress;      // Bytecode address of error handler
+        size_t handlerAddress = 0;      // Bytecode address of error handler
         size_t stackBase;           // Stack position when frame created
         TypePtr expectedErrorType;  // Expected error type for this frame
         std::string functionName;   // Function name for debugging
@@ -675,4 +675,4 @@ struct LegacyCallFrame {
     std::shared_ptr<Environment> environment;
 };
 
-#endif // VM_H
+#endif // VM_H ErrorFrame

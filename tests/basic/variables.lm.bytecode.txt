@@ -1,0 +1,43 @@
+Bytecode for tests\basic\variables.lm
+Parser mode: CST
+========================================
+
+=== Bytecode ===
+Generated 35 instructions
+
+   0: PRINT               
+   1: PRINT               
+   2: PUSH_NULL           
+   3: STORE_VAR            "<missing>"
+   4: PUSH_NULL           
+   5: STORE_VAR            "<missing>"
+   6: PUSH_NULL           
+   7: STORE_VAR            "<missing>"
+   8: PUSH_NULL           
+   9: STORE_VAR            "<missing>"
+  10: PRINT               
+  11: PRINT               
+  12: PRINT               
+  13: PRINT               
+  14: POP                 
+  15: POP                 
+  16: POP                 
+  17: POP                 
+  18: PRINT               
+  19: PRINT               
+  20: PRINT               
+  21: PRINT               
+  22: PRINT               
+  23: PUSH_NULL           
+  24: STORE_VAR            "<missing>"
+  25: PUSH_NULL           
+  26: STORE_VAR            "<missing>"
+  27: PUSH_NULL           
+  28: STORE_VAR            "<missing>"
+  29: PRINT               
+  30: LOAD_VAR             "b"
+  31: POP                 
+  32: LOAD_VAR             "c"
+  33: POP                 
+  34: HALT                
+

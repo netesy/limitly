@@ -65,6 +65,12 @@ echo Compiling test parser...
     src\test_parser.cpp ^
     src\frontend\scanner.cpp ^
     src\frontend\parser.cpp ^
+    src\frontend\cst_parser.cpp ^
+    src\frontend\cst.cpp ^
+    src\frontend\cst_printer.cpp ^
+    src\frontend\cst_utils.cpp ^
+    src\frontend\cst_utils_simple.cpp ^
+    src\frontend\ast_builder.cpp ^
     src\backend\type_checker.cpp ^
     src\backend\backend.cpp ^
     src\backend\ast_printer.cpp ^
@@ -116,12 +122,12 @@ echo Available executables:
 echo   bin\limitly.exe      - Main language interpreter
 echo   bin\test_parser.exe  - Parser testing utility
 if exist "bin\format_code.exe" echo   bin\format_code.exe  - Code formatter
-echo.
-echo Note: embedding targets are intentionally disabled from this build.
-echo Use the generator and tools in `tools/` to produce embedded interpreters.
-echo
-:: Building embedded interpreters is disabled in the default build.
-echo Note: the lembed generator and embedding targets are disabled by default.
-echo To generate embedded interpreters, use the `lembed` generator and the
-echo `tools\make_embedded.bat` / `tools/make_embedded.sh` helpers manually.
-echo
+@REM echo.
+@REM echo Note: embedding targets are intentionally disabled from this build.
+@REM echo Use the generator and tools in `tools/` to produce embedded interpreters.
+@REM echo
+@REM :: Building embedded interpreters is disabled in the default build.
+@REM echo Note: the lembed generator and embedding targets are disabled by default.
+@REM echo To generate embedded interpreters, use the `lembed` generator and the
+@REM echo `tools\make_embedded.bat` / `tools/make_embedded.sh` helpers manually.
+@REM echo

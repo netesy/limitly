@@ -1,0 +1,32 @@
+// Test error-tolerant AST conversion
+// This file contains syntax errors to test that AST builder can handle partial CSTs
+
+fn main() {
+    // Valid code first
+    var x = 42;
+    print("Valid: {x}");
+    
+    // Syntax errors that should be handled gracefully
+    var y = 24
+    // Missing semicolon - should still create AST node
+    
+    // Incomplete expression
+    var z = x + ;
+    // Should create partial AST with error node
+    
+    // Missing closing brace
+    if (x > 0) {
+        print("positive");
+        // Missing closing brace
+    
+    // Should continue processing after error
+    print("After error");
+    
+    // Incomplete function
+    fn broken_func(
+    // Missing parameters and body
+    
+    // Valid code should still be processed
+    var final = x + y;
+    print("Final: {final}");
+}

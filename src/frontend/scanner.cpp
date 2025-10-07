@@ -2,12 +2,18 @@
 #include "../common/debugger.hh"
 
 std::vector<Token> Scanner::scanTokens() {
+    // Reset CST config to default (no trivia preservation) for regular scanning
+    cstConfig = CSTConfig{};
+    cstConfig.preserveWhitespace = false;
+    cstConfig.preserveComments = false;
+    cstConfig.emitErrorTokens = false;
+    
     while (!isAtEnd()) {
         start = current;
         scanToken();
     }
 
-    tokens.push_back({TokenType::EOF_TOKEN, "", line});
+    tokens.push_back({TokenType::EOF_TOKEN, "", line, 0, 0, {}, {}});
     return tokens;
 }
 
@@ -111,8 +117,29 @@ void Scanner::scanToken() {
     case '/':
         if (match('/')) {
             // A comment goes until the end of the line.
-            while (peek() != '\n' && !isAtEnd())
-                advance();
+            if (cstConfig.preserveComments) {
+                scanComment();
+            } else {
+                // Original behavior - skip comment
+                while (peek() != '\n' && !isAtEnd())
+                    advance();
+            }
+        } else if (match('*')) {
+            // Block comment
+            if (cstConfig.preserveComments) {
+                scanComment();
+            } else {
+                // Original behavior - skip block comment
+                while (!isAtEnd()) {
+                    if (peek() == '*' && peekNext() == '/') {
+                        advance(); // consume '*'
+                        advance(); // consume '/'
+                        break;
+                    }
+                    if (peek() == '\n') line++;
+                    advance();
+                }
+            }
         } else if (match('=')) {
             addToken(TokenType::SLASH_EQUAL);
         } else {
@@ -141,9 +168,15 @@ void Scanner::scanToken() {
     case ' ':
     case '\r':
     case '\t':
-        // Ignore whitespace.
+        if (cstConfig.preserveWhitespace) {
+            scanWhitespace();
+        }
+        // Otherwise ignore whitespace (original behavior)
         break;
     case '\n':
+        if (cstConfig.preserveWhitespace) {
+            addToken(TokenType::NEWLINE);
+        }
         line++;
         break;
     case '"':
@@ -157,9 +190,17 @@ void Scanner::scanToken() {
         } else if (isAlpha(c)) {
             identifier();
         } else {
-            // Get the unexpected character for better error reporting
-            std::string unexpectedChar = std::string(1, peek());
-            this->error("Unexpected character '" + unexpectedChar + "'", "valid identifier, number, string, or operator");
+            // Handle unexpected character
+            if (cstConfig.emitErrorTokens) {
+                // Create error token and continue scanning
+                std::string unexpectedChar = std::string(1, c);
+                Token errorToken = createErrorToken("Unexpected character '" + unexpectedChar + "'");
+                tokens.push_back(errorToken);
+            } else {
+                // Original behavior - report error and stop
+                std::string unexpectedChar = std::string(1, c);
+                this->error("Unexpected character '" + unexpectedChar + "'", "valid identifier, number, string, or operator");
+            }
         }
         break;
     }
@@ -228,7 +269,12 @@ void Scanner::addToken(TokenType type, const std::string& text) {
         }
     }
     
-    tokens.push_back({type, lexeme, line, start});
+    Token token = {type, lexeme, line, start, current, {}, {}};  // Include end position and trivia
+    
+    // Attach trivia if CST mode is enabled
+    attachTrivia(token, cstConfig);
+    
+    tokens.push_back(token);
     currentToken = tokens.back(); // Update currentToken
 }
 
@@ -251,7 +297,7 @@ Token Scanner::getNextToken() {
         return tokens[nextIndex];
     } else {
         // Handle end of tokens
-        return {TokenType::EOF_TOKEN, "", line, current};
+        return {TokenType::EOF_TOKEN, "", line, current, current, {}, {}};
 
     }
 }
@@ -262,7 +308,7 @@ Token Scanner::getPrevToken() {
         return tokens[current - 1];
     } else {
         // Handle no previous token
-        return {TokenType::EOF_TOKEN, "", line, 0};
+        return {TokenType::EOF_TOKEN, "", line, 0, 0, {}, {}};
     }
 }
 
@@ -394,15 +440,10 @@ void Scanner::string() {
             
             if (isInterpolation) {
                 // Found interpolation start
-                // Add the string part before interpolation if not empty
-                if (!value.empty()) {
-                    addToken(TokenType::STRING, value);
-                    value.clear();
-                }
-                
-                // Add interpolation start token
+                // Add interpolation start token with the string part before interpolation
                 advance(); // consume '{'
-                addToken(TokenType::INTERPOLATION_START);
+                addToken(TokenType::INTERPOLATION_START, value);
+                value.clear();
                 
                 // Parse the expression inside {}
                 int braceCount = 1;
@@ -435,7 +476,7 @@ void Scanner::string() {
                 // Add the expression tokens (excluding EOF)
                 for (const auto& token : exprTokens) {
                     if (token.type != TokenType::EOF_TOKEN) {
-                        tokens.push_back({token.type, token.lexeme, line, current});
+                        tokens.push_back({token.type, token.lexeme, line, current, current, {}, {}});
 
                     }
                 }
@@ -468,10 +509,8 @@ void Scanner::string() {
         return;
     }
     
-    // Add the final string part if not empty
-    if (!value.empty()) {
-        addToken(TokenType::STRING, value);
-    }
+    // Add the final string part (including empty strings)
+    addToken(TokenType::STRING, value);
     
     // Skip the closing quote
     advance();
@@ -764,6 +803,8 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "FALSE";
     case TokenType::FN:
         return "FN";
+    case TokenType::ELIF:
+        return "ELIF";
     case TokenType::ELSE:
         return "ELSE";
     case TokenType::FOR:
@@ -866,6 +907,18 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "CACHE";
     case TokenType::SLEEP:
         return "SLEEP";
+    case TokenType::WHITESPACE:
+        return "WHITESPACE";
+    case TokenType::NEWLINE:
+        return "NEWLINE";
+    case TokenType::COMMENT_LINE:
+        return "COMMENT_LINE";
+    case TokenType::COMMENT_BLOCK:
+        return "COMMENT_BLOCK";
+    case TokenType::ERROR:
+        return "ERROR";
+    case TokenType::MISSING:
+        return "MISSING";
     case TokenType::UNDEFINED:
         return "UNDEFINED";
     case TokenType::EOF_TOKEN:
@@ -911,6 +964,143 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         break;
     }
     return "UNKNOWN";
+}
+
+std::vector<Token> Scanner::scanAllTokens(const CSTConfig& config) {
+    cstConfig = config;
+    triviaBuffer.clear();
+    
+    while (!isAtEnd()) {
+        start = current;
+        scanTokenCST(config);
+    }
+
+    tokens.push_back({TokenType::EOF_TOKEN, "", line, start, current, {}, {}});
+    return tokens;
+}
+
+void Scanner::scanTokenCST(const CSTConfig& config) {
+    char c = advance();
+    
+    switch (c) {
+    case ' ':
+    case '\r':
+    case '\t':
+        if (config.preserveWhitespace) {
+            scanWhitespace();
+        }
+        break;
+    case '\n':
+        if (config.preserveWhitespace) {
+            addToken(TokenType::NEWLINE);
+        }
+        line++;
+        break;
+    case '/':
+        if (match('/')) {
+            if (config.preserveComments) {
+                scanComment();
+            } else {
+                // Skip comment as before
+                while (peek() != '\n' && !isAtEnd())
+                    advance();
+            }
+        } else if (match('*')) {
+            if (config.preserveComments) {
+                // Handle block comment - consume everything until */
+                while (!isAtEnd()) {
+                    if (peek() == '*' && peekNext() == '/') {
+                        advance(); // consume '*'
+                        advance(); // consume '/'
+                        break;
+                    }
+                    if (peek() == '\n') line++;
+                    advance();
+                }
+                addToken(TokenType::COMMENT_BLOCK);
+            } else {
+                // Skip block comment as before
+                while (!isAtEnd()) {
+                    if (peek() == '*' && peekNext() == '/') {
+                        advance(); // consume '*'
+                        advance(); // consume '/'
+                        break;
+                    }
+                    if (peek() == '\n') line++;
+                    advance();
+                }
+            }
+        } else {
+            // Back up and let the default case handle it
+            current--; // Back up the '/'
+            current--; // Back up to re-process
+            scanToken(); // Use existing logic
+        }
+        break;
+    default:
+        // For all other characters, use the existing scanToken logic
+        current--; // Back up to re-process the character
+        scanToken();
+        break;
+    }
+}
+
+void Scanner::scanWhitespace() {
+    // Consume all consecutive whitespace characters
+    while (!isAtEnd() && (peek() == ' ' || peek() == '\r' || peek() == '\t')) {
+        advance();
+    }
+    addToken(TokenType::WHITESPACE);
+}
+
+void Scanner::scanComment() {
+    // Check if this is a line comment (//) or block comment (/*)
+    if (source[current - 1] == '/' && source[current - 2] == '/') {
+        // Line comment - consume until end of line
+        while (peek() != '\n' && !isAtEnd()) {
+            advance();
+        }
+        addToken(TokenType::COMMENT_LINE);
+    } else if (source[current - 1] == '*' && source[current - 2] == '/') {
+        // Block comment - consume until */
+        while (!isAtEnd()) {
+            if (peek() == '*' && peekNext() == '/') {
+                advance(); // consume '*'
+                advance(); // consume '/'
+                break;
+            }
+            if (peek() == '\n') {
+                line++;
+            }
+            advance();
+        }
+        addToken(TokenType::COMMENT_BLOCK);
+    }
+}
+
+Token Scanner::createErrorToken(const std::string& message) {
+    Token errorToken;
+    errorToken.type = TokenType::ERROR;
+    errorToken.lexeme = source.substr(start, current - start);
+    errorToken.line = line;
+    errorToken.start = start;
+    errorToken.end = current;
+    
+    // Store error message in a way that can be retrieved later
+    // For now, we'll include it in the lexeme with a special prefix
+    errorToken.lexeme = "ERROR: " + message + " (" + errorToken.lexeme + ")";
+    
+    return errorToken;
+}
+
+void Scanner::attachTrivia(Token& token, const CSTConfig& config) {
+    if (!config.attachTrivia || triviaBuffer.empty()) {
+        return;
+    }
+    
+    // Attach collected trivia to the token
+    token.leadingTrivia = triviaBuffer;
+    triviaBuffer.clear();
 }
 
 void Scanner::error(const std::string& message, const std::string& expectedValue) {

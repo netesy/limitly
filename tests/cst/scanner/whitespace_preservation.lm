@@ -1,0 +1,31 @@
+// Test whitespace preservation in CST scanner
+// This file tests that the enhanced scanner preserves all whitespace tokens
+
+fn main() {
+    // Test various whitespace patterns
+    var x    =    42;     // Multiple spaces
+    var y	=	24;       // Tabs
+    
+    // Test newlines and indentation
+    if (x > 0) {
+        print("positive");
+        
+        // Nested with different indentation
+        if (y > 0) {
+            print("both positive");
+        }
+    }
+    
+    // Test trailing whitespace and empty lines
+    
+    
+    var z = x + y;   
+    
+    print("Result: {z}");
+}
+
+// Test comment preservation
+/* Block comment with
+   multiple lines */
+
+// Line comment at end

@@ -1,0 +1,9 @@
+AST for test_interpolation.lm
+Parser mode: CST
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+ExpressionStatement:
+  Variable: x

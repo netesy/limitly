@@ -1,0 +1,7 @@
+AST for test_empty_string.lm
+Parser mode: CST
+========================================
+
+AST Dump:
+==========
+PrintStatement:

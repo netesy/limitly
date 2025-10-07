@@ -2,6 +2,9 @@
 #include "backend/bytecode_printer.hh"
 #include "frontend/scanner.hh"
 #include "frontend/parser.hh"
+#include "frontend/cst_parser.hh"
+#include "frontend/cst_printer.hh"
+#include "frontend/ast_builder.hh"
 #include "common/backend.hh"
 #include "backend/vm.hh"
 #include "common/opcodes.hh"
@@ -28,15 +31,31 @@ int main(int argc, char* argv[]) {
     }
     
     if (argc < 2) {
-        std::cout << "Usage: " << argv[0] << " <source_file>" << std::endl;
+        std::cout << "Usage: " << argv[0] << " <source_file> [--cst|--legacy]" << std::endl;
         std::cout << "       " << argv[0] << " --list-opcodes" << std::endl;
+        std::cout << "Options:" << std::endl;
+        std::cout << "  --cst     Use CST parser (default)" << std::endl;
+        std::cout << "  --legacy  Use legacy parser" << std::endl;
         return 1;
     }
     
+    // Parse command line options
+    bool useCSTParser = true;  // Default to CST parser
+    std::string filename = argv[1];
+    
+    for (int i = 2; i < argc; i++) {
+        std::string arg = argv[i];
+        if (arg == "--legacy") {
+            useCSTParser = false;
+        } else if (arg == "--cst") {
+            useCSTParser = true;
+        }
+    }
+    
     // Read source file
-    std::ifstream file(argv[1]);
+    std::ifstream file(filename);
     if (!file.is_open()) {
-        std::cerr << "Error: Could not open file " << argv[1] << std::endl;
+        std::cerr << "Error: Could not open file " << filename << std::endl;
         return 1;
     }
     
@@ -45,25 +64,75 @@ int main(int argc, char* argv[]) {
     std::string source = buffer.str();
     
     try {
-        // Frontend: Lexical analysis (scanning)
-        //std::cout << "=== Scanning ===\n";
-        Scanner scanner(source);
-        scanner.scanTokens();
+        std::shared_ptr<AST::Program> ast;
         
-        // Print tokens to stdout
-        std::cout << "=== Tokens ===\n";
-        for (const auto& token : scanner.getTokens()) {
-            std::cout << "Line " << token.line << ": "
-                      << scanner.tokenTypeToString(token.type)
-                      << " = '" << token.lexeme << "'\n";
+        if (useCSTParser) {
+            std::cout << "=== Using CST Parser ===\n";
+            
+            // Frontend: Enhanced scanning with trivia preservation
+            Scanner scanner(source);
+            CSTConfig config;
+            config.preserveWhitespace = true;
+            config.preserveComments = true;
+            config.emitErrorTokens = true;
+            
+            // CST Parsing
+            std::cout << "=== CST Parsing ===\n";
+            CST::CSTParser cstParser(scanner, config);
+            auto cst = cstParser.parse();
+            
+            if (cstParser.hasErrors()) {
+                std::cout << "Parse errors found: " << cstParser.getErrors().size() << std::endl;
+                for (const auto& error : cstParser.getErrors()) {
+                    std::cout << "  Line " << error.line << ": " << error.description << std::endl;
+                }
+            } else {
+                std::cout << "CST parsing completed successfully!\n";
+            }
+            
+            // Print CST structure
+            std::cout << "\n=== CST Structure ===\n";
+            if (cst) {
+                std::cout << CST::printCST(cst.get()) << std::endl;
+            } else {
+                std::cout << "No CST generated\n";
+            }
+            
+            // Transform CST to AST
+            if (cst) {
+                std::cout << "=== CST to AST Transformation ===\n";
+                frontend::BuildConfig buildConfig;
+                buildConfig.insertErrorNodes = true;
+                buildConfig.insertMissingNodes = true;
+                buildConfig.preserveSourceMapping = true;
+                
+                frontend::ASTBuilder astBuilder(buildConfig);
+                ast = astBuilder.buildAST(*cst);
+                std::cout << "AST transformation completed successfully!\n\n";
+            }
+            
+        } else {
+            std::cout << "=== Using Legacy Parser ===\n";
+            
+            // Frontend: Lexical analysis (scanning)
+            Scanner scanner(source);
+            scanner.scanTokens();
+            
+            // Print tokens to stdout
+            std::cout << "=== Tokens ===\n";
+            for (const auto& token : scanner.getTokens()) {
+                std::cout << "Line " << token.line << ": "
+                          << scanner.tokenTypeToString(token.type)
+                          << " = '" << token.lexeme << "'\n";
+            }
+            std::cout << std::endl;
+            
+            // Frontend: Syntax analysis (parsing)
+            std::cout << "=== Parsing ===\n";
+            Parser parser(scanner);
+            ast = parser.parse();
+            std::cout << "Parsing completed successfully!\n\n";
         }
-        std::cout << std::endl;
-        
-        // Frontend: Syntax analysis (parsing)
-        std::cout << "=== Parsing ===\n";
-        Parser parser(scanner);
-        std::shared_ptr<AST::Program> ast = parser.parse();
-        std::cout << "Parsing completed successfully!\n\n";
         
         // Backend: Print AST to console and file
         std::cout << "=== AST Structure ===\n";
@@ -74,7 +143,7 @@ int main(int argc, char* argv[]) {
         std::cout << std::endl;
         
         // Save to file
-        std::string outputFilename = std::string(argv[1]) + ".ast.txt";
+        std::string outputFilename = filename + ".ast.txt";
         std::ofstream outFile(outputFilename);
         if (outFile.is_open()) {
             // Redirect cout to file
@@ -82,7 +151,8 @@ int main(int argc, char* argv[]) {
             std::cout.rdbuf(outFile.rdbuf());
             
             // Print AST to file
-            std::cout << "AST for " << argv[1] << "\n";
+            std::cout << "AST for " << filename << "\n";
+            std::cout << "Parser mode: " << (useCSTParser ? "CST" : "Legacy") << "\n";
             std::cout << "========================================\n\n";
             printer.process(ast);
             
@@ -103,10 +173,11 @@ int main(int argc, char* argv[]) {
         BytecodePrinter::print(generator.getBytecode());
         
         // Output bytecode to file
-        std::string bytecodeFilename = std::string(argv[1]) + ".bytecode.txt";
+        std::string bytecodeFilename = filename + ".bytecode.txt";
         std::ofstream bytecodeFile(bytecodeFilename);
         if (bytecodeFile.is_open()) {
-            bytecodeFile << "Bytecode for " << argv[1] << "\n";
+            bytecodeFile << "Bytecode for " << filename << "\n";
+            bytecodeFile << "Parser mode: " << (useCSTParser ? "CST" : "Legacy") << "\n";
             bytecodeFile << "========================================\n\n";
             
             // Use BytecodePrinter for file output too

@@ -1,0 +1,32 @@
+// Test round-trip source reconstruction
+// This file tests that CST can perfectly reconstruct the original source
+
+fn main() {
+    // Test various formatting patterns
+    var x    =    42;     // Multiple spaces
+    var y	=	24;       // Tabs
+    
+    /* Block comment */ var z = x + y; // Line comment
+    
+    // Test string interpolation with formatting
+    print("Result: {z}");
+    
+    // Test control flow with various spacing
+    if(x>0){
+        print("compact");
+    } else {
+        print("spaced");
+    }
+    
+    // Test function with different formatting
+    fn test(  a:int,  b:str  ){
+        return a;
+    }
+    
+    // Test nested structures
+    for(var i=0;i<3;i=i+1){
+        if(i%2==0){
+            print("even:{i}");
+        }
+    }
+}
