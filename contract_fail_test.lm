@@ -1,5 +1,0 @@
-// Test contract failure
-
-print("Testing contract failure...");
-contract(5 < 3, "Five should not be less than three");
-print("This should not print");

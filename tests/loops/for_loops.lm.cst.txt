@@ -1,0 +1,38 @@
+CST for C:\Projects\limitly\tests\loops\for_loops.lm
+Parser: New CSTParser from cst_parser.cpp
+Mode: CST (cstMode=true)
+========================================
+
+CST Statistics:
+- CST nodes created: 39
+- Trivia attachments: 75
+- Parse errors: 0
+
+=== Full CST Structure ===
++ Node: PROGRAM [785-859] (Program root node)
+├─ + Node: VAR_DECLARATION [785-802] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [785-786]
+│ ├─ Token: var [786-789]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [789-790]
+│ ├─ + Node: IDENTIFIER [790-795]
+│ │ └─ Token: outer [790-795]
+│ ├─ + Node: ASSIGNMENT_EXPR [796-801]
+│ │ ├─ Token: = [796-797]
+│ │ └─ + Node: LITERAL_EXPR [798-801]
+│ │   └─ Token: 100 [798-801]
+│ └─ Token: ; [801-802]
+└─ + Node: VAR_DECLARATION [835-859] (var declaration)
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [835-836]
+  ├─ + Node: WHITESPACE_NODE | Token:      [836-840]
+  ├─ Token: var [840-843]
+  ├─ + Node: WHITESPACE_NODE | Token:   [843-844]
+  ├─ + Node: IDENTIFIER [844-849]
+  │ └─ Token: inner [844-849]
+  ├─ + Node: ASSIGNMENT_EXPR [850-858]
+  │ ├─ Token: = [850-851]
+  │ └─ + Node: LITERAL_EXPR [856-858]
+  │   └─ Token: 10 [856-858]
+  └─ Token: ; [858-859]
+

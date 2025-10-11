@@ -1,0 +1,127 @@
+Bytecode for C:\Projects\limitly\tests\basic\control_flow.lm
+Parser: New CSTParser
+========================================
+
+=== Bytecode ===
+Generated 119 instructions
+
+   0: PUSH_STRING          "=== Control Flow Tests ==="
+   1: PRINT               
+   2: PUSH_INT             10
+   3: STORE_VAR            "x"
+   4: PUSH_INT             5
+   5: STORE_VAR            "y"
+   6: PUSH_STRING          "If statement tests:"
+   7: PRINT               
+   8: LOAD_VAR             "x"
+   9: LOAD_VAR             "y"
+  10: GREATER             
+  11: JUMP_IF_FALSE        5
+  12: BEGIN_SCOPE         
+  13: PUSH_STRING          "x is greater than y"
+  14: PRINT               
+  15: END_SCOPE           
+  16: JUMP                 0
+  17: LOAD_VAR             "x"
+  18: LOAD_VAR             "y"
+  19: LESS                
+  20: JUMP_IF_FALSE        5
+  21: BEGIN_SCOPE         
+  22: PUSH_STRING          "This should not print"
+  23: PRINT               
+  24: END_SCOPE           
+  25: JUMP                 4
+  26: BEGIN_SCOPE         
+  27: PUSH_STRING          "x is not less than y"
+  28: PRINT               
+  29: END_SCOPE           
+  30: PUSH_INT             85
+  31: STORE_VAR            "score"
+  32: PUSH_STRING          "Grade calculation:"
+  33: PRINT               
+  34: LOAD_VAR             "score"
+  35: PUSH_INT             90
+  36: GREATER_EQUAL       
+  37: JUMP_IF_FALSE        5
+  38: BEGIN_SCOPE         
+  39: PUSH_STRING          "Grade: A"
+  40: PRINT               
+  41: END_SCOPE           
+  42: JUMP                 22
+  43: LOAD_VAR             "score"
+  44: PUSH_INT             80
+  45: GREATER_EQUAL       
+  46: JUMP_IF_FALSE        5
+  47: BEGIN_SCOPE         
+  48: PUSH_STRING          "Grade: B"
+  49: PRINT               
+  50: END_SCOPE           
+  51: JUMP                 13
+  52: LOAD_VAR             "score"
+  53: PUSH_INT             70
+  54: GREATER_EQUAL       
+  55: JUMP_IF_FALSE        5
+  56: BEGIN_SCOPE         
+  57: PUSH_STRING          "Grade: C"
+  58: PRINT               
+  59: END_SCOPE           
+  60: JUMP                 4
+  61: BEGIN_SCOPE         
+  62: PUSH_STRING          "Grade: F"
+  63: PRINT               
+  64: END_SCOPE           
+  65: PUSH_STRING          "Nested if test:"
+  66: PRINT               
+  67: PUSH_INT             15
+  68: STORE_VAR            "a"
+  69: LOAD_VAR             "a"
+  70: PUSH_INT             10
+  71: GREATER             
+  72: JUMP_IF_FALSE        18
+  73: BEGIN_SCOPE         
+  74: PUSH_STRING          "a is greater than 10"
+  75: PRINT               
+  76: LOAD_VAR             "a"
+  77: PUSH_INT             20
+  78: GREATER             
+  79: JUMP_IF_FALSE        5
+  80: BEGIN_SCOPE         
+  81: PUSH_STRING          "a is also greater than 20"
+  82: PRINT               
+  83: END_SCOPE           
+  84: JUMP                 4
+  85: BEGIN_SCOPE         
+  86: PUSH_STRING          "but a is not greater than 20"
+  87: PRINT               
+  88: END_SCOPE           
+  89: END_SCOPE           
+  90: JUMP                 0
+  91: PUSH_BOOL            true
+  92: STORE_VAR            "isActive"
+  93: PUSH_BOOL            false
+  94: STORE_VAR            "isValid"
+  95: LOAD_VAR             "isActive"
+  96: DUP                 
+  97: JUMP_IF_FALSE        3
+  98: POP                 
+  99: LOAD_VAR             "isValid"
+ 100: NOT                 
+ 101: JUMP_IF_FALSE        5
+ 102: BEGIN_SCOPE         
+ 103: PUSH_STRING          "Active but not valid"
+ 104: PRINT               
+ 105: END_SCOPE           
+ 106: JUMP                 0
+ 107: LOAD_VAR             "isActive"
+ 108: DUP                 
+ 109: JUMP_IF_TRUE         2
+ 110: POP                 
+ 111: LOAD_VAR             "isValid"
+ 112: JUMP_IF_FALSE        5
+ 113: BEGIN_SCOPE         
+ 114: PUSH_STRING          "At least one is true"
+ 115: PRINT               
+ 116: END_SCOPE           
+ 117: JUMP                 0
+ 118: HALT                
+

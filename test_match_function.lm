@@ -1,0 +1,9 @@
+fn match_example(value) {
+    match (value) {
+        int => { print("Integer"); },
+        str => { print("String"); },
+        _ => { print("Unknown type"); }
+    }
+}
+
+match_example(42);

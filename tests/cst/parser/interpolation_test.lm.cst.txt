@@ -1,0 +1,69 @@
+CST for C:\Projects\limitly\tests\cst\parser\interpolation_test.lm
+Parser: New CSTParser from cst_parser.cpp
+Mode: CST (cstMode=true)
+========================================
+
+CST Statistics:
+- CST nodes created: 13
+- Trivia attachments: 20
+- Parse errors: 0
+
+=== Full CST Structure ===
++ Node: PROGRAM [0-233] (Program root node)
+├─ + Node: VAR_DECLARATION [0-48] (var declaration)
+│ ├─ + Node: COMMENT_NODE | Token: // Test interpolated strings [0-28]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [28-29]
+│ ├─ Token: var [29-32]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [32-33]
+│ ├─ + Node: IDENTIFIER [33-37]
+│ │ └─ Token: name [33-37]
+│ ├─ + Node: ASSIGNMENT_EXPR [38-46]
+│ │ ├─ Token: = [38-39]
+│ │ └─ + Node: LITERAL_EXPR [40-46]
+│ │   └─ Token: World [40-46]
+│ └─ Token: ; [47-48]
+├─ + Node: VAR_DECLARATION [73-86] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [73-74]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [74-75]
+│ ├─ Token: var [75-78]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [78-79]
+│ ├─ + Node: IDENTIFIER [79-80]
+│ │ └─ Token: x [79-80]
+│ ├─ + Node: ASSIGNMENT_EXPR [81-85]
+│ │ ├─ Token: = [81-82]
+│ │ └─ + Node: LITERAL_EXPR [83-85]
+│ │   └─ Token: 42 [83-85]
+│ └─ Token: ; [85-86]
+├─ + Node: VAR_DECLARATION [171-221] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [171-172]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [172-173]
+│ ├─ + Node: COMMENT_NODE | Token: // Test with multiple interpolations [173-209]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [209-210]
+│ ├─ Token: var [210-213]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [213-214]
+│ ├─ + Node: IDENTIFIER [214-215]
+│ │ └─ Token: a [214-215]
+│ ├─ + Node: ASSIGNMENT_EXPR [216-220]
+│ │ ├─ Token: = [216-217]
+│ │ └─ + Node: LITERAL_EXPR [218-220]
+│ │   └─ Token: 10 [218-220]
+│ └─ Token: ; [220-221]
+└─ + Node: VAR_DECLARATION [221-233] (var declaration)
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [221-222]
+  ├─ Token: var [222-225]
+  ├─ + Node: WHITESPACE_NODE | Token:   [225-226]
+  ├─ + Node: IDENTIFIER [226-227]
+  │ └─ Token: b [226-227]
+  ├─ + Node: ASSIGNMENT_EXPR [228-232]
+  │ ├─ Token: = [228-229]
+  │ └─ + Node: LITERAL_EXPR [230-232]
+  │   └─ Token: 20 [230-232]
+  └─ Token: ; [232-233]
+

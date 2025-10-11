@@ -1,0 +1,47 @@
+Bytecode for tests\loops\match_function_test.lm
+Parser mode: CST
+========================================
+
+=== Bytecode ===
+Generated 39 instructions
+
+   0: PRINT               
+   1: BEGIN_FUNCTION       "<missing>"
+   2: BEGIN_SCOPE         
+   3: PRINT               
+   4: LOAD_VAR             "value"
+   5: POP                 
+   6: PUSH_STRING          ""Testing value: {value}"
+   7: POP                 
+   8: LOAD_VAR             "value"
+   9: POP                 
+  10: BEGIN_SCOPE         
+  11: PUSH_NULL           
+  12: POP                 
+  13: BEGIN_SCOPE         
+  14: PRINT               
+  15: END_SCOPE           
+  16: PUSH_NULL           
+  17: POP                 
+  18: BEGIN_SCOPE         
+  19: PRINT               
+  20: END_SCOPE           
+  21: BEGIN_SCOPE         
+  22: PRINT               
+  23: END_SCOPE           
+  24: END_SCOPE           
+  25: END_SCOPE           
+  26: PUSH_NULL           
+  27: RETURN              
+  28: END_FUNCTION        
+  29: PUSH_FUNCTION       
+  30: STORE_VAR            "<missing>"
+  31: CALL                 "unknown"
+  32: POP                 
+  33: CALL                 "unknown"
+  34: POP                 
+  35: CALL                 "unknown"
+  36: POP                 
+  37: PRINT               
+  38: HALT                
+

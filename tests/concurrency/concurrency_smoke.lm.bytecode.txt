@@ -1,140 +1,40 @@
-Bytecode for tests\concurrency\concurrency_smoke.lm
+Bytecode for C:\Projects\limitly\tests\concurrency\concurrency_smoke.lm
+Parser: New CSTParser
 ========================================
 
-Total instructions: 135
+=== Bytecode ===
+Generated 32 instructions
 
-   1: PUSH_STRING          (line 2) "=== Concurrency Smoke Test ==="
-2   : PRINT                (line 2)
-3   : PUSH_INT             (line 5) 0
-4   : OP_9                 (line 5)
-5   : BEGIN_CONCURRENT     (line 8)
-6   : BEGIN_SCOPE          (line 8)
-7   : BEGIN_TASK           (line 9)
-8   : PUSH_NULL            (line 9)
-9   : STORE_ITERABLE       (line 9)
-10  : BEGIN_SCOPE          (line 9)
-11  : LOAD_VAR             (line 11) counter
-12  : PUSH_INT             (line 11) 1
-13  : ADD                  (line 11)
-14  : DUP                  (line 11)
-15  : STORE_VAR            (line 11) counter
-16  : POP                  (line 11)
-17  : PUSH_STRING          (line 12) "Task 1 completed with counter value: "
-18  : LOAD_VAR             (line 12) counter
-19  : PUSH_STRING          (line 12) ""
-20  : CONCAT               (line 12)
-21  : INTERPOLATE_STRING   (line 12)
-22  : PRINT                (line 12)
-23  : END_SCOPE            (line 9)
-24  : END_TASK             (line 9)
-25  : BEGIN_TASK           (line 14)
-26  : PUSH_NULL            (line 14)
-27  : STORE_ITERABLE       (line 14)
-28  : BEGIN_SCOPE          (line 14)
-29  : LOAD_VAR             (line 16) counter
-30  : PUSH_INT             (line 16) 1
-31  : ADD                  (line 16)
-32  : DUP                  (line 16)
-33  : STORE_VAR            (line 16) counter
-34  : POP                  (line 16)
-35  : PUSH_STRING          (line 17) "Task 2 completed with counter value: "
-36  : LOAD_VAR             (line 17) counter
-37  : PUSH_STRING          (line 17) ""
-38  : CONCAT               (line 17)
-39  : INTERPOLATE_STRING   (line 17)
-40  : PRINT                (line 17)
-41  : END_SCOPE            (line 14)
-42  : END_TASK             (line 14)
-43  : BEGIN_TASK           (line 19)
-44  : PUSH_NULL            (line 19)
-45  : STORE_ITERABLE       (line 19)
-46  : BEGIN_SCOPE          (line 19)
-47  : LOAD_VAR             (line 21) counter
-48  : PUSH_INT             (line 21) 1
-49  : ADD                  (line 21)
-50  : DUP                  (line 21)
-51  : STORE_VAR            (line 21) counter
-52  : POP                  (line 21)
-53  : PUSH_STRING          (line 22) "Task 3 completed with counter value: "
-54  : LOAD_VAR             (line 22) counter
-55  : PUSH_STRING          (line 22) ""
-56  : CONCAT               (line 22)
-57  : INTERPOLATE_STRING   (line 22)
-58  : PRINT                (line 22)
-59  : END_SCOPE            (line 19)
-60  : END_TASK             (line 19)
-61  : BEGIN_TASK           (line 24)
-62  : PUSH_NULL            (line 24)
-63  : STORE_ITERABLE       (line 24)
-64  : BEGIN_SCOPE          (line 24)
-65  : LOAD_VAR             (line 26) counter
-66  : PUSH_INT             (line 26) 1
-67  : ADD                  (line 26)
-68  : DUP                  (line 26)
-69  : STORE_VAR            (line 26) counter
-70  : POP                  (line 26)
-71  : PUSH_STRING          (line 27) "Task 4 completed with counter value: "
-72  : LOAD_VAR             (line 27) counter
-73  : PUSH_STRING          (line 27) ""
-74  : CONCAT               (line 27)
-75  : INTERPOLATE_STRING   (line 27)
-76  : PRINT                (line 27)
-77  : END_SCOPE            (line 24)
-78  : END_TASK             (line 24)
-79  : END_SCOPE            (line 8)
-80  : END_CONCURRENT       (line 8)
-81  : PUSH_STRING          (line 31) "Tasks Iteration Tests"
-82  : PRINT                (line 31)
-83  : BEGIN_CONCURRENT     (line 34)
-84  : BEGIN_SCOPE          (line 34)
-85  : BEGIN_TASK           (line 35)
-86  : PUSH_INT             (line 35) 1
-87  : PUSH_INT             (line 35) 3
-88  : CREATE_RANGE         (line 35)
-89  : STORE_ITERABLE       (line 35)
-90  : BEGIN_SCOPE          (line 35)
-91  : PUSH_STRING          (line 36) "Task "
-92  : LOAD_VAR             (line 36) i
-93  : PUSH_STRING          (line 36) ""
-94  : CONCAT               (line 36)
-95  : PUSH_STRING          (line 36) " running"
-96  : INTERPOLATE_STRING   (line 36)
-97  : PRINT                (line 36)
-98  : END_SCOPE            (line 35)
-99  : END_TASK             (line 35)
-100 : END_SCOPE            (line 34)
-101 : END_CONCURRENT       (line 34)
-102 : PUSH_STRING          (line 40) "end Task tests"
-103 : PRINT                (line 40)
-104 : PUSH_STRING          (line 41) "Final counter value: "
-105 : LOAD_VAR             (line 41) counter
-106 : PUSH_STRING          (line 41) ""
-107 : CONCAT               (line 41)
-108 : INTERPOLATE_STRING   (line 41)
-109 : PRINT                (line 41)
-110 : PUSH_STRING          (line 42) "Smoke test finished"
-111 : PRINT                (line 42)
-112 : PUSH_STRING          (line 45) "=== Test Concurrent Iteration ==="
-113 : PRINT                (line 45)
-114 : BEGIN_CONCURRENT     (line 47)
-115 : BEGIN_SCOPE          (line 47)
-116 : BEGIN_TASK           (line 48)
-117 : PUSH_INT             (line 48) 1
-118 : PUSH_INT             (line 48) 2
-119 : CREATE_RANGE         (line 48)
-120 : STORE_ITERABLE       (line 48)
-121 : BEGIN_SCOPE          (line 48)
-122 : PUSH_STRING          (line 49) "Task "
-123 : LOAD_VAR             (line 49) i
-124 : PUSH_STRING          (line 49) ""
-125 : CONCAT               (line 49)
-126 : PUSH_STRING          (line 49) " with default parameters"
-127 : INTERPOLATE_STRING   (line 49)
-128 : PRINT                (line 49)
-129 : END_SCOPE            (line 48)
-130 : END_TASK             (line 48)
-131 : END_SCOPE            (line 47)
-132 : END_CONCURRENT       (line 47)
-133 : PUSH_STRING          (line 53) "Test finished"
-134 : PRINT                (line 53)
-135 : HALT                 (line 0)
+   0: PUSH_STRING          "=== Concurrency Smoke Test ==="
+   1: PRINT               
+   2: PUSH_INT             0
+   3: STORE_VAR            "counter"
+   4: PUSH_STRING          "Tasks Iteration Tests"
+   5: PRINT               
+   6: BEGIN_CONCURRENT    
+   7: BEGIN_SCOPE         
+   8: BEGIN_TASK          
+   9: PUSH_INT             1
+  10: PUSH_INT             4
+  11: CREATE_RANGE        
+  12: STORE_ITERABLE      
+  13: END_TASK            
+  14: END_SCOPE           
+  15: END_CONCURRENT      
+  16: PUSH_STRING          "end Task tests"
+  17: PRINT               
+  18: PUSH_STRING         
+  19: LOAD_VAR             "counter"
+  20: PUSH_STRING         
+  21: CONCAT              
+  22: PUSH_STRING          ""Final counter value: {counter}"
+  23: INTERPOLATE_STRING  
+  24: PRINT               
+  25: PUSH_STRING          "Smoke test finished"
+  26: PRINT               
+  27: PUSH_STRING          "=== Test Concurrent Iteration ==="
+  28: PRINT               
+  29: PUSH_STRING          "Test finished"
+  30: PRINT               
+  31: HALT                
+

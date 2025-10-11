@@ -1,0 +1,21 @@
+Bytecode for C:\Projects\limitly\tests\concurrency\test.lm
+Parser: New CSTParser
+========================================
+
+=== Bytecode ===
+Generated 13 instructions
+
+   0: PUSH_INT             0
+   1: DEFINE_ATOMIC       
+   2: BEGIN_CONCURRENT    
+   3: BEGIN_SCOPE         
+   4: BEGIN_TASK          
+   5: PUSH_INT             1
+   6: PUSH_INT             3
+   7: CREATE_RANGE        
+   8: STORE_ITERABLE      
+   9: END_TASK            
+  10: END_SCOPE           
+  11: END_CONCURRENT      
+  12: HALT                
+

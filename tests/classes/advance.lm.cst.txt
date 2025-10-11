@@ -1,0 +1,209 @@
+CST for C:\Projects\limitly\tests\classes\advance.lm
+Parser: New CSTParser from cst_parser.cpp
+Mode: CST (cstMode=true)
+========================================
+
+CST Statistics:
+- CST nodes created: 100
+- Trivia attachments: 215
+- Parse errors: 0
+
+=== Full CST Structure ===
++ Node: PROGRAM [2136-5485] (Program root node)
+├─ + Node: VAR_DECLARATION [2136-2159] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [2136-2137]
+│ ├─ + Node: WHITESPACE_NODE | Token:      [2137-2141]
+│ ├─ Token: var [2141-2144]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [2144-2145]
+│ ├─ + Node: IDENTIFIER [2145-2153]
+│ │ └─ Token: species1 [2145-2153]
+│ ├─ + Node: ANNOTATION [2153-2158]
+│ │ ├─ Token: : [2153-2154]
+│ │ └─ + Node: PRIMITIVE_TYPE [2155-2158]
+│ │   └─ Token: str [2155-2158]
+│ └─ Token: ; [2158-2159]
+├─ + Node: VAR_DECLARATION [2159-2182] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [2159-2160]
+│ ├─ + Node: WHITESPACE_NODE | Token:      [2160-2164]
+│ ├─ Token: var [2164-2167]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [2167-2168]
+│ ├─ + Node: IDENTIFIER [2168-2176]
+│ │ └─ Token: species2 [2168-2176]
+│ ├─ + Node: ANNOTATION [2176-2181]
+│ │ ├─ Token: : [2176-2177]
+│ │ └─ + Node: PRIMITIVE_TYPE [2178-2181]
+│ │   └─ Token: str [2178-2181]
+│ └─ Token: ; [2181-2182]
+├─ + Node: VAR_DECLARATION [2182-2200] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [2182-2183]
+│ ├─ + Node: WHITESPACE_NODE | Token:      [2183-2187]
+│ ├─ Token: var [2187-2190]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [2190-2191]
+│ ├─ + Node: IDENTIFIER [2191-2194]
+│ │ └─ Token: age [2191-2194]
+│ ├─ + Node: ANNOTATION [2194-2199]
+│ │ ├─ Token: : [2194-2195]
+│ │ └─ + Node: PRIMITIVE_TYPE [2196-2199]
+│ │   └─ Token: int [2196-2199]
+│ └─ Token: ; [2199-2200]
+├─ + Node: VAR_DECLARATION [2200-2229] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [2200-2201]
+│ ├─ + Node: WHITESPACE_NODE | Token:      [2201-2205]
+│ ├─ Token: var [2205-2208]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [2208-2209]
+│ ├─ + Node: IDENTIFIER [2209-2222]
+│ │ └─ Token: isValidHybrid [2209-2222]
+│ ├─ + Node: ANNOTATION [2222-2228]
+│ │ ├─ Token: : [2222-2223]
+│ │ └─ + Node: PRIMITIVE_TYPE [2224-2228]
+│ │   └─ Token: bool [2224-2228]
+│ └─ Token: ; [2228-2229]
+├─ + Node: VAR_DECLARATION [2229-2252] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [2229-2230]
+│ ├─ + Node: WHITESPACE_NODE | Token:      [2230-2234]
+│ ├─ Token: var [2234-2237]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [2237-2238]
+│ ├─ + Node: IDENTIFIER [2238-2244]
+│ │ └─ Token: traits [2238-2244]
+│ ├─ + Node: ANNOTATION [2244-2251]
+│ │ ├─ Token: : [2244-2245]
+│ │ └─ + Node: PRIMITIVE_TYPE [2250-2251]
+│ │   └─ Token: ] [2250-2251]
+│ └─ Token: ; [2251-2252]
+├─ + Node: VAR_DECLARATION [3174-3425] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [3174-3175]
+│ ├─ + Node: WHITESPACE_NODE | Token:          [3175-3183]
+│ ├─ + Node: COMMENT_NODE | Token: // Simple validation - real hybrids are typically within animal families [3183-3255]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [3255-3256]
+│ ├─ + Node: WHITESPACE_NODE | Token:          [3256-3264]
+│ ├─ Token: var [3264-3267]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [3267-3268]
+│ ├─ + Node: IDENTIFIER [3268-3279]
+│ │ └─ Token: validCombos [3268-3279]
+│ ├─ + Node: ASSIGNMENT_EXPR [3280-3424]
+│ │ ├─ Token: = [3280-3281]
+│ │ └─ + Node: LITERAL_EXPR [3423-3424]
+│ │   └─ Token: ] [3423-3424]
+│ └─ Token: ; [3424-3425]
+├─ + Node: VAR_DECLARATION [3737-3762] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [3737-3738]
+│ ├─ + Node: WHITESPACE_NODE | Token:          [3738-3746]
+│ ├─ Token: var [3746-3749]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [3749-3750]
+│ ├─ + Node: IDENTIFIER [3750-3756]
+│ │ └─ Token: traits [3750-3756]
+│ ├─ + Node: ASSIGNMENT_EXPR [3757-3761]
+│ │ ├─ Token: = [3757-3758]
+│ │ └─ + Node: LITERAL_EXPR [3760-3761]
+│ │   └─ Token: ] [3760-3761]
+│ └─ Token: ; [3761-3762]
+├─ + Node: VAR_DECLARATION [5014-5058] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [5014-5015]
+│ ├─ Token: var [5015-5018]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [5018-5019]
+│ ├─ + Node: IDENTIFIER [5019-5022]
+│ │ └─ Token: dog [5019-5022]
+│ ├─ + Node: ASSIGNMENT_EXPR [5023-5057]
+│ │ ├─ Token: = [5023-5024]
+│ │ └─ + Node: LITERAL_EXPR [5056-5057]
+│ │   └─ Token: ) [5056-5057]
+│ └─ Token: ; [5057-5058]
+├─ + Node: VAR_DECLARATION [5091-5118] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [5091-5092]
+│ ├─ Token: var [5092-5095]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [5095-5096]
+│ ├─ + Node: IDENTIFIER [5096-5099]
+│ │ └─ Token: cat [5096-5099]
+│ ├─ + Node: ASSIGNMENT_EXPR [5100-5117]
+│ │ ├─ Token: = [5100-5101]
+│ │ └─ + Node: LITERAL_EXPR [5116-5117]
+│ │   └─ Token: ) [5116-5117]
+│ └─ Token: ; [5117-5118]
+├─ + Node: VAR_DECLARATION [5157-5216] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [5157-5158]
+│ ├─ Token: var [5158-5161]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [5161-5162]
+│ ├─ + Node: IDENTIFIER [5162-5170]
+│ │ └─ Token: smartDog [5162-5170]
+│ ├─ + Node: ASSIGNMENT_EXPR [5171-5215]
+│ │ ├─ Token: = [5171-5172]
+│ │ └─ + Node: LITERAL_EXPR [5214-5215]
+│ │   └─ Token: ) [5214-5215]
+│ └─ Token: ; [5215-5216]
+├─ + Node: VAR_DECLARATION [5216-5301] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [5216-5217]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [5217-5218]
+│ ├─ + Node: COMMENT_NODE | Token: // Test new inline constructor classes [5218-5256]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [5256-5257]
+│ ├─ Token: var [5257-5260]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [5260-5261]
+│ ├─ + Node: IDENTIFIER [5261-5266]
+│ │ └─ Token: eagle [5261-5266]
+│ ├─ + Node: ASSIGNMENT_EXPR [5267-5300]
+│ │ ├─ Token: = [5267-5268]
+│ │ └─ + Node: LITERAL_EXPR [5299-5300]
+│ │   └─ Token: ) [5299-5300]
+│ └─ Token: ; [5300-5301]
+├─ + Node: VAR_DECLARATION [5301-5358] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [5301-5302]
+│ ├─ Token: var [5302-5305]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [5305-5306]
+│ ├─ + Node: IDENTIFIER [5306-5313]
+│ │ └─ Token: penguin [5306-5313]
+│ ├─ + Node: ASSIGNMENT_EXPR [5314-5357]
+│ │ ├─ Token: = [5314-5315]
+│ │ └─ + Node: LITERAL_EXPR [5356-5357]
+│ │   └─ Token: ) [5356-5357]
+│ └─ Token: ; [5357-5358]
+├─ + Node: VAR_DECLARATION [5358-5399] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [5358-5359]
+│ ├─ Token: var [5359-5362]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [5362-5363]
+│ ├─ + Node: IDENTIFIER [5363-5371]
+│ │ └─ Token: goldfish [5363-5371]
+│ ├─ + Node: ASSIGNMENT_EXPR [5372-5398]
+│ │ ├─ Token: = [5372-5373]
+│ │ └─ + Node: LITERAL_EXPR [5397-5398]
+│ │   └─ Token: ) [5397-5398]
+│ └─ Token: ; [5398-5399]
+├─ + Node: VAR_DECLARATION [5399-5434] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [5399-5400]
+│ ├─ Token: var [5400-5403]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [5403-5404]
+│ ├─ + Node: IDENTIFIER [5404-5409]
+│ │ └─ Token: shark [5404-5409]
+│ ├─ + Node: ASSIGNMENT_EXPR [5410-5433]
+│ │ ├─ Token: = [5410-5411]
+│ │ └─ + Node: LITERAL_EXPR [5432-5433]
+│ │   └─ Token: ) [5432-5433]
+│ └─ Token: ; [5433-5434]
+└─ + Node: VAR_DECLARATION [5434-5485] (var declaration)
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [5434-5435]
+  ├─ Token: var [5435-5438]
+  ├─ + Node: WHITESPACE_NODE | Token:   [5438-5439]
+  ├─ + Node: IDENTIFIER [5439-5445]
+  │ └─ Token: hybrid [5439-5445]
+  ├─ + Node: ASSIGNMENT_EXPR [5446-5484]
+  │ ├─ Token: = [5446-5447]
+  │ └─ + Node: LITERAL_EXPR [5483-5484]
+  │   └─ Token: ) [5483-5484]
+  └─ Token: ; [5484-5485]
+

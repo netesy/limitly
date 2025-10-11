@@ -1,0 +1,9 @@
+Bytecode for C:\Projects\limitly\tests\error_handling\block_context_tests.lm
+Parser: New CSTParser
+========================================
+
+=== Bytecode ===
+Generated 1 instructions
+
+   0: HALT                
+

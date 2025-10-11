@@ -1,0 +1,32 @@
+Bytecode for C:\Projects\limitly\tests\concurrency\task_iteration_test.lm
+Parser: New CSTParser
+========================================
+
+=== Bytecode ===
+Generated 24 instructions
+
+   0: PUSH_STRING          "=== Task Iteration Test ==="
+   1: PRINT               
+   2: PUSH_INT             0
+   3: DEFINE_ATOMIC       
+   4: BEGIN_CONCURRENT    
+   5: BEGIN_SCOPE         
+   6: BEGIN_TASK          
+   7: PUSH_INT             1
+   8: PUSH_INT             3
+   9: CREATE_RANGE        
+  10: STORE_ITERABLE      
+  11: END_TASK            
+  12: END_SCOPE           
+  13: END_CONCURRENT      
+  14: PUSH_STRING          "Task iteration test completed"
+  15: PRINT               
+  16: PUSH_STRING         
+  17: LOAD_VAR             "counters"
+  18: PUSH_STRING         
+  19: CONCAT              
+  20: PUSH_STRING          ""Final counter value: {counters}"
+  21: INTERPOLATE_STRING  
+  22: PRINT               
+  23: HALT                
+

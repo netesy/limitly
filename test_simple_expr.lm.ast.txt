@@ -1,8 +1,0 @@
-AST for test_simple_expr.lm
-Parser mode: CST
-========================================
-
-AST Dump:
-==========
-ExpressionStatement:
-  Variable: x

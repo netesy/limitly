@@ -1,0 +1,186 @@
+AST for C:\Projects\limitly\tests\expressions\collections.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+  Literal: "=== Collection Operations Test ==="
+PrintStatement:
+  Literal: "List operations:"
+VarDeclaration: myList
+  Initializer:
+    ListExpression: [5 elements]
+      Literal: 1
+      Literal: 2
+      Literal: 3
+      Literal: 4
+      Literal: 5
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "Initial list: "
+    Operator: +
+    Right:
+      Variable: myList
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "myList[0] = "
+    Operator: +
+    Right:
+      IndexExpression:
+        Object:
+          Variable: myList
+        Index:
+          Literal: 0
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "myList[2] = "
+    Operator: +
+    Right:
+      IndexExpression:
+        Object:
+          Variable: myList
+        Index:
+          Literal: 2
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "myList[4] = "
+    Operator: +
+    Right:
+      IndexExpression:
+        Object:
+          Variable: myList
+        Index:
+          Literal: 4
+PrintStatement:
+  Literal: "Dictionary operations:"
+VarDeclaration: myDict
+  Initializer:
+    DictionaryExpression: {3 entries}
+      Key:
+        Literal: "name"
+      Value:
+        Literal: "Alice"
+      Key:
+        Literal: "age"
+      Value:
+        Literal: 25
+      Key:
+        Literal: "city"
+      Value:
+        Literal: "New York"
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "Initial dict: "
+    Operator: +
+    Right:
+      Variable: myDict
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "myDict['name'] = "
+    Operator: +
+    Right:
+      IndexExpression:
+        Object:
+          Variable: myDict
+        Index:
+          Literal: "name"
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "myDict['age'] = "
+    Operator: +
+    Right:
+      IndexExpression:
+        Object:
+          Variable: myDict
+        Index:
+          Literal: "age"
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "myDict['city'] = "
+    Operator: +
+    Right:
+      IndexExpression:
+        Object:
+          Variable: myDict
+        Index:
+          Literal: "city"
+PrintStatement:
+  Literal: "Mixed collections:"
+VarDeclaration: mixedList
+  Initializer:
+    ListExpression: [4 elements]
+      Literal: 1
+      Literal: "hello"
+      Literal: true
+      DictionaryExpression: {1 entries}
+        Key:
+          Literal: "key"
+        Value:
+          Literal: "value"
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "Mixed list: "
+    Operator: +
+    Right:
+      Variable: mixedList
+VarDeclaration: nestedDict
+  Initializer:
+    DictionaryExpression: {2 entries}
+      Key:
+        Literal: "user"
+      Value:
+        DictionaryExpression: {2 entries}
+          Key:
+            Literal: "name"
+          Value:
+            Literal: "Bob"
+          Key:
+            Literal: "age"
+          Value:
+            Literal: 30
+      Key:
+        Literal: "active"
+      Value:
+        Literal: true
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "Nested dict: "
+    Operator: +
+    Right:
+      Variable: nestedDict
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "nestedDict['user'] = "
+    Operator: +
+    Right:
+      IndexExpression:
+        Object:
+          Variable: nestedDict
+        Index:
+          Literal: "user"
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "nestedDict['active'] = "
+    Operator: +
+    Right:
+      IndexExpression:
+        Object:
+          Variable: nestedDict
+        Index:
+          Literal: "active"

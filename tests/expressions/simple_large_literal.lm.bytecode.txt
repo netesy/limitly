@@ -1,0 +1,14 @@
+Bytecode for C:\Projects\limitly\tests\expressions\simple_large_literal.lm
+Parser: New CSTParser
+========================================
+
+=== Bytecode ===
+Generated 6 instructions
+
+   0: PUSH_FLOAT           1.84467e+19
+   1: STORE_VAR            "test"
+   2: PUSH_STRING          "Test:"
+   3: LOAD_VAR             "test"
+   4: PRINT               
+   5: HALT                
+

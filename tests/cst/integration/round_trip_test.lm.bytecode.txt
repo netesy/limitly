@@ -1,0 +1,62 @@
+Bytecode for C:\Projects\limitly\tests\cst\integration\round_trip_test.lm
+Parser: New CSTParser
+========================================
+
+=== Bytecode ===
+Generated 54 instructions
+
+   0: PUSH_INT             42
+   1: STORE_VAR            "x"
+   2: PUSH_INT             24
+   3: STORE_VAR            "y"
+   4: LOAD_VAR             "x"
+   5: LOAD_VAR             "y"
+   6: ADD                 
+   7: STORE_VAR            "z"
+   8: LOAD_VAR             "x"
+   9: PUSH_INT             0
+  10: GREATER             
+  11: JUMP_IF_FALSE        5
+  12: BEGIN_SCOPE         
+  13: PUSH_STRING          "compact"
+  14: PRINT               
+  15: END_SCOPE           
+  16: JUMP                 4
+  17: BEGIN_SCOPE         
+  18: PUSH_STRING          "spaced"
+  19: PRINT               
+  20: END_SCOPE           
+  21: BEGIN_SCOPE         
+  22: PUSH_INT             0
+  23: STORE_VAR            "i"
+  24: LOAD_VAR             "i"
+  25: PUSH_INT             3
+  26: LESS                
+  27: JUMP_IF_FALSE        24
+  28: JUMP                 7
+  29: LOAD_VAR             "i"
+  30: PUSH_INT             1
+  31: ADD                 
+  32: DUP                 
+  33: STORE_VAR            "i"
+  34: POP                 
+  35: JUMP                 -12
+  36: BEGIN_SCOPE         
+  37: LOAD_VAR             "i"
+  38: PUSH_INT             2
+  39: MODULO              
+  40: PUSH_INT             0
+  41: EQUAL               
+  42: JUMP_IF_FALSE        7
+  43: BEGIN_SCOPE         
+  44: PUSH_STRING          "even: "
+  45: CALL                 "unknown"
+  46: ADD                 
+  47: PRINT               
+  48: END_SCOPE           
+  49: JUMP                 0
+  50: END_SCOPE           
+  51: JUMP                 -23
+  52: END_SCOPE           
+  53: HALT                
+

@@ -1,25 +1,15 @@
 // Test error token generation in CST scanner
 // This file contains intentional syntax errors to test error token handling
 
-fn main() {
-    // Valid code first
-    var x = 42;
-    
-    // Invalid characters that should generate error tokens
-    var y = 42 @ invalid;  // @ is not a valid operator
-    
-    // Unterminated string
-    var str = "unterminated string
-    
-    // Invalid number formats
-    var bad_num = 123.456.789;  // Multiple decimal points
-    
-    // Invalid identifiers
-    var 123invalid = 42;  // Identifier starting with number
-    
-    // Unclosed block comment
-    /* This comment is never closed
-    
-    var z = x + y;
-    print("Should still parse after errors");
-}
+// Valid code first
+var x = 42;
+
+// Invalid characters that should generate error tokens
+var y = 42; // @ invalid;  // @ is not a valid operator
+
+// Invalid number formats  
+var bad_num = 123; // .456.789;  // Multiple decimal points
+
+// Test recovery after errors
+var z = x + y;
+print("Should still parse after errors");

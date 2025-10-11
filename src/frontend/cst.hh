@@ -54,6 +54,7 @@ namespace CST {
         MEMBER_EXPR,
         INDEX_EXPR,
         LITERAL_EXPR,
+        OBJECT_LITERAL_EXPR,
         VARIABLE_EXPR,
         GROUPING_EXPR,
         ASSIGNMENT_EXPR,
@@ -131,6 +132,10 @@ namespace CST {
         // CST preserves ALL source elements in order
         std::vector<CSTElement> elements;
         
+        // Trivia integration for precise source reconstruction
+        std::vector<Token> leadingTrivia;     // Trivia before this node
+        std::vector<Token> trailingTrivia;    // Trivia after this node
+        
         // Optional metadata
         bool isValid = true;          // Validation flag
         std::string errorMessage;     // For error nodes
@@ -161,6 +166,14 @@ namespace CST {
         // Source reconstruction
         std::string getText() const;
         std::string getTextWithoutTrivia() const;
+        std::string reconstructSource() const;  // Rebuild original source with all trivia
+        
+        // Trivia management
+        void attachTriviaFromToken(const Token& token);
+        void addLeadingTrivia(const std::vector<Token>& trivia);
+        void addTrailingTrivia(const std::vector<Token>& trivia);
+        const std::vector<Token>& getLeadingTrivia() const { return leadingTrivia; }
+        const std::vector<Token>& getTrailingTrivia() const { return trailingTrivia; }
         
         // Tree traversal helpers
         void setSourceSpan(size_t start, size_t end);

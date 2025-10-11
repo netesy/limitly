@@ -1,0 +1,163 @@
+Bytecode for C:\Projects\limitly\tests\integration\error_handling_vm.lm
+Parser: New CSTParser
+========================================
+
+=== Bytecode ===
+Generated 155 instructions
+
+   0: PUSH_STRING          "=== Test 1: Basic Error Construction ==="
+   1: PRINT               
+   2: PUSH_INT             10
+   3: STORE_VAR            "x"
+   4: PUSH_INT             0
+   5: STORE_VAR            "y"
+   6: LOAD_VAR             "y"
+   7: PUSH_INT             0
+   8: EQUAL               
+   9: JUMP_IF_FALSE        5
+  10: BEGIN_SCOPE         
+  11: PUSH_STRING          "Division by zero detected"
+  12: PRINT               
+  13: END_SCOPE           
+  14: JUMP                 10
+  15: BEGIN_SCOPE         
+  16: LOAD_VAR             "x"
+  17: LOAD_VAR             "y"
+  18: DIVIDE              
+  19: STORE_VAR            "result"
+  20: PUSH_STRING          "Result: "
+  21: LOAD_VAR             "result"
+  22: ADD                 
+  23: PRINT               
+  24: END_SCOPE           
+  25: PUSH_STRING          "=== Test 2: Success Value Construction ==="
+  26: PRINT               
+  27: PUSH_INT             42
+  28: STORE_VAR            "success_value"
+  29: PUSH_STRING          "Success value: "
+  30: LOAD_VAR             "success_value"
+  31: ADD                 
+  32: PRINT               
+  33: PUSH_STRING          "=== Test 3: Error Propagation Simulation ==="
+  34: PRINT               
+  35: BEGIN_FUNCTION       "divide"
+  36: DEFINE_PARAM        
+  37: DEFINE_PARAM        
+  38: BEGIN_SCOPE         
+  39: LOAD_VAR             "b"
+  40: PUSH_INT             0
+  41: EQUAL               
+  42: JUMP_IF_FALSE        8
+  43: BEGIN_SCOPE         
+  44: PUSH_STRING          "Error: Division by zero in divide function"
+  45: PRINT               
+  46: PUSH_INT             1
+  47: NEGATE              
+  48: RETURN              
+  49: END_SCOPE           
+  50: JUMP                 0
+  51: LOAD_VAR             "a"
+  52: LOAD_VAR             "b"
+  53: DIVIDE              
+  54: RETURN              
+  55: END_SCOPE           
+  56: PUSH_NULL           
+  57: RETURN              
+  58: END_FUNCTION        
+  59: PUSH_FUNCTION       
+  60: STORE_VAR            "divide"
+  61: PUSH_INT             10
+  62: PUSH_INT             2
+  63: CALL                 "divide"
+  64: STORE_VAR            "result1"
+  65: PUSH_STRING          "10 / 2 = "
+  66: LOAD_VAR             "result1"
+  67: ADD                 
+  68: PRINT               
+  69: PUSH_INT             10
+  70: PUSH_INT             0
+  71: CALL                 "divide"
+  72: STORE_VAR            "result2"
+  73: PUSH_STRING          "10 / 0 = "
+  74: LOAD_VAR             "result2"
+  75: ADD                 
+  76: PRINT               
+  77: PUSH_STRING          "=== Test 4: Nested Error Propagation ==="
+  78: PRINT               
+  79: BEGIN_FUNCTION       "safe_divide"
+  80: DEFINE_PARAM        
+  81: DEFINE_PARAM        
+  82: BEGIN_SCOPE         
+  83: LOAD_VAR             "a"
+  84: LOAD_VAR             "b"
+  85: CALL                 "divide"
+  86: RETURN              
+  87: END_SCOPE           
+  88: PUSH_NULL           
+  89: RETURN              
+  90: END_FUNCTION        
+  91: PUSH_FUNCTION       
+  92: STORE_VAR            "safe_divide"
+  93: PUSH_INT             20
+  94: PUSH_INT             4
+  95: CALL                 "safe_divide"
+  96: STORE_VAR            "result3"
+  97: PUSH_STRING          "20 / 4 = "
+  98: LOAD_VAR             "result3"
+  99: ADD                 
+ 100: PRINT               
+ 101: PUSH_INT             20
+ 102: PUSH_INT             0
+ 103: CALL                 "safe_divide"
+ 104: STORE_VAR            "result4"
+ 105: PUSH_STRING          "20 / 0 = "
+ 106: LOAD_VAR             "result4"
+ 107: ADD                 
+ 108: PRINT               
+ 109: PUSH_STRING          "=== Test 5: Error Handling Simulation ==="
+ 110: PRINT               
+ 111: BEGIN_FUNCTION       "handle_division"
+ 112: DEFINE_PARAM        
+ 113: DEFINE_PARAM        
+ 114: BEGIN_SCOPE         
+ 115: LOAD_VAR             "b"
+ 116: PUSH_INT             0
+ 117: EQUAL               
+ 118: JUMP_IF_FALSE        9
+ 119: BEGIN_SCOPE         
+ 120: PUSH_STRING          "Handled error: Cannot divide "
+ 121: LOAD_VAR             "a"
+ 122: ADD                 
+ 123: PUSH_STRING          " by zero"
+ 124: ADD                 
+ 125: PRINT               
+ 126: END_SCOPE           
+ 127: JUMP                 10
+ 128: BEGIN_SCOPE         
+ 129: LOAD_VAR             "a"
+ 130: LOAD_VAR             "b"
+ 131: DIVIDE              
+ 132: STORE_VAR            "result"
+ 133: PUSH_STRING          "Division result: "
+ 134: LOAD_VAR             "result"
+ 135: ADD                 
+ 136: PRINT               
+ 137: END_SCOPE           
+ 138: END_SCOPE           
+ 139: PUSH_NULL           
+ 140: RETURN              
+ 141: END_FUNCTION        
+ 142: PUSH_FUNCTION       
+ 143: STORE_VAR            "handle_division"
+ 144: PUSH_INT             15
+ 145: PUSH_INT             3
+ 146: CALL                 "handle_division"
+ 147: POP                 
+ 148: PUSH_INT             15
+ 149: PUSH_INT             0
+ 150: CALL                 "handle_division"
+ 151: POP                 
+ 152: PUSH_STRING          "=== Error Handling VM Tests Compvare ==="
+ 153: PRINT               
+ 154: HALT                
+

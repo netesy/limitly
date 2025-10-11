@@ -1,0 +1,346 @@
+AST for C:\Projects\limitly\tests\cst\integration\performance_benchmark.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
+========================================
+
+AST Dump:
+==========
+VarDeclaration: a
+  Initializer:
+    Literal: 1
+VarDeclaration: b
+  Initializer:
+    Literal: 2
+VarDeclaration: c
+  Initializer:
+    Literal: 3
+VarDeclaration: d
+  Initializer:
+    Literal: 4
+VarDeclaration: e
+  Initializer:
+    Literal: 5
+VarDeclaration: sum1
+  Initializer:
+    BinaryExpression: +
+      Left:
+        BinaryExpression: +
+          Left:
+            Variable: a
+          Operator: +
+          Right:
+            Variable: b
+      Operator: +
+      Right:
+        Variable: c
+VarDeclaration: sum2
+  Initializer:
+    BinaryExpression: +
+      Left:
+        Variable: d
+      Operator: +
+      Right:
+        Variable: e
+VarDeclaration: product
+  Initializer:
+    BinaryExpression: *
+      Left:
+        Variable: sum1
+      Operator: *
+      Right:
+        Variable: sum2
+VarDeclaration: difference
+  Initializer:
+    BinaryExpression: -
+      Left:
+        Variable: product
+      Operator: -
+      Right:
+        Variable: sum1
+ForStatement (traditional):
+  Initializer:
+    VarDeclaration: outer
+      Initializer:
+        Literal: 0
+  Condition:
+    BinaryExpression: <
+      Left:
+        Variable: outer
+      Operator: <
+      Right:
+        Literal: 5
+  Increment:
+    Assignment: =
+      Target: outer
+      Value:
+      BinaryExpression: +
+        Left:
+          Variable: outer
+        Operator: +
+        Right:
+          Literal: 1
+  Body:
+    BlockStatement:
+      ForStatement (traditional):
+        Initializer:
+          VarDeclaration: inner
+            Initializer:
+              Literal: 0
+        Condition:
+          BinaryExpression: <
+            Left:
+              Variable: inner
+            Operator: <
+            Right:
+              Literal: 3
+        Increment:
+          Assignment: =
+            Target: inner
+            Value:
+            BinaryExpression: +
+              Left:
+                Variable: inner
+              Operator: +
+              Right:
+                Literal: 1
+        Body:
+          BlockStatement:
+            IfStatement:
+              Condition:
+                BinaryExpression: ==
+                  Left:
+                    Variable: outer
+                  Operator: ==
+                  Right:
+                    Variable: inner
+              Then:
+                BlockStatement:
+                  PrintStatement:
+                    BinaryExpression: +
+                      Left:
+                        BinaryExpression: +
+                          Left:
+                            BinaryExpression: +
+                              Left:
+                                Literal: "Equal: "
+                              Operator: +
+                              Right:
+                                CallExpression:
+                                  Callee:
+                                    Literal: nil
+                                  Arguments:
+                                    Variable: outer
+                          Operator: +
+                          Right:
+                            Literal: ", "
+                      Operator: +
+                      Right:
+                        CallExpression:
+                          Callee:
+                            Literal: nil
+                          Arguments:
+                            Variable: inner
+              Else:
+                IfStatement:
+                  Condition:
+                    BinaryExpression: >
+                      Left:
+                        Variable: outer
+                      Operator: >
+                      Right:
+                        Variable: inner
+                  Then:
+                    BlockStatement:
+                      PrintStatement:
+                        BinaryExpression: +
+                          Left:
+                            BinaryExpression: +
+                              Left:
+                                BinaryExpression: +
+                                  Left:
+                                    Literal: "Greater: "
+                                  Operator: +
+                                  Right:
+                                    CallExpression:
+                                      Callee:
+                                        Literal: nil
+                                      Arguments:
+                                        Variable: outer
+                              Operator: +
+                              Right:
+                                Literal: ", "
+                          Operator: +
+                          Right:
+                            CallExpression:
+                              Callee:
+                                Literal: nil
+                              Arguments:
+                                Variable: inner
+                  Else:
+                    BlockStatement:
+                      PrintStatement:
+                        BinaryExpression: +
+                          Left:
+                            BinaryExpression: +
+                              Left:
+                                BinaryExpression: +
+                                  Left:
+                                    Literal: "Less: "
+                                  Operator: +
+                                  Right:
+                                    CallExpression:
+                                      Callee:
+                                        Literal: nil
+                                      Arguments:
+                                        Variable: outer
+                              Operator: +
+                              Right:
+                                Literal: ", "
+                          Operator: +
+                          Right:
+                            CallExpression:
+                              Callee:
+                                Literal: nil
+                              Arguments:
+                                Variable: inner
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "Sum1: "
+    Operator: +
+    Right:
+      CallExpression:
+        Callee:
+          Literal: nil
+        Arguments:
+          Variable: sum1
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "Sum2: "
+    Operator: +
+    Right:
+      CallExpression:
+        Callee:
+          Literal: nil
+        Arguments:
+          Variable: sum2
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "Product: "
+    Operator: +
+    Right:
+      CallExpression:
+        Callee:
+          Literal: nil
+        Arguments:
+          Variable: product
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "Difference: "
+    Operator: +
+    Right:
+      CallExpression:
+        Callee:
+          Literal: nil
+        Arguments:
+          Variable: difference
+VarDeclaration: complex1
+  Initializer:
+    BinaryExpression: -
+      Left:
+        BinaryExpression: *
+          Left:
+            Grouping:
+              BinaryExpression: +
+                Left:
+                  Variable: a
+                Operator: +
+                Right:
+                  Variable: b
+          Operator: *
+          Right:
+            Grouping:
+              BinaryExpression: +
+                Left:
+                  Variable: c
+                Operator: +
+                Right:
+                  Variable: d
+      Operator: -
+      Right:
+        Variable: e
+VarDeclaration: complex2
+  Initializer:
+    BinaryExpression: +
+      Left:
+        BinaryExpression: +
+          Left:
+            BinaryExpression: *
+              Left:
+                Variable: a
+              Operator: *
+              Right:
+                Variable: b
+          Operator: +
+          Right:
+            BinaryExpression: *
+              Left:
+                Variable: c
+              Operator: *
+              Right:
+                Variable: d
+      Operator: +
+      Right:
+        Variable: e
+VarDeclaration: complex3
+  Initializer:
+    BinaryExpression: /
+      Left:
+        Grouping:
+          BinaryExpression: +
+            Left:
+              Variable: complex1
+            Operator: +
+            Right:
+              Variable: complex2
+      Operator: /
+      Right:
+        Literal: 2
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "Complex1: "
+    Operator: +
+    Right:
+      CallExpression:
+        Callee:
+          Literal: nil
+        Arguments:
+          Variable: complex1
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "Complex2: "
+    Operator: +
+    Right:
+      CallExpression:
+        Callee:
+          Literal: nil
+        Arguments:
+          Variable: complex2
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "Complex3: "
+    Operator: +
+    Right:
+      CallExpression:
+        Callee:
+          Literal: nil
+        Arguments:
+          Variable: complex3

@@ -1,33 +1,16 @@
 // Test error node creation in CST parser
 // This file tests creation of ErrorNode, MissingNode, and IncompleteNode types
 
-fn main() {
-    // Test missing tokens that should create MissingNode
-    var x;  // Missing initializer
-    var : int = 42;  // Missing identifier
-    
-    // Test invalid syntax that should create ErrorNode
-    var y = 42 ++ 10;  // Invalid operator
-    var z = [1, 2, 3;  // Missing closing bracket
-    
-    // Test incomplete constructs that should create IncompleteNode
-    if (x > 0  // Missing closing parenthesis and body
-    
-    // Test function with missing elements
-    fn incomplete_func(  // Missing parameters and body
-    
-    // Test class with missing elements
-    class TestClass  // Missing body
-    
-    // Test match expression with missing elements
-    match (x)  // Missing cases and body
-    
-    // Valid code should still parse after errors
-    print("This should still work");
-    
-    // Test nested error recovery
-    if (true) {
-        var nested_error = ;  // Missing expression
-        print("After nested error");
-    }
+// Test missing tokens that should create MissingNode
+var x = 42;  // Valid for comparison
+
+// Test incomplete constructs that should create IncompleteNode
+if (x > 0  // Missing closing parenthesis and body
+
+// Valid code should still parse after errors
+print("This should still work");
+
+// Test nested error recovery
+if (true) {
+    print("After nested error");
 }

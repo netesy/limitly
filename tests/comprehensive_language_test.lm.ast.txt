@@ -1,0 +1,1654 @@
+AST for C:\Projects\limitly\tests\comprehensive_language_test.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+  Literal: "=== COMPREHENSIVE LANGUAGE FEATURE TEST ==="
+PrintStatement:
+  Literal: "\n=== 1. LITERALS AND VARIABLES ==="
+PrintStatement:
+  Literal: "Integers:"
+PrintStatement:
+  Literal: 0
+PrintStatement:
+  Literal: 42
+PrintStatement:
+  UnaryExpression: -
+    Operand:
+      Literal: 17
+PrintStatement:
+  Literal: 999999
+PrintStatement:
+  Literal: "Floats:"
+PrintStatement:
+  Literal: 
+PrintStatement:
+  Literal: 3.14159
+PrintStatement:
+  UnaryExpression: -
+    Operand:
+      Literal: 2.71828
+PrintStatement:
+  Literal: "Strings:"
+PrintStatement:
+  Literal: "Hello, World!"
+PrintStatement:
+  Literal: "\""
+PrintStatement:
+  Literal: "Special chars: \n\t\\\""
+PrintStatement:
+  Literal: "Booleans:"
+PrintStatement:
+  Literal: true
+PrintStatement:
+  Literal: false
+PrintStatement:
+  Literal: "Null:"
+PrintStatement:
+  Literal: nil
+VarDeclaration: x
+  Initializer:
+    Literal: 42
+VarDeclaration: y
+  Initializer:
+    Literal: 3.14
+VarDeclaration: name
+  Initializer:
+    Literal: "Limit"
+VarDeclaration: isActive
+  Initializer:
+    Literal: true
+PrintStatement:
+  Literal: "Variables:"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: x
+    String: "\"Integer: {x}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: y
+    String: "\"Float: {y}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: name
+    String: "\"String: {name}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: isActive
+    String: "\"Boolean: {isActive}"
+ExpressionStatement:
+  Assignment: =
+    Target: x
+    Value:
+    Literal: 100
+ExpressionStatement:
+  Assignment: =
+    Target: y
+    Value:
+    Literal: 2.71
+ExpressionStatement:
+  Assignment: =
+    Target: name
+    Value:
+    Literal: "Language"
+ExpressionStatement:
+  Assignment: =
+    Target: isActive
+    Value:
+    Literal: false
+PrintStatement:
+  Literal: "After reassignment:"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: x
+    String: "\"Integer: {x}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: y
+    String: "\"Float: {y}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: name
+    String: "\"String: {name}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: isActive
+    String: "\"Boolean: {isActive}"
+PrintStatement:
+  Literal: "\n=== 2. EXPRESSIONS AND OPERATORS ==="
+VarDeclaration: a
+  Initializer:
+    Literal: 10
+VarDeclaration: b
+  Initializer:
+    Literal: 3
+PrintStatement:
+  Literal: "Arithmetic:"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      Variable: b
+    Expression:
+      BinaryExpression: +
+        Left:
+          Variable: a
+        Operator: +
+        Right:
+          Variable: b
+    String: "\"Addition: {a} + {b} = {a + b}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      Variable: b
+    Expression:
+      BinaryExpression: -
+        Left:
+          Variable: a
+        Operator: -
+        Right:
+          Variable: b
+    String: "\"Subtraction: {a} - {b} = {a - b}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      Variable: b
+    Expression:
+      BinaryExpression: *
+        Left:
+          Variable: a
+        Operator: *
+        Right:
+          Variable: b
+    String: "\"Multiplication: {a} * {b} = {a * b}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      Variable: b
+    Expression:
+      BinaryExpression: /
+        Left:
+          Variable: a
+        Operator: /
+        Right:
+          Variable: b
+    String: "\"Division: {a} / {b} = {a / b}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      Variable: b
+    Expression:
+      BinaryExpression: %
+        Left:
+          Variable: a
+        Operator: %
+        Right:
+          Variable: b
+    String: "\"Modulo: {a} % {b} = {a % b}"
+PrintStatement:
+  Literal: "Unary:"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      UnaryExpression: -
+        Operand:
+          Variable: a
+    String: "\"Negation: -{a} = {-a}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      UnaryExpression: +
+        Operand:
+          Variable: a
+    String: "\"Positive: +{a} = {+a}"
+PrintStatement:
+  Literal: "Comparison:"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      Variable: b
+    Expression:
+      BinaryExpression: ==
+        Left:
+          Variable: a
+        Operator: ==
+        Right:
+          Variable: b
+    String: "\"{a} == {b}: {a == b}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      Variable: b
+    Expression:
+      BinaryExpression: !=
+        Left:
+          Variable: a
+        Operator: !=
+        Right:
+          Variable: b
+    String: "\"{a} != {b}: {a != b}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      Variable: b
+    Expression:
+      BinaryExpression: <
+        Left:
+          Variable: a
+        Operator: <
+        Right:
+          Variable: b
+    String: "\"{a} < {b}: {a < b}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      Variable: b
+    Expression:
+      BinaryExpression: >
+        Left:
+          Variable: a
+        Operator: >
+        Right:
+          Variable: b
+    String: "\"{a} > {b}: {a > b}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      Variable: b
+    Expression:
+      BinaryExpression: <=
+        Left:
+          Variable: a
+        Operator: <=
+        Right:
+          Variable: b
+    String: "\"{a} <= {b}: {a <= b}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      Variable: b
+    Expression:
+      BinaryExpression: >=
+        Left:
+          Variable: a
+        Operator: >=
+        Right:
+          Variable: b
+    String: "\"{a} >= {b}: {a >= b}"
+VarDeclaration: p
+  Initializer:
+    Literal: true
+VarDeclaration: q
+  Initializer:
+    Literal: false
+PrintStatement:
+  Literal: "Logical:"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      BinaryExpression: and
+        Left:
+          Variable: p
+        Operator: and
+        Right:
+          Variable: q
+    String: "\"p && q: {p and q}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      BinaryExpression: <unknown>
+        Left:
+          Variable: p
+        Operator: <unknown>
+        Right:
+          Variable: q
+    String: "\"p || q: {p or q}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      UnaryExpression: !
+        Operand:
+          Variable: p
+    String: "\"!p: {!p}"
+VarDeclaration: result
+  Initializer:
+    BinaryExpression: -
+      Left:
+        BinaryExpression: *
+          Left:
+            Grouping:
+              BinaryExpression: +
+                Left:
+                  Variable: a
+                Operator: +
+                Right:
+                  Variable: b
+          Operator: *
+          Right:
+            Literal: 2
+      Operator: -
+      Right:
+        BinaryExpression: /
+          Left:
+            Variable: a
+          Operator: /
+          Right:
+            Variable: b
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      Variable: b
+    Expression:
+      Variable: a
+    Expression:
+      Variable: b
+    Expression:
+      Variable: result
+    String: "\"Complex: ({a} + {b}) * 2 - {a} / {b} = {result}"
+PrintStatement:
+  Literal: "\n=== 3. STRING INTERPOLATION ==="
+VarDeclaration: userName
+  Initializer:
+    Literal: "Alice"
+VarDeclaration: userAge
+  Initializer:
+    Literal: 25
+VarDeclaration: pi
+  Initializer:
+    Literal: 3.14159
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: userName
+    String: "!"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: userAge
+    String: "\"Age: {userAge}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: pi
+    String: "\"Pi: {pi}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      BinaryExpression: +
+        Left:
+          Variable: userAge
+        Operator: +
+        Right:
+          Literal: 1
+    String: "\"Next year: {userAge + 1}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      BinaryExpression: *
+        Left:
+          BinaryExpression: *
+            Left:
+              Variable: pi
+            Operator: *
+            Right:
+              Literal: 2
+        Operator: *
+        Right:
+          Literal: 2
+    String: "\"Area of circle: {pi * 2 * 2}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: userName
+    Expression:
+      Variable: userAge
+    String: "\"Name: {userName}, Age: {userAge}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: userName
+    Expression:
+      Variable: userAge
+    String: " years old"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: userName
+    String: " says hello"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: userAge
+    String: " is the age"
+VarDeclaration: x1
+  Initializer:
+    Literal: 10
+VarDeclaration: y1
+  Initializer:
+    Literal: 5
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: x1
+    Expression:
+      Variable: y1
+    Expression:
+      BinaryExpression: +
+        Left:
+          Variable: x1
+        Operator: +
+        Right:
+          Variable: y1
+    String: "\"Math: {x1} + {y1} = {x1 + y1}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: x1
+    Expression:
+      Variable: y1
+    Expression:
+      BinaryExpression: >
+        Left:
+          Variable: x1
+        Operator: >
+        Right:
+          Variable: y1
+    String: "\"Comparison: {x1} > {y1} is {x1 > y1}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      BinaryExpression: -
+        Left:
+          BinaryExpression: *
+            Left:
+              Grouping:
+                BinaryExpression: +
+                  Left:
+                    Variable: x1
+                  Operator: +
+                  Right:
+                    Variable: y1
+            Operator: *
+            Right:
+              Literal: 2
+        Operator: -
+        Right:
+          Literal: 1
+    String: "\"Complex: {(x1 + y1) * 2 - 1}"
+PrintStatement:
+  Literal: "\n=== 4. CONTROL FLOW - IF/ELSE ==="
+VarDeclaration: score
+  Initializer:
+    Literal: 85
+IfStatement:
+  Condition:
+    BinaryExpression: >=
+      Left:
+        Variable: score
+      Operator: >=
+      Right:
+        Literal: 90
+  Then:
+    BlockStatement:
+      PrintStatement:
+        Literal: "Grade: A"
+  Else:
+    IfStatement:
+      Condition:
+        BinaryExpression: >=
+          Left:
+            Variable: score
+          Operator: >=
+          Right:
+            Literal: 80
+      Then:
+        BlockStatement:
+          PrintStatement:
+            Literal: "Grade: B"
+      Else:
+        IfStatement:
+          Condition:
+            BinaryExpression: >=
+              Left:
+                Variable: score
+              Operator: >=
+              Right:
+                Literal: 70
+          Then:
+            BlockStatement:
+              PrintStatement:
+                Literal: "Grade: C"
+          Else:
+            BlockStatement:
+              PrintStatement:
+                Literal: "Grade: F"
+VarDeclaration: weather
+  Initializer:
+    Literal: "sunny"
+VarDeclaration: temperature
+  Initializer:
+    Literal: 75
+IfStatement:
+  Condition:
+    BinaryExpression: ==
+      Left:
+        Variable: weather
+      Operator: ==
+      Right:
+        Literal: "sunny"
+  Then:
+    BlockStatement:
+      IfStatement:
+        Condition:
+          BinaryExpression: >
+            Left:
+              Variable: temperature
+            Operator: >
+            Right:
+              Literal: 70
+        Then:
+          BlockStatement:
+            PrintStatement:
+              Literal: "Perfect day for outdoor activities!"
+        Else:
+          BlockStatement:
+            PrintStatement:
+              Literal: "Sunny but a bit cold."
+  Else:
+    BlockStatement:
+      PrintStatement:
+        Literal: "Not ideal weather."
+PrintStatement:
+  Literal: "\n=== 5. LOOPS - FOR LOOPS ==="
+PrintStatement:
+  Literal: "Basic for loop (0 to 4):"
+ForStatement (traditional):
+  Initializer:
+    VarDeclaration: i
+      Initializer:
+        Literal: 0
+  Condition:
+    BinaryExpression: <
+      Left:
+        Variable: i
+      Operator: <
+      Right:
+        Literal: 5
+  Increment:
+    Assignment: +=
+      Target: i
+      Value:
+      Literal: 1
+  Body:
+    BlockStatement:
+      PrintStatement:
+        InterpolatedString:
+          String: ""
+          Expression:
+            Variable: i
+          String: "\"i = {i}"
+PrintStatement:
+  Literal: "For loop with increment 2:"
+ForStatement (traditional):
+  Initializer:
+    VarDeclaration: j
+      Initializer:
+        Literal: 0
+  Condition:
+    BinaryExpression: <
+      Left:
+        Variable: j
+      Operator: <
+      Right:
+        Literal: 10
+  Increment:
+    Assignment: +=
+      Target: j
+      Value:
+      Literal: 2
+  Body:
+    BlockStatement:
+      PrintStatement:
+        InterpolatedString:
+          String: ""
+          Expression:
+            Variable: j
+          String: "\"j = {j}"
+PrintStatement:
+  Literal: "Countdown loop:"
+ForStatement (traditional):
+  Initializer:
+    VarDeclaration: k
+      Initializer:
+        Literal: 5
+  Condition:
+    BinaryExpression: >
+      Left:
+        Variable: k
+      Operator: >
+      Right:
+        Literal: 0
+  Increment:
+    Assignment: -=
+      Target: k
+      Value:
+      Literal: 1
+  Body:
+    BlockStatement:
+      PrintStatement:
+        InterpolatedString:
+          String: ""
+          Expression:
+            Variable: k
+          String: "\"k = {k}"
+PrintStatement:
+  Literal: "Nested for loops (2x3 grid):"
+ForStatement (traditional):
+  Initializer:
+    VarDeclaration: row
+      Initializer:
+        Literal: 0
+  Condition:
+    BinaryExpression: <
+      Left:
+        Variable: row
+      Operator: <
+      Right:
+        Literal: 2
+  Increment:
+    Assignment: +=
+      Target: row
+      Value:
+      Literal: 1
+  Body:
+    BlockStatement:
+      ForStatement (traditional):
+        Initializer:
+          VarDeclaration: col
+            Initializer:
+              Literal: 0
+        Condition:
+          BinaryExpression: <
+            Left:
+              Variable: col
+            Operator: <
+            Right:
+              Literal: 3
+        Increment:
+          Assignment: +=
+            Target: col
+            Value:
+            Literal: 1
+        Body:
+          BlockStatement:
+            PrintStatement:
+              InterpolatedString:
+                String: ""
+                Expression:
+                  Variable: row
+                Expression:
+                  Variable: col
+                String: ")"
+PrintStatement:
+  Literal: "\n=== 6. LOOPS - ITER LOOPS ==="
+PrintStatement:
+  Literal: "Basic range (1 to 5):"
+IterStatement:
+  Variables: i
+  Iterable:
+    RangeExpression:
+      Start:
+        Literal: 1
+      End:
+        Literal: 6
+      Inclusive: true
+  Body:
+    BlockStatement:
+      PrintStatement:
+        InterpolatedString:
+          String: ""
+          Expression:
+            Variable: i
+          String: "\"i = {i}"
+PrintStatement:
+  Literal: "Range (0 to 3):"
+IterStatement:
+  Variables: x
+  Iterable:
+    RangeExpression:
+      Start:
+        Literal: 0
+      End:
+        Literal: 4
+      Inclusive: true
+  Body:
+    BlockStatement:
+      PrintStatement:
+        InterpolatedString:
+          String: ""
+          Expression:
+            Variable: x
+          String: "\"x = {x}"
+PrintStatement:
+  Literal: "Nested iter loops:"
+IterStatement:
+  Variables: i
+  Iterable:
+    RangeExpression:
+      Start:
+        Literal: 1
+      End:
+        Literal: 3
+      Inclusive: true
+  Body:
+    BlockStatement:
+      IterStatement:
+        Variables: j
+        Iterable:
+          RangeExpression:
+            Start:
+              Literal: 10
+            End:
+              Literal: 12
+            Inclusive: true
+        Body:
+          BlockStatement:
+            PrintStatement:
+              InterpolatedString:
+                String: ""
+                Expression:
+                  Variable: i
+                Expression:
+                  Variable: j
+                String: ")"
+PrintStatement:
+  Literal: "Mixed loops (for outer, iter inner):"
+ForStatement (traditional):
+  Initializer:
+    VarDeclaration: i
+      Initializer:
+        Literal: 0
+  Condition:
+    BinaryExpression: <
+      Left:
+        Variable: i
+      Operator: <
+      Right:
+        Literal: 2
+  Increment:
+    Assignment: +=
+      Target: i
+      Value:
+      Literal: 1
+  Body:
+    BlockStatement:
+      IterStatement:
+        Variables: j
+        Iterable:
+          RangeExpression:
+            Start:
+              Literal: 5
+            End:
+              Literal: 7
+            Inclusive: true
+        Body:
+          BlockStatement:
+            PrintStatement:
+              InterpolatedString:
+                String: ""
+                Expression:
+                  Variable: i
+                Expression:
+                  Variable: j
+                String: ")"
+PrintStatement:
+  Literal: "\n=== 7. LOOPS - WHILE LOOPS ==="
+VarDeclaration: count
+  Initializer:
+    Literal: 0
+PrintStatement:
+  Literal: "While loop (count to 3):"
+WhileStatement:
+  Condition:
+    BinaryExpression: <
+      Left:
+        Variable: count
+      Operator: <
+      Right:
+        Literal: 3
+  Body:
+    BlockStatement:
+      PrintStatement:
+        InterpolatedString:
+          String: ""
+          Expression:
+            Variable: count
+          String: "\"count = {count}"
+      ExpressionStatement:
+        Assignment: +=
+          Target: count
+          Value:
+          Literal: 1
+VarDeclaration: num
+  Initializer:
+    Literal: 1
+PrintStatement:
+  Literal: "Powers of 2 less than 20:"
+WhileStatement:
+  Condition:
+    BinaryExpression: <
+      Left:
+        Variable: num
+      Operator: <
+      Right:
+        Literal: 20
+  Body:
+    BlockStatement:
+      PrintStatement:
+        InterpolatedString:
+          String: ""
+          Expression:
+            Variable: num
+          String: "\"num = {num}"
+      ExpressionStatement:
+        Assignment: *=
+          Target: num
+          Value:
+          Literal: 2
+PrintStatement:
+  Literal: "\n=== 8. FUNCTIONS - BASIC ==="
+FunctionDeclaration: sayHello
+  ReturnType: nil
+  Body:
+    BlockStatement:
+      PrintStatement:
+        Literal: "Hello from function!"
+PrintStatement:
+  Literal: "Calling simple function:"
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: sayHello
+FunctionDeclaration: add
+  Parameters:
+    a: int
+    b: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      ReturnStatement:
+        Value:
+          BinaryExpression: +
+            Left:
+              Variable: a
+            Operator: +
+            Right:
+              Variable: b
+PrintStatement:
+  Literal: "Function with parameters:"
+VarDeclaration: addResult
+  Type: int
+  Initializer:
+    CallExpression:
+      Callee:
+        Variable: add
+      Arguments:
+        Literal: 5
+        Literal: 3
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: addResult
+    String: "\"add(5, 3) = {addResult}"
+FunctionDeclaration: square
+  Parameters:
+    x: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      ReturnStatement:
+        Value:
+          BinaryExpression: *
+            Left:
+              Variable: x
+            Operator: *
+            Right:
+              Variable: x
+PrintStatement:
+  Literal: "Square function:"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      CallExpression:
+        Callee:
+          Variable: square
+        Arguments:
+          Literal: 4
+    String: "\"square(4) = {square(4)}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      CallExpression:
+        Callee:
+          Variable: square
+        Arguments:
+          Literal: 7
+    String: "\"square(7) = {square(7)}"
+FunctionDeclaration: greet
+  Parameters:
+    name: str
+  ReturnType: str
+  Body:
+    BlockStatement:
+      PrintStatement:
+        InterpolatedString:
+          String: ""
+          Expression:
+            Variable: name
+          String: "!"
+      ReturnStatement:
+        Value:
+          Literal: "greeted"
+PrintStatement:
+  Literal: "Function with string parameter:"
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: greet
+    Arguments:
+      Literal: "Bob"
+FunctionDeclaration: calculate
+  Parameters:
+    x: int
+    y: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      VarDeclaration: sum
+        Type: int
+        Initializer:
+          BinaryExpression: +
+            Left:
+              Variable: x
+            Operator: +
+            Right:
+              Variable: y
+      VarDeclaration: product
+        Type: int
+        Initializer:
+          BinaryExpression: *
+            Left:
+              Variable: x
+            Operator: *
+            Right:
+              Variable: y
+      PrintStatement:
+        InterpolatedString:
+          String: ""
+          Expression:
+            Variable: sum
+          Expression:
+            Variable: product
+          String: "\"Local calculations: sum={sum}, product={product}"
+      ReturnStatement:
+        Value:
+          BinaryExpression: *
+            Left:
+              Variable: sum
+            Operator: *
+            Right:
+              Variable: product
+PrintStatement:
+  Literal: "Function with locals:"
+VarDeclaration: calcResult
+  Type: int
+  Initializer:
+    CallExpression:
+      Callee:
+        Variable: calculate
+      Arguments:
+        Literal: 3
+        Literal: 4
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: calcResult
+    String: "\"Result: {calcResult}"
+FunctionDeclaration: factorial
+  Parameters:
+    n: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      IfStatement:
+        Condition:
+          BinaryExpression: <=
+            Left:
+              Variable: n
+            Operator: <=
+            Right:
+              Literal: 1
+        Then:
+          BlockStatement:
+            ReturnStatement:
+              Value:
+                Literal: 1
+      ReturnStatement:
+        Value:
+          BinaryExpression: *
+            Left:
+              Variable: n
+            Operator: *
+            Right:
+              CallExpression:
+                Callee:
+                  Variable: factorial
+                Arguments:
+                  BinaryExpression: -
+                    Left:
+                      Variable: n
+                    Operator: -
+                    Right:
+                      Literal: 1
+PrintStatement:
+  Literal: "Recursive function:"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      CallExpression:
+        Callee:
+          Variable: factorial
+        Arguments:
+          Literal: 5
+    String: "\"factorial(5) = {factorial(5)}"
+PrintStatement:
+  Literal: "\n=== 9. FUNCTIONS - OPTIONAL PARAMETERS ==="
+FunctionDeclaration: greetOptional
+  Parameters:
+    name (optional): str?
+  ReturnType: str
+  Body:
+    BlockStatement:
+      IfStatement:
+        Condition:
+          Variable: name
+        Then:
+          BlockStatement:
+            PrintStatement:
+              InterpolatedString:
+                String: ""
+                Expression:
+                  Variable: name
+                String: "!"
+            ReturnStatement:
+              Value:
+                InterpolatedString:
+                  String: ""
+                  Expression:
+                    Variable: name
+                  String: "\"greeted {name}"
+        Else:
+          BlockStatement:
+            PrintStatement:
+              Literal: "Hello, stranger!"
+            ReturnStatement:
+              Value:
+                Literal: "greeted stranger"
+PrintStatement:
+  Literal: "Testing optional parameter:"
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: greetOptional
+    Arguments:
+      Literal: "Charlie"
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: greetOptional
+FunctionDeclaration: createUser
+  Parameters:
+    username: str
+    email (optional): str?
+    age (optional): int?
+  ReturnType: str
+  Body:
+    BlockStatement:
+      PrintStatement:
+        InterpolatedString:
+          String: ""
+          Expression:
+            Variable: username
+          String: "\"Creating user: {username}"
+      IfStatement:
+        Condition:
+          Variable: email
+        Then:
+          BlockStatement:
+            PrintStatement:
+              InterpolatedString:
+                String: ""
+                Expression:
+                  Variable: email
+                String: "\"Email: {email}"
+      IfStatement:
+        Condition:
+          Variable: age
+        Then:
+          BlockStatement:
+            PrintStatement:
+              InterpolatedString:
+                String: ""
+                Expression:
+                  Variable: age
+                String: "\"Age: {age}"
+      ReturnStatement:
+        Value:
+          Literal: "user created"
+PrintStatement:
+  Literal: "Testing multiple optional parameters:"
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: createUser
+    Arguments:
+      Literal: "alice"
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: createUser
+    Arguments:
+      Literal: "bob"
+      Literal: "bob@email.com"
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: createUser
+    Arguments:
+      Literal: "charlie"
+      Literal: "charlie@email.com"
+      Literal: 25
+PrintStatement:
+  Literal: "\n=== 10. FUNCTIONS - DEFAULT PARAMETERS ==="
+FunctionDeclaration: greetDefault
+  Parameters:
+    name (optional): str
+      Default value:
+      Literal: "World"
+  ReturnType: str
+  Body:
+    BlockStatement:
+      PrintStatement:
+        InterpolatedString:
+          String: ""
+          Expression:
+            Variable: name
+          String: "!"
+      ReturnStatement:
+        Value:
+          InterpolatedString:
+            String: ""
+            Expression:
+              Variable: name
+            String: "\"greeted {name}"
+PrintStatement:
+  Literal: "Testing default parameter:"
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: greetDefault
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: greetDefault
+    Arguments:
+      Literal: "Dave"
+FunctionDeclaration: createMessage
+  Parameters:
+    greeting (optional): str
+      Default value:
+      Literal: "Hello"
+    name (optional): str
+      Default value:
+      Literal: "User"
+    punctuation (optional): str
+      Default value:
+      Literal: "!"
+  ReturnType: str
+  Body:
+    BlockStatement:
+      VarDeclaration: message
+        Initializer:
+          InterpolatedString:
+            String: ""
+            Expression:
+              Variable: greeting
+            Expression:
+              Variable: name
+            Expression:
+              Variable: punctuation
+            String: "\"{greeting}, {name}{punctuation}"
+      PrintStatement:
+        Variable: message
+      ReturnStatement:
+        Value:
+          Variable: message
+PrintStatement:
+  Literal: "Testing multiple default parameters:"
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: createMessage
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: createMessage
+    Arguments:
+      Literal: "Hi"
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: createMessage
+    Arguments:
+      Literal: "Hey"
+      Literal: "Alice"
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: createMessage
+    Arguments:
+      Literal: "Greetings"
+      Literal: "Bob"
+      Literal: "."
+PrintStatement:
+  Literal: "\n=== 11. TYPE SYSTEM - TYPE ALIASES ==="
+TypeDeclaration: Id = uint
+TypeDeclaration: Name = str
+TypeDeclaration: Age = int
+TypeDeclaration: Score = float
+TypeDeclaration: IsActive = bool
+VarDeclaration: userId
+  Type: Id
+  Initializer:
+    Literal: 12345
+VarDeclaration: userName
+  Type: Name
+  Initializer:
+    Literal: "Alice"
+VarDeclaration: userAge
+  Type: Age
+  Initializer:
+    Literal: 25
+VarDeclaration: userScore
+  Type: Score
+  Initializer:
+    Literal: 95.5
+VarDeclaration: isUserActive
+  Type: IsActive
+  Initializer:
+    Literal: true
+PrintStatement:
+  Literal: "Type aliases:"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: userId
+    String: "\"User ID: {userId}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: userName
+    String: "\"User Name: {userName}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: userAge
+    String: "\"User Age: {userAge}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: userScore
+    String: "\"User Score: {userScore}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: isUserActive
+    String: "\"Is Active: {isUserActive}"
+PrintStatement:
+  Literal: "\n=== 12. TYPE SYSTEM - UNION TYPES ==="
+TypeDeclaration: StringOrInt = str | int
+VarDeclaration: value1
+  Type: StringOrInt
+  Initializer:
+    Literal: "hello"
+VarDeclaration: value2
+  Type: StringOrInt
+  Initializer:
+    Literal: 42
+PrintStatement:
+  Literal: "Union types:"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: value1
+    String: "\"String value: {value1}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: value2
+    String: "\"Int value: {value2}"
+PrintStatement:
+  Literal: "\n=== 13. TYPE SYSTEM - OPTION TYPES ==="
+TypeDeclaration: IntOption = Some | None
+VarDeclaration: someValue
+  Initializer:
+    Unknown node type
+VarDeclaration: noneValue
+  Initializer:
+    Unknown node type
+PrintStatement:
+  Literal: "Option types:"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: someValue
+    String: "\"Some value: {someValue}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: noneValue
+    String: "\"None value: {noneValue}"
+PrintStatement:
+  Literal: "\n=== 14. ERROR HANDLING - WORKING ==="
+FunctionDeclaration: divide
+  Parameters:
+    a: int
+    b: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      IfStatement:
+        Condition:
+          BinaryExpression: ==
+            Left:
+              Variable: b
+            Operator: ==
+            Right:
+              Literal: 0
+        Then:
+          BlockStatement:
+            ReturnStatement:
+              Value:
+                ErrorConstruct: DivisionByZero
+      ReturnStatement:
+        Value:
+          OkConstruct:
+            Value:
+              BinaryExpression: /
+                Left:
+                  Variable: a
+                Operator: /
+                Right:
+                  Variable: b
+FunctionDeclaration: safeDivide
+  Parameters:
+    x: int
+    y: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      VarDeclaration: result
+        Initializer:
+          FallibleExpression:
+            Expression:
+              CallExpression:
+                Callee:
+                  Variable: divide
+                Arguments:
+                  Variable: x
+                  Variable: y
+      ReturnStatement:
+        Value:
+          OkConstruct:
+            Value:
+              Variable: result
+PrintStatement:
+  Literal: "Testing error handling:"
+VarDeclaration: successResult
+  Initializer:
+    CallExpression:
+      Callee:
+        Variable: divide
+      Arguments:
+        Literal: 10
+        Literal: 2
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: successResult
+    String: "\"divide(10, 2) = {successResult}"
+VarDeclaration: errorResult
+  Initializer:
+    CallExpression:
+      Callee:
+        Variable: divide
+      Arguments:
+        Literal: 10
+        Literal: 0
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: errorResult
+    String: "\"divide(10, 0) = {errorResult}"
+VarDeclaration: propagatedResult
+  Initializer:
+    CallExpression:
+      Callee:
+        Variable: safeDivide
+      Arguments:
+        Literal: 15
+        Literal: 3
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: propagatedResult
+    String: "\"safeDivide(15, 3) = {propagatedResult}"
+PrintStatement:
+  Literal: "Error handling working with ? operator and error propagation"
+PrintStatement:
+  Literal: "\n=== 15. CLASSES - BASIC SYNTAX ==="
+ClassDeclaration: Person
+  Methods:
+    FunctionDeclaration: init
+      Parameters:
+        name
+        age
+      Body:
+        BlockStatement:
+          ExpressionStatement:
+            Assignment: =
+              Member: name
+              Object:
+                This
+              Value:
+              Variable: name
+          ExpressionStatement:
+            Assignment: =
+              Member: age
+              Object:
+                This
+              Value:
+              Variable: age
+    FunctionDeclaration: greet
+      Body:
+        BlockStatement:
+          PrintStatement:
+            InterpolatedString:
+              String: ""
+              Expression:
+                MemberExpression: .name
+                  Object:
+                    This
+              Expression:
+                MemberExpression: .age
+                  Object:
+                    This
+              String: " years old"
+    FunctionDeclaration: birthday
+      Body:
+        BlockStatement:
+          ExpressionStatement:
+            Assignment: +=
+              Member: age
+              Object:
+                This
+              Value:
+              Literal: 1
+          PrintStatement:
+            InterpolatedString:
+              String: ""
+              Expression:
+                MemberExpression: .name
+                  Object:
+                    This
+              Expression:
+                MemberExpression: .age
+                  Object:
+                    This
+              String: " years old"
+PrintStatement:
+  Literal: "Class syntax defined (VM implementation in progress)"
+PrintStatement:
+  Literal: "\n=== 16. MODULES - BASIC SYNTAX ==="
+PrintStatement:
+  Literal: "Module syntax defined (import/export working)"
+PrintStatement:
+  Literal: "\n=== 17. CONCURRENCY - BASIC SYNTAX ==="
+PrintStatement:
+  Literal: "Concurrency syntax defined (VM implementation pending)"
+PrintStatement:
+  Literal: "\n=== 18. PATTERN MATCHING - BASIC SYNTAX ==="
+PrintStatement:
+  Literal: "Pattern matching syntax defined (VM implementation pending)"
+PrintStatement:
+  Literal: "\n=== COMPREHENSIVE TEST SUMMARY ==="
+PrintStatement:
+  Literal: "✅ Literals and variables"
+PrintStatement:
+  Literal: "✅ Expressions and operators"
+PrintStatement:
+  Literal: "✅ String interpolation"
+PrintStatement:
+  Literal: "✅ Control flow (if/else)"
+PrintStatement:
+  Literal: "✅ Loops (for, iter, while)"
+PrintStatement:
+  Literal: "✅ Functions (basic, optional params, default params)"
+PrintStatement:
+  Literal: "✅ Type system (aliases, unions, options)"
+PrintStatement:
+  Literal: "✅ Error handling (? operator, error propagation working)"
+PrintStatement:
+  Literal: "🔄 Classes (syntax complete, VM in progress)"
+PrintStatement:
+  Literal: "✅ Modules (import/export working)"
+PrintStatement:
+  Literal: "🔄 Concurrency (syntax complete, VM pending)"
+PrintStatement:
+  Literal: "🔄 Pattern matching (match expressions - VM pending)"
+PrintStatement:
+  Literal: "\n=== TEST COMPLETE ==="

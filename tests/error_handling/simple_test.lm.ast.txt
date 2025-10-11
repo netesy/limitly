@@ -1,0 +1,100 @@
+AST for C:\Projects\limitly\tests\error_handling\simple_test.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
+========================================
+
+AST Dump:
+==========
+FunctionDeclaration: divide
+  Parameters:
+    a: int
+    b: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      ReturnStatement:
+        Value:
+          BinaryExpression: /
+            Left:
+              Variable: a
+            Operator: /
+            Right:
+              Variable: b
+FunctionDeclaration: goodPropagation
+  Parameters:
+    x: int
+    y: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      VarDeclaration: result
+        Initializer:
+          FallibleExpression:
+            Expression:
+              CallExpression:
+                Callee:
+                  Variable: divide
+                Arguments:
+                  Variable: x
+                  Variable: y
+      ReturnStatement:
+        Value:
+          Variable: result
+FunctionDeclaration: badPropagation
+  Parameters:
+    x: int
+    y: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      VarDeclaration: result
+        Initializer:
+          FallibleExpression:
+            Expression:
+              CallExpression:
+                Callee:
+                  Variable: divide
+                Arguments:
+                  Variable: x
+                  Variable: y
+      ReturnStatement:
+        Value:
+          Variable: result
+FunctionDeclaration: nonFallible
+  Parameters:
+    x: int
+    y: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      VarDeclaration: result
+        Initializer:
+          FallibleExpression:
+            Expression:
+              CallExpression:
+                Callee:
+                  Variable: divide
+                Arguments:
+                  Variable: x
+                  Variable: y
+      ReturnStatement:
+        Value:
+          Variable: result
+FunctionDeclaration: unhandled
+  Parameters:
+    x: int
+    y: int
+  ReturnType: nil
+  Body:
+    BlockStatement:
+      ExpressionStatement:
+        CallExpression:
+          Callee:
+            Variable: divide
+          Arguments:
+            Variable: x
+            Variable: y
+PrintStatement:
+  Literal: "Simple error checking test"

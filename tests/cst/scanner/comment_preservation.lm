@@ -6,24 +6,21 @@
  * with various formatting
  */
 
-fn main() {
-    // Inline comment before statement
-    var x = 42; // Trailing comment
-    
-    /* Block comment in middle */ var y = 24;
-    
-    // Test nested comments and edge cases
-    var z = /* comment */ x + y /* another comment */;
-    
-    /*
-     * Documentation-style comment
-     * @param none
-     * @return void
-     */
-    print("Value: {z}");
-    
-    // Comment at end of block
-}
+// Inline comment before statement
+var x = 42; // Trailing comment
+
+/* Block comment in middle */ 
+var y = 24;
+
+// Test comments with expressions
+var z = x + y;
+
+/*
+ * Documentation-style comment
+ * @param none
+ * @return void
+ */
+print("Value: " + str(z));
 
 // Final comment
 

@@ -1,0 +1,63 @@
+Bytecode for C:\Projects\limitly\tests\concurrency\atomic_increment.lm
+Parser: New CSTParser
+========================================
+
+=== Bytecode ===
+Generated 55 instructions
+
+   0: PUSH_INT             0
+   1: DEFINE_ATOMIC       
+   2: CALL                 "channel"
+   3: STORE_VAR            "ch"
+   4: BEGIN_CONCURRENT    
+   5: BEGIN_SCOPE         
+   6: BEGIN_TASK          
+   7: PUSH_INT             1
+   8: PUSH_INT             10
+   9: CREATE_RANGE        
+  10: STORE_ITERABLE      
+  11: END_TASK            
+  12: END_SCOPE           
+  13: END_CONCURRENT      
+  14: PUSH_INT             0
+  15: STORE_VAR            "seen"
+  16: LOAD_VAR             "ch"
+  17: GET_ITERATOR        
+  18: STORE_TEMP          
+  19: LOAD_TEMP           
+  20: ITERATOR_HAS_NEXT   
+  21: JUMP_IF_FALSE        24
+  22: LOAD_TEMP           
+  23: ITERATOR_NEXT       
+  24: STORE_VAR            "v"
+  25: BEGIN_SCOPE         
+  26: PUSH_STRING         
+  27: LOAD_VAR             "v"
+  28: PUSH_STRING         
+  29: CONCAT              
+  30: PUSH_STRING          ""Value from channel: {v}"
+  31: INTERPOLATE_STRING  
+  32: PRINT               
+  33: LOAD_VAR             "seen"
+  34: PUSH_INT             1
+  35: ADD                 
+  36: DUP                 
+  37: STORE_VAR            "seen"
+  38: POP                 
+  39: LOAD_VAR             "seen"
+  40: PUSH_INT             10
+  41: GREATER_EQUAL       
+  42: JUMP_IF_FALSE        1
+  43: JUMP                 0
+  44: END_SCOPE           
+  45: JUMP                 -27
+  46: CLEAR_TEMP          
+  47: PUSH_STRING         
+  48: LOAD_VAR             "counter"
+  49: PUSH_STRING         
+  50: CONCAT              
+  51: PUSH_STRING          ""Final counter: {counter}"
+  52: INTERPOLATE_STRING  
+  53: PRINT               
+  54: HALT                
+

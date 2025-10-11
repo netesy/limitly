@@ -1,63 +1,112 @@
-AST for tests\basic\variables.lm
-Parser mode: CST
+AST for C:\Projects\limitly\tests\basic\variables.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
 ========================================
 
 AST Dump:
 ==========
 PrintStatement:
+  Literal: "=== Variable Declaration Tests ==="
+VarDeclaration: x
+  Initializer:
+    Literal: 42
+VarDeclaration: y
+  Initializer:
+    Literal: 3.14
+VarDeclaration: name
+  Initializer:
+    Literal: "Limit"
+VarDeclaration: isActive
+  Initializer:
+    Literal: true
 PrintStatement:
-VarDeclaration: <missing>
-VarDeclaration: <missing>
-VarDeclaration: <missing>
-VarDeclaration: <missing>
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: x
+    String: "\"Integer: {x}"
 PrintStatement:
-ExpressionStatement:
-  Literal: "\"Integer: {x}"
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: y
+    String: "\"Float: {y}"
 PrintStatement:
-ExpressionStatement:
-  Literal: "\"Float: {y}"
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: name
+    String: "\"String: {name}"
 PrintStatement:
-ExpressionStatement:
-  Literal: "\"String: {name}"
-PrintStatement:
-ExpressionStatement:
-  Literal: "\"Boolean: {isActive}"
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: isActive
+    String: "\"Boolean: {isActive}"
 ExpressionStatement:
   Assignment: =
+    Target: x
     Value:
-    (null)
+    Literal: 100
 ExpressionStatement:
   Assignment: =
+    Target: y
     Value:
-    (null)
+    Literal: 2.71
 ExpressionStatement:
   Assignment: =
+    Target: name
     Value:
-    (null)
+    Literal: "Language"
 ExpressionStatement:
   Assignment: =
+    Target: isActive
     Value:
-    (null)
+    Literal: false
 PrintStatement:
+  Literal: "After reassignment:"
 PrintStatement:
-ExpressionStatement:
-  Literal: "\"Integer: {x}"
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: x
+    String: "\"Integer: {x}"
 PrintStatement:
-ExpressionStatement:
-  Literal: "\"Float: {y}"
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: y
+    String: "\"Float: {y}"
 PrintStatement:
-ExpressionStatement:
-  Literal: "\"String: {name}"
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: name
+    String: "\"String: {name}"
 PrintStatement:
-ExpressionStatement:
-  Literal: "\"Boolean: {isActive}"
-VarDeclaration: <missing>
-VarDeclaration: <missing>
-VarDeclaration: <missing>
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: isActive
+    String: "\"Boolean: {isActive}"
+VarDeclaration: a
+  Initializer:
+    Literal: 1
+VarDeclaration: b
+  Initializer:
+    Literal: 2
+VarDeclaration: c
+  Initializer:
+    Literal: 3
 PrintStatement:
-ExpressionStatement:
-  Variable: b
-ExpressionStatement:
-  Variable: c
-ExpressionStatement:
-  Literal: "\"Multiple declarations: a={a}, b={b}, c={c}"
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      Variable: b
+    Expression:
+      Variable: c
+    String: "\"Multiple declarations: a={a}, b={b}, c={c}"

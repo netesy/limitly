@@ -1,0 +1,34 @@
+AST for tests\loops\match_type_only.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+  Literal: "=== Type Pattern Test ==="
+VarDeclaration: value
+  Initializer:
+    Literal: 42
+MatchStatement:
+  Value:
+    Variable: value
+  Cases:
+    Case:
+      Pattern:
+      TypePattern: int
+      Body:
+      BlockStatement:
+        PrintStatement:
+          Literal: "It's an integer"
+    Case:
+      Pattern:
+      Literal: nil
+      Body:
+      BlockStatement:
+        PrintStatement:
+          Literal: "It's something else"
+PrintStatement:
+  Literal: "=== Test completed ==="

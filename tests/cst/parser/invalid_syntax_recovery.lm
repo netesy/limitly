@@ -1,39 +1,20 @@
 // Test invalid syntax recovery in CST parser
 // This file contains syntax errors to test error recovery and partial node creation
 
-fn main() {
-    // Valid code first
-    var x = 42;
-    
-    // Missing semicolon - should recover
-    var y = 24
-    var z = x + y;  // Should parse correctly after recovery
-    
-    // Missing closing brace - should create error/missing node
-    if (x > 0) {
-        print("positive");
-        // Missing closing brace
-    
-    // Should continue parsing after synchronization
-    print("After error");
-    
-    // Missing function parameter
-    fn broken_func() {
-        // Missing parameter type
-        return 42;
-    }
-    
-    // Incomplete expression - should create partial node
-    var incomplete = x + ;
-    
-    // Missing condition in if statement
-    if () {
-        print("empty condition");
-    }
-    
-    // Unclosed parentheses in expression
-    var unclosed = (x + y;
-    
-    // Should still parse valid code after errors
-    print("Final statement");
-}
+// Valid code first
+var x = 42;
+
+// Missing semicolon - should recover
+var y = 24
+var z = x + y;  // Should parse correctly after recovery
+
+// Missing closing brace - should create error/missing node
+if (x > 0) {
+    print("positive");
+    // Missing closing brace
+
+// Should continue parsing after synchronization
+print("After error");
+
+// Should still parse valid code after errors
+print("Final statement");

@@ -1,14 +1,18 @@
-Bytecode for tests\cst\parser\simple_interp.lm
-Parser mode: CST
+Bytecode for C:\Projects\limitly\tests\cst\parser\simple_interp.lm
+Parser: New CSTParser
 ========================================
 
 === Bytecode ===
-Generated 6 instructions
+Generated 10 instructions
 
-   0: PUSH_NULL           
-   1: STORE_VAR            "<missing>"
-   2: PRINT               
-   3: PUSH_STRING          "!"
-   4: POP                 
-   5: HALT                
+   0: PUSH_STRING          "World"
+   1: STORE_VAR            "name"
+   2: PUSH_STRING         
+   3: LOAD_VAR             "name"
+   4: PUSH_STRING         
+   5: CONCAT              
+   6: PUSH_STRING          "!"
+   7: INTERPOLATE_STRING  
+   8: PRINT               
+   9: HALT                
 

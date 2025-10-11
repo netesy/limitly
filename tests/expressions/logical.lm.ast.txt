@@ -1,0 +1,269 @@
+AST for C:\Projects\limitly\tests\expressions\logical.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+  Literal: "=== Logical Expression Tests ==="
+VarDeclaration: t
+  Initializer:
+    Literal: true
+VarDeclaration: f
+  Initializer:
+    Literal: false
+PrintStatement:
+  Literal: "AND operations:"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: t
+    Expression:
+      Variable: t
+    Expression:
+      BinaryExpression: and
+        Left:
+          Variable: t
+        Operator: and
+        Right:
+          Variable: t
+    String: "\"{t} and {t}: {t and t}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: t
+    Expression:
+      Variable: f
+    Expression:
+      BinaryExpression: and
+        Left:
+          Variable: t
+        Operator: and
+        Right:
+          Variable: f
+    String: "\"{t} and {f}: {t and f}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: f
+    Expression:
+      Variable: t
+    Expression:
+      BinaryExpression: and
+        Left:
+          Variable: f
+        Operator: and
+        Right:
+          Variable: t
+    String: "\"{f} and {t}: {f and t}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: f
+    Expression:
+      Variable: f
+    Expression:
+      BinaryExpression: and
+        Left:
+          Variable: f
+        Operator: and
+        Right:
+          Variable: f
+    String: "\"{f} and {f}: {f and f}"
+PrintStatement:
+  Literal: "OR operations:"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: t
+    Expression:
+      Variable: t
+    Expression:
+      BinaryExpression: <unknown>
+        Left:
+          Variable: t
+        Operator: <unknown>
+        Right:
+          Variable: t
+    String: "\"{t} or {t}: {t or t}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: t
+    Expression:
+      Variable: f
+    Expression:
+      BinaryExpression: <unknown>
+        Left:
+          Variable: t
+        Operator: <unknown>
+        Right:
+          Variable: f
+    String: "\"{t} or {f}: {t or f}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: f
+    Expression:
+      Variable: t
+    Expression:
+      BinaryExpression: <unknown>
+        Left:
+          Variable: f
+        Operator: <unknown>
+        Right:
+          Variable: t
+    String: "\"{f} or {t}: {f or t}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: f
+    Expression:
+      Variable: f
+    Expression:
+      BinaryExpression: <unknown>
+        Left:
+          Variable: f
+        Operator: <unknown>
+        Right:
+          Variable: f
+    String: "\"{f} or {f}: {f or f}"
+PrintStatement:
+  Literal: "NOT operations:"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: t
+    Expression:
+      UnaryExpression: !
+        Operand:
+          Variable: t
+    String: "\"!{t}: {!t}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: f
+    Expression:
+      UnaryExpression: !
+        Operand:
+          Variable: f
+    String: "\"!{f}: {!f}"
+VarDeclaration: a
+  Initializer:
+    Literal: 5
+VarDeclaration: b
+  Initializer:
+    Literal: 10
+VarDeclaration: result1
+  Initializer:
+    BinaryExpression: and
+      Left:
+        Grouping:
+          BinaryExpression: <
+            Left:
+              Variable: a
+            Operator: <
+            Right:
+              Variable: b
+      Operator: and
+      Right:
+        Grouping:
+          BinaryExpression: >
+            Left:
+              Variable: b
+            Operator: >
+            Right:
+              Literal: 0
+VarDeclaration: result2
+  Initializer:
+    BinaryExpression: <unknown>
+      Left:
+        Grouping:
+          BinaryExpression: >
+            Left:
+              Variable: a
+            Operator: >
+            Right:
+              Variable: b
+      Operator: <unknown>
+      Right:
+        Grouping:
+          BinaryExpression: ==
+            Left:
+              Variable: a
+            Operator: ==
+            Right:
+              Literal: 5
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      Variable: b
+    Expression:
+      Variable: b
+    Expression:
+      Variable: result1
+    String: "\"Complex: ({a} < {b}) and ({b} > 0) = {result1}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      Variable: b
+    Expression:
+      Variable: a
+    Expression:
+      Variable: result2
+    String: "\"Complex: ({a} > {b}) or ({a} == 5) = {result2}"
+PrintStatement:
+  Literal: "Short-circuit tests:"
+VarDeclaration: x
+  Initializer:
+    Literal: 0
+VarDeclaration: result3
+  Initializer:
+    BinaryExpression: and
+      Left:
+        Grouping:
+          BinaryExpression: !=
+            Left:
+              Variable: x
+            Operator: !=
+            Right:
+              Literal: 0
+      Operator: and
+      Right:
+        Grouping:
+          BinaryExpression: >
+            Left:
+              BinaryExpression: /
+                Left:
+                  Literal: 10
+                Operator: /
+                Right:
+                  Variable: x
+            Operator: >
+            Right:
+              Literal: 1
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: result3
+    String: "\"Safe division with and: {result3}"

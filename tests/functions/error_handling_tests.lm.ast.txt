@@ -1,0 +1,61 @@
+AST for tests\functions\error_handling_tests.lm
+Parser mode: CST
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+PrintStatement:
+PrintStatement:
+ExpressionStatement:
+  Variable: <invalid>
+BlockStatement:
+  VarDeclaration: <missing>
+  PrintStatement:
+ExpressionStatement:
+  Variable: <invalid>
+BlockStatement:
+  PrintStatement:
+PrintStatement:
+FunctionDeclaration: <missing>
+  Body:
+    BlockStatement:
+      ReturnStatement
+ExpressionStatement:
+  Variable: <invalid>
+BlockStatement:
+  VarDeclaration: <missing>
+  PrintStatement:
+ExpressionStatement:
+  Variable: <invalid>
+BlockStatement:
+  PrintStatement:
+PrintStatement:
+ExpressionStatement:
+  Variable: <invalid>
+BlockStatement:
+  VarDeclaration: <missing>
+  PrintStatement:
+ExpressionStatement:
+  Variable: <invalid>
+BlockStatement:
+  PrintStatement:
+PrintStatement:
+FunctionDeclaration: <missing>
+  Body:
+    BlockStatement:
+      VarDeclaration: <missing>
+ExpressionStatement:
+  Variable: <invalid>
+BlockStatement:
+  VarDeclaration: <missing>
+  PrintStatement:
+  ExpressionStatement:
+    Variable: result
+  ExpressionStatement:
+    Literal: "\"Result: {result}"
+ExpressionStatement:
+  Variable: <invalid>
+BlockStatement:
+  PrintStatement:
+PrintStatement:

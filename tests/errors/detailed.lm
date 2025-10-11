@@ -63,7 +63,7 @@ fn test_error_handling() {
         // Valid type checking
         if (error == "InvalidNumber") {
             print("Invalid number format");
-        } else if (error == "Overflow") {
+        } elif (error == "Overflow") {
             print("Number too large");
         }
         return -1;

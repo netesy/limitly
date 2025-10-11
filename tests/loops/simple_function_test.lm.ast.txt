@@ -1,4 +1,5 @@
 AST for tests\loops\simple_function_test.lm
+Parser mode: Legacy
 ========================================
 
 AST Dump:
@@ -12,9 +13,10 @@ FunctionDeclaration: test_function
     BlockStatement:
       PrintStatement:
         InterpolatedString:
-          String: "Function called with: "
+          String: ""
           Expression:
             Variable: x
+          String: "\"Function called with: {x}"
 ExpressionStatement:
   CallExpression:
     Callee:

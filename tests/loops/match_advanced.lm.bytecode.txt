@@ -1,0 +1,142 @@
+Bytecode for tests\loops\match_advanced.lm
+Parser mode: CST
+========================================
+
+=== Bytecode ===
+Generated 134 instructions
+
+   0: PRINT               
+   1: BEGIN_FUNCTION       "<missing>"
+   2: BEGIN_SCOPE         
+   3: LOAD_VAR             "value"
+   4: POP                 
+   5: BEGIN_SCOPE         
+   6: BEGIN_SCOPE         
+   7: LOAD_VAR             "name"
+   8: POP                 
+   9: LOAD_VAR             "age"
+  10: POP                 
+  11: END_SCOPE           
+  12: BEGIN_SCOPE         
+  13: PRINT               
+  14: LOAD_VAR             "name"
+  15: POP                 
+  16: LOAD_VAR             "age"
+  17: POP                 
+  18: PUSH_STRING          ""Name: {name}, Age: {age}"
+  19: POP                 
+  20: END_SCOPE           
+  21: BEGIN_SCOPE         
+  22: LOAD_VAR             "name"
+  23: POP                 
+  24: LOAD_VAR             "age"
+  25: POP                 
+  26: LOAD_VAR             "city"
+  27: POP                 
+  28: END_SCOPE           
+  29: BEGIN_SCOPE         
+  30: PRINT               
+  31: LOAD_VAR             "name"
+  32: POP                 
+  33: LOAD_VAR             "age"
+  34: POP                 
+  35: LOAD_VAR             "city"
+  36: POP                 
+  37: PUSH_STRING          ""Name: {name}, Age: {age}, City: {city}"
+  38: POP                 
+  39: END_SCOPE           
+  40: END_SCOPE           
+  41: END_SCOPE           
+  42: PUSH_NULL           
+  43: RETURN              
+  44: END_FUNCTION        
+  45: PUSH_FUNCTION       
+  46: STORE_VAR            "<missing>"
+  47: CALL                 "unknown"
+  48: POP                 
+  49: BEGIN_SCOPE         
+  50: LOAD_VAR             "name"
+  51: POP                 
+  52: PUSH_STRING          "John"
+  53: POP                 
+  54: LOAD_VAR             "age"
+  55: POP                 
+  56: PUSH_INT             30
+  57: POP                 
+  58: END_SCOPE           
+  59: CALL                 "unknown"
+  60: POP                 
+  61: BEGIN_SCOPE         
+  62: LOAD_VAR             "name"
+  63: POP                 
+  64: PUSH_STRING          "Joan"
+  65: POP                 
+  66: LOAD_VAR             "age"
+  67: POP                 
+  68: PUSH_INT             26
+  69: POP                 
+  70: LOAD_VAR             "city"
+  71: POP                 
+  72: PUSH_STRING          "New York"
+  73: POP                 
+  74: END_SCOPE           
+  75: BEGIN_FUNCTION       "<missing>"
+  76: BEGIN_SCOPE         
+  77: LOAD_VAR             "value"
+  78: POP                 
+  79: BEGIN_SCOPE         
+  80: BEGIN_SCOPE         
+  81: PRINT               
+  82: END_SCOPE           
+  83: LOAD_VAR             "x"
+  84: POP                 
+  85: BEGIN_SCOPE         
+  86: PRINT               
+  87: LOAD_VAR             "x"
+  88: POP                 
+  89: PUSH_STRING          ""One element: {x}"
+  90: POP                 
+  91: END_SCOPE           
+  92: LOAD_VAR             "x"
+  93: POP                 
+  94: LOAD_VAR             "y"
+  95: POP                 
+  96: BEGIN_SCOPE         
+  97: PRINT               
+  98: LOAD_VAR             "x"
+  99: POP                 
+ 100: LOAD_VAR             "y"
+ 101: POP                 
+ 102: PUSH_STRING          ""Two elements: {x}, {y}"
+ 103: POP                 
+ 104: END_SCOPE           
+ 105: LOAD_VAR             "head"
+ 106: POP                 
+ 107: LOAD_VAR             "tail"
+ 108: POP                 
+ 109: BEGIN_SCOPE         
+ 110: PRINT               
+ 111: LOAD_VAR             "head"
+ 112: POP                 
+ 113: LOAD_VAR             "tail"
+ 114: POP                 
+ 115: PUSH_STRING          ""Head: {head}, Tail: {tail}"
+ 116: POP                 
+ 117: END_SCOPE           
+ 118: END_SCOPE           
+ 119: END_SCOPE           
+ 120: PUSH_NULL           
+ 121: RETURN              
+ 122: END_FUNCTION        
+ 123: PUSH_FUNCTION       
+ 124: STORE_VAR            "<missing>"
+ 125: CALL                 "unknown"
+ 126: POP                 
+ 127: CALL                 "unknown"
+ 128: POP                 
+ 129: CALL                 "unknown"
+ 130: POP                 
+ 131: CALL                 "unknown"
+ 132: POP                 
+ 133: HALT                
+

@@ -1,10 +1,18 @@
-AST for tests\cst\parser\simple_interp.lm
-Parser mode: CST
+AST for C:\Projects\limitly\tests\cst\parser\simple_interp.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
 ========================================
 
 AST Dump:
 ==========
-VarDeclaration: <missing>
+VarDeclaration: name
+  Initializer:
+    Literal: "World"
 PrintStatement:
-ExpressionStatement:
-  Literal: "!"
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: name
+    String: "!"

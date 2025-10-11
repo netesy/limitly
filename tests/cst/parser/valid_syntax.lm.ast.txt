@@ -1,64 +1,107 @@
-AST for tests\cst\parser\valid_syntax.lm
-Parser mode: CST
+AST for C:\Projects\limitly\tests\cst\parser\valid_syntax.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
 ========================================
 
 AST Dump:
 ==========
-FunctionDeclaration: <missing>
-  Body:
-    BlockStatement:
-FunctionDeclaration: <missing>
-  Body:
-    BlockStatement:
-      VarDeclaration: <missing>
-        Type: int
-      VarDeclaration: <missing>
-        Type: str
-      VarDeclaration: <missing>
-        Type: bool
-      IfStatement:
-        Condition:
-          (null)
-        Then:
-          (null)
-      ForStatement (traditional):
-        Body:
-          (null)
-      ExpressionStatement:
-        Variable: <invalid>
-      ExpressionStatement:
-        Literal: 1
-      ExpressionStatement:
+VarDeclaration: x
+  Initializer:
+    Literal: 42
+VarDeclaration: y
+  Initializer:
+    Literal: "hello"
+VarDeclaration: z
+  Initializer:
+    Literal: true
+VarDeclaration: sum
+  Initializer:
+    BinaryExpression: +
+      Left:
+        Variable: x
+      Operator: +
+      Right:
         Literal: 10
-      BlockStatement:
-        IfStatement:
-          Condition:
-            (null)
-          Then:
-            (null)
-      ExpressionStatement:
-        CallExpression:
-          Callee:
-            (null)
-      VarDeclaration: <missing>
-      VarDeclaration: <missing>
-      ExpressionStatement:
-        Literal: nil
-      ExpressionStatement:
+VarDeclaration: product
+  Initializer:
+    BinaryExpression: *
+      Left:
+        Variable: x
+      Operator: *
+      Right:
+        Literal: 2
+IfStatement:
+  Condition:
+    BinaryExpression: >
+      Left:
+        Variable: x
+      Operator: >
+      Right:
         Literal: 0
+  Then:
+    BlockStatement:
       PrintStatement:
-      ExpressionStatement:
-        Variable: complex
-      ExpressionStatement:
-        Literal: "\"Result: {result}, Complex: {complex}"
-FunctionDeclaration: <missing>
+        Literal: "positive"
+  Else:
+    BlockStatement:
+      PrintStatement:
+        Literal: "non-positive"
+ForStatement (traditional):
+  Initializer:
+    VarDeclaration: i
+      Initializer:
+        Literal: 0
+  Condition:
+    BinaryExpression: <
+      Left:
+        Variable: i
+      Operator: <
+      Right:
+        Literal: 3
+  Increment:
+    Assignment: =
+      Target: i
+      Value:
+      BinaryExpression: +
+        Left:
+          Variable: i
+        Operator: +
+        Right:
+          Literal: 1
   Body:
     BlockStatement:
       PrintStatement:
-      ExpressionStatement:
-        Literal: "!"
-FunctionDeclaration: <missing>
-  Body:
-    BlockStatement:
-BlockStatement:
-  ReturnStatement
+        BinaryExpression: +
+          Left:
+            Literal: "Loop: "
+          Operator: +
+          Right:
+            CallExpression:
+              Callee:
+                Literal: nil
+              Arguments:
+                Variable: i
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "Result: "
+    Operator: +
+    Right:
+      CallExpression:
+        Callee:
+          Literal: nil
+        Arguments:
+          Variable: sum
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "Product: "
+    Operator: +
+    Right:
+      CallExpression:
+        Callee:
+          Literal: nil
+        Arguments:
+          Variable: product

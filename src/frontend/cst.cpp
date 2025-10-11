@@ -161,6 +161,57 @@ namespace CST {
         return result;
     }
 
+    std::string Node::reconstructSource() const {
+        std::string result;
+        
+        // Add leading trivia first
+        for (const auto& trivia : leadingTrivia) {
+            result += trivia.lexeme;
+        }
+        
+        // Add all elements (preserves original source order)
+        for (const auto& element : elements) {
+            if (std::holds_alternative<Token>(element)) {
+                const auto& token = std::get<Token>(element);
+                result += token.lexeme;
+            } else if (std::holds_alternative<std::unique_ptr<Node>>(element)) {
+                const auto& node = std::get<std::unique_ptr<Node>>(element);
+                if (node) {
+                    result += node->reconstructSource();
+                }
+            }
+        }
+        
+        // Add trailing trivia last
+        for (const auto& trivia : trailingTrivia) {
+            result += trivia.lexeme;
+        }
+        
+        return result;
+    }
+
+    void Node::attachTriviaFromToken(const Token& token) {
+        // Extract leading trivia from token and add to this node
+        const auto& leading = token.getLeadingTrivia();
+        if (!leading.empty()) {
+            leadingTrivia.insert(leadingTrivia.end(), leading.begin(), leading.end());
+        }
+        
+        // Extract trailing trivia from token and add to this node
+        const auto& trailing = token.getTrailingTrivia();
+        if (!trailing.empty()) {
+            trailingTrivia.insert(trailingTrivia.end(), trailing.begin(), trailing.end());
+        }
+    }
+
+    void Node::addLeadingTrivia(const std::vector<Token>& trivia) {
+        leadingTrivia.insert(leadingTrivia.end(), trivia.begin(), trivia.end());
+    }
+
+    void Node::addTrailingTrivia(const std::vector<Token>& trivia) {
+        trailingTrivia.insert(trailingTrivia.end(), trivia.begin(), trivia.end());
+    }
+
     std::vector<Node*> Node::getSignificantChildren() const {
         std::vector<Node*> result;
         

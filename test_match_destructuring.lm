@@ -1,0 +1,16 @@
+// Test list destructuring
+var list = [1, 2, 3];
+match (list) {
+    [a, b, c] => { print("Three elements: {a}, {b}, {c}"); },
+    [a, b] => { print("Two elements: {a}, {b}"); },
+    [a] => { print("One element: {a}"); },
+    [] => { print("Empty list"); },
+    _ => { print("Other list"); }
+}
+
+// Test tuple destructuring  
+var tuple = (42, "hello");
+match (tuple) {
+    (x, y) => { print("Tuple: {x}, {y}"); },
+    _ => { print("Not a tuple"); }
+}

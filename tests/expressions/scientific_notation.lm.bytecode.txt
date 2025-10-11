@@ -1,0 +1,70 @@
+Bytecode for C:\Projects\limitly\tests\expressions\scientific_notation.lm
+Parser: New CSTParser
+========================================
+
+=== Bytecode ===
+Generated 62 instructions
+
+   0: PUSH_FLOAT           1.23e-10
+   1: STORE_VAR            "small"
+   2: PUSH_FLOAT           4.56e+15
+   3: STORE_VAR            "large"
+   4: PUSH_FLOAT           7.89e-05
+   5: NEGATE              
+   6: STORE_VAR            "negative"
+   7: PUSH_STRING          "Scientific notation test:"
+   8: PRINT               
+   9: PUSH_STRING          "Small:"
+  10: LOAD_VAR             "small"
+  11: PRINT               
+  12: PUSH_STRING          "Large:"
+  13: LOAD_VAR             "large"
+  14: PRINT               
+  15: PUSH_STRING          "Negative:"
+  16: LOAD_VAR             "negative"
+  17: PRINT               
+  18: PUSH_FLOAT           2.5e+08
+  19: STORE_VAR            "capitalE"
+  20: PUSH_FLOAT           0.00314
+  21: STORE_VAR            "capitalENeg"
+  22: PUSH_STRING          "Capital E notation:"
+  23: PRINT               
+  24: PUSH_STRING          "Capital E positive:"
+  25: LOAD_VAR             "capitalE"
+  26: PRINT               
+  27: PUSH_STRING          "Capital E negative:"
+  28: LOAD_VAR             "capitalENeg"
+  29: PRINT               
+  30: PUSH_FLOAT           5e+10
+  31: STORE_VAR            "intScientific"
+  32: PUSH_FLOAT           2e-06
+  33: STORE_VAR            "intScientificNeg"
+  34: PUSH_STRING          "Integer scientific notation:"
+  35: PRINT               
+  36: PUSH_STRING          "Int scientific:"
+  37: LOAD_VAR             "intScientific"
+  38: PRINT               
+  39: PUSH_STRING          "Int scientific negative:"
+  40: LOAD_VAR             "intScientificNeg"
+  41: PRINT               
+  42: PUSH_FLOAT           0
+  43: STORE_VAR            "zero"
+  44: PUSH_FLOAT           1
+  45: STORE_VAR            "one"
+  46: PUSH_STRING          "Edge cases:"
+  47: PRINT               
+  48: PUSH_STRING          "Zero:"
+  49: LOAD_VAR             "zero"
+  50: PRINT               
+  51: PUSH_STRING          "One:"
+  52: LOAD_VAR             "one"
+  53: PRINT               
+  54: PUSH_FLOAT           1500
+  55: PUSH_FLOAT           250
+  56: ADD                 
+  57: STORE_VAR            "result"
+  58: PUSH_STRING          "Expression result:"
+  59: LOAD_VAR             "result"
+  60: PRINT               
+  61: HALT                
+

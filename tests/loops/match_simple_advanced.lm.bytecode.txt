@@ -1,0 +1,162 @@
+Bytecode for tests\loops\match_simple_advanced.lm
+Parser mode: CST
+========================================
+
+=== Bytecode ===
+Generated 154 instructions
+
+   0: PRINT               
+   1: PRINT               
+   2: BEGIN_FUNCTION       "<missing>"
+   3: BEGIN_SCOPE         
+   4: LOAD_VAR             "value"
+   5: POP                 
+   6: BEGIN_SCOPE         
+   7: LOAD_VAR             "<invalid>"
+   8: POP                 
+   9: LOAD_VAR             "<invalid>"
+  10: PUSH_NULL           
+  11: ADD                 
+  12: POP                 
+  13: BEGIN_SCOPE         
+  14: PRINT               
+  15: LOAD_VAR             "x"
+  16: POP                 
+  17: PUSH_STRING          " is greater than 10"
+  18: POP                 
+  19: END_SCOPE           
+  20: LOAD_VAR             "<invalid>"
+  21: POP                 
+  22: LOAD_VAR             "<invalid>"
+  23: PUSH_NULL           
+  24: ADD                 
+  25: POP                 
+  26: BEGIN_SCOPE         
+  27: PRINT               
+  28: LOAD_VAR             "x"
+  29: POP                 
+  30: PUSH_STRING          " is less than 10"
+  31: POP                 
+  32: END_SCOPE           
+  33: LOAD_VAR             "<invalid>"
+  34: POP                 
+  35: BEGIN_SCOPE         
+  36: PRINT               
+  37: LOAD_VAR             "x"
+  38: POP                 
+  39: PUSH_STRING          " is exactly 10"
+  40: POP                 
+  41: END_SCOPE           
+  42: END_SCOPE           
+  43: END_SCOPE           
+  44: PUSH_NULL           
+  45: RETURN              
+  46: END_FUNCTION        
+  47: PUSH_FUNCTION       
+  48: STORE_VAR            "<missing>"
+  49: CALL                 "unknown"
+  50: POP                 
+  51: CALL                 "unknown"
+  52: POP                 
+  53: CALL                 "unknown"
+  54: POP                 
+  55: BEGIN_FUNCTION       "<missing>"
+  56: BEGIN_SCOPE         
+  57: LOAD_VAR             "value"
+  58: POP                 
+  59: BEGIN_SCOPE         
+  60: BEGIN_SCOPE         
+  61: PRINT               
+  62: LOAD_VAR             "value"
+  63: POP                 
+  64: PUSH_STRING          ""Integer: {value}"
+  65: POP                 
+  66: END_SCOPE           
+  67: BEGIN_SCOPE         
+  68: PRINT               
+  69: LOAD_VAR             "value"
+  70: POP                 
+  71: PUSH_STRING          ""String: {value}"
+  72: POP                 
+  73: END_SCOPE           
+  74: BEGIN_SCOPE         
+  75: PRINT               
+  76: LOAD_VAR             "value"
+  77: POP                 
+  78: PUSH_STRING          ""List: {value}"
+  79: POP                 
+  80: END_SCOPE           
+  81: BEGIN_SCOPE         
+  82: PRINT               
+  83: LOAD_VAR             "value"
+  84: POP                 
+  85: PUSH_STRING          ""Dictionary: {value}"
+  86: POP                 
+  87: END_SCOPE           
+  88: BEGIN_SCOPE         
+  89: PRINT               
+  90: LOAD_VAR             "value"
+  91: POP                 
+  92: PUSH_STRING          ""Unknown type: {value}"
+  93: POP                 
+  94: END_SCOPE           
+  95: END_SCOPE           
+  96: END_SCOPE           
+  97: PUSH_NULL           
+  98: RETURN              
+  99: END_FUNCTION        
+ 100: PUSH_FUNCTION       
+ 101: STORE_VAR            "<missing>"
+ 102: CALL                 "unknown"
+ 103: POP                 
+ 104: CALL                 "unknown"
+ 105: POP                 
+ 106: CALL                 "unknown"
+ 107: POP                 
+ 108: CALL                 "unknown"
+ 109: POP                 
+ 110: BEGIN_SCOPE         
+ 111: PUSH_STRING          "key"
+ 112: POP                 
+ 113: PUSH_STRING          "value"
+ 114: POP                 
+ 115: END_SCOPE           
+ 116: CALL                 "unknown"
+ 117: POP                 
+ 118: BEGIN_FUNCTION       "<missing>"
+ 119: BEGIN_SCOPE         
+ 120: LOAD_VAR             "value"
+ 121: POP                 
+ 122: BEGIN_SCOPE         
+ 123: PUSH_NULL           
+ 124: POP                 
+ 125: BEGIN_SCOPE         
+ 126: PRINT               
+ 127: END_SCOPE           
+ 128: LOAD_VAR             "<invalid>"
+ 129: POP                 
+ 130: PUSH_STRING          "<ERROR: Unsupported expression type: LOGICAL_EXPR>"
+ 131: POP                 
+ 132: BEGIN_SCOPE         
+ 133: PRINT               
+ 134: LOAD_VAR             "x"
+ 135: POP                 
+ 136: PUSH_STRING          ""Single digit positive: {x}"
+ 137: POP                 
+ 138: END_SCOPE           
+ 139: LOAD_VAR             "<invalid>"
+ 140: POP                 
+ 141: PUSH_STRING          "<ERROR: Unsupported expression type: LOGICAL_EXPR>"
+ 142: POP                 
+ 143: BEGIN_SCOPE         
+ 144: PRINT               
+ 145: END_SCOPE           
+ 146: END_SCOPE           
+ 147: END_SCOPE           
+ 148: PUSH_NULL           
+ 149: RETURN              
+ 150: END_FUNCTION        
+ 151: PUSH_FUNCTION       
+ 152: STORE_VAR            "<missing>"
+ 153: HALT                
+

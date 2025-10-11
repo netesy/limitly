@@ -1,0 +1,129 @@
+AST for tests\loops\match_advanced.lm
+Parser mode: CST
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+FunctionDeclaration: <missing>
+  Body:
+    BlockStatement:
+      ExpressionStatement:
+        Variable: value
+      BlockStatement:
+        BlockStatement:
+          ExpressionStatement:
+            Variable: name
+          ExpressionStatement:
+            Variable: age
+        BlockStatement:
+          PrintStatement:
+          ExpressionStatement:
+            Variable: name
+          ExpressionStatement:
+            Variable: age
+          ExpressionStatement:
+            Literal: "\"Name: {name}, Age: {age}"
+        BlockStatement:
+          ExpressionStatement:
+            Variable: name
+          ExpressionStatement:
+            Variable: age
+          ExpressionStatement:
+            Variable: city
+        BlockStatement:
+          PrintStatement:
+          ExpressionStatement:
+            Variable: name
+          ExpressionStatement:
+            Variable: age
+          ExpressionStatement:
+            Variable: city
+          ExpressionStatement:
+            Literal: "\"Name: {name}, Age: {age}, City: {city}"
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+BlockStatement:
+  ExpressionStatement:
+    Variable: name
+  ExpressionStatement:
+    Literal: "John"
+  ExpressionStatement:
+    Variable: age
+  ExpressionStatement:
+    Literal: 30
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+BlockStatement:
+  ExpressionStatement:
+    Variable: name
+  ExpressionStatement:
+    Literal: "Joan"
+  ExpressionStatement:
+    Variable: age
+  ExpressionStatement:
+    Literal: 26
+  ExpressionStatement:
+    Variable: city
+  ExpressionStatement:
+    Literal: "New York"
+FunctionDeclaration: <missing>
+  Body:
+    BlockStatement:
+      ExpressionStatement:
+        Variable: value
+      BlockStatement:
+        BlockStatement:
+          PrintStatement:
+        ExpressionStatement:
+          Variable: x
+        BlockStatement:
+          PrintStatement:
+          ExpressionStatement:
+            Variable: x
+          ExpressionStatement:
+            Literal: "\"One element: {x}"
+        ExpressionStatement:
+          Variable: x
+        ExpressionStatement:
+          Variable: y
+        BlockStatement:
+          PrintStatement:
+          ExpressionStatement:
+            Variable: x
+          ExpressionStatement:
+            Variable: y
+          ExpressionStatement:
+            Literal: "\"Two elements: {x}, {y}"
+        ExpressionStatement:
+          Variable: head
+        ExpressionStatement:
+          Variable: tail
+        BlockStatement:
+          PrintStatement:
+          ExpressionStatement:
+            Variable: head
+          ExpressionStatement:
+            Variable: tail
+          ExpressionStatement:
+            Literal: "\"Head: {head}, Tail: {tail}"
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)

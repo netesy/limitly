@@ -1,98 +1,43 @@
 // Performance benchmark test file
-// This file contains complex code to test CST parser performance vs legacy parser
+// This file contains moderately complex code to test CST parser performance
 
-fn fibonacci(n: int) -> int {
-    if (n <= 1) {
-        return n;
-    }
-    return fibonacci(n - 1) + fibonacci(n - 2);
-}
+// Test multiple variable declarations
+var a = 1;
+var b = 2;
+var c = 3;
+var d = 4;
+var e = 5;
 
-fn quicksort(arr: list<int>, low: int, high: int) {
-    if (low < high) {
-        var pi = partition(arr, low, high);
-        quicksort(arr, low, pi - 1);
-        quicksort(arr, pi + 1, high);
-    }
-}
+// Test multiple expressions
+var sum1 = a + b + c;
+var sum2 = d + e;
+var product = sum1 * sum2;
+var difference = product - sum1;
 
-fn partition(arr: list<int>, low: int, high: int) -> int {
-    var pivot = arr[high];
-    var i = low - 1;
-    
-    for (var j = low; j < high; j = j + 1) {
-        if (arr[j] < pivot) {
-            i = i + 1;
-            swap(arr, i, j);
-        }
-    }
-    
-    swap(arr, i + 1, high);
-    return i + 1;
-}
-
-fn swap(arr: list<int>, i: int, j: int) {
-    var temp = arr[i];
-    arr[i] = arr[j];
-    arr[j] = temp;
-}
-
-class ComplexClass {
-    var data: map<str, int>;
-    var nested: list<ComplexClass>;
-    
-    fn init(initialData: map<str, int>) {
-        this.data = initialData;
-        this.nested = [];
-    }
-    
-    fn processData() -> str {
-        var result = "";
-        for (key in this.data.keys()) {
-            var value = this.data[key];
-            result = result + "{key}: {value}, ";
-        }
-        return result;
-    }
-    
-    fn addNested(item: ComplexClass) {
-        this.nested.append(item);
-    }
-}
-
-fn main() {
-    // Test complex expressions
-    var numbers = [1, 5, 3, 8, 2, 7, 4, 6];
-    quicksort(numbers, 0, numbers.length() - 1);
-    
-    // Test recursive function
-    var fib10 = fibonacci(10);
-    print("Fibonacci(10): {fib10}");
-    
-    // Test complex object creation and manipulation
-    var dataMap = {"a": 1, "b": 2, "c": 3};
-    var obj = ComplexClass(dataMap);
-    
-    for (var i = 0; i < 5; i = i + 1) {
-        var nestedData = {"nested_{i}": i * 2};
-        var nestedObj = ComplexClass(nestedData);
-        obj.addNested(nestedObj);
-    }
-    
-    // Test string interpolation with complex expressions
-    print("Processed: {obj.processData()}");
-    print("Nested count: {obj.nested.length()}");
-    
-    // Test nested control structures
-    for (var outer = 0; outer < 3; outer = outer + 1) {
-        for (var inner = 0; inner < 3; inner = inner + 1) {
-            if (outer == inner) {
-                print("Diagonal: ({outer}, {inner})");
-            } else if (outer > inner) {
-                print("Upper: ({outer}, {inner})");
-            } else {
-                print("Lower: ({outer}, {inner})");
-            }
+// Test nested control structures
+for (var outer = 0; outer < 5; outer = outer + 1) {
+    for (var inner = 0; inner < 3; inner = inner + 1) {
+        if (outer == inner) {
+            print("Equal: " + str(outer) + ", " + str(inner));
+        } else if (outer > inner) {
+            print("Greater: " + str(outer) + ", " + str(inner));
+        } else {
+            print("Less: " + str(outer) + ", " + str(inner));
         }
     }
 }
+
+// Test multiple print statements
+print("Sum1: " + str(sum1));
+print("Sum2: " + str(sum2));
+print("Product: " + str(product));
+print("Difference: " + str(difference));
+
+// Test more complex expressions
+var complex1 = (a + b) * (c + d) - e;
+var complex2 = a * b + c * d + e;
+var complex3 = (complex1 + complex2) / 2;
+
+print("Complex1: " + str(complex1));
+print("Complex2: " + str(complex2));
+print("Complex3: " + str(complex3));

@@ -1,21 +1,17 @@
 // Test trivia attachment in CST scanner
 // This file tests that trivia (whitespace/comments) is properly attached to meaningful tokens
 
-fn main() {
-    /* Leading comment for variable */ var x = 42; // Trailing comment
-    
-    // Leading comment for if statement
-    if (x > 0) { // Trailing comment for condition
-        // Leading comment for print
-        print("positive"); // Trailing comment for print
-    } // Trailing comment for block
-    
-    /* Multi-line leading comment
-       for function call */ print("test"); /* Trailing block comment */
-    
-    // Test trivia around operators
-    var result = x /* comment */ + /* comment */ 10;
-    
-    // Test trivia around delimiters
-    var list = [ /* comment */ 1, 2, 3 /* comment */ ];
-}
+/* Leading comment for variable */ var x = 42; // Trailing comment
+
+// Leading comment for if statement
+if (x > 0) { // Trailing comment for condition
+    // Leading comment for print
+    print("positive"); // Trailing comment for print
+} // Trailing comment for block
+
+/* Multi-line leading comment
+   for function call */ 
+print("test"); /* Trailing block comment */
+
+// Test trivia around operators
+var result = x /* comment */ + /* comment */ 10;

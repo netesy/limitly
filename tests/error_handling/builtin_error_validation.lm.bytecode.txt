@@ -1,0 +1,157 @@
+Bytecode for C:\Projects\limitly\tests\error_handling\builtin_error_validation.lm
+Parser: New CSTParser
+========================================
+
+=== Bytecode ===
+Generated 149 instructions
+
+   0: BEGIN_FUNCTION       "divide"
+   1: DEFINE_PARAM        
+   2: DEFINE_PARAM        
+   3: BEGIN_SCOPE         
+   4: LOAD_VAR             "b"
+   5: PUSH_INT             0
+   6: EQUAL               
+   7: JUMP_IF_FALSE        5
+   8: BEGIN_SCOPE         
+   9: CONSTRUCT_ERROR     
+  10: RETURN              
+  11: END_SCOPE           
+  12: JUMP                 0
+  13: LOAD_VAR             "a"
+  14: LOAD_VAR             "b"
+  15: DIVIDE              
+  16: RETURN              
+  17: END_SCOPE           
+  18: PUSH_NULL           
+  19: RETURN              
+  20: END_FUNCTION        
+  21: PUSH_FUNCTION       
+  22: STORE_VAR            "divide"
+  23: BEGIN_FUNCTION       "safeDivision"
+  24: DEFINE_PARAM        
+  25: DEFINE_PARAM        
+  26: BEGIN_SCOPE         
+  27: LOAD_VAR             "x"
+  28: LOAD_VAR             "y"
+  29: CALL                 "divide"
+  30: CHECK_ERROR         
+  31: JUMP_IF_FALSE        1
+  32: PROPAGATE_ERROR     
+  33: UNWRAP_VALUE        
+  34: RETURN              
+  35: END_SCOPE           
+  36: PUSH_NULL           
+  37: RETURN              
+  38: END_FUNCTION        
+  39: PUSH_FUNCTION       
+  40: STORE_VAR            "safeDivision"
+  41: BEGIN_FUNCTION       "arrayAccess"
+  42: DEFINE_PARAM        
+  43: DEFINE_PARAM        
+  44: BEGIN_SCOPE         
+  45: LOAD_VAR             "index"
+  46: PUSH_INT             0
+  47: LESS                
+  48: JUMP_IF_FALSE        5
+  49: BEGIN_SCOPE         
+  50: CONSTRUCT_ERROR     
+  51: RETURN              
+  52: END_SCOPE           
+  53: JUMP                 0
+  54: PUSH_INT             10
+  55: PUSH_INT             2
+  56: CALL                 "divide"
+  57: CHECK_ERROR         
+  58: JUMP_IF_FALSE        1
+  59: PROPAGATE_ERROR     
+  60: UNWRAP_VALUE        
+  61: RETURN              
+  62: END_SCOPE           
+  63: PUSH_NULL           
+  64: RETURN              
+  65: END_FUNCTION        
+  66: PUSH_FUNCTION       
+  67: STORE_VAR            "arrayAccess"
+  68: BEGIN_FUNCTION       "complexOperation"
+  69: DEFINE_PARAM        
+  70: DEFINE_PARAM        
+  71: BEGIN_SCOPE         
+  72: LOAD_VAR             "arr"
+  73: LOAD_VAR             "index"
+  74: CALL                 "arrayAccess"
+  75: CHECK_ERROR         
+  76: JUMP_IF_FALSE        1
+  77: PROPAGATE_ERROR     
+  78: UNWRAP_VALUE        
+  79: STORE_VAR            "value"
+  80: LOAD_VAR             "value"
+  81: PUSH_INT             3
+  82: CALL                 "divide"
+  83: CHECK_ERROR         
+  84: JUMP_IF_FALSE        1
+  85: PROPAGATE_ERROR     
+  86: UNWRAP_VALUE        
+  87: RETURN              
+  88: END_SCOPE           
+  89: PUSH_NULL           
+  90: RETURN              
+  91: END_FUNCTION        
+  92: PUSH_FUNCTION       
+  93: STORE_VAR            "complexOperation"
+  94: PUSH_STRING          "Testing function signature validation with built-in error types"
+  95: PRINT               
+  96: PUSH_INT             10
+  97: PUSH_INT             2
+  98: CALL                 "safeDivision"
+  99: STORE_TEMP          
+ 100: LOAD_TEMP           
+ 101: PUSH_STRING          "__val_pattern__"
+ 102: PUSH_STRING          "result"
+ 103: MATCH_PATTERN       
+ 104: JUMP_IF_FALSE        5
+ 105: PUSH_STRING          "Division result: "
+ 106: LOAD_VAR             "result"
+ 107: ADD                 
+ 108: PRINT               
+ 109: JUMP                 11
+ 110: LOAD_TEMP           
+ 111: PUSH_STRING          "__err_pattern__"
+ 112: PUSH_STRING          "error"
+ 113: PUSH_NULL           
+ 114: MATCH_PATTERN       
+ 115: JUMP_IF_FALSE        5
+ 116: PUSH_STRING          "Division error: "
+ 117: LOAD_VAR             "error"
+ 118: ADD                 
+ 119: PRINT               
+ 120: JUMP                 0
+ 121: CLEAR_TEMP          
+ 122: PUSH_INT             10
+ 123: PUSH_INT             0
+ 124: CALL                 "safeDivision"
+ 125: STORE_TEMP          
+ 126: LOAD_TEMP           
+ 127: PUSH_STRING          "__val_pattern__"
+ 128: PUSH_STRING          "result"
+ 129: MATCH_PATTERN       
+ 130: JUMP_IF_FALSE        5
+ 131: PUSH_STRING          "Division result: "
+ 132: LOAD_VAR             "result"
+ 133: ADD                 
+ 134: PRINT               
+ 135: JUMP                 11
+ 136: LOAD_TEMP           
+ 137: PUSH_STRING          "__err_pattern__"
+ 138: PUSH_STRING          "error"
+ 139: PUSH_NULL           
+ 140: MATCH_PATTERN       
+ 141: JUMP_IF_FALSE        5
+ 142: PUSH_STRING          "Division error: "
+ 143: LOAD_VAR             "error"
+ 144: ADD                 
+ 145: PRINT               
+ 146: JUMP                 0
+ 147: CLEAR_TEMP          
+ 148: HALT                
+

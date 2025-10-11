@@ -1,0 +1,116 @@
+CST for C:\Projects\limitly\tests\expressions\logical.lm
+Parser: New CSTParser from cst_parser.cpp
+Mode: CST (cstMode=true)
+========================================
+
+CST Statistics:
+- CST nodes created: 37
+- Trivia attachments: 82
+- Parse errors: 0
+
+=== Full CST Structure ===
++ Node: PROGRAM [70-857] (Program root node)
+├─ + Node: VAR_DECLARATION [70-85] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [70-71]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [71-72]
+│ ├─ Token: var [72-75]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [75-76]
+│ ├─ + Node: IDENTIFIER [76-77]
+│ │ └─ Token: t [76-77]
+│ ├─ + Node: ASSIGNMENT_EXPR [78-84]
+│ │ ├─ Token: = [78-79]
+│ │ └─ + Node: LITERAL_EXPR [80-84]
+│ │   └─ Token: true [80-84]
+│ └─ Token: ; [84-85]
+├─ + Node: VAR_DECLARATION [85-100] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [85-86]
+│ ├─ Token: var [86-89]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [89-90]
+│ ├─ + Node: IDENTIFIER [90-91]
+│ │ └─ Token: f [90-91]
+│ ├─ + Node: ASSIGNMENT_EXPR [92-99]
+│ │ ├─ Token: = [92-93]
+│ │ └─ + Node: LITERAL_EXPR [94-99]
+│ │   └─ Token: false [94-99]
+│ └─ Token: ; [99-100]
+├─ + Node: VAR_DECLARATION [506-549] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [506-507]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [507-508]
+│ ├─ + Node: COMMENT_NODE | Token: // Complex logical expressions [508-538]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [538-539]
+│ ├─ Token: var [539-542]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [542-543]
+│ ├─ + Node: IDENTIFIER [543-544]
+│ │ └─ Token: a [543-544]
+│ ├─ + Node: ASSIGNMENT_EXPR [545-548]
+│ │ ├─ Token: = [545-546]
+│ │ └─ + Node: LITERAL_EXPR [547-548]
+│ │   └─ Token: 5 [547-548]
+│ └─ Token: ; [548-549]
+├─ + Node: VAR_DECLARATION [549-561] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [549-550]
+│ ├─ Token: var [550-553]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [553-554]
+│ ├─ + Node: IDENTIFIER [554-555]
+│ │ └─ Token: b [554-555]
+│ ├─ + Node: ASSIGNMENT_EXPR [556-560]
+│ │ ├─ Token: = [556-557]
+│ │ └─ + Node: LITERAL_EXPR [558-560]
+│ │   └─ Token: 10 [558-560]
+│ └─ Token: ; [560-561]
+├─ + Node: VAR_DECLARATION [561-596] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [561-562]
+│ ├─ Token: var [562-565]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [565-566]
+│ ├─ + Node: IDENTIFIER [566-573]
+│ │ └─ Token: result1 [566-573]
+│ ├─ + Node: ASSIGNMENT_EXPR [574-595]
+│ │ ├─ Token: = [574-575]
+│ │ └─ + Node: LITERAL_EXPR [594-595]
+│ │   └─ Token: ) [594-595]
+│ └─ Token: ; [595-596]
+├─ + Node: VAR_DECLARATION [596-631] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [596-597]
+│ ├─ Token: var [597-600]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [600-601]
+│ ├─ + Node: IDENTIFIER [601-608]
+│ │ └─ Token: result2 [601-608]
+│ ├─ + Node: ASSIGNMENT_EXPR [609-630]
+│ │ ├─ Token: = [609-610]
+│ │ └─ + Node: LITERAL_EXPR [629-630]
+│ │   └─ Token: ) [629-630]
+│ └─ Token: ; [630-631]
+├─ + Node: VAR_DECLARATION [805-816] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [805-806]
+│ ├─ Token: var [806-809]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [809-810]
+│ ├─ + Node: IDENTIFIER [810-811]
+│ │ └─ Token: x [810-811]
+│ ├─ + Node: ASSIGNMENT_EXPR [812-815]
+│ │ ├─ Token: = [812-813]
+│ │ └─ + Node: LITERAL_EXPR [814-815]
+│ │   └─ Token: 0 [814-815]
+│ └─ Token: ; [815-816]
+└─ + Node: VAR_DECLARATION [816-857] (var declaration)
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [816-817]
+  ├─ Token: var [817-820]
+  ├─ + Node: WHITESPACE_NODE | Token:   [820-821]
+  ├─ + Node: IDENTIFIER [821-828]
+  │ └─ Token: result3 [821-828]
+  ├─ + Node: ASSIGNMENT_EXPR [829-856]
+  │ ├─ Token: = [829-830]
+  │ └─ + Node: LITERAL_EXPR [855-856]
+  │   └─ Token: ) [855-856]
+  └─ Token: ; [856-857]
+

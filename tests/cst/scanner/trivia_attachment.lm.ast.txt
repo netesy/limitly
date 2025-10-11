@@ -1,0 +1,34 @@
+AST for C:\Projects\limitly\tests\cst\scanner\trivia_attachment.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
+========================================
+
+AST Dump:
+==========
+VarDeclaration: x
+  Initializer:
+    Literal: 42
+IfStatement:
+  Condition:
+    BinaryExpression: >
+      Left:
+        Variable: x
+      Operator: >
+      Right:
+        Literal: 0
+  Then:
+    BlockStatement:
+      PrintStatement:
+        Literal: "positive"
+PrintStatement:
+  Literal: "test"
+VarDeclaration: result
+  Initializer:
+    BinaryExpression: +
+      Left:
+        Variable: x
+      Operator: +
+      Right:
+        Literal: 10

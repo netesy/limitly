@@ -1,0 +1,85 @@
+Bytecode for tests\strings\operations.lm
+Parser mode: CST
+========================================
+
+=== Bytecode ===
+Generated 77 instructions
+
+   0: PRINT               
+   1: PRINT               
+   2: PUSH_NULL           
+   3: STORE_VAR            "<missing>"
+   4: PUSH_NULL           
+   5: STORE_VAR            "<missing>"
+   6: PUSH_NULL           
+   7: STORE_VAR            "<missing>"
+   8: PRINT               
+   9: PRINT               
+  10: LOAD_VAR             "str1"
+  11: POP                 
+  12: LOAD_VAR             "str2"
+  13: POP                 
+  14: LOAD_VAR             "str1"
+  15: LOAD_VAR             "str2"
+  16: EQUAL               
+  17: POP                 
+  18: PUSH_STRING          ""{str1} == {str2}: {str1 == str2}"
+  19: POP                 
+  20: PRINT               
+  21: LOAD_VAR             "str1"
+  22: POP                 
+  23: LOAD_VAR             "str2"
+  24: POP                 
+  25: LOAD_VAR             "str1"
+  26: LOAD_VAR             "str2"
+  27: NOT_EQUAL           
+  28: POP                 
+  29: PUSH_STRING          ""{str1} != {str2}: {str1 != str2}"
+  30: POP                 
+  31: PUSH_NULL           
+  32: STORE_VAR            "<missing>"
+  33: PUSH_NULL           
+  34: STORE_VAR            "<missing>"
+  35: PRINT               
+  36: LOAD_VAR             "numStr"
+  37: POP                 
+  38: LOAD_VAR             "num"
+  39: POP                 
+  40: LOAD_VAR             "numStr"
+  41: LOAD_VAR             "num"
+  42: EQUAL               
+  43: POP                 
+  44: PUSH_STRING          ""String vs number: {numStr} == {num}: {numStr == num}"
+  45: POP                 
+  46: PUSH_NULL           
+  47: STORE_VAR            "<missing>"
+  48: PRINT               
+  49: LOAD_VAR             "empty"
+  50: POP                 
+  51: PUSH_STRING          "'"
+  52: POP                 
+  53: PUSH_NULL           
+  54: STORE_VAR            "<missing>"
+  55: PRINT               
+  56: LOAD_VAR             "empty"
+  57: LOAD_VAR             "emptyStr"
+  58: EQUAL               
+  59: POP                 
+  60: PUSH_STRING          ""Empty length check: {empty == emptyStr}"
+  61: POP                 
+  62: PUSH_NULL           
+  63: STORE_VAR            "<missing>"
+  64: PRINT               
+  65: LOAD_VAR             "special"
+  66: POP                 
+  67: PUSH_STRING          ""Special chars: {special}"
+  68: POP                 
+  69: PUSH_NULL           
+  70: STORE_VAR            "<missing>"
+  71: PRINT               
+  72: LOAD_VAR             "quoted"
+  73: POP                 
+  74: PUSH_STRING          ""Quoted: {quoted}"
+  75: POP                 
+  76: HALT                
+

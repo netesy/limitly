@@ -1,0 +1,39 @@
+CST for C:\Projects\limitly\tests\error_handling\correct_function_validation.lm
+Parser: New CSTParser from cst_parser.cpp
+Mode: CST (cstMode=true)
+========================================
+
+CST Statistics:
+- CST nodes created: 23
+- Trivia attachments: 37
+- Parse errors: 0
+
+=== Full CST Structure ===
++ Node: PROGRAM [711-788] (Program root node)
+├─ + Node: VAR_DECLARATION [711-744] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [711-712]
+│ ├─ + Node: WHITESPACE_NODE | Token:      [712-716]
+│ ├─ Token: var [716-719]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [719-720]
+│ ├─ + Node: IDENTIFIER [720-727]
+│ │ └─ Token: result1 [720-727]
+│ ├─ + Node: ASSIGNMENT_EXPR [728-743]
+│ │ ├─ Token: = [728-729]
+│ │ └─ + Node: LITERAL_EXPR [742-743]
+│ │   └─ Token: ? [742-743]
+│ └─ Token: ; [743-744]
+└─ + Node: VAR_DECLARATION [744-788] (var declaration)
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [744-745]
+  ├─ + Node: WHITESPACE_NODE | Token:      [745-749]
+  ├─ Token: var [749-752]
+  ├─ + Node: WHITESPACE_NODE | Token:   [752-753]
+  ├─ + Node: IDENTIFIER [753-760]
+  │ └─ Token: result2 [753-760]
+  ├─ + Node: ASSIGNMENT_EXPR [761-787]
+  │ ├─ Token: = [761-762]
+  │ └─ + Node: LITERAL_EXPR [786-787]
+  │   └─ Token: ? [786-787]
+  └─ Token: ; [787-788]
+

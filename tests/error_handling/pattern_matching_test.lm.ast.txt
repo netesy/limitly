@@ -1,0 +1,461 @@
+AST for C:\Projects\limitly\tests\error_handling\pattern_matching_test.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
+========================================
+
+AST Dump:
+==========
+FunctionDeclaration: divide
+  Parameters:
+    a: int
+    b: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      IfStatement:
+        Condition:
+          BinaryExpression: ==
+            Left:
+              Variable: b
+            Operator: ==
+            Right:
+              Literal: 0
+        Then:
+          BlockStatement:
+            ReturnStatement:
+              Value:
+                ErrorConstruct: DivisionByZero
+                  Arguments:
+                    Literal: "Cannot divide by zero"
+      ReturnStatement:
+        Value:
+          OkConstruct:
+            Value:
+              BinaryExpression: /
+                Left:
+                  Variable: a
+                Operator: /
+                Right:
+                  Variable: b
+FunctionDeclaration: processResult
+  Parameters:
+    result: int
+  ReturnType: str
+  Body:
+    BlockStatement:
+      MatchStatement:
+        Value:
+          Variable: result
+        Cases:
+          Case:
+            Pattern:
+            Unknown node type
+            Body:
+            ExpressionStatement:
+              BinaryExpression: +
+                Left:
+                  Literal: "Success: "
+                Operator: +
+                Right:
+                  Variable: x
+          Case:
+            Pattern:
+            Unknown node type
+            Body:
+            ExpressionStatement:
+              BinaryExpression: +
+                Left:
+                  Literal: "Error: "
+                Operator: +
+                Right:
+                  MemberExpression: .message
+                    Object:
+                      Variable: e
+FunctionDeclaration: processResultSpecific
+  Parameters:
+    result: int
+  ReturnType: str
+  Body:
+    BlockStatement:
+      MatchStatement:
+        Value:
+          Variable: result
+        Cases:
+          Case:
+            Pattern:
+            Unknown node type
+            Body:
+            ExpressionStatement:
+              BinaryExpression: +
+                Left:
+                  Literal: "Success: "
+                Operator: +
+                Right:
+                  Variable: x
+          Case:
+            Pattern:
+            Unknown node type
+            Body:
+            ExpressionStatement:
+              BinaryExpression: +
+                Left:
+                  Literal: "Division error: "
+                Operator: +
+                Right:
+                  Variable: msg
+FunctionDeclaration: processMultipleErrors
+  Parameters:
+    result: int
+  ReturnType: str
+  Body:
+    BlockStatement:
+      MatchStatement:
+        Value:
+          Variable: result
+        Cases:
+          Case:
+            Pattern:
+            Unknown node type
+            Body:
+            ExpressionStatement:
+              BinaryExpression: +
+                Left:
+                  Literal: "Success: "
+                Operator: +
+                Right:
+                  Variable: x
+          Case:
+            Pattern:
+            Unknown node type
+            Body:
+            ExpressionStatement:
+              BinaryExpression: +
+                Left:
+                  Literal: "Division error: "
+                Operator: +
+                Right:
+                  Variable: msg
+          Case:
+            Pattern:
+            Unknown node type
+            Body:
+            ExpressionStatement:
+              BinaryExpression: +
+                Left:
+                  Literal: "Index error: "
+                Operator: +
+                Right:
+                  Variable: msg
+FunctionDeclaration: testGenericErrorPattern
+  Body:
+    BlockStatement:
+      VarDeclaration: result1
+        Initializer:
+          CallExpression:
+            Callee:
+              Variable: divide
+            Arguments:
+              Literal: 10
+              Literal: 2
+      VarDeclaration: result2
+        Initializer:
+          CallExpression:
+            Callee:
+              Variable: divide
+            Arguments:
+              Literal: 10
+              Literal: 0
+      PrintStatement:
+        CallExpression:
+          Callee:
+            Variable: processResult
+          Arguments:
+            Variable: result1
+      PrintStatement:
+        CallExpression:
+          Callee:
+            Variable: processResult
+          Arguments:
+            Variable: result2
+FunctionDeclaration: testSpecificErrorPattern
+  Body:
+    BlockStatement:
+      VarDeclaration: result1
+        Initializer:
+          CallExpression:
+            Callee:
+              Variable: divide
+            Arguments:
+              Literal: 10
+              Literal: 2
+      VarDeclaration: result2
+        Initializer:
+          CallExpression:
+            Callee:
+              Variable: divide
+            Arguments:
+              Literal: 10
+              Literal: 0
+      PrintStatement:
+        CallExpression:
+          Callee:
+            Variable: processResultSpecific
+          Arguments:
+            Variable: result1
+      PrintStatement:
+        CallExpression:
+          Callee:
+            Variable: processResultSpecific
+          Arguments:
+            Variable: result2
+FunctionDeclaration: testNestedErrorPatterns
+  Body:
+    BlockStatement:
+      FunctionDeclaration: processNested
+        Parameters:
+          outer: int
+        ReturnType: str
+        Body:
+          BlockStatement:
+            MatchStatement:
+              Value:
+                Variable: outer
+              Cases:
+                Case:
+                  Pattern:
+                  Unknown node type
+                  Body:
+                  BlockStatement:
+                    VarDeclaration: inner
+                      Initializer:
+                        CallExpression:
+                          Callee:
+                            Variable: divide
+                          Arguments:
+                            Variable: x
+                            Literal: 2
+                    MatchStatement:
+                      Value:
+                        Variable: inner
+                      Cases:
+                        Case:
+                          Pattern:
+                          Unknown node type
+                          Body:
+                          ExpressionStatement:
+                            BinaryExpression: +
+                              Left:
+                                Literal: "Nested success: "
+                              Operator: +
+                              Right:
+                                Variable: y
+                        Case:
+                          Pattern:
+                          Unknown node type
+                          Body:
+                          ExpressionStatement:
+                            BinaryExpression: +
+                              Left:
+                                Literal: "Nested error: "
+                              Operator: +
+                              Right:
+                                MemberExpression: .message
+                                  Object:
+                                    Variable: e
+                Case:
+                  Pattern:
+                  Unknown node type
+                  Body:
+                  ExpressionStatement:
+                    BinaryExpression: +
+                      Left:
+                        Literal: "Outer error: "
+                      Operator: +
+                      Right:
+                        MemberExpression: .message
+                          Object:
+                            Variable: e
+      VarDeclaration: result1
+        Initializer:
+          CallExpression:
+            Callee:
+              Variable: divide
+            Arguments:
+              Literal: 10
+              Literal: 2
+      VarDeclaration: result2
+        Initializer:
+          CallExpression:
+            Callee:
+              Variable: divide
+            Arguments:
+              Literal: 10
+              Literal: 0
+      PrintStatement:
+        CallExpression:
+          Callee:
+            Variable: processNested
+          Arguments:
+            Variable: result1
+      PrintStatement:
+        CallExpression:
+          Callee:
+            Variable: processNested
+          Arguments:
+            Variable: result2
+FunctionDeclaration: testErrorPatternWithGuards
+  Body:
+    BlockStatement:
+      FunctionDeclaration: processWithGuard
+        Parameters:
+          result: int
+        ReturnType: str
+        Body:
+          BlockStatement:
+            MatchStatement:
+              Value:
+                Variable: result
+              Cases:
+                Case:
+                  Pattern:
+                  Unknown node type
+                  Body:
+                  ExpressionStatement:
+                    BinaryExpression: +
+                      Left:
+                        Literal: "Large success: "
+                      Operator: +
+                      Right:
+                        Variable: x
+                Case:
+                  Pattern:
+                  Unknown node type
+                  Body:
+                  ExpressionStatement:
+                    BinaryExpression: +
+                      Left:
+                        Literal: "Small success: "
+                      Operator: +
+                      Right:
+                        Variable: x
+                Case:
+                  Pattern:
+                  Unknown node type
+                  Body:
+                  ExpressionStatement:
+                    BinaryExpression: +
+                      Left:
+                        Literal: "Error: "
+                      Operator: +
+                      Right:
+                        MemberExpression: .message
+                          Object:
+                            Variable: e
+      VarDeclaration: result1
+        Initializer:
+          CallExpression:
+            Callee:
+              Variable: divide
+            Arguments:
+              Literal: 20
+              Literal: 2
+      VarDeclaration: result2
+        Initializer:
+          CallExpression:
+            Callee:
+              Variable: divide
+            Arguments:
+              Literal: 6
+              Literal: 2
+      VarDeclaration: result3
+        Initializer:
+          CallExpression:
+            Callee:
+              Variable: divide
+            Arguments:
+              Literal: 10
+              Literal: 0
+      PrintStatement:
+        CallExpression:
+          Callee:
+            Variable: processWithGuard
+          Arguments:
+            Variable: result1
+      PrintStatement:
+        CallExpression:
+          Callee:
+            Variable: processWithGuard
+          Arguments:
+            Variable: result2
+      PrintStatement:
+        CallExpression:
+          Callee:
+            Variable: processWithGuard
+          Arguments:
+            Variable: result3
+FunctionDeclaration: testExhaustiveMatching
+  Body:
+    BlockStatement:
+      FunctionDeclaration: exhaustive
+        Parameters:
+          result: int
+        ReturnType: str
+        Body:
+          BlockStatement:
+            MatchStatement:
+              Value:
+                Variable: result
+              Cases:
+                Case:
+                  Pattern:
+                  Unknown node type
+                  Body:
+                  ExpressionStatement:
+                    BinaryExpression: +
+                      Left:
+                        Literal: "Success: "
+                      Operator: +
+                      Right:
+                        Variable: x
+                Case:
+                  Pattern:
+                  Unknown node type
+                  Body:
+                  ExpressionStatement:
+                    BinaryExpression: +
+                      Left:
+                        Literal: "Error: "
+                      Operator: +
+                      Right:
+                        MemberExpression: .message
+                          Object:
+                            Variable: e
+FunctionDeclaration: main
+  Body:
+    BlockStatement:
+      PrintStatement:
+        Literal: "Testing error pattern matching..."
+      ExpressionStatement:
+        CallExpression:
+          Callee:
+            Variable: testGenericErrorPattern
+      ExpressionStatement:
+        CallExpression:
+          Callee:
+            Variable: testSpecificErrorPattern
+      ExpressionStatement:
+        CallExpression:
+          Callee:
+            Variable: testNestedErrorPatterns
+      ExpressionStatement:
+        CallExpression:
+          Callee:
+            Variable: testErrorPatternWithGuards
+      ExpressionStatement:
+        CallExpression:
+          Callee:
+            Variable: testExhaustiveMatching
+      PrintStatement:
+        Literal: "Error pattern matching tests completed!"

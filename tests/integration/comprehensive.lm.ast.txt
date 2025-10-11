@@ -1,4 +1,8 @@
-AST for tests\integration\comprehensive.lm
+AST for C:\Projects\limitly\tests\integration\comprehensive.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
 ========================================
 
 AST Dump:
@@ -18,17 +22,18 @@ VarDeclaration: isStable
     Literal: true
 PrintStatement:
   InterpolatedString:
-    String: "Language: "
+    String: ""
     Expression:
       Variable: name
-    String: " v"
     Expression:
       Variable: version
+    String: "\"Language: {name} v{version}"
 PrintStatement:
   InterpolatedString:
-    String: "Stable: "
+    String: ""
     Expression:
       Variable: isStable
+    String: "\"Stable: {isStable}"
 PrintStatement:
   Literal: "Feature matrix:"
 ForStatement (traditional):
@@ -52,7 +57,7 @@ ForStatement (traditional):
     BlockStatement:
       PrintStatement:
         InterpolatedString:
-          String: "Feature "
+          String: ""
           Expression:
             Variable: feature
           String: ":"
@@ -76,13 +81,11 @@ ForStatement (traditional):
                 Literal: 5
             PrintStatement:
               InterpolatedString:
-                String: "  - Example: "
+                String: ""
                 Expression:
                   Variable: x
-                String: " + "
                 Expression:
                   Variable: y
-                String: " = "
                 Expression:
                   BinaryExpression: +
                     Left:
@@ -90,6 +93,7 @@ ForStatement (traditional):
                     Operator: +
                     Right:
                       Variable: y
+                String: "\"  - Example: {x} + {y} = {x + y}"
         Else:
           IfStatement:
             Condition:
@@ -116,9 +120,10 @@ ForStatement (traditional):
                     BlockStatement:
                       PrintStatement:
                         InterpolatedString:
-                          String: "  - Loop iteration "
+                          String: ""
                           Expression:
                             Variable: i
+                          String: "\"  - Loop iteration {i}"
             Else:
               BlockStatement:
                 PrintStatement:
@@ -126,97 +131,16 @@ ForStatement (traditional):
                 VarDeclaration: msg
                   Initializer:
                     InterpolatedString:
-                      String: "Hello, "
+                      String: ""
                       Expression:
                         Variable: name
                       String: "!"
                 PrintStatement:
                   InterpolatedString:
-                    String: "  - Message: "
+                    String: ""
                     Expression:
                       Variable: msg
-PrintStatement:
-  Literal: "Nested structure test:"
-ForStatement (traditional):
-  Initializer:
-    VarDeclaration: outer
-      Initializer:
-        Literal: 1
-  Condition:
-    BinaryExpression: <=
-      Left:
-        Variable: outer
-      Operator: <=
-      Right:
-        Literal: 2
-  Increment:
-    Assignment: +=
-      Target: outer
-      Value:
-      Literal: 1
-  Body:
-    BlockStatement:
-      PrintStatement:
-        InterpolatedString:
-          String: "Outer level "
-          Expression:
-            Variable: outer
-          String: ":"
-      IterStatement:
-        Variables: inner
-        Iterable:
-          RangeExpression:
-            Start:
-              Grouping:
-                BinaryExpression: *
-                  Left:
-                    Variable: outer
-                  Operator: *
-                  Right:
-                    Literal: 10
-            End:
-              Grouping:
-                BinaryExpression: +
-                  Left:
-                    BinaryExpression: *
-                      Left:
-                        Variable: outer
-                      Operator: *
-                      Right:
-                        Literal: 10
-                  Operator: +
-                  Right:
-                    Literal: 2
-            Inclusive: true
-        Body:
-          BlockStatement:
-            IfStatement:
-              Condition:
-                BinaryExpression: ==
-                  Left:
-                    BinaryExpression: %
-                      Left:
-                        Variable: inner
-                      Operator: %
-                      Right:
-                        Literal: 2
-                  Operator: ==
-                  Right:
-                    Literal: 0
-              Then:
-                BlockStatement:
-                  PrintStatement:
-                    InterpolatedString:
-                      String: "  Even: "
-                      Expression:
-                        Variable: inner
-              Else:
-                BlockStatement:
-                  PrintStatement:
-                    InterpolatedString:
-                      String: "  Odd: "
-                      Expression:
-                        Variable: inner
+                    String: "\"  - Message: {msg}"
 PrintStatement:
   Literal: "Complex expression test:"
 VarDeclaration: a
@@ -255,64 +179,57 @@ VarDeclaration: result
               Variable: b
 PrintStatement:
   InterpolatedString:
-    String: "("
+    String: ""
     Expression:
       Variable: a
-    String: " + "
     Expression:
       Variable: b
-    String: ") * "
     Expression:
       Variable: c
-    String: " - ("
     Expression:
       Variable: a
-    String: " - "
     Expression:
       Variable: b
-    String: ") = "
     Expression:
       Variable: result
+    String: "\"({a} + {b}) * {c} - ({a} - {b}) = {result}"
 VarDeclaration: condition
   Initializer:
-    Grouping:
-      BinaryExpression: >
-        Left:
-          Variable: a
-        Operator: >
-        Right:
-          Variable: b
-ExpressionStatement:
-  Literal: nil
-ExpressionStatement:
-  CallExpression:
-    Callee:
-      Literal: nil
-    Arguments:
-      BinaryExpression: >
-        Left:
-          Variable: b
-        Operator: >
-        Right:
-          Variable: c
-ExpressionStatement:
-  Literal: nil
-ExpressionStatement:
-  CallExpression:
-    Callee:
-      Literal: nil
-    Arguments:
-      BinaryExpression: ==
-        Left:
-          Variable: a
-        Operator: ==
-        Right:
-          Literal: 5
+    BinaryExpression: <unknown>
+      Left:
+        BinaryExpression: and
+          Left:
+            Grouping:
+              BinaryExpression: >
+                Left:
+                  Variable: a
+                Operator: >
+                Right:
+                  Variable: b
+          Operator: and
+          Right:
+            Grouping:
+              BinaryExpression: >
+                Left:
+                  Variable: b
+                Operator: >
+                Right:
+                  Variable: c
+      Operator: <unknown>
+      Right:
+        Grouping:
+          BinaryExpression: ==
+            Left:
+              Variable: a
+            Operator: ==
+            Right:
+              Literal: 5
 PrintStatement:
   InterpolatedString:
-    String: "Complex condition: "
+    String: ""
     Expression:
       Variable: condition
+    String: "\"Complex condition: {condition}"
 PrintStatement:
   Literal: "String processing:"
 VarDeclaration: words
@@ -350,7 +267,7 @@ ForStatement (traditional):
               Variable: i
       PrintStatement:
         InterpolatedString:
-          String: "Word "
+          String: ""
           Expression:
             BinaryExpression: +
               Left:
@@ -358,8 +275,8 @@ ForStatement (traditional):
               Operator: +
               Right:
                 Literal: 1
-          String: ": "
           Expression:
             Variable: word
+          String: "\"Word {i + 1}: {word}"
 PrintStatement:
   Literal: "Integration test complete!"

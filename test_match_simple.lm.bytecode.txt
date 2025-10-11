@@ -1,0 +1,38 @@
+Bytecode for test_match_simple.lm
+Parser: New CSTParser
+========================================
+
+=== Bytecode ===
+Generated 30 instructions
+
+   0: PUSH_INT             18
+   1: STORE_VAR            "x"
+   2: LOAD_VAR             "x"
+   3: STORE_TEMP          
+   4: LOAD_TEMP           
+   5: DUP                 
+   6: STORE_VAR            "x"
+   7: PUSH_STRING          "_"
+   8: MATCH_PATTERN       
+   9: JUMP_IF_FALSE        9
+  10: LOAD_VAR             "x"
+  11: PUSH_INT             10
+  12: GREATER             
+  13: JUMP_IF_FALSE        5
+  14: BEGIN_SCOPE         
+  15: PUSH_STRING          "greater than 10"
+  16: PRINT               
+  17: END_SCOPE           
+  18: JUMP                 9
+  19: LOAD_TEMP           
+  20: PUSH_NULL           
+  21: MATCH_PATTERN       
+  22: JUMP_IF_FALSE        5
+  23: BEGIN_SCOPE         
+  24: PUSH_STRING          "other"
+  25: PRINT               
+  26: END_SCOPE           
+  27: JUMP                 0
+  28: CLEAR_TEMP          
+  29: HALT                
+

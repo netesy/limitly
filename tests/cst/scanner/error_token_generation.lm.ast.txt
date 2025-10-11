@@ -1,0 +1,28 @@
+AST for C:\Projects\limitly\tests\cst\scanner\error_token_generation.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
+========================================
+
+AST Dump:
+==========
+VarDeclaration: x
+  Initializer:
+    Literal: 42
+VarDeclaration: y
+  Initializer:
+    Literal: 42
+VarDeclaration: bad_num
+  Initializer:
+    Literal: 123
+VarDeclaration: z
+  Initializer:
+    BinaryExpression: +
+      Left:
+        Variable: x
+      Operator: +
+      Right:
+        Variable: y
+PrintStatement:
+  Literal: "Should still parse after errors"

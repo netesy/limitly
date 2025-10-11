@@ -29,6 +29,7 @@ namespace AST {
     struct MemberExpr;
     struct ListExpr;
     struct DictExpr;
+    struct ObjectLiteralExpr;
     struct RangeExpr;
     struct ExprStatement;
     struct VarDeclaration;
@@ -245,6 +246,12 @@ namespace AST {
     // Dictionary literal {'a': 1, 'b': 2}
     struct DictExpr : public Expression {
         std::vector<std::pair<std::shared_ptr<Expression>, std::shared_ptr<Expression>>> entries;
+    };
+    
+    // Object literal with constructor name (e.g., Some { kind: "Some", value: 42 })
+    struct ObjectLiteralExpr : public Expression {
+        std::string constructorName;
+        std::unordered_map<std::string, std::shared_ptr<Expression>> properties;
     };
     
     // Range expression (e.g., 1..10)

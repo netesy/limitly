@@ -1,0 +1,7 @@
+var value = false;
+match (value) {
+    int => { print("Integer: {value}"); },
+    str => { print("String: {value}"); },
+    bool => { print("Boolean: {value}"); },
+    _ => { print("Unknown type"); }
+}
