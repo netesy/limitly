@@ -1,0 +1,95 @@
+CST for C:\Projects\limitly\tests\cst\parser\valid_syntax.lm
+Parser: New CSTParser from cst_parser.cpp
+Mode: CST (cstMode=true)
+========================================
+
+CST Statistics:
+- CST nodes created: 20
+- Trivia attachments: 32
+- Parse errors: 3
+
+Parse Errors:
+  Line 22: Expected expression.
+  Line 26: Expected expression.
+  Line 27: Expected expression.
+
+=== Full CST Structure ===
++ Node: PROGRAM [0-252] (Program root node)
+├─ + Node: VAR_DECLARATION [0-159] (var declaration)
+│ ├─ + Node: COMMENT_NODE | Token: // Test valid syntax parsing in CST parser [0-42]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [42-43]
+│ ├─ + Node: COMMENT_NODE | Token: // This file contains various valid language constructs to test CST generation [43-121]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [121-122]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [122-123]
+│ ├─ + Node: COMMENT_NODE | Token: // Variable declarations [123-147]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [147-148]
+│ ├─ Token: var [148-151]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [151-152]
+│ ├─ + Node: IDENTIFIER [152-153]
+│ │ └─ Token: x [152-153]
+│ ├─ + Node: ASSIGNMENT_EXPR [154-158]
+│ │ ├─ Token: = [154-155]
+│ │ └─ + Node: LITERAL_EXPR [156-158]
+│ │   └─ Token: 42 [156-158]
+│ └─ Token: ; [158-159]
+├─ + Node: VAR_DECLARATION [159-176] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [159-160]
+│ ├─ Token: var [160-163]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [163-164]
+│ ├─ + Node: IDENTIFIER [164-165]
+│ │ └─ Token: y [164-165]
+│ ├─ + Node: ASSIGNMENT_EXPR [166-174]
+│ │ ├─ Token: = [166-167]
+│ │ └─ + Node: LITERAL_EXPR [168-174]
+│ │   └─ Token: hello [168-174]
+│ └─ Token: ; [175-176]
+├─ + Node: VAR_DECLARATION [176-190] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [176-177]
+│ ├─ Token: var [177-180]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [180-181]
+│ ├─ + Node: IDENTIFIER [181-182]
+│ │ └─ Token: z [181-182]
+│ ├─ + Node: ASSIGNMENT_EXPR [183-189]
+│ │ ├─ Token: = [183-184]
+│ │ └─ + Node: LITERAL_EXPR [185-189]
+│ │   └─ Token: true [185-189]
+│ └─ Token: ; [189-190]
+├─ + Node: VAR_DECLARATION [190-231] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [190-191]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [191-192]
+│ ├─ + Node: COMMENT_NODE | Token: // Simple expressions [192-213]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [213-214]
+│ ├─ Token: var [214-217]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [217-218]
+│ ├─ + Node: IDENTIFIER [218-221]
+│ │ └─ Token: sum [218-221]
+│ ├─ + Node: ASSIGNMENT_EXPR [222-230]
+│ │ ├─ Token: = [222-223]
+│ │ └─ + Node: LITERAL_EXPR [228-230]
+│ │   └─ Token: 10 [228-230]
+│ └─ Token: ; [230-231]
+├─ + Node: VAR_DECLARATION [231-252] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [231-232]
+│ ├─ Token: var [232-235]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [235-236]
+│ ├─ + Node: IDENTIFIER [236-243]
+│ │ └─ Token: product [236-243]
+│ ├─ + Node: ASSIGNMENT_EXPR [244-251]
+│ │ ├─ Token: = [244-245]
+│ │ └─ + Node: LITERAL_EXPR [250-251]
+│ │   └─ Token: 2 [250-251]
+│ └─ Token: ; [251-252]
+├─ + Node: ERROR_NODE [0-0] ERROR: Expected expression.
+├─ + Node: ERROR_NODE [0-0] ERROR: Expected expression.
+└─ + Node: ERROR_NODE [0-0] ERROR: Expected expression.
+

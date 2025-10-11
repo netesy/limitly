@@ -1,0 +1,154 @@
+CST for C:\Projects\limitly\tests\classes\basic_classes.lm
+Parser: New CSTParser from cst_parser.cpp
+Mode: CST (cstMode=true)
+========================================
+
+CST Statistics:
+- CST nodes created: 46
+- Trivia attachments: 75
+- Parse errors: 0
+
+=== Full CST Structure ===
++ Node: PROGRAM [457-2075] (Program root node)
+├─ + Node: VAR_DECLARATION [457-492] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [457-458]
+│ ├─ Token: var [458-461]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [461-462]
+│ ├─ + Node: IDENTIFIER [462-469]
+│ │ └─ Token: person1 [462-469]
+│ ├─ + Node: ASSIGNMENT_EXPR [470-491]
+│ │ ├─ Token: = [470-471]
+│ │ └─ + Node: LITERAL_EXPR [490-491]
+│ │   └─ Token: ) [490-491]
+│ └─ Token: ; [491-492]
+├─ + Node: VAR_DECLARATION [492-525] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [492-493]
+│ ├─ Token: var [493-496]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [496-497]
+│ ├─ + Node: IDENTIFIER [497-504]
+│ │ └─ Token: person2 [497-504]
+│ ├─ + Node: ASSIGNMENT_EXPR [505-524]
+│ │ ├─ Token: = [505-506]
+│ │ └─ + Node: LITERAL_EXPR [523-524]
+│ │   └─ Token: ) [523-524]
+│ └─ Token: ; [524-525]
+├─ + Node: VAR_DECLARATION [694-717] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [694-695]
+│ ├─ + Node: WHITESPACE_NODE | Token:      [695-699]
+│ ├─ Token: var [699-702]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [702-703]
+│ ├─ + Node: IDENTIFIER [703-708]
+│ │ └─ Token: width [703-708]
+│ ├─ + Node: ANNOTATION [708-712]
+│ │ ├─ Token: : [708-709]
+│ │ └─ + Node: PRIMITIVE_TYPE [709-712]
+│ │   └─ Token: int [709-712]
+│ ├─ + Node: ASSIGNMENT_EXPR [713-716]
+│ │ ├─ Token: = [713-714]
+│ │ └─ + Node: LITERAL_EXPR [715-716]
+│ │   └─ Token: 0 [715-716]
+│ └─ Token: ; [716-717]
+├─ + Node: VAR_DECLARATION [717-741] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [717-718]
+│ ├─ + Node: WHITESPACE_NODE | Token:      [718-722]
+│ ├─ Token: var [722-725]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [725-726]
+│ ├─ + Node: IDENTIFIER [726-732]
+│ │ └─ Token: height [726-732]
+│ ├─ + Node: ANNOTATION [732-736]
+│ │ ├─ Token: : [732-733]
+│ │ └─ + Node: PRIMITIVE_TYPE [733-736]
+│ │   └─ Token: int [733-736]
+│ ├─ + Node: ASSIGNMENT_EXPR [737-740]
+│ │ ├─ Token: = [737-738]
+│ │ └─ + Node: LITERAL_EXPR [739-740]
+│ │   └─ Token: 0 [739-740]
+│ └─ Token: ; [740-741]
+├─ + Node: VAR_DECLARATION [1012-1040] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [1012-1013]
+│ ├─ Token: var [1013-1016]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [1016-1017]
+│ ├─ + Node: IDENTIFIER [1017-1021]
+│ │ └─ Token: rect [1017-1021]
+│ ├─ + Node: ASSIGNMENT_EXPR [1022-1039]
+│ │ ├─ Token: = [1022-1023]
+│ │ └─ + Node: LITERAL_EXPR [1038-1039]
+│ │   └─ Token: ) [1038-1039]
+│ └─ Token: ; [1039-1040]
+├─ + Node: VAR_DECLARATION [1181-1211] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [1181-1182]
+│ ├─ + Node: WHITESPACE_NODE | Token:      [1182-1186]
+│ ├─ Token: var [1186-1189]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [1189-1190]
+│ ├─ + Node: IDENTIFIER [1190-1197]
+│ │ └─ Token: balance [1190-1197]
+│ ├─ + Node: ANNOTATION [1197-1204]
+│ │ ├─ Token: : [1197-1198]
+│ │ └─ + Node: PRIMITIVE_TYPE [1199-1204]
+│ │   └─ Token: float [1199-1204]
+│ ├─ + Node: ASSIGNMENT_EXPR [1205-1210]
+│ │ ├─ Token: = [1205-1206]
+│ │ └─ + Node: LITERAL_EXPR [1207-1210]
+│ │   └─ Token: 0.0 [1207-1210]
+│ └─ Token: ; [1210-1211]
+├─ + Node: VAR_DECLARATION [1631-1663] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [1631-1632]
+│ ├─ + Node: WHITESPACE_NODE | Token:      [1632-1636]
+│ ├─ Token: var [1636-1639]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [1639-1640]
+│ ├─ + Node: IDENTIFIER [1640-1647]
+│ │ └─ Token: account [1640-1647]
+│ └─ + Node: ASSIGNMENT_EXPR [1648-1663]
+│   ├─ Token: = [1648-1649]
+│   └─ + Node: LITERAL_EXPR [1662-1663]
+│     └─ Token: ) [1662-1663]
+├─ + Node: VAR_DECLARATION [1769-1858] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token:    [1769-1771]
+│ ├─ + Node: COMMENT_NODE | Token: // Should be 100.0 [1771-1789]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [1789-1790]
+│ ├─ + Node: WHITESPACE_NODE | Token:      [1790-1794]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [1794-1795]
+│ ├─ + Node: WHITESPACE_NODE | Token:      [1795-1799]
+│ ├─ + Node: COMMENT_NODE | Token: // Test withdraw [1799-1815]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [1815-1816]
+│ ├─ + Node: WHITESPACE_NODE | Token:      [1816-1820]
+│ ├─ Token: var [1820-1823]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [1823-1824]
+│ ├─ + Node: IDENTIFIER [1824-1833]
+│ │ └─ Token: withdrawn [1824-1833]
+│ └─ + Node: ASSIGNMENT_EXPR [1834-1858]
+│   ├─ Token: = [1834-1835]
+│   └─ + Node: LITERAL_EXPR [1857-1858]
+│     └─ Token: ) [1857-1858]
+└─ + Node: VAR_DECLARATION [1970-2075] (var declaration)
+  ├─ + Node: WHITESPACE_NODE | Token:    [1970-1972]
+  ├─ + Node: COMMENT_NODE | Token: // Should be 70.0 [1972-1989]
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [1989-1990]
+  ├─ + Node: WHITESPACE_NODE | Token:      [1990-1994]
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [1994-1995]
+  ├─ + Node: WHITESPACE_NODE | Token:      [1995-1999]
+  ├─ + Node: COMMENT_NODE | Token: // Test insufficient funds [1999-2025]
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [2025-2026]
+  ├─ + Node: WHITESPACE_NODE | Token:      [2026-2030]
+  ├─ Token: var [2030-2033]
+  ├─ + Node: WHITESPACE_NODE | Token:   [2033-2034]
+  ├─ + Node: IDENTIFIER [2034-2049]
+  │ └─ Token: failed_withdraw [2034-2049]
+  └─ + Node: ASSIGNMENT_EXPR [2050-2075]
+    ├─ Token: = [2050-2051]
+    └─ + Node: LITERAL_EXPR [2074-2075]
+      └─ Token: ) [2074-2075]
+

@@ -1,0 +1,19 @@
+// Test Result type matching with val() and err()
+fn divide(a: int, b: int) : int?str {
+    if (b == 0) {
+        return err("Division by zero");
+    }
+    return val(a / b);
+}
+
+var result1 = divide(10, 2);
+match (result1) {
+    val(x) => { print("Success: {x}"); },
+    err(msg) => { print("Error: {msg}"); }
+}
+
+var result2 = divide(10, 0);
+match (result2) {
+    val(x) => { print("Success: {x}"); },
+    err(msg) => { print("Error: {msg}"); }
+}

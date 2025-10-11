@@ -1,0 +1,12 @@
+// Test variable binding in match patterns
+var x = 42;
+
+match (x) {
+    n => { print("Bound to variable n: {n}"); }
+}
+
+// Test with guard
+match (x) {
+    n where n > 10 => { print("n is greater than 10: {n}"); },
+    n => { print("n is 10 or less: {n}"); }
+}

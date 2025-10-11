@@ -1,0 +1,188 @@
+AST for C:\Projects\limitly\tests\error_handling\comprehensive_validation_test.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
+========================================
+
+AST Dump:
+==========
+FunctionDeclaration: divide
+  Parameters:
+    a: int
+    b: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      IfStatement:
+        Condition:
+          BinaryExpression: ==
+            Left:
+              Variable: b
+            Operator: ==
+            Right:
+              Literal: 0
+        Then:
+          BlockStatement:
+            ReturnStatement:
+              Value:
+                ErrorConstruct: DivisionByZero
+      ReturnStatement:
+        Value:
+          BinaryExpression: /
+            Left:
+              Variable: a
+            Operator: /
+            Right:
+              Variable: b
+FunctionDeclaration: safeDivision
+  Parameters:
+    x: int
+    y: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      ReturnStatement:
+        Value:
+          FallibleExpression:
+            Expression:
+              CallExpression:
+                Callee:
+                  Variable: divide
+                Arguments:
+                  Variable: x
+                  Variable: y
+FunctionDeclaration: legacyDivide
+  Parameters:
+    a: int
+    b: int
+  ReturnType: int
+  Throws: true
+  Body:
+    BlockStatement:
+      IfStatement:
+        Condition:
+          BinaryExpression: ==
+            Left:
+              Variable: b
+            Operator: ==
+            Right:
+              Literal: 0
+        Then:
+          BlockStatement:
+            ReturnStatement:
+              Value:
+                ErrorConstruct: DivisionByZero
+      ReturnStatement:
+        Value:
+          BinaryExpression: /
+            Left:
+              Variable: a
+            Operator: /
+            Right:
+              Variable: b
+FunctionDeclaration: handleErrors
+  Parameters:
+    x: int
+    y: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      MatchStatement:
+        Value:
+          CallExpression:
+            Callee:
+              Variable: divide
+            Arguments:
+              Variable: x
+              Variable: y
+        Cases:
+          Case:
+            Pattern:
+            Unknown node type
+            Body:
+            ReturnStatement:
+              Value:
+                Variable: result
+          Case:
+            Pattern:
+            Unknown node type
+            Body:
+            ReturnStatement:
+              Value:
+                UnaryExpression: -
+                  Operand:
+                    Literal: 1
+PrintStatement:
+  Literal: "=== Function Signature Error Type Validation Test ==="
+PrintStatement:
+  Literal: "Testing correct error type propagation..."
+MatchStatement:
+  Value:
+    CallExpression:
+      Callee:
+        Variable: safeDivision
+      Arguments:
+        Literal: 10
+        Literal: 2
+  Cases:
+    Case:
+      Pattern:
+      Unknown node type
+      Body:
+      PrintStatement:
+        BinaryExpression: +
+          Left:
+            Literal: "Success: 10 / 2 = "
+          Operator: +
+          Right:
+            Variable: result
+    Case:
+      Pattern:
+      Unknown node type
+      Body:
+      PrintStatement:
+        Literal: "Unexpected error"
+MatchStatement:
+  Value:
+    CallExpression:
+      Callee:
+        Variable: safeDivision
+      Arguments:
+        Literal: 10
+        Literal: 0
+  Cases:
+    Case:
+      Pattern:
+      Unknown node type
+      Body:
+      PrintStatement:
+        BinaryExpression: +
+          Left:
+            Literal: "Unexpected success: "
+          Operator: +
+          Right:
+            Variable: result
+    Case:
+      Pattern:
+      Unknown node type
+      Body:
+      PrintStatement:
+        Literal: "Expected error: Division by zero caught"
+VarDeclaration: handled
+  Initializer:
+    CallExpression:
+      Callee:
+        Variable: handleErrors
+      Arguments:
+        Literal: 10
+        Literal: 0
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "Handled error result: "
+    Operator: +
+    Right:
+      Variable: handled
+PrintStatement:
+  Literal: "=== Test completed successfully ==="

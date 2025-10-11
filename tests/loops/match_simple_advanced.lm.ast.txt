@@ -1,0 +1,151 @@
+AST for tests\loops\match_simple_advanced.lm
+Parser mode: CST
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+PrintStatement:
+FunctionDeclaration: <missing>
+  Body:
+    BlockStatement:
+      ExpressionStatement:
+        Variable: value
+      BlockStatement:
+        ExpressionStatement:
+          Variable: <invalid>
+        ExpressionStatement:
+          BinaryExpression: +
+            Left:
+              Variable: <invalid>
+            Operator: +
+            Right:
+              Literal: nil
+        BlockStatement:
+          PrintStatement:
+          ExpressionStatement:
+            Variable: x
+          ExpressionStatement:
+            Literal: " is greater than 10"
+        ExpressionStatement:
+          Variable: <invalid>
+        ExpressionStatement:
+          BinaryExpression: +
+            Left:
+              Variable: <invalid>
+            Operator: +
+            Right:
+              Literal: nil
+        BlockStatement:
+          PrintStatement:
+          ExpressionStatement:
+            Variable: x
+          ExpressionStatement:
+            Literal: " is less than 10"
+        ExpressionStatement:
+          Variable: <invalid>
+        BlockStatement:
+          PrintStatement:
+          ExpressionStatement:
+            Variable: x
+          ExpressionStatement:
+            Literal: " is exactly 10"
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+FunctionDeclaration: <missing>
+  Body:
+    BlockStatement:
+      ExpressionStatement:
+        Variable: value
+      BlockStatement:
+        BlockStatement:
+          PrintStatement:
+          ExpressionStatement:
+            Variable: value
+          ExpressionStatement:
+            Literal: "\"Integer: {value}"
+        BlockStatement:
+          PrintStatement:
+          ExpressionStatement:
+            Variable: value
+          ExpressionStatement:
+            Literal: "\"String: {value}"
+        BlockStatement:
+          PrintStatement:
+          ExpressionStatement:
+            Variable: value
+          ExpressionStatement:
+            Literal: "\"List: {value}"
+        BlockStatement:
+          PrintStatement:
+          ExpressionStatement:
+            Variable: value
+          ExpressionStatement:
+            Literal: "\"Dictionary: {value}"
+        BlockStatement:
+          PrintStatement:
+          ExpressionStatement:
+            Variable: value
+          ExpressionStatement:
+            Literal: "\"Unknown type: {value}"
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+BlockStatement:
+  ExpressionStatement:
+    Literal: "key"
+  ExpressionStatement:
+    Literal: "value"
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+FunctionDeclaration: <missing>
+  Body:
+    BlockStatement:
+      ExpressionStatement:
+        Variable: value
+      BlockStatement:
+        ExpressionStatement:
+          Literal: nil
+        BlockStatement:
+          PrintStatement:
+        ExpressionStatement:
+          Variable: <invalid>
+        ExpressionStatement:
+          Literal: "<ERROR: Unsupported expression type: LOGICAL_EXPR>"
+        BlockStatement:
+          PrintStatement:
+          ExpressionStatement:
+            Variable: x
+          ExpressionStatement:
+            Literal: "\"Single digit positive: {x}"
+        ExpressionStatement:
+          Variable: <invalid>
+        ExpressionStatement:
+          Literal: "<ERROR: Unsupported expression type: LOGICAL_EXPR>"
+        BlockStatement:
+          PrintStatement:

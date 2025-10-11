@@ -1,0 +1,42 @@
+CST for C:\Projects\limitly\tests\cst\parser\partial_node_construction.lm
+Parser: New CSTParser from cst_parser.cpp
+Mode: CST (cstMode=true)
+========================================
+
+CST Statistics:
+- CST nodes created: 8
+- Trivia attachments: 10
+- Parse errors: 3
+
+Parse Errors:
+  Line 11: Expected ')' after if condition.
+  Line 17: Expected ';' after loop condition.
+  Line 18: Expected expression.
+
+=== Full CST Structure ===
++ Node: PROGRAM [0-172] (Program root node)
+├─ + Node: VAR_DECLARATION [0-172] (var declaration)
+│ ├─ + Node: COMMENT_NODE | Token: // Test partial node construction in CST parser [0-47]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [47-48]
+│ ├─ + Node: COMMENT_NODE | Token: // This file tests that the parser creates partial nodes for incomplete constructs [48-130]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [130-131]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [131-132]
+│ ├─ + Node: COMMENT_NODE | Token: // Valid code for comparison [132-160]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [160-161]
+│ ├─ Token: var [161-164]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [164-165]
+│ ├─ + Node: IDENTIFIER [165-166]
+│ │ └─ Token: x [165-166]
+│ ├─ + Node: ASSIGNMENT_EXPR [167-171]
+│ │ ├─ Token: = [167-168]
+│ │ └─ + Node: LITERAL_EXPR [169-171]
+│ │   └─ Token: 42 [169-171]
+│ └─ Token: ; [171-172]
+├─ + Node: ERROR_NODE [0-0] ERROR: Expected ')' after if condition.
+├─ + Node: ERROR_NODE [0-0] ERROR: Expected ';' after loop condition.
+└─ + Node: ERROR_NODE [0-0] ERROR: Expected expression.
+

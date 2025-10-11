@@ -22,7 +22,7 @@ for (var feature = 1; feature <= 3; feature += 1) {
         var x = 10;
         var y = 5;
         print("  - Example: {x} + {y} = {x + y}");
-    } else if (feature == 2) {
+    } elif (feature == 2) {
         print("  - Control flow and loops");
         iter (i in 1..4) {
             print("  - Loop iteration {i}");
@@ -47,6 +47,7 @@ for (var feature = 1; feature <= 3; feature += 1) {
 //         }
 //     }
 // }
+
 
 // Complex expressions
 print("Complex expression test:");

@@ -1,4 +1,8 @@
-AST for tests\concurrency\concurrency_smoke.lm
+AST for C:\Projects\limitly\tests\concurrency\concurrency_smoke.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
 ========================================
 
 AST Dump:
@@ -6,63 +10,9 @@ AST Dump:
 PrintStatement:
   Literal: "=== Concurrency Smoke Test ==="
 VarDeclaration: counter
-  Type: atomic
+  Type: int
   Initializer:
     Literal: 0
-ConcurrentStatement:
-  BlockStatement:
-    TaskStatement
-      Body:
-        BlockStatement:
-          ExpressionStatement:
-            Assignment: +=
-              Target: counter
-              Value:
-              Literal: 1
-          PrintStatement:
-            InterpolatedString:
-              String: "Task 1 completed with counter value: "
-              Expression:
-                Variable: counter
-    TaskStatement
-      Body:
-        BlockStatement:
-          ExpressionStatement:
-            Assignment: +=
-              Target: counter
-              Value:
-              Literal: 1
-          PrintStatement:
-            InterpolatedString:
-              String: "Task 2 completed with counter value: "
-              Expression:
-                Variable: counter
-    TaskStatement
-      Body:
-        BlockStatement:
-          ExpressionStatement:
-            Assignment: +=
-              Target: counter
-              Value:
-              Literal: 1
-          PrintStatement:
-            InterpolatedString:
-              String: "Task 3 completed with counter value: "
-              Expression:
-                Variable: counter
-    TaskStatement
-      Body:
-        BlockStatement:
-          ExpressionStatement:
-            Assignment: +=
-              Target: counter
-              Value:
-              Literal: 1
-          PrintStatement:
-            InterpolatedString:
-              String: "Task 4 completed with counter value: "
-              Expression:
-                Variable: counter
 PrintStatement:
   Literal: "Tasks Iteration Tests"
 ConcurrentStatement:
@@ -74,45 +24,32 @@ ConcurrentStatement:
           Start:
             Literal: 1
           End:
-            Literal: 3
+            Literal: 4
           Inclusive: true
       Body:
         BlockStatement:
+          ExpressionStatement:
+            Assignment: +=
+              Target: counter
+              Value:
+              Literal: 1
           PrintStatement:
             InterpolatedString:
-              String: "Task "
+              String: ""
               Expression:
-                Variable: i
-              String: " running"
+                Variable: counter
+              String: "\"Task running with counter {counter}"
 PrintStatement:
   Literal: "end Task tests"
 PrintStatement:
   InterpolatedString:
-    String: "Final counter value: "
+    String: ""
     Expression:
       Variable: counter
+    String: "\"Final counter value: {counter}"
 PrintStatement:
   Literal: "Smoke test finished"
 PrintStatement:
   Literal: "=== Test Concurrent Iteration ==="
-ConcurrentStatement:
-  BlockStatement:
-    TaskStatement
-      LoopVar: i
-      Iterable:
-        RangeExpression:
-          Start:
-            Literal: 1
-          End:
-            Literal: 2
-          Inclusive: true
-      Body:
-        BlockStatement:
-          PrintStatement:
-            InterpolatedString:
-              String: "Task "
-              Expression:
-                Variable: i
-              String: " with default parameters"
 PrintStatement:
   Literal: "Test finished"

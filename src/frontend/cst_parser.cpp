@@ -1,4286 +1,3424 @@
 #include "cst_parser.hh"
-#include "ast_builder.hh"
-#include "../error/error_handling.hh"
-#include "../error/error_formatter.hh"
-#include "../error/contextual_hint_provider.hh"
 #include "../common/debugger.hh"
-#include <algorithm>
-#include <sstream>
-#include <iomanip>
-#include <unordered_set>
-#include <chrono>
-#include <cassert>
-#include <iostream>
+#include <stdexcept>
+#include <limits>
 
-namespace CST {
+// Helper methods
+Token CSTParser::peek() {
+    return scanner.getTokens()[current];
+}
 
-    // Constructor taking vector of tokens from enhanced Scanner
-    CSTParser::CSTParser(const std::vector<Token>& tokens) 
-        : tokens(tokens), current(0), scanner(nullptr) {
-        // Initialize with default recovery configuration
-        recoveryConfig = RecoveryConfig{};
-    }
+Token CSTParser::previous() {
+    return scanner.getTokens()[current - 1];
+}
 
-    // Alternative constructor taking Scanner directly
-    CSTParser::CSTParser(Scanner& scanner, const CSTConfig& config) 
-        : current(0), scanner(&scanner) {
-        // Scan all tokens including trivia if CST config specifies
-        tokens = scanner.scanAllTokens(config);
-        
-        // Configure recovery based on CST config
-        recoveryConfig.preserveTrivia = config.preserveComments || config.preserveWhitespace;
-        recoveryConfig.continueOnError = config.emitErrorTokens;
-        
-        // Initialize unified grammar system
-        // initializeUnifiedGrammar(); // Temporarily disabled for compilation
-    }
+Token CSTParser::advance() {
+    if (!isAtEnd()) current++;
+    return previous();
+}
 
-    // Unified Grammar System Implementation
-    
-    void CSTParser::initializeUnifiedGrammar() {
-        // Initialize the unified grammar table with all language rules
-        // Temporarily disabled for compilation
-        // uncommeted
-        initializeCoreGrammar();
-        initializeStatementGrammar();
-        initializeExpressionGrammar();
-        initializeDeclarationGrammar();
-        initializeTypeGrammar();
-        
-        // Optimize rule order for performance
-        grammar.optimizeRuleOrder();
-        
-        // Enable memoization for frequently used rules
-        grammar.enableMemoization(true);
-        // uncommeted end
-    }
-    
-    void CSTParser::initializeCoreGrammar() {
-        // Temporarily disabled for compilation
-        // uncommeted
-        // Core program structure
-        grammar.addRule("program", [this](ParseContext& ctx) -> RuleResult {
-            if (ctx.mode == ParserMode::DIRECT_AST) {
-                // Direct AST generation
-                auto program = std::make_shared<AST::Program>();
-                program->line = ctx.peek().line;
-                
-                while (!ctx.isAtEnd()) {
-                    auto stmtResult = executeRule("statement", ctx);
-                    if (stmtResult.success && stmtResult.hasAST()) {
-                        if (auto stmt = stmtResult.getAST<AST::Statement>()) {
-                            program->statements.push_back(stmt);
-                        }
-                    }
-                }
-                
-                RuleResult result;
-                result.node = std::static_pointer_cast<AST::Node>(program);
-                result.success = true;
-                result.tokensConsumed = ctx.currentToken;
-                return result;
-            } else {
-                // CST generation
-                auto programNode = createNode(NodeKind::PROGRAM);
-                
-                while (!ctx.isAtEnd()) {
-                    if (!ctx.skipTriviaCollection) {
-                        ctx.collectTrivia();
-                    }
-                    
-                    auto stmtResult = executeRule("statement", ctx);
-                    if (stmtResult.success && stmtResult.hasCST()) {
-                        // Note: getCST() returns a pointer, we need to create a new unique_ptr
-                        // This is a simplified approach - in practice we'd need proper node transfer
-                        auto cstNode = stmtResult.getCST();
-                        if (cstNode) {
-                            // For now, skip adding CST nodes to avoid ownership issues
-                            // This would need proper implementation in a real system
-                        }
-                    }
-                }
-                
-                RuleResult result;
-                result.node = std::move(programNode);
-                result.success = true;
-                result.tokensConsumed = ctx.currentToken;
-                return result;
-            }
-        });
-        
-        // Core token matching rules
-        grammar.addRule("identifier", [this](ParseContext& ctx) -> RuleResult {
-            return parseIdentifier(ctx);
-        });
-        
-        grammar.addRule("literal", [this](ParseContext& ctx) -> RuleResult {
-            return parseLiteral(ctx);
-        });
-        // uncommeted end
-    }
-    
-    void CSTParser::initializeStatementGrammar() {
-        // Temporarily disabled for compilation
-        // uncommeted
-        // Statement rule - choice between different statement types
-        grammar.addRule("statement", [this](ParseContext& ctx) -> RuleResult {
-            return parseChoice({
-                "varDeclaration",
-                "functionDeclaration", 
-                "classDeclaration",
-                "ifStatement",
-                "forStatement",
-                "whileStatement",
-                "returnStatement",
-                "expressionStatement"
-            }, ctx);
-        });
-        
-        // Variable declaration: var identifier : type = expression ;
-        grammar.addRule("varDeclaration", [this](ParseContext& ctx) -> RuleResult {
-            auto seqResult = parseSequence({
-                "var_keyword",
-                "identifier",
-                "optional_type_annotation",
-                "optional_initializer",
-                "semicolon"
-            }, ctx);
-            
-            if (ctx.mode == ParserMode::DIRECT_AST && seqResult.success) {
-                // Transform to AST VarDeclaration
-                auto varDecl = std::make_shared<AST::VarDeclaration>();
-                varDecl->line = ctx.peek().line;
-                // TODO: Extract name, type, initializer from sequence result
-                
-                RuleResult result;
-                result.node = std::static_pointer_cast<AST::Node>(varDecl);
-                result.success = true;
-                result.tokensConsumed = seqResult.tokensConsumed;
-                return result;
-            }
-            
-            return seqResult;
-        });
-        
-        // Expression statement: expression ;
-        grammar.addRule("expressionStatement", [this](ParseContext& ctx) -> RuleResult {
-            auto exprResult = executeRule("expression", ctx);
-            if (!exprResult.success) return exprResult;
-            
-            // Optional semicolon
-            auto semiResult = executeRule("optional_semicolon", ctx);
-            
-            if (ctx.mode == ParserMode::DIRECT_AST) {
-                auto exprStmt = std::make_shared<AST::ExprStatement>();
-                exprStmt->line = ctx.peek().line;
-                exprStmt->expression = exprResult.getAST<AST::Expression>();
-                
-                RuleResult result;
-                result.node = std::static_pointer_cast<AST::Node>(exprStmt);
-                result.success = true;
-                result.tokensConsumed = exprResult.tokensConsumed + semiResult.tokensConsumed;
-                return result;
-            } else {
-                // CST mode - create expression statement node
-                auto exprStmtNode = createNode(NodeKind::EXPRESSION_STATEMENT);
-                if (exprResult.hasCST()) {
-                    // Skip CST node addition for now due to ownership complexity
-                }
-                
-                RuleResult result;
-                result.node = std::move(exprStmtNode);
-                result.success = true;
-                result.tokensConsumed = exprResult.tokensConsumed + semiResult.tokensConsumed;
-                return result;
-            }
-        });
-        // uncommeted end
-    }
-    
-    void CSTParser::initializeExpressionGrammar() {
-        // Temporarily disabled for compilation
-        // uncommeted
-        // Expression hierarchy with operator precedence
-        grammar.addRule("expression", [this](ParseContext& ctx) -> RuleResult {
-            return executeRule("assignmentExpression", ctx);
-        });
-        
-        grammar.addRule("assignmentExpression", [this](ParseContext& ctx) -> RuleResult {
-            return executeRule("logicalOrExpression", ctx);
-        });
-        
-        grammar.addRule("logicalOrExpression", [this](ParseContext& ctx) -> RuleResult {
-            return parseBinaryExpressionRule("logicalAndExpression", {TokenType::OR}, ctx);
-        });
-        
-        grammar.addRule("logicalAndExpression", [this](ParseContext& ctx) -> RuleResult {
-            return parseBinaryExpressionRule("equalityExpression", {TokenType::AND}, ctx);
-        });
-        
-        grammar.addRule("equalityExpression", [this](ParseContext& ctx) -> RuleResult {
-            return parseBinaryExpressionRule("comparisonExpression", {TokenType::EQUAL_EQUAL, TokenType::BANG_EQUAL}, ctx);
-        });
-        
-        grammar.addRule("comparisonExpression", [this](ParseContext& ctx) -> RuleResult {
-            return parseBinaryExpressionRule("termExpression", {TokenType::GREATER, TokenType::GREATER_EQUAL, TokenType::LESS, TokenType::LESS_EQUAL}, ctx);
-        });
-        
-        grammar.addRule("termExpression", [this](ParseContext& ctx) -> RuleResult {
-            return parseBinaryExpressionRule("factorExpression", {TokenType::PLUS, TokenType::MINUS}, ctx);
-        });
-        
-        grammar.addRule("factorExpression", [this](ParseContext& ctx) -> RuleResult {
-            return parseBinaryExpressionRule("unaryExpression", {TokenType::STAR, TokenType::SLASH, TokenType::MODULUS}, ctx);
-        });
-        
-        grammar.addRule("unaryExpression", [this](ParseContext& ctx) -> RuleResult {
-            if (ctx.match({TokenType::BANG, TokenType::MINUS})) {
-                Token op = ctx.advance();
-                auto rightResult = executeRule("unaryExpression", ctx);
-                
-                if (ctx.mode == ParserMode::DIRECT_AST) {
-                    auto unaryExpr = std::make_shared<AST::UnaryExpr>();
-                    unaryExpr->line = op.line;
-                    unaryExpr->op = op.type;
-                    unaryExpr->right = rightResult.getAST<AST::Expression>();
-                    
-                    RuleResult result;
-                    result.node = std::static_pointer_cast<AST::Node>(unaryExpr);
-                    result.success = true;
-                    result.tokensConsumed = 1 + rightResult.tokensConsumed;
-                    return result;
-                } else {
-                    auto unaryNode = createNode(NodeKind::UNARY_EXPR);
-                    unaryNode->addToken(op);
-                    if (rightResult.hasCST()) {
-                        unaryNode->addNode(std::unique_ptr<Node>(rightResult.getCST()));
-                    }
-                    
-                    RuleResult result;
-                    result.node = std::move(unaryNode);
-                    result.success = true;
-                    result.tokensConsumed = 1 + rightResult.tokensConsumed;
-                    return result;
-                }
-            }
-            
-            return executeRule("primaryExpression", ctx);
-        });
-        
-        grammar.addRule("primaryExpression", [this](ParseContext& ctx) -> RuleResult {
-            return parseChoice({
-                "literal",
-                "identifier", 
-                "groupingExpression"
-            }, ctx);
-        });
-        
-        grammar.addRule("groupingExpression", [this](ParseContext& ctx) -> RuleResult {
-            if (!ctx.match(TokenType::LEFT_PAREN)) {
-                RuleResult result;
-                result.success = false;
-                result.errorMessage = "Expected '('";
-                return result;
-            }
-            
-            Token leftParen = ctx.advance();
-            auto exprResult = executeRule("expression", ctx);
-            
-            if (!ctx.match(TokenType::RIGHT_PAREN)) {
-                RuleResult result;
-                result.success = false;
-                result.errorMessage = "Expected ')' after expression";
-                return result;
-            }
-            
-            Token rightParen = ctx.advance();
-            
-            if (ctx.mode == ParserMode::DIRECT_AST) {
-                auto groupingExpr = std::make_shared<AST::GroupingExpr>();
-                groupingExpr->line = leftParen.line;
-                groupingExpr->expression = exprResult.getAST<AST::Expression>();
-                
-                RuleResult result;
-                result.node = std::static_pointer_cast<AST::Node>(groupingExpr);
-                result.success = true;
-                result.tokensConsumed = 2 + exprResult.tokensConsumed;
-                return result;
-            } else {
-                auto groupingNode = createNode(NodeKind::GROUPING_EXPR);
-                groupingNode->addToken(leftParen);
-                if (exprResult.hasCST()) {
-                    groupingNode->addNode(std::unique_ptr<Node>(exprResult.getCST()));
-                }
-                groupingNode->addToken(rightParen);
-                
-                RuleResult result;
-                result.node = std::move(groupingNode);
-                result.success = true;
-                result.tokensConsumed = 2 + exprResult.tokensConsumed;
-                return result;
-            }
-        });
-        // uncommeted end
-    }
-    
-    void CSTParser::initializeDeclarationGrammar() {
-        // Temporarily disabled for compilation
-        // uncommeted
-        // Function declaration
-        grammar.addRule("functionDeclaration", [this](ParseContext& ctx) -> RuleResult {
-            return parseSequence({
-                "fn_keyword",
-                "identifier",
-                "parameterList",
-                "optional_return_type",
-                "blockStatement"
-            }, ctx);
-        });
-        
-        // Class declaration  
-        grammar.addRule("classDeclaration", [this](ParseContext& ctx) -> RuleResult {
-            return parseSequence({
-                "class_keyword",
-                "identifier", 
-                "optional_inheritance",
-                "classBody"
-            }, ctx);
-        });
-        // uncommeted end
-    }
-    
-    void CSTParser::initializeTypeGrammar() {
-        // Temporarily disabled for compilation
-        // uncommeted
-        // Type annotations
-        grammar.addRule("typeAnnotation", [this](ParseContext& ctx) -> RuleResult {
-            return parseChoice({
-                "primitiveType",
-                "userType",
-                "unionType",
-                "optionType"
-            }, ctx);
-        });
-        
-        // Optional type annotation: : type
-        grammar.addRule("optional_type_annotation", [this](ParseContext& ctx) -> RuleResult {
-            if (ctx.match(TokenType::COLON)) {
-                ctx.advance();
-                return executeRule("typeAnnotation", ctx);
-            }
-            
-            RuleResult result;
-            result.success = true;  // Optional, so success even if not present
-            result.tokensConsumed = 0;
-            return result;
-        });
-        // uncommeted end
-    }
+bool CSTParser::check(TokenType type) {
+    if (isAtEnd()) return false;
+    return peek().type == type;
+}
 
-    // Main parsing entry point
-    std::unique_ptr<Node> CSTParser::parse() {
-        // Clear any previous errors
-        errors.clear();
-        current = 0;
-        
-        // Delegate to parseCST for the actual parsing logic
-        return parseCST();
-    }
-    
-    // Unified grammar parsing methods
-    
-    template<typename OutputType>
-    std::shared_ptr<OutputType> CSTParser::parseRule(const std::string& ruleName, ParserMode mode) {
-        setParserMode(mode);
-        
-        ParseContext context(mode, this, tokens);
-        auto result = executeRule(ruleName, context);
-        
-        if (result.success) {
-            return result.getAST<OutputType>();
-        }
-        
-        return nullptr;
-    }
-    
-    std::shared_ptr<AST::Program> CSTParser::parseAST() {
-        return parseRule<AST::Program>("program", ParserMode::DIRECT_AST);
-    }
-    
-    std::shared_ptr<AST::Program> CSTParser::parseViaCST() {
-        // First generate CST
-        auto cst = parseRule<CST::Node>("program", ParserMode::CST_ONLY);
-        if (!cst) return nullptr;
-        
-        // Then transform to AST using ASTBuilder
-        frontend::ASTBuilder builder;
-        return builder.buildAST(*cst);
-    }
-    
-    RuleResult CSTParser::executeRule(const std::string& ruleName, ParseContext& context) {
-        // Check cache first if memoization is enabled
-        if (shouldUseCache(ruleName)) {
-            auto cached = getCachedResult(ruleName, context.currentToken);
-            if (cached) {
-                stats.cacheHits++;
-                return std::move(*cached);
-            }
-            stats.cacheMisses++;
-        }
-        
-        // Execute the rule
-        auto startTime = std::chrono::high_resolution_clock::now();
-        auto result = grammar.executeRule(ruleName, context);
-        auto endTime = std::chrono::high_resolution_clock::now();
-        
-        // Update statistics
-        stats.rulesExecuted++;
-        stats.parseTimeMs += std::chrono::duration<double, std::milli>(endTime - startTime).count();
-        
-        // Cache the result if appropriate
-        if (shouldUseCache(ruleName) && result.success) {
-            cacheResult(ruleName, context.currentToken, result);
-        }
-        
-        return result;
-    }
-    
-    // Core parsing combinators implementation
-
-    RuleResult CSTParser::parseSequence(const std::vector<std::string>& elements, ParseContext& context) {
-        RuleResult result;
-        result.success = true;
-        result.tokensConsumed = 0;
-        
-        std::vector<RuleResult> elementResults;
-        
-        for (const auto& element : elements) {
-            auto elementResult = executeRule(element, context);
-            if (!elementResult.success) {
-                result.success = false;
-                result.errorMessage = "Failed to parse sequence element: " + element + " - " + elementResult.errorMessage;
-                return result;
-            }
-            
-            elementResults.push_back(std::move(elementResult));
-            result.tokensConsumed += elementResult.tokensConsumed;
-        }
-        
-        // Create appropriate output node based on mode
-        if (context.mode == ParserMode::DIRECT_AST) {
-            // For AST mode, we need to combine the results appropriately
-            // This is context-dependent and would be handled by specific rule implementations
-            result.success = true;
-        } else {
-            // For CST mode, create a sequence node containing all elements
-            auto sequenceNode = createNode(NodeKind::STATEMENT_LIST);  // Generic sequence node
-            for (auto& elementResult : elementResults) {
-                if (elementResult.hasCST()) {
-                    sequenceNode->addNode(std::unique_ptr<Node>(elementResult.getCST()));
-                }
-            }
-            result.node = std::move(sequenceNode);
-        }
-        
-        return result;
-    }
-    
-    RuleResult CSTParser::parseChoice(const std::vector<std::string>& alternatives, ParseContext& context) {
-        size_t startToken = context.currentToken;
-        
-        for (const auto& alternative : alternatives) {
-            // Reset position for each alternative
-            context.currentToken = startToken;
-            
-            auto result = executeRule(alternative, context);
-            if (result.success) {
-                return result;
-            }
-        }
-        
-        // None of the alternatives matched
-        RuleResult result;
-        result.success = false;
-        result.errorMessage = "No alternative matched in choice";
-        return result;
-    }
-    
-    RuleResult CSTParser::parseOptional(const std::string& element, ParseContext& context) {
-        size_t startToken = context.currentToken;
-        
-        auto result = executeRule(element, context);
-        if (result.success) {
-            return result;
-        }
-        
-        // Optional element not present - reset position and return success
-        context.currentToken = startToken;
-        
-        RuleResult optionalResult;
-        optionalResult.success = true;
-        optionalResult.tokensConsumed = 0;
-        return optionalResult;
-    }
-    
-    RuleResult CSTParser::parseZeroOrMore(const std::string& element, ParseContext& context) {
-        RuleResult result;
-        result.success = true;
-        result.tokensConsumed = 0;
-        
-        std::vector<RuleResult> elementResults;
-        
-        while (!context.isAtEnd()) {
-            size_t startToken = context.currentToken;
-            auto elementResult = executeRule(element, context);
-            
-            if (!elementResult.success) {
-                // Reset position and break
-                context.currentToken = startToken;
-                break;
-            }
-            
-            elementResults.push_back(std::move(elementResult));
-            result.tokensConsumed += elementResult.tokensConsumed;
-        }
-        
-        // Create appropriate output based on mode
-        if (context.mode == ParserMode::DIRECT_AST) {
-            // AST mode - results would be combined by specific rule implementations
-            result.success = true;
-        } else {
-            // CST mode - create a list node
-            auto listNode = createNode(NodeKind::STATEMENT_LIST);
-            for (auto& elementResult : elementResults) {
-                if (elementResult.hasCST()) {
-                    listNode->addNode(std::unique_ptr<Node>(elementResult.getCST()));
-                }
-            }
-            result.node = std::move(listNode);
-        }
-        
-        return result;
-    }
-    
-    RuleResult CSTParser::parseOneOrMore(const std::string& element, ParseContext& context) {
-        auto firstResult = executeRule(element, context);
-        if (!firstResult.success) {
-            return firstResult;
-        }
-        
-        auto restResult = parseZeroOrMore(element, context);
-        
-        RuleResult result;
-        result.success = true;
-        result.tokensConsumed = firstResult.tokensConsumed + restResult.tokensConsumed;
-        
-        // Combine first and rest results
-        if (context.mode == ParserMode::DIRECT_AST) {
-            result.success = true;
-        } else {
-            auto listNode = createNode(NodeKind::STATEMENT_LIST);
-            if (firstResult.hasCST()) {
-                listNode->addNode(std::unique_ptr<Node>(firstResult.getCST()));
-            }
-            if (restResult.hasCST()) {
-                // Add children from rest result
-                auto restNode = restResult.getCST();
-                for (auto& child : restNode->getChildNodes()) {
-                    // Note: This is a simplified approach - in practice we'd need proper node transfer
-                }
-            }
-            result.node = std::move(listNode);
-        }
-        
-        return result;
-    }
-    
-    RuleResult CSTParser::parseSeparated(const std::string& element, const std::string& separator, ParseContext& context) {
-        auto firstResult = executeRule(element, context);
-        if (!firstResult.success) {
-            RuleResult result;
-            result.success = true;  // Empty list is valid for separated
-            result.tokensConsumed = 0;
-            return result;
-        }
-        
-        RuleResult result;
-        result.success = true;
-        result.tokensConsumed = firstResult.tokensConsumed;
-        
-        std::vector<RuleResult> elementResults;
-        elementResults.push_back(std::move(firstResult));
-        
-        while (!context.isAtEnd()) {
-            size_t startToken = context.currentToken;
-            
-            auto sepResult = executeRule(separator, context);
-            if (!sepResult.success) {
-                context.currentToken = startToken;
-                break;
-            }
-            
-            auto elemResult = executeRule(element, context);
-            if (!elemResult.success) {
-                context.currentToken = startToken;
-                break;
-            }
-            
-            result.tokensConsumed += sepResult.tokensConsumed + elemResult.tokensConsumed;
-            elementResults.push_back(std::move(elemResult));
-        }
-        
-        // Create output based on mode
-        if (context.mode == ParserMode::DIRECT_AST) {
-            result.success = true;
-        } else {
-            auto listNode = createNode(NodeKind::STATEMENT_LIST);
-            for (auto& elementResult : elementResults) {
-                if (elementResult.hasCST()) {
-                    listNode->addNode(std::unique_ptr<Node>(elementResult.getCST()));
-                }
-            }
-            result.node = std::move(listNode);
-        }
-        
-        return result;
-    }
-    
-    // Core CST parsing methods implementation (Task 5)
-    
-    std::unique_ptr<Node> CSTParser::parseCST() {
-        // Main parsing entry point - creates program-level CST node
-        return parseProgram();
-    }
-    
-    std::unique_ptr<Node> CSTParser::parseProgram() {
-        // Create program-level CST node with all tokens
-        auto programNode = createNode(NodeKind::PROGRAM);
-        Token startToken = peek();
-        
-        // Consume any leading trivia
-        if (recoveryConfig.preserveTrivia) {
-            consumeTrivia();
-            attachLeadingTrivia(*programNode);
-        }
-        
-        // Parse all statements in the program
-        while (!isAtEnd() && shouldContinueParsing()) {
-            // Skip any trivia between statements
-            if (recoveryConfig.preserveTrivia) {
-                consumeTrivia();
-            }
-            
-            // Check for EOF after consuming trivia
-            if (peek().type == TokenType::EOF_TOKEN) {
-                break;
-            }
-            
-            // Parse the next statement
-            auto stmt = parseStatement();
-            if (stmt) {
-                programNode->addNode(std::move(stmt));
-            } else {
-                // If parseStatement returns nullptr, we need to advance to prevent infinite loop
-                // This can happen with EOF or unrecoverable errors
-                if (!isAtEnd() && peek().type == TokenType::EOF_TOKEN) {
-                    break;
-                }
-                // For other cases, advance to prevent infinite loop
-                if (!isAtEnd()) {
-                    advance();
-                }
-            }
-            
-            // Handle error recovery if needed
-            if (!canRecover()) {
-                break;
-            }
-        }
-        
-        // Consume any trailing trivia
-        if (recoveryConfig.preserveTrivia) {
-            consumeTrivia();
-            attachTrailingTrivia(*programNode);
-        }
-        
-        // Set the span for the entire program
-        if (!tokens.empty()) {
-            Token endToken = isAtEnd() ? tokens.back() : peek();
-            setNodeSpanFromTokens(*programNode, startToken, endToken);
-        }
-        
-        return programNode;
-    }
-    
-    std::unique_ptr<Node> CSTParser::parseStatement() {
-        // Handle all statement types with error recovery
-        if (isAtEnd()) {
-            return nullptr;
-        }
-        
-        Token startToken = peek();
-        
-        try {
-            // Consume leading trivia for this statement
-            if (recoveryConfig.preserveTrivia) {
-                consumeTrivia();
-            }
-            
-            // Determine statement type and parse accordingly
-            TokenType currentType = peek().type;
-            
-            // Handle EOF token explicitly
-            if (currentType == TokenType::EOF_TOKEN) {
-                return nullptr;
-            }
-            
-            if (isDeclarationStart(currentType)) {
-                return parseDeclaration();
-            } else if (isStatementStart(currentType)) {
-                return parseStatementByType();
-            } else if (isExpressionStart(currentType)) {
-                // Expression statement
-                auto exprStmt = createNode(NodeKind::EXPRESSION_STATEMENT);
-                auto expr = parseExpression();
-                if (expr) {
-                    exprStmt->addNode(std::move(expr));
-                }
-                
-                // Consume optional semicolon
-                if (check(TokenType::SEMICOLON)) {
-                    exprStmt->addToken(advance());
-                }
-                
-                setNodeSpanFromTokens(*exprStmt, startToken, previous());
-                return exprStmt;
-            } else {
-                // Unknown statement - try error recovery
-                std::string errorMsg = "Unexpected token '" + peek().lexeme + "' in statement";
-                reportError(errorMsg, TokenType::IDENTIFIER, currentType);
-                
-                // Skip the problematic token to avoid infinite loops
-                Token problematicToken = advance();
-                
-                // Try to recover by creating a partial statement
-                if (recoveryConfig.createPartialNodes) {
-                    auto partialNode = createPartialNode(NodeKind::EXPRESSION_STATEMENT, 
-                                                       "Incomplete statement starting with '" + problematicToken.lexeme + "'");
-                    partialNode->addToken(problematicToken);
-                    return partialNode;
-                } else {
-                    auto errorNode = createErrorRecoveryNode("Invalid statement");
-                    errorNode->addToken(problematicToken);
-                    return errorNode;
-                }
-            }
-            
-        } catch (...) {
-            // Error recovery - synchronize and create error node
-            reportError("Unexpected error parsing statement");
-            
-            if (attemptErrorRecovery("statement parsing")) {
-                return createErrorRecoveryNode("Statement parsing error");
-            } else {
-                // Cannot recover - return null to stop parsing
-                return nullptr;
-            }
-        }
-    }
-    
-    std::unique_ptr<Node> CSTParser::parseExpression() {
-        // Parse expressions with operator precedence and error tolerance
-        if (isAtEnd()) {
-            return nullptr;
-        }
-        
-        // Consume any leading trivia
-        if (recoveryConfig.preserveTrivia) {
-            consumeTrivia();
-        }
-        
-        Token startToken = peek();
-        try {
-            // Start with assignment expression (lowest precedence)
-            return parseAssignmentExpression();
-            
-        } catch (...) {
-            // Error recovery for expressions
-            reportError("Unexpected error parsing expression");
-            
-            // Try different recovery strategies
-            if (recoveryConfig.createPartialNodes) {
-                // Try to create a partial expression node
-                auto partialExpr = createPartialNode(NodeKind::LITERAL_EXPR, 
-                                                   "Incomplete expression");
-                
-                // Skip tokens until we find expression boundary
-                while (!isAtEnd() && !check(TokenType::SEMICOLON) && 
-                       !check(TokenType::RIGHT_PAREN) && !check(TokenType::RIGHT_BRACE) && 
-                       !check(TokenType::COMMA) && shouldContinueParsing()) {
-                    
-                    // Stop if we hit another expression or statement start
-                    if (isExpressionStart(peek().type) || isStatementStart(peek().type)) {
-                        break;
-                    }
-                    
-                    partialExpr->addToken(advance());
-                }
-                
-                return partialExpr;
-            } else {
-                return createErrorRecoveryNode("Expression parsing error");
-            }
-        }
-    }
-    
-    std::unique_ptr<Node> CSTParser::parseBlock() {
-        // Parse block preserving all tokens including braces and internal whitespace
-        if (!check(TokenType::LEFT_BRACE)) {
-            reportError("Expected '{' to start block", TokenType::LEFT_BRACE, peek().type);
-            return createErrorRecoveryNode("Missing block start");
-        }
-        
-        auto blockNode = createNode(NodeKind::BLOCK_STATEMENT);
-        Token startToken = peek();
-        
-        // Track block context for better error messages
-        pushBlockContext("block", startToken);
-        
-        // Consume opening brace
-        blockNode->addToken(advance()); // '{'
-        
-        // Consume any whitespace/trivia after opening brace
-        if (recoveryConfig.preserveTrivia) {
-            consumeTrivia();
-        }
-        
-        // Parse statements within the block
-        while (!check(TokenType::RIGHT_BRACE) && !isAtEnd() && shouldContinueParsing()) {
-            // Parse each statement in the block
-            auto stmt = parseStatement();
-            if (stmt) {
-                blockNode->addNode(std::move(stmt));
-            }
-            
-            // Preserve whitespace between statements
-            if (recoveryConfig.preserveTrivia) {
-                consumeTrivia();
-            }
-        }
-        
-        // Consume closing brace
-        if (check(TokenType::RIGHT_BRACE)) {
-            blockNode->addToken(advance()); // '}'
-            popBlockContext(); // Successfully closed block
-        } else {
-            // Enhanced error message with block context
-            auto blockContext = getCurrentBlockContext();
-            if (blockContext.has_value()) {
-                std::string enhancedMessage = "Expected '}' to close block\n" + 
-                                            generateCausedByMessage(blockContext.value());
-                reportErrorWithSuggestions(enhancedMessage, {"Add closing brace '}'"});
-            } else {
-                reportError("Expected '}' to close block", TokenType::RIGHT_BRACE, peek().type);
-            }
-            
-            if (recoveryConfig.insertMissingTokens) {
-                // Create a missing closing brace token
-                Token missingBrace;
-                missingBrace.type = TokenType::RIGHT_BRACE;
-                missingBrace.lexeme = "}";
-                missingBrace.line = peek().line;
-                missingBrace.start = getCurrentPosition();
-                missingBrace.end = getCurrentPosition();
-                blockNode->addToken(missingBrace);
-            }
-            
-            popBlockContext(); // Remove from stack even if not properly closed
-        }
-        
-        // Set span from opening to closing brace
-        setNodeSpanFromTokens(*blockNode, startToken, previous());
-        
-        return blockNode;
-    }
-
-    // Configuration methods
-    void CSTParser::setRecoveryConfig(const RecoveryConfig& config) {
-        recoveryConfig = config;
-    }
-
-    // Core token consumption methods
-    Token CSTParser::consume(TokenType type, const std::string& message) {
-        if (check(type)) {
-            return advance();
-        }
-        
-        reportError(message, type, peek().type);
-        
-        // Try error recovery strategies
-        if (recoveryConfig.insertMissingTokens && isRecoverableError(type, peek().type)) {
-            // Create a missing token placeholder
-            Token missingToken;
-            missingToken.type = type;
-            missingToken.lexeme = tokenTypeToString(type);
-            missingToken.line = peek().line;
-            missingToken.start = getCurrentPosition();
-            missingToken.end = getCurrentPosition();
-            return missingToken;
-        }
-        
-        // Return current token as fallback (don't advance)
-        Token errorToken = peek();
-        return errorToken;
-    }
-
-    Token CSTParser::consumeOrError(TokenType type, const std::string& message) {
-        if (check(type)) {
-            return advance();
-        }
-        
-        // Report the error with enhanced context
-        reportError(message, type, peek().type);
-        
-        if (recoveryConfig.insertMissingTokens && isRecoverableError(type, peek().type)) {
-            // Create a missing token placeholder
-            Token missingToken;
-            missingToken.type = type;
-            missingToken.lexeme = "<missing:" + tokenTypeToString(type) + ">";
-            missingToken.line = peek().line;
-            missingToken.start = getCurrentPosition();
-            missingToken.end = getCurrentPosition();
-            return missingToken;
-        }
-        
-        // For non-recoverable errors, try to synchronize
-        if (!isRecoverableError(type, peek().type)) {
-            synchronize();
-        }
-        
-        return peek();  // Return current token as fallback
-    }
-
-    bool CSTParser::match(std::initializer_list<TokenType> types) {
-        for (TokenType type : types) {
-            if (check(type)) {
-                advance();
-                return true;
-            }
-        }
-        return false;
-    }
-
-    bool CSTParser::match(TokenType type) {
+bool CSTParser::match(std::initializer_list<TokenType> types) {
+    for (TokenType type : types) {
         if (check(type)) {
             advance();
             return true;
         }
-        return false;
     }
+    return false;
+}
 
-    bool CSTParser::check(TokenType type) const {
-        if (isAtEnd()) return false;
-        return peek().type == type;
-    }
+bool CSTParser::isAtEnd() {
+    return peek().type == TokenType::EOF_TOKEN;
+}
 
-    // Token access methods
-    Token CSTParser::advance() {
-        if (!isAtEnd()) {
-            Token result = tokens[current];
-            current++;
-            // Skip whitespace tokens during parsing
-            while (current < tokens.size() && isTrivia(tokens[current].type)) {
-                current++;
-            }
-            return result;
-        }
-        return tokens.empty() ? Token{} : tokens.back();
-    }
+Token CSTParser::consume(TokenType type, const std::string &message) {
+    if (check(type)) return advance();
+    error(message);
+    throw std::runtime_error(message);
+}
 
-    Token CSTParser::peek() const {
-        size_t pos = current;
-        // Skip whitespace tokens to find the next meaningful token
-        while (pos < tokens.size() && isTrivia(tokens[pos].type)) {
-            pos++;
-        }
-        
-        if (pos >= tokens.size()) {
-            // Return EOF token
-            Token eofToken;
-            eofToken.type = TokenType::EOF_TOKEN;
-            eofToken.lexeme = "";
-            eofToken.line = tokens.empty() ? 1 : tokens.back().line;
-            eofToken.start = tokens.empty() ? 0 : tokens.back().end;
-            eofToken.end = eofToken.start;
-            return eofToken;
-        }
-        return tokens[pos];
-    }
+void CSTParser::synchronize() {
+    advance();
 
-    Token CSTParser::previous() const {
-        if (current == 0) {
-            Token startToken;
-            startToken.type = TokenType::UNDEFINED;
-            startToken.lexeme = "";
-            startToken.line = 1;
-            startToken.start = 0;
-            startToken.end = 0;
-            return startToken;
-        }
-        return tokens[current - 1];
-    }
+    while (!isAtEnd()) {
+        if (previous().type == TokenType::SEMICOLON) return;
 
-    Token CSTParser::peekAhead(size_t offset) const {
-        size_t targetIndex = current + offset;
-        if (targetIndex >= tokens.size()) {
-            return peek();  // Return EOF token
-        }
-        return tokens[targetIndex];
-    }
-
-    // Trivia handling methods
-    void CSTParser::consumeTrivia() {
-        triviaBuffer.clear();
-        
-        while (!isAtEnd() && isTrivia(peek().type)) {
-            triviaBuffer.push_back(advance());
-        }
-    }
-
-    std::vector<Token> CSTParser::collectTrivia() {
-        std::vector<Token> trivia;
-        
-        while (!isAtEnd() && isTrivia(peek().type)) {
-            trivia.push_back(advance());
-        }
-        
-        return trivia;
-    }
-
-    void CSTParser::attachTrivia(Node& node) {
-        if (!recoveryConfig.attachTrivia || triviaBuffer.empty()) {
-            return;
-        }
-        
-        // Add trivia tokens to the node
-        for (const Token& token : triviaBuffer) {
-            node.addToken(token);
-        }
-        
-        triviaBuffer.clear();
-    }
-
-    void CSTParser::attachLeadingTrivia(Node& node) {
-        if (!recoveryConfig.preserveTrivia) {
-            return;
-        }
-        
-        // Collect any trivia before the current position
-        std::vector<Token> leadingTrivia = collectTrivia();
-        
-        for (const Token& token : leadingTrivia) {
-            node.addToken(token);
-        }
-    }
-
-    void CSTParser::attachTrailingTrivia(Node& node) {
-        if (!recoveryConfig.preserveTrivia) {
-            return;
-        }
-        
-        // Look ahead for trivia after current token
-        size_t savedCurrent = current;
-        std::vector<Token> trailingTrivia = collectTrivia();
-        
-        for (const Token& token : trailingTrivia) {
-            node.addToken(token);
-        }
-        
-        // Don't advance current - trivia will be consumed by next parsing operation
-        current = savedCurrent;
-    }
-
-    bool CSTParser::isTrivia(TokenType type) const {
-        return type == TokenType::WHITESPACE || 
-               type == TokenType::NEWLINE || 
-               type == TokenType::COMMENT_LINE || 
-               type == TokenType::COMMENT_BLOCK;
-    }
-
-    // Error recovery methods
-    void CSTParser::reportError(const std::string& message) {
-        if (errors.size() >= recoveryConfig.maxErrors) {
-            // Add a final error indicating we've hit the limit
-            if (errors.size() == recoveryConfig.maxErrors) {
-                Token currentToken = peek();
-                auto [line, column] = getLineColumn(getCurrentPosition());
-                ErrorHandling::ErrorMessage limitError("E299", "CST_TooManyErrors", 
-                                                     "Too many errors - stopping error reporting", 
-                                                     scanner ? scanner->getFilePath() : "", 
-                                                     line, column, currentToken.lexeme, 
-                                                     InterpretationStage::PARSING);
-                errors.push_back(limitError);
-            }
-            return;
-        }
-        
-        Token currentToken = peek();
-        auto [line, column] = getLineColumn(getCurrentPosition());
-        
-        // Create enhanced error message using ErrorFormatter
-        auto options = ErrorHandling::ErrorFormatter::getDefaultOptions();
-        
-        ErrorHandling::ErrorMessage enhancedError = ErrorHandling::ErrorFormatter::createErrorMessage(
-            message, line, column, InterpretationStage::PARSING,
-            scanner ? scanner->getSource() : "",
-            scanner ? scanner->getFilePath() : "",
-            currentToken.lexeme, "", std::nullopt, options
-        );
-        
-        // Use Debugger::error with the enhanced error message
-        Debugger::error(enhancedError);
-        
-        // Store for recovery logic
-        errors.push_back(enhancedError);
-    }
-
-    void CSTParser::reportError(const std::string& message, TokenType expected, TokenType actual) {
-        if (errors.size() >= recoveryConfig.maxErrors) {
-            return;
-        }
-        
-        Token currentToken = peek();
-        auto [line, column] = getLineColumn(getCurrentPosition());
-        
-        // Generate expected value string
-        std::string expectedValue = tokenTypeToString(expected);
-        
-        // Create enhanced error message using ErrorFormatter
-        auto options = ErrorHandling::ErrorFormatter::getDefaultOptions();
-        
-        ErrorHandling::ErrorMessage enhancedError = ErrorHandling::ErrorFormatter::createErrorMessage(
-            message, line, column, InterpretationStage::PARSING,
-            scanner ? scanner->getSource() : "",
-            scanner ? scanner->getFilePath() : "",
-            currentToken.lexeme, expectedValue, std::nullopt, options
-        );
-        
-        // Add CST-specific suggestions
-        auto suggestions = generateSuggestions(expected, actual);
-        if (!suggestions.empty() && enhancedError.suggestion.empty()) {
-            enhancedError.suggestion = suggestions[0];
-        }
-        
-        // Use Debugger::error with the enhanced error message
-        Debugger::error(enhancedError);
-        
-        // Store for recovery logic
-        errors.push_back(enhancedError);
-    }
-
-    void CSTParser::reportErrorWithSuggestions(const std::string& message, 
-                                              const std::vector<std::string>& suggestions) {
-        if (errors.size() >= recoveryConfig.maxErrors) {
-            return;
-        }
-        
-        Token currentToken = peek();
-        auto [line, column] = getLineColumn(getCurrentPosition());
-        
-        // Create enhanced message with suggestions
-        std::string enhancedMessage = message;
-        if (!suggestions.empty()) {
-            enhancedMessage += "\nSuggestions:";
-            for (const auto& suggestion : suggestions) {
-                enhancedMessage += "\n  - " + suggestion;
-            }
-        }
-        
-        // Use Debugger::error for consistent error reporting
-        if (scanner) {
-            Debugger::error(enhancedMessage, line, column, InterpretationStage::PARSING, 
-                          scanner->getSource(), scanner->getFilePath(), 
-                          currentToken.lexeme, "");
-        } else {
-            // Fallback when no scanner available
-            Debugger::error(enhancedMessage, line, column, InterpretationStage::PARSING, 
-                          "", "", currentToken.lexeme, "");
-        }
-        
-        // Still maintain internal error list for recovery logic
-        ErrorHandling::ErrorMessage error("E202", "CST_SuggestionError", message, 
-                                         scanner ? scanner->getFilePath() : "", 
-                                         line, column, currentToken.lexeme, 
-                                         InterpretationStage::PARSING);
-        
-        // Add suggestions to the error
-        if (!suggestions.empty()) {
-            error.suggestion = suggestions[0]; // Use first suggestion as primary
-            // Could also join all suggestions if needed
-        }
-        
-        errors.push_back(error);
-    }
-
-    void CSTParser::synchronize() {
-        if (!recoveryConfig.continueOnError) {
-            return;
-        }
-        
-        // Don't skip the current token automatically - let the caller decide
-        // This prevents double-skipping of tokens
-        
-        // Skip tokens until we find a synchronization point
-        while (!isAtEnd() && shouldContinueParsing()) {
-            // Check if current token is a synchronization point
-            if (isSyncToken(peek().type)) {
-                return;  // Found synchronization point
-            }
-            
-            // Skip trivia tokens during synchronization
-            if (isTrivia(peek().type)) {
-                advance();
-                continue;
-            }
-            
-            // Skip error tokens
-            if (peek().type == TokenType::ERROR) {
-                advance();
-                continue;
-            }
-            
-            // Check if previous token was a statement terminator
-            if (current > 0 && previous().type == TokenType::SEMICOLON) {
-                return;  // Found statement boundary
-            }
-            
-            advance();
-        }
-    }
-
-    std::unique_ptr<Node> CSTParser::createErrorRecoveryNode() {
-        return createErrorRecoveryNode("Syntax error");
-    }
-
-    std::unique_ptr<Node> CSTParser::createErrorRecoveryNode(const std::string& message) {
-        size_t startPos = getCurrentPosition();
-        auto errorNode = CST::createErrorNode(message, startPos, startPos);
-        
-        // Collect skipped tokens during error recovery
-        std::vector<Token> skippedTokens;
-        size_t tokensSkipped = 0;
-        const size_t maxSkipTokens = 50; // Prevent infinite loops
-        
-        while (!isAtEnd() && !isSyncToken(peek().type) && 
-               tokensSkipped < maxSkipTokens && shouldContinueParsing()) {
-            
-            Token skippedToken = advance();
-            skippedTokens.push_back(skippedToken);
-            errorNode->addSkippedToken(skippedToken);
-            tokensSkipped++;
-            
-            // Stop skipping if we encounter meaningful structure
-            if (isStatementStart(skippedToken.type) || 
-                isDeclarationStart(skippedToken.type) ||
-                skippedToken.type == TokenType::RIGHT_BRACE ||
-                skippedToken.type == TokenType::SEMICOLON) {
-                // Back up one token so the next parser can handle it
-                if (current > 0) {
-                    current--;
-                    skippedTokens.pop_back();
-                    if (!errorNode->skippedTokens.empty()) {
-                        errorNode->skippedTokens.pop_back();
-                    }
-                }
-                break;
-            }
-        }
-        
-        // Update error node span to cover all skipped tokens
-        if (!skippedTokens.empty()) {
-            errorNode->setSourceSpan(startPos, skippedTokens.back().end);
-        }
-        
-        return errorNode;
-    }
-
-    // Error context and suggestions
-    std::string CSTParser::getSourceContext(size_t position, size_t contextLines) const {
-        std::ostringstream context;
-        
-        // Show current token and surrounding tokens for context
-        context << "Near: ";
-        
-        // Show previous token if available
-        if (current > 0) {
-            context << "'" << previous().lexeme << "' ";
-        }
-        
-        // Show current token
-        if (!isAtEnd()) {
-            context << ">>> '" << peek().lexeme << "' <<<";
-        } else {
-            context << ">>> END OF FILE <<<";
-        }
-        
-        // Show next token if available
-        if (current + 1 < tokens.size()) {
-            context << " '" << peekAhead(1).lexeme << "'";
-        }
-        
-        return context.str();
-    }
-
-    std::vector<std::string> CSTParser::generateSuggestions(TokenType expected, TokenType actual) const {
-        std::vector<std::string> suggestions;
-        
-        // Generate context-specific suggestions based on expected vs actual tokens
-        if (expected == TokenType::SEMICOLON) {
-            suggestions.push_back("Add a semicolon ';' to end the statement");
-            if (actual == TokenType::NEWLINE) {
-                suggestions.push_back("Semicolon may be optional in some contexts");
-            }
-        } else if (expected == TokenType::RIGHT_BRACE) {
-            suggestions.push_back("Add a closing brace '}' to close the block");
-            suggestions.push_back("Check for matching opening brace '{'");
-        } else if (expected == TokenType::RIGHT_PAREN) {
-            suggestions.push_back("Add a closing parenthesis ')' to close the expression");
-            suggestions.push_back("Check for matching opening parenthesis '('");
-        } else if (expected == TokenType::LEFT_BRACE) {
-            suggestions.push_back("Add an opening brace '{' to start the block");
-        } else if (expected == TokenType::IDENTIFIER) {
-            suggestions.push_back("Provide a valid identifier name");
-            if (actual == TokenType::NUMBER) {
-                suggestions.push_back("Identifiers cannot start with numbers");
-            } else if (actual == TokenType::STRING) {
-                suggestions.push_back("Remove quotes if this should be an identifier");
-            }
-        } else if (expected == TokenType::EQUAL) {
-            suggestions.push_back("Add '=' for assignment");
-        } else if (expected == TokenType::COLON) {
-            suggestions.push_back("Add ':' for type annotation");
-        }
-        
-        // General suggestions based on actual token
-        if (actual == TokenType::EOF_TOKEN) {
-            suggestions.push_back("Unexpected end of file - check for missing closing brackets or braces");
-        } else if (actual == TokenType::ERROR) {
-            suggestions.push_back("Fix the invalid token or character");
-        }
-        
-        // Context-specific suggestions
-        if (isStatementStart(actual)) {
-            suggestions.push_back("This looks like the start of a new statement - check previous statement completion");
-        }
-        
-        return suggestions;
-    }
-
-    void CSTParser::addErrorContext(ParseError& error, const Node* node) const {
-        if (node) {
-            // Since ErrorMessage doesn't have relatedNode, we can add context to hint
-            if (error.hint.empty()) {
-                error.hint = "Related to " + node->getKindName() + " node";
-            } else {
-                error.hint += " (Related to " + node->getKindName() + " node)";
-            }
-        }
-    }
-
-    // Synchronization helpers
-    bool CSTParser::isSyncToken(TokenType type) const {
-        return std::find(recoveryConfig.syncTokens.begin(), 
-                        recoveryConfig.syncTokens.end(), 
-                        type) != recoveryConfig.syncTokens.end();
-    }
-
-    void CSTParser::skipToSyncPoint() {
-        while (!isAtEnd() && !isSyncToken(peek().type) && shouldContinueParsing()) {
-            advance();
-        }
-    }
-
-    void CSTParser::skipInvalidTokens() {
-        size_t tokensSkipped = 0;
-        const size_t maxSkipTokens = 20; // Prevent infinite loops
-        
-        while (!isAtEnd() && tokensSkipped < maxSkipTokens && shouldContinueParsing()) {
-            TokenType currentType = peek().type;
-            
-            // Skip error tokens
-            if (currentType == TokenType::ERROR) {
-                advance();
-                tokensSkipped++;
-                continue;
-            }
-            
-            // Skip tokens that don't make sense in current context
-            if (recoveryConfig.skipInvalidTokens) {
-                // This would need context-specific logic
-                // For now, just break if we find a meaningful token
-                if (isMeaningfulToken(currentType)) {
-                    break;
-                }
-            }
-            
-            break; // Don't skip valid tokens
-        }
-    }
-
-    // Node creation helpers
-    std::unique_ptr<Node> CSTParser::createNode(NodeKind kind) {
-        return CST::createNode(kind, getCurrentPosition(), getCurrentPosition());
-    }
-
-    std::unique_ptr<Node> CSTParser::createNodeWithSpan(NodeKind kind, size_t start, size_t end) {
-        return CST::createNode(kind, start, end);
-    }
-
-    void CSTParser::setNodeSpan(Node& node, size_t start, size_t end) {
-        node.setSourceSpan(start, end);
-    }
-
-    void CSTParser::setNodeSpanFromTokens(Node& node, const Token& startToken, const Token& endToken) {
-        node.setSourceSpan(startToken.start, endToken.end);
-    }
-
-    // Utility methods for error recovery
-    bool CSTParser::canRecover() const {
-        return errors.size() < recoveryConfig.maxErrors && recoveryConfig.continueOnError;
-    }
-
-    bool CSTParser::shouldContinueParsing() const {
-        return !isAtEnd() && canRecover();
-    }
-
-    void CSTParser::incrementErrorCount() {
-        // Error count is tracked by the size of the errors vector
-        // This method is here for potential future use
-    }
-
-    // Token classification helpers
-    bool CSTParser::isMeaningfulToken(TokenType type) const {
-        return !isTrivia(type) && type != TokenType::ERROR && type != TokenType::MISSING && type != TokenType::EOF_TOKEN;
-    }
-
-    bool CSTParser::isStatementStart(TokenType type) const {
-        return type == TokenType::VAR || type == TokenType::FN || type == TokenType::CLASS ||
-               type == TokenType::IF || type == TokenType::FOR || type == TokenType::WHILE ||
-               type == TokenType::RETURN || type == TokenType::BREAK || type == TokenType::CONTINUE ||
-               type == TokenType::PRINT || type == TokenType::LEFT_BRACE;
-    }
-
-    bool CSTParser::isExpressionStart(TokenType type) const {
-        return type == TokenType::IDENTIFIER || type == TokenType::NUMBER || type == TokenType::STRING ||
-               type == TokenType::TRUE || type == TokenType::FALSE || type == TokenType::NIL ||
-               type == TokenType::LEFT_PAREN || type == TokenType::MINUS || type == TokenType::BANG;
-    }
-
-    bool CSTParser::isDeclarationStart(TokenType type) const {
-        return type == TokenType::VAR || type == TokenType::FN || type == TokenType::CLASS ||
-               type == TokenType::TYPE || type == TokenType::TRAIT || type == TokenType::INTERFACE;
-    }
-
-    // Source position helpers
-    size_t CSTParser::getCurrentPosition() const {
-        if (isAtEnd()) {
-            return tokens.empty() ? 0 : tokens.back().end;
-        }
-        return tokens[current].start;
-    }
-
-    size_t CSTParser::getTokenPosition(const Token& token) const {
-        return token.start;
-    }
-
-    std::pair<size_t, size_t> CSTParser::getLineColumn(size_t position) const {
-        Token currentToken = peek();
-        
-        // If we have a scanner, we can get more accurate position info
-        if (scanner) {
-            // Use the token's line number and try to calculate column from position
-            size_t line = currentToken.line;
-            size_t column = 1;
-            
-            // Try to calculate column based on token start position
-            if (currentToken.start > 0) {
-                // This is a simplified calculation - ideally we'd scan back to line start
-                column = (currentToken.start % 80) + 1; // Rough estimate
-            }
-            
-            return {line, column};
-        }
-        
-        // Fallback to token line with column 1
-        return {currentToken.line, 1};
-    }
-
-    // Debug and diagnostic helpers
-    std::string CSTParser::getCurrentTokenInfo() const {
-        Token token = peek();
-        std::ostringstream info;
-        info << "Token: " << static_cast<int>(token.type) << " ('" << token.lexeme << "') at line " << token.line;
-        return info.str();
-    }
-
-    std::string CSTParser::getParsingContext() const {
-        std::ostringstream context;
-        context << "Parsing at position " << current << "/" << tokens.size();
-        if (!isAtEnd()) {
-            context << ", current token: " << getCurrentTokenInfo();
-        }
-        return context.str();
-    }
-
-    void CSTParser::logParsingState(const std::string& context) const {
-        // For debugging - could output to stderr or a log file
-        // std::cerr << "[CSTParser] " << context << " - " << getParsingContext() << std::endl;
-    }
-
-    // Additional error recovery helper methods
-    
-    std::unique_ptr<Node> CSTParser::createPartialNode(NodeKind targetKind, const std::string& description) {
-        size_t startPos = getCurrentPosition();
-        auto incompleteNode = CST::createIncompleteNode(targetKind, description, startPos, startPos);
-        
-        // Don't automatically consume tokens here - let the caller handle token consumption
-        // This prevents infinite loops when the caller has already advanced past a problematic token
-        
-        return incompleteNode;
-    }
-    
-    bool CSTParser::attemptErrorRecovery(const std::string& context) {
-        if (!canRecover()) {
-            return false;
-        }
-        
-        // Log the recovery attempt
-        reportError("Attempting error recovery in " + context);
-        
-        // Try different recovery strategies
-        
-        // Strategy 1: Skip to next statement
-        if (isSyncToken(peek().type)) {
-            return true; // Already at sync point
-        }
-        
-        // Strategy 2: Look for missing punctuation
-        if (recoveryConfig.insertMissingTokens) {
-            // This would need context-specific logic
-            // For now, just synchronize
-            synchronize();
-            return !isAtEnd();
-        }
-        
-        // Strategy 3: Skip invalid tokens
-        if (recoveryConfig.skipInvalidTokens) {
-            skipInvalidTokens();
-            return !isAtEnd();
-        }
-        
-        // Default: synchronize
-        synchronize();
-        return !isAtEnd();
-    }
-    
-    void CSTParser::reportDetailedError(const std::string& message, 
-                                       const std::string& context,
-                                       const std::vector<std::string>& suggestions) {
-        if (errors.size() >= recoveryConfig.maxErrors) {
-            return;
-        }
-        
-        Token currentToken = peek();
-        auto [line, column] = getLineColumn(getCurrentPosition());
-        
-        // Create enhanced message with context and suggestions
-        std::string enhancedMessage = message;
-        if (!context.empty()) {
-            enhancedMessage += "\nContext: " + context;
-        }
-        if (!suggestions.empty()) {
-            enhancedMessage += "\nSuggestions:";
-            for (const auto& suggestion : suggestions) {
-                enhancedMessage += "\n  - " + suggestion;
-            }
-        }
-        
-        // Use Debugger::error for consistent error reporting
-        if (scanner) {
-            Debugger::error(enhancedMessage, line, column, InterpretationStage::PARSING, 
-                          scanner->getSource(), scanner->getFilePath(), 
-                          currentToken.lexeme, "");
-        } else {
-            // Fallback when no scanner available
-            Debugger::error(enhancedMessage, line, column, InterpretationStage::PARSING, 
-                          "", "", currentToken.lexeme, "");
-        }
-        
-        // Still maintain internal error list for recovery logic
-        ErrorHandling::ErrorMessage error("E203", "CST_DetailedError", message, 
-                                         scanner ? scanner->getFilePath() : "", 
-                                         line, column, currentToken.lexeme, 
-                                         InterpretationStage::PARSING);
-        
-        // Add context and suggestions
-        if (!context.empty()) {
-            error.hint = context;
-        }
-        if (!suggestions.empty()) {
-            error.suggestion = suggestions[0]; // Use first suggestion as primary
-        }
-        
-        errors.push_back(error);
-    }
-    
-    void CSTParser::reportErrorAtToken(const std::string& message, const Token& errorToken, 
-                                      TokenType expected, TokenType actual) {
-        if (errors.size() >= recoveryConfig.maxErrors) {
-            return;
-        }
-        
-        // Use the specific token's position information
-        size_t line = errorToken.line;
-        size_t column = errorToken.start + 1; // Use token's actual start position
-        
-        // Generate expected value string if provided
-        std::string expectedValue = (expected != TokenType::UNDEFINED) ? tokenTypeToString(expected) : "";
-        TokenType actualType = (actual != TokenType::UNDEFINED) ? actual : peek().type;
-        
-        // Create enhanced error message using ErrorFormatter
-        auto options = ErrorHandling::ErrorFormatter::getDefaultOptions();
-        
-        ErrorHandling::ErrorMessage enhancedError = ErrorHandling::ErrorFormatter::createErrorMessage(
-            message, line, column, InterpretationStage::PARSING,
-            scanner ? scanner->getSource() : "",
-            scanner ? scanner->getFilePath() : "",
-            errorToken.lexeme, expectedValue, std::nullopt, options
-        );
-        
-        // Use Debugger::error with the enhanced error message
-        Debugger::error(enhancedError);
-        
-        // Store for recovery logic
-        errors.push_back(enhancedError);
-    }
-    
-    bool CSTParser::isRecoverableError(TokenType expected, TokenType actual) const {
-        // Some errors are more recoverable than others
-        
-        // Missing punctuation is usually recoverable
-        if (expected == TokenType::SEMICOLON || 
-            expected == TokenType::RIGHT_PAREN || 
-            expected == TokenType::RIGHT_BRACE) {
-            return true;
-        }
-        
-        // Identifier mismatches might be recoverable
-        if (expected == TokenType::IDENTIFIER && actual != TokenType::EOF_TOKEN) {
-            return true;
-        }
-        
-        // EOF is usually not recoverable
-        if (actual == TokenType::EOF_TOKEN) {
-            return false;
-        }
-        
-        return recoveryConfig.continueOnError;
-    }
-    
-    std::unique_ptr<Node> CSTParser::handleMissingToken(TokenType expectedType, const std::string& context) {
-        if (!recoveryConfig.insertMissingTokens) {
-            return nullptr;
-        }
-        
-        // Create a missing node for the expected token
-        std::string description = "Missing " + tokenTypeToString(expectedType);
-        if (!context.empty()) {
-            description += " in " + context;
-        }
-        
-        auto missingNode = CST::createMissingNode(NodeKind::MISSING_NODE, description, 
-                                                 getCurrentPosition(), getCurrentPosition());
-        
-        // Report the error
-        reportError("Expected " + tokenTypeToString(expectedType), expectedType, peek().type);
-        
-        return missingNode;
-    }
-    
-    std::string CSTParser::tokenTypeToString(TokenType type) const {
-        // This would ideally be in a shared utility, but for now implement here
-        switch (type) {
-            case TokenType::SEMICOLON: return "';'";
-            case TokenType::LEFT_BRACE: return "'{'";
-            case TokenType::RIGHT_BRACE: return "'}'";
-            case TokenType::LEFT_PAREN: return "'('";
-            case TokenType::RIGHT_PAREN: return "')'";
-            case TokenType::IDENTIFIER: return "identifier";
-            case TokenType::NUMBER: return "number";
-            case TokenType::STRING: return "string";
-            case TokenType::IF: return "'if'";
-            case TokenType::FN: return "'fn'";
-            case TokenType::VAR: return "'var'";
-            case TokenType::CLASS: return "'class'";
-            case TokenType::EOF_TOKEN: return "end of file";
-            default: return "token";
-        }
-    }
-    
-    // Block context tracking methods implementation
-    
-    void CSTParser::pushBlockContext(const std::string& blockType, const Token& startToken) {
-        auto [line, column] = getLineColumn(startToken.start);
-        ErrorHandling::BlockContext context(blockType, line, column, startToken.lexeme);
-        blockStack.push_back(context);
-    }
-    
-    void CSTParser::popBlockContext() {
-        if (!blockStack.empty()) {
-            blockStack.pop_back();
-        }
-    }
-    
-    std::optional<ErrorHandling::BlockContext> CSTParser::getCurrentBlockContext() const {
-        if (blockStack.empty()) {
-            return std::nullopt;
-        }
-        return blockStack.back();
-    }
-    
-    std::string CSTParser::generateCausedByMessage(const ErrorHandling::BlockContext& context) const {
-        std::ostringstream message;
-        message << "Caused by: Unclosed " << context.blockType 
-                << " starting at line " << context.startLine 
-                << " ('" << context.startLexeme << "')";
-        return message.str();
-    }
-
-    // Utility functions for working with CSTParser
-
-    std::unique_ptr<Node> parseSourceToCST(const std::string& source, 
-                                          const CSTConfig& scanConfig,
-                                          const RecoveryConfig& parseConfig) {
-        Scanner scanner(source);
-        CSTParser parser(scanner, scanConfig);
-        parser.setRecoveryConfig(parseConfig);
-        return parser.parse();
-    }
-
-    std::unique_ptr<Node> parseTokensToCST(const std::vector<Token>& tokens,
-                                          const RecoveryConfig& config) {
-        CSTParser parser(tokens);
-        parser.setRecoveryConfig(config);
-        return parser.parse();
-    }
-
-    bool isParsingSuccessful(const std::vector<ParseError>& errors) {
-        // Check if there are any errors (all ErrorMessage objects represent errors)
-        return errors.empty();
-    }
-
-    std::string formatErrors(const std::vector<ParseError>& errors) {
-        std::ostringstream formatted;
-        
-        for (const auto& error : errors) {
-            formatted << error.errorCode << " " << error.errorType 
-                     << " at line " << error.line << ", column " << error.column 
-                     << ": " << error.description << std::endl;
-            
-            if (!error.hint.empty()) {
-                formatted << "  Hint: " << error.hint << std::endl;
-            }
-            
-            if (!error.suggestion.empty()) {
-                formatted << "  Suggestion: " << error.suggestion << std::endl;
-            }
-            
-            if (!error.causedBy.empty()) {
-                formatted << "  Caused by: " << error.causedBy << std::endl;
-            }
-            
-            formatted << std::endl;
-        }
-        
-        return formatted.str();
-    }
-
-    std::vector<ParseError> filterErrorsByType(const std::vector<ParseError>& errors,
-                                              const std::string& errorType) {
-        std::vector<ParseError> filtered;
-        
-        for (const auto& error : errors) {
-            if (error.errorType == errorType) {
-                filtered.push_back(error);
-            }
-        }
-        
-        return filtered;
-    }
-
-    // Helper methods for statement parsing
-    
-    std::unique_ptr<Node> CSTParser::parseDeclaration() {
-        TokenType type = peek().type;
-        Token startToken = peek();
-        
-        switch (type) {
-            case TokenType::VAR:
-                return parseVariableDeclaration();
-            case TokenType::FN:
-                return parseFunctionDeclaration();
+        switch (peek().type) {
             case TokenType::CLASS:
-                return parseClassDeclaration();
-            case TokenType::TYPE:
-                return parseTypeDeclaration();
-            case TokenType::TRAIT:
-                return parseTraitDeclaration();
-            case TokenType::INTERFACE:
-                return parseInterfaceDeclaration();
-            default:
-                reportError("Unknown declaration type");
-                return createErrorRecoveryNode("Invalid declaration");
-        }
-    }
-    
-    std::unique_ptr<Node> CSTParser::parseStatementByType() {
-        TokenType type = peek().type;
-        Token startToken = peek();
-        
-        switch (type) {
-            case TokenType::IF:
-                return parseIfStatement();
+            case TokenType::FN:
+            case TokenType::VAR:
             case TokenType::FOR:
-                return parseForStatement();
+            case TokenType::IF:
             case TokenType::WHILE:
-                return parseWhileStatement();
-            case TokenType::ITER:
-                return parseIterStatement();
-            case TokenType::MATCH:
-                return parseMatchStatement();
-            case TokenType::RETURN:
-                return parseReturnStatement();
-            case TokenType::BREAK:
-                return parseBreakStatement();
-            case TokenType::CONTINUE:
-                return parseContinueStatement();
             case TokenType::PRINT:
-                return parsePrintStatement();
-            case TokenType::LEFT_BRACE:
-                return parseBlock();
+            case TokenType::RETURN:
+                return;
             default:
-                reportError("Unknown statement type");
-                return createErrorRecoveryNode("Invalid statement");
-        }
-    }
-    
-    std::unique_ptr<Node> CSTParser::parseAssignmentExpression() {
-        auto expr = parseLogicalOrExpression();
-        
-        if (match(TokenType::EQUAL)) {
-            Token operatorToken = previous();
-            auto assignNode = createNode(NodeKind::ASSIGNMENT_EXPR);
-            assignNode->addNode(std::move(expr));
-            assignNode->addToken(operatorToken);
-            
-            auto value = parseAssignmentExpression();
-            if (value) {
-                assignNode->addNode(std::move(value));
-            }
-            
-            return assignNode;
-        }
-        
-        return expr;
-    }
-    
-    std::unique_ptr<Node> CSTParser::parseLogicalOrExpression() {
-        auto expr = parseLogicalAndExpression();
-        
-        while (match(TokenType::OR)) {
-            Token operatorToken = previous();
-            auto logicalNode = createNode(NodeKind::LOGICAL_EXPR);
-            logicalNode->addNode(std::move(expr));
-            logicalNode->addToken(operatorToken);
-            
-            auto right = parseLogicalAndExpression();
-            if (right) {
-                logicalNode->addNode(std::move(right));
-            }
-            
-            expr = std::move(logicalNode);
-        }
-        
-        return expr;
-    }
-    
-    std::unique_ptr<Node> CSTParser::parseLogicalAndExpression() {
-        auto expr = parseEqualityExpression();
-        
-        while (match(TokenType::AND)) {
-            Token operatorToken = previous();
-            auto logicalNode = createNode(NodeKind::LOGICAL_EXPR);
-            logicalNode->addNode(std::move(expr));
-            logicalNode->addToken(operatorToken);
-            
-            auto right = parseEqualityExpression();
-            if (right) {
-                logicalNode->addNode(std::move(right));
-            }
-            
-            expr = std::move(logicalNode);
-        }
-        
-        return expr;
-    }
-    
-    std::unique_ptr<Node> CSTParser::parseEqualityExpression() {
-        return parseBinaryExpr(&CSTParser::parseComparisonExpression, 
-            {TokenType::BANG_EQUAL, TokenType::EQUAL_EQUAL});
-    }
-    
-    std::unique_ptr<Node> CSTParser::parseComparisonExpression() {
-        return parseBinaryExpr(&CSTParser::parseTermExpression, 
-            {TokenType::GREATER, TokenType::GREATER_EQUAL, TokenType::LESS, TokenType::LESS_EQUAL});
-    }
-    
-    std::unique_ptr<Node> CSTParser::parseTermExpression() {
-        return parseBinaryExpr(&CSTParser::parseFactorExpression, 
-            {TokenType::MINUS, TokenType::PLUS});
-    }
-    
-    std::unique_ptr<Node> CSTParser::parseFactorExpression() {
-        return parseBinaryExpr(&CSTParser::parseUnaryExpression, 
-            {TokenType::SLASH, TokenType::STAR, TokenType::MODULUS});
-    }
-    
-    std::unique_ptr<Node> CSTParser::parseUnaryExpression() {
-        if (match({TokenType::BANG, TokenType::MINUS})) {
-            Token operatorToken = previous();
-            auto unaryNode = createNode(NodeKind::UNARY_EXPR);
-            unaryNode->addToken(operatorToken);
-            
-            // Enhanced error recovery for missing operands after unary operators
-            auto expr = parseUnaryExpression();
-            if (expr) {
-                unaryNode->addNode(std::move(expr));
-            } else {
-                // Create specific error recovery for missing operand
-                reportErrorWithSuggestions("Expected expression after unary operator '" + operatorToken.lexeme + "'",
-                    {"Add an expression after the unary operator", 
-                     "Use parentheses to group complex expressions",
-                     "Check for missing operand"});
-                
-                // Create missing node for the expected operand
-                auto missingOperand = CST::createMissingNode(NodeKind::UNARY_EXPR, 
-                    "Missing operand after unary operator '" + operatorToken.lexeme + "'");
-                unaryNode->addNode(std::move(missingOperand));
-            }
-            
-            return unaryNode;
-        }
-        
-        return parseCallExpression();
-    }
-    
-    std::unique_ptr<Node> CSTParser::parseCallExpression() {
-        auto expr = parsePrimaryExpression();
-        
-        while (true) {
-            if (match(TokenType::LEFT_PAREN)) {
-                // Function call with enhanced error recovery
-                Token openParen = previous();
-                auto callNode = createNode(NodeKind::CALL_EXPR);
-                callNode->addNode(std::move(expr));
-                callNode->addToken(openParen);
-                
-                // Parse arguments with recovery for missing arguments and commas
-                if (!check(TokenType::RIGHT_PAREN)) {
-                    do {
-                        auto arg = parseExpression();
-                        if (arg) {
-                            callNode->addNode(std::move(arg));
-                        } else {
-                            // Recovery for missing argument
-                            reportErrorWithSuggestions("Expected argument in function call",
-                                {"Add a valid expression as argument",
-                                 "Remove extra comma if no argument intended",
-                                 "Check for missing closing parenthesis"});
-                            
-                            auto missingArg = CST::createMissingNode(NodeKind::ARGUMENT, "Missing function argument");
-                            callNode->addNode(std::move(missingArg));
-                        }
-                        
-                        // Handle comma recovery
-                        if (match(TokenType::COMMA)) {
-                            callNode->addToken(previous());
-                            
-                            // Check for trailing comma before closing paren
-                            if (check(TokenType::RIGHT_PAREN)) {
-                                reportErrorWithSuggestions("Unexpected trailing comma in function call",
-                                    {"Remove the trailing comma",
-                                     "Add another argument after the comma"});
-                                break;
-                            }
-                        } else {
-                            break;
-                        }
-                    } while (true);
-                }
-                
-                // Recovery for missing closing parenthesis
-                if (check(TokenType::RIGHT_PAREN)) {
-                    callNode->addToken(advance());
-                } else {
-                    reportErrorWithSuggestions("Expected ')' after function arguments", 
-                        {"Add closing parenthesis ')' to complete function call",
-                         "Check for missing or extra arguments",
-                         "Verify proper comma separation between arguments"});
-                    
-                    if (recoveryConfig.insertMissingTokens) {
-                        // Insert missing closing parenthesis
-                        Token missingParen;
-                        missingParen.type = TokenType::RIGHT_PAREN;
-                        missingParen.lexeme = ")";
-                        missingParen.line = peek().line;
-                        missingParen.start = getCurrentPosition();
-                        missingParen.end = getCurrentPosition();
-                        callNode->addToken(missingParen);
-                    }
-                }
-                
-                expr = std::move(callNode);
-            } else if (match(TokenType::DOT)) {
-                // Member access with enhanced error recovery
-                Token dot = previous();
-                auto memberNode = createNode(NodeKind::MEMBER_EXPR);
-                memberNode->addNode(std::move(expr));
-                memberNode->addToken(dot);
-                
-                // Recovery for missing member names after dots
-                if (check(TokenType::IDENTIFIER)) {
-                    memberNode->addToken(advance());
-                } else {
-                    reportErrorWithSuggestions("Expected property name after '.'", 
-                        {"Add a valid identifier after the dot",
-                         "Remove the dot if member access not intended",
-                         "Check for typos in property name"});
-                    
-                    if (recoveryConfig.insertMissingTokens) {
-                        // Create missing identifier token
-                        Token missingId;
-                        missingId.type = TokenType::IDENTIFIER;
-                        missingId.lexeme = "<missing_property>";
-                        missingId.line = peek().line;
-                        missingId.start = getCurrentPosition();
-                        missingId.end = getCurrentPosition();
-                        memberNode->addToken(missingId);
-                    } else {
-                        // Create missing node for the property
-                        auto missingProperty = CST::createMissingNode(NodeKind::IDENTIFIER, 
-                            "Missing property name after '.'");
-                        memberNode->addNode(std::move(missingProperty));
-                    }
-                }
-                
-                expr = std::move(memberNode);
-            } else if (match(TokenType::LEFT_BRACKET)) {
-                // Index access
-                Token openBracket = previous();
-                auto indexNode = createNode(NodeKind::INDEX_EXPR);
-                indexNode->addNode(std::move(expr));
-                indexNode->addToken(openBracket);
-                
-                auto index = parseExpression();
-                if (index) {
-                    indexNode->addNode(std::move(index));
-                } else {
-                    // Recovery for missing index expression
-                    reportErrorWithSuggestions("Expected index expression after '['",
-                        {"Add a valid expression for array/object indexing",
-                         "Use a number for array indexing",
-                         "Use a string for object property access"});
-                    
-                    auto missingIndex = CST::createMissingNode(NodeKind::INDEX_EXPR, "Missing index expression");
-                    indexNode->addNode(std::move(missingIndex));
-                }
-                
-                if (check(TokenType::RIGHT_BRACKET)) {
-                    indexNode->addToken(advance());
-                } else {
-                    reportErrorWithSuggestions("Expected ']' after index expression", 
-                        {"Add closing bracket ']' to complete index access",
-                         "Check for missing or invalid index expression"});
-                    
-                    if (recoveryConfig.insertMissingTokens) {
-                        // Insert missing closing bracket
-                        Token missingBracket;
-                        missingBracket.type = TokenType::RIGHT_BRACKET;
-                        missingBracket.lexeme = "]";
-                        missingBracket.line = peek().line;
-                        missingBracket.start = getCurrentPosition();
-                        missingBracket.end = getCurrentPosition();
-                        indexNode->addToken(missingBracket);
-                    }
-                }
-                
-                expr = std::move(indexNode);
-            } else {
                 break;
-            }
         }
-        
-        return expr;
+
+        advance();
     }
+}
+
+void CSTParser::error(const std::string &message, bool suppressException) {
+    // Get the current token's lexeme for better error reporting
+    std::string lexeme = "";
+    int line = 0;
+    int column = 0;
+    std::string codeContext = "";
     
-    std::unique_ptr<Node> CSTParser::parsePrimaryExpression() {
-        // Handle literals
-        if (check(TokenType::TRUE) || check(TokenType::FALSE) || check(TokenType::NIL) ||
-            check(TokenType::NUMBER) || check(TokenType::STRING)) {
-            // Check if this is the start of an interpolated string
-            if (check(TokenType::STRING) && peekAhead(1).type == TokenType::INTERPOLATION_START) {
-                // Consume the STRING token first
-                advance();
-                return parseInterpolatedString();
-            }
-            return parseLiteralExpr();
-        }
-        
-        // Handle variables
-        if (check(TokenType::IDENTIFIER)) {
-            return parseVariableExpr();
-        }
-        
-        // Handle parenthesized expressions
-        if (match(TokenType::LEFT_PAREN)) {
-            auto expr = parseExpression();
-            if (!match(TokenType::RIGHT_PAREN)) {
-                reportError("Expected ')' after expression");
-            }
-            return expr;
-        }
-        
-        // If we get here, we have an unexpected token
-        reportError("Unexpected token in expression");
-        return nullptr;
-    }
-    
-    // Enhanced parseLiteralExpr with error node creation for invalid tokens
-    std::unique_ptr<Node> CSTParser::parseLiteralExpr() {
-        if (match(TokenType::TRUE) || match(TokenType::FALSE) || match(TokenType::NIL)) {
-            auto literalNode = createNode(NodeKind::LITERAL_EXPR);
-            literalNode->addToken(previous());
-            return literalNode;
-        }
-        
-        if (match(TokenType::NUMBER) || match(TokenType::STRING)) {
-            auto literalNode = createNode(NodeKind::LITERAL_EXPR);
-            Token literalToken = previous();
-            
-            // Note: String validation is handled by the scanner
-            
-            if (literalToken.type == TokenType::NUMBER && literalToken.lexeme.empty()) {
-                // Invalid number literal
-                reportErrorWithSuggestions("Invalid number literal",
-                    {"Provide a valid numeric value",
-                     "Check for proper decimal notation",
-                     "Ensure no invalid characters in number"});
-                
-                auto errorNode = CST::createErrorNode("Invalid number literal", 
-                    literalToken.start, literalToken.end);
-                errorNode->addToken(literalToken);
-                return errorNode;
-            }
-            
-            literalNode->addToken(literalToken);
-            return literalNode;
-        }
-        
-        // If we get here, this is not a literal
-        return nullptr;
-    }
-    
-    // Enhanced parseVariableExpr with error node creation for invalid tokens
-    std::unique_ptr<Node> CSTParser::parseVariableExpr() {
-        if (match(TokenType::IDENTIFIER)) {
-            Token identifierToken = previous();
-            auto varNode = createNode(NodeKind::VARIABLE_EXPR);
-            
-            // Validate identifier token
-            if (identifierToken.lexeme.empty()) {
-                reportErrorWithSuggestions("Empty identifier",
-                    {"Provide a valid variable name",
-                     "Check for typos in identifier",
-                     "Ensure identifier follows naming rules"});
-                
-                auto errorNode = CST::createErrorNode("Invalid identifier", 
-                    identifierToken.start, identifierToken.end);
-                errorNode->addToken(identifierToken);
-                return errorNode;
-            }
-            
-            // Check for reserved keywords used as identifiers
-            if (isReservedKeyword(identifierToken.lexeme)) {
-                reportErrorWithSuggestions("Cannot use reserved keyword '" + identifierToken.lexeme + "' as identifier",
-                    {"Choose a different variable name",
-                     "Add prefix or suffix to make it unique",
-                     "Check language reserved words list"});
-                
-                auto errorNode = CST::createErrorNode("Reserved keyword used as identifier", 
-                    identifierToken.start, identifierToken.end);
-                errorNode->addToken(identifierToken);
-                return errorNode;
-            }
-            
-            varNode->addToken(identifierToken);
-            return varNode;
-        }
-        
-        return parseGroupingExpr();
-    }
-    
-    // Enhanced parseGroupingExpr with recovery for missing closing parentheses
-    std::unique_ptr<Node> CSTParser::parseGroupingExpr() {
-        if (match(TokenType::LEFT_PAREN)) {
-            Token openParen = previous();
-            auto groupingNode = createNode(NodeKind::GROUPING_EXPR);
-            groupingNode->addToken(openParen);
-            
-            auto expr = parseExpression();
-            if (expr) {
-                groupingNode->addNode(std::move(expr));
-            } else {
-                // Recovery for missing expression inside parentheses
-                reportErrorWithSuggestions("Expected expression inside parentheses",
-                    {"Add a valid expression between the parentheses",
-                     "Remove empty parentheses if not needed",
-                     "Check for syntax errors in the expression"});
-                
-                auto missingExpr = CST::createMissingNode(NodeKind::GROUPING_EXPR, 
-                    "Missing expression inside parentheses");
-                groupingNode->addNode(std::move(missingExpr));
-            }
-            
-            // Enhanced recovery for missing closing parentheses
-            if (check(TokenType::RIGHT_PAREN)) {
-                groupingNode->addToken(advance());
-            } else {
-                reportErrorWithSuggestions("Expected ')' after expression", 
-                    {"Add closing parenthesis ')' to complete grouped expression",
-                     "Check for nested parentheses balance",
-                     "Verify expression syntax inside parentheses"});
-                
-                if (recoveryConfig.insertMissingTokens) {
-                    // Insert missing closing parenthesis
-                    Token missingParen;
-                    missingParen.type = TokenType::RIGHT_PAREN;
-                    missingParen.lexeme = ")";
-                    missingParen.line = peek().line;
-                    missingParen.start = getCurrentPosition();
-                    missingParen.end = getCurrentPosition();
-                    groupingNode->addToken(missingParen);
-                } else {
-                    // Create incomplete node to indicate missing closing paren
-                    auto incompleteNode = CST::createIncompleteNode(NodeKind::GROUPING_EXPR,
-                        "Missing closing parenthesis");
-                    incompleteNode->addMissingElement("closing parenthesis ')'");
-                    return incompleteNode;
+    if (current < scanner.getTokens().size()) {
+        Token currentToken = peek();
+        lexeme = currentToken.lexeme;
+        line = currentToken.line;
+        column = currentToken.start;
+        // Extract code context (source line)
+        if (line > 0) {
+            const std::string& src = scanner.getSource();
+            size_t srcLen = src.length();
+            size_t lineStart = 0, lineEnd = srcLen;
+            int curLine = 1;
+            for (size_t i = 0; i < srcLen; ++i) {
+                if (curLine == line) {
+                    lineStart = i;
+                    while (lineStart > 0 && src[lineStart - 1] != '\n') --lineStart;
+                    lineEnd = i;
+                    while (lineEnd < srcLen && src[lineEnd] != '\n') ++lineEnd;
+                    codeContext = src.substr(lineStart, lineEnd - lineStart);
+                    break;
                 }
+                if (src[i] == '\n') ++curLine;
             }
-            
-            return groupingNode;
         }
+    }
+    
+    // Check if this is an "Expected expression" error in a trait method
+    if (message == "Expected expression." && 
+        (current > 0 && current < scanner.getTokens().size() && 
+         scanner.getTokens()[current-1].type == TokenType::LEFT_BRACE && 
+         scanner.getTokens()[current].type == TokenType::RIGHT_BRACE)) {
+        // Let the debugger handle this common case
+        Debugger::error(message, line, column, InterpretationStage::PARSING, scanner.getSource(), scanner.getFilePath(), lexeme, codeContext);
+        return;
+    }
+    
+    // Check for block-related errors and add "Caused by" information
+    std::string enhancedMessage = message;
+    if ((message.find("Expected '}'") != std::string::npos || 
+         message.find("Unexpected closing brace") != std::string::npos ||
+         message.find("Expected '}' after") != std::string::npos) && 
+        !blockStack.empty()) {
         
-        // If we reach here, we have an invalid token for an expression
-        Token invalidToken = peek();
-        reportErrorWithSuggestions("Expected expression, found '" + invalidToken.lexeme + "'",
-            {"Provide a valid expression (literal, variable, or grouped expression)",
-             "Check for missing operators or operands",
-             "Verify syntax is correct at this position"});
-        
-        // Create error node for invalid expression token
-        auto errorNode = CST::createErrorNode("Invalid expression token", 
-            invalidToken.start, invalidToken.end);
-        
-        if (!isAtEnd()) {
-            errorNode->addToken(advance()); // Consume the invalid token
+        // Find the most relevant block context (the most recent unclosed block)
+        auto blockContext = getCurrentBlockContext();
+        if (blockContext.has_value()) {
+            std::string causedBy = generateCausedByMessage(blockContext.value());
+            enhancedMessage += "\n" + causedBy;
         }
-        
-        return errorNode;
+    }
+    
+    // Use enhanced error reporting with block context if available
+    auto blockContext = getCurrentBlockContext();
+    if (blockContext.has_value()) {
+        Debugger::error(enhancedMessage, line, column, InterpretationStage::PARSING, scanner.getSource(), scanner.getFilePath(), blockContext, lexeme, codeContext);
+    } else {
+        Debugger::error(enhancedMessage, line, column, InterpretationStage::PARSING, scanner.getSource(), scanner.getFilePath(), lexeme, codeContext);
     }
 
-    // Task 6: Statement parsing methods with error recovery
+    // Collect error for multi-error reporting
+    errors.push_back(ParseError{enhancedMessage, line, column, codeContext});
+    if (errors.size() >= MAX_ERRORS) {
+        throw std::runtime_error("Too many syntax errors; aborting parse.");
+    }
+
+    // Do not throw for normal errors; let parser continue and synchronize.
+}
+
+// Unified node creation helper - creates CST::Node or AST::Node based on cstMode
+template<typename ASTNodeType>
+auto CSTParser::createNode() -> std::conditional_t<std::is_same_v<ASTNodeType, AST::Program>, 
+                                                   std::shared_ptr<AST::Program>,
+                                                   std::shared_ptr<ASTNodeType>> {
+    if (cstMode) {
+        // In CST mode, create CST::Node and return nullptr for AST (will be handled separately)
+        // For now, we'll create both for compatibility
+        auto astNode = std::make_shared<ASTNodeType>();
+        
+        // Map AST type to CST NodeKind
+        CST::NodeKind cstKind = mapASTNodeKind(typeid(ASTNodeType).name());
+        auto cstNode = std::make_unique<CST::Node>(cstKind);
+        
+        // Set position information
+        if (current < scanner.getTokens().size()) {
+            Token currentToken = peek();
+            cstNode->startPos = currentToken.start;
+            cstNode->endPos = currentToken.end;
+        }
+        
+        // Store CST node for trivia attachment
+        currentNode = std::move(cstNode);
+        
+        // Increment counter for testing
+        cstNodeCount++;
+        
+        return astNode;
+    } else {
+        // Legacy AST mode - just create AST node
+        return std::make_shared<ASTNodeType>();
+    }
+}
+
+// AST to CST NodeKind mapping
+CST::NodeKind CSTParser::mapASTNodeKind(const std::string& astNodeType) {
+    // Extract class name from mangled type name
+    std::string className = astNodeType;
     
-    std::unique_ptr<Node> CSTParser::parseVariableDeclaration() {
-        // Parse: var name: type = initializer;
-        Token startToken = peek();
-        auto varNode = createNode(NodeKind::VAR_DECLARATION);
-        
-        // Consume 'var' keyword
-        if (check(TokenType::VAR)) {
-            varNode->addToken(advance());
-        } else {
-            reportError("Expected 'var' keyword", TokenType::VAR, peek().type);
-            return createErrorRecoveryNode("Invalid variable declaration");
-        }
-        
-        // Consume any trivia after 'var' keyword
-        if (recoveryConfig.preserveTrivia) {
-            consumeTrivia();
-        }
-        
-        // Parse variable name
-        if (check(TokenType::IDENTIFIER)) {
-            varNode->addToken(advance());
-        } else {
-            reportError("Expected variable name after 'var'", TokenType::IDENTIFIER, peek().type);
+    // Simple mapping based on common patterns
+    if (className.find("Program") != std::string::npos) return CST::NodeKind::PROGRAM;
+    if (className.find("VarDeclaration") != std::string::npos) return CST::NodeKind::VAR_DECLARATION;
+    if (className.find("FunctionDeclaration") != std::string::npos) return CST::NodeKind::FUNCTION_DECLARATION;
+    if (className.find("ClassDeclaration") != std::string::npos) return CST::NodeKind::CLASS_DECLARATION;
+    if (className.find("EnumDeclaration") != std::string::npos) return CST::NodeKind::ENUM_DECLARATION;
+    if (className.find("TypeDeclaration") != std::string::npos) return CST::NodeKind::TYPE_DECLARATION;
+    if (className.find("TraitDeclaration") != std::string::npos) return CST::NodeKind::TRAIT_DECLARATION;
+    if (className.find("InterfaceDeclaration") != std::string::npos) return CST::NodeKind::INTERFACE_DECLARATION;
+    if (className.find("ModuleDeclaration") != std::string::npos) return CST::NodeKind::MODULE_DECLARATION;
+    if (className.find("ImportStatement") != std::string::npos) return CST::NodeKind::IMPORT_DECLARATION;
+    
+    if (className.find("IfStatement") != std::string::npos) return CST::NodeKind::IF_STATEMENT;
+    if (className.find("ForStatement") != std::string::npos) return CST::NodeKind::FOR_STATEMENT;
+    if (className.find("WhileStatement") != std::string::npos) return CST::NodeKind::WHILE_STATEMENT;
+    if (className.find("IterStatement") != std::string::npos) return CST::NodeKind::ITER_STATEMENT;
+    if (className.find("MatchStatement") != std::string::npos) return CST::NodeKind::MATCH_STATEMENT;
+    if (className.find("BlockStatement") != std::string::npos) return CST::NodeKind::BLOCK_STATEMENT;
+    if (className.find("ExprStatement") != std::string::npos) return CST::NodeKind::EXPRESSION_STATEMENT;
+    if (className.find("ReturnStatement") != std::string::npos) return CST::NodeKind::RETURN_STATEMENT;
+    if (className.find("BreakStatement") != std::string::npos) return CST::NodeKind::BREAK_STATEMENT;
+    if (className.find("ContinueStatement") != std::string::npos) return CST::NodeKind::CONTINUE_STATEMENT;
+    if (className.find("PrintStatement") != std::string::npos) return CST::NodeKind::PRINT_STATEMENT;
+    if (className.find("AttemptStatement") != std::string::npos) return CST::NodeKind::ATTEMPT_STATEMENT;
+    if (className.find("ParallelStatement") != std::string::npos) return CST::NodeKind::PARALLEL_STATEMENT;
+    if (className.find("ConcurrentStatement") != std::string::npos) return CST::NodeKind::CONCURRENT_STATEMENT;
+    
+    if (className.find("BinaryExpr") != std::string::npos) return CST::NodeKind::BINARY_EXPR;
+    if (className.find("UnaryExpr") != std::string::npos) return CST::NodeKind::UNARY_EXPR;
+    if (className.find("CallExpr") != std::string::npos) return CST::NodeKind::CALL_EXPR;
+    if (className.find("MemberExpr") != std::string::npos) return CST::NodeKind::MEMBER_EXPR;
+    if (className.find("IndexExpr") != std::string::npos) return CST::NodeKind::INDEX_EXPR;
+    if (className.find("LiteralExpr") != std::string::npos) return CST::NodeKind::LITERAL_EXPR;
+    if (className.find("ObjectLiteralExpr") != std::string::npos) return CST::NodeKind::OBJECT_LITERAL_EXPR;
+    if (className.find("VariableExpr") != std::string::npos) return CST::NodeKind::VARIABLE_EXPR;
+    if (className.find("GroupingExpr") != std::string::npos) return CST::NodeKind::GROUPING_EXPR;
+    if (className.find("AssignExpr") != std::string::npos) return CST::NodeKind::ASSIGNMENT_EXPR;
+    if (className.find("TernaryExpr") != std::string::npos) return CST::NodeKind::CONDITIONAL_EXPR;
+    if (className.find("LambdaExpr") != std::string::npos) return CST::NodeKind::LAMBDA_EXPR;
+    if (className.find("RangeExpr") != std::string::npos) return CST::NodeKind::RANGE_EXPR;
+    if (className.find("InterpolatedStringExpr") != std::string::npos) return CST::NodeKind::INTERPOLATION_EXPR;
+    
+    // Default to error node if mapping not found
+    return CST::NodeKind::ERROR_NODE;
+}
+
+// Token consumption with trivia tracking
+Token CSTParser::consumeWithTrivia(TokenType type, const std::string &message) {
+    Token token = consume(type, message);
+    attachTriviaFromToken(token);
+    return token;
+}
+
+Token CSTParser::advanceWithTrivia() {
+    Token token = advance();
+    attachTriviaFromToken(token);
+    return token;
+}
+
+// Trivia attachment helpers
+void CSTParser::attachTriviaFromToken(const Token& token) {
+    if (cstMode && std::holds_alternative<std::unique_ptr<CST::Node>>(currentNode)) {
+        auto& cstNode = std::get<std::unique_ptr<CST::Node>>(currentNode);
+        if (cstNode) {
+            // Add the token itself to the elements
+            cstNode->addToken(token);
             
-            if (recoveryConfig.insertMissingTokens) {
-                Token missingName;
-                missingName.type = TokenType::IDENTIFIER;
-                missingName.lexeme = "<missing_name>";
-                missingName.line = peek().line;
-                missingName.start = getCurrentPosition();
-                missingName.end = getCurrentPosition();
-                varNode->addToken(missingName);
+            // Extract and attach trivia from the token
+            cstNode->attachTriviaFromToken(token);
+            
+            // Update trivia attachment count for statistics
+            triviaAttachmentCount++;
+        }
+    }
+}
+
+void CSTParser::attachTriviaFromTokens(const std::vector<Token>& tokens) {
+    if (cstMode && std::holds_alternative<std::unique_ptr<CST::Node>>(currentNode)) {
+        auto& cstNode = std::get<std::unique_ptr<CST::Node>>(currentNode);
+        if (cstNode) {
+            for (const auto& token : tokens) {
+                cstNode->addToken(token);
             }
         }
-        
-        // Consume trivia before checking for type annotation
-        if (recoveryConfig.preserveTrivia) {
-            consumeTrivia();
-        }
-        
-        // Parse optional type annotation
-        if (match(TokenType::COLON)) {
-            varNode->addToken(previous()); // ':'
-            
-            // Consume trivia after colon
-            if (recoveryConfig.preserveTrivia) {
-                consumeTrivia();
-            }
-            
-            // Parse type
-            if (isTypeStart(peek().type)) {
-                auto typeNode = parseType();
-                if (typeNode) {
-                    varNode->addNode(std::move(typeNode));
-                }
-            } else {
-                reportError("Expected type after ':'", TokenType::IDENTIFIER, peek().type);
+    }
+}
+
+// Explicit template instantiations for common AST node types
+template auto CSTParser::createNode<AST::Program>() -> std::shared_ptr<AST::Program>;
+template auto CSTParser::createNode<AST::VarDeclaration>() -> std::shared_ptr<AST::VarDeclaration>;
+template auto CSTParser::createNode<AST::FunctionDeclaration>() -> std::shared_ptr<AST::FunctionDeclaration>;
+template auto CSTParser::createNode<AST::ClassDeclaration>() -> std::shared_ptr<AST::ClassDeclaration>;
+template auto CSTParser::createNode<AST::IfStatement>() -> std::shared_ptr<AST::IfStatement>;
+template auto CSTParser::createNode<AST::ForStatement>() -> std::shared_ptr<AST::ForStatement>;
+template auto CSTParser::createNode<AST::WhileStatement>() -> std::shared_ptr<AST::WhileStatement>;
+template auto CSTParser::createNode<AST::BlockStatement>() -> std::shared_ptr<AST::BlockStatement>;
+template auto CSTParser::createNode<AST::ExprStatement>() -> std::shared_ptr<AST::ExprStatement>;
+template auto CSTParser::createNode<AST::ReturnStatement>() -> std::shared_ptr<AST::ReturnStatement>;
+template auto CSTParser::createNode<AST::PrintStatement>() -> std::shared_ptr<AST::PrintStatement>;
+template auto CSTParser::createNode<AST::BinaryExpr>() -> std::shared_ptr<AST::BinaryExpr>;
+template auto CSTParser::createNode<AST::UnaryExpr>() -> std::shared_ptr<AST::UnaryExpr>;
+template auto CSTParser::createNode<AST::LiteralExpr>() -> std::shared_ptr<AST::LiteralExpr>;
+template auto CSTParser::createNode<AST::ObjectLiteralExpr>() -> std::shared_ptr<AST::ObjectLiteralExpr>;
+template auto CSTParser::createNode<AST::VariableExpr>() -> std::shared_ptr<AST::VariableExpr>;
+template auto CSTParser::createNode<AST::CallExpr>() -> std::shared_ptr<AST::CallExpr>;
+template auto CSTParser::createNode<AST::AssignExpr>() -> std::shared_ptr<AST::AssignExpr>;
+
+// Main parse method
+std::shared_ptr<AST::Program> CSTParser::parse() {
+    auto program = createNode<AST::Program>();
+    program->line = 1;
+
+    // If in CST mode, the createNode call above created the CST root
+    if (cstMode && std::holds_alternative<std::unique_ptr<CST::Node>>(currentNode)) {
+        // Move the current CST node to be our root
+        cstRoot = std::move(std::get<std::unique_ptr<CST::Node>>(currentNode));
+        cstRoot->setDescription("Program root node");
+    }
+
+    try {
+        while (!isAtEnd()) {
+            auto stmt = declaration();
+            if (stmt) {
+                program->statements.push_back(stmt);
                 
-                if (recoveryConfig.createPartialNodes) {
-                    auto missingType = createMissingNode(NodeKind::USER_TYPE, "Missing type annotation");
-                    varNode->addNode(std::move(missingType));
-                }
-            }
-        }
-        
-        // Consume trivia before checking for initializer
-        if (recoveryConfig.preserveTrivia) {
-            consumeTrivia();
-        }
-        
-        // Parse optional initializer
-        if (match(TokenType::EQUAL)) {
-            Token equalsToken = previous();
-            varNode->addToken(equalsToken); // '='
-            
-            // Consume trivia after equals
-            if (recoveryConfig.preserveTrivia) {
-                consumeTrivia();
-            }
-            
-            // Check what comes after the equals sign
-            TokenType nextType = peek().type;
-            
-            // If we immediately hit a semicolon, newline, or statement start, the initializer is missing
-            if (nextType == TokenType::SEMICOLON || 
-                nextType == TokenType::NEWLINE ||
-                isStatementStart(nextType) || 
-                isDeclarationStart(nextType) ||
-                nextType == TokenType::EOF_TOKEN) {
-                
-                // Report error at the equals sign location, not the next token
-                reportErrorAtToken("Expected initializer expression after '='", equalsToken, 
-                                 TokenType::IDENTIFIER, nextType);
-                
-                if (recoveryConfig.createPartialNodes) {
-                    auto missingInit = createMissingNode(NodeKind::LITERAL_EXPR, "Missing initializer");
-                    varNode->addNode(std::move(missingInit));
-                }
-            } else {
-                // Try to parse the expression
-                auto initializer = parseExpression();
-                if (initializer) {
-                    varNode->addNode(std::move(initializer));
-                } else {
-                    // Expression parsing failed
-                    reportError("Invalid initializer expression after '='");
-                    
-                    if (recoveryConfig.createPartialNodes) {
-                        auto missingInit = createMissingNode(NodeKind::LITERAL_EXPR, "Invalid initializer");
-                        varNode->addNode(std::move(missingInit));
-                    }
-                }
+                // In CST mode, the declaration() method will have created CST nodes
+                // and they will be automatically attached to the tree structure
             }
         }
+    } catch (const std::exception &e) {
+        // Handle parsing errors
+        synchronize();
         
-        // Consume trivia before checking for semicolon
-        if (recoveryConfig.preserveTrivia) {
-            consumeTrivia();
+        // Add error info to CST if in CST mode
+        if (cstMode && cstRoot) {
+            cstRoot->setError("Parse error: " + std::string(e.what()));
         }
-        
-        // Parse semicolon
-        if (check(TokenType::SEMICOLON)) {
-            varNode->addToken(advance());
-        } else {
-            // Check if we're at end of line or statement - this might be acceptable
-            TokenType currentType = peek().type;
-            if (currentType == TokenType::NEWLINE || 
-                isStatementStart(currentType) || 
-                isDeclarationStart(currentType) ||
-                currentType == TokenType::EOF_TOKEN) {
-                
-                // Missing semicolon at end of variable declaration
-                reportError("Expected ';' after variable declaration", TokenType::SEMICOLON, currentType);
-                
-                if (recoveryConfig.insertMissingTokens) {
-                    Token missingSemicolon;
-                    missingSemicolon.type = TokenType::SEMICOLON;
-                    missingSemicolon.lexeme = ";";
-                    missingSemicolon.line = previous().line; // Use previous token's line
-                    missingSemicolon.start = previous().end;  // Place after previous token
-                    missingSemicolon.end = previous().end;
-                    varNode->addToken(missingSemicolon);
-                }
-            } else {
-                // Unexpected token where semicolon expected
-                reportError("Expected ';' after variable declaration, found '" + peek().lexeme + "'", 
-                           TokenType::SEMICOLON, currentType);
-                
-                if (recoveryConfig.insertMissingTokens) {
-                    Token missingSemicolon;
-                    missingSemicolon.type = TokenType::SEMICOLON;
-                    missingSemicolon.lexeme = ";";
-                    missingSemicolon.line = peek().line;
-                    missingSemicolon.start = getCurrentPosition();
-                    missingSemicolon.end = getCurrentPosition();
-                    varNode->addToken(missingSemicolon);
-                }
+    }
+
+    // After parsing, print all collected errors if any
+    if (!errors.empty()) {
+        std::cerr << "\n--- Syntax Errors ---\n";
+        for (const auto& err : errors) {
+            std::cerr << "[Line " << err.line << ", Col " << err.column << "]: " << err.message << "\n";
+            if (!err.codeContext.empty()) {
+                std::cerr << "    " << err.codeContext << "\n";
             }
         }
+        std::cerr << "---------------------\n";
         
-        setNodeSpanFromTokens(*varNode, startToken, previous());
-        return varNode;
+        // Add errors to CST if in CST mode
+        if (cstMode && cstRoot) {
+            for (const auto& err : errors) {
+                auto errorNode = std::make_unique<CST::ErrorNode>(err.message, 0, 0);
+                cstRoot->addChild(std::move(errorNode));
+            }
+        }
     }
     
-    std::unique_ptr<Node> CSTParser::parseFunctionDeclaration() {
-        // Parse: fn name(param1: type1, param2: type2): returnType { body }
-        Token startToken = peek();
-        auto fnNode = createNode(NodeKind::FUNCTION_DECLARATION);
-        
-        // Consume 'fn' keyword
-        if (check(TokenType::FN)) {
-            fnNode->addToken(advance());
-        } else {
-            reportError("Expected 'fn' keyword", TokenType::FN, peek().type);
-            return createErrorRecoveryNode("Invalid function declaration");
+    return program;
+}
+
+// Parse declarations
+// Helper to collect leading annotations
+std::vector<Token> CSTParser::collectAnnotations() {
+    std::vector<Token> annotations;
+    while (check(TokenType::PUBLIC) || check(TokenType::PRIVATE) || check(TokenType::PROTECTED)) {
+        annotations.push_back(advance());
+    }
+    return annotations;
+}
+
+std::shared_ptr<AST::Statement> CSTParser::declaration() {
+    try {
+        // Collect leading annotations
+        std::vector<Token> annotations = collectAnnotations();
+        if (match({TokenType::CLASS})) {
+            auto decl = classDeclaration();
+            if (decl) decl->annotations = annotations;
+            return decl;
         }
-        
-        // Consume trivia after 'fn' keyword
-        if (recoveryConfig.preserveTrivia) {
-            consumeTrivia();
+        if (match({TokenType::FN})) {
+            auto decl = function("function");
+            if (decl) decl->annotations = annotations;
+            return decl;
         }
-        
-        // Parse function name
-        if (check(TokenType::IDENTIFIER)) {
-            fnNode->addToken(advance());
-        } else {
-            reportError("Expected function name after 'fn'", TokenType::IDENTIFIER, peek().type);
-            
-            if (recoveryConfig.insertMissingTokens) {
-                Token missingName;
-                missingName.type = TokenType::IDENTIFIER;
-                missingName.lexeme = "<missing_function_name>";
-                missingName.line = peek().line;
-                missingName.start = getCurrentPosition();
-                missingName.end = getCurrentPosition();
-                fnNode->addToken(missingName);
+        if (match({TokenType::ASYNC})) {
+            consume(TokenType::FN, "Expected 'fn' after 'async'.");
+            auto asyncFn = std::make_shared<AST::AsyncFunctionDeclaration>(*function("async function"));
+            asyncFn->annotations = annotations;
+            return asyncFn;
+        }
+        if (match({TokenType::VAR})) {
+            auto decl = varDeclaration();
+            if (decl) decl->annotations = annotations;
+            return decl;
+        }
+        if (match({TokenType::ENUM})) {
+            auto decl = enumDeclaration();
+            if (decl) decl->annotations = annotations;
+            return decl;
+        }
+        if (match({TokenType::IMPORT})) {
+            auto decl = importStatement();
+            if (decl) decl->annotations = annotations;
+            return decl;
+        }
+        if (match({TokenType::TYPE})) {
+            auto decl = typeDeclaration();
+            if (decl) decl->annotations = annotations;
+            return decl;
+        }
+        if (match({TokenType::TRAIT})) {
+            auto decl = traitDeclaration();
+            if (decl) decl->annotations = annotations;
+            return decl;
+        }
+        if (match({TokenType::INTERFACE})) {
+            auto decl = interfaceDeclaration();
+            if (decl) decl->annotations = annotations;
+            return decl;
+        }
+        if (match({TokenType::MODULE})) {
+            auto decl = moduleDeclaration();
+            if (decl) decl->annotations = annotations;
+            return decl;
+        }
+
+        auto stmt = statement();
+        if (stmt) stmt->annotations = annotations;
+        return stmt;
+    } catch (const std::exception &e) {
+        synchronize();
+        return nullptr;
+    }
+}
+
+std::shared_ptr<AST::Statement> CSTParser::varDeclaration() {
+    auto var = createNode<AST::VarDeclaration>();
+    var->line = previous().line;
+    
+    // Store the current CST node for this variable declaration
+    std::unique_ptr<CST::Node> varCSTNode;
+    if (cstMode && std::holds_alternative<std::unique_ptr<CST::Node>>(currentNode)) {
+        varCSTNode = std::move(std::get<std::unique_ptr<CST::Node>>(currentNode));
+        varCSTNode->setDescription("var declaration");
+    }
+
+    // Add 'var' keyword token to CST with its trivia
+    Token varToken = previous();
+    if (cstMode && varCSTNode) {
+        // Add leading trivia (comments, whitespace before 'var')
+        for (const auto& trivia : varToken.getLeadingTrivia()) {
+            if (trivia.type == TokenType::COMMENT_LINE || trivia.type == TokenType::COMMENT_BLOCK) {
+                auto commentNode = std::make_unique<CST::CommentNode>(trivia);
+                varCSTNode->addChild(std::move(commentNode));
+            } else if (trivia.type == TokenType::WHITESPACE || trivia.type == TokenType::NEWLINE) {
+                auto whitespaceNode = std::make_unique<CST::WhitespaceNode>(trivia);
+                varCSTNode->addChild(std::move(whitespaceNode));
             }
         }
         
-        // Parse parameter list
-        if (check(TokenType::LEFT_PAREN)) {
-            fnNode->addToken(advance()); // '('
+        // Add the 'var' keyword as a direct token (not wrapped in a node)
+        varCSTNode->addToken(varToken);
+    }
+
+    // Parse variable name with semantic structure
+    Token name = consumeWithTrivia(TokenType::IDENTIFIER, "Expected variable name.");
+    var->name = name.lexeme;
+    
+    // Create IDENTIFIER semantic node
+    if (cstMode && varCSTNode) {
+        auto identifierNode = std::make_unique<CST::Node>(CST::NodeKind::IDENTIFIER, name.start, name.end);
+        
+        // Add any trivia before the identifier
+        for (const auto& trivia : name.getLeadingTrivia()) {
+            if (trivia.type == TokenType::WHITESPACE || trivia.type == TokenType::NEWLINE) {
+                auto whitespaceNode = std::make_unique<CST::WhitespaceNode>(trivia);
+                varCSTNode->addChild(std::move(whitespaceNode));
+            }
+        }
+        
+        // Add the identifier token to the IDENTIFIER node
+        identifierNode->addToken(name);
+        varCSTNode->addChild(std::move(identifierNode));
+    }
+
+    // Parse optional type annotation with semantic structure
+    if (match({TokenType::COLON})) {
+        Token colon = previous();
+        
+        if (cstMode && varCSTNode) {
+            // Create TYPE_ANNOTATION semantic node
+            auto typeAnnotationNode = std::make_unique<CST::Node>(CST::NodeKind::ANNOTATION, colon.start, 0);
+            
+            // Add colon token directly to TYPE_ANNOTATION
+            typeAnnotationNode->addToken(colon);
+            
+            var->type = parseTypeAnnotation();
+            
+            // Add the actual type token to TYPE_ANNOTATION
+            Token typeToken = previous(); // The type token (int, str, etc.)
+            
+            // Create PRIMITIVE_TYPE semantic node
+            auto primitiveTypeNode = std::make_unique<CST::Node>(CST::NodeKind::PRIMITIVE_TYPE, typeToken.start, typeToken.end);
+            primitiveTypeNode->addToken(typeToken);
+            
+            typeAnnotationNode->addChild(std::move(primitiveTypeNode));
+            typeAnnotationNode->endPos = typeToken.end;
+            
+            varCSTNode->addChild(std::move(typeAnnotationNode));
+        } else {
+            var->type = parseTypeAnnotation();
+        }
+    }
+
+    // Parse optional initializer with semantic structure
+    if (match({TokenType::EQUAL})) {
+        Token equal = previous();
+        
+        if (cstMode && varCSTNode) {
+            // Create ASSIGNMENT semantic node
+            auto assignmentNode = std::make_unique<CST::Node>(CST::NodeKind::ASSIGNMENT_EXPR, equal.start, 0);
+            
+            // Add = token directly to ASSIGNMENT
+            assignmentNode->addToken(equal);
+            
+            var->initializer = expression();
+            
+            // Add the actual value token to ASSIGNMENT
+            Token valueToken = previous(); // The value token (42, "hello", etc.)
+            
+            // Create LITERAL semantic node
+            auto literalNode = std::make_unique<CST::Node>(CST::NodeKind::LITERAL_EXPR, valueToken.start, valueToken.end);
+            literalNode->addToken(valueToken);
+            
+            assignmentNode->addChild(std::move(literalNode));
+            assignmentNode->endPos = valueToken.end;
+            
+            varCSTNode->addChild(std::move(assignmentNode));
+        } else {
+            var->initializer = expression();
+        }
+    }
+
+    // Make semicolon optional
+    if (match({TokenType::SEMICOLON})) {
+        Token semicolon = previous();
+        if (cstMode && varCSTNode) {
+            varCSTNode->addToken(semicolon);
+        }
+    }
+    
+    // Add this variable declaration to the program root
+    if (cstMode && cstRoot && varCSTNode) {
+        cstRoot->addChild(std::move(varCSTNode));
+    }
+    
+    return var;
+}
+
+std::shared_ptr<AST::Statement> CSTParser::statement() {
+    if (match({TokenType::PRINT})) {
+        return printStatement();
+    }
+    if (match({TokenType::IF})) {
+        return ifStatement();
+    }
+    if (match({TokenType::FOR})) {
+        return forStatement();
+    }
+    if (match({TokenType::WHILE})) {
+        return whileStatement();
+    }
+    if (match({TokenType::BREAK})) {
+        return breakStatement();
+    }
+    if (match({TokenType::CONTINUE})) {
+        return continueStatement();
+    }
+    if (match({TokenType::ITER})) {
+        return iterStatement();
+    }
+    if (match({TokenType::LEFT_BRACE})) {
+        return block();
+    }
+    if (match({TokenType::RETURN})) {
+        return returnStatement();
+    }
+    if (match({TokenType::PARALLEL})) {
+        return parallelStatement();
+    }
+    if (match({TokenType::CONCURRENT})) {
+        return concurrentStatement();
+    }
+    if (match({TokenType::MATCH})) {
+        return matchStatement();
+    }
+    if (match({TokenType::UNSAFE})) {
+        return unsafeBlock();
+    }
+    if (match({TokenType::CONTRACT})) {
+        return contractStatement();
+    }
+    if (match({TokenType::COMPTIME})) {
+        return comptimeStatement();
+    }
+
+    return expressionStatement();
+}
+
+std::shared_ptr<AST::Statement> CSTParser::expressionStatement() {
+    try {
+        auto expr = expression();
+        // Make semicolon optional
+        match({TokenType::SEMICOLON});
+
+        auto stmt = std::make_shared<AST::ExprStatement>();
+        stmt->line = expr->line;
+        stmt->expression = expr;
+        return stmt;
+    } catch (const std::exception &e) {
+        // If we can't parse an expression, return an empty statement
+        auto stmt = std::make_shared<AST::ExprStatement>();
+        stmt->line = peek().line;
+        stmt->expression = nullptr;
+        return stmt;
+    }
+}
+
+std::shared_ptr<AST::Statement> CSTParser::printStatement() {
+    auto stmt = createNode<AST::PrintStatement>();
+    stmt->line = previous().line;
+
+    attachTriviaFromToken(previous());
+
+    // Parse arguments
+    consumeWithTrivia(TokenType::LEFT_PAREN, "Expected '(' after 'print'.");
+
+    if (!check(TokenType::RIGHT_PAREN)) {
+        do {
+            stmt->arguments.push_back(expression());
+            if (match({TokenType::COMMA})) {
+                attachTriviaFromToken(previous());
+            }
+        } while (previous().type == TokenType::COMMA);
+    }
+
+    consumeWithTrivia(TokenType::RIGHT_PAREN, "Expected ')' after print arguments.");
+    
+    // Make semicolon optional
+    if (match({TokenType::SEMICOLON})) {
+        attachTriviaFromToken(previous());
+    }
+    
+    return stmt;
+}
+
+std::shared_ptr<AST::Statement> CSTParser::taskStatement() {
+    auto stmt = std::make_shared<AST::TaskStatement>();
+    stmt->line = peek().line;
+
+    consume(TokenType::LEFT_PAREN, "Expected '(' after 'task'.");
+    
+    // Parse loop variable if present
+    if (check(TokenType::IDENTIFIER)) {
+        stmt->loopVar = consume(TokenType::IDENTIFIER, "Expected loop variable name.").lexeme;
+        consume(TokenType::IN, "Expected 'in' after loop variable.");
+    }
+    
+    // Parse the iterable expression (could be a range, list, etc.)
+    stmt->iterable = expression();
+    
+    consume(TokenType::RIGHT_PAREN, "Expected ')' after task arguments.");
+
+    // Parse the task body
+    consume(TokenType::LEFT_BRACE, "Expected '{' before task body.");
+    stmt->body = block();
+
+    return stmt;
+}
+
+std::shared_ptr<AST::Statement> CSTParser::workerStatement() {
+    auto stmt = std::make_shared<AST::WorkerStatement>();
+    stmt->line = peek().line;
+
+    consume(TokenType::LEFT_PAREN, "Expected '(' after 'worker'.");
+    if (check(TokenType::RIGHT_PAREN)) {
+        // No parameter
+    } else {
+        stmt->param = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
+    }
+    consume(TokenType::RIGHT_PAREN, "Expected ')' after worker arguments.");
+
+    consume(TokenType::LEFT_BRACE, "Expected '{' before worker body.");
+    stmt->body = block();
+
+    return stmt;
+}
+
+std::shared_ptr<AST::Statement> CSTParser::traitDeclaration() {
+    // Create a new trait declaration statement
+    auto traitDecl = std::make_shared<AST::TraitDeclaration>();
+    traitDecl->line = previous().line;
+
+    // Check for @open annotation
+    if (match({TokenType::OPEN})) {
+        traitDecl->isOpen = true;
+    }
+
+    // Parse trait name
+    Token name = consume(TokenType::IDENTIFIER, "Expected trait name.");
+    traitDecl->name = name.lexeme;
+
+    // Parse trait body
+    consume(TokenType::LEFT_BRACE, "Expected '{' before trait body.");
+
+    // Parse trait methods
+    while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
+        if (match({TokenType::FN})) {
+            // For traits, we need to handle method declarations that might not have bodies
+            auto method = std::make_shared<AST::FunctionDeclaration>();
+            method->line = previous().line;
+            
+            // Parse function name
+            Token name = consume(TokenType::IDENTIFIER, "Expected method name.");
+            method->name = name.lexeme;
+            
+            consume(TokenType::LEFT_PAREN, "Expected '(' after method name.");
             
             // Parse parameters
             if (!check(TokenType::RIGHT_PAREN)) {
                 do {
-                    // Consume trivia before parameter
-                    if (recoveryConfig.preserveTrivia) {
-                        consumeTrivia();
-                    }
+                    auto paramName = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
                     
-                    auto param = parseParameter();
-                    if (param) {
-                        fnNode->addNode(std::move(param));
-                    }
+                    // Parse parameter type
+                    consume(TokenType::COLON, "Expected ':' after parameter name.");
+                    auto paramType = parseTypeAnnotation();
                     
-                    // Consume trivia after parameter
-                    if (recoveryConfig.preserveTrivia) {
-                        consumeTrivia();
-                    }
-                } while (match(TokenType::COMMA));
+                    method->params.push_back({paramName, paramType});
+                } while (match({TokenType::COMMA}));
             }
             
-            if (check(TokenType::RIGHT_PAREN)) {
-                fnNode->addToken(advance()); // ')'
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after parameters.");
+            
+            // Parse return type
+            if (match({TokenType::COLON})) {
+                method->returnType = parseTypeAnnotation();
+            }
+            
+            // Check if there's a semicolon (no body) or a brace (with body)
+            if (match({TokenType::SEMICOLON})) {
+                // Method declaration without body (interface/trait style)
+                method->body = std::make_shared<AST::BlockStatement>();
+                method->body->line = method->line;
             } else {
-                reportError("Expected ')' after parameter list", TokenType::RIGHT_PAREN, peek().type);
-                
-                if (recoveryConfig.insertMissingTokens) {
-                    Token missingParen;
-                    missingParen.type = TokenType::RIGHT_PAREN;
-                    missingParen.lexeme = ")";
-                    missingParen.line = peek().line;
-                    missingParen.start = getCurrentPosition();
-                    missingParen.end = getCurrentPosition();
-                    fnNode->addToken(missingParen);
-                }
+                // Method with body
+                consume(TokenType::LEFT_BRACE, "Expected '{' or ';' after method declaration.");
+                method->body = block();
             }
+            
+            traitDecl->methods.push_back(method);
         } else {
-            reportError("Expected '(' after function name", TokenType::LEFT_PAREN, peek().type);
-            
-            if (recoveryConfig.insertMissingTokens) {
-                Token missingOpenParen;
-                missingOpenParen.type = TokenType::LEFT_PAREN;
-                missingOpenParen.lexeme = "(";
-                missingOpenParen.line = peek().line;
-                missingOpenParen.start = getCurrentPosition();
-                missingOpenParen.end = getCurrentPosition();
-                fnNode->addToken(missingOpenParen);
-                
-                Token missingCloseParen;
-                missingCloseParen.type = TokenType::RIGHT_PAREN;
-                missingCloseParen.lexeme = ")";
-                missingCloseParen.line = peek().line;
-                missingCloseParen.start = getCurrentPosition();
-                missingCloseParen.end = getCurrentPosition();
-                fnNode->addToken(missingCloseParen);
-            }
+            error("Expected method declaration in trait.");
+            // Create a placeholder expression to allow parsing to continue
+            auto errorExpr = std::make_shared<AST::LiteralExpr>();
+            errorExpr->line = peek().line;
+            errorExpr->value = nullptr; // Use null as a placeholder
+            // return errorExpr;
+           break;
         }
-        
-        // Consume trivia after parameter list
-        if (recoveryConfig.preserveTrivia) {
-            consumeTrivia();
-        }
-        
-        // Parse optional return type (using ':' instead of '->')
-        if (match(TokenType::COLON)) {
-            fnNode->addToken(previous()); // ':'
-            
-            // Consume trivia after colon
-            if (recoveryConfig.preserveTrivia) {
-                consumeTrivia();
-            }
-            
-            if (isTypeStart(peek().type)) {
-                auto returnType = parseType();
-                if (returnType) {
-                    fnNode->addNode(std::move(returnType));
-                }
-            } else {
-                reportError("Expected return type after ':'");
-                
-                if (recoveryConfig.createPartialNodes) {
-                    auto missingReturnType = createMissingNode(NodeKind::USER_TYPE, "Missing return type");
-                    fnNode->addNode(std::move(missingReturnType));
-                }
-            }
-        }
-        
-        // Consume trivia before function body
-        if (recoveryConfig.preserveTrivia) {
-            consumeTrivia();
-        }
-        
-        // Parse function body
-        if (check(TokenType::LEFT_BRACE)) {
-            auto body = parseBlock();
-            if (body) {
-                fnNode->addNode(std::move(body));
-            }
-        } else {
-            reportError("Expected '{' to start function body", TokenType::LEFT_BRACE, peek().type);
-            
-            if (recoveryConfig.createPartialNodes) {
-                auto missingBody = createMissingNode(NodeKind::BLOCK_STATEMENT, "Missing function body");
-                fnNode->addNode(std::move(missingBody));
-            }
-        }
-        
-        setNodeSpanFromTokens(*fnNode, startToken, previous());
-        return fnNode;
     }
-    
-    std::unique_ptr<Node> CSTParser::parseClassDeclaration() {
-        // Parse: class Name extends SuperClass { members }
-        Token startToken = peek();
-        auto classNode = createNode(NodeKind::CLASS_DECLARATION);
-        
-        // Consume 'class' keyword
-        if (check(TokenType::CLASS)) {
-            classNode->addToken(advance());
-        } else {
-            reportError("Expected 'class' keyword", TokenType::CLASS, peek().type);
-            return createErrorRecoveryNode("Invalid class declaration");
+
+    consume(TokenType::RIGHT_BRACE, "Expected '}' after trait body.");
+
+    return traitDecl;
+}
+
+std::shared_ptr<AST::Statement> CSTParser::interfaceDeclaration() {
+    // Create a new interface declaration statement
+    auto interfaceDecl = std::make_shared<AST::InterfaceDeclaration>();
+    interfaceDecl->line = previous().line;
+
+    // Check for @open annotation
+    if (match({TokenType::AT_SIGN})) {
+        Token annotation = consume(TokenType::IDENTIFIER, "Expected annotation name after '@'.");
+        if (annotation.lexeme == "open") {
+            interfaceDecl->isOpen = true;
         }
-        
-        // Consume trivia after 'class' keyword
-        if (recoveryConfig.preserveTrivia) {
-            consumeTrivia();
-        }
-        
-        // Parse class name
-        if (check(TokenType::IDENTIFIER)) {
-            classNode->addToken(advance());
-        } else {
-            reportError("Expected class name after 'class'", TokenType::IDENTIFIER, peek().type);
-            
-            if (recoveryConfig.insertMissingTokens) {
-                Token missingName;
-                missingName.type = TokenType::IDENTIFIER;
-                missingName.lexeme = "<missing_class_name>";
-                missingName.line = peek().line;
-                missingName.start = getCurrentPosition();
-                missingName.end = getCurrentPosition();
-                classNode->addToken(missingName);
-            }
-        }
-        
-        // Parse optional inheritance
-        if (match(TokenType::COLON)) {
-            classNode->addToken(previous()); // ':'
-            
-            if (check(TokenType::IDENTIFIER)) {
-                classNode->addToken(advance()); // superclass name
-            } else {
-                reportError("Expected superclass name after ':'", TokenType::IDENTIFIER, peek().type);
-                
-                if (recoveryConfig.insertMissingTokens) {
-                    Token missingSuperclass;
-                    missingSuperclass.type = TokenType::IDENTIFIER;
-                    missingSuperclass.lexeme = "<missing_superclass>";
-                    missingSuperclass.line = peek().line;
-                    missingSuperclass.start = getCurrentPosition();
-                    missingSuperclass.end = getCurrentPosition();
-                    classNode->addToken(missingSuperclass);
-                }
-            }
-        }
-        
-        // Parse class body
-        if (check(TokenType::LEFT_BRACE)) {
-            classNode->addToken(advance()); // '{'
-            
-            // Parse class members
-            while (!check(TokenType::RIGHT_BRACE) && !isAtEnd() && shouldContinueParsing()) {
-                // Skip trivia
-                if (recoveryConfig.preserveTrivia) {
-                    consumeTrivia();
-                }
-                
-                // Parse member declaration
-                if (isDeclarationStart(peek().type)) {
-                    auto member = parseDeclaration();
-                    if (member) {
-                        classNode->addNode(std::move(member));
-                    }
-                } else if (peek().type == TokenType::RIGHT_BRACE) {
-                    break; // End of class body
-                } else {
-                    reportError("Expected member declaration in class body");
-                    
-                    // Skip invalid tokens until we find a sync point
-                    auto errorNode = createErrorRecoveryNode("Invalid class member");
-                    while (!isAtEnd() && !isSyncToken(peek().type) && !check(TokenType::RIGHT_BRACE)) {
-                        errorNode->addToken(advance());
-                    }
-                    classNode->addNode(std::move(errorNode));
-                }
-            }
-            
-            if (check(TokenType::RIGHT_BRACE)) {
-                classNode->addToken(advance()); // '}'
-            } else {
-                reportError("Expected '}' to close class body", TokenType::RIGHT_BRACE, peek().type);
-                
-                if (recoveryConfig.insertMissingTokens) {
-                    Token missingBrace;
-                    missingBrace.type = TokenType::RIGHT_BRACE;
-                    missingBrace.lexeme = "}";
-                    missingBrace.line = peek().line;
-                    missingBrace.start = getCurrentPosition();
-                    missingBrace.end = getCurrentPosition();
-                    classNode->addToken(missingBrace);
-                }
-            }
-        } else {
-            reportError("Expected '{' to start class body", TokenType::LEFT_BRACE, peek().type);
-            
-            if (recoveryConfig.createPartialNodes) {
-                auto missingBody = createMissingNode(NodeKind::BLOCK_STATEMENT, "Missing class body");
-                classNode->addNode(std::move(missingBody));
-            }
-        }
-        
-        setNodeSpanFromTokens(*classNode, startToken, previous());
-        return classNode;
     }
-    
-    std::unique_ptr<Node> CSTParser::parseIfStatement() {
-        // Parse: if (condition) { thenBranch } else { elseBranch }
-        Token startToken = peek();
-        auto ifNode = createNode(NodeKind::IF_STATEMENT);
-        
-        // Consume 'if' keyword
-        if (check(TokenType::IF)) {
-            ifNode->addToken(advance());
+
+    // Parse interface name
+    Token name = consume(TokenType::IDENTIFIER, "Expected interface name.");
+    interfaceDecl->name = name.lexeme;
+
+    // Parse interface body
+    consume(TokenType::LEFT_BRACE, "Expected '{' before interface body.");
+
+    // Parse interface methods
+    while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
+        if (match({TokenType::FN})) {
+            auto method = function("method");
+            interfaceDecl->methods.push_back(method);
         } else {
-            reportError("Expected 'if' keyword", TokenType::IF, peek().type);
-            return createErrorRecoveryNode("Invalid if statement");
+            error("Expected method declaration in interface.");
+            break;
         }
-        
-        // Consume trivia after 'if' keyword
-        if (recoveryConfig.preserveTrivia) {
-            consumeTrivia();
-        }
-        
-        // Parse condition (with optional parentheses)
-        bool hasParens = false;
-        if (match(TokenType::LEFT_PAREN)) {
-            ifNode->addToken(previous()); // '('
-            hasParens = true;
-            
-            // Consume trivia after opening paren
-            if (recoveryConfig.preserveTrivia) {
-                consumeTrivia();
+    }
+
+    consume(TokenType::RIGHT_BRACE, "Expected '}' after interface body.");
+
+    return interfaceDecl;
+}
+
+std::shared_ptr<AST::Statement> CSTParser::moduleDeclaration() {
+    // Create a new module declaration statement
+    auto moduleDecl = std::make_shared<AST::ModuleDeclaration>();
+    moduleDecl->line = previous().line;
+
+    // Parse module name
+    Token name = consume(TokenType::IDENTIFIER, "Expected module name.");
+    moduleDecl->name = name.lexeme;
+
+    // Parse module body
+    consume(TokenType::LEFT_BRACE, "Expected '{' before module body.");
+
+    // Parse module members
+    while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
+        // Check for visibility annotations
+        bool isPublic = false;
+        bool isProtected = false;
+
+        if (match({TokenType::AT_SIGN})) {
+            Token annotation = consume(TokenType::IDENTIFIER, "Expected annotation name after '@'.");
+            if (annotation.lexeme == "public") {
+                isPublic = true;
+            } else if (annotation.lexeme == "protected") {
+                isProtected = true;
             }
         }
-        
-        auto condition = parseExpression();
-        if (condition) {
-            ifNode->addNode(std::move(condition));
+
+        // Parse module member
+        auto member = declaration();
+        if (member) {
+            if (isPublic) {
+                moduleDecl->publicMembers.push_back(member);
+            } else if (isProtected) {
+                moduleDecl->protectedMembers.push_back(member);
+            } else {
+                moduleDecl->privateMembers.push_back(member);
+            }
+        }
+    }
+
+    consume(TokenType::RIGHT_BRACE, "Expected '}' after module body.");
+
+    return moduleDecl;
+}
+
+std::shared_ptr<AST::Statement> CSTParser::iterStatement() {
+    auto stmt = std::make_shared<AST::IterStatement>();
+    stmt->line = previous().line;
+
+    consume(TokenType::LEFT_PAREN, "Expected '(' after 'iter'.");
+
+    // Parse loop variables
+    if (match({TokenType::VAR})) {
+        // Variable declaration in loop
+        Token name = consume(TokenType::IDENTIFIER, "Expected variable name.");
+        stmt->loopVars.push_back(name.lexeme);
+
+        // Check for multiple variables (key, value)
+        if (match({TokenType::COMMA})) {
+            Token secondVar = consume(TokenType::IDENTIFIER, "Expected second variable name after comma.");
+            stmt->loopVars.push_back(secondVar.lexeme);
+        }
+
+        consume(TokenType::IN, "Expected 'in' after loop variables.");
+        stmt->iterable = expression();
+    } else if (match({TokenType::IDENTIFIER})) {
+        // Identifier directly
+        std::string firstVar = previous().lexeme;
+        stmt->loopVars.push_back(firstVar);
+
+        // Check for multiple variables (key, value)
+        if (match({TokenType::COMMA})) {
+            Token secondVar = consume(TokenType::IDENTIFIER, "Expected second variable name after comma.");
+            stmt->loopVars.push_back(secondVar.lexeme);
+
+            consume(TokenType::IN, "Expected 'in' after loop variables.");
+            stmt->iterable = expression();
+        } else if (match({TokenType::IN})) {
+            stmt->iterable = expression();
         } else {
-            reportError("Expected condition after 'if'");
-            
-            if (recoveryConfig.createPartialNodes) {
-                auto missingCondition = createMissingNode(NodeKind::LITERAL_EXPR, "Missing if condition");
-                ifNode->addNode(std::move(missingCondition));
-            }
+            error("Expected 'in' after loop variable.");
         }
-        
-        if (hasParens) {
-            // Consume trivia before closing paren
-            if (recoveryConfig.preserveTrivia) {
-                consumeTrivia();
-            }
-            
-            if (check(TokenType::RIGHT_PAREN)) {
-                ifNode->addToken(advance()); // ')'
-            } else {
-                reportError("Expected ')' after if condition", TokenType::RIGHT_PAREN, peek().type);
-                
-                if (recoveryConfig.insertMissingTokens) {
-                    Token missingParen;
-                    missingParen.type = TokenType::RIGHT_PAREN;
-                    missingParen.lexeme = ")";
-                    missingParen.line = peek().line;
-                    missingParen.start = getCurrentPosition();
-                    missingParen.end = getCurrentPosition();
-                    ifNode->addToken(missingParen);
-                }
-            }
-        }
-        
-        // Consume trivia before then branch
-        if (recoveryConfig.preserveTrivia) {
-            consumeTrivia();
-        }
-        
-        // Parse then branch
-        if (check(TokenType::LEFT_BRACE)) {
-            auto thenBranch = parseBlock();
-            if (thenBranch) {
-                ifNode->addNode(std::move(thenBranch));
-            }
+    } else {
+        error("Expected variable name or identifier after 'iter ('.");
+    }
+
+    consume(TokenType::RIGHT_PAREN, "Expected ')' after iter clauses.");
+
+    // Parse loop body
+    stmt->body = statement();
+
+    return stmt;
+}
+
+std::shared_ptr<AST::Statement> CSTParser::breakStatement() {
+    auto stmt = std::make_shared<AST::BreakStatement>();
+    stmt->line = previous().line;
+    consume(TokenType::SEMICOLON, "Expected ';' after 'break'.");
+    return stmt;
+}
+
+std::shared_ptr<AST::Statement> CSTParser::continueStatement() {
+    auto stmt = std::make_shared<AST::ContinueStatement>();
+    stmt->line = previous().line;
+    consume(TokenType::SEMICOLON, "Expected ';' after 'continue'.");
+    return stmt;
+}
+
+std::shared_ptr<AST::Statement> CSTParser::unsafeBlock() {
+    auto stmt = std::make_shared<AST::UnsafeStatement>();
+    stmt->line = previous().line;
+
+    consume(TokenType::LEFT_BRACE, "Expected '{' after 'unsafe'.");
+    stmt->body = block();
+
+    return stmt;
+}
+
+std::shared_ptr<AST::Statement> CSTParser::contractStatement() {
+    auto stmt = std::make_shared<AST::ContractStatement>();
+    stmt->line = previous().line;
+
+    consume(TokenType::LEFT_PAREN, "Expected '(' after 'contract'.");
+    stmt->condition = expression();
+
+    if (match({TokenType::COMMA})) {
+        // Parse error message
+        if (match({TokenType::STRING})) {
+            auto literalExpr = std::make_shared<AST::LiteralExpr>();
+            literalExpr->line = previous().line;
+            literalExpr->value = previous().lexeme;
+            stmt->message = literalExpr;
         } else {
-            // Single statement without braces
-            auto stmt = parseStatement();
-            if (stmt) {
-                ifNode->addNode(std::move(stmt));
-            } else {
-                reportError("Expected statement or '{' after if condition");
-                
-                if (recoveryConfig.createPartialNodes) {
-                    auto missingThen = createMissingNode(NodeKind::BLOCK_STATEMENT, "Missing then branch");
-                    ifNode->addNode(std::move(missingThen));
-                }
+            stmt->message = expression();
+        }
+    }
+
+    consume(TokenType::RIGHT_PAREN, "Expected ')' after contract condition.");
+    consume(TokenType::SEMICOLON, "Expected ';' after contract statement.");
+
+    return stmt;
+}
+
+std::shared_ptr<AST::Statement> CSTParser::comptimeStatement() {
+    auto stmt = std::make_shared<AST::ComptimeStatement>();
+    stmt->line = previous().line;
+
+    // Parse the declaration that should be evaluated at compile time
+    stmt->declaration = declaration();
+
+    return stmt;
+}
+
+std::shared_ptr<AST::Statement> CSTParser::ifStatement() {
+    auto stmt = createNode<AST::IfStatement>();
+    Token ifToken = previous();
+    stmt->line = ifToken.line;
+
+    attachTriviaFromToken(ifToken);
+
+    consumeWithTrivia(TokenType::LEFT_PAREN, "Expected '(' after 'if'.");
+    stmt->condition = expression();
+    consumeWithTrivia(TokenType::RIGHT_PAREN, "Expected ')' after if condition.");
+
+    stmt->thenBranch = parseStatementWithContext("if", ifToken);
+
+    // Handle elif chains
+    while (match({TokenType::ELIF})) {
+        Token elifToken = previous();
+        attachTriviaFromToken(elifToken);
+        
+        // Create a nested if statement for the elif
+        auto elifStmt = createNode<AST::IfStatement>();
+        elifStmt->line = elifToken.line;
+        
+        consumeWithTrivia(TokenType::LEFT_PAREN, "Expected '(' after 'elif'.");
+        elifStmt->condition = expression();
+        consumeWithTrivia(TokenType::RIGHT_PAREN, "Expected ')' after elif condition.");
+        
+        elifStmt->thenBranch = parseStatementWithContext("elif", elifToken);
+        
+        // Chain the elif as the else branch of the previous statement
+        if (!stmt->elseBranch) {
+            stmt->elseBranch = elifStmt;
+        } else {
+            // Find the last elif in the chain and attach this one
+            auto current = std::dynamic_pointer_cast<AST::IfStatement>(stmt->elseBranch);
+            while (current && current->elseBranch && 
+                   std::dynamic_pointer_cast<AST::IfStatement>(current->elseBranch)) {
+                current = std::dynamic_pointer_cast<AST::IfStatement>(current->elseBranch);
+            }
+            if (current) {
+                current->elseBranch = elifStmt;
             }
         }
+    }
+
+    if (match({TokenType::ELSE})) {
+        Token elseToken = previous();
+        attachTriviaFromToken(elseToken);
         
-        // Parse optional else branch
-        if (match(TokenType::ELSE)) {
-            ifNode->addToken(previous()); // 'else'
-            
-            if (check(TokenType::IF)) {
-                // else if - parse as nested if statement
-                auto elseIf = parseIfStatement();
-                if (elseIf) {
-                    ifNode->addNode(std::move(elseIf));
-                }
-            } else if (check(TokenType::LEFT_BRACE)) {
-                // else block
-                auto elseBranch = parseBlock();
-                if (elseBranch) {
-                    ifNode->addNode(std::move(elseBranch));
-                }
-            } else {
-                // Single statement without braces
-                auto stmt = parseStatement();
-                if (stmt) {
-                    ifNode->addNode(std::move(stmt));
-                } else {
-                    reportError("Expected statement or '{' after 'else'");
-                    
-                    if (recoveryConfig.createPartialNodes) {
-                        auto missingElse = createMissingNode(NodeKind::BLOCK_STATEMENT, "Missing else branch");
-                        ifNode->addNode(std::move(missingElse));
+        auto elseStmt = parseStatementWithContext("else", elseToken);
+        
+        // Attach else to the end of the elif chain
+        if (!stmt->elseBranch) {
+            stmt->elseBranch = elseStmt;
+        } else {
+            // Find the last elif in the chain and attach the else
+            auto current = std::dynamic_pointer_cast<AST::IfStatement>(stmt->elseBranch);
+            while (current && current->elseBranch && 
+                   std::dynamic_pointer_cast<AST::IfStatement>(current->elseBranch)) {
+                current = std::dynamic_pointer_cast<AST::IfStatement>(current->elseBranch);
+            }
+            if (current) {
+                current->elseBranch = elseStmt;
+            }
+        }
+    }
+
+    return stmt;
+}
+
+std::shared_ptr<AST::BlockStatement> CSTParser::block() {
+    auto block = std::make_shared<AST::BlockStatement>();
+    Token leftBrace = previous();
+    block->line = leftBrace.line;
+
+    // Handle empty blocks
+    if (check(TokenType::RIGHT_BRACE)) {
+        consume(TokenType::RIGHT_BRACE, "Expected '}' after block.");
+        return block;
+    }
+
+    while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
+        try {
+            if (in_concurrent_block) {
+                bool is_async = match({TokenType::ASYNC});
+                if (peek().type == TokenType::IDENTIFIER) {
+                    if (peek().lexeme == "task") {
+                        advance(); // consume 'task'
+                        auto stmt = taskStatement();
+                        auto task_stmt = std::dynamic_pointer_cast<AST::TaskStatement>(stmt);
+                        if (task_stmt) task_stmt->isAsync = is_async;
+                        block->statements.push_back(stmt);
+                        continue;
+                    }
+                    if (peek().lexeme == "worker") {
+                        advance(); // consume 'worker'
+                        auto stmt = workerStatement();
+                        auto worker_stmt = std::dynamic_pointer_cast<AST::WorkerStatement>(stmt);
+                        if (worker_stmt) worker_stmt->isAsync = is_async;
+                        block->statements.push_back(stmt);
+                        continue;
                     }
                 }
+                if (is_async) {
+                    // if we matched 'async' but not 'task' or 'worker', it's an error.
+                    error("Expected 'task' or 'worker' after 'async' in this context.");
+                }
             }
+            // Try to parse a declaration
+            auto declaration = this->declaration();
+            if (declaration) {
+                block->statements.push_back(declaration);
+            }
+        } catch (const std::exception &e) {
+            // Skip invalid statements and continue parsing
+            synchronize();
         }
-        
-        setNodeSpanFromTokens(*ifNode, startToken, previous());
-        return ifNode;
     }
-    
-    std::unique_ptr<Node> CSTParser::parseForStatement() {
-        // Parse: for (init; condition; update) { body }
-        Token startToken = peek();
-        auto forNode = createNode(NodeKind::FOR_STATEMENT);
-        
-        // Consume 'for' keyword
-        if (check(TokenType::FOR)) {
-            forNode->addToken(advance());
+
+    consume(TokenType::RIGHT_BRACE, "Expected '}' after block.");
+    return block;
+}
+
+std::shared_ptr<AST::Statement> CSTParser::forStatement() {
+    auto stmt = std::make_shared<AST::ForStatement>();
+    Token forToken = previous();
+    stmt->line = forToken.line;
+
+    consume(TokenType::LEFT_PAREN, "Expected '(' after 'for'.");
+
+    // Check for the type of for loop
+    if (match({TokenType::VAR})) {
+        // Could be either traditional or iterable loop
+        Token name = consume(TokenType::IDENTIFIER, "Expected variable name.");
+
+        if (match({TokenType::IN})) {
+            // Iterable loop: for (var i in range(10))
+            stmt->isIterableLoop = true;
+            stmt->loopVars.push_back(name.lexeme);
+            stmt->iterable = expression();
         } else {
-            reportError("Expected 'for' keyword", TokenType::FOR, peek().type);
-            return createErrorRecoveryNode("Invalid for statement");
-        }
-        
-        // Parse for loop header
-        if (check(TokenType::LEFT_PAREN)) {
-            forNode->addToken(advance()); // '('
-            
-            // Parse initializer (can be variable declaration or expression)
-            if (check(TokenType::VAR)) {
-                auto init = parseVariableDeclaration();
-                if (init) {
-                    forNode->addNode(std::move(init));
-                }
-            } else if (!check(TokenType::SEMICOLON)) {
-                auto init = parseExpression();
-                if (init) {
-                    forNode->addNode(std::move(init));
-                }
-                
-                if (check(TokenType::SEMICOLON)) {
-                    forNode->addToken(advance()); // ';'
-                } else {
-                    reportError("Expected ';' after for loop initializer", TokenType::SEMICOLON, peek().type);
-                }
-            } else {
-                forNode->addToken(advance()); // ';' (empty initializer)
+            // Traditional loop: for (var i = 0; i < 5; i++)
+            auto initializer = std::make_shared<AST::VarDeclaration>();
+            initializer->line = name.line;
+            initializer->name = name.lexeme;
+
+            // Parse optional type annotation
+            if (match({TokenType::COLON})) {
+                initializer->type = parseTypeAnnotation();
             }
-            
+
+            // Parse initializer
+            if (match({TokenType::EQUAL})) {
+                initializer->initializer = expression();
+            }
+
+            stmt->initializer = initializer;
+
+            consume(TokenType::SEMICOLON, "Expected ';' after loop initializer.");
+
             // Parse condition
             if (!check(TokenType::SEMICOLON)) {
-                auto condition = parseExpression();
-                if (condition) {
-                    forNode->addNode(std::move(condition));
-                }
-            } else {
-                // Empty condition - create a missing node
-                if (recoveryConfig.createPartialNodes) {
-                    auto missingCondition = createMissingNode(NodeKind::LITERAL_EXPR, "Missing for condition");
-                    forNode->addNode(std::move(missingCondition));
-                }
+                stmt->condition = expression();
             }
-            
-            if (check(TokenType::SEMICOLON)) {
-                forNode->addToken(advance()); // ';'
-            } else {
-                reportError("Expected ';' after for loop condition", TokenType::SEMICOLON, peek().type);
-            }
-            
-            // Parse update expression
+
+            consume(TokenType::SEMICOLON, "Expected ';' after loop condition.");
+
+            // Parse increment
             if (!check(TokenType::RIGHT_PAREN)) {
-                auto update = parseExpression();
-                if (update) {
-                    forNode->addNode(std::move(update));
-                }
+                stmt->increment = expression();
             }
-            
-            if (check(TokenType::RIGHT_PAREN)) {
-                forNode->addToken(advance()); // ')'
-            } else {
-                reportError("Expected ')' after for loop header", TokenType::RIGHT_PAREN, peek().type);
-                
-                if (recoveryConfig.insertMissingTokens) {
-                    Token missingParen;
-                    missingParen.type = TokenType::RIGHT_PAREN;
-                    missingParen.lexeme = ")";
-                    missingParen.line = peek().line;
-                    missingParen.start = getCurrentPosition();
-                    missingParen.end = getCurrentPosition();
-                    forNode->addToken(missingParen);
-                }
-            }
+        }
+    } else if (match({TokenType::IDENTIFIER})) {
+        // Check if it's an iterable loop with multiple variables
+        std::string firstVar = previous().lexeme;
+
+        if (match({TokenType::COMMA})) {
+            // Multiple variables: for (key, value in dict)
+            stmt->isIterableLoop = true;
+            stmt->loopVars.push_back(firstVar);
+
+            Token secondVar = consume(TokenType::IDENTIFIER, "Expected second variable name after comma.");
+            stmt->loopVars.push_back(secondVar.lexeme);
+
+            consume(TokenType::IN, "Expected 'in' after loop variables.");
+            stmt->iterable = expression();
+        } else if (match({TokenType::IN})) {
+            // Single variable: for (key in list)
+            stmt->isIterableLoop = true;
+            stmt->loopVars.push_back(firstVar);
+            stmt->iterable = expression();
         } else {
-            reportError("Expected '(' after 'for'", TokenType::LEFT_PAREN, peek().type);
-            
-            if (recoveryConfig.createPartialNodes) {
-                // Create missing for loop header
-                auto missingHeader = createMissingNode(NodeKind::PARAMETER_LIST, "Missing for loop header");
-                forNode->addNode(std::move(missingHeader));
+            // Traditional loop with an expression as initializer
+            current--; // Rewind to re-parse the identifier
+            stmt->initializer = expressionStatement();
+
+            // Parse condition
+            if (!check(TokenType::SEMICOLON)) {
+                stmt->condition = expression();
+            }
+
+            consume(TokenType::SEMICOLON, "Expected ';' after loop condition.");
+
+            // Parse increment
+            if (!check(TokenType::RIGHT_PAREN)) {
+                stmt->increment = expression();
             }
         }
-        
-        // Parse loop body
-        if (check(TokenType::LEFT_BRACE)) {
-            auto body = parseBlock();
-            if (body) {
-                forNode->addNode(std::move(body));
-            }
-        } else {
-            // Single statement without braces
-            auto stmt = parseStatement();
-            if (stmt) {
-                forNode->addNode(std::move(stmt));
-            } else {
-                reportError("Expected statement or '{' for loop body");
-                
-                if (recoveryConfig.createPartialNodes) {
-                    auto missingBody = createMissingNode(NodeKind::BLOCK_STATEMENT, "Missing for loop body");
-                    forNode->addNode(std::move(missingBody));
-                }
-            }
+    } else if (!match({TokenType::SEMICOLON})) {
+        // Traditional loop with an expression as initializer
+        stmt->initializer = expressionStatement();
+
+        // Parse condition
+        if (!check(TokenType::SEMICOLON)) {
+            stmt->condition = expression();
         }
-        
-        setNodeSpanFromTokens(*forNode, startToken, previous());
-        return forNode;
-    }
-    
-    std::unique_ptr<Node> CSTParser::parseWhileStatement() {
-        // Parse: while (condition) { body }
-        Token startToken = peek();
-        auto whileNode = createNode(NodeKind::WHILE_STATEMENT);
-        
-        // Consume 'while' keyword
-        if (check(TokenType::WHILE)) {
-            whileNode->addToken(advance());
-        } else {
-            reportError("Expected 'while' keyword", TokenType::WHILE, peek().type);
-            return createErrorRecoveryNode("Invalid while statement");
+
+        consume(TokenType::SEMICOLON, "Expected ';' after loop condition.");
+
+        // Parse increment
+        if (!check(TokenType::RIGHT_PAREN)) {
+            stmt->increment = expression();
         }
-        
-        // Parse condition (with optional parentheses)
-        bool hasParens = false;
-        if (match(TokenType::LEFT_PAREN)) {
-            whileNode->addToken(previous()); // '('
-            hasParens = true;
+    } else {
+        // Traditional loop with no initializer
+        // Parse condition
+        if (!check(TokenType::SEMICOLON)) {
+            stmt->condition = expression();
         }
-        
-        auto condition = parseExpression();
-        if (condition) {
-            whileNode->addNode(std::move(condition));
-        } else {
-            reportError("Expected condition after 'while'");
-            
-            if (recoveryConfig.createPartialNodes) {
-                auto missingCondition = createMissingNode(NodeKind::LITERAL_EXPR, "Missing while condition");
-                whileNode->addNode(std::move(missingCondition));
-            }
+
+        consume(TokenType::SEMICOLON, "Expected ';' after loop condition.");
+
+        // Parse increment
+        if (!check(TokenType::RIGHT_PAREN)) {
+            stmt->increment = expression();
         }
-        
-        if (hasParens) {
-            if (check(TokenType::RIGHT_PAREN)) {
-                whileNode->addToken(advance()); // ')'
-            } else {
-                reportError("Expected ')' after while condition", TokenType::RIGHT_PAREN, peek().type);
-                
-                if (recoveryConfig.insertMissingTokens) {
-                    Token missingParen;
-                    missingParen.type = TokenType::RIGHT_PAREN;
-                    missingParen.lexeme = ")";
-                    missingParen.line = peek().line;
-                    missingParen.start = getCurrentPosition();
-                    missingParen.end = getCurrentPosition();
-                    whileNode->addToken(missingParen);
-                }
-            }
-        }
-        
-        // Parse loop body
-        if (check(TokenType::LEFT_BRACE)) {
-            auto body = parseBlock();
-            if (body) {
-                whileNode->addNode(std::move(body));
-            }
-        } else {
-            // Single statement without braces
-            auto stmt = parseStatement();
-            if (stmt) {
-                whileNode->addNode(std::move(stmt));
-            } else {
-                reportError("Expected statement or '{' for while body");
-                
-                if (recoveryConfig.createPartialNodes) {
-                    auto missingBody = createMissingNode(NodeKind::BLOCK_STATEMENT, "Missing while loop body");
-                    whileNode->addNode(std::move(missingBody));
-                }
-            }
-        }
-        
-        setNodeSpanFromTokens(*whileNode, startToken, previous());
-        return whileNode;
     }
 
-    // Helper methods for statement parsing
+    consume(TokenType::RIGHT_PAREN, "Expected ')' after for clauses.");
     
-    std::unique_ptr<Node> CSTParser::parseParameter() {
-        // Parse: name: type or name: type = default
-        auto paramNode = createNode(NodeKind::PARAMETER);
-        Token startToken = peek();
-        
-        // Parse parameter name
-        if (check(TokenType::IDENTIFIER)) {
-            paramNode->addToken(advance());
-        } else {
-            reportError("Expected parameter name", TokenType::IDENTIFIER, peek().type);
-            return createErrorRecoveryNode("Invalid parameter");
-        }
-        
-        // Parse type annotation
-        if (match(TokenType::COLON)) {
-            paramNode->addToken(previous()); // ':'
-            
-            if (isTypeStart(peek().type)) {
-                auto type = parseType();
-                if (type) {
-                    paramNode->addNode(std::move(type));
-                }
-            } else {
-                reportError("Expected type after ':'", TokenType::IDENTIFIER, peek().type);
-                
-                if (recoveryConfig.createPartialNodes) {
-                    auto missingType = createMissingNode(NodeKind::USER_TYPE, "Missing parameter type");
-                    paramNode->addNode(std::move(missingType));
-                }
-            }
-        }
-        
-        // Parse optional default value
-        if (match(TokenType::EQUAL)) {
-            paramNode->addToken(previous()); // '='
-            
-            auto defaultValue = parseExpression();
-            if (defaultValue) {
-                paramNode->addNode(std::move(defaultValue));
-            } else {
-                reportError("Expected default value after '='");
-                
-                if (recoveryConfig.createPartialNodes) {
-                    auto missingDefault = createMissingNode(NodeKind::LITERAL_EXPR, "Missing default value");
-                    paramNode->addNode(std::move(missingDefault));
-                }
-            }
-        }
-        
-        setNodeSpanFromTokens(*paramNode, startToken, previous());
-        return paramNode;
-    }
+    stmt->body = parseStatementWithContext("for", forToken);
+
+    return stmt;
+}
+
+std::shared_ptr<AST::Statement> CSTParser::whileStatement() {
+    auto stmt = std::make_shared<AST::WhileStatement>();
+    Token whileToken = previous();
+    stmt->line = whileToken.line;
+
+    consume(TokenType::LEFT_PAREN, "Expected '(' after 'while'.");
+    stmt->condition = expression();
+    consume(TokenType::RIGHT_PAREN, "Expected ')' after while condition.");
+
+    stmt->body = parseStatementWithContext("while", whileToken);
+
+    return stmt;
+}
+
+std::shared_ptr<AST::FunctionDeclaration> CSTParser::function(const std::string& kind) {
+    auto func = createNode<AST::FunctionDeclaration>();
+    func->line = previous().line;
     
-    std::unique_ptr<Node> CSTParser::parseType() {
-        // Simple type parsing - can be extended for complex types
-        if (check(TokenType::IDENTIFIER) || isBuiltinType(peek().type)) {
-            auto typeNode = createNode(NodeKind::USER_TYPE);
-            typeNode->addToken(advance());
-            return typeNode;
-        }
-        
-        reportError("Expected type");
-        return createErrorRecoveryNode("Invalid type");
-    }
-    
-    bool CSTParser::isTypeStart(TokenType type) const {
-        return type == TokenType::IDENTIFIER || isBuiltinType(type);
-    }
-    
-    bool CSTParser::isBuiltinType(TokenType type) const {
-        return type == TokenType::INT_TYPE || type == TokenType::FLOAT_TYPE || 
-               type == TokenType::STR_TYPE || type == TokenType::BOOL_TYPE ||
-               type == TokenType::LIST_TYPE || type == TokenType::DICT_TYPE;
+    attachTriviaFromToken(previous());
+
+    // Parse function name
+    Token name = consume(TokenType::IDENTIFIER, "Expected " + kind + " name.");
+    func->name = name.lexeme;
+
+    // Check for generic parameters
+    if (match({TokenType::LEFT_BRACKET})) {
+        do {
+            func->genericParams.push_back(consume(TokenType::IDENTIFIER, "Expected generic parameter name.").lexeme);
+        } while (match({TokenType::COMMA}));
+
+        consume(TokenType::RIGHT_BRACKET, "Expected ']' after generic parameters.");
     }
 
-    // Stub implementations for remaining statement types
-    
-    std::unique_ptr<Node> CSTParser::parseTypeDeclaration() {
-        // Parse: type Name = Type;
-        Token startToken = peek();
-        auto typeNode = createNode(NodeKind::TYPE_DECLARATION);
-        
-        // Consume 'type' keyword
-        if (check(TokenType::TYPE)) {
-            typeNode->addToken(advance());
-        } else {
-            reportError("Expected 'type' keyword", TokenType::TYPE, peek().type);
-            return createErrorRecoveryNode("Invalid type declaration");
-        }
-        
-        // Parse type name
-        if (check(TokenType::IDENTIFIER)) {
-            typeNode->addToken(advance());
-        } else {
-            reportError("Expected type name after 'type'", TokenType::IDENTIFIER, peek().type);
-            
-            if (recoveryConfig.insertMissingTokens) {
-                Token missingName;
-                missingName.type = TokenType::IDENTIFIER;
-                missingName.lexeme = "<missing_type_name>";
-                missingName.line = peek().line;
-                missingName.start = getCurrentPosition();
-                missingName.end = getCurrentPosition();
-                typeNode->addToken(missingName);
+    consume(TokenType::LEFT_PAREN, "Expected '(' after " + kind + " name.");
+
+    // Parse parameters
+    if (!check(TokenType::RIGHT_PAREN)) {
+        do {
+            auto paramName = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
+
+            // Parse optional parameter type
+            std::shared_ptr<AST::TypeAnnotation> paramType = nullptr;
+            if (match({TokenType::COLON})) {
+                paramType = parseTypeAnnotation();
             }
-        }
-        
-        // Parse '=' for type alias
-        if (check(TokenType::EQUAL)) {
-            typeNode->addToken(advance());
-            
-            // Parse the aliased type
-            if (isTypeStart(peek().type)) {
-                auto aliasedType = parseType();
-                if (aliasedType) {
-                    typeNode->addNode(std::move(aliasedType));
-                }
+
+            // Check if parameter has a default value (making it optional)
+            if (match({TokenType::EQUAL})) {
+                // This is an optional parameter with a default value
+                std::shared_ptr<AST::Expression> defaultValue = expression();
+                func->optionalParams.push_back({paramName, {paramType, defaultValue}});
+            } else if (paramType && paramType->isOptional) {
+                // This is an optional parameter with nullable type (no default value)
+                func->optionalParams.push_back({paramName, {paramType, nullptr}});
             } else {
-                reportError("Expected type after '='");
-                
-                if (recoveryConfig.createPartialNodes) {
-                    auto missingType = createMissingNode(NodeKind::USER_TYPE, "Missing aliased type");
-                    typeNode->addNode(std::move(missingType));
-                }
+                // This is a required parameter
+                func->params.push_back({paramName, paramType});
             }
-        } else {
-            reportError("Expected '=' after type name", TokenType::EQUAL, peek().type);
-            
-            if (recoveryConfig.insertMissingTokens) {
-                Token missingEqual;
-                missingEqual.type = TokenType::EQUAL;
-                missingEqual.lexeme = "=";
-                missingEqual.line = peek().line;
-                missingEqual.start = getCurrentPosition();
-                missingEqual.end = getCurrentPosition();
-                typeNode->addToken(missingEqual);
-                
-                // Also add a missing type
-                if (recoveryConfig.createPartialNodes) {
-                    auto missingType = createMissingNode(NodeKind::USER_TYPE, "Missing aliased type");
-                    typeNode->addNode(std::move(missingType));
-                }
-            }
-        }
-        
-        // Parse semicolon
-        if (check(TokenType::SEMICOLON)) {
-            typeNode->addToken(advance());
-        } else {
-            reportError("Expected ';' after type declaration", TokenType::SEMICOLON, peek().type);
-            
-            if (recoveryConfig.insertMissingTokens) {
-                Token missingSemicolon;
-                missingSemicolon.type = TokenType::SEMICOLON;
-                missingSemicolon.lexeme = ";";
-                missingSemicolon.line = peek().line;
-                missingSemicolon.start = getCurrentPosition();
-                missingSemicolon.end = getCurrentPosition();
-                typeNode->addToken(missingSemicolon);
-            }
-        }
-        
-        setNodeSpanFromTokens(*typeNode, startToken, previous());
-        return typeNode;
+        } while (match({TokenType::COMMA}));
     }
-    
-    std::unique_ptr<Node> CSTParser::parseTraitDeclaration() {
-        // Parse: trait Name { methods }
-        Token startToken = peek();
-        auto traitNode = createNode(NodeKind::TRAIT_DECLARATION);
+
+    consume(TokenType::RIGHT_PAREN, "Expected ')' after parameters.");
+
+    // Parse return type
+    if (match({TokenType::COLON})) {
+        func->returnType = parseTypeAnnotation();
         
-        // Consume 'trait' keyword
-        if (check(TokenType::TRAIT)) {
-            traitNode->addToken(advance());
-        } else {
-            reportError("Expected 'trait' keyword", TokenType::TRAIT, peek().type);
-            return createErrorRecoveryNode("Invalid trait declaration");
+        // Extract error type information from return type annotation
+        if (func->returnType && (*func->returnType)->isFallible) {
+            func->canFail = true;
+            func->declaredErrorTypes = (*func->returnType)->errorTypes;
         }
-        
-        // Parse trait name
-        if (check(TokenType::IDENTIFIER)) {
-            traitNode->addToken(advance());
-        } else {
-            reportError("Expected trait name after 'trait'", TokenType::IDENTIFIER, peek().type);
-            
-            if (recoveryConfig.insertMissingTokens) {
-                Token missingName;
-                missingName.type = TokenType::IDENTIFIER;
-                missingName.lexeme = "<missing_trait_name>";
-                missingName.line = peek().line;
-                missingName.start = getCurrentPosition();
-                missingName.end = getCurrentPosition();
-                traitNode->addToken(missingName);
-            }
-        }
-        
-        // Parse trait body
-        if (check(TokenType::LEFT_BRACE)) {
-            traitNode->addToken(advance()); // '{'
-            
-            // Parse trait methods and declarations
-            while (!check(TokenType::RIGHT_BRACE) && !isAtEnd() && shouldContinueParsing()) {
-                // Skip trivia
-                if (recoveryConfig.preserveTrivia) {
-                    consumeTrivia();
-                }
-                
-                // Parse trait member (typically function declarations)
-                if (isDeclarationStart(peek().type)) {
-                    auto member = parseDeclaration();
-                    if (member) {
-                        traitNode->addNode(std::move(member));
-                    }
-                } else if (peek().type == TokenType::RIGHT_BRACE) {
-                    break; // End of trait body
-                } else {
-                    reportError("Expected method declaration in trait body");
-                    
-                    // Skip invalid tokens until we find a sync point
-                    auto errorNode = createErrorRecoveryNode("Invalid trait member");
-                    while (!isAtEnd() && !isSyncToken(peek().type) && !check(TokenType::RIGHT_BRACE)) {
-                        errorNode->addToken(advance());
-                    }
-                    traitNode->addNode(std::move(errorNode));
-                }
-            }
-            
-            if (check(TokenType::RIGHT_BRACE)) {
-                traitNode->addToken(advance()); // '}'
-            } else {
-                reportError("Expected '}' to close trait body", TokenType::RIGHT_BRACE, peek().type);
-                
-                if (recoveryConfig.insertMissingTokens) {
-                    Token missingBrace;
-                    missingBrace.type = TokenType::RIGHT_BRACE;
-                    missingBrace.lexeme = "}";
-                    missingBrace.line = peek().line;
-                    missingBrace.start = getCurrentPosition();
-                    missingBrace.end = getCurrentPosition();
-                    traitNode->addToken(missingBrace);
-                }
-            }
-        } else {
-            reportError("Expected '{' to start trait body", TokenType::LEFT_BRACE, peek().type);
-            
-            if (recoveryConfig.createPartialNodes) {
-                auto missingBody = createMissingNode(NodeKind::BLOCK_STATEMENT, "Missing trait body");
-                traitNode->addNode(std::move(missingBody));
-            }
-        }
-        
-        setNodeSpanFromTokens(*traitNode, startToken, previous());
-        return traitNode;
     }
-    
-    std::unique_ptr<Node> CSTParser::parseInterfaceDeclaration() {
-        // Parse: interface Name { method signatures }
-        Token startToken = peek();
-        auto interfaceNode = createNode(NodeKind::INTERFACE_DECLARATION);
+
+    // Check if function throws and parse error types (legacy syntax)
+    if (match({TokenType::THROWS})) {
+        func->throws = true;
+        func->canFail = true;
         
-        // Consume 'interface' keyword
-        if (check(TokenType::INTERFACE)) {
-            interfaceNode->addToken(advance());
-        } else {
-            reportError("Expected 'interface' keyword", TokenType::INTERFACE, peek().type);
-            return createErrorRecoveryNode("Invalid interface declaration");
+        // Parse specific error types if provided
+        if (!check(TokenType::LEFT_BRACE)) {
+            do {
+                Token errorType = consume(TokenType::IDENTIFIER, "Expected error type name after 'throws'.");
+                func->declaredErrorTypes.push_back(errorType.lexeme);
+            } while (match({TokenType::COMMA}));
         }
-        
-        // Parse interface name
-        if (check(TokenType::IDENTIFIER)) {
-            interfaceNode->addToken(advance());
-        } else {
-            reportError("Expected interface name after 'interface'", TokenType::IDENTIFIER, peek().type);
-            
-            if (recoveryConfig.insertMissingTokens) {
-                Token missingName;
-                missingName.type = TokenType::IDENTIFIER;
-                missingName.lexeme = "<missing_interface_name>";
-                missingName.line = peek().line;
-                missingName.start = getCurrentPosition();
-                missingName.end = getCurrentPosition();
-                interfaceNode->addToken(missingName);
-            }
-        }
-        
-        // Parse interface body
-        if (check(TokenType::LEFT_BRACE)) {
-            interfaceNode->addToken(advance()); // '{'
-            
-            // Parse interface method signatures
-            while (!check(TokenType::RIGHT_BRACE) && !isAtEnd() && shouldContinueParsing()) {
-                // Skip trivia
-                if (recoveryConfig.preserveTrivia) {
-                    consumeTrivia();
-                }
-                
-                // Parse interface member (typically function signatures)
-                if (isDeclarationStart(peek().type)) {
-                    auto member = parseDeclaration();
-                    if (member) {
-                        interfaceNode->addNode(std::move(member));
-                    }
-                } else if (peek().type == TokenType::RIGHT_BRACE) {
-                    break; // End of interface body
-                } else {
-                    reportError("Expected method signature in interface body");
-                    
-                    // Skip invalid tokens until we find a sync point
-                    auto errorNode = createErrorRecoveryNode("Invalid interface member");
-                    while (!isAtEnd() && !isSyncToken(peek().type) && !check(TokenType::RIGHT_BRACE)) {
-                        errorNode->addToken(advance());
-                    }
-                    interfaceNode->addNode(std::move(errorNode));
-                }
-            }
-            
-            if (check(TokenType::RIGHT_BRACE)) {
-                interfaceNode->addToken(advance()); // '}'
-            } else {
-                reportError("Expected '}' to close interface body", TokenType::RIGHT_BRACE, peek().type);
-                
-                if (recoveryConfig.insertMissingTokens) {
-                    Token missingBrace;
-                    missingBrace.type = TokenType::RIGHT_BRACE;
-                    missingBrace.lexeme = "}";
-                    missingBrace.line = peek().line;
-                    missingBrace.start = getCurrentPosition();
-                    missingBrace.end = getCurrentPosition();
-                    interfaceNode->addToken(missingBrace);
-                }
-            }
-        } else {
-            reportError("Expected '{' to start interface body", TokenType::LEFT_BRACE, peek().type);
-            
-            if (recoveryConfig.createPartialNodes) {
-                auto missingBody = createMissingNode(NodeKind::BLOCK_STATEMENT, "Missing interface body");
-                interfaceNode->addNode(std::move(missingBody));
-            }
-        }
-        
-        setNodeSpanFromTokens(*interfaceNode, startToken, previous());
-        return interfaceNode;
     }
-    
-    std::unique_ptr<Node> CSTParser::parseIterStatement() {
-        // Parse: iter (variable in iterable) { body }
-        Token startToken = peek();
-        auto iterNode = createNode(NodeKind::ITER_STATEMENT);
+
+    // Parse function body
+    Token leftBrace = consume(TokenType::LEFT_BRACE, "Expected '{' before " + kind + " body.");
+    pushBlockContext("function", leftBrace);
+    func->body = block();
+    popBlockContext();
+
+    return func;
+}
+
+std::shared_ptr<AST::Statement> CSTParser::returnStatement() {
+    auto stmt = std::make_shared<AST::ReturnStatement>();
+    stmt->line = previous().line;
+
+    if (!check(TokenType::SEMICOLON) && !check(TokenType::RIGHT_BRACE)) {
+        stmt->value = expression();
+    }
+
+    // Make semicolon optional
+    match({TokenType::SEMICOLON});
+
+    return stmt;
+}
+
+std::shared_ptr<AST::ClassDeclaration> CSTParser::classDeclaration() {
+    auto classDecl = std::make_shared<AST::ClassDeclaration>();
+    classDecl->line = previous().line;
+
+    // Parse class name
+    Token name = consume(TokenType::IDENTIFIER, "Expected class name.");
+    classDecl->name = name.lexeme;
+
+    // Check for inline constructor parameters
+    if (check(TokenType::LEFT_PAREN)) {
+        classDecl->hasInlineConstructor = true;
+        advance(); // consume '('
         
-        // Consume 'iter' keyword
-        if (check(TokenType::ITER)) {
-            iterNode->addToken(advance());
-        } else {
-            reportError("Expected 'iter' keyword", TokenType::ITER, peek().type);
-            return createErrorRecoveryNode("Invalid iter statement");
+        // Parse constructor parameters
+        if (!check(TokenType::RIGHT_PAREN)) {
+            do {
+                auto paramName = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
+                consume(TokenType::COLON, "Expected ':' after parameter name.");
+                auto paramType = parseTypeAnnotation();
+                classDecl->constructorParams.push_back({paramName, paramType});
+            } while (match({TokenType::COMMA}));
         }
         
-        // Parse iter header with parentheses
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after constructor parameters.");
+    }
+
+    // Check for inheritance
+    if (match({TokenType::COLON})) {
+        // Parse superclass name
+        Token superName = consume(TokenType::IDENTIFIER, "Expected superclass name.");
+        classDecl->superClassName = superName.lexeme;
+        
+        // Check for super constructor call
         if (check(TokenType::LEFT_PAREN)) {
-            iterNode->addToken(advance()); // '('
+            advance(); // consume '('
             
-            // Parse iterator variable
-            if (check(TokenType::IDENTIFIER)) {
-                iterNode->addToken(advance());
-            } else {
-                reportError("Expected iterator variable name", TokenType::IDENTIFIER, peek().type);
-                
-                if (recoveryConfig.insertMissingTokens) {
-                    Token missingVar;
-                    missingVar.type = TokenType::IDENTIFIER;
-                    missingVar.lexeme = "<missing_var>";
-                    missingVar.line = peek().line;
-                    missingVar.start = getCurrentPosition();
-                    missingVar.end = getCurrentPosition();
-                    iterNode->addToken(missingVar);
-                }
+            // Parse super constructor arguments
+            if (!check(TokenType::RIGHT_PAREN)) {
+                do {
+                    classDecl->superConstructorArgs.push_back(expression());
+                } while (match({TokenType::COMMA}));
             }
             
-            // Parse 'in' keyword
-            if (check(TokenType::IN)) {
-                iterNode->addToken(advance());
-            } else {
-                reportError("Expected 'in' after iterator variable", TokenType::IN, peek().type);
-                
-                if (recoveryConfig.insertMissingTokens) {
-                    Token missingIn;
-                    missingIn.type = TokenType::IN;
-                    missingIn.lexeme = "in";
-                    missingIn.line = peek().line;
-                    missingIn.start = getCurrentPosition();
-                    missingIn.end = getCurrentPosition();
-                    iterNode->addToken(missingIn);
-                }
-            }
-            
-            // Parse iterable expression
-            auto iterable = parseExpression();
-            if (iterable) {
-                iterNode->addNode(std::move(iterable));
-            } else {
-                reportError("Expected iterable expression after 'in'");
-                
-                if (recoveryConfig.createPartialNodes) {
-                    auto missingIterable = createMissingNode(NodeKind::LITERAL_EXPR, "Missing iterable expression");
-                    iterNode->addNode(std::move(missingIterable));
-                }
-            }
-            
-            // Parse closing parenthesis
-            if (check(TokenType::RIGHT_PAREN)) {
-                iterNode->addToken(advance()); // ')'
-            } else {
-                reportError("Expected ')' after iter expression", TokenType::RIGHT_PAREN, peek().type);
-                
-                if (recoveryConfig.insertMissingTokens) {
-                    Token missingParen;
-                    missingParen.type = TokenType::RIGHT_PAREN;
-                    missingParen.lexeme = ")";
-                    missingParen.line = peek().line;
-                    missingParen.start = getCurrentPosition();
-                    missingParen.end = getCurrentPosition();
-                    iterNode->addToken(missingParen);
-                }
-            }
-        } else {
-            reportError("Expected '(' after 'iter'", TokenType::LEFT_PAREN, peek().type);
-            
-            if (recoveryConfig.createPartialNodes) {
-                // Create missing iter header
-                auto missingHeader = createMissingNode(NodeKind::PARAMETER_LIST, "Missing iter header");
-                iterNode->addNode(std::move(missingHeader));
-            }
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after super constructor arguments.");
         }
-        
-        // Parse loop body
-        if (check(TokenType::LEFT_BRACE)) {
-            auto body = parseBlock();
-            if (body) {
-                iterNode->addNode(std::move(body));
-            }
-        } else {
-            // Single statement without braces
-            auto stmt = parseStatement();
-            if (stmt) {
-                iterNode->addNode(std::move(stmt));
-            } else {
-                reportError("Expected statement or '{' for iter body");
-                
-                if (recoveryConfig.createPartialNodes) {
-                    auto missingBody = createMissingNode(NodeKind::BLOCK_STATEMENT, "Missing iter loop body");
-                    iterNode->addNode(std::move(missingBody));
-                }
-            }
-        }
-        
-        setNodeSpanFromTokens(*iterNode, startToken, previous());
-        return iterNode;
     }
-    
-    std::unique_ptr<Node> CSTParser::parseMatchStatement() {
-        // Parse: match (expression) { case pattern => statement ... }
-        Token startToken = peek();
-        auto matchNode = createNode(NodeKind::MATCH_STATEMENT);
-        
-        // Consume 'match' keyword
-        if (check(TokenType::MATCH)) {
-            matchNode->addToken(advance());
+
+    Token leftBrace = consume(TokenType::LEFT_BRACE, "Expected '{' before class body.");
+    pushBlockContext("class", leftBrace);
+
+    // Parse class members
+    while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
+        if (match({TokenType::VAR})) {
+            // Parse field
+            auto field = std::dynamic_pointer_cast<AST::VarDeclaration>(varDeclaration());
+            if (field) {
+                classDecl->fields.push_back(field);
+            }
+        } else if (match({TokenType::FN})) {
+            // Parse method
+            auto method = function("method");
+            if (method) {
+                classDecl->methods.push_back(method);
+            }
+        } else if (check(TokenType::IDENTIFIER) && peek().lexeme == classDecl->name) {
+            // Parse constructor
+            advance(); // Consume the class name
+            auto constructor = std::make_shared<AST::FunctionDeclaration>();
+            constructor->line = previous().line;
+            constructor->name = classDecl->name;
+            
+            consume(TokenType::LEFT_PAREN, "Expected '(' after constructor name.");
+            
+            // Parse parameters
+            if (!check(TokenType::RIGHT_PAREN)) {
+                do {
+                    auto paramName = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
+                    
+                    // Parse parameter type
+                    consume(TokenType::COLON, "Expected ':' after parameter name.");
+                    auto paramType = parseTypeAnnotation();
+                    
+                    constructor->params.push_back({paramName, paramType});
+                } while (match({TokenType::COMMA}));
+            }
+            
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after parameters.");
+            
+            // Parse constructor body
+            consume(TokenType::LEFT_BRACE, "Expected '{' before constructor body.");
+            constructor->body = block();
+            
+            classDecl->methods.push_back(constructor);
         } else {
-            reportError("Expected 'match' keyword", TokenType::MATCH, peek().type);
-            return createErrorRecoveryNode("Invalid match statement");
+            error("Expected class member declaration.");
+            break;
+        }
+    }
+
+    consume(TokenType::RIGHT_BRACE, "Expected '}' after class body.");
+    popBlockContext();
+
+    // Generate automatic init constructor if class has inline constructor parameters
+    if (classDecl->hasInlineConstructor) {
+        auto initMethod = std::make_shared<AST::FunctionDeclaration>();
+        initMethod->line = classDecl->line;
+        initMethod->name = "init";
+        
+        // Copy constructor parameters to init method
+        for (const auto& param : classDecl->constructorParams) {
+            initMethod->params.push_back(param);
         }
         
-        // Parse match expression with parentheses
-        if (check(TokenType::LEFT_PAREN)) {
-            matchNode->addToken(advance()); // '('
+        // Create constructor body
+        auto body = std::make_shared<AST::BlockStatement>();
+        body->line = classDecl->line;
+        
+        // Add super constructor call if there's inheritance
+        if (!classDecl->superClassName.empty()) {
+            // Create super.init() call
+            auto superCall = std::make_shared<AST::ExprStatement>();
+            superCall->line = classDecl->line;
             
-            auto expr = parseExpression();
-            if (expr) {
-                matchNode->addNode(std::move(expr));
-            } else {
-                reportError("Expected expression after 'match ('");
-                
-                if (recoveryConfig.createPartialNodes) {
-                    auto missingExpr = createMissingNode(NodeKind::LITERAL_EXPR, "Missing match expression");
-                    matchNode->addNode(std::move(missingExpr));
-                }
+            auto callExpr = std::make_shared<AST::CallExpr>();
+            callExpr->line = classDecl->line;
+            
+            // Create super.init member expression
+            auto memberExpr = std::make_shared<AST::MemberExpr>();
+            memberExpr->line = classDecl->line;
+            memberExpr->name = "init";
+            
+            auto superExpr = std::make_shared<AST::VariableExpr>();
+            superExpr->line = classDecl->line;
+            superExpr->name = "super";
+            memberExpr->object = superExpr;
+            
+            callExpr->callee = memberExpr;
+            
+            // Add super constructor arguments
+            for (const auto& arg : classDecl->superConstructorArgs) {
+                callExpr->arguments.push_back(arg);
             }
             
-            if (check(TokenType::RIGHT_PAREN)) {
-                matchNode->addToken(advance()); // ')'
-            } else {
-                reportError("Expected ')' after match expression", TokenType::RIGHT_PAREN, peek().type);
-                
-                if (recoveryConfig.insertMissingTokens) {
-                    Token missingParen;
-                    missingParen.type = TokenType::RIGHT_PAREN;
-                    missingParen.lexeme = ")";
-                    missingParen.line = peek().line;
-                    missingParen.start = getCurrentPosition();
-                    missingParen.end = getCurrentPosition();
-                    matchNode->addToken(missingParen);
-                }
-            }
-        } else {
-            reportError("Expected '(' after 'match'", TokenType::LEFT_PAREN, peek().type);
-            
-            if (recoveryConfig.createPartialNodes) {
-                auto missingExpr = createMissingNode(NodeKind::LITERAL_EXPR, "Missing match expression");
-                matchNode->addNode(std::move(missingExpr));
-            }
+            superCall->expression = callExpr;
+            body->statements.push_back(superCall);
         }
         
-        // Parse match body with cases
-        if (check(TokenType::LEFT_BRACE)) {
-            matchNode->addToken(advance()); // '{'
+        // Add automatic field assignments for constructor parameters
+        for (const auto& param : classDecl->constructorParams) {
+            auto assignment = std::make_shared<AST::ExprStatement>();
+            assignment->line = classDecl->line;
             
-            // Parse match cases
-            while (!check(TokenType::RIGHT_BRACE) && !isAtEnd() && shouldContinueParsing()) {
-                // Skip trivia between cases
-                if (recoveryConfig.preserveTrivia) {
-                    consumeTrivia();
+            auto assignExpr = std::make_shared<AST::AssignExpr>();
+            assignExpr->line = classDecl->line;
+            assignExpr->op = TokenType::EQUAL;
+            
+            // Create self.paramName member expression
+            auto memberExpr = std::make_shared<AST::MemberExpr>();
+            memberExpr->line = classDecl->line;
+            memberExpr->name = param.first;
+            
+            auto thisExpr = std::make_shared<AST::ThisExpr>();
+            thisExpr->line = classDecl->line;
+            memberExpr->object = thisExpr;
+            
+            assignExpr->object = memberExpr;
+            assignExpr->member = param.first;
+            
+            // Create parameter variable expression
+            auto paramExpr = std::make_shared<AST::VariableExpr>();
+            paramExpr->line = classDecl->line;
+            paramExpr->name = param.first;
+            
+            assignExpr->value = paramExpr;
+            assignment->expression = assignExpr;
+            body->statements.push_back(assignment);
+        }
+        
+        initMethod->body = body;
+        classDecl->methods.push_back(initMethod);
+    }
+
+    return classDecl;
+}
+
+std::shared_ptr<AST::Statement> CSTParser::attemptStatement() {
+    auto stmt = std::make_shared<AST::AttemptStatement>();
+    stmt->line = previous().line;
+
+    consume(TokenType::LEFT_BRACE, "Expected '{' after 'attempt'.");
+    stmt->tryBlock = block();
+
+    // Parse handlers
+    while (match({TokenType::HANDLE})) {
+        AST::HandleClause handler;
+
+        // Parse error type
+        handler.errorType = consume(TokenType::IDENTIFIER, "Expected error type after 'handle'.").lexeme;
+
+        // Parse optional error variable
+        if (match({TokenType::LEFT_PAREN})) {
+            handler.errorVar = consume(TokenType::IDENTIFIER, "Expected error variable name.").lexeme;
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after error variable.");
+        }
+
+        // Parse handler body
+        consume(TokenType::LEFT_BRACE, "Expected '{' after handle clause.");
+        handler.body = block();
+
+        stmt->handlers.push_back(handler);
+    }
+
+    return stmt;
+}
+
+void CSTParser::parseConcurrencyParams(
+    std::string& channel,
+    std::string& mode,
+    std::string& cores,
+    std::string& onError,
+    std::string& timeout,
+    std::string& grace,
+    std::string& onTimeout
+) {
+    if (match({TokenType::LEFT_PAREN})) {
+        while (!check(TokenType::RIGHT_PAREN) && !isAtEnd()) {
+            // Parse parameter name
+            std::string paramName = consume(TokenType::IDENTIFIER, "Expected parameter name").lexeme;
+            
+            // Check if this is type annotation (param: Type) or assignment (param = value)
+            if (match({TokenType::COLON})) {
+                // Type annotation syntax: param: Type
+                // For now, we'll skip the type and treat it as a parameter with the type name as value
+                std::string typeName = consume(TokenType::IDENTIFIER, "Expected type name after ':'").lexeme;
+                // Store the type name as the parameter value for now
+                if (paramName == "events") {
+                    // This is a special case for event type annotation
+                    // We can ignore it for now or store it for later use
                 }
-                
-                // Parse case pattern and statement
-                // For now, treat each case as a statement until we have proper pattern parsing
-                auto caseStmt = parseStatement();
-                if (caseStmt) {
-                    matchNode->addNode(std::move(caseStmt));
-                }
-                
-                // Handle error recovery within match body
-                if (!canRecover()) {
+                // Continue to next parameter
+                if (!match({TokenType::COMMA}) && !check(TokenType::RIGHT_PAREN)) {
+                    error("Expected ',' or ')' after type annotation");
                     break;
                 }
-            }
-            
-            if (check(TokenType::RIGHT_BRACE)) {
-                matchNode->addToken(advance()); // '}'
+                continue;
+            } else if (match({TokenType::EQUAL})) {
+                // Assignment syntax: param = value
+                // Continue with existing logic
             } else {
-                reportError("Expected '}' to close match body", TokenType::RIGHT_BRACE, peek().type);
-                
-                if (recoveryConfig.insertMissingTokens) {
-                    Token missingBrace;
-                    missingBrace.type = TokenType::RIGHT_BRACE;
-                    missingBrace.lexeme = "}";
-                    missingBrace.line = peek().line;
-                    missingBrace.start = getCurrentPosition();
-                    missingBrace.end = getCurrentPosition();
-                    matchNode->addToken(missingBrace);
-                }
-            }
-        } else {
-            reportError("Expected '{' for match body", TokenType::LEFT_BRACE, peek().type);
-            
-            if (recoveryConfig.createPartialNodes) {
-                auto missingBody = createMissingNode(NodeKind::BLOCK_STATEMENT, "Missing match body");
-                matchNode->addNode(std::move(missingBody));
-            }
-        }
-        
-        setNodeSpanFromTokens(*matchNode, startToken, previous());
-        return matchNode;
-    }
-    
-    std::unique_ptr<Node> CSTParser::parseReturnStatement() {
-        // Parse: return expression;
-        Token startToken = peek();
-        auto returnNode = createNode(NodeKind::RETURN_STATEMENT);
-        
-        if (check(TokenType::RETURN)) {
-            returnNode->addToken(advance());
-        }
-        
-        // Consume trivia after 'return' keyword
-        if (recoveryConfig.preserveTrivia) {
-            consumeTrivia();
-        }
-        
-        // Parse optional return value
-        if (!check(TokenType::SEMICOLON) && !isAtEnd()) {
-            auto expr = parseExpression();
-            if (expr) {
-                returnNode->addNode(std::move(expr));
-            }
-        }
-        
-        // Consume trivia before semicolon
-        if (recoveryConfig.preserveTrivia) {
-            consumeTrivia();
-        }
-        
-        // Parse semicolon
-        if (check(TokenType::SEMICOLON)) {
-            returnNode->addToken(advance());
-        }
-        
-        setNodeSpanFromTokens(*returnNode, startToken, previous());
-        return returnNode;
-    }
-    
-    std::unique_ptr<Node> CSTParser::parseBreakStatement() {
-        // Parse: break;
-        Token startToken = peek();
-        auto breakNode = createNode(NodeKind::BREAK_STATEMENT);
-        
-        if (check(TokenType::BREAK)) {
-            breakNode->addToken(advance());
-        }
-        
-        if (check(TokenType::SEMICOLON)) {
-            breakNode->addToken(advance());
-        }
-        
-        setNodeSpanFromTokens(*breakNode, startToken, previous());
-        return breakNode;
-    }
-    
-    std::unique_ptr<Node> CSTParser::parseContinueStatement() {
-        // Parse: continue;
-        Token startToken = peek();
-        auto continueNode = createNode(NodeKind::CONTINUE_STATEMENT);
-        
-        if (check(TokenType::CONTINUE)) {
-            continueNode->addToken(advance());
-        }
-        
-        if (check(TokenType::SEMICOLON)) {
-            continueNode->addToken(advance());
-        }
-        
-        setNodeSpanFromTokens(*continueNode, startToken, previous());
-        return continueNode;
-    }
-    
-    std::unique_ptr<Node> CSTParser::parsePrintStatement() {
-        // Parse: print expression;
-        Token startToken = peek();
-        auto printNode = createNode(NodeKind::PRINT_STATEMENT);
-        
-        if (check(TokenType::PRINT)) {
-            printNode->addToken(advance());
-        }
-        
-        // Consume trivia after 'print' keyword
-        if (recoveryConfig.preserveTrivia) {
-            consumeTrivia();
-        }
-        
-        // Parse expression to print
-        auto expr = parseExpression();
-        if (expr) {
-            printNode->addNode(std::move(expr));
-        }
-        
-        // Consume trivia before semicolon
-        if (recoveryConfig.preserveTrivia) {
-            consumeTrivia();
-        }
-        
-        // Parse semicolon
-        if (check(TokenType::SEMICOLON)) {
-            printNode->addToken(advance());
-        }
-        
-        setNodeSpanFromTokens(*printNode, startToken, previous());
-        return printNode;
-    }
-    
-    // Enhanced parseBinaryExpr with operator precedence and missing operand recovery
-    std::unique_ptr<Node> CSTParser::parseBinaryExpr(std::unique_ptr<Node> (CSTParser::*parseNext)(), 
-                                                     const std::vector<TokenType>& operators) {
-        auto expr = (this->*parseNext)();
-        
-        while (true) {
-            bool foundOperator = false;
-            TokenType currentOp = TokenType::UNDEFINED;
-            
-            // Check if current token matches any of the operators
-            for (TokenType op : operators) {
-                if (check(op)) {
-                    foundOperator = true;
-                    currentOp = op;
-                    break;
-                }
-            }
-            
-            if (!foundOperator) {
+                error("Expected '=' or ':' after parameter name");
                 break;
             }
             
-            // Consume the operator
+            // Parse parameter value
+            std::string paramValue;
+            if (check(TokenType::STRING)) {
+                paramValue = consume(TokenType::STRING, "Expected string value").lexeme;
+                // Remove quotes
+                if (paramValue.size() >= 2) {
+                    paramValue = paramValue.substr(1, paramValue.size() - 2);
+                }
+            } else if (check(TokenType::NUMBER)) {
+                // Get the number value
+                paramValue = consume(TokenType::NUMBER, "Expected number value").lexeme;
+                
+                // Check for time unit (s, ms, etc.)
+                if (check(TokenType::IDENTIFIER)) {
+                    std::string unit = peek().lexeme;
+                    if (unit == "s" || unit == "ms" || unit == "us" || unit == "ns") {
+                        advance();  // Consume the unit
+                        paramValue += unit;
+                    }
+                }
+            } else if (check(TokenType::IDENTIFIER)) {
+                paramValue = consume(TokenType::IDENTIFIER, "Expected identifier").lexeme;
+            } else {
+                error("Expected string, number, or identifier as parameter value");
+                break;
+            }
+
+            // Assign parameter value to the appropriate field
+            if (paramName == "ch") {
+                channel = paramValue;
+            } else if (paramName == "mode") {
+                mode = paramValue;
+            } else if (paramName == "cores") {
+                cores = paramValue;
+            } else if (paramName == "on_error") {
+                onError = paramValue;
+            } else if (paramName == "timeout") {
+                timeout = paramValue;
+            } else if (paramName == "grace") {
+                grace = paramValue;
+            } else if (paramName == "on_timeout") {
+                onTimeout = paramValue;
+            } else {
+                error("Unknown parameter: " + paramName);
+            }
+
+            // Check for comma or end of parameters
+            if (!match({TokenType::COMMA}) && !check(TokenType::RIGHT_PAREN)) {
+                error("Expected ',' or ')' after parameter");
+                break;
+            }
+        }
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after parameters");
+    }
+}
+
+std::shared_ptr<AST::Statement> CSTParser::parallelStatement() {
+    auto stmt = std::make_shared<AST::ParallelStatement>();
+    stmt->line = previous().line;
+
+    // Set default values
+    stmt->channel = "";
+    stmt->mode = "fork-join";  // Default mode for parallel blocks
+    stmt->cores = "auto";
+    stmt->onError = "stop";
+    stmt->timeout = "0";
+    stmt->grace = "0";
+    stmt->onTimeout = "partial";
+
+    // Parse parameters
+    parseConcurrencyParams(stmt->channel, stmt->mode, stmt->cores, stmt->onError, stmt->timeout, stmt->grace, stmt->onTimeout);
+
+    // Parse the block
+    consume(TokenType::LEFT_BRACE, "Expected '{' after 'parallel'.");
+    in_concurrent_block = true;
+    stmt->body = block();
+    in_concurrent_block = false;
+
+    return stmt;
+}
+
+std::shared_ptr<AST::Statement> CSTParser::concurrentStatement() {
+    auto stmt = std::make_shared<AST::ConcurrentStatement>();
+    stmt->line = previous().line;
+
+    // Set default values
+    stmt->channel = "";
+    stmt->mode = "batch";
+    stmt->cores = "auto";
+    stmt->onError = "stop";
+    stmt->timeout = "0";
+    stmt->grace = "0";
+    stmt->onTimeout = "partial";
+
+    // Parse parameters
+    parseConcurrencyParams(stmt->channel, stmt->mode, stmt->cores, stmt->onError, stmt->timeout, stmt->grace, stmt->onTimeout);
+
+    // Parse the block
+    consume(TokenType::LEFT_BRACE, "Expected '{' after 'concurrent'.");
+    in_concurrent_block = true;
+    stmt->body = block();
+    in_concurrent_block = false;
+
+    return stmt;
+}
+
+std::shared_ptr<AST::Statement> CSTParser::importStatement() {
+    auto stmt = std::make_shared<AST::ImportStatement>();
+    stmt->line = previous().line;
+
+    // Parse module path
+    if (check(TokenType::IDENTIFIER) || check(TokenType::MODULE)) {
+        stmt->modulePath = advance().lexeme;
+        while (match({TokenType::DOT})) {
+            if (check(TokenType::IDENTIFIER) || check(TokenType::MODULE)) {
+                stmt->modulePath += "." + advance().lexeme;
+            } else {
+                error("Expected module path component.");
+                return nullptr;
+            }
+        }
+    } else if (match({TokenType::LEFT_PAREN})) {
+        stmt->isStringLiteralPath = true;
+        stmt->modulePath = consume(TokenType::STRING, "Expected string literal for module path.").lexeme;
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after module path string.");
+    } else {
+        error("Expected module path or string literal after 'import'.");
+        return nullptr;
+    }
+
+    // Parse optional alias
+    if (match({TokenType::AS})) {
+        stmt->alias = consume(TokenType::IDENTIFIER, "Expected alias name.").lexeme;
+    }
+
+    // Parse optional filter
+    if (match({TokenType::SHOW, TokenType::HIDE})) {
+        AST::ImportFilter filter;
+        filter.type = previous().type == TokenType::SHOW ? AST::ImportFilterType::Show : AST::ImportFilterType::Hide;
+
+        do {
+            if (check(TokenType::IDENTIFIER) || check(TokenType::MODULE)) {
+                filter.identifiers.push_back(advance().lexeme);
+            } else {
+                error("Expected identifier in filter list.");
+                return nullptr;
+            }
+        } while (match({TokenType::COMMA}));
+
+        stmt->filter = filter;
+    }
+
+    // Make semicolon optional
+    match({TokenType::SEMICOLON});
+
+    return stmt;
+}
+
+std::shared_ptr<AST::EnumDeclaration> CSTParser::enumDeclaration() {
+    auto enumDecl = std::make_shared<AST::EnumDeclaration>();
+    enumDecl->line = previous().line;
+
+    // Parse enum name
+    Token name = consume(TokenType::IDENTIFIER, "Expected enum name.");
+    enumDecl->name = name.lexeme;
+
+    consume(TokenType::LEFT_BRACE, "Expected '{' before enum body.");
+
+    // Parse enum variants
+    if (!check(TokenType::RIGHT_BRACE)) {
+        do {
+            std::string variantName = consume(TokenType::IDENTIFIER, "Expected variant name.").lexeme;
+
+            std::optional<std::shared_ptr<AST::TypeAnnotation>> variantType;
+            if (match({TokenType::LEFT_PAREN})) {
+                variantType = parseTypeAnnotation();
+                consume(TokenType::RIGHT_PAREN, "Expected ')' after variant type.");
+            }
+
+            enumDecl->variants.push_back({variantName, variantType});
+        } while (match({TokenType::COMMA}));
+    }
+
+    consume(TokenType::RIGHT_BRACE, "Expected '}' after enum body.");
+    return enumDecl;
+}
+
+// Parse match statement: match(value) { pattern => statement, ... }
+std::shared_ptr<AST::Statement> CSTParser::matchStatement() {
+    auto stmt = std::make_shared<AST::MatchStatement>();
+    stmt->line = previous().line;
+
+    consume(TokenType::LEFT_PAREN, "Expected '(' after 'match'.");
+    stmt->value = expression();
+    consume(TokenType::RIGHT_PAREN, "Expected ')' after match value.");
+
+    consume(TokenType::LEFT_BRACE, "Expected '{' before match cases.");
+
+    // Parse match cases: pattern => statement, ...
+    while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
+        AST::MatchCase matchCase;
+
+        // Parse pattern
+        matchCase.pattern = parsePattern();
+
+        // Parse optional guard
+        if (match({TokenType::WHERE})) {
+            matchCase.guard = expression();
+        }
+
+        consume(TokenType::ARROW, "Expected '=>' after match pattern.");
+
+        // Parse body as a statement
+        matchCase.body = statement();
+
+        // Optional comma between cases
+        if (match({TokenType::COMMA})) {
+            // Allow trailing comma before '}'
+            if (check(TokenType::RIGHT_BRACE)) break;
+        }
+        stmt->cases.push_back(matchCase);
+    }
+
+    consume(TokenType::RIGHT_BRACE, "Expected '}' after match cases.");
+
+    return stmt;
+}
+
+std::shared_ptr<AST::Expression> CSTParser::parsePattern() {
+    // Error pattern matching: val identifier
+    if (check(TokenType::VAL)) {
+        return parseValPattern();
+    }
+
+    // Error pattern matching: err identifier or err ErrorType
+    if (check(TokenType::ERR)) {
+        return parseErrPattern();
+    }
+
+    // Specific error type pattern: ErrorType or ErrorType(params)
+    if (check(TokenType::IDENTIFIER) && isErrorType(peek().lexeme)) {
+        return parseErrorTypePattern();
+    }
+
+    // Wildcard pattern
+    if (match({TokenType::DEFAULT}) || (check(TokenType::IDENTIFIER) && peek().lexeme == "_")) {
+        if (previous().type != TokenType::DEFAULT) advance(); // consume '_' if it was an identifier
+        auto pattern = std::make_shared<AST::LiteralExpr>();
+        pattern->line = previous().line;
+        pattern->value = nullptr; // Represent wildcard with null
+        return pattern;
+    }
+
+    // List pattern
+    if (check(TokenType::LEFT_BRACKET)) {
+        return parseListPattern();
+    }
+
+    // Dictionary/Record destructuring pattern
+    if (check(TokenType::LEFT_BRACE)) {
+        return parseDictPattern();
+    }
+
+    // Tuple destructuring pattern
+    if (check(TokenType::LEFT_PAREN)) {
+        return parseTuplePattern();
+    }
+
+    // Binding pattern (e.g. Some(x))
+    if (check(TokenType::IDENTIFIER) && current + 1 < scanner.getTokens().size() && 
+        scanner.getTokens()[current + 1].type == TokenType::LEFT_PAREN) {
+        return parseBindingPattern();
+    }
+
+    // Type pattern - check for primitive types and collection types
+    if (isPrimitiveType(peek().type) || 
+        check(TokenType::LIST_TYPE) || check(TokenType::DICT_TYPE) ||
+        (check(TokenType::IDENTIFIER) && (peek().lexeme == "string" || peek().lexeme == "list" || peek().lexeme == "dict"))) {
+        auto typePattern = std::make_shared<AST::TypePatternExpr>();
+        typePattern->line = peek().line;
+        typePattern->type = parseTypeAnnotation();
+        return typePattern;
+    }
+
+    // Literal pattern
+    if (check(TokenType::IDENTIFIER) ||
+               check(TokenType::NUMBER) || check(TokenType::STRING) ||
+               check(TokenType::TRUE) || check(TokenType::FALSE) ||
+               check(TokenType::NIL)) {
+        return primary();
+    }
+
+    error("Expected pattern in match case.");
+    return makeErrorExpr();
+}
+
+std::shared_ptr<AST::Expression> CSTParser::parseBindingPattern() {
+    auto pattern = std::make_shared<AST::BindingPatternExpr>();
+    pattern->line = peek().line;
+    pattern->typeName = consume(TokenType::IDENTIFIER, "Expected type name in binding pattern.").lexeme;
+    consume(TokenType::LEFT_PAREN, "Expected '(' after type name in binding pattern.");
+    pattern->variableName = consume(TokenType::IDENTIFIER, "Expected variable name in binding pattern.").lexeme;
+    consume(TokenType::RIGHT_PAREN, "Expected ')' after variable name in binding pattern.");
+    return pattern;
+}
+
+std::shared_ptr<AST::Expression> CSTParser::parseListPattern() {
+    auto pattern = std::make_shared<AST::ListPatternExpr>();
+    pattern->line = peek().line;
+    consume(TokenType::LEFT_BRACKET, "Expected '[' at start of list pattern.");
+
+    if (!check(TokenType::RIGHT_BRACKET)) {
+        do {
+            if (match({TokenType::ELLIPSIS})) {
+                pattern->restElement = consume(TokenType::IDENTIFIER, "Expected identifier for rest element.").lexeme;
+                break;
+            }
+            pattern->elements.push_back(parsePattern());
+        } while (match({TokenType::COMMA}));
+    }
+
+    consume(TokenType::RIGHT_BRACKET, "Expected ']' at end of list pattern.");
+    return pattern;
+}
+
+std::shared_ptr<AST::Expression> CSTParser::parseDictPattern() {
+    auto pattern = std::make_shared<AST::DictPatternExpr>();
+    pattern->line = peek().line;
+    consume(TokenType::LEFT_BRACE, "Expected '{' at start of dict pattern.");
+
+    if (!check(TokenType::RIGHT_BRACE)) {
+        do {
+            if (match({TokenType::ELLIPSIS})) {
+                // Rest pattern: ...rest
+                pattern->hasRestElement = true;
+                if (check(TokenType::IDENTIFIER)) {
+                    pattern->restBinding = advance().lexeme;
+                }
+                break;
+            }
+
+            // Parse field pattern: key or key: binding
+            std::string key = consume(TokenType::IDENTIFIER, "Expected field name in dict pattern.").lexeme;
+            AST::DictPatternExpr::Field field;
+            field.key = key;
+
+            if (match({TokenType::COLON})) {
+                // Explicit binding: key: binding
+                field.binding = consume(TokenType::IDENTIFIER, "Expected binding name after ':' in dict pattern.").lexeme;
+            } else {
+                // Shorthand: key (binding is same as key)
+                field.binding = key;
+            }
+
+            pattern->fields.push_back(field);
+        } while (match({TokenType::COMMA}));
+    }
+
+    consume(TokenType::RIGHT_BRACE, "Expected '}' at end of dict pattern.");
+    return pattern;
+}
+
+std::shared_ptr<AST::Expression> CSTParser::parseTuplePattern() {
+    auto pattern = std::make_shared<AST::TuplePatternExpr>();
+    pattern->line = peek().line;
+    consume(TokenType::LEFT_PAREN, "Expected '(' at start of tuple pattern.");
+
+    if (!check(TokenType::RIGHT_PAREN)) {
+        do {
+            pattern->elements.push_back(parsePattern());
+        } while (match({TokenType::COMMA}));
+    }
+
+    consume(TokenType::RIGHT_PAREN, "Expected ')' at end of tuple pattern.");
+    return pattern;
+}
+
+// Expression parsing methods
+std::shared_ptr<AST::Expression> CSTParser::expression() {
+    return assignment();
+}
+
+std::shared_ptr<AST::Expression> CSTParser::assignment() {
+    auto expr = logicalOr();
+
+    if (match({TokenType::EQUAL, TokenType::PLUS_EQUAL, TokenType::MINUS_EQUAL,
+               TokenType::STAR_EQUAL, TokenType::SLASH_EQUAL, TokenType::MODULUS_EQUAL})) {
+        auto op = previous();
+        auto value = assignment();
+
+        if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(expr)) {
+            auto assignExpr = std::make_shared<AST::AssignExpr>();
+            assignExpr->line = op.line;
+            assignExpr->name = varExpr->name;
+            assignExpr->op = op.type;
+            assignExpr->value = value;
+            return assignExpr;
+        } else if (auto memberExpr = std::dynamic_pointer_cast<AST::MemberExpr>(expr)) {
+            auto assignExpr = std::make_shared<AST::AssignExpr>();
+            assignExpr->line = op.line;
+            assignExpr->object = memberExpr->object;
+            assignExpr->member = memberExpr->name;
+            assignExpr->op = op.type;
+            assignExpr->value = value;
+            return assignExpr;
+        } else if (auto indexExpr = std::dynamic_pointer_cast<AST::IndexExpr>(expr)) {
+            auto assignExpr = std::make_shared<AST::AssignExpr>();
+            assignExpr->line = op.line;
+            assignExpr->object = indexExpr->object;
+            assignExpr->index = indexExpr->index;
+            assignExpr->op = op.type;
+            assignExpr->value = value;
+            return assignExpr;
+        }
+
+        error("Invalid assignment target.");
+    }
+
+    return expr;
+}
+
+std::shared_ptr<AST::Expression> CSTParser::logicalOr() {
+    auto expr = logicalAnd();
+
+    while (match({TokenType::OR})) {
+        auto op = previous();
+        auto right = logicalAnd();
+
+        auto binaryExpr = std::make_shared<AST::BinaryExpr>();
+        binaryExpr->line = op.line;
+        binaryExpr->left = expr;
+        binaryExpr->op = op.type;
+        binaryExpr->right = right;
+
+        expr = binaryExpr;
+    }
+
+    return expr;
+}
+
+std::shared_ptr<AST::Expression> CSTParser::logicalAnd() {
+    auto expr = equality();
+
+    while (match({TokenType::AND})) {
+        auto op = previous();
+        auto right = equality();
+
+        auto binaryExpr = std::make_shared<AST::BinaryExpr>();
+        binaryExpr->line = op.line;
+        binaryExpr->left = expr;
+        binaryExpr->op = op.type;
+        binaryExpr->right = right;
+
+        expr = binaryExpr;
+    }
+
+    return expr;
+}
+
+std::shared_ptr<AST::Expression> CSTParser::equality() {
+    auto expr = comparison();
+
+    while (match({TokenType::BANG_EQUAL, TokenType::EQUAL_EQUAL})) {
+        auto op = previous();
+        auto right = comparison();
+
+        auto binaryExpr = std::make_shared<AST::BinaryExpr>();
+        binaryExpr->line = op.line;
+        binaryExpr->left = expr;
+        binaryExpr->op = op.type;
+        binaryExpr->right = right;
+
+        expr = binaryExpr;
+    }
+
+    return expr;
+}
+
+std::shared_ptr<AST::Expression> CSTParser::comparison() {
+    auto expr = term();
+
+    // Check for range expressions (e.g., 1..10)
+    if (match({TokenType::RANGE})) {
+        auto rangeExpr = std::make_shared<AST::RangeExpr>();
+        rangeExpr->line = previous().line;
+        rangeExpr->start = expr;
+        rangeExpr->end = term();
+        rangeExpr->step = nullptr; // No step value for now
+        rangeExpr->inclusive = true; // Default to inclusive range
+        return rangeExpr;
+    }
+
+    while (match({TokenType::GREATER, TokenType::GREATER_EQUAL, TokenType::LESS, TokenType::LESS_EQUAL})) {
+        auto op = previous();
+        auto right = term();
+
+        auto binaryExpr = std::make_shared<AST::BinaryExpr>();
+        binaryExpr->line = op.line;
+        binaryExpr->left = expr;
+        binaryExpr->op = op.type;
+        binaryExpr->right = right;
+
+        expr = binaryExpr;
+    }
+
+    return expr;
+}
+
+std::shared_ptr<AST::Expression> CSTParser::term() {
+    auto expr = factor();
+
+    while (match({TokenType::MINUS, TokenType::PLUS})) {
+        auto op = previous();
+        auto right = factor();
+
+        auto binaryExpr = std::make_shared<AST::BinaryExpr>();
+        binaryExpr->line = op.line;
+        binaryExpr->left = expr;
+        binaryExpr->op = op.type;
+        binaryExpr->right = right;
+
+        expr = binaryExpr;
+    }
+
+    return expr;
+}
+
+std::shared_ptr<AST::Expression> CSTParser::factor() {
+    auto expr = power();
+
+    while (match({TokenType::SLASH, TokenType::STAR, TokenType::MODULUS})) {
+        auto op = previous();
+        auto right = unary();
+
+        auto binaryExpr = std::make_shared<AST::BinaryExpr>();
+        binaryExpr->line = op.line;
+        binaryExpr->left = expr;
+        binaryExpr->op = op.type;
+        binaryExpr->right = right;
+
+        expr = binaryExpr;
+    }
+
+    return expr;
+}
+
+std::shared_ptr<AST::Expression> CSTParser::power() {
+    auto expr = unary();
+    while (match({TokenType::POWER})) { // Assuming POWER is '**'
+        auto op = previous();
+        auto right = power(); // Right-associative!
+        auto binaryExpr = createNode<AST::BinaryExpr>();
+        binaryExpr->line = op.line;
+        binaryExpr->left = expr;
+        binaryExpr->op = op.type;
+        binaryExpr->right = right;
+        attachTriviaFromToken(op);
+        expr = binaryExpr;
+    }
+    return expr;
+}
+
+std::shared_ptr<AST::Expression> CSTParser::unary() {
+    if (match({TokenType::BANG, TokenType::MINUS, TokenType::PLUS})) {
+        auto op = previous();
+        auto right = unary();
+
+        auto unaryExpr = std::make_shared<AST::UnaryExpr>();
+        unaryExpr->line = op.line;
+        unaryExpr->op = op.type;
+        unaryExpr->right = right;
+
+        return unaryExpr;
+    }
+
+    if (match({TokenType::AWAIT})) {
+        auto awaitExpr = std::make_shared<AST::AwaitExpr>();
+        awaitExpr->line = previous().line;
+        awaitExpr->expression = unary();
+        return awaitExpr;
+    }
+
+    return call();
+}
+
+std::shared_ptr<AST::Expression> CSTParser::call() {
+    auto expr = primary();
+
+    while (true) {
+        if (match({TokenType::LEFT_PAREN})) {
+            expr = finishCall(expr);
+        } else if (match({TokenType::DOT})) {
+            auto name = consume(TokenType::IDENTIFIER, "Expected property name after '.'.");
+
+            auto memberExpr = std::make_shared<AST::MemberExpr>();
+            memberExpr->line = name.line;
+            memberExpr->object = expr;
+            memberExpr->name = name.lexeme;
+
+            expr = memberExpr;
+        } else if (match({TokenType::LEFT_BRACKET})) {
+            auto index = expression();
+            consume(TokenType::RIGHT_BRACKET, "Expected ']' after index.");
+
+            auto indexExpr = std::make_shared<AST::IndexExpr>();
+            indexExpr->line = previous().line;
+            indexExpr->object = expr;
+            indexExpr->index = index;
+
+            expr = indexExpr;
+        } else if (match({TokenType::QUESTION})) {
+            // Handle fallible expression with ? operator
+            auto fallibleExpr = std::make_shared<AST::FallibleExpr>();
+            fallibleExpr->line = previous().line;
+            fallibleExpr->expression = expr;
+            
+            // Check for optional else handler
+            if (match({TokenType::ELSE})) {
+                // Parse optional error variable binding
+                if (check(TokenType::IDENTIFIER)) {
+                    fallibleExpr->elseVariable = consume(TokenType::IDENTIFIER, "Expected error variable name.").lexeme;
+                }
+                
+                // Parse else handler block or statement
+                fallibleExpr->elseHandler = statement();
+            }
+            
+            expr = fallibleExpr;
+        } else {
+            break;
+        }
+    }
+
+    return expr;
+}
+
+std::shared_ptr<AST::Expression> CSTParser::finishCall(std::shared_ptr<AST::Expression> callee) {
+    std::vector<std::shared_ptr<AST::Expression>> arguments;
+    std::unordered_map<std::string, std::shared_ptr<AST::Expression>> namedArgs;
+
+    if (!check(TokenType::RIGHT_PAREN)) {
+        do {
+            // Check for named arguments
+            if (check(TokenType::IDENTIFIER) && peek().lexeme.length() > 0) {
+                Token nameToken = peek();
+                advance();
+
+                if (match({TokenType::EQUAL})) {
+                    // This is a named argument
+                    auto argValue = expression();
+                    namedArgs[nameToken.lexeme] = argValue;
+                    continue;
+                } else {
+                    // Not a named argument, rewind and parse as regular expression
+                    current--; // Rewind to before the identifier
+                }
+            }
+
+            // Regular positional argument
+            arguments.push_back(expression());
+        } while (match({TokenType::COMMA}));
+    }
+
+    auto paren = consume(TokenType::RIGHT_PAREN, "Expected ')' after arguments.");
+
+    auto callExpr = std::make_shared<AST::CallExpr>();
+    callExpr->line = paren.line;
+    callExpr->callee = callee;
+    callExpr->arguments = arguments;
+    callExpr->namedArgs = namedArgs;
+    return callExpr;
+}
+
+std::shared_ptr<AST::InterpolatedStringExpr> CSTParser::interpolatedString() {
+    auto interpolated = std::make_shared<AST::InterpolatedStringExpr>();
+    interpolated->line = previous().line;
+    
+    // Add the initial string part
+    interpolated->addStringPart(previous().lexeme);
+    
+    // Parse interpolation parts
+    while (check(TokenType::INTERPOLATION_START)) {
+        advance(); // consume INTERPOLATION_START
+        
+        // Parse the expression inside the interpolation
+        auto expr = expression();
+        interpolated->addExpressionPart(expr);
+        
+        // Expect INTERPOLATION_END
+        consume(TokenType::INTERPOLATION_END, "Expected '}' after interpolation expression.");
+        
+        // Check if there's another string part after this interpolation
+        if (check(TokenType::STRING)) {
             advance();
-            Token operatorToken = previous();
-            
-            auto binaryNode = createNode(NodeKind::BINARY_EXPR);
-            binaryNode->addNode(std::move(expr));
-            binaryNode->addToken(operatorToken);
-            
-            // Parse right operand with enhanced error recovery
-            auto right = (this->*parseNext)();
-            if (right) {
-                binaryNode->addNode(std::move(right));
-            } else {
-                // Enhanced recovery for missing operand after binary operator
-                reportErrorWithSuggestions("Expected expression after binary operator '" + operatorToken.lexeme + "'",
-                    {"Add a valid expression after the operator",
-                     "Check for missing operand or extra operator",
-                     "Verify operator precedence and grouping"});
-                
-                // Create missing node for the expected right operand
-                auto missingOperand = CST::createMissingNode(NodeKind::BINARY_EXPR, 
-                    "Missing right operand for binary operator '" + operatorToken.lexeme + "'");
-                binaryNode->addNode(std::move(missingOperand));
-                
-                // Try to recover by synchronizing to next meaningful token
-                if (recoveryConfig.continueOnError) {
-                    // Look ahead to see if we can find a valid expression start
-                    if (isExpressionStart(peek().type)) {
-                        // Continue parsing - the missing operand error is recorded
-                    } else {
-                        // Skip to synchronization point
-                        synchronize();
-                    }
-                }
-            }
-            
-            expr = std::move(binaryNode);
+            interpolated->addStringPart(previous().lexeme);
         }
-        
-        return expr;
     }
     
-    // Helper method to check if an identifier is a reserved keyword
-    bool CSTParser::isReservedKeyword(const std::string& identifier) const {
-        static const std::unordered_set<std::string> reservedKeywords = {
-            "var", "fn", "class", "if", "elif", "else", "for", "while", "where", "iter", "in",
-            "match", "return", "break", "continue", "print", "true", "false", "nil",
-            "and", "as", "not", "type", "trait", "interface", "import", "export",
-            "module", "async", "await", "parallel", "concurrent", "attempt", "handle",
-            "contract", "requires", "ensures", "invariant", "contract", "assert", "assume",
-            "int", "uint", "float", "bool", "str", "list", "dict", "array",
-            "Some", "None", "Ok", "Err", "Result", "Option"
-        };
-        
-        return reservedKeywords.find(identifier) != reservedKeywords.end();
+    return interpolated;
+}
+
+std::shared_ptr<AST::Expression> CSTParser::primary() {
+    if (match({TokenType::FALSE})) {
+        auto literalExpr = createNode<AST::LiteralExpr>();
+        literalExpr->line = previous().line;
+        literalExpr->value = false;
+        attachTriviaFromToken(previous());
+        return literalExpr;
     }
 
-    // Unified Grammar System - Token matching implementations
-    
-    RuleResult CSTParser::parseToken(TokenType type, ParseContext& context) {
-        if (!context.match(type)) {
-            RuleResult result;
-            result.success = false;
-            result.errorMessage = "Expected token type " + std::to_string(static_cast<int>(type));
-            return result;
-        }
-        
-        Token token = context.advance();
-        
-        RuleResult result;
-        result.success = true;
-        result.tokensConsumed = 1;
-        
-        if (context.mode == ParserMode::DIRECT_AST) {
-            // For AST mode, tokens are typically incorporated into parent nodes
-            result.success = true;
-        } else {
-            // For CST mode, create a token node
-            auto tokenNode = createTokenNode(token);
-            result.node = std::move(tokenNode);
-        }
-        
-        return result;
+    if (match({TokenType::TRUE})) {
+        auto literalExpr = createNode<AST::LiteralExpr>();
+        literalExpr->line = previous().line;
+        literalExpr->value = true;
+        attachTriviaFromToken(previous());
+        return literalExpr;
     }
-    
-    RuleResult CSTParser::parseKeyword(const std::string& keyword, ParseContext& context) {
-        Token token = context.peek();
-        if (token.type != TokenType::IDENTIFIER || token.lexeme != keyword) {
-            RuleResult result;
-            result.success = false;
-            result.errorMessage = "Expected keyword '" + keyword + "'";
-            return result;
-        }
-        
-        context.advance();
-        
-        RuleResult result;
-        result.success = true;
-        result.tokensConsumed = 1;
-        
-        if (context.mode == ParserMode::DIRECT_AST) {
-            result.success = true;
-        } else {
-            auto tokenNode = createTokenNode(token);
-            result.node = std::move(tokenNode);
-        }
-        
-        return result;
+
+    if (match({TokenType::NONE})) {
+        auto literalExpr = createNode<AST::LiteralExpr>();
+        literalExpr->line = previous().line;
+        literalExpr->value = nullptr;
+        attachTriviaFromToken(previous());
+        return literalExpr;
     }
-    
-    RuleResult CSTParser::parseIdentifier(ParseContext& context) {
-        if (!context.match(TokenType::IDENTIFIER)) {
-            RuleResult result;
-            result.success = false;
-            result.errorMessage = "Expected identifier";
-            return result;
-        }
-        
-        Token token = context.advance();
-        
-        RuleResult result;
-        result.success = true;
-        result.tokensConsumed = 1;
-        
-        if (context.mode == ParserMode::DIRECT_AST) {
-            auto varExpr = std::make_shared<AST::VariableExpr>();
-            varExpr->line = token.line;
-            varExpr->name = token.lexeme;
-            result.node = std::static_pointer_cast<AST::Node>(varExpr);
-        } else {
-            auto identifierNode = createNode(NodeKind::IDENTIFIER);
-            identifierNode->addToken(token);
-            result.node = std::move(identifierNode);
-        }
-        
-        return result;
+
+    if (match({TokenType::NIL})) {
+        auto literalExpr = createNode<AST::LiteralExpr>();
+        literalExpr->line = previous().line;
+        literalExpr->value = nullptr;
+        attachTriviaFromToken(previous());
+        return literalExpr;
     }
-    
-    RuleResult CSTParser::parseLiteral(ParseContext& context) {
-        Token token = context.peek();
-        
-        if (!context.match({TokenType::NUMBER, TokenType::STRING, TokenType::TRUE, TokenType::FALSE, TokenType::NIL})) {
-            RuleResult result;
-            result.success = false;
-            result.errorMessage = "Expected literal value";
-            return result;
-        }
-        
-        context.advance();
-        
-        RuleResult result;
-        result.success = true;
-        result.tokensConsumed = 1;
-        
-        if (context.mode == ParserMode::DIRECT_AST) {
-            auto literalExpr = std::make_shared<AST::LiteralExpr>();
-            literalExpr->line = token.line;
-            
-            // Convert token to appropriate literal value
-            switch (token.type) {
-                case TokenType::NUMBER:
-                    if (token.lexeme.find('.') != std::string::npos) {
+
+    if (match({TokenType::NUMBER})) {
+        auto token = previous();
+        auto literalExpr = createNode<AST::LiteralExpr>();
+        literalExpr->line = token.line;
+        attachTriviaFromToken(token);
+
+        // Check if the number is an integer or a float
+        // Numbers with decimal points or scientific notation are treated as floats
+        if (token.lexeme.find('.') != std::string::npos || 
+            token.lexeme.find('e') != std::string::npos || 
+            token.lexeme.find('E') != std::string::npos) {
+            try {
+                literalExpr->value = std::stod(token.lexeme);
+            } catch (const std::exception& e) {
+                error("Invalid floating-point number: " + token.lexeme);
+                literalExpr->value = 0.0;
+            }
+        } else {
+            try {
+                // Try to parse as signed long long first
+                literalExpr->value = std::stoll(token.lexeme);
+            } catch (const std::out_of_range& e) {
+                try {
+                    // If that fails, try unsigned long long and convert to double if needed
+                    unsigned long long ullValue = std::stoull(token.lexeme);
+                    
+                    // If the value fits in long long, use it as long long
+                    if (ullValue <= static_cast<unsigned long long>(std::numeric_limits<long long>::max())) {
+                        literalExpr->value = static_cast<long long>(ullValue);
+                    } else {
+                        // Otherwise, convert to double (may lose precision for very large values)
+                        literalExpr->value = static_cast<double>(ullValue);
+                    }
+                } catch (const std::exception& e2) {
+                    // If both fail, treat as double
+                    try {
                         literalExpr->value = std::stod(token.lexeme);
-                    } else {
-                        literalExpr->value = std::stoll(token.lexeme);
+                    } catch (const std::exception& e3) {
+                        error("Invalid number: " + token.lexeme);
+                        literalExpr->value = 0LL;
                     }
-                    break;
-                case TokenType::STRING:
-                    literalExpr->value = token.lexeme;
-                    break;
-                case TokenType::TRUE:
-                    literalExpr->value = true;
-                    break;
-                case TokenType::FALSE:
-                    literalExpr->value = false;
-                    break;
-                case TokenType::NIL:
-                    literalExpr->value = nullptr;
-                    break;
-                default:
-                    break;
+                }
+            } catch (const std::exception& e) {
+                error("Invalid integer number: " + token.lexeme);
+                literalExpr->value = 0LL;
             }
-            
-            result.node = std::static_pointer_cast<AST::Node>(literalExpr);
+        }
+
+        return literalExpr;
+    }
+
+    if (match({TokenType::STRING})) {
+        // Check if this is an interpolated string (followed by INTERPOLATION_START)
+        if (check(TokenType::INTERPOLATION_START)) {
+            // This is an interpolated string
+            return interpolatedString();
         } else {
-            auto literalNode = createNode(NodeKind::LITERAL);
-            literalNode->addToken(token);
-            result.node = std::move(literalNode);
-        }
-        
-        return result;
-    }
-    
-    // Helper method for binary expressions in unified grammar
-    RuleResult CSTParser::parseBinaryExpressionRule(const std::string& nextRule, const std::vector<TokenType>& operators, ParseContext& context) {
-        auto leftResult = executeRule(nextRule, context);
-        if (!leftResult.success) {
-            return leftResult;
-        }
-        
-        while (!context.isAtEnd() && std::find(operators.begin(), operators.end(), context.peek().type) != operators.end()) {
-            Token op = context.advance();
-            auto rightResult = executeRule(nextRule, context);
-            
-            if (!rightResult.success) {
-                RuleResult result;
-                result.success = false;
-                result.errorMessage = "Expected right operand for binary expression";
-                return result;
-            }
-            
-            if (context.mode == ParserMode::DIRECT_AST) {
-                auto binaryExpr = std::make_shared<AST::BinaryExpr>();
-                binaryExpr->line = op.line;
-                binaryExpr->left = leftResult.getAST<AST::Expression>();
-                binaryExpr->op = op.type;
-                binaryExpr->right = rightResult.getAST<AST::Expression>();
-                
-                leftResult.node = std::static_pointer_cast<AST::Node>(binaryExpr);
-                leftResult.tokensConsumed += 1 + rightResult.tokensConsumed;
-            } else {
-                auto binaryNode = createNode(NodeKind::BINARY_EXPR);
-                if (leftResult.hasCST()) {
-                    // Skip CST node addition for now due to ownership complexity
-                }
-                binaryNode->addToken(op);
-                if (rightResult.hasCST()) {
-                    // Skip CST node addition for now due to ownership complexity
-                }
-                
-                leftResult.node = std::move(binaryNode);
-                leftResult.tokensConsumed += 1 + rightResult.tokensConsumed;
-            }
-        }
-        
-        return leftResult;
-    }
-    
-    // Performance and caching methods
-    
-    bool CSTParser::shouldUseCache(const std::string& ruleName) const {
-        // Enable caching for expensive rules
-        static const std::unordered_set<std::string> cacheableRules = {
-            "expression", "statement", "typeAnnotation", "primaryExpression"
-        };
-        
-        return cacheableRules.find(ruleName) != cacheableRules.end();
-    }
-    
-    void CSTParser::cacheResult(const std::string& ruleName, size_t tokenPos, const RuleResult& result) const {
-        // Caching disabled for now due to RuleResult move-only semantics
-        // if (result.success) {
-        //     ruleCache[ruleName][tokenPos] = std::move(result);
-        // }
-    }
-    
-    std::optional<RuleResult> CSTParser::getCachedResult(const std::string& ruleName, size_t tokenPos) const {
-        // Caching disabled for now due to RuleResult move-only semantics
-        return std::nullopt;
-    }
-    
-    void CSTParser::updateStats(const RuleResult& result) const {
-        stats.tokensConsumed += result.tokensConsumed;
-    }
-    
-    std::string CSTParser::getCurrentRuleContext(ParseContext& context) const {
-        if (context.currentToken < context.tokens.size()) {
-            return "at token: " + context.tokens[context.currentToken].lexeme;
-        }
-        return "at end of input";
-    }
-
-    // ParseContext implementation
-    
-    Token ParseContext::peek(size_t offset) const {
-        size_t pos = currentToken + offset;
-        if (pos >= tokens.size()) {
-            Token eofToken;
-            eofToken.type = TokenType::EOF_TOKEN;
-            eofToken.lexeme = "";
-            eofToken.line = tokens.empty() ? 1 : tokens.back().line;
-            return eofToken;
-        }
-        return tokens[pos];
-    }
-    
-    Token ParseContext::advance() {
-        if (currentToken < tokens.size()) {
-            return tokens[currentToken++];
-        }
-        return peek();
-    }
-    
-    bool ParseContext::match(TokenType type) {
-        return peek().type == type;
-    }
-    
-    bool ParseContext::match(std::initializer_list<TokenType> types) {
-        TokenType current = peek().type;
-        return std::find(types.begin(), types.end(), current) != types.end();
-    }
-    
-    void ParseContext::reportError(const std::string& message) {
-        if (errors.size() < maxErrors) {
-            errors.push_back(message);
-        }
-    }
-    
-    void ParseContext::collectTrivia() {
-        if (skipTriviaCollection) return;
-        
-        while (currentToken < tokens.size()) {
-            Token token = tokens[currentToken];
-            if (token.type == TokenType::WHITESPACE || 
-                token.type == TokenType::NEWLINE ||
-                token.type == TokenType::COMMENT_LINE ||
-                token.type == TokenType::COMMENT_BLOCK) {
-                triviaBuffer.push_back(token);
-                currentToken++;
-            } else {
-                break;
-            }
+            // Regular string literal
+            auto literalExpr = std::make_shared<AST::LiteralExpr>();
+            literalExpr->line = previous().line;
+            literalExpr->value = previous().lexeme;
+            return literalExpr;
         }
     }
 
-    // GrammarTable implementation
-    
-    void GrammarTable::addRule(const GrammarRule& rule) {
-        rules_.emplace(rule.name, rule);
-    }
-    
-    void GrammarTable::addRule(const std::string& name, GrammarRule::RuleFunction func) {
-        rules_.emplace(name, GrammarRule(name, func));
-    }
-    
-    const GrammarRule* GrammarTable::getRule(const std::string& name) const {
-        auto it = rules_.find(name);
-        return it != rules_.end() ? &it->second : nullptr;
-    }
-    
-    bool GrammarTable::hasRule(const std::string& name) const {
-        return rules_.find(name) != rules_.end();
-    }
-    
-    RuleResult GrammarTable::executeRule(const std::string& name, ParseContext& context) const {
-        auto rule = getRule(name);
-        if (!rule) {
-            RuleResult result;
-            result.success = false;
-            result.errorMessage = "Unknown rule: " + name;
-            return result;
-        }
+    // Handle interpolated strings that start with interpolation (no initial string part)
+    if (match({TokenType::INTERPOLATION_START})) {
+        // This is an interpolated string starting with interpolation
+        // We need to "back up" and call interpolatedString with an empty initial string
+        current--; // Back up to before INTERPOLATION_START
         
-        // Memoization disabled for now due to RuleResult move-only semantics
+        auto interpolated = std::make_shared<AST::InterpolatedStringExpr>();
+        interpolated->line = peek().line;
         
-        // Execute the rule
-        auto result = rule->execute(context);
+        // Add empty initial string part
+        interpolated->addStringPart("");
         
-        // Caching disabled for now due to RuleResult move-only semantics
-        
-        return result;
-    }
-    
-    std::vector<std::string> GrammarTable::getAllRuleNames() const {
-        std::vector<std::string> names;
-        for (const auto& pair : rules_) {
-            names.push_back(pair.first);
-        }
-        return names;
-    }
-    
-    void GrammarTable::optimizeRuleOrder() {
-        // Sort rules by priority (higher priority first)
-        // This is a simplified implementation - in practice we'd do more sophisticated optimization
-    }
-    
-    std::string GrammarTable::getMemoKey(const std::string& ruleName, size_t tokenPos) const {
-        return ruleName + "_" + std::to_string(tokenPos);
-    }
-    
-    // Utility functions
-    
-    RuleBuilder rule(const std::string& name) {
-        return RuleBuilder(name);
-    }
-    
-    template<typename OutputType>
-    std::shared_ptr<OutputType> parseSource(const std::string& source, ParserMode mode) {
-        Scanner scanner(source);
-        CSTParser parser(scanner);
-        return parser.parseRule<OutputType>("program", mode);
-    }
-    
-    PerformanceComparison benchmarkModes(const std::string& source) {
-        PerformanceComparison comparison;
-        
-        Scanner scanner(source);
-        CSTParser parser(scanner);
-        
-        // Benchmark DIRECT_AST mode
-        auto start = std::chrono::high_resolution_clock::now();
-        auto astResult = parser.parseRule<AST::Program>("program", ParserMode::DIRECT_AST);
-        auto end = std::chrono::high_resolution_clock::now();
-        comparison.directASTTime = std::chrono::duration<double, std::milli>(end - start).count();
-        
-        // Benchmark CST_THEN_AST mode
-        start = std::chrono::high_resolution_clock::now();
-        auto cstAstResult = parser.parseRule<AST::Program>("program", ParserMode::CST_THEN_AST);
-        end = std::chrono::high_resolution_clock::now();
-        comparison.cstThenASTTime = std::chrono::duration<double, std::milli>(end - start).count();
-        
-        // Benchmark CST_ONLY mode
-        start = std::chrono::high_resolution_clock::now();
-        auto cstResult = parser.parse(); // Use public parse method instead
-        end = std::chrono::high_resolution_clock::now();
-        comparison.cstOnlyTime = std::chrono::duration<double, std::milli>(end - start).count();
-        
-        comparison.tokensProcessed = parser.getTotalTokens();
-        
-        return comparison;
-    }
-    
-    void PerformanceComparison::print() const {
-        std::cout << "Performance Comparison:\n";
-        std::cout << "  Direct AST:    " << directASTTime << " ms\n";
-        std::cout << "  CST then AST:  " << cstThenASTTime << " ms\n";
-        std::cout << "  CST only:      " << cstOnlyTime << " ms\n";
-        std::cout << "  Tokens:        " << tokensProcessed << "\n";
-        std::cout << "  Speedup:       " << getSpeedup() << "x\n";
-    }
-    
-    bool validateUnifiedGrammar(const GrammarTable& grammar) {
-        // Basic validation - check for circular dependencies, missing rules, etc.
-        auto issues = findGrammarIssues(grammar);
-        return issues.empty();
-    }
-    
-    std::vector<std::string> findGrammarIssues(const GrammarTable& grammar) {
-        std::vector<std::string> issues;
-        
-        // Check for missing rules referenced by other rules
-        auto allRules = grammar.getAllRuleNames();
-        std::unordered_set<std::string> ruleSet(allRules.begin(), allRules.end());
-        
-        for (const auto& ruleName : allRules) {
-            auto rule = grammar.getRule(ruleName);
-            if (rule) {
-                for (const auto& dep : rule->dependencies) {
-                    if (ruleSet.find(dep) == ruleSet.end()) {
-                        issues.push_back("Rule '" + ruleName + "' depends on missing rule '" + dep + "'");
-                    }
-                }
-            }
-        }
-        
-        return issues;
-    }
-
-    // Template specializations
-    
-    template<>
-    std::shared_ptr<AST::Program> CSTParser::parseRule<AST::Program>(const std::string& ruleName, ParserMode mode) {
-        setParserMode(mode);
-        ParseContext context(mode, this, tokens);
-        auto result = executeRule(ruleName, context);
-        
-        if (result.success) {
-            return result.getAST<AST::Program>();
-        }
-        return nullptr;
-    }
-    
-    template<>
-    std::shared_ptr<AST::Statement> CSTParser::parseRule<AST::Statement>(const std::string& ruleName, ParserMode mode) {
-        setParserMode(mode);
-        ParseContext context(mode, this, tokens);
-        auto result = executeRule(ruleName, context);
-        
-        if (result.success) {
-            return result.getAST<AST::Statement>();
-        }
-        return nullptr;
-    }
-    
-    template<>
-    std::shared_ptr<AST::Expression> CSTParser::parseRule<AST::Expression>(const std::string& ruleName, ParserMode mode) {
-        setParserMode(mode);
-        ParseContext context(mode, this, tokens);
-        auto result = executeRule(ruleName, context);
-        
-        if (result.success) {
-            return result.getAST<AST::Expression>();
-        }
-        return nullptr;
-    }
-    
-    std::unique_ptr<Node> CSTParser::parseInterpolatedString() {
-        // Handle interpolated strings properly
-        // The scanner generates: STRING INTERPOLATION_START expression INTERPOLATION_END STRING ...
-        auto node = createNode(NodeKind::INTERPOLATION_EXPR);
-        
-        // Add the initial string part (we've already confirmed it exists and consumed the STRING token)
-        auto stringNode = createNode(NodeKind::LITERAL_EXPR);
-        stringNode->addToken(previous()); // The STRING token that was consumed to get here
-        node->addNode(std::move(stringNode));
-        
-        // Handle interpolation parts
+        // Parse interpolation parts
         while (check(TokenType::INTERPOLATION_START)) {
-            // Consume INTERPOLATION_START
-            node->addToken(advance());
+            advance(); // consume INTERPOLATION_START
             
-            // Parse expression inside interpolation
-            auto expr = parseExpression();
-            if (expr) {
-                node->addNode(std::move(expr));
-            }
+            // Parse the expression inside the interpolation
+            auto expr = expression();
+            interpolated->addExpressionPart(expr);
             
             // Expect INTERPOLATION_END
-            if (check(TokenType::INTERPOLATION_END)) {
-                node->addToken(advance());
-            } else {
-                reportError("Expected '}' after interpolation expression", TokenType::INTERPOLATION_END, peek().type);
-            }
+            consume(TokenType::INTERPOLATION_END, "Expected '}' after interpolation expression.");
             
             // Check if there's another string part after this interpolation
             if (check(TokenType::STRING)) {
-                auto stringNode = createNode(NodeKind::LITERAL_EXPR);
-                stringNode->addToken(advance());
-                node->addNode(std::move(stringNode));
+                advance();
+                interpolated->addStringPart(previous().lexeme);
             }
         }
         
-        return node;
+        return interpolated;
     }
-} // namespace CST
+
+    if (match({TokenType::THIS})) {
+        auto thisExpr = std::make_shared<AST::ThisExpr>();
+        thisExpr->line = previous().line;
+        return thisExpr;
+    }
+
+    if (match({TokenType::IDENTIFIER})) {
+        auto token = previous();
+        // Check if this is 'self' keyword
+        if (token.lexeme == "self" || token.lexeme == "this" ) {
+            auto thisExpr = std::make_shared<AST::ThisExpr>();
+            thisExpr->line = token.line;
+            return thisExpr;
+        } else {
+            // Check if this is an object literal: Identifier { ... }
+            if (check(TokenType::LEFT_BRACE)) {
+                // This is an object literal with constructor name
+                auto objExpr = std::make_shared<AST::ObjectLiteralExpr>();
+                objExpr->line = token.line;
+                objExpr->constructorName = token.lexeme;
+                
+                advance(); // consume LEFT_BRACE
+                
+                // Parse key-value pairs
+                if (!check(TokenType::RIGHT_BRACE)) {
+                    do {
+                        // Parse key
+                        Token keyToken = consume(TokenType::IDENTIFIER, "Expected property name in object literal.");
+                        consume(TokenType::COLON, "Expected ':' after property name.");
+                        
+                        // Parse value
+                        auto value = expression();
+                        
+                        objExpr->properties[keyToken.lexeme] = value;
+                    } while (match({TokenType::COMMA}));
+                }
+                
+                consume(TokenType::RIGHT_BRACE, "Expected '}' after object literal properties.");
+                return objExpr;
+            } else {
+                auto varExpr = std::make_shared<AST::VariableExpr>();
+                varExpr->line = token.line;
+                varExpr->name = token.lexeme;
+                return varExpr;
+            }
+        }
+    }
+
+    if (match({TokenType::SLEEP})) {
+        // Treat SLEEP as a function call
+        auto varExpr = std::make_shared<AST::VariableExpr>();
+        varExpr->line = previous().line;
+        varExpr->name = "sleep";
+        return varExpr;
+    }
+
+    // Handle error construction: err(ErrorType) or err(ErrorType(args))
+    if (match({TokenType::ERR})) {
+        auto errorExpr = std::make_shared<AST::ErrorConstructExpr>();
+        errorExpr->line = previous().line;
+        
+        consume(TokenType::LEFT_PAREN, "Expected '(' after 'err'.");
+        
+        // Parse error type
+        errorExpr->errorType = consume(TokenType::IDENTIFIER, "Expected error type name.").lexeme;
+        
+        // Check if there are constructor arguments
+        if (match({TokenType::LEFT_PAREN})) {
+            // Parse constructor arguments: err(ErrorType(arg1, arg2))
+            if (!check(TokenType::RIGHT_PAREN)) {
+                do {
+                    errorExpr->arguments.push_back(expression());
+                } while (match({TokenType::COMMA}));
+            }
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after error constructor arguments.");
+        }
+        
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after error construction.");
+        return errorExpr;
+    }
+
+    // Handle success construction: ok(value)
+    if (match({TokenType::OK})) {
+        auto okExpr = std::make_shared<AST::OkConstructExpr>();
+        okExpr->line = previous().line;
+        
+        consume(TokenType::LEFT_PAREN, "Expected '(' after 'ok'.");
+        okExpr->value = expression();
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after ok value.");
+        
+        return okExpr;
+    }
+
+    // Check for lambda expression: fn(param1, param2): returnType {body}
+    if (check(TokenType::FN)) {
+        return lambdaExpression();
+    }
+
+    if (match({TokenType::LEFT_PAREN})) {
+        auto expr = expression();
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after expression.");
+
+        auto groupingExpr = std::make_shared<AST::GroupingExpr>();
+        groupingExpr->line = previous().line;
+        groupingExpr->expression = expr;
+
+        return groupingExpr;
+    }
+
+    if (match({TokenType::LEFT_BRACKET})) {
+        // Parse list literal
+        std::vector<std::shared_ptr<AST::Expression>> elements;
+
+        if (!check(TokenType::RIGHT_BRACKET)) {
+            do {
+                elements.push_back(expression());
+            } while (match({TokenType::COMMA}));
+        }
+
+        consume(TokenType::RIGHT_BRACKET, "Expected ']' after list elements.");
+
+        auto listExpr = std::make_shared<AST::ListExpr>();
+        listExpr->line = previous().line;
+        listExpr->elements = elements;
+
+        return listExpr;
+    }
+
+    if (match({TokenType::LEFT_BRACE})) {
+        // Parse dictionary literal
+        std::vector<std::pair<std::shared_ptr<AST::Expression>, std::shared_ptr<AST::Expression>>> entries;
+
+        if (!check(TokenType::RIGHT_BRACE)) {
+            do {
+                auto key = expression();
+                consume(TokenType::COLON, "Expected ':' after dictionary key.");
+                auto value = expression();
+
+                entries.push_back({key, value});
+            } while (match({TokenType::COMMA}));
+        }
+
+        consume(TokenType::RIGHT_BRACE, "Expected '}' after dictionary entries.");
+
+        auto dictExpr = std::make_shared<AST::DictExpr>();
+        dictExpr->line = previous().line;
+        dictExpr->entries = entries;
+
+        return dictExpr;
+    }
+
+    // Check if we're in a trait method or other context where an empty expression might be valid
+    if (current > 0 && current < scanner.getTokens().size() && 
+        scanner.getTokens()[current-1].type == TokenType::LEFT_BRACE && 
+        scanner.getTokens()[current].type == TokenType::RIGHT_BRACE) {
+        // This is likely an empty block, so we'll create a placeholder expression
+        auto placeholderExpr = std::make_shared<AST::LiteralExpr>();
+        placeholderExpr->line = peek().line;
+        placeholderExpr->value = nullptr; // Use null as a placeholder
+        return placeholderExpr;
+    } else if (match({TokenType::SELF, TokenType::THIS})) {
+        // Handle 'self' as a special case
+        auto thisExpr = std::make_shared<AST::ThisExpr>();
+        thisExpr->line = previous().line;
+        return thisExpr;
+    } else if (match({TokenType::SUPER})) {
+        // Handle 'super' for parent class access
+        auto superExpr = std::make_shared<AST::SuperExpr>();
+        superExpr->line = previous().line;
+        return superExpr;
+    } else {
+        // Only report error if we're not at the end of input or at a statement terminator
+        if (!isAtEnd() && !check(TokenType::SEMICOLON) && !check(TokenType::RIGHT_BRACE) && 
+            !check(TokenType::RIGHT_PAREN) && !check(TokenType::RIGHT_BRACKET)) {
+            error("Expected expression.", false);
+            advance(); // Move past the error token to avoid infinite loop
+        }
+        return makeErrorExpr();
+    }
+}
+
+std::shared_ptr<AST::Statement> CSTParser::typeDeclaration() {
+    // Create a new type declaration statement
+    auto typeDecl = std::make_shared<AST::TypeDeclaration>();
+    typeDecl->line = previous().line;
+
+    // Parse type name
+    Token name = consume(TokenType::IDENTIFIER, "Expected type name.");
+    typeDecl->name = name.lexeme;
+    
+    // Parse equals sign
+    consume(TokenType::EQUAL, "Expected '=' after type name.");
+    
+    // Parse the right-hand side of the type declaration
+    
+    // For list literals like [any], [str], [Person]
+    if (match({TokenType::LEFT_BRACKET})) {
+        auto listType = std::make_shared<AST::TypeAnnotation>();
+        listType->typeName = "list";
+        listType->isList = true;
+        
+        // Parse element type (e.g., any in [any])
+        if (!check(TokenType::RIGHT_BRACKET)) {
+            // Parse the element type
+            auto elementType = parseTypeAnnotation();
+            listType->elementType = elementType;
+        } else {
+            // Default to any if no element type is specified
+            auto anyType = std::make_shared<AST::TypeAnnotation>();
+            anyType->typeName = "any";
+            anyType->isPrimitive = true;
+            listType->elementType = anyType;
+        }
+        
+        consume(TokenType::RIGHT_BRACKET, "Expected ']' after list element type.");
+        typeDecl->type = listType;
+    }
+    // For dictionary literals like {any: any}, {str: str}, {int: User} or structural types like {name: str, age: int}
+    else if (match({TokenType::LEFT_BRACE})) {
+        // We need to determine if this is a dictionary type or a structural type
+        // Dictionary types have the pattern: {KeyType: ValueType} (single key-value pair)
+        // Structural types have the pattern: {field: Type, field: Type, ...} (field names)
+        
+        // Look ahead to determine the type
+        size_t savedCurrent = current;
+        bool isDictionary = false;
+        
+        // Check if the first token is a type (for dictionary) or identifier (for field name)
+        if (check(TokenType::IDENTIFIER) || isPrimitiveType(peek().type)) {
+            Token firstToken = peek();
+            advance(); // Consume the first token
+            
+            if (match({TokenType::COLON})) {
+                // We have a colon, now check what comes after
+                if (check(TokenType::IDENTIFIER) || isPrimitiveType(peek().type)) {
+                    Token secondToken = peek();
+                    advance(); // Consume the second token
+                    
+                    // If we immediately hit a closing brace, it's a dictionary type
+                    if (check(TokenType::RIGHT_BRACE)) {
+                        isDictionary = true;
+                    }
+                    // If the first token is a primitive type and second is also a type, it's likely a dictionary
+                    else if (isPrimitiveType(firstToken.type) && (isPrimitiveType(secondToken.type) || 
+                             secondToken.lexeme == "any" || secondToken.lexeme == "str" || 
+                             secondToken.lexeme == "int" || secondToken.lexeme == "float")) {
+                        isDictionary = true;
+                    }
+                }
+            }
+        }
+        
+        // Reset the parser position
+        current = savedCurrent;
+        
+        if (isDictionary) {
+            // Parse as dictionary type
+            auto dictType = std::make_shared<AST::TypeAnnotation>();
+            dictType->typeName = "dict";
+            dictType->isDict = true;
+            
+            // Parse key type
+            Token keyToken = advance();
+            auto keyType = std::make_shared<AST::TypeAnnotation>();
+            if (isPrimitiveType(keyToken.type)) {
+                keyType->typeName = tokenTypeToString(keyToken.type);
+                keyType->isPrimitive = true;
+            } else if (keyToken.lexeme == "any") {
+                keyType->typeName = "any";
+                keyType->isPrimitive = true;
+            } else if (keyToken.lexeme == "int") {
+                keyType->typeName = "int";
+                keyType->isPrimitive = true;
+            } else if (keyToken.lexeme == "str") {
+                keyType->typeName = "str";
+                keyType->isPrimitive = true;
+            } else {
+                keyType->typeName = keyToken.lexeme;
+                keyType->isUserDefined = true;
+            }
+            
+            consume(TokenType::COLON, "Expected ':' in dictionary type.");
+            
+            // Parse value type
+            auto valueType = parseTypeAnnotation();
+            
+            // Set the key and value types
+            dictType->keyType = keyType;
+            dictType->valueType = valueType;
+            
+            consume(TokenType::RIGHT_BRACE, "Expected '}' after dictionary type.");
+            typeDecl->type = dictType;
+        } else {
+            // Parse as structural type
+            auto structType = std::make_shared<AST::TypeAnnotation>();
+            structType->typeName = "struct";
+            structType->isStructural = true;
+            
+            // Parse fields until we hit a closing brace
+            while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
+                // Check for rest parameter (...) or extensible record (...baseRecord)
+                if (match({TokenType::ELLIPSIS})) {
+                    structType->hasRest = true;
+                    
+                    // Check if there's a base record identifier after ...
+                    if (check(TokenType::IDENTIFIER)) {
+                        // This is an extensible record with a base record
+                        std::string baseRecordName = consume(TokenType::IDENTIFIER, "Expected base record name after '...'.").lexeme;
+                        
+                        // Store the base record name
+                        if (structType->baseRecord.empty()) {
+                            structType->baseRecord = baseRecordName;
+                        }
+                        
+                        // Also add to the list of base records for multiple inheritance
+                        structType->baseRecords.push_back(baseRecordName);
+                    }
+                    
+                    // Check for comma to continue with more fields
+                    if (check(TokenType::COMMA)) {
+                        consume(TokenType::COMMA, "Expected ',' after rest parameter.");
+                        continue;
+                    } else if (check(TokenType::RIGHT_BRACE)) {
+                        // End of record definition
+                        break;
+                    } else {
+                        error("Expected ',' or '}' after rest parameter.");
+                    }
+                }
+                
+                // Parse field name
+                std::string fieldName;
+                if (check(TokenType::IDENTIFIER)) {
+                    fieldName = consume(TokenType::IDENTIFIER, "Expected field name.").lexeme;
+                } else if (check(TokenType::STRING)) {
+                    // Handle string literals as field names (e.g., { "kind": "Some" })
+                    Token stringToken = consume(TokenType::STRING, "Expected field name.");
+                    fieldName = stringToken.lexeme;
+                    // Remove quotes if present
+                    if (fieldName.size() >= 2 && (fieldName[0] == '"' || fieldName[0] == '\'') && 
+                        (fieldName[fieldName.size()-1] == '"' || fieldName[fieldName.size()-1] == '\'')) {
+                        fieldName = fieldName.substr(1, fieldName.size() - 2);
+                    }
+                } else {
+                    error("Expected field name.");
+                    return typeDecl;
+                }
+                
+                // Parse field type
+                consume(TokenType::COLON, "Expected ':' after field name.");
+                auto fieldType = parseTypeAnnotation();
+                
+                // Add field to structural type
+                structType->structuralFields.push_back({fieldName, fieldType});
+                
+                // Check for comma or end of struct
+                if (!check(TokenType::RIGHT_BRACE)) {
+                    match({TokenType::COMMA}); // Optional comma
+                }
+            }
+            
+            consume(TokenType::RIGHT_BRACE, "Expected '}' after structural type.");
+            typeDecl->type = structType;
+        }
+    }
+    // For union types like Some | None, Success | Error
+    else if (check(TokenType::IDENTIFIER) || isPrimitiveType(peek().type)) {
+        // Parse the first type in the union
+        auto firstType = parseTypeAnnotation();
+        
+        // Check if this is a union type (e.g., Some | None)
+        if (match({TokenType::PIPE})) {
+            // This is a union type
+            auto unionType = std::make_shared<AST::TypeAnnotation>();
+            unionType->typeName = "union";
+            unionType->isUnion = true;
+            unionType->unionTypes.push_back(firstType);
+            
+            // Parse the right side of the union
+            do {
+                unionType->unionTypes.push_back(parseTypeAnnotation());
+            } while (match({TokenType::PIPE}));
+            
+            typeDecl->type = unionType;
+        }
+        // Check if this is an intersection type (e.g., HasName and HasAge)
+        else if (match({TokenType::AND})) {
+            // This is an intersection type
+            auto intersectionType = std::make_shared<AST::TypeAnnotation>();
+            intersectionType->typeName = "intersection";
+            intersectionType->isIntersection = true;
+            intersectionType->unionTypes.push_back(firstType);
+            
+            // Parse the right side of the intersection
+            do {
+                intersectionType->unionTypes.push_back(parseTypeAnnotation());
+            } while (match({TokenType::AND}));
+            
+            typeDecl->type = intersectionType;
+        }
+        // Check if this is a refined type (e.g., int where value > 0)
+        else if (match({TokenType::WHERE})) {
+            // This is a refined type
+            firstType->isRefined = true;
+            firstType->refinementCondition = expression();
+            typeDecl->type = firstType;
+        }
+        // Otherwise, it's a simple type alias
+        else {
+            typeDecl->type = firstType;
+        }
+    }
+    // For nil type
+    else if (match({TokenType::NIL})) {
+        auto nilType = std::make_shared<AST::TypeAnnotation>();
+        nilType->typeName = "nil";
+        nilType->isPrimitive = true;
+        typeDecl->type = nilType;
+    }
+    else {
+        error("Expected type definition after '='.");
+    }
+    
+    // Parse optional semicolon
+    match({TokenType::SEMICOLON});
+    
+    return typeDecl;
+}
+            
+// Type annotation parsing
+std::shared_ptr<AST::TypeAnnotation> CSTParser::parseTypeAnnotation() {
+    // Parse the base type first
+    auto type = parseBasicType();
+    
+    // Check for union types (e.g., int | float)
+    if (check(TokenType::PIPE)) {
+        // This is a union type - create a union and add the first type
+        auto unionType = std::make_shared<AST::TypeAnnotation>();
+        unionType->typeName = "union";
+        unionType->isUnion = true;
+        unionType->unionTypes.push_back(type);
+        
+        // Parse the remaining union types
+        while (match({TokenType::PIPE})) {
+            auto nextType = parseBasicType();
+            unionType->unionTypes.push_back(nextType);
+        }
+        
+        return unionType;
+    }
+    
+    // Check for intersection types (e.g., HasName and HasAge)
+    if (check(TokenType::AND)) {
+        // This is an intersection type
+        auto intersectionType = std::make_shared<AST::TypeAnnotation>();
+        intersectionType->typeName = "intersection";
+        intersectionType->isIntersection = true;
+        intersectionType->unionTypes.push_back(type); // Reuse unionTypes for intersection types
+
+        // Parse the right side of the intersection
+        while (match({TokenType::AND})) {
+            auto nextType = parseBasicType();
+            intersectionType->unionTypes.push_back(nextType);
+        }
+
+        return intersectionType;
+    }
+
+    // Check for refined types (e.g., int where value > 0)
+    if (match({TokenType::WHERE})) {
+        // This is a refined type with a constraint
+        type->isRefined = true;
+        
+        // Parse the refinement condition
+        // For example: "value > 0" or "matches(value, pattern)"
+        type->refinementCondition = expression();
+    }
+
+    return type;
+}
+
+
+// Helper method to check if a token type is a primitive type
+bool CSTParser::isPrimitiveType(TokenType type) {
+    return type == TokenType::INT_TYPE || type == TokenType::INT8_TYPE || type == TokenType::INT16_TYPE ||
+           type == TokenType::INT32_TYPE || type == TokenType::INT64_TYPE || type == TokenType::UINT_TYPE ||
+           type == TokenType::UINT8_TYPE || type == TokenType::UINT16_TYPE || type == TokenType::UINT32_TYPE ||
+           type == TokenType::UINT64_TYPE || type == TokenType::FLOAT_TYPE || type == TokenType::FLOAT32_TYPE ||
+           type == TokenType::FLOAT64_TYPE || type == TokenType::STR_TYPE || type == TokenType::BOOL_TYPE ||
+           type == TokenType::ANY_TYPE || type == TokenType::NIL_TYPE;
+}
+
+// Helper method to convert a token type to a string
+std::string CSTParser::tokenTypeToString(TokenType type) {
+    switch (type) {
+        case TokenType::INT_TYPE: return "int";
+        case TokenType::INT8_TYPE: return "i8";
+        case TokenType::INT16_TYPE: return "i16";
+        case TokenType::INT32_TYPE: return "i32";
+        case TokenType::INT64_TYPE: return "i64";
+        case TokenType::UINT_TYPE: return "uint";
+        case TokenType::UINT8_TYPE: return "u8";
+        case TokenType::UINT16_TYPE: return "u16";
+        case TokenType::UINT32_TYPE: return "u32";
+        case TokenType::UINT64_TYPE: return "u64";
+        case TokenType::FLOAT_TYPE: return "float";
+        case TokenType::FLOAT32_TYPE: return "f32";
+        case TokenType::FLOAT64_TYPE: return "f64";
+        case TokenType::STR_TYPE: return "str";
+        case TokenType::BOOL_TYPE: return "bool";
+        case TokenType::ANY_TYPE: return "any";
+        case TokenType::NIL_TYPE: return "nil";
+        default: return "unknown";
+    }
+}
+
+// Parse union type (e.g., Some | None, int | str | bool)
+std::shared_ptr<AST::TypeAnnotation> CSTParser::parseUnionType() {
+    auto unionType = std::make_shared<AST::TypeAnnotation>();
+    unionType->typeName = "union";
+    unionType->isUnion = true;
+    
+    // Parse the first type in the union (call parseBasicType to avoid recursion)
+    auto firstType = parseBasicType();
+    unionType->unionTypes.push_back(firstType);
+    
+    // Parse additional types separated by PIPE tokens
+    while (match({TokenType::PIPE})) {
+        auto nextType = parseBasicType();
+        unionType->unionTypes.push_back(nextType);
+    }
+    
+    return unionType;
+}
+
+// Parse a basic type without union/intersection logic (to avoid recursion)
+std::shared_ptr<AST::TypeAnnotation> CSTParser::parseBasicType() {
+    auto type = std::make_shared<AST::TypeAnnotation>();
+
+    // Check for list types (e.g., [int], [str], [Person])
+    if (match({TokenType::LEFT_BRACKET})) {
+        type->isList = true;
+        type->typeName = "list";
+        
+        // Parse element type (e.g., int in [int])
+        if (!check(TokenType::RIGHT_BRACKET)) {
+            // Parse the element type
+            type->elementType = parseBasicType();
+        } else {
+            // Default to any if no element type is specified
+            auto anyType = std::make_shared<AST::TypeAnnotation>();
+            anyType->typeName = "any";
+            anyType->isPrimitive = true;
+            type->elementType = anyType;
+        }
+        
+        consume(TokenType::RIGHT_BRACKET, "Expected ']' after list element type.");
+        return type;
+    }
+    
+    // Check for dictionary types (e.g., {str: int}) or structural types (e.g., { name: str, age: int })
+    if (match({TokenType::LEFT_BRACE})) {
+        return parseBraceType();
+    }
+
+    // Parse primitive and user-defined types
+    if (match({TokenType::INT_TYPE})) {
+        type->typeName = "int";
+        type->isPrimitive = true;
+    } else if (match({TokenType::INT8_TYPE})) {
+        type->typeName = "i8";
+        type->isPrimitive = true;
+    } else if (match({TokenType::INT16_TYPE})) {
+        type->typeName = "i16";
+        type->isPrimitive = true;
+    } else if (match({TokenType::INT32_TYPE})) {
+        type->typeName = "i32";
+        type->isPrimitive = true;
+    } else if (match({TokenType::INT64_TYPE})) {
+        type->typeName = "i64";
+        type->isPrimitive = true;
+    } else if (match({TokenType::UINT_TYPE})) {
+        type->typeName = "uint";
+        type->isPrimitive = true;
+    } else if (match({TokenType::UINT8_TYPE})) {
+        type->typeName = "u8";
+        type->isPrimitive = true;
+    } else if (match({TokenType::UINT16_TYPE})) {
+        type->typeName = "u16";
+        type->isPrimitive = true;
+    } else if (match({TokenType::UINT32_TYPE})) {
+        type->typeName = "u32";
+        type->isPrimitive = true;
+    } else if (match({TokenType::UINT64_TYPE})) {
+        type->typeName = "u64";
+        type->isPrimitive = true;
+    } else if (match({TokenType::FLOAT_TYPE})) {
+        type->typeName = "float";
+        type->isPrimitive = true;
+    } else if (match({TokenType::FLOAT32_TYPE})) {
+        type->typeName = "f32";
+        type->isPrimitive = true;
+    } else if (match({TokenType::FLOAT64_TYPE})) {
+        type->typeName = "f64";
+        type->isPrimitive = true;
+    } else if (match({TokenType::STR_TYPE})) {
+        type->typeName = "str";
+        type->isPrimitive = true;
+    } else if (match({TokenType::BOOL_TYPE})) {
+        type->typeName = "bool";
+        type->isPrimitive = true;
+    } else if (match({TokenType::ANY_TYPE})) {
+        type->typeName = "any";
+        type->isPrimitive = true;
+    } else if (match({TokenType::NIL_TYPE})) {
+        type->typeName = "nil";
+        type->isPrimitive = true;
+    } else if (match({TokenType::NIL})) {
+        type->typeName = "nil";
+        type->isPrimitive = true;
+    } else if (match({TokenType::LIST_TYPE})) {
+        type->typeName = "list";
+        type->isList = true;
+    } else if (match({TokenType::DICT_TYPE})) {
+        type->typeName = "dict";
+        type->isDict = true;
+    } else if (match({TokenType::ARRAY_TYPE})) {
+        type->typeName = "array";
+        type->isList = true;
+    } else if (match({TokenType::OPTION_TYPE})) {
+        type->typeName = "option";
+    } else if (match({TokenType::RESULT_TYPE})) {
+        type->typeName = "result";
+    } else if (match({TokenType::CHANNEL_TYPE})) {
+        type->typeName = "channel";
+    } else if (match({TokenType::ATOMIC_TYPE})) {
+        type->typeName = "atomic";
+    } else if (match({TokenType::FUNCTION_TYPE})) {
+        type->typeName = "function";
+        type->isFunction = true;
+        
+        // Check for function signature: (param1: Type1, param2: Type2): ReturnType
+        if (match({TokenType::LEFT_PAREN})) {
+            // Parse parameter types
+            if (!check(TokenType::RIGHT_PAREN)) {
+                do {
+                    // Skip parameter name if present (we only care about types)
+                    if (check(TokenType::IDENTIFIER) && peek().lexeme != "int" && peek().lexeme != "str" && 
+                        peek().lexeme != "bool" && peek().lexeme != "float") {
+                        advance(); // consume parameter name
+                        if (match({TokenType::COLON})) {
+                            // Parse parameter type
+                            type->functionParams.push_back(parseTypeAnnotation());
+                        }
+                    } else {
+                        // Just a type without parameter name
+                        type->functionParams.push_back(parseTypeAnnotation());
+                    }
+                } while (match({TokenType::COMMA}));
+            }
+            
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after function parameters.");
+            
+            // Check for return type
+            if (match({TokenType::COLON})) {
+                type->returnType = parseTypeAnnotation();
+            }
+        }
+    } else if (match({TokenType::ENUM_TYPE})) {
+        type->typeName = "enum";
+    } else if (match({TokenType::SUM_TYPE})) {
+        type->typeName = "sum";
+    } else if (match({TokenType::UNION_TYPE})) {
+        type->typeName = "union";
+        type->isUnion = true;
+    } else if (match({TokenType::STRING})) {
+        // Handle string literals as literal types (e.g., "Some", "None")
+        std::string literalValue = previous().lexeme;
+        // Remove quotes if present
+        if (literalValue.size() >= 2 && (literalValue[0] == '"' || literalValue[0] == '\'') && 
+            (literalValue[literalValue.size()-1] == '"' || literalValue[literalValue.size()-1] == '\'')) {
+            literalValue = literalValue.substr(1, literalValue.size() - 2);
+        }
+        type->typeName = "\"" + literalValue + "\""; // Keep quotes to indicate it's a literal type
+        type->isPrimitive = true; // Treat literal types as primitive
+    } else {
+        // Handle user-defined types
+        if (check(TokenType::IDENTIFIER)) {
+            // Parse the user-defined type name
+            std::string typeName = consume(TokenType::IDENTIFIER, "Expected type name.").lexeme;
+            type->typeName = typeName;
+            type->isUserDefined = true;
+        } else {
+            // Fall back to identifier for user-defined types
+            type->typeName = consume(TokenType::IDENTIFIER, "Expected type name for definition.").lexeme;
+            type->isUserDefined = true;
+        }
+    }
+
+    // Check for optional type or error union type
+    if (match({TokenType::QUESTION})) {
+        // This could be either optional (Type?) or error union (Type?ErrorType1, ErrorType2)
+        if (check(TokenType::IDENTIFIER)) {
+            // This is an error union type: Type?ErrorType1, ErrorType2
+            type->isFallible = true;
+            
+            // Parse the first error type
+            std::string errorType = consume(TokenType::IDENTIFIER, "Expected error type after '?'.").lexeme;
+            type->errorTypes.push_back(errorType);
+            
+            // Parse additional error types separated by commas
+            while (match({TokenType::COMMA})) {
+                std::string additionalErrorType = consume(TokenType::IDENTIFIER, "Expected error type after ','.").lexeme;
+                type->errorTypes.push_back(additionalErrorType);
+            }
+        } else {
+            // This is a simple optional type: Type?
+            type->isOptional = true;
+        }
+    }
+
+    return type;
+}
+
+// Parse brace type - either dictionary {keyType: valueType} or structural {field: type, ...}
+std::shared_ptr<AST::TypeAnnotation> CSTParser::parseBraceType() {
+    // Look ahead to determine if this is a dictionary type or structural type
+    size_t savedCurrent = current;
+    bool isDictionary = false;
+    
+    // Check the pattern to distinguish dictionary from structural type
+    if (check(TokenType::IDENTIFIER) || isPrimitiveType(peek().type)) {
+        Token firstToken = peek();
+        advance();
+        
+        if (match({TokenType::COLON})) {
+            // We have a colon, check what comes after
+            // Dictionary types can have complex value types like [int] or {str: int}
+            if (check(TokenType::IDENTIFIER) || isPrimitiveType(peek().type) || 
+                check(TokenType::LEFT_BRACKET) || check(TokenType::LEFT_BRACE)) {
+                
+                // If the first token is a primitive type, it's likely a dictionary
+                if (isPrimitiveType(firstToken.type)) {
+                    isDictionary = true;
+                } else {
+                    // For identifiers, check if it's a known type name
+                    if (isKnownTypeName(firstToken.lexeme)) {
+                        isDictionary = true;
+                    } else {
+                        // Look at the value type to make a decision
+                        if (check(TokenType::LEFT_BRACKET) || check(TokenType::LEFT_BRACE) ||
+                            isPrimitiveType(peek().type) || isKnownTypeName(peek().lexeme)) {
+                            isDictionary = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Reset parser position
+    current = savedCurrent;
+    
+    if (isDictionary) {
+        return parseDictionaryType();
+    } else {
+        return parseStructuralType();
+    }
+}
+
+// Parse dictionary type {keyType: valueType}
+std::shared_ptr<AST::TypeAnnotation> CSTParser::parseDictionaryType() {
+    auto type = std::make_shared<AST::TypeAnnotation>();
+    type->isDict = true;
+    type->typeName = "dict";
+    
+    // Parse key type
+    auto keyType = parseBasicType();
+    consume(TokenType::COLON, "Expected ':' in dictionary type.");
+    
+    // Parse value type
+    auto valueType = parseBasicType();
+    
+    type->keyType = keyType;
+    type->valueType = valueType;
+    
+    consume(TokenType::RIGHT_BRACE, "Expected '}' after dictionary type.");
+    return type;
+}
+
+// Helper method to check if a lexeme is a known type name
+bool CSTParser::isKnownTypeName(const std::string& name) {
+    return name == "any" || name == "str" || name == "int" || name == "float" || 
+           name == "bool" || name == "list" || name == "dict" || name == "option" || 
+           name == "result";
+}
+
+// Parse structural type (e.g., { name: str, age: int, ...baseRecord })
+std::shared_ptr<AST::TypeAnnotation> CSTParser::parseStructuralType(const std::string& typeName) {
+    auto type = std::make_shared<AST::TypeAnnotation>();
+    type->isStructural = true;
+    type->typeName = typeName.empty() ? "struct" : typeName;
+
+    // Parse fields until we hit a closing brace
+    while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
+        // Check for rest parameter (...) or extensible record (...baseRecord)
+        if (match({TokenType::ELLIPSIS})) {
+            type->hasRest = true;
+            
+            // Check if there's a base record identifier after ...
+            if (check(TokenType::IDENTIFIER)) {
+                // This is an extensible record with a base record
+                std::string baseRecordName = consume(TokenType::IDENTIFIER, "Expected base record name after '...'.").lexeme;
+                
+                // Store the base record name
+                if (type->baseRecord.empty()) {
+                    type->baseRecord = baseRecordName;
+                }
+                
+                // Also add to the list of base records for multiple inheritance
+                type->baseRecords.push_back(baseRecordName);
+            }
+            
+            // Check for comma to continue with more fields
+            if (check(TokenType::COMMA)) {
+                consume(TokenType::COMMA, "Expected ',' after rest parameter.");
+                continue;
+            } else if (check(TokenType::RIGHT_BRACE)) {
+                // End of record definition
+                break;
+            } else {
+                error("Expected ',' or '}' after rest parameter.");
+            }
+        }
+
+        // Parse field name
+        std::string fieldName;
+        if (check(TokenType::IDENTIFIER)) {
+            fieldName = consume(TokenType::IDENTIFIER, "Expected field name.").lexeme;
+        } else if (check(TokenType::STRING)) {
+            // Handle string literals as field names (e.g., { "kind": "Some" })
+            Token stringToken = consume(TokenType::STRING, "Expected field name.");
+            fieldName = stringToken.lexeme;
+            // Remove quotes if present
+            if (fieldName.size() >= 2 && (fieldName[0] == '"' || fieldName[0] == '\'') && 
+                (fieldName[fieldName.size()-1] == '"' || fieldName[fieldName.size()-1] == '\'')) {
+                fieldName = fieldName.substr(1, fieldName.size() - 2);
+            }
+        } else {
+            error("Expected field name.");
+            break;
+        }
+
+        // Parse field type
+        consume(TokenType::COLON, "Expected ':' after field name.");
+        auto fieldType = parseBasicType();
+
+        // Add field to structural type
+        type->structuralFields.push_back({fieldName, fieldType});
+
+        // Check for comma or end of struct
+        if (!check(TokenType::RIGHT_BRACE)) {
+            match({TokenType::COMMA}); // Optional comma
+        }
+    }
+
+    consume(TokenType::RIGHT_BRACE, "Expected '}' after structural type.");
+    return type;
+}
+// Error pattern parsing methods
+
+// Parse val pattern: val identifier
+std::shared_ptr<AST::Expression> CSTParser::parseValPattern() {
+    auto pattern = std::make_shared<AST::ValPatternExpr>();
+    pattern->line = peek().line;
+    
+    consume(TokenType::VAL, "Expected 'val' keyword.");
+    pattern->variableName = consume(TokenType::IDENTIFIER, "Expected variable name after 'val'.").lexeme;
+    
+    return pattern;
+}
+
+// Parse err pattern: err identifier or err ErrorType
+std::shared_ptr<AST::Expression> CSTParser::parseErrPattern() {
+    auto pattern = std::make_shared<AST::ErrPatternExpr>();
+    pattern->line = peek().line;
+    
+    consume(TokenType::ERR, "Expected 'err' keyword.");
+    
+    // Check if this is a specific error type pattern or generic error pattern
+    if (check(TokenType::IDENTIFIER)) {
+        std::string identifier = consume(TokenType::IDENTIFIER, "Expected identifier after 'err'.").lexeme;
+        
+        // Check if this identifier is an error type or a variable name
+        if (isErrorType(identifier)) {
+            // This is a specific error type pattern: err ErrorType
+            pattern->errorType = identifier;
+            pattern->variableName = identifier; // Use error type as variable name by default
+        } else {
+            // This is a generic error pattern: err variable
+            pattern->variableName = identifier;
+        }
+    } else {
+        error("Expected identifier after 'err'.");
+    }
+    
+    return pattern;
+}
+
+// Parse specific error type pattern: ErrorType or ErrorType(params)
+std::shared_ptr<AST::Expression> CSTParser::parseErrorTypePattern() {
+    auto pattern = std::make_shared<AST::ErrorTypePatternExpr>();
+    pattern->line = peek().line;
+    
+    pattern->errorType = consume(TokenType::IDENTIFIER, "Expected error type name.").lexeme;
+    
+    // Check for parameter extraction: ErrorType(param1, param2, ...)
+    if (match({TokenType::LEFT_PAREN})) {
+        if (!check(TokenType::RIGHT_PAREN)) {
+            do {
+                std::string paramName = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
+                pattern->parameterNames.push_back(paramName);
+            } while (match({TokenType::COMMA}));
+        }
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after error type parameters.");
+    }
+    
+    return pattern;
+}
+
+// Helper method to check if an identifier is an error type
+bool CSTParser::isErrorType(const std::string& name) {
+    // Built-in error types
+    return name == "DivisionByZero" || name == "IndexOutOfBounds" || 
+           name == "NullReference" || name == "TypeConversion" || 
+           name == "IOError" || name == "ParseError" || name == "NetworkError" ||
+           name == "Error"; // Generic error type
+}
+
+
+// Block context tracking methods implementation
+
+void CSTParser::pushBlockContext(const std::string& blockType, const Token& startToken) {
+    ErrorHandling::BlockContext context(blockType, startToken.line, startToken.start, startToken.lexeme);
+    blockStack.push(context);
+}
+
+void CSTParser::popBlockContext() {
+    if (!blockStack.empty()) {
+        blockStack.pop();
+    }
+}
+
+std::optional<ErrorHandling::BlockContext> CSTParser::getCurrentBlockContext() const {
+    if (blockStack.empty()) {
+        return std::nullopt;
+    }
+    return blockStack.top();
+}
+
+std::string CSTParser::generateCausedByMessage(const ErrorHandling::BlockContext& context) const {
+    std::string message = "Caused by: Unterminated " + context.blockType + " starting at line " + 
+                         std::to_string(context.startLine) + ":";
+    message += "\n" + std::to_string(context.startLine) + " | " + context.startLexeme;
+    if (context.blockType == "function" || context.blockType == "class") {
+        message += " - unclosed " + context.blockType + " starts here";
+    } else {
+        message += " - unclosed block starts here";
+    }
+    
+
+    
+    return message;
+}
+
+std::shared_ptr<AST::Statement> CSTParser::parseStatementWithContext(const std::string& blockType, const Token& contextToken) {
+    if (check(TokenType::LEFT_BRACE)) {
+        pushBlockContext(blockType, contextToken);
+        auto stmt = statement();
+        popBlockContext();
+        return stmt;
+    } else {
+        return statement();
+    }
+}
+
+// Parse lambda expression: fn(param1, param2): returnType {body}
+std::shared_ptr<AST::LambdaExpr> CSTParser::lambdaExpression() {
+    auto lambda = std::make_shared<AST::LambdaExpr>();
+    lambda->line = peek().line;
+    
+    // Consume 'fn'
+    consume(TokenType::FN, "Expected 'fn' at start of lambda expression.");
+    
+    // Consume opening (
+    consume(TokenType::LEFT_PAREN, "Expected '(' after 'fn'.");
+    
+    // Parse parameters
+    if (!check(TokenType::RIGHT_PAREN)) {
+        do {
+            std::string paramName = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
+            
+            // Check for type annotation
+            std::shared_ptr<AST::TypeAnnotation> paramType = nullptr;
+            if (match({TokenType::COLON})) {
+                paramType = parseTypeAnnotation();
+            }
+            
+            lambda->params.push_back({paramName, paramType});
+        } while (match({TokenType::COMMA}));
+    }
+    
+    // Consume closing )
+    consume(TokenType::RIGHT_PAREN, "Expected ')' after lambda parameters.");
+    
+    // Check for return type annotation
+    if (match({TokenType::COLON})) {
+        lambda->returnType = parseTypeAnnotation();
+    }
+    
+    // Parse lambda body (block statement)
+    consume(TokenType::LEFT_BRACE, "Expected '{' before lambda body.");
+    
+    auto lambdaBody = std::make_shared<AST::BlockStatement>();
+    lambdaBody->line = previous().line;
+    
+    // Parse statements in the lambda body
+    while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
+        lambdaBody->statements.push_back(declaration());
+    }
+    
+    consume(TokenType::RIGHT_BRACE, "Expected '}' after lambda body.");
+    lambda->body = lambdaBody;
+    
+    return lambda;
+}

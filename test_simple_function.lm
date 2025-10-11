@@ -1,9 +1,0 @@
-// Test simple function without closures
-
-fn add(x: int, y: int): int {
-    return x + y;
-}
-
-print("Testing simple function:");
-var result = add(5, 3);
-print("add(5, 3) =", result);

@@ -1,0 +1,1020 @@
+Bytecode for C:\Projects\limitly\tests\classes\advance.lm
+Parser: New CSTParser
+========================================
+
+=== Bytecode ===
+Generated 1012 instructions
+
+   0: PUSH_STRING          "=== Class Inheritance Tests ==="
+   1: PRINT               
+   2: BEGIN_CLASS          "Animal"
+   3: BEGIN_FUNCTION       "init"
+   4: DEFINE_PARAM        
+   5: BEGIN_SCOPE         
+   6: LOAD_THIS           
+   7: LOAD_VAR             "name"
+   8: SET_PROPERTY         "name"
+   9: POP                 
+  10: END_SCOPE           
+  11: PUSH_NULL           
+  12: RETURN              
+  13: END_FUNCTION        
+  14: PUSH_FUNCTION       
+  15: STORE_VAR            "init"
+  16: BEGIN_FUNCTION       "speak"
+  17: BEGIN_SCOPE         
+  18: PUSH_STRING         
+  19: LOAD_THIS           
+  20: GET_PROPERTY         "name"
+  21: PUSH_STRING         
+  22: CONCAT              
+  23: PUSH_STRING          " makes a sound"
+  24: INTERPOLATE_STRING  
+  25: PRINT               
+  26: END_SCOPE           
+  27: PUSH_NULL           
+  28: RETURN              
+  29: END_FUNCTION        
+  30: PUSH_FUNCTION       
+  31: STORE_VAR            "speak"
+  32: BEGIN_FUNCTION       "info"
+  33: BEGIN_SCOPE         
+  34: PUSH_STRING         
+  35: LOAD_THIS           
+  36: GET_PROPERTY         "name"
+  37: PUSH_STRING         
+  38: CONCAT              
+  39: PUSH_STRING          ""Animal is {self.name}"
+  40: INTERPOLATE_STRING  
+  41: PRINT               
+  42: END_SCOPE           
+  43: PUSH_NULL           
+  44: RETURN              
+  45: END_FUNCTION        
+  46: PUSH_FUNCTION       
+  47: STORE_VAR            "info"
+  48: END_CLASS           
+  49: PUSH_STRING          "Dog Class:"
+  50: PRINT               
+  51: BEGIN_CLASS          "Dog"
+  52: SET_SUPERCLASS      
+  53: BEGIN_FUNCTION       "speak"
+  54: BEGIN_SCOPE         
+  55: PUSH_STRING         
+  56: LOAD_THIS           
+  57: GET_PROPERTY         "name"
+  58: PUSH_STRING         
+  59: CONCAT              
+  60: PUSH_STRING          " barks!"
+  61: INTERPOLATE_STRING  
+  62: PRINT               
+  63: END_SCOPE           
+  64: PUSH_NULL           
+  65: RETURN              
+  66: END_FUNCTION        
+  67: PUSH_FUNCTION       
+  68: STORE_VAR            "speak"
+  69: BEGIN_FUNCTION       "wagTail"
+  70: BEGIN_SCOPE         
+  71: PUSH_STRING         
+  72: LOAD_THIS           
+  73: GET_PROPERTY         "name"
+  74: PUSH_STRING         
+  75: CONCAT              
+  76: PUSH_STRING          " wags tail happily"
+  77: INTERPOLATE_STRING  
+  78: PRINT               
+  79: END_SCOPE           
+  80: PUSH_NULL           
+  81: RETURN              
+  82: END_FUNCTION        
+  83: PUSH_FUNCTION       
+  84: STORE_VAR            "wagTail"
+  85: BEGIN_FUNCTION       "info"
+  86: BEGIN_SCOPE         
+  87: PUSH_STRING         
+  88: LOAD_THIS           
+  89: GET_PROPERTY         "name"
+  90: PUSH_STRING         
+  91: CONCAT              
+  92: LOAD_THIS           
+  93: GET_PROPERTY         "breed"
+  94: PUSH_STRING         
+  95: CONCAT              
+  96: PUSH_STRING          ""Dog {self.name} is a {self.breed}"
+  97: INTERPOLATE_STRING  
+  98: PRINT               
+  99: END_SCOPE           
+ 100: PUSH_NULL           
+ 101: RETURN              
+ 102: END_FUNCTION        
+ 103: PUSH_FUNCTION       
+ 104: STORE_VAR            "info"
+ 105: BEGIN_FUNCTION       "init"
+ 106: DEFINE_PARAM        
+ 107: DEFINE_PARAM        
+ 108: BEGIN_SCOPE         
+ 109: LOAD_SUPER          
+ 110: GET_PROPERTY         "init"
+ 111: CALL                
+ 112: POP                 
+ 113: LOAD_THIS           
+ 114: GET_PROPERTY         "name"
+ 115: LOAD_VAR             "name"
+ 116: SET_PROPERTY         "name"
+ 117: POP                 
+ 118: LOAD_THIS           
+ 119: GET_PROPERTY         "breed"
+ 120: LOAD_VAR             "breed"
+ 121: SET_PROPERTY         "breed"
+ 122: POP                 
+ 123: END_SCOPE           
+ 124: PUSH_NULL           
+ 125: RETURN              
+ 126: END_FUNCTION        
+ 127: PUSH_FUNCTION       
+ 128: STORE_VAR            "init"
+ 129: END_CLASS           
+ 130: PUSH_STRING          "Cat Class:"
+ 131: PRINT               
+ 132: BEGIN_CLASS          "Cat"
+ 133: SET_SUPERCLASS      
+ 134: BEGIN_FUNCTION       "speak"
+ 135: BEGIN_SCOPE         
+ 136: PUSH_STRING         
+ 137: LOAD_THIS           
+ 138: GET_PROPERTY         "name"
+ 139: PUSH_STRING         
+ 140: CONCAT              
+ 141: PUSH_STRING          " meows"
+ 142: INTERPOLATE_STRING  
+ 143: PRINT               
+ 144: END_SCOPE           
+ 145: PUSH_NULL           
+ 146: RETURN              
+ 147: END_FUNCTION        
+ 148: PUSH_FUNCTION       
+ 149: STORE_VAR            "speak"
+ 150: BEGIN_FUNCTION       "purr"
+ 151: BEGIN_SCOPE         
+ 152: PUSH_STRING         
+ 153: LOAD_THIS           
+ 154: GET_PROPERTY         "name"
+ 155: PUSH_STRING         
+ 156: CONCAT              
+ 157: PUSH_STRING          " purrs contentedly"
+ 158: INTERPOLATE_STRING  
+ 159: PRINT               
+ 160: END_SCOPE           
+ 161: PUSH_NULL           
+ 162: RETURN              
+ 163: END_FUNCTION        
+ 164: PUSH_FUNCTION       
+ 165: STORE_VAR            "purr"
+ 166: BEGIN_FUNCTION       "init"
+ 167: DEFINE_PARAM        
+ 168: BEGIN_SCOPE         
+ 169: LOAD_SUPER          
+ 170: GET_PROPERTY         "init"
+ 171: CALL                
+ 172: POP                 
+ 173: LOAD_THIS           
+ 174: GET_PROPERTY         "name"
+ 175: LOAD_VAR             "name"
+ 176: SET_PROPERTY         "name"
+ 177: POP                 
+ 178: END_SCOPE           
+ 179: PUSH_NULL           
+ 180: RETURN              
+ 181: END_FUNCTION        
+ 182: PUSH_FUNCTION       
+ 183: STORE_VAR            "init"
+ 184: END_CLASS           
+ 185: BEGIN_CLASS          "SmartDog"
+ 186: SET_SUPERCLASS      
+ 187: BEGIN_FUNCTION       "speak"
+ 188: BEGIN_SCOPE         
+ 189: LOAD_SUPER          
+ 190: GET_PROPERTY         "speak"
+ 191: CALL                
+ 192: POP                 
+ 193: PUSH_STRING          "Woof woof! (intelligently)"
+ 194: PRINT               
+ 195: END_SCOPE           
+ 196: PUSH_NULL           
+ 197: RETURN              
+ 198: END_FUNCTION        
+ 199: PUSH_FUNCTION       
+ 200: STORE_VAR            "speak"
+ 201: BEGIN_FUNCTION       "solve"
+ 202: DEFINE_PARAM        
+ 203: BEGIN_SCOPE         
+ 204: PUSH_STRING         
+ 205: LOAD_THIS           
+ 206: GET_PROPERTY         "name"
+ 207: PUSH_STRING         
+ 208: CONCAT              
+ 209: LOAD_VAR             "problem"
+ 210: PUSH_STRING         
+ 211: CONCAT              
+ 212: PUSH_STRING          ""{self.name} solves: {problem}"
+ 213: INTERPOLATE_STRING  
+ 214: PRINT               
+ 215: END_SCOPE           
+ 216: PUSH_NULL           
+ 217: RETURN              
+ 218: END_FUNCTION        
+ 219: PUSH_FUNCTION       
+ 220: STORE_VAR            "solve"
+ 221: BEGIN_FUNCTION       "getIQ"
+ 222: BEGIN_SCOPE         
+ 223: LOAD_THIS           
+ 224: GET_PROPERTY         "iq"
+ 225: RETURN              
+ 226: END_SCOPE           
+ 227: PUSH_NULL           
+ 228: RETURN              
+ 229: END_FUNCTION        
+ 230: PUSH_FUNCTION       
+ 231: STORE_VAR            "getIQ"
+ 232: BEGIN_FUNCTION       "init"
+ 233: DEFINE_PARAM        
+ 234: DEFINE_PARAM        
+ 235: DEFINE_PARAM        
+ 236: BEGIN_SCOPE         
+ 237: LOAD_SUPER          
+ 238: GET_PROPERTY         "init"
+ 239: CALL                
+ 240: POP                 
+ 241: LOAD_THIS           
+ 242: GET_PROPERTY         "name"
+ 243: LOAD_VAR             "name"
+ 244: SET_PROPERTY         "name"
+ 245: POP                 
+ 246: LOAD_THIS           
+ 247: GET_PROPERTY         "breed"
+ 248: LOAD_VAR             "breed"
+ 249: SET_PROPERTY         "breed"
+ 250: POP                 
+ 251: LOAD_THIS           
+ 252: GET_PROPERTY         "iq"
+ 253: LOAD_VAR             "iq"
+ 254: SET_PROPERTY         "iq"
+ 255: POP                 
+ 256: END_SCOPE           
+ 257: PUSH_NULL           
+ 258: RETURN              
+ 259: END_FUNCTION        
+ 260: PUSH_FUNCTION       
+ 261: STORE_VAR            "init"
+ 262: END_CLASS           
+ 263: BEGIN_CLASS          "Bird"
+ 264: SET_SUPERCLASS      
+ 265: BEGIN_FUNCTION       "speak"
+ 266: BEGIN_SCOPE         
+ 267: PUSH_STRING         
+ 268: LOAD_THIS           
+ 269: GET_PROPERTY         "name"
+ 270: PUSH_STRING         
+ 271: CONCAT              
+ 272: PUSH_STRING          " chirps melodiously"
+ 273: INTERPOLATE_STRING  
+ 274: PRINT               
+ 275: END_SCOPE           
+ 276: PUSH_NULL           
+ 277: RETURN              
+ 278: END_FUNCTION        
+ 279: PUSH_FUNCTION       
+ 280: STORE_VAR            "speak"
+ 281: BEGIN_FUNCTION       "fly"
+ 282: BEGIN_SCOPE         
+ 283: LOAD_THIS           
+ 284: GET_PROPERTY         "canFly"
+ 285: JUMP_IF_FALSE        11
+ 286: BEGIN_SCOPE         
+ 287: PUSH_STRING         
+ 288: LOAD_THIS           
+ 289: GET_PROPERTY         "name"
+ 290: PUSH_STRING         
+ 291: CONCAT              
+ 292: PUSH_STRING          " soars through the sky"
+ 293: INTERPOLATE_STRING  
+ 294: PRINT               
+ 295: END_SCOPE           
+ 296: JUMP                 10
+ 297: BEGIN_SCOPE         
+ 298: PUSH_STRING         
+ 299: LOAD_THIS           
+ 300: GET_PROPERTY         "name"
+ 301: PUSH_STRING         
+ 302: CONCAT              
+ 303: PUSH_STRING          " cannot fly but runs fast"
+ 304: INTERPOLATE_STRING  
+ 305: PRINT               
+ 306: END_SCOPE           
+ 307: END_SCOPE           
+ 308: PUSH_NULL           
+ 309: RETURN              
+ 310: END_FUNCTION        
+ 311: PUSH_FUNCTION       
+ 312: STORE_VAR            "fly"
+ 313: BEGIN_FUNCTION       "info"
+ 314: BEGIN_SCOPE         
+ 315: PUSH_STRING         
+ 316: LOAD_THIS           
+ 317: GET_PROPERTY         "name"
+ 318: PUSH_STRING         
+ 319: CONCAT              
+ 320: LOAD_THIS           
+ 321: GET_PROPERTY         "species"
+ 322: PUSH_STRING         
+ 323: CONCAT              
+ 324: PUSH_STRING          ""Bird {self.name} is a {self.species}"
+ 325: INTERPOLATE_STRING  
+ 326: PRINT               
+ 327: END_SCOPE           
+ 328: PUSH_NULL           
+ 329: RETURN              
+ 330: END_FUNCTION        
+ 331: PUSH_FUNCTION       
+ 332: STORE_VAR            "info"
+ 333: BEGIN_FUNCTION       "init"
+ 334: DEFINE_PARAM        
+ 335: DEFINE_PARAM        
+ 336: DEFINE_PARAM        
+ 337: BEGIN_SCOPE         
+ 338: LOAD_SUPER          
+ 339: GET_PROPERTY         "init"
+ 340: CALL                
+ 341: POP                 
+ 342: LOAD_THIS           
+ 343: GET_PROPERTY         "name"
+ 344: LOAD_VAR             "name"
+ 345: SET_PROPERTY         "name"
+ 346: POP                 
+ 347: LOAD_THIS           
+ 348: GET_PROPERTY         "species"
+ 349: LOAD_VAR             "species"
+ 350: SET_PROPERTY         "species"
+ 351: POP                 
+ 352: LOAD_THIS           
+ 353: GET_PROPERTY         "canFly"
+ 354: LOAD_VAR             "canFly"
+ 355: SET_PROPERTY         "canFly"
+ 356: POP                 
+ 357: END_SCOPE           
+ 358: PUSH_NULL           
+ 359: RETURN              
+ 360: END_FUNCTION        
+ 361: PUSH_FUNCTION       
+ 362: STORE_VAR            "init"
+ 363: END_CLASS           
+ 364: BEGIN_CLASS          "Fish"
+ 365: SET_SUPERCLASS      
+ 366: BEGIN_FUNCTION       "speak"
+ 367: BEGIN_SCOPE         
+ 368: PUSH_STRING         
+ 369: LOAD_THIS           
+ 370: GET_PROPERTY         "name"
+ 371: PUSH_STRING         
+ 372: CONCAT              
+ 373: PUSH_STRING          " makes bubbles"
+ 374: INTERPOLATE_STRING  
+ 375: PRINT               
+ 376: END_SCOPE           
+ 377: PUSH_NULL           
+ 378: RETURN              
+ 379: END_FUNCTION        
+ 380: PUSH_FUNCTION       
+ 381: STORE_VAR            "speak"
+ 382: BEGIN_FUNCTION       "swim"
+ 383: BEGIN_SCOPE         
+ 384: PUSH_STRING         
+ 385: LOAD_THIS           
+ 386: GET_PROPERTY         "name"
+ 387: PUSH_STRING         
+ 388: CONCAT              
+ 389: LOAD_THIS           
+ 390: GET_PROPERTY         "waterType"
+ 391: PUSH_STRING         
+ 392: CONCAT              
+ 393: PUSH_STRING          " water"
+ 394: INTERPOLATE_STRING  
+ 395: PRINT               
+ 396: END_SCOPE           
+ 397: PUSH_NULL           
+ 398: RETURN              
+ 399: END_FUNCTION        
+ 400: PUSH_FUNCTION       
+ 401: STORE_VAR            "swim"
+ 402: BEGIN_FUNCTION       "info"
+ 403: BEGIN_SCOPE         
+ 404: PUSH_STRING         
+ 405: LOAD_THIS           
+ 406: GET_PROPERTY         "name"
+ 407: PUSH_STRING         
+ 408: CONCAT              
+ 409: LOAD_THIS           
+ 410: GET_PROPERTY         "waterType"
+ 411: PUSH_STRING         
+ 412: CONCAT              
+ 413: PUSH_STRING          " water"
+ 414: INTERPOLATE_STRING  
+ 415: PRINT               
+ 416: END_SCOPE           
+ 417: PUSH_NULL           
+ 418: RETURN              
+ 419: END_FUNCTION        
+ 420: PUSH_FUNCTION       
+ 421: STORE_VAR            "info"
+ 422: BEGIN_FUNCTION       "init"
+ 423: DEFINE_PARAM        
+ 424: DEFINE_PARAM        
+ 425: BEGIN_SCOPE         
+ 426: LOAD_SUPER          
+ 427: GET_PROPERTY         "init"
+ 428: CALL                
+ 429: POP                 
+ 430: LOAD_THIS           
+ 431: GET_PROPERTY         "name"
+ 432: LOAD_VAR             "name"
+ 433: SET_PROPERTY         "name"
+ 434: POP                 
+ 435: LOAD_THIS           
+ 436: GET_PROPERTY         "waterType"
+ 437: LOAD_VAR             "waterType"
+ 438: SET_PROPERTY         "waterType"
+ 439: POP                 
+ 440: END_SCOPE           
+ 441: PUSH_NULL           
+ 442: RETURN              
+ 443: END_FUNCTION        
+ 444: PUSH_FUNCTION       
+ 445: STORE_VAR            "init"
+ 446: END_CLASS           
+ 447: BEGIN_CLASS          "HybridPet"
+ 448: SET_SUPERCLASS      
+ 449: PUSH_NULL           
+ 450: DEFINE_FIELD         "species1"
+ 451: PUSH_NULL           
+ 452: DEFINE_FIELD         "species2"
+ 453: PUSH_NULL           
+ 454: DEFINE_FIELD         "age"
+ 455: PUSH_NULL           
+ 456: DEFINE_FIELD         "isValidHybrid"
+ 457: PUSH_NULL           
+ 458: DEFINE_FIELD         "traits"
+ 459: BEGIN_FUNCTION       "init"
+ 460: LOAD_THIS           
+ 461: LOAD_SUPER          
+ 462: CALL                
+ 463: PUSH_NULL           
+ 464: RETURN              
+ 465: END_FUNCTION        
+ 466: BEGIN_FUNCTION       "init"
+ 467: DEFINE_PARAM        
+ 468: DEFINE_PARAM        
+ 469: DEFINE_PARAM        
+ 470: DEFINE_PARAM        
+ 471: BEGIN_SCOPE         
+ 472: LOAD_SUPER          
+ 473: GET_PROPERTY         "init"
+ 474: CALL                
+ 475: POP                 
+ 476: LOAD_VAR             "age"
+ 477: PUSH_INT             0
+ 478: LESS                
+ 479: DUP                 
+ 480: JUMP_IF_FALSE        4
+ 481: POP                 
+ 482: LOAD_VAR             "age"
+ 483: PUSH_INT             30
+ 484: GREATER             
+ 485: JUMP_IF_FALSE        10
+ 486: BEGIN_SCOPE         
+ 487: PUSH_STRING         
+ 488: LOAD_VAR             "age"
+ 489: PUSH_STRING         
+ 490: CONCAT              
+ 491: PUSH_STRING          ""Invalid age for hybrid pet: {age}"
+ 492: INTERPOLATE_STRING  
+ 493: PRINT               
+ 494: END_SCOPE           
+ 495: JUMP                 0
+ 496: LOAD_VAR             "species1"
+ 497: LOAD_VAR             "species2"
+ 498: EQUAL               
+ 499: JUMP_IF_FALSE        10
+ 500: BEGIN_SCOPE         
+ 501: PUSH_STRING         
+ 502: LOAD_VAR             "species1"
+ 503: PUSH_STRING         
+ 504: CONCAT              
+ 505: PUSH_STRING          ""Cannot create hybrid from same species: {species1}"
+ 506: INTERPOLATE_STRING  
+ 507: PRINT               
+ 508: END_SCOPE           
+ 509: JUMP                 0
+ 510: LOAD_THIS           
+ 511: LOAD_VAR             "species1"
+ 512: SET_PROPERTY         "species1"
+ 513: POP                 
+ 514: LOAD_THIS           
+ 515: LOAD_VAR             "species2"
+ 516: SET_PROPERTY         "species2"
+ 517: POP                 
+ 518: LOAD_THIS           
+ 519: LOAD_VAR             "age"
+ 520: SET_PROPERTY         "age"
+ 521: POP                 
+ 522: LOAD_THIS           
+ 523: LOAD_THIS           
+ 524: GET_PROPERTY         "validateHybrid"
+ 525: CALL                
+ 526: SET_PROPERTY         "isValidHybrid"
+ 527: POP                 
+ 528: LOAD_THIS           
+ 529: LOAD_THIS           
+ 530: GET_PROPERTY         "generateTraits"
+ 531: CALL                
+ 532: SET_PROPERTY         "traits"
+ 533: POP                 
+ 534: PUSH_STRING         
+ 535: LOAD_THIS           
+ 536: GET_PROPERTY         "name"
+ 537: PUSH_STRING         
+ 538: CONCAT              
+ 539: LOAD_THIS           
+ 540: GET_PROPERTY         "species1"
+ 541: PUSH_STRING         
+ 542: CONCAT              
+ 543: LOAD_THIS           
+ 544: GET_PROPERTY         "species2"
+ 545: PUSH_STRING         
+ 546: CONCAT              
+ 547: PUSH_STRING          " mix"
+ 548: INTERPOLATE_STRING  
+ 549: PRINT               
+ 550: LOAD_THIS           
+ 551: GET_PROPERTY         "isValidHybrid"
+ 552: NOT                 
+ 553: JUMP_IF_FALSE        5
+ 554: BEGIN_SCOPE         
+ 555: PUSH_STRING          "Warning: Unusual hybrid combination detected"
+ 556: PRINT               
+ 557: END_SCOPE           
+ 558: JUMP                 0
+ 559: END_SCOPE           
+ 560: PUSH_NULL           
+ 561: RETURN              
+ 562: END_FUNCTION        
+ 563: PUSH_FUNCTION       
+ 564: STORE_VAR            "init"
+ 565: BEGIN_FUNCTION       "validateHybrid"
+ 566: BEGIN_SCOPE         
+ 567: PUSH_STRING          "Cat"
+ 568: PUSH_STRING          "Lion"
+ 569: CREATE_LIST         
+ 570: PUSH_STRING          "Dog"
+ 571: PUSH_STRING          "Wolf"
+ 572: CREATE_LIST         
+ 573: PUSH_STRING          "Horse"
+ 574: PUSH_STRING          "Donkey"
+ 575: CREATE_LIST         
+ 576: PUSH_STRING          "Tiger"
+ 577: PUSH_STRING          "Lion"
+ 578: CREATE_LIST         
+ 579: PUSH_STRING          "Cat"
+ 580: PUSH_STRING          "Tiger"
+ 581: CREATE_LIST         
+ 582: PUSH_STRING          "Dog"
+ 583: PUSH_STRING          "Fox"
+ 584: CREATE_LIST         
+ 585: CREATE_LIST         
+ 586: STORE_VAR            "validCombos"
+ 587: LOAD_VAR             "validCombos"
+ 588: GET_ITERATOR        
+ 589: STORE_TEMP          
+ 590: LOAD_TEMP           
+ 591: ITERATOR_HAS_NEXT   
+ 592: JUMP_IF_FALSE        45
+ 593: LOAD_TEMP           
+ 594: ITERATOR_NEXT       
+ 595: STORE_VAR            "combo"
+ 596: BEGIN_SCOPE         
+ 597: LOAD_VAR             "combo"
+ 598: PUSH_INT             0
+ 599: GET_INDEX           
+ 600: LOAD_THIS           
+ 601: GET_PROPERTY         "species1"
+ 602: EQUAL               
+ 603: DUP                 
+ 604: JUMP_IF_TRUE         7
+ 605: POP                 
+ 606: LOAD_VAR             "combo"
+ 607: PUSH_INT             1
+ 608: GET_INDEX           
+ 609: LOAD_THIS           
+ 610: GET_PROPERTY         "species2"
+ 611: EQUAL               
+ 612: DUP                 
+ 613: JUMP_IF_FALSE        16
+ 614: POP                 
+ 615: LOAD_VAR             "combo"
+ 616: PUSH_INT             0
+ 617: GET_INDEX           
+ 618: LOAD_THIS           
+ 619: GET_PROPERTY         "species2"
+ 620: EQUAL               
+ 621: DUP                 
+ 622: JUMP_IF_TRUE         7
+ 623: POP                 
+ 624: LOAD_VAR             "combo"
+ 625: PUSH_INT             1
+ 626: GET_INDEX           
+ 627: LOAD_THIS           
+ 628: GET_PROPERTY         "species1"
+ 629: EQUAL               
+ 630: JUMP_IF_FALSE        5
+ 631: BEGIN_SCOPE         
+ 632: PUSH_BOOL            true
+ 633: RETURN              
+ 634: END_SCOPE           
+ 635: JUMP                 0
+ 636: END_SCOPE           
+ 637: JUMP                 -48
+ 638: CLEAR_TEMP          
+ 639: PUSH_BOOL            false
+ 640: RETURN              
+ 641: END_SCOPE           
+ 642: PUSH_NULL           
+ 643: RETURN              
+ 644: END_FUNCTION        
+ 645: PUSH_FUNCTION       
+ 646: STORE_VAR            "validateHybrid"
+ 647: BEGIN_FUNCTION       "generateTraits"
+ 648: BEGIN_SCOPE         
+ 649: CREATE_LIST         
+ 650: STORE_VAR            "traits"
+ 651: LOAD_THIS           
+ 652: GET_PROPERTY         "species1"
+ 653: PUSH_STRING          "Cat"
+ 654: EQUAL               
+ 655: DUP                 
+ 656: JUMP_IF_FALSE        5
+ 657: POP                 
+ 658: LOAD_THIS           
+ 659: GET_PROPERTY         "species2"
+ 660: PUSH_STRING          "Cat"
+ 661: EQUAL               
+ 662: JUMP_IF_FALSE        11
+ 663: BEGIN_SCOPE         
+ 664: LOAD_VAR             "traits"
+ 665: GET_PROPERTY         "append"
+ 666: CALL                
+ 667: POP                 
+ 668: LOAD_VAR             "traits"
+ 669: GET_PROPERTY         "append"
+ 670: CALL                
+ 671: POP                 
+ 672: END_SCOPE           
+ 673: JUMP                 0
+ 674: LOAD_THIS           
+ 675: GET_PROPERTY         "species1"
+ 676: PUSH_STRING          "Dog"
+ 677: EQUAL               
+ 678: DUP                 
+ 679: JUMP_IF_FALSE        5
+ 680: POP                 
+ 681: LOAD_THIS           
+ 682: GET_PROPERTY         "species2"
+ 683: PUSH_STRING          "Dog"
+ 684: EQUAL               
+ 685: JUMP_IF_FALSE        11
+ 686: BEGIN_SCOPE         
+ 687: LOAD_VAR             "traits"
+ 688: GET_PROPERTY         "append"
+ 689: CALL                
+ 690: POP                 
+ 691: LOAD_VAR             "traits"
+ 692: GET_PROPERTY         "append"
+ 693: CALL                
+ 694: POP                 
+ 695: END_SCOPE           
+ 696: JUMP                 0
+ 697: LOAD_THIS           
+ 698: GET_PROPERTY         "species1"
+ 699: PUSH_STRING          "Lion"
+ 700: EQUAL               
+ 701: DUP                 
+ 702: JUMP_IF_FALSE        5
+ 703: POP                 
+ 704: LOAD_THIS           
+ 705: GET_PROPERTY         "species2"
+ 706: PUSH_STRING          "Lion"
+ 707: EQUAL               
+ 708: JUMP_IF_FALSE        11
+ 709: BEGIN_SCOPE         
+ 710: LOAD_VAR             "traits"
+ 711: GET_PROPERTY         "append"
+ 712: CALL                
+ 713: POP                 
+ 714: LOAD_VAR             "traits"
+ 715: GET_PROPERTY         "append"
+ 716: CALL                
+ 717: POP                 
+ 718: END_SCOPE           
+ 719: JUMP                 0
+ 720: LOAD_VAR             "traits"
+ 721: RETURN              
+ 722: END_SCOPE           
+ 723: PUSH_NULL           
+ 724: RETURN              
+ 725: END_FUNCTION        
+ 726: PUSH_FUNCTION       
+ 727: STORE_VAR            "generateTraits"
+ 728: BEGIN_FUNCTION       "speak"
+ 729: BEGIN_SCOPE         
+ 730: LOAD_THIS           
+ 731: GET_PROPERTY         "isValidHybrid"
+ 732: JUMP_IF_FALSE        19
+ 733: BEGIN_SCOPE         
+ 734: PUSH_STRING         
+ 735: LOAD_THIS           
+ 736: GET_PROPERTY         "name"
+ 737: PUSH_STRING         
+ 738: CONCAT              
+ 739: LOAD_THIS           
+ 740: GET_PROPERTY         "species1"
+ 741: PUSH_STRING         
+ 742: CONCAT              
+ 743: LOAD_THIS           
+ 744: GET_PROPERTY         "species2"
+ 745: PUSH_STRING         
+ 746: CONCAT              
+ 747: PUSH_STRING          " sound"
+ 748: INTERPOLATE_STRING  
+ 749: PRINT               
+ 750: END_SCOPE           
+ 751: JUMP                 10
+ 752: BEGIN_SCOPE         
+ 753: PUSH_STRING         
+ 754: LOAD_THIS           
+ 755: GET_PROPERTY         "name"
+ 756: PUSH_STRING         
+ 757: CONCAT              
+ 758: PUSH_STRING          " makes an unusual hybrid sound that's hard to describe"
+ 759: INTERPOLATE_STRING  
+ 760: PRINT               
+ 761: END_SCOPE           
+ 762: END_SCOPE           
+ 763: PUSH_NULL           
+ 764: RETURN              
+ 765: END_FUNCTION        
+ 766: PUSH_FUNCTION       
+ 767: STORE_VAR            "speak"
+ 768: BEGIN_FUNCTION       "getHybridInfo"
+ 769: BEGIN_SCOPE         
+ 770: PUSH_STRING         
+ 771: LOAD_THIS           
+ 772: GET_PROPERTY         "name"
+ 773: PUSH_STRING         
+ 774: CONCAT              
+ 775: LOAD_THIS           
+ 776: GET_PROPERTY         "age"
+ 777: PUSH_STRING         
+ 778: CONCAT              
+ 779: LOAD_THIS           
+ 780: GET_PROPERTY         "species1"
+ 781: PUSH_STRING         
+ 782: CONCAT              
+ 783: LOAD_THIS           
+ 784: GET_PROPERTY         "species2"
+ 785: PUSH_STRING         
+ 786: CONCAT              
+ 787: PUSH_STRING          ""{self.name} is {self.age} years old and is a mix of {self.species1} and {self.species2}"
+ 788: INTERPOLATE_STRING  
+ 789: PRINT               
+ 790: PUSH_STRING         
+ 791: LOAD_THIS           
+ 792: GET_PROPERTY         "isValidHybrid"
+ 793: PUSH_STRING         
+ 794: CONCAT              
+ 795: PUSH_STRING          ""Valid hybrid: {self.isValidHybrid}"
+ 796: INTERPOLATE_STRING  
+ 797: PRINT               
+ 798: PUSH_STRING         
+ 799: LOAD_THIS           
+ 800: GET_PROPERTY         "traits"
+ 801: GET_PROPERTY         "join"
+ 802: CALL                
+ 803: PUSH_STRING         
+ 804: CONCAT              
+ 805: PUSH_STRING          ""Traits: {self.traits.join(', ')}"
+ 806: INTERPOLATE_STRING  
+ 807: PRINT               
+ 808: END_SCOPE           
+ 809: PUSH_NULL           
+ 810: RETURN              
+ 811: END_FUNCTION        
+ 812: PUSH_FUNCTION       
+ 813: STORE_VAR            "getHybridInfo"
+ 814: BEGIN_FUNCTION       "displayTraits"
+ 815: BEGIN_SCOPE         
+ 816: PUSH_STRING         
+ 817: LOAD_THIS           
+ 818: GET_PROPERTY         "name"
+ 819: PUSH_STRING         
+ 820: CONCAT              
+ 821: PUSH_STRING          "'s traits:"
+ 822: INTERPOLATE_STRING  
+ 823: PRINT               
+ 824: LOAD_THIS           
+ 825: GET_PROPERTY         "traits"
+ 826: GET_ITERATOR        
+ 827: STORE_TEMP          
+ 828: LOAD_TEMP           
+ 829: ITERATOR_HAS_NEXT   
+ 830: JUMP_IF_FALSE        13
+ 831: LOAD_TEMP           
+ 832: ITERATOR_NEXT       
+ 833: STORE_VAR            "traity"
+ 834: BEGIN_SCOPE         
+ 835: PUSH_STRING         
+ 836: LOAD_VAR             "traity"
+ 837: PUSH_STRING         
+ 838: CONCAT              
+ 839: PUSH_STRING          ""  - {traity}"
+ 840: INTERPOLATE_STRING  
+ 841: PRINT               
+ 842: END_SCOPE           
+ 843: JUMP                 -16
+ 844: CLEAR_TEMP          
+ 845: END_SCOPE           
+ 846: PUSH_NULL           
+ 847: RETURN              
+ 848: END_FUNCTION        
+ 849: PUSH_FUNCTION       
+ 850: STORE_VAR            "displayTraits"
+ 851: END_CLASS           
+ 852: PUSH_STRING          "Inheritance test:"
+ 853: PRINT               
+ 854: PUSH_STRING          "Buddy"
+ 855: PUSH_STRING          "Golden Retriever"
+ 856: CALL                 "Dog"
+ 857: STORE_VAR            "dog"
+ 858: PUSH_STRING          "Cat class constructor:"
+ 859: PRINT               
+ 860: PUSH_STRING          "Whiskers"
+ 861: CALL                 "Cat"
+ 862: STORE_VAR            "cat"
+ 863: PUSH_STRING          "Smart Dog class constructor:"
+ 864: PRINT               
+ 865: PUSH_STRING          "Einstein"
+ 866: PUSH_STRING          "Border Collie"
+ 867: PUSH_INT             150
+ 868: CALL                 "SmartDog"
+ 869: STORE_VAR            "smartDog"
+ 870: PUSH_STRING          "Sky"
+ 871: PUSH_STRING          "Bald Eagle"
+ 872: PUSH_BOOL            true
+ 873: CALL                 "Bird"
+ 874: STORE_VAR            "eagle"
+ 875: PUSH_STRING          "Waddles"
+ 876: PUSH_STRING          "Emperor Penguin"
+ 877: PUSH_BOOL            false
+ 878: CALL                 "Bird"
+ 879: STORE_VAR            "penguin"
+ 880: PUSH_STRING          "Bubbles"
+ 881: PUSH_STRING          "fresh"
+ 882: CALL                 "Fish"
+ 883: STORE_VAR            "goldfish"
+ 884: PUSH_STRING          "Bruce"
+ 885: PUSH_STRING          "salt"
+ 886: CALL                 "Fish"
+ 887: STORE_VAR            "shark"
+ 888: PUSH_STRING          "Unique"
+ 889: PUSH_STRING          "Cat"
+ 890: PUSH_STRING          "Dog"
+ 891: PUSH_INT             3
+ 892: CALL                 "HybridPet"
+ 893: STORE_VAR            "hybrid"
+ 894: PUSH_STRING          "Dog methods:"
+ 895: PRINT               
+ 896: LOAD_VAR             "dog"
+ 897: GET_PROPERTY         "info"
+ 898: CALL                
+ 899: POP                 
+ 900: LOAD_VAR             "dog"
+ 901: GET_PROPERTY         "speak"
+ 902: CALL                
+ 903: POP                 
+ 904: LOAD_VAR             "dog"
+ 905: GET_PROPERTY         "wagTail"
+ 906: CALL                
+ 907: POP                 
+ 908: PUSH_STRING          "Cat methods:"
+ 909: PRINT               
+ 910: LOAD_VAR             "cat"
+ 911: GET_PROPERTY         "info"
+ 912: CALL                
+ 913: POP                 
+ 914: LOAD_VAR             "cat"
+ 915: GET_PROPERTY         "speak"
+ 916: CALL                
+ 917: POP                 
+ 918: LOAD_VAR             "cat"
+ 919: GET_PROPERTY         "purr"
+ 920: CALL                
+ 921: POP                 
+ 922: PUSH_STRING          "Smart dog methods:"
+ 923: PRINT               
+ 924: LOAD_VAR             "smartDog"
+ 925: GET_PROPERTY         "info"
+ 926: CALL                
+ 927: POP                 
+ 928: LOAD_VAR             "smartDog"
+ 929: GET_PROPERTY         "speak"
+ 930: CALL                
+ 931: POP                 
+ 932: LOAD_VAR             "smartDog"
+ 933: GET_PROPERTY         "solve"
+ 934: CALL                
+ 935: POP                 
+ 936: PUSH_STRING         
+ 937: LOAD_VAR             "smartDog"
+ 938: GET_PROPERTY         "getIQ"
+ 939: CALL                
+ 940: PUSH_STRING         
+ 941: CONCAT              
+ 942: PUSH_STRING          ""Einstein's IQ: {smartDog.getIQ()}"
+ 943: INTERPOLATE_STRING  
+ 944: PRINT               
+ 945: PUSH_STRING          "Bird methods:"
+ 946: PRINT               
+ 947: LOAD_VAR             "eagle"
+ 948: GET_PROPERTY         "info"
+ 949: CALL                
+ 950: POP                 
+ 951: LOAD_VAR             "eagle"
+ 952: GET_PROPERTY         "speak"
+ 953: CALL                
+ 954: POP                 
+ 955: LOAD_VAR             "eagle"
+ 956: GET_PROPERTY         "fly"
+ 957: CALL                
+ 958: POP                 
+ 959: LOAD_VAR             "penguin"
+ 960: GET_PROPERTY         "info"
+ 961: CALL                
+ 962: POP                 
+ 963: LOAD_VAR             "penguin"
+ 964: GET_PROPERTY         "speak"
+ 965: CALL                
+ 966: POP                 
+ 967: LOAD_VAR             "penguin"
+ 968: GET_PROPERTY         "fly"
+ 969: CALL                
+ 970: POP                 
+ 971: PUSH_STRING          "Fish methods:"
+ 972: PRINT               
+ 973: LOAD_VAR             "goldfish"
+ 974: GET_PROPERTY         "info"
+ 975: CALL                
+ 976: POP                 
+ 977: LOAD_VAR             "goldfish"
+ 978: GET_PROPERTY         "speak"
+ 979: CALL                
+ 980: POP                 
+ 981: LOAD_VAR             "goldfish"
+ 982: GET_PROPERTY         "swim"
+ 983: CALL                
+ 984: POP                 
+ 985: LOAD_VAR             "shark"
+ 986: GET_PROPERTY         "info"
+ 987: CALL                
+ 988: POP                 
+ 989: LOAD_VAR             "shark"
+ 990: GET_PROPERTY         "speak"
+ 991: CALL                
+ 992: POP                 
+ 993: LOAD_VAR             "shark"
+ 994: GET_PROPERTY         "swim"
+ 995: CALL                
+ 996: POP                 
+ 997: PUSH_STRING          "Hybrid pet methods:"
+ 998: PRINT               
+ 999: LOAD_VAR             "hybrid"
+1000: GET_PROPERTY         "info"
+1001: CALL                
+1002: POP                 
+1003: LOAD_VAR             "hybrid"
+1004: GET_PROPERTY         "speak"
+1005: CALL                
+1006: POP                 
+1007: LOAD_VAR             "hybrid"
+1008: GET_PROPERTY         "getHybridInfo"
+1009: CALL                
+1010: POP                 
+1011: HALT                
+

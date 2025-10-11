@@ -1,0 +1,59 @@
+CST for C:\Projects\limitly\tests\expressions\ranges.lm
+Parser: New CSTParser from cst_parser.cpp
+Mode: CST (cstMode=true)
+========================================
+
+CST Statistics:
+- CST nodes created: 35
+- Trivia attachments: 76
+- Parse errors: 0
+
+=== Full CST Structure ===
++ Node: PROGRAM [198-374] (Program root node)
+├─ + Node: VAR_DECLARATION [198-238] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [198-199]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [199-200]
+│ ├─ + Node: COMMENT_NODE | Token: // Range with variables [200-223]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [223-224]
+│ ├─ Token: var [224-227]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [227-228]
+│ ├─ + Node: IDENTIFIER [228-233]
+│ │ └─ Token: start [228-233]
+│ ├─ + Node: ASSIGNMENT_EXPR [234-237]
+│ │ ├─ Token: = [234-235]
+│ │ └─ + Node: LITERAL_EXPR [236-237]
+│ │   └─ Token: 5 [236-237]
+│ └─ Token: ; [237-238]
+├─ + Node: VAR_DECLARATION [238-251] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [238-239]
+│ ├─ Token: var [239-242]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [242-243]
+│ ├─ + Node: IDENTIFIER [243-246]
+│ │ └─ Token: end [243-246]
+│ ├─ + Node: ASSIGNMENT_EXPR [247-250]
+│ │ ├─ Token: = [247-248]
+│ │ └─ + Node: LITERAL_EXPR [249-250]
+│ │   └─ Token: 8 [249-250]
+│ └─ Token: ; [250-251]
+└─ + Node: VAR_DECLARATION [333-374] (var declaration)
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [333-334]
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [334-335]
+  ├─ + Node: COMMENT_NODE | Token: // Range with expressions [335-360]
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [360-361]
+  ├─ Token: var [361-364]
+  ├─ + Node: WHITESPACE_NODE | Token:   [364-365]
+  ├─ + Node: IDENTIFIER [365-369]
+  │ └─ Token: base [365-369]
+  ├─ + Node: ASSIGNMENT_EXPR [370-373]
+  │ ├─ Token: = [370-371]
+  │ └─ + Node: LITERAL_EXPR [372-373]
+  │   └─ Token: 2 [372-373]
+  └─ Token: ; [373-374]
+

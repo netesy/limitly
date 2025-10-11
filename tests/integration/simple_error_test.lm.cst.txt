@@ -1,0 +1,110 @@
+CST for C:\Projects\limitly\tests\integration\simple_error_test.lm
+Parser: New CSTParser from cst_parser.cpp
+Mode: CST (cstMode=true)
+========================================
+
+CST Statistics:
+- CST nodes created: 23
+- Trivia attachments: 37
+- Parse errors: 0
+
+=== Full CST Structure ===
++ Node: PROGRAM [168-493] (Program root node)
+├─ + Node: VAR_DECLARATION [168-194] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [168-169]
+│ ├─ + Node: WHITESPACE_NODE | Token:      [169-173]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [173-174]
+│ ├─ + Node: WHITESPACE_NODE | Token:      [174-178]
+│ ├─ Token: var [178-181]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [181-182]
+│ ├─ + Node: IDENTIFIER [182-183]
+│ │ └─ Token: x [182-183]
+│ ├─ + Node: ANNOTATION [183-188]
+│ │ ├─ Token: : [183-184]
+│ │ └─ + Node: PRIMITIVE_TYPE [185-188]
+│ │   └─ Token: int [185-188]
+│ ├─ + Node: ASSIGNMENT_EXPR [189-193]
+│ │ ├─ Token: = [189-190]
+│ │ └─ + Node: LITERAL_EXPR [191-193]
+│ │   └─ Token: 10 [191-193]
+│ └─ Token: ; [193-194]
+├─ + Node: VAR_DECLARATION [194-214] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [194-195]
+│ ├─ + Node: WHITESPACE_NODE | Token:      [195-199]
+│ ├─ Token: var [199-202]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [202-203]
+│ ├─ + Node: IDENTIFIER [203-204]
+│ │ └─ Token: y [203-204]
+│ ├─ + Node: ANNOTATION [204-209]
+│ │ ├─ Token: : [204-205]
+│ │ └─ + Node: PRIMITIVE_TYPE [206-209]
+│ │   └─ Token: int [206-209]
+│ ├─ + Node: ASSIGNMENT_EXPR [210-213]
+│ │ ├─ Token: = [210-211]
+│ │ └─ + Node: LITERAL_EXPR [212-213]
+│ │   └─ Token: 2 [212-213]
+│ └─ Token: ; [213-214]
+├─ + Node: VAR_DECLARATION [214-243] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [214-215]
+│ ├─ + Node: WHITESPACE_NODE | Token:      [215-219]
+│ ├─ Token: var [219-222]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [222-223]
+│ ├─ + Node: IDENTIFIER [223-229]
+│ │ └─ Token: result [223-229]
+│ ├─ + Node: ANNOTATION [229-234]
+│ │ ├─ Token: : [229-230]
+│ │ └─ + Node: PRIMITIVE_TYPE [231-234]
+│ │   └─ Token: int [231-234]
+│ ├─ + Node: ASSIGNMENT_EXPR [235-242]
+│ │ ├─ Token: = [235-236]
+│ │ └─ + Node: LITERAL_EXPR [241-242]
+│ │   └─ Token: y [241-242]
+│ └─ Token: ; [242-243]
+├─ + Node: VAR_DECLARATION [276-304] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [276-277]
+│ ├─ + Node: WHITESPACE_NODE | Token:      [277-281]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [281-282]
+│ ├─ + Node: WHITESPACE_NODE | Token:      [282-286]
+│ ├─ Token: var [286-289]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [289-290]
+│ ├─ + Node: IDENTIFIER [290-294]
+│ │ └─ Token: zero [290-294]
+│ ├─ + Node: ANNOTATION [294-299]
+│ │ ├─ Token: : [294-295]
+│ │ └─ + Node: PRIMITIVE_TYPE [296-299]
+│ │   └─ Token: int [296-299]
+│ ├─ + Node: ASSIGNMENT_EXPR [300-303]
+│ │ ├─ Token: = [300-301]
+│ │ └─ + Node: LITERAL_EXPR [302-303]
+│ │   └─ Token: 0 [302-303]
+│ └─ Token: ; [303-304]
+└─ + Node: VAR_DECLARATION [454-493] (var declaration)
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [454-455]
+  ├─ + Node: WHITESPACE_NODE | Token:      [455-459]
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [459-460]
+  ├─ + Node: WHITESPACE_NODE | Token:     [460-463]
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [463-464]
+  ├─ + Node: WHITESPACE_NODE | Token:      [464-468]
+  ├─ Token: var [468-471]
+  ├─ + Node: WHITESPACE_NODE | Token:   [471-472]
+  ├─ + Node: IDENTIFIER [472-475]
+  │ └─ Token: sum [472-475]
+  ├─ + Node: ANNOTATION [475-480]
+  │ ├─ Token: : [475-476]
+  │ └─ + Node: PRIMITIVE_TYPE [477-480]
+  │   └─ Token: int [477-480]
+  ├─ + Node: ASSIGNMENT_EXPR [481-492]
+  │ ├─ Token: = [481-482]
+  │ └─ + Node: LITERAL_EXPR [491-492]
+  │   └─ Token: ) [491-492]
+  └─ Token: ; [492-493]
+

@@ -1,0 +1,395 @@
+AST for C:\Projects\limitly\tests\error_handling\performance_test.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
+========================================
+
+AST Dump:
+==========
+FunctionDeclaration: success_path_test
+  Parameters:
+    iterations: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      VarDeclaration: sum
+        Initializer:
+          Literal: 0
+      IterStatement:
+        Variables: i
+        Iterable:
+          RangeExpression:
+            Start:
+              Literal: 1
+            End:
+              Variable: iterations
+            Inclusive: true
+        Body:
+          BlockStatement:
+            VarDeclaration: result
+              Initializer:
+                FallibleExpression:
+                  Expression:
+                    CallExpression:
+                      Callee:
+                        Variable: safe_add
+                      Arguments:
+                        Variable: i
+                        Literal: 1
+            ExpressionStatement:
+              Assignment: =
+                Target: sum
+                Value:
+                BinaryExpression: +
+                  Left:
+                    Variable: sum
+                  Operator: +
+                  Right:
+                    Variable: result
+      ReturnStatement:
+        Value:
+          Variable: sum
+FunctionDeclaration: error_path_test
+  Parameters:
+    iterations: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      VarDeclaration: sum
+        Initializer:
+          Literal: 0
+      IterStatement:
+        Variables: i
+        Iterable:
+          RangeExpression:
+            Start:
+              Literal: 1
+            End:
+              Variable: iterations
+            Inclusive: true
+        Body:
+          BlockStatement:
+            VarDeclaration: result
+              Initializer:
+                FallibleExpression:
+                  Expression:
+                    CallExpression:
+                      Callee:
+                        Variable: safe_divide
+                      Arguments:
+                        Variable: i
+                        Literal: 0
+            ExpressionStatement:
+              Assignment: =
+                Target: sum
+                Value:
+                BinaryExpression: +
+                  Left:
+                    Variable: sum
+                  Operator: +
+                  Right:
+                    Variable: result
+      ReturnStatement:
+        Value:
+          Variable: sum
+FunctionDeclaration: mixed_path_test
+  Parameters:
+    iterations: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      VarDeclaration: sum
+        Initializer:
+          Literal: 0
+      IterStatement:
+        Variables: i
+        Iterable:
+          RangeExpression:
+            Start:
+              Literal: 1
+            End:
+              Variable: iterations
+            Inclusive: true
+        Body:
+          BlockStatement:
+            IfStatement:
+              Condition:
+                BinaryExpression: ==
+                  Left:
+                    BinaryExpression: %
+                      Left:
+                        Variable: i
+                      Operator: %
+                      Right:
+                        Literal: 10
+                  Operator: ==
+                  Right:
+                    Literal: 0
+              Then:
+                BlockStatement:
+                  VarDeclaration: result
+                    Initializer:
+                      FallibleExpression:
+                        Expression:
+                          CallExpression:
+                            Callee:
+                              Variable: safe_divide
+                            Arguments:
+                              Variable: i
+                              Literal: 0
+                        ElseHandler:
+                          BlockStatement:
+                            ContinueStatement
+                  ExpressionStatement:
+                    Assignment: =
+                      Target: sum
+                      Value:
+                      BinaryExpression: +
+                        Left:
+                          Variable: sum
+                        Operator: +
+                        Right:
+                          Variable: result
+              Else:
+                BlockStatement:
+                  VarDeclaration: result
+                    Initializer:
+                      FallibleExpression:
+                        Expression:
+                          CallExpression:
+                            Callee:
+                              Variable: safe_add
+                            Arguments:
+                              Variable: i
+                              Literal: 1
+                  ExpressionStatement:
+                    Assignment: =
+                      Target: sum
+                      Value:
+                      BinaryExpression: +
+                        Left:
+                          Variable: sum
+                        Operator: +
+                        Right:
+                          Variable: result
+      ReturnStatement:
+        Value:
+          Variable: sum
+FunctionDeclaration: safe_add
+  Parameters:
+    a: int
+    b: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      ReturnStatement:
+        Value:
+          BinaryExpression: +
+            Left:
+              Variable: a
+            Operator: +
+            Right:
+              Variable: b
+FunctionDeclaration: safe_divide
+  Parameters:
+    a: int
+    b: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      IfStatement:
+        Condition:
+          BinaryExpression: ==
+            Left:
+              Variable: b
+            Operator: ==
+            Right:
+              Literal: 0
+        Then:
+          BlockStatement:
+            ReturnStatement:
+              Value:
+                ErrorConstruct: DivisionByZero
+                  Arguments:
+                    Literal: "Division by zero"
+      ReturnStatement:
+        Value:
+          BinaryExpression: /
+            Left:
+              Variable: a
+            Operator: /
+            Right:
+              Variable: b
+FunctionDeclaration: benchmark_error_handling
+  Body:
+    BlockStatement:
+      VarDeclaration: iterations
+        Initializer:
+          Literal: 10000
+      PrintStatement:
+        Literal: "Running error handling performance tests..."
+      VarDeclaration: start_time
+        Initializer:
+          CallExpression:
+            Callee:
+              Variable: clock
+      VarDeclaration: success_result
+        Initializer:
+          FallibleExpression:
+            Expression:
+              CallExpression:
+                Callee:
+                  Variable: success_path_test
+                Arguments:
+                  Variable: iterations
+            ElseHandler:
+              BlockStatement:
+                PrintStatement:
+                  Literal: "Unexpected error in success path test"
+                ReturnStatement
+      VarDeclaration: success_time
+        Initializer:
+          BinaryExpression: -
+            Left:
+              CallExpression:
+                Callee:
+                  Variable: clock
+            Operator: -
+            Right:
+              Variable: start_time
+      PrintStatement:
+        BinaryExpression: +
+          Left:
+            BinaryExpression: +
+              Left:
+                Literal: "Success path test compvared in "
+              Operator: +
+              Right:
+                Variable: success_time
+          Operator: +
+          Right:
+            Literal: " seconds"
+      PrintStatement:
+        BinaryExpression: +
+          Left:
+            Literal: "Result: "
+          Operator: +
+          Right:
+            Variable: success_result
+      VarDeclaration: mixed_start
+        Initializer:
+          CallExpression:
+            Callee:
+              Variable: clock
+      VarDeclaration: mixed_result
+        Initializer:
+          CallExpression:
+            Callee:
+              Variable: mixed_path_test
+            Arguments:
+              Variable: iterations
+      VarDeclaration: mixed_time
+        Initializer:
+          BinaryExpression: -
+            Left:
+              CallExpression:
+                Callee:
+                  Variable: clock
+            Operator: -
+            Right:
+              Variable: mixed_start
+      PrintStatement:
+        BinaryExpression: +
+          Left:
+            BinaryExpression: +
+              Left:
+                Literal: "Mixed path test compvared in "
+              Operator: +
+              Right:
+                Variable: mixed_time
+          Operator: +
+          Right:
+            Literal: " seconds"
+      PrintStatement:
+        BinaryExpression: +
+          Left:
+            Literal: "Result: "
+          Operator: +
+          Right:
+            Variable: mixed_result
+      VarDeclaration: success_ops_per_sec
+        Initializer:
+          BinaryExpression: /
+            Left:
+              Variable: iterations
+            Operator: /
+            Right:
+              Variable: success_time
+      VarDeclaration: mixed_ops_per_sec
+        Initializer:
+          BinaryExpression: /
+            Left:
+              Variable: iterations
+            Operator: /
+            Right:
+              Variable: mixed_time
+      PrintStatement:
+        BinaryExpression: +
+          Left:
+            BinaryExpression: +
+              Left:
+                Literal: "Success path: "
+              Operator: +
+              Right:
+                Variable: success_ops_per_sec
+          Operator: +
+          Right:
+            Literal: " operations/second"
+      PrintStatement:
+        BinaryExpression: +
+          Left:
+            BinaryExpression: +
+              Left:
+                Literal: "Mixed path: "
+              Operator: +
+              Right:
+                Variable: mixed_ops_per_sec
+          Operator: +
+          Right:
+            Literal: " operations/second"
+      VarDeclaration: overhead_ratio
+        Initializer:
+          BinaryExpression: /
+            Left:
+              Variable: mixed_time
+            Operator: /
+            Right:
+              Variable: success_time
+      PrintStatement:
+        BinaryExpression: +
+          Left:
+            Literal: "Overhead ratio: "
+          Operator: +
+          Right:
+            Variable: overhead_ratio
+      IfStatement:
+        Condition:
+          BinaryExpression: <
+            Left:
+              Variable: overhead_ratio
+            Operator: <
+            Right:
+              Literal: 1.5
+        Then:
+          BlockStatement:
+            PrintStatement:
+              Literal: "✓ Zero-cost abstraction validated - low overhead"
+        Else:
+          BlockStatement:
+            PrintStatement:
+              Literal: "⚠ High overhead detected - optimization needed"
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: benchmark_error_handling

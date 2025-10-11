@@ -1,0 +1,117 @@
+AST for tests\functions\advanced_functions.lm
+Parser mode: CST
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+PrintStatement:
+FunctionDeclaration: <missing>
+  Body:
+    BlockStatement:
+      PrintStatement:
+      ExpressionStatement:
+        Variable: name
+      ExpressionStatement:
+        Literal: "!"
+PrintStatement:
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+FunctionDeclaration: <missing>
+  Body:
+    BlockStatement:
+      PrintStatement:
+      ExpressionStatement:
+        Variable: name
+      ExpressionStatement:
+        Variable: age
+      ExpressionStatement:
+        Variable: active
+      ExpressionStatement:
+        Literal: "\"User: {name}, Age: {age}, Active: {active}"
+PrintStatement:
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+FunctionDeclaration: <missing>
+  Body:
+    BlockStatement:
+FunctionDeclaration: <missing>
+  Body:
+    BlockStatement:
+ReturnStatement
+ReturnStatement
+FunctionDeclaration: <missing>
+  Body:
+    BlockStatement:
+      ReturnStatement
+PrintStatement:
+VarDeclaration: <missing>
+  Type: int
+PrintStatement:
+ExpressionStatement:
+  Variable: result
+ExpressionStatement:
+  Literal: "\"applyOperation(6, 7, multiply) = {result}"
+FunctionDeclaration: <missing>
+  Body:
+    BlockStatement:
+FunctionDeclaration: <missing>
+  Body:
+    BlockStatement:
+      VarDeclaration: <missing>
+        Type: int
+      FunctionDeclaration: <missing>
+        Body:
+          BlockStatement:
+            ExpressionStatement:
+              Variable: <invalid>
+            ExpressionStatement:
+              Literal: 1
+            ReturnStatement
+      ReturnStatement
+PrintStatement:
+VarDeclaration: <missing>
+FunctionDeclaration: <missing>
+  Body:
+    BlockStatement:
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+PrintStatement:
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+ExpressionStatement:
+  Literal: "\"Counter: {counter()}"
+PrintStatement:
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+ExpressionStatement:
+  Literal: "\"Counter: {counter()}"
+PrintStatement:
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+ExpressionStatement:
+  Literal: "\"Counter: {counter()}"

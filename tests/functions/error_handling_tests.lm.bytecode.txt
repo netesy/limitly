@@ -1,0 +1,88 @@
+Bytecode for tests\functions\error_handling_tests.lm
+Parser mode: CST
+========================================
+
+=== Bytecode ===
+Generated 80 instructions
+
+   0: PRINT               
+   1: PRINT               
+   2: PRINT               
+   3: LOAD_VAR             "<invalid>"
+   4: POP                 
+   5: BEGIN_SCOPE         
+   6: PUSH_NULL           
+   7: STORE_VAR            "<missing>"
+   8: PRINT               
+   9: END_SCOPE           
+  10: LOAD_VAR             "<invalid>"
+  11: POP                 
+  12: BEGIN_SCOPE         
+  13: PRINT               
+  14: END_SCOPE           
+  15: PRINT               
+  16: BEGIN_FUNCTION       "<missing>"
+  17: BEGIN_SCOPE         
+  18: PUSH_NULL           
+  19: RETURN              
+  20: END_SCOPE           
+  21: PUSH_NULL           
+  22: RETURN              
+  23: END_FUNCTION        
+  24: PUSH_FUNCTION       
+  25: STORE_VAR            "<missing>"
+  26: LOAD_VAR             "<invalid>"
+  27: POP                 
+  28: BEGIN_SCOPE         
+  29: PUSH_NULL           
+  30: STORE_VAR            "<missing>"
+  31: PRINT               
+  32: END_SCOPE           
+  33: LOAD_VAR             "<invalid>"
+  34: POP                 
+  35: BEGIN_SCOPE         
+  36: PRINT               
+  37: END_SCOPE           
+  38: PRINT               
+  39: LOAD_VAR             "<invalid>"
+  40: POP                 
+  41: BEGIN_SCOPE         
+  42: PUSH_NULL           
+  43: STORE_VAR            "<missing>"
+  44: PRINT               
+  45: END_SCOPE           
+  46: LOAD_VAR             "<invalid>"
+  47: POP                 
+  48: BEGIN_SCOPE         
+  49: PRINT               
+  50: END_SCOPE           
+  51: PRINT               
+  52: BEGIN_FUNCTION       "<missing>"
+  53: BEGIN_SCOPE         
+  54: PUSH_NULL           
+  55: STORE_VAR            "<missing>"
+  56: END_SCOPE           
+  57: PUSH_NULL           
+  58: RETURN              
+  59: END_FUNCTION        
+  60: PUSH_FUNCTION       
+  61: STORE_VAR            "<missing>"
+  62: LOAD_VAR             "<invalid>"
+  63: POP                 
+  64: BEGIN_SCOPE         
+  65: PUSH_NULL           
+  66: STORE_VAR            "<missing>"
+  67: PRINT               
+  68: LOAD_VAR             "result"
+  69: POP                 
+  70: PUSH_STRING          ""Result: {result}"
+  71: POP                 
+  72: END_SCOPE           
+  73: LOAD_VAR             "<invalid>"
+  74: POP                 
+  75: BEGIN_SCOPE         
+  76: PRINT               
+  77: END_SCOPE           
+  78: PRINT               
+  79: HALT                
+

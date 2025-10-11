@@ -1,7 +1,0 @@
-// Test complex lambda expressions
-var simpleAdd = fn(a, b) { a + b };
-var typedMultiply = fn(x: int, y: int): int { x * y };
-var stringFormatter = fn(name: str, age: int): str { 
-    "Name: " + name + ", Age: " + age 
-};
-var noParams = fn(): str { "Hello World" };

@@ -1,0 +1,89 @@
+CST for C:\Projects\limitly\tests\cst\scanner\error_token_generation.lm
+Parser: New CSTParser from cst_parser.cpp
+Mode: CST (cstMode=true)
+========================================
+
+CST Statistics:
+- CST nodes created: 9
+- Trivia attachments: 7
+- Parse errors: 0
+
+=== Full CST Structure ===
++ Node: PROGRAM [0-403] (Program root node)
+├─ + Node: VAR_DECLARATION [0-155] (var declaration)
+│ ├─ + Node: COMMENT_NODE | Token: // Test error token generation in CST scanner [0-45]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [45-46]
+│ ├─ + Node: COMMENT_NODE | Token: // This file contains intentional syntax errors to test error token handling [46-122]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [122-123]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [123-124]
+│ ├─ + Node: COMMENT_NODE | Token: // Valid code first [124-143]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [143-144]
+│ ├─ Token: var [144-147]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [147-148]
+│ ├─ + Node: IDENTIFIER [148-149]
+│ │ └─ Token: x [148-149]
+│ ├─ + Node: ASSIGNMENT_EXPR [150-154]
+│ │ ├─ Token: = [150-151]
+│ │ └─ + Node: LITERAL_EXPR [152-154]
+│ │   └─ Token: 42 [152-154]
+│ └─ Token: ; [154-155]
+├─ + Node: VAR_DECLARATION [155-224] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [155-156]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [156-157]
+│ ├─ + Node: COMMENT_NODE | Token: // Invalid characters that should generate error tokens [157-212]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [212-213]
+│ ├─ Token: var [213-216]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [216-217]
+│ ├─ + Node: IDENTIFIER [217-218]
+│ │ └─ Token: y [217-218]
+│ ├─ + Node: ASSIGNMENT_EXPR [219-223]
+│ │ ├─ Token: = [219-220]
+│ │ └─ + Node: LITERAL_EXPR [221-223]
+│ │   └─ Token: 42 [221-223]
+│ └─ Token: ; [223-224]
+├─ + Node: VAR_DECLARATION [224-316] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token:   [224-225]
+│ ├─ + Node: COMMENT_NODE | Token: // @ invalid;  // @ is not a valid operator [225-268]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [268-269]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [269-270]
+│ ├─ + Node: COMMENT_NODE | Token: // Invalid number formats   [270-297]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [297-298]
+│ ├─ Token: var [298-301]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [301-302]
+│ ├─ + Node: IDENTIFIER [302-309]
+│ │ └─ Token: bad_num [302-309]
+│ ├─ + Node: ASSIGNMENT_EXPR [310-315]
+│ │ ├─ Token: = [310-311]
+│ │ └─ + Node: LITERAL_EXPR [312-315]
+│ │   └─ Token: 123 [312-315]
+│ └─ Token: ; [315-316]
+└─ + Node: VAR_DECLARATION [316-403] (var declaration)
+  ├─ + Node: WHITESPACE_NODE | Token:   [316-317]
+  ├─ + Node: COMMENT_NODE | Token: // .456.789;  // Multiple decimal points [317-357]
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [357-358]
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [358-359]
+  ├─ + Node: COMMENT_NODE | Token: // Test recovery after errors [359-388]
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [388-389]
+  ├─ Token: var [389-392]
+  ├─ + Node: WHITESPACE_NODE | Token:   [392-393]
+  ├─ + Node: IDENTIFIER [393-394]
+  │ └─ Token: z [393-394]
+  ├─ + Node: ASSIGNMENT_EXPR [395-402]
+  │ ├─ Token: = [395-396]
+  │ └─ + Node: LITERAL_EXPR [401-402]
+  │   └─ Token: y [401-402]
+  └─ Token: ; [402-403]
+

@@ -2,11 +2,29 @@
 #include "../common/debugger.hh"
 
 std::vector<Token> Scanner::scanTokens() {
-    // Reset CST config to default (no trivia preservation) for regular scanning
-    cstConfig = CSTConfig{};
-    cstConfig.preserveWhitespace = false;
-    cstConfig.preserveComments = false;
-    cstConfig.emitErrorTokens = false;
+    return scanTokens(ScanMode::LEGACY);
+}
+
+std::vector<Token> Scanner::scanTokens(ScanMode mode) {
+    scanMode = mode;
+    
+    if (mode == ScanMode::LEGACY) {
+        // Original behavior - no trivia preservation
+        cstConfig = CSTConfig{};
+        cstConfig.preserveWhitespace = false;
+        cstConfig.preserveComments = false;
+        cstConfig.emitErrorTokens = false;
+        cstConfig.attachTrivia = false;
+    } else {
+        // CST mode - preserve trivia and attach to tokens
+        cstConfig = CSTConfig{};
+        cstConfig.preserveWhitespace = true;
+        cstConfig.preserveComments = true;
+        cstConfig.emitErrorTokens = true;
+        cstConfig.attachTrivia = true;
+    }
+    
+    triviaBuffer.clear();
     
     while (!isAtEnd()) {
         start = current;
@@ -117,8 +135,9 @@ void Scanner::scanToken() {
     case '/':
         if (match('/')) {
             // A comment goes until the end of the line.
-            if (cstConfig.preserveComments) {
+            if (scanMode == ScanMode::CST) {
                 scanComment();
+                collectTrivia(TokenType::COMMENT_LINE);
             } else {
                 // Original behavior - skip comment
                 while (peek() != '\n' && !isAtEnd())
@@ -126,8 +145,9 @@ void Scanner::scanToken() {
             }
         } else if (match('*')) {
             // Block comment
-            if (cstConfig.preserveComments) {
+            if (scanMode == ScanMode::CST) {
                 scanComment();
+                collectTrivia(TokenType::COMMENT_BLOCK);
             } else {
                 // Original behavior - skip block comment
                 while (!isAtEnd()) {
@@ -168,14 +188,17 @@ void Scanner::scanToken() {
     case ' ':
     case '\r':
     case '\t':
-        if (cstConfig.preserveWhitespace) {
+        if (scanMode == ScanMode::CST) {
+            // In CST mode, collect whitespace as trivia
             scanWhitespace();
+            collectTrivia(TokenType::WHITESPACE);
         }
         // Otherwise ignore whitespace (original behavior)
         break;
     case '\n':
-        if (cstConfig.preserveWhitespace) {
-            addToken(TokenType::NEWLINE);
+        if (scanMode == ScanMode::CST) {
+            // In CST mode, collect newlines as trivia
+            collectTrivia(TokenType::NEWLINE);
         }
         line++;
         break;
@@ -271,8 +294,14 @@ void Scanner::addToken(TokenType type, const std::string& text) {
     
     Token token = {type, lexeme, line, start, current, {}, {}};  // Include end position and trivia
     
-    // Attach trivia if CST mode is enabled
-    attachTrivia(token, cstConfig);
+    // In CST mode, attach collected trivia to meaningful tokens
+    if (scanMode == ScanMode::CST && 
+        type != TokenType::WHITESPACE && 
+        type != TokenType::NEWLINE && 
+        type != TokenType::COMMENT_LINE && 
+        type != TokenType::COMMENT_BLOCK) {
+        attachTriviaToToken(token);
+    }
     
     tokens.push_back(token);
     currentToken = tokens.back(); // Update currentToken
@@ -584,6 +613,7 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "and") return TokenType::AND;
     if (rest == "as") return TokenType::AS;
     if (rest == "class") return TokenType::CLASS;
+    if (rest == "elif") return TokenType::ELIF;
     if (rest == "else") return TokenType::ELSE;
     if (rest == "false") return TokenType::FALSE;
     if (rest == "for") return TokenType::FOR;
@@ -1050,19 +1080,21 @@ void Scanner::scanWhitespace() {
     while (!isAtEnd() && (peek() == ' ' || peek() == '\r' || peek() == '\t')) {
         advance();
     }
-    addToken(TokenType::WHITESPACE);
+    // Don't call addToken here - let collectTrivia handle it
 }
 
 void Scanner::scanComment() {
-    // Check if this is a line comment (//) or block comment (/*)
-    if (source[current - 1] == '/' && source[current - 2] == '/') {
+    // We're already positioned after the '//' or '/*'
+    // For line comments, consume until end of line
+    if (source[current - 2] == '/' && source[current - 1] == '/') {
         // Line comment - consume until end of line
         while (peek() != '\n' && !isAtEnd()) {
             advance();
         }
-        addToken(TokenType::COMMENT_LINE);
-    } else if (source[current - 1] == '*' && source[current - 2] == '/') {
-        // Block comment - consume until */
+        // Don't call addToken here - let collectTrivia handle it
+    } else {
+        // Block comment - we're positioned after '/*'
+        // Consume until we find '*/'
         while (!isAtEnd()) {
             if (peek() == '*' && peekNext() == '/') {
                 advance(); // consume '*'
@@ -1074,7 +1106,7 @@ void Scanner::scanComment() {
             }
             advance();
         }
-        addToken(TokenType::COMMENT_BLOCK);
+        // Don't call addToken here - let collectTrivia handle it
     }
 }
 
@@ -1103,8 +1135,48 @@ void Scanner::attachTrivia(Token& token, const CSTConfig& config) {
     triviaBuffer.clear();
 }
 
+void Scanner::collectTrivia(TokenType triviaType) {
+    // Create trivia token from current scan
+    std::string lexeme = source.substr(start, current - start);
+    Token triviaToken = {triviaType, lexeme, line, start, current, {}, {}};
+    
+    // Add to trivia buffer for attachment to next meaningful token
+    triviaBuffer.push_back(triviaToken);
+}
+
+void Scanner::attachTriviaToToken(Token& token) {
+    if (!triviaBuffer.empty()) {
+        // Attach all collected trivia as leading trivia
+        token.leadingTrivia = triviaBuffer;
+        triviaBuffer.clear();
+    }
+    
+    // After adding this meaningful token, we need to collect any trailing trivia
+    // until the next meaningful token. This will be handled by the scanning loop
+    // as it encounters whitespace/comments after this token.
+}
+
 void Scanner::error(const std::string& message, const std::string& expectedValue) {
     // Get the current lexeme for better error reporting
     std::string lexeme = getLexeme();
     Debugger::error(message, getLine(), static_cast<int>(getCurrent()), InterpretationStage::SCANNING, source, filePath, lexeme, expectedValue);
+}
+// Implementation of Token::reconstructSource() method
+std::string Token::reconstructSource() const {
+    std::string result;
+    
+    // Add leading trivia
+    for (const auto& trivia : leadingTrivia) {
+        result += trivia.lexeme;
+    }
+    
+    // Add the main token lexeme
+    result += lexeme;
+    
+    // Add trailing trivia
+    for (const auto& trivia : trailingTrivia) {
+        result += trivia.lexeme;
+    }
+    
+    return result;
 }

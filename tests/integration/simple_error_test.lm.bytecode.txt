@@ -1,0 +1,82 @@
+Bytecode for C:\Projects\limitly\tests\integration\simple_error_test.lm
+Parser: New CSTParser
+========================================
+
+=== Bytecode ===
+Generated 74 instructions
+
+   0: PUSH_STRING          "=== Simple Error Handling Test ==="
+   1: PRINT               
+   2: BEGIN_FUNCTION       "add"
+   3: DEFINE_PARAM        
+   4: DEFINE_PARAM        
+   5: BEGIN_SCOPE         
+   6: LOAD_VAR             "a"
+   7: LOAD_VAR             "b"
+   8: ADD                 
+   9: RETURN              
+  10: END_SCOPE           
+  11: PUSH_NULL           
+  12: RETURN              
+  13: END_FUNCTION        
+  14: PUSH_FUNCTION       
+  15: STORE_VAR            "add"
+  16: BEGIN_FUNCTION       "test_basic_operations"
+  17: BEGIN_SCOPE         
+  18: PUSH_STRING          "Testing basic operations..."
+  19: PRINT               
+  20: PUSH_INT             10
+  21: STORE_VAR            "x"
+  22: PUSH_INT             2
+  23: STORE_VAR            "y"
+  24: LOAD_VAR             "x"
+  25: LOAD_VAR             "y"
+  26: DIVIDE              
+  27: STORE_VAR            "result"
+  28: PUSH_STRING          "10 / 2 = "
+  29: LOAD_VAR             "result"
+  30: ADD                 
+  31: PRINT               
+  32: PUSH_INT             0
+  33: STORE_VAR            "zero"
+  34: LOAD_VAR             "zero"
+  35: PUSH_INT             0
+  36: EQUAL               
+  37: JUMP_IF_FALSE        5
+  38: BEGIN_SCOPE         
+  39: PUSH_STRING          "Division by zero would be an error"
+  40: PRINT               
+  41: END_SCOPE           
+  42: JUMP                 0
+  43: END_SCOPE           
+  44: PUSH_NULL           
+  45: RETURN              
+  46: END_FUNCTION        
+  47: PUSH_FUNCTION       
+  48: STORE_VAR            "test_basic_operations"
+  49: BEGIN_FUNCTION       "test_function_calls"
+  50: BEGIN_SCOPE         
+  51: PUSH_STRING          "Testing function calls..."
+  52: PRINT               
+  53: PUSH_INT             5
+  54: PUSH_INT             3
+  55: CALL                 "add"
+  56: STORE_VAR            "sum"
+  57: PUSH_STRING          "5 + 3 = "
+  58: LOAD_VAR             "sum"
+  59: ADD                 
+  60: PRINT               
+  61: END_SCOPE           
+  62: PUSH_NULL           
+  63: RETURN              
+  64: END_FUNCTION        
+  65: PUSH_FUNCTION       
+  66: STORE_VAR            "test_function_calls"
+  67: CALL                 "test_basic_operations"
+  68: POP                 
+  69: CALL                 "test_function_calls"
+  70: POP                 
+  71: PUSH_STRING          "=== Error Handling Test Compvare ==="
+  72: PRINT               
+  73: HALT                
+

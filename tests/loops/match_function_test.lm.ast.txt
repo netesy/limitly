@@ -1,0 +1,41 @@
+AST for tests\loops\match_function_test.lm
+Parser mode: CST
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+FunctionDeclaration: <missing>
+  Body:
+    BlockStatement:
+      PrintStatement:
+      ExpressionStatement:
+        Variable: value
+      ExpressionStatement:
+        Literal: "\"Testing value: {value}"
+      ExpressionStatement:
+        Variable: value
+      BlockStatement:
+        ExpressionStatement:
+          Literal: nil
+        BlockStatement:
+          PrintStatement:
+        ExpressionStatement:
+          Literal: nil
+        BlockStatement:
+          PrintStatement:
+        BlockStatement:
+          PrintStatement:
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      (null)
+PrintStatement:

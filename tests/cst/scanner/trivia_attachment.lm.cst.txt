@@ -1,0 +1,52 @@
+CST for C:\Projects\limitly\tests\cst\scanner\trivia_attachment.lm
+Parser: New CSTParser from cst_parser.cpp
+Mode: CST (cstMode=true)
+========================================
+
+CST Statistics:
+- CST nodes created: 9
+- Trivia attachments: 14
+- Parse errors: 0
+
+=== Full CST Structure ===
++ Node: PROGRAM [0-587] (Program root node)
+├─ + Node: VAR_DECLARATION [0-183] (var declaration)
+│ ├─ + Node: COMMENT_NODE | Token: // Test trivia attachment in CST scanner [0-40]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [40-41]
+│ ├─ + Node: COMMENT_NODE | Token: // This file tests that trivia (whitespace/comments) is properly attached to meaningful tokens [41-135]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [135-136]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [136-137]
+│ ├─ + Node: COMMENT_NODE | Token: /* Leading comment for variable */ [137-171]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [171-172]
+│ ├─ Token: var [172-175]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [175-176]
+│ ├─ + Node: IDENTIFIER [176-177]
+│ │ └─ Token: x [176-177]
+│ ├─ + Node: ASSIGNMENT_EXPR [178-182]
+│ │ ├─ Token: = [178-179]
+│ │ └─ + Node: LITERAL_EXPR [180-182]
+│ │   └─ Token: 42 [180-182]
+│ └─ Token: ; [182-183]
+└─ + Node: VAR_DECLARATION [476-587] (var declaration)
+  ├─ + Node: WHITESPACE_NODE | Token:   [476-477]
+  ├─ + Node: COMMENT_NODE | Token: /* Trailing block comment */ [477-505]
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [505-506]
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [506-507]
+  ├─ + Node: COMMENT_NODE | Token: // Test trivia around operators [507-538]
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [538-539]
+  ├─ Token: var [539-542]
+  ├─ + Node: WHITESPACE_NODE | Token:   [542-543]
+  ├─ + Node: IDENTIFIER [543-549]
+  │ └─ Token: result [543-549]
+  ├─ + Node: ASSIGNMENT_EXPR [550-586]
+  │ ├─ Token: = [550-551]
+  │ └─ + Node: LITERAL_EXPR [584-586]
+  │   └─ Token: 10 [584-586]
+  └─ Token: ; [586-587]
+

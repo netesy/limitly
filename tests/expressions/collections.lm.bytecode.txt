@@ -1,0 +1,114 @@
+Bytecode for C:\Projects\limitly\tests\expressions\collections.lm
+Parser: New CSTParser
+========================================
+
+=== Bytecode ===
+Generated 106 instructions
+
+   0: PUSH_STRING          "=== Collection Operations Test ==="
+   1: PRINT               
+   2: PUSH_STRING          "List operations:"
+   3: PRINT               
+   4: PUSH_INT             1
+   5: PUSH_INT             2
+   6: PUSH_INT             3
+   7: PUSH_INT             4
+   8: PUSH_INT             5
+   9: CREATE_LIST         
+  10: STORE_VAR            "myList"
+  11: PUSH_STRING          "Initial list: "
+  12: LOAD_VAR             "myList"
+  13: ADD                 
+  14: PRINT               
+  15: PUSH_STRING          "myList[0] = "
+  16: LOAD_VAR             "myList"
+  17: PUSH_INT             0
+  18: GET_INDEX           
+  19: ADD                 
+  20: PRINT               
+  21: PUSH_STRING          "myList[2] = "
+  22: LOAD_VAR             "myList"
+  23: PUSH_INT             2
+  24: GET_INDEX           
+  25: ADD                 
+  26: PRINT               
+  27: PUSH_STRING          "myList[4] = "
+  28: LOAD_VAR             "myList"
+  29: PUSH_INT             4
+  30: GET_INDEX           
+  31: ADD                 
+  32: PRINT               
+  33: PUSH_STRING          "Dictionary operations:"
+  34: PRINT               
+  35: PUSH_STRING          "name"
+  36: PUSH_STRING          "Alice"
+  37: PUSH_STRING          "age"
+  38: PUSH_INT             25
+  39: PUSH_STRING          "city"
+  40: PUSH_STRING          "New York"
+  41: CREATE_DICT         
+  42: STORE_VAR            "myDict"
+  43: PUSH_STRING          "Initial dict: "
+  44: LOAD_VAR             "myDict"
+  45: ADD                 
+  46: PRINT               
+  47: PUSH_STRING          "myDict['name'] = "
+  48: LOAD_VAR             "myDict"
+  49: PUSH_STRING          "name"
+  50: GET_INDEX           
+  51: ADD                 
+  52: PRINT               
+  53: PUSH_STRING          "myDict['age'] = "
+  54: LOAD_VAR             "myDict"
+  55: PUSH_STRING          "age"
+  56: GET_INDEX           
+  57: ADD                 
+  58: PRINT               
+  59: PUSH_STRING          "myDict['city'] = "
+  60: LOAD_VAR             "myDict"
+  61: PUSH_STRING          "city"
+  62: GET_INDEX           
+  63: ADD                 
+  64: PRINT               
+  65: PUSH_STRING          "Mixed collections:"
+  66: PRINT               
+  67: PUSH_INT             1
+  68: PUSH_STRING          "hello"
+  69: PUSH_BOOL            true
+  70: PUSH_STRING          "key"
+  71: PUSH_STRING          "value"
+  72: CREATE_DICT         
+  73: CREATE_LIST         
+  74: STORE_VAR            "mixedList"
+  75: PUSH_STRING          "Mixed list: "
+  76: LOAD_VAR             "mixedList"
+  77: ADD                 
+  78: PRINT               
+  79: PUSH_STRING          "user"
+  80: PUSH_STRING          "name"
+  81: PUSH_STRING          "Bob"
+  82: PUSH_STRING          "age"
+  83: PUSH_INT             30
+  84: CREATE_DICT         
+  85: PUSH_STRING          "active"
+  86: PUSH_BOOL            true
+  87: CREATE_DICT         
+  88: STORE_VAR            "nestedDict"
+  89: PUSH_STRING          "Nested dict: "
+  90: LOAD_VAR             "nestedDict"
+  91: ADD                 
+  92: PRINT               
+  93: PUSH_STRING          "nestedDict['user'] = "
+  94: LOAD_VAR             "nestedDict"
+  95: PUSH_STRING          "user"
+  96: GET_INDEX           
+  97: ADD                 
+  98: PRINT               
+  99: PUSH_STRING          "nestedDict['active'] = "
+ 100: LOAD_VAR             "nestedDict"
+ 101: PUSH_STRING          "active"
+ 102: GET_INDEX           
+ 103: ADD                 
+ 104: PRINT               
+ 105: HALT                
+

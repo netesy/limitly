@@ -1,0 +1,292 @@
+AST for C:\Projects\limitly\tests\error_handling\optimization_test.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
+========================================
+
+AST Dump:
+==========
+FunctionDeclaration: test_error_pooling
+  Body:
+    BlockStatement:
+      PrintStatement:
+        Literal: "Testing error value pooling..."
+      IterStatement:
+        Variables: i
+        Iterable:
+          RangeExpression:
+            Start:
+              Literal: 1
+            End:
+              Literal: 100
+            Inclusive: true
+        Body:
+          BlockStatement:
+            VarDeclaration: error_result
+              Initializer:
+                CallExpression:
+                  Callee:
+                    Variable: create_test_error
+                  Arguments:
+                    Literal: "TestError"
+                    BinaryExpression: +
+                      Left:
+                        Literal: "Message "
+                      Operator: +
+                      Right:
+                        Variable: i
+      PrintStatement:
+        Literal: "Error pooling test compvared"
+FunctionDeclaration: test_error_frame_efficiency
+  Body:
+    BlockStatement:
+      PrintStatement:
+        Literal: "Testing error frame stack efficiency..."
+      VarDeclaration: result
+        Initializer:
+          FallibleExpression:
+            Expression:
+              CallExpression:
+                Callee:
+                  Variable: deeply_nested_function
+                Arguments:
+                  Literal: 5
+            ElseHandler:
+              BlockStatement:
+                PrintStatement:
+                  Literal: "Caught error from deeply nested function"
+                ReturnStatement
+      PrintStatement:
+        BinaryExpression: +
+          Left:
+            Literal: "Nested function result: "
+          Operator: +
+          Right:
+            Variable: result
+FunctionDeclaration: test_zero_cost_success
+  Body:
+    BlockStatement:
+      PrintStatement:
+        Literal: "Testing zero-cost success path..."
+      VarDeclaration: iterations
+        Initializer:
+          Literal: 1000
+      VarDeclaration: start_time
+        Initializer:
+          CallExpression:
+            Callee:
+              Variable: clock
+      IterStatement:
+        Variables: i
+        Iterable:
+          RangeExpression:
+            Start:
+              Literal: 1
+            End:
+              Variable: iterations
+            Inclusive: true
+        Body:
+          BlockStatement:
+            VarDeclaration: result
+              Initializer:
+                FallibleExpression:
+                  Expression:
+                    CallExpression:
+                      Callee:
+                        Variable: simple_success_function
+                      Arguments:
+                        Variable: i
+      VarDeclaration: end_time
+        Initializer:
+          CallExpression:
+            Callee:
+              Variable: clock
+      VarDeclaration: duration
+        Initializer:
+          BinaryExpression: -
+            Left:
+              Variable: end_time
+            Operator: -
+            Right:
+              Variable: start_time
+      PrintStatement:
+        BinaryExpression: +
+          Left:
+            BinaryExpression: +
+              Left:
+                Literal: "Zero-cost success test compvared in "
+              Operator: +
+              Right:
+                Variable: duration
+          Operator: +
+          Right:
+            Literal: " seconds"
+      PrintStatement:
+        BinaryExpression: +
+          Left:
+            BinaryExpression: +
+              Left:
+                Literal: "Average time per operation: "
+              Operator: +
+              Right:
+                Grouping:
+                  BinaryExpression: /
+                    Left:
+                      Variable: duration
+                    Operator: /
+                    Right:
+                      Variable: iterations
+          Operator: +
+          Right:
+            Literal: " seconds"
+FunctionDeclaration: test_error_union_layout
+  Body:
+    BlockStatement:
+      PrintStatement:
+        Literal: "Testing error union type layout..."
+      VarDeclaration: success_union
+        Initializer:
+          OkConstruct:
+            Value:
+              Literal: 42
+      VarDeclaration: error_union
+        Initializer:
+          ErrorConstruct: TestError
+            Arguments:
+              Literal: "Test error message"
+      IterStatement:
+        Variables: i
+        Iterable:
+          RangeExpression:
+            Start:
+              Literal: 1
+            End:
+              Literal: 100
+            Inclusive: true
+        Body:
+          BlockStatement:
+            IfStatement:
+              Condition:
+                CallExpression:
+                  Callee:
+                    Variable: is_error
+                  Arguments:
+                    Variable: success_union
+              Then:
+                BlockStatement:
+                  PrintStatement:
+                    Literal: "Unexpected error in success union"
+            IfStatement:
+              Condition:
+                CallExpression:
+                  Callee:
+                    Variable: is_success
+                  Arguments:
+                    Variable: error_union
+              Then:
+                BlockStatement:
+                  PrintStatement:
+                    Literal: "Unexpected success in error union"
+      PrintStatement:
+        Literal: "Error union layout test compvared"
+FunctionDeclaration: create_test_error
+  Parameters:
+    error_type: str
+    message: str
+  ReturnType: int
+  Body:
+    BlockStatement:
+      ReturnStatement:
+        Value:
+          ErrorConstruct: TestError
+            Arguments:
+              Variable: message
+FunctionDeclaration: deeply_nested_function
+  Parameters:
+    depth: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      IfStatement:
+        Condition:
+          BinaryExpression: <=
+            Left:
+              Variable: depth
+            Operator: <=
+            Right:
+              Literal: 0
+        Then:
+          BlockStatement:
+            ReturnStatement:
+              Value:
+                ErrorConstruct: NestedError
+                  Arguments:
+                    Literal: "Reached maximum depth"
+      VarDeclaration: result
+        Initializer:
+          FallibleExpression:
+            Expression:
+              CallExpression:
+                Callee:
+                  Variable: deeply_nested_function
+                Arguments:
+                  BinaryExpression: -
+                    Left:
+                      Variable: depth
+                    Operator: -
+                    Right:
+                      Literal: 1
+      ReturnStatement:
+        Value:
+          BinaryExpression: +
+            Left:
+              Variable: result
+            Operator: +
+            Right:
+              Literal: 1
+FunctionDeclaration: simple_success_function
+  Parameters:
+    value: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      ReturnStatement:
+        Value:
+          BinaryExpression: *
+            Left:
+              Variable: value
+            Operator: *
+            Right:
+              Literal: 2
+EnumDeclaration: TestError
+  Variant: TestError (type: str)
+EnumDeclaration: NestedError
+  Variant: NestedError (type: str)
+FunctionDeclaration: run_optimization_tests
+  Body:
+    BlockStatement:
+      PrintStatement:
+        Literal: "=== Error Handling Optimization Tests ==="
+      ExpressionStatement:
+        CallExpression:
+          Callee:
+            Variable: test_error_pooling
+      ExpressionStatement:
+        CallExpression:
+          Callee:
+            Variable: test_error_frame_efficiency
+      ExpressionStatement:
+        CallExpression:
+          Callee:
+            Variable: test_zero_cost_success
+      ExpressionStatement:
+        CallExpression:
+          Callee:
+            Variable: test_error_union_layout
+      PrintStatement:
+        Literal: "=== All optimization tests compvared ==="
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: run_optimization_tests

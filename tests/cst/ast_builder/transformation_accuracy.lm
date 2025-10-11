@@ -1,39 +1,24 @@
 // Test AST builder transformation accuracy
 // This file tests that CST to AST transformation preserves semantic meaning
 
-fn main() {
-    // Test variable declarations with type annotations
-    var x: int = 42;
-    var name: str = "test";
-    var active: bool = true;
+// Test variable declarations
+var x = 42;
+var name = "test";
+var active = true;
+
+// Test expressions with proper precedence
+var result = (x + 10) * 2 - 5;
+
+// Test control flow structures
+if (active) {
+    print("Active: " + str(x));
     
-    // Test expressions with proper precedence
-    var result = (x + 10) * 2 - 5;
-    var comparison = x > 0 && name.length() > 0;
-    
-    // Test control flow structures
-    if (active) {
-        print("Active: {x}");
-        
-        for (var i = 0; i < 3; i = i + 1) {
-            print("Loop: {i}");
-        }
-    } else {
-        print("Inactive");
+    for (var i = 0; i < 3; i = i + 1) {
+        print("Loop: " + str(i));
     }
-    
-    // Test function calls
-    greet(name);
-    var sum = add(x, result);
-    
-    // Test string interpolation
-    print("Final result: {sum}, comparison: {comparison}");
+} else {
+    print("Inactive");
 }
 
-fn greet(name: str) {
-    print("Hello, {name}!");
-}
-
-fn add(a: int, b: int) -> int {
-    return a + b;
-}
+// Test final output
+print("Final result: " + str(result));

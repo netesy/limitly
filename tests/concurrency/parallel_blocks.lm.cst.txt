@@ -1,0 +1,59 @@
+CST for C:\Projects\limitly\tests\concurrency\parallel_blocks.lm
+Parser: New CSTParser from cst_parser.cpp
+Mode: CST (cstMode=true)
+========================================
+
+CST Statistics:
+- CST nodes created: 11
+- Trivia attachments: 20
+- Parse errors: 0
+
+=== Full CST Structure ===
++ Node: PROGRAM [63-858] (Program root node)
+├─ + Node: VAR_DECLARATION [63-219] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [63-64]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [64-65]
+│ ├─ + Node: COMMENT_NODE | Token: // ========================================== [65-110]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [110-111]
+│ ├─ + Node: COMMENT_NODE | Token: //  Batch parallel block (CPU bound) [111-147]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [147-148]
+│ ├─ + Node: COMMENT_NODE | Token: // ========================================== [148-193]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [193-194]
+│ ├─ Token: var [194-197]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [197-198]
+│ ├─ + Node: IDENTIFIER [198-206]
+│ │ └─ Token: messages [198-206]
+│ ├─ + Node: ASSIGNMENT_EXPR [207-218]
+│ │ ├─ Token: = [207-208]
+│ │ └─ + Node: LITERAL_EXPR [217-218]
+│ │   └─ Token: ) [217-218]
+│ └─ Token: ; [218-219]
+└─ + Node: VAR_DECLARATION [695-858] (var declaration)
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [695-696]
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [696-697]
+  ├─ + Node: COMMENT_NODE | Token: // ========================================== [697-742]
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [742-743]
+  ├─ + Node: COMMENT_NODE | Token: //  Stream processing (CPU bound, retries) [743-785]
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [785-786]
+  ├─ + Node: COMMENT_NODE | Token: // ========================================== [786-831]
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [831-832]
+  ├─ Token: var [832-835]
+  ├─ + Node: WHITESPACE_NODE | Token:   [835-836]
+  ├─ + Node: IDENTIFIER [836-845]
+  │ └─ Token: files_out [836-845]
+  ├─ + Node: ASSIGNMENT_EXPR [846-857]
+  │ ├─ Token: = [846-847]
+  │ └─ + Node: LITERAL_EXPR [856-857]
+  │   └─ Token: ) [856-857]
+  └─ Token: ; [857-858]
+

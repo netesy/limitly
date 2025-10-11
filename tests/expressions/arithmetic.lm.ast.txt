@@ -1,0 +1,209 @@
+AST for C:\Projects\limitly\tests\expressions\arithmetic.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+  Literal: "=== Arithmetic Expression Tests ==="
+VarDeclaration: a
+  Initializer:
+    Literal: 10
+VarDeclaration: b
+  Initializer:
+    Literal: 3
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      Variable: b
+    Expression:
+      BinaryExpression: +
+        Left:
+          Variable: a
+        Operator: +
+        Right:
+          Variable: b
+    String: "\"Addition: {a} + {b} = {a + b}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      Variable: b
+    Expression:
+      BinaryExpression: -
+        Left:
+          Variable: a
+        Operator: -
+        Right:
+          Variable: b
+    String: "\"Subtraction: {a} - {b} = {a - b}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      Variable: b
+    Expression:
+      BinaryExpression: *
+        Left:
+          Variable: a
+        Operator: *
+        Right:
+          Variable: b
+    String: "\"Multiplication: {a} * {b} = {a * b}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      Variable: b
+    Expression:
+      BinaryExpression: /
+        Left:
+          Variable: a
+        Operator: /
+        Right:
+          Variable: b
+    String: "\"Division: {a} / {b} = {a / b}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      Variable: b
+    Expression:
+      BinaryExpression: %
+        Left:
+          Variable: a
+        Operator: %
+        Right:
+          Variable: b
+    String: "\"Modulo: {a} % {b} = {a % b}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      UnaryExpression: -
+        Operand:
+          Variable: a
+    String: "\"Negation: -{a} = {-a}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      UnaryExpression: +
+        Operand:
+          Variable: a
+    String: "\"Positive: +{a} = {+a}"
+VarDeclaration: result
+  Initializer:
+    BinaryExpression: -
+      Left:
+        BinaryExpression: *
+          Left:
+            Grouping:
+              BinaryExpression: +
+                Left:
+                  Variable: a
+                Operator: +
+                Right:
+                  Variable: b
+          Operator: *
+          Right:
+            Literal: 2
+      Operator: -
+      Right:
+        BinaryExpression: /
+          Left:
+            Variable: a
+          Operator: /
+          Right:
+            Variable: b
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      Variable: b
+    Expression:
+      Variable: a
+    Expression:
+      Variable: b
+    Expression:
+      Variable: result
+    String: "\"Complex: ({a} + {b}) * 2 - {a} / {b} = {result}"
+VarDeclaration: precedence
+  Initializer:
+    BinaryExpression: +
+      Left:
+        Variable: a
+      Operator: +
+      Right:
+        BinaryExpression: *
+          Left:
+            Variable: b
+          Operator: *
+          Right:
+            Literal: 2
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: a
+    Expression:
+      Variable: b
+    Expression:
+      Variable: precedence
+    String: "\"Precedence: {a} + {b} * 2 = {precedence}"
+VarDeclaration: x
+  Initializer:
+    Literal: 3.14
+VarDeclaration: y
+  Initializer:
+    Literal: 2
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: x
+    Expression:
+      Variable: y
+    Expression:
+      BinaryExpression: +
+        Left:
+          Variable: x
+        Operator: +
+        Right:
+          Variable: y
+    String: "\"Float arithmetic: {x} + {y} = {x + y}"
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: x
+    Expression:
+      Variable: y
+    Expression:
+      BinaryExpression: /
+        Left:
+          Variable: x
+        Operator: /
+        Right:
+          Variable: y
+    String: "\"Float division: {x} / {y} = {x / y}"

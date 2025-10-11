@@ -1,0 +1,104 @@
+Bytecode for tests\loops\match_no_functions.lm
+Parser mode: CST
+========================================
+
+=== Bytecode ===
+Generated 96 instructions
+
+   0: PUSH_INT             0
+   1: STORE_VAR            "<missing>"
+   2: LOAD_VAR             "x"
+   3: POP                 
+   4: BEGIN_SCOPE         
+   5: PUSH_NULL           
+   6: POP                 
+   7: BEGIN_SCOPE         
+   8: PRINT               
+   9: END_SCOPE           
+  10: PUSH_NULL           
+  11: POP                 
+  12: BEGIN_SCOPE         
+  13: PRINT               
+  14: END_SCOPE           
+  15: BEGIN_SCOPE         
+  16: PRINT               
+  17: END_SCOPE           
+  18: END_SCOPE           
+  19: PUSH_NULL           
+  20: STORE_VAR            "<missing>"
+  21: LOAD_VAR             "value"
+  22: POP                 
+  23: BEGIN_SCOPE         
+  24: BEGIN_SCOPE         
+  25: PRINT               
+  26: LOAD_VAR             "value"
+  27: POP                 
+  28: PUSH_STRING          ""Integer: {value}"
+  29: POP                 
+  30: END_SCOPE           
+  31: BEGIN_SCOPE         
+  32: PRINT               
+  33: LOAD_VAR             "value"
+  34: POP                 
+  35: PUSH_STRING          ""String: {value}"
+  36: POP                 
+  37: END_SCOPE           
+  38: BEGIN_SCOPE         
+  39: PRINT               
+  40: LOAD_VAR             "value"
+  41: POP                 
+  42: PUSH_STRING          ""List of integers: {value}"
+  43: POP                 
+  44: END_SCOPE           
+  45: BEGIN_SCOPE         
+  46: PRINT               
+  47: LOAD_VAR             "value"
+  48: POP                 
+  49: PUSH_STRING          ""Dictionary: {value}"
+  50: POP                 
+  51: END_SCOPE           
+  52: BEGIN_SCOPE         
+  53: PRINT               
+  54: END_SCOPE           
+  55: END_SCOPE           
+  56: PUSH_INT             18
+  57: POP                 
+  58: BEGIN_SCOPE         
+  59: LOAD_VAR             "<invalid>"
+  60: POP                 
+  61: LOAD_VAR             "<invalid>"
+  62: PUSH_NULL           
+  63: ADD                 
+  64: POP                 
+  65: BEGIN_SCOPE         
+  66: PRINT               
+  67: LOAD_VAR             "x"
+  68: POP                 
+  69: PUSH_STRING          " is greater than 10"
+  70: POP                 
+  71: END_SCOPE           
+  72: LOAD_VAR             "<invalid>"
+  73: POP                 
+  74: LOAD_VAR             "<invalid>"
+  75: PUSH_NULL           
+  76: ADD                 
+  77: POP                 
+  78: BEGIN_SCOPE         
+  79: PRINT               
+  80: LOAD_VAR             "x"
+  81: POP                 
+  82: PUSH_STRING          " is less than 10"
+  83: POP                 
+  84: END_SCOPE           
+  85: LOAD_VAR             "<invalid>"
+  86: POP                 
+  87: BEGIN_SCOPE         
+  88: PRINT               
+  89: LOAD_VAR             "x"
+  90: POP                 
+  91: PUSH_STRING          " is 10"
+  92: POP                 
+  93: END_SCOPE           
+  94: END_SCOPE           
+  95: HALT                
+

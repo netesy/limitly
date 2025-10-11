@@ -187,39 +187,26 @@ namespace CST {
             if (!root) return "";
             
             std::ostringstream oss;
-            oss << formatNodeLine(root, options) << "\n";
             
-            auto children = root->getChildNodes();
-            auto tokens = root->getTokens();
+            // Show root node with + prefix
+            oss << "+ " << formatNodeLine(root, options) << "\n";
             
-            // Combine children and tokens for display
-            std::vector<std::pair<std::string, bool>> items; // (text, isLast)
-            
-            // Add child nodes
-            for (size_t i = 0; i < children.size(); ++i) {
-                bool isLast = (i == children.size() - 1) && (!options.showTokens || tokens.empty());
-                std::string childViz = visualizeSubtree(children[i], "", isLast, options);
-                items.push_back({childViz, isLast});
-            }
-            
-            // Add tokens if requested
-            if (options.showTokens) {
-                for (size_t i = 0; i < tokens.size(); ++i) {
-                    if (!options.showTrivia && isTriviaToken(tokens[i])) {
-                        continue;
+            // Process all elements in order (preserving source structure)
+            for (size_t i = 0; i < root->elements.size(); ++i) {
+                const auto& element = root->elements[i];
+                bool isLast = (i == root->elements.size() - 1);
+                
+                if (std::holds_alternative<std::unique_ptr<Node>>(element)) {
+                    const auto& childNode = std::get<std::unique_ptr<Node>>(element);
+                    if (childNode) {
+                        oss << visualizeSubtree(childNode.get(), "", isLast, options);
                     }
-                    
-                    bool isLast = (i == tokens.size() - 1);
-                    std::string tokenLine = formatTokenLine(tokens[i], options);
-                    std::string prefix = isLast ? options.chars.lastBranch : options.chars.branch;
-                    items.push_back({prefix + options.chars.connector + " " + tokenLine, isLast});
-                }
-            }
-            
-            for (const auto& item : items) {
-                oss << item.first;
-                if (!item.second || !items.empty()) {
-                    oss << "\n";
+                } else if (std::holds_alternative<Token>(element)) {
+                    const auto& token = std::get<Token>(element);
+                    if (options.showTokens && (options.showTrivia || !isTriviaToken(token))) {
+                        std::string connector = isLast ? options.chars.lastBranch : options.chars.branch;
+                        oss << connector << options.chars.connector << " " << formatTokenLine(token, options) << "\n";
+                    }
                 }
             }
             
@@ -231,33 +218,30 @@ namespace CST {
             
             std::ostringstream oss;
             
-            // Current node line
+            // Current node line with + prefix for structural nodes
             std::string connector = isLast ? options.chars.lastBranch : options.chars.branch;
-            oss << prefix << connector << options.chars.connector << " " << formatNodeLine(node, options) << "\n";
+            oss << prefix << connector << options.chars.connector << " + " << formatNodeLine(node, options) << "\n";
             
             // Prepare prefix for children
             std::string childPrefix = prefix + (isLast ? options.chars.space : options.chars.vertical) + " ";
             
-            auto children = node->getChildNodes();
-            auto tokens = node->getTokens();
-            
-            // Display children
-            for (size_t i = 0; i < children.size(); ++i) {
-                bool childIsLast = (i == children.size() - 1) && (!options.showTokens || tokens.empty());
-                oss << visualizeSubtree(children[i], childPrefix, childIsLast, options);
-            }
-            
-            // Display tokens if requested
-            if (options.showTokens) {
-                for (size_t i = 0; i < tokens.size(); ++i) {
-                    if (!options.showTrivia && isTriviaToken(tokens[i])) {
-                        continue;
+            // Process all elements in order (preserving source structure)
+            for (size_t i = 0; i < node->elements.size(); ++i) {
+                const auto& element = node->elements[i];
+                bool elementIsLast = (i == node->elements.size() - 1);
+                
+                if (std::holds_alternative<std::unique_ptr<Node>>(element)) {
+                    const auto& childNode = std::get<std::unique_ptr<Node>>(element);
+                    if (childNode) {
+                        oss << visualizeSubtree(childNode.get(), childPrefix, elementIsLast, options);
                     }
-                    
-                    bool tokenIsLast = (i == tokens.size() - 1);
-                    std::string tokenConnector = tokenIsLast ? options.chars.lastBranch : options.chars.branch;
-                    oss << childPrefix << tokenConnector << options.chars.connector << " " 
-                        << formatTokenLine(tokens[i], options) << "\n";
+                } else if (std::holds_alternative<Token>(element)) {
+                    const auto& token = std::get<Token>(element);
+                    if (options.showTokens && (options.showTrivia || !isTriviaToken(token))) {
+                        std::string tokenConnector = elementIsLast ? options.chars.lastBranch : options.chars.branch;
+                        oss << childPrefix << tokenConnector << options.chars.connector << " " 
+                            << formatTokenLine(token, options) << "\n";
+                    }
                 }
             }
             
@@ -269,8 +253,22 @@ namespace CST {
             
             std::ostringstream oss;
             
-            if (options.showTypes) {
-                oss << nodeKindToString(node->kind);
+            // Check if this is a token-specific node and show token value
+            if (node->kind == NodeKind::TOKEN_NODE) {
+                const auto* tokenNode = static_cast<const TokenNode*>(node);
+                oss << "Node: " << nodeKindToString(node->kind) << " | Token: " << tokenNode->token.lexeme;
+            } else if (node->kind == NodeKind::WHITESPACE_NODE) {
+                const auto* wsNode = static_cast<const WhitespaceNode*>(node);
+                oss << "Node: " << nodeKindToString(node->kind) << " | Token: " << wsNode->whitespace.lexeme;
+            } else if (node->kind == NodeKind::COMMENT_NODE) {
+                const auto* commentNode = static_cast<const CommentNode*>(node);
+                oss << "Node: " << nodeKindToString(node->kind) << " | Token: " << commentNode->comment.lexeme;
+            } else if (node->kind == NodeKind::TRIVIA_NODE) {
+                const auto* triviaNode = static_cast<const TriviaNode*>(node);
+                oss << "Node: " << nodeKindToString(node->kind) << " | Token: " << triviaNode->trivia.lexeme;
+            } else {
+                // For structural nodes, show node type
+                oss << "Node: " << nodeKindToString(node->kind);
             }
             
             if (options.showPositions) {
@@ -290,7 +288,7 @@ namespace CST {
         
         std::string formatTokenLine(const Token& token, const TreeVizOptions& options) {
             std::ostringstream oss;
-            oss << "Token: '" << truncateText(token.lexeme, 20) << "'";
+            oss << "Token: " << truncateText(token.lexeme, 20);
             
             if (options.showPositions) {
                 oss << " [" << token.start;

@@ -1,0 +1,168 @@
+Bytecode for C:\Projects\limitly\tests\error_handling\comprehensive_validation_test.lm
+Parser: New CSTParser
+========================================
+
+=== Bytecode ===
+Generated 160 instructions
+
+   0: BEGIN_FUNCTION       "divide"
+   1: DEFINE_PARAM        
+   2: DEFINE_PARAM        
+   3: BEGIN_SCOPE         
+   4: LOAD_VAR             "b"
+   5: PUSH_INT             0
+   6: EQUAL               
+   7: JUMP_IF_FALSE        5
+   8: BEGIN_SCOPE         
+   9: CONSTRUCT_ERROR     
+  10: RETURN              
+  11: END_SCOPE           
+  12: JUMP                 0
+  13: LOAD_VAR             "a"
+  14: LOAD_VAR             "b"
+  15: DIVIDE              
+  16: RETURN              
+  17: END_SCOPE           
+  18: PUSH_NULL           
+  19: RETURN              
+  20: END_FUNCTION        
+  21: PUSH_FUNCTION       
+  22: STORE_VAR            "divide"
+  23: BEGIN_FUNCTION       "safeDivision"
+  24: DEFINE_PARAM        
+  25: DEFINE_PARAM        
+  26: BEGIN_SCOPE         
+  27: LOAD_VAR             "x"
+  28: LOAD_VAR             "y"
+  29: CALL                 "divide"
+  30: CHECK_ERROR         
+  31: JUMP_IF_FALSE        1
+  32: PROPAGATE_ERROR     
+  33: UNWRAP_VALUE        
+  34: RETURN              
+  35: END_SCOPE           
+  36: PUSH_NULL           
+  37: RETURN              
+  38: END_FUNCTION        
+  39: PUSH_FUNCTION       
+  40: STORE_VAR            "safeDivision"
+  41: BEGIN_FUNCTION       "legacyDivide"
+  42: DEFINE_PARAM        
+  43: DEFINE_PARAM        
+  44: BEGIN_SCOPE         
+  45: LOAD_VAR             "b"
+  46: PUSH_INT             0
+  47: EQUAL               
+  48: JUMP_IF_FALSE        5
+  49: BEGIN_SCOPE         
+  50: CONSTRUCT_ERROR     
+  51: RETURN              
+  52: END_SCOPE           
+  53: JUMP                 0
+  54: LOAD_VAR             "a"
+  55: LOAD_VAR             "b"
+  56: DIVIDE              
+  57: RETURN              
+  58: END_SCOPE           
+  59: PUSH_NULL           
+  60: RETURN              
+  61: END_FUNCTION        
+  62: PUSH_FUNCTION       
+  63: STORE_VAR            "legacyDivide"
+  64: BEGIN_FUNCTION       "handleErrors"
+  65: DEFINE_PARAM        
+  66: DEFINE_PARAM        
+  67: BEGIN_SCOPE         
+  68: LOAD_VAR             "x"
+  69: LOAD_VAR             "y"
+  70: CALL                 "divide"
+  71: STORE_TEMP          
+  72: LOAD_TEMP           
+  73: PUSH_STRING          "__val_pattern__"
+  74: PUSH_STRING          "result"
+  75: MATCH_PATTERN       
+  76: JUMP_IF_FALSE        3
+  77: LOAD_VAR             "result"
+  78: RETURN              
+  79: JUMP                 10
+  80: LOAD_TEMP           
+  81: PUSH_STRING          "__err_pattern__"
+  82: PUSH_STRING          "error"
+  83: PUSH_NULL           
+  84: MATCH_PATTERN       
+  85: JUMP_IF_FALSE        4
+  86: PUSH_INT             1
+  87: NEGATE              
+  88: RETURN              
+  89: JUMP                 0
+  90: CLEAR_TEMP          
+  91: END_SCOPE           
+  92: PUSH_NULL           
+  93: RETURN              
+  94: END_FUNCTION        
+  95: PUSH_FUNCTION       
+  96: STORE_VAR            "handleErrors"
+  97: PUSH_STRING          "=== Function Signature Error Type Validation Test ==="
+  98: PRINT               
+  99: PUSH_STRING          "Testing correct error type propagation..."
+ 100: PRINT               
+ 101: PUSH_INT             10
+ 102: PUSH_INT             2
+ 103: CALL                 "safeDivision"
+ 104: STORE_TEMP          
+ 105: LOAD_TEMP           
+ 106: PUSH_STRING          "__val_pattern__"
+ 107: PUSH_STRING          "result"
+ 108: MATCH_PATTERN       
+ 109: JUMP_IF_FALSE        5
+ 110: PUSH_STRING          "Success: 10 / 2 = "
+ 111: LOAD_VAR             "result"
+ 112: ADD                 
+ 113: PRINT               
+ 114: JUMP                 9
+ 115: LOAD_TEMP           
+ 116: PUSH_STRING          "__err_pattern__"
+ 117: PUSH_STRING          "error"
+ 118: PUSH_NULL           
+ 119: MATCH_PATTERN       
+ 120: JUMP_IF_FALSE        3
+ 121: PUSH_STRING          "Unexpected error"
+ 122: PRINT               
+ 123: JUMP                 0
+ 124: CLEAR_TEMP          
+ 125: PUSH_INT             10
+ 126: PUSH_INT             0
+ 127: CALL                 "safeDivision"
+ 128: STORE_TEMP          
+ 129: LOAD_TEMP           
+ 130: PUSH_STRING          "__val_pattern__"
+ 131: PUSH_STRING          "result"
+ 132: MATCH_PATTERN       
+ 133: JUMP_IF_FALSE        5
+ 134: PUSH_STRING          "Unexpected success: "
+ 135: LOAD_VAR             "result"
+ 136: ADD                 
+ 137: PRINT               
+ 138: JUMP                 9
+ 139: LOAD_TEMP           
+ 140: PUSH_STRING          "__err_pattern__"
+ 141: PUSH_STRING          "error"
+ 142: PUSH_NULL           
+ 143: MATCH_PATTERN       
+ 144: JUMP_IF_FALSE        3
+ 145: PUSH_STRING          "Expected error: Division by zero caught"
+ 146: PRINT               
+ 147: JUMP                 0
+ 148: CLEAR_TEMP          
+ 149: PUSH_INT             10
+ 150: PUSH_INT             0
+ 151: CALL                 "handleErrors"
+ 152: STORE_VAR            "handled"
+ 153: PUSH_STRING          "Handled error result: "
+ 154: LOAD_VAR             "handled"
+ 155: ADD                 
+ 156: PRINT               
+ 157: PUSH_STRING          "=== Test completed successfully ==="
+ 158: PRINT               
+ 159: HALT                
+

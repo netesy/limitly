@@ -1,47 +1,55 @@
-Bytecode for tests\cst\parser\interpolation_test.lm
-Parser mode: CST
+Bytecode for C:\Projects\limitly\tests\cst\parser\interpolation_test.lm
+Parser: New CSTParser
 ========================================
 
 === Bytecode ===
-Generated 39 instructions
+Generated 47 instructions
 
-   0: PUSH_NULL           
-   1: STORE_VAR            "<missing>"
-   2: PUSH_NULL           
-   3: STORE_VAR            "<missing>"
-   4: PRINT               
-   5: LOAD_VAR             "name"
-   6: POP                 
-   7: PUSH_STRING          "!"
-   8: POP                 
-   9: PUSH_NULL           
-  10: STORE_VAR            "<missing>"
-  11: PRINT               
+   0: PUSH_STRING          "World"
+   1: STORE_VAR            "name"
+   2: PUSH_STRING         
+   3: LOAD_VAR             "name"
+   4: PUSH_STRING         
+   5: CONCAT              
+   6: PUSH_STRING          "!"
+   7: INTERPOLATE_STRING  
+   8: PRINT               
+   9: PUSH_INT             42
+  10: STORE_VAR            "x"
+  11: PUSH_STRING         
   12: LOAD_VAR             "x"
-  13: POP                 
-  14: PUSH_STRING          ""The value is {x}"
-  15: POP                 
-  16: PRINT               
-  17: LOAD_VAR             "x"
-  18: PUSH_INT             2
-  19: MULTIPLY            
-  20: POP                 
-  21: PUSH_STRING          ""Double value: {x * 2}"
-  22: POP                 
-  23: PUSH_NULL           
-  24: STORE_VAR            "<missing>"
-  25: PUSH_NULL           
-  26: STORE_VAR            "<missing>"
-  27: PRINT               
-  28: LOAD_VAR             "a"
-  29: POP                 
-  30: LOAD_VAR             "b"
-  31: POP                 
+  13: PUSH_STRING         
+  14: CONCAT              
+  15: PUSH_STRING          ""The value is {x}"
+  16: INTERPOLATE_STRING  
+  17: PRINT               
+  18: PUSH_STRING         
+  19: LOAD_VAR             "x"
+  20: PUSH_INT             2
+  21: MULTIPLY            
+  22: PUSH_STRING         
+  23: CONCAT              
+  24: PUSH_STRING          ""Double value: {x * 2}"
+  25: INTERPOLATE_STRING  
+  26: PRINT               
+  27: PUSH_INT             10
+  28: STORE_VAR            "a"
+  29: PUSH_INT             20
+  30: STORE_VAR            "b"
+  31: PUSH_STRING         
   32: LOAD_VAR             "a"
-  33: LOAD_VAR             "b"
-  34: ADD                 
-  35: POP                 
-  36: PUSH_STRING          ""a={a}, b={b}, sum={a + b}"
-  37: POP                 
-  38: HALT                
+  33: PUSH_STRING         
+  34: CONCAT              
+  35: LOAD_VAR             "b"
+  36: PUSH_STRING         
+  37: CONCAT              
+  38: LOAD_VAR             "a"
+  39: LOAD_VAR             "b"
+  40: ADD                 
+  41: PUSH_STRING         
+  42: CONCAT              
+  43: PUSH_STRING          ""a={a}, b={b}, sum={a + b}"
+  44: INTERPOLATE_STRING  
+  45: PRINT               
+  46: HALT                
 

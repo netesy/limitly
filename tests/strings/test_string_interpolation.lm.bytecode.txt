@@ -1,0 +1,42 @@
+Bytecode for tests\strings\test_string_interpolation.lm
+Parser mode: CST
+========================================
+
+=== Bytecode ===
+Generated 34 instructions
+
+   0: PUSH_NULL           
+   1: STORE_VAR            "<missing>"
+   2: PUSH_NULL           
+   3: STORE_VAR            "<missing>"
+   4: PUSH_NULL           
+   5: STORE_VAR            "<missing>"
+   6: PRINT               
+   7: PRINT               
+   8: LOAD_VAR             "i"
+   9: POP                 
+  10: PUSH_STRING          ""Value of i: {i}"
+  11: POP                 
+  12: PRINT               
+  13: LOAD_VAR             "i"
+  14: POP                 
+  15: LOAD_VAR             "j"
+  16: POP                 
+  17: PUSH_STRING          ""Values: {i}, {j}"
+  18: POP                 
+  19: PRINT               
+  20: LOAD_VAR             "i"
+  21: LOAD_VAR             "j"
+  22: ADD                 
+  23: POP                 
+  24: PUSH_STRING          ""Expression: {i + j}"
+  25: POP                 
+  26: PRINT               
+  27: LOAD_VAR             "i"
+  28: POP                 
+  29: LOAD_VAR             "j"
+  30: POP                 
+  31: PUSH_STRING          ""{i}, {j}"
+  32: POP                 
+  33: HALT                
+

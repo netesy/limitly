@@ -1,0 +1,94 @@
+AST for C:\Projects\limitly\tests\error_handling\builtin_errors_test.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+  Literal: "=== Testing Built-in Error Types ==="
+PrintStatement:
+  Literal: "Test 1: Division by zero"
+VarDeclaration: result1
+  Initializer:
+    BinaryExpression: /
+      Left:
+        Literal: 10
+      Operator: /
+      Right:
+        Literal: 0
+PrintStatement:
+  Literal: "Division result:"
+  Variable: result1
+PrintStatement:
+  Literal: "Test 2: List index out of bounds"
+VarDeclaration: myList
+  Initializer:
+    ListExpression: [3 elements]
+      Literal: 1
+      Literal: 2
+      Literal: 3
+VarDeclaration: result2
+  Initializer:
+    IndexExpression:
+      Object:
+        Variable: myList
+      Index:
+        Literal: 5
+PrintStatement:
+  Literal: "List access result:"
+  Variable: result2
+PrintStatement:
+  Literal: "Test 3: Dictionary key not found"
+VarDeclaration: myDict
+  Initializer:
+    DictionaryExpression: {2 entries}
+      Key:
+        Literal: "a"
+      Value:
+        Literal: 1
+      Key:
+        Literal: "b"
+      Value:
+        Literal: 2
+VarDeclaration: result3
+  Initializer:
+    IndexExpression:
+      Object:
+        Variable: myDict
+      Index:
+        Literal: "c"
+PrintStatement:
+  Literal: "Dict access result:"
+  Variable: result3
+PrintStatement:
+  Literal: "Test 4: Invalid list index type"
+VarDeclaration: result4
+  Initializer:
+    IndexExpression:
+      Object:
+        Variable: myList
+      Index:
+        Literal: "invalid"
+PrintStatement:
+  Literal: "Invalid index result:"
+  Variable: result4
+PrintStatement:
+  Literal: "Test 5: Indexing non-container"
+VarDeclaration: number
+  Initializer:
+    Literal: 42
+VarDeclaration: result5
+  Initializer:
+    IndexExpression:
+      Object:
+        Variable: number
+      Index:
+        Literal: 0
+PrintStatement:
+  Literal: "Non-container index result:"
+  Variable: result5
+PrintStatement:
+  Literal: "=== Built-in Error Types Test Complete ==="

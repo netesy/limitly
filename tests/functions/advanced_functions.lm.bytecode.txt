@@ -1,0 +1,153 @@
+Bytecode for tests\functions\advanced_functions.lm
+Parser mode: CST
+========================================
+
+=== Bytecode ===
+Generated 145 instructions
+
+   0: PRINT               
+   1: PRINT               
+   2: BEGIN_FUNCTION       "<missing>"
+   3: BEGIN_SCOPE         
+   4: PRINT               
+   5: LOAD_VAR             "name"
+   6: POP                 
+   7: PUSH_STRING          "!"
+   8: POP                 
+   9: END_SCOPE           
+  10: PUSH_NULL           
+  11: RETURN              
+  12: END_FUNCTION        
+  13: PUSH_FUNCTION       
+  14: STORE_VAR            "<missing>"
+  15: PRINT               
+  16: CALL                 "unknown"
+  17: POP                 
+  18: CALL                 "unknown"
+  19: POP                 
+  20: BEGIN_FUNCTION       "<missing>"
+  21: BEGIN_SCOPE         
+  22: PRINT               
+  23: LOAD_VAR             "name"
+  24: POP                 
+  25: LOAD_VAR             "age"
+  26: POP                 
+  27: LOAD_VAR             "active"
+  28: POP                 
+  29: PUSH_STRING          ""User: {name}, Age: {age}, Active: {active}"
+  30: POP                 
+  31: END_SCOPE           
+  32: PUSH_NULL           
+  33: RETURN              
+  34: END_FUNCTION        
+  35: PUSH_FUNCTION       
+  36: STORE_VAR            "<missing>"
+  37: PRINT               
+  38: CALL                 "unknown"
+  39: POP                 
+  40: CALL                 "unknown"
+  41: POP                 
+  42: CALL                 "unknown"
+  43: POP                 
+  44: BEGIN_FUNCTION       "<missing>"
+  45: BEGIN_SCOPE         
+  46: END_SCOPE           
+  47: PUSH_NULL           
+  48: RETURN              
+  49: END_FUNCTION        
+  50: PUSH_FUNCTION       
+  51: STORE_VAR            "<missing>"
+  52: BEGIN_FUNCTION       "<missing>"
+  53: BEGIN_SCOPE         
+  54: END_SCOPE           
+  55: PUSH_NULL           
+  56: RETURN              
+  57: END_FUNCTION        
+  58: PUSH_FUNCTION       
+  59: STORE_VAR            "<missing>"
+  60: PUSH_NULL           
+  61: RETURN              
+  62: PUSH_NULL           
+  63: RETURN              
+  64: BEGIN_FUNCTION       "<missing>"
+  65: BEGIN_SCOPE         
+  66: PUSH_NULL           
+  67: RETURN              
+  68: END_SCOPE           
+  69: PUSH_NULL           
+  70: RETURN              
+  71: END_FUNCTION        
+  72: PUSH_FUNCTION       
+  73: STORE_VAR            "<missing>"
+  74: PRINT               
+  75: PUSH_INT             0
+  76: STORE_VAR            "<missing>"
+  77: PRINT               
+  78: LOAD_VAR             "result"
+  79: POP                 
+  80: PUSH_STRING          ""applyOperation(6, 7, multiply) = {result}"
+  81: POP                 
+  82: BEGIN_FUNCTION       "<missing>"
+  83: BEGIN_SCOPE         
+  84: END_SCOPE           
+  85: PUSH_NULL           
+  86: RETURN              
+  87: END_FUNCTION        
+  88: PUSH_FUNCTION       
+  89: STORE_VAR            "<missing>"
+  90: BEGIN_FUNCTION       "<missing>"
+  91: BEGIN_SCOPE         
+  92: PUSH_INT             0
+  93: STORE_VAR            "<missing>"
+  94: BEGIN_FUNCTION       "<missing>"
+  95: BEGIN_SCOPE         
+  96: LOAD_VAR             "<invalid>"
+  97: POP                 
+  98: PUSH_INT             1
+  99: POP                 
+ 100: PUSH_NULL           
+ 101: RETURN              
+ 102: END_SCOPE           
+ 103: PUSH_NULL           
+ 104: RETURN              
+ 105: END_FUNCTION        
+ 106: PUSH_FUNCTION       
+ 107: STORE_VAR            "<missing>"
+ 108: PUSH_NULL           
+ 109: RETURN              
+ 110: END_SCOPE           
+ 111: PUSH_NULL           
+ 112: RETURN              
+ 113: END_FUNCTION        
+ 114: PUSH_FUNCTION       
+ 115: STORE_VAR            "<missing>"
+ 116: PRINT               
+ 117: PUSH_NULL           
+ 118: STORE_VAR            "<missing>"
+ 119: BEGIN_FUNCTION       "<missing>"
+ 120: BEGIN_SCOPE         
+ 121: END_SCOPE           
+ 122: PUSH_NULL           
+ 123: RETURN              
+ 124: END_FUNCTION        
+ 125: PUSH_FUNCTION       
+ 126: STORE_VAR            "<missing>"
+ 127: CALL                 "unknown"
+ 128: POP                 
+ 129: PRINT               
+ 130: CALL                 "unknown"
+ 131: POP                 
+ 132: PUSH_STRING          ""Counter: {counter()}"
+ 133: POP                 
+ 134: PRINT               
+ 135: CALL                 "unknown"
+ 136: POP                 
+ 137: PUSH_STRING          ""Counter: {counter()}"
+ 138: POP                 
+ 139: PRINT               
+ 140: CALL                 "unknown"
+ 141: POP                 
+ 142: PUSH_STRING          ""Counter: {counter()}"
+ 143: POP                 
+ 144: HALT                
+

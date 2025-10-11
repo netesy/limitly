@@ -1,0 +1,17 @@
+Bytecode for C:\Projects\limitly\tests\cst\parser\invalid_syntax_recovery.lm
+Parser: New CSTParser
+========================================
+
+=== Bytecode ===
+Generated 9 instructions
+
+   0: PUSH_INT             42
+   1: STORE_VAR            "x"
+   2: PUSH_INT             24
+   3: STORE_VAR            "y"
+   4: LOAD_VAR             "x"
+   5: LOAD_VAR             "y"
+   6: ADD                 
+   7: STORE_VAR            "z"
+   8: HALT                
+

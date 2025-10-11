@@ -1,0 +1,132 @@
+CST for C:\Projects\limitly\tests\functions\basic_functions.lm
+Parser: New CSTParser from cst_parser.cpp
+Mode: CST (cstMode=true)
+========================================
+
+CST Statistics:
+- CST nodes created: 103
+- Trivia attachments: 216
+- Parse errors: 0
+
+=== Full CST Structure ===
++ Node: PROGRAM [257-3183] (Program root node)
+├─ + Node: VAR_DECLARATION [257-287] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [257-258]
+│ ├─ Token: var [258-261]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [261-262]
+│ ├─ + Node: IDENTIFIER [262-268]
+│ │ └─ Token: result [262-268]
+│ ├─ + Node: ANNOTATION [268-273]
+│ │ ├─ Token: : [268-269]
+│ │ └─ + Node: PRIMITIVE_TYPE [270-273]
+│ │   └─ Token: int [270-273]
+│ ├─ + Node: ASSIGNMENT_EXPR [274-286]
+│ │ ├─ Token: = [274-275]
+│ │ └─ + Node: LITERAL_EXPR [285-286]
+│ │   └─ Token: ) [285-286]
+│ └─ Token: ; [286-287]
+├─ + Node: VAR_DECLARATION [741-767] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [741-742]
+│ ├─ + Node: WHITESPACE_NODE | Token:      [742-746]
+│ ├─ Token: var [746-749]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [749-750]
+│ ├─ + Node: IDENTIFIER [750-753]
+│ │ └─ Token: sum [750-753]
+│ ├─ + Node: ANNOTATION [753-758]
+│ │ ├─ Token: : [753-754]
+│ │ └─ + Node: PRIMITIVE_TYPE [755-758]
+│ │   └─ Token: int [755-758]
+│ ├─ + Node: ASSIGNMENT_EXPR [759-766]
+│ │ ├─ Token: = [759-760]
+│ │ └─ + Node: LITERAL_EXPR [765-766]
+│ │   └─ Token: y [765-766]
+│ └─ Token: ; [766-767]
+├─ + Node: VAR_DECLARATION [767-797] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [767-768]
+│ ├─ + Node: WHITESPACE_NODE | Token:      [768-772]
+│ ├─ Token: var [772-775]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [775-776]
+│ ├─ + Node: IDENTIFIER [776-783]
+│ │ └─ Token: product [776-783]
+│ ├─ + Node: ANNOTATION [783-788]
+│ │ ├─ Token: : [783-784]
+│ │ └─ + Node: PRIMITIVE_TYPE [785-788]
+│ │   └─ Token: int [785-788]
+│ ├─ + Node: ASSIGNMENT_EXPR [789-796]
+│ │ ├─ Token: = [789-790]
+│ │ └─ + Node: LITERAL_EXPR [795-796]
+│ │   └─ Token: y [795-796]
+│ └─ Token: ; [796-797]
+├─ + Node: VAR_DECLARATION [921-961] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [921-922]
+│ ├─ Token: var [922-925]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [925-926]
+│ ├─ + Node: IDENTIFIER [926-937]
+│ │ └─ Token: calc_result [926-937]
+│ ├─ + Node: ANNOTATION [937-942]
+│ │ ├─ Token: : [937-938]
+│ │ └─ + Node: PRIMITIVE_TYPE [939-942]
+│ │   └─ Token: int [939-942]
+│ ├─ + Node: ASSIGNMENT_EXPR [943-960]
+│ │ ├─ Token: = [943-944]
+│ │ └─ + Node: LITERAL_EXPR [959-960]
+│ │   └─ Token: ) [959-960]
+│ └─ Token: ; [960-961]
+├─ + Node: VAR_DECLARATION [1626-1647] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [1626-1627]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [1627-1628]
+│ ├─ + Node: WHITESPACE_NODE | Token:      [1628-1632]
+│ ├─ Token: var [1632-1635]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [1635-1636]
+│ ├─ + Node: IDENTIFIER [1636-1637]
+│ │ └─ Token: i [1636-1637]
+│ ├─ + Node: ANNOTATION [1637-1642]
+│ │ ├─ Token: : [1637-1638]
+│ │ └─ + Node: PRIMITIVE_TYPE [1639-1642]
+│ │   └─ Token: int [1639-1642]
+│ ├─ + Node: ASSIGNMENT_EXPR [1643-1646]
+│ │ ├─ Token: = [1643-1644]
+│ │ └─ + Node: LITERAL_EXPR [1645-1646]
+│ │   └─ Token: 3 [1645-1646]
+│ └─ Token: ; [1646-1647]
+├─ + Node: VAR_DECLARATION [3130-3159] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [3130-3131]
+│ ├─ + Node: WHITESPACE_NODE | Token:          [3131-3139]
+│ ├─ Token: var [3139-3142]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [3142-3143]
+│ ├─ + Node: IDENTIFIER [3143-3149]
+│ │ └─ Token: result [3143-3149]
+│ ├─ + Node: ANNOTATION [3149-3154]
+│ │ ├─ Token: : [3149-3150]
+│ │ └─ + Node: PRIMITIVE_TYPE [3151-3154]
+│ │   └─ Token: int [3151-3154]
+│ ├─ + Node: ASSIGNMENT_EXPR [3155-3158]
+│ │ ├─ Token: = [3155-3156]
+│ │ └─ + Node: LITERAL_EXPR [3157-3158]
+│ │   └─ Token: 1 [3157-3158]
+│ └─ Token: ; [3158-3159]
+└─ + Node: VAR_DECLARATION [3159-3183] (var declaration)
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [3159-3160]
+  ├─ + Node: WHITESPACE_NODE | Token:          [3160-3168]
+  ├─ Token: var [3168-3171]
+  ├─ + Node: WHITESPACE_NODE | Token:   [3171-3172]
+  ├─ + Node: IDENTIFIER [3172-3173]
+  │ └─ Token: i [3172-3173]
+  ├─ + Node: ANNOTATION [3173-3178]
+  │ ├─ Token: : [3173-3174]
+  │ └─ + Node: PRIMITIVE_TYPE [3175-3178]
+  │   └─ Token: int [3175-3178]
+  ├─ + Node: ASSIGNMENT_EXPR [3179-3182]
+  │ ├─ Token: = [3179-3180]
+  │ └─ + Node: LITERAL_EXPR [3181-3182]
+  │   └─ Token: 0 [3181-3182]
+  └─ Token: ; [3182-3183]
+

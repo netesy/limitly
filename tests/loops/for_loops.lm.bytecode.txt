@@ -1,0 +1,217 @@
+Bytecode for C:\Projects\limitly\tests\loops\for_loops.lm
+Parser: New CSTParser
+========================================
+
+=== Bytecode ===
+Generated 209 instructions
+
+   0: PUSH_STRING          "=== For Loop Tests ==="
+   1: PRINT               
+   2: PUSH_STRING          "Basic for loop (0 to 4):"
+   3: PRINT               
+   4: BEGIN_SCOPE         
+   5: PUSH_INT             0
+   6: STORE_VAR            "i"
+   7: LOAD_VAR             "i"
+   8: PUSH_INT             5
+   9: LESS                
+  10: JUMP_IF_FALSE        18
+  11: JUMP                 7
+  12: LOAD_VAR             "i"
+  13: PUSH_INT             1
+  14: ADD                 
+  15: DUP                 
+  16: STORE_VAR            "i"
+  17: POP                 
+  18: JUMP                 -12
+  19: BEGIN_SCOPE         
+  20: PUSH_STRING         
+  21: LOAD_VAR             "i"
+  22: PUSH_STRING         
+  23: CONCAT              
+  24: PUSH_STRING          ""i = {i}"
+  25: INTERPOLATE_STRING  
+  26: PRINT               
+  27: END_SCOPE           
+  28: JUMP                 -17
+  29: END_SCOPE           
+  30: PUSH_STRING          "For loop with increment 2:"
+  31: PRINT               
+  32: BEGIN_SCOPE         
+  33: PUSH_INT             0
+  34: STORE_VAR            "j"
+  35: LOAD_VAR             "j"
+  36: PUSH_INT             10
+  37: LESS                
+  38: JUMP_IF_FALSE        18
+  39: JUMP                 7
+  40: LOAD_VAR             "j"
+  41: PUSH_INT             2
+  42: ADD                 
+  43: DUP                 
+  44: STORE_VAR            "j"
+  45: POP                 
+  46: JUMP                 -12
+  47: BEGIN_SCOPE         
+  48: PUSH_STRING         
+  49: LOAD_VAR             "j"
+  50: PUSH_STRING         
+  51: CONCAT              
+  52: PUSH_STRING          ""j = {j}"
+  53: INTERPOLATE_STRING  
+  54: PRINT               
+  55: END_SCOPE           
+  56: JUMP                 -17
+  57: END_SCOPE           
+  58: PUSH_STRING          "Countdown loop:"
+  59: PRINT               
+  60: BEGIN_SCOPE         
+  61: PUSH_INT             5
+  62: STORE_VAR            "k"
+  63: LOAD_VAR             "k"
+  64: PUSH_INT             0
+  65: GREATER             
+  66: JUMP_IF_FALSE        18
+  67: JUMP                 7
+  68: LOAD_VAR             "k"
+  69: PUSH_INT             1
+  70: SUBTRACT            
+  71: DUP                 
+  72: STORE_VAR            "k"
+  73: POP                 
+  74: JUMP                 -12
+  75: BEGIN_SCOPE         
+  76: PUSH_STRING         
+  77: LOAD_VAR             "k"
+  78: PUSH_STRING         
+  79: CONCAT              
+  80: PUSH_STRING          ""k = {k}"
+  81: INTERPOLATE_STRING  
+  82: PRINT               
+  83: END_SCOPE           
+  84: JUMP                 -17
+  85: END_SCOPE           
+  86: PUSH_STRING          "Complex condition:"
+  87: PRINT               
+  88: BEGIN_SCOPE         
+  89: PUSH_INT             1
+  90: STORE_VAR            "x"
+  91: LOAD_VAR             "x"
+  92: LOAD_VAR             "x"
+  93: MULTIPLY            
+  94: PUSH_INT             20
+  95: LESS                
+  96: JUMP_IF_FALSE        23
+  97: JUMP                 7
+  98: LOAD_VAR             "x"
+  99: PUSH_INT             1
+ 100: ADD                 
+ 101: DUP                 
+ 102: STORE_VAR            "x"
+ 103: POP                 
+ 104: JUMP                 -14
+ 105: BEGIN_SCOPE         
+ 106: PUSH_STRING         
+ 107: LOAD_VAR             "x"
+ 108: PUSH_STRING         
+ 109: CONCAT              
+ 110: LOAD_VAR             "x"
+ 111: LOAD_VAR             "x"
+ 112: MULTIPLY            
+ 113: PUSH_STRING         
+ 114: CONCAT              
+ 115: PUSH_STRING          ""x = {x}, x² = {x * x}"
+ 116: INTERPOLATE_STRING  
+ 117: PRINT               
+ 118: END_SCOPE           
+ 119: JUMP                 -22
+ 120: END_SCOPE           
+ 121: PUSH_STRING          "Nested for loops (2x3 grid):"
+ 122: PRINT               
+ 123: BEGIN_SCOPE         
+ 124: PUSH_INT             0
+ 125: STORE_VAR            "row"
+ 126: LOAD_VAR             "row"
+ 127: PUSH_INT             2
+ 128: LESS                
+ 129: JUMP_IF_FALSE        40
+ 130: JUMP                 7
+ 131: LOAD_VAR             "row"
+ 132: PUSH_INT             1
+ 133: ADD                 
+ 134: DUP                 
+ 135: STORE_VAR            "row"
+ 136: POP                 
+ 137: JUMP                 -12
+ 138: BEGIN_SCOPE         
+ 139: BEGIN_SCOPE         
+ 140: PUSH_INT             0
+ 141: STORE_VAR            "col"
+ 142: LOAD_VAR             "col"
+ 143: PUSH_INT             3
+ 144: LESS                
+ 145: JUMP_IF_FALSE        21
+ 146: JUMP                 7
+ 147: LOAD_VAR             "col"
+ 148: PUSH_INT             1
+ 149: ADD                 
+ 150: DUP                 
+ 151: STORE_VAR            "col"
+ 152: POP                 
+ 153: JUMP                 -12
+ 154: BEGIN_SCOPE         
+ 155: PUSH_STRING         
+ 156: LOAD_VAR             "row"
+ 157: PUSH_STRING         
+ 158: CONCAT              
+ 159: LOAD_VAR             "col"
+ 160: PUSH_STRING         
+ 161: CONCAT              
+ 162: PUSH_STRING          ")"
+ 163: INTERPOLATE_STRING  
+ 164: PRINT               
+ 165: END_SCOPE           
+ 166: JUMP                 -20
+ 167: END_SCOPE           
+ 168: END_SCOPE           
+ 169: JUMP                 -39
+ 170: END_SCOPE           
+ 171: PUSH_STRING          "Variable scope test:"
+ 172: PRINT               
+ 173: PUSH_INT             100
+ 174: STORE_VAR            "outer"
+ 175: BEGIN_SCOPE         
+ 176: PUSH_INT             0
+ 177: STORE_VAR            "i"
+ 178: LOAD_VAR             "i"
+ 179: PUSH_INT             3
+ 180: LESS                
+ 181: JUMP_IF_FALSE        25
+ 182: JUMP                 7
+ 183: LOAD_VAR             "i"
+ 184: PUSH_INT             1
+ 185: ADD                 
+ 186: DUP                 
+ 187: STORE_VAR            "i"
+ 188: POP                 
+ 189: JUMP                 -12
+ 190: BEGIN_SCOPE         
+ 191: LOAD_VAR             "i"
+ 192: PUSH_INT             10
+ 193: MULTIPLY            
+ 194: STORE_VAR            "inner"
+ 195: PUSH_STRING         
+ 196: LOAD_VAR             "outer"
+ 197: PUSH_STRING         
+ 198: CONCAT              
+ 199: LOAD_VAR             "inner"
+ 200: PUSH_STRING         
+ 201: CONCAT              
+ 202: PUSH_STRING          ""outer: {outer}, inner: {inner}"
+ 203: INTERPOLATE_STRING  
+ 204: PRINT               
+ 205: END_SCOPE           
+ 206: JUMP                 -24
+ 207: END_SCOPE           
+ 208: HALT                
+

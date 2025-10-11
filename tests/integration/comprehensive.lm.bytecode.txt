@@ -1,321 +1,249 @@
-Bytecode for tests\integration\comprehensive.lm
+Bytecode for C:\Projects\limitly\tests\integration\comprehensive.lm
+Parser: New CSTParser
 ========================================
 
-Total instructions: 316
+=== Bytecode ===
+Generated 241 instructions
 
-   1: PUSH_STRING          (line 2) "=== Comprehensive Integration Test ==="
-2   : PRINT                (line 2)
-3   : PUSH_STRING          (line 5) "Multi-feature test:"
-4   : PRINT                (line 5)
-5   : PUSH_STRING          (line 8) "Luminar"
-6   : STORE_VAR            (line 8) name
-7   : PUSH_FLOAT           (line 9) 1
-8   : STORE_VAR            (line 9) version
-9   : PUSH_BOOL            (line 10) true
-10  : STORE_VAR            (line 10) isStable
-11  : PUSH_STRING          (line 12) "Language: "
-12  : LOAD_VAR             (line 12) name
-13  : PUSH_STRING          (line 12) ""
-14  : CONCAT               (line 12)
-15  : PUSH_STRING          (line 12) " v"
-16  : LOAD_VAR             (line 12) version
-17  : PUSH_STRING          (line 12) ""
-18  : CONCAT               (line 12)
-19  : INTERPOLATE_STRING   (line 12)
-20  : PRINT                (line 12)
-21  : PUSH_STRING          (line 13) "Stable: "
-22  : LOAD_VAR             (line 13) isStable
-23  : PUSH_STRING          (line 13) ""
-24  : CONCAT               (line 13)
-25  : INTERPOLATE_STRING   (line 13)
-26  : PRINT                (line 13)
-27  : PUSH_STRING          (line 16) "Feature matrix:"
-28  : PRINT                (line 16)
-29  : BEGIN_SCOPE          (line 17)
-30  : PUSH_INT             (line 17) 1
-31  : STORE_VAR            (line 17) feature
-32  : LOAD_VAR             (line 17) feature
-33  : PUSH_INT             (line 17) 3
-34  : LESS_EQUAL           (line 17)
-35  : JUMP_IF_FALSE        (line 17) 94
-36  : JUMP                 (line 17) 7
-37  : LOAD_VAR             (line 17) feature
-38  : PUSH_INT             (line 17) 1
-39  : ADD                  (line 17)
-40  : DUP                  (line 17)
-41  : STORE_VAR            (line 17) feature
-42  : POP                  (line 17)
-43  : JUMP                 (line 17) -12
-44  : BEGIN_SCOPE          (line 17)
-45  : PUSH_STRING          (line 18) "Feature "
-46  : LOAD_VAR             (line 18) feature
-47  : PUSH_STRING          (line 18) ""
-48  : CONCAT               (line 18)
-49  : PUSH_STRING          (line 18) ":"
-50  : INTERPOLATE_STRING   (line 18)
-51  : PRINT                (line 18)
-52  : LOAD_VAR             (line 20) feature
-53  : PUSH_INT             (line 20) 1
-54  : EQUAL                (line 20)
-55  : JUMP_IF_FALSE        (line 20) 25
-56  : BEGIN_SCOPE          (line 20)
-57  : PUSH_STRING          (line 21) "  - Variables and expressions"
-58  : PRINT                (line 21)
-59  : PUSH_INT             (line 22) 10
-60  : STORE_VAR            (line 22) x
-61  : PUSH_INT             (line 23) 5
-62  : STORE_VAR            (line 23) y
-63  : PUSH_STRING          (line 24) "  - Example: "
-64  : LOAD_VAR             (line 24) x
-65  : PUSH_STRING          (line 24) ""
-66  : CONCAT               (line 24)
-67  : PUSH_STRING          (line 24) " + "
-68  : LOAD_VAR             (line 24) y
-69  : PUSH_STRING          (line 24) ""
-70  : CONCAT               (line 24)
-71  : PUSH_STRING          (line 24) " = "
-72  : LOAD_VAR             (line 24) x
-73  : LOAD_VAR             (line 24) y
-74  : ADD                  (line 24)
-75  : PUSH_STRING          (line 24) ""
-76  : CONCAT               (line 24)
-77  : INTERPOLATE_STRING   (line 24)
-78  : PRINT                (line 24)
-79  : END_SCOPE            (line 20)
-80  : JUMP                 (line 20) 47
-81  : LOAD_VAR             (line 25) feature
-82  : PUSH_INT             (line 25) 2
-83  : EQUAL                (line 25)
-84  : JUMP_IF_FALSE        (line 25) 26
-85  : BEGIN_SCOPE          (line 25)
-86  : PUSH_STRING          (line 26) "  - Control flow and loops"
-87  : PRINT                (line 26)
-88  : PUSH_INT             (line 27) 1
-89  : PUSH_INT             (line 27) 4
-90  : CREATE_RANGE         (line 27)
-91  : GET_ITERATOR         (line 27)
-92  : STORE_TEMP           (line 27)
-93  : LOAD_TEMP            (line 27)
-94  : ITERATOR_HAS_NEXT    (line 27)
-95  : JUMP_IF_FALSE        (line 27) 12
-96  : LOAD_TEMP            (line 27)
-97  : ITERATOR_NEXT        (line 27)
-98  : STORE_VAR            (line 27) i
-99  : BEGIN_SCOPE          (line 27)
-100 : PUSH_STRING          (line 28) "  - Loop iteration "
-101 : LOAD_VAR             (line 28) i
-102 : PUSH_STRING          (line 28) ""
-103 : CONCAT               (line 28)
-104 : INTERPOLATE_STRING   (line 28)
-105 : PRINT                (line 28)
-106 : END_SCOPE            (line 27)
-107 : JUMP                 (line 27) -15
-108 : CLEAR_TEMP           (line 27)
-109 : END_SCOPE            (line 25)
-110 : JUMP                 (line 25) 17
-111 : BEGIN_SCOPE          (line 30)
-112 : PUSH_STRING          (line 31) "  - String interpolation"
-113 : PRINT                (line 31)
-114 : PUSH_STRING          (line 32) "Hello, "
-115 : LOAD_VAR             (line 32) name
-116 : PUSH_STRING          (line 32) ""
-117 : CONCAT               (line 32)
-118 : PUSH_STRING          (line 32) "!"
-119 : INTERPOLATE_STRING   (line 32)
-120 : STORE_VAR            (line 32) msg
-121 : PUSH_STRING          (line 33) "  - Message: "
-122 : LOAD_VAR             (line 33) msg
-123 : PUSH_STRING          (line 33) ""
-124 : CONCAT               (line 33)
-125 : INTERPOLATE_STRING   (line 33)
-126 : PRINT                (line 33)
-127 : END_SCOPE            (line 30)
-128 : END_SCOPE            (line 17)
-129 : JUMP                 (line 17) -93
-130 : END_SCOPE            (line 17)
-131 : PUSH_STRING          (line 38) "Nested structure test:"
-132 : PRINT                (line 38)
-133 : BEGIN_SCOPE          (line 39)
-134 : PUSH_INT             (line 39) 1
-135 : STORE_VAR            (line 39) outer
-136 : LOAD_VAR             (line 39) outer
-137 : PUSH_INT             (line 39) 2
-138 : LESS_EQUAL           (line 39)
-139 : JUMP_IF_FALSE        (line 39) 62
-140 : JUMP                 (line 39) 7
-141 : LOAD_VAR             (line 39) outer
-142 : PUSH_INT             (line 39) 1
-143 : ADD                  (line 39)
-144 : DUP                  (line 39)
-145 : STORE_VAR            (line 39) outer
-146 : POP                  (line 39)
-147 : JUMP                 (line 39) -12
-148 : BEGIN_SCOPE          (line 39)
-149 : PUSH_STRING          (line 40) "Outer level "
-150 : LOAD_VAR             (line 40) outer
-151 : PUSH_STRING          (line 40) ""
-152 : CONCAT               (line 40)
-153 : PUSH_STRING          (line 40) ":"
-154 : INTERPOLATE_STRING   (line 40)
-155 : PRINT                (line 40)
-156 : LOAD_VAR             (line 42) outer
-157 : PUSH_INT             (line 42) 10
-158 : MULTIPLY             (line 42)
-159 : LOAD_VAR             (line 42) outer
-160 : PUSH_INT             (line 42) 10
-161 : MULTIPLY             (line 42)
-162 : PUSH_INT             (line 42) 2
-163 : ADD                  (line 42)
-164 : CREATE_RANGE         (line 42)
-165 : GET_ITERATOR         (line 42)
-166 : STORE_TEMP           (line 42)
-167 : LOAD_TEMP            (line 42)
-168 : ITERATOR_HAS_NEXT    (line 42)
-169 : JUMP_IF_FALSE        (line 42) 29
-170 : LOAD_TEMP            (line 42)
-171 : ITERATOR_NEXT        (line 42)
-172 : STORE_VAR            (line 42) inner
-173 : BEGIN_SCOPE          (line 42)
-174 : LOAD_VAR             (line 43) inner
-175 : PUSH_INT             (line 43) 2
-176 : MODULO               (line 43)
-177 : PUSH_INT             (line 43) 0
-178 : EQUAL                (line 43)
-179 : JUMP_IF_FALSE        (line 43) 9
-180 : BEGIN_SCOPE          (line 43)
-181 : PUSH_STRING          (line 44) "  Even: "
-182 : LOAD_VAR             (line 44) inner
-183 : PUSH_STRING          (line 44) ""
-184 : CONCAT               (line 44)
-185 : INTERPOLATE_STRING   (line 44)
-186 : PRINT                (line 44)
-187 : END_SCOPE            (line 43)
-188 : JUMP                 (line 43) 8
-189 : BEGIN_SCOPE          (line 45)
-190 : PUSH_STRING          (line 46) "  Odd: "
-191 : LOAD_VAR             (line 46) inner
-192 : PUSH_STRING          (line 46) ""
-193 : CONCAT               (line 46)
-194 : INTERPOLATE_STRING   (line 46)
-195 : PRINT                (line 46)
-196 : END_SCOPE            (line 45)
-197 : END_SCOPE            (line 42)
-198 : JUMP                 (line 42) -32
-199 : CLEAR_TEMP           (line 42)
-200 : END_SCOPE            (line 39)
-201 : JUMP                 (line 39) -61
-202 : END_SCOPE            (line 39)
-203 : PUSH_STRING          (line 52) "Complex expression test:"
-204 : PRINT                (line 52)
-205 : PUSH_INT             (line 53) 5
-206 : STORE_VAR            (line 53) a
-207 : PUSH_INT             (line 54) 3
-208 : STORE_VAR            (line 54) b
-209 : PUSH_INT             (line 55) 2
-210 : STORE_VAR            (line 55) c
-211 : LOAD_VAR             (line 57) a
-212 : LOAD_VAR             (line 57) b
-213 : ADD                  (line 57)
-214 : LOAD_VAR             (line 57) c
-215 : MULTIPLY             (line 57)
-216 : LOAD_VAR             (line 57) a
-217 : LOAD_VAR             (line 57) b
-218 : SUBTRACT             (line 57)
-219 : SUBTRACT             (line 57)
-220 : STORE_VAR            (line 57) result
-221 : PUSH_STRING          (line 58) "("
-222 : LOAD_VAR             (line 58) a
-223 : PUSH_STRING          (line 58) ""
-224 : CONCAT               (line 58)
-225 : PUSH_STRING          (line 58) " + "
-226 : LOAD_VAR             (line 58) b
-227 : PUSH_STRING          (line 58) ""
-228 : CONCAT               (line 58)
-229 : PUSH_STRING          (line 58) ") * "
-230 : LOAD_VAR             (line 58) c
-231 : PUSH_STRING          (line 58) ""
-232 : CONCAT               (line 58)
-233 : PUSH_STRING          (line 58) " - ("
-234 : LOAD_VAR             (line 58) a
-235 : PUSH_STRING          (line 58) ""
-236 : CONCAT               (line 58)
-237 : PUSH_STRING          (line 58) " - "
-238 : LOAD_VAR             (line 58) b
-239 : PUSH_STRING          (line 58) ""
-240 : CONCAT               (line 58)
-241 : PUSH_STRING          (line 58) ") = "
-242 : LOAD_VAR             (line 58) result
-243 : PUSH_STRING          (line 58) ""
-244 : CONCAT               (line 58)
-245 : INTERPOLATE_STRING   (line 58)
-246 : PRINT                (line 58)
-247 : LOAD_VAR             (line 60) a
-248 : LOAD_VAR             (line 60) b
-249 : GREATER              (line 60)
-250 : STORE_VAR            (line 60) condition
-251 : PUSH_NULL            (line 60)
-252 : POP                  (line 60)
-253 : LOAD_VAR             (line 60) b
-254 : LOAD_VAR             (line 60) c
-255 : GREATER              (line 60)
-256 : CALL                 (line 60) 1
-257 : POP                  (line 60)
-258 : PUSH_NULL            (line 60)
-259 : POP                  (line 60)
-260 : LOAD_VAR             (line 60) a
-261 : PUSH_INT             (line 60) 5
-262 : EQUAL                (line 60)
-263 : CALL                 (line 60) 1
-264 : POP                  (line 60)
-265 : PUSH_STRING          (line 61) "Complex condition: "
-266 : LOAD_VAR             (line 61) condition
-267 : PUSH_STRING          (line 61) ""
-268 : CONCAT               (line 61)
-269 : INTERPOLATE_STRING   (line 61)
-270 : PRINT                (line 61)
-271 : PUSH_STRING          (line 64) "String processing:"
-272 : PRINT                (line 64)
-273 : PUSH_STRING          (line 65) "Hello"
-274 : PUSH_STRING          (line 65) "World"
-275 : PUSH_STRING          (line 65) "from"
-276 : PUSH_STRING          (line 65) "Limit"
-277 : CREATE_LIST          (line 65) 4
-278 : STORE_VAR            (line 65) words
-279 : BEGIN_SCOPE          (line 66)
-280 : PUSH_INT             (line 66) 0
-281 : STORE_VAR            (line 66) i
-282 : LOAD_VAR             (line 66) i
-283 : PUSH_INT             (line 66) 4
-284 : LESS                 (line 66)
-285 : JUMP_IF_FALSE        (line 66) 27
-286 : JUMP                 (line 66) 7
-287 : LOAD_VAR             (line 66) i
-288 : PUSH_INT             (line 66) 1
-289 : ADD                  (line 66)
-290 : DUP                  (line 66)
-291 : STORE_VAR            (line 66) i
-292 : POP                  (line 66)
-293 : JUMP                 (line 66) -12
-294 : BEGIN_SCOPE          (line 66)
-295 : LOAD_VAR             (line 67) words
-296 : LOAD_VAR             (line 67) i
-297 : GET_INDEX            (line 67)
-298 : STORE_VAR            (line 67) word
-299 : PUSH_STRING          (line 68) "Word "
-300 : LOAD_VAR             (line 68) i
-301 : PUSH_INT             (line 68) 1
-302 : ADD                  (line 68)
-303 : PUSH_STRING          (line 68) ""
-304 : CONCAT               (line 68)
-305 : PUSH_STRING          (line 68) ": "
-306 : LOAD_VAR             (line 68) word
-307 : PUSH_STRING          (line 68) ""
-308 : CONCAT               (line 68)
-309 : INTERPOLATE_STRING   (line 68)
-310 : PRINT                (line 68)
-311 : END_SCOPE            (line 66)
-312 : JUMP                 (line 66) -26
-313 : END_SCOPE            (line 66)
-314 : PUSH_STRING          (line 71) "Integration test complete!"
-315 : PRINT                (line 71)
-316 : HALT                 (line 0)
+   0: PUSH_STRING          "=== Comprehensive Integration Test ==="
+   1: PRINT               
+   2: PUSH_STRING          "Multi-feature test:"
+   3: PRINT               
+   4: PUSH_STRING          "Luminar"
+   5: STORE_VAR            "name"
+   6: PUSH_FLOAT           1
+   7: STORE_VAR            "version"
+   8: PUSH_BOOL            true
+   9: STORE_VAR            "isStable"
+  10: PUSH_STRING         
+  11: LOAD_VAR             "name"
+  12: PUSH_STRING         
+  13: CONCAT              
+  14: LOAD_VAR             "version"
+  15: PUSH_STRING         
+  16: CONCAT              
+  17: PUSH_STRING          ""Language: {name} v{version}"
+  18: INTERPOLATE_STRING  
+  19: PRINT               
+  20: PUSH_STRING         
+  21: LOAD_VAR             "isStable"
+  22: PUSH_STRING         
+  23: CONCAT              
+  24: PUSH_STRING          ""Stable: {isStable}"
+  25: INTERPOLATE_STRING  
+  26: PRINT               
+  27: PUSH_STRING          "Feature matrix:"
+  28: PRINT               
+  29: BEGIN_SCOPE         
+  30: PUSH_INT             1
+  31: STORE_VAR            "feature"
+  32: LOAD_VAR             "feature"
+  33: PUSH_INT             3
+  34: LESS_EQUAL          
+  35: JUMP_IF_FALSE        95
+  36: JUMP                 7
+  37: LOAD_VAR             "feature"
+  38: PUSH_INT             1
+  39: ADD                 
+  40: DUP                 
+  41: STORE_VAR            "feature"
+  42: POP                 
+  43: JUMP                 -12
+  44: BEGIN_SCOPE         
+  45: PUSH_STRING         
+  46: LOAD_VAR             "feature"
+  47: PUSH_STRING         
+  48: CONCAT              
+  49: PUSH_STRING          ":"
+  50: INTERPOLATE_STRING  
+  51: PRINT               
+  52: LOAD_VAR             "feature"
+  53: PUSH_INT             1
+  54: EQUAL               
+  55: JUMP_IF_FALSE        24
+  56: BEGIN_SCOPE         
+  57: PUSH_STRING          "  - Variables and expressions"
+  58: PRINT               
+  59: PUSH_INT             10
+  60: STORE_VAR            "x"
+  61: PUSH_INT             5
+  62: STORE_VAR            "y"
+  63: PUSH_STRING         
+  64: LOAD_VAR             "x"
+  65: PUSH_STRING         
+  66: CONCAT              
+  67: LOAD_VAR             "y"
+  68: PUSH_STRING         
+  69: CONCAT              
+  70: LOAD_VAR             "x"
+  71: LOAD_VAR             "y"
+  72: ADD                 
+  73: PUSH_STRING         
+  74: CONCAT              
+  75: PUSH_STRING          ""  - Example: {x} + {y} = {x + y}"
+  76: INTERPOLATE_STRING  
+  77: PRINT               
+  78: END_SCOPE           
+  79: JUMP                 49
+  80: LOAD_VAR             "feature"
+  81: PUSH_INT             2
+  82: EQUAL               
+  83: JUMP_IF_FALSE        27
+  84: BEGIN_SCOPE         
+  85: PUSH_STRING          "  - Control flow and loops"
+  86: PRINT               
+  87: PUSH_INT             1
+  88: PUSH_INT             4
+  89: CREATE_RANGE        
+  90: GET_ITERATOR        
+  91: STORE_TEMP          
+  92: LOAD_TEMP           
+  93: ITERATOR_HAS_NEXT   
+  94: JUMP_IF_FALSE        13
+  95: LOAD_TEMP           
+  96: ITERATOR_NEXT       
+  97: STORE_VAR            "i"
+  98: BEGIN_SCOPE         
+  99: PUSH_STRING         
+ 100: LOAD_VAR             "i"
+ 101: PUSH_STRING         
+ 102: CONCAT              
+ 103: PUSH_STRING          ""  - Loop iteration {i}"
+ 104: INTERPOLATE_STRING  
+ 105: PRINT               
+ 106: END_SCOPE           
+ 107: JUMP                 -16
+ 108: CLEAR_TEMP          
+ 109: END_SCOPE           
+ 110: JUMP                 18
+ 111: BEGIN_SCOPE         
+ 112: PUSH_STRING          "  - String interpolation"
+ 113: PRINT               
+ 114: PUSH_STRING         
+ 115: LOAD_VAR             "name"
+ 116: PUSH_STRING         
+ 117: CONCAT              
+ 118: PUSH_STRING          "!"
+ 119: INTERPOLATE_STRING  
+ 120: STORE_VAR            "msg"
+ 121: PUSH_STRING         
+ 122: LOAD_VAR             "msg"
+ 123: PUSH_STRING         
+ 124: CONCAT              
+ 125: PUSH_STRING          ""  - Message: {msg}"
+ 126: INTERPOLATE_STRING  
+ 127: PRINT               
+ 128: END_SCOPE           
+ 129: END_SCOPE           
+ 130: JUMP                 -94
+ 131: END_SCOPE           
+ 132: PUSH_STRING          "Complex expression test:"
+ 133: PRINT               
+ 134: PUSH_INT             5
+ 135: STORE_VAR            "a"
+ 136: PUSH_INT             3
+ 137: STORE_VAR            "b"
+ 138: PUSH_INT             2
+ 139: STORE_VAR            "c"
+ 140: LOAD_VAR             "a"
+ 141: LOAD_VAR             "b"
+ 142: ADD                 
+ 143: LOAD_VAR             "c"
+ 144: MULTIPLY            
+ 145: LOAD_VAR             "a"
+ 146: LOAD_VAR             "b"
+ 147: SUBTRACT            
+ 148: SUBTRACT            
+ 149: STORE_VAR            "result"
+ 150: PUSH_STRING         
+ 151: LOAD_VAR             "a"
+ 152: PUSH_STRING         
+ 153: CONCAT              
+ 154: LOAD_VAR             "b"
+ 155: PUSH_STRING         
+ 156: CONCAT              
+ 157: LOAD_VAR             "c"
+ 158: PUSH_STRING         
+ 159: CONCAT              
+ 160: LOAD_VAR             "a"
+ 161: PUSH_STRING         
+ 162: CONCAT              
+ 163: LOAD_VAR             "b"
+ 164: PUSH_STRING         
+ 165: CONCAT              
+ 166: LOAD_VAR             "result"
+ 167: PUSH_STRING         
+ 168: CONCAT              
+ 169: PUSH_STRING          ""({a} + {b}) * {c} - ({a} - {b}) = {result}"
+ 170: INTERPOLATE_STRING  
+ 171: PRINT               
+ 172: LOAD_VAR             "a"
+ 173: LOAD_VAR             "b"
+ 174: GREATER             
+ 175: DUP                 
+ 176: JUMP_IF_FALSE        4
+ 177: POP                 
+ 178: LOAD_VAR             "b"
+ 179: LOAD_VAR             "c"
+ 180: GREATER             
+ 181: DUP                 
+ 182: JUMP_IF_TRUE         4
+ 183: POP                 
+ 184: LOAD_VAR             "a"
+ 185: PUSH_INT             5
+ 186: EQUAL               
+ 187: STORE_VAR            "condition"
+ 188: PUSH_STRING         
+ 189: LOAD_VAR             "condition"
+ 190: PUSH_STRING         
+ 191: CONCAT              
+ 192: PUSH_STRING          ""Complex condition: {condition}"
+ 193: INTERPOLATE_STRING  
+ 194: PRINT               
+ 195: PUSH_STRING          "String processing:"
+ 196: PRINT               
+ 197: PUSH_STRING          "Hello"
+ 198: PUSH_STRING          "World"
+ 199: PUSH_STRING          "from"
+ 200: PUSH_STRING          "Limit"
+ 201: CREATE_LIST         
+ 202: STORE_VAR            "words"
+ 203: BEGIN_SCOPE         
+ 204: PUSH_INT             0
+ 205: STORE_VAR            "i"
+ 206: LOAD_VAR             "i"
+ 207: PUSH_INT             4
+ 208: LESS                
+ 209: JUMP_IF_FALSE        27
+ 210: JUMP                 7
+ 211: LOAD_VAR             "i"
+ 212: PUSH_INT             1
+ 213: ADD                 
+ 214: DUP                 
+ 215: STORE_VAR            "i"
+ 216: POP                 
+ 217: JUMP                 -12
+ 218: BEGIN_SCOPE         
+ 219: LOAD_VAR             "words"
+ 220: LOAD_VAR             "i"
+ 221: GET_INDEX           
+ 222: STORE_VAR            "word"
+ 223: PUSH_STRING         
+ 224: LOAD_VAR             "i"
+ 225: PUSH_INT             1
+ 226: ADD                 
+ 227: PUSH_STRING         
+ 228: CONCAT              
+ 229: LOAD_VAR             "word"
+ 230: PUSH_STRING         
+ 231: CONCAT              
+ 232: PUSH_STRING          ""Word {i + 1}: {word}"
+ 233: INTERPOLATE_STRING  
+ 234: PRINT               
+ 235: END_SCOPE           
+ 236: JUMP                 -26
+ 237: END_SCOPE           
+ 238: PUSH_STRING          "Integration test complete!"
+ 239: PRINT               
+ 240: HALT                
+

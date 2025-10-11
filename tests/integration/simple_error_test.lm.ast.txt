@@ -1,0 +1,102 @@
+AST for C:\Projects\limitly\tests\integration\simple_error_test.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+  Literal: "=== Simple Error Handling Test ==="
+FunctionDeclaration: add
+  Parameters:
+    a: int
+    b: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      ReturnStatement:
+        Value:
+          BinaryExpression: +
+            Left:
+              Variable: a
+            Operator: +
+            Right:
+              Variable: b
+FunctionDeclaration: test_basic_operations
+  Body:
+    BlockStatement:
+      PrintStatement:
+        Literal: "Testing basic operations..."
+      VarDeclaration: x
+        Type: int
+        Initializer:
+          Literal: 10
+      VarDeclaration: y
+        Type: int
+        Initializer:
+          Literal: 2
+      VarDeclaration: result
+        Type: int
+        Initializer:
+          BinaryExpression: /
+            Left:
+              Variable: x
+            Operator: /
+            Right:
+              Variable: y
+      PrintStatement:
+        BinaryExpression: +
+          Left:
+            Literal: "10 / 2 = "
+          Operator: +
+          Right:
+            Variable: result
+      VarDeclaration: zero
+        Type: int
+        Initializer:
+          Literal: 0
+      IfStatement:
+        Condition:
+          BinaryExpression: ==
+            Left:
+              Variable: zero
+            Operator: ==
+            Right:
+              Literal: 0
+        Then:
+          BlockStatement:
+            PrintStatement:
+              Literal: "Division by zero would be an error"
+FunctionDeclaration: test_function_calls
+  Body:
+    BlockStatement:
+      PrintStatement:
+        Literal: "Testing function calls..."
+      VarDeclaration: sum
+        Type: int
+        Initializer:
+          CallExpression:
+            Callee:
+              Variable: add
+            Arguments:
+              Literal: 5
+              Literal: 3
+      PrintStatement:
+        BinaryExpression: +
+          Left:
+            Literal: "5 + 3 = "
+          Operator: +
+          Right:
+            Variable: sum
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: test_basic_operations
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: test_function_calls
+PrintStatement:
+  Literal: "=== Error Handling Test Compvare ==="

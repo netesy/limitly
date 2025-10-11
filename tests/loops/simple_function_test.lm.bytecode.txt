@@ -1,26 +1,32 @@
 Bytecode for tests\loops\simple_function_test.lm
+Parser mode: Legacy
 ========================================
 
-Total instructions: 21
+=== Bytecode ===
+Generated 24 instructions
 
-   1: PUSH_STRING          (line 1) "=== Simple Function Test ==="
-2   : PRINT                (line 1)
-3   : BEGIN_FUNCTION       (line 3)
-4   : DEFINE_PARAM         (line 3) x
-5   : BEGIN_SCOPE          (line 3)
-6   : PUSH_STRING          (line 4) "Function called with: "
-7   : LOAD_VAR             (line 4) x
-8   : PUSH_STRING          (line 4) ""
-9   : CONCAT               (line 4)
-10  : INTERPOLATE_STRING   (line 4)
-11  : PRINT                (line 4)
-12  : END_SCOPE            (line 3)
-13  : PUSH_NULL            (line 3)
-14  : RETURN               (line 3)
-15  : END_FUNCTION         (line 3)
-16  : PUSH_INT             (line 7) 42
-17  : CALL                 (line 7) 1
-18  : POP                  (line 7)
-19  : PUSH_STRING          (line 8) "=== Test completed ==="
-20  : PRINT                (line 8)
-21  : HALT                 (line 0)
+   0: PUSH_STRING          "=== Simple Function Test ==="
+   1: PRINT               
+   2: BEGIN_FUNCTION       "test_function"
+   3: DEFINE_PARAM        
+   4: BEGIN_SCOPE         
+   5: PUSH_STRING         
+   6: LOAD_VAR             "x"
+   7: PUSH_STRING         
+   8: CONCAT              
+   9: PUSH_STRING          ""Function called with: {x}"
+  10: INTERPOLATE_STRING  
+  11: PRINT               
+  12: END_SCOPE           
+  13: PUSH_NULL           
+  14: RETURN              
+  15: END_FUNCTION        
+  16: PUSH_FUNCTION       
+  17: STORE_VAR            "test_function"
+  18: PUSH_INT             42
+  19: CALL                 "test_function"
+  20: POP                 
+  21: PUSH_STRING          "=== Test completed ==="
+  22: PRINT               
+  23: HALT                
+

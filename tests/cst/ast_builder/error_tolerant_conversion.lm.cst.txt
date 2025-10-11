@@ -1,0 +1,79 @@
+CST for C:\Projects\limitly\tests\cst\ast_builder\error_tolerant_conversion.lm
+Parser: New CSTParser from cst_parser.cpp
+Mode: CST (cstMode=true)
+========================================
+
+CST Statistics:
+- CST nodes created: 12
+- Trivia attachments: 22
+- Parse errors: 3
+
+Parse Errors:
+  Line 6: Expected expression.
+  Line 22: Expected expression.
+  Line 22: Expected '}' after block.
+Caused by: Unterminated if starting at line 13:
+13 | if - unclosed block starts here
+
+=== Full CST Structure ===
++ Node: PROGRAM [0-513] (Program root node)
+├─ + Node: VAR_DECLARATION [0-155] (var declaration)
+│ ├─ + Node: COMMENT_NODE | Token: // Test error-tolerant AST conversion [0-37]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [37-38]
+│ ├─ + Node: COMMENT_NODE | Token: // This file contains syntax errors to test that AST builder can handle partial CSTs [38-122]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [122-123]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [123-124]
+│ ├─ + Node: COMMENT_NODE | Token: // Valid code first [124-143]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [143-144]
+│ ├─ Token: var [144-147]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [147-148]
+│ ├─ + Node: IDENTIFIER [148-149]
+│ │ └─ Token: x [148-149]
+│ ├─ + Node: ASSIGNMENT_EXPR [150-154]
+│ │ ├─ Token: = [150-151]
+│ │ └─ + Node: LITERAL_EXPR [152-154]
+│ │   └─ Token: 42 [152-154]
+│ └─ Token: ; [154-155]
+├─ + Node: VAR_DECLARATION [182-245] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [182-183]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [183-184]
+│ ├─ + Node: COMMENT_NODE | Token: // Syntax errors that should be handled gracefully [184-234]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [234-235]
+│ ├─ Token: var [235-238]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [238-239]
+│ ├─ + Node: IDENTIFIER [239-240]
+│ │ └─ Token: y [239-240]
+│ └─ + Node: ASSIGNMENT_EXPR [241-245]
+│   ├─ Token: = [241-242]
+│   └─ + Node: LITERAL_EXPR [243-245]
+│     └─ Token: 24 [243-245]
+├─ + Node: VAR_DECLARATION [453-513] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [453-454]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [454-455]
+│ ├─ + Node: COMMENT_NODE | Token: // Valid code should still be processed [455-494]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [494-495]
+│ ├─ Token: var [495-498]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [498-499]
+│ ├─ + Node: IDENTIFIER [499-504]
+│ │ └─ Token: final [499-504]
+│ ├─ + Node: ASSIGNMENT_EXPR [505-512]
+│ │ ├─ Token: = [505-506]
+│ │ └─ + Node: LITERAL_EXPR [511-512]
+│ │   └─ Token: y [511-512]
+│ └─ Token: ; [512-513]
+├─ + Node: ERROR_NODE [0-0] ERROR: Expected expression.
+├─ + Node: ERROR_NODE [0-0] ERROR: Expected expression.
+└─ + Node: ERROR_NODE [0-0] ERROR: Expected '}' after block.
+Caused by: Unterminated if starting at line 13:
+13 | if - unclosed block starts here
+

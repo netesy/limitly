@@ -1,0 +1,41 @@
+CST for tests\loops\match.lm
+Parser: New CSTParser from cst_parser.cpp
+Mode: CST (cstMode=true)
+========================================
+
+CST Statistics:
+- CST nodes created: 33
+- Trivia attachments: 78
+- Parse errors: 0
+
+=== Full CST Structure ===
++ Node: PROGRAM [0-196] (Program root node)
+├─ + Node: VAR_DECLARATION [0-14] (var declaration)
+│ ├─ Token: var [0-3]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [3-4]
+│ ├─ + Node: IDENTIFIER [4-5]
+│ │ └─ Token: x [4-5]
+│ ├─ + Node: ANNOTATION [5-9]
+│ │ ├─ Token: : [5-6]
+│ │ └─ + Node: PRIMITIVE_TYPE [6-9]
+│ │   └─ Token: int [6-9]
+│ ├─ + Node: ASSIGNMENT_EXPR [10-13]
+│ │ ├─ Token: = [10-11]
+│ │ └─ + Node: LITERAL_EXPR [12-13]
+│ │   └─ Token: 5 [12-13]
+│ └─ Token: ; [13-14]
+└─ + Node: VAR_DECLARATION [176-196] (var declaration)
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [176-177]
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [177-178]
+  ├─ Token: var [178-181]
+  ├─ + Node: WHITESPACE_NODE | Token:   [181-182]
+  ├─ + Node: IDENTIFIER [182-187]
+  │ └─ Token: value [182-187]
+  ├─ + Node: ASSIGNMENT_EXPR [188-195]
+  │ ├─ Token: = [188-189]
+  │ └─ + Node: LITERAL_EXPR [190-195]
+  │   └─ Token: false [190-195]
+  └─ Token: ; [195-196]
+

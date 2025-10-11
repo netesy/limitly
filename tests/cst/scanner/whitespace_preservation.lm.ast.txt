@@ -1,0 +1,36 @@
+AST for C:\Projects\limitly\tests\cst\scanner\whitespace_preservation.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
+========================================
+
+AST Dump:
+==========
+VarDeclaration: x
+  Initializer:
+    Literal: 42
+VarDeclaration: y
+  Initializer:
+    Literal: 24
+PrintStatement:
+  Literal: "Testing whitespace preservation"
+VarDeclaration: z
+  Initializer:
+    BinaryExpression: +
+      Left:
+        Variable: x
+      Operator: +
+      Right:
+        Variable: y
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "Result: "
+    Operator: +
+    Right:
+      CallExpression:
+        Callee:
+          Literal: nil
+        Arguments:
+          Variable: z

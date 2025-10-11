@@ -1,0 +1,83 @@
+CST for C:\Projects\limitly\tests\cst\scanner\comment_preservation.lm
+Parser: New CSTParser from cst_parser.cpp
+Mode: CST (cstMode=true)
+========================================
+
+CST Statistics:
+- CST nodes created: 7
+- Trivia attachments: 6
+- Parse errors: 1
+
+Parse Errors:
+  Line 23: Expected expression.
+
+=== Full CST Structure ===
++ Node: PROGRAM [0-326] (Program root node)
+├─ + Node: VAR_DECLARATION [0-212] (var declaration)
+│ ├─ + Node: COMMENT_NODE | Token: // Test comment preservation in CST scanner [0-43]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [43-44]
+│ ├─ + Node: COMMENT_NODE | Token: // This file tests that comments are preserved as tokens [44-100]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [100-101]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [101-102]
+│ ├─ + Node: COMMENT_NODE | Token: /* 
+ * Multi-line block comment
+ * with various formatting
+ */ [102-164]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [164-165]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [165-166]
+│ ├─ + Node: COMMENT_NODE | Token: // Inline comment before statement [166-200]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [200-201]
+│ ├─ Token: var [201-204]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [204-205]
+│ ├─ + Node: IDENTIFIER [205-206]
+│ │ └─ Token: x [205-206]
+│ ├─ + Node: ASSIGNMENT_EXPR [207-211]
+│ │ ├─ Token: = [207-208]
+│ │ └─ + Node: LITERAL_EXPR [209-211]
+│ │   └─ Token: 42 [209-211]
+│ └─ Token: ; [211-212]
+├─ + Node: VAR_DECLARATION [212-276] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token:   [212-213]
+│ ├─ + Node: COMMENT_NODE | Token: // Trailing comment [213-232]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [232-233]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [233-234]
+│ ├─ + Node: COMMENT_NODE | Token: /* Block comment in middle */ [234-263]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [263-264]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [264-265]
+│ ├─ Token: var [265-268]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [268-269]
+│ ├─ + Node: IDENTIFIER [269-270]
+│ │ └─ Token: y [269-270]
+│ ├─ + Node: ASSIGNMENT_EXPR [271-275]
+│ │ ├─ Token: = [271-272]
+│ │ └─ + Node: LITERAL_EXPR [273-275]
+│ │   └─ Token: 24 [273-275]
+│ └─ Token: ; [275-276]
+├─ + Node: VAR_DECLARATION [276-326] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [276-277]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [277-278]
+│ ├─ + Node: COMMENT_NODE | Token: // Test comments with expressions [278-311]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [311-312]
+│ ├─ Token: var [312-315]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [315-316]
+│ ├─ + Node: IDENTIFIER [316-317]
+│ │ └─ Token: z [316-317]
+│ ├─ + Node: ASSIGNMENT_EXPR [318-325]
+│ │ ├─ Token: = [318-319]
+│ │ └─ + Node: LITERAL_EXPR [324-325]
+│ │   └─ Token: y [324-325]
+│ └─ Token: ; [325-326]
+└─ + Node: ERROR_NODE [0-0] ERROR: Expected expression.
+

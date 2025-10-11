@@ -1,0 +1,68 @@
+CST for C:\Projects\limitly\tests\concurrency\sample.lm
+Parser: New CSTParser from cst_parser.cpp
+Mode: CST (cstMode=true)
+========================================
+
+CST Statistics:
+- CST nodes created: 22
+- Trivia attachments: 45
+- Parse errors: 0
+
+=== Full CST Structure ===
++ Node: PROGRAM [120-904] (Program root node)
+├─ + Node: VAR_DECLARATION [120-164] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [120-121]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [121-122]
+│ ├─ + Node: COMMENT_NODE | Token: // Atomic counter [122-139]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [139-140]
+│ ├─ Token: var [140-143]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [143-144]
+│ ├─ + Node: IDENTIFIER [144-151]
+│ │ └─ Token: counter [144-151]
+│ ├─ + Node: ANNOTATION [151-159]
+│ │ ├─ Token: : [151-152]
+│ │ └─ + Node: PRIMITIVE_TYPE [153-159]
+│ │   └─ Token: atomic [153-159]
+│ ├─ + Node: ASSIGNMENT_EXPR [160-163]
+│ │ ├─ Token: = [160-161]
+│ │ └─ + Node: LITERAL_EXPR [162-163]
+│ │   └─ Token: 0 [162-163]
+│ └─ Token: ; [163-164]
+├─ + Node: VAR_DECLARATION [849-878] (var declaration)
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [849-850]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [850-851]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [851-852]
+│ ├─ + Node: WHITESPACE_NODE | Token: 
+ [852-853]
+│ ├─ Token: var [853-856]
+│ ├─ + Node: WHITESPACE_NODE | Token:   [856-857]
+│ ├─ + Node: IDENTIFIER [857-865]
+│ │ └─ Token: messages [857-865]
+│ ├─ + Node: ASSIGNMENT_EXPR [866-877]
+│ │ ├─ Token: = [866-867]
+│ │ └─ + Node: LITERAL_EXPR [876-877]
+│ │   └─ Token: ) [876-877]
+│ └─ Token: ; [877-878]
+└─ + Node: VAR_DECLARATION [878-904] (var declaration)
+  ├─ + Node: WHITESPACE_NODE | Token: 
+ [878-879]
+  ├─ Token: var [879-882]
+  ├─ + Node: WHITESPACE_NODE | Token:   [882-883]
+  ├─ + Node: IDENTIFIER [883-891]
+  │ └─ Token: counters [883-891]
+  ├─ + Node: ANNOTATION [891-899]
+  │ ├─ Token: : [891-892]
+  │ └─ + Node: PRIMITIVE_TYPE [893-899]
+  │   └─ Token: atomic [893-899]
+  ├─ + Node: ASSIGNMENT_EXPR [900-903]
+  │ ├─ Token: = [900-901]
+  │ └─ + Node: LITERAL_EXPR [902-903]
+  │   └─ Token: 0 [902-903]
+  └─ Token: ; [903-904]
+

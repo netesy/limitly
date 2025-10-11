@@ -1,0 +1,17 @@
+Bytecode for C:\Projects\limitly\tests\cst\ast_builder\error_tolerant_conversion.lm
+Parser: New CSTParser
+========================================
+
+=== Bytecode ===
+Generated 9 instructions
+
+   0: PUSH_INT             42
+   1: STORE_VAR            "x"
+   2: PUSH_STRING          "Valid: "
+   3: CALL                 "unknown"
+   4: ADD                 
+   5: PRINT               
+   6: PUSH_INT             24
+   7: STORE_VAR            "y"
+   8: HALT                
+

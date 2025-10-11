@@ -1,0 +1,99 @@
+Bytecode for C:\Projects\limitly\tests\error_handling\simple_test.lm
+Parser: New CSTParser
+========================================
+
+=== Bytecode ===
+Generated 91 instructions
+
+   0: BEGIN_FUNCTION       "divide"
+   1: DEFINE_PARAM        
+   2: DEFINE_PARAM        
+   3: BEGIN_SCOPE         
+   4: LOAD_VAR             "a"
+   5: LOAD_VAR             "b"
+   6: DIVIDE              
+   7: RETURN              
+   8: END_SCOPE           
+   9: PUSH_NULL           
+  10: RETURN              
+  11: END_FUNCTION        
+  12: PUSH_FUNCTION       
+  13: STORE_VAR            "divide"
+  14: BEGIN_FUNCTION       "goodPropagation"
+  15: DEFINE_PARAM        
+  16: DEFINE_PARAM        
+  17: BEGIN_SCOPE         
+  18: LOAD_VAR             "x"
+  19: LOAD_VAR             "y"
+  20: CALL                 "divide"
+  21: CHECK_ERROR         
+  22: JUMP_IF_FALSE        1
+  23: PROPAGATE_ERROR     
+  24: UNWRAP_VALUE        
+  25: STORE_VAR            "result"
+  26: LOAD_VAR             "result"
+  27: RETURN              
+  28: END_SCOPE           
+  29: PUSH_NULL           
+  30: RETURN              
+  31: END_FUNCTION        
+  32: PUSH_FUNCTION       
+  33: STORE_VAR            "goodPropagation"
+  34: BEGIN_FUNCTION       "badPropagation"
+  35: DEFINE_PARAM        
+  36: DEFINE_PARAM        
+  37: BEGIN_SCOPE         
+  38: LOAD_VAR             "x"
+  39: LOAD_VAR             "y"
+  40: CALL                 "divide"
+  41: CHECK_ERROR         
+  42: JUMP_IF_FALSE        1
+  43: PROPAGATE_ERROR     
+  44: UNWRAP_VALUE        
+  45: STORE_VAR            "result"
+  46: LOAD_VAR             "result"
+  47: RETURN              
+  48: END_SCOPE           
+  49: PUSH_NULL           
+  50: RETURN              
+  51: END_FUNCTION        
+  52: PUSH_FUNCTION       
+  53: STORE_VAR            "badPropagation"
+  54: BEGIN_FUNCTION       "nonFallible"
+  55: DEFINE_PARAM        
+  56: DEFINE_PARAM        
+  57: BEGIN_SCOPE         
+  58: LOAD_VAR             "x"
+  59: LOAD_VAR             "y"
+  60: CALL                 "divide"
+  61: CHECK_ERROR         
+  62: JUMP_IF_FALSE        1
+  63: PROPAGATE_ERROR     
+  64: UNWRAP_VALUE        
+  65: STORE_VAR            "result"
+  66: LOAD_VAR             "result"
+  67: RETURN              
+  68: END_SCOPE           
+  69: PUSH_NULL           
+  70: RETURN              
+  71: END_FUNCTION        
+  72: PUSH_FUNCTION       
+  73: STORE_VAR            "nonFallible"
+  74: BEGIN_FUNCTION       "unhandled"
+  75: DEFINE_PARAM        
+  76: DEFINE_PARAM        
+  77: BEGIN_SCOPE         
+  78: LOAD_VAR             "x"
+  79: LOAD_VAR             "y"
+  80: CALL                 "divide"
+  81: POP                 
+  82: END_SCOPE           
+  83: PUSH_NULL           
+  84: RETURN              
+  85: END_FUNCTION        
+  86: PUSH_FUNCTION       
+  87: STORE_VAR            "unhandled"
+  88: PUSH_STRING          "Simple error checking test"
+  89: PRINT               
+  90: HALT                
+

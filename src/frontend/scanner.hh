@@ -173,6 +173,30 @@ struct Token {
     size_t end = 0;                           // End position for precise spans
     std::vector<Token> leadingTrivia;         // Optional trivia attachment
     std::vector<Token> trailingTrivia;        // Optional trivia attachment
+    
+    // Default constructors for backward compatibility
+    Token() : type(TokenType::UNDEFINED), lexeme(""), line(0), start(0), end(0) {}
+    
+    Token(TokenType t, const std::string& lex, size_t ln, size_t st = 0, size_t en = 0)
+        : type(t), lexeme(lex), line(ln), start(st), end(en) {}
+    
+    Token(TokenType t, const std::string& lex, size_t ln, size_t st, size_t en,
+          const std::vector<Token>& leading, const std::vector<Token>& trailing)
+        : type(t), lexeme(lex), line(ln), start(st), end(en), 
+          leadingTrivia(leading), trailingTrivia(trailing) {}
+    
+    // Accessor methods for trivia
+    const std::vector<Token>& getLeadingTrivia() const { return leadingTrivia; }
+    const std::vector<Token>& getTrailingTrivia() const { return trailingTrivia; }
+    
+    // Method to reconstruct original source text with trivia
+    std::string reconstructSource() const;
+};
+
+// Scan mode enumeration for backward compatibility
+enum class ScanMode {
+    LEGACY,     // No trivia collection (original behavior)
+    CST         // Collect and attach trivia to tokens
 };
 
 // Configuration for CST trivia preservation
@@ -200,6 +224,7 @@ public:
     
 
     std::vector<Token> scanTokens();
+    std::vector<Token> scanTokens(ScanMode mode);  // Enhanced with mode parameter
     void scanToken();
     
     // CST-enhanced methods (purely additive)
@@ -246,7 +271,8 @@ private:
     
     // CST support
     CSTConfig cstConfig;
-    std::vector<Token> triviaBuffer;  // Buffer for collecting trivia
+    ScanMode scanMode = ScanMode::LEGACY;  // Current scanning mode
+    std::vector<Token> triviaBuffer;       // Buffer for collecting trivia before meaningful tokens
 
     void addToken(TokenType type);
     void addToken(TokenType type, const std::string& text);
@@ -270,6 +296,8 @@ private:
     void scanComment();
     Token createErrorToken(const std::string& message);
     void attachTrivia(Token& token, const CSTConfig& config);
+    void collectTrivia(TokenType triviaType);  // Collect trivia into buffer
+    void attachTriviaToToken(Token& token);    // Attach buffered trivia to token
 };
 
 #endif // SCANNER_H

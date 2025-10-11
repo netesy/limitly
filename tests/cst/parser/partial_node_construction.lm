@@ -1,0 +1,18 @@
+// Test partial node construction in CST parser
+// This file tests that the parser creates partial nodes for incomplete constructs
+
+// Valid code for comparison
+var x = 42;
+
+// Incomplete if statement - should create partial node
+if (x > 0
+
+// Should continue parsing after partial node
+print("After incomplete if");
+
+// Incomplete for loop - should create partial node  
+for (var i = 0; i < 3
+
+// Should still parse valid code
+var y = x + 10;
+print("Final: " + str(y));

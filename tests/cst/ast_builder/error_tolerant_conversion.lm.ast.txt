@@ -1,0 +1,26 @@
+AST for C:\Projects\limitly\tests\cst\ast_builder\error_tolerant_conversion.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
+========================================
+
+AST Dump:
+==========
+VarDeclaration: x
+  Initializer:
+    Literal: 42
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: "Valid: "
+    Operator: +
+    Right:
+      CallExpression:
+        Callee:
+          Literal: nil
+        Arguments:
+          Variable: x
+VarDeclaration: y
+  Initializer:
+    Literal: 24

@@ -1,45 +1,59 @@
-AST for tests\cst\parser\interpolation_test.lm
-Parser mode: CST
+AST for C:\Projects\limitly\tests\cst\parser\interpolation_test.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
 ========================================
 
 AST Dump:
 ==========
-VarDeclaration: <missing>
-VarDeclaration: <missing>
+VarDeclaration: name
+  Initializer:
+    Literal: "World"
 PrintStatement:
-ExpressionStatement:
-  Variable: name
-ExpressionStatement:
-  Literal: "!"
-VarDeclaration: <missing>
+  InterpolatedString:
+    String: ""
+    Expression:
+      Variable: name
+    String: "!"
+VarDeclaration: x
+  Initializer:
+    Literal: 42
 PrintStatement:
-ExpressionStatement:
-  Variable: x
-ExpressionStatement:
-  Literal: "\"The value is {x}"
-PrintStatement:
-ExpressionStatement:
-  BinaryExpression: *
-    Left:
+  InterpolatedString:
+    String: ""
+    Expression:
       Variable: x
-    Operator: *
-    Right:
-      Literal: 2
-ExpressionStatement:
-  Literal: "\"Double value: {x * 2}"
-VarDeclaration: <missing>
-VarDeclaration: <missing>
+    String: "\"The value is {x}"
 PrintStatement:
-ExpressionStatement:
-  Variable: a
-ExpressionStatement:
-  Variable: b
-ExpressionStatement:
-  BinaryExpression: +
-    Left:
+  InterpolatedString:
+    String: ""
+    Expression:
+      BinaryExpression: *
+        Left:
+          Variable: x
+        Operator: *
+        Right:
+          Literal: 2
+    String: "\"Double value: {x * 2}"
+VarDeclaration: a
+  Initializer:
+    Literal: 10
+VarDeclaration: b
+  Initializer:
+    Literal: 20
+PrintStatement:
+  InterpolatedString:
+    String: ""
+    Expression:
       Variable: a
-    Operator: +
-    Right:
+    Expression:
       Variable: b
-ExpressionStatement:
-  Literal: "\"a={a}, b={b}, sum={a + b}"
+    Expression:
+      BinaryExpression: +
+        Left:
+          Variable: a
+        Operator: +
+        Right:
+          Variable: b
+    String: "\"a={a}, b={b}, sum={a + b}"

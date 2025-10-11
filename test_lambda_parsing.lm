@@ -1,8 +1,0 @@
-// Test lambda expression parsing
-var add = fn(x: int, y: int): int {x + y};
-var multiply = fn(a, b) {a * b};
-var greet = fn(name: str) {"Hello, " + name};
-
-print(add(5, 3));
-print(multiply(4, 6));
-print(greet("World"));

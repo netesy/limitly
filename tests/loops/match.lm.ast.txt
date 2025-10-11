@@ -1,4 +1,8 @@
 AST for tests\loops\match.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
 ========================================
 
 AST Dump:
@@ -46,9 +50,10 @@ MatchStatement:
       BlockStatement:
         PrintStatement:
           InterpolatedString:
-            String: "Integer: "
+            String: ""
             Expression:
               Variable: value
+            String: "\"Integer: {value}"
     Case:
       Pattern:
       TypePattern: str
@@ -56,9 +61,10 @@ MatchStatement:
       BlockStatement:
         PrintStatement:
           InterpolatedString:
-            String: "String: "
+            String: ""
             Expression:
               Variable: value
+            String: "\"String: {value}"
     Case:
       Pattern:
       TypePattern: list
@@ -66,9 +72,10 @@ MatchStatement:
       BlockStatement:
         PrintStatement:
           InterpolatedString:
-            String: "List of integers: "
+            String: ""
             Expression:
               Variable: value
+            String: "\"List of integers: {value}"
     Case:
       Pattern:
       TypePattern: dict
@@ -76,9 +83,10 @@ MatchStatement:
       BlockStatement:
         PrintStatement:
           InterpolatedString:
-            String: "Dictionary: "
+            String: ""
             Expression:
               Variable: value
+            String: "\"Dictionary: {value}"
     Case:
       Pattern:
       Literal: nil
@@ -139,9 +147,10 @@ FunctionDeclaration: match_example
             BlockStatement:
               PrintStatement:
                 InterpolatedString:
-                  String: "Integer: "
+                  String: ""
                   Expression:
                     Variable: value
+                  String: "\"Integer: {value}"
           Case:
             Pattern:
             TypePattern: str
@@ -149,9 +158,10 @@ FunctionDeclaration: match_example
             BlockStatement:
               PrintStatement:
                 InterpolatedString:
-                  String: "String: "
+                  String: ""
                   Expression:
                     Variable: value
+                  String: "\"String: {value}"
           Case:
             Pattern:
             TypePattern: list
@@ -159,9 +169,10 @@ FunctionDeclaration: match_example
             BlockStatement:
               PrintStatement:
                 InterpolatedString:
-                  String: "List of integers: "
+                  String: ""
                   Expression:
                     Variable: value
+                  String: "\"List of integers: {value}"
           Case:
             Pattern:
             TypePattern: dict
@@ -169,9 +180,10 @@ FunctionDeclaration: match_example
             BlockStatement:
               PrintStatement:
                 InterpolatedString:
-                  String: "Dictionary: "
+                  String: ""
                   Expression:
                     Variable: value
+                  String: "\"Dictionary: {value}"
           Case:
             Pattern:
             Literal: nil

@@ -1,0 +1,175 @@
+AST for C:\Projects\limitly\tests\error_handling\builtin_error_validation.lm
+Parser: New CSTParser (cst_parser.cpp)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
+========================================
+
+AST Dump:
+==========
+FunctionDeclaration: divide
+  Parameters:
+    a: int
+    b: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      IfStatement:
+        Condition:
+          BinaryExpression: ==
+            Left:
+              Variable: b
+            Operator: ==
+            Right:
+              Literal: 0
+        Then:
+          BlockStatement:
+            ReturnStatement:
+              Value:
+                ErrorConstruct: DivisionByZero
+      ReturnStatement:
+        Value:
+          BinaryExpression: /
+            Left:
+              Variable: a
+            Operator: /
+            Right:
+              Variable: b
+FunctionDeclaration: safeDivision
+  Parameters:
+    x: int
+    y: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      ReturnStatement:
+        Value:
+          FallibleExpression:
+            Expression:
+              CallExpression:
+                Callee:
+                  Variable: divide
+                Arguments:
+                  Variable: x
+                  Variable: y
+FunctionDeclaration: arrayAccess
+  Parameters:
+    arr: [int]
+    index: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      IfStatement:
+        Condition:
+          BinaryExpression: <
+            Left:
+              Variable: index
+            Operator: <
+            Right:
+              Literal: 0
+        Then:
+          BlockStatement:
+            ReturnStatement:
+              Value:
+                ErrorConstruct: IndexOutOfBounds
+      ReturnStatement:
+        Value:
+          FallibleExpression:
+            Expression:
+              CallExpression:
+                Callee:
+                  Variable: divide
+                Arguments:
+                  Literal: 10
+                  Literal: 2
+FunctionDeclaration: complexOperation
+  Parameters:
+    arr: [int]
+    index: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      VarDeclaration: value
+        Initializer:
+          FallibleExpression:
+            Expression:
+              CallExpression:
+                Callee:
+                  Variable: arrayAccess
+                Arguments:
+                  Variable: arr
+                  Variable: index
+      ReturnStatement:
+        Value:
+          FallibleExpression:
+            Expression:
+              CallExpression:
+                Callee:
+                  Variable: divide
+                Arguments:
+                  Variable: value
+                  Literal: 3
+PrintStatement:
+  Literal: "Testing function signature validation with built-in error types"
+MatchStatement:
+  Value:
+    CallExpression:
+      Callee:
+        Variable: safeDivision
+      Arguments:
+        Literal: 10
+        Literal: 2
+  Cases:
+    Case:
+      Pattern:
+      Unknown node type
+      Body:
+      PrintStatement:
+        BinaryExpression: +
+          Left:
+            Literal: "Division result: "
+          Operator: +
+          Right:
+            Variable: result
+    Case:
+      Pattern:
+      Unknown node type
+      Body:
+      PrintStatement:
+        BinaryExpression: +
+          Left:
+            Literal: "Division error: "
+          Operator: +
+          Right:
+            Variable: error
+MatchStatement:
+  Value:
+    CallExpression:
+      Callee:
+        Variable: safeDivision
+      Arguments:
+        Literal: 10
+        Literal: 0
+  Cases:
+    Case:
+      Pattern:
+      Unknown node type
+      Body:
+      PrintStatement:
+        BinaryExpression: +
+          Left:
+            Literal: "Division result: "
+          Operator: +
+          Right:
+            Variable: result
+    Case:
+      Pattern:
+      Unknown node type
+      Body:
+      PrintStatement:
+        BinaryExpression: +
+          Left:
+            Literal: "Division error: "
+          Operator: +
+          Right:
+            Variable: error

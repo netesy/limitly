@@ -1,0 +1,131 @@
+Bytecode for C:\Projects\limitly\tests\integration\error_infrastructure_test.lm
+Parser: New CSTParser
+========================================
+
+=== Bytecode ===
+Generated 123 instructions
+
+   0: PUSH_STRING          "=== Error Infrastructure Test ==="
+   1: PRINT               
+   2: PUSH_INT             10
+   3: STORE_VAR            "a"
+   4: PUSH_INT             2
+   5: STORE_VAR            "b"
+   6: LOAD_VAR             "a"
+   7: LOAD_VAR             "b"
+   8: DIVIDE              
+   9: STORE_VAR            "result1"
+  10: PUSH_STRING         
+  11: LOAD_VAR             "result1"
+  12: PUSH_STRING         
+  13: CONCAT              
+  14: PUSH_STRING          ""10 / 2 = {result1}"
+  15: INTERPOLATE_STRING  
+  16: PRINT               
+  17: PUSH_INT             10
+  18: STORE_VAR            "c"
+  19: PUSH_INT             1
+  20: STORE_VAR            "d"
+  21: LOAD_VAR             "c"
+  22: LOAD_VAR             "d"
+  23: DIVIDE              
+  24: STORE_VAR            "result2"
+  25: PUSH_STRING         
+  26: LOAD_VAR             "result2"
+  27: PUSH_STRING         
+  28: CONCAT              
+  29: PUSH_STRING          ""10 / 1 = {result2}"
+  30: INTERPOLATE_STRING  
+  31: PRINT               
+  32: PUSH_INT             1
+  33: PUSH_INT             2
+  34: PUSH_INT             3
+  35: PUSH_INT             4
+  36: PUSH_INT             5
+  37: CREATE_LIST         
+  38: STORE_VAR            "arr"
+  39: LOAD_VAR             "arr"
+  40: PUSH_INT             2
+  41: GET_INDEX           
+  42: STORE_VAR            "item1"
+  43: PUSH_STRING         
+  44: LOAD_VAR             "item1"
+  45: PUSH_STRING         
+  46: CONCAT              
+  47: PUSH_STRING          ""arr[2] = {item1}"
+  48: INTERPOLATE_STRING  
+  49: PRINT               
+  50: BEGIN_FUNCTION       "divide_safe"
+  51: DEFINE_PARAM        
+  52: DEFINE_PARAM        
+  53: BEGIN_SCOPE         
+  54: LOAD_VAR             "x"
+  55: LOAD_VAR             "y"
+  56: DIVIDE              
+  57: RETURN              
+  58: END_SCOPE           
+  59: PUSH_NULL           
+  60: RETURN              
+  61: END_FUNCTION        
+  62: PUSH_FUNCTION       
+  63: STORE_VAR            "divide_safe"
+  64: PUSH_INT             20
+  65: PUSH_INT             4
+  66: CALL                 "divide_safe"
+  67: STORE_VAR            "safe_result"
+  68: PUSH_STRING         
+  69: LOAD_VAR             "safe_result"
+  70: PUSH_STRING         
+  71: CONCAT              
+  72: PUSH_STRING          ""Safe division: 20 / 4 = {safe_result}"
+  73: INTERPOLATE_STRING  
+  74: PRINT               
+  75: PUSH_INT             10
+  76: PUSH_INT             20
+  77: PUSH_INT             30
+  78: CREATE_LIST         
+  79: STORE_VAR            "myList"
+  80: LOAD_VAR             "myList"
+  81: PUSH_INT             0
+  82: GET_INDEX           
+  83: STORE_VAR            "first"
+  84: LOAD_VAR             "myList"
+  85: PUSH_INT             2
+  86: GET_INDEX           
+  87: STORE_VAR            "last"
+  88: PUSH_STRING         
+  89: LOAD_VAR             "first"
+  90: PUSH_STRING         
+  91: CONCAT              
+  92: PUSH_STRING          ""First element: {first}"
+  93: INTERPOLATE_STRING  
+  94: PRINT               
+  95: PUSH_STRING         
+  96: LOAD_VAR             "last"
+  97: PUSH_STRING         
+  98: CONCAT              
+  99: PUSH_STRING          ""Last element: {last}"
+ 100: INTERPOLATE_STRING  
+ 101: PRINT               
+ 102: PUSH_STRING          "=== Error Infrastructure Ready ==="
+ 103: PRINT               
+ 104: PUSH_STRING          "VM error handling opcodes implemented:"
+ 105: PRINT               
+ 106: PUSH_STRING          "- CHECK_ERROR: Check if value is error"
+ 107: PRINT               
+ 108: PUSH_STRING          "- PROPAGATE_ERROR: Propagate error up call stack"
+ 109: PRINT               
+ 110: PUSH_STRING          "- CONSTRUCT_ERROR: Create error values"
+ 111: PRINT               
+ 112: PUSH_STRING          "- CONSTRUCT_OK: Create success values"
+ 113: PRINT               
+ 114: PUSH_STRING          "- IS_ERROR: Check if union contains error"
+ 115: PRINT               
+ 116: PUSH_STRING          "- IS_SUCCESS: Check if union contains success"
+ 117: PRINT               
+ 118: PUSH_STRING          "- UNWRAP_VALUE: Extract value from success union"
+ 119: PRINT               
+ 120: PUSH_STRING          "=== Test Complete ==="
+ 121: PRINT               
+ 122: HALT                
+

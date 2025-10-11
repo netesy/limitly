@@ -1,0 +1,196 @@
+Bytecode for C:\Projects\limitly\tests\error_handling\valid_cases.lm
+Parser: New CSTParser
+========================================
+
+=== Bytecode ===
+Generated 188 instructions
+
+   0: BEGIN_FUNCTION       "safeDivide"
+   1: DEFINE_PARAM        
+   2: DEFINE_PARAM        
+   3: BEGIN_SCOPE         
+   4: LOAD_VAR             "a"
+   5: LOAD_VAR             "b"
+   6: DIVIDE              
+   7: CONSTRUCT_OK        
+   8: RETURN              
+   9: END_SCOPE           
+  10: PUSH_NULL           
+  11: RETURN              
+  12: END_FUNCTION        
+  13: PUSH_FUNCTION       
+  14: STORE_VAR            "safeDivide"
+  15: BEGIN_FUNCTION       "chainedDivision"
+  16: DEFINE_PARAM        
+  17: DEFINE_PARAM        
+  18: DEFINE_PARAM        
+  19: BEGIN_SCOPE         
+  20: LOAD_VAR             "x"
+  21: LOAD_VAR             "y"
+  22: CALL                 "safeDivide"
+  23: CHECK_ERROR         
+  24: JUMP_IF_FALSE        1
+  25: PROPAGATE_ERROR     
+  26: UNWRAP_VALUE        
+  27: STORE_VAR            "step1"
+  28: LOAD_VAR             "step1"
+  29: LOAD_VAR             "z"
+  30: CALL                 "safeDivide"
+  31: CHECK_ERROR         
+  32: JUMP_IF_FALSE        1
+  33: PROPAGATE_ERROR     
+  34: UNWRAP_VALUE        
+  35: STORE_VAR            "step2"
+  36: LOAD_VAR             "step2"
+  37: CONSTRUCT_OK        
+  38: RETURN              
+  39: END_SCOPE           
+  40: PUSH_NULL           
+  41: RETURN              
+  42: END_FUNCTION        
+  43: PUSH_FUNCTION       
+  44: STORE_VAR            "chainedDivision"
+  45: BEGIN_FUNCTION       "maybeError"
+  46: DEFINE_PARAM        
+  47: BEGIN_SCOPE         
+  48: LOAD_VAR             "flag"
+  49: JUMP_IF_FALSE        5
+  50: BEGIN_SCOPE         
+  51: CONSTRUCT_ERROR     
+  52: RETURN              
+  53: END_SCOPE           
+  54: JUMP                 0
+  55: PUSH_INT             42
+  56: CONSTRUCT_OK        
+  57: RETURN              
+  58: END_SCOPE           
+  59: PUSH_NULL           
+  60: RETURN              
+  61: END_FUNCTION        
+  62: PUSH_FUNCTION       
+  63: STORE_VAR            "maybeError"
+  64: BEGIN_FUNCTION       "narrowError"
+  65: DEFINE_PARAM        
+  66: BEGIN_SCOPE         
+  67: LOAD_VAR             "flag"
+  68: CALL                 "maybeError"
+  69: CHECK_ERROR         
+  70: JUMP_IF_FALSE        1
+  71: PROPAGATE_ERROR     
+  72: UNWRAP_VALUE        
+  73: STORE_VAR            "result"
+  74: LOAD_VAR             "result"
+  75: CONSTRUCT_OK        
+  76: RETURN              
+  77: END_SCOPE           
+  78: PUSH_NULL           
+  79: RETURN              
+  80: END_FUNCTION        
+  81: PUSH_FUNCTION       
+  82: STORE_VAR            "narrowError"
+  83: BEGIN_FUNCTION       "multiError"
+  84: DEFINE_PARAM        
+  85: BEGIN_SCOPE         
+  86: LOAD_VAR             "x"
+  87: PUSH_INT             0
+  88: LESS                
+  89: JUMP_IF_FALSE        5
+  90: BEGIN_SCOPE         
+  91: CONSTRUCT_ERROR     
+  92: RETURN              
+  93: END_SCOPE           
+  94: JUMP                 0
+  95: LOAD_VAR             "x"
+  96: PUSH_INT             100
+  97: GREATER             
+  98: JUMP_IF_FALSE        5
+  99: BEGIN_SCOPE         
+ 100: CONSTRUCT_ERROR     
+ 101: RETURN              
+ 102: END_SCOPE           
+ 103: JUMP                 0
+ 104: LOAD_VAR             "x"
+ 105: CONSTRUCT_OK        
+ 106: RETURN              
+ 107: END_SCOPE           
+ 108: PUSH_NULL           
+ 109: RETURN              
+ 110: END_FUNCTION        
+ 111: PUSH_FUNCTION       
+ 112: STORE_VAR            "multiError"
+ 113: BEGIN_FUNCTION       "validAssignments"
+ 114: BEGIN_SCOPE         
+ 115: PUSH_INT             42
+ 116: CONSTRUCT_OK        
+ 117: STORE_VAR            "success"
+ 118: CONSTRUCT_ERROR     
+ 119: STORE_VAR            "error"
+ 120: PUSH_INT             100
+ 121: CONSTRUCT_OK        
+ 122: STORE_VAR            "generic"
+ 123: END_SCOPE           
+ 124: PUSH_NULL           
+ 125: RETURN              
+ 126: END_FUNCTION        
+ 127: PUSH_FUNCTION       
+ 128: STORE_VAR            "validAssignments"
+ 129: BEGIN_FUNCTION       "correctCalls"
+ 130: BEGIN_SCOPE         
+ 131: PUSH_INT             10
+ 132: PUSH_INT             2
+ 133: CALL                 "safeDivide"
+ 134: STORE_VAR            "result1"
+ 135: PUSH_INT             20
+ 136: PUSH_INT             4
+ 137: PUSH_INT             2
+ 138: CALL                 "chainedDivision"
+ 139: STORE_VAR            "result2"
+ 140: END_SCOPE           
+ 141: PUSH_NULL           
+ 142: RETURN              
+ 143: END_FUNCTION        
+ 144: PUSH_FUNCTION       
+ 145: STORE_VAR            "correctCalls"
+ 146: BEGIN_FUNCTION       "nonFallibleCorrect"
+ 147: DEFINE_PARAM        
+ 148: DEFINE_PARAM        
+ 149: BEGIN_SCOPE         
+ 150: LOAD_VAR             "x"
+ 151: LOAD_VAR             "y"
+ 152: ADD                 
+ 153: RETURN              
+ 154: END_SCOPE           
+ 155: PUSH_NULL           
+ 156: RETURN              
+ 157: END_FUNCTION        
+ 158: PUSH_FUNCTION       
+ 159: STORE_VAR            "nonFallibleCorrect"
+ 160: BEGIN_FUNCTION       "main"
+ 161: BEGIN_SCOPE         
+ 162: PUSH_STRING          "Valid error handling cases test"
+ 163: PRINT               
+ 164: PUSH_INT             100
+ 165: PUSH_INT             10
+ 166: PUSH_INT             2
+ 167: CALL                 "chainedDivision"
+ 168: STORE_VAR            "r1"
+ 169: PUSH_BOOL            false
+ 170: CALL                 "narrowError"
+ 171: STORE_VAR            "r2"
+ 172: PUSH_INT             50
+ 173: CALL                 "multiError"
+ 174: STORE_VAR            "r3"
+ 175: PUSH_INT             5
+ 176: PUSH_INT             3
+ 177: CALL                 "nonFallibleCorrect"
+ 178: STORE_VAR            "r4"
+ 179: PUSH_STRING          "All valid cases compiled successfully!"
+ 180: PRINT               
+ 181: END_SCOPE           
+ 182: PUSH_NULL           
+ 183: RETURN              
+ 184: END_FUNCTION        
+ 185: PUSH_FUNCTION       
+ 186: STORE_VAR            "main"
+ 187: HALT                
+

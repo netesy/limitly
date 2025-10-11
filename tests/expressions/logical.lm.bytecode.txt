@@ -1,0 +1,258 @@
+Bytecode for C:\Projects\limitly\tests\expressions\logical.lm
+Parser: New CSTParser
+========================================
+
+=== Bytecode ===
+Generated 250 instructions
+
+   0: PUSH_STRING          "=== Logical Expression Tests ==="
+   1: PRINT               
+   2: PUSH_BOOL            true
+   3: STORE_VAR            "t"
+   4: PUSH_BOOL            false
+   5: STORE_VAR            "f"
+   6: PUSH_STRING          "AND operations:"
+   7: PRINT               
+   8: PUSH_STRING         
+   9: LOAD_VAR             "t"
+  10: PUSH_STRING         
+  11: CONCAT              
+  12: LOAD_VAR             "t"
+  13: PUSH_STRING         
+  14: CONCAT              
+  15: LOAD_VAR             "t"
+  16: DUP                 
+  17: JUMP_IF_FALSE        2
+  18: POP                 
+  19: LOAD_VAR             "t"
+  20: PUSH_STRING         
+  21: CONCAT              
+  22: PUSH_STRING          ""{t} and {t}: {t and t}"
+  23: INTERPOLATE_STRING  
+  24: PRINT               
+  25: PUSH_STRING         
+  26: LOAD_VAR             "t"
+  27: PUSH_STRING         
+  28: CONCAT              
+  29: LOAD_VAR             "f"
+  30: PUSH_STRING         
+  31: CONCAT              
+  32: LOAD_VAR             "t"
+  33: DUP                 
+  34: JUMP_IF_FALSE        2
+  35: POP                 
+  36: LOAD_VAR             "f"
+  37: PUSH_STRING         
+  38: CONCAT              
+  39: PUSH_STRING          ""{t} and {f}: {t and f}"
+  40: INTERPOLATE_STRING  
+  41: PRINT               
+  42: PUSH_STRING         
+  43: LOAD_VAR             "f"
+  44: PUSH_STRING         
+  45: CONCAT              
+  46: LOAD_VAR             "t"
+  47: PUSH_STRING         
+  48: CONCAT              
+  49: LOAD_VAR             "f"
+  50: DUP                 
+  51: JUMP_IF_FALSE        2
+  52: POP                 
+  53: LOAD_VAR             "t"
+  54: PUSH_STRING         
+  55: CONCAT              
+  56: PUSH_STRING          ""{f} and {t}: {f and t}"
+  57: INTERPOLATE_STRING  
+  58: PRINT               
+  59: PUSH_STRING         
+  60: LOAD_VAR             "f"
+  61: PUSH_STRING         
+  62: CONCAT              
+  63: LOAD_VAR             "f"
+  64: PUSH_STRING         
+  65: CONCAT              
+  66: LOAD_VAR             "f"
+  67: DUP                 
+  68: JUMP_IF_FALSE        2
+  69: POP                 
+  70: LOAD_VAR             "f"
+  71: PUSH_STRING         
+  72: CONCAT              
+  73: PUSH_STRING          ""{f} and {f}: {f and f}"
+  74: INTERPOLATE_STRING  
+  75: PRINT               
+  76: PUSH_STRING          "OR operations:"
+  77: PRINT               
+  78: PUSH_STRING         
+  79: LOAD_VAR             "t"
+  80: PUSH_STRING         
+  81: CONCAT              
+  82: LOAD_VAR             "t"
+  83: PUSH_STRING         
+  84: CONCAT              
+  85: LOAD_VAR             "t"
+  86: DUP                 
+  87: JUMP_IF_TRUE         2
+  88: POP                 
+  89: LOAD_VAR             "t"
+  90: PUSH_STRING         
+  91: CONCAT              
+  92: PUSH_STRING          ""{t} or {t}: {t or t}"
+  93: INTERPOLATE_STRING  
+  94: PRINT               
+  95: PUSH_STRING         
+  96: LOAD_VAR             "t"
+  97: PUSH_STRING         
+  98: CONCAT              
+  99: LOAD_VAR             "f"
+ 100: PUSH_STRING         
+ 101: CONCAT              
+ 102: LOAD_VAR             "t"
+ 103: DUP                 
+ 104: JUMP_IF_TRUE         2
+ 105: POP                 
+ 106: LOAD_VAR             "f"
+ 107: PUSH_STRING         
+ 108: CONCAT              
+ 109: PUSH_STRING          ""{t} or {f}: {t or f}"
+ 110: INTERPOLATE_STRING  
+ 111: PRINT               
+ 112: PUSH_STRING         
+ 113: LOAD_VAR             "f"
+ 114: PUSH_STRING         
+ 115: CONCAT              
+ 116: LOAD_VAR             "t"
+ 117: PUSH_STRING         
+ 118: CONCAT              
+ 119: LOAD_VAR             "f"
+ 120: DUP                 
+ 121: JUMP_IF_TRUE         2
+ 122: POP                 
+ 123: LOAD_VAR             "t"
+ 124: PUSH_STRING         
+ 125: CONCAT              
+ 126: PUSH_STRING          ""{f} or {t}: {f or t}"
+ 127: INTERPOLATE_STRING  
+ 128: PRINT               
+ 129: PUSH_STRING         
+ 130: LOAD_VAR             "f"
+ 131: PUSH_STRING         
+ 132: CONCAT              
+ 133: LOAD_VAR             "f"
+ 134: PUSH_STRING         
+ 135: CONCAT              
+ 136: LOAD_VAR             "f"
+ 137: DUP                 
+ 138: JUMP_IF_TRUE         2
+ 139: POP                 
+ 140: LOAD_VAR             "f"
+ 141: PUSH_STRING         
+ 142: CONCAT              
+ 143: PUSH_STRING          ""{f} or {f}: {f or f}"
+ 144: INTERPOLATE_STRING  
+ 145: PRINT               
+ 146: PUSH_STRING          "NOT operations:"
+ 147: PRINT               
+ 148: PUSH_STRING         
+ 149: LOAD_VAR             "t"
+ 150: PUSH_STRING         
+ 151: CONCAT              
+ 152: LOAD_VAR             "t"
+ 153: NOT                 
+ 154: PUSH_STRING         
+ 155: CONCAT              
+ 156: PUSH_STRING          ""!{t}: {!t}"
+ 157: INTERPOLATE_STRING  
+ 158: PRINT               
+ 159: PUSH_STRING         
+ 160: LOAD_VAR             "f"
+ 161: PUSH_STRING         
+ 162: CONCAT              
+ 163: LOAD_VAR             "f"
+ 164: NOT                 
+ 165: PUSH_STRING         
+ 166: CONCAT              
+ 167: PUSH_STRING          ""!{f}: {!f}"
+ 168: INTERPOLATE_STRING  
+ 169: PRINT               
+ 170: PUSH_INT             5
+ 171: STORE_VAR            "a"
+ 172: PUSH_INT             10
+ 173: STORE_VAR            "b"
+ 174: LOAD_VAR             "a"
+ 175: LOAD_VAR             "b"
+ 176: LESS                
+ 177: DUP                 
+ 178: JUMP_IF_FALSE        4
+ 179: POP                 
+ 180: LOAD_VAR             "b"
+ 181: PUSH_INT             0
+ 182: GREATER             
+ 183: STORE_VAR            "result1"
+ 184: LOAD_VAR             "a"
+ 185: LOAD_VAR             "b"
+ 186: GREATER             
+ 187: DUP                 
+ 188: JUMP_IF_TRUE         4
+ 189: POP                 
+ 190: LOAD_VAR             "a"
+ 191: PUSH_INT             5
+ 192: EQUAL               
+ 193: STORE_VAR            "result2"
+ 194: PUSH_STRING         
+ 195: LOAD_VAR             "a"
+ 196: PUSH_STRING         
+ 197: CONCAT              
+ 198: LOAD_VAR             "b"
+ 199: PUSH_STRING         
+ 200: CONCAT              
+ 201: LOAD_VAR             "b"
+ 202: PUSH_STRING         
+ 203: CONCAT              
+ 204: LOAD_VAR             "result1"
+ 205: PUSH_STRING         
+ 206: CONCAT              
+ 207: PUSH_STRING          ""Complex: ({a} < {b}) and ({b} > 0) = {result1}"
+ 208: INTERPOLATE_STRING  
+ 209: PRINT               
+ 210: PUSH_STRING         
+ 211: LOAD_VAR             "a"
+ 212: PUSH_STRING         
+ 213: CONCAT              
+ 214: LOAD_VAR             "b"
+ 215: PUSH_STRING         
+ 216: CONCAT              
+ 217: LOAD_VAR             "a"
+ 218: PUSH_STRING         
+ 219: CONCAT              
+ 220: LOAD_VAR             "result2"
+ 221: PUSH_STRING         
+ 222: CONCAT              
+ 223: PUSH_STRING          ""Complex: ({a} > {b}) or ({a} == 5) = {result2}"
+ 224: INTERPOLATE_STRING  
+ 225: PRINT               
+ 226: PUSH_STRING          "Short-circuit tests:"
+ 227: PRINT               
+ 228: PUSH_INT             0
+ 229: STORE_VAR            "x"
+ 230: LOAD_VAR             "x"
+ 231: PUSH_INT             0
+ 232: NOT_EQUAL           
+ 233: DUP                 
+ 234: JUMP_IF_FALSE        6
+ 235: POP                 
+ 236: PUSH_INT             10
+ 237: LOAD_VAR             "x"
+ 238: DIVIDE              
+ 239: PUSH_INT             1
+ 240: GREATER             
+ 241: STORE_VAR            "result3"
+ 242: PUSH_STRING         
+ 243: LOAD_VAR             "result3"
+ 244: PUSH_STRING         
+ 245: CONCAT              
+ 246: PUSH_STRING          ""Safe division with and: {result3}"
+ 247: INTERPOLATE_STRING  
+ 248: PRINT               
+ 249: HALT                
+
