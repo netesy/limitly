@@ -1,4 +1,4 @@
-AST for C:\Projects\limitly\tests\functions\basic_functions.lm
+AST for tests/functions/basic_functions.lm
 Parser: New CSTParser (cst_parser.cpp)
 Mode: CST with AST compatibility
 Note: CST nodes were created internally with trivia preservation
@@ -8,7 +8,7 @@ Note: CST nodes were created internally with trivia preservation
 AST Dump:
 ==========
 PrintStatement:
-  Literal: "=== Basic Function Tests ==="
+  Literal: "\"=== Basic Function Tests ===\""
 FunctionDeclaration: add
   Parameters:
     a: int
@@ -25,7 +25,7 @@ FunctionDeclaration: add
             Right:
               Variable: b
 PrintStatement:
-  Literal: "Function with parameters:"
+  Literal: "\"Function with parameters:\""
 VarDeclaration: result
   Type: int
   Initializer:
@@ -40,7 +40,7 @@ PrintStatement:
     String: ""
     Expression:
       Variable: result
-    String: "\"add(5, 3) = {result}"
+    String: "\"add(5, 3) = {result}\""
 FunctionDeclaration: square
   Parameters:
     x: int
@@ -56,7 +56,7 @@ FunctionDeclaration: square
             Right:
               Variable: x
 PrintStatement:
-  Literal: "Square function:"
+  Literal: "\"Square function:\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -66,7 +66,7 @@ PrintStatement:
           Variable: square
         Arguments:
           Literal: 4
-    String: "\"square(4) = {square(4)}"
+    String: "\"square(4) = {square(4)}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -76,7 +76,7 @@ PrintStatement:
           Variable: square
         Arguments:
           Literal: 7
-    String: "\"square(7) = {square(7)}"
+    String: "\"square(7) = {square(7)}\""
 FunctionDeclaration: greet_name
   Parameters:
     name: str
@@ -88,18 +88,18 @@ FunctionDeclaration: greet_name
           String: ""
           Expression:
             Variable: name
-          String: "!"
+          String: "\"Hello, {name}!\""
       ReturnStatement:
         Value:
-          Literal: "greeted"
+          Literal: "\"greeted\""
 PrintStatement:
-  Literal: "Function with string parameter:"
+  Literal: "\"Function with string parameter:\""
 ExpressionStatement:
   CallExpression:
     Callee:
       Variable: greet_name
     Arguments:
-      Literal: "Alice"
+      Literal: "\"Alice\""
 FunctionDeclaration: calculate
   Parameters:
     x: int
@@ -132,7 +132,7 @@ FunctionDeclaration: calculate
             Variable: sum
           Expression:
             Variable: product
-          String: "\"Local calculations: sum={sum}, product={product}"
+          String: "\"Local calculations: sum={sum}, product={product}\""
       ReturnStatement:
         Value:
           BinaryExpression: *
@@ -142,7 +142,7 @@ FunctionDeclaration: calculate
             Right:
               Variable: product
 PrintStatement:
-  Literal: "Function with locals:"
+  Literal: "\"Function with locals:\""
 VarDeclaration: calc_result
   Type: int
   Initializer:
@@ -157,7 +157,7 @@ PrintStatement:
     String: ""
     Expression:
       Variable: calc_result
-    String: "\"Result: {calc_result}"
+    String: "\"Result: {calc_result}\""
 FunctionDeclaration: factorial_main
   Parameters:
     n: int
@@ -195,7 +195,7 @@ FunctionDeclaration: factorial_main
                     Right:
                       Literal: 1
 PrintStatement:
-  Literal: "Recursive function:"
+  Literal: "\"Recursive function:\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -205,7 +205,7 @@ PrintStatement:
           Variable: factorial_main
         Arguments:
           Literal: 5
-    String: "\"factorial(5) = {factorial_main(5)}"
+    String: "\"factorial(5) = {factorial_main(5)}\""
 FunctionDeclaration: subtract
   Parameters:
     a: int
@@ -381,7 +381,7 @@ FunctionDeclaration: is_prime
         Value:
           Literal: true
 PrintStatement:
-  Literal: "Additional function tests:"
+  Literal: "\"Additional function tests:\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -392,7 +392,7 @@ PrintStatement:
         Arguments:
           Literal: 10
           Literal: 3
-    String: "\"subtract(10, 3) = {subtract(10, 3)}"
+    String: "\"subtract(10, 3) = {subtract(10, 3)}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -402,7 +402,7 @@ PrintStatement:
           Variable: factorial
         Arguments:
           Literal: 4
-    String: "\"factorial(4) = {factorial(4)}"
+    String: "\"factorial(4) = {factorial(4)}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -412,7 +412,7 @@ PrintStatement:
           Variable: is_even
         Arguments:
           Literal: 6
-    String: "\"is_even(6) = {is_even(6)}"
+    String: "\"is_even(6) = {is_even(6)}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -422,7 +422,7 @@ PrintStatement:
           Variable: is_odd
         Arguments:
           Literal: 7
-    String: "\"is_odd(7) = {is_odd(7)}"
+    String: "\"is_odd(7) = {is_odd(7)}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -432,9 +432,9 @@ PrintStatement:
           Variable: is_prime
         Arguments:
           Literal: 17
-    String: "\"is_prime(17) = {is_prime(17)}"
+    String: "\"is_prime(17) = {is_prime(17)}\""
 PrintStatement:
-  Literal: "=== Optional Parameter Tests ==="
+  Literal: "\"=== Optional Parameter Tests ===\""
 FunctionDeclaration: greet_optional
   Parameters:
     name (optional): str?
@@ -451,29 +451,29 @@ FunctionDeclaration: greet_optional
                 String: ""
                 Expression:
                   Variable: name
-                String: "!"
+                String: "\"Hello, {name}!\""
             ReturnStatement:
               Value:
                 InterpolatedString:
                   String: ""
                   Expression:
                     Variable: name
-                  String: "\"greeted {name}"
+                  String: "\"greeted {name}\""
         Else:
           BlockStatement:
             PrintStatement:
-              Literal: "Hello, stranger!"
+              Literal: "\"Hello, stranger!\""
             ReturnStatement:
               Value:
-                Literal: "greeted stranger"
+                Literal: "\"greeted stranger\""
 PrintStatement:
-  Literal: "Testing optional parameter:"
+  Literal: "\"Testing optional parameter:\""
 ExpressionStatement:
   CallExpression:
     Callee:
       Variable: greet_optional
     Arguments:
-      Literal: "Bob"
+      Literal: "\"Bob\""
 ExpressionStatement:
   CallExpression:
     Callee:
@@ -491,7 +491,7 @@ FunctionDeclaration: create_user
           String: ""
           Expression:
             Variable: username
-          String: "\"Creating user: {username}"
+          String: "\"Creating user: {username}\""
       IfStatement:
         Condition:
           Variable: email
@@ -502,7 +502,7 @@ FunctionDeclaration: create_user
                 String: ""
                 Expression:
                   Variable: email
-                String: "\"Email: {email}"
+                String: "\"Email: {email}\""
       IfStatement:
         Condition:
           Variable: age
@@ -513,32 +513,32 @@ FunctionDeclaration: create_user
                 String: ""
                 Expression:
                   Variable: age
-                String: "\"Age: {age}"
+                String: "\"Age: {age}\""
       ReturnStatement:
         Value:
-          Literal: "user created"
+          Literal: "\"user created\""
 PrintStatement:
-  Literal: "Testing multiple optional parameters:"
+  Literal: "\"Testing multiple optional parameters:\""
 ExpressionStatement:
   CallExpression:
     Callee:
       Variable: create_user
     Arguments:
-      Literal: "alice"
+      Literal: "\"alice\""
 ExpressionStatement:
   CallExpression:
     Callee:
       Variable: create_user
     Arguments:
-      Literal: "bob"
-      Literal: "bob@email.com"
+      Literal: "\"bob\""
+      Literal: "\"bob@email.com\""
 ExpressionStatement:
   CallExpression:
     Callee:
       Variable: create_user
     Arguments:
-      Literal: "charlie"
-      Literal: "charlie@email.com"
+      Literal: "\"charlie\""
+      Literal: "\"charlie@email.com\""
       Literal: 25
 FunctionDeclaration: power
   Parameters:
@@ -594,7 +594,7 @@ FunctionDeclaration: power
                   Right:
                     Variable: base
 PrintStatement:
-  Literal: "Testing optional math parameter:"
+  Literal: "\"Testing optional math parameter:\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -604,7 +604,7 @@ PrintStatement:
           Variable: power
         Arguments:
           Literal: 3
-    String: "\"power(3) = {power(3)}"
+    String: "\"power(3) = {power(3)}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -615,14 +615,14 @@ PrintStatement:
         Arguments:
           Literal: 3
           Literal: 4
-    String: "\"power(3, 4) = {power(3, 4)}"
+    String: "\"power(3, 4) = {power(3, 4)}\""
 PrintStatement:
-  Literal: "=== Default Parameter Tests ==="
+  Literal: "\"=== Default Parameter Tests ===\""
 FunctionDeclaration: greet_default
   Parameters:
     name (optional): str
       Default value:
-      Literal: "World"
+      Literal: "\"World\""
   ReturnType: str
   Body:
     BlockStatement:
@@ -631,16 +631,16 @@ FunctionDeclaration: greet_default
           String: ""
           Expression:
             Variable: name
-          String: "!"
+          String: "\"Hello, {name}!\""
       ReturnStatement:
         Value:
           InterpolatedString:
             String: ""
             Expression:
               Variable: name
-            String: "\"greeted {name}"
+            String: "\"greeted {name}\""
 PrintStatement:
-  Literal: "Testing default parameter:"
+  Literal: "\"Testing default parameter:\""
 ExpressionStatement:
   CallExpression:
     Callee:
@@ -650,4 +650,4 @@ ExpressionStatement:
     Callee:
       Variable: greet_default
     Arguments:
-      Literal: "Alice"
+      Literal: "\"Alice\""

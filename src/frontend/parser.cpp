@@ -140,10 +140,162 @@ void Parser::error(const std::string &message, bool suppressException) {
     // Do not throw for normal errors; let parser continue and synchronize.
 }
 
+// Unified node creation helper - creates CST::Node or AST::Node based on cstMode
+template<typename ASTNodeType>
+auto Parser::createNode() -> std::conditional_t<std::is_same_v<ASTNodeType, AST::Program>, 
+                                                   std::shared_ptr<AST::Program>,
+                                                   std::shared_ptr<ASTNodeType>> {
+    if (cstMode) {
+        // In CST mode, create CST::Node and return nullptr for AST (will be handled separately)
+        // For now, we'll create both for compatibility
+        auto astNode = std::make_shared<ASTNodeType>();
+        
+        // Map AST type to CST NodeKind
+        CST::NodeKind cstKind = mapASTNodeKind(typeid(ASTNodeType).name());
+        auto cstNode = std::make_unique<CST::Node>(cstKind);
+        
+        // Set position information
+        if (current < scanner.getTokens().size()) {
+            Token currentToken = peek();
+            cstNode->startPos = currentToken.start;
+            cstNode->endPos = currentToken.end;
+        }
+        
+        // Store CST node for trivia attachment
+        currentNode = std::move(cstNode);
+        
+        // Increment counter for testing
+        cstNodeCount++;
+        
+        return astNode;
+    } else {
+        // Legacy AST mode - just create AST node
+        return std::make_shared<ASTNodeType>();
+    }
+}
+
+// AST to CST NodeKind mapping
+CST::NodeKind Parser::mapASTNodeKind(const std::string& astNodeType) {
+    // Extract class name from mangled type name
+    std::string className = astNodeType;
+    
+    // Simple mapping based on common patterns
+    if (className.find("Program") != std::string::npos) return CST::NodeKind::PROGRAM;
+    if (className.find("VarDeclaration") != std::string::npos) return CST::NodeKind::VAR_DECLARATION;
+    if (className.find("FunctionDeclaration") != std::string::npos) return CST::NodeKind::FUNCTION_DECLARATION;
+    if (className.find("ClassDeclaration") != std::string::npos) return CST::NodeKind::CLASS_DECLARATION;
+    if (className.find("EnumDeclaration") != std::string::npos) return CST::NodeKind::ENUM_DECLARATION;
+    if (className.find("TypeDeclaration") != std::string::npos) return CST::NodeKind::TYPE_DECLARATION;
+    if (className.find("TraitDeclaration") != std::string::npos) return CST::NodeKind::TRAIT_DECLARATION;
+    if (className.find("InterfaceDeclaration") != std::string::npos) return CST::NodeKind::INTERFACE_DECLARATION;
+    if (className.find("ModuleDeclaration") != std::string::npos) return CST::NodeKind::MODULE_DECLARATION;
+    if (className.find("ImportStatement") != std::string::npos) return CST::NodeKind::IMPORT_DECLARATION;
+    
+    if (className.find("IfStatement") != std::string::npos) return CST::NodeKind::IF_STATEMENT;
+    if (className.find("ForStatement") != std::string::npos) return CST::NodeKind::FOR_STATEMENT;
+    if (className.find("WhileStatement") != std::string::npos) return CST::NodeKind::WHILE_STATEMENT;
+    if (className.find("IterStatement") != std::string::npos) return CST::NodeKind::ITER_STATEMENT;
+    if (className.find("MatchStatement") != std::string::npos) return CST::NodeKind::MATCH_STATEMENT;
+    if (className.find("BlockStatement") != std::string::npos) return CST::NodeKind::BLOCK_STATEMENT;
+    if (className.find("ExprStatement") != std::string::npos) return CST::NodeKind::EXPRESSION_STATEMENT;
+    if (className.find("ReturnStatement") != std::string::npos) return CST::NodeKind::RETURN_STATEMENT;
+    if (className.find("BreakStatement") != std::string::npos) return CST::NodeKind::BREAK_STATEMENT;
+    if (className.find("ContinueStatement") != std::string::npos) return CST::NodeKind::CONTINUE_STATEMENT;
+    if (className.find("PrintStatement") != std::string::npos) return CST::NodeKind::PRINT_STATEMENT;
+    if (className.find("AttemptStatement") != std::string::npos) return CST::NodeKind::ATTEMPT_STATEMENT;
+    if (className.find("ParallelStatement") != std::string::npos) return CST::NodeKind::PARALLEL_STATEMENT;
+    if (className.find("ConcurrentStatement") != std::string::npos) return CST::NodeKind::CONCURRENT_STATEMENT;
+    
+    if (className.find("BinaryExpr") != std::string::npos) return CST::NodeKind::BINARY_EXPR;
+    if (className.find("UnaryExpr") != std::string::npos) return CST::NodeKind::UNARY_EXPR;
+    if (className.find("CallExpr") != std::string::npos) return CST::NodeKind::CALL_EXPR;
+    if (className.find("MemberExpr") != std::string::npos) return CST::NodeKind::MEMBER_EXPR;
+    if (className.find("IndexExpr") != std::string::npos) return CST::NodeKind::INDEX_EXPR;
+    if (className.find("LiteralExpr") != std::string::npos) return CST::NodeKind::LITERAL_EXPR;
+    if (className.find("ObjectLiteralExpr") != std::string::npos) return CST::NodeKind::OBJECT_LITERAL_EXPR;
+    if (className.find("VariableExpr") != std::string::npos) return CST::NodeKind::VARIABLE_EXPR;
+    if (className.find("GroupingExpr") != std::string::npos) return CST::NodeKind::GROUPING_EXPR;
+    if (className.find("AssignExpr") != std::string::npos) return CST::NodeKind::ASSIGNMENT_EXPR;
+    if (className.find("TernaryExpr") != std::string::npos) return CST::NodeKind::CONDITIONAL_EXPR;
+    if (className.find("LambdaExpr") != std::string::npos) return CST::NodeKind::LAMBDA_EXPR;
+    if (className.find("RangeExpr") != std::string::npos) return CST::NodeKind::RANGE_EXPR;
+    if (className.find("InterpolatedStringExpr") != std::string::npos) return CST::NodeKind::INTERPOLATION_EXPR;
+    
+    // Default to error node if mapping not found
+    return CST::NodeKind::ERROR_NODE;
+}
+
+// Token consumption with trivia tracking
+Token Parser::consumeWithTrivia(TokenType type, const std::string &message) {
+    Token token = consume(type, message);
+    attachTriviaFromToken(token);
+    return token;
+}
+
+Token Parser::advanceWithTrivia() {
+    Token token = advance();
+    attachTriviaFromToken(token);
+    return token;
+}
+
+// Trivia attachment helpers
+void Parser::attachTriviaFromToken(const Token& token) {
+    if (cstMode && std::holds_alternative<std::unique_ptr<CST::Node>>(currentNode)) {
+        auto& cstNode = std::get<std::unique_ptr<CST::Node>>(currentNode);
+        if (cstNode) {
+            // Add the token itself to the elements
+            cstNode->addToken(token);
+            
+            // Extract and attach trivia from the token
+            cstNode->attachTriviaFromToken(token);
+            
+            // Update trivia attachment count for statistics
+            triviaAttachmentCount++;
+        }
+    }
+}
+
+void Parser::attachTriviaFromTokens(const std::vector<Token>& tokens) {
+    if (cstMode && std::holds_alternative<std::unique_ptr<CST::Node>>(currentNode)) {
+        auto& cstNode = std::get<std::unique_ptr<CST::Node>>(currentNode);
+        if (cstNode) {
+            for (const auto& token : tokens) {
+                cstNode->addToken(token);
+            }
+        }
+    }
+}
+
+// Explicit template instantiations for common AST node types
+template auto Parser::createNode<AST::Program>() -> std::shared_ptr<AST::Program>;
+template auto Parser::createNode<AST::VarDeclaration>() -> std::shared_ptr<AST::VarDeclaration>;
+template auto Parser::createNode<AST::FunctionDeclaration>() -> std::shared_ptr<AST::FunctionDeclaration>;
+template auto Parser::createNode<AST::ClassDeclaration>() -> std::shared_ptr<AST::ClassDeclaration>;
+template auto Parser::createNode<AST::IfStatement>() -> std::shared_ptr<AST::IfStatement>;
+template auto Parser::createNode<AST::ForStatement>() -> std::shared_ptr<AST::ForStatement>;
+template auto Parser::createNode<AST::WhileStatement>() -> std::shared_ptr<AST::WhileStatement>;
+template auto Parser::createNode<AST::BlockStatement>() -> std::shared_ptr<AST::BlockStatement>;
+template auto Parser::createNode<AST::ExprStatement>() -> std::shared_ptr<AST::ExprStatement>;
+template auto Parser::createNode<AST::ReturnStatement>() -> std::shared_ptr<AST::ReturnStatement>;
+template auto Parser::createNode<AST::PrintStatement>() -> std::shared_ptr<AST::PrintStatement>;
+template auto Parser::createNode<AST::BinaryExpr>() -> std::shared_ptr<AST::BinaryExpr>;
+template auto Parser::createNode<AST::UnaryExpr>() -> std::shared_ptr<AST::UnaryExpr>;
+template auto Parser::createNode<AST::LiteralExpr>() -> std::shared_ptr<AST::LiteralExpr>;
+template auto Parser::createNode<AST::ObjectLiteralExpr>() -> std::shared_ptr<AST::ObjectLiteralExpr>;
+template auto Parser::createNode<AST::VariableExpr>() -> std::shared_ptr<AST::VariableExpr>;
+template auto Parser::createNode<AST::CallExpr>() -> std::shared_ptr<AST::CallExpr>;
+template auto Parser::createNode<AST::AssignExpr>() -> std::shared_ptr<AST::AssignExpr>;
+
 // Main parse method
 std::shared_ptr<AST::Program> Parser::parse() {
-    auto program = std::make_shared<AST::Program>();
+    auto program = createNode<AST::Program>();
     program->line = 1;
+
+    // If in CST mode, create CST root for trivia reconstruction
+    if (cstMode) {
+        cstRoot = std::make_unique<CST::Node>(CST::NodeKind::PROGRAM, 0, scanner.getSource().size());
+        cstRoot->setDescription("Program root node with trivia");
+    }
 
     try {
         while (!isAtEnd()) {
@@ -155,6 +307,24 @@ std::shared_ptr<AST::Program> Parser::parse() {
     } catch (const std::exception &e) {
         // Handle parsing errors
         synchronize();
+        
+        // Add error info to CST if in CST mode
+        if (cstMode && cstRoot) {
+            cstRoot->setError("Parse error: " + std::string(e.what()));
+        }
+    }
+
+    // In CST mode, reconstruct from meaningful tokens with attached trivia
+    if (cstMode && cstRoot) {
+        // Get all meaningful tokens (these have trivia attached)
+        const auto& tokens = scanner.getTokens();
+        
+        for (const auto& token : tokens) {
+            if (token.type != TokenType::EOF_TOKEN) {
+                // Add the token with its attached trivia to CST root
+                cstRoot->addToken(token);
+            }
+        }
     }
 
     // After parsing, print all collected errors if any
@@ -167,7 +337,16 @@ std::shared_ptr<AST::Program> Parser::parse() {
             }
         }
         std::cerr << "---------------------\n";
+        
+        // Add errors to CST if in CST mode
+        if (cstMode && cstRoot) {
+            for (const auto& err : errors) {
+                auto errorNode = std::make_unique<CST::ErrorNode>(err.message, 0, 0);
+                cstRoot->addChild(std::move(errorNode));
+            }
+        }
     }
+    
     return program;
 }
 
@@ -179,6 +358,33 @@ std::vector<Token> Parser::collectAnnotations() {
         annotations.push_back(advance());
     }
     return annotations;
+}
+
+void Parser::skipTrivia() {
+    // Skip trivia tokens (whitespace, comments, newlines) in CST mode
+    // These are handled separately and shouldn't interfere with parsing logic
+    while (!isAtEnd() && 
+           (check(TokenType::WHITESPACE) || 
+            check(TokenType::NEWLINE) || 
+            check(TokenType::COMMENT_LINE) || 
+            check(TokenType::COMMENT_BLOCK))) {
+        
+        // In CST mode, we can collect these tokens for the CST tree
+        if (cstMode && cstRoot) {
+            Token triviaToken = advance();
+            
+            // Create appropriate trivia node and add to CST
+            if (triviaToken.type == TokenType::WHITESPACE || triviaToken.type == TokenType::NEWLINE) {
+                auto whitespaceNode = std::make_unique<CST::WhitespaceNode>(triviaToken);
+                cstRoot->addChild(std::move(whitespaceNode));
+            } else if (triviaToken.type == TokenType::COMMENT_LINE || triviaToken.type == TokenType::COMMENT_BLOCK) {
+                auto commentNode = std::make_unique<CST::CommentNode>(triviaToken);
+                cstRoot->addChild(std::move(commentNode));
+            }
+        } else {
+            advance(); // Just skip the trivia token
+        }
+    }
 }
 
 std::shared_ptr<AST::Statement> Parser::declaration() {
@@ -247,26 +453,126 @@ std::shared_ptr<AST::Statement> Parser::declaration() {
 }
 
 std::shared_ptr<AST::Statement> Parser::varDeclaration() {
-    auto var = std::make_shared<AST::VarDeclaration>();
+    auto var = createNode<AST::VarDeclaration>();
     var->line = previous().line;
-
-    // Parse variable name
-    Token name = consume(TokenType::IDENTIFIER, "Expected variable name.");
-    var->name = name.lexeme;
-
-    // Parse optional type annotation
-    if (match({TokenType::COLON})) {
-        // Parse the type annotation - all type handling is done in parseTypeAnnotation
-        var->type = parseTypeAnnotation();
+    
+    // Store the current CST node for this variable declaration
+    std::unique_ptr<CST::Node> varCSTNode;
+    if (cstMode && std::holds_alternative<std::unique_ptr<CST::Node>>(currentNode)) {
+        varCSTNode = std::move(std::get<std::unique_ptr<CST::Node>>(currentNode));
+        varCSTNode->setDescription("var declaration");
     }
 
-    // Parse optional initializer
+    // Add 'var' keyword token to CST with its trivia
+    Token varToken = previous();
+    if (cstMode && varCSTNode) {
+        // Add leading trivia (comments, whitespace before 'var')
+        for (const auto& trivia : varToken.getLeadingTrivia()) {
+            if (trivia.type == TokenType::COMMENT_LINE || trivia.type == TokenType::COMMENT_BLOCK) {
+                auto commentNode = std::make_unique<CST::CommentNode>(trivia);
+                varCSTNode->addChild(std::move(commentNode));
+            } else if (trivia.type == TokenType::WHITESPACE || trivia.type == TokenType::NEWLINE) {
+                auto whitespaceNode = std::make_unique<CST::WhitespaceNode>(trivia);
+                varCSTNode->addChild(std::move(whitespaceNode));
+            }
+        }
+        
+        // Add the 'var' keyword as a direct token (not wrapped in a node)
+        varCSTNode->addToken(varToken);
+    }
+
+    // Parse variable name with semantic structure
+    Token name = consumeWithTrivia(TokenType::IDENTIFIER, "Expected variable name.");
+    var->name = name.lexeme;
+    
+    // Create IDENTIFIER semantic node
+    if (cstMode && varCSTNode) {
+        auto identifierNode = std::make_unique<CST::Node>(CST::NodeKind::IDENTIFIER, name.start, name.end);
+        
+        // Add any trivia before the identifier
+        for (const auto& trivia : name.getLeadingTrivia()) {
+            if (trivia.type == TokenType::WHITESPACE || trivia.type == TokenType::NEWLINE) {
+                auto whitespaceNode = std::make_unique<CST::WhitespaceNode>(trivia);
+                varCSTNode->addChild(std::move(whitespaceNode));
+            }
+        }
+        
+        // Add the identifier token to the IDENTIFIER node
+        identifierNode->addToken(name);
+        varCSTNode->addChild(std::move(identifierNode));
+    }
+
+    // Parse optional type annotation with semantic structure
+    if (match({TokenType::COLON})) {
+        Token colon = previous();
+        
+        if (cstMode && varCSTNode) {
+            // Create TYPE_ANNOTATION semantic node
+            auto typeAnnotationNode = std::make_unique<CST::Node>(CST::NodeKind::ANNOTATION, colon.start, 0);
+            
+            // Add colon token directly to TYPE_ANNOTATION
+            typeAnnotationNode->addToken(colon);
+            
+            var->type = parseTypeAnnotation();
+            
+            // Add the actual type token to TYPE_ANNOTATION
+            Token typeToken = previous(); // The type token (int, str, etc.)
+            
+            // Create PRIMITIVE_TYPE semantic node
+            auto primitiveTypeNode = std::make_unique<CST::Node>(CST::NodeKind::PRIMITIVE_TYPE, typeToken.start, typeToken.end);
+            primitiveTypeNode->addToken(typeToken);
+            
+            typeAnnotationNode->addChild(std::move(primitiveTypeNode));
+            typeAnnotationNode->endPos = typeToken.end;
+            
+            varCSTNode->addChild(std::move(typeAnnotationNode));
+        } else {
+            var->type = parseTypeAnnotation();
+        }
+    }
+
+    // Parse optional initializer with semantic structure
     if (match({TokenType::EQUAL})) {
-        var->initializer = expression();
+        Token equal = previous();
+        
+        if (cstMode && varCSTNode) {
+            // Create ASSIGNMENT semantic node
+            auto assignmentNode = std::make_unique<CST::Node>(CST::NodeKind::ASSIGNMENT_EXPR, equal.start, 0);
+            
+            // Add = token directly to ASSIGNMENT
+            assignmentNode->addToken(equal);
+            
+            var->initializer = expression();
+            
+            // Add the actual value token to ASSIGNMENT
+            Token valueToken = previous(); // The value token (42, "hello", etc.)
+            
+            // Create LITERAL semantic node
+            auto literalNode = std::make_unique<CST::Node>(CST::NodeKind::LITERAL_EXPR, valueToken.start, valueToken.end);
+            literalNode->addToken(valueToken);
+            
+            assignmentNode->addChild(std::move(literalNode));
+            assignmentNode->endPos = valueToken.end;
+            
+            varCSTNode->addChild(std::move(assignmentNode));
+        } else {
+            var->initializer = expression();
+        }
     }
 
     // Make semicolon optional
-    match({TokenType::SEMICOLON});
+    if (match({TokenType::SEMICOLON})) {
+        Token semicolon = previous();
+        if (cstMode && varCSTNode) {
+            varCSTNode->addToken(semicolon);
+        }
+    }
+    
+    // Add this variable declaration to the program root
+    if (cstMode && cstRoot && varCSTNode) {
+        cstRoot->addChild(std::move(varCSTNode));
+    }
+    
     return var;
 }
 
@@ -340,21 +646,30 @@ std::shared_ptr<AST::Statement> Parser::expressionStatement() {
 }
 
 std::shared_ptr<AST::Statement> Parser::printStatement() {
-    auto stmt = std::make_shared<AST::PrintStatement>();
+    auto stmt = createNode<AST::PrintStatement>();
     stmt->line = previous().line;
 
+    attachTriviaFromToken(previous());
+
     // Parse arguments
-    consume(TokenType::LEFT_PAREN, "Expected '(' after 'print'.");
+    consumeWithTrivia(TokenType::LEFT_PAREN, "Expected '(' after 'print'.");
 
     if (!check(TokenType::RIGHT_PAREN)) {
         do {
             stmt->arguments.push_back(expression());
-        } while (match({TokenType::COMMA}));
+            if (match({TokenType::COMMA})) {
+                attachTriviaFromToken(previous());
+            }
+        } while (previous().type == TokenType::COMMA);
     }
 
-    consume(TokenType::RIGHT_PAREN, "Expected ')' after print arguments.");
+    consumeWithTrivia(TokenType::RIGHT_PAREN, "Expected ')' after print arguments.");
+    
     // Make semicolon optional
-    match({TokenType::SEMICOLON});
+    if (match({TokenType::SEMICOLON})) {
+        attachTriviaFromToken(previous());
+    }
+    
     return stmt;
 }
 
@@ -668,19 +983,69 @@ std::shared_ptr<AST::Statement> Parser::comptimeStatement() {
 }
 
 std::shared_ptr<AST::Statement> Parser::ifStatement() {
-    auto stmt = std::make_shared<AST::IfStatement>();
+    auto stmt = createNode<AST::IfStatement>();
     Token ifToken = previous();
     stmt->line = ifToken.line;
 
-    consume(TokenType::LEFT_PAREN, "Expected '(' after 'if'.");
+    attachTriviaFromToken(ifToken);
+
+    consumeWithTrivia(TokenType::LEFT_PAREN, "Expected '(' after 'if'.");
     stmt->condition = expression();
-    consume(TokenType::RIGHT_PAREN, "Expected ')' after if condition.");
+    consumeWithTrivia(TokenType::RIGHT_PAREN, "Expected ')' after if condition.");
 
     stmt->thenBranch = parseStatementWithContext("if", ifToken);
 
+    // Handle elif chains
+    while (match({TokenType::ELIF})) {
+        Token elifToken = previous();
+        attachTriviaFromToken(elifToken);
+        
+        // Create a nested if statement for the elif
+        auto elifStmt = createNode<AST::IfStatement>();
+        elifStmt->line = elifToken.line;
+        
+        consumeWithTrivia(TokenType::LEFT_PAREN, "Expected '(' after 'elif'.");
+        elifStmt->condition = expression();
+        consumeWithTrivia(TokenType::RIGHT_PAREN, "Expected ')' after elif condition.");
+        
+        elifStmt->thenBranch = parseStatementWithContext("elif", elifToken);
+        
+        // Chain the elif as the else branch of the previous statement
+        if (!stmt->elseBranch) {
+            stmt->elseBranch = elifStmt;
+        } else {
+            // Find the last elif in the chain and attach this one
+            auto current = std::dynamic_pointer_cast<AST::IfStatement>(stmt->elseBranch);
+            while (current && current->elseBranch && 
+                   std::dynamic_pointer_cast<AST::IfStatement>(current->elseBranch)) {
+                current = std::dynamic_pointer_cast<AST::IfStatement>(current->elseBranch);
+            }
+            if (current) {
+                current->elseBranch = elifStmt;
+            }
+        }
+    }
+
     if (match({TokenType::ELSE})) {
         Token elseToken = previous();
-        stmt->elseBranch = parseStatementWithContext("else", elseToken);
+        attachTriviaFromToken(elseToken);
+        
+        auto elseStmt = parseStatementWithContext("else", elseToken);
+        
+        // Attach else to the end of the elif chain
+        if (!stmt->elseBranch) {
+            stmt->elseBranch = elseStmt;
+        } else {
+            // Find the last elif in the chain and attach the else
+            auto current = std::dynamic_pointer_cast<AST::IfStatement>(stmt->elseBranch);
+            while (current && current->elseBranch && 
+                   std::dynamic_pointer_cast<AST::IfStatement>(current->elseBranch)) {
+                current = std::dynamic_pointer_cast<AST::IfStatement>(current->elseBranch);
+            }
+            if (current) {
+                current->elseBranch = elseStmt;
+            }
+        }
     }
 
     return stmt;
@@ -876,8 +1241,10 @@ std::shared_ptr<AST::Statement> Parser::whileStatement() {
 }
 
 std::shared_ptr<AST::FunctionDeclaration> Parser::function(const std::string& kind) {
-    auto func = std::make_shared<AST::FunctionDeclaration>();
+    auto func = createNode<AST::FunctionDeclaration>();
     func->line = previous().line;
+    
+    attachTriviaFromToken(previous());
 
     // Parse function name
     Token name = consume(TokenType::IDENTIFIER, "Expected " + kind + " name.");
@@ -1774,11 +2141,12 @@ std::shared_ptr<AST::Expression> Parser::power() {
     while (match({TokenType::POWER})) { // Assuming POWER is '**'
         auto op = previous();
         auto right = power(); // Right-associative!
-        auto binaryExpr = std::make_shared<AST::BinaryExpr>();
+        auto binaryExpr = createNode<AST::BinaryExpr>();
         binaryExpr->line = op.line;
         binaryExpr->left = expr;
         binaryExpr->op = op.type;
         binaryExpr->right = right;
+        attachTriviaFromToken(op);
         expr = binaryExpr;
     }
     return expr;
@@ -1925,37 +2293,42 @@ std::shared_ptr<AST::InterpolatedStringExpr> Parser::interpolatedString() {
 
 std::shared_ptr<AST::Expression> Parser::primary() {
     if (match({TokenType::FALSE})) {
-        auto literalExpr = std::make_shared<AST::LiteralExpr>();
+        auto literalExpr = createNode<AST::LiteralExpr>();
         literalExpr->line = previous().line;
         literalExpr->value = false;
+        attachTriviaFromToken(previous());
         return literalExpr;
     }
 
     if (match({TokenType::TRUE})) {
-        auto literalExpr = std::make_shared<AST::LiteralExpr>();
+        auto literalExpr = createNode<AST::LiteralExpr>();
         literalExpr->line = previous().line;
         literalExpr->value = true;
+        attachTriviaFromToken(previous());
         return literalExpr;
     }
 
     if (match({TokenType::NONE})) {
-        auto literalExpr = std::make_shared<AST::LiteralExpr>();
+        auto literalExpr = createNode<AST::LiteralExpr>();
         literalExpr->line = previous().line;
         literalExpr->value = nullptr;
+        attachTriviaFromToken(previous());
         return literalExpr;
     }
 
     if (match({TokenType::NIL})) {
-        auto literalExpr = std::make_shared<AST::LiteralExpr>();
+        auto literalExpr = createNode<AST::LiteralExpr>();
         literalExpr->line = previous().line;
         literalExpr->value = nullptr;
+        attachTriviaFromToken(previous());
         return literalExpr;
     }
 
     if (match({TokenType::NUMBER})) {
         auto token = previous();
-        auto literalExpr = std::make_shared<AST::LiteralExpr>();
+        auto literalExpr = createNode<AST::LiteralExpr>();
         literalExpr->line = token.line;
+        attachTriviaFromToken(token);
 
         // Check if the number is an integer or a float
         // Numbers with decimal points or scientific notation are treated as floats
@@ -2063,10 +2436,37 @@ std::shared_ptr<AST::Expression> Parser::primary() {
             thisExpr->line = token.line;
             return thisExpr;
         } else {
-            auto varExpr = std::make_shared<AST::VariableExpr>();
-            varExpr->line = token.line;
-            varExpr->name = token.lexeme;
-            return varExpr;
+            // Check if this is an object literal: Identifier { ... }
+            if (check(TokenType::LEFT_BRACE)) {
+                // This is an object literal with constructor name
+                auto objExpr = std::make_shared<AST::ObjectLiteralExpr>();
+                objExpr->line = token.line;
+                objExpr->constructorName = token.lexeme;
+                
+                advance(); // consume LEFT_BRACE
+                
+                // Parse key-value pairs
+                if (!check(TokenType::RIGHT_BRACE)) {
+                    do {
+                        // Parse key
+                        Token keyToken = consume(TokenType::IDENTIFIER, "Expected property name in object literal.");
+                        consume(TokenType::COLON, "Expected ':' after property name.");
+                        
+                        // Parse value
+                        auto value = expression();
+                        
+                        objExpr->properties[keyToken.lexeme] = value;
+                    } while (match({TokenType::COMMA}));
+                }
+                
+                consume(TokenType::RIGHT_BRACE, "Expected '}' after object literal properties.");
+                return objExpr;
+            } else {
+                auto varExpr = std::make_shared<AST::VariableExpr>();
+                varExpr->line = token.line;
+                varExpr->name = token.lexeme;
+                return varExpr;
+            }
         }
     }
 

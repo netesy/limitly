@@ -28,7 +28,7 @@ echo Compiling CST test runner...
 "%MSYS2_PATH%\mingw64\bin\g++.exe" -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -o bin\test_parser.exe ^
     src\test_parser.cpp ^
     src\frontend\scanner.cpp ^
-    src\frontend\cst_parser.cpp ^
+    src\frontend\parser.cpp ^
     src\frontend\cst.cpp ^
     src\frontend\cst_printer.cpp ^
     src\frontend\ast_builder.cpp ^

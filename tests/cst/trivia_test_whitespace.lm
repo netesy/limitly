@@ -1,0 +1,16 @@
+// Test various whitespace patterns
+
+var	tab_separated:	int	=	42;
+
+var    space_heavy   :   str   =   "test"   ;
+
+
+// Multiple blank lines above
+
+var mixed_whitespace	 :  	bool 	= 	true	;
+
+	// Indented comment
+    var indented: int = 100;
+
+// Trailing whitespace test (spaces after semicolon)
+var trailing: str = "end";   

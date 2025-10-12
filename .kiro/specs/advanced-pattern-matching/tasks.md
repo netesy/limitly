@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. Extend AST pattern hierarchy for advanced patterns
+- [ ] 1. Extend CST and AST pattern hierarchy for advanced patterns
   - Add ListDestructurePattern, TupleDestructurePattern, ValPattern, ErrPattern classes to ast.hh
   - Implement visitor pattern methods for new pattern types
   - Add VariablePattern with guard expression support

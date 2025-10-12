@@ -21,16 +21,32 @@ namespace CST {
     }
 
     void Node::addToken(const Token& token) {
-        // Classify token and create appropriate node or add directly
-        if (isWhitespaceToken(token)) {
-            addWhitespace(token);
-        } else if (isCommentToken(token)) {
-            addComment(token);
-        } else if (isTriviaToken(token)) {
-            addTrivia(token);
-        } else {
-            // Add significant token directly
+        // For meaningful tokens with attached trivia, add trivia first
+        if (!isTriviaToken(token)) {
+            // Add leading trivia first
+            for (const auto& trivia : token.getLeadingTrivia()) {
+                if (isWhitespaceToken(trivia)) {
+                    addWhitespace(trivia);
+                } else if (isCommentToken(trivia)) {
+                    addComment(trivia);
+                } else {
+                    addTrivia(trivia);
+                }
+            }
+            
+            // Add the meaningful token
             elements.emplace_back(token);
+            
+            // Add trailing trivia after the token
+            for (const auto& trivia : token.getTrailingTrivia()) {
+                if (isWhitespaceToken(trivia)) {
+                    addWhitespace(trivia);
+                } else if (isCommentToken(trivia)) {
+                    addComment(trivia);
+                } else {
+                    addTrivia(trivia);
+                }
+            }
             
             // Update source span
             if (elements.size() == 1) {
@@ -40,6 +56,15 @@ namespace CST {
                 startPos = std::min(startPos, token.start);
                 size_t tokenEnd = token.end > 0 ? token.end : token.start + token.lexeme.length();
                 endPos = std::max(endPos, tokenEnd);
+            }
+        } else {
+            // Handle pure trivia tokens
+            if (isWhitespaceToken(token)) {
+                addWhitespace(token);
+            } else if (isCommentToken(token)) {
+                addComment(token);
+            } else {
+                addTrivia(token);
             }
         }
     }
@@ -173,7 +198,20 @@ namespace CST {
         for (const auto& element : elements) {
             if (std::holds_alternative<Token>(element)) {
                 const auto& token = std::get<Token>(element);
+                
+                // Add leading trivia from token
+                for (const auto& trivia : token.getLeadingTrivia()) {
+                    result += trivia.lexeme;
+                }
+                
+                // Add the token itself
                 result += token.lexeme;
+                
+                // Add trailing trivia from token
+                for (const auto& trivia : token.getTrailingTrivia()) {
+                    result += trivia.lexeme;
+                }
+                
             } else if (std::holds_alternative<std::unique_ptr<Node>>(element)) {
                 const auto& node = std::get<std::unique_ptr<Node>>(element);
                 if (node) {

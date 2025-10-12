@@ -1,0 +1,21 @@
+// Outer comment
+/* Nested comment test
+   // Line comment inside block comment
+   var x: int = 42;
+   /* Another nested block comment */
+   var y: str = "test";
+*/
+
+// Function with complex comment patterns
+fn test() {
+    /* Multi-line comment
+       with various patterns:
+       - Bullet points
+       - Code examples: var z = 10;
+       - Special chars: @#$%^&*()
+    */
+    var result: int = 0;
+    
+    // Inline comment with special chars: {}[]()
+    return result; // End comment
+}

@@ -1,0 +1,9 @@
+// Simple variable declaration with comments
+var x: int = 42; // inline comment
+
+/* Block comment
+   spanning multiple lines */
+var y: str = "hello";
+
+// Another comment
+print(x, y);

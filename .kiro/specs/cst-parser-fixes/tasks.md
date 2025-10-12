@@ -102,7 +102,17 @@
   - Verify memory usage is reasonable and no crashes occur in either parser
   - _Requirements: 7.1, 7.2, 1.2, 1.4_
 
-- [-] 9. Validate Trivia Preservation and Source Reconstruction
+- [x] 9. Validate Trivia Preservation and Source Reconstruction
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -112,21 +122,38 @@
   - Ensure trivia is correctly associated with appropriate tokens and nodes
   - _Requirements: 3.1, 3.2, 3.3, 7.3_
 
-- [ ] 10. Performance and Memory Optimization
+- [x] 10. Performance and Memory Optimization
+
+
+
+
+
+
   - Profile memory usage of new CSTParser vs legacy Parser
   - Optimize trivia storage in tokens to minimize memory overhead
   - Add benchmarks comparing parsing speed between new CST parser and legacy parser
   - Ensure new CST parser performance is within 2x of legacy parser
   - _Requirements: 5.1, 5.2, 5.4_
 
-- [ ] 11. Achieve Parity and Replace Old CST Parser
+- [x] 11. Achieve Parity and Replace Old CST Parser
+
+
+
+
+
+
+
   - Verify new CSTParser handles all test cases as well as legacy Parser
   - Ensure no regressions in parsing accuracy or performance
   - Once parity achieved, remove old problematic parser.cpp/hh files
   - Rename cst_parser.cpp/hh to parser.cpp/hh
   - _Requirements: 1.1, 6.3, 7.1, 7.2_
 
-- [ ] 12. Final Testing and Documentation
+- [x] 12. Final Testing and Documentation
+
+
+
+
   - Run comprehensive test suite with both legacy Parser and new CSTParser
   - Document the new approach: clean CST parser based on proven legacy parser
   - Add usage examples for both AST and CST generation

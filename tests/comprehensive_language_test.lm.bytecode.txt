@@ -1,16 +1,15 @@
-Bytecode for C:\Projects\limitly\tests\comprehensive_language_test.lm
-Parser: New CSTParser
+Bytecode for tests/comprehensive_language_test.lm
+Parser: Legacy Parser
 ========================================
 
 === Bytecode ===
-Generated 1552 instructions
+Generated 1578 instructions
 
-   0: PUSH_STRING          "=== COMPREHENSIVE LANGUAGE FEATURE TEST ==="
+   0: PUSH_STRING          ""=== COMPREHENSIVE LANGUAGE FEATURE TEST ===""
    1: PRINT               
-   2: PUSH_STRING          "
-=== 1. LITERALS AND VARIABLES ==="
+   2: PUSH_STRING          ""\n=== 1. LITERALS AND VARIABLES ===""
    3: PRINT               
-   4: PUSH_STRING          "Integers:"
+   4: PUSH_STRING          ""Integers:""
    5: PRINT               
    6: PUSH_INT             0
    7: PRINT               
@@ -21,7 +20,7 @@ Generated 1552 instructions
   12: PRINT               
   13: PUSH_INT             999999
   14: PRINT               
-  15: PUSH_STRING          "Floats:"
+  15: PUSH_STRING          ""Floats:""
   16: PRINT               
   17: PUSH_FLOAT           0
   18: PRINT               
@@ -30,22 +29,21 @@ Generated 1552 instructions
   21: PUSH_FLOAT           2.71828
   22: NEGATE              
   23: PRINT               
-  24: PUSH_STRING          "Strings:"
+  24: PUSH_STRING          ""Strings:""
   25: PRINT               
-  26: PUSH_STRING          "Hello, World!"
+  26: PUSH_STRING          ""Hello, World!""
   27: PRINT               
-  28: PUSH_STRING          """
+  28: PUSH_STRING          """"
   29: PRINT               
-  30: PUSH_STRING          "Special chars: 
-	\""
+  30: PUSH_STRING          ""Special chars: \n\t\\\"""
   31: PRINT               
-  32: PUSH_STRING          "Booleans:"
+  32: PUSH_STRING          ""Booleans:""
   33: PRINT               
   34: PUSH_BOOL            true
   35: PRINT               
   36: PUSH_BOOL            false
   37: PRINT               
-  38: PUSH_STRING          "Null:"
+  38: PUSH_STRING          ""Null:""
   39: PRINT               
   40: PUSH_NULL           
   41: PRINT               
@@ -53,38 +51,38 @@ Generated 1552 instructions
   43: STORE_VAR            "x"
   44: PUSH_FLOAT           3.14
   45: STORE_VAR            "y"
-  46: PUSH_STRING          "Limit"
+  46: PUSH_STRING          ""Limit""
   47: STORE_VAR            "name"
   48: PUSH_BOOL            true
   49: STORE_VAR            "isActive"
-  50: PUSH_STRING          "Variables:"
+  50: PUSH_STRING          ""Variables:""
   51: PRINT               
   52: PUSH_STRING         
   53: LOAD_VAR             "x"
   54: PUSH_STRING         
   55: CONCAT              
-  56: PUSH_STRING          ""Integer: {x}"
+  56: PUSH_STRING          ""Integer: {x}""
   57: INTERPOLATE_STRING  
   58: PRINT               
   59: PUSH_STRING         
   60: LOAD_VAR             "y"
   61: PUSH_STRING         
   62: CONCAT              
-  63: PUSH_STRING          ""Float: {y}"
+  63: PUSH_STRING          ""Float: {y}""
   64: INTERPOLATE_STRING  
   65: PRINT               
   66: PUSH_STRING         
   67: LOAD_VAR             "name"
   68: PUSH_STRING         
   69: CONCAT              
-  70: PUSH_STRING          ""String: {name}"
+  70: PUSH_STRING          ""String: {name}""
   71: INTERPOLATE_STRING  
   72: PRINT               
   73: PUSH_STRING         
   74: LOAD_VAR             "isActive"
   75: PUSH_STRING         
   76: CONCAT              
-  77: PUSH_STRING          ""Boolean: {isActive}"
+  77: PUSH_STRING          ""Boolean: {isActive}""
   78: INTERPOLATE_STRING  
   79: PRINT               
   80: PUSH_INT             100
@@ -95,7 +93,7 @@ Generated 1552 instructions
   85: DUP                 
   86: STORE_VAR            "y"
   87: POP                 
-  88: PUSH_STRING          "Language"
+  88: PUSH_STRING          ""Language""
   89: DUP                 
   90: STORE_VAR            "name"
   91: POP                 
@@ -103,44 +101,43 @@ Generated 1552 instructions
   93: DUP                 
   94: STORE_VAR            "isActive"
   95: POP                 
-  96: PUSH_STRING          "After reassignment:"
+  96: PUSH_STRING          ""After reassignment:""
   97: PRINT               
   98: PUSH_STRING         
   99: LOAD_VAR             "x"
  100: PUSH_STRING         
  101: CONCAT              
- 102: PUSH_STRING          ""Integer: {x}"
+ 102: PUSH_STRING          ""Integer: {x}""
  103: INTERPOLATE_STRING  
  104: PRINT               
  105: PUSH_STRING         
  106: LOAD_VAR             "y"
  107: PUSH_STRING         
  108: CONCAT              
- 109: PUSH_STRING          ""Float: {y}"
+ 109: PUSH_STRING          ""Float: {y}""
  110: INTERPOLATE_STRING  
  111: PRINT               
  112: PUSH_STRING         
  113: LOAD_VAR             "name"
  114: PUSH_STRING         
  115: CONCAT              
- 116: PUSH_STRING          ""String: {name}"
+ 116: PUSH_STRING          ""String: {name}""
  117: INTERPOLATE_STRING  
  118: PRINT               
  119: PUSH_STRING         
  120: LOAD_VAR             "isActive"
  121: PUSH_STRING         
  122: CONCAT              
- 123: PUSH_STRING          ""Boolean: {isActive}"
+ 123: PUSH_STRING          ""Boolean: {isActive}""
  124: INTERPOLATE_STRING  
  125: PRINT               
- 126: PUSH_STRING          "
-=== 2. EXPRESSIONS AND OPERATORS ==="
+ 126: PUSH_STRING          ""\n=== 2. EXPRESSIONS AND OPERATORS ===""
  127: PRINT               
  128: PUSH_INT             10
  129: STORE_VAR            "a"
  130: PUSH_INT             3
  131: STORE_VAR            "b"
- 132: PUSH_STRING          "Arithmetic:"
+ 132: PUSH_STRING          ""Arithmetic:""
  133: PRINT               
  134: PUSH_STRING         
  135: LOAD_VAR             "a"
@@ -154,7 +151,7 @@ Generated 1552 instructions
  143: ADD                 
  144: PUSH_STRING         
  145: CONCAT              
- 146: PUSH_STRING          ""Addition: {a} + {b} = {a + b}"
+ 146: PUSH_STRING          ""Addition: {a} + {b} = {a + b}""
  147: INTERPOLATE_STRING  
  148: PRINT               
  149: PUSH_STRING         
@@ -169,7 +166,7 @@ Generated 1552 instructions
  158: SUBTRACT            
  159: PUSH_STRING         
  160: CONCAT              
- 161: PUSH_STRING          ""Subtraction: {a} - {b} = {a - b}"
+ 161: PUSH_STRING          ""Subtraction: {a} - {b} = {a - b}""
  162: INTERPOLATE_STRING  
  163: PRINT               
  164: PUSH_STRING         
@@ -184,7 +181,7 @@ Generated 1552 instructions
  173: MULTIPLY            
  174: PUSH_STRING         
  175: CONCAT              
- 176: PUSH_STRING          ""Multiplication: {a} * {b} = {a * b}"
+ 176: PUSH_STRING          ""Multiplication: {a} * {b} = {a * b}""
  177: INTERPOLATE_STRING  
  178: PRINT               
  179: PUSH_STRING         
@@ -199,7 +196,7 @@ Generated 1552 instructions
  188: DIVIDE              
  189: PUSH_STRING         
  190: CONCAT              
- 191: PUSH_STRING          ""Division: {a} / {b} = {a / b}"
+ 191: PUSH_STRING          ""Division: {a} / {b} = {a / b}""
  192: INTERPOLATE_STRING  
  193: PRINT               
  194: PUSH_STRING         
@@ -214,10 +211,10 @@ Generated 1552 instructions
  203: MODULO              
  204: PUSH_STRING         
  205: CONCAT              
- 206: PUSH_STRING          ""Modulo: {a} % {b} = {a % b}"
+ 206: PUSH_STRING          ""Modulo: {a} % {b} = {a % b}""
  207: INTERPOLATE_STRING  
  208: PRINT               
- 209: PUSH_STRING          "Unary:"
+ 209: PUSH_STRING          ""Unary:""
  210: PRINT               
  211: PUSH_STRING         
  212: LOAD_VAR             "a"
@@ -227,7 +224,7 @@ Generated 1552 instructions
  216: NEGATE              
  217: PUSH_STRING         
  218: CONCAT              
- 219: PUSH_STRING          ""Negation: -{a} = {-a}"
+ 219: PUSH_STRING          ""Negation: -{a} = {-a}""
  220: INTERPOLATE_STRING  
  221: PRINT               
  222: PUSH_STRING         
@@ -237,10 +234,10 @@ Generated 1552 instructions
  226: LOAD_VAR             "a"
  227: PUSH_STRING         
  228: CONCAT              
- 229: PUSH_STRING          ""Positive: +{a} = {+a}"
+ 229: PUSH_STRING          ""Positive: +{a} = {+a}""
  230: INTERPOLATE_STRING  
  231: PRINT               
- 232: PUSH_STRING          "Comparison:"
+ 232: PUSH_STRING          ""Comparison:""
  233: PRINT               
  234: PUSH_STRING         
  235: LOAD_VAR             "a"
@@ -254,7 +251,7 @@ Generated 1552 instructions
  243: EQUAL               
  244: PUSH_STRING         
  245: CONCAT              
- 246: PUSH_STRING          ""{a} == {b}: {a == b}"
+ 246: PUSH_STRING          ""{a} == {b}: {a == b}""
  247: INTERPOLATE_STRING  
  248: PRINT               
  249: PUSH_STRING         
@@ -269,7 +266,7 @@ Generated 1552 instructions
  258: NOT_EQUAL           
  259: PUSH_STRING         
  260: CONCAT              
- 261: PUSH_STRING          ""{a} != {b}: {a != b}"
+ 261: PUSH_STRING          ""{a} != {b}: {a != b}""
  262: INTERPOLATE_STRING  
  263: PRINT               
  264: PUSH_STRING         
@@ -284,7 +281,7 @@ Generated 1552 instructions
  273: LESS                
  274: PUSH_STRING         
  275: CONCAT              
- 276: PUSH_STRING          ""{a} < {b}: {a < b}"
+ 276: PUSH_STRING          ""{a} < {b}: {a < b}""
  277: INTERPOLATE_STRING  
  278: PRINT               
  279: PUSH_STRING         
@@ -299,7 +296,7 @@ Generated 1552 instructions
  288: GREATER             
  289: PUSH_STRING         
  290: CONCAT              
- 291: PUSH_STRING          ""{a} > {b}: {a > b}"
+ 291: PUSH_STRING          ""{a} > {b}: {a > b}""
  292: INTERPOLATE_STRING  
  293: PRINT               
  294: PUSH_STRING         
@@ -314,7 +311,7 @@ Generated 1552 instructions
  303: LESS_EQUAL          
  304: PUSH_STRING         
  305: CONCAT              
- 306: PUSH_STRING          ""{a} <= {b}: {a <= b}"
+ 306: PUSH_STRING          ""{a} <= {b}: {a <= b}""
  307: INTERPOLATE_STRING  
  308: PRINT               
  309: PUSH_STRING         
@@ -329,14 +326,14 @@ Generated 1552 instructions
  318: GREATER_EQUAL       
  319: PUSH_STRING         
  320: CONCAT              
- 321: PUSH_STRING          ""{a} >= {b}: {a >= b}"
+ 321: PUSH_STRING          ""{a} >= {b}: {a >= b}""
  322: INTERPOLATE_STRING  
  323: PRINT               
  324: PUSH_BOOL            true
  325: STORE_VAR            "p"
  326: PUSH_BOOL            false
  327: STORE_VAR            "q"
- 328: PUSH_STRING          "Logical:"
+ 328: PUSH_STRING          ""Logical:""
  329: PRINT               
  330: PUSH_STRING         
  331: LOAD_VAR             "p"
@@ -346,7 +343,7 @@ Generated 1552 instructions
  335: LOAD_VAR             "q"
  336: PUSH_STRING         
  337: CONCAT              
- 338: PUSH_STRING          ""p && q: {p and q}"
+ 338: PUSH_STRING          ""p && q: {p and q}""
  339: INTERPOLATE_STRING  
  340: PRINT               
  341: PUSH_STRING         
@@ -357,7 +354,7 @@ Generated 1552 instructions
  346: LOAD_VAR             "q"
  347: PUSH_STRING         
  348: CONCAT              
- 349: PUSH_STRING          ""p || q: {p or q}"
+ 349: PUSH_STRING          ""p || q: {p or q}""
  350: INTERPOLATE_STRING  
  351: PRINT               
  352: PUSH_STRING         
@@ -365,7 +362,7 @@ Generated 1552 instructions
  354: NOT                 
  355: PUSH_STRING         
  356: CONCAT              
- 357: PUSH_STRING          ""!p: {!p}"
+ 357: PUSH_STRING          ""!p: {!p}""
  358: INTERPOLATE_STRING  
  359: PRINT               
  360: LOAD_VAR             "a"
@@ -394,13 +391,12 @@ Generated 1552 instructions
  383: LOAD_VAR             "result"
  384: PUSH_STRING         
  385: CONCAT              
- 386: PUSH_STRING          ""Complex: ({a} + {b}) * 2 - {a} / {b} = {result}"
+ 386: PUSH_STRING          ""Complex: ({a} + {b}) * 2 - {a} / {b} = {result}""
  387: INTERPOLATE_STRING  
  388: PRINT               
- 389: PUSH_STRING          "
-=== 3. STRING INTERPOLATION ==="
+ 389: PUSH_STRING          ""\n=== 3. STRING INTERPOLATION ===""
  390: PRINT               
- 391: PUSH_STRING          "Alice"
+ 391: PUSH_STRING          ""Alice""
  392: STORE_VAR            "userName"
  393: PUSH_INT             25
  394: STORE_VAR            "userAge"
@@ -410,21 +406,21 @@ Generated 1552 instructions
  398: LOAD_VAR             "userName"
  399: PUSH_STRING         
  400: CONCAT              
- 401: PUSH_STRING          "!"
+ 401: PUSH_STRING          ""Hello, {userName}!""
  402: INTERPOLATE_STRING  
  403: PRINT               
  404: PUSH_STRING         
  405: LOAD_VAR             "userAge"
  406: PUSH_STRING         
  407: CONCAT              
- 408: PUSH_STRING          ""Age: {userAge}"
+ 408: PUSH_STRING          ""Age: {userAge}""
  409: INTERPOLATE_STRING  
  410: PRINT               
  411: PUSH_STRING         
  412: LOAD_VAR             "pi"
  413: PUSH_STRING         
  414: CONCAT              
- 415: PUSH_STRING          ""Pi: {pi}"
+ 415: PUSH_STRING          ""Pi: {pi}""
  416: INTERPOLATE_STRING  
  417: PRINT               
  418: PUSH_STRING         
@@ -433,7 +429,7 @@ Generated 1552 instructions
  421: ADD                 
  422: PUSH_STRING         
  423: CONCAT              
- 424: PUSH_STRING          ""Next year: {userAge + 1}"
+ 424: PUSH_STRING          ""Next year: {userAge + 1}""
  425: INTERPOLATE_STRING  
  426: PRINT               
  427: PUSH_STRING         
@@ -444,7 +440,7 @@ Generated 1552 instructions
  432: MULTIPLY            
  433: PUSH_STRING         
  434: CONCAT              
- 435: PUSH_STRING          ""Area of circle: {pi * 2 * 2}"
+ 435: PUSH_STRING          ""Area of circle: {pi * 2 * 2}""
  436: INTERPOLATE_STRING  
  437: PRINT               
  438: PUSH_STRING         
@@ -454,7 +450,7 @@ Generated 1552 instructions
  442: LOAD_VAR             "userAge"
  443: PUSH_STRING         
  444: CONCAT              
- 445: PUSH_STRING          ""Name: {userName}, Age: {userAge}"
+ 445: PUSH_STRING          ""Name: {userName}, Age: {userAge}""
  446: INTERPOLATE_STRING  
  447: PRINT               
  448: PUSH_STRING         
@@ -464,21 +460,21 @@ Generated 1552 instructions
  452: LOAD_VAR             "userAge"
  453: PUSH_STRING         
  454: CONCAT              
- 455: PUSH_STRING          " years old"
+ 455: PUSH_STRING          ""{userName} is {userAge} years old""
  456: INTERPOLATE_STRING  
  457: PRINT               
  458: PUSH_STRING         
  459: LOAD_VAR             "userName"
  460: PUSH_STRING         
  461: CONCAT              
- 462: PUSH_STRING          " says hello"
+ 462: PUSH_STRING          ""{userName} says hello""
  463: INTERPOLATE_STRING  
  464: PRINT               
  465: PUSH_STRING         
  466: LOAD_VAR             "userAge"
  467: PUSH_STRING         
  468: CONCAT              
- 469: PUSH_STRING          " is the age"
+ 469: PUSH_STRING          ""{userAge} is the age""
  470: INTERPOLATE_STRING  
  471: PRINT               
  472: PUSH_INT             10
@@ -497,7 +493,7 @@ Generated 1552 instructions
  485: ADD                 
  486: PUSH_STRING         
  487: CONCAT              
- 488: PUSH_STRING          ""Math: {x1} + {y1} = {x1 + y1}"
+ 488: PUSH_STRING          ""Math: {x1} + {y1} = {x1 + y1}""
  489: INTERPOLATE_STRING  
  490: PRINT               
  491: PUSH_STRING         
@@ -512,7 +508,7 @@ Generated 1552 instructions
  500: GREATER             
  501: PUSH_STRING         
  502: CONCAT              
- 503: PUSH_STRING          ""Comparison: {x1} > {y1} is {x1 > y1}"
+ 503: PUSH_STRING          ""Comparison: {x1} > {y1} is {x1 > y1}""
  504: INTERPOLATE_STRING  
  505: PRINT               
  506: PUSH_STRING         
@@ -525,11 +521,10 @@ Generated 1552 instructions
  513: SUBTRACT            
  514: PUSH_STRING         
  515: CONCAT              
- 516: PUSH_STRING          ""Complex: {(x1 + y1) * 2 - 1}"
+ 516: PUSH_STRING          ""Complex: {(x1 + y1) * 2 - 1}""
  517: INTERPOLATE_STRING  
  518: PRINT               
- 519: PUSH_STRING          "
-=== 4. CONTROL FLOW - IF/ELSE ==="
+ 519: PUSH_STRING          ""\n=== 4. CONTROL FLOW - IF/ELSE ===""
  520: PRINT               
  521: PUSH_INT             85
  522: STORE_VAR            "score"
@@ -538,1044 +533,1054 @@ Generated 1552 instructions
  525: GREATER_EQUAL       
  526: JUMP_IF_FALSE        5
  527: BEGIN_SCOPE         
- 528: PUSH_STRING          "Grade: A"
+ 528: PUSH_STRING          ""Grade: A""
  529: PRINT               
  530: END_SCOPE           
- 531: JUMP                 22
- 532: LOAD_VAR             "score"
- 533: PUSH_INT             80
- 534: GREATER_EQUAL       
- 535: JUMP_IF_FALSE        5
- 536: BEGIN_SCOPE         
- 537: PUSH_STRING          "Grade: B"
- 538: PRINT               
- 539: END_SCOPE           
- 540: JUMP                 13
- 541: LOAD_VAR             "score"
- 542: PUSH_INT             70
- 543: GREATER_EQUAL       
- 544: JUMP_IF_FALSE        5
- 545: BEGIN_SCOPE         
- 546: PUSH_STRING          "Grade: C"
- 547: PRINT               
- 548: END_SCOPE           
- 549: JUMP                 4
- 550: BEGIN_SCOPE         
- 551: PUSH_STRING          "Grade: F"
- 552: PRINT               
- 553: END_SCOPE           
- 554: PUSH_STRING          "sunny"
- 555: STORE_VAR            "weather"
- 556: PUSH_INT             75
- 557: STORE_VAR            "temperature"
- 558: LOAD_VAR             "weather"
- 559: PUSH_STRING          "sunny"
- 560: EQUAL               
- 561: JUMP_IF_FALSE        16
- 562: BEGIN_SCOPE         
- 563: LOAD_VAR             "temperature"
- 564: PUSH_INT             70
- 565: GREATER             
- 566: JUMP_IF_FALSE        5
- 567: BEGIN_SCOPE         
- 568: PUSH_STRING          "Perfect day for outdoor activities!"
- 569: PRINT               
- 570: END_SCOPE           
- 571: JUMP                 4
- 572: BEGIN_SCOPE         
- 573: PUSH_STRING          "Sunny but a bit cold."
- 574: PRINT               
- 575: END_SCOPE           
- 576: END_SCOPE           
- 577: JUMP                 4
- 578: BEGIN_SCOPE         
- 579: PUSH_STRING          "Not ideal weather."
- 580: PRINT               
- 581: END_SCOPE           
- 582: PUSH_STRING          "
-=== 5. LOOPS - FOR LOOPS ==="
- 583: PRINT               
- 584: PUSH_STRING          "Basic for loop (0 to 4):"
- 585: PRINT               
- 586: BEGIN_SCOPE         
- 587: PUSH_INT             0
- 588: STORE_VAR            "i"
- 589: LOAD_VAR             "i"
- 590: PUSH_INT             5
- 591: LESS                
- 592: JUMP_IF_FALSE        18
- 593: JUMP                 7
- 594: LOAD_VAR             "i"
- 595: PUSH_INT             1
- 596: ADD                 
- 597: DUP                 
- 598: STORE_VAR            "i"
- 599: POP                 
- 600: JUMP                 -12
- 601: BEGIN_SCOPE         
- 602: PUSH_STRING         
- 603: LOAD_VAR             "i"
- 604: PUSH_STRING         
- 605: CONCAT              
- 606: PUSH_STRING          ""i = {i}"
- 607: INTERPOLATE_STRING  
- 608: PRINT               
- 609: END_SCOPE           
- 610: JUMP                 -17
- 611: END_SCOPE           
- 612: PUSH_STRING          "For loop with increment 2:"
- 613: PRINT               
- 614: BEGIN_SCOPE         
- 615: PUSH_INT             0
- 616: STORE_VAR            "j"
- 617: LOAD_VAR             "j"
- 618: PUSH_INT             10
- 619: LESS                
- 620: JUMP_IF_FALSE        18
- 621: JUMP                 7
- 622: LOAD_VAR             "j"
- 623: PUSH_INT             2
- 624: ADD                 
- 625: DUP                 
- 626: STORE_VAR            "j"
- 627: POP                 
- 628: JUMP                 -12
- 629: BEGIN_SCOPE         
- 630: PUSH_STRING         
- 631: LOAD_VAR             "j"
- 632: PUSH_STRING         
- 633: CONCAT              
- 634: PUSH_STRING          ""j = {j}"
- 635: INTERPOLATE_STRING  
- 636: PRINT               
- 637: END_SCOPE           
- 638: JUMP                 -17
- 639: END_SCOPE           
- 640: PUSH_STRING          "Countdown loop:"
- 641: PRINT               
- 642: BEGIN_SCOPE         
- 643: PUSH_INT             5
- 644: STORE_VAR            "k"
- 645: LOAD_VAR             "k"
- 646: PUSH_INT             0
- 647: GREATER             
- 648: JUMP_IF_FALSE        18
- 649: JUMP                 7
- 650: LOAD_VAR             "k"
- 651: PUSH_INT             1
- 652: SUBTRACT            
- 653: DUP                 
- 654: STORE_VAR            "k"
- 655: POP                 
- 656: JUMP                 -12
- 657: BEGIN_SCOPE         
- 658: PUSH_STRING         
- 659: LOAD_VAR             "k"
- 660: PUSH_STRING         
- 661: CONCAT              
- 662: PUSH_STRING          ""k = {k}"
- 663: INTERPOLATE_STRING  
- 664: PRINT               
- 665: END_SCOPE           
- 666: JUMP                 -17
- 667: END_SCOPE           
- 668: PUSH_STRING          "Nested for loops (2x3 grid):"
- 669: PRINT               
- 670: BEGIN_SCOPE         
- 671: PUSH_INT             0
- 672: STORE_VAR            "row"
- 673: LOAD_VAR             "row"
- 674: PUSH_INT             2
- 675: LESS                
- 676: JUMP_IF_FALSE        40
- 677: JUMP                 7
- 678: LOAD_VAR             "row"
- 679: PUSH_INT             1
- 680: ADD                 
- 681: DUP                 
- 682: STORE_VAR            "row"
- 683: POP                 
- 684: JUMP                 -12
- 685: BEGIN_SCOPE         
- 686: BEGIN_SCOPE         
- 687: PUSH_INT             0
- 688: STORE_VAR            "col"
- 689: LOAD_VAR             "col"
- 690: PUSH_INT             3
- 691: LESS                
- 692: JUMP_IF_FALSE        21
- 693: JUMP                 7
- 694: LOAD_VAR             "col"
- 695: PUSH_INT             1
- 696: ADD                 
- 697: DUP                 
- 698: STORE_VAR            "col"
- 699: POP                 
- 700: JUMP                 -12
- 701: BEGIN_SCOPE         
- 702: PUSH_STRING         
- 703: LOAD_VAR             "row"
- 704: PUSH_STRING         
- 705: CONCAT              
- 706: LOAD_VAR             "col"
- 707: PUSH_STRING         
- 708: CONCAT              
- 709: PUSH_STRING          ")"
- 710: INTERPOLATE_STRING  
- 711: PRINT               
- 712: END_SCOPE           
- 713: JUMP                 -20
- 714: END_SCOPE           
- 715: END_SCOPE           
- 716: JUMP                 -39
- 717: END_SCOPE           
- 718: PUSH_STRING          "
-=== 6. LOOPS - ITER LOOPS ==="
- 719: PRINT               
- 720: PUSH_STRING          "Basic range (1 to 5):"
- 721: PRINT               
- 722: PUSH_INT             1
- 723: PUSH_INT             6
- 724: CREATE_RANGE        
- 725: GET_ITERATOR        
- 726: STORE_TEMP          
- 727: LOAD_TEMP           
- 728: ITERATOR_HAS_NEXT   
- 729: JUMP_IF_FALSE        13
- 730: LOAD_TEMP           
- 731: ITERATOR_NEXT       
- 732: STORE_VAR            "i"
- 733: BEGIN_SCOPE         
- 734: PUSH_STRING         
- 735: LOAD_VAR             "i"
- 736: PUSH_STRING         
- 737: CONCAT              
- 738: PUSH_STRING          ""i = {i}"
- 739: INTERPOLATE_STRING  
- 740: PRINT               
- 741: END_SCOPE           
- 742: JUMP                 -16
- 743: CLEAR_TEMP          
- 744: PUSH_STRING          "Range (0 to 3):"
- 745: PRINT               
- 746: PUSH_INT             0
- 747: PUSH_INT             4
- 748: CREATE_RANGE        
- 749: GET_ITERATOR        
- 750: STORE_TEMP          
- 751: LOAD_TEMP           
- 752: ITERATOR_HAS_NEXT   
- 753: JUMP_IF_FALSE        13
- 754: LOAD_TEMP           
- 755: ITERATOR_NEXT       
- 756: STORE_VAR            "x"
- 757: BEGIN_SCOPE         
- 758: PUSH_STRING         
- 759: LOAD_VAR             "x"
- 760: PUSH_STRING         
- 761: CONCAT              
- 762: PUSH_STRING          ""x = {x}"
- 763: INTERPOLATE_STRING  
- 764: PRINT               
- 765: END_SCOPE           
- 766: JUMP                 -16
- 767: CLEAR_TEMP          
- 768: PUSH_STRING          "Nested iter loops:"
- 769: PRINT               
- 770: PUSH_INT             1
- 771: PUSH_INT             3
- 772: CREATE_RANGE        
- 773: GET_ITERATOR        
- 774: STORE_TEMP          
- 775: LOAD_TEMP           
- 776: ITERATOR_HAS_NEXT   
- 777: JUMP_IF_FALSE        31
- 778: LOAD_TEMP           
- 779: ITERATOR_NEXT       
- 780: STORE_VAR            "i"
- 781: BEGIN_SCOPE         
- 782: PUSH_INT             10
- 783: PUSH_INT             12
- 784: CREATE_RANGE        
- 785: GET_ITERATOR        
- 786: STORE_TEMP          
- 787: LOAD_TEMP           
- 788: ITERATOR_HAS_NEXT   
- 789: JUMP_IF_FALSE        16
- 790: LOAD_TEMP           
- 791: ITERATOR_NEXT       
- 792: STORE_VAR            "j"
- 793: BEGIN_SCOPE         
- 794: PUSH_STRING         
- 795: LOAD_VAR             "i"
- 796: PUSH_STRING         
- 797: CONCAT              
- 798: LOAD_VAR             "j"
- 799: PUSH_STRING         
- 800: CONCAT              
- 801: PUSH_STRING          ")"
- 802: INTERPOLATE_STRING  
- 803: PRINT               
- 804: END_SCOPE           
- 805: JUMP                 -19
- 806: CLEAR_TEMP          
- 807: END_SCOPE           
- 808: JUMP                 -34
- 809: CLEAR_TEMP          
- 810: PUSH_STRING          "Mixed loops (for outer, iter inner):"
- 811: PRINT               
- 812: BEGIN_SCOPE         
- 813: PUSH_INT             0
- 814: STORE_VAR            "i"
- 815: LOAD_VAR             "i"
- 816: PUSH_INT             2
- 817: LESS                
- 818: JUMP_IF_FALSE        36
- 819: JUMP                 7
- 820: LOAD_VAR             "i"
- 821: PUSH_INT             1
- 822: ADD                 
- 823: DUP                 
- 824: STORE_VAR            "i"
- 825: POP                 
- 826: JUMP                 -12
- 827: BEGIN_SCOPE         
- 828: PUSH_INT             5
- 829: PUSH_INT             7
- 830: CREATE_RANGE        
- 831: GET_ITERATOR        
- 832: STORE_TEMP          
- 833: LOAD_TEMP           
- 834: ITERATOR_HAS_NEXT   
- 835: JUMP_IF_FALSE        16
- 836: LOAD_TEMP           
- 837: ITERATOR_NEXT       
- 838: STORE_VAR            "j"
- 839: BEGIN_SCOPE         
- 840: PUSH_STRING         
- 841: LOAD_VAR             "i"
- 842: PUSH_STRING         
- 843: CONCAT              
- 844: LOAD_VAR             "j"
- 845: PUSH_STRING         
- 846: CONCAT              
- 847: PUSH_STRING          ")"
- 848: INTERPOLATE_STRING  
- 849: PRINT               
- 850: END_SCOPE           
- 851: JUMP                 -19
- 852: CLEAR_TEMP          
- 853: END_SCOPE           
- 854: JUMP                 -35
- 855: END_SCOPE           
- 856: PUSH_STRING          "
-=== 7. LOOPS - WHILE LOOPS ==="
+ 531: JUMP                 0
+ 532: CALL                 "unknown"
+ 533: POP                 
+ 534: BEGIN_SCOPE         
+ 535: PUSH_STRING          ""Grade: B""
+ 536: PRINT               
+ 537: END_SCOPE           
+ 538: CALL                 "unknown"
+ 539: POP                 
+ 540: BEGIN_SCOPE         
+ 541: PUSH_STRING          ""Grade: C""
+ 542: PRINT               
+ 543: END_SCOPE           
+ 544: PUSH_NULL           
+ 545: POP                 
+ 546: BEGIN_SCOPE         
+ 547: PUSH_STRING          ""Grade: F""
+ 548: PRINT               
+ 549: END_SCOPE           
+ 550: PUSH_STRING          ""sunny""
+ 551: STORE_VAR            "weather"
+ 552: PUSH_INT             75
+ 553: STORE_VAR            "temperature"
+ 554: LOAD_VAR             "weather"
+ 555: PUSH_STRING          ""sunny""
+ 556: EQUAL               
+ 557: JUMP_IF_FALSE        16
+ 558: BEGIN_SCOPE         
+ 559: LOAD_VAR             "temperature"
+ 560: PUSH_INT             70
+ 561: GREATER             
+ 562: JUMP_IF_FALSE        5
+ 563: BEGIN_SCOPE         
+ 564: PUSH_STRING          ""Perfect day for outdoor activities!""
+ 565: PRINT               
+ 566: END_SCOPE           
+ 567: JUMP                 4
+ 568: BEGIN_SCOPE         
+ 569: PUSH_STRING          ""Sunny but a bit cold.""
+ 570: PRINT               
+ 571: END_SCOPE           
+ 572: END_SCOPE           
+ 573: JUMP                 4
+ 574: BEGIN_SCOPE         
+ 575: PUSH_STRING          ""Not ideal weather.""
+ 576: PRINT               
+ 577: END_SCOPE           
+ 578: PUSH_STRING          ""\n=== 5. LOOPS - FOR LOOPS ===""
+ 579: PRINT               
+ 580: PUSH_STRING          ""Basic for loop (0 to 4):""
+ 581: PRINT               
+ 582: BEGIN_SCOPE         
+ 583: PUSH_INT             0
+ 584: STORE_VAR            "i"
+ 585: LOAD_VAR             "i"
+ 586: PUSH_INT             5
+ 587: LESS                
+ 588: JUMP_IF_FALSE        18
+ 589: JUMP                 7
+ 590: LOAD_VAR             "i"
+ 591: PUSH_INT             1
+ 592: ADD                 
+ 593: DUP                 
+ 594: STORE_VAR            "i"
+ 595: POP                 
+ 596: JUMP                 -12
+ 597: BEGIN_SCOPE         
+ 598: PUSH_STRING         
+ 599: LOAD_VAR             "i"
+ 600: PUSH_STRING         
+ 601: CONCAT              
+ 602: PUSH_STRING          ""i = {i}""
+ 603: INTERPOLATE_STRING  
+ 604: PRINT               
+ 605: END_SCOPE           
+ 606: JUMP                 -17
+ 607: END_SCOPE           
+ 608: PUSH_STRING          ""For loop with increment 2:""
+ 609: PRINT               
+ 610: BEGIN_SCOPE         
+ 611: PUSH_INT             0
+ 612: STORE_VAR            "j"
+ 613: LOAD_VAR             "j"
+ 614: PUSH_INT             10
+ 615: LESS                
+ 616: JUMP_IF_FALSE        18
+ 617: JUMP                 7
+ 618: LOAD_VAR             "j"
+ 619: PUSH_INT             2
+ 620: ADD                 
+ 621: DUP                 
+ 622: STORE_VAR            "j"
+ 623: POP                 
+ 624: JUMP                 -12
+ 625: BEGIN_SCOPE         
+ 626: PUSH_STRING         
+ 627: LOAD_VAR             "j"
+ 628: PUSH_STRING         
+ 629: CONCAT              
+ 630: PUSH_STRING          ""j = {j}""
+ 631: INTERPOLATE_STRING  
+ 632: PRINT               
+ 633: END_SCOPE           
+ 634: JUMP                 -17
+ 635: END_SCOPE           
+ 636: PUSH_STRING          ""Countdown loop:""
+ 637: PRINT               
+ 638: BEGIN_SCOPE         
+ 639: PUSH_INT             5
+ 640: STORE_VAR            "k"
+ 641: LOAD_VAR             "k"
+ 642: PUSH_INT             0
+ 643: GREATER             
+ 644: JUMP_IF_FALSE        18
+ 645: JUMP                 7
+ 646: LOAD_VAR             "k"
+ 647: PUSH_INT             1
+ 648: SUBTRACT            
+ 649: DUP                 
+ 650: STORE_VAR            "k"
+ 651: POP                 
+ 652: JUMP                 -12
+ 653: BEGIN_SCOPE         
+ 654: PUSH_STRING         
+ 655: LOAD_VAR             "k"
+ 656: PUSH_STRING         
+ 657: CONCAT              
+ 658: PUSH_STRING          ""k = {k}""
+ 659: INTERPOLATE_STRING  
+ 660: PRINT               
+ 661: END_SCOPE           
+ 662: JUMP                 -17
+ 663: END_SCOPE           
+ 664: PUSH_STRING          ""Nested for loops (2x3 grid):""
+ 665: PRINT               
+ 666: BEGIN_SCOPE         
+ 667: PUSH_INT             0
+ 668: STORE_VAR            "row"
+ 669: LOAD_VAR             "row"
+ 670: PUSH_INT             2
+ 671: LESS                
+ 672: JUMP_IF_FALSE        40
+ 673: JUMP                 7
+ 674: LOAD_VAR             "row"
+ 675: PUSH_INT             1
+ 676: ADD                 
+ 677: DUP                 
+ 678: STORE_VAR            "row"
+ 679: POP                 
+ 680: JUMP                 -12
+ 681: BEGIN_SCOPE         
+ 682: BEGIN_SCOPE         
+ 683: PUSH_INT             0
+ 684: STORE_VAR            "col"
+ 685: LOAD_VAR             "col"
+ 686: PUSH_INT             3
+ 687: LESS                
+ 688: JUMP_IF_FALSE        21
+ 689: JUMP                 7
+ 690: LOAD_VAR             "col"
+ 691: PUSH_INT             1
+ 692: ADD                 
+ 693: DUP                 
+ 694: STORE_VAR            "col"
+ 695: POP                 
+ 696: JUMP                 -12
+ 697: BEGIN_SCOPE         
+ 698: PUSH_STRING         
+ 699: LOAD_VAR             "row"
+ 700: PUSH_STRING         
+ 701: CONCAT              
+ 702: LOAD_VAR             "col"
+ 703: PUSH_STRING         
+ 704: CONCAT              
+ 705: PUSH_STRING          ""({row}, {col})""
+ 706: INTERPOLATE_STRING  
+ 707: PRINT               
+ 708: END_SCOPE           
+ 709: JUMP                 -20
+ 710: END_SCOPE           
+ 711: END_SCOPE           
+ 712: JUMP                 -39
+ 713: END_SCOPE           
+ 714: PUSH_STRING          ""\n=== 6. LOOPS - ITER LOOPS ===""
+ 715: PRINT               
+ 716: PUSH_STRING          ""Basic range (1 to 5):""
+ 717: PRINT               
+ 718: PUSH_INT             1
+ 719: PUSH_INT             6
+ 720: CREATE_RANGE        
+ 721: GET_ITERATOR        
+ 722: STORE_TEMP          
+ 723: LOAD_TEMP           
+ 724: ITERATOR_HAS_NEXT   
+ 725: JUMP_IF_FALSE        13
+ 726: LOAD_TEMP           
+ 727: ITERATOR_NEXT       
+ 728: STORE_VAR            "i"
+ 729: BEGIN_SCOPE         
+ 730: PUSH_STRING         
+ 731: LOAD_VAR             "i"
+ 732: PUSH_STRING         
+ 733: CONCAT              
+ 734: PUSH_STRING          ""i = {i}""
+ 735: INTERPOLATE_STRING  
+ 736: PRINT               
+ 737: END_SCOPE           
+ 738: JUMP                 -16
+ 739: CLEAR_TEMP          
+ 740: PUSH_STRING          ""Range (0 to 3):""
+ 741: PRINT               
+ 742: PUSH_INT             0
+ 743: PUSH_INT             4
+ 744: CREATE_RANGE        
+ 745: GET_ITERATOR        
+ 746: STORE_TEMP          
+ 747: LOAD_TEMP           
+ 748: ITERATOR_HAS_NEXT   
+ 749: JUMP_IF_FALSE        13
+ 750: LOAD_TEMP           
+ 751: ITERATOR_NEXT       
+ 752: STORE_VAR            "x"
+ 753: BEGIN_SCOPE         
+ 754: PUSH_STRING         
+ 755: LOAD_VAR             "x"
+ 756: PUSH_STRING         
+ 757: CONCAT              
+ 758: PUSH_STRING          ""x = {x}""
+ 759: INTERPOLATE_STRING  
+ 760: PRINT               
+ 761: END_SCOPE           
+ 762: JUMP                 -16
+ 763: CLEAR_TEMP          
+ 764: PUSH_STRING          ""Nested iter loops:""
+ 765: PRINT               
+ 766: PUSH_INT             1
+ 767: PUSH_INT             3
+ 768: CREATE_RANGE        
+ 769: GET_ITERATOR        
+ 770: STORE_TEMP          
+ 771: LOAD_TEMP           
+ 772: ITERATOR_HAS_NEXT   
+ 773: JUMP_IF_FALSE        31
+ 774: LOAD_TEMP           
+ 775: ITERATOR_NEXT       
+ 776: STORE_VAR            "i"
+ 777: BEGIN_SCOPE         
+ 778: PUSH_INT             10
+ 779: PUSH_INT             12
+ 780: CREATE_RANGE        
+ 781: GET_ITERATOR        
+ 782: STORE_TEMP          
+ 783: LOAD_TEMP           
+ 784: ITERATOR_HAS_NEXT   
+ 785: JUMP_IF_FALSE        16
+ 786: LOAD_TEMP           
+ 787: ITERATOR_NEXT       
+ 788: STORE_VAR            "j"
+ 789: BEGIN_SCOPE         
+ 790: PUSH_STRING         
+ 791: LOAD_VAR             "i"
+ 792: PUSH_STRING         
+ 793: CONCAT              
+ 794: LOAD_VAR             "j"
+ 795: PUSH_STRING         
+ 796: CONCAT              
+ 797: PUSH_STRING          ""({i}, {j})""
+ 798: INTERPOLATE_STRING  
+ 799: PRINT               
+ 800: END_SCOPE           
+ 801: JUMP                 -19
+ 802: CLEAR_TEMP          
+ 803: END_SCOPE           
+ 804: JUMP                 -34
+ 805: CLEAR_TEMP          
+ 806: PUSH_STRING          ""Mixed loops (for outer, iter inner):""
+ 807: PRINT               
+ 808: BEGIN_SCOPE         
+ 809: PUSH_INT             0
+ 810: STORE_VAR            "i"
+ 811: LOAD_VAR             "i"
+ 812: PUSH_INT             2
+ 813: LESS                
+ 814: JUMP_IF_FALSE        36
+ 815: JUMP                 7
+ 816: LOAD_VAR             "i"
+ 817: PUSH_INT             1
+ 818: ADD                 
+ 819: DUP                 
+ 820: STORE_VAR            "i"
+ 821: POP                 
+ 822: JUMP                 -12
+ 823: BEGIN_SCOPE         
+ 824: PUSH_INT             5
+ 825: PUSH_INT             7
+ 826: CREATE_RANGE        
+ 827: GET_ITERATOR        
+ 828: STORE_TEMP          
+ 829: LOAD_TEMP           
+ 830: ITERATOR_HAS_NEXT   
+ 831: JUMP_IF_FALSE        16
+ 832: LOAD_TEMP           
+ 833: ITERATOR_NEXT       
+ 834: STORE_VAR            "j"
+ 835: BEGIN_SCOPE         
+ 836: PUSH_STRING         
+ 837: LOAD_VAR             "i"
+ 838: PUSH_STRING         
+ 839: CONCAT              
+ 840: LOAD_VAR             "j"
+ 841: PUSH_STRING         
+ 842: CONCAT              
+ 843: PUSH_STRING          ""for-iter: ({i}, {j})""
+ 844: INTERPOLATE_STRING  
+ 845: PRINT               
+ 846: END_SCOPE           
+ 847: JUMP                 -19
+ 848: CLEAR_TEMP          
+ 849: END_SCOPE           
+ 850: JUMP                 -35
+ 851: END_SCOPE           
+ 852: PUSH_STRING          ""\n=== 7. LOOPS - WHILE LOOPS ===""
+ 853: PRINT               
+ 854: PUSH_INT             0
+ 855: STORE_VAR            "count"
+ 856: PUSH_STRING          ""While loop (count to 3):""
  857: PRINT               
- 858: PUSH_INT             0
- 859: STORE_VAR            "count"
- 860: PUSH_STRING          "While loop (count to 3):"
- 861: PRINT               
- 862: LOAD_VAR             "count"
- 863: PUSH_INT             3
- 864: LESS                
- 865: JUMP_IF_FALSE        16
- 866: BEGIN_SCOPE         
- 867: PUSH_STRING         
- 868: LOAD_VAR             "count"
- 869: PUSH_STRING         
- 870: CONCAT              
- 871: PUSH_STRING          ""count = {count}"
- 872: INTERPOLATE_STRING  
- 873: PRINT               
- 874: LOAD_VAR             "count"
- 875: PUSH_INT             1
- 876: ADD                 
- 877: DUP                 
- 878: STORE_VAR            "count"
- 879: POP                 
- 880: END_SCOPE           
- 881: JUMP                 -20
- 882: PUSH_INT             1
- 883: STORE_VAR            "num"
- 884: PUSH_STRING          "Powers of 2 less than 20:"
- 885: PRINT               
- 886: LOAD_VAR             "num"
- 887: PUSH_INT             20
- 888: LESS                
- 889: JUMP_IF_FALSE        16
- 890: BEGIN_SCOPE         
- 891: PUSH_STRING         
- 892: LOAD_VAR             "num"
- 893: PUSH_STRING         
- 894: CONCAT              
- 895: PUSH_STRING          ""num = {num}"
- 896: INTERPOLATE_STRING  
- 897: PRINT               
- 898: LOAD_VAR             "num"
- 899: PUSH_INT             2
- 900: MULTIPLY            
- 901: DUP                 
- 902: STORE_VAR            "num"
- 903: POP                 
- 904: END_SCOPE           
- 905: JUMP                 -20
- 906: PUSH_STRING          "
-=== 8. FUNCTIONS - BASIC ==="
+ 858: LOAD_VAR             "count"
+ 859: PUSH_INT             3
+ 860: LESS                
+ 861: JUMP_IF_FALSE        16
+ 862: BEGIN_SCOPE         
+ 863: PUSH_STRING         
+ 864: LOAD_VAR             "count"
+ 865: PUSH_STRING         
+ 866: CONCAT              
+ 867: PUSH_STRING          ""count = {count}""
+ 868: INTERPOLATE_STRING  
+ 869: PRINT               
+ 870: LOAD_VAR             "count"
+ 871: PUSH_INT             1
+ 872: ADD                 
+ 873: DUP                 
+ 874: STORE_VAR            "count"
+ 875: POP                 
+ 876: END_SCOPE           
+ 877: JUMP                 -20
+ 878: PUSH_INT             1
+ 879: STORE_VAR            "num"
+ 880: PUSH_STRING          ""Powers of 2 less than 20:""
+ 881: PRINT               
+ 882: LOAD_VAR             "num"
+ 883: PUSH_INT             20
+ 884: LESS                
+ 885: JUMP_IF_FALSE        16
+ 886: BEGIN_SCOPE         
+ 887: PUSH_STRING         
+ 888: LOAD_VAR             "num"
+ 889: PUSH_STRING         
+ 890: CONCAT              
+ 891: PUSH_STRING          ""num = {num}""
+ 892: INTERPOLATE_STRING  
+ 893: PRINT               
+ 894: LOAD_VAR             "num"
+ 895: PUSH_INT             2
+ 896: MULTIPLY            
+ 897: DUP                 
+ 898: STORE_VAR            "num"
+ 899: POP                 
+ 900: END_SCOPE           
+ 901: JUMP                 -20
+ 902: PUSH_STRING          ""\n=== 8. FUNCTIONS - BASIC ===""
+ 903: PRINT               
+ 904: BEGIN_FUNCTION       "sayHello"
+ 905: BEGIN_SCOPE         
+ 906: PUSH_STRING          ""Hello from function!""
  907: PRINT               
- 908: BEGIN_FUNCTION       "sayHello"
- 909: BEGIN_SCOPE         
- 910: PUSH_STRING          "Hello from function!"
- 911: PRINT               
- 912: END_SCOPE           
- 913: PUSH_NULL           
- 914: RETURN              
- 915: END_FUNCTION        
- 916: PUSH_FUNCTION       
- 917: STORE_VAR            "sayHello"
- 918: PUSH_STRING          "Calling simple function:"
- 919: PRINT               
- 920: CALL                 "sayHello"
- 921: POP                 
- 922: BEGIN_FUNCTION       "add"
- 923: DEFINE_PARAM        
- 924: DEFINE_PARAM        
- 925: BEGIN_SCOPE         
- 926: LOAD_VAR             "a"
- 927: LOAD_VAR             "b"
- 928: ADD                 
- 929: RETURN              
- 930: END_SCOPE           
- 931: PUSH_NULL           
- 932: RETURN              
- 933: END_FUNCTION        
- 934: PUSH_FUNCTION       
- 935: STORE_VAR            "add"
- 936: PUSH_STRING          "Function with parameters:"
- 937: PRINT               
- 938: PUSH_INT             5
- 939: PUSH_INT             3
- 940: CALL                 "add"
- 941: STORE_VAR            "addResult"
- 942: PUSH_STRING         
- 943: LOAD_VAR             "addResult"
- 944: PUSH_STRING         
- 945: CONCAT              
- 946: PUSH_STRING          ""add(5, 3) = {addResult}"
- 947: INTERPOLATE_STRING  
- 948: PRINT               
- 949: BEGIN_FUNCTION       "square"
- 950: DEFINE_PARAM        
- 951: BEGIN_SCOPE         
- 952: LOAD_VAR             "x"
- 953: LOAD_VAR             "x"
- 954: MULTIPLY            
- 955: RETURN              
- 956: END_SCOPE           
- 957: PUSH_NULL           
- 958: RETURN              
- 959: END_FUNCTION        
- 960: PUSH_FUNCTION       
- 961: STORE_VAR            "square"
- 962: PUSH_STRING          "Square function:"
- 963: PRINT               
- 964: PUSH_STRING         
- 965: PUSH_INT             4
- 966: CALL                 "square"
- 967: PUSH_STRING         
- 968: CONCAT              
- 969: PUSH_STRING          ""square(4) = {square(4)}"
- 970: INTERPOLATE_STRING  
- 971: PRINT               
- 972: PUSH_STRING         
- 973: PUSH_INT             7
- 974: CALL                 "square"
- 975: PUSH_STRING         
- 976: CONCAT              
- 977: PUSH_STRING          ""square(7) = {square(7)}"
- 978: INTERPOLATE_STRING  
- 979: PRINT               
- 980: BEGIN_FUNCTION       "greet"
- 981: DEFINE_PARAM        
- 982: BEGIN_SCOPE         
- 983: PUSH_STRING         
- 984: LOAD_VAR             "name"
- 985: PUSH_STRING         
- 986: CONCAT              
- 987: PUSH_STRING          "!"
- 988: INTERPOLATE_STRING  
- 989: PRINT               
- 990: PUSH_STRING          "greeted"
- 991: RETURN              
- 992: END_SCOPE           
- 993: PUSH_NULL           
- 994: RETURN              
- 995: END_FUNCTION        
- 996: PUSH_FUNCTION       
- 997: STORE_VAR            "greet"
- 998: PUSH_STRING          "Function with string parameter:"
- 999: PRINT               
-1000: PUSH_STRING          "Bob"
-1001: CALL                 "greet"
-1002: POP                 
-1003: BEGIN_FUNCTION       "calculate"
-1004: DEFINE_PARAM        
-1005: DEFINE_PARAM        
-1006: BEGIN_SCOPE         
+ 908: END_SCOPE           
+ 909: PUSH_NULL           
+ 910: RETURN              
+ 911: END_FUNCTION        
+ 912: PUSH_FUNCTION       
+ 913: STORE_VAR            "sayHello"
+ 914: PUSH_STRING          ""Calling simple function:""
+ 915: PRINT               
+ 916: CALL                 "sayHello"
+ 917: POP                 
+ 918: BEGIN_FUNCTION       "add"
+ 919: DEFINE_PARAM        
+ 920: DEFINE_PARAM        
+ 921: BEGIN_SCOPE         
+ 922: LOAD_VAR             "a"
+ 923: LOAD_VAR             "b"
+ 924: ADD                 
+ 925: RETURN              
+ 926: END_SCOPE           
+ 927: PUSH_NULL           
+ 928: RETURN              
+ 929: END_FUNCTION        
+ 930: PUSH_FUNCTION       
+ 931: STORE_VAR            "add"
+ 932: PUSH_STRING          ""Function with parameters:""
+ 933: PRINT               
+ 934: PUSH_INT             5
+ 935: PUSH_INT             3
+ 936: CALL                 "add"
+ 937: STORE_VAR            "addResult"
+ 938: PUSH_STRING         
+ 939: LOAD_VAR             "addResult"
+ 940: PUSH_STRING         
+ 941: CONCAT              
+ 942: PUSH_STRING          ""add(5, 3) = {addResult}""
+ 943: INTERPOLATE_STRING  
+ 944: PRINT               
+ 945: BEGIN_FUNCTION       "square"
+ 946: DEFINE_PARAM        
+ 947: BEGIN_SCOPE         
+ 948: LOAD_VAR             "x"
+ 949: LOAD_VAR             "x"
+ 950: MULTIPLY            
+ 951: RETURN              
+ 952: END_SCOPE           
+ 953: PUSH_NULL           
+ 954: RETURN              
+ 955: END_FUNCTION        
+ 956: PUSH_FUNCTION       
+ 957: STORE_VAR            "square"
+ 958: PUSH_STRING          ""Square function:""
+ 959: PRINT               
+ 960: PUSH_STRING         
+ 961: PUSH_INT             4
+ 962: CALL                 "square"
+ 963: PUSH_STRING         
+ 964: CONCAT              
+ 965: PUSH_STRING          ""square(4) = {square(4)}""
+ 966: INTERPOLATE_STRING  
+ 967: PRINT               
+ 968: PUSH_STRING         
+ 969: PUSH_INT             7
+ 970: CALL                 "square"
+ 971: PUSH_STRING         
+ 972: CONCAT              
+ 973: PUSH_STRING          ""square(7) = {square(7)}""
+ 974: INTERPOLATE_STRING  
+ 975: PRINT               
+ 976: BEGIN_FUNCTION       "greet"
+ 977: DEFINE_PARAM        
+ 978: BEGIN_SCOPE         
+ 979: PUSH_STRING         
+ 980: LOAD_VAR             "name"
+ 981: PUSH_STRING         
+ 982: CONCAT              
+ 983: PUSH_STRING          ""Hello, {name}!""
+ 984: INTERPOLATE_STRING  
+ 985: PRINT               
+ 986: PUSH_STRING          ""greeted""
+ 987: RETURN              
+ 988: END_SCOPE           
+ 989: PUSH_NULL           
+ 990: RETURN              
+ 991: END_FUNCTION        
+ 992: PUSH_FUNCTION       
+ 993: STORE_VAR            "greet"
+ 994: PUSH_STRING          ""Function with string parameter:""
+ 995: PRINT               
+ 996: PUSH_STRING          ""Bob""
+ 997: CALL                 "greet"
+ 998: POP                 
+ 999: BEGIN_FUNCTION       "calculate"
+1000: DEFINE_PARAM        
+1001: DEFINE_PARAM        
+1002: BEGIN_SCOPE         
+1003: LOAD_VAR             "x"
+1004: LOAD_VAR             "y"
+1005: ADD                 
+1006: STORE_VAR            "sum"
 1007: LOAD_VAR             "x"
 1008: LOAD_VAR             "y"
-1009: ADD                 
-1010: STORE_VAR            "sum"
-1011: LOAD_VAR             "x"
-1012: LOAD_VAR             "y"
-1013: MULTIPLY            
-1014: STORE_VAR            "product"
-1015: PUSH_STRING         
-1016: LOAD_VAR             "sum"
-1017: PUSH_STRING         
-1018: CONCAT              
-1019: LOAD_VAR             "product"
-1020: PUSH_STRING         
-1021: CONCAT              
-1022: PUSH_STRING          ""Local calculations: sum={sum}, product={product}"
-1023: INTERPOLATE_STRING  
-1024: PRINT               
-1025: LOAD_VAR             "sum"
-1026: LOAD_VAR             "product"
-1027: MULTIPLY            
-1028: RETURN              
-1029: END_SCOPE           
-1030: PUSH_NULL           
-1031: RETURN              
-1032: END_FUNCTION        
-1033: PUSH_FUNCTION       
-1034: STORE_VAR            "calculate"
-1035: PUSH_STRING          "Function with locals:"
-1036: PRINT               
-1037: PUSH_INT             3
-1038: PUSH_INT             4
-1039: CALL                 "calculate"
-1040: STORE_VAR            "calcResult"
-1041: PUSH_STRING         
-1042: LOAD_VAR             "calcResult"
-1043: PUSH_STRING         
-1044: CONCAT              
-1045: PUSH_STRING          ""Result: {calcResult}"
-1046: INTERPOLATE_STRING  
-1047: PRINT               
-1048: BEGIN_FUNCTION       "factorial"
-1049: DEFINE_PARAM        
-1050: BEGIN_SCOPE         
-1051: LOAD_VAR             "n"
+1009: MULTIPLY            
+1010: STORE_VAR            "product"
+1011: PUSH_STRING         
+1012: LOAD_VAR             "sum"
+1013: PUSH_STRING         
+1014: CONCAT              
+1015: LOAD_VAR             "product"
+1016: PUSH_STRING         
+1017: CONCAT              
+1018: PUSH_STRING          ""Local calculations: sum={sum}, product={product}""
+1019: INTERPOLATE_STRING  
+1020: PRINT               
+1021: LOAD_VAR             "sum"
+1022: LOAD_VAR             "product"
+1023: MULTIPLY            
+1024: RETURN              
+1025: END_SCOPE           
+1026: PUSH_NULL           
+1027: RETURN              
+1028: END_FUNCTION        
+1029: PUSH_FUNCTION       
+1030: STORE_VAR            "calculate"
+1031: PUSH_STRING          ""Function with locals:""
+1032: PRINT               
+1033: PUSH_INT             3
+1034: PUSH_INT             4
+1035: CALL                 "calculate"
+1036: STORE_VAR            "calcResult"
+1037: PUSH_STRING         
+1038: LOAD_VAR             "calcResult"
+1039: PUSH_STRING         
+1040: CONCAT              
+1041: PUSH_STRING          ""Result: {calcResult}""
+1042: INTERPOLATE_STRING  
+1043: PRINT               
+1044: BEGIN_FUNCTION       "factorial"
+1045: DEFINE_PARAM        
+1046: BEGIN_SCOPE         
+1047: LOAD_VAR             "n"
+1048: PUSH_INT             1
+1049: LESS_EQUAL          
+1050: JUMP_IF_FALSE        5
+1051: BEGIN_SCOPE         
 1052: PUSH_INT             1
-1053: LESS_EQUAL          
-1054: JUMP_IF_FALSE        5
-1055: BEGIN_SCOPE         
-1056: PUSH_INT             1
-1057: RETURN              
-1058: END_SCOPE           
-1059: JUMP                 0
-1060: LOAD_VAR             "n"
-1061: LOAD_VAR             "n"
-1062: PUSH_INT             1
-1063: SUBTRACT            
-1064: CALL                 "factorial"
-1065: MULTIPLY            
-1066: RETURN              
-1067: END_SCOPE           
-1068: PUSH_NULL           
-1069: RETURN              
-1070: END_FUNCTION        
-1071: PUSH_FUNCTION       
-1072: STORE_VAR            "factorial"
-1073: PUSH_STRING          "Recursive function:"
-1074: PRINT               
-1075: PUSH_STRING         
-1076: PUSH_INT             5
-1077: CALL                 "factorial"
-1078: PUSH_STRING         
-1079: CONCAT              
-1080: PUSH_STRING          ""factorial(5) = {factorial(5)}"
-1081: INTERPOLATE_STRING  
-1082: PRINT               
-1083: PUSH_STRING          "
-=== 9. FUNCTIONS - OPTIONAL PARAMETERS ==="
-1084: PRINT               
-1085: BEGIN_FUNCTION       "greetOptional"
-1086: DEFINE_OPTIONAL_PARAM
-1087: BEGIN_SCOPE         
+1053: RETURN              
+1054: END_SCOPE           
+1055: JUMP                 0
+1056: LOAD_VAR             "n"
+1057: LOAD_VAR             "n"
+1058: PUSH_INT             1
+1059: SUBTRACT            
+1060: CALL                 "factorial"
+1061: MULTIPLY            
+1062: RETURN              
+1063: END_SCOPE           
+1064: PUSH_NULL           
+1065: RETURN              
+1066: END_FUNCTION        
+1067: PUSH_FUNCTION       
+1068: STORE_VAR            "factorial"
+1069: PUSH_STRING          ""Recursive function:""
+1070: PRINT               
+1071: PUSH_STRING         
+1072: PUSH_INT             5
+1073: CALL                 "factorial"
+1074: PUSH_STRING         
+1075: CONCAT              
+1076: PUSH_STRING          ""factorial(5) = {factorial(5)}""
+1077: INTERPOLATE_STRING  
+1078: PRINT               
+1079: PUSH_STRING          ""\n=== 9. FUNCTIONS - OPTIONAL PARAMETERS ===""
+1080: PRINT               
+1081: BEGIN_FUNCTION       "greetOptional"
+1082: DEFINE_OPTIONAL_PARAM
+1083: BEGIN_SCOPE         
+1084: LOAD_VAR             "name"
+1085: JUMP_IF_FALSE        17
+1086: BEGIN_SCOPE         
+1087: PUSH_STRING         
 1088: LOAD_VAR             "name"
-1089: JUMP_IF_FALSE        17
-1090: BEGIN_SCOPE         
-1091: PUSH_STRING         
-1092: LOAD_VAR             "name"
-1093: PUSH_STRING         
-1094: CONCAT              
-1095: PUSH_STRING          "!"
-1096: INTERPOLATE_STRING  
-1097: PRINT               
-1098: PUSH_STRING         
-1099: LOAD_VAR             "name"
-1100: PUSH_STRING         
-1101: CONCAT              
-1102: PUSH_STRING          ""greeted {name}"
-1103: INTERPOLATE_STRING  
-1104: RETURN              
-1105: END_SCOPE           
-1106: JUMP                 6
-1107: BEGIN_SCOPE         
-1108: PUSH_STRING          "Hello, stranger!"
-1109: PRINT               
-1110: PUSH_STRING          "greeted stranger"
+1089: PUSH_STRING         
+1090: CONCAT              
+1091: PUSH_STRING          ""Hello, {name}!""
+1092: INTERPOLATE_STRING  
+1093: PRINT               
+1094: PUSH_STRING         
+1095: LOAD_VAR             "name"
+1096: PUSH_STRING         
+1097: CONCAT              
+1098: PUSH_STRING          ""greeted {name}""
+1099: INTERPOLATE_STRING  
+1100: RETURN              
+1101: END_SCOPE           
+1102: JUMP                 6
+1103: BEGIN_SCOPE         
+1104: PUSH_STRING          ""Hello, stranger!""
+1105: PRINT               
+1106: PUSH_STRING          ""greeted stranger""
+1107: RETURN              
+1108: END_SCOPE           
+1109: END_SCOPE           
+1110: PUSH_NULL           
 1111: RETURN              
-1112: END_SCOPE           
-1113: END_SCOPE           
-1114: PUSH_NULL           
-1115: RETURN              
-1116: END_FUNCTION        
-1117: PUSH_FUNCTION       
-1118: STORE_VAR            "greetOptional"
-1119: PUSH_STRING          "Testing optional parameter:"
-1120: PRINT               
-1121: PUSH_STRING          "Charlie"
-1122: CALL                 "greetOptional"
-1123: POP                 
-1124: CALL                 "greetOptional"
-1125: POP                 
-1126: BEGIN_FUNCTION       "createUser"
-1127: DEFINE_PARAM        
-1128: DEFINE_OPTIONAL_PARAM
-1129: DEFINE_OPTIONAL_PARAM
-1130: BEGIN_SCOPE         
-1131: PUSH_STRING         
-1132: LOAD_VAR             "username"
-1133: PUSH_STRING         
-1134: CONCAT              
-1135: PUSH_STRING          ""Creating user: {username}"
-1136: INTERPOLATE_STRING  
-1137: PRINT               
+1112: END_FUNCTION        
+1113: PUSH_FUNCTION       
+1114: STORE_VAR            "greetOptional"
+1115: PUSH_STRING          ""Testing optional parameter:""
+1116: PRINT               
+1117: PUSH_STRING          ""Charlie""
+1118: CALL                 "greetOptional"
+1119: POP                 
+1120: CALL                 "greetOptional"
+1121: POP                 
+1122: BEGIN_FUNCTION       "createUser"
+1123: DEFINE_PARAM        
+1124: DEFINE_OPTIONAL_PARAM
+1125: DEFINE_OPTIONAL_PARAM
+1126: BEGIN_SCOPE         
+1127: PUSH_STRING         
+1128: LOAD_VAR             "username"
+1129: PUSH_STRING         
+1130: CONCAT              
+1131: PUSH_STRING          ""Creating user: {username}""
+1132: INTERPOLATE_STRING  
+1133: PRINT               
+1134: LOAD_VAR             "email"
+1135: JUMP_IF_FALSE        10
+1136: BEGIN_SCOPE         
+1137: PUSH_STRING         
 1138: LOAD_VAR             "email"
-1139: JUMP_IF_FALSE        10
-1140: BEGIN_SCOPE         
-1141: PUSH_STRING         
-1142: LOAD_VAR             "email"
-1143: PUSH_STRING         
-1144: CONCAT              
-1145: PUSH_STRING          ""Email: {email}"
-1146: INTERPOLATE_STRING  
-1147: PRINT               
-1148: END_SCOPE           
-1149: JUMP                 0
+1139: PUSH_STRING         
+1140: CONCAT              
+1141: PUSH_STRING          ""Email: {email}""
+1142: INTERPOLATE_STRING  
+1143: PRINT               
+1144: END_SCOPE           
+1145: JUMP                 0
+1146: LOAD_VAR             "age"
+1147: JUMP_IF_FALSE        10
+1148: BEGIN_SCOPE         
+1149: PUSH_STRING         
 1150: LOAD_VAR             "age"
-1151: JUMP_IF_FALSE        10
-1152: BEGIN_SCOPE         
-1153: PUSH_STRING         
-1154: LOAD_VAR             "age"
-1155: PUSH_STRING         
-1156: CONCAT              
-1157: PUSH_STRING          ""Age: {age}"
-1158: INTERPOLATE_STRING  
-1159: PRINT               
+1151: PUSH_STRING         
+1152: CONCAT              
+1153: PUSH_STRING          ""Age: {age}""
+1154: INTERPOLATE_STRING  
+1155: PRINT               
+1156: END_SCOPE           
+1157: JUMP                 0
+1158: PUSH_STRING          ""user created""
+1159: RETURN              
 1160: END_SCOPE           
-1161: JUMP                 0
-1162: PUSH_STRING          "user created"
-1163: RETURN              
-1164: END_SCOPE           
-1165: PUSH_NULL           
-1166: RETURN              
-1167: END_FUNCTION        
-1168: PUSH_FUNCTION       
-1169: STORE_VAR            "createUser"
-1170: PUSH_STRING          "Testing multiple optional parameters:"
-1171: PRINT               
-1172: PUSH_STRING          "alice"
+1161: PUSH_NULL           
+1162: RETURN              
+1163: END_FUNCTION        
+1164: PUSH_FUNCTION       
+1165: STORE_VAR            "createUser"
+1166: PUSH_STRING          ""Testing multiple optional parameters:""
+1167: PRINT               
+1168: PUSH_STRING          ""alice""
+1169: CALL                 "createUser"
+1170: POP                 
+1171: PUSH_STRING          ""bob""
+1172: PUSH_STRING          ""bob@email.com""
 1173: CALL                 "createUser"
 1174: POP                 
-1175: PUSH_STRING          "bob"
-1176: PUSH_STRING          "bob@email.com"
-1177: CALL                 "createUser"
-1178: POP                 
-1179: PUSH_STRING          "charlie"
-1180: PUSH_STRING          "charlie@email.com"
-1181: PUSH_INT             25
-1182: CALL                 "createUser"
-1183: POP                 
-1184: PUSH_STRING          "
-=== 10. FUNCTIONS - DEFAULT PARAMETERS ==="
-1185: PRINT               
-1186: BEGIN_FUNCTION       "greetDefault"
-1187: DEFINE_OPTIONAL_PARAM
-1188: PUSH_STRING          "World"
-1189: SET_DEFAULT_VALUE   
-1190: BEGIN_SCOPE         
-1191: PUSH_STRING         
-1192: LOAD_VAR             "name"
-1193: PUSH_STRING         
-1194: CONCAT              
-1195: PUSH_STRING          "!"
-1196: INTERPOLATE_STRING  
-1197: PRINT               
-1198: PUSH_STRING         
-1199: LOAD_VAR             "name"
-1200: PUSH_STRING         
-1201: CONCAT              
-1202: PUSH_STRING          ""greeted {name}"
-1203: INTERPOLATE_STRING  
-1204: RETURN              
-1205: END_SCOPE           
-1206: PUSH_NULL           
-1207: RETURN              
-1208: END_FUNCTION        
-1209: PUSH_FUNCTION       
-1210: STORE_VAR            "greetDefault"
-1211: PUSH_STRING          "Testing default parameter:"
-1212: PRINT               
-1213: CALL                 "greetDefault"
-1214: POP                 
-1215: PUSH_STRING          "Dave"
-1216: CALL                 "greetDefault"
-1217: POP                 
-1218: BEGIN_FUNCTION       "createMessage"
-1219: DEFINE_OPTIONAL_PARAM
-1220: PUSH_STRING          "Hello"
-1221: SET_DEFAULT_VALUE   
-1222: DEFINE_OPTIONAL_PARAM
-1223: PUSH_STRING          "User"
-1224: SET_DEFAULT_VALUE   
-1225: DEFINE_OPTIONAL_PARAM
-1226: PUSH_STRING          "!"
-1227: SET_DEFAULT_VALUE   
-1228: BEGIN_SCOPE         
-1229: PUSH_STRING         
-1230: LOAD_VAR             "greeting"
-1231: PUSH_STRING         
-1232: CONCAT              
-1233: LOAD_VAR             "name"
-1234: PUSH_STRING         
-1235: CONCAT              
-1236: LOAD_VAR             "punctuation"
-1237: PUSH_STRING         
-1238: CONCAT              
-1239: PUSH_STRING          ""{greeting}, {name}{punctuation}"
-1240: INTERPOLATE_STRING  
-1241: STORE_VAR            "message"
-1242: LOAD_VAR             "message"
-1243: PRINT               
-1244: LOAD_VAR             "message"
-1245: RETURN              
-1246: END_SCOPE           
-1247: PUSH_NULL           
-1248: RETURN              
-1249: END_FUNCTION        
-1250: PUSH_FUNCTION       
-1251: STORE_VAR            "createMessage"
-1252: PUSH_STRING          "Testing multiple default parameters:"
-1253: PRINT               
-1254: CALL                 "createMessage"
-1255: POP                 
-1256: PUSH_STRING          "Hi"
+1175: PUSH_STRING          ""charlie""
+1176: PUSH_STRING          ""charlie@email.com""
+1177: PUSH_INT             25
+1178: CALL                 "createUser"
+1179: POP                 
+1180: PUSH_STRING          ""\n=== 10. FUNCTIONS - DEFAULT PARAMETERS ===""
+1181: PRINT               
+1182: BEGIN_FUNCTION       "greetDefault"
+1183: DEFINE_OPTIONAL_PARAM
+1184: PUSH_STRING          ""World""
+1185: SET_DEFAULT_VALUE   
+1186: BEGIN_SCOPE         
+1187: PUSH_STRING         
+1188: LOAD_VAR             "name"
+1189: PUSH_STRING         
+1190: CONCAT              
+1191: PUSH_STRING          ""Hello, {name}!""
+1192: INTERPOLATE_STRING  
+1193: PRINT               
+1194: PUSH_STRING         
+1195: LOAD_VAR             "name"
+1196: PUSH_STRING         
+1197: CONCAT              
+1198: PUSH_STRING          ""greeted {name}""
+1199: INTERPOLATE_STRING  
+1200: RETURN              
+1201: END_SCOPE           
+1202: PUSH_NULL           
+1203: RETURN              
+1204: END_FUNCTION        
+1205: PUSH_FUNCTION       
+1206: STORE_VAR            "greetDefault"
+1207: PUSH_STRING          ""Testing default parameter:""
+1208: PRINT               
+1209: CALL                 "greetDefault"
+1210: POP                 
+1211: PUSH_STRING          ""Dave""
+1212: CALL                 "greetDefault"
+1213: POP                 
+1214: BEGIN_FUNCTION       "createMessage"
+1215: DEFINE_OPTIONAL_PARAM
+1216: PUSH_STRING          ""Hello""
+1217: SET_DEFAULT_VALUE   
+1218: DEFINE_OPTIONAL_PARAM
+1219: PUSH_STRING          ""User""
+1220: SET_DEFAULT_VALUE   
+1221: DEFINE_OPTIONAL_PARAM
+1222: PUSH_STRING          ""!""
+1223: SET_DEFAULT_VALUE   
+1224: BEGIN_SCOPE         
+1225: PUSH_STRING         
+1226: LOAD_VAR             "greeting"
+1227: PUSH_STRING         
+1228: CONCAT              
+1229: LOAD_VAR             "name"
+1230: PUSH_STRING         
+1231: CONCAT              
+1232: LOAD_VAR             "punctuation"
+1233: PUSH_STRING         
+1234: CONCAT              
+1235: PUSH_STRING          ""{greeting}, {name}{punctuation}""
+1236: INTERPOLATE_STRING  
+1237: STORE_VAR            "message"
+1238: LOAD_VAR             "message"
+1239: PRINT               
+1240: LOAD_VAR             "message"
+1241: RETURN              
+1242: END_SCOPE           
+1243: PUSH_NULL           
+1244: RETURN              
+1245: END_FUNCTION        
+1246: PUSH_FUNCTION       
+1247: STORE_VAR            "createMessage"
+1248: PUSH_STRING          ""Testing multiple default parameters:""
+1249: PRINT               
+1250: CALL                 "createMessage"
+1251: POP                 
+1252: PUSH_STRING          ""Hi""
+1253: CALL                 "createMessage"
+1254: POP                 
+1255: PUSH_STRING          ""Hey""
+1256: PUSH_STRING          ""Alice""
 1257: CALL                 "createMessage"
 1258: POP                 
-1259: PUSH_STRING          "Hey"
-1260: PUSH_STRING          "Alice"
-1261: CALL                 "createMessage"
-1262: POP                 
-1263: PUSH_STRING          "Greetings"
-1264: PUSH_STRING          "Bob"
-1265: PUSH_STRING          "."
-1266: CALL                 "createMessage"
-1267: POP                 
-1268: PUSH_STRING          "
-=== 11. TYPE SYSTEM - TYPE ALIASES ==="
-1269: PRINT               
-1270: PUSH_INT             12345
-1271: STORE_VAR            "userId"
-1272: PUSH_STRING          "Alice"
-1273: STORE_VAR            "userName"
-1274: PUSH_INT             25
-1275: STORE_VAR            "userAge"
-1276: PUSH_FLOAT           95.5
-1277: STORE_VAR            "userScore"
-1278: PUSH_BOOL            true
-1279: STORE_VAR            "isUserActive"
-1280: PUSH_STRING          "Type aliases:"
-1281: PRINT               
-1282: PUSH_STRING         
-1283: LOAD_VAR             "userId"
-1284: PUSH_STRING         
-1285: CONCAT              
-1286: PUSH_STRING          ""User ID: {userId}"
-1287: INTERPOLATE_STRING  
-1288: PRINT               
-1289: PUSH_STRING         
-1290: LOAD_VAR             "userName"
-1291: PUSH_STRING         
-1292: CONCAT              
-1293: PUSH_STRING          ""User Name: {userName}"
-1294: INTERPOLATE_STRING  
-1295: PRINT               
-1296: PUSH_STRING         
-1297: LOAD_VAR             "userAge"
-1298: PUSH_STRING         
-1299: CONCAT              
-1300: PUSH_STRING          ""User Age: {userAge}"
-1301: INTERPOLATE_STRING  
-1302: PRINT               
-1303: PUSH_STRING         
-1304: LOAD_VAR             "userScore"
-1305: PUSH_STRING         
-1306: CONCAT              
-1307: PUSH_STRING          ""User Score: {userScore}"
-1308: INTERPOLATE_STRING  
-1309: PRINT               
-1310: PUSH_STRING         
-1311: LOAD_VAR             "isUserActive"
-1312: PUSH_STRING         
-1313: CONCAT              
-1314: PUSH_STRING          ""Is Active: {isUserActive}"
-1315: INTERPOLATE_STRING  
-1316: PRINT               
-1317: PUSH_STRING          "
-=== 12. TYPE SYSTEM - UNION TYPES ==="
-1318: PRINT               
-1319: PUSH_STRING          "hello"
-1320: STORE_VAR            "value1"
-1321: PUSH_INT             42
-1322: STORE_VAR            "value2"
-1323: PUSH_STRING          "Union types:"
-1324: PRINT               
-1325: PUSH_STRING         
-1326: LOAD_VAR             "value1"
-1327: PUSH_STRING         
-1328: CONCAT              
-1329: PUSH_STRING          ""String value: {value1}"
-1330: INTERPOLATE_STRING  
-1331: PRINT               
-1332: PUSH_STRING         
-1333: LOAD_VAR             "value2"
-1334: PUSH_STRING         
-1335: CONCAT              
-1336: PUSH_STRING          ""Int value: {value2}"
-1337: INTERPOLATE_STRING  
-1338: PRINT               
-1339: PUSH_STRING          "
-=== 13. TYPE SYSTEM - OPTION TYPES ==="
-1340: PRINT               
-1341: STORE_VAR            "someValue"
-1342: STORE_VAR            "noneValue"
-1343: PUSH_STRING          "Option types:"
-1344: PRINT               
-1345: PUSH_STRING         
-1346: LOAD_VAR             "someValue"
-1347: PUSH_STRING         
-1348: CONCAT              
-1349: PUSH_STRING          ""Some value: {someValue}"
-1350: INTERPOLATE_STRING  
-1351: PRINT               
-1352: PUSH_STRING         
-1353: LOAD_VAR             "noneValue"
-1354: PUSH_STRING         
-1355: CONCAT              
-1356: PUSH_STRING          ""None value: {noneValue}"
-1357: INTERPOLATE_STRING  
-1358: PRINT               
-1359: PUSH_STRING          "
-=== 14. ERROR HANDLING - WORKING ==="
-1360: PRINT               
-1361: BEGIN_FUNCTION       "divide"
-1362: DEFINE_PARAM        
-1363: DEFINE_PARAM        
-1364: BEGIN_SCOPE         
-1365: LOAD_VAR             "b"
-1366: PUSH_INT             0
-1367: EQUAL               
-1368: JUMP_IF_FALSE        5
-1369: BEGIN_SCOPE         
-1370: CONSTRUCT_ERROR     
-1371: RETURN              
-1372: END_SCOPE           
-1373: JUMP                 0
-1374: LOAD_VAR             "a"
-1375: LOAD_VAR             "b"
-1376: DIVIDE              
-1377: CONSTRUCT_OK        
-1378: RETURN              
-1379: END_SCOPE           
-1380: PUSH_NULL           
-1381: RETURN              
-1382: END_FUNCTION        
-1383: PUSH_FUNCTION       
-1384: STORE_VAR            "divide"
-1385: BEGIN_FUNCTION       "safeDivide"
-1386: DEFINE_PARAM        
-1387: DEFINE_PARAM        
-1388: BEGIN_SCOPE         
-1389: LOAD_VAR             "x"
-1390: LOAD_VAR             "y"
-1391: CALL                 "divide"
-1392: CHECK_ERROR         
-1393: JUMP_IF_FALSE        1
-1394: PROPAGATE_ERROR     
-1395: UNWRAP_VALUE        
-1396: STORE_VAR            "result"
-1397: LOAD_VAR             "result"
-1398: CONSTRUCT_OK        
-1399: RETURN              
-1400: END_SCOPE           
-1401: PUSH_NULL           
-1402: RETURN              
-1403: END_FUNCTION        
-1404: PUSH_FUNCTION       
-1405: STORE_VAR            "safeDivide"
-1406: PUSH_STRING          "Testing error handling:"
-1407: PRINT               
-1408: PUSH_INT             10
-1409: PUSH_INT             2
-1410: CALL                 "divide"
-1411: STORE_VAR            "successResult"
-1412: PUSH_STRING         
-1413: LOAD_VAR             "successResult"
-1414: PUSH_STRING         
-1415: CONCAT              
-1416: PUSH_STRING          ""divide(10, 2) = {successResult}"
-1417: INTERPOLATE_STRING  
-1418: PRINT               
-1419: PUSH_INT             10
-1420: PUSH_INT             0
-1421: CALL                 "divide"
-1422: STORE_VAR            "errorResult"
-1423: PUSH_STRING         
-1424: LOAD_VAR             "errorResult"
-1425: PUSH_STRING         
-1426: CONCAT              
-1427: PUSH_STRING          ""divide(10, 0) = {errorResult}"
-1428: INTERPOLATE_STRING  
-1429: PRINT               
-1430: PUSH_INT             15
-1431: PUSH_INT             3
-1432: CALL                 "safeDivide"
-1433: STORE_VAR            "propagatedResult"
-1434: PUSH_STRING         
-1435: LOAD_VAR             "propagatedResult"
-1436: PUSH_STRING         
-1437: CONCAT              
-1438: PUSH_STRING          ""safeDivide(15, 3) = {propagatedResult}"
-1439: INTERPOLATE_STRING  
-1440: PRINT               
-1441: PUSH_STRING          "Error handling working with ? operator and error propagation"
-1442: PRINT               
-1443: PUSH_STRING          "
-=== 15. CLASSES - BASIC SYNTAX ==="
+1259: PUSH_STRING          ""Greetings""
+1260: PUSH_STRING          ""Bob""
+1261: PUSH_STRING          "".""
+1262: CALL                 "createMessage"
+1263: POP                 
+1264: PUSH_STRING          ""\n=== 11. TYPE SYSTEM - TYPE ALIASES ===""
+1265: PRINT               
+1266: PUSH_INT             12345
+1267: STORE_VAR            "userId"
+1268: PUSH_STRING          ""Alice""
+1269: STORE_VAR            "userName"
+1270: PUSH_INT             25
+1271: STORE_VAR            "userAge"
+1272: PUSH_FLOAT           95.5
+1273: STORE_VAR            "userScore"
+1274: PUSH_BOOL            true
+1275: STORE_VAR            "isUserActive"
+1276: PUSH_STRING          ""Type aliases:""
+1277: PRINT               
+1278: PUSH_STRING         
+1279: LOAD_VAR             "userId"
+1280: PUSH_STRING         
+1281: CONCAT              
+1282: PUSH_STRING          ""User ID: {userId}""
+1283: INTERPOLATE_STRING  
+1284: PRINT               
+1285: PUSH_STRING         
+1286: LOAD_VAR             "userName"
+1287: PUSH_STRING         
+1288: CONCAT              
+1289: PUSH_STRING          ""User Name: {userName}""
+1290: INTERPOLATE_STRING  
+1291: PRINT               
+1292: PUSH_STRING         
+1293: LOAD_VAR             "userAge"
+1294: PUSH_STRING         
+1295: CONCAT              
+1296: PUSH_STRING          ""User Age: {userAge}""
+1297: INTERPOLATE_STRING  
+1298: PRINT               
+1299: PUSH_STRING         
+1300: LOAD_VAR             "userScore"
+1301: PUSH_STRING         
+1302: CONCAT              
+1303: PUSH_STRING          ""User Score: {userScore}""
+1304: INTERPOLATE_STRING  
+1305: PRINT               
+1306: PUSH_STRING         
+1307: LOAD_VAR             "isUserActive"
+1308: PUSH_STRING         
+1309: CONCAT              
+1310: PUSH_STRING          ""Is Active: {isUserActive}""
+1311: INTERPOLATE_STRING  
+1312: PRINT               
+1313: PUSH_STRING          ""\n=== 12. TYPE SYSTEM - UNION TYPES ===""
+1314: PRINT               
+1315: PUSH_STRING          ""hello""
+1316: STORE_VAR            "value1"
+1317: PUSH_INT             42
+1318: STORE_VAR            "value2"
+1319: PUSH_STRING          ""Union types:""
+1320: PRINT               
+1321: PUSH_STRING         
+1322: LOAD_VAR             "value1"
+1323: PUSH_STRING         
+1324: CONCAT              
+1325: PUSH_STRING          ""String value: {value1}""
+1326: INTERPOLATE_STRING  
+1327: PRINT               
+1328: PUSH_STRING         
+1329: LOAD_VAR             "value2"
+1330: PUSH_STRING         
+1331: CONCAT              
+1332: PUSH_STRING          ""Int value: {value2}""
+1333: INTERPOLATE_STRING  
+1334: PRINT               
+1335: PUSH_STRING          ""\n=== 13. TYPE SYSTEM - OPTION TYPES ===""
+1336: PRINT               
+1337: LOAD_VAR             "Some"
+1338: STORE_VAR            "someValue"
+1339: BEGIN_SCOPE         
+1340: LOAD_VAR             "kind"
+1341: POP                 
+1342: PUSH_NULL           
+1343: POP                 
+1344: PUSH_STRING          ""Some""
+1345: POP                 
+1346: PUSH_NULL           
+1347: POP                 
+1348: LOAD_VAR             "value"
+1349: POP                 
+1350: PUSH_NULL           
+1351: POP                 
+1352: PUSH_INT             42
+1353: POP                 
+1354: END_SCOPE           
+1355: PUSH_NULL           
+1356: POP                 
+1357: LOAD_VAR             "None"
+1358: STORE_VAR            "noneValue"
+1359: BEGIN_SCOPE         
+1360: LOAD_VAR             "kind"
+1361: POP                 
+1362: PUSH_NULL           
+1363: POP                 
+1364: PUSH_STRING          ""None""
+1365: POP                 
+1366: END_SCOPE           
+1367: PUSH_NULL           
+1368: POP                 
+1369: PUSH_STRING          ""Option types:""
+1370: PRINT               
+1371: PUSH_STRING         
+1372: LOAD_VAR             "someValue"
+1373: PUSH_STRING         
+1374: CONCAT              
+1375: PUSH_STRING          ""Some value: {someValue}""
+1376: INTERPOLATE_STRING  
+1377: PRINT               
+1378: PUSH_STRING         
+1379: LOAD_VAR             "noneValue"
+1380: PUSH_STRING         
+1381: CONCAT              
+1382: PUSH_STRING          ""None value: {noneValue}""
+1383: INTERPOLATE_STRING  
+1384: PRINT               
+1385: PUSH_STRING          ""\n=== 14. ERROR HANDLING - WORKING ===""
+1386: PRINT               
+1387: BEGIN_FUNCTION       "divide"
+1388: DEFINE_PARAM        
+1389: DEFINE_PARAM        
+1390: BEGIN_SCOPE         
+1391: LOAD_VAR             "b"
+1392: PUSH_INT             0
+1393: EQUAL               
+1394: JUMP_IF_FALSE        5
+1395: BEGIN_SCOPE         
+1396: CONSTRUCT_ERROR     
+1397: RETURN              
+1398: END_SCOPE           
+1399: JUMP                 0
+1400: LOAD_VAR             "a"
+1401: LOAD_VAR             "b"
+1402: DIVIDE              
+1403: CONSTRUCT_OK        
+1404: RETURN              
+1405: END_SCOPE           
+1406: PUSH_NULL           
+1407: RETURN              
+1408: END_FUNCTION        
+1409: PUSH_FUNCTION       
+1410: STORE_VAR            "divide"
+1411: BEGIN_FUNCTION       "safeDivide"
+1412: DEFINE_PARAM        
+1413: DEFINE_PARAM        
+1414: BEGIN_SCOPE         
+1415: LOAD_VAR             "x"
+1416: LOAD_VAR             "y"
+1417: CALL                 "divide"
+1418: CHECK_ERROR         
+1419: JUMP_IF_FALSE        1
+1420: PROPAGATE_ERROR     
+1421: UNWRAP_VALUE        
+1422: STORE_VAR            "result"
+1423: LOAD_VAR             "result"
+1424: CONSTRUCT_OK        
+1425: RETURN              
+1426: END_SCOPE           
+1427: PUSH_NULL           
+1428: RETURN              
+1429: END_FUNCTION        
+1430: PUSH_FUNCTION       
+1431: STORE_VAR            "safeDivide"
+1432: PUSH_STRING          ""Testing error handling:""
+1433: PRINT               
+1434: PUSH_INT             10
+1435: PUSH_INT             2
+1436: CALL                 "divide"
+1437: STORE_VAR            "successResult"
+1438: PUSH_STRING         
+1439: LOAD_VAR             "successResult"
+1440: PUSH_STRING         
+1441: CONCAT              
+1442: PUSH_STRING          ""divide(10, 2) = {successResult}""
+1443: INTERPOLATE_STRING  
 1444: PRINT               
-1445: BEGIN_CLASS          "Person"
-1446: BEGIN_FUNCTION       "init"
-1447: DEFINE_PARAM        
-1448: DEFINE_PARAM        
-1449: BEGIN_SCOPE         
-1450: LOAD_THIS           
-1451: LOAD_VAR             "name"
-1452: SET_PROPERTY         "name"
-1453: POP                 
-1454: LOAD_THIS           
-1455: LOAD_VAR             "age"
-1456: SET_PROPERTY         "age"
-1457: POP                 
-1458: END_SCOPE           
-1459: PUSH_NULL           
-1460: RETURN              
-1461: END_FUNCTION        
-1462: PUSH_FUNCTION       
-1463: STORE_VAR            "init"
-1464: BEGIN_FUNCTION       "greet"
-1465: BEGIN_SCOPE         
-1466: PUSH_STRING         
-1467: LOAD_THIS           
-1468: GET_PROPERTY         "name"
-1469: PUSH_STRING         
-1470: CONCAT              
-1471: LOAD_THIS           
-1472: GET_PROPERTY         "age"
-1473: PUSH_STRING         
-1474: CONCAT              
-1475: PUSH_STRING          " years old"
-1476: INTERPOLATE_STRING  
-1477: PRINT               
-1478: END_SCOPE           
-1479: PUSH_NULL           
-1480: RETURN              
-1481: END_FUNCTION        
-1482: PUSH_FUNCTION       
-1483: STORE_VAR            "greet"
-1484: BEGIN_FUNCTION       "birthday"
-1485: BEGIN_SCOPE         
-1486: LOAD_THIS           
-1487: PUSH_INT             1
-1488: SET_PROPERTY         "age"
-1489: POP                 
-1490: PUSH_STRING         
-1491: LOAD_THIS           
-1492: GET_PROPERTY         "name"
-1493: PUSH_STRING         
-1494: CONCAT              
-1495: LOAD_THIS           
-1496: GET_PROPERTY         "age"
-1497: PUSH_STRING         
-1498: CONCAT              
-1499: PUSH_STRING          " years old"
-1500: INTERPOLATE_STRING  
-1501: PRINT               
-1502: END_SCOPE           
-1503: PUSH_NULL           
-1504: RETURN              
-1505: END_FUNCTION        
-1506: PUSH_FUNCTION       
-1507: STORE_VAR            "birthday"
-1508: END_CLASS           
-1509: PUSH_STRING          "Class syntax defined (VM implementation in progress)"
-1510: PRINT               
-1511: PUSH_STRING          "
-=== 16. MODULES - BASIC SYNTAX ==="
-1512: PRINT               
-1513: PUSH_STRING          "Module syntax defined (import/export working)"
-1514: PRINT               
-1515: PUSH_STRING          "
-=== 17. CONCURRENCY - BASIC SYNTAX ==="
-1516: PRINT               
-1517: PUSH_STRING          "Concurrency syntax defined (VM implementation pending)"
-1518: PRINT               
-1519: PUSH_STRING          "
-=== 18. PATTERN MATCHING - BASIC SYNTAX ==="
-1520: PRINT               
-1521: PUSH_STRING          "Pattern matching syntax defined (VM implementation pending)"
-1522: PRINT               
-1523: PUSH_STRING          "
-=== COMPREHENSIVE TEST SUMMARY ==="
-1524: PRINT               
-1525: PUSH_STRING          "✅ Literals and variables"
-1526: PRINT               
-1527: PUSH_STRING          "✅ Expressions and operators"
-1528: PRINT               
-1529: PUSH_STRING          "✅ String interpolation"
-1530: PRINT               
-1531: PUSH_STRING          "✅ Control flow (if/else)"
-1532: PRINT               
-1533: PUSH_STRING          "✅ Loops (for, iter, while)"
-1534: PRINT               
-1535: PUSH_STRING          "✅ Functions (basic, optional params, default params)"
+1445: PUSH_INT             10
+1446: PUSH_INT             0
+1447: CALL                 "divide"
+1448: STORE_VAR            "errorResult"
+1449: PUSH_STRING         
+1450: LOAD_VAR             "errorResult"
+1451: PUSH_STRING         
+1452: CONCAT              
+1453: PUSH_STRING          ""divide(10, 0) = {errorResult}""
+1454: INTERPOLATE_STRING  
+1455: PRINT               
+1456: PUSH_INT             15
+1457: PUSH_INT             3
+1458: CALL                 "safeDivide"
+1459: STORE_VAR            "propagatedResult"
+1460: PUSH_STRING         
+1461: LOAD_VAR             "propagatedResult"
+1462: PUSH_STRING         
+1463: CONCAT              
+1464: PUSH_STRING          ""safeDivide(15, 3) = {propagatedResult}""
+1465: INTERPOLATE_STRING  
+1466: PRINT               
+1467: PUSH_STRING          ""Error handling working with ? operator and error propagation""
+1468: PRINT               
+1469: PUSH_STRING          ""\n=== 15. CLASSES - BASIC SYNTAX ===""
+1470: PRINT               
+1471: BEGIN_CLASS          "Person"
+1472: BEGIN_FUNCTION       "init"
+1473: DEFINE_PARAM        
+1474: DEFINE_PARAM        
+1475: BEGIN_SCOPE         
+1476: LOAD_THIS           
+1477: LOAD_VAR             "name"
+1478: SET_PROPERTY         "name"
+1479: POP                 
+1480: LOAD_THIS           
+1481: LOAD_VAR             "age"
+1482: SET_PROPERTY         "age"
+1483: POP                 
+1484: END_SCOPE           
+1485: PUSH_NULL           
+1486: RETURN              
+1487: END_FUNCTION        
+1488: PUSH_FUNCTION       
+1489: STORE_VAR            "init"
+1490: BEGIN_FUNCTION       "greet"
+1491: BEGIN_SCOPE         
+1492: PUSH_STRING         
+1493: LOAD_THIS           
+1494: GET_PROPERTY         "name"
+1495: PUSH_STRING         
+1496: CONCAT              
+1497: LOAD_THIS           
+1498: GET_PROPERTY         "age"
+1499: PUSH_STRING         
+1500: CONCAT              
+1501: PUSH_STRING          ""Hello, I'm {self.name} and I'm {self.age} years old""
+1502: INTERPOLATE_STRING  
+1503: PRINT               
+1504: END_SCOPE           
+1505: PUSH_NULL           
+1506: RETURN              
+1507: END_FUNCTION        
+1508: PUSH_FUNCTION       
+1509: STORE_VAR            "greet"
+1510: BEGIN_FUNCTION       "birthday"
+1511: BEGIN_SCOPE         
+1512: LOAD_THIS           
+1513: PUSH_INT             1
+1514: SET_PROPERTY         "age"
+1515: POP                 
+1516: PUSH_STRING         
+1517: LOAD_THIS           
+1518: GET_PROPERTY         "name"
+1519: PUSH_STRING         
+1520: CONCAT              
+1521: LOAD_THIS           
+1522: GET_PROPERTY         "age"
+1523: PUSH_STRING         
+1524: CONCAT              
+1525: PUSH_STRING          ""{self.name} is now {self.age} years old""
+1526: INTERPOLATE_STRING  
+1527: PRINT               
+1528: END_SCOPE           
+1529: PUSH_NULL           
+1530: RETURN              
+1531: END_FUNCTION        
+1532: PUSH_FUNCTION       
+1533: STORE_VAR            "birthday"
+1534: END_CLASS           
+1535: PUSH_STRING          ""Class syntax defined (VM implementation in progress)""
 1536: PRINT               
-1537: PUSH_STRING          "✅ Type system (aliases, unions, options)"
+1537: PUSH_STRING          ""\n=== 16. MODULES - BASIC SYNTAX ===""
 1538: PRINT               
-1539: PUSH_STRING          "✅ Error handling (? operator, error propagation working)"
+1539: PUSH_STRING          ""Module syntax defined (import/export working)""
 1540: PRINT               
-1541: PUSH_STRING          "🔄 Classes (syntax complete, VM in progress)"
+1541: PUSH_STRING          ""\n=== 17. CONCURRENCY - BASIC SYNTAX ===""
 1542: PRINT               
-1543: PUSH_STRING          "✅ Modules (import/export working)"
+1543: PUSH_STRING          ""Concurrency syntax defined (VM implementation pending)""
 1544: PRINT               
-1545: PUSH_STRING          "🔄 Concurrency (syntax complete, VM pending)"
+1545: PUSH_STRING          ""\n=== 18. PATTERN MATCHING - BASIC SYNTAX ===""
 1546: PRINT               
-1547: PUSH_STRING          "🔄 Pattern matching (match expressions - VM pending)"
+1547: PUSH_STRING          ""Pattern matching syntax defined (VM implementation pending)""
 1548: PRINT               
-1549: PUSH_STRING          "
-=== TEST COMPLETE ==="
+1549: PUSH_STRING          ""\n=== COMPREHENSIVE TEST SUMMARY ===""
 1550: PRINT               
-1551: HALT                
+1551: PUSH_STRING          ""✅ Literals and variables""
+1552: PRINT               
+1553: PUSH_STRING          ""✅ Expressions and operators""
+1554: PRINT               
+1555: PUSH_STRING          ""✅ String interpolation""
+1556: PRINT               
+1557: PUSH_STRING          ""✅ Control flow (if/else)""
+1558: PRINT               
+1559: PUSH_STRING          ""✅ Loops (for, iter, while)""
+1560: PRINT               
+1561: PUSH_STRING          ""✅ Functions (basic, optional params, default params)""
+1562: PRINT               
+1563: PUSH_STRING          ""✅ Type system (aliases, unions, options)""
+1564: PRINT               
+1565: PUSH_STRING          ""✅ Error handling (? operator, error propagation working)""
+1566: PRINT               
+1567: PUSH_STRING          ""🔄 Classes (syntax complete, VM in progress)""
+1568: PRINT               
+1569: PUSH_STRING          ""✅ Modules (import/export working)""
+1570: PRINT               
+1571: PUSH_STRING          ""🔄 Concurrency (syntax complete, VM pending)""
+1572: PRINT               
+1573: PUSH_STRING          ""🔄 Pattern matching (match expressions - VM pending)""
+1574: PRINT               
+1575: PUSH_STRING          ""\n=== TEST COMPLETE ===""
+1576: PRINT               
+1577: HALT                
 

@@ -190,7 +190,24 @@ struct Token {
     const std::vector<Token>& getTrailingTrivia() const { return trailingTrivia; }
     
     // Method to reconstruct original source text with trivia
-    std::string reconstructSource() const;
+    std::string reconstructSource() const {
+        std::string result;
+        
+        // Add leading trivia
+        for (const auto& trivia : leadingTrivia) {
+            result += trivia.lexeme;
+        }
+        
+        // Add the token itself
+        result += lexeme;
+        
+        // Add trailing trivia
+        for (const auto& trivia : trailingTrivia) {
+            result += trivia.lexeme;
+        }
+        
+        return result;
+    }
 };
 
 // Scan mode enumeration for backward compatibility

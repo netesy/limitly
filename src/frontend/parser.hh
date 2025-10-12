@@ -10,18 +10,30 @@
 #include <stack>
 #include "scanner.hh"
 #include "ast.hh"
+#include "cst.hh"
 #include "../error/error_message.hh"
 
-// Frontend parser class - responsible for parsing tokens into AST
+// CST parser class - responsible for parsing tokens into AST (copied from legacy parser)
 class Parser {
 public:
-    Parser(Scanner &scanner) : scanner(scanner), current(0) {}
+    Parser(Scanner &scanner, bool cstMode = true) : scanner(scanner), current(0), cstMode(cstMode) {}
 
     std::shared_ptr<AST::Program> parse();
+    
+    // Public accessor for testing
+    bool isCSTMode() const { return cstMode; }
+    size_t getCSTNodeCount() const { return cstNodeCount; }
+    size_t getTriviaAttachmentCount() const { return triviaAttachmentCount; }
 
 private:
     Scanner &scanner;
     size_t current;
+    bool cstMode; // CST mode flag - default true for CST mode
+    
+    // Statistics for testing
+    mutable size_t cstNodeCount = 0;
+    mutable size_t triviaAttachmentCount = 0;
+    CSTConfig config; // CST configuration
     bool in_concurrent_block = false;
     
     // Block context tracking for enhanced error messages
@@ -48,6 +60,32 @@ public:
         return errorExpr;
     };
 
+    // Unified node creation helper - creates CST::Node or AST::Node based on cstMode
+    template<typename ASTNodeType>
+    auto createNode() -> std::conditional_t<std::is_same_v<ASTNodeType, AST::Program>, 
+                                           std::shared_ptr<AST::Program>,
+                                           std::shared_ptr<ASTNodeType>>;
+    
+    // AST to CST NodeKind mapping
+    CST::NodeKind mapASTNodeKind(const std::string& astNodeType);
+    
+    // Token consumption with trivia tracking
+    Token consumeWithTrivia(TokenType type, const std::string &message);
+    Token advanceWithTrivia();
+    
+    // Trivia attachment helpers
+    void attachTriviaFromToken(const Token& token);
+    void attachTriviaFromTokens(const std::vector<Token>& tokens);
+    
+    // Current node being built (for trivia attachment in CST mode)
+    std::variant<std::shared_ptr<AST::Node>, std::unique_ptr<CST::Node>> currentNode;
+    
+    // CST root node (when in CST mode)
+    std::unique_ptr<CST::Node> cstRoot;
+    
+    // Method to get the CST root (for printing/analysis)
+    const CST::Node* getCST() const { return cstRoot.get(); }
+
     // Helper methods
     Token peek();
     Token previous();
@@ -59,6 +97,7 @@ public:
     void synchronize();
     void error(const std::string &message, bool suppressException = false);
     std::vector<Token> collectAnnotations();
+    void skipTrivia(); // Skip trivia tokens in CST mode
     
     // Block context tracking methods
     void pushBlockContext(const std::string& blockType, const Token& startToken);
@@ -153,4 +192,4 @@ public:
 };
 
 
-#endif // PARSER_H
+#endif // CST_PARSER_H

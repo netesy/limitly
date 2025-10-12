@@ -1,18 +1,16 @@
-AST for C:\Projects\limitly\tests\comprehensive_language_test.lm
-Parser: New CSTParser (cst_parser.cpp)
-Mode: CST with AST compatibility
-Note: CST nodes were created internally with trivia preservation
-      AST output shown below for compatibility testing
+AST for tests/comprehensive_language_test.lm
+Parser: Legacy Parser (parser.cpp)
+Mode: Legacy AST only
 ========================================
 
 AST Dump:
 ==========
 PrintStatement:
-  Literal: "=== COMPREHENSIVE LANGUAGE FEATURE TEST ==="
+  Literal: "\"=== COMPREHENSIVE LANGUAGE FEATURE TEST ===\""
 PrintStatement:
-  Literal: "\n=== 1. LITERALS AND VARIABLES ==="
+  Literal: "\"\\n=== 1. LITERALS AND VARIABLES ===\""
 PrintStatement:
-  Literal: "Integers:"
+  Literal: "\"Integers:\""
 PrintStatement:
   Literal: 0
 PrintStatement:
@@ -24,7 +22,7 @@ PrintStatement:
 PrintStatement:
   Literal: 999999
 PrintStatement:
-  Literal: "Floats:"
+  Literal: "\"Floats:\""
 PrintStatement:
   Literal: 
 PrintStatement:
@@ -34,21 +32,21 @@ PrintStatement:
     Operand:
       Literal: 2.71828
 PrintStatement:
-  Literal: "Strings:"
+  Literal: "\"Strings:\""
 PrintStatement:
-  Literal: "Hello, World!"
+  Literal: "\"Hello, World!\""
 PrintStatement:
-  Literal: "\""
+  Literal: "\"\""
 PrintStatement:
-  Literal: "Special chars: \n\t\\\""
+  Literal: "\"Special chars: \\n\\t\\\\\\\"\""
 PrintStatement:
-  Literal: "Booleans:"
+  Literal: "\"Booleans:\""
 PrintStatement:
   Literal: true
 PrintStatement:
   Literal: false
 PrintStatement:
-  Literal: "Null:"
+  Literal: "\"Null:\""
 PrintStatement:
   Literal: nil
 VarDeclaration: x
@@ -59,36 +57,36 @@ VarDeclaration: y
     Literal: 3.14
 VarDeclaration: name
   Initializer:
-    Literal: "Limit"
+    Literal: "\"Limit\""
 VarDeclaration: isActive
   Initializer:
     Literal: true
 PrintStatement:
-  Literal: "Variables:"
+  Literal: "\"Variables:\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: x
-    String: "\"Integer: {x}"
+    String: "\"Integer: {x}\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: y
-    String: "\"Float: {y}"
+    String: "\"Float: {y}\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: name
-    String: "\"String: {name}"
+    String: "\"String: {name}\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: isActive
-    String: "\"Boolean: {isActive}"
+    String: "\"Boolean: {isActive}\""
 ExpressionStatement:
   Assignment: =
     Target: x
@@ -103,40 +101,40 @@ ExpressionStatement:
   Assignment: =
     Target: name
     Value:
-    Literal: "Language"
+    Literal: "\"Language\""
 ExpressionStatement:
   Assignment: =
     Target: isActive
     Value:
     Literal: false
 PrintStatement:
-  Literal: "After reassignment:"
+  Literal: "\"After reassignment:\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: x
-    String: "\"Integer: {x}"
+    String: "\"Integer: {x}\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: y
-    String: "\"Float: {y}"
+    String: "\"Float: {y}\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: name
-    String: "\"String: {name}"
+    String: "\"String: {name}\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: isActive
-    String: "\"Boolean: {isActive}"
+    String: "\"Boolean: {isActive}\""
 PrintStatement:
-  Literal: "\n=== 2. EXPRESSIONS AND OPERATORS ==="
+  Literal: "\"\\n=== 2. EXPRESSIONS AND OPERATORS ===\""
 VarDeclaration: a
   Initializer:
     Literal: 10
@@ -144,7 +142,7 @@ VarDeclaration: b
   Initializer:
     Literal: 3
 PrintStatement:
-  Literal: "Arithmetic:"
+  Literal: "\"Arithmetic:\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -159,7 +157,7 @@ PrintStatement:
         Operator: +
         Right:
           Variable: b
-    String: "\"Addition: {a} + {b} = {a + b}"
+    String: "\"Addition: {a} + {b} = {a + b}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -174,7 +172,7 @@ PrintStatement:
         Operator: -
         Right:
           Variable: b
-    String: "\"Subtraction: {a} - {b} = {a - b}"
+    String: "\"Subtraction: {a} - {b} = {a - b}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -189,7 +187,7 @@ PrintStatement:
         Operator: *
         Right:
           Variable: b
-    String: "\"Multiplication: {a} * {b} = {a * b}"
+    String: "\"Multiplication: {a} * {b} = {a * b}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -204,7 +202,7 @@ PrintStatement:
         Operator: /
         Right:
           Variable: b
-    String: "\"Division: {a} / {b} = {a / b}"
+    String: "\"Division: {a} / {b} = {a / b}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -219,9 +217,9 @@ PrintStatement:
         Operator: %
         Right:
           Variable: b
-    String: "\"Modulo: {a} % {b} = {a % b}"
+    String: "\"Modulo: {a} % {b} = {a % b}\""
 PrintStatement:
-  Literal: "Unary:"
+  Literal: "\"Unary:\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -231,7 +229,7 @@ PrintStatement:
       UnaryExpression: -
         Operand:
           Variable: a
-    String: "\"Negation: -{a} = {-a}"
+    String: "\"Negation: -{a} = {-a}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -241,9 +239,9 @@ PrintStatement:
       UnaryExpression: +
         Operand:
           Variable: a
-    String: "\"Positive: +{a} = {+a}"
+    String: "\"Positive: +{a} = {+a}\""
 PrintStatement:
-  Literal: "Comparison:"
+  Literal: "\"Comparison:\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -258,7 +256,7 @@ PrintStatement:
         Operator: ==
         Right:
           Variable: b
-    String: "\"{a} == {b}: {a == b}"
+    String: "\"{a} == {b}: {a == b}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -273,7 +271,7 @@ PrintStatement:
         Operator: !=
         Right:
           Variable: b
-    String: "\"{a} != {b}: {a != b}"
+    String: "\"{a} != {b}: {a != b}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -288,7 +286,7 @@ PrintStatement:
         Operator: <
         Right:
           Variable: b
-    String: "\"{a} < {b}: {a < b}"
+    String: "\"{a} < {b}: {a < b}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -303,7 +301,7 @@ PrintStatement:
         Operator: >
         Right:
           Variable: b
-    String: "\"{a} > {b}: {a > b}"
+    String: "\"{a} > {b}: {a > b}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -318,7 +316,7 @@ PrintStatement:
         Operator: <=
         Right:
           Variable: b
-    String: "\"{a} <= {b}: {a <= b}"
+    String: "\"{a} <= {b}: {a <= b}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -333,7 +331,7 @@ PrintStatement:
         Operator: >=
         Right:
           Variable: b
-    String: "\"{a} >= {b}: {a >= b}"
+    String: "\"{a} >= {b}: {a >= b}\""
 VarDeclaration: p
   Initializer:
     Literal: true
@@ -341,7 +339,7 @@ VarDeclaration: q
   Initializer:
     Literal: false
 PrintStatement:
-  Literal: "Logical:"
+  Literal: "\"Logical:\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -352,7 +350,7 @@ PrintStatement:
         Operator: and
         Right:
           Variable: q
-    String: "\"p && q: {p and q}"
+    String: "\"p && q: {p and q}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -363,7 +361,7 @@ PrintStatement:
         Operator: <unknown>
         Right:
           Variable: q
-    String: "\"p || q: {p or q}"
+    String: "\"p || q: {p or q}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -371,7 +369,7 @@ PrintStatement:
       UnaryExpression: !
         Operand:
           Variable: p
-    String: "\"!p: {!p}"
+    String: "\"!p: {!p}\""
 VarDeclaration: result
   Initializer:
     BinaryExpression: -
@@ -409,12 +407,12 @@ PrintStatement:
       Variable: b
     Expression:
       Variable: result
-    String: "\"Complex: ({a} + {b}) * 2 - {a} / {b} = {result}"
+    String: "\"Complex: ({a} + {b}) * 2 - {a} / {b} = {result}\""
 PrintStatement:
-  Literal: "\n=== 3. STRING INTERPOLATION ==="
+  Literal: "\"\\n=== 3. STRING INTERPOLATION ===\""
 VarDeclaration: userName
   Initializer:
-    Literal: "Alice"
+    Literal: "\"Alice\""
 VarDeclaration: userAge
   Initializer:
     Literal: 25
@@ -426,19 +424,19 @@ PrintStatement:
     String: ""
     Expression:
       Variable: userName
-    String: "!"
+    String: "\"Hello, {userName}!\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: userAge
-    String: "\"Age: {userAge}"
+    String: "\"Age: {userAge}\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: pi
-    String: "\"Pi: {pi}"
+    String: "\"Pi: {pi}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -449,7 +447,7 @@ PrintStatement:
         Operator: +
         Right:
           Literal: 1
-    String: "\"Next year: {userAge + 1}"
+    String: "\"Next year: {userAge + 1}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -465,7 +463,7 @@ PrintStatement:
         Operator: *
         Right:
           Literal: 2
-    String: "\"Area of circle: {pi * 2 * 2}"
+    String: "\"Area of circle: {pi * 2 * 2}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -473,7 +471,7 @@ PrintStatement:
       Variable: userName
     Expression:
       Variable: userAge
-    String: "\"Name: {userName}, Age: {userAge}"
+    String: "\"Name: {userName}, Age: {userAge}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -481,19 +479,19 @@ PrintStatement:
       Variable: userName
     Expression:
       Variable: userAge
-    String: " years old"
+    String: "\"{userName} is {userAge} years old\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: userName
-    String: " says hello"
+    String: "\"{userName} says hello\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: userAge
-    String: " is the age"
+    String: "\"{userAge} is the age\""
 VarDeclaration: x1
   Initializer:
     Literal: 10
@@ -514,7 +512,7 @@ PrintStatement:
         Operator: +
         Right:
           Variable: y1
-    String: "\"Math: {x1} + {y1} = {x1 + y1}"
+    String: "\"Math: {x1} + {y1} = {x1 + y1}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -529,7 +527,7 @@ PrintStatement:
         Operator: >
         Right:
           Variable: y1
-    String: "\"Comparison: {x1} > {y1} is {x1 > y1}"
+    String: "\"Comparison: {x1} > {y1} is {x1 > y1}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -551,9 +549,9 @@ PrintStatement:
         Operator: -
         Right:
           Literal: 1
-    String: "\"Complex: {(x1 + y1) * 2 - 1}"
+    String: "\"Complex: {(x1 + y1) * 2 - 1}\""
 PrintStatement:
-  Literal: "\n=== 4. CONTROL FLOW - IF/ELSE ==="
+  Literal: "\"\\n=== 4. CONTROL FLOW - IF/ELSE ===\""
 VarDeclaration: score
   Initializer:
     Literal: 85
@@ -568,40 +566,43 @@ IfStatement:
   Then:
     BlockStatement:
       PrintStatement:
-        Literal: "Grade: A"
-  Else:
-    IfStatement:
-      Condition:
-        BinaryExpression: >=
-          Left:
-            Variable: score
-          Operator: >=
-          Right:
-            Literal: 80
-      Then:
-        BlockStatement:
-          PrintStatement:
-            Literal: "Grade: B"
-      Else:
-        IfStatement:
-          Condition:
-            BinaryExpression: >=
-              Left:
-                Variable: score
-              Operator: >=
-              Right:
-                Literal: 70
-          Then:
-            BlockStatement:
-              PrintStatement:
-                Literal: "Grade: C"
-          Else:
-            BlockStatement:
-              PrintStatement:
-                Literal: "Grade: F"
+        Literal: "\"Grade: A\""
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Literal: nil
+    Arguments:
+      BinaryExpression: >=
+        Left:
+          Variable: score
+        Operator: >=
+        Right:
+          Literal: 80
+BlockStatement:
+  PrintStatement:
+    Literal: "\"Grade: B\""
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Literal: nil
+    Arguments:
+      BinaryExpression: >=
+        Left:
+          Variable: score
+        Operator: >=
+        Right:
+          Literal: 70
+BlockStatement:
+  PrintStatement:
+    Literal: "\"Grade: C\""
+ExpressionStatement:
+  Literal: nil
+BlockStatement:
+  PrintStatement:
+    Literal: "\"Grade: F\""
 VarDeclaration: weather
   Initializer:
-    Literal: "sunny"
+    Literal: "\"sunny\""
 VarDeclaration: temperature
   Initializer:
     Literal: 75
@@ -612,7 +613,7 @@ IfStatement:
         Variable: weather
       Operator: ==
       Right:
-        Literal: "sunny"
+        Literal: "\"sunny\""
   Then:
     BlockStatement:
       IfStatement:
@@ -626,19 +627,19 @@ IfStatement:
         Then:
           BlockStatement:
             PrintStatement:
-              Literal: "Perfect day for outdoor activities!"
+              Literal: "\"Perfect day for outdoor activities!\""
         Else:
           BlockStatement:
             PrintStatement:
-              Literal: "Sunny but a bit cold."
+              Literal: "\"Sunny but a bit cold.\""
   Else:
     BlockStatement:
       PrintStatement:
-        Literal: "Not ideal weather."
+        Literal: "\"Not ideal weather.\""
 PrintStatement:
-  Literal: "\n=== 5. LOOPS - FOR LOOPS ==="
+  Literal: "\"\\n=== 5. LOOPS - FOR LOOPS ===\""
 PrintStatement:
-  Literal: "Basic for loop (0 to 4):"
+  Literal: "\"Basic for loop (0 to 4):\""
 ForStatement (traditional):
   Initializer:
     VarDeclaration: i
@@ -663,9 +664,9 @@ ForStatement (traditional):
           String: ""
           Expression:
             Variable: i
-          String: "\"i = {i}"
+          String: "\"i = {i}\""
 PrintStatement:
-  Literal: "For loop with increment 2:"
+  Literal: "\"For loop with increment 2:\""
 ForStatement (traditional):
   Initializer:
     VarDeclaration: j
@@ -690,9 +691,9 @@ ForStatement (traditional):
           String: ""
           Expression:
             Variable: j
-          String: "\"j = {j}"
+          String: "\"j = {j}\""
 PrintStatement:
-  Literal: "Countdown loop:"
+  Literal: "\"Countdown loop:\""
 ForStatement (traditional):
   Initializer:
     VarDeclaration: k
@@ -717,9 +718,9 @@ ForStatement (traditional):
           String: ""
           Expression:
             Variable: k
-          String: "\"k = {k}"
+          String: "\"k = {k}\""
 PrintStatement:
-  Literal: "Nested for loops (2x3 grid):"
+  Literal: "\"Nested for loops (2x3 grid):\""
 ForStatement (traditional):
   Initializer:
     VarDeclaration: row
@@ -765,11 +766,11 @@ ForStatement (traditional):
                   Variable: row
                 Expression:
                   Variable: col
-                String: ")"
+                String: "\"({row}, {col})\""
 PrintStatement:
-  Literal: "\n=== 6. LOOPS - ITER LOOPS ==="
+  Literal: "\"\\n=== 6. LOOPS - ITER LOOPS ===\""
 PrintStatement:
-  Literal: "Basic range (1 to 5):"
+  Literal: "\"Basic range (1 to 5):\""
 IterStatement:
   Variables: i
   Iterable:
@@ -786,9 +787,9 @@ IterStatement:
           String: ""
           Expression:
             Variable: i
-          String: "\"i = {i}"
+          String: "\"i = {i}\""
 PrintStatement:
-  Literal: "Range (0 to 3):"
+  Literal: "\"Range (0 to 3):\""
 IterStatement:
   Variables: x
   Iterable:
@@ -805,9 +806,9 @@ IterStatement:
           String: ""
           Expression:
             Variable: x
-          String: "\"x = {x}"
+          String: "\"x = {x}\""
 PrintStatement:
-  Literal: "Nested iter loops:"
+  Literal: "\"Nested iter loops:\""
 IterStatement:
   Variables: i
   Iterable:
@@ -837,9 +838,9 @@ IterStatement:
                   Variable: i
                 Expression:
                   Variable: j
-                String: ")"
+                String: "\"({i}, {j})\""
 PrintStatement:
-  Literal: "Mixed loops (for outer, iter inner):"
+  Literal: "\"Mixed loops (for outer, iter inner):\""
 ForStatement (traditional):
   Initializer:
     VarDeclaration: i
@@ -877,14 +878,14 @@ ForStatement (traditional):
                   Variable: i
                 Expression:
                   Variable: j
-                String: ")"
+                String: "\"for-iter: ({i}, {j})\""
 PrintStatement:
-  Literal: "\n=== 7. LOOPS - WHILE LOOPS ==="
+  Literal: "\"\\n=== 7. LOOPS - WHILE LOOPS ===\""
 VarDeclaration: count
   Initializer:
     Literal: 0
 PrintStatement:
-  Literal: "While loop (count to 3):"
+  Literal: "\"While loop (count to 3):\""
 WhileStatement:
   Condition:
     BinaryExpression: <
@@ -900,7 +901,7 @@ WhileStatement:
           String: ""
           Expression:
             Variable: count
-          String: "\"count = {count}"
+          String: "\"count = {count}\""
       ExpressionStatement:
         Assignment: +=
           Target: count
@@ -910,7 +911,7 @@ VarDeclaration: num
   Initializer:
     Literal: 1
 PrintStatement:
-  Literal: "Powers of 2 less than 20:"
+  Literal: "\"Powers of 2 less than 20:\""
 WhileStatement:
   Condition:
     BinaryExpression: <
@@ -926,22 +927,22 @@ WhileStatement:
           String: ""
           Expression:
             Variable: num
-          String: "\"num = {num}"
+          String: "\"num = {num}\""
       ExpressionStatement:
         Assignment: *=
           Target: num
           Value:
           Literal: 2
 PrintStatement:
-  Literal: "\n=== 8. FUNCTIONS - BASIC ==="
+  Literal: "\"\\n=== 8. FUNCTIONS - BASIC ===\""
 FunctionDeclaration: sayHello
   ReturnType: nil
   Body:
     BlockStatement:
       PrintStatement:
-        Literal: "Hello from function!"
+        Literal: "\"Hello from function!\""
 PrintStatement:
-  Literal: "Calling simple function:"
+  Literal: "\"Calling simple function:\""
 ExpressionStatement:
   CallExpression:
     Callee:
@@ -962,7 +963,7 @@ FunctionDeclaration: add
             Right:
               Variable: b
 PrintStatement:
-  Literal: "Function with parameters:"
+  Literal: "\"Function with parameters:\""
 VarDeclaration: addResult
   Type: int
   Initializer:
@@ -977,7 +978,7 @@ PrintStatement:
     String: ""
     Expression:
       Variable: addResult
-    String: "\"add(5, 3) = {addResult}"
+    String: "\"add(5, 3) = {addResult}\""
 FunctionDeclaration: square
   Parameters:
     x: int
@@ -993,7 +994,7 @@ FunctionDeclaration: square
             Right:
               Variable: x
 PrintStatement:
-  Literal: "Square function:"
+  Literal: "\"Square function:\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -1003,7 +1004,7 @@ PrintStatement:
           Variable: square
         Arguments:
           Literal: 4
-    String: "\"square(4) = {square(4)}"
+    String: "\"square(4) = {square(4)}\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -1013,7 +1014,7 @@ PrintStatement:
           Variable: square
         Arguments:
           Literal: 7
-    String: "\"square(7) = {square(7)}"
+    String: "\"square(7) = {square(7)}\""
 FunctionDeclaration: greet
   Parameters:
     name: str
@@ -1025,18 +1026,18 @@ FunctionDeclaration: greet
           String: ""
           Expression:
             Variable: name
-          String: "!"
+          String: "\"Hello, {name}!\""
       ReturnStatement:
         Value:
-          Literal: "greeted"
+          Literal: "\"greeted\""
 PrintStatement:
-  Literal: "Function with string parameter:"
+  Literal: "\"Function with string parameter:\""
 ExpressionStatement:
   CallExpression:
     Callee:
       Variable: greet
     Arguments:
-      Literal: "Bob"
+      Literal: "\"Bob\""
 FunctionDeclaration: calculate
   Parameters:
     x: int
@@ -1069,7 +1070,7 @@ FunctionDeclaration: calculate
             Variable: sum
           Expression:
             Variable: product
-          String: "\"Local calculations: sum={sum}, product={product}"
+          String: "\"Local calculations: sum={sum}, product={product}\""
       ReturnStatement:
         Value:
           BinaryExpression: *
@@ -1079,7 +1080,7 @@ FunctionDeclaration: calculate
             Right:
               Variable: product
 PrintStatement:
-  Literal: "Function with locals:"
+  Literal: "\"Function with locals:\""
 VarDeclaration: calcResult
   Type: int
   Initializer:
@@ -1094,7 +1095,7 @@ PrintStatement:
     String: ""
     Expression:
       Variable: calcResult
-    String: "\"Result: {calcResult}"
+    String: "\"Result: {calcResult}\""
 FunctionDeclaration: factorial
   Parameters:
     n: int
@@ -1132,7 +1133,7 @@ FunctionDeclaration: factorial
                     Right:
                       Literal: 1
 PrintStatement:
-  Literal: "Recursive function:"
+  Literal: "\"Recursive function:\""
 PrintStatement:
   InterpolatedString:
     String: ""
@@ -1142,9 +1143,9 @@ PrintStatement:
           Variable: factorial
         Arguments:
           Literal: 5
-    String: "\"factorial(5) = {factorial(5)}"
+    String: "\"factorial(5) = {factorial(5)}\""
 PrintStatement:
-  Literal: "\n=== 9. FUNCTIONS - OPTIONAL PARAMETERS ==="
+  Literal: "\"\\n=== 9. FUNCTIONS - OPTIONAL PARAMETERS ===\""
 FunctionDeclaration: greetOptional
   Parameters:
     name (optional): str?
@@ -1161,29 +1162,29 @@ FunctionDeclaration: greetOptional
                 String: ""
                 Expression:
                   Variable: name
-                String: "!"
+                String: "\"Hello, {name}!\""
             ReturnStatement:
               Value:
                 InterpolatedString:
                   String: ""
                   Expression:
                     Variable: name
-                  String: "\"greeted {name}"
+                  String: "\"greeted {name}\""
         Else:
           BlockStatement:
             PrintStatement:
-              Literal: "Hello, stranger!"
+              Literal: "\"Hello, stranger!\""
             ReturnStatement:
               Value:
-                Literal: "greeted stranger"
+                Literal: "\"greeted stranger\""
 PrintStatement:
-  Literal: "Testing optional parameter:"
+  Literal: "\"Testing optional parameter:\""
 ExpressionStatement:
   CallExpression:
     Callee:
       Variable: greetOptional
     Arguments:
-      Literal: "Charlie"
+      Literal: "\"Charlie\""
 ExpressionStatement:
   CallExpression:
     Callee:
@@ -1201,7 +1202,7 @@ FunctionDeclaration: createUser
           String: ""
           Expression:
             Variable: username
-          String: "\"Creating user: {username}"
+          String: "\"Creating user: {username}\""
       IfStatement:
         Condition:
           Variable: email
@@ -1212,7 +1213,7 @@ FunctionDeclaration: createUser
                 String: ""
                 Expression:
                   Variable: email
-                String: "\"Email: {email}"
+                String: "\"Email: {email}\""
       IfStatement:
         Condition:
           Variable: age
@@ -1223,40 +1224,40 @@ FunctionDeclaration: createUser
                 String: ""
                 Expression:
                   Variable: age
-                String: "\"Age: {age}"
+                String: "\"Age: {age}\""
       ReturnStatement:
         Value:
-          Literal: "user created"
+          Literal: "\"user created\""
 PrintStatement:
-  Literal: "Testing multiple optional parameters:"
+  Literal: "\"Testing multiple optional parameters:\""
 ExpressionStatement:
   CallExpression:
     Callee:
       Variable: createUser
     Arguments:
-      Literal: "alice"
+      Literal: "\"alice\""
 ExpressionStatement:
   CallExpression:
     Callee:
       Variable: createUser
     Arguments:
-      Literal: "bob"
-      Literal: "bob@email.com"
+      Literal: "\"bob\""
+      Literal: "\"bob@email.com\""
 ExpressionStatement:
   CallExpression:
     Callee:
       Variable: createUser
     Arguments:
-      Literal: "charlie"
-      Literal: "charlie@email.com"
+      Literal: "\"charlie\""
+      Literal: "\"charlie@email.com\""
       Literal: 25
 PrintStatement:
-  Literal: "\n=== 10. FUNCTIONS - DEFAULT PARAMETERS ==="
+  Literal: "\"\\n=== 10. FUNCTIONS - DEFAULT PARAMETERS ===\""
 FunctionDeclaration: greetDefault
   Parameters:
     name (optional): str
       Default value:
-      Literal: "World"
+      Literal: "\"World\""
   ReturnType: str
   Body:
     BlockStatement:
@@ -1265,16 +1266,16 @@ FunctionDeclaration: greetDefault
           String: ""
           Expression:
             Variable: name
-          String: "!"
+          String: "\"Hello, {name}!\""
       ReturnStatement:
         Value:
           InterpolatedString:
             String: ""
             Expression:
               Variable: name
-            String: "\"greeted {name}"
+            String: "\"greeted {name}\""
 PrintStatement:
-  Literal: "Testing default parameter:"
+  Literal: "\"Testing default parameter:\""
 ExpressionStatement:
   CallExpression:
     Callee:
@@ -1284,18 +1285,18 @@ ExpressionStatement:
     Callee:
       Variable: greetDefault
     Arguments:
-      Literal: "Dave"
+      Literal: "\"Dave\""
 FunctionDeclaration: createMessage
   Parameters:
     greeting (optional): str
       Default value:
-      Literal: "Hello"
+      Literal: "\"Hello\""
     name (optional): str
       Default value:
-      Literal: "User"
+      Literal: "\"User\""
     punctuation (optional): str
       Default value:
-      Literal: "!"
+      Literal: "\"!\""
   ReturnType: str
   Body:
     BlockStatement:
@@ -1309,14 +1310,14 @@ FunctionDeclaration: createMessage
               Variable: name
             Expression:
               Variable: punctuation
-            String: "\"{greeting}, {name}{punctuation}"
+            String: "\"{greeting}, {name}{punctuation}\""
       PrintStatement:
         Variable: message
       ReturnStatement:
         Value:
           Variable: message
 PrintStatement:
-  Literal: "Testing multiple default parameters:"
+  Literal: "\"Testing multiple default parameters:\""
 ExpressionStatement:
   CallExpression:
     Callee:
@@ -1326,24 +1327,24 @@ ExpressionStatement:
     Callee:
       Variable: createMessage
     Arguments:
-      Literal: "Hi"
+      Literal: "\"Hi\""
 ExpressionStatement:
   CallExpression:
     Callee:
       Variable: createMessage
     Arguments:
-      Literal: "Hey"
-      Literal: "Alice"
+      Literal: "\"Hey\""
+      Literal: "\"Alice\""
 ExpressionStatement:
   CallExpression:
     Callee:
       Variable: createMessage
     Arguments:
-      Literal: "Greetings"
-      Literal: "Bob"
-      Literal: "."
+      Literal: "\"Greetings\""
+      Literal: "\"Bob\""
+      Literal: "\".\""
 PrintStatement:
-  Literal: "\n=== 11. TYPE SYSTEM - TYPE ALIASES ==="
+  Literal: "\"\\n=== 11. TYPE SYSTEM - TYPE ALIASES ===\""
 TypeDeclaration: Id = uint
 TypeDeclaration: Name = str
 TypeDeclaration: Age = int
@@ -1356,7 +1357,7 @@ VarDeclaration: userId
 VarDeclaration: userName
   Type: Name
   Initializer:
-    Literal: "Alice"
+    Literal: "\"Alice\""
 VarDeclaration: userAge
   Type: Age
   Initializer:
@@ -1370,87 +1371,113 @@ VarDeclaration: isUserActive
   Initializer:
     Literal: true
 PrintStatement:
-  Literal: "Type aliases:"
+  Literal: "\"Type aliases:\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: userId
-    String: "\"User ID: {userId}"
+    String: "\"User ID: {userId}\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: userName
-    String: "\"User Name: {userName}"
+    String: "\"User Name: {userName}\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: userAge
-    String: "\"User Age: {userAge}"
+    String: "\"User Age: {userAge}\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: userScore
-    String: "\"User Score: {userScore}"
+    String: "\"User Score: {userScore}\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: isUserActive
-    String: "\"Is Active: {isUserActive}"
+    String: "\"Is Active: {isUserActive}\""
 PrintStatement:
-  Literal: "\n=== 12. TYPE SYSTEM - UNION TYPES ==="
+  Literal: "\"\\n=== 12. TYPE SYSTEM - UNION TYPES ===\""
 TypeDeclaration: StringOrInt = str | int
 VarDeclaration: value1
   Type: StringOrInt
   Initializer:
-    Literal: "hello"
+    Literal: "\"hello\""
 VarDeclaration: value2
   Type: StringOrInt
   Initializer:
     Literal: 42
 PrintStatement:
-  Literal: "Union types:"
+  Literal: "\"Union types:\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: value1
-    String: "\"String value: {value1}"
+    String: "\"String value: {value1}\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: value2
-    String: "\"Int value: {value2}"
+    String: "\"Int value: {value2}\""
 PrintStatement:
-  Literal: "\n=== 13. TYPE SYSTEM - OPTION TYPES ==="
+  Literal: "\"\\n=== 13. TYPE SYSTEM - OPTION TYPES ===\""
 TypeDeclaration: IntOption = Some | None
 VarDeclaration: someValue
   Initializer:
-    Unknown node type
+    Variable: Some
+BlockStatement:
+  ExpressionStatement:
+    Variable: kind
+  ExpressionStatement:
+    Literal: nil
+  ExpressionStatement:
+    Literal: "\"Some\""
+  ExpressionStatement:
+    Literal: nil
+  ExpressionStatement:
+    Variable: value
+  ExpressionStatement:
+    Literal: nil
+  ExpressionStatement:
+    Literal: 42
+ExpressionStatement:
+  Literal: nil
 VarDeclaration: noneValue
   Initializer:
-    Unknown node type
+    Variable: None
+BlockStatement:
+  ExpressionStatement:
+    Variable: kind
+  ExpressionStatement:
+    Literal: nil
+  ExpressionStatement:
+    Literal: "\"None\""
+ExpressionStatement:
+  Literal: nil
 PrintStatement:
-  Literal: "Option types:"
+  Literal: "\"Option types:\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: someValue
-    String: "\"Some value: {someValue}"
+    String: "\"Some value: {someValue}\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: noneValue
-    String: "\"None value: {noneValue}"
+    String: "\"None value: {noneValue}\""
 PrintStatement:
-  Literal: "\n=== 14. ERROR HANDLING - WORKING ==="
+  Literal: "\"\\n=== 14. ERROR HANDLING - WORKING ===\""
 FunctionDeclaration: divide
   Parameters:
     a: int
@@ -1504,7 +1531,7 @@ FunctionDeclaration: safeDivide
             Value:
               Variable: result
 PrintStatement:
-  Literal: "Testing error handling:"
+  Literal: "\"Testing error handling:\""
 VarDeclaration: successResult
   Initializer:
     CallExpression:
@@ -1518,7 +1545,7 @@ PrintStatement:
     String: ""
     Expression:
       Variable: successResult
-    String: "\"divide(10, 2) = {successResult}"
+    String: "\"divide(10, 2) = {successResult}\""
 VarDeclaration: errorResult
   Initializer:
     CallExpression:
@@ -1532,7 +1559,7 @@ PrintStatement:
     String: ""
     Expression:
       Variable: errorResult
-    String: "\"divide(10, 0) = {errorResult}"
+    String: "\"divide(10, 0) = {errorResult}\""
 VarDeclaration: propagatedResult
   Initializer:
     CallExpression:
@@ -1546,11 +1573,11 @@ PrintStatement:
     String: ""
     Expression:
       Variable: propagatedResult
-    String: "\"safeDivide(15, 3) = {propagatedResult}"
+    String: "\"safeDivide(15, 3) = {propagatedResult}\""
 PrintStatement:
-  Literal: "Error handling working with ? operator and error propagation"
+  Literal: "\"Error handling working with ? operator and error propagation\""
 PrintStatement:
-  Literal: "\n=== 15. CLASSES - BASIC SYNTAX ==="
+  Literal: "\"\\n=== 15. CLASSES - BASIC SYNTAX ===\""
 ClassDeclaration: Person
   Methods:
     FunctionDeclaration: init
@@ -1587,7 +1614,7 @@ ClassDeclaration: Person
                 MemberExpression: .age
                   Object:
                     This
-              String: " years old"
+              String: "\"Hello, I'm {self.name} and I'm {self.age} years old\""
     FunctionDeclaration: birthday
       Body:
         BlockStatement:
@@ -1609,46 +1636,46 @@ ClassDeclaration: Person
                 MemberExpression: .age
                   Object:
                     This
-              String: " years old"
+              String: "\"{self.name} is now {self.age} years old\""
 PrintStatement:
-  Literal: "Class syntax defined (VM implementation in progress)"
+  Literal: "\"Class syntax defined (VM implementation in progress)\""
 PrintStatement:
-  Literal: "\n=== 16. MODULES - BASIC SYNTAX ==="
+  Literal: "\"\\n=== 16. MODULES - BASIC SYNTAX ===\""
 PrintStatement:
-  Literal: "Module syntax defined (import/export working)"
+  Literal: "\"Module syntax defined (import/export working)\""
 PrintStatement:
-  Literal: "\n=== 17. CONCURRENCY - BASIC SYNTAX ==="
+  Literal: "\"\\n=== 17. CONCURRENCY - BASIC SYNTAX ===\""
 PrintStatement:
-  Literal: "Concurrency syntax defined (VM implementation pending)"
+  Literal: "\"Concurrency syntax defined (VM implementation pending)\""
 PrintStatement:
-  Literal: "\n=== 18. PATTERN MATCHING - BASIC SYNTAX ==="
+  Literal: "\"\\n=== 18. PATTERN MATCHING - BASIC SYNTAX ===\""
 PrintStatement:
-  Literal: "Pattern matching syntax defined (VM implementation pending)"
+  Literal: "\"Pattern matching syntax defined (VM implementation pending)\""
 PrintStatement:
-  Literal: "\n=== COMPREHENSIVE TEST SUMMARY ==="
+  Literal: "\"\\n=== COMPREHENSIVE TEST SUMMARY ===\""
 PrintStatement:
-  Literal: "✅ Literals and variables"
+  Literal: "\"✅ Literals and variables\""
 PrintStatement:
-  Literal: "✅ Expressions and operators"
+  Literal: "\"✅ Expressions and operators\""
 PrintStatement:
-  Literal: "✅ String interpolation"
+  Literal: "\"✅ String interpolation\""
 PrintStatement:
-  Literal: "✅ Control flow (if/else)"
+  Literal: "\"✅ Control flow (if/else)\""
 PrintStatement:
-  Literal: "✅ Loops (for, iter, while)"
+  Literal: "\"✅ Loops (for, iter, while)\""
 PrintStatement:
-  Literal: "✅ Functions (basic, optional params, default params)"
+  Literal: "\"✅ Functions (basic, optional params, default params)\""
 PrintStatement:
-  Literal: "✅ Type system (aliases, unions, options)"
+  Literal: "\"✅ Type system (aliases, unions, options)\""
 PrintStatement:
-  Literal: "✅ Error handling (? operator, error propagation working)"
+  Literal: "\"✅ Error handling (? operator, error propagation working)\""
 PrintStatement:
-  Literal: "🔄 Classes (syntax complete, VM in progress)"
+  Literal: "\"🔄 Classes (syntax complete, VM in progress)\""
 PrintStatement:
-  Literal: "✅ Modules (import/export working)"
+  Literal: "\"✅ Modules (import/export working)\""
 PrintStatement:
-  Literal: "🔄 Concurrency (syntax complete, VM pending)"
+  Literal: "\"🔄 Concurrency (syntax complete, VM pending)\""
 PrintStatement:
-  Literal: "🔄 Pattern matching (match expressions - VM pending)"
+  Literal: "\"🔄 Pattern matching (match expressions - VM pending)\""
 PrintStatement:
-  Literal: "\n=== TEST COMPLETE ==="
+  Literal: "\"\\n=== TEST COMPLETE ===\""

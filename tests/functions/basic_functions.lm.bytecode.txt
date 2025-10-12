@@ -1,11 +1,11 @@
-Bytecode for C:\Projects\limitly\tests\functions\basic_functions.lm
+Bytecode for tests/functions/basic_functions.lm
 Parser: New CSTParser
 ========================================
 
 === Bytecode ===
 Generated 539 instructions
 
-   0: PUSH_STRING          "=== Basic Function Tests ==="
+   0: PUSH_STRING          ""=== Basic Function Tests ===""
    1: PRINT               
    2: BEGIN_FUNCTION       "add"
    3: DEFINE_PARAM        
@@ -21,7 +21,7 @@ Generated 539 instructions
   13: END_FUNCTION        
   14: PUSH_FUNCTION       
   15: STORE_VAR            "add"
-  16: PUSH_STRING          "Function with parameters:"
+  16: PUSH_STRING          ""Function with parameters:""
   17: PRINT               
   18: PUSH_INT             5
   19: PUSH_INT             3
@@ -31,7 +31,7 @@ Generated 539 instructions
   23: LOAD_VAR             "result"
   24: PUSH_STRING         
   25: CONCAT              
-  26: PUSH_STRING          ""add(5, 3) = {result}"
+  26: PUSH_STRING          ""add(5, 3) = {result}""
   27: INTERPOLATE_STRING  
   28: PRINT               
   29: BEGIN_FUNCTION       "square"
@@ -47,14 +47,14 @@ Generated 539 instructions
   39: END_FUNCTION        
   40: PUSH_FUNCTION       
   41: STORE_VAR            "square"
-  42: PUSH_STRING          "Square function:"
+  42: PUSH_STRING          ""Square function:""
   43: PRINT               
   44: PUSH_STRING         
   45: PUSH_INT             4
   46: CALL                 "square"
   47: PUSH_STRING         
   48: CONCAT              
-  49: PUSH_STRING          ""square(4) = {square(4)}"
+  49: PUSH_STRING          ""square(4) = {square(4)}""
   50: INTERPOLATE_STRING  
   51: PRINT               
   52: PUSH_STRING         
@@ -62,7 +62,7 @@ Generated 539 instructions
   54: CALL                 "square"
   55: PUSH_STRING         
   56: CONCAT              
-  57: PUSH_STRING          ""square(7) = {square(7)}"
+  57: PUSH_STRING          ""square(7) = {square(7)}""
   58: INTERPOLATE_STRING  
   59: PRINT               
   60: BEGIN_FUNCTION       "greet_name"
@@ -72,10 +72,10 @@ Generated 539 instructions
   64: LOAD_VAR             "name"
   65: PUSH_STRING         
   66: CONCAT              
-  67: PUSH_STRING          "!"
+  67: PUSH_STRING          ""Hello, {name}!""
   68: INTERPOLATE_STRING  
   69: PRINT               
-  70: PUSH_STRING          "greeted"
+  70: PUSH_STRING          ""greeted""
   71: RETURN              
   72: END_SCOPE           
   73: PUSH_NULL           
@@ -83,9 +83,9 @@ Generated 539 instructions
   75: END_FUNCTION        
   76: PUSH_FUNCTION       
   77: STORE_VAR            "greet_name"
-  78: PUSH_STRING          "Function with string parameter:"
+  78: PUSH_STRING          ""Function with string parameter:""
   79: PRINT               
-  80: PUSH_STRING          "Alice"
+  80: PUSH_STRING          ""Alice""
   81: CALL                 "greet_name"
   82: POP                 
   83: BEGIN_FUNCTION       "calculate"
@@ -107,7 +107,7 @@ Generated 539 instructions
   99: LOAD_VAR             "product"
  100: PUSH_STRING         
  101: CONCAT              
- 102: PUSH_STRING          ""Local calculations: sum={sum}, product={product}"
+ 102: PUSH_STRING          ""Local calculations: sum={sum}, product={product}""
  103: INTERPOLATE_STRING  
  104: PRINT               
  105: LOAD_VAR             "sum"
@@ -120,7 +120,7 @@ Generated 539 instructions
  112: END_FUNCTION        
  113: PUSH_FUNCTION       
  114: STORE_VAR            "calculate"
- 115: PUSH_STRING          "Function with locals:"
+ 115: PUSH_STRING          ""Function with locals:""
  116: PRINT               
  117: PUSH_INT             3
  118: PUSH_INT             4
@@ -130,7 +130,7 @@ Generated 539 instructions
  122: LOAD_VAR             "calc_result"
  123: PUSH_STRING         
  124: CONCAT              
- 125: PUSH_STRING          ""Result: {calc_result}"
+ 125: PUSH_STRING          ""Result: {calc_result}""
  126: INTERPOLATE_STRING  
  127: PRINT               
  128: BEGIN_FUNCTION       "factorial_main"
@@ -158,14 +158,14 @@ Generated 539 instructions
  150: END_FUNCTION        
  151: PUSH_FUNCTION       
  152: STORE_VAR            "factorial_main"
- 153: PUSH_STRING          "Recursive function:"
+ 153: PUSH_STRING          ""Recursive function:""
  154: PRINT               
  155: PUSH_STRING         
  156: PUSH_INT             5
  157: CALL                 "factorial_main"
  158: PUSH_STRING         
  159: CONCAT              
- 160: PUSH_STRING          ""factorial(5) = {factorial_main(5)}"
+ 160: PUSH_STRING          ""factorial(5) = {factorial_main(5)}""
  161: INTERPOLATE_STRING  
  162: PRINT               
  163: BEGIN_FUNCTION       "subtract"
@@ -300,7 +300,7 @@ Generated 539 instructions
  292: END_FUNCTION        
  293: PUSH_FUNCTION       
  294: STORE_VAR            "is_prime"
- 295: PUSH_STRING          "Additional function tests:"
+ 295: PUSH_STRING          ""Additional function tests:""
  296: PRINT               
  297: PUSH_STRING         
  298: PUSH_INT             10
@@ -308,7 +308,7 @@ Generated 539 instructions
  300: CALL                 "subtract"
  301: PUSH_STRING         
  302: CONCAT              
- 303: PUSH_STRING          ""subtract(10, 3) = {subtract(10, 3)}"
+ 303: PUSH_STRING          ""subtract(10, 3) = {subtract(10, 3)}""
  304: INTERPOLATE_STRING  
  305: PRINT               
  306: PUSH_STRING         
@@ -316,7 +316,7 @@ Generated 539 instructions
  308: CALL                 "factorial"
  309: PUSH_STRING         
  310: CONCAT              
- 311: PUSH_STRING          ""factorial(4) = {factorial(4)}"
+ 311: PUSH_STRING          ""factorial(4) = {factorial(4)}""
  312: INTERPOLATE_STRING  
  313: PRINT               
  314: PUSH_STRING         
@@ -324,7 +324,7 @@ Generated 539 instructions
  316: CALL                 "is_even"
  317: PUSH_STRING         
  318: CONCAT              
- 319: PUSH_STRING          ""is_even(6) = {is_even(6)}"
+ 319: PUSH_STRING          ""is_even(6) = {is_even(6)}""
  320: INTERPOLATE_STRING  
  321: PRINT               
  322: PUSH_STRING         
@@ -332,7 +332,7 @@ Generated 539 instructions
  324: CALL                 "is_odd"
  325: PUSH_STRING         
  326: CONCAT              
- 327: PUSH_STRING          ""is_odd(7) = {is_odd(7)}"
+ 327: PUSH_STRING          ""is_odd(7) = {is_odd(7)}""
  328: INTERPOLATE_STRING  
  329: PRINT               
  330: PUSH_STRING         
@@ -340,10 +340,10 @@ Generated 539 instructions
  332: CALL                 "is_prime"
  333: PUSH_STRING         
  334: CONCAT              
- 335: PUSH_STRING          ""is_prime(17) = {is_prime(17)}"
+ 335: PUSH_STRING          ""is_prime(17) = {is_prime(17)}""
  336: INTERPOLATE_STRING  
  337: PRINT               
- 338: PUSH_STRING          "=== Optional Parameter Tests ==="
+ 338: PUSH_STRING          ""=== Optional Parameter Tests ===""
  339: PRINT               
  340: BEGIN_FUNCTION       "greet_optional"
  341: DEFINE_OPTIONAL_PARAM
@@ -355,22 +355,22 @@ Generated 539 instructions
  347: LOAD_VAR             "name"
  348: PUSH_STRING         
  349: CONCAT              
- 350: PUSH_STRING          "!"
+ 350: PUSH_STRING          ""Hello, {name}!""
  351: INTERPOLATE_STRING  
  352: PRINT               
  353: PUSH_STRING         
  354: LOAD_VAR             "name"
  355: PUSH_STRING         
  356: CONCAT              
- 357: PUSH_STRING          ""greeted {name}"
+ 357: PUSH_STRING          ""greeted {name}""
  358: INTERPOLATE_STRING  
  359: RETURN              
  360: END_SCOPE           
  361: JUMP                 6
  362: BEGIN_SCOPE         
- 363: PUSH_STRING          "Hello, stranger!"
+ 363: PUSH_STRING          ""Hello, stranger!""
  364: PRINT               
- 365: PUSH_STRING          "greeted stranger"
+ 365: PUSH_STRING          ""greeted stranger""
  366: RETURN              
  367: END_SCOPE           
  368: END_SCOPE           
@@ -379,9 +379,9 @@ Generated 539 instructions
  371: END_FUNCTION        
  372: PUSH_FUNCTION       
  373: STORE_VAR            "greet_optional"
- 374: PUSH_STRING          "Testing optional parameter:"
+ 374: PUSH_STRING          ""Testing optional parameter:""
  375: PRINT               
- 376: PUSH_STRING          "Bob"
+ 376: PUSH_STRING          ""Bob""
  377: CALL                 "greet_optional"
  378: POP                 
  379: CALL                 "greet_optional"
@@ -395,7 +395,7 @@ Generated 539 instructions
  387: LOAD_VAR             "username"
  388: PUSH_STRING         
  389: CONCAT              
- 390: PUSH_STRING          ""Creating user: {username}"
+ 390: PUSH_STRING          ""Creating user: {username}""
  391: INTERPOLATE_STRING  
  392: PRINT               
  393: LOAD_VAR             "email"
@@ -405,7 +405,7 @@ Generated 539 instructions
  397: LOAD_VAR             "email"
  398: PUSH_STRING         
  399: CONCAT              
- 400: PUSH_STRING          ""Email: {email}"
+ 400: PUSH_STRING          ""Email: {email}""
  401: INTERPOLATE_STRING  
  402: PRINT               
  403: END_SCOPE           
@@ -417,12 +417,12 @@ Generated 539 instructions
  409: LOAD_VAR             "age"
  410: PUSH_STRING         
  411: CONCAT              
- 412: PUSH_STRING          ""Age: {age}"
+ 412: PUSH_STRING          ""Age: {age}""
  413: INTERPOLATE_STRING  
  414: PRINT               
  415: END_SCOPE           
  416: JUMP                 0
- 417: PUSH_STRING          "user created"
+ 417: PUSH_STRING          ""user created""
  418: RETURN              
  419: END_SCOPE           
  420: PUSH_NULL           
@@ -430,17 +430,17 @@ Generated 539 instructions
  422: END_FUNCTION        
  423: PUSH_FUNCTION       
  424: STORE_VAR            "create_user"
- 425: PUSH_STRING          "Testing multiple optional parameters:"
+ 425: PUSH_STRING          ""Testing multiple optional parameters:""
  426: PRINT               
- 427: PUSH_STRING          "alice"
+ 427: PUSH_STRING          ""alice""
  428: CALL                 "create_user"
  429: POP                 
- 430: PUSH_STRING          "bob"
- 431: PUSH_STRING          "bob@email.com"
+ 430: PUSH_STRING          ""bob""
+ 431: PUSH_STRING          ""bob@email.com""
  432: CALL                 "create_user"
  433: POP                 
- 434: PUSH_STRING          "charlie"
- 435: PUSH_STRING          "charlie@email.com"
+ 434: PUSH_STRING          ""charlie""
+ 435: PUSH_STRING          ""charlie@email.com""
  436: PUSH_INT             25
  437: CALL                 "create_user"
  438: POP                 
@@ -490,14 +490,14 @@ Generated 539 instructions
  482: END_FUNCTION        
  483: PUSH_FUNCTION       
  484: STORE_VAR            "power"
- 485: PUSH_STRING          "Testing optional math parameter:"
+ 485: PUSH_STRING          ""Testing optional math parameter:""
  486: PRINT               
  487: PUSH_STRING         
  488: PUSH_INT             3
  489: CALL                 "power"
  490: PUSH_STRING         
  491: CONCAT              
- 492: PUSH_STRING          ""power(3) = {power(3)}"
+ 492: PUSH_STRING          ""power(3) = {power(3)}""
  493: INTERPOLATE_STRING  
  494: PRINT               
  495: PUSH_STRING         
@@ -506,28 +506,28 @@ Generated 539 instructions
  498: CALL                 "power"
  499: PUSH_STRING         
  500: CONCAT              
- 501: PUSH_STRING          ""power(3, 4) = {power(3, 4)}"
+ 501: PUSH_STRING          ""power(3, 4) = {power(3, 4)}""
  502: INTERPOLATE_STRING  
  503: PRINT               
- 504: PUSH_STRING          "=== Default Parameter Tests ==="
+ 504: PUSH_STRING          ""=== Default Parameter Tests ===""
  505: PRINT               
  506: BEGIN_FUNCTION       "greet_default"
  507: DEFINE_OPTIONAL_PARAM
- 508: PUSH_STRING          "World"
+ 508: PUSH_STRING          ""World""
  509: SET_DEFAULT_VALUE   
  510: BEGIN_SCOPE         
  511: PUSH_STRING         
  512: LOAD_VAR             "name"
  513: PUSH_STRING         
  514: CONCAT              
- 515: PUSH_STRING          "!"
+ 515: PUSH_STRING          ""Hello, {name}!""
  516: INTERPOLATE_STRING  
  517: PRINT               
  518: PUSH_STRING         
  519: LOAD_VAR             "name"
  520: PUSH_STRING         
  521: CONCAT              
- 522: PUSH_STRING          ""greeted {name}"
+ 522: PUSH_STRING          ""greeted {name}""
  523: INTERPOLATE_STRING  
  524: RETURN              
  525: END_SCOPE           
@@ -536,11 +536,11 @@ Generated 539 instructions
  528: END_FUNCTION        
  529: PUSH_FUNCTION       
  530: STORE_VAR            "greet_default"
- 531: PUSH_STRING          "Testing default parameter:"
+ 531: PUSH_STRING          ""Testing default parameter:""
  532: PRINT               
  533: CALL                 "greet_default"
  534: POP                 
- 535: PUSH_STRING          "Alice"
+ 535: PUSH_STRING          ""Alice""
  536: CALL                 "greet_default"
  537: POP                 
  538: HALT                
