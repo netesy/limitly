@@ -1,17 +1,17 @@
-Bytecode for C:\Projects\limitly\tests\basic\variables.lm
-Parser: New CSTParser
+Bytecode for tests/basic/variables.lm
+Parser: New Unified Parser (Legacy mode)
 ========================================
 
 === Bytecode ===
 Generated 104 instructions
 
-   0: PUSH_STRING          "=== Variable Declaration Tests ==="
+   0: PUSH_STRING          ""=== Variable Declaration Tests ===""
    1: PRINT               
    2: PUSH_INT             42
    3: STORE_VAR            "x"
    4: PUSH_FLOAT           3.14
    5: STORE_VAR            "y"
-   6: PUSH_STRING          "Limit"
+   6: PUSH_STRING          ""Limit""
    7: STORE_VAR            "name"
    8: PUSH_BOOL            true
    9: STORE_VAR            "isActive"
@@ -19,28 +19,28 @@ Generated 104 instructions
   11: LOAD_VAR             "x"
   12: PUSH_STRING         
   13: CONCAT              
-  14: PUSH_STRING          ""Integer: {x}"
+  14: PUSH_STRING          ""Integer: {x}""
   15: INTERPOLATE_STRING  
   16: PRINT               
   17: PUSH_STRING         
   18: LOAD_VAR             "y"
   19: PUSH_STRING         
   20: CONCAT              
-  21: PUSH_STRING          ""Float: {y}"
+  21: PUSH_STRING          ""Float: {y}""
   22: INTERPOLATE_STRING  
   23: PRINT               
   24: PUSH_STRING         
   25: LOAD_VAR             "name"
   26: PUSH_STRING         
   27: CONCAT              
-  28: PUSH_STRING          ""String: {name}"
+  28: PUSH_STRING          ""String: {name}""
   29: INTERPOLATE_STRING  
   30: PRINT               
   31: PUSH_STRING         
   32: LOAD_VAR             "isActive"
   33: PUSH_STRING         
   34: CONCAT              
-  35: PUSH_STRING          ""Boolean: {isActive}"
+  35: PUSH_STRING          ""Boolean: {isActive}""
   36: INTERPOLATE_STRING  
   37: PRINT               
   38: PUSH_INT             100
@@ -51,7 +51,7 @@ Generated 104 instructions
   43: DUP                 
   44: STORE_VAR            "y"
   45: POP                 
-  46: PUSH_STRING          "Language"
+  46: PUSH_STRING          ""Language""
   47: DUP                 
   48: STORE_VAR            "name"
   49: POP                 
@@ -59,34 +59,34 @@ Generated 104 instructions
   51: DUP                 
   52: STORE_VAR            "isActive"
   53: POP                 
-  54: PUSH_STRING          "After reassignment:"
+  54: PUSH_STRING          ""After reassignment:""
   55: PRINT               
   56: PUSH_STRING         
   57: LOAD_VAR             "x"
   58: PUSH_STRING         
   59: CONCAT              
-  60: PUSH_STRING          ""Integer: {x}"
+  60: PUSH_STRING          ""Integer: {x}""
   61: INTERPOLATE_STRING  
   62: PRINT               
   63: PUSH_STRING         
   64: LOAD_VAR             "y"
   65: PUSH_STRING         
   66: CONCAT              
-  67: PUSH_STRING          ""Float: {y}"
+  67: PUSH_STRING          ""Float: {y}""
   68: INTERPOLATE_STRING  
   69: PRINT               
   70: PUSH_STRING         
   71: LOAD_VAR             "name"
   72: PUSH_STRING         
   73: CONCAT              
-  74: PUSH_STRING          ""String: {name}"
+  74: PUSH_STRING          ""String: {name}""
   75: INTERPOLATE_STRING  
   76: PRINT               
   77: PUSH_STRING         
   78: LOAD_VAR             "isActive"
   79: PUSH_STRING         
   80: CONCAT              
-  81: PUSH_STRING          ""Boolean: {isActive}"
+  81: PUSH_STRING          ""Boolean: {isActive}""
   82: INTERPOLATE_STRING  
   83: PRINT               
   84: PUSH_INT             1
@@ -105,7 +105,7 @@ Generated 104 instructions
   97: LOAD_VAR             "c"
   98: PUSH_STRING         
   99: CONCAT              
- 100: PUSH_STRING          ""Multiple declarations: a={a}, b={b}, c={c}"
+ 100: PUSH_STRING          ""Multiple declarations: a={a}, b={b}, c={c}""
  101: INTERPOLATE_STRING  
  102: PRINT               
  103: HALT                

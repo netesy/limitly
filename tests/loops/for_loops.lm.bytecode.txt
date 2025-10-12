@@ -1,13 +1,13 @@
-Bytecode for C:\Projects\limitly\tests\loops\for_loops.lm
+Bytecode for tests/loops/for_loops.lm
 Parser: New CSTParser
 ========================================
 
 === Bytecode ===
 Generated 209 instructions
 
-   0: PUSH_STRING          "=== For Loop Tests ==="
+   0: PUSH_STRING          ""=== For Loop Tests ===""
    1: PRINT               
-   2: PUSH_STRING          "Basic for loop (0 to 4):"
+   2: PUSH_STRING          ""Basic for loop (0 to 4):""
    3: PRINT               
    4: BEGIN_SCOPE         
    5: PUSH_INT             0
@@ -29,13 +29,13 @@ Generated 209 instructions
   21: LOAD_VAR             "i"
   22: PUSH_STRING         
   23: CONCAT              
-  24: PUSH_STRING          ""i = {i}"
+  24: PUSH_STRING          ""i = {i}""
   25: INTERPOLATE_STRING  
   26: PRINT               
   27: END_SCOPE           
   28: JUMP                 -17
   29: END_SCOPE           
-  30: PUSH_STRING          "For loop with increment 2:"
+  30: PUSH_STRING          ""For loop with increment 2:""
   31: PRINT               
   32: BEGIN_SCOPE         
   33: PUSH_INT             0
@@ -57,13 +57,13 @@ Generated 209 instructions
   49: LOAD_VAR             "j"
   50: PUSH_STRING         
   51: CONCAT              
-  52: PUSH_STRING          ""j = {j}"
+  52: PUSH_STRING          ""j = {j}""
   53: INTERPOLATE_STRING  
   54: PRINT               
   55: END_SCOPE           
   56: JUMP                 -17
   57: END_SCOPE           
-  58: PUSH_STRING          "Countdown loop:"
+  58: PUSH_STRING          ""Countdown loop:""
   59: PRINT               
   60: BEGIN_SCOPE         
   61: PUSH_INT             5
@@ -85,13 +85,13 @@ Generated 209 instructions
   77: LOAD_VAR             "k"
   78: PUSH_STRING         
   79: CONCAT              
-  80: PUSH_STRING          ""k = {k}"
+  80: PUSH_STRING          ""k = {k}""
   81: INTERPOLATE_STRING  
   82: PRINT               
   83: END_SCOPE           
   84: JUMP                 -17
   85: END_SCOPE           
-  86: PUSH_STRING          "Complex condition:"
+  86: PUSH_STRING          ""Complex condition:""
   87: PRINT               
   88: BEGIN_SCOPE         
   89: PUSH_INT             1
@@ -120,13 +120,13 @@ Generated 209 instructions
  112: MULTIPLY            
  113: PUSH_STRING         
  114: CONCAT              
- 115: PUSH_STRING          ""x = {x}, x² = {x * x}"
+ 115: PUSH_STRING          ""x = {x}, x² = {x * x}""
  116: INTERPOLATE_STRING  
  117: PRINT               
  118: END_SCOPE           
  119: JUMP                 -22
  120: END_SCOPE           
- 121: PUSH_STRING          "Nested for loops (2x3 grid):"
+ 121: PUSH_STRING          ""Nested for loops (2x3 grid):""
  122: PRINT               
  123: BEGIN_SCOPE         
  124: PUSH_INT             0
@@ -167,7 +167,7 @@ Generated 209 instructions
  159: LOAD_VAR             "col"
  160: PUSH_STRING         
  161: CONCAT              
- 162: PUSH_STRING          ")"
+ 162: PUSH_STRING          ""({row}, {col})""
  163: INTERPOLATE_STRING  
  164: PRINT               
  165: END_SCOPE           
@@ -176,7 +176,7 @@ Generated 209 instructions
  168: END_SCOPE           
  169: JUMP                 -39
  170: END_SCOPE           
- 171: PUSH_STRING          "Variable scope test:"
+ 171: PUSH_STRING          ""Variable scope test:""
  172: PRINT               
  173: PUSH_INT             100
  174: STORE_VAR            "outer"
@@ -207,7 +207,7 @@ Generated 209 instructions
  199: LOAD_VAR             "inner"
  200: PUSH_STRING         
  201: CONCAT              
- 202: PUSH_STRING          ""outer: {outer}, inner: {inner}"
+ 202: PUSH_STRING          ""outer: {outer}, inner: {inner}""
  203: INTERPOLATE_STRING  
  204: PRINT               
  205: END_SCOPE           

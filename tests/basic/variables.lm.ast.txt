@@ -1,14 +1,12 @@
-AST for C:\Projects\limitly\tests\basic\variables.lm
-Parser: New CSTParser (cst_parser.cpp)
-Mode: CST with AST compatibility
-Note: CST nodes were created internally with trivia preservation
-      AST output shown below for compatibility testing
+AST for tests/basic/variables.lm
+Parser: New Unified Parser (Legacy mode)
+Mode: Legacy AST only
 ========================================
 
 AST Dump:
 ==========
 PrintStatement:
-  Literal: "=== Variable Declaration Tests ==="
+  Literal: "\"=== Variable Declaration Tests ===\""
 VarDeclaration: x
   Initializer:
     Literal: 42
@@ -17,7 +15,7 @@ VarDeclaration: y
     Literal: 3.14
 VarDeclaration: name
   Initializer:
-    Literal: "Limit"
+    Literal: "\"Limit\""
 VarDeclaration: isActive
   Initializer:
     Literal: true
@@ -26,25 +24,25 @@ PrintStatement:
     String: ""
     Expression:
       Variable: x
-    String: "\"Integer: {x}"
+    String: "\"Integer: {x}\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: y
-    String: "\"Float: {y}"
+    String: "\"Float: {y}\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: name
-    String: "\"String: {name}"
+    String: "\"String: {name}\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: isActive
-    String: "\"Boolean: {isActive}"
+    String: "\"Boolean: {isActive}\""
 ExpressionStatement:
   Assignment: =
     Target: x
@@ -59,38 +57,38 @@ ExpressionStatement:
   Assignment: =
     Target: name
     Value:
-    Literal: "Language"
+    Literal: "\"Language\""
 ExpressionStatement:
   Assignment: =
     Target: isActive
     Value:
     Literal: false
 PrintStatement:
-  Literal: "After reassignment:"
+  Literal: "\"After reassignment:\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: x
-    String: "\"Integer: {x}"
+    String: "\"Integer: {x}\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: y
-    String: "\"Float: {y}"
+    String: "\"Float: {y}\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: name
-    String: "\"String: {name}"
+    String: "\"String: {name}\""
 PrintStatement:
   InterpolatedString:
     String: ""
     Expression:
       Variable: isActive
-    String: "\"Boolean: {isActive}"
+    String: "\"Boolean: {isActive}\""
 VarDeclaration: a
   Initializer:
     Literal: 1
@@ -109,4 +107,4 @@ PrintStatement:
       Variable: b
     Expression:
       Variable: c
-    String: "\"Multiple declarations: a={a}, b={b}, c={c}"
+    String: "\"Multiple declarations: a={a}, b={b}, c={c}\""

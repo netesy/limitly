@@ -1,4 +1,4 @@
-AST for C:\Projects\limitly\tests\loops\for_loops.lm
+AST for tests/loops/for_loops.lm
 Parser: New CSTParser (cst_parser.cpp)
 Mode: CST with AST compatibility
 Note: CST nodes were created internally with trivia preservation
@@ -8,9 +8,9 @@ Note: CST nodes were created internally with trivia preservation
 AST Dump:
 ==========
 PrintStatement:
-  Literal: "=== For Loop Tests ==="
+  Literal: "\"=== For Loop Tests ===\""
 PrintStatement:
-  Literal: "Basic for loop (0 to 4):"
+  Literal: "\"Basic for loop (0 to 4):\""
 ForStatement (traditional):
   Initializer:
     VarDeclaration: i
@@ -35,9 +35,9 @@ ForStatement (traditional):
           String: ""
           Expression:
             Variable: i
-          String: "\"i = {i}"
+          String: "\"i = {i}\""
 PrintStatement:
-  Literal: "For loop with increment 2:"
+  Literal: "\"For loop with increment 2:\""
 ForStatement (traditional):
   Initializer:
     VarDeclaration: j
@@ -62,9 +62,9 @@ ForStatement (traditional):
           String: ""
           Expression:
             Variable: j
-          String: "\"j = {j}"
+          String: "\"j = {j}\""
 PrintStatement:
-  Literal: "Countdown loop:"
+  Literal: "\"Countdown loop:\""
 ForStatement (traditional):
   Initializer:
     VarDeclaration: k
@@ -89,9 +89,9 @@ ForStatement (traditional):
           String: ""
           Expression:
             Variable: k
-          String: "\"k = {k}"
+          String: "\"k = {k}\""
 PrintStatement:
-  Literal: "Complex condition:"
+  Literal: "\"Complex condition:\""
 ForStatement (traditional):
   Initializer:
     VarDeclaration: x
@@ -128,9 +128,9 @@ ForStatement (traditional):
               Operator: *
               Right:
                 Variable: x
-          String: "\"x = {x}, x² = {x * x}"
+          String: "\"x = {x}, x² = {x * x}\""
 PrintStatement:
-  Literal: "Nested for loops (2x3 grid):"
+  Literal: "\"Nested for loops (2x3 grid):\""
 ForStatement (traditional):
   Initializer:
     VarDeclaration: row
@@ -176,9 +176,9 @@ ForStatement (traditional):
                   Variable: row
                 Expression:
                   Variable: col
-                String: ")"
+                String: "\"({row}, {col})\""
 PrintStatement:
-  Literal: "Variable scope test:"
+  Literal: "\"Variable scope test:\""
 VarDeclaration: outer
   Initializer:
     Literal: 100
@@ -216,4 +216,4 @@ ForStatement (traditional):
             Variable: outer
           Expression:
             Variable: inner
-          String: "\"outer: {outer}, inner: {inner}"
+          String: "\"outer: {outer}, inner: {inner}\""

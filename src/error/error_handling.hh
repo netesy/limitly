@@ -37,9 +37,9 @@
 #include <optional>
 
 // Forward declarations to avoid circular dependencies
+// Forward declarations
 class Scanner;
 class Token;
-enum class TokenType;
 enum class InterpretationStage;
 
 namespace ErrorHandling {

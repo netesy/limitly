@@ -29,6 +29,7 @@ echo Compiling main executable...
     src\main.cpp ^
     src\frontend\scanner.cpp ^
     src\frontend\parser.cpp ^
+    src\frontend\cst.cpp ^
     src\backend\backend.cpp ^
     src\backend\vm.cpp ^
     src\backend\ast_printer.cpp ^
@@ -65,7 +66,6 @@ echo Compiling test parser...
     src\test_parser.cpp ^
     src\frontend\scanner.cpp ^
     src\frontend\parser.cpp ^
-    src\frontend\cst_parser.cpp ^
     src\frontend\cst.cpp ^
     src\frontend\cst_printer.cpp ^
     src\frontend\cst_utils.cpp ^
@@ -92,24 +92,6 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
-:: Compile code formatter (optional)
-if exist "format_code.cpp" (
-    echo Compiling code formatter...
-    "%MSYS2_PATH%\mingw64\bin\g++.exe" -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -o bin\format_code.exe ^
-        src\format_code.cpp ^
-        src\frontend\scanner.cpp ^
-        src\frontend\parser.cpp ^
-        src\backend\code_formatter.cpp ^
-        bin\debugger.o ^
-        -I. -static-libgcc -static-libstdc++
-    
-    if %ERRORLEVEL% EQU 0 (
-        echo Code formatter compiled successfully.
-    ) else (
-        echo Warning: Failed to compile code formatter.
-    )
-)
-
 :: Clean up object file
 del bin\debugger.o
 
@@ -121,7 +103,6 @@ echo.
 echo Available executables:
 echo   bin\limitly.exe      - Main language interpreter
 echo   bin\test_parser.exe  - Parser testing utility
-if exist "bin\format_code.exe" echo   bin\format_code.exe  - Code formatter
 @REM echo.
 @REM echo Note: embedding targets are intentionally disabled from this build.
 @REM echo Use the generator and tools in `tools/` to produce embedded interpreters.

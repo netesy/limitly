@@ -1,0 +1,4 @@
+/* Outer comment
+   /* Nested comment */
+   More outer */
+var x = 42; // Final comment

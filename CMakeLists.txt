@@ -61,7 +61,7 @@ add_executable(limitly
 add_executable(test_parser
     src/test_parser.cpp
     src/frontend/scanner.cpp
-    src/frontend/cst_parser.cpp
+    src/frontend/parser.cpp
     src/frontend/cst.cpp
     src/frontend/ast_builder.cpp
     src/backend/ast_printer.cpp
@@ -106,7 +106,84 @@ add_executable(test_scanner
     src/frontend/lexer.cpp
 )
 
+# Add benchmark executables
+add_executable(benchmark_parsers
+    src/benchmark_parsers.cpp
+    src/frontend/parser_benchmark.cpp
+    src/frontend/scanner.cpp
+    src/frontend/parser.cpp
+    # cst_parser.cpp functionality now integrated into parser.cpp
+    src/frontend/cst.cpp
+    src/frontend/ast_builder.cpp
+    src/backend/ast_printer.cpp
+    src/backend/bytecode_printer.cpp
+    src/backend/vm.cpp
+    src/backend/value.cpp
+    src/backend/function.cpp
+    src/backend/instruction.cpp
+    src/backend/opcodes.cpp
+    src/backend/type_system.cpp
+    src/backend/type_checker.cpp
+    src/backend/scope.cpp
+    src/backend/compiler.cpp
+    src/backend/constant_pool.cpp
+    src/backend/interpreter.cpp
+    src/backend/module.cpp
+    src/backend/imports.cpp
+    src/backend/stack_trace.cpp
+    src/backend/error_handling.cpp
+    src/backend/debugger.cpp
+    src/backend/debugger_ui.cpp
+    src/common/builtin_functions.cpp
+    src/common/debugger.cpp
+    src/error/error_handling.cpp
+    src/error/error_formatter.cpp
+    src/error/contextual_hint_provider.cpp
+    src/frontend/ast.cpp
+    src/frontend/lexer.cpp
+)
+
+# Add performance optimization test executable
+add_executable(test_performance_optimization
+    src/test_performance_optimization.cpp
+    src/frontend/parser_benchmark.cpp
+    src/frontend/trivia_optimizer.cpp
+    src/frontend/scanner.cpp
+    src/frontend/parser.cpp
+    # cst_parser.cpp functionality now integrated into parser.cpp
+    src/frontend/cst.cpp
+    src/frontend/ast_builder.cpp
+    src/backend/ast_printer.cpp
+    src/backend/bytecode_printer.cpp
+    src/backend/vm.cpp
+    src/backend/value.cpp
+    src/backend/function.cpp
+    src/backend/instruction.cpp
+    src/backend/opcodes.cpp
+    src/backend/type_system.cpp
+    src/backend/type_checker.cpp
+    src/backend/scope.cpp
+    src/backend/compiler.cpp
+    src/backend/constant_pool.cpp
+    src/backend/interpreter.cpp
+    src/backend/module.cpp
+    src/backend/imports.cpp
+    src/backend/stack_trace.cpp
+    src/backend/error_handling.cpp
+    src/backend/debugger.cpp
+    src/backend/debugger_ui.cpp
+    src/common/builtin_functions.cpp
+    src/common/debugger.cpp
+    src/error/error_handling.cpp
+    src/error/error_formatter.cpp
+    src/error/contextual_hint_provider.cpp
+    src/frontend/ast.cpp
+    src/frontend/lexer.cpp
+)
+
 # Link libraries
 target_link_libraries(limitly PRIVATE Threads::Threads)
 target_link_libraries(test_parser PRIVATE Threads::Threads)
 target_link_libraries(test_scanner PRIVATE Threads::Threads)
+target_link_libraries(benchmark_parsers PRIVATE Threads::Threads)
+target_link_libraries(test_performance_optimization PRIVATE Threads::Threads)

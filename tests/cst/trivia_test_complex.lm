@@ -1,0 +1,26 @@
+/*
+ * Complex trivia test file
+ * Tests nested comments, mixed whitespace, and various patterns
+ */
+
+// Function with complex trivia patterns
+fn calculate(   a: int,    b: int   ): int {
+    // Local variable with mixed whitespace
+    var   result  :  int  =  a  +  b  ;   // calculation
+    
+    /* Multi-line comment with
+       various indentation levels
+         and nested structure */
+    
+    if (result > 0) {  // positive check
+        return result;
+    } else {
+        // negative or zero
+        return 0;
+    }
+}
+
+// String interpolation with trivia
+var message: str = "Result is {calculate(10, 20)}";  // function call in string
+
+/* Final comment block */

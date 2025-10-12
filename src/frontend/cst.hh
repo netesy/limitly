@@ -214,6 +214,7 @@ namespace CST {
             : Node(NodeKind::WHITESPACE_NODE, ws.start, ws.end), whitespace(ws) {}
         
         std::string getText() const { return whitespace.lexeme; }
+        std::string reconstructSource() const { return whitespace.lexeme; }
     };
 
     // Specialized node for comment preservation
@@ -247,13 +248,13 @@ namespace CST {
     class ErrorNode : public Node {
     public:
         std::vector<Token> skippedTokens;  // Tokens skipped during recovery
-        TokenType expectedToken;           // What was expected
-        TokenType actualToken;             // What was found
+        std::string expectedTokenName;     // What was expected (as string)
+        std::string actualTokenName;       // What was found (as string)
         
         ErrorNode(const std::string& message, size_t start = 0, size_t end = 0)
             : Node(NodeKind::ERROR_NODE, start, end), 
-              expectedToken(TokenType::UNDEFINED), 
-              actualToken(TokenType::UNDEFINED) {
+              expectedTokenName("UNDEFINED"), 
+              actualTokenName("UNDEFINED") {
             setError(message);
             isValid = false;
         }
@@ -262,9 +263,9 @@ namespace CST {
             skippedTokens.push_back(token);
         }
         
-        void setExpectedActual(TokenType expected, TokenType actual) {
-            expectedToken = expected;
-            actualToken = actual;
+        void setExpectedActual(const std::string& expected, const std::string& actual) {
+            expectedTokenName = expected;
+            actualTokenName = actual;
         }
     };
 

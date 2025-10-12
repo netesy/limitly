@@ -1,0 +1,28 @@
+// Edge case tests for trivia preservation
+
+// Empty lines and mixed whitespace
+
+
+	// Tab-indented comment
+    // Space-indented comment
+
+var x:int=42;// No spaces around operators
+
+/* Comment at start of file */var y: str = "hello";
+
+// Comment at end of line with trailing spaces   
+var z: bool = true;   
+
+// Multiple consecutive comments
+// Comment 1
+// Comment 2
+// Comment 3
+var multiple: int = 123;
+
+/* Block comment with no spaces */var compact: str = "test";
+
+// Unicode and special characters: ñáéíóú ©®™
+var unicode: str = "ñáéíóú";
+
+// Very long comment that spans across multiple conceptual lines but is actually a single line comment that goes on and on and on
+var longComment: int = 999;

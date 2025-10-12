@@ -54,7 +54,7 @@ void executeFile(const std::string& filename, bool printAst = false, bool printT
         }
         
         // Frontend: Syntax analysis (parsing)
-        Parser parser(scanner);
+        Parser parser(scanner, false); // Use legacy mode for optimal execution performance
         std::shared_ptr<AST::Program> ast = parser.parse();
         
         // Print AST if requested
@@ -145,7 +145,7 @@ void startRepl() {
             scanner.scanTokens();
             
             // Frontend: Syntax analysis (parsing)
-            Parser parser(scanner);
+            Parser parser(scanner, false); // Use legacy mode for optimal REPL performance
             std::shared_ptr<AST::Program> ast = parser.parse();
             
             // Backend: Generate bytecode

@@ -1,28 +1,28 @@
-#include "cst_parser.hh"
+#include "parser.hh"
 #include "../common/debugger.hh"
 #include <stdexcept>
 #include <limits>
 
 // Helper methods
-Token CSTParser::peek() {
+Token Parser::peek() {
     return scanner.getTokens()[current];
 }
 
-Token CSTParser::previous() {
+Token Parser::previous() {
     return scanner.getTokens()[current - 1];
 }
 
-Token CSTParser::advance() {
+Token Parser::advance() {
     if (!isAtEnd()) current++;
     return previous();
 }
 
-bool CSTParser::check(TokenType type) {
+bool Parser::check(TokenType type) {
     if (isAtEnd()) return false;
     return peek().type == type;
 }
 
-bool CSTParser::match(std::initializer_list<TokenType> types) {
+bool Parser::match(std::initializer_list<TokenType> types) {
     for (TokenType type : types) {
         if (check(type)) {
             advance();
@@ -32,17 +32,17 @@ bool CSTParser::match(std::initializer_list<TokenType> types) {
     return false;
 }
 
-bool CSTParser::isAtEnd() {
+bool Parser::isAtEnd() {
     return peek().type == TokenType::EOF_TOKEN;
 }
 
-Token CSTParser::consume(TokenType type, const std::string &message) {
+Token Parser::consume(TokenType type, const std::string &message) {
     if (check(type)) return advance();
     error(message);
     throw std::runtime_error(message);
 }
 
-void CSTParser::synchronize() {
+void Parser::synchronize() {
     advance();
 
     while (!isAtEnd()) {
@@ -66,7 +66,7 @@ void CSTParser::synchronize() {
     }
 }
 
-void CSTParser::error(const std::string &message, bool suppressException) {
+void Parser::error(const std::string &message, bool suppressException) {
     // Get the current token's lexeme for better error reporting
     std::string lexeme = "";
     int line = 0;
@@ -140,182 +140,21 @@ void CSTParser::error(const std::string &message, bool suppressException) {
     // Do not throw for normal errors; let parser continue and synchronize.
 }
 
-// Unified node creation helper - creates CST::Node or AST::Node based on cstMode
-template<typename ASTNodeType>
-auto CSTParser::createNode() -> std::conditional_t<std::is_same_v<ASTNodeType, AST::Program>, 
-                                                   std::shared_ptr<AST::Program>,
-                                                   std::shared_ptr<ASTNodeType>> {
-    if (cstMode) {
-        // In CST mode, create CST::Node and return nullptr for AST (will be handled separately)
-        // For now, we'll create both for compatibility
-        auto astNode = std::make_shared<ASTNodeType>();
-        
-        // Map AST type to CST NodeKind
-        CST::NodeKind cstKind = mapASTNodeKind(typeid(ASTNodeType).name());
-        auto cstNode = std::make_unique<CST::Node>(cstKind);
-        
-        // Set position information
-        if (current < scanner.getTokens().size()) {
-            Token currentToken = peek();
-            cstNode->startPos = currentToken.start;
-            cstNode->endPos = currentToken.end;
-        }
-        
-        // Store CST node for trivia attachment
-        currentNode = std::move(cstNode);
-        
-        // Increment counter for testing
-        cstNodeCount++;
-        
-        return astNode;
-    } else {
-        // Legacy AST mode - just create AST node
-        return std::make_shared<ASTNodeType>();
-    }
-}
-
-// AST to CST NodeKind mapping
-CST::NodeKind CSTParser::mapASTNodeKind(const std::string& astNodeType) {
-    // Extract class name from mangled type name
-    std::string className = astNodeType;
-    
-    // Simple mapping based on common patterns
-    if (className.find("Program") != std::string::npos) return CST::NodeKind::PROGRAM;
-    if (className.find("VarDeclaration") != std::string::npos) return CST::NodeKind::VAR_DECLARATION;
-    if (className.find("FunctionDeclaration") != std::string::npos) return CST::NodeKind::FUNCTION_DECLARATION;
-    if (className.find("ClassDeclaration") != std::string::npos) return CST::NodeKind::CLASS_DECLARATION;
-    if (className.find("EnumDeclaration") != std::string::npos) return CST::NodeKind::ENUM_DECLARATION;
-    if (className.find("TypeDeclaration") != std::string::npos) return CST::NodeKind::TYPE_DECLARATION;
-    if (className.find("TraitDeclaration") != std::string::npos) return CST::NodeKind::TRAIT_DECLARATION;
-    if (className.find("InterfaceDeclaration") != std::string::npos) return CST::NodeKind::INTERFACE_DECLARATION;
-    if (className.find("ModuleDeclaration") != std::string::npos) return CST::NodeKind::MODULE_DECLARATION;
-    if (className.find("ImportStatement") != std::string::npos) return CST::NodeKind::IMPORT_DECLARATION;
-    
-    if (className.find("IfStatement") != std::string::npos) return CST::NodeKind::IF_STATEMENT;
-    if (className.find("ForStatement") != std::string::npos) return CST::NodeKind::FOR_STATEMENT;
-    if (className.find("WhileStatement") != std::string::npos) return CST::NodeKind::WHILE_STATEMENT;
-    if (className.find("IterStatement") != std::string::npos) return CST::NodeKind::ITER_STATEMENT;
-    if (className.find("MatchStatement") != std::string::npos) return CST::NodeKind::MATCH_STATEMENT;
-    if (className.find("BlockStatement") != std::string::npos) return CST::NodeKind::BLOCK_STATEMENT;
-    if (className.find("ExprStatement") != std::string::npos) return CST::NodeKind::EXPRESSION_STATEMENT;
-    if (className.find("ReturnStatement") != std::string::npos) return CST::NodeKind::RETURN_STATEMENT;
-    if (className.find("BreakStatement") != std::string::npos) return CST::NodeKind::BREAK_STATEMENT;
-    if (className.find("ContinueStatement") != std::string::npos) return CST::NodeKind::CONTINUE_STATEMENT;
-    if (className.find("PrintStatement") != std::string::npos) return CST::NodeKind::PRINT_STATEMENT;
-    if (className.find("AttemptStatement") != std::string::npos) return CST::NodeKind::ATTEMPT_STATEMENT;
-    if (className.find("ParallelStatement") != std::string::npos) return CST::NodeKind::PARALLEL_STATEMENT;
-    if (className.find("ConcurrentStatement") != std::string::npos) return CST::NodeKind::CONCURRENT_STATEMENT;
-    
-    if (className.find("BinaryExpr") != std::string::npos) return CST::NodeKind::BINARY_EXPR;
-    if (className.find("UnaryExpr") != std::string::npos) return CST::NodeKind::UNARY_EXPR;
-    if (className.find("CallExpr") != std::string::npos) return CST::NodeKind::CALL_EXPR;
-    if (className.find("MemberExpr") != std::string::npos) return CST::NodeKind::MEMBER_EXPR;
-    if (className.find("IndexExpr") != std::string::npos) return CST::NodeKind::INDEX_EXPR;
-    if (className.find("LiteralExpr") != std::string::npos) return CST::NodeKind::LITERAL_EXPR;
-    if (className.find("ObjectLiteralExpr") != std::string::npos) return CST::NodeKind::OBJECT_LITERAL_EXPR;
-    if (className.find("VariableExpr") != std::string::npos) return CST::NodeKind::VARIABLE_EXPR;
-    if (className.find("GroupingExpr") != std::string::npos) return CST::NodeKind::GROUPING_EXPR;
-    if (className.find("AssignExpr") != std::string::npos) return CST::NodeKind::ASSIGNMENT_EXPR;
-    if (className.find("TernaryExpr") != std::string::npos) return CST::NodeKind::CONDITIONAL_EXPR;
-    if (className.find("LambdaExpr") != std::string::npos) return CST::NodeKind::LAMBDA_EXPR;
-    if (className.find("RangeExpr") != std::string::npos) return CST::NodeKind::RANGE_EXPR;
-    if (className.find("InterpolatedStringExpr") != std::string::npos) return CST::NodeKind::INTERPOLATION_EXPR;
-    
-    // Default to error node if mapping not found
-    return CST::NodeKind::ERROR_NODE;
-}
-
-// Token consumption with trivia tracking
-Token CSTParser::consumeWithTrivia(TokenType type, const std::string &message) {
-    Token token = consume(type, message);
-    attachTriviaFromToken(token);
-    return token;
-}
-
-Token CSTParser::advanceWithTrivia() {
-    Token token = advance();
-    attachTriviaFromToken(token);
-    return token;
-}
-
-// Trivia attachment helpers
-void CSTParser::attachTriviaFromToken(const Token& token) {
-    if (cstMode && std::holds_alternative<std::unique_ptr<CST::Node>>(currentNode)) {
-        auto& cstNode = std::get<std::unique_ptr<CST::Node>>(currentNode);
-        if (cstNode) {
-            // Add the token itself to the elements
-            cstNode->addToken(token);
-            
-            // Extract and attach trivia from the token
-            cstNode->attachTriviaFromToken(token);
-            
-            // Update trivia attachment count for statistics
-            triviaAttachmentCount++;
-        }
-    }
-}
-
-void CSTParser::attachTriviaFromTokens(const std::vector<Token>& tokens) {
-    if (cstMode && std::holds_alternative<std::unique_ptr<CST::Node>>(currentNode)) {
-        auto& cstNode = std::get<std::unique_ptr<CST::Node>>(currentNode);
-        if (cstNode) {
-            for (const auto& token : tokens) {
-                cstNode->addToken(token);
-            }
-        }
-    }
-}
-
-// Explicit template instantiations for common AST node types
-template auto CSTParser::createNode<AST::Program>() -> std::shared_ptr<AST::Program>;
-template auto CSTParser::createNode<AST::VarDeclaration>() -> std::shared_ptr<AST::VarDeclaration>;
-template auto CSTParser::createNode<AST::FunctionDeclaration>() -> std::shared_ptr<AST::FunctionDeclaration>;
-template auto CSTParser::createNode<AST::ClassDeclaration>() -> std::shared_ptr<AST::ClassDeclaration>;
-template auto CSTParser::createNode<AST::IfStatement>() -> std::shared_ptr<AST::IfStatement>;
-template auto CSTParser::createNode<AST::ForStatement>() -> std::shared_ptr<AST::ForStatement>;
-template auto CSTParser::createNode<AST::WhileStatement>() -> std::shared_ptr<AST::WhileStatement>;
-template auto CSTParser::createNode<AST::BlockStatement>() -> std::shared_ptr<AST::BlockStatement>;
-template auto CSTParser::createNode<AST::ExprStatement>() -> std::shared_ptr<AST::ExprStatement>;
-template auto CSTParser::createNode<AST::ReturnStatement>() -> std::shared_ptr<AST::ReturnStatement>;
-template auto CSTParser::createNode<AST::PrintStatement>() -> std::shared_ptr<AST::PrintStatement>;
-template auto CSTParser::createNode<AST::BinaryExpr>() -> std::shared_ptr<AST::BinaryExpr>;
-template auto CSTParser::createNode<AST::UnaryExpr>() -> std::shared_ptr<AST::UnaryExpr>;
-template auto CSTParser::createNode<AST::LiteralExpr>() -> std::shared_ptr<AST::LiteralExpr>;
-template auto CSTParser::createNode<AST::ObjectLiteralExpr>() -> std::shared_ptr<AST::ObjectLiteralExpr>;
-template auto CSTParser::createNode<AST::VariableExpr>() -> std::shared_ptr<AST::VariableExpr>;
-template auto CSTParser::createNode<AST::CallExpr>() -> std::shared_ptr<AST::CallExpr>;
-template auto CSTParser::createNode<AST::AssignExpr>() -> std::shared_ptr<AST::AssignExpr>;
-
 // Main parse method
-std::shared_ptr<AST::Program> CSTParser::parse() {
-    auto program = createNode<AST::Program>();
+std::shared_ptr<AST::Program> Parser::parse() {
+    auto program = std::make_shared<AST::Program>();
     program->line = 1;
-
-    // If in CST mode, the createNode call above created the CST root
-    if (cstMode && std::holds_alternative<std::unique_ptr<CST::Node>>(currentNode)) {
-        // Move the current CST node to be our root
-        cstRoot = std::move(std::get<std::unique_ptr<CST::Node>>(currentNode));
-        cstRoot->setDescription("Program root node");
-    }
 
     try {
         while (!isAtEnd()) {
             auto stmt = declaration();
             if (stmt) {
                 program->statements.push_back(stmt);
-                
-                // In CST mode, the declaration() method will have created CST nodes
-                // and they will be automatically attached to the tree structure
             }
         }
     } catch (const std::exception &e) {
         // Handle parsing errors
         synchronize();
-        
-        // Add error info to CST if in CST mode
-        if (cstMode && cstRoot) {
-            cstRoot->setError("Parse error: " + std::string(e.what()));
-        }
     }
 
     // After parsing, print all collected errors if any
@@ -328,22 +167,13 @@ std::shared_ptr<AST::Program> CSTParser::parse() {
             }
         }
         std::cerr << "---------------------\n";
-        
-        // Add errors to CST if in CST mode
-        if (cstMode && cstRoot) {
-            for (const auto& err : errors) {
-                auto errorNode = std::make_unique<CST::ErrorNode>(err.message, 0, 0);
-                cstRoot->addChild(std::move(errorNode));
-            }
-        }
     }
-    
     return program;
 }
 
 // Parse declarations
 // Helper to collect leading annotations
-std::vector<Token> CSTParser::collectAnnotations() {
+std::vector<Token> Parser::collectAnnotations() {
     std::vector<Token> annotations;
     while (check(TokenType::PUBLIC) || check(TokenType::PRIVATE) || check(TokenType::PROTECTED)) {
         annotations.push_back(advance());
@@ -351,7 +181,7 @@ std::vector<Token> CSTParser::collectAnnotations() {
     return annotations;
 }
 
-std::shared_ptr<AST::Statement> CSTParser::declaration() {
+std::shared_ptr<AST::Statement> Parser::declaration() {
     try {
         // Collect leading annotations
         std::vector<Token> annotations = collectAnnotations();
@@ -416,131 +246,31 @@ std::shared_ptr<AST::Statement> CSTParser::declaration() {
     }
 }
 
-std::shared_ptr<AST::Statement> CSTParser::varDeclaration() {
-    auto var = createNode<AST::VarDeclaration>();
+std::shared_ptr<AST::Statement> Parser::varDeclaration() {
+    auto var = std::make_shared<AST::VarDeclaration>();
     var->line = previous().line;
-    
-    // Store the current CST node for this variable declaration
-    std::unique_ptr<CST::Node> varCSTNode;
-    if (cstMode && std::holds_alternative<std::unique_ptr<CST::Node>>(currentNode)) {
-        varCSTNode = std::move(std::get<std::unique_ptr<CST::Node>>(currentNode));
-        varCSTNode->setDescription("var declaration");
-    }
 
-    // Add 'var' keyword token to CST with its trivia
-    Token varToken = previous();
-    if (cstMode && varCSTNode) {
-        // Add leading trivia (comments, whitespace before 'var')
-        for (const auto& trivia : varToken.getLeadingTrivia()) {
-            if (trivia.type == TokenType::COMMENT_LINE || trivia.type == TokenType::COMMENT_BLOCK) {
-                auto commentNode = std::make_unique<CST::CommentNode>(trivia);
-                varCSTNode->addChild(std::move(commentNode));
-            } else if (trivia.type == TokenType::WHITESPACE || trivia.type == TokenType::NEWLINE) {
-                auto whitespaceNode = std::make_unique<CST::WhitespaceNode>(trivia);
-                varCSTNode->addChild(std::move(whitespaceNode));
-            }
-        }
-        
-        // Add the 'var' keyword as a direct token (not wrapped in a node)
-        varCSTNode->addToken(varToken);
-    }
-
-    // Parse variable name with semantic structure
-    Token name = consumeWithTrivia(TokenType::IDENTIFIER, "Expected variable name.");
+    // Parse variable name
+    Token name = consume(TokenType::IDENTIFIER, "Expected variable name.");
     var->name = name.lexeme;
-    
-    // Create IDENTIFIER semantic node
-    if (cstMode && varCSTNode) {
-        auto identifierNode = std::make_unique<CST::Node>(CST::NodeKind::IDENTIFIER, name.start, name.end);
-        
-        // Add any trivia before the identifier
-        for (const auto& trivia : name.getLeadingTrivia()) {
-            if (trivia.type == TokenType::WHITESPACE || trivia.type == TokenType::NEWLINE) {
-                auto whitespaceNode = std::make_unique<CST::WhitespaceNode>(trivia);
-                varCSTNode->addChild(std::move(whitespaceNode));
-            }
-        }
-        
-        // Add the identifier token to the IDENTIFIER node
-        identifierNode->addToken(name);
-        varCSTNode->addChild(std::move(identifierNode));
-    }
 
-    // Parse optional type annotation with semantic structure
+    // Parse optional type annotation
     if (match({TokenType::COLON})) {
-        Token colon = previous();
-        
-        if (cstMode && varCSTNode) {
-            // Create TYPE_ANNOTATION semantic node
-            auto typeAnnotationNode = std::make_unique<CST::Node>(CST::NodeKind::ANNOTATION, colon.start, 0);
-            
-            // Add colon token directly to TYPE_ANNOTATION
-            typeAnnotationNode->addToken(colon);
-            
-            var->type = parseTypeAnnotation();
-            
-            // Add the actual type token to TYPE_ANNOTATION
-            Token typeToken = previous(); // The type token (int, str, etc.)
-            
-            // Create PRIMITIVE_TYPE semantic node
-            auto primitiveTypeNode = std::make_unique<CST::Node>(CST::NodeKind::PRIMITIVE_TYPE, typeToken.start, typeToken.end);
-            primitiveTypeNode->addToken(typeToken);
-            
-            typeAnnotationNode->addChild(std::move(primitiveTypeNode));
-            typeAnnotationNode->endPos = typeToken.end;
-            
-            varCSTNode->addChild(std::move(typeAnnotationNode));
-        } else {
-            var->type = parseTypeAnnotation();
-        }
+        // Parse the type annotation - all type handling is done in parseTypeAnnotation
+        var->type = parseTypeAnnotation();
     }
 
-    // Parse optional initializer with semantic structure
+    // Parse optional initializer
     if (match({TokenType::EQUAL})) {
-        Token equal = previous();
-        
-        if (cstMode && varCSTNode) {
-            // Create ASSIGNMENT semantic node
-            auto assignmentNode = std::make_unique<CST::Node>(CST::NodeKind::ASSIGNMENT_EXPR, equal.start, 0);
-            
-            // Add = token directly to ASSIGNMENT
-            assignmentNode->addToken(equal);
-            
-            var->initializer = expression();
-            
-            // Add the actual value token to ASSIGNMENT
-            Token valueToken = previous(); // The value token (42, "hello", etc.)
-            
-            // Create LITERAL semantic node
-            auto literalNode = std::make_unique<CST::Node>(CST::NodeKind::LITERAL_EXPR, valueToken.start, valueToken.end);
-            literalNode->addToken(valueToken);
-            
-            assignmentNode->addChild(std::move(literalNode));
-            assignmentNode->endPos = valueToken.end;
-            
-            varCSTNode->addChild(std::move(assignmentNode));
-        } else {
-            var->initializer = expression();
-        }
+        var->initializer = expression();
     }
 
     // Make semicolon optional
-    if (match({TokenType::SEMICOLON})) {
-        Token semicolon = previous();
-        if (cstMode && varCSTNode) {
-            varCSTNode->addToken(semicolon);
-        }
-    }
-    
-    // Add this variable declaration to the program root
-    if (cstMode && cstRoot && varCSTNode) {
-        cstRoot->addChild(std::move(varCSTNode));
-    }
-    
+    match({TokenType::SEMICOLON});
     return var;
 }
 
-std::shared_ptr<AST::Statement> CSTParser::statement() {
+std::shared_ptr<AST::Statement> Parser::statement() {
     if (match({TokenType::PRINT})) {
         return printStatement();
     }
@@ -590,7 +320,7 @@ std::shared_ptr<AST::Statement> CSTParser::statement() {
     return expressionStatement();
 }
 
-std::shared_ptr<AST::Statement> CSTParser::expressionStatement() {
+std::shared_ptr<AST::Statement> Parser::expressionStatement() {
     try {
         auto expr = expression();
         // Make semicolon optional
@@ -609,35 +339,26 @@ std::shared_ptr<AST::Statement> CSTParser::expressionStatement() {
     }
 }
 
-std::shared_ptr<AST::Statement> CSTParser::printStatement() {
-    auto stmt = createNode<AST::PrintStatement>();
+std::shared_ptr<AST::Statement> Parser::printStatement() {
+    auto stmt = std::make_shared<AST::PrintStatement>();
     stmt->line = previous().line;
 
-    attachTriviaFromToken(previous());
-
     // Parse arguments
-    consumeWithTrivia(TokenType::LEFT_PAREN, "Expected '(' after 'print'.");
+    consume(TokenType::LEFT_PAREN, "Expected '(' after 'print'.");
 
     if (!check(TokenType::RIGHT_PAREN)) {
         do {
             stmt->arguments.push_back(expression());
-            if (match({TokenType::COMMA})) {
-                attachTriviaFromToken(previous());
-            }
-        } while (previous().type == TokenType::COMMA);
+        } while (match({TokenType::COMMA}));
     }
 
-    consumeWithTrivia(TokenType::RIGHT_PAREN, "Expected ')' after print arguments.");
-    
+    consume(TokenType::RIGHT_PAREN, "Expected ')' after print arguments.");
     // Make semicolon optional
-    if (match({TokenType::SEMICOLON})) {
-        attachTriviaFromToken(previous());
-    }
-    
+    match({TokenType::SEMICOLON});
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> CSTParser::taskStatement() {
+std::shared_ptr<AST::Statement> Parser::taskStatement() {
     auto stmt = std::make_shared<AST::TaskStatement>();
     stmt->line = peek().line;
 
@@ -661,7 +382,7 @@ std::shared_ptr<AST::Statement> CSTParser::taskStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> CSTParser::workerStatement() {
+std::shared_ptr<AST::Statement> Parser::workerStatement() {
     auto stmt = std::make_shared<AST::WorkerStatement>();
     stmt->line = peek().line;
 
@@ -679,7 +400,7 @@ std::shared_ptr<AST::Statement> CSTParser::workerStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> CSTParser::traitDeclaration() {
+std::shared_ptr<AST::Statement> Parser::traitDeclaration() {
     // Create a new trait declaration statement
     auto traitDecl = std::make_shared<AST::TraitDeclaration>();
     traitDecl->line = previous().line;
@@ -757,7 +478,7 @@ std::shared_ptr<AST::Statement> CSTParser::traitDeclaration() {
     return traitDecl;
 }
 
-std::shared_ptr<AST::Statement> CSTParser::interfaceDeclaration() {
+std::shared_ptr<AST::Statement> Parser::interfaceDeclaration() {
     // Create a new interface declaration statement
     auto interfaceDecl = std::make_shared<AST::InterfaceDeclaration>();
     interfaceDecl->line = previous().line;
@@ -793,7 +514,7 @@ std::shared_ptr<AST::Statement> CSTParser::interfaceDeclaration() {
     return interfaceDecl;
 }
 
-std::shared_ptr<AST::Statement> CSTParser::moduleDeclaration() {
+std::shared_ptr<AST::Statement> Parser::moduleDeclaration() {
     // Create a new module declaration statement
     auto moduleDecl = std::make_shared<AST::ModuleDeclaration>();
     moduleDecl->line = previous().line;
@@ -838,7 +559,7 @@ std::shared_ptr<AST::Statement> CSTParser::moduleDeclaration() {
     return moduleDecl;
 }
 
-std::shared_ptr<AST::Statement> CSTParser::iterStatement() {
+std::shared_ptr<AST::Statement> Parser::iterStatement() {
     auto stmt = std::make_shared<AST::IterStatement>();
     stmt->line = previous().line;
 
@@ -887,21 +608,21 @@ std::shared_ptr<AST::Statement> CSTParser::iterStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> CSTParser::breakStatement() {
+std::shared_ptr<AST::Statement> Parser::breakStatement() {
     auto stmt = std::make_shared<AST::BreakStatement>();
     stmt->line = previous().line;
     consume(TokenType::SEMICOLON, "Expected ';' after 'break'.");
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> CSTParser::continueStatement() {
+std::shared_ptr<AST::Statement> Parser::continueStatement() {
     auto stmt = std::make_shared<AST::ContinueStatement>();
     stmt->line = previous().line;
     consume(TokenType::SEMICOLON, "Expected ';' after 'continue'.");
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> CSTParser::unsafeBlock() {
+std::shared_ptr<AST::Statement> Parser::unsafeBlock() {
     auto stmt = std::make_shared<AST::UnsafeStatement>();
     stmt->line = previous().line;
 
@@ -911,7 +632,7 @@ std::shared_ptr<AST::Statement> CSTParser::unsafeBlock() {
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> CSTParser::contractStatement() {
+std::shared_ptr<AST::Statement> Parser::contractStatement() {
     auto stmt = std::make_shared<AST::ContractStatement>();
     stmt->line = previous().line;
 
@@ -936,7 +657,7 @@ std::shared_ptr<AST::Statement> CSTParser::contractStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> CSTParser::comptimeStatement() {
+std::shared_ptr<AST::Statement> Parser::comptimeStatement() {
     auto stmt = std::make_shared<AST::ComptimeStatement>();
     stmt->line = previous().line;
 
@@ -946,76 +667,26 @@ std::shared_ptr<AST::Statement> CSTParser::comptimeStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> CSTParser::ifStatement() {
-    auto stmt = createNode<AST::IfStatement>();
+std::shared_ptr<AST::Statement> Parser::ifStatement() {
+    auto stmt = std::make_shared<AST::IfStatement>();
     Token ifToken = previous();
     stmt->line = ifToken.line;
 
-    attachTriviaFromToken(ifToken);
-
-    consumeWithTrivia(TokenType::LEFT_PAREN, "Expected '(' after 'if'.");
+    consume(TokenType::LEFT_PAREN, "Expected '(' after 'if'.");
     stmt->condition = expression();
-    consumeWithTrivia(TokenType::RIGHT_PAREN, "Expected ')' after if condition.");
+    consume(TokenType::RIGHT_PAREN, "Expected ')' after if condition.");
 
     stmt->thenBranch = parseStatementWithContext("if", ifToken);
 
-    // Handle elif chains
-    while (match({TokenType::ELIF})) {
-        Token elifToken = previous();
-        attachTriviaFromToken(elifToken);
-        
-        // Create a nested if statement for the elif
-        auto elifStmt = createNode<AST::IfStatement>();
-        elifStmt->line = elifToken.line;
-        
-        consumeWithTrivia(TokenType::LEFT_PAREN, "Expected '(' after 'elif'.");
-        elifStmt->condition = expression();
-        consumeWithTrivia(TokenType::RIGHT_PAREN, "Expected ')' after elif condition.");
-        
-        elifStmt->thenBranch = parseStatementWithContext("elif", elifToken);
-        
-        // Chain the elif as the else branch of the previous statement
-        if (!stmt->elseBranch) {
-            stmt->elseBranch = elifStmt;
-        } else {
-            // Find the last elif in the chain and attach this one
-            auto current = std::dynamic_pointer_cast<AST::IfStatement>(stmt->elseBranch);
-            while (current && current->elseBranch && 
-                   std::dynamic_pointer_cast<AST::IfStatement>(current->elseBranch)) {
-                current = std::dynamic_pointer_cast<AST::IfStatement>(current->elseBranch);
-            }
-            if (current) {
-                current->elseBranch = elifStmt;
-            }
-        }
-    }
-
     if (match({TokenType::ELSE})) {
         Token elseToken = previous();
-        attachTriviaFromToken(elseToken);
-        
-        auto elseStmt = parseStatementWithContext("else", elseToken);
-        
-        // Attach else to the end of the elif chain
-        if (!stmt->elseBranch) {
-            stmt->elseBranch = elseStmt;
-        } else {
-            // Find the last elif in the chain and attach the else
-            auto current = std::dynamic_pointer_cast<AST::IfStatement>(stmt->elseBranch);
-            while (current && current->elseBranch && 
-                   std::dynamic_pointer_cast<AST::IfStatement>(current->elseBranch)) {
-                current = std::dynamic_pointer_cast<AST::IfStatement>(current->elseBranch);
-            }
-            if (current) {
-                current->elseBranch = elseStmt;
-            }
-        }
+        stmt->elseBranch = parseStatementWithContext("else", elseToken);
     }
 
     return stmt;
 }
 
-std::shared_ptr<AST::BlockStatement> CSTParser::block() {
+std::shared_ptr<AST::BlockStatement> Parser::block() {
     auto block = std::make_shared<AST::BlockStatement>();
     Token leftBrace = previous();
     block->line = leftBrace.line;
@@ -1068,7 +739,7 @@ std::shared_ptr<AST::BlockStatement> CSTParser::block() {
     return block;
 }
 
-std::shared_ptr<AST::Statement> CSTParser::forStatement() {
+std::shared_ptr<AST::Statement> Parser::forStatement() {
     auto stmt = std::make_shared<AST::ForStatement>();
     Token forToken = previous();
     stmt->line = forToken.line;
@@ -1190,7 +861,7 @@ std::shared_ptr<AST::Statement> CSTParser::forStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> CSTParser::whileStatement() {
+std::shared_ptr<AST::Statement> Parser::whileStatement() {
     auto stmt = std::make_shared<AST::WhileStatement>();
     Token whileToken = previous();
     stmt->line = whileToken.line;
@@ -1204,11 +875,9 @@ std::shared_ptr<AST::Statement> CSTParser::whileStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::FunctionDeclaration> CSTParser::function(const std::string& kind) {
-    auto func = createNode<AST::FunctionDeclaration>();
+std::shared_ptr<AST::FunctionDeclaration> Parser::function(const std::string& kind) {
+    auto func = std::make_shared<AST::FunctionDeclaration>();
     func->line = previous().line;
-    
-    attachTriviaFromToken(previous());
 
     // Parse function name
     Token name = consume(TokenType::IDENTIFIER, "Expected " + kind + " name.");
@@ -1287,7 +956,7 @@ std::shared_ptr<AST::FunctionDeclaration> CSTParser::function(const std::string&
     return func;
 }
 
-std::shared_ptr<AST::Statement> CSTParser::returnStatement() {
+std::shared_ptr<AST::Statement> Parser::returnStatement() {
     auto stmt = std::make_shared<AST::ReturnStatement>();
     stmt->line = previous().line;
 
@@ -1301,7 +970,7 @@ std::shared_ptr<AST::Statement> CSTParser::returnStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::ClassDeclaration> CSTParser::classDeclaration() {
+std::shared_ptr<AST::ClassDeclaration> Parser::classDeclaration() {
     auto classDecl = std::make_shared<AST::ClassDeclaration>();
     classDecl->line = previous().line;
 
@@ -1486,7 +1155,7 @@ std::shared_ptr<AST::ClassDeclaration> CSTParser::classDeclaration() {
     return classDecl;
 }
 
-std::shared_ptr<AST::Statement> CSTParser::attemptStatement() {
+std::shared_ptr<AST::Statement> Parser::attemptStatement() {
     auto stmt = std::make_shared<AST::AttemptStatement>();
     stmt->line = previous().line;
 
@@ -1516,7 +1185,7 @@ std::shared_ptr<AST::Statement> CSTParser::attemptStatement() {
     return stmt;
 }
 
-void CSTParser::parseConcurrencyParams(
+void Parser::parseConcurrencyParams(
     std::string& channel,
     std::string& mode,
     std::string& cores,
@@ -1610,7 +1279,7 @@ void CSTParser::parseConcurrencyParams(
     }
 }
 
-std::shared_ptr<AST::Statement> CSTParser::parallelStatement() {
+std::shared_ptr<AST::Statement> Parser::parallelStatement() {
     auto stmt = std::make_shared<AST::ParallelStatement>();
     stmt->line = previous().line;
 
@@ -1635,7 +1304,7 @@ std::shared_ptr<AST::Statement> CSTParser::parallelStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> CSTParser::concurrentStatement() {
+std::shared_ptr<AST::Statement> Parser::concurrentStatement() {
     auto stmt = std::make_shared<AST::ConcurrentStatement>();
     stmt->line = previous().line;
 
@@ -1660,7 +1329,7 @@ std::shared_ptr<AST::Statement> CSTParser::concurrentStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> CSTParser::importStatement() {
+std::shared_ptr<AST::Statement> Parser::importStatement() {
     auto stmt = std::make_shared<AST::ImportStatement>();
     stmt->line = previous().line;
 
@@ -1712,7 +1381,7 @@ std::shared_ptr<AST::Statement> CSTParser::importStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::EnumDeclaration> CSTParser::enumDeclaration() {
+std::shared_ptr<AST::EnumDeclaration> Parser::enumDeclaration() {
     auto enumDecl = std::make_shared<AST::EnumDeclaration>();
     enumDecl->line = previous().line;
 
@@ -1742,7 +1411,7 @@ std::shared_ptr<AST::EnumDeclaration> CSTParser::enumDeclaration() {
 }
 
 // Parse match statement: match(value) { pattern => statement, ... }
-std::shared_ptr<AST::Statement> CSTParser::matchStatement() {
+std::shared_ptr<AST::Statement> Parser::matchStatement() {
     auto stmt = std::make_shared<AST::MatchStatement>();
     stmt->line = previous().line;
 
@@ -1782,7 +1451,7 @@ std::shared_ptr<AST::Statement> CSTParser::matchStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::Expression> CSTParser::parsePattern() {
+std::shared_ptr<AST::Expression> Parser::parsePattern() {
     // Error pattern matching: val identifier
     if (check(TokenType::VAL)) {
         return parseValPattern();
@@ -1850,7 +1519,7 @@ std::shared_ptr<AST::Expression> CSTParser::parsePattern() {
     return makeErrorExpr();
 }
 
-std::shared_ptr<AST::Expression> CSTParser::parseBindingPattern() {
+std::shared_ptr<AST::Expression> Parser::parseBindingPattern() {
     auto pattern = std::make_shared<AST::BindingPatternExpr>();
     pattern->line = peek().line;
     pattern->typeName = consume(TokenType::IDENTIFIER, "Expected type name in binding pattern.").lexeme;
@@ -1860,7 +1529,7 @@ std::shared_ptr<AST::Expression> CSTParser::parseBindingPattern() {
     return pattern;
 }
 
-std::shared_ptr<AST::Expression> CSTParser::parseListPattern() {
+std::shared_ptr<AST::Expression> Parser::parseListPattern() {
     auto pattern = std::make_shared<AST::ListPatternExpr>();
     pattern->line = peek().line;
     consume(TokenType::LEFT_BRACKET, "Expected '[' at start of list pattern.");
@@ -1879,7 +1548,7 @@ std::shared_ptr<AST::Expression> CSTParser::parseListPattern() {
     return pattern;
 }
 
-std::shared_ptr<AST::Expression> CSTParser::parseDictPattern() {
+std::shared_ptr<AST::Expression> Parser::parseDictPattern() {
     auto pattern = std::make_shared<AST::DictPatternExpr>();
     pattern->line = peek().line;
     consume(TokenType::LEFT_BRACE, "Expected '{' at start of dict pattern.");
@@ -1916,7 +1585,7 @@ std::shared_ptr<AST::Expression> CSTParser::parseDictPattern() {
     return pattern;
 }
 
-std::shared_ptr<AST::Expression> CSTParser::parseTuplePattern() {
+std::shared_ptr<AST::Expression> Parser::parseTuplePattern() {
     auto pattern = std::make_shared<AST::TuplePatternExpr>();
     pattern->line = peek().line;
     consume(TokenType::LEFT_PAREN, "Expected '(' at start of tuple pattern.");
@@ -1932,11 +1601,11 @@ std::shared_ptr<AST::Expression> CSTParser::parseTuplePattern() {
 }
 
 // Expression parsing methods
-std::shared_ptr<AST::Expression> CSTParser::expression() {
+std::shared_ptr<AST::Expression> Parser::expression() {
     return assignment();
 }
 
-std::shared_ptr<AST::Expression> CSTParser::assignment() {
+std::shared_ptr<AST::Expression> Parser::assignment() {
     auto expr = logicalOr();
 
     if (match({TokenType::EQUAL, TokenType::PLUS_EQUAL, TokenType::MINUS_EQUAL,
@@ -1975,7 +1644,7 @@ std::shared_ptr<AST::Expression> CSTParser::assignment() {
     return expr;
 }
 
-std::shared_ptr<AST::Expression> CSTParser::logicalOr() {
+std::shared_ptr<AST::Expression> Parser::logicalOr() {
     auto expr = logicalAnd();
 
     while (match({TokenType::OR})) {
@@ -1994,7 +1663,7 @@ std::shared_ptr<AST::Expression> CSTParser::logicalOr() {
     return expr;
 }
 
-std::shared_ptr<AST::Expression> CSTParser::logicalAnd() {
+std::shared_ptr<AST::Expression> Parser::logicalAnd() {
     auto expr = equality();
 
     while (match({TokenType::AND})) {
@@ -2013,7 +1682,7 @@ std::shared_ptr<AST::Expression> CSTParser::logicalAnd() {
     return expr;
 }
 
-std::shared_ptr<AST::Expression> CSTParser::equality() {
+std::shared_ptr<AST::Expression> Parser::equality() {
     auto expr = comparison();
 
     while (match({TokenType::BANG_EQUAL, TokenType::EQUAL_EQUAL})) {
@@ -2032,7 +1701,7 @@ std::shared_ptr<AST::Expression> CSTParser::equality() {
     return expr;
 }
 
-std::shared_ptr<AST::Expression> CSTParser::comparison() {
+std::shared_ptr<AST::Expression> Parser::comparison() {
     auto expr = term();
 
     // Check for range expressions (e.g., 1..10)
@@ -2062,7 +1731,7 @@ std::shared_ptr<AST::Expression> CSTParser::comparison() {
     return expr;
 }
 
-std::shared_ptr<AST::Expression> CSTParser::term() {
+std::shared_ptr<AST::Expression> Parser::term() {
     auto expr = factor();
 
     while (match({TokenType::MINUS, TokenType::PLUS})) {
@@ -2081,7 +1750,7 @@ std::shared_ptr<AST::Expression> CSTParser::term() {
     return expr;
 }
 
-std::shared_ptr<AST::Expression> CSTParser::factor() {
+std::shared_ptr<AST::Expression> Parser::factor() {
     auto expr = power();
 
     while (match({TokenType::SLASH, TokenType::STAR, TokenType::MODULUS})) {
@@ -2100,23 +1769,22 @@ std::shared_ptr<AST::Expression> CSTParser::factor() {
     return expr;
 }
 
-std::shared_ptr<AST::Expression> CSTParser::power() {
+std::shared_ptr<AST::Expression> Parser::power() {
     auto expr = unary();
     while (match({TokenType::POWER})) { // Assuming POWER is '**'
         auto op = previous();
         auto right = power(); // Right-associative!
-        auto binaryExpr = createNode<AST::BinaryExpr>();
+        auto binaryExpr = std::make_shared<AST::BinaryExpr>();
         binaryExpr->line = op.line;
         binaryExpr->left = expr;
         binaryExpr->op = op.type;
         binaryExpr->right = right;
-        attachTriviaFromToken(op);
         expr = binaryExpr;
     }
     return expr;
 }
 
-std::shared_ptr<AST::Expression> CSTParser::unary() {
+std::shared_ptr<AST::Expression> Parser::unary() {
     if (match({TokenType::BANG, TokenType::MINUS, TokenType::PLUS})) {
         auto op = previous();
         auto right = unary();
@@ -2139,7 +1807,7 @@ std::shared_ptr<AST::Expression> CSTParser::unary() {
     return call();
 }
 
-std::shared_ptr<AST::Expression> CSTParser::call() {
+std::shared_ptr<AST::Expression> Parser::call() {
     auto expr = primary();
 
     while (true) {
@@ -2190,7 +1858,7 @@ std::shared_ptr<AST::Expression> CSTParser::call() {
     return expr;
 }
 
-std::shared_ptr<AST::Expression> CSTParser::finishCall(std::shared_ptr<AST::Expression> callee) {
+std::shared_ptr<AST::Expression> Parser::finishCall(std::shared_ptr<AST::Expression> callee) {
     std::vector<std::shared_ptr<AST::Expression>> arguments;
     std::unordered_map<std::string, std::shared_ptr<AST::Expression>> namedArgs;
 
@@ -2227,7 +1895,7 @@ std::shared_ptr<AST::Expression> CSTParser::finishCall(std::shared_ptr<AST::Expr
     return callExpr;
 }
 
-std::shared_ptr<AST::InterpolatedStringExpr> CSTParser::interpolatedString() {
+std::shared_ptr<AST::InterpolatedStringExpr> Parser::interpolatedString() {
     auto interpolated = std::make_shared<AST::InterpolatedStringExpr>();
     interpolated->line = previous().line;
     
@@ -2255,44 +1923,39 @@ std::shared_ptr<AST::InterpolatedStringExpr> CSTParser::interpolatedString() {
     return interpolated;
 }
 
-std::shared_ptr<AST::Expression> CSTParser::primary() {
+std::shared_ptr<AST::Expression> Parser::primary() {
     if (match({TokenType::FALSE})) {
-        auto literalExpr = createNode<AST::LiteralExpr>();
+        auto literalExpr = std::make_shared<AST::LiteralExpr>();
         literalExpr->line = previous().line;
         literalExpr->value = false;
-        attachTriviaFromToken(previous());
         return literalExpr;
     }
 
     if (match({TokenType::TRUE})) {
-        auto literalExpr = createNode<AST::LiteralExpr>();
+        auto literalExpr = std::make_shared<AST::LiteralExpr>();
         literalExpr->line = previous().line;
         literalExpr->value = true;
-        attachTriviaFromToken(previous());
         return literalExpr;
     }
 
     if (match({TokenType::NONE})) {
-        auto literalExpr = createNode<AST::LiteralExpr>();
+        auto literalExpr = std::make_shared<AST::LiteralExpr>();
         literalExpr->line = previous().line;
         literalExpr->value = nullptr;
-        attachTriviaFromToken(previous());
         return literalExpr;
     }
 
     if (match({TokenType::NIL})) {
-        auto literalExpr = createNode<AST::LiteralExpr>();
+        auto literalExpr = std::make_shared<AST::LiteralExpr>();
         literalExpr->line = previous().line;
         literalExpr->value = nullptr;
-        attachTriviaFromToken(previous());
         return literalExpr;
     }
 
     if (match({TokenType::NUMBER})) {
         auto token = previous();
-        auto literalExpr = createNode<AST::LiteralExpr>();
+        auto literalExpr = std::make_shared<AST::LiteralExpr>();
         literalExpr->line = token.line;
-        attachTriviaFromToken(token);
 
         // Check if the number is an integer or a float
         // Numbers with decimal points or scientific notation are treated as floats
@@ -2400,37 +2063,10 @@ std::shared_ptr<AST::Expression> CSTParser::primary() {
             thisExpr->line = token.line;
             return thisExpr;
         } else {
-            // Check if this is an object literal: Identifier { ... }
-            if (check(TokenType::LEFT_BRACE)) {
-                // This is an object literal with constructor name
-                auto objExpr = std::make_shared<AST::ObjectLiteralExpr>();
-                objExpr->line = token.line;
-                objExpr->constructorName = token.lexeme;
-                
-                advance(); // consume LEFT_BRACE
-                
-                // Parse key-value pairs
-                if (!check(TokenType::RIGHT_BRACE)) {
-                    do {
-                        // Parse key
-                        Token keyToken = consume(TokenType::IDENTIFIER, "Expected property name in object literal.");
-                        consume(TokenType::COLON, "Expected ':' after property name.");
-                        
-                        // Parse value
-                        auto value = expression();
-                        
-                        objExpr->properties[keyToken.lexeme] = value;
-                    } while (match({TokenType::COMMA}));
-                }
-                
-                consume(TokenType::RIGHT_BRACE, "Expected '}' after object literal properties.");
-                return objExpr;
-            } else {
-                auto varExpr = std::make_shared<AST::VariableExpr>();
-                varExpr->line = token.line;
-                varExpr->name = token.lexeme;
-                return varExpr;
-            }
+            auto varExpr = std::make_shared<AST::VariableExpr>();
+            varExpr->line = token.line;
+            varExpr->name = token.lexeme;
+            return varExpr;
         }
     }
 
@@ -2567,7 +2203,7 @@ std::shared_ptr<AST::Expression> CSTParser::primary() {
     }
 }
 
-std::shared_ptr<AST::Statement> CSTParser::typeDeclaration() {
+std::shared_ptr<AST::Statement> Parser::typeDeclaration() {
     // Create a new type declaration statement
     auto typeDecl = std::make_shared<AST::TypeDeclaration>();
     typeDecl->line = previous().line;
@@ -2816,7 +2452,7 @@ std::shared_ptr<AST::Statement> CSTParser::typeDeclaration() {
 }
             
 // Type annotation parsing
-std::shared_ptr<AST::TypeAnnotation> CSTParser::parseTypeAnnotation() {
+std::shared_ptr<AST::TypeAnnotation> Parser::parseTypeAnnotation() {
     // Parse the base type first
     auto type = parseBasicType();
     
@@ -2869,7 +2505,7 @@ std::shared_ptr<AST::TypeAnnotation> CSTParser::parseTypeAnnotation() {
 
 
 // Helper method to check if a token type is a primitive type
-bool CSTParser::isPrimitiveType(TokenType type) {
+bool Parser::isPrimitiveType(TokenType type) {
     return type == TokenType::INT_TYPE || type == TokenType::INT8_TYPE || type == TokenType::INT16_TYPE ||
            type == TokenType::INT32_TYPE || type == TokenType::INT64_TYPE || type == TokenType::UINT_TYPE ||
            type == TokenType::UINT8_TYPE || type == TokenType::UINT16_TYPE || type == TokenType::UINT32_TYPE ||
@@ -2879,7 +2515,7 @@ bool CSTParser::isPrimitiveType(TokenType type) {
 }
 
 // Helper method to convert a token type to a string
-std::string CSTParser::tokenTypeToString(TokenType type) {
+std::string Parser::tokenTypeToString(TokenType type) {
     switch (type) {
         case TokenType::INT_TYPE: return "int";
         case TokenType::INT8_TYPE: return "i8";
@@ -2903,7 +2539,7 @@ std::string CSTParser::tokenTypeToString(TokenType type) {
 }
 
 // Parse union type (e.g., Some | None, int | str | bool)
-std::shared_ptr<AST::TypeAnnotation> CSTParser::parseUnionType() {
+std::shared_ptr<AST::TypeAnnotation> Parser::parseUnionType() {
     auto unionType = std::make_shared<AST::TypeAnnotation>();
     unionType->typeName = "union";
     unionType->isUnion = true;
@@ -2922,7 +2558,7 @@ std::shared_ptr<AST::TypeAnnotation> CSTParser::parseUnionType() {
 }
 
 // Parse a basic type without union/intersection logic (to avoid recursion)
-std::shared_ptr<AST::TypeAnnotation> CSTParser::parseBasicType() {
+std::shared_ptr<AST::TypeAnnotation> Parser::parseBasicType() {
     auto type = std::make_shared<AST::TypeAnnotation>();
 
     // Check for list types (e.g., [int], [str], [Person])
@@ -3111,7 +2747,7 @@ std::shared_ptr<AST::TypeAnnotation> CSTParser::parseBasicType() {
 }
 
 // Parse brace type - either dictionary {keyType: valueType} or structural {field: type, ...}
-std::shared_ptr<AST::TypeAnnotation> CSTParser::parseBraceType() {
+std::shared_ptr<AST::TypeAnnotation> Parser::parseBraceType() {
     // Look ahead to determine if this is a dictionary type or structural type
     size_t savedCurrent = current;
     bool isDictionary = false;
@@ -3157,7 +2793,7 @@ std::shared_ptr<AST::TypeAnnotation> CSTParser::parseBraceType() {
 }
 
 // Parse dictionary type {keyType: valueType}
-std::shared_ptr<AST::TypeAnnotation> CSTParser::parseDictionaryType() {
+std::shared_ptr<AST::TypeAnnotation> Parser::parseDictionaryType() {
     auto type = std::make_shared<AST::TypeAnnotation>();
     type->isDict = true;
     type->typeName = "dict";
@@ -3177,14 +2813,14 @@ std::shared_ptr<AST::TypeAnnotation> CSTParser::parseDictionaryType() {
 }
 
 // Helper method to check if a lexeme is a known type name
-bool CSTParser::isKnownTypeName(const std::string& name) {
+bool Parser::isKnownTypeName(const std::string& name) {
     return name == "any" || name == "str" || name == "int" || name == "float" || 
            name == "bool" || name == "list" || name == "dict" || name == "option" || 
            name == "result";
 }
 
 // Parse structural type (e.g., { name: str, age: int, ...baseRecord })
-std::shared_ptr<AST::TypeAnnotation> CSTParser::parseStructuralType(const std::string& typeName) {
+std::shared_ptr<AST::TypeAnnotation> Parser::parseStructuralType(const std::string& typeName) {
     auto type = std::make_shared<AST::TypeAnnotation>();
     type->isStructural = true;
     type->typeName = typeName.empty() ? "struct" : typeName;
@@ -3258,7 +2894,7 @@ std::shared_ptr<AST::TypeAnnotation> CSTParser::parseStructuralType(const std::s
 // Error pattern parsing methods
 
 // Parse val pattern: val identifier
-std::shared_ptr<AST::Expression> CSTParser::parseValPattern() {
+std::shared_ptr<AST::Expression> Parser::parseValPattern() {
     auto pattern = std::make_shared<AST::ValPatternExpr>();
     pattern->line = peek().line;
     
@@ -3269,7 +2905,7 @@ std::shared_ptr<AST::Expression> CSTParser::parseValPattern() {
 }
 
 // Parse err pattern: err identifier or err ErrorType
-std::shared_ptr<AST::Expression> CSTParser::parseErrPattern() {
+std::shared_ptr<AST::Expression> Parser::parseErrPattern() {
     auto pattern = std::make_shared<AST::ErrPatternExpr>();
     pattern->line = peek().line;
     
@@ -3296,7 +2932,7 @@ std::shared_ptr<AST::Expression> CSTParser::parseErrPattern() {
 }
 
 // Parse specific error type pattern: ErrorType or ErrorType(params)
-std::shared_ptr<AST::Expression> CSTParser::parseErrorTypePattern() {
+std::shared_ptr<AST::Expression> Parser::parseErrorTypePattern() {
     auto pattern = std::make_shared<AST::ErrorTypePatternExpr>();
     pattern->line = peek().line;
     
@@ -3317,7 +2953,7 @@ std::shared_ptr<AST::Expression> CSTParser::parseErrorTypePattern() {
 }
 
 // Helper method to check if an identifier is an error type
-bool CSTParser::isErrorType(const std::string& name) {
+bool Parser::isErrorType(const std::string& name) {
     // Built-in error types
     return name == "DivisionByZero" || name == "IndexOutOfBounds" || 
            name == "NullReference" || name == "TypeConversion" || 
@@ -3328,25 +2964,25 @@ bool CSTParser::isErrorType(const std::string& name) {
 
 // Block context tracking methods implementation
 
-void CSTParser::pushBlockContext(const std::string& blockType, const Token& startToken) {
+void Parser::pushBlockContext(const std::string& blockType, const Token& startToken) {
     ErrorHandling::BlockContext context(blockType, startToken.line, startToken.start, startToken.lexeme);
     blockStack.push(context);
 }
 
-void CSTParser::popBlockContext() {
+void Parser::popBlockContext() {
     if (!blockStack.empty()) {
         blockStack.pop();
     }
 }
 
-std::optional<ErrorHandling::BlockContext> CSTParser::getCurrentBlockContext() const {
+std::optional<ErrorHandling::BlockContext> Parser::getCurrentBlockContext() const {
     if (blockStack.empty()) {
         return std::nullopt;
     }
     return blockStack.top();
 }
 
-std::string CSTParser::generateCausedByMessage(const ErrorHandling::BlockContext& context) const {
+std::string Parser::generateCausedByMessage(const ErrorHandling::BlockContext& context) const {
     std::string message = "Caused by: Unterminated " + context.blockType + " starting at line " + 
                          std::to_string(context.startLine) + ":";
     message += "\n" + std::to_string(context.startLine) + " | " + context.startLexeme;
@@ -3361,7 +2997,7 @@ std::string CSTParser::generateCausedByMessage(const ErrorHandling::BlockContext
     return message;
 }
 
-std::shared_ptr<AST::Statement> CSTParser::parseStatementWithContext(const std::string& blockType, const Token& contextToken) {
+std::shared_ptr<AST::Statement> Parser::parseStatementWithContext(const std::string& blockType, const Token& contextToken) {
     if (check(TokenType::LEFT_BRACE)) {
         pushBlockContext(blockType, contextToken);
         auto stmt = statement();
@@ -3373,7 +3009,7 @@ std::shared_ptr<AST::Statement> CSTParser::parseStatementWithContext(const std::
 }
 
 // Parse lambda expression: fn(param1, param2): returnType {body}
-std::shared_ptr<AST::LambdaExpr> CSTParser::lambdaExpression() {
+std::shared_ptr<AST::LambdaExpr> Parser::lambdaExpression() {
     auto lambda = std::make_shared<AST::LambdaExpr>();
     lambda->line = peek().line;
     

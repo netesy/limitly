@@ -2,7 +2,7 @@
 #include "backend/bytecode_printer.hh"
 #include "frontend/scanner.hh"
 #include "frontend/parser.hh"
-#include "frontend/cst_parser.hh"
+// CST parser functionality is now integrated into parser.hh
 #include "frontend/cst_printer.hh"
 #include "frontend/ast_builder.hh"
 #include "common/backend.hh"
@@ -67,7 +67,7 @@ int main(int argc, char* argv[]) {
         std::shared_ptr<AST::Program> ast;
         
         if (useCSTParser) {
-            std::cout << "=== Using New CST Parser (from cst_parser.cpp) ===\n";
+            std::cout << "=== Using New Unified Parser (CST mode) ===\n";
             
             // Frontend: CST scanning with trivia collection
             Scanner scanner(source, filename);
@@ -102,9 +102,9 @@ int main(int argc, char* argv[]) {
             }
             std::cout << std::endl;
             
-            // Use new CSTParser from cst_parser.cpp with CST mode enabled
+            // Use new Parser with CST mode enabled
             std::cout << "=== Testing New CST Parser (cstMode=true) ===\n";
-            CSTParser cstParser(scanner, true);  // CST mode enabled
+            Parser cstParser(scanner, true);  // CST mode enabled
             
             try {
                 ast = cstParser.parse();
@@ -140,7 +140,7 @@ int main(int argc, char* argv[]) {
             std::cout << "\n=== Testing Fallback Mode (cstMode=false) ===\n";
             Scanner scanner2(source, filename);
             scanner2.scanTokens(ScanMode::LEGACY);  // Use legacy scan mode for fallback
-            CSTParser fallbackParser(scanner2, false);  // CST mode disabled
+            Parser fallbackParser(scanner2, false);  // CST mode disabled
             
             try {
                 auto astFallback = fallbackParser.parse();
@@ -201,7 +201,7 @@ int main(int argc, char* argv[]) {
                     
                     // Print CST to file
                     std::cout << "CST for " << filename << "\n";
-                    std::cout << "Parser: New CSTParser from cst_parser.cpp\n";
+                    std::cout << "Parser: New Unified Parser (CST mode)\n";
                     std::cout << "Mode: CST (cstMode=true)\n";
                     std::cout << "========================================\n\n";
                     
@@ -243,7 +243,7 @@ int main(int argc, char* argv[]) {
             }
             
         } else {
-            std::cout << "=== Using Legacy Parser (from parser.cpp) ===\n";
+            std::cout << "=== Using New Unified Parser (Legacy mode) ===\n";
             
             // Frontend: Lexical analysis (scanning) - no trivia collection
             Scanner scanner(source, filename);
@@ -259,8 +259,8 @@ int main(int argc, char* argv[]) {
             std::cout << std::endl;
             
             // Frontend: Syntax analysis (parsing)
-            std::cout << "=== Legacy Parsing ===\n";
-            Parser parser(scanner);
+            std::cout << "=== Legacy Mode Parsing ===\n";
+            Parser parser(scanner, false);  // CST mode disabled for legacy behavior
             
             try {
                 ast = parser.parse();
@@ -271,8 +271,8 @@ int main(int argc, char* argv[]) {
                         std::cout << "  Line " << error.line << ": " << error.message << std::endl;
                     }
                 } else {
-                    std::cout << "✓ Legacy parsing completed successfully!\n";
-                    std::cout << "✓ No trivia preservation (original behavior)\n";
+                    std::cout << "✓ Legacy mode parsing completed successfully!\n";
+                    std::cout << "✓ No trivia preservation (legacy behavior)\n";
                     std::cout << "✓ Direct AST creation without CST overhead\n";
                 }
                 
@@ -303,7 +303,7 @@ int main(int argc, char* argv[]) {
                 
                 // Print AST to file
                 std::cout << "AST for " << filename << "\n";
-                std::cout << "Parser: " << (useCSTParser ? "New CSTParser (cst_parser.cpp)" : "Legacy Parser (parser.cpp)") << "\n";
+                std::cout << "Parser: " << (useCSTParser ? "New Unified Parser (CST mode)" : "New Unified Parser (Legacy mode)") << "\n";
                 std::cout << "Mode: " << (useCSTParser ? "CST with AST compatibility" : "Legacy AST only") << "\n";
                 if (useCSTParser) {
                     std::cout << "Note: CST nodes were created internally with trivia preservation\n";
@@ -337,7 +337,7 @@ int main(int argc, char* argv[]) {
             std::ofstream bytecodeFile(bytecodeFilename);
             if (bytecodeFile.is_open()) {
                 bytecodeFile << "Bytecode for " << filename << "\n";
-                bytecodeFile << "Parser: " << (useCSTParser ? "New CSTParser" : "Legacy Parser") << "\n";
+                bytecodeFile << "Parser: " << (useCSTParser ? "New Unified Parser (CST mode)" : "New Unified Parser (Legacy mode)") << "\n";
                 bytecodeFile << "========================================\n\n";
                 
                 // Use BytecodePrinter for file output too

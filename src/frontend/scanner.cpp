@@ -538,11 +538,13 @@ void Scanner::string() {
         return;
     }
     
-    // Add the final string part (including empty strings)
-    addToken(TokenType::STRING, value);
-    
     // Skip the closing quote
     advance();
+    
+    // Add the final string part with original lexeme (including quotes)
+    // Use the original source span to preserve quotes
+    std::string originalLexeme = source.substr(start, current - start);
+    addToken(TokenType::STRING, originalLexeme);
 }
 
 void Scanner::number() {
@@ -1160,23 +1162,4 @@ void Scanner::error(const std::string& message, const std::string& expectedValue
     // Get the current lexeme for better error reporting
     std::string lexeme = getLexeme();
     Debugger::error(message, getLine(), static_cast<int>(getCurrent()), InterpretationStage::SCANNING, source, filePath, lexeme, expectedValue);
-}
-// Implementation of Token::reconstructSource() method
-std::string Token::reconstructSource() const {
-    std::string result;
-    
-    // Add leading trivia
-    for (const auto& trivia : leadingTrivia) {
-        result += trivia.lexeme;
-    }
-    
-    // Add the main token lexeme
-    result += lexeme;
-    
-    // Add trailing trivia
-    for (const auto& trivia : trailingTrivia) {
-        result += trivia.lexeme;
-    }
-    
-    return result;
 }
