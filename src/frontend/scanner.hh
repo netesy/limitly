@@ -222,6 +222,7 @@ struct CSTConfig {
     bool preserveComments = true;
     bool emitErrorTokens = true;
     bool attachTrivia = false;      // Attach trivia to meaningful tokens
+    bool detailedExpressionNodes = false;  // Create detailed CST nodes for complex expressions
 };
 
 class Scanner {

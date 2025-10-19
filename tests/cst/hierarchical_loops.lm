@@ -1,0 +1,29 @@
+// Test hierarchical CST structure for nested loops
+// Loop body statements should be children of the loop CST nodes
+
+for (i in 1..3) {
+    print("Outer loop: " + i);
+    
+    for (j in 1..2) {
+        print("Inner loop: " + j);
+        
+        if (i == j) {
+            print("Match found");
+            break;
+        }
+    }
+}
+
+while (true) {
+    print("While loop body");
+    
+    iter (k in 1..5) {
+        print("Iter inside while: " + k);
+        
+        if (k > 3) {
+            break;
+        }
+    }
+    
+    break;
+}

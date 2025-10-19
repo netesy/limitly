@@ -40,7 +40,8 @@ namespace CST {
                 .showTypes = true,
                 .colorNodes = options.colorOutput,
                 .compactMode = false,
-                .maxWidth = 120
+                .maxWidth = 120//,
+                // .chars = {}
             });
         }
         

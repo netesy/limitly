@@ -24,6 +24,12 @@ public:
     bool isCSTMode() const { return cstMode; }
     size_t getCSTNodeCount() const { return cstNodeCount; }
     size_t getTriviaAttachmentCount() const { return triviaAttachmentCount; }
+    
+    // CST configuration methods
+    void setCSTConfig(const CSTConfig& cfg) { config = cfg; }
+    const CSTConfig& getCSTConfig() const { return config; }
+    void enableDetailedExpressionNodes(bool enable = true) { config.detailedExpressionNodes = enable; }
+    bool isDetailedExpressionNodesEnabled() const { return config.detailedExpressionNodes; }
 
 private:
     Scanner &scanner;
@@ -66,6 +72,12 @@ public:
                                            std::shared_ptr<AST::Program>,
                                            std::shared_ptr<ASTNodeType>>;
     
+    // Enhanced node creation with context management
+    template<typename ASTNodeType>
+    auto createNodeWithContext() -> std::conditional_t<std::is_same_v<ASTNodeType, AST::Program>, 
+                                                      std::shared_ptr<AST::Program>,
+                                                      std::shared_ptr<ASTNodeType>>;
+    
     // AST to CST NodeKind mapping
     CST::NodeKind mapASTNodeKind(const std::string& astNodeType);
     
@@ -83,8 +95,18 @@ public:
     // CST root node (when in CST mode)
     std::unique_ptr<CST::Node> cstRoot;
     
+    // CST context stack for parent-child relationship management
+    std::stack<CST::Node*> cstContextStack;
+    
     // Method to get the CST root (for printing/analysis)
     const CST::Node* getCST() const { return cstRoot.get(); }
+    
+    // CST context management methods
+    void pushCSTContext(CST::Node* parent);
+    void popCSTContext();
+    CST::Node* getCurrentCSTParent();
+    void addChildToCurrentContext(std::unique_ptr<CST::Node> child);
+    bool isContainerNode(CST::NodeKind kind);
 
     // Helper methods
     Token peek();
@@ -98,6 +120,9 @@ public:
     void error(const std::string &message, bool suppressException = false);
     std::vector<Token> collectAnnotations();
     void skipTrivia(); // Skip trivia tokens in CST mode
+    
+    // String parsing helper
+    std::string parseStringLiteral(const std::string& tokenLexeme);
     
     // Block context tracking methods
     void pushBlockContext(const std::string& blockType, const Token& startToken);

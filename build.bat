@@ -30,6 +30,8 @@ echo Compiling main executable...
     src\frontend\scanner.cpp ^
     src\frontend\parser.cpp ^
     src\frontend\cst.cpp ^
+    src\frontend\cst_printer.cpp ^
+    src\frontend\cst_utils.cpp ^
     src\backend\backend.cpp ^
     src\backend\vm.cpp ^
     src\backend\ast_printer.cpp ^
@@ -69,7 +71,6 @@ echo Compiling test parser...
     src\frontend\cst.cpp ^
     src\frontend\cst_printer.cpp ^
     src\frontend\cst_utils.cpp ^
-    src\frontend\cst_utils_simple.cpp ^
     src\frontend\ast_builder.cpp ^
     src\backend\type_checker.cpp ^
     src\backend\backend.cpp ^

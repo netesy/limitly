@@ -1,9 +1,0 @@
-AST for C:\Projects\limitly\tests\error_handling\block_context_tests.lm
-Parser: New CSTParser (cst_parser.cpp)
-Mode: CST with AST compatibility
-Note: CST nodes were created internally with trivia preservation
-      AST output shown below for compatibility testing
-========================================
-
-AST Dump:
-==========

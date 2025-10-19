@@ -1,9 +1,0 @@
-AST for C:\Projects\limitly\tests\simple_interpolation.lm
-Parser: New CSTParser (cst_parser.cpp)
-Mode: CST with AST compatibility
-Note: CST nodes were created internally with trivia preservation
-      AST output shown below for compatibility testing
-========================================
-
-AST Dump:
-==========
