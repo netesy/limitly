@@ -327,34 +327,181 @@ std::unique_ptr<Node> CSTParser::parseObjectLiteral() {
 - Verify `test_parser --cst` vs `test_parser --legacy` equivalence
 - Test error reporting and recovery
 
+## Hierarchical CST Structure Design
+
+### Problem Statement
+
+The current CST implementation creates a flat structure where all statements are added to the root CST node, losing the hierarchical relationships between parent and child statements. For example, statements inside if blocks or loop bodies appear at the root level instead of being nested under their parent statement.
+
+### Solution: CST Context Stack
+
+**Core Concept**: Maintain a context stack of CST nodes during parsing to track the current parent node for newly created statements.
+
+**Architecture**:
+```cpp
+class Parser {
+private:
+    std::stack<CST::Node*> cstContextStack;  // Stack of parent CST nodes
+    std::unique_ptr<CST::Node> cstRoot;      // Root CST node
+    
+    // Context management methods
+    void pushCSTContext(CST::Node* parent);
+    void popCSTContext();
+    CST::Node* getCurrentCSTParent();
+    void addChildToCurrentContext(std::unique_ptr<CST::Node> child);
+    
+public:
+    // Enhanced parsing methods that use context
+    std::shared_ptr<AST::Statement> parseStatementInContext();
+    std::shared_ptr<AST::BlockStatement> parseBlockWithContext();
+};
+```
+
+### Hierarchical Node Creation Pattern
+
+**Enhanced createNode Pattern**:
+```cpp
+template<typename ASTNodeType>
+std::shared_ptr<ASTNodeType> Parser::createNodeWithContext() {
+    auto astNode = std::make_shared<ASTNodeType>();
+    
+    if (cstMode) {
+        // Create CST node
+        CST::NodeKind cstKind = mapASTNodeKind(typeid(ASTNodeType).name());
+        auto cstNode = std::make_unique<CST::Node>(cstKind);
+        
+        // Add to current parent context instead of root
+        addChildToCurrentContext(std::move(cstNode));
+        
+        // Set this node as current context for its children
+        pushCSTContext(getCurrentCSTParent()->getLastChild());
+    }
+    
+    return astNode;
+}
+```
+
+### Block Statement Hierarchical Parsing
+
+**Enhanced Block Parsing**:
+```cpp
+std::shared_ptr<AST::BlockStatement> Parser::block() {
+    auto blockAST = createNodeWithContext<AST::BlockStatement>();
+    
+    // CST context is automatically set by createNodeWithContext
+    Token leftBrace = consume(TokenType::LEFT_BRACE, "Expected '{'");
+    
+    // Parse statements - they will be added as children of this block
+    while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
+        auto stmt = declaration();  // This will add to current context
+        if (stmt) {
+            blockAST->statements.push_back(stmt);
+        }
+    }
+    
+    Token rightBrace = consume(TokenType::RIGHT_BRACE, "Expected '}'");
+    
+    // Pop context when exiting block
+    if (cstMode) {
+        popCSTContext();
+    }
+    
+    return blockAST;
+}
+```
+
+### Statement Context Integration
+
+**Enhanced Statement Parsing**:
+```cpp
+std::shared_ptr<AST::Statement> Parser::ifStatement() {
+    auto stmt = createNodeWithContext<AST::IfStatement>();
+    
+    // Parse if condition and tokens...
+    
+    // Parse then branch - statements will be nested under this if statement
+    stmt->thenBranch = parseStatementWithContext("if", ifToken);
+    
+    // Parse else branch if present
+    if (match({TokenType::ELSE})) {
+        stmt->elseBranch = parseStatementWithContext("else", elseToken);
+    }
+    
+    // Context is automatically popped by createNodeWithContext
+    return stmt;
+}
+```
+
+### CST Node Parent-Child API
+
+**Enhanced CST Node Interface**:
+```cpp
+class CST::Node {
+private:
+    std::vector<std::unique_ptr<Node>> children;
+    Node* parent = nullptr;
+    
+public:
+    // Hierarchical management
+    void addChild(std::unique_ptr<Node> child);
+    Node* getParent() const { return parent; }
+    const std::vector<std::unique_ptr<Node>>& getChildren() const { return children; }
+    Node* getLastChild() const;
+    
+    // Navigation
+    Node* getNextSibling() const;
+    Node* getPreviousSibling() const;
+    size_t getChildIndex() const;
+    
+    // Traversal
+    void visitDepthFirst(std::function<void(Node*)> visitor);
+    void visitBreadthFirst(std::function<void(Node*)> visitor);
+};
+```
+
 ## Implementation Plan
 
-### Phase 1: Core Fixes (High Priority)
+### Phase 1: Core Fixes (High Priority) ✅ COMPLETED
 
 1. Fix memory allocation issues in existing CST parser
-2. Implement pratt /recursive descent parsing based on the legacy parser
+2. Implement recursive descent parsing based on the legacy parser
 3. Fix string interpolation parsing
 4. Add ELIF token type and parsing
 
-### Phase 2: Trivia Integration
+### Phase 2: Trivia Integration ✅ COMPLETED
 
 1. Enhance scanner to store trivia separately
 2. Implement trivia reintegration in CST nodes
 3. Add source reconstruction capability
 4. Test trivia preservation
 
-### Phase 3: Error Recovery
+### Phase 3: Hierarchical CST Structure (CURRENT PHASE)
 
-1. Implement robust error recovery
+1. Implement CST context stack for parent-child relationship management
+2. Update block() method to use createNodeWithContext pattern
+3. Enhance if, loop, and function statement parsing for proper nesting
+4. Add CST node parent-child API and navigation methods
+5. Test hierarchical structure with nested statements
+
+### Phase 4: Enhanced Statement CST Nodes
+
+1. Update all statement parsing methods to use createNodeWithContext
+2. Implement proper token capture for all statement types
+3. Add optional complex expression CST nodes
+4. Test comprehensive statement and expression CST coverage
+
+### Phase 5: Error Recovery and Polish
+
+1. Implement robust error recovery with hierarchical context
 2. Add comprehensive error reporting
 3. Test with malformed input files
 4. Optimize error message quality
 
-### Phase 4: Performance and Polish
+### Phase 6: Performance and Validation
 
-1. Optimize parsing performance
-2. Add comprehensive test coverage
-3. Document API and usage patterns
+1. Optimize parsing performance with hierarchical structures
+2. Add comprehensive test coverage for nested structures
+3. Document hierarchical API and usage patterns
 4. Performance benchmarking and tuning
 
-This design maintains the separation of concerns while fixing the critical issues in the CST parser, enabling accurate parsing with full trivia preservation.
+This enhanced design maintains the separation of concerns while adding proper hierarchical structure to the CST, enabling accurate representation of nested code structures with full trivia preservation.

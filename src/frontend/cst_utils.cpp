@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <set>
 #include <cmath>
+#include <iostream>
 
 namespace CST {
 
@@ -752,6 +753,161 @@ namespace CST {
         }
         
     } // namespace Validation
+
+    // Simple utility functions for CST manipulation
+    namespace Utils {
+        
+        // Text reconstruction
+        std::string getText(const Node* node) {
+            if (!node) return "";
+            return node->getText();
+        }
+        
+        std::string getTextWithoutTrivia(const Node* node) {
+            if (!node) return "";
+            return node->getTextWithoutTrivia();
+        }
+        
+        // Token extraction
+        std::vector<Token> getAllTokens(const Node* node) {
+            if (!node) return {};
+            return node->getAllTokens();
+        }
+        
+        std::vector<Token> getSignificantTokens(const Node* node) {
+            if (!node) return {};
+            
+            auto allTokens = node->getAllTokens();
+            std::vector<Token> significant;
+            
+            for (const auto& token : allTokens) {
+                if (isSignificantToken(token)) {
+                    significant.push_back(token);
+                }
+            }
+            
+            return significant;
+        }
+        
+        // Tree traversal
+        void forEachChild(const Node* node, std::function<void(const Node*)> visitor) {
+            if (!node || !visitor) return;
+            
+            auto children = node->getChildNodes();
+            for (const auto* child : children) {
+                if (child) {
+                    visitor(child);
+                }
+            }
+        }
+        
+        void forEachDescendant(const Node* node, std::function<void(const Node*)> visitor) {
+            if (!node || !visitor) return;
+            
+            visitor(node);
+            
+            auto children = node->getChildNodes();
+            for (const auto* child : children) {
+                if (child) {
+                    forEachDescendant(child, visitor);
+                }
+            }
+        }
+        
+        // Find operations
+        const Node* findByKind(const Node* root, NodeKind kind) {
+            if (!root) return nullptr;
+            
+            if (root->kind == kind) {
+                return root;
+            }
+            
+            auto children = root->getChildNodes();
+            for (const auto* child : children) {
+                if (child) {
+                    const Node* result = findByKind(child, kind);
+                    if (result) {
+                        return result;
+                    }
+                }
+            }
+            
+            return nullptr;
+        }
+        
+        std::vector<const Node*> findAllByKind(const Node* root, NodeKind kind) {
+            std::vector<const Node*> results;
+            if (!root) return results;
+            
+            forEachDescendant(root, [&](const Node* node) {
+                if (node->kind == kind) {
+                    results.push_back(node);
+                }
+            });
+            
+            return results;
+        }
+        
+        // Source reconstruction
+        std::string reconstructSource(const Node* node) {
+            if (!node) return "";
+            
+            std::string result;
+            
+            for (const auto& element : node->elements) {
+                if (std::holds_alternative<Token>(element)) {
+                    const auto& token = std::get<Token>(element);
+                    result += token.lexeme;
+                } else if (std::holds_alternative<std::unique_ptr<Node>>(element)) {
+                    const auto& childNode = std::get<std::unique_ptr<Node>>(element);
+                    if (childNode) {
+                        result += reconstructSource(childNode.get());
+                    }
+                }
+            }
+            
+            return result;
+        }
+        
+        // Validation
+        bool validateCST(const Node* root) {
+            if (!root) return false;
+            
+            bool isValid = true;
+            
+            forEachDescendant(root, [&](const Node* node) {
+                if (!node->isValid) {
+                    isValid = false;
+                }
+            });
+            
+            return isValid;
+        }
+        
+        // Statistics
+        size_t countNodes(const Node* root) {
+            if (!root) return 0;
+            
+            size_t count = 0;
+            forEachDescendant(root, [&](const Node* node) {
+                count++;
+            });
+            
+            return count;
+        }
+        
+        size_t countTokens(const Node* root) {
+            if (!root) return 0;
+            
+            auto tokens = root->getAllTokens();
+            return tokens.size();
+        }
+        
+        std::vector<const Node*> findErrorNodes(const Node* root) {
+            return findAllByKind(root, NodeKind::ERROR_NODE);
+        }
+        
+    } // namespace Utils
 
     // Analysis utilities implementation - temporarily disabled
     /*

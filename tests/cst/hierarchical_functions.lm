@@ -1,0 +1,44 @@
+// Test hierarchical CST structure for functions
+// Function body statements should be children of FUNCTION_DECLARATION CST nodes
+
+fn outerFunction(x: int) {
+    print("In outer function");
+    var result = x * 2;
+    
+    fn innerFunction(y: int) {
+        print("In inner function");
+        return y + 1;
+    }
+    
+    if (result > 10) {
+        result = innerFunction(result);
+    }
+    
+    return result;
+}
+
+fn simpleFunction() {
+    print("Simple function body");
+    var local = 42;
+    return local;
+}
+
+// Function with complex nested structure
+fn complexFunction(a: int, b: int) {
+    for (i in 1..a) {
+        if (i % 2 == 0) {
+            print("Even: " + i);
+        } else {
+            print("Odd: " + i);
+        }
+    }
+    
+    while (b > 0) {
+        b = b - 1;
+        if (b == 0) {
+            break;
+        }
+    }
+    
+    return a + b;
+}

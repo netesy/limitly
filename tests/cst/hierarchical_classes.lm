@@ -1,0 +1,41 @@
+// Test hierarchical CST structure for classes
+// Class members should be children of CLASS_DECLARATION CST nodes
+
+class OuterClass {
+    var field1: int = 10;
+    var field2: str = "test";
+    
+    fn method1() {
+        print("Method 1 called");
+        var local = this.field1;
+        
+        if (local > 5) {
+            print("Field is large");
+        }
+        
+        return local;
+    }
+    
+    fn method2(param: int) -> int {
+        for (i in 1..param) {
+            if (i == this.field1) {
+                return i;
+            }
+        }
+        return 0;
+    }
+    
+    class InnerClass {
+        var innerField: str = "inner";
+        
+        fn innerMethod() {
+            print("Inner method: " + this.innerField);
+        }
+    }
+}
+
+class SimpleClass {
+    fn simpleMethod() {
+        print("Simple method");
+    }
+}

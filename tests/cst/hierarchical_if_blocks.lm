@@ -1,0 +1,24 @@
+// Test hierarchical CST structure for nested if blocks
+// This should create a proper hierarchy where statements inside if blocks
+// are children of the IF_STATEMENT CST node, not at root level
+
+if (true) {
+    print("Level 1 - inside if");
+    var x = 42;
+    
+    if (x > 40) {
+        print("Level 2 - nested if");
+        var y = x + 1;
+        
+        if (y > 42) {
+            print("Level 3 - deeply nested");
+        }
+    } else {
+        print("Level 2 - else branch");
+    }
+}
+
+// Another top-level if for comparison
+if (false) {
+    print("Second if block");
+}

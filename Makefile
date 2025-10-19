@@ -21,44 +21,32 @@ endif
 # Binaries
 BIN_DIR := bin
 
-TARGETS := limitly$(EXE_EXT) test_parser$(EXE_EXT) benchmark_parsers$(EXE_EXT) test_performance_optimization$(EXE_EXT)
+TARGETS := limitly$(EXE_EXT) test_parser$(EXE_EXT)
 
 # Sources
 COMMON_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp src/common/debugger.cpp
 BACKEND_COMMON_SRCS := src/backend/backend.cpp src/backend/functions.cpp src/backend/classes.cpp src/backend/ast_printer.cpp src/backend/bytecode_printer.cpp src/backend/type_checker.cpp
 ERROR_SRCS := src/error/error_formatter.cpp src/error/error_code_generator.cpp src/error/contextual_hint_provider.cpp src/error/source_code_formatter.cpp src/error/console_formatter.cpp src/error/error_catalog.cpp
-CST_SRCS := src/frontend/cst_parser.cpp src/frontend/cst.cpp src/frontend/cst_printer.cpp src/frontend/cst_utils.cpp src/frontend/cst_utils_simple.cpp src/frontend/ast_builder.cpp
+CST_SRCS := src/frontend/cst.cpp src/frontend/cst_printer.cpp src/frontend/cst_utils.cpp src/frontend/cst_utils_simple.cpp src/frontend/ast_builder.cpp
 
 # Platform-specific concurrency sources
 ifeq ($(PLATFORM),windows)
     CONCURRENCY_SRCS := src/backend/concurrency/scheduler.cpp src/backend/concurrency/thread_pool.cpp src/backend/concurrency/event_loop.cpp src/backend/concurrency/iocp_event_loop.cpp src/backend/concurrency/concurrency_runtime.cpp src/backend/concurrency/task_vm.cpp
 else
-    CONCURRENCY_SRCS := src/backend/concurrency/scheduler.cpp src/backend/concurrency/thread_pool.cpp src/backend/concurrency/event_loop.cpp src/backend/concurrency/epoll_event_loop.cpp src/backend/concurrency/concurrency_runtime.cpp
+    CONCURRENCY_SRCS := src/backend/concurrency/scheduler.cpp src/backend/concurrency/thread_pool.cpp src/backend/concurrency/event_loop.cpp src/backend/concurrency/epoll_event_loop.cpp src/backend/concurrency/concurrency_runtime.cpp src/backend/concurrency/task_vm.cpp
 endif
 
-MAIN_SRCS := src/main.cpp src/backend/vm.cpp $(BACKEND_COMMON_SRCS) $(COMMON_SRCS) $(CONCURRENCY_SRCS) src/backend/closure_impl.cpp src/common/builtin_functions.cpp $(ERROR_SRCS)
+MAIN_SRCS := src/main.cpp src/backend/vm.cpp $(BACKEND_COMMON_SRCS) $(COMMON_SRCS) $(CONCURRENCY_SRCS) src/backend/closure_impl.cpp src/common/builtin_functions.cpp $(ERROR_SRCS) $(CST_SRCS)
 TEST_SRCS := src/test_parser.cpp $(CST_SRCS) $(BACKEND_COMMON_SRCS) $(COMMON_SRCS) $(ERROR_SRCS)
-BENCHMARK_SRCS := src/benchmark_parsers.cpp src/frontend/parser_benchmark.cpp $(CST_SRCS) $(BACKEND_COMMON_SRCS) $(COMMON_SRCS) $(ERROR_SRCS)
-PERF_OPT_SRCS := src/test_performance_optimization.cpp src/frontend/parser_benchmark.cpp src/frontend/trivia_optimizer.cpp $(CST_SRCS) $(BACKEND_COMMON_SRCS) $(COMMON_SRCS) $(ERROR_SRCS)
-
 
 # Objects
 OBJ_DIR := obj
 MAIN_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(MAIN_SRCS))
 TEST_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(TEST_SRCS))
-BENCHMARK_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(BENCHMARK_SRCS))
-PERF_OPT_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(PERF_OPT_SRCS))
 
-.PHONY: all clean check-deps benchmarks performance-tests
+.PHONY: all clean clear check-deps linux windows
 
 all: check-deps $(TARGETS)
-
-benchmarks: benchmark_parsers$(EXE_EXT) test_performance_optimization$(EXE_EXT)
-
-performance-tests: benchmarks
-	@echo "Running performance benchmarks..."
-	$(BIN_DIR)/test_performance_optimization$(EXE_EXT)
-	$(BIN_DIR)/benchmark_parsers$(EXE_EXT)
 
 # =============================
 # Dependency checks
@@ -79,12 +67,6 @@ limitly$(EXE_EXT): $(MAIN_OBJS) | $(BIN_DIR)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $(BIN_DIR)/$@ $^ $(LIBS)
 
 test_parser$(EXE_EXT): $(TEST_OBJS) | $(BIN_DIR)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $(BIN_DIR)/$@ $^ $(LIBS)
-
-benchmark_parsers$(EXE_EXT): $(BENCHMARK_OBJS) | $(BIN_DIR)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $(BIN_DIR)/$@ $^ $(LIBS)
-
-test_performance_optimization$(EXE_EXT): $(PERF_OPT_OBJS) | $(BIN_DIR)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $(BIN_DIR)/$@ $^ $(LIBS)
 
 
@@ -118,9 +100,115 @@ ifeq ($(PLATFORM),windows)
 	@cmd /c "if exist \"$(BIN_DIR)\" (cd $(BIN_DIR) && del /q *.exe 2>nul)"
 else
 	rm -rf $(OBJ_DIR)
-	rm -f $(BIN_DIR)/limitly $(BIN_DIR)/test_parser $(BIN_DIR)/benchmark_parsers $(BIN_DIR)/test_performance_optimization
+	rm -f $(BIN_DIR)/limitly $(BIN_DIR)/test_parser
 endif
 	@echo "🧹 Cleaned build artifacts."
+
+# Clear generated files (.ast.txt, .bytecode.txt, .cst.txt, .tokens.txt)
+clear:
+ifeq ($(PLATFORM),windows)
+	@echo "🧹 Cleaning generated .txt files (keeping CMakeLists.txt)..."
+	@cmd /c "for /r . %%f in (*.ast.txt) do @del \"%%f\" 2>nul"
+	@cmd /c "for /r . %%f in (*.bytecode.txt) do @del \"%%f\" 2>nul"
+	@cmd /c "for /r . %%f in (*.cst.txt) do @del \"%%f\" 2>nul"
+	@cmd /c "for /r . %%f in (*.tokens.txt) do @del \"%%f\" 2>nul"
+else
+	@echo "🧹 Cleaning generated .txt files (keeping CMakeLists.txt)..."
+	@find . -name "*.ast.txt" -type f -delete 2>/dev/null || true
+	@find . -name "*.bytecode.txt" -type f -delete 2>/dev/null || true
+	@find . -name "*.cst.txt" -type f -delete 2>/dev/null || true
+	@find . -name "*.tokens.txt" -type f -delete 2>/dev/null || true
+endif
+	@echo "✅ Generated files cleaned."
+
+# =============================
+# Platform-specific builds using build script commands
+# =============================
+
+# Windows build using build.bat
+windows:
+	@echo "🔨 Building for Windows using build.bat..."
+	./build.bat
+	@echo ""
+	@echo "Available executables:"
+	@echo "  bin/limitly.exe      - Main language interpreter"
+	@echo "  bin/test_parser.exe  - Parser testing utility"
+
+# Linux build using build.sh commands
+linux: | $(BIN_DIR)
+	@echo "🔨 Building for Linux using build.sh commands..."
+	@echo "Checking dependencies..."
+	@command -v g++ >/dev/null || (echo "Error: g++ not found." && exit 1)
+	@echo "✅ All dependencies found."
+	
+	@echo "Compiling debugger..."
+	g++ -std=c++17 -Wall -Wextra -pedantic -c -o $(BIN_DIR)/debugger.o src/common/debugger.cpp -I.
+	
+	@echo "Compiling main executable..."
+	g++ -std=c++17 -Wall -Wextra -pedantic -I. -o $(BIN_DIR)/limitly \
+		src/main.cpp \
+		src/frontend/scanner.cpp \
+		src/frontend/parser.cpp \
+		src/frontend/cst.cpp \
+		src/frontend/cst_printer.cpp \
+		src/frontend/cst_utils.cpp \
+		src/backend/backend.cpp \
+		src/backend/vm.cpp \
+		src/backend/ast_printer.cpp \
+		src/backend/bytecode_printer.cpp \
+		src/backend/functions.cpp \
+		src/backend/closure_impl.cpp \
+		src/backend/classes.cpp \
+		src/backend/type_checker.cpp \
+		src/backend/concurrency/scheduler.cpp \
+		src/backend/concurrency/thread_pool.cpp \
+		src/backend/concurrency/event_loop.cpp \
+		src/backend/concurrency/epoll_event_loop.cpp \
+		src/backend/concurrency/concurrency_runtime.cpp \
+		src/common/builtin_functions.cpp \
+		src/error/error_formatter.cpp \
+		src/error/error_code_generator.cpp \
+		src/error/contextual_hint_provider.cpp \
+		src/error/source_code_formatter.cpp \
+		src/error/console_formatter.cpp \
+		src/error/error_catalog.cpp \
+		$(BIN_DIR)/debugger.o
+	@echo "✅ limitly built successfully."
+	
+	@echo "Compiling test parser..."
+	g++ -std=c++17 -Wall -Wextra -pedantic -I. -o $(BIN_DIR)/test_parser \
+		src/test_parser.cpp \
+		src/frontend/scanner.cpp \
+		src/frontend/parser.cpp \
+		src/frontend/cst.cpp \
+		src/frontend/cst_printer.cpp \
+		src/frontend/cst_utils.cpp \
+		src/frontend/ast_builder.cpp \
+		src/backend/type_checker.cpp \
+		src/backend/backend.cpp \
+		src/backend/ast_printer.cpp \
+		src/backend/bytecode_printer.cpp \
+		src/backend/functions.cpp \
+		src/backend/closure_impl.cpp \
+		src/backend/classes.cpp \
+		src/error/error_formatter.cpp \
+		src/error/error_code_generator.cpp \
+		src/error/contextual_hint_provider.cpp \
+		src/error/source_code_formatter.cpp \
+		src/error/console_formatter.cpp \
+		src/error/error_catalog.cpp \
+		$(BIN_DIR)/debugger.o
+	@echo "✅ test_parser built successfully."
+	
+	@echo "Cleaning up object file..."
+	rm -f $(BIN_DIR)/debugger.o
+	
+	@echo ""
+	@echo "✅ Linux build completed successfully!"
+	@echo ""
+	@echo "Available executables:"
+	@echo "  $(BIN_DIR)/limitly      - Main language interpreter"
+	@echo "  $(BIN_DIR)/test_parser  - Parser testing utility"
 
 # =============================
 # Help
@@ -130,11 +218,10 @@ help:
 	@echo "  all                          - Build all main targets"
 	@echo "  limitly$(EXE_EXT)           - Build main language interpreter"
 	@echo "  test_parser$(EXE_EXT)       - Build parser testing utility"
-	@echo "  benchmarks                   - Build performance benchmark tools"
-	@echo "  benchmark_parsers$(EXE_EXT) - Build parser comparison tool"
-	@echo "  test_performance_optimization$(EXE_EXT) - Build trivia optimization tester"
-	@echo "  performance-tests            - Build and run all performance tests"
-	@echo "  clean                        - Clean build artifacts"
+	@echo "  clean                        - Clean build artifacts (obj/, bin/)"
+	@echo "  clear                        - Clear generated .txt files (.ast, .bytecode, .cst, .tokens)"
+	@echo "  windows                      - Build using build.bat commands (Windows only)"
+	@echo "  linux                        - Build using build.sh commands (Linux only)"
 	@echo "  check-deps                   - Check build dependencies"
 	@echo ""
 	@echo "Platform: $(PLATFORM)"

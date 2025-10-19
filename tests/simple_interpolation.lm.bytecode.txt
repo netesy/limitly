@@ -1,9 +1,0 @@
-Bytecode for C:\Projects\limitly\tests\simple_interpolation.lm
-Parser: New CSTParser
-========================================
-
-=== Bytecode ===
-Generated 1 instructions
-
-   0: HALT                
-

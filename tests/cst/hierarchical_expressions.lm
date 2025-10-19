@@ -1,0 +1,37 @@
+// Test hierarchical CST structure for expression statements
+// Expressions should be children of EXPRESSION_STATEMENT CST nodes
+
+// Simple expression statements
+x = 42;
+y = x + 10;
+z = (x * y) / 2;
+
+// Complex expression statements
+result = functionCall(arg1, arg2);
+obj.method(param);
+array[index] = value;
+
+// Expression statements with nested expressions
+complexResult = (a + b) * (c - d) + functionCall(x, y);
+conditionalResult = condition ? trueValue : falseValue;
+
+// Expression statements in control structures
+if (true) {
+    // These expression statements should be nested under the if block
+    innerX = 100;
+    innerY = innerX * 2;
+    innerResult = calculate(innerX, innerY);
+}
+
+for (i in 1..5) {
+    // These expression statements should be nested under the for loop
+    loopVar = i * i;
+    loopResult = process(loopVar);
+}
+
+fn testFunction() {
+    // These expression statements should be nested under the function
+    localVar = 50;
+    localResult = localVar + 25;
+    return localResult;
+}

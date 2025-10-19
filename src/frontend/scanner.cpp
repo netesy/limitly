@@ -376,6 +376,7 @@ void Scanner::string() {
     char quoteType = source[start]; // Store the opening quote type (' or ")
     std::string value;
     current = start + 1; // Skip the opening quote
+    bool hasInterpolation = false; // Track if this string has interpolation
     
     
     // Parse string with interpolation support
@@ -468,10 +469,13 @@ void Scanner::string() {
             }
             
             if (isInterpolation) {
+                hasInterpolation = true; // Mark that this string has interpolation
                 // Found interpolation start
                 // Add interpolation start token with the string part before interpolation
                 advance(); // consume '{'
-                addToken(TokenType::INTERPOLATION_START, value);
+                // Add quotes around the value for consistency with regular strings
+                std::string quotedValue = std::string(1, quoteType) + value + std::string(1, quoteType);
+                addToken(TokenType::INTERPOLATION_START, quotedValue);
                 value.clear();
                 
                 // Parse the expression inside {}
@@ -512,7 +516,9 @@ void Scanner::string() {
                 
                 // Add interpolation end token
                 advance(); // consume '}'
-                addToken(TokenType::INTERPOLATION_END);
+                // Set start position to current to avoid including previous content
+                start = current;
+                addToken(TokenType::INTERPOLATION_END, "");
             } else {
                 // Regular brace, treat as normal character
                 value += peek();
@@ -541,10 +547,23 @@ void Scanner::string() {
     // Skip the closing quote
     advance();
     
-    // Add the final string part with original lexeme (including quotes)
-    // Use the original source span to preserve quotes
-    std::string originalLexeme = source.substr(start, current - start);
-    addToken(TokenType::STRING, originalLexeme);
+    // Only add final STRING token if this wasn't an interpolated string
+    if (!hasInterpolation) {
+        // Add the final string part with original lexeme (including quotes)
+        // Use the original source span to preserve quotes
+        std::string originalLexeme = source.substr(start, current - start);
+        addToken(TokenType::STRING, originalLexeme);
+    } else {
+        // For interpolated strings, add the final string part if there's remaining content
+        if (!value.empty()) {
+            std::string quotedValue = std::string(1, quoteType) + value + std::string(1, quoteType);
+            addToken(TokenType::STRING, quotedValue);
+        } else {
+            // Add empty string token to complete the interpolation sequence
+            std::string emptyQuoted = std::string(2, quoteType);
+            addToken(TokenType::STRING, emptyQuoted);
+        }
+    }
 }
 
 void Scanner::number() {

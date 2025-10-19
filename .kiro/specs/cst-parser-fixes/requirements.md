@@ -78,7 +78,49 @@ The CST (Concrete Syntax Tree) parser is currently failing with memory allocatio
 4. WHEN switching parser modes THEN the interface SHALL be consistent and intuitive
 5. WHEN debugging parsing issues THEN the parser SHALL provide detailed diagnostic information
 
-### Requirement 7: Test Coverage and Validation
+### Requirement 7: Hierarchical CST Structure and Node Nesting
+
+**User Story:** As a tool developer, I want the CST to represent the hierarchical structure of the source code accurately, so that I can build tools that understand the nested relationships between statements and expressions.
+
+#### Acceptance Criteria
+
+1. WHEN parsing block statements THEN child statements SHALL be nested under their parent block CST node, not added to the root level
+2. WHEN parsing if statements with blocks THEN the statements inside the if block SHALL be children of the if statement CST node
+3. WHEN parsing loop statements (for, while, iter) THEN the loop body statements SHALL be nested under the loop CST node
+4. WHEN parsing function declarations THEN the function body statements SHALL be nested under the function CST node
+5. WHEN parsing class declarations THEN method and field declarations SHALL be nested under the class CST node
+6. WHEN parsing nested structures THEN the CST SHALL maintain proper parent-child relationships at all levels
+7. WHEN traversing the CST THEN tools SHALL be able to navigate from parent to child nodes and vice versa
+
+### Requirement 8: Enhanced Statement and Expression CST Nodes
+
+**User Story:** As a developer, I want all statement and expression types to have proper CST node representation, so that the CST provides complete structural information about the source code.
+
+#### Acceptance Criteria
+
+1. WHEN parsing block statements THEN the parser SHALL create BLOCK_STATEMENT CST nodes using createNode<AST::BlockStatement>()
+2. WHEN parsing loop statements (for, while, iter) THEN the parser SHALL create structured CST nodes with proper token capture
+3. WHEN parsing function declarations THEN the parser SHALL create FUNCTION_DECLARATION CST nodes with parameter and body structure
+4. WHEN parsing class declarations THEN the parser SHALL create CLASS_DECLARATION CST nodes with member structure
+5. WHEN parsing complex expressions THEN the parser SHALL optionally create structured CST nodes for binary expressions, member access, and function calls
+6. WHEN parsing expression statements THEN the parser SHALL create EXPRESSION_STATEMENT CST nodes that properly contain their expression tokens
+7. WHEN parsing any statement type THEN all consumed tokens SHALL be captured in the appropriate CST node hierarchy
+
+### Requirement 9: CST Node Parent-Child Relationship Management
+
+**User Story:** As a tool developer, I want a clear API for managing parent-child relationships in CST nodes, so that I can build and manipulate hierarchical CST structures programmatically.
+
+#### Acceptance Criteria
+
+1. WHEN creating nested CST structures THEN the parser SHALL provide a mechanism to set the current parent CST node context
+2. WHEN parsing statements within a block THEN new statement CST nodes SHALL be added as children of the current block CST node
+3. WHEN entering a new scope (block, function, class) THEN the parser SHALL push the new CST node as the current parent context
+4. WHEN exiting a scope THEN the parser SHALL pop the parent context and return to the previous parent
+5. WHEN adding child nodes THEN the CST node API SHALL maintain bidirectional parent-child references
+6. WHEN querying CST structure THEN tools SHALL be able to access parent nodes, child nodes, and sibling nodes efficiently
+7. WHEN building CST incrementally THEN the parser SHALL ensure all nodes are properly connected in the hierarchy
+
+### Requirement 10: Test Coverage and Validation
 
 **User Story:** As a developer, I want comprehensive test coverage for the CST parser, so that I can be confident in its correctness across all language features.
 
@@ -89,3 +131,5 @@ The CST (Concrete Syntax Tree) parser is currently failing with memory allocatio
 3. WHEN comparing CST and legacy parser outputs THEN automated tests SHALL verify equivalence
 4. WHEN testing error conditions THEN the CST parser SHALL handle errors as well as or better than the legacy parser
 5. WHEN running performance benchmarks THEN the CST parser SHALL meet performance requirements consistently
+6. WHEN testing hierarchical structures THEN the CST SHALL correctly represent nested relationships for all statement types
+7. WHEN testing CST reconstruction THEN nested structures SHALL be properly preserved and reconstructed

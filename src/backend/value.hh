@@ -153,6 +153,59 @@ struct ClosureValue {
         return functionName;
     }
     
+    // Memory management methods
+    std::string getClosureId() const {
+        return functionName + "_" + std::to_string(reinterpret_cast<uintptr_t>(this));
+    }
+    
+    void cleanup() {
+        // Clear captured environment to help with garbage collection
+        if (capturedEnvironment) {
+            // Remove references to captured variables to break potential cycles
+            for (const auto& varName : capturedVariables) {
+                try {
+                    capturedEnvironment->remove(varName);
+                } catch (const std::runtime_error&) {
+                    // Variable might already be removed, continue cleanup
+                }
+            }
+        }
+        capturedVariables.clear();
+    }
+    
+    // Check for potential memory leaks
+    bool hasMemoryLeaks() const {
+        if (!capturedEnvironment) return false;
+        
+        // Check if captured environment has circular references
+        auto symbols = capturedEnvironment->getAllSymbols();
+        for (const auto& [name, value] : symbols) {
+            if (value && value->type && value->type->tag == TypeTag::Closure) {
+                // Found another closure in captured variables - potential cycle
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    // Get memory usage estimate
+    size_t getMemoryUsage() const {
+        size_t usage = sizeof(ClosureValue);
+        usage += functionName.size();
+        usage += capturedVariables.size() * sizeof(std::string);
+        for (const auto& var : capturedVariables) {
+            usage += var.size();
+        }
+        
+        // Estimate captured environment size
+        if (capturedEnvironment) {
+            auto symbols = capturedEnvironment->getAllSymbols();
+            usage += symbols.size() * (sizeof(std::string) + sizeof(ValuePtr));
+        }
+        
+        return usage;
+    }
+    
     // String representation
     std::string toString() const;
     

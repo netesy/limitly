@@ -4,6 +4,7 @@
 #include "frontend/parser.hh"
 // CST parser functionality is now integrated into parser.hh
 #include "frontend/cst_printer.hh"
+#include "frontend/cst_utils.hh"
 #include "frontend/ast_builder.hh"
 #include "common/backend.hh"
 #include "backend/vm.hh"
@@ -75,36 +76,59 @@ int main(int argc, char* argv[]) {
             
             // Print tokens with trivia information
             std::cout << "=== Tokens with Trivia ===\n";
+            
+            // Capture token output for both console and file
+            std::ostringstream tokenOutput;
+            tokenOutput << "=== Tokens with Trivia ===\n";
+            
             for (const auto& token : tokens) {
-                std::cout << "Line " << token.line << ": "
-                          << scanner.tokenTypeToString(token.type)
-                          << " = '" << token.lexeme << "'";
+                std::string tokenLine = "Line " + std::to_string(token.line) + ": "
+                                      + scanner.tokenTypeToString(token.type)
+                                      + " = '" + token.lexeme + "'";
                 
                 // Show leading trivia
                 if (!token.getLeadingTrivia().empty()) {
-                    std::cout << " [leading: ";
+                    tokenLine += " [leading: ";
                     for (const auto& trivia : token.getLeadingTrivia()) {
-                        std::cout << scanner.tokenTypeToString(trivia.type) << "('" << trivia.lexeme << "') ";
+                        tokenLine += scanner.tokenTypeToString(trivia.type) + "('" + trivia.lexeme + "') ";
                     }
-                    std::cout << "]";
+                    tokenLine += "]";
                 }
                 
                 // Show trailing trivia
                 if (!token.getTrailingTrivia().empty()) {
-                    std::cout << " [trailing: ";
+                    tokenLine += " [trailing: ";
                     for (const auto& trivia : token.getTrailingTrivia()) {
-                        std::cout << scanner.tokenTypeToString(trivia.type) << "('" << trivia.lexeme << "') ";
+                        tokenLine += scanner.tokenTypeToString(trivia.type) + "('" + trivia.lexeme + "') ";
                     }
-                    std::cout << "]";
+                    tokenLine += "]";
                 }
                 
-                std::cout << "\n";
+                tokenLine += "\n";
+                std::cout << tokenLine;
+                tokenOutput << tokenLine;
             }
             std::cout << std::endl;
+            
+            // Save tokens to file
+            std::string tokensFilename = filename + ".tokens.txt";
+            std::ofstream tokensFile(tokensFilename);
+            if (tokensFile.is_open()) {
+                tokensFile << "Tokens for " << filename << "\n";
+                tokensFile << "Parser: New Unified Parser (CST mode)\n";
+                tokensFile << "Mode: CST with trivia preservation\n";
+                tokensFile << "========================================\n\n";
+                tokensFile << tokenOutput.str();
+                tokensFile.close();
+                std::cout << "Tokens output saved to " << tokensFilename << std::endl;
+            } else {
+                std::cerr << "Warning: Could not open " << tokensFilename << " for writing" << std::endl;
+            }
             
             // Use new Parser with CST mode enabled
             std::cout << "=== Testing New CST Parser (cstMode=true) ===\n";
             Parser cstParser(scanner, true);  // CST mode enabled
+            cstParser.enableDetailedExpressionNodes(true);  // Enable detailed expression CST nodes
             
             try {
                 ast = cstParser.parse();
@@ -183,12 +207,8 @@ int main(int argc, char* argv[]) {
                 
                 // Print CST to console using CST printer
                 CST::Printer::PrintOptions consoleOptions;
-                consoleOptions.format = CST::Printer::PrintFormat::TREE;
-                consoleOptions.includeTrivia = true;
-                consoleOptions.includeTokens = true;
-                consoleOptions.includeSourcePositions = false;
-                consoleOptions.maxDepth = 3;  // Limit depth for console output
-                
+                consoleOptions.includeTrivia = false; // Simplify console output
+                consoleOptions.maxDepth = 3; // Limit depth for console readability
                 std::cout << CST::Printer::printCST(cstRoot, consoleOptions) << std::endl;
                 
                 // Save CST to file for detailed analysis
@@ -221,13 +241,10 @@ int main(int argc, char* argv[]) {
                     // Print full CST structure using CST printer
                     std::cout << "=== Full CST Structure ===\n";
                     CST::Printer::PrintOptions fileOptions;
-                    fileOptions.format = CST::Printer::PrintFormat::TREE;
-                    fileOptions.includeTrivia = true;
-                    fileOptions.includeTokens = true;
-                    fileOptions.includeSourcePositions = true;
-                    fileOptions.includeErrorInfo = true;
-                    fileOptions.maxDepth = -1;  // No depth limit for file output
-                    
+                    fileOptions.includeTrivia = true; // Include all trivia in file output
+                    fileOptions.includeTokens = true; // Include all tokens
+                    fileOptions.includeSourcePositions = true; // Include source positions
+                    fileOptions.includeErrorInfo = true; // Include error information
                     std::cout << CST::Printer::printCST(cstRoot, fileOptions) << std::endl;
                     
                     // Restore cout
@@ -251,12 +268,34 @@ int main(int argc, char* argv[]) {
             
             // Print tokens to stdout
             std::cout << "=== Tokens (Legacy Mode) ===\n";
+            
+            // Capture token output for both console and file
+            std::ostringstream tokenOutput;
+            tokenOutput << "=== Tokens (Legacy Mode) ===\n";
+            
             for (const auto& token : tokens) {
-                std::cout << "Line " << token.line << ": "
-                          << scanner.tokenTypeToString(token.type)
-                          << " = '" << token.lexeme << "'\n";
+                std::string tokenLine = "Line " + std::to_string(token.line) + ": "
+                                      + scanner.tokenTypeToString(token.type)
+                                      + " = '" + token.lexeme + "'\n";
+                std::cout << tokenLine;
+                tokenOutput << tokenLine;
             }
             std::cout << std::endl;
+            
+            // Save tokens to file
+            std::string tokensFilename = filename + ".tokens.txt";
+            std::ofstream tokensFile(tokensFilename);
+            if (tokensFile.is_open()) {
+                tokensFile << "Tokens for " << filename << "\n";
+                tokensFile << "Parser: New Unified Parser (Legacy mode)\n";
+                tokensFile << "Mode: Legacy AST only (no trivia preservation)\n";
+                tokensFile << "========================================\n\n";
+                tokensFile << tokenOutput.str();
+                tokensFile.close();
+                std::cout << "Tokens output saved to " << tokensFilename << std::endl;
+            } else {
+                std::cerr << "Warning: Could not open " << tokensFilename << " for writing" << std::endl;
+            }
             
             // Frontend: Syntax analysis (parsing)
             std::cout << "=== Legacy Mode Parsing ===\n";

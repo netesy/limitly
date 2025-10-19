@@ -1,6 +1,0 @@
-var x = 18;
-
-match(x) {
-    x where x > 10 => { print("greater than 10"); },
-    _ => { print("other"); }
-}

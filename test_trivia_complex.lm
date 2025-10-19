@@ -1,7 +1,0 @@
-/* Block comment */
-// Line comment
-var   x   :   int   =   42   ;   // Trailing comment
-
-/* Another block
-   comment */
-var y = "hello";  // End comment

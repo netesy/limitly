@@ -1,5 +1,0 @@
-match(18) {
-    x where x > 10 => { print("greater than 10"); },
-    x where x < 10 => { print("less than 10"); },
-    x => { print("equals 10"); }
-}

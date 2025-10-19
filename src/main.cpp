@@ -1,5 +1,6 @@
 #include "frontend/scanner.hh"
 #include "frontend/parser.hh"
+#include "frontend/cst_printer.hh"
 #include "common/backend.hh"
 #include "backend/ast_printer.hh"
 #include "backend/bytecode_printer.hh"
@@ -17,6 +18,7 @@ void printUsage(const char* programName) {
     std::cout << "Usage:" << std::endl;
     std::cout << "  " << programName << " <source_file>    - Execute a source file" << std::endl;
     std::cout << "  " << programName << " -ast <source_file> - Print the AST for a source file" << std::endl;
+    std::cout << "  " << programName << " -cst <source_file> - Print the CST for a source file" << std::endl;
     std::cout << "  " << programName << " -tokens <source_file> - Print the tokens for a source file" << std::endl;
     std::cout << "  " << programName << " -bytecode <source_file> - Print the bytecode for a source file" << std::endl;
     std::cout << "  " << programName << " -debug <source_file> - Execute with debug output enabled" << std::endl;
@@ -34,7 +36,7 @@ std::string readFile(const std::string& filename) {
     return buffer.str();
 }
 
-void executeFile(const std::string& filename, bool printAst = false, bool printTokens = false, bool printBytecode = false, bool useJit = false, bool enableDebug = false) {
+void executeFile(const std::string& filename, bool printAst = false, bool printCst = false, bool printTokens = false, bool printBytecode = false, bool useJit = false, bool enableDebug = false) {
     try {
         // Read source file
         std::string source = readFile(filename);
@@ -54,8 +56,20 @@ void executeFile(const std::string& filename, bool printAst = false, bool printT
         }
         
         // Frontend: Syntax analysis (parsing)
-        Parser parser(scanner, false); // Use legacy mode for optimal execution performance
+        bool useCSTMode = printCst; // Use CST mode if CST printing is requested
+        Parser parser(scanner, useCSTMode);
         std::shared_ptr<AST::Program> ast = parser.parse();
+        
+        // Print CST if requested
+        if (printCst) {
+            std::cout << "=== CST ===\n";
+            const CST::Node* cstRoot = parser.getCST();
+            if (cstRoot) {
+                std::cout << CST::Printer::printCST(cstRoot) << std::endl;
+            } else {
+                std::cout << "No CST available (parser not in CST mode)" << std::endl;
+            }
+        }
         
         // Print AST if requested
         if (printAst) {
@@ -205,13 +219,15 @@ int main(int argc, char* argv[]) {
     if (arg == "-repl") {
         startRepl();
     } else if (arg == "-ast" && argc >= 3) {
-        executeFile(argv[2], true, false, false);
+        executeFile(argv[2], true, false, false, false);
+    } else if (arg == "-cst" && argc >= 3) {
+        executeFile(argv[2], false, true, false, false);
     } else if (arg == "-tokens" && argc >= 3) {
-        executeFile(argv[2], false, true, false);
+        executeFile(argv[2], false, false, true, false);
     } else if (arg == "-bytecode" && argc >= 3) {
-        executeFile(argv[2], false, false, true);
+        executeFile(argv[2], false, false, false, true);
     } else if (arg == "-debug" && argc >= 3) {
-        executeFile(argv[2], false, false, false, false, true);
+        executeFile(argv[2], false, false, false, false, false, true);
     // } else if (arg == "-jit" && argc >= 3) {
     //     executeFile(argv[2], false, false, false, true);
     } else if (arg[0] == '-') {

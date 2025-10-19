@@ -158,4 +158,118 @@
   - Document the new approach: clean CST parser based on proven legacy parser
   - Add usage examples for both AST and CST generation
   - Create migration guide from old complex CST parser to new simple approach
-  - _Requirements: 7.1, 7.4, 7.5, 6.5_
+  - _Requirements: 10.1, 10.4, 10.5, 6.5_
+
+- [x] 13. Implement CST Node Parent-Child Context Management
+
+
+
+
+
+
+  - Add CST node context stack to Parser class to track current parent CST node
+  - Implement pushCSTContext() and popCSTContext() methods for scope management
+  - Modify statement parsing methods to add child nodes to current parent context instead of root
+  - Add getCurrentCSTParent() method to get the current parent CST node
+  - _Requirements: 9.1, 9.2, 9.3, 9.4_
+
+- [x] 14. Update Block Statement Parsing for Hierarchical CST
+
+
+
+
+
+  - Modify block() method to use createNode<AST::BlockStatement>() instead of std::make_shared
+  - Create BLOCK_STATEMENT CST node and set it as parent context when parsing block contents
+  - Ensure all statements within the block are added as children of the BLOCK_STATEMENT CST node
+  - Add proper token capture for opening and closing braces in block CST nodes
+  - _Requirements: 7.1, 7.2, 8.1, 9.2_
+
+- [x] 15. Enhance If Statement CST with Nested Block Structure
+
+
+
+
+
+
+  - Update ifStatement() method to properly handle nested block statements as children
+  - Ensure the print statement inside if blocks appears as child of IF_STATEMENT, not at root level
+  - Add proper CST structure for elif and else branches with their nested statements
+  - Capture all tokens including block braces in the IF_STATEMENT CST node hierarchy
+  - _Requirements: 7.2, 7.6, 8.2, 9.2_
+
+- [x] 16. Implement Enhanced Loop Statement CST Nodes
+
+
+
+
+
+
+  - Update forStatement(), whileStatement(), matchStatement() and iterStatement() methods to use createNode pattern
+  - Create structured CST nodes (FOR_STATEMENT, WHILE_STATEMENT, ITER_STATEMENT) with proper token capture
+  - Implement nested block structure for loop bodies with statements as children of loop CST nodes
+  - Add proper token capture for loop keywords, conditions, and iteration expressions
+  - _Requirements: 7.3, 7.6, 8.2, 8.6_
+
+
+- [x] 17. Implement Function and Class Declaration CST Hierarchy
+
+
+
+
+
+  - Update function() and classDeclaration() methods to create hierarchical CST structures
+  - Ensure function body statements are nested under FUNCTION_DECLARATION CST nodes
+  - Ensure class member declarations are nested under CLASS_DECLARATION CST nodes
+  - Add proper token capture for function signatures, class names, and member declarations
+  - _Requirements: 7.4, 7.5, 8.3, 8.4_
+
+- [x] 18. Add Expression Statement CST Node Support
+
+
+
+
+
+
+  - Update expressionStatement() method to use createNode<AST::ExprStatement>()
+  - create structured cst nodes for (CONTRACT, MATCH, CONCURRENT, PARALLEL) with proper token capture
+  - Ensure the expression inside the statement appears as child of EXPRESSION_STATEMENT, not at root
+  - Create EXPRESSION_STATEMENT CST nodes that properly contain their expression tokens
+  - Implement token range capture for complex expressions within expression statements
+  - Ensure expression tokens are nested under EXPRESSION_STATEMENT nodes, not added to root
+  - _Requirements: 8.6, 8.7, 9.2_
+
+- [x] 19. Implement Optional Complex Expression CST Nodes
+
+
+
+
+
+
+
+
+
+
+
+
+  - Update expression() method to create hierarchical CST nodes for complex expressions ✅ DONE
+  - Invalid syntax recovery should be handled by the CST parser ✅ DONE
+  - Add createNode support for binary expressions, member access, and function calls ✅ DONE
+  - Create structured CST nodes for BINARY_EXPR, MEMBER_EXPR, and CALL_EXPR when beneficial ✅ DONE
+  - Implement hierarchical token capture for complex nested expressions ✅ DONE
+  - Add configuration option to enable/disable detailed expression CST nodes ✅ DONE
+  - _Requirements: 8.5, 8.7, 7.6_
+
+- [x] 20. Test and Validate Hierarchical CST Structure
+
+
+
+
+
+  - Create comprehensive test cases for nested CST structures (if blocks, loops, modules, functions, classes)
+  - Verify that statements inside blocks appear as children of their parent CST nodes, not at root level
+  - Test CST traversal APIs for parent-child navigation and sibling access
+  - Validate CST reconstruction maintains proper hierarchical structure
+  - Delete all the test files not in the tests folder
+  - Remove "" from string for the AST but let it remain for the CST
+  - _Requirements: 10.6, 10.7, 7.6, 9.6_

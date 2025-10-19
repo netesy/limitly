@@ -41,7 +41,7 @@ void BytecodeGenerator::visitInterpolatedStringExpr(const std::shared_ptr<AST::I
         std::visit(overloaded {
             // Handle string literal parts
             [&](const std::string& str) {
-                // Push the string literal onto the stack
+                // String value is already parsed (quotes removed) by the parser
                 emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, str);
             },
             // Handle expression parts
@@ -1177,7 +1177,9 @@ void BytecodeGenerator::visitLiteralExpr(const std::shared_ptr<AST::LiteralExpr>
     } else if (std::holds_alternative<double>(expr->value)) {
         emit(Opcode::PUSH_FLOAT, expr->line, 0, std::get<double>(expr->value));
     } else if (std::holds_alternative<std::string>(expr->value)) {
-        emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, std::get<std::string>(expr->value));
+        std::string stringValue = std::get<std::string>(expr->value);
+        // String value is already parsed (quotes removed) by the parser
+        emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, stringValue);
     } else if (std::holds_alternative<bool>(expr->value)) {
         emit(Opcode::PUSH_BOOL, expr->line, 0, 0.0f, std::get<bool>(expr->value));
     } else if (std::holds_alternative<std::nullptr_t>(expr->value)) {

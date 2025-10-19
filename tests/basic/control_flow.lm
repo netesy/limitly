@@ -16,14 +16,14 @@ if (x < y) {
     print("x is not less than y");
 }
 
-// If-else if-else chain
+// If-elif-else chain
 var score = 85;
 print("Grade calculation:");
 if (score >= 90) {
     print("Grade: A");
-} else if (score >= 80) {
+} elif (score >= 80) {
     print("Grade: B");
-} else if (score >= 70) {
+} elif (score >= 70) {
     print("Grade: C");
 } else {
     print("Grade: F");

@@ -889,7 +889,7 @@ std::string ASTPrinter::valueToString(const std::variant<long long, double, std:
         if (s.back() == '.') s.pop_back();
         return s;
     } else if (std::holds_alternative<std::string>(value)) {
-        return "\"" + escapeString(std::get<std::string>(value)) + "\"";
+        return std::get<std::string>(value);
     } else if (std::holds_alternative<bool>(value)) {
         return std::get<bool>(value) ? "true" : "false";
     } else if (std::holds_alternative<std::nullptr_t>(value)) {

@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <unordered_set>
+#include <ostream>
 
 namespace CST {
 
@@ -266,6 +267,36 @@ namespace CST {
         std::vector<const Node*> selectByPredicate(const Node* root, NodePredicate predicate);
         
     } // namespace Query
+
+    // Simple utility functions for CST manipulation
+    namespace Utils {
+        
+        // Text reconstruction utilities
+        std::string getText(const Node* node);
+        std::string getTextWithoutTrivia(const Node* node);
+        std::string reconstructSource(const Node* node);
+        
+        // Token extraction utilities
+        std::vector<Token> getAllTokens(const Node* node);
+        std::vector<Token> getSignificantTokens(const Node* node);
+        
+        // Tree traversal utilities
+        void forEachChild(const Node* node, std::function<void(const Node*)> visitor);
+        void forEachDescendant(const Node* node, std::function<void(const Node*)> visitor);
+        
+        // Find operations
+        const Node* findByKind(const Node* root, NodeKind kind);
+        std::vector<const Node*> findAllByKind(const Node* root, NodeKind kind);
+        
+        // Validation utilities
+        bool validateCST(const Node* root);
+        std::vector<const Node*> findErrorNodes(const Node* root);
+        
+        // Analysis utilities
+        size_t countNodes(const Node* root);
+        size_t countTokens(const Node* root);
+        
+    } // namespace Utils
 
 } // namespace CST
 
