@@ -1,0 +1,71 @@
+print("=== Higher-Order Functions Tests ===");
+
+print("\n--- Test 1: Function as Parameter ---");
+fn applyOperation(x: int, y: int, operation: fn(int, int): int): int {
+    return operation(x, y);
+}
+
+fn add(a: int, b: int): int {
+    return a + b;
+}
+
+fn multiply(a: int, b: int): int {
+    return a * b;
+}
+
+var addResult = applyOperation(5, 3, add);
+print("applyOperation(5, 3, add) = " + addResult);
+
+var multiplyResult = applyOperation(5, 3, multiply);
+print("applyOperation(5, 3, multiply) = " + multiplyResult);
+
+print("\n--- Test 2: Function Returning Function ---");
+fn createAdder(increment: int): fn(int): int {
+    return fn(x: int): int {
+        return x + increment;
+    };
+}
+
+var addFive = createAdder(5);
+var result1 = addFive(10);
+print("addFive(10) = " + result1);
+
+var addTen = createAdder(10);
+var result2 = addTen(20);
+print("addTen(20) = " + result2);
+
+print("\n--- Test 3: Nested Higher-Order Functions ---");
+fn createMultiplier(factor: int): fn(int): int {
+    return fn(x: int): int {
+        return x * factor;
+    };
+}
+
+fn applyTwice(f: fn(int): int, x: int): int {
+    return f(f(x));
+}
+
+var double = createMultiplier(2);
+var quadrupleResult = applyTwice(double, 3);
+print("applyTwice(double, 3) = " + quadrupleResult);
+
+print("\n--- Test 4: Function Composition ---");
+fn compose(f: fn(int): int, g: fn(int): int): fn(int): int {
+    return fn(x: int): int {
+        return f(g(x));
+    };
+}
+
+fn square(x: int): int {
+    return x * x;
+}
+
+fn increment(x: int): int {
+    return x + 1;
+}
+
+var squareThenIncrement = compose(increment, square);
+var compositionResult = squareThenIncrement(4);
+print("squareThenIncrement(4) = " + compositionResult);
+
+print("\n=== Higher-Order Functions Tests Complete ===");

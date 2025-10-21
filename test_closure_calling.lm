@@ -1,0 +1,45 @@
+print("=== Testing Closure Calling ===");
+
+print("\n🔹 Test 1: Simple Lambda Call");
+var simpleLambda = fn(x: int): int {
+    return x + 10;
+};
+print("Created lambda: " + simpleLambda);
+
+// Try to call the lambda
+print("Attempting to call simpleLambda(5)...");
+var result1 = simpleLambda(5);
+print("Result: " + result1);
+
+print("\n🔹 Test 2: Closure with Capture Call");
+fn createMultiplier(factor: int): function {
+    return fn(value: int): int {
+        return value * factor;
+    };
+}
+var multiplyByThree = createMultiplier(3);
+print("Created multiplier: " + multiplyByThree);
+
+print("Attempting to call multiplyByThree(7)...");
+var result2 = multiplyByThree(7);
+print("Result: " + result2);
+
+print("\n🔹 Test 3: Counter Closure Call");
+fn createCounter(initial: int): function {
+    var counter: int = initial;
+    return fn(): int {
+        counter = counter + 1;
+        return counter;
+    };
+}
+var counter1 = createCounter(0);
+print("Created counter: " + counter1);
+
+print("Attempting to call counter1()...");
+var count1 = counter1();
+print("First count: " + count1);
+
+var count2 = counter1();
+print("Second count: " + count2);
+
+print("\n=== Test Complete ===");

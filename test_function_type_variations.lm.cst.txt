@@ -1,0 +1,26 @@
+CST for test_function_type_variations.lm
+Parser: New Unified Parser (CST mode)
+Mode: CST (cstMode=true)
+========================================
+
+CST Statistics:
+- CST nodes created: 11
+- Trivia attachments: 0
+- Parse errors: 0
+
+=== Full CST Structure ===
++ Node: PROGRAM [0-974] (Program root node with trivia)
+├─ + Node: VAR_DECLARATION [87-95]
+├─ + Node: VAR_DECLARATION [158-169]
+├─ + Node: VAR_DECLARATION [270-281]
+├─ + Node: VAR_DECLARATION [364-378]
+├─ + Node: VAR_DECLARATION [572-585]
+├─ + Node: VAR_DECLARATION [614-624]
+├─ + Node: VAR_DECLARATION [690-700]
+├─ + Node: VAR_DECLARATION [797-807]
+├─ + Node: VAR_DECLARATION [888-902]
+├─ + Node: PRINT_STATEMENT [932-933]
+├─ + Node: LITERAL_EXPR [933-974] (string literal)
+│ └─ Token: "Function type va... [933-974]
+└─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+

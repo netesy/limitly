@@ -1,0 +1,17 @@
+// Test named function calls
+
+// Function with named parameters
+fn greet(name: str, age: int, formal: bool): str {
+    if (formal) {
+        return "Good day, " + name + ". You are " + age + " years old.";
+    } else {
+        return "Hey " + name + "! Age: " + age;
+    }
+}
+
+// Test named function calls
+var result1 = greet(name="Alice", age=25, formal=true);
+var result2 = greet(age=30, name="Bob", formal=false);
+var result3 = greet("Charlie", age=35, formal=true); // Mixed positional and named
+
+print("Named function calls test completed");

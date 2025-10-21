@@ -1,0 +1,29 @@
+Bytecode for test_function_type_variations.lm
+Parser: New Unified Parser (CST mode)
+========================================
+
+=== Bytecode ===
+Generated 21 instructions
+
+   0: PUSH_NULL           
+   1: STORE_VAR            "noParams"
+   2: PUSH_NULL           
+   3: STORE_VAR            "multiParams"
+   4: PUSH_NULL           
+   5: STORE_VAR            "mixedParams"
+   6: PUSH_NULL           
+   7: STORE_VAR            "optionalParams"
+   8: PUSH_NULL           
+   9: STORE_VAR            "complexReturn"
+  10: PUSH_NULL           
+  11: STORE_VAR            "dictReturn"
+  12: PUSH_NULL           
+  13: STORE_VAR            "nestedFunc"
+  14: PUSH_NULL           
+  15: STORE_VAR            "unionParam"
+  16: PUSH_NULL           
+  17: STORE_VAR            "optionalReturn"
+  18: PUSH_STRING          "Function type variations test completed"
+  19: PRINT               
+  20: HALT                
+

@@ -184,6 +184,12 @@ public:
     bool isPrimitiveType(TokenType type);
     bool isKnownTypeName(const std::string& name);
     std::string tokenTypeToString(TokenType type);
+    
+    // Function type parsing methods
+    std::shared_ptr<AST::FunctionTypeAnnotation> parseFunctionTypeAnnotation();
+    std::shared_ptr<AST::TypeAnnotation> parseLegacyFunctionType();
+    AST::FunctionParameter parseFunctionParameter();
+    bool isValidParameterName(const std::string& name);
 
     // Parsing methods for expressions
     std::shared_ptr<AST::Expression> expression();

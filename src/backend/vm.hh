@@ -247,8 +247,9 @@ private:
     bool debugOutput;
     bool isPreProcessing; // Track if we're in pre-processing mode
     static int matchCounter;
-    std::string currentFunctionBeingDefined; // Track which function is currently being defined
-    bool insideFunctionDefinition; // Track if we're currently inside a function definition
+    // Nested function definition tracking
+    std::stack<std::string> functionDefinitionStack; // Stack of functions being defined (for nested functions)
+    std::stack<bool> functionDefinitionModeStack; // Stack of definition modes (for nested functions)
     std::string currentClassBeingDefined; // Track which class is currently being defined
     bool insideClassDefinition; // Track if we're currently inside a class definition
     bool insideTaskDefinition; // Track if we're currently inside a task definition
@@ -274,6 +275,31 @@ private:
     };
     std::unordered_map<Environment*, std::unordered_map<std::string, backend::Function>> moduleUserDefinedFunctions;
     std::unordered_map<std::string, ModuleFunctionInfo> moduleFunctions_;
+    
+    // Closure memory management
+    struct ClosureTracker {
+        std::unordered_map<std::string, std::weak_ptr<Value>> activeClosure;
+        std::unordered_map<std::string, std::vector<std::string>> variableToClosures;
+        std::unordered_map<std::string, std::shared_ptr<ValuePtr>> sharedVariables;
+        std::unordered_set<std::string> circularReferences;
+        mutable std::mutex trackerMutex;
+        
+        // Statistics
+        size_t totalClosuresCreated = 0;
+        size_t activeClosureCount = 0;
+        size_t cleanupOperations = 0;
+        size_t circularReferencesDetected = 0;
+        size_t memoryOptimizations = 0;
+        
+        void cleanup() {
+            std::lock_guard<std::mutex> lock(trackerMutex);
+            activeClosure.clear();
+            variableToClosures.clear();
+            sharedVariables.clear();
+            circularReferences.clear();
+        }
+    };
+    ClosureTracker closureTracker;
 
     // Concurrency runtime - replaced with integrated state
     std::unique_ptr<ConcurrencyState> concurrency_state;
@@ -423,6 +449,12 @@ private:
     bool bindFunctionParameters(const backend::Function& func, const std::vector<ValuePtr>& args, 
                                std::shared_ptr<Environment> funcEnv, const std::string& funcName);
     
+    // Nested function definition tracking helpers
+    void pushFunctionDefinition(const std::string& functionName);
+    void popFunctionDefinition();
+    bool isInsideFunctionDefinition() const;
+    std::string getCurrentFunctionBeingDefined() const;
+    
     // Helper function for consistent call frame management
     void createAndPushCallFrame(const std::string& funcName, size_t returnAddress, 
                                std::shared_ptr<Environment> funcEnv);
@@ -502,6 +534,17 @@ private:
     void handlePushLambda(const Instruction& instruction);
     void handlePushFunctionRef(const Instruction& instruction);
     void handleCallHigherOrder(const Instruction& instruction);
+    
+    // Closure memory management methods
+    std::string trackClosure(ValuePtr closureValue);
+    void untrackClosure(const std::string& closureId);
+    std::shared_ptr<Environment> optimizeCapturedEnvironment(
+        const std::vector<std::string>& capturedVars,
+        std::shared_ptr<Environment> sourceEnv);
+    bool detectCircularReferences(const std::string& closureId);
+    void cleanupInactiveClosures();
+    size_t performClosureGarbageCollection();
+    void printClosureMemoryStats() const;
     
     // Error handling instruction handlers
     void handleCheckError(const Instruction& instruction);

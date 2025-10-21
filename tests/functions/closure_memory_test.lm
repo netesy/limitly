@@ -1,9 +1,5 @@
-# Closure Memory Management Test
-# Tests closure variable lifetime tracking, cleanup, and circular reference detection
-
 print("=== Closure Memory Management Tests ===");
 
-# Test 1: Basic closure creation and cleanup
 print("\n--- Test 1: Basic Closure Creation ---");
 fn createSimpleClosure() : fn(int) : int {
     var x: int = 42;
@@ -14,9 +10,8 @@ fn createSimpleClosure() : fn(int) : int {
 
 var simpleClosure = createSimpleClosure();
 var result1 = simpleClosure(8);
-print("Simple closure result: " + result1); # Should be 50
+print("Simple closure result: " + result1);
 
-# Test 2: Closure with multiple captured variables
 print("\n--- Test 2: Multiple Captured Variables ---");
 fn createMultiVarClosure() : fn(int) : int {
     var a: int = 10;
@@ -29,9 +24,8 @@ fn createMultiVarClosure() : fn(int) : int {
 
 var multiVarClosure = createMultiVarClosure();
 var result2 = multiVarClosure(5);
-print("Multi-variable closure result: " + result2); # Should be 65
+print("Multi-variable closure result: " + result2);
 
-# Test 3: Nested closures (potential for circular references)
 print("\n--- Test 3: Nested Closures ---");
 fn createNestedClosure() : fn(int) : fn(int) : int {
     var outer: int = 100;
@@ -46,9 +40,8 @@ fn createNestedClosure() : fn(int) : fn(int) : int {
 var nestedClosure = createNestedClosure();
 var innerClosure = nestedClosure(50);
 var result3 = innerClosure(25);
-print("Nested closure result: " + result3); # Should be 175
+print("Nested closure result: " + result3);
 
-# Test 4: Closure variable modification
 print("\n--- Test 4: Closure Variable Modification ---");
 fn createModifyingClosure() : fn() : int {
     var counter: int = 0;
@@ -59,11 +52,10 @@ fn createModifyingClosure() : fn() : int {
 }
 
 var counterClosure = createModifyingClosure();
-print("Counter 1: " + counterClosure()); # Should be 1
-print("Counter 2: " + counterClosure()); # Should be 2
-print("Counter 3: " + counterClosure()); # Should be 3
+print("Counter 1: " + counterClosure());
+print("Counter 2: " + counterClosure());
+print("Counter 3: " + counterClosure());
 
-# Test 5: Multiple closures sharing variables (memory optimization test)
 print("\n--- Test 5: Shared Variable Optimization ---");
 fn createSharedVarClosures() : (fn(int) : int, fn(int) : int) {
     var shared: int = 1000;
@@ -77,10 +69,9 @@ fn createSharedVarClosures() : (fn(int) : int, fn(int) : int) {
 }
 
 var (sharedClosure1, sharedClosure2) = createSharedVarClosures();
-print("Shared closure 1: " + sharedClosure1(5)); # Should be 1005
-print("Shared closure 2: " + sharedClosure2(3)); # Should be 3000
+print("Shared closure 1: " + sharedClosure1(5));
+print("Shared closure 2: " + sharedClosure2(3));
 
-# Test 6: Closure cleanup test (creating many closures)
 print("\n--- Test 6: Closure Cleanup Test ---");
 fn createManyClosures() {
     iter (i in 1..10) {
@@ -88,7 +79,6 @@ fn createManyClosures() {
         var tempClosure = fn(x: int) : int {
             return localVar + x;
         };
-        # These closures should be cleaned up when they go out of scope
         var tempResult = tempClosure(i);
         print("Temp closure " + i + " result: " + tempResult);
     }
@@ -96,7 +86,6 @@ fn createManyClosures() {
 
 createManyClosures();
 
-# Test 7: Closure with captured closure (circular reference test)
 print("\n--- Test 7: Circular Reference Test ---");
 fn createCircularTest() : fn(int) : int {
     var value: int = 42;
@@ -104,7 +93,6 @@ fn createCircularTest() : fn(int) : int {
         return value + x;
     };
     
-    # This closure captures another closure
     var outerClosure = fn(y: int) : int {
         var innerResult = innerClosure(y);
         return innerResult * 2;
@@ -115,6 +103,6 @@ fn createCircularTest() : fn(int) : int {
 
 var circularClosure = createCircularTest();
 var result7 = circularClosure(8);
-print("Circular reference test result: " + result7); # Should be 100
+print("Circular reference test result: " + result7);
 
-print("\n=== All Closure Memory Management Tests Compvare ===");
+print("\n=== All Closure Memory Management Tests Complete ===");

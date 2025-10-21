@@ -1,0 +1,46 @@
+// Test optional parameters and optional types
+
+// Test 1: Function with optional parameters (using ? syntax)
+fn formatMessage(text: str, prefix: str?, suffix: str?): str {
+    var result = text;
+    if (prefix) {
+        result = prefix + result;
+    }
+    if (suffix) {
+        result = result + suffix;
+    }
+    return result;
+}
+
+// Test 2: Function with optional types (nullable parameters)
+fn processValue(value: int?, multiplier: int): int? {
+    if (value) {
+        return value * multiplier;
+    } else {
+        return nil;
+    }
+}
+
+// Test 3: Function type annotations with optional parameters
+var formatter: fn(text: str, indent: int?): str;
+var processor: fn(value: int?, default: int): int;
+
+// Test 4: Function returning optional type
+fn findUser(id: int): str? {
+    if (id > 0) {
+        return "User" + id;
+    } else {
+        return nil;
+    }
+}
+
+// Test 5: Complex optional types in function signatures
+// var complexFunc: fn(data: [int]?, callback: fn(int): str): [str]?; // Complex nested types need more work
+
+// Test 6: Optional parameters with default values (conceptual)
+// Note: This syntax might need to be implemented separately
+// fn greetWithDefaults(name: str, greeting: str = "Hello", punctuation: str = "!"): str {
+//     return greeting + " " + name + punctuation;
+// }
+
+print("Optional parameters and types test completed");

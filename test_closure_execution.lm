@@ -1,0 +1,14 @@
+print("=== Test Closure Execution ===");
+
+fn createSimpleClosure(): function {
+    return fn(x: int): int {
+        print("Inside closure with x = " + x);
+        return x + 1;
+    };
+}
+
+var closure = createSimpleClosure();
+print("Calling closure(5)...");
+var result = closure(5);
+print("Result: " + result);
+print("=== End Test ===");

@@ -103,8 +103,6 @@ VM::VM(bool create_runtime)
     debugMode(false),
     debugOutput(false),
       isPreProcessing(false),
-      currentFunctionBeingDefined(""),
-      insideFunctionDefinition(false),
       currentClassBeingDefined(""),
       insideClassDefinition(false),
       insideTaskDefinition(false) {
@@ -191,6 +189,16 @@ VM::VM(bool create_runtime)
 }
 
 VM::~VM() {
+    // Clean up all tracked closures
+    closureTracker.cleanup();
+    
+    // Perform final garbage collection
+    performClosureGarbageCollection();
+    
+    if (debugMode) {
+        printClosureMemoryStats();
+    }
+    
     // Concurrency state will clean up automatically in its destructor
     delete typeSystem;
 }
@@ -299,6 +307,12 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
             }
             
             executionCount++;
+            
+            // Periodic closure cleanup to prevent memory leaks
+            if (executionCount % 1000 == 0) { // Every 1000 instructions
+                performClosureGarbageCollection();
+            }
+            
             // if (executionCount > 200) {
             //     std::cerr << "[ERROR] Execution count exceeded 200, possible infinite loop at IP " << ip << std::endl;
             //     break;
@@ -307,21 +321,29 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
 
             
             // Check if we need to start skipping function body
-            if (!currentFunctionBeingDefined.empty() && !insideFunctionDefinition) {
-                auto funcIt = userDefinedFunctions.find(currentFunctionBeingDefined);
+            // This logic is now handled by the stack-based approach in BEGIN_FUNCTION/END_FUNCTION
+            std::string currentFunc = getCurrentFunctionBeingDefined();
+            if (!currentFunc.empty() && !isInsideFunctionDefinition()) {
+                auto funcIt = userDefinedFunctions.find(currentFunc);
                 if (funcIt != userDefinedFunctions.end() && ip >= funcIt->second.startAddress) {
                     if (debugMode) {
-                    std::cout << "[DEBUG] Starting to skip function body at IP " << ip << " (startAddress: " << funcIt->second.startAddress << ")" << std::endl;
-                  }
-                    insideFunctionDefinition = true;
+                        std::cout << "[DEBUG] Starting to skip function body at IP " << ip << " (startAddress: " << funcIt->second.startAddress << ")" << std::endl;
+                    }
+                    // Note: We don't set insideFunctionDefinition here anymore, it's handled by the stack
                 }
             }
             
-            // Skip execution if we're inside a function definition (except for END_FUNCTION)
-            if (insideFunctionDefinition && instruction.opcode != Opcode::END_FUNCTION) {
+            // Skip execution if we're inside a function definition (except for function definition and parameter instructions)
+            // Use the stack-based approach for better nested function support
+            if (isInsideFunctionDefinition() && 
+                instruction.opcode != Opcode::END_FUNCTION &&
+                instruction.opcode != Opcode::BEGIN_FUNCTION &&
+                instruction.opcode != Opcode::DEFINE_PARAM &&
+                instruction.opcode != Opcode::DEFINE_OPTIONAL_PARAM &&
+                instruction.opcode != Opcode::SET_DEFAULT_VALUE) {
                 if (debugMode) {
-                std::cout << "[DEBUG] Skipping instruction at IP " << ip << ": " << static_cast<int>(instruction.opcode) << std::endl;
-                            }
+                    std::cout << "[DEBUG] Skipping instruction at IP " << ip << ": " << static_cast<int>(instruction.opcode) << std::endl;
+                }
                 ip++;
                 continue;
             }
@@ -670,6 +692,14 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                             handleCallClosure(instruction);
                             break;
                         case Opcode::PUSH_LAMBDA:
+                            std::cout << "[DEBUG] About to execute PUSH_LAMBDA for: " << instruction.stringValue << std::endl;
+                            std::cout << "[DEBUG] Registry state before PUSH_LAMBDA:" << std::endl;
+                            for (const auto& [name, func] : userDefinedFunctions) {
+                                if (name.find("__lambda_") == 0) {
+                                    std::cout << "[DEBUG]   " << name << ": startAddress=" << func.startAddress 
+                                              << ", endAddress=" << func.endAddress << std::endl;
+                                }
+                            }
                             handlePushLambda(instruction);
                             break;
                         case Opcode::PUSH_FUNCTION_REF:
@@ -712,10 +742,10 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
 
 void VM::preProcessBytecode(const std::vector<Instruction>& code) {
     isPreProcessing = true; // Set pre-processing flag
-    if (debugMode) {    
-    std::cout << "[DEBUG] ===== PRE-PROCESSING BYTECODE =====" << std::endl;
+    static int preprocessCallCount = 0;
+    preprocessCallCount++;
+    std::cout << "[DEBUG] ===== PRE-PROCESSING BYTECODE (Call #" << preprocessCallCount << ") =====" << std::endl;
     std::cout << "[DEBUG] Total bytecode instructions: " << code.size() << std::endl;
-    }
     size_t i = 0;
     while (i < code.size()) {
         const Instruction& instruction = code[i];
@@ -723,14 +753,18 @@ void VM::preProcessBytecode(const std::vector<Instruction>& code) {
         if (instruction.opcode == Opcode::BEGIN_FUNCTION) {
             std::string functionName = instruction.stringValue;
             
-            if (debugMode) {
-                std::cout << "[DEBUG] Found BEGIN_FUNCTION at IP " << i << ": " << functionName << std::endl;
-            }
+            std::cout << "[DEBUG] Found BEGIN_FUNCTION at IP " << i << ": " << functionName << std::endl;
             
             // Check if this is a lambda function (starts with __lambda_)
             if (functionName.find("__lambda_") == 0) {
-                if (debugMode) {
-                    std::cout << "[DEBUG] Found lambda function: " << functionName << " at IP " << i << std::endl;
+                std::cout << "[DEBUG] Found lambda function: " << functionName << " at IP " << i << std::endl;
+                
+                // Check if this lambda is already registered
+                if (userDefinedFunctions.find(functionName) != userDefinedFunctions.end()) {
+                    std::cout << "[DEBUG] WARNING: Lambda function " << functionName << " is already registered!" << std::endl;
+                    const auto& existing = userDefinedFunctions[functionName];
+                    std::cout << "[DEBUG] Existing function addresses - startAddress: " << existing.startAddress 
+                              << ", endAddress: " << existing.endAddress << std::endl;
                 }
                 
                 // Find the matching END_FUNCTION
@@ -766,12 +800,18 @@ void VM::preProcessBytecode(const std::vector<Instruction>& code) {
                 
                 // Parse parameters between BEGIN_FUNCTION and function body
                 size_t paramIndex = startAddress + 1;
+                std::cout << "[DEBUG] Parsing lambda parameters for " << functionName 
+                          << " from index " << paramIndex << " to " << endAddress << std::endl;
+                
                 while (paramIndex < endAddress && 
                        (code[paramIndex].opcode == Opcode::DEFINE_PARAM || 
                         code[paramIndex].opcode == Opcode::DEFINE_OPTIONAL_PARAM)) {
                     
                     std::string paramName = code[paramIndex].stringValue;
                     bool isOptional = (code[paramIndex].opcode == Opcode::DEFINE_OPTIONAL_PARAM);
+                    
+                    std::cout << "[DEBUG] Found parameter: " << paramName 
+                              << " (optional: " << (isOptional ? "true" : "false") << ")" << std::endl;
                     
                     // For lambda functions, we'll use a generic type for now
                     TypePtr paramType = typeSystem->ANY_TYPE;
@@ -785,14 +825,40 @@ void VM::preProcessBytecode(const std::vector<Instruction>& code) {
                     // Check for default value
                     if (paramIndex + 1 < endAddress && code[paramIndex + 1].opcode == Opcode::SET_DEFAULT_VALUE) {
                         // Default value will be handled during execution
+                        std::cout << "[DEBUG] Parameter " << paramName << " has default value" << std::endl;
                         paramIndex++; // Skip SET_DEFAULT_VALUE instruction
                     }
                     
                     paramIndex++;
                 }
                 
-                // Register the lambda function
-                userDefinedFunctions[functionName] = lambdaFunc;
+                std::cout << "[DEBUG] Lambda " << functionName << " has " 
+                          << lambdaFunc.parameters.size() << " regular parameters and " 
+                          << lambdaFunc.optionalParameters.size() << " optional parameters" << std::endl;
+                
+                // Check if function already exists
+                if (userDefinedFunctions.find(functionName) != userDefinedFunctions.end()) {
+                    std::cout << "[WARNING] Lambda function " << functionName << " already exists in registry!" << std::endl;
+                    std::cout << "[WARNING] Existing: startAddress=" << userDefinedFunctions[functionName].startAddress 
+                              << ", endAddress=" << userDefinedFunctions[functionName].endAddress << std::endl;
+                    std::cout << "[WARNING] New: startAddress=" << lambdaFunc.startAddress 
+                              << ", endAddress=" << lambdaFunc.endAddress << std::endl;
+                }
+                
+                // Check if lambda function already exists with correct parameters
+                auto existingLambda = userDefinedFunctions.find(functionName);
+                if (existingLambda != userDefinedFunctions.end() && 
+                    existingLambda->second.endAddress > 0 &&
+                    !existingLambda->second.parameters.empty()) {
+                    std::cout << "[DEBUG] Lambda function " << functionName 
+                              << " already registered with " << existingLambda->second.parameters.size() 
+                              << " parameters. Skipping re-registration." << std::endl;
+                } else {
+                    // Register the lambda function (this should only happen once during preprocessing)
+                    std::cout << "[DEBUG] Registering lambda function " << functionName 
+                              << " with " << lambdaFunc.parameters.size() << " parameters" << std::endl;
+                    userDefinedFunctions[functionName] = lambdaFunc;
+                }
                 
                 if (debugMode) {
                     std::cout << "[DEBUG] Registered lambda function: " << functionName 
@@ -806,11 +872,21 @@ void VM::preProcessBytecode(const std::vector<Instruction>& code) {
         }
         i++;
     }
-    if (debugMode) {    
     std::cout << "[DEBUG] Pre-processing complete. Registered " 
               << userDefinedFunctions.size() << " functions total." << std::endl;
-    std::cout << "[DEBUG] ===== END PRE-PROCESSING =====" << std::endl;
+    
+    // Debug: Check what's in the registry after preprocessing
+    for (const auto& [name, func] : userDefinedFunctions) {
+        if (name.find("__lambda_") == 0) {
+            std::cout << "[DEBUG] POST-PREPROCESSING: Lambda " << name 
+                      << " has " << func.parameters.size() << " parameters" << std::endl;
+            for (size_t i = 0; i < func.parameters.size(); i++) {
+                std::cout << "[DEBUG] POST-PREPROCESSING: param[" << i << "]: " << func.parameters[i].first << std::endl;
+            }
+        }
     }
+    
+    std::cout << "[DEBUG] ===== END PRE-PROCESSING =====" << std::endl;
     isPreProcessing = false; // Clear pre-processing flag
 }
 
@@ -2916,6 +2992,76 @@ void VM::handleCall(const Instruction& instruction) {
         }
     }
     
+    // Check if the function name refers to a variable containing a closure
+    try {
+        ValuePtr possibleClosure = environment->get(funcName);
+        if (possibleClosure && possibleClosure->type && possibleClosure->type->tag == TypeTag::Closure) {
+            // This is a closure stored in a variable
+            ClosureValue closure = std::get<ClosureValue>(possibleClosure->data);
+            
+            if (!closure.isValid()) {
+                error("Invalid closure in function call: " + funcName);
+                return;
+            }
+            
+            if (debugMode) {
+                std::cout << "[DEBUG] CALL: Calling closure from variable: " << funcName << " -> " << closure.getFunctionName() << std::endl;
+            }
+            
+            // Save current environment
+            std::shared_ptr<Environment> savedEnv = environment;
+            
+            // Create a new environment for the closure call that includes captured variables
+            std::shared_ptr<Environment> closureCallEnv = std::make_shared<Environment>(closure.capturedEnvironment);
+            
+            // Set the closure environment as current
+            environment = closureCallEnv;
+            
+            // Create a call frame for the closure
+            backend::CallFrame closureFrame(
+                closure.functionName,
+                ip + 1, // Return address
+                nullptr // We don't use the function pointer in this implementation
+            );
+            closureFrame.isClosureCall = true;
+            closureFrame.closureEnvironment = closure.capturedEnvironment;
+            
+            // Find the function in the registry to get parameter information
+            auto funcIt = userDefinedFunctions.find(closure.functionName);
+            if (funcIt != userDefinedFunctions.end()) {
+                // Bind function parameters
+                if (!bindFunctionParameters(funcIt->second, args, closureCallEnv, closure.functionName)) {
+                    // Restore environment on error
+                    environment = savedEnv;
+                    error("Failed to bind parameters for closure call: " + funcName);
+                    return;
+                }
+                
+                // Push the call frame
+                callStack.push_back(closureFrame);
+                
+                // Jump to the function start address
+                ip = funcIt->second.startAddress - 1; // -1 because ip will be incremented
+                
+                if (debugMode) {
+                    std::cout << "[DEBUG] CALL: Closure call successful, jumping to address " << funcIt->second.startAddress << std::endl;
+                }
+                
+                if (canFail) {
+                    popErrorFrame();
+                }
+                return;
+            } else {
+                // Restore environment on error
+                environment = savedEnv;
+                error("Closure function not found in registry: " + closure.getFunctionName());
+                return;
+            }
+        }
+    } catch (const std::runtime_error&) {
+        // Variable not found or not a closure, continue with regular function call logic
+    }
+    
     // Check if we have a closure value on the stack (for closure calls)
     // This happens when a closure is passed as a value and then called
     if (!stack.empty() && stack.back()->type && stack.back()->type->tag == TypeTag::Closure) {
@@ -3295,6 +3441,13 @@ void VM::handleReturn(const Instruction& /*unused*/) {
         }
     }
 
+    // Perform closure cleanup when returning from functions
+    // This helps clean up closures that may have gone out of scope
+    static size_t returnCount = 0;
+    if (++returnCount % 10 == 0) { // Cleanup every 10 returns to avoid overhead
+        cleanupInactiveClosures();
+    }
+    
     // Return to the caller
     if (debugMode) {
         std::cout << "[DEBUG] RETURN: Returning to IP " << frame.returnAddress << std::endl;
@@ -3383,17 +3536,23 @@ void VM::handleBeginFunction(const Instruction& instruction) {
     const std::string& funcName = instruction.stringValue;
     if (debugMode) {
         std::cout << "[DEBUG] BEGIN_FUNCTION: " << funcName << " at IP " << ip << std::endl;
-        std::cout << "[DEBUG] BEGIN_FUNCTION: Current function being defined: " << currentFunctionBeingDefined << std::endl;
-        std::cout << "[DEBUG] BEGIN_FUNCTION: Inside function definition: " << insideFunctionDefinition << std::endl;
+        std::cout << "[DEBUG] BEGIN_FUNCTION: Current function being defined: " << getCurrentFunctionBeingDefined() << std::endl;
+        std::cout << "[DEBUG] BEGIN_FUNCTION: Inside function definition: " << isInsideFunctionDefinition() << std::endl;
     }
-    // If we're inside a class definition, use the full method key
+    
+    // Use the stack-based approach for nested function support
+    std::string fullFunctionName;
     if (insideClassDefinition && !currentClassBeingDefined.empty()) {
-        currentFunctionBeingDefined = currentClassBeingDefined + "::" + funcName;
+        fullFunctionName = currentClassBeingDefined + "::" + funcName;
     } else {
-        currentFunctionBeingDefined = funcName;
+        fullFunctionName = funcName;
     }
-                            if (debugMode) {
-    std::cout << "[DEBUG] Current function being defined: " << currentFunctionBeingDefined << std::endl;
+    
+    // Push this function onto the definition stack
+    pushFunctionDefinition(fullFunctionName);
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] Current function being defined: " << getCurrentFunctionBeingDefined() << std::endl;
     }
     // Create a new Function struct
     backend::Function func(funcName, 0); // Will set start address later
@@ -3438,32 +3597,53 @@ void VM::handleBeginFunction(const Instruction& instruction) {
         }
     } else {
         // Regular function
-        userDefinedFunctions[funcName] = func;
-        if (debugMode) {
-            std::cout << "[DEBUG] Stored function: " << funcName << " with start address: " << func.startAddress << std::endl;
-            std::cout << "[DEBUG] Total functions stored: " << userDefinedFunctions.size() << std::endl;
+        std::cout << "[DEBUG] handleBeginFunction: Storing function: " << funcName 
+                  << " with start address: " << func.startAddress << std::endl;
+        
+        // Check if this is a lambda function that's already registered
+        if (funcName.find("__lambda_") == 0) {
+            auto existingFunc = userDefinedFunctions.find(funcName);
+            if (existingFunc != userDefinedFunctions.end() && 
+                existingFunc->second.endAddress > 0) {
+                // Lambda function is already properly registered, don't overwrite it
+                std::cout << "[DEBUG] handleBeginFunction: Skipping lambda function " << funcName 
+                          << " - already registered with correct addresses (start=" 
+                          << existingFunc->second.startAddress << ", end=" 
+                          << existingFunc->second.endAddress << ")" << std::endl;
+                return;
+            }
+            std::cout << "[DEBUG] handleBeginFunction: Registering lambda function " << funcName 
+                      << " for the first time" << std::endl;
         }
+        
+        userDefinedFunctions[funcName] = func;
+        std::cout << "[DEBUG] Total functions stored: " << userDefinedFunctions.size() << std::endl;
     }
     // Continue with normal execution to process parameter definitions
     // The function body will be skipped later when we encounter END_FUNCTION
 }
 
 void VM::handleEndFunction(const Instruction& /*unused*/) {
-    // Check if we're currently defining a function
-    if (!currentFunctionBeingDefined.empty()) {
+    // Check if we're currently defining a function (using the stack-based approach)
+    if (isInsideFunctionDefinition()) {
         if (debugMode) {
-            // This is the end of function definition, not function execution
-            std::cout << "[DEBUG] END_FUNCTION: Ending definition of " << currentFunctionBeingDefined << " at IP " << ip << std::endl;
+            std::cout << "[DEBUG] END_FUNCTION: Ending function definition at IP " << ip << std::endl;
         }
-        auto funcIt = userDefinedFunctions.find(currentFunctionBeingDefined);
-        if (funcIt != userDefinedFunctions.end()) {
-            funcIt->second.endAddress = ip;
-            if (debugMode) {
-                std::cout << "[DEBUG] END_FUNCTION: Set end address for " << currentFunctionBeingDefined << " to " << ip << std::endl;
+        
+        // Pop from the function definition stack
+        popFunctionDefinition();
+        
+        // Also handle the legacy function tracking if needed
+        std::string currentFunc = getCurrentFunctionBeingDefined();
+        if (!currentFunc.empty()) {
+            auto funcIt = userDefinedFunctions.find(currentFunc);
+            if (funcIt != userDefinedFunctions.end()) {
+                funcIt->second.endAddress = ip;
+                if (debugMode) {
+                    std::cout << "[DEBUG] END_FUNCTION: Set end address for " << currentFunc << " to " << ip << std::endl;
+                }
             }
         }
-        currentFunctionBeingDefined.clear();
-        insideFunctionDefinition = false;
         if (debugMode) {
             std::cout << "[DEBUG] END_FUNCTION: Resuming normal execution" << std::endl;
         }
@@ -3503,9 +3683,19 @@ void VM::handleEndFunction(const Instruction& /*unused*/) {
 
 void VM::handleDefineParam(const Instruction& instruction) {
     // Add parameter to the current function being defined
-    if (!currentFunctionBeingDefined.empty()) {
-        auto funcIt = userDefinedFunctions.find(currentFunctionBeingDefined);
+    std::string currentFunc = getCurrentFunctionBeingDefined();
+    if (!currentFunc.empty()) {
+        auto funcIt = userDefinedFunctions.find(currentFunc);
         if (funcIt != userDefinedFunctions.end()) {
+            // Don't modify lambda functions that are already registered with parameters
+            if (currentFunc.find("__lambda_") == 0 && !funcIt->second.parameters.empty()) {
+                std::cout << "[DEBUG] handleDefineParam: Skipping parameter addition for already-registered lambda " 
+                          << currentFunc << " (has " << funcIt->second.parameters.size() << " parameters)" << std::endl;
+                return;
+            }
+            
+            std::cout << "[DEBUG] handleDefineParam: Adding parameter '" << instruction.stringValue 
+                      << "' to function " << currentFunc << std::endl;
             funcIt->second.parameters.push_back(std::make_pair(instruction.stringValue, nullptr));
         }
     }
@@ -3513,9 +3703,21 @@ void VM::handleDefineParam(const Instruction& instruction) {
 
 void VM::handleDefineOptionalParam(const Instruction& instruction) {
     // Add optional parameter to the current function being defined
-    if (!currentFunctionBeingDefined.empty()) {
-        auto funcIt = userDefinedFunctions.find(currentFunctionBeingDefined);
+    std::string currentFunc = getCurrentFunctionBeingDefined();
+    if (!currentFunc.empty()) {
+        auto funcIt = userDefinedFunctions.find(currentFunc);
         if (funcIt != userDefinedFunctions.end()) {
+            // Don't modify lambda functions that are already registered with parameters
+            if (currentFunc.find("__lambda_") == 0 && 
+                (!funcIt->second.parameters.empty() || !funcIt->second.optionalParameters.empty())) {
+                std::cout << "[DEBUG] handleDefineOptionalParam: Skipping optional parameter addition for already-registered lambda " 
+                          << currentFunc << " (has " << funcIt->second.parameters.size() << " required and " 
+                          << funcIt->second.optionalParameters.size() << " optional parameters)" << std::endl;
+                return;
+            }
+            
+            std::cout << "[DEBUG] handleDefineOptionalParam: Adding optional parameter '" << instruction.stringValue 
+                      << "' to function " << currentFunc << std::endl;
             funcIt->second.optionalParameters.push_back(std::make_pair(instruction.stringValue, nullptr));
         }
     }
@@ -3523,12 +3725,13 @@ void VM::handleDefineOptionalParam(const Instruction& instruction) {
 
 void VM::handleSetDefaultValue(const Instruction& /*unused*/) {
     // Set default value for the last optional parameter
-    if (currentFunctionBeingDefined.empty()) {
+    std::string currentFunc = getCurrentFunctionBeingDefined();
+    if (currentFunc.empty()) {
         error("SET_DEFAULT_VALUE outside of function definition");
         return;
     }
     
-    auto funcIt = userDefinedFunctions.find(currentFunctionBeingDefined);
+    auto funcIt = userDefinedFunctions.find(currentFunc);
     if (funcIt != userDefinedFunctions.end() && !funcIt->second.optionalParameters.empty()) {
         backend::Function& currentFunc = funcIt->second;
         std::string paramName = currentFunc.optionalParameters.back().first; // Get the parameter name
@@ -3687,6 +3890,19 @@ bool VM::bindFunctionParameters(const backend::Function& func, const std::vector
     // Check argument count
     size_t requiredParams = func.parameters.size();
     size_t totalParams = requiredParams + func.optionalParameters.size();
+    
+    std::cout << "[DEBUG] bindFunctionParameters for " << funcName << ":" << std::endl;
+    std::cout << "[DEBUG]   Required parameters: " << requiredParams << std::endl;
+    std::cout << "[DEBUG]   Optional parameters: " << func.optionalParameters.size() << std::endl;
+    std::cout << "[DEBUG]   Total parameters: " << totalParams << std::endl;
+    std::cout << "[DEBUG]   Arguments provided: " << args.size() << std::endl;
+    
+    for (size_t i = 0; i < func.parameters.size(); i++) {
+        std::cout << "[DEBUG]   Required param[" << i << "]: " << func.parameters[i].first << std::endl;
+    }
+    for (size_t i = 0; i < func.optionalParameters.size(); i++) {
+        std::cout << "[DEBUG]   Optional param[" << i << "]: " << func.optionalParameters[i].first << std::endl;
+    }
     
     if (args.size() < requiredParams || args.size() > totalParams) {
         error("Function " + funcName + " expects " + std::to_string(requiredParams) + 
@@ -6376,24 +6592,52 @@ void VM::handleCreateClosure(const Instruction& instruction) {
     }
     
     if (debugMode) {
-        std::cout << "[DEBUG] Creating closure from lambda function: " << lambdaFunc->name << std::endl;
+        std::cout << "[DEBUG] CREATE_CLOSURE: Creating closure from lambda function: " << lambdaFunc->name << std::endl;
     }
     
-    // Create a closure environment with captured variables
-    auto closureEnv = std::make_shared<Environment>();
+    // Create optimized closure environment with captured variables
+    auto closureEnv = optimizeCapturedEnvironment(capturedVarNames, environment);
+    
+    // Add the captured values to the optimized environment
     for (const auto& [name, value] : capturedValues) {
         closureEnv->captureVariable(name, value);
     }
     
-    // Create the closure value using the ClosureValue struct
-    ClosureValue closure(lambdaFunc->name, lambdaFunc->startAddress, lambdaFunc->endAddress,
+    // Look up the function in the registry to get correct addresses
+    // (workaround for potential corruption in the stack-stored function)
+    auto registryIt = userDefinedFunctions.find(lambdaFunc->name);
+    size_t correctStartAddress = lambdaFunc->startAddress;
+    size_t correctEndAddress = lambdaFunc->endAddress;
+    
+    if (registryIt != userDefinedFunctions.end()) {
+        correctStartAddress = registryIt->second.startAddress;
+        correctEndAddress = registryIt->second.endAddress;
+        std::cout << "[DEBUG] CREATE_CLOSURE: Using registry addresses - startAddress: " 
+                  << correctStartAddress << ", endAddress: " << correctEndAddress << std::endl;
+    } else {
+        std::cout << "[WARNING] CREATE_CLOSURE: Function not found in registry, using stack addresses" << std::endl;
+    }
+    
+    // Create the closure value using the correct addresses
+    ClosureValue closure(lambdaFunc->name, correctStartAddress, correctEndAddress,
                         closureEnv, capturedVarNames);
     
     // Create a closure type
     TypePtr closureType = std::make_shared<Type>(TypeTag::Closure);
     
-    // Push the closure onto the stack
+    // Create the closure value and track it for memory management
     ValuePtr closureValue = memoryManager.makeRef<Value>(*region, closureType, closure);
+    
+    // Track the closure for memory management
+    std::string closureId = trackClosure(closureValue);
+    
+    // Detect circular references
+    if (detectCircularReferences(closureId)) {
+        if (debugMode) {
+            std::cout << "[DEBUG] Circular reference detected in closure: " << closureId << std::endl;
+        }
+    }
+    
     push(closureValue);
     
     if (debugMode) {
@@ -6409,8 +6653,8 @@ void VM::handleCaptureVar(const Instruction& instruction) {
     
     if (debugMode) {
         std::cout << "[DEBUG] CAPTURE_VAR: Attempting to capture '" << varName << "'" << std::endl;
-        std::cout << "[DEBUG] CAPTURE_VAR: currentFunctionBeingDefined = '" << currentFunctionBeingDefined << "'" << std::endl;
-        std::cout << "[DEBUG] CAPTURE_VAR: insideFunctionDefinition = " << insideFunctionDefinition << std::endl;
+        std::cout << "[DEBUG] CAPTURE_VAR: currentFunctionBeingDefined = '" << getCurrentFunctionBeingDefined() << "'" << std::endl;
+        std::cout << "[DEBUG] CAPTURE_VAR: insideFunctionDefinition = " << isInsideFunctionDefinition() << std::endl;
         std::cout << "[DEBUG] CAPTURE_VAR: Current environment has " << environment->getAllSymbols().size() << " symbols" << std::endl;
         auto symbols = environment->getAllSymbols();
         for (const auto& [name, value] : symbols) {
@@ -6577,6 +6821,9 @@ void VM::handlePushLambda(const Instruction& instruction) {
         return;
     }
     
+    std::cout << "[DEBUG] PUSH_LAMBDA: Found function in registry with addresses - startAddress: " 
+              << funcIt->second.startAddress << ", endAddress: " << funcIt->second.endAddress << std::endl;
+    
     if (debugMode) {
         std::cout << "[DEBUG] Found lambda function: " << lambdaName 
                   << " (isLambda: " << funcIt->second.isLambda << ")" << std::endl;
@@ -6587,8 +6834,22 @@ void VM::handlePushLambda(const Instruction& instruction) {
     
     // For lambda functions, we store the Function struct directly in the value
     // This allows us to access the bytecode addresses and parameters later
+    std::cout << "[DEBUG] PUSH_LAMBDA: About to store function with addresses - startAddress: " 
+              << funcIt->second.startAddress << ", endAddress: " << funcIt->second.endAddress << std::endl;
     ValuePtr functionValue = memoryManager.makeRef<Value>(*region, functionType, funcIt->second);
     push(functionValue);
+    
+    // Verify what was stored
+    if (std::holds_alternative<backend::Function>(functionValue->data)) {
+        const auto& storedFunc = std::get<backend::Function>(functionValue->data);
+        std::cout << "[DEBUG] PUSH_LAMBDA: Stored function addresses - startAddress: " 
+                  << storedFunc.startAddress << ", endAddress: " << storedFunc.endAddress << std::endl;
+        std::cout << "[DEBUG] PUSH_LAMBDA: Stored function parameters - required: " 
+                  << storedFunc.parameters.size() << ", optional: " << storedFunc.optionalParameters.size() << std::endl;
+        for (size_t i = 0; i < storedFunc.parameters.size(); i++) {
+            std::cout << "[DEBUG] PUSH_LAMBDA: Required param[" << i << "]: " << storedFunc.parameters[i].first << std::endl;
+        }
+    }
     
     if (debugMode) {
         std::cout << "[DEBUG] PUSH_LAMBDA: Successfully pushed lambda function " << lambdaName << std::endl;
@@ -6701,28 +6962,91 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
         if (std::holds_alternative<std::shared_ptr<backend::UserDefinedFunction>>(functionValue->data)) {
             auto userFunc = std::get<std::shared_ptr<backend::UserDefinedFunction>>(functionValue->data);
             
-            // Call the user-defined function (similar to regular CALL but with higher-order support)
-            // This is a simplified implementation - you'd want to use the existing call mechanism
+            // Get the function name from the user function
+            std::string functionName = userFunc->getSignature().name;
+            
+            // Look up the function in the registry to get execution details
+            auto funcIt = userDefinedFunctions.find(functionName);
+            if (funcIt == userDefinedFunctions.end()) {
+                error("CALL_HIGHER_ORDER: user function not found in registry: " + functionName);
+                return;
+            }
+            
+            // Call the user-defined function using the VM's call mechanism
             try {
-                ValuePtr result = userFunc->execute(args);
-                push(result ? result : memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
+                const backend::Function& funcInfo = funcIt->second;
+                
+                // Create a new environment for the function
+                auto funcEnv = std::make_shared<Environment>(environment);
+                
+                // Bind function parameters
+                if (!bindFunctionParameters(funcInfo, args, funcEnv, functionName)) {
+                    error("CALL_HIGHER_ORDER: failed to bind parameters for " + functionName);
+                    return;
+                }
+                
+                // Create call frame and switch environment
+                createAndPushCallFrame(functionName, ip + 1, funcEnv);
+                
+                // Jump to function start
+                ip = funcInfo.startAddress;
+                
+                if (debugMode) {
+                    std::cout << "[DEBUG] CALL_HIGHER_ORDER: Called user function " << functionName 
+                              << " at address " << ip << std::endl;
+                }
+                return; // Don't increment IP, we've jumped to the function
+                
             } catch (const std::exception& e) {
                 error("CALL_HIGHER_ORDER: error calling user function: " + std::string(e.what()));
             }
         } else if (std::holds_alternative<std::string>(functionValue->data)) {
-            // Native function reference stored as string
-            std::string nativeFuncName = std::get<std::string>(functionValue->data);
+            // Function reference stored as string - could be user-defined or native
+            std::string funcName = std::get<std::string>(functionValue->data);
             
-            auto nativeFuncIt = nativeFunctions.find(nativeFuncName);
-            if (nativeFuncIt != nativeFunctions.end()) {
+            // First check if it's a user-defined function
+            auto userFuncIt = userDefinedFunctions.find(funcName);
+            if (userFuncIt != userDefinedFunctions.end()) {
                 try {
-                    ValuePtr result = nativeFuncIt->second(args);
-                    push(result ? result : memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
+                    const backend::Function& funcInfo = userFuncIt->second;
+                    
+                    // Create a new environment for the function
+                    auto funcEnv = std::make_shared<Environment>(environment);
+                    
+                    // Bind function parameters
+                    if (!bindFunctionParameters(funcInfo, args, funcEnv, funcName)) {
+                        error("CALL_HIGHER_ORDER: failed to bind parameters for " + funcName);
+                        return;
+                    }
+                    
+                    // Create call frame and switch environment
+                    createAndPushCallFrame(funcName, ip + 1, funcEnv);
+                    
+                    // Jump to function start
+                    ip = funcInfo.startAddress;
+                    
+                    if (debugMode) {
+                        std::cout << "[DEBUG] CALL_HIGHER_ORDER: Called user function " << funcName 
+                                  << " at address " << ip << std::endl;
+                    }
+                    return; // Don't increment IP, we've jumped to the function
+                    
                 } catch (const std::exception& e) {
-                    error("CALL_HIGHER_ORDER: error calling native function: " + std::string(e.what()));
+                    error("CALL_HIGHER_ORDER: error calling user function: " + std::string(e.what()));
                 }
             } else {
-                error("CALL_HIGHER_ORDER: native function not found: " + nativeFuncName);
+                // Check if it's a native function
+                auto nativeFuncIt = nativeFunctions.find(funcName);
+                if (nativeFuncIt != nativeFunctions.end()) {
+                    try {
+                        ValuePtr result = nativeFuncIt->second(args);
+                        push(result ? result : memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
+                    } catch (const std::exception& e) {
+                        error("CALL_HIGHER_ORDER: error calling native function: " + std::string(e.what()));
+                    }
+                } else {
+                    error("CALL_HIGHER_ORDER: function not found: " + funcName);
+                }
             }
         } else {
             error("CALL_HIGHER_ORDER: unsupported function type");
@@ -6731,8 +7055,24 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
         // Handle closure calls
         ClosureValue closure = std::get<ClosureValue>(functionValue->data);
         
+        if (debugMode) {
+            std::cout << "[DEBUG] CALL_HIGHER_ORDER: Closure details:" << std::endl;
+            std::cout << "  functionName: " << closure.functionName << std::endl;
+            std::cout << "  startAddress: " << closure.startAddress << std::endl;
+            std::cout << "  endAddress: " << closure.endAddress << std::endl;
+            std::cout << "  isValid(): " << (closure.isValid() ? "true" : "false") << std::endl;
+        }
+        
         if (!closure.isValid()) {
-            error("CALL_HIGHER_ORDER: invalid closure");
+            std::cout << "[ERROR] CALL_HIGHER_ORDER: invalid closure details:" << std::endl;
+            std::cout << "  functionName: '" << closure.functionName << "'" << std::endl;
+            std::cout << "  startAddress: " << closure.startAddress << std::endl;
+            std::cout << "  endAddress: " << closure.endAddress << std::endl;
+            std::cout << "  functionName.empty(): " << (closure.functionName.empty() ? "true" : "false") << std::endl;
+            std::cout << "  startAddress < endAddress: " << (closure.startAddress < closure.endAddress ? "true" : "false") << std::endl;
+            error("CALL_HIGHER_ORDER: invalid closure (functionName='" + closure.functionName + 
+                  "', startAddress=" + std::to_string(closure.startAddress) + 
+                  ", endAddress=" + std::to_string(closure.endAddress) + ")");
             return;
         }
         
@@ -6780,4 +7120,297 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
     if (debugMode) {
         std::cout << "[DEBUG] Called higher-order function with " << argCount << " arguments" << std::endl;
     }
+}
+// Closure memory management methods
+
+std::string VM::trackClosure(ValuePtr closureValue) {
+    if (!closureValue || !std::holds_alternative<ClosureValue>(closureValue->data)) {
+        return "";
+    }
+    
+    const auto& closure = std::get<ClosureValue>(closureValue->data);
+    std::string closureId = closure.getClosureId();
+    
+    std::lock_guard<std::mutex> lock(closureTracker.trackerMutex);
+    
+    // Track the closure
+    closureTracker.activeClosure[closureId] = std::weak_ptr<Value>(closureValue);
+    
+    // Track variable references
+    for (const auto& varName : closure.capturedVariables) {
+        closureTracker.variableToClosures[varName].push_back(closureId);
+    }
+    
+    // Update statistics
+    closureTracker.totalClosuresCreated++;
+    closureTracker.activeClosureCount++;
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] Tracking closure: " << closureId << " with " 
+                  << closure.capturedVariables.size() << " captured variables" << std::endl;
+    }
+    
+    return closureId;
+}
+
+void VM::untrackClosure(const std::string& closureId) {
+    std::lock_guard<std::mutex> lock(closureTracker.trackerMutex);
+    
+    auto it = closureTracker.activeClosure.find(closureId);
+    if (it == closureTracker.activeClosure.end()) {
+        return; // Already untracked
+    }
+    
+    // Get the closure to remove variable references
+    auto closurePtr = it->second.lock();
+    if (closurePtr && std::holds_alternative<ClosureValue>(closurePtr->data)) {
+        const auto& closure = std::get<ClosureValue>(closurePtr->data);
+        
+        // Remove variable references
+        for (const auto& varName : closure.capturedVariables) {
+            auto varIt = closureTracker.variableToClosures.find(varName);
+            if (varIt != closureTracker.variableToClosures.end()) {
+                auto& closureList = varIt->second;
+                closureList.erase(std::remove(closureList.begin(), closureList.end(), closureId), 
+                                closureList.end());
+                
+                if (closureList.empty()) {
+                    closureTracker.variableToClosures.erase(varIt);
+                    // Remove shared variable if no longer referenced
+                    closureTracker.sharedVariables.erase(varName);
+                }
+            }
+        }
+    }
+    
+    // Remove from active closures
+    closureTracker.activeClosure.erase(it);
+    closureTracker.activeClosureCount--;
+    closureTracker.cleanupOperations++;
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] Untracked closure: " << closureId << std::endl;
+    }
+}
+
+std::shared_ptr<Environment> VM::optimizeCapturedEnvironment(
+    const std::vector<std::string>& capturedVars,
+    std::shared_ptr<Environment> sourceEnv) {
+    
+    std::lock_guard<std::mutex> lock(closureTracker.trackerMutex);
+    
+    auto optimizedEnv = std::make_shared<Environment>();
+    
+    for (const auto& varName : capturedVars) {
+        try {
+            ValuePtr value = sourceEnv->get(varName);
+            
+            // Check if this variable is used by multiple closures (sharing opportunity)
+            auto varIt = closureTracker.variableToClosures.find(varName);
+            bool shouldShare = (varIt != closureTracker.variableToClosures.end() && 
+                              varIt->second.size() >= 2);
+            
+            if (shouldShare) {
+                // Use or create shared variable
+                auto sharedIt = closureTracker.sharedVariables.find(varName);
+                if (sharedIt != closureTracker.sharedVariables.end()) {
+                    optimizedEnv->captureVariable(varName, *sharedIt->second);
+                    closureTracker.memoryOptimizations++;
+                } else {
+                    // Create new shared variable
+                    auto sharedValue = std::make_shared<ValuePtr>(value);
+                    closureTracker.sharedVariables[varName] = sharedValue;
+                    optimizedEnv->captureVariable(varName, value);
+                }
+            } else {
+                // Use direct capture
+                optimizedEnv->captureVariable(varName, value);
+            }
+        } catch (const std::runtime_error&) {
+            // Variable not found, skip it
+            continue;
+        }
+    }
+    
+    return optimizedEnv;
+}
+
+bool VM::detectCircularReferences(const std::string& closureId) {
+    std::lock_guard<std::mutex> lock(closureTracker.trackerMutex);
+    
+    // Check if already marked as circular
+    if (closureTracker.circularReferences.find(closureId) != closureTracker.circularReferences.end()) {
+        return true;
+    }
+    
+    auto it = closureTracker.activeClosure.find(closureId);
+    if (it == closureTracker.activeClosure.end()) {
+        return false;
+    }
+    
+    auto closurePtr = it->second.lock();
+    if (!closurePtr || !std::holds_alternative<ClosureValue>(closurePtr->data)) {
+        return false;
+    }
+    
+    const auto& closure = std::get<ClosureValue>(closurePtr->data);
+    
+    // Check if this closure captures other closures
+    if (closure.capturedEnvironment) {
+        for (const auto& varName : closure.capturedVariables) {
+            try {
+                ValuePtr capturedValue = closure.capturedEnvironment->get(varName);
+                if (capturedValue && capturedValue->type && 
+                    capturedValue->type->tag == TypeTag::Closure) {
+                    
+                    if (std::holds_alternative<ClosureValue>(capturedValue->data)) {
+                        const auto& capturedClosure = std::get<ClosureValue>(capturedValue->data);
+                        std::string capturedClosureId = capturedClosure.getClosureId();
+                        
+                        // Simple cycle detection: if captured closure also captures this closure
+                        if (capturedClosure.capturedEnvironment) {
+                            for (const auto& capturedVar : capturedClosure.capturedVariables) {
+                                try {
+                                    ValuePtr nestedValue = capturedClosure.capturedEnvironment->get(capturedVar);
+                                    if (nestedValue && nestedValue->type && 
+                                        nestedValue->type->tag == TypeTag::Closure) {
+                                        
+                                        if (std::holds_alternative<ClosureValue>(nestedValue->data)) {
+                                            const auto& nestedClosure = std::get<ClosureValue>(nestedValue->data);
+                                            if (nestedClosure.getClosureId() == closureId) {
+                                                // Found circular reference
+                                                closureTracker.circularReferences.insert(closureId);
+                                                closureTracker.circularReferences.insert(capturedClosureId);
+                                                closureTracker.circularReferencesDetected++;
+                                                return true;
+                                            }
+                                        }
+                                    }
+                                } catch (const std::runtime_error&) {
+                                    // Variable not accessible, continue
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (const std::runtime_error&) {
+                // Variable not accessible, continue
+            }
+        }
+    }
+    
+    return false;
+}
+
+void VM::cleanupInactiveClosures() {
+    std::vector<std::string> toRemove;
+    
+    // Find closures that are no longer referenced
+    {
+        std::lock_guard<std::mutex> lock(closureTracker.trackerMutex);
+        for (const auto& [closureId, weakPtr] : closureTracker.activeClosure) {
+            if (weakPtr.expired()) {
+                toRemove.push_back(closureId);
+            }
+        }
+    }
+    
+    // Remove them (no lock needed since untrackClosure handles its own locking)
+    for (const auto& closureId : toRemove) {
+        untrackClosure(closureId);
+    }
+    
+    if (debugMode && !toRemove.empty()) {
+        std::cout << "[DEBUG] Cleaned up " << toRemove.size() << " inactive closures" << std::endl;
+    }
+}
+
+size_t VM::performClosureGarbageCollection() {
+    size_t freedClosures = 0;
+    
+    // Clean up inactive closures
+    cleanupInactiveClosures();
+    
+    std::lock_guard<std::mutex> lock(closureTracker.trackerMutex);
+    
+    // Clean up shared variables that are no longer referenced
+    std::vector<std::string> varsToRemove;
+    for (const auto& [varName, sharedValue] : closureTracker.sharedVariables) {
+        auto varIt = closureTracker.variableToClosures.find(varName);
+        if (varIt == closureTracker.variableToClosures.end() || varIt->second.empty()) {
+            varsToRemove.push_back(varName);
+        }
+    }
+    
+    for (const auto& varName : varsToRemove) {
+        closureTracker.sharedVariables.erase(varName);
+        freedClosures++;
+    }
+    
+    if (debugMode && freedClosures > 0) {
+        std::cout << "[DEBUG] Garbage collected " << freedClosures << " shared variables" << std::endl;
+    }
+    
+    return freedClosures;
+}
+
+void VM::printClosureMemoryStats() const {
+    std::lock_guard<std::mutex> lock(closureTracker.trackerMutex);
+    
+    std::cout << "\n=== Closure Memory Management Statistics ===" << std::endl;
+    std::cout << "Total Closures Created: " << closureTracker.totalClosuresCreated << std::endl;
+    std::cout << "Active Closures: " << closureTracker.activeClosureCount << std::endl;
+    std::cout << "Cleanup Operations: " << closureTracker.cleanupOperations << std::endl;
+    std::cout << "Circular References Detected: " << closureTracker.circularReferencesDetected << std::endl;
+    std::cout << "Memory Optimizations: " << closureTracker.memoryOptimizations << std::endl;
+    std::cout << "Shared Variables: " << closureTracker.sharedVariables.size() << std::endl;
+    std::cout << "Variable-to-Closure Mappings: " << closureTracker.variableToClosures.size() << std::endl;
+    
+    if (closureTracker.totalClosuresCreated > 0) {
+        double cleanupRatio = static_cast<double>(closureTracker.cleanupOperations) / 
+                             closureTracker.totalClosuresCreated * 100.0;
+        std::cout << "Cleanup Ratio: " << cleanupRatio << "%" << std::endl;
+    }
+    
+    if (closureTracker.memoryOptimizations > 0) {
+        std::cout << "Memory Optimization Efficiency: " << closureTracker.memoryOptimizations 
+                  << " variables optimized" << std::endl;
+    }
+    
+    std::cout << "=============================================" << std::endl;
+}
+
+// Nested function definition tracking helpers
+void VM::pushFunctionDefinition(const std::string& functionName) {
+    functionDefinitionStack.push(functionName);
+    functionDefinitionModeStack.push(true);
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] Pushed function definition: " << functionName 
+                  << " (depth: " << functionDefinitionStack.size() << ")" << std::endl;
+    }
+}
+
+void VM::popFunctionDefinition() {
+    if (!functionDefinitionStack.empty()) {
+        std::string functionName = functionDefinitionStack.top();
+        functionDefinitionStack.pop();
+        functionDefinitionModeStack.pop();
+        
+        if (debugMode) {
+            std::cout << "[DEBUG] Popped function definition: " << functionName 
+                      << " (depth: " << functionDefinitionStack.size() << ")" << std::endl;
+        }
+    }
+}
+
+bool VM::isInsideFunctionDefinition() const {
+    return !functionDefinitionModeStack.empty() && functionDefinitionModeStack.top();
+}
+
+std::string VM::getCurrentFunctionBeingDefined() const {
+    if (functionDefinitionStack.empty()) {
+        return "";
+    }
+    return functionDefinitionStack.top();
 }
