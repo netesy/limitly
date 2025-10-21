@@ -1,261 +1,214 @@
 # Implementation Plan
 
-- [x] 1. Set up concurrency runtime infrastructure
-
-
-
-
-  - Create ConcurrencyRuntime class with scheduler, thread pool, and event loop integration
-  - Implement ChannelManager for thread-safe channel creation and management
-  - Add ConcurrencyState struct to VM for managing concurrent execution state
-  - _Requirements: 1.1, 2.1, 6.1_
-
-- [x] 2. Implement basic concurrent block execution
-
-
-
-
-
-  - [x] 2.1 Create BlockExecutionState class for managing concurrent block state
-
-
-    - Implement BlockExecutionState with mode, error strategy, and timeout configuration
-    - Add parsing logic for concurrent block parameters (mode, cores, on_error, timeout, etc.)
-    - Create concurrency_stack in VM to track nested concurrent blocks
-    - _Requirements: 1.1, 1.5, 7.1_
-
-  - [x] 2.2 Implement handleBeginConcurrent instruction handler
-
-
-    - Parse concurrent block parameters from instruction string
-    - Create BlockExecutionState and push onto concurrency stack
-    - Set up output channel if specified in parameters
-    - Initialize error handling strategy and timeout configuration
-    - _Requirements: 1.1, 1.5, 6.1_
-
-  - [x] 2.3 Implement handleEndConcurrent instruction handler
-
-
-    - Wait for all tasks in current block to complete
-    - Collect results from tasks and handle any errors according to strategy
-    - Clean up block resources and pop from concurrency stack
-    - Close output channel and propagate final results
-    - _Requirements: 1.3, 8.5, 10.1_
-
-- [x] 3. Implement task statement execution
-
-
-
-
-
-  - [x] 3.1 Create TaskContext class for isolated task execution
-
-
-    - Implement TaskContext with task ID, loop variables, environment, and bytecode
-    - Add error handling context with error frames and strategy
-    - Create task-specific environment isolation
-    - _Requirements: 3.1, 3.2, 7.4_
-
-  - [x] 3.2 Implement handleBeginTask instruction handler
-
-
-    - Create TaskContext instances for each iteration value
-    - Copy current error frames to task contexts
-    - Generate task bytecode from current instruction stream
-    - Submit tasks to scheduler for execution
-    - _Requirements: 3.1, 3.2, 3.3_
-
-  - [x] 3.3 Implement task execution in thread pool
-
-
-    - Create TaskVM class for isolated task execution
-    - Execute task bytecode with proper environment setup
-    - Handle task completion and result collection
-    - Implement task cleanup and resource management
-    - _Requirements: 3.3, 3.4, 10.2_
-
-- [-] 4. Implement parallel block execution
-
-
-
-  - [x] 4.1 Implement handleBeginParallel instruction handler
-
-
-    - Create BlockExecutionState for parallel execution mode
-    - Configure work-stealing thread pool for CPU-bound tasks
-    - Set up core count management and work distribution
-    - _Requirements: 2.1, 2.2, 2.4_
-
-  - [x] 4.2 Implement handleEndParallel instruction handler
-
-    - Synchronize all parallel tasks before completion
-    - Collect results from CPU-bound parallel tasks
-    - Handle parallel task errors and cleanup resources
-    - _Requirements: 2.3, 2.5, 10.1_
-
-  - [x] 4.3 Implement work distribution for parallel tasks
-
-
-
-    - Distribute CPU-bound tasks across available cores
-    - Implement work-stealing algorithm for load balancing
-    - Handle task completion synchronization
-    - _Requirements: 2.2, 2.3, 2.4_
-
-- [ ] 5. Implement atomic variable support
-  - [ ] 5.1 Enhance AtomicValue operations for concurrent access
-    - Implement atomic add, subtract, compare-exchange operations
-    - Add atomic load and store operations for thread safety
-    - Create AtomicOperations utility class for VM integration
+- [ ] 1. Implement concurrency analysis and mode selection
+  - [ ] 1.1 Create ConcurrencyModeAnalyzer for execution mode determination
+    - Implement analysis logic to determine bare metal vs runtime-assisted execution
+    - Add complexity analysis for concurrent/parallel blocks (task count, features used)
+    - Create decision criteria for automatic mode selection
     - _Requirements: 5.1, 5.2, 5.3_
 
-  - [ ] 5.2 Implement handleDefineAtomic instruction handler
-    - Create atomic wrapper for integer variables
-    - Ensure thread-safe access from multiple tasks
-    - Integrate atomic operations with VM instruction set
-    - _Requirements: 5.1, 5.4, 5.5_
+  - [ ] 1.2 Add concurrency analysis pass to compiler pipeline
+    - Integrate ConcurrencyModeAnalyzer into AST processing pipeline
+    - Generate ConcurrencyAnalysis metadata for each concurrent/parallel block
+    - Add required runtime features detection (channels, error handling, monitoring)
+    - _Requirements: 5.4, 5.5_
 
-  - [ ] 5.3 Add atomic operation instruction handlers
-    - Implement atomic increment/decrement for concurrent tasks
-    - Add atomic read/write operations for shared state
-    - Ensure consistent atomic value access across threads
-    - _Requirements: 5.2, 5.3, 5.4_
+  - [ ] 1.3 Implement runtime feature detection
+    - Detect channel usage requiring runtime mode
+    - Identify complex error handling patterns requiring runtime support
+    - Detect stream processing and worker statements requiring runtime mode
+    - _Requirements: 2.1, 2.2, 2.3, 7.1_
 
-- [ ] 6. Implement channel communication system
-  - [ ] 6.1 Create ChannelManager for thread-safe channel operations
-    - Implement channel creation, retrieval, and cleanup
-    - Add thread-safe channel registry with mutex protection
-    - Create channel lifecycle management
-    - _Requirements: 6.1, 6.4, 10.3_
+- [ ] 2. Implement bare metal code generation
+  - [ ] 2.1 Create BareMetalConcurrencyGenerator for simple concurrent blocks
+    - Generate native thread creation code for simple task iterations
+    - Implement work partitioning for parallel blocks with uniform tasks
+    - Add thread joining and synchronization code generation
+    - _Requirements: 1.1, 1.2, 1.3, 3.1, 3.2_
 
-  - [ ] 6.2 Implement channel send and receive operations
-    - Add channel send operations for task result communication
-    - Implement channel receive with FIFO message ordering
-    - Handle channel closing and end-of-stream signaling
-    - _Requirements: 6.2, 6.3, 6.4_
+  - [ ] 2.2 Implement bare metal parallel block code generation
+    - Generate work distribution code for CPU-bound parallel tasks
+    - Create thread pool sizing based on cores parameter or hardware detection
+    - Add simple work partitioning for uniform parallel tasks
+    - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-  - [ ] 6.3 Integrate channels with task execution
-    - Connect task results to output channels
-    - Implement channel iteration for result processing
-    - Add automatic channel cleanup on block completion
-    - _Requirements: 6.1, 6.5, 10.3_
+  - [ ] 2.3 Add bare metal atomic operations code generation
+    - Generate atomic declarations and operations for shared variables
+    - Implement atomic load, store, add, and compare-exchange operations
+    - Add atomic operation code for thread-safe shared state access
+    - _Requirements: 8.1, 8.2, 8.3, 8.4_
 
-- [ ] 7. Implement error handling integration
-  - [ ] 7.1 Create ConcurrentErrorCollector for thread-safe error handling
-    - Implement thread-safe error collection across tasks
-    - Add error propagation strategies (Stop, Auto, Retry)
-    - Create error channel communication between tasks and main thread
-    - _Requirements: 7.1, 7.2, 7.4_
+  - [ ] 2.4 Implement bare metal error handling code generation
+    - Generate atomic flags for Stop error strategy (early termination)
+    - Create thread-safe error collection for Collect error strategy
+    - Add simple error checking and propagation in task loops
+    - _Requirements: 1.4, 1.5, 6.1, 6.2, 6.3_
 
-  - [ ] 7.2 Implement error propagation across thread boundaries
-    - Create ThreadSafeErrorPropagator for cross-thread error handling
-    - Implement error frame copying to task contexts
-    - Add error context preservation across thread boundaries
-    - _Requirements: 7.4, 7.5, 3.5_
+- [ ] 3. Define runtime hook interface
+  - [ ] 3.1 Create C-compatible hook interface definitions
+    - Define TaskDescriptor, TaskHandle, and ChannelHandle types
+    - Create function signatures for concurrency hooks (spawn, join, cancel)
+    - Add channel communication hooks (create, send, receive, close)
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 7.1_
 
-  - [ ] 7.3 Implement error handling strategies
-    - Add Stop strategy: terminate all tasks on first error
-    - Implement Auto strategy: continue with remaining tasks, collect errors
-    - Create Retry strategy: retry failed tasks up to configured limit
-    - _Requirements: 7.1, 7.2, 7.3_
+  - [ ] 3.2 Add memory management hooks interface
+    - Define shared memory allocation and deallocation hooks
+    - Create atomic operation hooks for custom atomic implementations
+    - Add memory pool management hooks for advanced memory strategies
+    - _Requirements: 8.5, 2.5_
 
-  - [ ] 7.4 Implement TaskRetryManager for failed task retry logic
-    - Create retry mechanism with configurable retry count and delay
-    - Track task failure history and retry attempts
-    - Implement exponential backoff for retry delays
-    - _Requirements: 7.3, 7.4_
+  - [ ] 3.3 Define error handling hooks interface
+    - Create ErrorContext structure for cross-thread error information
+    - Add error propagation and collection hook functions
+    - Define error handling strategy hooks (stop, collect, retry)
+    - _Requirements: 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 8. Implement timeout and grace period support
-  - [ ] 8.1 Add timeout enforcement for concurrent blocks
-    - Implement timeout monitoring for concurrent block execution
-    - Add graceful shutdown initiation when timeout is reached
-    - Create timeout action handling (partial results vs error)
-    - _Requirements: 8.1, 8.2, 8.4_
+  - [ ] 3.4 Add optional I/O hooks interface
+    - Define async I/O operation hooks for advanced I/O handling
+    - Create I/O handle types and operation signatures
+    - Add hooks for async read/write operations
+    - _Requirements: 7.1_
 
-  - [ ] 8.2 Implement grace period handling
-    - Allow tasks to complete within grace period after timeout
-    - Implement forceful task termination after grace period expires
-    - Add partial result collection during graceful shutdown
-    - _Requirements: 8.3, 8.4, 8.5_
+- [ ] 4. Implement default runtime implementation
+  - [ ] 4.1 Create DefaultRuntimeImpl using standard library
+    - Implement basic task scheduling using std::thread and ThreadPool
+    - Add simple channel implementation using std::queue and std::mutex
+    - Create basic error collection and propagation mechanisms
+    - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
-  - [ ] 8.3 Add timeout configuration parsing
-    - Parse timeout and grace period from block parameters
-    - Implement timeout action configuration (partial/error)
-    - Add timeout validation and default value handling
-    - _Requirements: 8.1, 8.3, 8.4_
+  - [ ] 4.2 Implement runtime lifecycle management
+    - Add runtime initialization and shutdown functions
+    - Create hook registration system for pluggable implementations
+    - Implement runtime configuration parsing and validation
+    - _Requirements: 2.5, 5.5_
 
-- [ ] 9. Implement async/await support
-  - [ ] 9.1 Implement handleAwait instruction handler
-    - Create async operation suspension and resumption
-    - Add future/promise integration for async results
-    - Implement task continuation after await completion
-    - _Requirements: 9.1, 9.2, 9.3_
+  - [ ] 4.3 Add default atomic operations implementation
+    - Implement atomic hooks using atomic operations
+    - Create atomic handle management for runtime atomic variables
+    - Add atomic operation implementations (load, store, add, compare_exchange)
+    - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
 
-  - [ ] 9.2 Add async function call support
-    - Implement async function execution in concurrent contexts
-    - Create future/promise return value handling
-    - Add async operation error propagation
-    - _Requirements: 9.3, 9.4, 9.5_
+  - [ ] 4.4 Create default error handling implementation
+    - Implement thread-safe error collection using std::vector and std::mutex
+    - Add error propagation across thread boundaries
+    - Create error strategy implementations (stop, collect, ignore)
+    - _Requirements: 2.2, 2.3, 2.4, 2.5_
 
-  - [ ] 9.3 Integrate async operations with error handling
-    - Handle async operation failures in concurrent tasks
-    - Propagate async errors according to error handling strategy
-    - Add async operation timeout and cancellation support
-    - _Requirements: 9.4, 9.5, 7.5_
+- [ ] 5. Implement runtime-assisted code generation
+  - [ ] 5.1 Create RuntimeAssistedCodeGenerator for complex concurrent blocks
+    - Generate runtime initialization code when runtime features are needed
+    - Add hook function calls for task spawning and management
+    - Create channel operation code using runtime hooks
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 10. Implement resource management and cleanup
-  - [ ] 10.1 Create ResourceTracker for automatic cleanup
-    - Implement automatic resource cleanup on block completion
-    - Add cleanup function registration for tasks and channels
-    - Create RAII-style resource management for concurrent blocks
-    - _Requirements: 10.1, 10.2, 10.4_
+  - [ ] 5.2 Implement channel operations code generation
+    - Generate channel creation calls through runtime hooks
+    - Add channel send and receive operations in generated code
+    - Create channel cleanup and lifecycle management code
+    - _Requirements: 7.1, 2.1, 2.2, 2.3, 2.4_
 
-  - [ ] 10.2 Implement task resource cleanup
-    - Clean up task-specific resources on task completion
-    - Handle resource cleanup during task cancellation
-    - Add memory management for task environments and contexts
-    - _Requirements: 10.2, 10.4, 3.4_
+  - [ ] 5.3 Add complex error handling code generation
+    - Generate error handling setup through runtime hooks
+    - Create error propagation code for complex error strategies
+    - Add error collection and reporting through runtime interface
+    - _Requirements: 2.2, 2.3, 2.4, 2.5_
 
-  - [ ] 10.3 Add channel and atomic variable cleanup
-    - Implement automatic channel cleanup on block completion
-    - Clean up atomic variable wrappers when out of scope
-    - Add proper resource cleanup during error unwinding
-    - _Requirements: 10.3, 10.4, 10.5_
+  - [ ] 5.4 Implement worker statement code generation
+    - Generate worker function creation through runtime hooks
+    - Add stream processing setup and worker management code
+    - Create worker result collection and stream completion handling
+    - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
-- [ ] 11. Implement worker statement support
-  - [ ] 11.1 Create WorkerStatement execution for stream processing
-    - Implement worker function creation and management
-    - Add stream input processing through workers
-    - Create worker parameter passing and result collection
-    - _Requirements: 4.1, 4.2, 4.3_
+- [ ] 6. Integrate hybrid execution into compiler
+  - [ ] 6.1 Add mode selection to concurrent block compilation
+    - Integrate ConcurrencyModeAnalyzer into concurrent block processing
+    - Route simple blocks to bare metal code generation
+    - Route complex blocks to runtime-assisted code generation
+    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
 
-  - [ ] 11.2 Implement stream mode execution
-    - Add stream processing mode for concurrent blocks
-    - Implement input stream distribution to workers
-    - Handle stream completion and worker termination
-    - _Requirements: 4.2, 4.4, 4.5_
+  - [ ] 6.2 Implement seamless mode transitions
+    - Allow bare metal and runtime-assisted blocks in same program
+    - Add runtime initialization only when first runtime block is encountered
+    - Create clean transitions between execution modes
+    - _Requirements: 5.5, 2.5_
 
-  - [ ] 11.3 Integrate workers with error handling
-    - Handle worker errors according to block error strategy
-    - Implement worker retry logic for failed stream processing
-    - Add worker resource cleanup on stream completion
-    - _Requirements: 4.3, 4.4, 4.5_
+  - [ ] 6.3 Add compilation metadata generation
+    - Generate ConcurrencyCodeMetadata for each concurrent block
+    - Add mode selection reasoning and feature usage information
+    - Create debugging information for execution mode choices
+    - _Requirements: 5.4, 5.5_
 
-- [ ] 12. Add comprehensive testing and validation
-  - [ ] 12.1 Create unit tests for concurrency components
-    - Write tests for TaskContext creation and execution
-    - Test atomic operations in concurrent scenarios
-    - Add channel communication tests with multiple producers/consumers
-    - _Requirements: 1.1, 3.1, 5.1, 6.1_
+  - [ ] 6.4 Implement adaptive execution feedback
+    - Add compiler feedback about execution mode selection
+    - Create warnings for suboptimal concurrency patterns
+    - Add suggestions for improving concurrency performance
+    - _Requirements: 5.5_
 
-  - [ ] 12.2 Create integration tests for concurrent blocks
-    - Test complete concurrent block execution workflows
-    - Add tests for error handling strategies in concurrent contexts
-    - Test timeout and grace period handling
-    - _Requirements: 1.1, 7.1, 8.1_
+- [ ] 7. Add advanced runtime features
+  - [ ] 7.1 Implement work-stealing scheduler for runtime mode
+    - Create work-stealing thread pool for dynamic load balancing
+    - Add task queue management with work stealing between threads
+    - Implement NUMA-aware task scheduling for large systems
+    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
-  - [ ] 12.3 Add performance and stress tests
-    - Create scalability tests with varying task counts
-    - Test memory usage and leak detection in concurrent execution
-    - Add stress tests for high error rates and resource constraints
-    - _Requirements: 10.1, 10.2, 10.3_
+  - [ ] 7.2 Add high-performance channel implementation
+    - Implement lock-free channels for high-throughput communication
+    - Create bounded and unbounded channel variants
+    - Add channel selection and multiplexing capabilities
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
+
+  - [ ] 7.3 Implement advanced error handling features
+    - Add error recovery and retry mechanisms with exponential backoff
+    - Create error aggregation and reporting for complex error scenarios
+    - Implement error context preservation across thread boundaries
+    - _Requirements: 2.2, 2.3, 2.4, 2.5_
+
+  - [ ] 7.4 Add monitoring and profiling hooks
+    - Create performance monitoring hooks for task execution times
+    - Add memory usage tracking for concurrent operations
+    - Implement profiling hooks for identifying bottlenecks
+    - _Requirements: 2.5_
+
+- [ ] 8. Create comprehensive testing suite
+  - [ ] 8.1 Add bare metal execution tests
+    - Test simple concurrent blocks with bare metal thread generation
+    - Verify atomic operations work correctly in bare metal mode
+    - Test parallel work distribution and thread synchronization
+    - _Requirements: 1.1, 1.2, 1.3, 3.1, 3.2, 8.1, 8.2_
+
+  - [ ] 8.2 Create runtime-assisted execution tests
+    - Test complex concurrent blocks using runtime hooks
+    - Verify channel communication works correctly through runtime
+    - Test error handling strategies in runtime-assisted mode
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 7.1_
+
+  - [ ] 8.3 Add hybrid execution integration tests
+    - Test programs mixing bare metal and runtime-assisted blocks
+    - Verify seamless transitions between execution modes
+    - Test runtime initialization and cleanup in mixed programs
+    - _Requirements: 5.5, 6.1, 6.2_
+
+  - [ ] 8.4 Create performance and scalability tests
+    - Benchmark bare metal vs runtime-assisted execution performance
+    - Test scalability with varying numbers of tasks and threads
+    - Measure memory usage and overhead for both execution modes
+    - _Requirements: 1.5, 2.5, 3.5, 4.5, 8.5_
+
+- [ ] 9. Add documentation and examples
+  - [ ] 9.1 Create concurrency programming guide
+    - Document when to use concurrent vs parallel blocks
+    - Explain execution mode selection and performance implications
+    - Provide examples of bare metal vs runtime-assisted patterns
+    - _Requirements: 5.4, 5.5_
+
+  - [ ] 9.2 Add runtime implementation guide
+    - Document how to create custom runtime implementations
+    - Explain hook interface and implementation requirements
+    - Provide examples of advanced runtime features
+    - _Requirements: 2.5, 7.4_
+
+  - [ ] 9.3 Create performance tuning guide
+    - Document best practices for high-performance concurrency
+    - Explain how to optimize concurrent code for bare metal execution
+    - Provide guidelines for when to use runtime features
+    - _Requirements: 1.5, 3.5, 4.5_

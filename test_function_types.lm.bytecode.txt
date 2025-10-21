@@ -1,0 +1,61 @@
+Bytecode for test_function_types.lm
+Parser: New Unified Parser (CST mode)
+========================================
+
+=== Bytecode ===
+Generated 53 instructions
+
+   0: PUSH_NULL           
+   1: STORE_VAR            "callback"
+   2: PUSH_NULL           
+   3: STORE_VAR            "processor"
+   4: PUSH_NULL           
+   5: STORE_VAR            "formatter"
+   6: PUSH_NULL           
+   7: STORE_VAR            "factory"
+   8: PUSH_NULL           
+   9: STORE_VAR            "mapper"
+  10: BEGIN_FUNCTION       "__lambda_0"
+  11: DEFINE_PARAM        
+  12: BEGIN_SCOPE         
+  13: LOAD_VAR             "x"
+  14: PUSH_INT             2
+  15: MULTIPLY            
+  16: RETURN              
+  17: END_SCOPE           
+  18: PUSH_NULL           
+  19: RETURN              
+  20: END_FUNCTION        
+  21: PUSH_LAMBDA         
+  22: PUSH_INT             0
+  23: CREATE_CLOSURE       "__lambda_0"
+  24: STORE_VAR            "lambda"
+  25: BEGIN_FUNCTION       "createAdder"
+  26: DEFINE_PARAM        
+  27: BEGIN_SCOPE         
+  28: BEGIN_FUNCTION       "__lambda_1"
+  29: DEFINE_PARAM        
+  30: BEGIN_SCOPE         
+  31: LOAD_VAR             "base"
+  32: LOAD_VAR             "x"
+  33: ADD                 
+  34: RETURN              
+  35: END_SCOPE           
+  36: PUSH_NULL           
+  37: RETURN              
+  38: END_FUNCTION        
+  39: PUSH_LAMBDA         
+  40: CAPTURE_VAR          "base"
+  41: PUSH_INT             1
+  42: CREATE_CLOSURE       "__lambda_1"
+  43: RETURN              
+  44: END_SCOPE           
+  45: PUSH_NULL           
+  46: RETURN              
+  47: END_FUNCTION        
+  48: PUSH_FUNCTION       
+  49: STORE_VAR            "createAdder"
+  50: PUSH_STRING          "Function type system test completed"
+  51: PRINT               
+  52: HALT                
+

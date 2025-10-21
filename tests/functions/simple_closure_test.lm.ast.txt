@@ -1,0 +1,73 @@
+AST for tests\functions\simple_closure_test.lm
+Parser: New Unified Parser (CST mode)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+  Literal: === Simple Closure Test ===
+FunctionDeclaration: simpleAdd
+  Parameters:
+    a: int
+    b: int
+  ReturnType: int
+  Body:
+    BlockStatement:
+      ReturnStatement:
+        Value:
+          BinaryExpression: +
+            Left:
+              Variable: a
+            Operator: +
+            Right:
+              Variable: b
+VarDeclaration: result
+  Initializer:
+    CallExpression:
+      Callee:
+        Variable: simpleAdd
+      Arguments:
+        Literal: 5
+        Literal: 3
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: Simple function result: 
+    Operator: +
+    Right:
+      Variable: result
+VarDeclaration: simpleLambda
+  Initializer:
+    LambdaExpression:
+      Parameters:
+        x: int
+      ReturnType: int
+      Body:
+        BlockStatement:
+          ReturnStatement:
+            Value:
+              BinaryExpression: *
+                Left:
+                  Variable: x
+                Operator: *
+                Right:
+                  Literal: 2
+VarDeclaration: lambdaResult
+  Initializer:
+    CallExpression:
+      Callee:
+        Variable: simpleLambda
+      Arguments:
+        Literal: 5
+PrintStatement:
+  BinaryExpression: +
+    Left:
+      Literal: Lambda result: 
+    Operator: +
+    Right:
+      Variable: lambdaResult
+PrintStatement:
+  Literal: === Test Complete ===

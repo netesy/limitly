@@ -1,0 +1,209 @@
+Tokens for test_optional_parameters_and_types.lm
+Parser: New Unified Parser (CST mode)
+Mode: CST with trivia preservation
+========================================
+
+=== Tokens with Trivia ===
+Line 4: FN = 'fn' [leading: COMMENT_LINE('// Test optional parameters and optional types') NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 1: Function with optional parameters (using ? syntax)') NEWLINE('
+') ]
+Line 4: IDENTIFIER = 'formatMessage' [leading: WHITESPACE(' ') ]
+Line 4: LEFT_PAREN = '('
+Line 4: IDENTIFIER = 'text'
+Line 4: COLON = ':'
+Line 4: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 4: COMMA = ','
+Line 4: IDENTIFIER = 'prefix' [leading: WHITESPACE(' ') ]
+Line 4: COLON = ':'
+Line 4: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 4: QUESTION = '?'
+Line 4: COMMA = ','
+Line 4: IDENTIFIER = 'suffix' [leading: WHITESPACE(' ') ]
+Line 4: COLON = ':'
+Line 4: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 4: QUESTION = '?'
+Line 4: RIGHT_PAREN = ')'
+Line 4: COLON = ':'
+Line 4: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 4: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 5: VAR = 'var' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 5: IDENTIFIER = 'result' [leading: WHITESPACE(' ') ]
+Line 5: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 5: IDENTIFIER = 'text' [leading: WHITESPACE(' ') ]
+Line 5: SEMICOLON = ';'
+Line 6: IF = 'if' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 6: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 6: IDENTIFIER = 'prefix'
+Line 6: RIGHT_PAREN = ')'
+Line 6: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 7: IDENTIFIER = 'result' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 7: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 7: IDENTIFIER = 'prefix' [leading: WHITESPACE(' ') ]
+Line 7: PLUS = '+' [leading: WHITESPACE(' ') ]
+Line 7: IDENTIFIER = 'result' [leading: WHITESPACE(' ') ]
+Line 7: SEMICOLON = ';'
+Line 8: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 9: IF = 'if' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 9: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 9: IDENTIFIER = 'suffix'
+Line 9: RIGHT_PAREN = ')'
+Line 9: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 10: IDENTIFIER = 'result' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 10: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 10: IDENTIFIER = 'result' [leading: WHITESPACE(' ') ]
+Line 10: PLUS = '+' [leading: WHITESPACE(' ') ]
+Line 10: IDENTIFIER = 'suffix' [leading: WHITESPACE(' ') ]
+Line 10: SEMICOLON = ';'
+Line 11: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 12: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 12: IDENTIFIER = 'result' [leading: WHITESPACE(' ') ]
+Line 12: SEMICOLON = ';'
+Line 13: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 16: FN = 'fn' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 2: Function with optional types (nullable parameters)') NEWLINE('
+') ]
+Line 16: IDENTIFIER = 'processValue' [leading: WHITESPACE(' ') ]
+Line 16: LEFT_PAREN = '('
+Line 16: IDENTIFIER = 'value'
+Line 16: COLON = ':'
+Line 16: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 16: QUESTION = '?'
+Line 16: COMMA = ','
+Line 16: IDENTIFIER = 'multiplier' [leading: WHITESPACE(' ') ]
+Line 16: COLON = ':'
+Line 16: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 16: RIGHT_PAREN = ')'
+Line 16: COLON = ':'
+Line 16: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 16: QUESTION = '?'
+Line 16: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 17: IF = 'if' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 17: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 17: IDENTIFIER = 'value'
+Line 17: RIGHT_PAREN = ')'
+Line 17: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 18: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 18: IDENTIFIER = 'value' [leading: WHITESPACE(' ') ]
+Line 18: STAR = '*' [leading: WHITESPACE(' ') ]
+Line 18: IDENTIFIER = 'multiplier' [leading: WHITESPACE(' ') ]
+Line 18: SEMICOLON = ';'
+Line 19: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 19: ELSE = 'else' [leading: WHITESPACE(' ') ]
+Line 19: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 20: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 20: NIL = 'nil' [leading: WHITESPACE(' ') ]
+Line 20: SEMICOLON = ';'
+Line 21: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 22: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 25: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 3: Function type annotations with optional parameters') NEWLINE('
+') ]
+Line 25: IDENTIFIER = 'formatter' [leading: WHITESPACE(' ') ]
+Line 25: COLON = ':'
+Line 25: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 25: LEFT_PAREN = '('
+Line 25: IDENTIFIER = 'text'
+Line 25: COLON = ':'
+Line 25: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 25: COMMA = ','
+Line 25: IDENTIFIER = 'indent' [leading: WHITESPACE(' ') ]
+Line 25: COLON = ':'
+Line 25: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 25: QUESTION = '?'
+Line 25: RIGHT_PAREN = ')'
+Line 25: COLON = ':'
+Line 25: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 25: SEMICOLON = ';'
+Line 26: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 26: IDENTIFIER = 'processor' [leading: WHITESPACE(' ') ]
+Line 26: COLON = ':'
+Line 26: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 26: LEFT_PAREN = '('
+Line 26: IDENTIFIER = 'value'
+Line 26: COLON = ':'
+Line 26: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 26: QUESTION = '?'
+Line 26: COMMA = ','
+Line 26: IDENTIFIER = 'default' [leading: WHITESPACE(' ') ]
+Line 26: COLON = ':'
+Line 26: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 26: RIGHT_PAREN = ')'
+Line 26: COLON = ':'
+Line 26: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 26: SEMICOLON = ';'
+Line 29: FN = 'fn' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 4: Function returning optional type') NEWLINE('
+') ]
+Line 29: IDENTIFIER = 'findUser' [leading: WHITESPACE(' ') ]
+Line 29: LEFT_PAREN = '('
+Line 29: IDENTIFIER = 'id'
+Line 29: COLON = ':'
+Line 29: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 29: RIGHT_PAREN = ')'
+Line 29: COLON = ':'
+Line 29: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 29: QUESTION = '?'
+Line 29: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 30: IF = 'if' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 30: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 30: IDENTIFIER = 'id'
+Line 30: GREATER = '>' [leading: WHITESPACE(' ') ]
+Line 30: NUMBER = '0' [leading: WHITESPACE(' ') ]
+Line 30: RIGHT_PAREN = ')'
+Line 30: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 31: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 31: STRING = '"User"' [leading: WHITESPACE(' ') ]
+Line 31: PLUS = '+' [leading: WHITESPACE(' ') ]
+Line 31: IDENTIFIER = 'id' [leading: WHITESPACE(' ') ]
+Line 31: SEMICOLON = ';'
+Line 32: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 32: ELSE = 'else' [leading: WHITESPACE(' ') ]
+Line 32: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 33: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 33: NIL = 'nil' [leading: WHITESPACE(' ') ]
+Line 33: SEMICOLON = ';'
+Line 34: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 35: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 46: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 5: Complex optional types in function signatures') NEWLINE('
+') COMMENT_LINE('// var complexFunc: fn(data: [int]?, callback: fn(int): str): [str]?; // Complex nested types need more work') NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 6: Optional parameters with default values (conceptual)') NEWLINE('
+') COMMENT_LINE('// Note: This syntax might need to be implemented separately') NEWLINE('
+') COMMENT_LINE('// fn greetWithDefaults(name: str, greeting: str = "Hello", punctuation: str = "!"): str {') NEWLINE('
+') COMMENT_LINE('//     return greeting + " " + name + punctuation;') NEWLINE('
+') COMMENT_LINE('// }') NEWLINE('
+') NEWLINE('
+') ]
+Line 46: LEFT_PAREN = '('
+Line 46: STRING = '"Optional parameters and types test completed"'
+Line 46: RIGHT_PAREN = ')'
+Line 46: SEMICOLON = ';'
+Line 46: EOF_TOKEN = ''

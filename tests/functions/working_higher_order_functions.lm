@@ -1,0 +1,103 @@
+print("=== Working Higher-Order Functions Test ===");
+
+print("\n--- Test 1: Function as Variable ---");
+fn add(x: int, y: int): int {
+    return x + y;
+}
+
+fn multiply(x: int, y: int): int {
+    return x * y;
+}
+
+var operation1: function = add;
+var operation2: function = multiply;
+
+print("Function variables created:");
+print("  add function: " + operation1);
+print("  multiply function: " + operation2);
+
+print("\n--- Test 2: Lambda as Function ---");
+var addLambda = fn(a: int, b: int): int {
+    return a + b;
+};
+
+var multiplyLambda = fn(a: int, b: int): int {
+    return a * b;
+};
+
+print("Lambda functions created:");
+print("  add lambda: " + addLambda);
+print("  multiply lambda: " + multiplyLambda);
+
+print("\n--- Test 3: Function Returning Function ---");
+fn createAdder(increment: int): function {
+    return fn(x: int): int {
+        return x + increment;
+    };
+}
+
+var addFive = createAdder(5);
+var addTen = createAdder(10);
+
+print("Function factories created:");
+print("  addFive: " + addFive);
+print("  addTen: " + addTen);
+
+print("\n--- Test 4: Function with Function Parameter ---");
+fn applyTwice(x: int, operation: function): int {
+    // Note: Direct function calling not implemented yet
+    // This demonstrates the parameter passing
+    print("  Received function: " + operation);
+    print("  Input value: " + x);
+    return x; // Placeholder return
+}
+
+var result = applyTwice(5, addLambda);
+print("Applied function twice, result: " + result);
+
+print("\n--- Test 5: Closure with Captured Variables ---");
+fn createCounter(start: int): function {
+    var count: int = start;
+    return fn(): int {
+        count = count + 1;
+        return count;
+    };
+}
+
+var counter1 = createCounter(0);
+var counter2 = createCounter(100);
+
+print("Counters created:");
+print("  counter1: " + counter1);
+print("  counter2: " + counter2);
+
+print("\n--- Test 6: Multiple Closures Sharing Variables ---");
+fn createCalculator(initial: int): (function, function, function) {
+    var value: int = initial;
+    
+    var getter = fn(): int {
+        return value;
+    };
+    
+    var adder = fn(x: int): int {
+        value = value + x;
+        return value;
+    };
+    
+    var multiplier = fn(x: int): int {
+        value = value * x;
+        return value;
+    };
+    
+    return (getter, adder, multiplier);
+}
+
+var (getValue, addValue, multiplyValue) = createCalculator(10);
+
+print("Calculator functions created:");
+print("  getValue: " + getValue);
+print("  addValue: " + addValue);
+print("  multiplyValue: " + multiplyValue);
+
+print("\n=== Working Higher-Order Functions Test Complete ===");
+print("Note: Function calling syntax needs to be implemented for full functionality.");

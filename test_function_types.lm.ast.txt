@@ -1,0 +1,60 @@
+AST for test_function_types.lm
+Parser: New Unified Parser (CST mode)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
+========================================
+
+AST Dump:
+==========
+VarDeclaration: callback
+  Type: () -> bool
+VarDeclaration: processor
+  Type: () -> str
+VarDeclaration: formatter
+  Type: () -> str
+VarDeclaration: factory
+  Type: () -> () -> int
+VarDeclaration: mapper
+  Type: () -> [str]
+VarDeclaration: lambda
+  Type: () -> int
+  Initializer:
+    LambdaExpression:
+      Parameters:
+        x: int
+      ReturnType: int
+      Body:
+        BlockStatement:
+          ReturnStatement:
+            Value:
+              BinaryExpression: *
+                Left:
+                  Variable: x
+                Operator: *
+                Right:
+                  Literal: 2
+FunctionDeclaration: createAdder
+  Parameters:
+    base: int
+  ReturnType: () -> int
+  Body:
+    BlockStatement:
+      ReturnStatement:
+        Value:
+          LambdaExpression:
+            Parameters:
+              x: int
+            ReturnType: int
+            Body:
+              BlockStatement:
+                ReturnStatement:
+                  Value:
+                    BinaryExpression: +
+                      Left:
+                        Variable: base
+                      Operator: +
+                      Right:
+                        Variable: x
+PrintStatement:
+  Literal: Function type system test completed

@@ -1,0 +1,90 @@
+CST for tests\functions\simple_closure_test.lm
+Parser: New Unified Parser (CST mode)
+Mode: CST (cstMode=true)
+========================================
+
+CST Statistics:
+- CST nodes created: 21
+- Trivia attachments: 0
+- Parse errors: 0
+
+=== Full CST Structure ===
++ Node: PROGRAM [0-51] (Program root node with trivia)
+├─ + Node: PRINT_STATEMENT [5-6]
+├─ + Node: LITERAL_EXPR [6-35] (string literal)
+│ └─ Token: "=== Simple Closu... [6-35]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+└─ + Node: FUNCTION_DECLARATION [0-337]
+  ├─ + Node: BLOCK_STATEMENT [72-74]
+  │ └─ + Node: BLOCK_STATEMENT [0-94] (block statement)
+  │   ├─ + Node: WHITESPACE_NODE | Token:   [72-73]
+  │   ├─ Token: { [73-74]
+  │   ├─ + Node: VARIABLE_EXPR [88-89]
+  │   ├─ + Node: VARIABLE_EXPR [86-87] (variable reference)
+  │   │ ├─ + Node: WHITESPACE_NODE | Token:   [85-86]
+  │   │ └─ Token: a [86-87]
+  │   ├─ + Node: VARIABLE_EXPR [91-92]
+  │   ├─ + Node: VARIABLE_EXPR [90-91] (variable reference)
+  │   │ ├─ + Node: WHITESPACE_NODE | Token:   [89-90]
+  │   │ └─ Token: b [90-91]
+  │   ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+  │   ├─ + Node: WHITESPACE_NODE | Token: 
+ [92-93]
+  │   └─ Token: } [93-94]
+  ├─ + Node: VAR_DECLARATION [100-106]
+  ├─ + Node: VARIABLE_EXPR [118-119]
+  ├─ + Node: VARIABLE_EXPR [109-118] (variable reference)
+  │ ├─ + Node: WHITESPACE_NODE | Token:   [108-109]
+  │ └─ Token: simpleAdd [109-118]
+  ├─ + Node: LITERAL_EXPR [120-121]
+  ├─ + Node: LITERAL_EXPR [119-120] (number literal)
+  │ └─ Token: 5 [119-120]
+  ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+  ├─ + Node: LITERAL_EXPR [123-124]
+  ├─ + Node: LITERAL_EXPR [122-123] (number literal)
+  │ ├─ + Node: WHITESPACE_NODE | Token:   [121-122]
+  │ └─ Token: 3 [122-123]
+  ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+  ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+  ├─ + Node: PRINT_STATEMENT [131-132]
+  ├─ + Node: LITERAL_EXPR [132-158] (string literal)
+  │ └─ Token: "Simple function ... [132-158]
+  ├─ + Node: VARIABLE_EXPR [167-168]
+  ├─ + Node: VARIABLE_EXPR [161-167] (variable reference)
+  │ ├─ + Node: WHITESPACE_NODE | Token:   [160-161]
+  │ └─ Token: result [161-167]
+  ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+  ├─ + Node: VAR_DECLARATION [175-187]
+  ├─ + Node: VARIABLE_EXPR [221-222]
+  ├─ + Node: VARIABLE_EXPR [219-220] (variable reference)
+  │ ├─ + Node: WHITESPACE_NODE | Token:   [218-219]
+  │ └─ Token: x [219-220]
+  ├─ + Node: LITERAL_EXPR [224-225]
+  ├─ + Node: LITERAL_EXPR [223-224] (number literal)
+  │ ├─ + Node: WHITESPACE_NODE | Token:   [222-223]
+  │ └─ Token: 2 [223-224]
+  ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+  ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+  ├─ + Node: VAR_DECLARATION [234-246]
+  ├─ + Node: VARIABLE_EXPR [261-262]
+  ├─ + Node: VARIABLE_EXPR [249-261] (variable reference)
+  │ ├─ + Node: WHITESPACE_NODE | Token:   [248-249]
+  │ └─ Token: simpleLambda [249-261]
+  ├─ + Node: LITERAL_EXPR [263-264]
+  ├─ + Node: LITERAL_EXPR [262-263] (number literal)
+  │ └─ Token: 5 [262-263]
+  ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+  ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+  ├─ + Node: PRINT_STATEMENT [271-272]
+  ├─ + Node: LITERAL_EXPR [272-289] (string literal)
+  │ └─ Token: "Lambda result: " [272-289]
+  ├─ + Node: VARIABLE_EXPR [304-305]
+  ├─ + Node: VARIABLE_EXPR [292-304] (variable reference)
+  │ ├─ + Node: WHITESPACE_NODE | Token:   [291-292]
+  │ └─ Token: lambdaResult [292-304]
+  ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+  ├─ + Node: PRINT_STATEMENT [313-314]
+  ├─ + Node: LITERAL_EXPR [314-337] (string literal)
+  │ └─ Token: "=== Test Complet... [314-337]
+  └─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+

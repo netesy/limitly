@@ -7,7 +7,13 @@
 #include <variant>
 #include <optional>
 #include <unordered_map>
+#include <sstream>
+#include <algorithm>
 #include "scanner.hh"
+
+// Forward declarations
+struct Type;
+using TypePtr = std::shared_ptr<Type>;
 
 // Forward declarations for AST node types
 namespace AST {
@@ -22,6 +28,7 @@ namespace AST {
     struct ThisExpr;
     struct SuperExpr;
     struct CallExpr;
+    struct CallClosureExpr;
     struct AssignExpr;
     struct TernaryExpr;
     struct GroupingExpr;
@@ -69,6 +76,7 @@ namespace AST {
     struct ErrorTypePatternExpr;
     struct LambdaExpr;
     struct TypeAnnotation;
+    struct FunctionTypeAnnotation;
     struct StructuralTypeField;
     struct TypeDeclaration;
     struct TraitDeclaration;
@@ -107,8 +115,23 @@ namespace AST {
         std::shared_ptr<TypeAnnotation> type;
     };
     
+    // Function parameter for function type annotations
+    struct FunctionParameter {
+        std::string name;                                      // Parameter name (optional)
+        std::shared_ptr<TypeAnnotation> type;                  // Parameter type
+        bool hasDefaultValue = false;                          // Whether parameter has default value
+        
+        FunctionParameter() = default;
+        FunctionParameter(const std::string& n, std::shared_ptr<TypeAnnotation> t) 
+            : name(n), type(t) {}
+        FunctionParameter(std::shared_ptr<TypeAnnotation> t) 
+            : type(t) {}
+    };
+
     // Type annotation structure
     struct TypeAnnotation {
+        virtual ~TypeAnnotation() = default;                  // Make polymorphic for dynamic_cast
+        
         std::string typeName;                                  // The name of the type (e.g., "int", "str", "Person")
         bool isOptional = false;                               // Whether this is an optional type (e.g., int?)
         bool isPrimitive = false;                              // Whether this is a primitive type (e.g., int, str, bool)
@@ -125,7 +148,9 @@ namespace AST {
         std::string baseRecord = "";                           // Name of the base record for extensible records
         std::vector<std::string> baseRecords;                  // Multiple base records for extensible records
         
-        std::vector<std::shared_ptr<TypeAnnotation>> functionParams;    // Function parameters for function types
+        // Enhanced function type support
+        std::vector<FunctionParameter> functionParameters;              // Named function parameters with types
+        std::vector<std::shared_ptr<TypeAnnotation>> functionParams;    // Legacy function parameters (for backward compatibility)
         std::vector<std::shared_ptr<TypeAnnotation>> unionTypes;        // Types in a union (e.g., int | str)
         std::vector<StructuralTypeField> structuralFields;              // Fields in a structural type
         
@@ -138,6 +163,34 @@ namespace AST {
         // Error handling support
         bool isFallible = false;                                         // Whether this type can fail (Type?)
         std::vector<std::string> errorTypes;                             // Specific error types (Type?Error1, Error2)
+    };
+
+    // Function type annotation with specific signature (e.g., fn(a: int, b: str): bool)
+    struct FunctionTypeAnnotation : public TypeAnnotation {
+        std::vector<FunctionParameter> parameters;                       // Named parameters with types
+        std::shared_ptr<TypeAnnotation> returnType;                      // Return type
+        bool isVariadic = false;                                         // Whether function accepts variable arguments
+        
+        FunctionTypeAnnotation() {
+            typeName = "function";
+            isFunction = true;
+        }
+        
+        // Helper methods
+        size_t getParameterCount() const { return parameters.size(); }
+        
+        bool hasNamedParameters() const {
+            return std::any_of(parameters.begin(), parameters.end(),
+                             [](const FunctionParameter& param) { return !param.name.empty(); });
+        }
+        
+        std::vector<TypePtr> getParameterTypes() const;  // Convert to TypePtr vector
+        
+        // Type compatibility checking
+        bool isCompatibleWith(const FunctionTypeAnnotation& other) const;
+        
+        // String representation
+        std::string toString() const;
     };
 
     // Program - the root of our AST
@@ -197,6 +250,13 @@ namespace AST {
     // Function call
     struct CallExpr : public Expression {
         std::shared_ptr<Expression> callee;
+        std::vector<std::shared_ptr<Expression>> arguments;
+        std::unordered_map<std::string, std::shared_ptr<Expression>> namedArgs;
+    };
+
+    // Closure call (for calling closure variables)
+    struct CallClosureExpr : public Expression {
+        std::shared_ptr<Expression> closure;  // The closure expression to call
         std::vector<std::shared_ptr<Expression>> arguments;
         std::unordered_map<std::string, std::shared_ptr<Expression>> namedArgs;
     };
@@ -599,6 +659,86 @@ namespace AST {
         // Captured variables (determined during analysis)
         std::vector<std::string> capturedVars;
     };
+}
+
+// FunctionTypeAnnotation method implementations
+namespace AST {
+    inline std::vector<TypePtr> FunctionTypeAnnotation::getParameterTypes() const {
+        std::vector<TypePtr> types;
+        for (const auto& param : parameters) {
+            if (param.type) {
+                // This would need to be converted from AST::TypeAnnotation to TypePtr
+                // For now, we'll return empty vector as this requires TypeSystem integration
+            }
+        }
+        return types; // Placeholder - needs TypeSystem integration
+    }
+
+    inline bool FunctionTypeAnnotation::isCompatibleWith(const FunctionTypeAnnotation& other) const {
+        // Check parameter count
+        if (parameters.size() != other.parameters.size()) {
+            return false;
+        }
+        
+        // For now, do basic comparison - full implementation needs TypeSystem
+        for (size_t i = 0; i < parameters.size(); ++i) {
+            if (!parameters[i].type || !other.parameters[i].type) {
+                return false;
+            }
+            
+            // Basic type name comparison (would need proper type checking)
+            if (parameters[i].type->typeName != other.parameters[i].type->typeName) {
+                return false;
+            }
+        }
+        
+        // Check return types
+        if (returnType && other.returnType) {
+            return returnType->typeName == other.returnType->typeName;
+        }
+        
+        return returnType == other.returnType; // Both null or both non-null
+    }
+
+    inline std::string FunctionTypeAnnotation::toString() const {
+        std::ostringstream oss;
+        oss << "fn(";
+        
+        for (size_t i = 0; i < parameters.size(); ++i) {
+            if (i > 0) oss << ", ";
+            
+            // Add parameter name if available
+            if (!parameters[i].name.empty()) {
+                oss << parameters[i].name << ": ";
+            }
+            
+            // Add parameter type
+            if (parameters[i].type) {
+                oss << parameters[i].type->typeName;
+            } else {
+                oss << "unknown";
+            }
+            
+            // Add default indicator if applicable
+            if (parameters[i].hasDefaultValue) {
+                oss << "?";
+            }
+        }
+        
+        if (isVariadic) {
+            if (!parameters.empty()) oss << ", ";
+            oss << "...";
+        }
+        
+        oss << ")";
+        
+        // Add return type
+        if (returnType) {
+            oss << ": " << returnType->typeName;
+        }
+        
+        return oss.str();
+    }
 }
 
 #endif // AST_H

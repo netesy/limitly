@@ -16,6 +16,13 @@
 #include <variant>
 #include <vector>
 
+// Forward declarations for AST types
+namespace AST {
+    struct TypeAnnotation;
+    struct FunctionTypeAnnotation;
+    struct LambdaExpr;
+}
+
 class TypeSystem
 {
 private:
@@ -597,14 +604,65 @@ public:
         return std::make_shared<Type>(TypeTag::ErrorUnion, errorUnion);
     }
 
-    // Create function type
+    // Create function type (legacy)
     TypePtr createFunctionType(const std::vector<TypePtr>& paramTypes, TypePtr returnType) {
-        FunctionType functionType;
-        functionType.paramTypes = paramTypes;
-        functionType.returnType = returnType;
-        
+        FunctionType functionType(paramTypes, returnType);
         return std::make_shared<Type>(TypeTag::Function, functionType);
     }
+    
+    // Create function type with named parameters
+    TypePtr createFunctionType(const std::vector<std::string>& paramNames,
+                              const std::vector<TypePtr>& paramTypes, 
+                              TypePtr returnType,
+                              const std::vector<bool>& hasDefaults = {}) {
+        FunctionType functionType(paramNames, paramTypes, returnType, hasDefaults);
+        return std::make_shared<Type>(TypeTag::Function, functionType);
+    }
+    
+    // Create function type from AST function type annotation (implemented below)
+    TypePtr createFunctionTypeFromAST(const AST::FunctionTypeAnnotation& funcTypeAnnotation);
+    
+    // Function type inference for lambda expressions (implemented below)
+    TypePtr inferFunctionType(const AST::LambdaExpr& lambda);
+    
+    // Function type compatibility checking
+    bool areFunctionTypesCompatible(TypePtr fromFunc, TypePtr toFunc) {
+        if (!fromFunc || !toFunc || 
+            fromFunc->tag != TypeTag::Function || 
+            toFunc->tag != TypeTag::Function) {
+            return false;
+        }
+        
+        auto fromFuncType = std::get<FunctionType>(fromFunc->extra);
+        auto toFuncType = std::get<FunctionType>(toFunc->extra);
+        
+        return fromFuncType.isCompatibleWith(toFuncType);
+    }
+    
+    // Function overloading support
+    bool canOverloadFunction(const std::string& functionName,
+                           const std::vector<TypePtr>& newParamTypes,
+                           const std::vector<TypePtr>& existingParamTypes) {
+        // Check if parameter lists are different enough to allow overloading
+        if (newParamTypes.size() != existingParamTypes.size()) {
+            return true; // Different arity allows overloading
+        }
+        
+        // Check if any parameter types are different
+        for (size_t i = 0; i < newParamTypes.size(); ++i) {
+            if (!newParamTypes[i] || !existingParamTypes[i]) {
+                continue;
+            }
+            
+            if (newParamTypes[i]->tag != existingParamTypes[i]->tag) {
+                return true; // Different parameter types allow overloading
+            }
+        }
+        
+        return false; // Same signature, no overloading allowed
+    }
+    
+
 
     TypePtr inferType(const ValuePtr &value) { return value->type; }
 
@@ -1336,4 +1394,10 @@ public:
 
         return result;
     }
+
+private:
+    // Helper method to convert AST::TypeAnnotation to TypePtr (implemented in function_types.cpp)
+    TypePtr convertASTTypeToTypePtr(std::shared_ptr<AST::TypeAnnotation> astType);
+
+
 };

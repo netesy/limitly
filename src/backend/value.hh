@@ -158,53 +158,13 @@ struct ClosureValue {
         return functionName + "_" + std::to_string(reinterpret_cast<uintptr_t>(this));
     }
     
-    void cleanup() {
-        // Clear captured environment to help with garbage collection
-        if (capturedEnvironment) {
-            // Remove references to captured variables to break potential cycles
-            for (const auto& varName : capturedVariables) {
-                try {
-                    capturedEnvironment->remove(varName);
-                } catch (const std::runtime_error&) {
-                    // Variable might already be removed, continue cleanup
-                }
-            }
-        }
-        capturedVariables.clear();
-    }
+    void cleanup();
     
     // Check for potential memory leaks
-    bool hasMemoryLeaks() const {
-        if (!capturedEnvironment) return false;
-        
-        // Check if captured environment has circular references
-        auto symbols = capturedEnvironment->getAllSymbols();
-        for (const auto& [name, value] : symbols) {
-            if (value && value->type && value->type->tag == TypeTag::Closure) {
-                // Found another closure in captured variables - potential cycle
-                return true;
-            }
-        }
-        return false;
-    }
+    bool hasMemoryLeaks() const;
     
     // Get memory usage estimate
-    size_t getMemoryUsage() const {
-        size_t usage = sizeof(ClosureValue);
-        usage += functionName.size();
-        usage += capturedVariables.size() * sizeof(std::string);
-        for (const auto& var : capturedVariables) {
-            usage += var.size();
-        }
-        
-        // Estimate captured environment size
-        if (capturedEnvironment) {
-            auto symbols = capturedEnvironment->getAllSymbols();
-            usage += symbols.size() * (sizeof(std::string) + sizeof(ValuePtr));
-        }
-        
-        return usage;
-    }
+    size_t getMemoryUsage() const;
     
     // String representation
     std::string toString() const;
@@ -292,8 +252,60 @@ struct EnumType
 
 struct FunctionType
 {
-    std::vector<TypePtr> paramTypes;
-    TypePtr returnType;
+    std::vector<TypePtr> paramTypes;                         // Parameter types (legacy)
+    TypePtr returnType;                                      // Return type
+    
+    // Enhanced function signature support
+    std::vector<std::string> paramNames;                     // Parameter names (optional)
+    std::vector<bool> hasDefaultValues;                      // Which parameters have defaults
+    bool isVariadic = false;                                 // Whether function accepts variable arguments
+    
+    // Constructors
+    FunctionType() = default;
+    
+    FunctionType(const std::vector<TypePtr>& params, TypePtr ret)
+        : paramTypes(params), returnType(ret) {
+        // Initialize default values tracking
+        hasDefaultValues.resize(params.size(), false);
+    }
+    
+    FunctionType(const std::vector<std::string>& names, 
+                 const std::vector<TypePtr>& params, 
+                 TypePtr ret,
+                 const std::vector<bool>& defaults = {})
+        : paramTypes(params), returnType(ret), paramNames(names), hasDefaultValues(defaults) {
+        // Ensure consistent sizes
+        if (hasDefaultValues.empty()) {
+            hasDefaultValues.resize(params.size(), false);
+        }
+    }
+    
+    // Helper methods
+    size_t getParameterCount() const { return paramTypes.size(); }
+    
+    bool hasNamedParameters() const { 
+        return !paramNames.empty() && 
+               std::any_of(paramNames.begin(), paramNames.end(), 
+                          [](const std::string& name) { return !name.empty(); });
+    }
+    
+    std::string getParameterName(size_t index) const {
+        return (index < paramNames.size()) ? paramNames[index] : "";
+    }
+    
+    TypePtr getParameterType(size_t index) const {
+        return (index < paramTypes.size()) ? paramTypes[index] : nullptr;
+    }
+    
+    bool parameterHasDefault(size_t index) const {
+        return (index < hasDefaultValues.size()) ? hasDefaultValues[index] : false;
+    }
+    
+    // Type compatibility checking (contravariance for parameters, covariance for return)
+    bool isCompatibleWith(const FunctionType& other) const;
+    
+    // String representation
+    std::string toString() const;
 };
 
 struct UserDefinedType
@@ -1149,53 +1161,77 @@ struct Value {
     }
 };
 
-inline ValuePtr EnumValue::create(const std::string& variantName, const TypePtr& enumType, ValuePtr associatedValue) {
-    auto value = std::make_shared<Value>(enumType);
-    value->data = EnumValue(variantName, enumType, associatedValue);
-    return value;
-}
-
-// ErrorValue toString implementation (defined after Value struct)
-inline std::string ErrorValue::toString() const {
-    std::ostringstream oss;
-    oss << "Error(" << errorType;
-    if (!message.empty()) {
-        oss << ", \"" << message << "\"";
+// FunctionType method implementations
+inline bool FunctionType::isCompatibleWith(const FunctionType& other) const {
+    // Check parameter count
+    if (paramTypes.size() != other.paramTypes.size()) {
+        return false;
     }
-    if (!arguments.empty()) {
-        oss << ", [";
-        for (size_t i = 0; i < arguments.size(); ++i) {
-            if (i > 0) oss << ", ";
-            oss << arguments[i]->toString();
+    
+    // Check parameter types (contravariant - parameters can be more general in target)
+    for (size_t i = 0; i < paramTypes.size(); ++i) {
+        // For function parameters, the target type should accept what the source provides
+        // This means other.paramTypes[i] should be assignable from paramTypes[i]
+        if (!paramTypes[i] || !other.paramTypes[i]) {
+            return false;
         }
-        oss << "]";
+        // Note: This would need access to TypeSystem for proper compatibility checking
+        // For now, we'll do a simple type tag comparison
+        if (paramTypes[i]->tag != other.paramTypes[i]->tag) {
+            return false;
+        }
     }
+    
+    // Check return type (covariant - return type can be more specific in source)
+    if (returnType && other.returnType) {
+        if (returnType->tag != other.returnType->tag) {
+            return false;
+        }
+    } else if (returnType != other.returnType) {
+        return false; // One has return type, other doesn't
+    }
+    
+    return true;
+}
+
+inline std::string FunctionType::toString() const {
+    std::ostringstream oss;
+    oss << "fn(";
+    
+    for (size_t i = 0; i < paramTypes.size(); ++i) {
+        if (i > 0) oss << ", ";
+        
+        // Add parameter name if available
+        if (i < paramNames.size() && !paramNames[i].empty()) {
+            oss << paramNames[i] << ": ";
+        }
+        
+        // Add parameter type
+        if (paramTypes[i]) {
+            oss << paramTypes[i]->toString();
+        } else {
+            oss << "unknown";
+        }
+        
+        // Add default indicator if applicable
+        if (i < hasDefaultValues.size() && hasDefaultValues[i]) {
+            oss << "?";
+        }
+    }
+    
+    if (isVariadic) {
+        if (!paramTypes.empty()) oss << ", ";
+        oss << "...";
+    }
+    
     oss << ")";
+    
+    // Add return type
+    if (returnType) {
+        oss << ": " << returnType->toString();
+    }
+    
     return oss.str();
-}
-
-// ErrorUnion toValue implementation (defined after Value struct)
-inline ValuePtr ErrorUnion::toValue(TypePtr errorUnionType) const {
-    auto value = std::make_shared<Value>(errorUnionType);
-    
-    if (isSuccess()) {
-        // For success values, store the actual success data
-        value->data = successValue_->data;
-    } else {
-        // For error values, store the ErrorValue
-        value->data = errorValue_;
-    }
-    
-    return value;
-}
-
-// ErrorUnion toString implementation (defined after Value struct)
-inline std::string ErrorUnion::toString() const {
-    if (isSuccess()) {
-        return "Success(" + (successValue_ ? successValue_->toString() : "null") + ")";
-    } else {
-        return "Error(" + errorValue_.toString() + ")";
-    }
 }
 
 // Error value construction and inspection utility functions

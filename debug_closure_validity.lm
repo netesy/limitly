@@ -1,0 +1,19 @@
+print("=== Debug Closure Validity ===");
+
+fn createSimpleClosure(): function {
+    print("Creating simple closure");
+    return fn(x: int): int {
+        print("Inside closure with x: " + x);
+        return x + 1;
+    };
+}
+
+print("Calling createSimpleClosure...");
+var closure = createSimpleClosure();
+print("Got closure: " + closure);
+
+print("Attempting to call closure...");
+var result = closure(5);
+print("Result: " + result);
+
+print("=== End Debug ===");

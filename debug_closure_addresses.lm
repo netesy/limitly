@@ -1,0 +1,13 @@
+print("=== Debug Closure Addresses ===");
+
+fn createSimpleClosure(): function {
+    print("Creating simple closure");
+    return fn(x: int): int {
+        return x + 1;
+    };
+}
+
+print("Calling createSimpleClosure...");
+var closure = createSimpleClosure();
+print("Got closure: " + closure);
+print("=== End Debug ===");

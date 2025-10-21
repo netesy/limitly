@@ -1,0 +1,183 @@
+Tokens for test_function_type_variations.lm
+Parser: New Unified Parser (CST mode)
+Mode: CST with trivia preservation
+========================================
+
+=== Tokens with Trivia ===
+Line 4: VAR = 'var' [leading: COMMENT_LINE('// Test variations of function type syntax') NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 1: Function with no parameters') NEWLINE('
+') ]
+Line 4: IDENTIFIER = 'noParams' [leading: WHITESPACE(' ') ]
+Line 4: COLON = ':'
+Line 4: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 4: LEFT_PAREN = '('
+Line 4: RIGHT_PAREN = ')'
+Line 4: COLON = ':'
+Line 4: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 4: SEMICOLON = ';'
+Line 7: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 2: Function with multiple parameters') NEWLINE('
+') ]
+Line 7: IDENTIFIER = 'multiParams' [leading: WHITESPACE(' ') ]
+Line 7: COLON = ':'
+Line 7: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 7: LEFT_PAREN = '('
+Line 7: IDENTIFIER = 'a'
+Line 7: COLON = ':'
+Line 7: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 7: COMMA = ','
+Line 7: IDENTIFIER = 'b' [leading: WHITESPACE(' ') ]
+Line 7: COLON = ':'
+Line 7: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 7: COMMA = ','
+Line 7: IDENTIFIER = 'c' [leading: WHITESPACE(' ') ]
+Line 7: COLON = ':'
+Line 7: BOOL_TYPE = 'bool' [leading: WHITESPACE(' ') ]
+Line 7: RIGHT_PAREN = ')'
+Line 7: COLON = ':'
+Line 7: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 7: SEMICOLON = ';'
+Line 10: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 3: Function with mixed named and unnamed parameters') NEWLINE('
+') ]
+Line 10: IDENTIFIER = 'mixedParams' [leading: WHITESPACE(' ') ]
+Line 10: COLON = ':'
+Line 10: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 10: LEFT_PAREN = '('
+Line 10: INT_TYPE = 'int'
+Line 10: COMMA = ','
+Line 10: IDENTIFIER = 'name' [leading: WHITESPACE(' ') ]
+Line 10: COLON = ':'
+Line 10: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 10: COMMA = ','
+Line 10: BOOL_TYPE = 'bool' [leading: WHITESPACE(' ') ]
+Line 10: RIGHT_PAREN = ')'
+Line 10: COLON = ':'
+Line 10: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 10: SEMICOLON = ';'
+Line 13: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 4: Function with optional parameters') NEWLINE('
+') ]
+Line 13: IDENTIFIER = 'optionalParams' [leading: WHITESPACE(' ') ]
+Line 13: COLON = ':'
+Line 13: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 13: LEFT_PAREN = '('
+Line 13: IDENTIFIER = 'required'
+Line 13: COLON = ':'
+Line 13: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 13: COMMA = ','
+Line 13: IDENTIFIER = 'optional' [leading: WHITESPACE(' ') ]
+Line 13: QUESTION = '?'
+Line 13: COLON = ':'
+Line 13: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 13: RIGHT_PAREN = ')'
+Line 13: COLON = ':'
+Line 13: BOOL_TYPE = 'bool' [leading: WHITESPACE(' ') ]
+Line 13: SEMICOLON = ';'
+Line 19: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 5: Variadic function (if supported)') NEWLINE('
+') COMMENT_LINE('// var variadicFunc: fn(base: int, ...args: int): int;') NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 6: Function with complex return types') NEWLINE('
+') ]
+Line 19: IDENTIFIER = 'complexReturn' [leading: WHITESPACE(' ') ]
+Line 19: COLON = ':'
+Line 19: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 19: LEFT_PAREN = '('
+Line 19: IDENTIFIER = 'input'
+Line 19: COLON = ':'
+Line 19: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 19: RIGHT_PAREN = ')'
+Line 19: COLON = ':'
+Line 19: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 19: INT_TYPE = 'int'
+Line 19: RIGHT_BRACKET = ']'
+Line 19: SEMICOLON = ';'
+Line 20: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 20: IDENTIFIER = 'dictReturn' [leading: WHITESPACE(' ') ]
+Line 20: COLON = ':'
+Line 20: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 20: LEFT_PAREN = '('
+Line 20: IDENTIFIER = 'key'
+Line 20: COLON = ':'
+Line 20: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 20: RIGHT_PAREN = ')'
+Line 20: COLON = ':'
+Line 20: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 20: STR_TYPE = 'str'
+Line 20: COLON = ':'
+Line 20: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 20: RIGHT_BRACE = '}'
+Line 20: SEMICOLON = ';'
+Line 23: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 7: Nested function types') NEWLINE('
+') ]
+Line 23: IDENTIFIER = 'nestedFunc' [leading: WHITESPACE(' ') ]
+Line 23: COLON = ':'
+Line 23: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 23: LEFT_PAREN = '('
+Line 23: IDENTIFIER = 'callback'
+Line 23: COLON = ':'
+Line 23: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 23: LEFT_PAREN = '('
+Line 23: INT_TYPE = 'int'
+Line 23: RIGHT_PAREN = ')'
+Line 23: COLON = ':'
+Line 23: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 23: RIGHT_PAREN = ')'
+Line 23: COLON = ':'
+Line 23: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 23: LEFT_PAREN = '('
+Line 23: STR_TYPE = 'str'
+Line 23: RIGHT_PAREN = ')'
+Line 23: COLON = ':'
+Line 23: BOOL_TYPE = 'bool' [leading: WHITESPACE(' ') ]
+Line 23: SEMICOLON = ';'
+Line 26: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 8: Function with union parameter types') NEWLINE('
+') ]
+Line 26: IDENTIFIER = 'unionParam' [leading: WHITESPACE(' ') ]
+Line 26: COLON = ':'
+Line 26: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 26: LEFT_PAREN = '('
+Line 26: IDENTIFIER = 'value'
+Line 26: COLON = ':'
+Line 26: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 26: PIPE = '|' [leading: WHITESPACE(' ') ]
+Line 26: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 26: RIGHT_PAREN = ')'
+Line 26: COLON = ':'
+Line 26: BOOL_TYPE = 'bool' [leading: WHITESPACE(' ') ]
+Line 26: SEMICOLON = ';'
+Line 29: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 9: Function with optional return type') NEWLINE('
+') ]
+Line 29: IDENTIFIER = 'optionalReturn' [leading: WHITESPACE(' ') ]
+Line 29: COLON = ':'
+Line 29: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 29: LEFT_PAREN = '('
+Line 29: IDENTIFIER = 'input'
+Line 29: COLON = ':'
+Line 29: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 29: RIGHT_PAREN = ')'
+Line 29: COLON = ':'
+Line 29: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 29: QUESTION = '?'
+Line 29: SEMICOLON = ';'
+Line 31: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 31: LEFT_PAREN = '('
+Line 31: STRING = '"Function type variations test completed"'
+Line 31: RIGHT_PAREN = ')'
+Line 31: SEMICOLON = ';'
+Line 31: EOF_TOKEN = ''

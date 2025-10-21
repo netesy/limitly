@@ -91,10 +91,30 @@ TypePtr TypeChecker::resolveTypeAnnotation(const std::shared_ptr<AST::TypeAnnota
     
     // Handle function types
     if (annotation->isFunction) {
-        // Create function type with parameter types and return type
+        // Check if this is a FunctionTypeAnnotation with specific signature
+        if (auto funcTypeAnnotation = std::dynamic_pointer_cast<AST::FunctionTypeAnnotation>(annotation)) {
+            return typeSystem.createFunctionTypeFromAST(*funcTypeAnnotation);
+        }
+        
+        // Handle legacy function type annotation
         std::vector<TypePtr> paramTypes;
-        for (const auto& param : annotation->functionParams) {
-            paramTypes.push_back(resolveTypeAnnotation(param));
+        std::vector<std::string> paramNames;
+        
+        // Use new parameter format if available
+        if (!annotation->functionParameters.empty()) {
+            for (const auto& param : annotation->functionParameters) {
+                paramNames.push_back(param.name);
+                if (param.type) {
+                    paramTypes.push_back(resolveTypeAnnotation(param.type));
+                } else {
+                    paramTypes.push_back(typeSystem.ANY_TYPE);
+                }
+            }
+        } else {
+            // Use legacy parameter format
+            for (const auto& param : annotation->functionParams) {
+                paramTypes.push_back(resolveTypeAnnotation(param));
+            }
         }
         
         TypePtr returnType = typeSystem.NIL_TYPE;
@@ -102,7 +122,11 @@ TypePtr TypeChecker::resolveTypeAnnotation(const std::shared_ptr<AST::TypeAnnota
             returnType = resolveTypeAnnotation(annotation->returnType);
         }
         
-        return typeSystem.createFunctionType(paramTypes, returnType);
+        if (!paramNames.empty()) {
+            return typeSystem.createFunctionType(paramNames, paramTypes, returnType);
+        } else {
+            return typeSystem.createFunctionType(paramTypes, returnType);
+        }
     }
     
     // Handle basic types

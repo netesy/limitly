@@ -2,6 +2,7 @@
 #include "../common/debugger.hh"
 #include <stdexcept>
 #include <limits>
+#include <set>
 
 // Helper methods
 Token Parser::peek() {
@@ -3016,23 +3017,25 @@ std::shared_ptr<AST::Expression> Parser::finishCall(std::shared_ptr<AST::Express
                     }
                     auto argValue = expression();
                     namedArgs[nameToken.lexeme] = argValue;
-                    continue;
                 } else {
                     // Not a named argument, rewind and parse as regular expression
                     current--; // Rewind to before the identifier
+                    // Regular positional argument
+                    arguments.push_back(expression());
                 }
+            } else {
+                // Regular positional argument
+                arguments.push_back(expression());
             }
-
-            // Regular positional argument
-            arguments.push_back(expression());
             
-            // Track comma tokens for CST
-            if (match({TokenType::COMMA})) {
-                if (cstMode && config.detailedExpressionNodes) {
-                    callTokens.push_back(previous());
-                }
+            // Track comma tokens for CST and continue if there's a comma
+            if (!match({TokenType::COMMA})) {
+                break; // No more arguments
             }
-        } while (check(TokenType::COMMA));
+            if (cstMode && config.detailedExpressionNodes) {
+                callTokens.push_back(previous());
+            }
+        } while (true);
     }
 
     auto paren = consume(TokenType::RIGHT_PAREN, "Expected ')' after arguments.");
@@ -4011,7 +4014,21 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseBasicType() {
         type->typeName = "channel";
     } else if (match({TokenType::ATOMIC_TYPE})) {
         type->typeName = "atomic";
+    } else if (match({TokenType::FN})) {
+        // Parse function type with unified syntax: fn(param1: Type1, param2: Type2): ReturnType
+        auto funcType = parseFunctionTypeAnnotation();
+        // Convert to TypeAnnotation for compatibility
+        auto type = std::make_shared<AST::TypeAnnotation>();
+        type->typeName = "function";
+        type->isFunction = true;
+        type->functionParameters = funcType->parameters;
+        type->returnType = funcType->returnType;
+        return type;
     } else if (match({TokenType::FUNCTION_TYPE})) {
+        // Legacy function type support - redirect to unified parsing
+        return parseLegacyFunctionType();
+    } else if (match({TokenType::FUNCTION_TYPE})) {
+        // Legacy function type support
         type->typeName = "function";
         type->isFunction = true;
         
@@ -4026,11 +4043,11 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseBasicType() {
                         advance(); // consume parameter name
                         if (match({TokenType::COLON})) {
                             // Parse parameter type
-                            type->functionParams.push_back(parseTypeAnnotation());
+                            type->functionParams.push_back(parseBasicType());
                         }
                     } else {
                         // Just a type without parameter name
-                        type->functionParams.push_back(parseTypeAnnotation());
+                        type->functionParams.push_back(parseBasicType());
                     }
                 } while (match({TokenType::COMMA}));
             }
@@ -4039,7 +4056,7 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseBasicType() {
             
             // Check for return type
             if (match({TokenType::COLON})) {
-                type->returnType = parseTypeAnnotation();
+                type->returnType = parseBasicType();
             }
         }
     } else if (match({TokenType::ENUM_TYPE})) {
@@ -4409,4 +4426,131 @@ std::shared_ptr<AST::LambdaExpr> Parser::lambdaExpression() {
     lambda->body = lambdaBody;
     
     return lambda;
+}
+
+// Parse unified function type annotation: fn(param1: Type1, param2: Type2): ReturnType
+std::shared_ptr<AST::FunctionTypeAnnotation> Parser::parseFunctionTypeAnnotation() {
+    auto funcType = std::make_shared<AST::FunctionTypeAnnotation>();
+    // Note: FunctionTypeAnnotation inherits from TypeAnnotation which has line field
+    
+    consume(TokenType::LEFT_PAREN, "Expected '(' after 'fn' in function type.");
+    
+    // Parse parameter types with optional names
+    if (!check(TokenType::RIGHT_PAREN)) {
+        do {
+            AST::FunctionParameter param = parseFunctionParameter();
+            funcType->parameters.push_back(param);
+        } while (match({TokenType::COMMA}));
+    }
+    
+    consume(TokenType::RIGHT_PAREN, "Expected ')' after function parameters.");
+    
+    // Parse return type
+    if (match({TokenType::COLON})) {
+        funcType->returnType = parseTypeAnnotation(); // Use full type annotation parsing for union types
+    } else {
+        // Default to void/nil return type if not specified
+        auto voidType = std::make_shared<AST::TypeAnnotation>();
+        voidType->typeName = "nil";
+        voidType->isPrimitive = true;
+        funcType->returnType = voidType;
+    }
+    
+    return funcType;
+}
+
+// Parse legacy function type for backward compatibility
+std::shared_ptr<AST::TypeAnnotation> Parser::parseLegacyFunctionType() {
+    auto type = std::make_shared<AST::TypeAnnotation>();
+    type->typeName = "function";
+    type->isFunction = true;
+    
+    // Check for function signature: (param1: Type1, param2: Type2): ReturnType
+    if (match({TokenType::LEFT_PAREN})) {
+        // Parse parameter types
+        if (!check(TokenType::RIGHT_PAREN)) {
+            do {
+                // Skip parameter name if present (we only care about types for legacy)
+                if (check(TokenType::IDENTIFIER) && peek().lexeme != "int" && peek().lexeme != "str" && 
+                    peek().lexeme != "bool" && peek().lexeme != "float") {
+                    advance(); // consume parameter name
+                    if (match({TokenType::COLON})) {
+                        // Parse parameter type
+                        type->functionParams.push_back(parseBasicType());
+                    }
+                } else {
+                    // Just a type without parameter name
+                    type->functionParams.push_back(parseBasicType());
+                }
+            } while (match({TokenType::COMMA}));
+        }
+        
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after function parameters.");
+        
+        // Check for return type
+        if (match({TokenType::COLON})) {
+            type->returnType = parseBasicType();
+        }
+    }
+    
+    return type;
+}
+
+// Parse a single function parameter with optional name and type
+AST::FunctionParameter Parser::parseFunctionParameter() {
+    AST::FunctionParameter param;
+    
+    // Check if we have a parameter name followed by colon
+    if (check(TokenType::IDENTIFIER)) {
+        Token nameToken = peek();
+        advance(); // consume potential parameter name
+        
+        // Check for optional parameter syntax: name?: type
+        if (match({TokenType::QUESTION})) {
+            // This is optional parameter syntax: name?: type
+            consume(TokenType::COLON, "Expected ':' after '?' in optional parameter.");
+            if (isValidParameterName(nameToken.lexeme)) {
+                param.name = nameToken.lexeme;
+                param.hasDefaultValue = true;
+            } else {
+                error("Invalid parameter name: " + nameToken.lexeme);
+            }
+            param.type = parseTypeAnnotation(); // Use full type annotation parsing for union types
+        } else if (match({TokenType::COLON})) {
+            // This was a parameter name with regular syntax: name: type
+            if (isValidParameterName(nameToken.lexeme)) {
+                param.name = nameToken.lexeme;
+            } else {
+                error("Invalid parameter name: " + nameToken.lexeme);
+            }
+            param.type = parseTypeAnnotation(); // Use full type annotation parsing for union types
+            
+            // The type itself might be optional (e.g., name: int?)
+            // This is handled in parseTypeAnnotation already
+        } else {
+            // This was actually a type name, backtrack
+            current--; // Go back to the identifier
+            param.type = parseTypeAnnotation(); // Use full type annotation parsing
+        }
+    } else {
+        // Just a type without parameter name
+        param.type = parseTypeAnnotation(); // Use full type annotation parsing
+    }
+    
+    return param;
+}
+
+// Check if a name is a valid parameter name (not a reserved type name)
+bool Parser::isValidParameterName(const std::string& name) {
+    // List of reserved type names that cannot be used as parameter names
+    static const std::set<std::string> reservedTypes = {
+        "int", "i8", "i16", "i32", "i64",
+        "uint", "u8", "u16", "u32", "u64", 
+        "float", "f32", "f64",
+        "str", "string", "bool", "nil", "any",
+        "list", "dict", "array", "function",
+        "option", "result", "channel", "atomic"
+    };
+    
+    return reservedTypes.find(name) == reservedTypes.end();
 }

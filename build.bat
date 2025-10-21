@@ -34,12 +34,14 @@ echo Compiling main executable...
     src\frontend\cst_utils.cpp ^
     src\backend\backend.cpp ^
     src\backend\vm.cpp ^
+    src\backend\value.cpp ^
     src\backend\ast_printer.cpp ^
     src\backend\bytecode_printer.cpp ^
     src\backend\functions.cpp ^
     src\backend\closure_impl.cpp ^
     src\backend\classes.cpp ^
     src\backend\type_checker.cpp ^
+    src\backend\function_types.cpp ^
     src\backend\concurrency\scheduler.cpp ^
     src\backend\concurrency\thread_pool.cpp ^
     src\backend\concurrency\event_loop.cpp ^
@@ -74,11 +76,13 @@ echo Compiling test parser...
     src\frontend\ast_builder.cpp ^
     src\backend\type_checker.cpp ^
     src\backend\backend.cpp ^
+    src\backend\value.cpp ^
     src\backend\ast_printer.cpp ^
     src\backend\bytecode_printer.cpp ^
     src\backend\functions.cpp ^
     src\backend\closure_impl.cpp ^
     src\backend\classes.cpp ^
+    src\backend\function_types.cpp ^
     src\error\error_formatter.cpp ^
     src\error\error_code_generator.cpp ^
     src\error\contextual_hint_provider.cpp ^

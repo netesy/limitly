@@ -1,0 +1,225 @@
+CST for test_optional_parameters_and_types.lm
+Parser: New Unified Parser (CST mode)
+Mode: CST (cstMode=true)
+========================================
+
+CST Statistics:
+- CST nodes created: 41
+- Trivia attachments: 0
+- Parse errors: 0
+
+=== Full CST Structure ===
++ Node: PROGRAM [113-126] (Program root node with trivia)
+└─ + Node: FUNCTION_DECLARATION [177-180]
+  └─ + Node: BLOCK_STATEMENT [170-172]
+    └─ + Node: BLOCK_STATEMENT [0-411] (block statement)
+      ├─ + Node: WHITESPACE_NODE | Token:   [170-171]
+      ├─ Token: { [171-172]
+      ├─ + Node: VAR_DECLARATION [181-187]
+      ├─ + Node: VARIABLE_EXPR [194-195]
+      ├─ + Node: VARIABLE_EXPR [190-194] (variable reference)
+      │ ├─ + Node: WHITESPACE_NODE | Token:   [189-190]
+      │ └─ Token: text [190-194]
+      ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+      ├─ + Node: IF_STATEMENT [0-262] (if statement)
+      │ ├─ + Node: WHITESPACE_NODE | Token: 
+ [195-196]
+      │ ├─ + Node: WHITESPACE_NODE | Token:      [196-200]
+      │ ├─ Token: if [200-202]
+      │ ├─ + Node: WHITESPACE_NODE | Token:   [202-203]
+      │ ├─ Token: ( [203-204]
+      │ ├─ + Node: VARIABLE_EXPR [210-211]
+      │ ├─ + Node: VARIABLE_EXPR [204-210] (variable reference)
+      │ │ └─ Token: prefix [204-210]
+      │ ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+      │ ├─ Token: prefix [204-210]
+      │ ├─ Token: ) [210-211]
+      │ ├─ + Node: BLOCK_STATEMENT [211-213]
+      │ │ └─ + Node: BLOCK_STATEMENT [0-253] (block statement)
+      │ │   ├─ + Node: WHITESPACE_NODE | Token:   [211-212]
+      │ │   ├─ Token: { [212-213]
+      │ │   ├─ + Node: EXPRESSION_STATEMENT [222-228]
+      │ │   ├─ + Node: VARIABLE_EXPR [229-230]
+      │ │   ├─ + Node: VARIABLE_EXPR [222-228] (variable reference)
+      │ │   │ ├─ + Node: WHITESPACE_NODE | Token: 
+ [213-214]
+      │ │   │ ├─ + Node: WHITESPACE_NODE | Token:          [214-222]
+      │ │   │ └─ Token: result [222-228]
+      │ │   ├─ + Node: VARIABLE_EXPR [238-239]
+      │ │   ├─ + Node: VARIABLE_EXPR [231-237] (variable reference)
+      │ │   │ ├─ + Node: WHITESPACE_NODE | Token:   [230-231]
+      │ │   │ └─ Token: prefix [231-237]
+      │ │   ├─ + Node: VARIABLE_EXPR [246-247]
+      │ │   ├─ + Node: VARIABLE_EXPR [240-246] (variable reference)
+      │ │   │ ├─ + Node: WHITESPACE_NODE | Token:   [239-240]
+      │ │   │ └─ Token: result [240-246]
+      │ │   ├─ + Node: ASSIGNMENT_EXPR [228-230] (assignment expression)
+      │ │   │ ├─ + Node: WHITESPACE_NODE | Token:   [228-229]
+      │ │   │ └─ Token: = [229-230]
+      │ │   ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+      │ │   ├─ + Node: WHITESPACE_NODE | Token: 
+ [247-248]
+      │ │   ├─ + Node: WHITESPACE_NODE | Token:      [248-252]
+      │ │   └─ Token: } [252-253]
+      │ └─ + Node: IF_STATEMENT [0-330] (if statement)
+      │   ├─ + Node: WHITESPACE_NODE | Token: 
+ [253-254]
+      │   ├─ + Node: WHITESPACE_NODE | Token:      [254-258]
+      │   ├─ Token: if [258-260]
+      │   ├─ + Node: WHITESPACE_NODE | Token:   [260-261]
+      │   ├─ Token: ( [261-262]
+      │   ├─ + Node: VARIABLE_EXPR [268-269]
+      │   ├─ + Node: VARIABLE_EXPR [262-268] (variable reference)
+      │   │ └─ Token: suffix [262-268]
+      │   ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+      │   ├─ Token: suffix [262-268]
+      │   ├─ Token: ) [268-269]
+      │   ├─ + Node: BLOCK_STATEMENT [269-271]
+      │   │ └─ + Node: BLOCK_STATEMENT [0-311] (block statement)
+      │   │   ├─ + Node: WHITESPACE_NODE | Token:   [269-270]
+      │   │   ├─ Token: { [270-271]
+      │   │   ├─ + Node: EXPRESSION_STATEMENT [280-286]
+      │   │   ├─ + Node: VARIABLE_EXPR [287-288]
+      │   │   ├─ + Node: VARIABLE_EXPR [280-286] (variable reference)
+      │   │   │ ├─ + Node: WHITESPACE_NODE | Token: 
+ [271-272]
+      │   │   │ ├─ + Node: WHITESPACE_NODE | Token:          [272-280]
+      │   │   │ └─ Token: result [280-286]
+      │   │   ├─ + Node: VARIABLE_EXPR [296-297]
+      │   │   ├─ + Node: VARIABLE_EXPR [289-295] (variable reference)
+      │   │   │ ├─ + Node: WHITESPACE_NODE | Token:   [288-289]
+      │   │   │ └─ Token: result [289-295]
+      │   │   ├─ + Node: VARIABLE_EXPR [304-305]
+      │   │   ├─ + Node: VARIABLE_EXPR [298-304] (variable reference)
+      │   │   │ ├─ + Node: WHITESPACE_NODE | Token:   [297-298]
+      │   │   │ └─ Token: suffix [298-304]
+      │   │   ├─ + Node: ASSIGNMENT_EXPR [286-288] (assignment expression)
+      │   │   │ ├─ + Node: WHITESPACE_NODE | Token:   [286-287]
+      │   │   │ └─ Token: = [287-288]
+      │   │   ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+      │   │   ├─ + Node: WHITESPACE_NODE | Token: 
+ [305-306]
+      │   │   ├─ + Node: WHITESPACE_NODE | Token:      [306-310]
+      │   │   └─ Token: } [310-311]
+      │   ├─ + Node: VARIABLE_EXPR [329-330]
+      │   ├─ + Node: VARIABLE_EXPR [323-329] (variable reference)
+      │   │ ├─ + Node: WHITESPACE_NODE | Token:   [322-323]
+      │   │ └─ Token: result [323-329]
+      │   └─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+      ├─ + Node: WHITESPACE_NODE | Token: 
+ [330-331]
+      ├─ Token: } [331-332]
+      └─ + Node: FUNCTION_DECLARATION [454-456]
+        └─ + Node: BLOCK_STATEMENT [447-449]
+          └─ + Node: BLOCK_STATEMENT [447-762] (block statement)
+            ├─ + Node: WHITESPACE_NODE | Token:   [447-448]
+            ├─ Token: { [448-449]
+            ├─ + Node: IF_STATEMENT [0-512] (if statement)
+            │ ├─ + Node: WHITESPACE_NODE | Token: 
+ [449-450]
+            │ ├─ + Node: WHITESPACE_NODE | Token:      [450-454]
+            │ ├─ Token: if [454-456]
+            │ ├─ + Node: WHITESPACE_NODE | Token:   [456-457]
+            │ ├─ Token: ( [457-458]
+            │ ├─ + Node: VARIABLE_EXPR [463-464]
+            │ ├─ + Node: VARIABLE_EXPR [458-463] (variable reference)
+            │ │ └─ Token: value [458-463]
+            │ ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+            │ ├─ Token: value [458-463]
+            │ ├─ Token: ) [463-464]
+            │ ├─ + Node: BLOCK_STATEMENT [464-529]
+            │ │ ├─ + Node: BLOCK_STATEMENT [0-507] (block statement)
+            │ │ │ ├─ + Node: WHITESPACE_NODE | Token:   [464-465]
+            │ │ │ ├─ Token: { [465-466]
+            │ │ │ ├─ + Node: VARIABLE_EXPR [488-489]
+            │ │ │ ├─ + Node: VARIABLE_EXPR [482-487] (variable reference)
+            │ │ │ │ ├─ + Node: WHITESPACE_NODE | Token:   [481-482]
+            │ │ │ │ └─ Token: value [482-487]
+            │ │ │ ├─ + Node: VARIABLE_EXPR [500-501]
+            │ │ │ ├─ + Node: VARIABLE_EXPR [490-500] (variable reference)
+            │ │ │ │ ├─ + Node: WHITESPACE_NODE | Token:   [489-490]
+            │ │ │ │ └─ Token: multiplier [490-500]
+            │ │ │ ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+            │ │ │ ├─ + Node: WHITESPACE_NODE | Token: 
+ [501-502]
+            │ │ │ ├─ + Node: WHITESPACE_NODE | Token:      [502-506]
+            │ │ │ └─ Token: } [506-507]
+            │ │ └─ + Node: BLOCK_STATEMENT [512-514]
+            │ │   └─ + Node: BLOCK_STATEMENT [0-540] (block statement)
+            │ │     ├─ + Node: WHITESPACE_NODE | Token:   [512-513]
+            │ │     ├─ Token: { [513-514]
+            │ │     ├─ + Node: LITERAL_EXPR [533-534]
+            │ │     ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+            │ │     ├─ + Node: WHITESPACE_NODE | Token: 
+ [534-535]
+            │ │     ├─ + Node: WHITESPACE_NODE | Token:      [535-539]
+            │ │     └─ Token: } [539-540]
+            │ ├─ + Node: WHITESPACE_NODE | Token:   [507-508]
+            │ └─ Token: else [508-512]
+            ├─ + Node: WHITESPACE_NODE | Token: 
+ [540-541]
+            ├─ Token: } [541-542]
+            ├─ + Node: VAR_DECLARATION [610-619]
+            ├─ + Node: VAR_DECLARATION [659-668]
+            └─ + Node: FUNCTION_DECLARATION [784-786]
+              └─ + Node: BLOCK_STATEMENT [777-779]
+                └─ + Node: BLOCK_STATEMENT [0-1360] (block statement)
+                  ├─ + Node: WHITESPACE_NODE | Token:   [777-778]
+                  ├─ Token: { [778-779]
+                  ├─ + Node: IF_STATEMENT [0-836] (if statement)
+                  │ ├─ + Node: WHITESPACE_NODE | Token: 
+ [779-780]
+                  │ ├─ + Node: WHITESPACE_NODE | Token:      [780-784]
+                  │ ├─ Token: if [784-786]
+                  │ ├─ + Node: WHITESPACE_NODE | Token:   [786-787]
+                  │ ├─ Token: ( [787-788]
+                  │ ├─ + Node: VARIABLE_EXPR [791-792]
+                  │ ├─ + Node: VARIABLE_EXPR [788-790] (variable reference)
+                  │ │ └─ Token: id [788-790]
+                  │ ├─ + Node: LITERAL_EXPR [794-795]
+                  │ ├─ + Node: LITERAL_EXPR [793-794] (number literal)
+                  │ │ ├─ + Node: WHITESPACE_NODE | Token:   [792-793]
+                  │ │ └─ Token: 0 [793-794]
+                  │ ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+                  │ ├─ Token: id [788-790]
+                  │ ├─ + Node: WHITESPACE_NODE | Token:   [790-791]
+                  │ ├─ Token: > [791-792]
+                  │ ├─ + Node: WHITESPACE_NODE | Token:   [792-793]
+                  │ ├─ Token: 0 [793-794]
+                  │ ├─ Token: ) [794-795]
+                  │ ├─ + Node: BLOCK_STATEMENT [795-853]
+                  │ │ ├─ + Node: BLOCK_STATEMENT [0-831] (block statement)
+                  │ │ │ ├─ + Node: WHITESPACE_NODE | Token:   [795-796]
+                  │ │ │ ├─ Token: { [796-797]
+                  │ │ │ ├─ + Node: LITERAL_EXPR [813-819] (string literal)
+                  │ │ │ │ ├─ + Node: WHITESPACE_NODE | Token:   [812-813]
+                  │ │ │ │ └─ Token: "User" [813-819]
+                  │ │ │ ├─ + Node: VARIABLE_EXPR [824-825]
+                  │ │ │ ├─ + Node: VARIABLE_EXPR [822-824] (variable reference)
+                  │ │ │ │ ├─ + Node: WHITESPACE_NODE | Token:   [821-822]
+                  │ │ │ │ └─ Token: id [822-824]
+                  │ │ │ ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+                  │ │ │ ├─ + Node: WHITESPACE_NODE | Token: 
+ [825-826]
+                  │ │ │ ├─ + Node: WHITESPACE_NODE | Token:      [826-830]
+                  │ │ │ └─ Token: } [830-831]
+                  │ │ └─ + Node: BLOCK_STATEMENT [836-838]
+                  │ │   └─ + Node: BLOCK_STATEMENT [0-864] (block statement)
+                  │ │     ├─ + Node: WHITESPACE_NODE | Token:   [836-837]
+                  │ │     ├─ Token: { [837-838]
+                  │ │     ├─ + Node: LITERAL_EXPR [857-858]
+                  │ │     ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+                  │ │     ├─ + Node: WHITESPACE_NODE | Token: 
+ [858-859]
+                  │ │     ├─ + Node: WHITESPACE_NODE | Token:      [859-863]
+                  │ │     └─ Token: } [863-864]
+                  │ ├─ + Node: WHITESPACE_NODE | Token:   [831-832]
+                  │ └─ Token: else [832-836]
+                  ├─ + Node: WHITESPACE_NODE | Token: 
+ [864-865]
+                  ├─ Token: } [865-866]
+                  ├─ + Node: PRINT_STATEMENT [1313-1314]
+                  ├─ + Node: LITERAL_EXPR [1314-1360] (string literal)
+                  │ └─ Token: "Optional paramet... [1314-1360]
+                  └─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+

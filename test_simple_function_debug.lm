@@ -1,0 +1,13 @@
+print("=== Simple Function Debug Test ===");
+
+print("\n🔹 Test 1: Simple function definition");
+fn simpleFunction(x: int): int {
+    print("Inside simpleFunction with x: " + x);
+    return x + 1;
+}
+
+print("Function defined, now calling...");
+var result = simpleFunction(5);
+print("Result: " + result);
+
+print("\n=== Test Complete ===");

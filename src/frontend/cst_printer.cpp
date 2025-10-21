@@ -34,14 +34,14 @@ namespace CST {
         
         std::string printAsTree(const Node* root, const PrintOptions& options) {
             return TreeViz::visualizeTree(root, TreeViz::TreeVizOptions{
+                .chars = {},  // Use default TreeChars
                 .showTokens = options.includeTokens,
                 .showTrivia = options.includeTrivia,
                 .showPositions = options.includeSourcePositions,
                 .showTypes = true,
                 .colorNodes = options.colorOutput,
                 .compactMode = false,
-                .maxWidth = 120//,
-                // .chars = {}
+                .maxWidth = 120
             });
         }
         

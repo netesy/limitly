@@ -1,0 +1,117 @@
+print("=== Comprehensive Closure Memory Tests ===");
+
+print("\n--- Test 1: Memory Cleanup Test ---");
+fn createTemporaryClosure(value: int): fn(): int {
+    var captured: int = value;
+    return fn(): int {
+        return captured * 2;
+    };
+}
+
+iter (i in 1..5) {
+    var tempClosure = createTemporaryClosure(i);
+    var result = tempClosure();
+    print("Temporary closure " + i + " result: " + result);
+}
+
+print("\n--- Test 2: Shared Variable Optimization ---");
+fn createSharedClosures(shared: int): (fn(): int, fn(): int, fn(): int) {
+    var closure1 = fn(): int {
+        return shared + 1;
+    };
+    
+    var closure2 = fn(): int {
+        return shared + 2;
+    };
+    
+    var closure3 = fn(): int {
+        return shared + 3;
+    };
+    
+    return (closure1, closure2, closure3);
+}
+
+var (shared1, shared2, shared3) = createSharedClosures(100);
+print("Shared closures: " + shared1() + ", " + shared2() + ", " + shared3());
+
+print("\n--- Test 3: Circular Reference Prevention ---");
+fn createPotentialCircular(): fn(): int {
+    var value: int = 42;
+    var closure1: fn(): int;
+    var closure2: fn(): int;
+    
+    closure1 = fn(): int {
+        return value + 10;
+    };
+    
+    closure2 = fn(): int {
+        var result1 = closure1();
+        return result1 + 20;
+    };
+    
+    return closure2;
+}
+
+var circularTest = createPotentialCircular();
+print("Circular test result: " + circularTest());
+
+print("\n--- Test 4: Large Closure Creation ---");
+fn createManyClosures(): int {
+    var total: int = 0;
+    
+    iter (i in 1..10) {
+        var localValue: int = i * 5;
+        var closure = fn(): int {
+            return localValue * 2;
+        };
+        total = total + closure();
+    }
+    
+    return total;
+}
+
+var manyClosuresResult = createManyClosures();
+print("Many closures total: " + manyClosuresResult);
+
+print("\n--- Test 5: Nested Closure Memory Test ---");
+fn createNestedMemoryTest(depth: int): fn(): int {
+    if (depth <= 0) {
+        return fn(): int {
+            return 1;
+        };
+    } else {
+        var innerClosure = createNestedMemoryTest(depth - 1);
+        var currentDepth: int = depth;
+        return fn(): int {
+            return currentDepth + innerClosure();
+        };
+    }
+}
+
+var nestedClosure = createNestedMemoryTest(5);
+print("Nested closure result: " + nestedClosure());
+
+print("\n--- Test 6: Closure Lifetime Test ---");
+fn testClosureLifetime(): fn(): int {
+    var data: int = 999;
+    var closure = fn(): int {
+        return data;
+    };
+    return closure;
+}
+
+var lifetimeClosure = testClosureLifetime();
+print("Lifetime closure result: " + lifetimeClosure());
+
+print("\n--- Test 7: Multiple Capture Patterns ---");
+fn createMultiCapture(a: int, b: str, c: bool): fn(): str {
+    return fn(): str {
+        var result: str = "Values: " + a + ", " + b + ", " + c;
+        return result;
+    };
+}
+
+var multiCapture = createMultiCapture(42, "test", true);
+print("Multi-capture result: " + multiCapture());
+
+print("\n=== Comprehensive Closure Memory Tests Complete ===");

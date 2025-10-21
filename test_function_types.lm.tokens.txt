@@ -1,0 +1,187 @@
+Tokens for test_function_types.lm
+Parser: New Unified Parser (CST mode)
+Mode: CST with trivia preservation
+========================================
+
+=== Tokens with Trivia ===
+Line 4: VAR = 'var' [leading: COMMENT_LINE('// Test file for unified function type system') NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 1: Basic function type annotation') NEWLINE('
+') ]
+Line 4: IDENTIFIER = 'callback' [leading: WHITESPACE(' ') ]
+Line 4: COLON = ':'
+Line 4: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 4: LEFT_PAREN = '('
+Line 4: INT_TYPE = 'int'
+Line 4: COMMA = ','
+Line 4: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 4: RIGHT_PAREN = ')'
+Line 4: COLON = ':'
+Line 4: BOOL_TYPE = 'bool' [leading: WHITESPACE(' ') ]
+Line 4: SEMICOLON = ';'
+Line 7: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 2: Named parameter function type') NEWLINE('
+') ]
+Line 7: IDENTIFIER = 'processor' [leading: WHITESPACE(' ') ]
+Line 7: COLON = ':'
+Line 7: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 7: LEFT_PAREN = '('
+Line 7: IDENTIFIER = 'value'
+Line 7: COLON = ':'
+Line 7: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 7: COMMA = ','
+Line 7: IDENTIFIER = 'name' [leading: WHITESPACE(' ') ]
+Line 7: COLON = ':'
+Line 7: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 7: RIGHT_PAREN = ')'
+Line 7: COLON = ':'
+Line 7: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 7: SEMICOLON = ';'
+Line 10: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 3: Function with optional parameters') NEWLINE('
+') ]
+Line 10: IDENTIFIER = 'formatter' [leading: WHITESPACE(' ') ]
+Line 10: COLON = ':'
+Line 10: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 10: LEFT_PAREN = '('
+Line 10: IDENTIFIER = 'text'
+Line 10: COLON = ':'
+Line 10: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 10: COMMA = ','
+Line 10: IDENTIFIER = 'indent' [leading: WHITESPACE(' ') ]
+Line 10: QUESTION = '?'
+Line 10: COLON = ':'
+Line 10: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 10: RIGHT_PAREN = ')'
+Line 10: COLON = ':'
+Line 10: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 10: SEMICOLON = ';'
+Line 13: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 4: Function returning function') NEWLINE('
+') ]
+Line 13: IDENTIFIER = 'factory' [leading: WHITESPACE(' ') ]
+Line 13: COLON = ':'
+Line 13: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 13: LEFT_PAREN = '('
+Line 13: IDENTIFIER = 'multiplier'
+Line 13: COLON = ':'
+Line 13: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 13: RIGHT_PAREN = ')'
+Line 13: COLON = ':'
+Line 13: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 13: LEFT_PAREN = '('
+Line 13: INT_TYPE = 'int'
+Line 13: RIGHT_PAREN = ')'
+Line 13: COLON = ':'
+Line 13: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 13: SEMICOLON = ';'
+Line 16: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 5: Higher-order function type') NEWLINE('
+') ]
+Line 16: IDENTIFIER = 'mapper' [leading: WHITESPACE(' ') ]
+Line 16: COLON = ':'
+Line 16: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 16: LEFT_PAREN = '('
+Line 16: IDENTIFIER = 'items'
+Line 16: COLON = ':'
+Line 16: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 16: INT_TYPE = 'int'
+Line 16: RIGHT_BRACKET = ']'
+Line 16: COMMA = ','
+Line 16: IDENTIFIER = 'transform' [leading: WHITESPACE(' ') ]
+Line 16: COLON = ':'
+Line 16: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 16: LEFT_PAREN = '('
+Line 16: INT_TYPE = 'int'
+Line 16: RIGHT_PAREN = ')'
+Line 16: COLON = ':'
+Line 16: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 16: RIGHT_PAREN = ')'
+Line 16: COLON = ':'
+Line 16: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 16: STR_TYPE = 'str'
+Line 16: RIGHT_BRACKET = ']'
+Line 16: SEMICOLON = ';'
+Line 19: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 6: Lambda with explicit type') NEWLINE('
+') ]
+Line 19: IDENTIFIER = 'lambda' [leading: WHITESPACE(' ') ]
+Line 19: COLON = ':'
+Line 19: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 19: LEFT_PAREN = '('
+Line 19: INT_TYPE = 'int'
+Line 19: RIGHT_PAREN = ')'
+Line 19: COLON = ':'
+Line 19: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 19: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 19: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 19: LEFT_PAREN = '('
+Line 19: IDENTIFIER = 'x'
+Line 19: COLON = ':'
+Line 19: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 19: RIGHT_PAREN = ')'
+Line 19: COLON = ':'
+Line 19: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 19: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 20: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 20: IDENTIFIER = 'x' [leading: WHITESPACE(' ') ]
+Line 20: STAR = '*' [leading: WHITESPACE(' ') ]
+Line 20: NUMBER = '2' [leading: WHITESPACE(' ') ]
+Line 20: SEMICOLON = ';'
+Line 21: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 21: SEMICOLON = ';'
+Line 24: FN = 'fn' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 7: Function declaration with new syntax') NEWLINE('
+') ]
+Line 24: IDENTIFIER = 'createAdder' [leading: WHITESPACE(' ') ]
+Line 24: LEFT_PAREN = '('
+Line 24: IDENTIFIER = 'base'
+Line 24: COLON = ':'
+Line 24: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 24: RIGHT_PAREN = ')'
+Line 24: COLON = ':'
+Line 24: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 24: LEFT_PAREN = '('
+Line 24: INT_TYPE = 'int'
+Line 24: RIGHT_PAREN = ')'
+Line 24: COLON = ':'
+Line 24: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 24: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 25: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 25: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 25: LEFT_PAREN = '('
+Line 25: IDENTIFIER = 'x'
+Line 25: COLON = ':'
+Line 25: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 25: RIGHT_PAREN = ')'
+Line 25: COLON = ':'
+Line 25: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 25: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 26: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 26: IDENTIFIER = 'base' [leading: WHITESPACE(' ') ]
+Line 26: PLUS = '+' [leading: WHITESPACE(' ') ]
+Line 26: IDENTIFIER = 'x' [leading: WHITESPACE(' ') ]
+Line 26: SEMICOLON = ';'
+Line 27: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 27: SEMICOLON = ';'
+Line 28: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 30: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 30: LEFT_PAREN = '('
+Line 30: STRING = '"Function type system test completed"'
+Line 30: RIGHT_PAREN = ')'
+Line 30: SEMICOLON = ';'
+Line 30: EOF_TOKEN = ''

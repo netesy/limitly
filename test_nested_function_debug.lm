@@ -1,0 +1,35 @@
+print("=== Nested Function Debug Test ===");
+
+print("\n🔹 Test 1: Simple nested function (should work)");
+fn outerFunction(): function {
+    print("Inside outerFunction");
+    return fn(x: int): int {
+        print("Inside inner lambda");
+        return x + 1;
+    };
+}
+
+print("Calling outerFunction...");
+var innerFunc = outerFunction();
+print("Got inner function: " + innerFunc);
+print("Calling innerFunc(5)...");
+var result = innerFunc(5);
+print("Result: " + result);
+
+print("\n🔹 Test 2: Function with captured variable");
+fn createMultiplier(factor: int): function {
+    print("Inside createMultiplier with factor: " + factor);
+    return fn(value: int): int {
+        print("Inside multiplier lambda with value: " + value + " and factor: " + factor);
+        return value * factor;
+    };
+}
+
+print("Creating multiplier...");
+var multiplier = createMultiplier(3);
+print("Got multiplier: " + multiplier);
+print("Calling multiplier(7)...");
+var result2 = multiplier(7);
+print("Result: " + result2);
+
+print("\n=== Test Complete ===");

@@ -2,76 +2,115 @@
 
 ## Introduction
 
-This feature implements the virtual machine execution support for concurrent and parallel blocks with integrated error handling. The language syntax and AST nodes are already defined, but the VM execution engine needs to be implemented to support:
+This feature implements a hybrid concurrency system that can operate in both bare metal and runtime-assisted modes. The language syntax and AST nodes are already defined, but the execution engine needs to support:
 
-1. **Concurrent blocks** for I/O-bound tasks with batch, stream, and async modes
-2. **Parallel blocks** for CPU-bound tasks with work distribution
-3. **Task and worker statements** within concurrent/parallel blocks
-4. **Error handling integration** with fallible expressions and ?else
-5. **Channel-based communication** between tasks
-6. **Atomic operations** for thread-safe shared state
+1. **Bare metal concurrency** - Direct compilation to native threads/processes with minimal runtime overhead
+2. **Runtime-assisted concurrency** - Full-featured runtime with advanced scheduling, error handling, and monitoring
+3. **Adaptive execution** - Automatic selection between bare metal and runtime modes based on complexity
+4. **Concurrent blocks** for I/O-bound tasks with batch, stream, and async modes
+5. **Parallel blocks** for CPU-bound tasks with work distribution
+6. **Task and worker statements** within concurrent/parallel blocks
+7. **Error handling integration** with fallible expressions and ?else
+8. **Channel-based communication** between tasks (runtime mode)
+9. **Atomic operations** for thread-safe shared state
 
 ## Requirements
 
-### Requirement 1: Basic Concurrent Block Execution
+### Requirement 1: Bare Metal Concurrent Block Execution
 
-**User Story:** As a developer, I want to execute concurrent blocks with task statements, so that I can run I/O-bound operations concurrently.
-
-#### Acceptance Criteria
-
-1. WHEN a concurrent block is encountered THEN the VM SHALL create a thread pool for task execution
-2. WHEN a task statement with iteration is encountered THEN the VM SHALL spawn separate tasks for each iteration
-3. WHEN tasks complete THEN the VM SHALL collect results and continue execution
-4. WHEN no parameters are specified THEN the VM SHALL use default values (mode=batch, cores=Auto, on_error=Stop)
-5. WHEN a channel parameter is specified THEN the VM SHALL create a channel for task communication
-
-### Requirement 2: Basic Parallel Block Execution
-
-**User Story:** As a developer, I want to execute parallel blocks with task statements, so that I can run CPU-bound operations in parallel.
+**User Story:** As a developer, I want simple concurrent blocks to compile to native threads with minimal overhead, so that I can achieve maximum performance for basic concurrent operations.
 
 #### Acceptance Criteria
 
-1. WHEN a parallel block is encountered THEN the VM SHALL create a work-stealing thread pool
-2. WHEN tasks are CPU-bound THEN the VM SHALL distribute work across available cores
-3. WHEN mode=batch is specified THEN the VM SHALL execute all tasks and wait for completion
-4. WHEN cores parameter is specified THEN the VM SHALL limit thread pool size accordingly
-5. WHEN tasks complete THEN the VM SHALL synchronize results before continuing
+1. WHEN a concurrent block has simple task statements THEN the compiler SHALL generate native thread creation code
+2. WHEN tasks have no complex error handling or channels THEN the compiler SHALL use bare metal execution mode
+3. WHEN tasks complete THEN the compiler SHALL generate thread join code for synchronization
+4. WHEN concurrent blocks are nested or complex THEN the compiler SHALL automatically switch to runtime mode
+5. WHEN bare metal mode is used THEN the runtime overhead SHALL be minimal (no thread pools, schedulers, or complex state management)
 
-### Requirement 3: Task Statement Execution
+### Requirement 2: Runtime-Assisted Concurrent Block Execution
 
-**User Story:** As a developer, I want to define task statements with iteration, so that I can create multiple concurrent/parallel tasks.
-
-#### Acceptance Criteria
-
-1. WHEN a task statement has an iteration variable THEN the VM SHALL create one task per iteration
-2. WHEN a task accesses the iteration variable THEN the VM SHALL provide the correct value for each task
-3. WHEN tasks execute concurrently THEN the VM SHALL ensure thread-safe access to shared variables
-4. WHEN a task completes THEN the VM SHALL clean up task-specific resources
-5. WHEN tasks throw errors THEN the VM SHALL handle them according to the on_error parameter
-
-### Requirement 4: Worker Statement Execution
-
-**User Story:** As a developer, I want to define worker statements for stream processing, so that I can process incoming data streams concurrently.
+**User Story:** As a developer, I want complex concurrent blocks to use the full runtime system, so that I can access advanced features like channels, error handling, and monitoring.
 
 #### Acceptance Criteria
 
-1. WHEN a worker statement is encountered THEN the VM SHALL create a worker function
-2. WHEN mode=stream is specified THEN the VM SHALL process input stream items through workers
-3. WHEN workers receive input THEN the VM SHALL pass the correct parameter to each worker
-4. WHEN workers complete THEN the VM SHALL send results to the output channel
-5. WHEN the input stream ends THEN the VM SHALL terminate all workers gracefully
+1. WHEN a concurrent block uses channels THEN the execution SHALL use runtime mode with thread pool management
+2. WHEN complex error handling is specified THEN the execution SHALL use runtime mode with error propagation
+3. WHEN monitoring or debugging is enabled THEN the execution SHALL use runtime mode with instrumentation
+4. WHEN task statements have complex iteration patterns THEN the execution SHALL use runtime mode with task scheduling
+5. WHEN runtime mode is used THEN the system SHALL provide full concurrency features (channels, error handling, monitoring)
 
-### Requirement 5: Atomic Variable Support
+### Requirement 3: Bare Metal Parallel Block Execution
 
-**User Story:** As a developer, I want to use atomic variables in concurrent contexts, so that I can safely share state between tasks.
+**User Story:** As a developer, I want simple parallel blocks to compile to native threads with work distribution, so that I can achieve maximum CPU utilization with minimal overhead.
 
 #### Acceptance Criteria
 
-1. WHEN an atomic variable is declared THEN the VM SHALL create a thread-safe atomic wrapper
-2. WHEN atomic variables are accessed from multiple tasks THEN the VM SHALL ensure atomic operations
-3. WHEN atomic variables are incremented THEN the VM SHALL use atomic add operations
-4. WHEN atomic variables are read THEN the VM SHALL return consistent values
-5. WHEN atomic variables are assigned THEN the VM SHALL use atomic store operations
+1. WHEN a parallel block has simple CPU-bound tasks THEN the compiler SHALL generate native thread creation with work distribution
+2. WHEN no complex scheduling is needed THEN the compiler SHALL use bare metal execution mode
+3. WHEN cores parameter is specified THEN the compiler SHALL generate code to create exactly that many threads
+4. WHEN tasks are uniform and independent THEN the compiler SHALL use simple work partitioning
+5. WHEN bare metal parallel execution is used THEN the overhead SHALL be minimal (direct thread creation, simple work division)
+
+### Requirement 4: Runtime-Assisted Parallel Block Execution
+
+**User Story:** As a developer, I want complex parallel blocks to use work-stealing thread pools and advanced scheduling, so that I can handle dynamic workloads efficiently.
+
+#### Acceptance Criteria
+
+1. WHEN parallel tasks have varying execution times THEN the execution SHALL use runtime mode with work-stealing
+2. WHEN dynamic load balancing is needed THEN the execution SHALL use runtime mode with adaptive scheduling
+3. WHEN parallel blocks use channels or complex error handling THEN the execution SHALL use runtime mode
+4. WHEN monitoring or profiling is enabled THEN the execution SHALL use runtime mode with instrumentation
+5. WHEN runtime parallel execution is used THEN the system SHALL provide work-stealing, load balancing, and advanced scheduling
+
+### Requirement 5: Adaptive Execution Mode Selection
+
+**User Story:** As a developer, I want the system to automatically choose between bare metal and runtime execution modes, so that I get optimal performance without manual configuration.
+
+#### Acceptance Criteria
+
+1. WHEN concurrent/parallel blocks are simple and independent THEN the compiler SHALL choose bare metal mode
+2. WHEN blocks use channels, complex error handling, or monitoring THEN the compiler SHALL choose runtime mode
+3. WHEN blocks have dynamic task creation or complex scheduling needs THEN the compiler SHALL choose runtime mode
+4. WHEN performance is critical and features are basic THEN the compiler SHALL prefer bare metal mode
+5. WHEN the execution mode is chosen THEN the system SHALL provide clear feedback about which mode is being used
+
+### Requirement 6: Task Statement Execution (Both Modes)
+
+**User Story:** As a developer, I want to define task statements with iteration that work efficiently in both bare metal and runtime modes, so that I can create multiple concurrent/parallel tasks.
+
+#### Acceptance Criteria
+
+1. WHEN a task statement has simple iteration THEN bare metal mode SHALL create threads directly for each iteration
+2. WHEN a task statement has complex iteration THEN runtime mode SHALL use task scheduling
+3. WHEN tasks access iteration variables THEN both modes SHALL provide correct values for each task
+4. WHEN tasks execute concurrently THEN both modes SHALL ensure thread-safe access to shared variables
+5. WHEN tasks complete THEN both modes SHALL clean up task-specific resources appropriately
+
+### Requirement 7: Worker Statement Execution (Runtime Mode Only)
+
+**User Story:** As a developer, I want to define worker statements for stream processing, so that I can process incoming data streams concurrently with full runtime support.
+
+#### Acceptance Criteria
+
+1. WHEN a worker statement is encountered THEN the system SHALL automatically use runtime mode
+2. WHEN mode=stream is specified THEN the runtime SHALL process input stream items through workers
+3. WHEN workers receive input THEN the runtime SHALL pass the correct parameter to each worker
+4. WHEN workers complete THEN the runtime SHALL send results to the output channel
+5. WHEN the input stream ends THEN the runtime SHALL terminate all workers gracefully
+
+### Requirement 8: Atomic Variable Support (Both Modes)
+
+**User Story:** As a developer, I want to use atomic variables in concurrent contexts that work efficiently in both execution modes, so that I can safely share state between tasks.
+
+#### Acceptance Criteria
+
+1. WHEN atomic variables are used in bare metal mode THEN the compiler SHALL generate native atomic operations (std::atomic)
+2. WHEN atomic variables are used in runtime mode THEN the runtime SHALL provide thread-safe atomic wrappers
+3. WHEN atomic variables are accessed from multiple tasks THEN both modes SHALL ensure atomic operations
+4. WHEN atomic variables are incremented THEN both modes SHALL use atomic add operations
+5. WHEN atomic variables are read/written THEN both modes SHALL return consistent values with minimal overhead
 
 ### Requirement 6: Channel Communication
 

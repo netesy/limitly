@@ -2,365 +2,546 @@
 
 ## Overview
 
-This design implements VM execution support for concurrent and parallel blocks with integrated error handling. The implementation builds upon the existing concurrency infrastructure (Scheduler, ThreadPool, EventLoop) and error handling system (ErrorValue, ErrorUnion, error frames) to provide a complete concurrency runtime.
+This design implements a hybrid concurrency system with bare metal compilation and optional runtime support through a pluggable system layer. The runtime acts as a thin compatibility layer providing implementations for Luminar's concurrency hooks, memory hooks, and optionally I/O hooks - not as a virtual machine.
 
 The design focuses on:
-- **Zero-cost abstractions** for the success path in concurrent operations
-- **Thread-safe error propagation** across task boundaries
-- **Efficient resource management** with automatic cleanup
-- **Flexible execution modes** (batch, stream, async) for different workload types
+- **Bare metal performance** - Direct compilation to native threads with zero runtime overhead for simple cases
+- **Pluggable runtime layer** - Optional system layer that provides advanced concurrency features when needed
+- **Automatic mode selection** - Compiler chooses between bare metal and runtime-assisted execution
+- **Hook-based architecture** - Clean separation between language semantics and system implementation
+- **Minimal overhead** - Runtime layer is thin and only used when advanced features are required
 
 ## Architecture
 
 ### Core Components
 
-#### 1. Concurrency Runtime Manager
+#### 1. Execution Mode Selection
 ```cpp
-class ConcurrencyRuntime {
-    std::shared_ptr<Scheduler> scheduler;
-    std::shared_ptr<ThreadPool> thread_pool;
-    std::shared_ptr<EventLoop> event_loop;
-    std::unordered_map<std::string, std::shared_ptr<Channel<ValuePtr>>> channels;
-    std::atomic<size_t> active_blocks{0};
-    
-    // Error handling integration
-    std::mutex error_mutex;
-    std::vector<ErrorValue> collected_errors;
-    ErrorHandlingStrategy current_strategy = ErrorHandlingStrategy::Stop;
+enum class ConcurrencyMode {
+    BareMetal,    // Direct native thread compilation
+    RuntimeAssisted  // Uses pluggable runtime layer
+};
+
+class ConcurrencyModeAnalyzer {
+public:
+    ConcurrencyMode analyzeBlock(const ConcurrentBlock& block);
+    bool requiresRuntime(const ConcurrentBlock& block);
+    bool hasComplexFeatures(const ConcurrentBlock& block);
 };
 ```
 
-#### 2. Task Execution Context
+#### 2. Hook-Based Architecture
 ```cpp
-struct TaskContext {
-    size_t task_id;
-    std::string loop_var;
-    ValuePtr iteration_value;
-    std::shared_ptr<Environment> task_env;
-    std::vector<Instruction> task_bytecode;
+// Concurrency hooks that can be implemented by runtime layer
+struct ConcurrencyHooks {
+    // Task management hooks
+    void (*spawn_task)(TaskDescriptor* task);
+    void (*join_tasks)(TaskHandle* handles, size_t count);
+    void (*cancel_tasks)(TaskHandle* handles, size_t count);
     
-    // Error handling context
-    std::vector<ErrorFrame> error_frames;
-    ErrorHandlingStrategy error_strategy;
-    std::shared_ptr<Channel<ErrorValue>> error_channel;
+    // Channel communication hooks
+    ChannelHandle (*create_channel)(size_t capacity);
+    void (*send_channel)(ChannelHandle ch, void* data);
+    bool (*recv_channel)(ChannelHandle ch, void* data);
+    void (*close_channel)(ChannelHandle ch);
+    
+    // Error handling hooks
+    void (*propagate_error)(ErrorContext* ctx);
+    void (*collect_errors)(ErrorCollector* collector);
+    
+    // Memory management hooks
+    void* (*allocate_shared)(size_t size);
+    void (*deallocate_shared)(void* ptr);
+    
+    // Optional I/O hooks
+    void (*async_read)(IOHandle handle, void* buffer, size_t size);
+    void (*async_write)(IOHandle handle, const void* buffer, size_t size);
 };
 ```
 
-#### 3. Block Execution State
+#### 3. Bare Metal Code Generation
 ```cpp
-struct BlockExecutionState {
-    enum class Mode { Batch, Stream, Async };
-    enum class BlockType { Parallel, Concurrent };
+class BareMetalConcurrencyGenerator {
+public:
+    // Generate native thread creation code
+    void generateParallelBlock(const ParallelBlock& block, CodeBuilder& builder);
+    void generateConcurrentBlock(const ConcurrentBlock& block, CodeBuilder& builder);
     
-    BlockType type;
-    Mode mode = Mode::Batch;
-    size_t cores = 0; // 0 = auto
-    ErrorHandlingStrategy error_strategy = ErrorHandlingStrategy::Stop;
-    std::chrono::milliseconds timeout{0};
-    std::chrono::milliseconds grace_period{500};
-    TimeoutAction timeout_action = TimeoutAction::Partial;
+    // Generate work distribution code
+    void generateWorkPartitioning(const TaskList& tasks, size_t thread_count, CodeBuilder& builder);
+    void generateThreadJoining(const TaskList& tasks, CodeBuilder& builder);
     
-    std::shared_ptr<Channel<ValuePtr>> output_channel;
-    std::vector<std::unique_ptr<TaskContext>> tasks;
-    std::atomic<size_t> completed_tasks{0};
-    std::atomic<size_t> failed_tasks{0};
+    // Generate atomic operations
+    void generateAtomicOperations(const AtomicVariable& var, CodeBuilder& builder);
 };
 ```
 
-### Error Handling Integration
-
-#### 1. Error Propagation Strategy
+#### 4. Runtime Layer Interface
 ```cpp
-enum class ErrorHandlingStrategy {
-    Stop,    // Terminate all tasks on first error
-    Auto,    // Continue with remaining tasks, collect errors
-    Retry    // Retry failed tasks up to limit
-};
-
-enum class TimeoutAction {
-    Partial,  // Return partial results
-    Error     // Treat timeout as error
-};
-```
-
-#### 2. Thread-Safe Error Collection
-```cpp
-class ConcurrentErrorCollector {
-    std::mutex mutex;
-    std::vector<ErrorValue> errors;
-    std::atomic<bool> has_errors{false};
+class RuntimeLayer {
+    ConcurrencyHooks hooks;
     
 public:
-    void addError(const ErrorValue& error);
-    std::vector<ErrorValue> getErrors() const;
-    bool hasErrors() const noexcept { return has_errors.load(); }
-    void clear();
+    // Initialize runtime with specific implementation
+    bool initialize(const RuntimeConfig& config);
+    void shutdown();
+    
+    // Hook registration
+    void registerConcurrencyHooks(const ConcurrencyHooks& hooks);
+    void registerMemoryHooks(const MemoryHooks& hooks);
+    void registerIOHooks(const IOHooks& hooks);
+    
+    // Runtime services (only when needed)
+    TaskScheduler* getTaskScheduler();
+    ChannelManager* getChannelManager();
+    ErrorCollector* getErrorCollector();
 };
 ```
 
-#### 3. Error Frame Management
-- Each task maintains its own error frame stack
-- Error frames are copied to task contexts during task creation
-- Errors are propagated back to the main thread through error channels
+### Execution Mode Selection Logic
+
+#### 1. Bare Metal Mode Criteria
+```cpp
+bool ConcurrencyModeAnalyzer::requiresBareMetal(const ConcurrentBlock& block) {
+    return !block.hasChannels() &&
+           !block.hasComplexErrorHandling() &&
+           !block.hasStreamProcessing() &&
+           !block.hasMonitoring() &&
+           block.hasSimpleTaskIteration() &&
+           block.getTaskCount() < MAX_BARE_METAL_TASKS;
+}
+```
+
+#### 2. Runtime Mode Criteria
+```cpp
+bool ConcurrencyModeAnalyzer::requiresRuntime(const ConcurrentBlock& block) {
+    return block.hasChannels() ||
+           block.hasComplexErrorHandling() ||
+           block.hasStreamProcessing() ||
+           block.hasWorkerStatements() ||
+           block.hasMonitoring() ||
+           block.hasDynamicTaskCreation() ||
+           block.requiresLoadBalancing();
+}
+```
+
+#### 3. Code Generation Strategy
+```cpp
+class ConcurrencyCodeGenerator {
+public:
+    void generateConcurrencyCode(const ConcurrentBlock& block, CodeBuilder& builder) {
+        ConcurrencyMode mode = analyzer.analyzeBlock(block);
+        
+        if (mode == ConcurrencyMode::BareMetal) {
+            generateBareMetalCode(block, builder);
+        } else {
+            generateRuntimeAssistedCode(block, builder);
+        }
+    }
+    
+private:
+    void generateBareMetalCode(const ConcurrentBlock& block, CodeBuilder& builder);
+    void generateRuntimeAssistedCode(const ConcurrentBlock& block, CodeBuilder& builder);
+};
+```
 
 ### Execution Flow
 
-#### 1. Concurrent Block Execution
+#### 1. Bare Metal Execution Flow
 ```
-1. Parse block parameters (mode, cores, error strategy, etc.)
-2. Create BlockExecutionState with configuration
-3. Create output channel if specified
-4. For each task statement:
-   a. Create TaskContext with iteration values
-   b. Copy current error frames to task context
-   c. Generate task bytecode
-   d. Submit task to scheduler
-5. Wait for task completion based on mode
-6. Collect results and handle errors
-7. Clean up resources
+1. Analyze concurrent block at compile time
+2. Determine if bare metal mode is suitable
+3. Generate native thread creation code:
+   a. Calculate work distribution
+   b. Generate thread creation with work partitions
+   c. Generate atomic operations for shared state
+   d. Generate thread joining code
+4. Compile to native executable with direct thread calls
+5. Execute with zero runtime overhead
 ```
 
-#### 2. Task Execution
+#### 2. Runtime-Assisted Execution Flow
 ```
-1. Create isolated VM instance for task
-2. Set up task environment with iteration variables
-3. Install error handlers from task context
-4. Execute task bytecode
-5. Handle any errors according to strategy
-6. Send results to output channel
-7. Send errors to error channel if any
-8. Clean up task resources
+1. Analyze concurrent block at compile time
+2. Determine runtime features needed
+3. Generate code that calls runtime hooks:
+   a. Initialize runtime layer if not already active
+   b. Register required hooks (concurrency, memory, I/O)
+   c. Generate calls to runtime hook functions
+   d. Generate cleanup calls to runtime layer
+4. Runtime layer provides implementations for:
+   a. Task scheduling and management
+   b. Channel communication
+   c. Error propagation and collection
+   d. Advanced memory management
+   e. I/O operations (if needed)
 ```
 
-#### 3. Error Handling Flow
+#### 3. Hybrid Execution Flow
 ```
-1. Task encounters error during execution
-2. Check current error handling strategy
-3. If Stop: signal all tasks to terminate
-4. If Auto: continue execution, collect error
-5. If Retry: retry task up to limit, then collect error
-6. Propagate error to main thread via error channel
-7. Main thread decides whether to continue or abort
+1. Some blocks use bare metal mode (simple parallel loops)
+2. Other blocks use runtime mode (complex concurrent operations)
+3. Runtime layer is initialized only when first needed
+4. Bare metal blocks continue with zero overhead
+5. Runtime blocks use pluggable system layer
+6. Clean transitions between modes within same program
 ```
 
 ## Components and Interfaces
 
-### 1. VM Integration
+### 1. Compiler Integration
 
-#### New VM Methods
+#### Concurrency Analysis Pass
 ```cpp
-class VM {
-    // Concurrency execution methods
-    void handleBeginParallel(const Instruction& instruction);
-    void handleBeginConcurrent(const Instruction& instruction);
-    void handleBeginTask(const Instruction& instruction);
-    void handleBeginWorker(const Instruction& instruction);
-    void handleSpawnIteratingTasks(const Instruction& instruction);
+class ConcurrencyAnalysisPass {
+public:
+    void analyzeConcurrentBlocks(AST::Program& program);
+    ConcurrencyMode determineModeForBlock(const AST::ConcurrentBlock& block);
+    std::vector<RuntimeFeature> getRequiredFeatures(const AST::ConcurrentBlock& block);
     
-    // Task management
-    std::unique_ptr<TaskContext> createTaskContext(const std::string& loopVar, 
-                                                   ValuePtr iterationValue);
-    void executeTaskInThread(std::unique_ptr<TaskContext> context);
-    
-    // Error handling integration
-    void propagateTaskError(const ErrorValue& error, ErrorHandlingStrategy strategy);
-    void collectTaskResults(BlockExecutionState& state);
-    
-    // Resource management
-    void cleanupConcurrencyResources();
+private:
+    bool hasSimpleTaskPattern(const AST::ConcurrentBlock& block);
+    bool requiresAdvancedFeatures(const AST::ConcurrentBlock& block);
+    size_t estimateTaskComplexity(const AST::ConcurrentBlock& block);
 };
 ```
 
-#### Instruction Handlers
+#### Code Generation
 ```cpp
-// Parallel block: parallel(ch=output, mode=batch, cores=4, on_error=Stop)
-void VM::handleBeginParallel(const Instruction& instruction) {
-    auto state = std::make_unique<BlockExecutionState>();
-    state->type = BlockExecutionState::BlockType::Parallel;
-    parseBlockParameters(instruction.stringValue, *state);
+class ConcurrencyCodeGen {
+public:
+    void generateBareMetalConcurrency(const AST::ConcurrentBlock& block, CodeBuilder& builder);
+    void generateRuntimeAssistedConcurrency(const AST::ConcurrentBlock& block, CodeBuilder& builder);
     
-    // Push state onto concurrency stack
-    concurrency_stack.push(std::move(state));
+private:
+    // Bare metal generation
+    void generateNativeThreads(const TaskList& tasks, CodeBuilder& builder);
+    void generateWorkPartitioning(const TaskList& tasks, size_t cores, CodeBuilder& builder);
+    void generateAtomicOperations(const AtomicVarList& atomics, CodeBuilder& builder);
+    
+    // Runtime-assisted generation
+    void generateRuntimeHookCalls(const AST::ConcurrentBlock& block, CodeBuilder& builder);
+    void generateChannelOperations(const ChannelList& channels, CodeBuilder& builder);
+    void generateErrorHandlingHooks(const ErrorHandlingConfig& config, CodeBuilder& builder);
+};
+```
+
+#### Generated Code Examples
+```cpp
+// Bare metal parallel block generates:
+void parallel_block_1() {
+    const size_t num_threads = std::min(4u, std::thread::hardware_concurrency());
+    std::vector<std::thread> threads;
+    std::atomic<int> shared_counter{0};
+    
+    for (size_t t = 0; t < num_threads; ++t) {
+        threads.emplace_back([&, t]() {
+            size_t start = t * (work_size / num_threads);
+            size_t end = (t + 1) * (work_size / num_threads);
+            for (size_t i = start; i < end; ++i) {
+                // Task body
+                shared_counter.fetch_add(process_item(i));
+            }
+        });
+    }
+    
+    for (auto& thread : threads) {
+        thread.join();
+    }
 }
 
-// Task statement: task(i in 1..10)
-void VM::handleBeginTask(const Instruction& instruction) {
-    auto& state = *concurrency_stack.top();
-    
-    // Create task contexts for iteration
-    if (currentTaskIterable) {
-        auto iterator = createIterator(currentTaskIterable);
-        while (hasNext(iterator)) {
-            auto value = next(iterator);
-            auto context = createTaskContext(currentTaskLoopVar, value);
-            state.tasks.push_back(std::move(context));
-        }
-    } else {
-        // Single task without iteration
-        auto context = createTaskContext("", nullptr);
-        state.tasks.push_back(std::move(context));
+// Runtime-assisted concurrent block generates:
+void concurrent_block_1() {
+    if (!runtime_initialized) {
+        luminar_runtime_init(&runtime_config);
+        runtime_initialized = true;
     }
+    
+    ChannelHandle output_ch = luminar_create_channel(100);
+    TaskHandle tasks[10];
+    
+    for (int i = 0; i < 10; ++i) {
+        TaskDescriptor desc = {
+            .task_func = task_function_1,
+            .task_data = &task_data[i],
+            .output_channel = output_ch
+        };
+        tasks[i] = luminar_spawn_task(&desc);
+    }
+    
+    luminar_join_tasks(tasks, 10);
+    luminar_close_channel(output_ch);
 }
 ```
 
-### 2. Channel Integration
+### 2. Runtime Layer Implementation
 
-#### Channel Creation and Management
+#### Hook Interface Definition
 ```cpp
-class ChannelManager {
-    std::unordered_map<std::string, std::shared_ptr<Channel<ValuePtr>>> channels;
+// C-compatible interface for runtime implementations
+extern "C" {
+    // Concurrency hooks
+    typedef struct TaskDescriptor {
+        void (*task_func)(void* data);
+        void* task_data;
+        ChannelHandle output_channel;
+        ErrorHandler error_handler;
+    } TaskDescriptor;
+    
+    typedef void* TaskHandle;
+    typedef void* ChannelHandle;
+    
+    // Hook function signatures
+    TaskHandle luminar_spawn_task(TaskDescriptor* desc);
+    void luminar_join_tasks(TaskHandle* handles, size_t count);
+    void luminar_cancel_tasks(TaskHandle* handles, size_t count);
+    
+    ChannelHandle luminar_create_channel(size_t capacity);
+    bool luminar_send_channel(ChannelHandle ch, void* data, size_t size);
+    bool luminar_recv_channel(ChannelHandle ch, void* data, size_t size);
+    void luminar_close_channel(ChannelHandle ch);
+    
+    // Memory hooks
+    void* luminar_alloc_shared(size_t size);
+    void luminar_free_shared(void* ptr);
+    
+    // Error hooks
+    void luminar_propagate_error(ErrorContext* ctx);
+    void luminar_collect_errors(ErrorCollector* collector);
+    
+    // Runtime lifecycle
+    bool luminar_runtime_init(RuntimeConfig* config);
+    void luminar_runtime_shutdown();
+}
+```
+
+#### Default Runtime Implementation
+```cpp
+// Simple default implementation using standard library
+class DefaultRuntimeImpl {
+    std::unique_ptr<ThreadPool> thread_pool;
+    std::unordered_map<ChannelHandle, std::unique_ptr<Channel>> channels;
     std::mutex channels_mutex;
     
 public:
-    std::shared_ptr<Channel<ValuePtr>> createChannel(const std::string& name);
-    std::shared_ptr<Channel<ValuePtr>> getChannel(const std::string& name);
-    void closeChannel(const std::string& name);
-    void closeAllChannels();
+    TaskHandle spawnTask(TaskDescriptor* desc);
+    void joinTasks(TaskHandle* handles, size_t count);
+    ChannelHandle createChannel(size_t capacity);
+    bool sendChannel(ChannelHandle ch, void* data, size_t size);
+    bool recvChannel(ChannelHandle ch, void* data, size_t size);
 };
+
+// Advanced runtime implementations can provide:
+// - Work-stealing schedulers
+// - NUMA-aware memory allocation
+// - High-performance channels
+// - Advanced error handling
+// - Monitoring and profiling
 ```
 
-#### Channel Operations in VM
-```cpp
-// Channel creation during block setup
-if (!state->output_channel && !channelName.empty()) {
-    state->output_channel = channel_manager.createChannel(channelName);
-    environment->define(channelName, std::make_shared<Value>(
-        std::make_shared<Type>(TypeTag::Channel), 
-        state->output_channel
-    ));
-}
+### 3. Atomic Operations (Both Modes)
 
-// Task result sending
-void TaskContext::sendResult(ValuePtr result) {
-    if (output_channel) {
-        output_channel->send(result);
+#### Bare Metal Atomic Generation
+```cpp
+// Generates direct std::atomic operations
+class BareMetalAtomicGen {
+public:
+    void generateAtomicDeclaration(const AtomicVariable& var, CodeBuilder& builder) {
+        builder.addLine(f"std::atomic<{var.type}> {var.name}{{{var.initial_value}}};");
     }
-}
+    
+    void generateAtomicOperation(const AtomicOperation& op, CodeBuilder& builder) {
+        switch (op.type) {
+            case AtomicOpType::Load:
+                builder.addLine(f"{op.result} = {op.atomic_var}.load();");
+                break;
+            case AtomicOpType::Store:
+                builder.addLine(f"{op.atomic_var}.store({op.value});");
+                break;
+            case AtomicOpType::Add:
+                builder.addLine(f"{op.result} = {op.atomic_var}.fetch_add({op.value});");
+                break;
+            case AtomicOpType::CompareExchange:
+                builder.addLine(f"{op.result} = {op.atomic_var}.compare_exchange_weak({op.expected}, {op.desired});");
+                break;
+        }
+    }
+};
 ```
 
-### 3. Atomic Operations
-
-#### Atomic Value Operations
+#### Runtime-Assisted Atomic Operations
 ```cpp
-// Enhanced atomic operations for concurrent access
-struct AtomicOperations {
-    static ValuePtr atomicAdd(ValuePtr atomic_val, ValuePtr operand);
-    static ValuePtr atomicSubtract(ValuePtr atomic_val, ValuePtr operand);
-    static ValuePtr atomicCompareExchange(ValuePtr atomic_val, ValuePtr expected, ValuePtr desired);
-    static ValuePtr atomicLoad(ValuePtr atomic_val);
-    static void atomicStore(ValuePtr atomic_val, ValuePtr value);
-};
-
-// VM instruction handler for atomic operations
-void VM::handleDefineAtomic(const Instruction& instruction) {
-    auto atomic_val = std::make_shared<Value>(
-        std::make_shared<Type>(TypeTag::Int), 
-        AtomicValue(0)
-    );
-    environment->define(instruction.stringValue, atomic_val);
+// Uses runtime hooks for atomic operations (allows custom implementations)
+extern "C" {
+    typedef void* AtomicHandle;
+    
+    AtomicHandle luminar_create_atomic(size_t size, void* initial_value);
+    void luminar_atomic_load(AtomicHandle handle, void* result);
+    void luminar_atomic_store(AtomicHandle handle, void* value);
+    void luminar_atomic_add(AtomicHandle handle, void* operand, void* result);
+    bool luminar_atomic_compare_exchange(AtomicHandle handle, void* expected, void* desired);
+    void luminar_destroy_atomic(AtomicHandle handle);
 }
 ```
 
 ## Data Models
 
-### 1. Concurrency State Management
+### 1. Compilation-Time Analysis
 ```cpp
-// Global concurrency state in VM
-struct ConcurrencyState {
-    std::stack<std::unique_ptr<BlockExecutionState>> block_stack;
-    std::unique_ptr<ConcurrencyRuntime> runtime;
-    std::unique_ptr<ChannelManager> channel_manager;
-    std::unique_ptr<ConcurrentErrorCollector> error_collector;
+// Analysis results for concurrency blocks
+struct ConcurrencyAnalysis {
+    ConcurrencyMode execution_mode;
+    std::vector<RuntimeFeature> required_features;
+    size_t estimated_task_count;
+    bool has_channels;
+    bool has_complex_error_handling;
+    bool has_atomic_operations;
+    bool requires_load_balancing;
     
-    // Performance monitoring
-    struct Stats {
-        std::atomic<size_t> tasks_executed{0};
-        std::atomic<size_t> tasks_failed{0};
-        std::atomic<size_t> blocks_executed{0};
-        std::atomic<size_t> errors_handled{0};
-    } stats;
+    // Performance estimates
+    size_t estimated_thread_count;
+    bool is_cpu_bound;
+    bool is_io_bound;
+};
+
+enum class RuntimeFeature {
+    TaskScheduling,
+    ChannelCommunication,
+    ErrorPropagation,
+    LoadBalancing,
+    StreamProcessing,
+    AsyncIO,
+    Monitoring
 };
 ```
 
-### 2. Task Isolation
+### 2. Runtime Configuration
 ```cpp
-// Each task gets isolated execution environment
-class TaskVM : public VM {
-    std::unique_ptr<TaskContext> context;
-    std::shared_ptr<ConcurrentErrorCollector> error_collector;
+// Configuration for runtime layer
+struct RuntimeConfig {
+    // Threading configuration
+    size_t max_threads = 0; // 0 = auto-detect
+    bool use_work_stealing = true;
+    bool enable_numa_awareness = false;
     
-public:
-    TaskVM(std::unique_ptr<TaskContext> ctx, 
-           std::shared_ptr<ConcurrentErrorCollector> errors);
+    // Channel configuration
+    size_t default_channel_capacity = 100;
+    bool use_lock_free_channels = true;
     
-    ValuePtr executeTask();
-    void handleTaskError(const ErrorValue& error);
+    // Error handling configuration
+    bool collect_error_statistics = false;
+    bool enable_error_recovery = true;
+    
+    // Memory configuration
+    bool use_custom_allocator = false;
+    size_t shared_memory_pool_size = 0; // 0 = no pool
+    
+    // Monitoring configuration
+    bool enable_profiling = false;
+    bool enable_task_tracing = false;
 };
 ```
 
-### 3. Resource Tracking
+### 3. Generated Code Metadata
 ```cpp
-// Automatic resource cleanup
-class ResourceTracker {
-    std::vector<std::function<void()>> cleanup_functions;
-    std::mutex cleanup_mutex;
+// Metadata about generated concurrency code
+struct ConcurrencyCodeMetadata {
+    struct BareMetal {
+        size_t thread_count;
+        std::vector<std::string> atomic_variables;
+        bool uses_work_partitioning;
+    };
     
-public:
-    void addCleanup(std::function<void()> cleanup);
-    void executeCleanup();
-    ~ResourceTracker() { executeCleanup(); }
+    struct RuntimeAssisted {
+        std::vector<RuntimeFeature> used_features;
+        std::vector<std::string> channel_names;
+        std::vector<std::string> hook_functions;
+    };
+    
+    ConcurrencyMode mode;
+    union {
+        BareMetal bare_metal;
+        RuntimeAssisted runtime_assisted;
+    };
 };
 ```
 
 ## Error Handling
 
-### 1. Error Propagation Across Threads
+### 1. Bare Metal Error Handling
 ```cpp
-// Thread-safe error propagation
-class ThreadSafeErrorPropagator {
-    std::shared_ptr<Channel<ErrorValue>> error_channel;
-    std::atomic<bool> should_stop{false};
-    
+// Simple error handling for bare metal mode
+class BareMetalErrorGen {
 public:
-    void propagateError(const ErrorValue& error, ErrorHandlingStrategy strategy);
-    void signalStop();
-    bool shouldStop() const { return should_stop.load(); }
+    void generateErrorHandling(const ErrorHandlingConfig& config, CodeBuilder& builder) {
+        if (config.strategy == ErrorStrategy::Stop) {
+            // Generate atomic flag for early termination
+            builder.addLine("std::atomic<bool> should_stop{false};");
+            builder.addLine("std::mutex error_mutex;");
+            builder.addLine("std::vector<std::string> errors;");
+            
+            // Generate error checking in task loops
+            generateStopOnErrorChecks(builder);
+        } else if (config.strategy == ErrorStrategy::Collect) {
+            // Generate thread-safe error collection
+            generateErrorCollection(builder);
+        }
+    }
+    
+private:
+    void generateStopOnErrorChecks(CodeBuilder& builder);
+    void generateErrorCollection(CodeBuilder& builder);
 };
 ```
 
-### 2. Error Recovery Strategies
+### 2. Runtime-Assisted Error Handling
 ```cpp
-// Retry mechanism for failed tasks
-class TaskRetryManager {
-    struct RetryInfo {
-        size_t attempt_count = 0;
-        std::chrono::steady_clock::time_point last_attempt;
-        ErrorValue last_error;
-    };
+// Error handling through runtime hooks
+extern "C" {
+    typedef struct ErrorContext {
+        const char* error_type;
+        const char* message;
+        const char* file;
+        int line;
+        void* user_data;
+    } ErrorContext;
     
-    std::unordered_map<size_t, RetryInfo> retry_info;
-    size_t max_retries = 3;
-    std::chrono::milliseconds retry_delay{100};
+    typedef void (*ErrorHandler)(ErrorContext* ctx);
     
-public:
-    bool shouldRetry(size_t task_id, const ErrorValue& error);
-    void recordFailure(size_t task_id, const ErrorValue& error);
-    void reset();
-};
+    void luminar_set_error_handler(ErrorHandler handler);
+    void luminar_propagate_error(ErrorContext* ctx);
+    void luminar_collect_error(ErrorContext* ctx);
+    bool luminar_has_errors();
+    size_t luminar_get_error_count();
+    void luminar_clear_errors();
+}
 ```
 
-### 3. Error Context Preservation
+### 3. Error Strategy Implementation
 ```cpp
-// Preserve error context across thread boundaries
-struct ErrorContext {
-    std::vector<ErrorFrame> error_frames;
-    std::string function_name;
-    size_t source_location;
-    std::thread::id thread_id;
-    std::chrono::steady_clock::time_point timestamp;
-    
-    ErrorValue createContextualError(const std::string& error_type, 
-                                   const std::string& message) const;
+// Compile-time error strategy selection
+enum class ErrorStrategy {
+    Stop,      // Terminate all tasks on first error (bare metal: atomic flag)
+    Collect,   // Collect all errors and continue (bare metal: thread-safe vector)
+    Ignore,    // Ignore errors and continue (bare metal: no error handling)
+    Runtime    // Use runtime error handling hooks
+};
+
+class ErrorStrategyGenerator {
+public:
+    void generateErrorStrategy(ErrorStrategy strategy, CodeBuilder& builder) {
+        switch (strategy) {
+            case ErrorStrategy::Stop:
+                generateStopStrategy(builder);
+                break;
+            case ErrorStrategy::Collect:
+                generateCollectStrategy(builder);
+                break;
+            case ErrorStrategy::Runtime:
+                generateRuntimeStrategy(builder);
+                break;
+        }
+    }
 };
 ```
 
@@ -392,32 +573,38 @@ struct ErrorContext {
 
 ## Implementation Phases
 
-### Phase 1: Basic Concurrent Block Support
-1. Implement `handleBeginConcurrent` and `handleEndConcurrent`
-2. Add task context creation and management
-3. Implement basic task execution in thread pool
-4. Add channel creation and communication
+### Phase 1: Concurrency Analysis and Mode Selection
+1. Implement `ConcurrencyModeAnalyzer` to determine execution mode
+2. Add analysis pass to identify required runtime features
+3. Implement decision logic for bare metal vs runtime-assisted execution
+4. Add metadata generation for concurrency blocks
 
-### Phase 2: Parallel Block Support
-1. Implement `handleBeginParallel` and `handleEndParallel`
-2. Add work-stealing thread pool integration
-3. Implement CPU-bound task distribution
-4. Add core count management
+### Phase 2: Bare Metal Code Generation
+1. Implement `BareMetalConcurrencyGenerator` for simple concurrent/parallel blocks
+2. Add native thread creation and work partitioning code generation
+3. Implement atomic operations code generation using std::atomic
+4. Add simple error handling code generation (atomic flags, thread-safe collections)
 
-### Phase 3: Error Handling Integration
-1. Implement thread-safe error propagation
-2. Add error handling strategies (Stop, Auto, Retry)
-3. Implement error collection and reporting
-4. Add timeout and grace period support
+### Phase 3: Runtime Hook Interface
+1. Define C-compatible hook interface for runtime implementations
+2. Implement default runtime using standard library (ThreadPool, channels)
+3. Add runtime initialization and lifecycle management
+4. Implement hook registration and dynamic loading
 
-### Phase 4: Advanced Features
-1. Implement async/await support
-2. Add stream processing mode
-3. Implement worker statements
-4. Add performance monitoring and debugging
+### Phase 4: Runtime-Assisted Code Generation
+1. Implement code generation that calls runtime hooks
+2. Add channel operations through runtime interface
+3. Implement complex error handling through runtime hooks
+4. Add support for advanced features (stream processing, monitoring)
 
-### Phase 5: Optimization and Polish
-1. Optimize success path performance
-2. Add comprehensive error messages
-3. Implement resource usage monitoring
-4. Add debugging and profiling tools
+### Phase 5: Integration and Optimization
+1. Integrate both modes into the compiler pipeline
+2. Add automatic mode selection based on block complexity
+3. Implement seamless transitions between modes within same program
+4. Add performance monitoring and debugging support
+
+### Phase 6: Advanced Runtime Features
+1. Implement work-stealing scheduler for runtime mode
+2. Add NUMA-aware memory allocation hooks
+3. Implement high-performance lock-free channels
+4. Add monitoring, profiling, and debugging hooks

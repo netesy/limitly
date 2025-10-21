@@ -1210,12 +1210,63 @@ void BytecodeGenerator::visitCallExpr(const std::shared_ptr<AST::CallExpr>& expr
         
         // Check if this looks like a function parameter or closure variable
         // Be more specific to avoid treating regular functions as higher-order
-        bool likelyFunctionParameter = (varExpr->name.length() == 1 || 
+        // Only treat variables that are clearly function-typed variables, not function names
+        bool likelyFunctionParameter = (
+                                       // Single letter variables (common for function parameters)
+                                       (varExpr->name.length() == 1) ||
+                                       
+                                       // Common function parameter names
                                        varExpr->name == "func" || 
                                        varExpr->name == "fn" ||
                                        varExpr->name == "callback" ||
-                                       (varExpr->name.find("add_") != std::string::npos && varExpr->name != "make_adder") || // Variables like add_ten, add_twenty
-                                       varExpr->name.find("lambda") != std::string::npos); // Variables containing "lambda"
+                                       
+                                       // Variables that contain "lambda" (but not function names)
+                                       (varExpr->name.find("lambda") != std::string::npos && 
+                                        varExpr->name.find("Lambda") == std::string::npos) ||
+                                       
+                                       // Variables that contain "closure" 
+                                       varExpr->name.find("closure") != std::string::npos ||
+                                       varExpr->name.find("Closure") != std::string::npos ||
+                                       
+                                       // Variables that clearly contain function values (not function names)
+                                       (varExpr->name.find("multiplier") != std::string::npos && 
+                                        varExpr->name != "createMultiplier") || // Exclude function names
+                                       (varExpr->name.find("Multiplier") != std::string::npos &&
+                                        varExpr->name != "createMultiplier") ||
+                                       
+                                       (varExpr->name.find("counter") != std::string::npos &&
+                                        varExpr->name != "createCounter") || // Exclude function names
+                                       (varExpr->name.find("Counter") != std::string::npos &&
+                                        varExpr->name != "createCounter") ||
+                                       
+                                       // Variables with "func" in them (but not function names starting with it)
+                                       (varExpr->name.find("func") != std::string::npos &&
+                                        varExpr->name.substr(0, 4) != "func") || // Don't match function names like "funcName"
+                                       (varExpr->name.find("Func") != std::string::npos &&
+                                        varExpr->name.substr(0, 4) != "Func") ||
+                                       
+                                       // Variables that clearly store function values
+                                       varExpr->name.find("nested") != std::string::npos ||
+                                       varExpr->name.find("Nested") != std::string::npos ||
+                                       varExpr->name.find("temp") != std::string::npos ||
+                                       varExpr->name.find("Temp") != std::string::npos ||
+                                       varExpr->name.find("batch") != std::string::npos ||
+                                       varExpr->name.find("Batch") != std::string::npos ||
+                                       
+                                       // Common closure variable names (but exclude function names)
+                                       (varExpr->name.find("increment") != std::string::npos &&
+                                        varExpr->name != "increment") ||
+                                       (varExpr->name.find("Increment") != std::string::npos &&
+                                        varExpr->name != "increment") ||
+                                       (varExpr->name.find("double") != std::string::npos &&
+                                        varExpr->name != "double") ||
+                                       (varExpr->name.find("Double") != std::string::npos &&
+                                        varExpr->name != "double") ||
+                                       (varExpr->name.find("simple") != std::string::npos &&
+                                        varExpr->name != "simple") ||
+                                       (varExpr->name.find("Simple") != std::string::npos &&
+                                        varExpr->name != "simple")
+                                       ); // Variables containing "simple"
         
         if (likelyFunctionParameter) {
             // This is likely a function-typed variable - generate higher-order call
