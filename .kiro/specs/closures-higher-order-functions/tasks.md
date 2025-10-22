@@ -255,14 +255,20 @@
 
 
 
-  - Resolve `END_FUNCTION reached outside of function call` errors
-  - Fix `PUSH_LAMBDA: lambda function not found` errors in nested scenarios
-  - Implement proper lambda function registration in VM function table
-  - Add support for deeply nested closure creation (6+ levels)
-  - Ensure proper cleanup of nested function call frames
+
+  - **Issue 1: Function Address Calculation** - Fix lambda function registration with incorrect start addresses that include BEGIN_FUNCTION instruction
+  - **Issue 2: Variable Scope in Nested Closures** - Fix inner lambda functions not accessing their parameters properly due to environment binding issues
+  - **Issue 3: Closure Execution Jumping** - Fix closure execution jumping to wrong bytecode addresses during nested function calls
+  - **Issue 4: Return Value Handling** - Fix nested function calls returning nil instead of expected closure values
+  - Resolve `END_FUNCTION reached outside of function call` errors by improving closure vs function call detection
+  - Fix `PUSH_LAMBDA: lambda function not found` errors in nested scenarios through proper function table registration
+  - Implement proper parameter environment binding for nested closures during execution
+  - Add support for deeply nested closure creation (6+ levels) with correct address calculation
+  - Ensure proper cleanup of nested function call frames and environment restoration
   - Add comprehensive error handling for nested function scenarios
   - _Requirements: 1.1, 1.2, 6.2_
-  - **Priority**: MEDIUM - Stability for advanced use cases
+  - **Priority**: HIGH - Critical for nested closure functionality
+  - **Status**: IN PROGRESS - Core technical issues identified and being fixed
 
 - [ ] 21. Add tuple type support
   - Implement TupleType AST node and type annotation

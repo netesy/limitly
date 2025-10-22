@@ -1,0 +1,13 @@
+print("=== Simple Closure Test ===");
+
+fn createAdder(): function {
+    return fn(x: int): int {
+        return x + 10;
+    };
+}
+
+var adder = createAdder();
+var result = adder(5);
+print("Result: " + result);
+print("Expected: 15");
+print("=== End Test ===");

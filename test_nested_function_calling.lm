@@ -1,0 +1,51 @@
+print("=== Testing Nested Function Calling Issues ===");
+
+print("\n🔹 Test 1: Call simple nested function");
+fn createSimple(): function {
+    return fn(x: int): int {
+        return x + 1;
+    };
+}
+
+var simple = createSimple();
+print("Calling simple(5)...");
+var result1 = simple(5);
+print("Result: " + result1);
+
+print("\n🔹 Test 2: Call double nested function");
+fn createDouble(): function {
+    return fn(): function {
+        return fn(x: int): int {
+            return x * 2;
+        };
+    };
+}
+
+var doubleNested = createDouble();
+print("Calling doubleNested()...");
+var innerFunc = doubleNested();
+print("Calling innerFunc(10)...");
+var result2 = innerFunc(10);
+print("Result: " + result2);
+
+print("\n🔹 Test 3: Call triple nested function (may cause END_FUNCTION error)");
+fn createTriple(): function {
+    return fn(): function {
+        return fn(): function {
+            return fn(x: int): int {
+                return x * 3;
+            };
+        };
+    };
+}
+
+var tripleNested = createTriple();
+print("Calling tripleNested()...");
+var level2 = tripleNested();
+print("Calling level2()...");
+var level3 = level2();
+print("Calling level3(7)...");
+var result3 = level3(7);
+print("Result: " + result3);
+
+print("\n=== All nested function calling tests completed ===");
