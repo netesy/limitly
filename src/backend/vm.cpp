@@ -492,6 +492,9 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                     case Opcode::LIST_APPEND:
                         handleListAppend(instruction);
                         break;
+                    case Opcode::CREATE_TUPLE:
+                        handleCreateTuple(instruction);
+                        break;
                     case Opcode::CREATE_DICT:
                         handleCreateDict(instruction);
                         break;
@@ -4160,6 +4163,38 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
         // Push the element at the index (wrapped in success value for consistency)
         push(listData.elements[idx]);
         
+    } else if (std::holds_alternative<TupleValue>(container->data)) {
+        // Handle tuple indexing
+        auto& tupleData = std::get<TupleValue>(container->data);
+        
+        // Check if index is an integer
+        if (!std::holds_alternative<int32_t>(index->data)) {
+            // Create and push error value for invalid index type
+            auto errorType = typeSystem->getErrorType("TypeConversion");
+            auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
+            ErrorValue errorVal("TypeConversion", "Tuple index must be an integer");
+            errorValue->data = errorVal;
+            push(errorValue);
+            return;
+        }
+        
+        int32_t idx = std::get<int32_t>(index->data);
+        
+        // Check bounds
+        if (idx < 0 || idx >= static_cast<int32_t>(tupleData.elements.size())) {
+            // Create and push error value for out of bounds
+            auto errorType = typeSystem->getErrorType("IndexOutOfBounds");
+            auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
+            ErrorValue errorVal("IndexOutOfBounds", "Tuple index " + std::to_string(idx) + 
+                              " out of bounds for tuple of size " + std::to_string(tupleData.elements.size()));
+            errorValue->data = errorVal;
+            push(errorValue);
+            return;
+        }
+        
+        // Push the element at the index
+        push(tupleData.elements[idx]);
+        
     } else if (std::holds_alternative<DictValue>(container->data)) {
         // Handle dictionary indexing
         auto& dictData = std::get<DictValue>(container->data);
@@ -4237,6 +4272,15 @@ void VM::handleSetIndex(const Instruction& /*unused*/) {
         
         // Set the element at the index
         listData.elements[idx] = value;
+        
+    } else if (std::holds_alternative<TupleValue>(container->data)) {
+        // Tuples are immutable - cannot set elements
+        auto errorType = typeSystem->getErrorType("TypeConversion");
+        auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
+        ErrorValue errorVal("TypeConversion", "Cannot modify immutable tuple");
+        errorValue->data = errorVal;
+        push(errorValue);
+        return;
         
     } else if (std::holds_alternative<DictValue>(container->data)) {
         // Handle dictionary indexing
@@ -6159,6 +6203,40 @@ void VM::handleCreateList(const Instruction& instruction) {
     
     if (debugMode) {
         std::cout << "[DEBUG] CREATE_LIST: Created list with " << listData.elements.size() << " elements" << std::endl;
+    }
+}
+
+void VM::handleCreateTuple(const Instruction& instruction) {
+    int32_t elementCount = instruction.intValue;
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] CREATE_TUPLE: Creating tuple with " << elementCount << " elements" << std::endl;
+    }
+    
+    if (stack.size() < static_cast<size_t>(elementCount)) {
+        error("Stack underflow in CREATE_TUPLE");
+        return;
+    }
+    
+    // Create a new tuple value
+    TupleValue tupleData;
+    tupleData.elements.reserve(elementCount);
+    
+    // Pop elements from stack in reverse order (they were pushed in forward order)
+    for (int32_t i = 0; i < elementCount; i++) {
+        ValuePtr element = pop();
+        tupleData.elements.insert(tupleData.elements.begin(), element);
+    }
+    
+    // Create the tuple value
+    auto tupleType = std::make_shared<Type>(TypeTag::Tuple);
+    ValuePtr tupleValue = memoryManager.makeRef<Value>(*region, tupleType);
+    tupleValue->data = tupleData;
+    
+    push(tupleValue);
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] CREATE_TUPLE: Created tuple with " << tupleData.elements.size() << " elements" << std::endl;
     }
 }
 

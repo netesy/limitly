@@ -82,6 +82,7 @@ enum class Opcode {
     CREATE_LIST,        // Create empty list
     LIST_APPEND,        // Append value to list
     CREATE_DICT,        // Create empty dictionary
+    CREATE_TUPLE,       // Create tuple from stack elements
     CREATE_RANGE,       //
     SET_RANGE_STEP,     //
     DICT_SET,           // Set key-value pair in dictionary

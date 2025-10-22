@@ -193,6 +193,7 @@ enum class TypeTag {
     String,
     List,
     Dict,
+    Tuple,
     Enum,
     Function,
     Closure,
@@ -225,6 +226,18 @@ struct DictType
 {
     TypePtr keyType;
     TypePtr valueType;
+};
+
+struct TupleType
+{
+    std::vector<TypePtr> elementTypes;
+    
+    TupleType() = default;
+    TupleType(const std::vector<TypePtr>& types) : elementTypes(types) {}
+    
+    size_t size() const { return elementTypes.size(); }
+    
+    std::string toString() const; // Implementation moved to avoid forward declaration issues
 };
 
 struct EnumType
@@ -336,7 +349,7 @@ struct Type
     TypeTag tag;
     bool isList = false;
     bool isDict = false;
-    std::variant<std::monostate, ListType, DictType, EnumType, FunctionType, SumType, UnionType, ErrorUnionType, UserDefinedType>
+    std::variant<std::monostate, ListType, DictType, TupleType, EnumType, FunctionType, SumType, UnionType, ErrorUnionType, UserDefinedType>
         extra;
 
     Type(TypeTag t)
@@ -346,6 +359,7 @@ struct Type
          const std::variant<std::monostate,
                             ListType,
                             DictType,
+                            TupleType,
                             EnumType,
                             FunctionType,
                             SumType,
@@ -398,6 +412,12 @@ struct Type
             return "List";
         case TypeTag::Dict:
             return "Dict";
+        case TypeTag::Tuple: {
+            if (const auto* tupleType = std::get_if<TupleType>(&extra)) {
+                return tupleType->toString();
+            }
+            return "Tuple";
+        }
         case TypeTag::Enum:
             return "Enum";
         case TypeTag::Function:
@@ -746,6 +766,31 @@ struct ListValue {
 };
 
 // Add these method declarations to DictValue struct
+struct TupleValue {
+    std::vector<ValuePtr> elements;
+    
+    TupleValue() = default;
+    TupleValue(const std::vector<ValuePtr>& elems) : elements(elems) {}
+    
+    size_t size() const { return elements.size(); }
+    
+    ValuePtr get(size_t index) const {
+        if (index >= elements.size()) {
+            throw std::runtime_error("Tuple index out of bounds: " + std::to_string(index));
+        }
+        return elements[index];
+    }
+    
+    void set(size_t index, ValuePtr value) {
+        if (index >= elements.size()) {
+            throw std::runtime_error("Tuple index out of bounds: " + std::to_string(index));
+        }
+        elements[index] = value;
+    }
+    
+    std::string toString() const; // Implementation moved to avoid forward declaration issues
+};
+
 struct DictValue {
     std::map<ValuePtr, ValuePtr> elements;
 
@@ -811,6 +856,7 @@ struct Value {
                  std::string,
                  ListValue,
                  DictValue,
+                 TupleValue,
                  SumValue,
                  EnumValue,
                  ErrorValue,
@@ -918,6 +964,11 @@ struct Value {
            
         }
 
+        // Constructor for TupleValue
+        Value(TypePtr t, const TupleValue& tv) : type(std::move(t)), data(tv) {
+           
+        }
+
         // Constructor for DictValue
         Value(TypePtr t, const DictValue& dv) : type(std::move(t)), data(dv) {
            
@@ -1021,6 +1072,14 @@ struct Value {
                 }
                 oss << "}";
             },
+            [&](const TupleValue& tv) {
+                oss << "(";
+                for (size_t i = 0; i < tv.elements.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << tv.elements[i]->getRawString();
+                }
+                oss << ")";
+            },
             [&](const SumValue& sv) {
                 oss << "Sum(" << sv.activeVariant << ", " << sv.value->getRawString() << ")";
             },
@@ -1109,6 +1168,9 @@ struct Value {
                     oss << key->toString() << ": " << value->toString();
                 }
                 oss << "}";
+            },
+            [&](const TupleValue& tv) {
+                oss << tv.toString();
             },
             [&](const SumValue& sv) {
                 oss << "Sum(" << sv.activeVariant << ", " << sv.value->toString() << ")";

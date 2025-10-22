@@ -96,6 +96,7 @@ private:
     void visitAssignExpr(const std::shared_ptr<AST::AssignExpr>& expr);
     void visitGroupingExpr(const std::shared_ptr<AST::GroupingExpr>& expr);
     void visitListExpr(const std::shared_ptr<AST::ListExpr>& expr);
+    void visitTupleExpr(const std::shared_ptr<AST::TupleExpr>& expr);
     void visitDictExpr(const std::shared_ptr<AST::DictExpr>& expr);
     void visitIndexExpr(const std::shared_ptr<AST::IndexExpr>& expr);
     void visitMemberExpr(const std::shared_ptr<AST::MemberExpr>& expr);

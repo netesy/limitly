@@ -1,0 +1,43 @@
+// Tuple type support test
+
+// Test 1: Basic tuple creation
+var tuple1 = (1, 2, 3);
+print("Tuple 1:", tuple1);
+
+// Test 2: Empty tuple
+var empty = ();
+print("Empty tuple:", empty);
+
+// Test 3: Mixed type tuple
+var mixed = (42, "hello", true);
+print("Mixed tuple:", mixed);
+
+// Test 4: Tuple indexing
+print("First element:", mixed.0);
+print("Second element:", mixed.1);
+print("Third element:", mixed.2);
+
+// Test 5: Tuple type annotation
+var typed: (int, str, bool) = (100, "world", false);
+print("Typed tuple:", typed);
+
+// Test 6: Nested tuples
+var nested = ((1, 2), (3, 4));
+print("Nested tuple:", nested);
+print("First nested:", nested.0);
+print("Second nested:", nested.1);
+print("Nested element:", nested.0.1);
+
+// Test 7: Function returning tuple
+fn createPair(a: int, b: str): (int, str) {
+    return (a, b);
+}
+
+var pair = createPair(42, "test");
+print("Function result:", pair);
+print("Pair first:", pair.0);
+print("Pair second:", pair.1);
+
+// Test 8: Tuple destructuring (basic syntax)
+var (x, y, z) = (10, 20, 30);
+print("Destructured x:", x);
