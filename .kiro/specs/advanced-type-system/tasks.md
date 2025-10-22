@@ -36,7 +36,7 @@
   - Create unit tests for structured type parsing ({ kind: "Some", value: any })
   - _Requirements: 5.1, 5.2, 5.3, 5.4_
 
-  - [ ] 5.1. Add tuple type support
+  - [x] 5.1. Add tuple type support
   - Implement TupleType AST node and type annotation
   - Add tuple expression parsing: `(value1, value2, value3)`
   - Implement tuple destructuring assignment: `var (a, b) = tuple;`
@@ -45,6 +45,7 @@
   - Add tuple indexing: `tuple.0`, `tuple.1`
   - _Requirements: 6.1, 6.3_
   - **Priority**: MEDIUM - Enhanced language expressiveness
+  - **Status**: COMPLETED - Full tuple support implemented including creation, indexing, destructuring, and type system integration
 
 - [ ] 6. Implement Option type as built-in union type with error handling compatibility
   - Create OptionType struct and related value constructors

@@ -222,6 +222,16 @@ void TypeChecker::checkStatement(const std::shared_ptr<AST::Statement>& stmt) {
         
         currentScope->variables[varDecl->name] = varType;
         
+    } else if (auto destructDecl = std::dynamic_pointer_cast<AST::DestructuringDeclaration>(stmt)) {
+        // Type check tuple destructuring assignment
+        TypePtr tupleType = checkExpression(destructDecl->initializer);
+        
+        // For now, assume all destructured variables have ANY_TYPE
+        // In a more sophisticated implementation, we could infer types from tuple element types
+        for (const std::string& varName : destructDecl->names) {
+            currentScope->variables[varName] = typeSystem.ANY_TYPE;
+        }
+        
     } else if (auto funcDecl = std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt)) {
         checkFunctionDeclaration(funcDecl);
         

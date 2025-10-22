@@ -1,0 +1,20 @@
+// Edge case tests for tuple destructuring
+
+print("=== Edge Case Tests ===");
+
+// Test 1: Destructuring more variables than tuple elements
+print("\n1. More variables than elements:");
+var (a, b, c, d) = (10, 20);  // Only 2 elements, but 4 variables
+print("a =", a, "b =", b, "c =", c, "d =", d);
+
+// Test 2: Destructuring fewer variables than tuple elements  
+print("\n2. Fewer variables than elements:");
+var (x, y) = (100, 200, 300, 400);  // 4 elements, but only 2 variables
+print("x =", x, "y =", y);
+
+// Test 3: Single element from tuple
+print("\n3. Single element from tuple:");
+var (single) = (42, 99);  // Extract first element from 2-element tuple
+print("single =", single);
+
+print("\n=== Edge case tests completed ===");

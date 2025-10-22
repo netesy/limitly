@@ -270,7 +270,7 @@
   - **Priority**: HIGH - Critical for nested closure functionality
   - **Status**: IN PROGRESS - Core technical issues identified and being fixed
 
-- [ ] 21. Add tuple type support
+- [x] 21. Add tuple type support
 
 
 
@@ -285,7 +285,10 @@
   - _Requirements: 6.1, 6.3_
   - **Priority**: MEDIUM - Enhanced language expressiveness
 
-- [ ] 22. Enhance type checking for function returns
+- [-] 22. Enhance type checking for function returns
+
+
+
   - Fix type mismatch warnings: "cannot assign Function to Function"
   - Implement specific return type validation for function-returning functions
   - Add proper type inference for closure return types

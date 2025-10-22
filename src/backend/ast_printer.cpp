@@ -99,6 +99,19 @@ void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
             printNode(varDecl->initializer, indent + 2);
         }
     }
+    else if (auto destructDecl = std::dynamic_pointer_cast<AST::DestructuringDeclaration>(node)) {
+        std::cout << indentation << "DestructuringDeclaration: (";
+        for (size_t i = 0; i < destructDecl->names.size(); ++i) {
+            if (i > 0) std::cout << ", ";
+            std::cout << destructDecl->names[i];
+        }
+        std::cout << ")" << std::endl;
+        
+        if (destructDecl->initializer) {
+            std::cout << indentation << "  Initializer:" << std::endl;
+            printNode(destructDecl->initializer, indent + 2);
+        }
+    }
     else if (auto funcDecl = std::dynamic_pointer_cast<AST::FunctionDeclaration>(node)) {
         std::cout << indentation << "FunctionDeclaration: " << funcDecl->name << std::endl;
         

@@ -64,6 +64,7 @@ private:
     
     // Statement visitors
     void visitVarDeclaration(const std::shared_ptr<AST::VarDeclaration>& stmt);
+    void visitDestructuringDeclaration(const std::shared_ptr<AST::DestructuringDeclaration>& stmt);
     void visitFunctionDeclaration(const std::shared_ptr<AST::FunctionDeclaration>& stmt);
     void visitClassDeclaration(const std::shared_ptr<AST::ClassDeclaration>& stmt);
     void visitBlockStatement(const std::shared_ptr<AST::BlockStatement>& stmt);
