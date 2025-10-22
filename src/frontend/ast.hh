@@ -71,6 +71,7 @@ namespace AST {
     struct ListPatternExpr;
     struct DictPatternExpr;
     struct TuplePatternExpr;
+    struct TupleExpr;
     struct ValPatternExpr;
     struct ErrPatternExpr;
     struct ErrorTypePatternExpr;
@@ -142,6 +143,7 @@ namespace AST {
         bool isList = false;                                   // Whether this is a list type (e.g., [int], ListOfString)
         bool isDict = false;                                   // Whether this is a dictionary type (e.g., {str: int}, DictOfStrToInt)
         bool isFunction = false;                               // Whether this is a function type
+        bool isTuple = false;                                  // Whether this is a tuple type (e.g., (int, str))
         bool isRefined = false;                                // Whether this is a refined type (e.g., int where value > 0)
         bool hasRest = false;                                  // Whether this structural type has a rest parameter (...)
         
@@ -152,6 +154,7 @@ namespace AST {
         std::vector<FunctionParameter> functionParameters;              // Named function parameters with types
         std::vector<std::shared_ptr<TypeAnnotation>> functionParams;    // Legacy function parameters (for backward compatibility)
         std::vector<std::shared_ptr<TypeAnnotation>> unionTypes;        // Types in a union (e.g., int | str)
+        std::vector<std::shared_ptr<TypeAnnotation>> tupleTypes;        // Types in a tuple (e.g., (int, str))
         std::vector<StructuralTypeField> structuralFields;              // Fields in a structural type
         
         std::shared_ptr<Expression> refinementCondition = nullptr;      // For refined types (e.g., int where value > 0)
@@ -298,8 +301,13 @@ namespace AST {
         std::string name;
     };
 
-    // List literal [1, 2, 3] or (1, 2, 3)
+    // List literal [1, 2, 3]
     struct ListExpr : public Expression {
+        std::vector<std::shared_ptr<Expression>> elements;
+    };
+
+    // Tuple literal (1, 2, 3)
+    struct TupleExpr : public Expression {
         std::vector<std::shared_ptr<Expression>> elements;
     };
 

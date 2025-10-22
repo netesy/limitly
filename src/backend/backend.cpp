@@ -197,6 +197,8 @@ void BytecodeGenerator::visitExpression(const std::shared_ptr<AST::Expression>& 
         visitGroupingExpr(groupingExpr);
     } else if (auto listExpr = std::dynamic_pointer_cast<AST::ListExpr>(expr)) {
         visitListExpr(listExpr);
+    } else if (auto tupleExpr = std::dynamic_pointer_cast<AST::TupleExpr>(expr)) {
+        visitTupleExpr(tupleExpr);
     } else if (auto dictExpr = std::dynamic_pointer_cast<AST::DictExpr>(expr)) {
         visitDictExpr(dictExpr);
     } else if (auto indexExpr = std::dynamic_pointer_cast<AST::IndexExpr>(expr)) {
@@ -1428,6 +1430,18 @@ void BytecodeGenerator::visitListExpr(const std::shared_ptr<AST::ListExpr>& expr
     
     // Create list with all elements on stack
     emit(Opcode::CREATE_LIST, expr->line, static_cast<int32_t>(expr->elements.size()));
+}
+
+void BytecodeGenerator::visitTupleExpr(const std::shared_ptr<AST::TupleExpr>& expr) {
+    // Generate bytecode for tuple literal expression
+    
+    // Evaluate each element and push onto stack
+    for (const auto& element : expr->elements) {
+        visitExpression(element);
+    }
+    
+    // Create tuple with all elements on stack
+    emit(Opcode::CREATE_TUPLE, expr->line, static_cast<int32_t>(expr->elements.size()));
 }
 
 void BytecodeGenerator::visitDictExpr(const std::shared_ptr<AST::DictExpr>& expr) {

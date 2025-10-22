@@ -90,6 +90,25 @@ private:
                    canConvert(fromDictType.valueType, toDictType.valueType);
         }
 
+        // Handle tuple type compatibility
+        if (from->tag == TypeTag::Tuple && to->tag == TypeTag::Tuple) {
+            auto fromTupleType = std::get<TupleType>(from->extra);
+            auto toTupleType = std::get<TupleType>(to->extra);
+            
+            // Tuples must have same number of elements
+            if (fromTupleType.elementTypes.size() != toTupleType.elementTypes.size()) {
+                return false;
+            }
+            
+            // All corresponding element types must be compatible
+            for (size_t i = 0; i < fromTupleType.elementTypes.size(); ++i) {
+                if (!canConvert(fromTupleType.elementTypes[i], toTupleType.elementTypes[i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         // Union and sum type compatibility
         if (from->tag == TypeTag::Union) {
             auto unionTypes = std::get<UnionType>(from->extra).types;
@@ -323,6 +342,7 @@ public:
     const TypePtr ANY_TYPE = std::make_shared<Type>(TypeTag::Any);
     const TypePtr LIST_TYPE = std::make_shared<Type>(TypeTag::List);
     const TypePtr DICT_TYPE = std::make_shared<Type>(TypeTag::Dict);
+    const TypePtr TUPLE_TYPE = std::make_shared<Type>(TypeTag::Tuple);
     const TypePtr ENUM_TYPE = std::make_shared<Type>(TypeTag::Enum);
     const TypePtr SUM_TYPE = std::make_shared<Type>(TypeTag::Sum);
     const TypePtr FUNCTION_TYPE = std::make_shared<Type>(TypeTag::Function);
@@ -352,6 +372,7 @@ public:
         if (name == "bool") return BOOL_TYPE;
         if (name == "list") return LIST_TYPE;
         if (name == "dict") return DICT_TYPE;
+        if (name == "tuple") return TUPLE_TYPE;
         if (name == "object") return OBJECT_TYPE;
         if (name == "module") return MODULE_TYPE;
         
@@ -422,6 +443,19 @@ public:
             break;
         case TypeTag::Dict:
             value->data = DictValue{};
+            break;
+        case TypeTag::Tuple:
+            // For tuple types, create tuple with default values for each element
+            if (const auto *tupleType = std::get_if<TupleType>(&type->extra)) {
+                TupleValue tupleValue;
+                for (const auto& elementType : tupleType->elementTypes) {
+                    tupleValue.elements.push_back(createValue(elementType));
+                }
+                value->data = tupleValue;
+            } else {
+                // Empty tuple
+                value->data = TupleValue{};
+            }
             break;
         case TypeTag::Enum:
             // For enums, we'll set it to the first value in the enum
@@ -619,6 +653,12 @@ public:
         return std::make_shared<Type>(TypeTag::Function, functionType);
     }
     
+    // Create tuple type
+    TypePtr createTupleType(const std::vector<TypePtr>& elementTypes) {
+        TupleType tupleType(elementTypes);
+        return std::make_shared<Type>(TypeTag::Tuple, tupleType);
+    }
+    
     // Create function type from AST function type annotation (implemented below)
     TypePtr createFunctionTypeFromAST(const AST::FunctionTypeAnnotation& funcTypeAnnotation);
     
@@ -708,6 +748,25 @@ public:
             if (const auto *dictValue = std::get_if<DictValue>(&value->data)) {
                 for (const auto &[key, val] : dictValue->elements) {
                     if (!checkType(key, dictType.keyType) || !checkType(val, dictType.valueType)) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            break;
+        }
+
+        case TypeTag::Tuple: {
+            const auto &tupleType = std::get<TupleType>(expectedType->extra);
+            if (const auto *tupleValue = std::get_if<TupleValue>(&value->data)) {
+                // Check that tuple has correct number of elements
+                if (tupleValue->elements.size() != tupleType.elementTypes.size()) {
+                    return false;
+                }
+                
+                // Check each element type
+                for (size_t i = 0; i < tupleValue->elements.size(); ++i) {
+                    if (!checkType(tupleValue->elements[i], tupleType.elementTypes[i])) {
                         return false;
                     }
                 }

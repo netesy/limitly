@@ -1,5 +1,6 @@
 #include "value.hh"
 #include "vm.hh"  // For Environment class definition
+#include "types.hh"
 #include <sstream>
 
 // ClosureValue method implementations
@@ -79,6 +80,34 @@ std::string ErrorValue::toString() const {
             }
         }
         oss << "]";
+    }
+    oss << ")";
+    return oss.str();
+}
+
+// TupleType toString implementation
+std::string TupleType::toString() const {
+    std::ostringstream oss;
+    oss << "(";
+    for (size_t i = 0; i < elementTypes.size(); ++i) {
+        if (i > 0) oss << ", ";
+        oss << (elementTypes[i] ? elementTypes[i]->toString() : "unknown");
+    }
+    oss << ")";
+    return oss.str();
+}
+
+// TupleValue toString implementation
+std::string TupleValue::toString() const {
+    std::ostringstream oss;
+    oss << "(";
+    for (size_t i = 0; i < elements.size(); ++i) {
+        if (i > 0) oss << ", ";
+        if (elements[i]) {
+            oss << elements[i]->toString();
+        } else {
+            oss << "nil";
+        }
     }
     oss << ")";
     return oss.str();

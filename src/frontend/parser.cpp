@@ -628,6 +628,33 @@ std::shared_ptr<AST::Statement> Parser::varDeclaration() {
     auto var = createNodeWithContext<AST::VarDeclaration>();
     var->line = previous().line;
 
+    // Check for tuple destructuring: var (a, b, c) = tuple;
+    if (check(TokenType::LEFT_PAREN)) {
+        // This is tuple destructuring - for now, we'll parse it as a regular variable
+        // and handle the destructuring in the backend
+        advance(); // consume '('
+        
+        // Parse first variable name
+        Token firstName = consume(TokenType::IDENTIFIER, "Expected variable name in tuple destructuring.");
+        var->name = firstName.lexeme;
+        
+        // Skip remaining variables for now (TODO: implement proper tuple destructuring AST)
+        while (match({TokenType::COMMA})) {
+            consume(TokenType::IDENTIFIER, "Expected variable name in tuple destructuring.");
+        }
+        
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after tuple destructuring variables.");
+        
+        // Parse assignment
+        consume(TokenType::EQUAL, "Expected '=' in tuple destructuring assignment.");
+        var->initializer = expression();
+        
+        // Make semicolon optional
+        match({TokenType::SEMICOLON});
+        
+        return var;
+    }
+
     // Parse variable name
     Token name = consume(TokenType::IDENTIFIER, "Expected variable name.");
     var->name = name.lexeme;
@@ -2903,35 +2930,63 @@ std::shared_ptr<AST::Expression> Parser::call() {
             expr = finishCall(expr);
         } else if (match({TokenType::DOT})) {
             auto dotToken = previous();
-            auto name = consume(TokenType::IDENTIFIER, "Expected property name after '.'.");
+            
+            // Check for tuple indexing (e.g., tuple.0, tuple.1)
+            if (check(TokenType::NUMBER)) {
+                auto numberToken = advance();
+                
+                // Create an index expression for tuple access
+                auto indexExpr = std::make_shared<AST::IndexExpr>();
+                indexExpr->line = numberToken.line;
+                indexExpr->object = expr;
+                
+                // Create a literal expression for the index
+                auto indexLiteral = std::make_shared<AST::LiteralExpr>();
+                indexLiteral->line = numberToken.line;
+                
+                // Parse the number as an integer
+                try {
+                    long long indexValue = std::stoll(numberToken.lexeme);
+                    indexLiteral->value = indexValue;
+                } catch (const std::exception&) {
+                    error("Invalid tuple index: " + numberToken.lexeme);
+                    indexLiteral->value = 0LL;
+                }
+                
+                indexExpr->index = indexLiteral;
+                expr = indexExpr;
+            } else {
+                // Regular member access
+                auto name = consume(TokenType::IDENTIFIER, "Expected property name after '.'.");
 
-            auto memberExpr = std::make_shared<AST::MemberExpr>();
-            memberExpr->line = name.line;
-            memberExpr->object = expr;
-            memberExpr->name = name.lexeme;
+                auto memberExpr = std::make_shared<AST::MemberExpr>();
+                memberExpr->line = name.line;
+                memberExpr->object = expr;
+                memberExpr->name = name.lexeme;
 
-            // Create detailed CST node if enabled
-            if (cstMode && config.detailedExpressionNodes) {
-                auto memberCSTNode = std::make_unique<CST::Node>(CST::NodeKind::MEMBER_EXPR);
-                memberCSTNode->setDescription("member access expression");
-                
-                // Set up hierarchical context for this member expression
-                pushCSTContext(memberCSTNode.get());
-                
-                // Capture the dot and identifier tokens with their trivia
-                memberCSTNode->addToken(dotToken);
-                memberCSTNode->addToken(name);
-                attachTriviaFromToken(dotToken);
-                attachTriviaFromToken(name);
-                
-                // Update source span to cover the entire member access
-                memberCSTNode->setSourceSpan(dotToken.start, name.end);
-                
-                addChildToCurrentContext(std::move(memberCSTNode));
-                popCSTContext();
+                // Create detailed CST node if enabled
+                if (cstMode && config.detailedExpressionNodes) {
+                    auto memberCSTNode = std::make_unique<CST::Node>(CST::NodeKind::MEMBER_EXPR);
+                    memberCSTNode->setDescription("member access expression");
+                    
+                    // Set up hierarchical context for this member expression
+                    pushCSTContext(memberCSTNode.get());
+                    
+                    // Capture the dot and identifier tokens with their trivia
+                    memberCSTNode->addToken(dotToken);
+                    memberCSTNode->addToken(name);
+                    attachTriviaFromToken(dotToken);
+                    attachTriviaFromToken(name);
+                    
+                    // Update source span to cover the entire member access
+                    memberCSTNode->setSourceSpan(dotToken.start, name.end);
+                    
+                    addChildToCurrentContext(std::move(memberCSTNode));
+                    popCSTContext();
+                }
+
+                expr = memberExpr;
             }
-
-            expr = memberExpr;
         } else if (match({TokenType::LEFT_BRACKET})) {
             auto leftBracket = previous();
             auto index = expression();
@@ -3429,35 +3484,72 @@ std::shared_ptr<AST::Expression> Parser::primary() {
 
     if (match({TokenType::LEFT_PAREN})) {
         auto leftParen = previous();
-        auto expr = expression();
-        auto rightParen = consume(TokenType::RIGHT_PAREN, "Expected ')' after expression.");
-
-        auto groupingExpr = std::make_shared<AST::GroupingExpr>();
-        groupingExpr->line = rightParen.line;
-        groupingExpr->expression = expr;
-
-        // Create detailed CST node if enabled
-        if (cstMode && config.detailedExpressionNodes) {
-            auto groupingCSTNode = std::make_unique<CST::Node>(CST::NodeKind::GROUPING_EXPR);
-            groupingCSTNode->setDescription("grouping expression");
+        
+        // Check for empty tuple: ()
+        if (check(TokenType::RIGHT_PAREN)) {
+            auto rightParen = consume(TokenType::RIGHT_PAREN, "Expected ')' after empty tuple.");
             
-            // Set up hierarchical context for this grouping expression
-            pushCSTContext(groupingCSTNode.get());
+            auto tupleExpr = std::make_shared<AST::TupleExpr>();
+            tupleExpr->line = rightParen.line;
+            // Empty tuple
             
-            // Capture the parentheses tokens with their trivia
-            groupingCSTNode->addToken(leftParen);
-            groupingCSTNode->addToken(rightParen);
-            attachTriviaFromToken(leftParen);
-            attachTriviaFromToken(rightParen);
-            
-            // Update source span to cover the entire grouping
-            groupingCSTNode->setSourceSpan(leftParen.start, rightParen.end);
-            
-            addChildToCurrentContext(std::move(groupingCSTNode));
-            popCSTContext();
+            return tupleExpr;
         }
+        
+        auto firstExpr = expression();
+        
+        // Check if this is a tuple (has comma) or grouping expression
+        if (match({TokenType::COMMA})) {
+            // This is a tuple
+            std::vector<std::shared_ptr<AST::Expression>> elements;
+            elements.push_back(firstExpr);
+            
+            // Parse remaining elements
+            do {
+                if (check(TokenType::RIGHT_PAREN)) {
+                    break; // Allow trailing comma
+                }
+                elements.push_back(expression());
+            } while (match({TokenType::COMMA}));
+            
+            auto rightParen = consume(TokenType::RIGHT_PAREN, "Expected ')' after tuple elements.");
+            
+            auto tupleExpr = std::make_shared<AST::TupleExpr>();
+            tupleExpr->line = rightParen.line;
+            tupleExpr->elements = elements;
+            
+            return tupleExpr;
+        } else {
+            // This is a grouping expression
+            auto rightParen = consume(TokenType::RIGHT_PAREN, "Expected ')' after expression.");
 
-        return groupingExpr;
+            auto groupingExpr = std::make_shared<AST::GroupingExpr>();
+            groupingExpr->line = rightParen.line;
+            groupingExpr->expression = firstExpr;
+
+            // Create detailed CST node if enabled
+            if (cstMode && config.detailedExpressionNodes) {
+                auto groupingCSTNode = std::make_unique<CST::Node>(CST::NodeKind::GROUPING_EXPR);
+                groupingCSTNode->setDescription("grouping expression");
+                
+                // Set up hierarchical context for this grouping expression
+                pushCSTContext(groupingCSTNode.get());
+                
+                // Capture the parentheses tokens with their trivia
+                groupingCSTNode->addToken(leftParen);
+                groupingCSTNode->addToken(rightParen);
+                attachTriviaFromToken(leftParen);
+                attachTriviaFromToken(rightParen);
+                
+                // Update source span to cover the entire grouping
+                groupingCSTNode->setSourceSpan(leftParen.start, rightParen.end);
+                
+                addChildToCurrentContext(std::move(groupingCSTNode));
+                popCSTContext();
+            }
+
+            return groupingExpr;
+        }
     }
 
     if (match({TokenType::LEFT_BRACKET})) {
@@ -3937,6 +4029,22 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseBasicType() {
         return type;
     }
     
+    // Check for tuple types (e.g., (int, str, bool))
+    if (match({TokenType::LEFT_PAREN})) {
+        type->isTuple = true;
+        type->typeName = "tuple";
+        
+        // Parse tuple element types
+        if (!check(TokenType::RIGHT_PAREN)) {
+            do {
+                type->tupleTypes.push_back(parseBasicType());
+            } while (match({TokenType::COMMA}));
+        }
+        
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after tuple element types.");
+        return type;
+    }
+
     // Check for dictionary types (e.g., {str: int}) or structural types (e.g., { name: str, age: int })
     if (match({TokenType::LEFT_BRACE})) {
         return parseBraceType();

@@ -271,6 +271,11 @@
   - **Status**: IN PROGRESS - Core technical issues identified and being fixed
 
 - [ ] 21. Add tuple type support
+
+
+
+
+
   - Implement TupleType AST node and type annotation
   - Add tuple expression parsing: `(value1, value2, value3)`
   - Implement tuple destructuring assignment: `var (a, b) = tuple;`

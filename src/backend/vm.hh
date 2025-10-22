@@ -429,6 +429,7 @@ private:
     void handleSetProperty(const Instruction& instruction);
     void handleCreateList(const Instruction& instruction);
     void handleListAppend(const Instruction& instruction);
+    void handleCreateTuple(const Instruction& instruction);
     void handleCreateDict(const Instruction& instruction);
     void handleCreateRange(const Instruction& instruction);
     void handleDictSet(const Instruction& instruction);
