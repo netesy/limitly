@@ -1,0 +1,25 @@
+print("=== Simple Triple Nested Test ===");
+
+fn createTriple(): function {
+    return fn(): function {
+        return fn(): function {
+            return fn(x: int): int {
+                return x * 3;
+            };
+        };
+    };
+}
+
+print("Creating triple nested function...");
+var tripleNested = createTriple();
+print("Triple nested created successfully");
+
+print("Calling tripleNested()...");
+var level2 = tripleNested();
+print("Level2 result: " + level2);
+
+print("Calling level2()...");
+var level3 = level2();
+print("Level3 result: " + level3);
+
+print("=== Test Complete ===");
