@@ -119,6 +119,8 @@ void BytecodeGenerator::visitStatement(const std::shared_ptr<AST::Statement>& st
     // Dispatch to the appropriate visitor method based on statement type
     if (auto varDecl = std::dynamic_pointer_cast<AST::VarDeclaration>(stmt)) {
         visitVarDeclaration(varDecl);
+    } else if (auto destructDecl = std::dynamic_pointer_cast<AST::DestructuringDeclaration>(stmt)) {
+        visitDestructuringDeclaration(destructDecl);
     } else if (auto funcDecl = std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt)) {
         visitFunctionDeclaration(funcDecl);
     } else if (auto classDecl = std::dynamic_pointer_cast<AST::ClassDeclaration>(stmt)) {
@@ -286,6 +288,34 @@ void BytecodeGenerator::visitVarDeclaration(const std::shared_ptr<AST::VarDeclar
     } else {
         emit(Opcode::STORE_VAR, stmt->line, 0, 0.0f, false, stmt->name);
     }
+}
+
+void BytecodeGenerator::visitDestructuringDeclaration(const std::shared_ptr<AST::DestructuringDeclaration>& stmt) {
+    // Generate bytecode for tuple destructuring assignment
+    // Example: var (x, y, z) = tuple;
+    
+    // First, evaluate the tuple expression
+    visitExpression(stmt->initializer);
+    
+    // Now we have the tuple on the stack
+    // We need to extract each element and store it in the corresponding variable
+    
+    for (size_t i = 0; i < stmt->names.size(); ++i) {
+        // Duplicate the tuple on the stack for each extraction
+        emit(Opcode::DUP, stmt->line);
+        
+        // Push the index we want to extract
+        emit(Opcode::PUSH_INT, stmt->line, static_cast<int64_t>(i));
+        
+        // Get the element at index i
+        emit(Opcode::GET_INDEX, stmt->line);
+        
+        // Store the extracted value in the variable
+        emit(Opcode::STORE_VAR, stmt->line, 0, 0.0f, false, stmt->names[i]);
+    }
+    
+    // Pop the original tuple from the stack (we duplicated it for each extraction)
+    emit(Opcode::POP, stmt->line);
 }
 
 void BytecodeGenerator::visitFunctionDeclaration(const std::shared_ptr<AST::FunctionDeclaration>& stmt) {

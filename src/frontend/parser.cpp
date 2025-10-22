@@ -273,6 +273,7 @@ CST::NodeKind Parser::mapASTNodeKind(const std::string& astNodeType) {
     // Simple mapping based on common patterns
     if (className.find("Program") != std::string::npos) return CST::NodeKind::PROGRAM;
     if (className.find("VarDeclaration") != std::string::npos) return CST::NodeKind::VAR_DECLARATION;
+    if (className.find("DestructuringDeclaration") != std::string::npos) return CST::NodeKind::VAR_DECLARATION; // Use same CST kind as VarDeclaration
     if (className.find("FunctionDeclaration") != std::string::npos) return CST::NodeKind::FUNCTION_DECLARATION;
     if (className.find("ClassDeclaration") != std::string::npos) return CST::NodeKind::CLASS_DECLARATION;
     if (className.find("EnumDeclaration") != std::string::npos) return CST::NodeKind::ENUM_DECLARATION;
@@ -414,6 +415,7 @@ bool Parser::isContainerNode(CST::NodeKind kind) {
 // Explicit template instantiations for common AST node types
 template auto Parser::createNode<AST::Program>() -> std::shared_ptr<AST::Program>;
 template auto Parser::createNode<AST::VarDeclaration>() -> std::shared_ptr<AST::VarDeclaration>;
+template auto Parser::createNode<AST::DestructuringDeclaration>() -> std::shared_ptr<AST::DestructuringDeclaration>;
 template auto Parser::createNode<AST::FunctionDeclaration>() -> std::shared_ptr<AST::FunctionDeclaration>;
 template auto Parser::createNode<AST::ClassDeclaration>() -> std::shared_ptr<AST::ClassDeclaration>;
 template auto Parser::createNode<AST::IfStatement>() -> std::shared_ptr<AST::IfStatement>;
@@ -444,6 +446,7 @@ template auto Parser::createNode<AST::SuperExpr>() -> std::shared_ptr<AST::Super
 // Explicit template instantiations for createNodeWithContext
 template auto Parser::createNodeWithContext<AST::Program>() -> std::shared_ptr<AST::Program>;
 template auto Parser::createNodeWithContext<AST::VarDeclaration>() -> std::shared_ptr<AST::VarDeclaration>;
+template auto Parser::createNodeWithContext<AST::DestructuringDeclaration>() -> std::shared_ptr<AST::DestructuringDeclaration>;
 template auto Parser::createNodeWithContext<AST::FunctionDeclaration>() -> std::shared_ptr<AST::FunctionDeclaration>;
 template auto Parser::createNodeWithContext<AST::ClassDeclaration>() -> std::shared_ptr<AST::ClassDeclaration>;
 template auto Parser::createNodeWithContext<AST::IfStatement>() -> std::shared_ptr<AST::IfStatement>;
@@ -625,35 +628,42 @@ std::shared_ptr<AST::Statement> Parser::declaration() {
 }
 
 std::shared_ptr<AST::Statement> Parser::varDeclaration() {
-    auto var = createNodeWithContext<AST::VarDeclaration>();
-    var->line = previous().line;
+    int line = previous().line;
 
     // Check for tuple destructuring: var (a, b, c) = tuple;
     if (check(TokenType::LEFT_PAREN)) {
-        // This is tuple destructuring - for now, we'll parse it as a regular variable
-        // and handle the destructuring in the backend
+        // This is tuple destructuring - create DestructuringDeclaration
+        auto destructuring = std::make_shared<AST::DestructuringDeclaration>();
+        destructuring->line = line;
+        destructuring->isTuple = true;
+        
         advance(); // consume '('
         
-        // Parse first variable name
+        // Parse variable names
         Token firstName = consume(TokenType::IDENTIFIER, "Expected variable name in tuple destructuring.");
-        var->name = firstName.lexeme;
+        destructuring->names.push_back(firstName.lexeme);
         
-        // Skip remaining variables for now (TODO: implement proper tuple destructuring AST)
+        // Parse remaining variables
         while (match({TokenType::COMMA})) {
-            consume(TokenType::IDENTIFIER, "Expected variable name in tuple destructuring.");
+            Token varName = consume(TokenType::IDENTIFIER, "Expected variable name in tuple destructuring.");
+            destructuring->names.push_back(varName.lexeme);
         }
         
         consume(TokenType::RIGHT_PAREN, "Expected ')' after tuple destructuring variables.");
         
         // Parse assignment
         consume(TokenType::EQUAL, "Expected '=' in tuple destructuring assignment.");
-        var->initializer = expression();
+        destructuring->initializer = expression();
         
         // Make semicolon optional
         match({TokenType::SEMICOLON});
         
-        return var;
+        return destructuring;
     }
+
+    // Regular variable declaration
+    auto var = createNodeWithContext<AST::VarDeclaration>();
+    var->line = line;
 
     // Parse variable name
     Token name = consume(TokenType::IDENTIFIER, "Expected variable name.");

@@ -40,6 +40,7 @@ namespace AST {
     struct RangeExpr;
     struct ExprStatement;
     struct VarDeclaration;
+    struct DestructuringDeclaration;
     struct FunctionDeclaration;
     struct ClassDeclaration;
     struct BlockStatement;
@@ -340,6 +341,13 @@ namespace AST {
         std::string name;
         std::optional<std::shared_ptr<TypeAnnotation>> type;
         std::shared_ptr<Expression> initializer;
+    };
+
+    // Destructuring assignment (e.g., var (x, y, z) = tuple)
+    struct DestructuringDeclaration : public Statement {
+        std::vector<std::string> names;  // Variable names to destructure into
+        std::shared_ptr<Expression> initializer;  // The tuple/array expression to destructure
+        bool isTuple = true;  // Whether destructuring a tuple (true) or array (false)
     };
 
     // Function declaration
