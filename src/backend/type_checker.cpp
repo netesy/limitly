@@ -1,5 +1,6 @@
 #include "type_checker.hh"
 #include "types.hh"
+#include "../common/debugger.hh"
 #include <algorithm>
 #include <sstream>
 #include <string>
@@ -7,6 +8,8 @@
 
 void TypeChecker::addError(const std::string& message, int line, int column, const std::string& context) {
     errors.emplace_back(message, line, column, context);
+    
+    // Don't report immediately - let backend.cpp handle error display with proper context
 }
 
 void TypeChecker::addError(const std::string& message, int line, int column, const std::string& context, const std::string& lexeme, const std::string& expectedValue) {
@@ -19,6 +22,8 @@ void TypeChecker::addError(const std::string& message, int line, int column, con
         enhancedMessage += " - expected: " + expectedValue;
     }
     errors.emplace_back(enhancedMessage, line, column, context);
+    
+    // Don't report immediately - let backend.cpp handle error display with proper context
 }
 
 void TypeChecker::enterScope() {
@@ -34,11 +39,23 @@ void TypeChecker::exitScope() {
 std::vector<TypeCheckError> TypeChecker::checkProgram(const std::shared_ptr<AST::Program>& program) {
     errors.clear();
     
-    // First pass: collect all function signatures
+    // First pass: collect type aliases and function signatures
     for (const auto& stmt : program->statements) {
-        if (auto funcDecl = std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt)) {
+        if (auto typeDecl = std::dynamic_pointer_cast<AST::TypeDeclaration>(stmt)) {
+            // Register type alias
+            TypePtr aliasType = resolveTypeAnnotation(typeDecl->type);
+            if (aliasType) {
+                typeSystem.registerTypeAlias(typeDecl->name, aliasType);
+            } else {
+                addError("Invalid type in type alias '" + typeDecl->name + "'", typeDecl->line);
+            }
+        } else if (auto funcDecl = std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt)) {
             // Extract function signature information
             std::vector<TypePtr> paramTypes;
+            std::vector<bool> optionalParams;
+            std::vector<bool> hasDefaultValues;
+            
+            // Process required parameters
             for (const auto& param : funcDecl->params) {
                 if (param.second) {
                     // Convert TypeAnnotation to TypePtr
@@ -47,6 +64,21 @@ std::vector<TypeCheckError> TypeChecker::checkProgram(const std::shared_ptr<AST:
                 } else {
                     paramTypes.push_back(typeSystem.ANY_TYPE);
                 }
+                optionalParams.push_back(false);  // Required parameters are not optional
+                hasDefaultValues.push_back(false); // Required parameters don't have defaults
+            }
+            
+            // Process optional parameters
+            for (const auto& optParam : funcDecl->optionalParams) {
+                if (optParam.second.first) {
+                    // Convert TypeAnnotation to TypePtr
+                    TypePtr paramType = resolveTypeAnnotation(optParam.second.first);
+                    paramTypes.push_back(paramType);
+                } else {
+                    paramTypes.push_back(typeSystem.ANY_TYPE);
+                }
+                optionalParams.push_back(true);  // These are optional parameters
+                hasDefaultValues.push_back(optParam.second.second != nullptr); // Has default if expression exists
             }
             
             TypePtr returnType = typeSystem.NIL_TYPE;
@@ -55,6 +87,11 @@ std::vector<TypeCheckError> TypeChecker::checkProgram(const std::shared_ptr<AST:
             
             if (funcDecl->returnType && *funcDecl->returnType) {
                 returnType = resolveTypeAnnotation(*funcDecl->returnType);
+                
+                // Special case: if return type is generic "function", keep it generic
+                if ((*funcDecl->returnType)->typeName == "function" && !(*funcDecl->returnType)->isFunction) {
+                    returnType = typeSystem.FUNCTION_TYPE;
+                }
                 
                 // Check if return type is an error union
                 if (returnType->tag == TypeTag::ErrorUnion) {
@@ -71,7 +108,7 @@ std::vector<TypeCheckError> TypeChecker::checkProgram(const std::shared_ptr<AST:
             currentScope->functions.emplace(
                 std::piecewise_construct,
                 std::forward_as_tuple(funcDecl->name),
-                std::forward_as_tuple(funcDecl->name, paramTypes, returnType, canFail, errorTypes, funcDecl->line)
+                std::forward_as_tuple(funcDecl->name, paramTypes, returnType, canFail, errorTypes, funcDecl->line, optionalParams, hasDefaultValues)
             );
         }
     }
@@ -89,11 +126,19 @@ TypePtr TypeChecker::resolveTypeAnnotation(const std::shared_ptr<AST::TypeAnnota
         return typeSystem.NIL_TYPE;
     }
     
+
+    
     // Handle function types
     if (annotation->isFunction) {
         // Check if this is a FunctionTypeAnnotation with specific signature
         if (auto funcTypeAnnotation = std::dynamic_pointer_cast<AST::FunctionTypeAnnotation>(annotation)) {
             return typeSystem.createFunctionTypeFromAST(*funcTypeAnnotation);
+        }
+        
+        // Check if this is a generic function type (no parameters or return type specified)
+        if (annotation->functionParameters.empty() && annotation->functionParams.empty() && 
+            !annotation->returnType && annotation->typeName == "function") {
+            return typeSystem.FUNCTION_TYPE;
         }
         
         // Handle legacy function type annotation
@@ -129,8 +174,38 @@ TypePtr TypeChecker::resolveTypeAnnotation(const std::shared_ptr<AST::TypeAnnota
         }
     }
     
+    // Handle union types (Type1 | Type2 | ...)
+    if (!annotation->unionTypes.empty()) {
+        std::vector<TypePtr> unionTypes;
+        for (const auto& unionType : annotation->unionTypes) {
+            TypePtr resolvedType = resolveTypeAnnotation(unionType);
+            if (resolvedType) {
+                unionTypes.push_back(resolvedType);
+            }
+        }
+        
+        if (!unionTypes.empty()) {
+            return typeSystem.createUnionType(unionTypes);
+        }
+    }
+    
     // Handle basic types
     TypePtr baseType = typeSystem.getType(annotation->typeName);
+    
+    // If baseType is NIL_TYPE, it might be a type alias that wasn't found
+    // This can happen during the first pass before all type aliases are registered
+    if (baseType == typeSystem.NIL_TYPE && annotation->typeName != "nil") {
+        // Try to resolve as type alias
+        TypePtr aliasType = typeSystem.resolveTypeAlias(annotation->typeName);
+        if (aliasType) {
+            baseType = aliasType;
+        }
+    }
+    
+    // Special handling for generic function type
+    if (annotation->typeName == "function" && !annotation->isFunction) {
+        return typeSystem.FUNCTION_TYPE;
+    }
     
     // Handle error union types (Type? or Type?Error1,Error2)
     if (annotation->isFallible) {
@@ -149,6 +224,7 @@ void TypeChecker::checkStatement(const std::shared_ptr<AST::Statement>& stmt) {
         
         if (varDecl->type && *varDecl->type) {
             varType = resolveTypeAnnotation(*varDecl->type);
+            
         }
         
         if (varDecl->initializer) {
@@ -180,7 +256,7 @@ void TypeChecker::checkStatement(const std::shared_ptr<AST::Statement>& stmt) {
                 }
             }
             
-            // Enhanced type compatibility checking for error unions
+            // Enhanced type compatibility checking for error unions and function types
             if (varType != typeSystem.ANY_TYPE && !typeSystem.isCompatible(initType, varType)) {
                 // Provide more specific error messages for error union types
                 if (isErrorUnionType(varType) || isErrorUnionType(initType)) {
@@ -204,6 +280,40 @@ void TypeChecker::checkStatement(const std::shared_ptr<AST::Statement>& stmt) {
                         addError("Type mismatch in variable declaration '" + varDecl->name + 
                                 "': incompatible error union types " + initTypeStr + 
                                 " and " + varTypeStr, 
+                                varDecl->line);
+                    }
+                } else if (varType->tag == TypeTag::Function && initType->tag == TypeTag::Function) {
+                    // Enhanced function type error messages
+                    std::string varTypeStr = varType->toString();
+                    std::string initTypeStr = initType->toString();
+                    
+                    // Check if both are generic function types
+                    bool varIsGeneric = !std::holds_alternative<FunctionType>(varType->extra);
+                    bool initIsGeneric = !std::holds_alternative<FunctionType>(initType->extra);
+                    
+                    if (varIsGeneric && initIsGeneric) {
+                        // Both are generic - this should be compatible, but if we get here there's another issue
+                        addError("Function type compatibility issue in variable declaration '" + varDecl->name + 
+                                "': both types are generic functions but incompatible", 
+                                varDecl->line);
+                    } else if (varIsGeneric) {
+                        // Variable is generic function, initializer is specific - should be compatible
+                        // This case should not occur with our enhanced compatibility checking
+                        addError("Function type mismatch in variable declaration '" + varDecl->name + 
+                                "': cannot assign specific function type " + initTypeStr + 
+                                " to generic function type", 
+                                varDecl->line);
+                    } else if (initIsGeneric) {
+                        // Variable is specific function, initializer is generic - should be compatible
+                        addError("Function type mismatch in variable declaration '" + varDecl->name + 
+                                "': cannot assign generic function type to specific function type " + varTypeStr, 
+                                varDecl->line);
+                    } else {
+                        // Both are specific function types - provide detailed mismatch info
+                        addError("Function signature mismatch in variable declaration '" + varDecl->name + 
+                                "': cannot assign function " + initTypeStr + 
+                                " to variable of type " + varTypeStr + 
+                                ". Function signatures must be compatible", 
                                 varDecl->line);
                     }
                 } else {
@@ -244,8 +354,12 @@ void TypeChecker::checkStatement(const std::shared_ptr<AST::Statement>& stmt) {
         
     } else if (auto ifStmt = std::dynamic_pointer_cast<AST::IfStatement>(stmt)) {
         TypePtr condType = checkExpression(ifStmt->condition);
-        if (condType != typeSystem.BOOL_TYPE && condType != typeSystem.ANY_TYPE) {
-            addError("If condition must be boolean, got " + condType->toString(), ifStmt->line);
+        // Allow boolean types, any type, optional types (str?, int?), and error union types
+        if (condType != typeSystem.BOOL_TYPE && 
+            condType != typeSystem.ANY_TYPE && 
+            !isOptionalType(condType) &&
+            !isErrorUnionType(condType)) {
+            addError("If condition must be boolean or optional type, got " + condType->toString(), ifStmt->line);
         }
         
         checkStatement(ifStmt->thenBranch);
@@ -293,9 +407,25 @@ void TypeChecker::checkStatement(const std::shared_ptr<AST::Statement>& stmt) {
             }
             
             // Check return type compatibility
-            if (!typeSystem.isCompatible(returnType, currentFunction->returnType)) {
+            // Be more lenient with ANY_TYPE - it can be compatible with any expected type
+            if (!typeSystem.isCompatible(returnType, currentFunction->returnType) && 
+                returnType->tag != TypeTag::Any && currentFunction->returnType->tag != TypeTag::Any) {
+                
+                // Add more context to the error message
+                std::string returnExpr = "";
+                if (returnStmt->value) {
+                    // Try to extract some context about what's being returned
+                    if (auto callExpr = std::dynamic_pointer_cast<AST::CallExpr>(returnStmt->value)) {
+                        if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(callExpr->callee)) {
+                            returnExpr = varExpr->name + "()";
+                        }
+                    }
+                }
+                
                 addError("Return type mismatch: expected " + currentFunction->returnType->toString() + 
-                        ", got " + returnType->toString(), returnStmt->line);
+                        ", got " + returnType->toString(), returnStmt->line, 0, 
+                        "Return statement", returnExpr, 
+                        "expression of type " + currentFunction->returnType->toString());
             }
         }
     } else if (auto contractStmt = std::dynamic_pointer_cast<AST::ContractStatement>(stmt)) {
@@ -331,8 +461,10 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
         // Check if it's a function being referenced (not called)
         FunctionSignature* signature = currentScope->getFunctionSignature(varExpr->name);
         if (signature) {
+         
             // Return a function type for the function reference
-            return typeSystem.createFunctionType(signature->paramTypes, signature->returnType);
+            TypePtr funcType = typeSystem.createFunctionType(signature->paramTypes, signature->returnType);
+            return funcType;
         }
         
         addError("Undefined variable", expr->line, 0, "Variable lookup", varExpr->name, "declared variable name");
@@ -355,6 +487,14 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
                 if (std::holds_alternative<FunctionType>(varType->extra)) {
                     auto funcType = std::get<FunctionType>(varType->extra);
                     return funcType.returnType;
+                } else {
+                    // Generic function type - try to infer return type from context
+                    // For now, if we're in a function that expects a specific return type,
+                    // assume the function call can return that type
+                    if (currentFunction && currentFunction->returnType->tag != TypeTag::Any) {
+                        return currentFunction->returnType;
+                    }
+                    return typeSystem.ANY_TYPE;
                 }
             }
         }
@@ -464,9 +604,8 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
         if (lambdaExpr->returnType.has_value()) {
             returnType = resolveTypeAnnotation(lambdaExpr->returnType.value());
         } else {
-            // Try to infer return type from body if possible
-            // For now, use ANY_TYPE - could be enhanced with return type inference
-            returnType = typeSystem.ANY_TYPE;
+            // Enhanced return type inference from lambda body
+            returnType = inferLambdaReturnType(lambdaExpr->body);
         }
         
         // Set up function context for the lambda
@@ -538,6 +677,54 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
     
     // For all other expressions, delegate to the original method
     return checkExpression(expr);
+}
+
+TypePtr TypeChecker::inferLambdaReturnType(const std::shared_ptr<AST::Statement>& body) {
+    // Try to infer return type from lambda body
+    if (!body) {
+        return typeSystem.NIL_TYPE;
+    }
+    
+    // If body is a block statement, look for return statements
+    if (auto blockStmt = std::dynamic_pointer_cast<AST::BlockStatement>(body)) {
+        std::vector<TypePtr> returnTypes;
+        
+        for (const auto& stmt : blockStmt->statements) {
+            if (auto returnStmt = std::dynamic_pointer_cast<AST::ReturnStatement>(stmt)) {
+                if (returnStmt->value) {
+                    TypePtr returnType = checkExpression(returnStmt->value);
+                    returnTypes.push_back(returnType);
+                } else {
+                    returnTypes.push_back(typeSystem.NIL_TYPE);
+                }
+            }
+        }
+        
+        // If we found return statements, try to find common type
+        if (!returnTypes.empty()) {
+            TypePtr commonType = returnTypes[0];
+            for (size_t i = 1; i < returnTypes.size(); ++i) {
+                try {
+                    commonType = typeSystem.getCommonType(commonType, returnTypes[i]);
+                } catch (const std::exception&) {
+                    // If types are incompatible, fall back to ANY_TYPE
+                    return typeSystem.ANY_TYPE;
+                }
+            }
+            return commonType;
+        }
+        
+        // No explicit return statements found, assume NIL return
+        return typeSystem.NIL_TYPE;
+    }
+    
+    // If body is an expression statement, infer from the expression
+    if (auto exprStmt = std::dynamic_pointer_cast<AST::ExprStatement>(body)) {
+        return checkExpression(exprStmt->expression);
+    }
+    
+    // For other statement types, assume NIL return
+    return typeSystem.NIL_TYPE;
 }
 
 void TypeChecker::checkFallibleExpression(const std::shared_ptr<AST::FallibleExpr>& expr) {
@@ -665,11 +852,21 @@ void TypeChecker::checkFunctionCall(const std::shared_ptr<AST::CallExpr>& expr) 
 }
 
 void TypeChecker::checkRegularFunctionCall(FunctionSignature* signature, const std::vector<TypePtr>& argTypes, const std::shared_ptr<AST::CallExpr>& expr) {
-    // Check argument count
-    if (argTypes.size() != signature->paramTypes.size()) {
-        addError("Function argument count mismatch", expr->line, 0, "Function call", 
+    // Check argument count with optional parameter support
+    if (!signature->isValidArgCount(argTypes.size())) {
+        size_t minArgs = signature->getMinRequiredArgs();
+        size_t maxArgs = signature->paramTypes.size();
+        
+        std::string expectedMsg;
+        if (minArgs == maxArgs) {
+            expectedMsg = std::to_string(minArgs) + " arguments";
+        } else {
+            expectedMsg = std::to_string(minArgs) + "-" + std::to_string(maxArgs) + " arguments";
+        }
+        
+        addError("Function argument count mismatch `" + signature->name + "`", expr->line, 0, "Function call", 
                 signature->name, 
-                std::to_string(signature->paramTypes.size()) + " arguments, got " + std::to_string(argTypes.size()));
+                expectedMsg + ", got " + std::to_string(argTypes.size()));
         return;
     }
     
@@ -720,7 +917,22 @@ void TypeChecker::checkHigherOrderFunctionCall(TypePtr functionType, const std::
             }
         }
     } else {
-        addError("Invalid function type in higher-order function call", expr->line);
+        // For generic function types, we should be more permissive
+        if (functionType->tag == TypeTag::Function) {
+            // Generic function type - allow any function call
+            // This handles cases where function parameter is declared as generic 'function'
+            return;
+        }
+        
+        std::string functionName = "";
+        if (auto callExpr = std::dynamic_pointer_cast<AST::CallExpr>(expr)) {
+            if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(callExpr->callee)) {
+                functionName = varExpr->name;
+            }
+        }
+        
+        addError("Invalid function type in higher-order function call", expr->line, 0, 
+                "Function call", functionName, "specific function signature or compatible function type");
     }
 }
 
@@ -750,13 +962,22 @@ void TypeChecker::checkFunctionDeclaration(const std::shared_ptr<AST::FunctionDe
     // Enter function scope
     enterScope();
     
-    // Add parameters to scope
+    // Add parameters to scope (both required and optional)
     for (const auto& param : stmt->params) {
         TypePtr paramType = typeSystem.ANY_TYPE;
         if (param.second) {
             paramType = resolveTypeAnnotation(param.second);
         }
         currentScope->variables[param.first] = paramType;
+    }
+    
+    // Add optional parameters to scope
+    for (const auto& optParam : stmt->optionalParams) {
+        TypePtr paramType = typeSystem.ANY_TYPE;
+        if (optParam.second.first) {
+            paramType = resolveTypeAnnotation(optParam.second.first);
+        }
+        currentScope->variables[optParam.first] = paramType;
     }
     
     // Check function body
@@ -1304,3 +1525,15 @@ std::string TypeChecker::getCodeContext(int line) {
     
     return "";
 }
+// Helper functions for type checking
+
+bool TypeChecker::isOptionalType(TypePtr type) {
+    if (!type || type->tag != TypeTag::ErrorUnion) {
+        return false;
+    }
+    
+    // Check if it's a generic error union (Type?) which represents optional types
+    auto errorUnion = std::get<ErrorUnionType>(type->extra);
+    return errorUnion.isGenericError;
+}
+

@@ -115,6 +115,13 @@ private:
             return std::any_of(unionTypes.begin(), unionTypes.end(),
                                [&](TypePtr type) { return canConvert(type, to); });
         }
+        
+        // Target is union type - source can convert if it matches any member
+        if (to->tag == TypeTag::Union) {
+            auto unionTypes = std::get<UnionType>(to->extra).types;
+            return std::any_of(unionTypes.begin(), unionTypes.end(),
+                               [&](TypePtr type) { return canConvert(from, type); });
+        }
 
         // Error union type compatibility
         if (from->tag == TypeTag::ErrorUnion && to->tag == TypeTag::ErrorUnion) {
@@ -157,6 +164,21 @@ private:
 
         // Function type compatibility
         if (from->tag == TypeTag::Function && to->tag == TypeTag::Function) {
+            // Handle case where one or both types don't have function type information
+            bool fromHasExtra = std::holds_alternative<FunctionType>(from->extra);
+            bool toHasExtra = std::holds_alternative<FunctionType>(to->extra);
+            
+            // If neither has specific function type info, they're compatible (generic function types)
+            if (!fromHasExtra && !toHasExtra) {
+                return true;
+            }
+            
+            // If one is generic function type and other is specific, they're compatible
+            if (!fromHasExtra || !toHasExtra) {
+                return true;
+            }
+            
+            // Both have specific function type information - do detailed compatibility check
             auto fromFuncType = std::get<FunctionType>(from->extra);
             auto toFuncType = std::get<FunctionType>(to->extra);
             
@@ -199,8 +221,8 @@ private:
     }
 public:
     bool isNumericType(TypeTag tag) {
-        return tag == TypeTag::Int8 || tag == TypeTag::Int16 || tag == TypeTag::Int32 ||
-        tag == TypeTag::Int64 || tag == TypeTag::UInt8 || tag == TypeTag::UInt16 ||
+        return tag == TypeTag::Int || tag == TypeTag::Int8 || tag == TypeTag::Int16 || tag == TypeTag::Int32 ||
+        tag == TypeTag::Int64 || tag == TypeTag::UInt || tag == TypeTag::UInt8 || tag == TypeTag::UInt16 ||
         tag == TypeTag::UInt32 || tag == TypeTag::UInt64 || tag == TypeTag::Float32 ||
         tag == TypeTag::Float64;
     }
@@ -211,6 +233,23 @@ private:
     bool isSafeNumericConversion(TypeTag from, TypeTag to) {
         // Conversion matrix to determine safe numeric conversions
         switch (from) {
+        case TypeTag::Int:
+            return to == TypeTag::Int ||
+                   to == TypeTag::UInt ||  // Allow Int <-> UInt conversion
+                   to == TypeTag::Int32 ||
+                   to == TypeTag::Int64 ||
+                   to == TypeTag::Float32 ||
+                   to == TypeTag::Float64;
+
+        case TypeTag::UInt:
+            return to == TypeTag::UInt ||
+                   to == TypeTag::Int ||   // Allow UInt <-> Int conversion
+                   to == TypeTag::UInt32 ||
+                   to == TypeTag::UInt64 ||
+                   to == TypeTag::Int64 ||
+                   to == TypeTag::Float32 ||
+                   to == TypeTag::Float64;
+
         case TypeTag::Int8:
             return to == TypeTag::Int8 ||
                    to == TypeTag::Int16 ||
@@ -363,6 +402,7 @@ public:
     TypePtr getType(const std::string& name) {
         // First check built-in types
         if (name == "int") return INT_TYPE;
+        if (name == "uint") return UINT_TYPE;
         if (name == "i64") return INT64_TYPE;
         if (name == "u64") return UINT64_TYPE;
         if (name == "f64") return FLOAT64_TYPE;
@@ -373,6 +413,7 @@ public:
         if (name == "list") return LIST_TYPE;
         if (name == "dict") return DICT_TYPE;
         if (name == "tuple") return TUPLE_TYPE;
+        if (name == "function") return FUNCTION_TYPE;  // Generic function type
         if (name == "object") return OBJECT_TYPE;
         if (name == "module") return MODULE_TYPE;
         
@@ -637,6 +678,21 @@ public:
         
         return std::make_shared<Type>(TypeTag::ErrorUnion, errorUnion);
     }
+    
+    // Create union type
+    TypePtr createUnionType(const std::vector<TypePtr>& types) {
+        if (types.empty()) {
+            return NIL_TYPE;
+        }
+        if (types.size() == 1) {
+            return types[0];
+        }
+        
+        UnionType unionType;
+        unionType.types = types;
+        
+        return std::make_shared<Type>(TypeTag::Union, unionType);
+    }
 
     // Create function type (legacy)
     TypePtr createFunctionType(const std::vector<TypePtr>& paramTypes, TypePtr returnType) {
@@ -648,8 +704,9 @@ public:
     TypePtr createFunctionType(const std::vector<std::string>& paramNames,
                               const std::vector<TypePtr>& paramTypes, 
                               TypePtr returnType,
-                              const std::vector<bool>& hasDefaults = {}) {
-        FunctionType functionType(paramNames, paramTypes, returnType, hasDefaults);
+                              const std::vector<bool>& hasDefaults = {},
+                              const std::vector<std::string>& typeParameters = {}) {
+        FunctionType functionType(paramNames, paramTypes, returnType, hasDefaults, typeParameters);
         return std::make_shared<Type>(TypeTag::Function, functionType);
     }
     
@@ -1453,6 +1510,8 @@ public:
 
         return result;
     }
+
+
 
 private:
     // Helper method to convert AST::TypeAnnotation to TypePtr (implemented in function_types.cpp)

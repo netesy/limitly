@@ -1,0 +1,5 @@
+type StringOrInt = str | int;
+var value1: StringOrInt = "hello";
+var value2: StringOrInt = 42;
+print(value1);
+print(value2);

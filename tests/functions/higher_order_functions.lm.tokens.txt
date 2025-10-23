@@ -1,0 +1,493 @@
+Tokens for tests\functions\higher_order_functions.lm
+Parser: New Unified Parser (CST mode)
+Mode: CST with trivia preservation
+========================================
+
+=== Tokens with Trivia ===
+Line 1: PRINT = 'print'
+Line 1: LEFT_PAREN = '('
+Line 1: STRING = '"=== Higher-Order Functions Tests ==="'
+Line 1: RIGHT_PAREN = ')'
+Line 1: SEMICOLON = ';'
+Line 3: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 3: LEFT_PAREN = '('
+Line 3: STRING = '"\n--- Test 1: Function as Parameter ---"'
+Line 3: RIGHT_PAREN = ')'
+Line 3: SEMICOLON = ';'
+Line 4: FN = 'fn' [leading: NEWLINE('
+') ]
+Line 4: IDENTIFIER = 'applyOperation' [leading: WHITESPACE(' ') ]
+Line 4: LEFT_PAREN = '('
+Line 4: IDENTIFIER = 'x'
+Line 4: COLON = ':'
+Line 4: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 4: COMMA = ','
+Line 4: IDENTIFIER = 'y' [leading: WHITESPACE(' ') ]
+Line 4: COLON = ':'
+Line 4: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 4: COMMA = ','
+Line 4: IDENTIFIER = 'operation' [leading: WHITESPACE(' ') ]
+Line 4: COLON = ':'
+Line 4: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 4: LEFT_PAREN = '('
+Line 4: INT_TYPE = 'int'
+Line 4: COMMA = ','
+Line 4: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 4: RIGHT_PAREN = ')'
+Line 4: COLON = ':'
+Line 4: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 4: RIGHT_PAREN = ')'
+Line 4: COLON = ':'
+Line 4: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 4: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 5: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 5: IDENTIFIER = 'operation' [leading: WHITESPACE(' ') ]
+Line 5: LEFT_PAREN = '('
+Line 5: IDENTIFIER = 'x'
+Line 5: COMMA = ','
+Line 5: IDENTIFIER = 'y' [leading: WHITESPACE(' ') ]
+Line 5: RIGHT_PAREN = ')'
+Line 5: SEMICOLON = ';'
+Line 6: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 8: FN = 'fn' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 8: IDENTIFIER = 'add' [leading: WHITESPACE(' ') ]
+Line 8: LEFT_PAREN = '('
+Line 8: IDENTIFIER = 'a'
+Line 8: COLON = ':'
+Line 8: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 8: COMMA = ','
+Line 8: IDENTIFIER = 'b' [leading: WHITESPACE(' ') ]
+Line 8: COLON = ':'
+Line 8: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 8: RIGHT_PAREN = ')'
+Line 8: COLON = ':'
+Line 8: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 8: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 9: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 9: IDENTIFIER = 'a' [leading: WHITESPACE(' ') ]
+Line 9: PLUS = '+' [leading: WHITESPACE(' ') ]
+Line 9: IDENTIFIER = 'b' [leading: WHITESPACE(' ') ]
+Line 9: SEMICOLON = ';'
+Line 10: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 12: FN = 'fn' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 12: IDENTIFIER = 'multiply' [leading: WHITESPACE(' ') ]
+Line 12: LEFT_PAREN = '('
+Line 12: IDENTIFIER = 'a'
+Line 12: COLON = ':'
+Line 12: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 12: COMMA = ','
+Line 12: IDENTIFIER = 'b' [leading: WHITESPACE(' ') ]
+Line 12: COLON = ':'
+Line 12: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 12: RIGHT_PAREN = ')'
+Line 12: COLON = ':'
+Line 12: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 12: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 13: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 13: IDENTIFIER = 'a' [leading: WHITESPACE(' ') ]
+Line 13: STAR = '*' [leading: WHITESPACE(' ') ]
+Line 13: IDENTIFIER = 'b' [leading: WHITESPACE(' ') ]
+Line 13: SEMICOLON = ';'
+Line 14: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 16: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 16: IDENTIFIER = 'addResult' [leading: WHITESPACE(' ') ]
+Line 16: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 16: IDENTIFIER = 'applyOperation' [leading: WHITESPACE(' ') ]
+Line 16: LEFT_PAREN = '('
+Line 16: NUMBER = '5'
+Line 16: COMMA = ','
+Line 16: NUMBER = '3' [leading: WHITESPACE(' ') ]
+Line 16: COMMA = ','
+Line 16: IDENTIFIER = 'add' [leading: WHITESPACE(' ') ]
+Line 16: RIGHT_PAREN = ')'
+Line 16: SEMICOLON = ';'
+Line 17: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 17: LEFT_PAREN = '('
+Line 17: STRING = '"applyOperation(5, 3, add) = "'
+Line 17: PLUS = '+' [leading: WHITESPACE(' ') ]
+Line 17: IDENTIFIER = 'addResult' [leading: WHITESPACE(' ') ]
+Line 17: RIGHT_PAREN = ')'
+Line 17: SEMICOLON = ';'
+Line 19: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 19: IDENTIFIER = 'multiplyResult' [leading: WHITESPACE(' ') ]
+Line 19: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 19: IDENTIFIER = 'applyOperation' [leading: WHITESPACE(' ') ]
+Line 19: LEFT_PAREN = '('
+Line 19: NUMBER = '5'
+Line 19: COMMA = ','
+Line 19: NUMBER = '3' [leading: WHITESPACE(' ') ]
+Line 19: COMMA = ','
+Line 19: IDENTIFIER = 'multiply' [leading: WHITESPACE(' ') ]
+Line 19: RIGHT_PAREN = ')'
+Line 19: SEMICOLON = ';'
+Line 20: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 20: LEFT_PAREN = '('
+Line 20: STRING = '"applyOperation(5, 3, multiply) = "'
+Line 20: PLUS = '+' [leading: WHITESPACE(' ') ]
+Line 20: IDENTIFIER = 'multiplyResult' [leading: WHITESPACE(' ') ]
+Line 20: RIGHT_PAREN = ')'
+Line 20: SEMICOLON = ';'
+Line 22: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 22: LEFT_PAREN = '('
+Line 22: STRING = '"\n--- Test 2: Function Returning Function ---"'
+Line 22: RIGHT_PAREN = ')'
+Line 22: SEMICOLON = ';'
+Line 23: FN = 'fn' [leading: NEWLINE('
+') ]
+Line 23: IDENTIFIER = 'createAdder' [leading: WHITESPACE(' ') ]
+Line 23: LEFT_PAREN = '('
+Line 23: IDENTIFIER = 'increment'
+Line 23: COLON = ':'
+Line 23: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 23: RIGHT_PAREN = ')'
+Line 23: COLON = ':'
+Line 23: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 23: LEFT_PAREN = '('
+Line 23: INT_TYPE = 'int'
+Line 23: RIGHT_PAREN = ')'
+Line 23: COLON = ':'
+Line 23: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 23: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 24: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 24: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 24: LEFT_PAREN = '('
+Line 24: IDENTIFIER = 'x'
+Line 24: COLON = ':'
+Line 24: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 24: RIGHT_PAREN = ')'
+Line 24: COLON = ':'
+Line 24: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 24: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 25: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 25: IDENTIFIER = 'x' [leading: WHITESPACE(' ') ]
+Line 25: PLUS = '+' [leading: WHITESPACE(' ') ]
+Line 25: IDENTIFIER = 'increment' [leading: WHITESPACE(' ') ]
+Line 25: SEMICOLON = ';'
+Line 26: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 26: SEMICOLON = ';'
+Line 27: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 29: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 29: IDENTIFIER = 'addFive' [leading: WHITESPACE(' ') ]
+Line 29: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 29: IDENTIFIER = 'createAdder' [leading: WHITESPACE(' ') ]
+Line 29: LEFT_PAREN = '('
+Line 29: NUMBER = '5'
+Line 29: RIGHT_PAREN = ')'
+Line 29: SEMICOLON = ';'
+Line 30: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 30: IDENTIFIER = 'result1' [leading: WHITESPACE(' ') ]
+Line 30: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 30: IDENTIFIER = 'addFive' [leading: WHITESPACE(' ') ]
+Line 30: LEFT_PAREN = '('
+Line 30: NUMBER = '10'
+Line 30: RIGHT_PAREN = ')'
+Line 30: SEMICOLON = ';'
+Line 31: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 31: LEFT_PAREN = '('
+Line 31: STRING = '"addFive(10) = "'
+Line 31: PLUS = '+' [leading: WHITESPACE(' ') ]
+Line 31: IDENTIFIER = 'result1' [leading: WHITESPACE(' ') ]
+Line 31: RIGHT_PAREN = ')'
+Line 31: SEMICOLON = ';'
+Line 33: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 33: IDENTIFIER = 'addTen' [leading: WHITESPACE(' ') ]
+Line 33: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 33: IDENTIFIER = 'createAdder' [leading: WHITESPACE(' ') ]
+Line 33: LEFT_PAREN = '('
+Line 33: NUMBER = '10'
+Line 33: RIGHT_PAREN = ')'
+Line 33: SEMICOLON = ';'
+Line 34: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 34: IDENTIFIER = 'result2' [leading: WHITESPACE(' ') ]
+Line 34: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 34: IDENTIFIER = 'addTen' [leading: WHITESPACE(' ') ]
+Line 34: LEFT_PAREN = '('
+Line 34: NUMBER = '20'
+Line 34: RIGHT_PAREN = ')'
+Line 34: SEMICOLON = ';'
+Line 35: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 35: LEFT_PAREN = '('
+Line 35: STRING = '"addTen(20) = "'
+Line 35: PLUS = '+' [leading: WHITESPACE(' ') ]
+Line 35: IDENTIFIER = 'result2' [leading: WHITESPACE(' ') ]
+Line 35: RIGHT_PAREN = ')'
+Line 35: SEMICOLON = ';'
+Line 37: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 37: LEFT_PAREN = '('
+Line 37: STRING = '"\n--- Test 3: Nested Higher-Order Functions ---"'
+Line 37: RIGHT_PAREN = ')'
+Line 37: SEMICOLON = ';'
+Line 38: FN = 'fn' [leading: NEWLINE('
+') ]
+Line 38: IDENTIFIER = 'createMultiplier' [leading: WHITESPACE(' ') ]
+Line 38: LEFT_PAREN = '('
+Line 38: IDENTIFIER = 'factor'
+Line 38: COLON = ':'
+Line 38: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 38: RIGHT_PAREN = ')'
+Line 38: COLON = ':'
+Line 38: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 38: LEFT_PAREN = '('
+Line 38: INT_TYPE = 'int'
+Line 38: RIGHT_PAREN = ')'
+Line 38: COLON = ':'
+Line 38: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 38: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 39: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 39: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 39: LEFT_PAREN = '('
+Line 39: IDENTIFIER = 'x'
+Line 39: COLON = ':'
+Line 39: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 39: RIGHT_PAREN = ')'
+Line 39: COLON = ':'
+Line 39: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 39: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 40: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 40: IDENTIFIER = 'x' [leading: WHITESPACE(' ') ]
+Line 40: STAR = '*' [leading: WHITESPACE(' ') ]
+Line 40: IDENTIFIER = 'factor' [leading: WHITESPACE(' ') ]
+Line 40: SEMICOLON = ';'
+Line 41: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 41: SEMICOLON = ';'
+Line 42: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 44: FN = 'fn' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 44: IDENTIFIER = 'applyTwice' [leading: WHITESPACE(' ') ]
+Line 44: LEFT_PAREN = '('
+Line 44: IDENTIFIER = 'f'
+Line 44: COLON = ':'
+Line 44: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 44: LEFT_PAREN = '('
+Line 44: INT_TYPE = 'int'
+Line 44: RIGHT_PAREN = ')'
+Line 44: COLON = ':'
+Line 44: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 44: COMMA = ','
+Line 44: IDENTIFIER = 'x' [leading: WHITESPACE(' ') ]
+Line 44: COLON = ':'
+Line 44: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 44: RIGHT_PAREN = ')'
+Line 44: COLON = ':'
+Line 44: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 44: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 45: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 45: IDENTIFIER = 'f' [leading: WHITESPACE(' ') ]
+Line 45: LEFT_PAREN = '('
+Line 45: IDENTIFIER = 'f'
+Line 45: LEFT_PAREN = '('
+Line 45: IDENTIFIER = 'x'
+Line 45: RIGHT_PAREN = ')'
+Line 45: RIGHT_PAREN = ')'
+Line 45: SEMICOLON = ';'
+Line 46: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 48: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 48: IDENTIFIER = 'double' [leading: WHITESPACE(' ') ]
+Line 48: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 48: IDENTIFIER = 'createMultiplier' [leading: WHITESPACE(' ') ]
+Line 48: LEFT_PAREN = '('
+Line 48: NUMBER = '2'
+Line 48: RIGHT_PAREN = ')'
+Line 48: SEMICOLON = ';'
+Line 49: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 49: IDENTIFIER = 'quadrupleResult' [leading: WHITESPACE(' ') ]
+Line 49: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 49: IDENTIFIER = 'applyTwice' [leading: WHITESPACE(' ') ]
+Line 49: LEFT_PAREN = '('
+Line 49: IDENTIFIER = 'double'
+Line 49: COMMA = ','
+Line 49: NUMBER = '3' [leading: WHITESPACE(' ') ]
+Line 49: RIGHT_PAREN = ')'
+Line 49: SEMICOLON = ';'
+Line 50: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 50: LEFT_PAREN = '('
+Line 50: STRING = '"applyTwice(double, 3) = "'
+Line 50: PLUS = '+' [leading: WHITESPACE(' ') ]
+Line 50: IDENTIFIER = 'quadrupleResult' [leading: WHITESPACE(' ') ]
+Line 50: RIGHT_PAREN = ')'
+Line 50: SEMICOLON = ';'
+Line 52: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 52: LEFT_PAREN = '('
+Line 52: STRING = '"\n--- Test 4: Function Composition ---"'
+Line 52: RIGHT_PAREN = ')'
+Line 52: SEMICOLON = ';'
+Line 53: FN = 'fn' [leading: NEWLINE('
+') ]
+Line 53: IDENTIFIER = 'compose' [leading: WHITESPACE(' ') ]
+Line 53: LEFT_PAREN = '('
+Line 53: IDENTIFIER = 'f'
+Line 53: COLON = ':'
+Line 53: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 53: LEFT_PAREN = '('
+Line 53: INT_TYPE = 'int'
+Line 53: RIGHT_PAREN = ')'
+Line 53: COLON = ':'
+Line 53: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 53: COMMA = ','
+Line 53: IDENTIFIER = 'g' [leading: WHITESPACE(' ') ]
+Line 53: COLON = ':'
+Line 53: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 53: LEFT_PAREN = '('
+Line 53: INT_TYPE = 'int'
+Line 53: RIGHT_PAREN = ')'
+Line 53: COLON = ':'
+Line 53: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 53: RIGHT_PAREN = ')'
+Line 53: COLON = ':'
+Line 53: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 53: LEFT_PAREN = '('
+Line 53: INT_TYPE = 'int'
+Line 53: RIGHT_PAREN = ')'
+Line 53: COLON = ':'
+Line 53: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 53: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 54: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 54: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 54: LEFT_PAREN = '('
+Line 54: IDENTIFIER = 'x'
+Line 54: COLON = ':'
+Line 54: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 54: RIGHT_PAREN = ')'
+Line 54: COLON = ':'
+Line 54: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 54: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 55: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 55: IDENTIFIER = 'f' [leading: WHITESPACE(' ') ]
+Line 55: LEFT_PAREN = '('
+Line 55: IDENTIFIER = 'g'
+Line 55: LEFT_PAREN = '('
+Line 55: IDENTIFIER = 'x'
+Line 55: RIGHT_PAREN = ')'
+Line 55: RIGHT_PAREN = ')'
+Line 55: SEMICOLON = ';'
+Line 56: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 56: SEMICOLON = ';'
+Line 57: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 59: FN = 'fn' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 59: IDENTIFIER = 'square' [leading: WHITESPACE(' ') ]
+Line 59: LEFT_PAREN = '('
+Line 59: IDENTIFIER = 'x'
+Line 59: COLON = ':'
+Line 59: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 59: RIGHT_PAREN = ')'
+Line 59: COLON = ':'
+Line 59: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 59: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 60: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 60: IDENTIFIER = 'x' [leading: WHITESPACE(' ') ]
+Line 60: STAR = '*' [leading: WHITESPACE(' ') ]
+Line 60: IDENTIFIER = 'x' [leading: WHITESPACE(' ') ]
+Line 60: SEMICOLON = ';'
+Line 61: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 63: FN = 'fn' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 63: IDENTIFIER = 'increment' [leading: WHITESPACE(' ') ]
+Line 63: LEFT_PAREN = '('
+Line 63: IDENTIFIER = 'x'
+Line 63: COLON = ':'
+Line 63: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 63: RIGHT_PAREN = ')'
+Line 63: COLON = ':'
+Line 63: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 63: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 64: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 64: IDENTIFIER = 'x' [leading: WHITESPACE(' ') ]
+Line 64: PLUS = '+' [leading: WHITESPACE(' ') ]
+Line 64: NUMBER = '1' [leading: WHITESPACE(' ') ]
+Line 64: SEMICOLON = ';'
+Line 65: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 67: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 67: IDENTIFIER = 'squareThenIncrement' [leading: WHITESPACE(' ') ]
+Line 67: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 67: IDENTIFIER = 'compose' [leading: WHITESPACE(' ') ]
+Line 67: LEFT_PAREN = '('
+Line 67: IDENTIFIER = 'increment'
+Line 67: COMMA = ','
+Line 67: IDENTIFIER = 'square' [leading: WHITESPACE(' ') ]
+Line 67: RIGHT_PAREN = ')'
+Line 67: SEMICOLON = ';'
+Line 68: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 68: IDENTIFIER = 'compositionResult' [leading: WHITESPACE(' ') ]
+Line 68: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 68: IDENTIFIER = 'squareThenIncrement' [leading: WHITESPACE(' ') ]
+Line 68: LEFT_PAREN = '('
+Line 68: NUMBER = '4'
+Line 68: RIGHT_PAREN = ')'
+Line 68: SEMICOLON = ';'
+Line 69: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 69: LEFT_PAREN = '('
+Line 69: STRING = '"squareThenIncrement(4) = "'
+Line 69: PLUS = '+' [leading: WHITESPACE(' ') ]
+Line 69: IDENTIFIER = 'compositionResult' [leading: WHITESPACE(' ') ]
+Line 69: RIGHT_PAREN = ')'
+Line 69: SEMICOLON = ';'
+Line 71: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 71: LEFT_PAREN = '('
+Line 71: STRING = '"\n=== Higher-Order Functions Tests Complete ==="'
+Line 71: RIGHT_PAREN = ')'
+Line 71: SEMICOLON = ';'
+Line 71: EOF_TOKEN = ''

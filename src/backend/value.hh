@@ -273,6 +273,10 @@ struct FunctionType
     std::vector<bool> hasDefaultValues;                      // Which parameters have defaults
     bool isVariadic = false;                                 // Whether function accepts variable arguments
     
+    // Generic function type support
+    std::vector<std::string> typeParameters;                 // Generic type parameter names (e.g., T, U)
+    bool isGeneric = false;                                  // Whether this is a generic function
+    
     // Constructors
     FunctionType() = default;
     
@@ -285,8 +289,10 @@ struct FunctionType
     FunctionType(const std::vector<std::string>& names, 
                  const std::vector<TypePtr>& params, 
                  TypePtr ret,
-                 const std::vector<bool>& defaults = {})
-        : paramTypes(params), returnType(ret), paramNames(names), hasDefaultValues(defaults) {
+                 const std::vector<bool>& defaults = {},
+                 const std::vector<std::string>& typeParams = {})
+        : paramTypes(params), returnType(ret), paramNames(names), hasDefaultValues(defaults), 
+          typeParameters(typeParams), isGeneric(!typeParams.empty()) {
         // Ensure consistent sizes
         if (hasDefaultValues.empty()) {
             hasDefaultValues.resize(params.size(), false);
@@ -420,8 +426,12 @@ struct Type
         }
         case TypeTag::Enum:
             return "Enum";
-        case TypeTag::Function:
-            return "Function";
+        case TypeTag::Function: {
+            if (const auto* funcType = std::get_if<FunctionType>(&extra)) {
+                return funcType->toString();
+            }
+            return "Function";  // Generic function type
+        }
         case TypeTag::Closure:
             return "Closure";
         case TypeTag::Any:
@@ -1258,7 +1268,19 @@ inline bool FunctionType::isCompatibleWith(const FunctionType& other) const {
 
 inline std::string FunctionType::toString() const {
     std::ostringstream oss;
-    oss << "fn(";
+    oss << "fn";
+    
+    // Add generic type parameters if present
+    if (isGeneric && !typeParameters.empty()) {
+        oss << "<";
+        for (size_t i = 0; i < typeParameters.size(); ++i) {
+            if (i > 0) oss << ", ";
+            oss << typeParameters[i];
+        }
+        oss << ">";
+    }
+    
+    oss << "(";
     
     for (size_t i = 0; i < paramTypes.size(); ++i) {
         if (i > 0) oss << ", ";

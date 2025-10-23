@@ -6,6 +6,7 @@
 #include "../backend/type_checker.hh"
 #include <vector>
 #include <memory>
+#include <set>
 
 class VM; // Forward declaration
 
@@ -57,6 +58,9 @@ private:
     
     // Current task body being processed
     std::shared_ptr<AST::BlockStatement> current_task_body;
+    
+    // Track declared functions during compilation
+    std::set<std::string> declaredFunctions;
     
     // Visitor methods for AST nodes
     void visitStatement(const std::shared_ptr<AST::Statement>& stmt);
@@ -144,6 +148,10 @@ private:
     // Module resolution helpers
     std::string resolveModulePath(const std::string& modulePath);
     std::string getModuleNameFromPath(const std::string& modulePath);
+    
+    // Function declaration tracking
+    bool isDeclaredFunction(const std::string& name) const;
+    void addDeclaredFunction(const std::string& name);
 };
 
 // AST Printer has been moved to ast_printer.hh

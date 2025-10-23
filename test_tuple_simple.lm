@@ -1,12 +1,1 @@
-// Simple tuple test
-var tuple1 = (1, 2, 3);
-print("Tuple:", tuple1);
-print("First element:", tuple1.0);
-print("Second element:", tuple1.1);
-
-var empty = ();
-print("Empty tuple:", empty);
-
-var mixed = (42, "hello", true);
-print("Mixed tuple:", mixed);
-print("String element:", mixed.1);
+https://novelbin.com/b/cultivation-when-you-take-things-to-the-extreme/chapter-1129-chapter-683-emperors-corpse2

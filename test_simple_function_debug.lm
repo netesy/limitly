@@ -1,13 +1,19 @@
-print("=== Simple Function Debug Test ===");
+// Simple test to debug function parameter issue
 
-print("\n🔹 Test 1: Simple function definition");
-fn simpleFunction(x: int): int {
-    print("Inside simpleFunction with x: " + x);
+fn addOne(x: int): int {
     return x + 1;
 }
 
-print("Function defined, now calling...");
-var result = simpleFunction(5);
-print("Result: " + result);
+fn testFunction(f: function, value: int): int {
+    print("Inside testFunction, f =", f);
+    print("Inside testFunction, value =", value);
+    return f(value);
+}
 
-print("\n=== Test Complete ===");
+print("Step 1: Direct function call");
+var result1 = addOne(5);
+print("addOne(5) =", result1);
+
+print("Step 2: Function as parameter");
+var result2 = testFunction(addOne, 5);
+print("testFunction(addOne, 5) =", result2);
