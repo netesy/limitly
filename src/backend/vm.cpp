@@ -695,6 +695,7 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                             handleCallClosure(instruction);
                             break;
                         case Opcode::PUSH_LAMBDA:
+                            if (debugMode) {
                             std::cout << "[DEBUG] About to execute PUSH_LAMBDA for: " << instruction.stringValue << std::endl;
                             std::cout << "[DEBUG] Registry state before PUSH_LAMBDA:" << std::endl;
                             for (const auto& [name, func] : userDefinedFunctions) {
@@ -702,6 +703,8 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                                     std::cout << "[DEBUG]   " << name << ": startAddress=" << func.startAddress 
                                               << ", endAddress=" << func.endAddress << std::endl;
                                 }
+                            }                                                     
+
                             }
                             handlePushLambda(instruction);
                             break;
@@ -747,8 +750,9 @@ void VM::preProcessBytecode(const std::vector<Instruction>& code) {
     isPreProcessing = true; // Set pre-processing flag
     static int preprocessCallCount = 0;
     preprocessCallCount++;
-    std::cout << "[DEBUG] ===== PRE-PROCESSING BYTECODE (Call #" << preprocessCallCount << ") =====" << std::endl;
-    std::cout << "[DEBUG] Total bytecode instructions: " << code.size() << std::endl;
+    
+    // std::cout << "[DEBUG] ===== PRE-PROCESSING BYTECODE (Call #" << preprocessCallCount << ") =====" << std::endl;
+    // std::cout << "[DEBUG] Total bytecode instructions: " << code.size() << std::endl;
     
     // First pass: Find all lambda functions and their boundaries
     std::vector<std::pair<size_t, std::string>> lambdaPositions;
@@ -758,21 +762,21 @@ void VM::preProcessBytecode(const std::vector<Instruction>& code) {
             std::string functionName = instruction.stringValue;
             if (functionName.find("__lambda_") == 0) {
                 lambdaPositions.push_back({i, functionName});
-                std::cout << "[DEBUG] Found lambda function: " << functionName << " at IP " << i << std::endl;
+              //  std::cout << "[DEBUG] Found lambda function: " << functionName << " at IP " << i << std::endl;
             }
         }
     }
     
     // Second pass: Process each lambda function to find its end address
     for (const auto& [startPos, functionName] : lambdaPositions) {
-        std::cout << "[DEBUG] Processing lambda function: " << functionName << " at IP " << startPos << std::endl;
+        //   std::cout << "[DEBUG] Processing lambda function: " << functionName << " at IP " << startPos << std::endl;
         
         // Check if this lambda is already registered
         if (userDefinedFunctions.find(functionName) != userDefinedFunctions.end()) {
-            std::cout << "[DEBUG] WARNING: Lambda function " << functionName << " is already registered!" << std::endl;
+         //   std::cout << "[DEBUG] WARNING: Lambda function " << functionName << " is already registered!" << std::endl;
             const auto& existing = userDefinedFunctions[functionName];
-            std::cout << "[DEBUG] Existing function addresses - startAddress: " << existing.startAddress 
-                      << ", endAddress: " << existing.endAddress << std::endl;
+         //   std::cout << "[DEBUG] Existing function addresses - startAddress: " << existing.startAddress 
+         //             << ", endAddress: " << existing.endAddress << std::endl;
             continue; // Skip if already registered
         }
         
@@ -809,8 +813,8 @@ void VM::preProcessBytecode(const std::vector<Instruction>& code) {
         
         // Parse parameters between BEGIN_FUNCTION and function body
         size_t paramIndex = startAddress + 1;
-        std::cout << "[DEBUG] Parsing lambda parameters for " << functionName 
-                  << " from index " << paramIndex << " to " << endAddress << std::endl;
+        //std::cout << "[DEBUG] Parsing lambda parameters for " << functionName 
+        //          << " from index " << paramIndex << " to " << endAddress << std::endl;
         
         while (paramIndex < endAddress && 
                (code[paramIndex].opcode == Opcode::DEFINE_PARAM || 
@@ -819,8 +823,8 @@ void VM::preProcessBytecode(const std::vector<Instruction>& code) {
             std::string paramName = code[paramIndex].stringValue;
             bool isOptional = (code[paramIndex].opcode == Opcode::DEFINE_OPTIONAL_PARAM);
             
-            std::cout << "[DEBUG] Found parameter: " << paramName 
-                      << " (optional: " << (isOptional ? "true" : "false") << ")" << std::endl;
+           // std::cout << "[DEBUG] Found parameter: " << paramName 
+                 //     << " (optional: " << (isOptional ? "true" : "false") << ")" << std::endl;
             
             // For lambda functions, we'll use a generic type for now
             TypePtr paramType = typeSystem->ANY_TYPE;
@@ -834,20 +838,20 @@ void VM::preProcessBytecode(const std::vector<Instruction>& code) {
             // Check for default value
             if (paramIndex + 1 < endAddress && code[paramIndex + 1].opcode == Opcode::SET_DEFAULT_VALUE) {
                 // Default value will be handled during execution
-                std::cout << "[DEBUG] Parameter " << paramName << " has default value" << std::endl;
+               // std::cout << "[DEBUG] Parameter " << paramName << " has default value" << std::endl;
                 paramIndex++; // Skip SET_DEFAULT_VALUE instruction
             }
             
             paramIndex++;
         }
         
-        std::cout << "[DEBUG] Lambda " << functionName << " has " 
-                  << lambdaFunc.parameters.size() << " regular parameters and " 
-                  << lambdaFunc.optionalParameters.size() << " optional parameters" << std::endl;
+        // std::cout << "[DEBUG] Lambda " << functionName << " has " 
+        //           << lambdaFunc.parameters.size() << " regular parameters and " 
+        //           << lambdaFunc.optionalParameters.size() << " optional parameters" << std::endl;
         
-        // Register the lambda function
-        std::cout << "[DEBUG] Registering lambda function " << functionName 
-                  << " with " << lambdaFunc.parameters.size() << " parameters" << std::endl;
+        // // Register the lambda function
+        // std::cout << "[DEBUG] Registering lambda function " << functionName 
+        //           << " with " << lambdaFunc.parameters.size() << " parameters" << std::endl;
         userDefinedFunctions[functionName] = lambdaFunc;
         
         if (debugMode) {
@@ -856,6 +860,8 @@ void VM::preProcessBytecode(const std::vector<Instruction>& code) {
                       << ", params: " << lambdaFunc.parameters.size() << ")" << std::endl;
         }
     }
+
+    if (debugMode) {
     std::cout << "[DEBUG] Pre-processing complete. Registered " 
               << userDefinedFunctions.size() << " functions total." << std::endl;
     
@@ -871,6 +877,8 @@ void VM::preProcessBytecode(const std::vector<Instruction>& code) {
     }
     
     std::cout << "[DEBUG] ===== END PRE-PROCESSING =====" << std::endl;
+        }
+
     isPreProcessing = false; // Clear pre-processing flag
 }
 
@@ -3027,29 +3035,29 @@ void VM::handleCall(const Instruction& instruction) {
                 // For lambda functions, we need to find the actual function body start
                 // by skipping nested function definitions, similar to CALL_HIGHER_ORDER
                 size_t bodyStart = closure.startAddress;
-                std::cout << "[DEBUG] CLOSURE CALL: Looking for function body start from " << bodyStart << std::endl;
+                // std::cout << "[DEBUG] CLOSURE CALL: Looking for function body start from " << bodyStart << std::endl;
                 
                 // Skip past BEGIN_FUNCTION and all parameter definitions and nested functions
                 bodyStart++; // Skip BEGIN_FUNCTION
                 int nestedFunctionDepth = 0;
                 while (bodyStart < closure.endAddress && bodyStart < bytecode->size()) {
                     const Instruction& inst = (*bytecode)[bodyStart];
-                    std::cout << "[DEBUG] CLOSURE CALL: Instruction at " << bodyStart << ": " << static_cast<int>(inst.opcode) << std::endl;
+                    // std::cout << "[DEBUG] CLOSURE CALL: Instruction at " << bodyStart << ": " << static_cast<int>(inst.opcode) << std::endl;
                     
                     if (inst.opcode == Opcode::BEGIN_FUNCTION) {
                         // Skip nested function definitions
                         nestedFunctionDepth++;
-                        std::cout << "[DEBUG] CLOSURE CALL: Entering nested function at " << bodyStart << ", depth=" << nestedFunctionDepth << std::endl;
+                        // std::cout << "[DEBUG] CLOSURE CALL: Entering nested function at " << bodyStart << ", depth=" << nestedFunctionDepth << std::endl;
                         bodyStart++;
                     } else if (inst.opcode == Opcode::END_FUNCTION) {
                         if (nestedFunctionDepth > 0) {
                             // End of nested function
                             nestedFunctionDepth--;
-                            std::cout << "[DEBUG] CLOSURE CALL: Exiting nested function at " << bodyStart << ", depth=" << nestedFunctionDepth << std::endl;
+                            // std::cout << "[DEBUG] CLOSURE CALL: Exiting nested function at " << bodyStart << ", depth=" << nestedFunctionDepth << std::endl;
                             bodyStart++;
                         } else {
                             // This is the END_FUNCTION for our current function, we've gone too far
-                            std::cout << "[DEBUG] CLOSURE CALL: Reached end of current function at " << bodyStart << ", no body found" << std::endl;
+                            // std::cout << "[DEBUG] CLOSURE CALL: Reached end of current function at " << bodyStart << ", no body found" << std::endl;
                             break;
                         }
                     } else if (nestedFunctionDepth > 0) {
@@ -3062,7 +3070,7 @@ void VM::handleCall(const Instruction& instruction) {
                         bodyStart++;
                     } else {
                         // Found the start of the actual function body
-                        std::cout << "[DEBUG] CLOSURE CALL: Found function body start at " << bodyStart << std::endl;
+                        // std::cout << "[DEBUG] CLOSURE CALL: Found function body start at " << bodyStart << std::endl;
                         break;
                     }
                 }
@@ -3075,7 +3083,7 @@ void VM::handleCall(const Instruction& instruction) {
                 }
                 
                 // Jump to the function body start address
-                std::cout << "[DEBUG] CLOSURE CALL: Jumping to " << bodyStart << " (ip will be " << (bodyStart - 1) << ")" << std::endl;
+                // std::cout << "[DEBUG] CLOSURE CALL: Jumping to " << bodyStart << " (ip will be " << (bodyStart - 1) << ")" << std::endl;
                 ip = bodyStart - 1; // -1 because ip will be incremented in the main loop
                 
                 if (debugMode) {
@@ -3099,12 +3107,15 @@ void VM::handleCall(const Instruction& instruction) {
     
     // Check if we have a closure value on the stack (for closure calls)
     // This happens when a closure is passed as a value and then called
+                if (debugMode) {
     std::cout << "[DEBUG] CALL: Checking for closure on stack. Stack size: " << stack.size() << std::endl;
     if (!stack.empty()) {
         std::cout << "[DEBUG] CALL: Top stack value type: " << static_cast<int>(stack.back()->type->tag) << std::endl;
     }
+        }
+
     if (!stack.empty() && stack.back()->type && stack.back()->type->tag == TypeTag::Closure) {
-        std::cout << "[DEBUG] CALL: Found closure on stack, executing closure call" << std::endl;
+        //std::cout << "[DEBUG] CALL: Found closure on stack, executing closure call" << std::endl;
         ValuePtr closureValue = pop();
         ClosureValue closure = std::get<ClosureValue>(closureValue->data);
         
@@ -3652,8 +3663,8 @@ void VM::handleBeginFunction(const Instruction& instruction) {
         }
     } else {
         // Regular function
-        std::cout << "[DEBUG] handleBeginFunction: Storing function: " << funcName 
-                  << " with start address: " << func.startAddress << std::endl;
+        // std::cout << "[DEBUG] handleBeginFunction: Storing function: " << funcName 
+        //           << " with start address: " << func.startAddress << std::endl;
         
         // Check if this is a lambda function that's already registered
         if (funcName.find("__lambda_") == 0) {
@@ -3661,18 +3672,18 @@ void VM::handleBeginFunction(const Instruction& instruction) {
             if (existingFunc != userDefinedFunctions.end() && 
                 existingFunc->second.endAddress > 0) {
                 // Lambda function is already properly registered, don't overwrite it
-                std::cout << "[DEBUG] handleBeginFunction: Skipping lambda function " << funcName 
-                          << " - already registered with correct addresses (start=" 
-                          << existingFunc->second.startAddress << ", end=" 
-                          << existingFunc->second.endAddress << ")" << std::endl;
+                // std::cout << "[DEBUG] handleBeginFunction: Skipping lambda function " << funcName 
+                //           << " - already registered with correct addresses (start=" 
+                //           << existingFunc->second.startAddress << ", end=" 
+                //           << existingFunc->second.endAddress << ")" << std::endl;
                 return;
             }
-            std::cout << "[DEBUG] handleBeginFunction: Registering lambda function " << funcName 
-                      << " for the first time" << std::endl;
+            // std::cout << "[DEBUG] handleBeginFunction: Registering lambda function " << funcName 
+            //           << " for the first time" << std::endl;
         }
         
         userDefinedFunctions[funcName] = func;
-        std::cout << "[DEBUG] Total functions stored: " << userDefinedFunctions.size() << std::endl;
+        // std::cout << "[DEBUG] Total functions stored: " << userDefinedFunctions.size() << std::endl;
     }
     // Continue with normal execution to process parameter definitions
     // The function body will be skipped later when we encounter END_FUNCTION
@@ -3752,13 +3763,16 @@ void VM::handleDefineParam(const Instruction& instruction) {
         if (funcIt != userDefinedFunctions.end()) {
             // Don't modify lambda functions that are already registered with parameters
             if (currentFunc.find("__lambda_") == 0 && !funcIt->second.parameters.empty()) {
-                std::cout << "[DEBUG] handleDefineParam: Skipping parameter addition for already-registered lambda " 
+                if (debugMode) {
+                    std::cout << "[DEBUG] handleDefineParam: Skipping parameter addition for already-registered lambda " 
                           << currentFunc << " (has " << funcIt->second.parameters.size() << " parameters)" << std::endl;
+                }           
                 return;
             }
-            
+        if (debugMode) { 
             std::cout << "[DEBUG] handleDefineParam: Adding parameter '" << instruction.stringValue 
                       << "' to function " << currentFunc << std::endl;
+           }                  
             funcIt->second.parameters.push_back(std::make_pair(instruction.stringValue, nullptr));
         }
     }
@@ -3953,6 +3967,8 @@ bool VM::bindFunctionParameters(const backend::Function& func, const std::vector
     // Check argument count
     size_t requiredParams = func.parameters.size();
     size_t totalParams = requiredParams + func.optionalParameters.size();
+
+            if (debugMode) {
     
     std::cout << "[DEBUG] bindFunctionParameters for " << funcName << ":" << std::endl;
     std::cout << "[DEBUG]   Required parameters: " << requiredParams << std::endl;
@@ -3965,6 +3981,10 @@ bool VM::bindFunctionParameters(const backend::Function& func, const std::vector
     }
     for (size_t i = 0; i < func.optionalParameters.size(); i++) {
         std::cout << "[DEBUG]   Optional param[" << i << "]: " << func.optionalParameters[i].first << std::endl;
+    }
+
+
+        
     }
     
     if (args.size() < requiredParams || args.size() > totalParams) {
@@ -6750,10 +6770,10 @@ void VM::handleCreateClosure(const Instruction& instruction) {
     if (registryIt != userDefinedFunctions.end()) {
         correctStartAddress = registryIt->second.startAddress;
         correctEndAddress = registryIt->second.endAddress;
-        std::cout << "[DEBUG] CREATE_CLOSURE: Using registry addresses - startAddress: " 
-                  << correctStartAddress << ", endAddress: " << correctEndAddress << std::endl;
+        // std::cout << "[DEBUG] CREATE_CLOSURE: Using registry addresses - startAddress: " 
+        //           << correctStartAddress << ", endAddress: " << correctEndAddress << std::endl;
     } else {
-        std::cout << "[WARNING] CREATE_CLOSURE: Function not found in registry, using stack addresses" << std::endl;
+      //  std::cout << "[WARNING] CREATE_CLOSURE: Function not found in registry, using stack addresses" << std::endl;
     }
     
     // Create the closure value using the correct addresses
@@ -6958,11 +6978,11 @@ void VM::handlePushLambda(const Instruction& instruction) {
               ". Available functions: " + std::to_string(userDefinedFunctions.size()));
         return;
     }
-    
+        if (debugMode) {
     std::cout << "[DEBUG] PUSH_LAMBDA: Found function in registry with addresses - startAddress: " 
               << funcIt->second.startAddress << ", endAddress: " << funcIt->second.endAddress << std::endl;
     
-    if (debugMode) {
+
         std::cout << "[DEBUG] Found lambda function: " << lambdaName 
                   << " (isLambda: " << funcIt->second.isLambda << ")" << std::endl;
     }
@@ -6972,21 +6992,26 @@ void VM::handlePushLambda(const Instruction& instruction) {
     
     // For lambda functions, we store the Function struct directly in the value
     // This allows us to access the bytecode addresses and parameters later
+        if (debugMode) {
     std::cout << "[DEBUG] PUSH_LAMBDA: About to store function with addresses - startAddress: " 
               << funcIt->second.startAddress << ", endAddress: " << funcIt->second.endAddress << std::endl;
+                }
     ValuePtr functionValue = memoryManager.makeRef<Value>(*region, functionType, funcIt->second);
     push(functionValue);
     
     // Verify what was stored
     if (std::holds_alternative<backend::Function>(functionValue->data)) {
         const auto& storedFunc = std::get<backend::Function>(functionValue->data);
+            if (debugMode) {
         std::cout << "[DEBUG] PUSH_LAMBDA: Stored function addresses - startAddress: " 
                   << storedFunc.startAddress << ", endAddress: " << storedFunc.endAddress << std::endl;
         std::cout << "[DEBUG] PUSH_LAMBDA: Stored function parameters - required: " 
                   << storedFunc.parameters.size() << ", optional: " << storedFunc.optionalParameters.size() << std::endl;
+                   
         for (size_t i = 0; i < storedFunc.parameters.size(); i++) {
             std::cout << "[DEBUG] PUSH_LAMBDA: Required param[" << i << "]: " << storedFunc.parameters[i].first << std::endl;
         }
+         }
     }
     
     if (debugMode) {
@@ -7003,17 +7028,25 @@ void VM::handlePushFunctionRef(const Instruction& instruction) {
     
     std::string functionName = instruction.stringValue;
     
+    if (debugMode) {
+        std::cout << "[DEBUG] PUSH_FUNCTION_REF: Looking for function: " << functionName << std::endl;
+        std::cout << "[DEBUG] Available user functions: ";
+        for (const auto& func : userDefinedFunctions) {
+            std::cout << func.first << " ";
+        }
+        std::cout << std::endl;
+    }
+    
     // First check user-defined functions
     auto userFuncIt = userDefinedFunctions.find(functionName);
     if (userFuncIt != userDefinedFunctions.end()) {
-        // Create a user-defined function object
-        auto userFunc = std::make_shared<backend::UserDefinedFunction>(userFuncIt->second.declaration);
+        if (debugMode) {
+            std::cout << "[DEBUG] PUSH_FUNCTION_REF: Found user function: " << functionName << std::endl;
+        }
         
-        // Create a function type
-        TypePtr functionType = std::make_shared<Type>(TypeTag::Function);
-        
-        // Push the function onto the stack
-        ValuePtr functionValue = memoryManager.makeRef<Value>(*region, functionType, userFunc);
+        // Create a function value that stores the function name (same as PUSH_FUNCTION)
+        // This will be used later when the function is called
+        ValuePtr functionValue = memoryManager.makeRef<Value>(*region, typeSystem->FUNCTION_TYPE, functionName);
         push(functionValue);
         
         if (debugMode) {
@@ -7246,29 +7279,29 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
             // For nested closures, we need to properly calculate the function body start
             // The startAddress points to BEGIN_FUNCTION, we need to skip setup instructions
             size_t bodyStart = closure.startAddress;
-            std::cout << "[DEBUG] CLOSURE EXEC: Looking for function body start from " << bodyStart << std::endl;
+           // std::cout << "[DEBUG] CLOSURE EXEC: Looking for function body start from " << bodyStart << std::endl;
             
             // Skip past BEGIN_FUNCTION and all parameter definitions and nested functions
             bodyStart++; // Skip BEGIN_FUNCTION
             int nestedFunctionDepth = 0;
             while (bodyStart < closure.endAddress && bodyStart < bytecode->size()) {
                 const Instruction& inst = (*bytecode)[bodyStart];
-                std::cout << "[DEBUG] CLOSURE EXEC: Instruction at " << bodyStart << ": " << static_cast<int>(inst.opcode) << std::endl;
+                //std::cout << "[DEBUG] CLOSURE EXEC: Instruction at " << bodyStart << ": " << static_cast<int>(inst.opcode) << std::endl;
                 
                 if (inst.opcode == Opcode::BEGIN_FUNCTION) {
                     // Skip nested function definitions
                     nestedFunctionDepth++;
-                    std::cout << "[DEBUG] CLOSURE EXEC: Entering nested function at " << bodyStart << ", depth=" << nestedFunctionDepth << std::endl;
+                //    std::cout << "[DEBUG] CLOSURE EXEC: Entering nested function at " << bodyStart << ", depth=" << nestedFunctionDepth << std::endl;
                     bodyStart++;
                 } else if (inst.opcode == Opcode::END_FUNCTION) {
                     if (nestedFunctionDepth > 0) {
                         // End of nested function
                         nestedFunctionDepth--;
-                        std::cout << "[DEBUG] CLOSURE EXEC: Exiting nested function at " << bodyStart << ", depth=" << nestedFunctionDepth << std::endl;
+                     //   std::cout << "[DEBUG] CLOSURE EXEC: Exiting nested function at " << bodyStart << ", depth=" << nestedFunctionDepth << std::endl;
                         bodyStart++;
                     } else {
                         // This is the END_FUNCTION for our current function, we've gone too far
-                        std::cout << "[DEBUG] CLOSURE EXEC: Reached end of current function at " << bodyStart << ", no body found" << std::endl;
+                    //    std::cout << "[DEBUG] CLOSURE EXEC: Reached end of current function at " << bodyStart << ", no body found" << std::endl;
                         break;
                     }
                 } else if (nestedFunctionDepth > 0) {
@@ -7281,7 +7314,7 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
                     bodyStart++;
                 } else {
                     // Found the start of the actual function body
-                    std::cout << "[DEBUG] CLOSURE EXEC: Found function body start at " << bodyStart << std::endl;
+                  //  std::cout << "[DEBUG] CLOSURE EXEC: Found function body start at " << bodyStart << std::endl;
                     break;
                 }
             }
@@ -7294,7 +7327,7 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
             }
             
             // Jump to the function body start address
-            std::cout << "[DEBUG] CLOSURE EXEC: Jumping to " << bodyStart << " (ip will be " << (bodyStart - 1) << ")" << std::endl;
+          //  std::cout << "[DEBUG] CLOSURE EXEC: Jumping to " << bodyStart << " (ip will be " << (bodyStart - 1) << ")" << std::endl;
             ip = bodyStart - 1; // -1 because ip will be incremented in the main loop
             
             // The function will return normally and restore the environment

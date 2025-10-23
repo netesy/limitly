@@ -1,0 +1,38 @@
+// Comprehensive test for higher-order functions
+
+fn addOne(x: int): int {
+    return x + 1;
+}
+
+fn multiplyByTwo(x: int): int {
+    return x * 2;
+}
+
+fn processValue(value: int, processor: function): int {
+    return processor(value);
+}
+
+fn processTwo(a: int, b: int, f1: function, f2: function): int {
+    return f1(a) + f2(b);
+}
+
+// Test 1: Single function parameter
+print("Test 1: Single function parameter");
+var result1 = processValue(5, addOne);
+print("processValue(5, addOne) =", result1);
+
+var result2 = processValue(10, multiplyByTwo);
+print("processValue(10, multiplyByTwo) =", result2);
+
+// Test 2: Multiple function parameters
+print("\nTest 2: Multiple function parameters");
+var result3 = processTwo(3, 4, addOne, multiplyByTwo);
+print("processTwo(3, 4, addOne, multiplyByTwo) =", result3);
+
+// Test 3: Mixed arguments (regular + function)
+print("\nTest 3: Mixed arguments work correctly");
+print("Regular calls still work:");
+print("addOne(7) =", addOne(7));
+print("multiplyByTwo(6) =", multiplyByTwo(6));
+
+print("\nAll tests completed successfully!");

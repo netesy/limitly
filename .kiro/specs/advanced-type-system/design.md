@@ -2,7 +2,28 @@
 
 ## Overview
 
-The advanced type system for Limit will extend the existing type infrastructure to support comprehensive type aliases, union types, generic containers, and advanced type constructs like Option and Result types. The design builds upon the existing TypeSystem class in `backend/types.hh` and the TypeAnnotation structure in `frontend/ast.hh`.
+The advanced type system for Limit extends the existing type infrastructure to support comprehensive type aliases, union types, generic containers, and advanced type constructs like Option and Result types. The design builds upon the existing TypeSystem class in `backend/types.hh` and the TypeAnnotation structure in `frontend/ast.hh`.
+
+## Current Implementation Status
+
+### ✅ COMPLETED COMPONENTS
+- **Type Alias System**: Full implementation with circular dependency detection
+- **Error Union Types**: Complete integration with error handling system (`Type?ErrorType`)
+- **Function Types**: Comprehensive function type system with parameter/return type checking
+- **Tuple Types**: Full tuple support including creation, indexing, destructuring
+- **Type Checker**: Comprehensive compile-time type validation with detailed error reporting
+- **Type Inference**: Context-aware type inference for variables and expressions
+
+### 🔄 PARTIALLY IMPLEMENTED COMPONENTS
+- **Union Types**: Basic parsing and type system infrastructure, needs runtime value support
+- **Container Types**: Basic type structures exist, needs parsing and validation
+- **Option Types**: Framework exists, needs integration with union type system
+- **Structured Types**: Basic support, needs enhancement for complex field validation
+
+### 📋 PLANNED COMPONENTS
+- **Pattern Matching**: Runtime union type discrimination and exhaustive case checking
+- **Generic Types**: Type parameters and generic type instantiation
+- **Runtime Type Safety**: Type introspection and safe variant access
 
 ## Cross-Spec Integration
 
@@ -500,34 +521,156 @@ struct Value {
    - Option/Result unwrapping performance
    - Pattern matching efficiency
 
-## Implementation Phases
+## Implementation Status and Next Steps
 
-### Phase 1: Basic Type Aliases
-- Implement type declaration parsing
-- Add type alias registry to TypeSystem
-- Support primitive type aliases
-- Basic type resolution
+### ✅ Phase 1: Basic Type Aliases - COMPLETED
+- ✅ Implement type declaration parsing
+- ✅ Add type alias registry to TypeSystem
+- ✅ Support primitive type aliases
+- ✅ Basic type resolution with circular dependency detection
 
-### Phase 2: Union Types
-- Implement union type syntax parsing
-- Add union type support to TypeSystem
-- Runtime union value representation
-- Basic pattern matching
+### 🔄 Phase 2: Union Types - PARTIALLY COMPLETED
+- ✅ Implement union type syntax parsing
+- ✅ Add union type support to TypeSystem
+- 📋 **NEEDS COMPLETION**: Runtime union value representation
+- 📋 **NEEDS COMPLETION**: Pattern matching integration
 
-### Phase 3: Typed Containers
-- Enhanced list/dictionary with specific element types
-- Container type validation
-- Homogeneous type enforcement
-- Container type safety
+### 🔄 Phase 3: Typed Containers - PARTIALLY COMPLETED
+- ✅ Enhanced list/dictionary type infrastructure
+- 📋 **NEEDS COMPLETION**: Container type parsing (`[elementType]`, `{keyType: valueType}`)
+- 📋 **NEEDS COMPLETION**: Container type validation
+- 📋 **NEEDS COMPLETION**: Homogeneous type enforcement
 
-### Phase 4: Built-in Types
-- Option type implementation
-- Result type implementation
-- Pattern matching integration
-- Runtime type discrimination
+### 🔄 Phase 4: Built-in Types - PARTIALLY COMPLETED
+- 📋 **NEEDS COMPLETION**: Option type implementation as union type
+- ✅ Result type implementation (via error handling system)
+- 📋 **NEEDS COMPLETION**: Pattern matching integration
+- 📋 **NEEDS COMPLETION**: Runtime type discrimination
 
-### Phase 5: Advanced Features
-- Type inference improvements
-- Complex type relationships
-- Performance optimizations
-- Comprehensive error handling
+### 📋 Phase 5: Advanced Features - PLANNED
+- 🔄 Type inference improvements (mostly complete)
+- 📋 Complex type relationships and constraints
+- 📋 Performance optimizations for type checking
+- ✅ Comprehensive error handling (completed)
+
+## Critical Implementation Gaps
+
+### 1. Union Type Runtime Support
+**Current State**: Union types can be parsed and type-checked, but lack runtime value representation.
+
+**Required Implementation**:
+```cpp
+// Enhanced Value struct for union types
+struct Value {
+    // ... existing fields ...
+    
+    // Union type support
+    size_t activeUnionVariant = 0;  // Which variant is currently active
+    std::vector<ValuePtr> unionVariants;  // Storage for all possible variants
+    
+    // Helper methods
+    bool isUnionType() const;
+    size_t getActiveVariant() const;
+    ValuePtr getVariantValue(size_t index) const;
+    void setActiveVariant(size_t index, ValuePtr value);
+};
+
+// VM support for union operations
+enum class OpCode {
+    // ... existing opcodes ...
+    CREATE_UNION,      // Create union value with specific variant
+    GET_UNION_VARIANT, // Get active variant from union
+    CHECK_UNION_TYPE,  // Check if union is specific variant
+    MATCH_UNION,       // Pattern match on union type
+};
+```
+
+### 2. Typed Container Parsing
+**Current State**: Container type infrastructure exists but lacks parsing support.
+
+**Required Implementation**:
+```cpp
+// Parser extensions for typed containers
+class Parser {
+    std::shared_ptr<AST::TypeAnnotation> parseContainerType();
+    std::shared_ptr<AST::TypeAnnotation> parseListType();      // [elementType]
+    std::shared_ptr<AST::TypeAnnotation> parseDictType();      // {keyType: valueType}
+    std::shared_ptr<AST::TypeAnnotation> parseTupleType();     // (type1, type2, ...)
+};
+
+// Enhanced TypeAnnotation for containers
+struct TypeAnnotation {
+    // ... existing fields ...
+    
+    // Container type support
+    bool isTypedContainer = false;
+    std::shared_ptr<TypeAnnotation> elementType = nullptr;     // For lists
+    std::shared_ptr<TypeAnnotation> keyType = nullptr;         // For dictionaries
+    std::shared_ptr<TypeAnnotation> valueType = nullptr;       // For dictionaries
+    std::vector<std::shared_ptr<TypeAnnotation>> tupleTypes;   // For tuples
+};
+```
+
+### 3. Pattern Matching Integration
+**Current State**: Match expressions exist syntactically but lack union type integration.
+
+**Required Implementation**:
+```cpp
+// Enhanced match statement for union types
+class TypeChecker {
+    void checkMatchStatement(const std::shared_ptr<AST::MatchStatement>& stmt);
+    bool isExhaustiveUnionMatch(TypePtr unionType, const std::vector<std::shared_ptr<AST::MatchCase>>& cases);
+    void validateUnionVariantAccess(TypePtr unionType, const std::string& variantName);
+};
+
+// Runtime pattern matching support
+class VM {
+    void executeMatchUnion(const std::shared_ptr<AST::MatchStatement>& stmt);
+    bool matchesUnionVariant(ValuePtr value, const std::string& pattern);
+    ValuePtr extractUnionVariantValue(ValuePtr unionValue, size_t variantIndex);
+};
+```
+
+### 4. Option Type Integration
+**Current State**: Option type framework exists but needs union type integration.
+
+**Required Implementation**:
+```cpp
+// Option type as union type
+type Option<T> = Some<T> | None;
+
+// Built-in constructors
+ValuePtr createSome(TypePtr valueType, ValuePtr value) {
+    // Create union value with Some variant active
+    auto unionType = createUnionType({createSomeType(valueType), createNoneType()});
+    auto unionValue = createUnionValue(unionType, 0, value);  // Some is variant 0
+    return unionValue;
+}
+
+ValuePtr createNone(TypePtr valueType) {
+    // Create union value with None variant active
+    auto unionType = createUnionType({createSomeType(valueType), createNoneType()});
+    auto unionValue = createUnionValue(unionType, 1, nullptr);  // None is variant 1
+    return unionValue;
+}
+
+// Pattern matching for Option types
+match optionValue {
+    Some(value) => { /* use value */ },
+    None => { /* handle absence */ }
+}
+```
+
+## Implementation Priority
+
+### HIGH PRIORITY (Core Functionality)
+1. **Union Type Runtime Support** - Essential for union type functionality
+2. **Pattern Matching Integration** - Required for safe union type access
+
+### MEDIUM PRIORITY (Enhanced Features)
+3. **Typed Container Parsing** - Improves type safety for collections
+4. **Option Type Integration** - Enhances null safety
+
+### LOW PRIORITY (Advanced Features)
+5. **Generic Type Parameters** - Advanced type system features
+6. **Runtime Type Introspection** - Debugging and reflection capabilities

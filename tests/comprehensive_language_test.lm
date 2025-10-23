@@ -93,8 +93,8 @@ print("{a} >= {b}: {a >= b}");
 var p = true;
 var q = false;
 print("Logical:");
-print("p && q: {p and q}");
-print("p || q: {p or q}");
+print("p and q: {p and q}");
+print("p or q: {p or q}");
 print("!p: {!p}");
 
 // Complex expressions

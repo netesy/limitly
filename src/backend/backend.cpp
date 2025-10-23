@@ -100,6 +100,12 @@ void BytecodeGenerator::process(const std::shared_ptr<AST::Program>& program) {
                 message = message.substr(0, lexemePartStart);
             }
             
+            // Debug: Check if we have source context
+            if (sourceCode.empty() || filePath.empty()) {
+                std::cerr << "[DEBUG] Missing source context - sourceCode.empty(): " << sourceCode.empty() 
+                         << ", filePath.empty(): " << filePath.empty() << std::endl;
+            }
+            
             Debugger::error(message, error.line, error.column, 
                           InterpretationStage::SEMANTIC, sourceCode, filePath, lexeme, expectedValue);
         }
@@ -320,6 +326,9 @@ void BytecodeGenerator::visitDestructuringDeclaration(const std::shared_ptr<AST:
 
 void BytecodeGenerator::visitFunctionDeclaration(const std::shared_ptr<AST::FunctionDeclaration>& stmt) {
     // Generate bytecode for function declaration
+    
+    // Track this function as declared
+    addDeclaredFunction(stmt->name);
     
     // Start function definition
     emit(Opcode::BEGIN_FUNCTION, stmt->line, 0, 0.0f, false, stmt->name);
@@ -1226,7 +1235,17 @@ void BytecodeGenerator::visitVariableExpr(const std::shared_ptr<AST::VariableExp
     } else if (expr->name == "this" || expr->name == "self") {
         emit(Opcode::LOAD_THIS, expr->line);
     } else {
-        emit(Opcode::LOAD_VAR, expr->line, 0, 0.0f, false, expr->name);
+        // Check if this identifier refers to a declared function
+        // We need to check if there's a function with this name that was declared
+        bool isFunctionName = isDeclaredFunction(expr->name);
+        
+        if (isFunctionName) {
+            // Generate a function reference for declared functions
+            emit(Opcode::PUSH_FUNCTION_REF, expr->line, 0, 0.0f, false, expr->name);
+        } else {
+            // Regular variable load for variables
+            emit(Opcode::LOAD_VAR, expr->line, 0, 0.0f, false, expr->name);
+        }
     }
 }
 
@@ -1251,6 +1270,7 @@ void BytecodeGenerator::visitCallExpr(const std::shared_ptr<AST::CallExpr>& expr
                                        varExpr->name == "func" || 
                                        varExpr->name == "fn" ||
                                        varExpr->name == "callback" ||
+                                       varExpr->name == "processor" ||
                                        
                                        // Variables that contain "lambda" (but not function names)
                                        (varExpr->name.find("lambda") != std::string::npos && 
@@ -1317,11 +1337,39 @@ void BytecodeGenerator::visitCallExpr(const std::shared_ptr<AST::CallExpr>& expr
             emit(Opcode::CALL_HIGHER_ORDER, expr->line, 0, 0.0f, false, "");
             return;
         } else {
-            // Regular function call - evaluate arguments first
+            // Check if any arguments are function references
+            bool hasFunctionArguments = false;
             for (const auto& arg : expr->arguments) {
-                visitExpression(arg);
+                if (auto argVarExpr = std::dynamic_pointer_cast<AST::VariableExpr>(arg)) {
+                    if (isDeclaredFunction(argVarExpr->name)) {
+                        hasFunctionArguments = true;
+                        break;
+                    }
+                }
             }
-            functionName = varExpr->name;
+            
+            if (hasFunctionArguments) {
+                // This is a higher-order function call - load the function first
+                emit(Opcode::LOAD_VAR, expr->line, 0, 0.0f, false, varExpr->name);
+                
+                // Then evaluate and push arguments
+                for (const auto& arg : expr->arguments) {
+                    visitExpression(arg);
+                }
+                
+                // Push argument count onto stack
+                emit(Opcode::PUSH_INT, expr->line, static_cast<int32_t>(expr->arguments.size()), 0.0f, false, "");
+                
+                // Then emit a higher-order call
+                emit(Opcode::CALL_HIGHER_ORDER, expr->line, 0, 0.0f, false, "");
+                return;
+            } else {
+                // Regular function call - evaluate arguments first
+                for (const auto& arg : expr->arguments) {
+                    visitExpression(arg);
+                }
+                functionName = varExpr->name;
+            }
         }
 
       //  std::cout << "[DEBUG] CallExpr: Function name = " << functionName << std::endl;
@@ -2112,4 +2160,13 @@ void BytecodeGenerator::findCapturedVariables(const std::shared_ptr<AST::Stateme
         }
     }
     // Add more statement types as needed
+}
+
+// Function declaration tracking methods
+bool BytecodeGenerator::isDeclaredFunction(const std::string& name) const {
+    return declaredFunctions.find(name) != declaredFunctions.end();
+}
+
+void BytecodeGenerator::addDeclaredFunction(const std::string& name) {
+    declaredFunctions.insert(name);
 }

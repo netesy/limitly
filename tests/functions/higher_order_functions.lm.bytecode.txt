@@ -1,0 +1,262 @@
+Bytecode for tests\functions\higher_order_functions.lm
+Parser: New Unified Parser (CST mode)
+========================================
+
+=== Bytecode ===
+Generated 249 instructions
+
+   0: PUSH_STRING          "=== Higher-Order Functions Tests ==="
+   1: PRINT               
+   2: PUSH_STRING          "
+--- Test 1: Function as Parameter ---"
+   3: PRINT               
+   4: BEGIN_FUNCTION       "applyOperation"
+   5: DEFINE_PARAM        
+   6: DEFINE_PARAM        
+   7: DEFINE_PARAM        
+   8: BEGIN_SCOPE         
+   9: LOAD_VAR             "x"
+  10: LOAD_VAR             "y"
+  11: CALL                 "operation"
+  12: RETURN              
+  13: END_SCOPE           
+  14: PUSH_NULL           
+  15: RETURN              
+  16: END_FUNCTION        
+  17: PUSH_FUNCTION       
+  18: STORE_VAR            "applyOperation"
+  19: BEGIN_FUNCTION       "add"
+  20: DEFINE_PARAM        
+  21: DEFINE_PARAM        
+  22: BEGIN_SCOPE         
+  23: LOAD_VAR             "a"
+  24: LOAD_VAR             "b"
+  25: ADD                 
+  26: RETURN              
+  27: END_SCOPE           
+  28: PUSH_NULL           
+  29: RETURN              
+  30: END_FUNCTION        
+  31: PUSH_FUNCTION       
+  32: STORE_VAR            "add"
+  33: BEGIN_FUNCTION       "multiply"
+  34: DEFINE_PARAM        
+  35: DEFINE_PARAM        
+  36: BEGIN_SCOPE         
+  37: LOAD_VAR             "a"
+  38: LOAD_VAR             "b"
+  39: MULTIPLY            
+  40: RETURN              
+  41: END_SCOPE           
+  42: PUSH_NULL           
+  43: RETURN              
+  44: END_FUNCTION        
+  45: PUSH_FUNCTION       
+  46: STORE_VAR            "multiply"
+  47: LOAD_VAR             "applyOperation"
+  48: PUSH_INT             5
+  49: PUSH_INT             3
+  50: PUSH_FUNCTION_REF    "add"
+  51: PUSH_INT             3
+  52: CALL_HIGHER_ORDER   
+  53: STORE_VAR            "addResult"
+  54: PUSH_STRING          "applyOperation(5, 3, add) = "
+  55: LOAD_VAR             "addResult"
+  56: ADD                 
+  57: PRINT               
+  58: LOAD_VAR             "applyOperation"
+  59: PUSH_INT             5
+  60: PUSH_INT             3
+  61: PUSH_FUNCTION_REF    "multiply"
+  62: PUSH_INT             3
+  63: CALL_HIGHER_ORDER   
+  64: STORE_VAR            "multiplyResult"
+  65: PUSH_STRING          "applyOperation(5, 3, multiply) = "
+  66: LOAD_VAR             "multiplyResult"
+  67: ADD                 
+  68: PRINT               
+  69: PUSH_STRING          "
+--- Test 2: Function Returning Function ---"
+  70: PRINT               
+  71: BEGIN_FUNCTION       "createAdder"
+  72: DEFINE_PARAM        
+  73: BEGIN_SCOPE         
+  74: BEGIN_FUNCTION       "__lambda_0"
+  75: DEFINE_PARAM        
+  76: BEGIN_SCOPE         
+  77: LOAD_VAR             "x"
+  78: LOAD_VAR             "increment"
+  79: ADD                 
+  80: RETURN              
+  81: END_SCOPE           
+  82: PUSH_NULL           
+  83: RETURN              
+  84: END_FUNCTION        
+  85: PUSH_LAMBDA         
+  86: CAPTURE_VAR          "increment"
+  87: PUSH_INT             1
+  88: CREATE_CLOSURE       "__lambda_0"
+  89: RETURN              
+  90: END_SCOPE           
+  91: PUSH_NULL           
+  92: RETURN              
+  93: END_FUNCTION        
+  94: PUSH_FUNCTION       
+  95: STORE_VAR            "createAdder"
+  96: PUSH_INT             5
+  97: CALL                 "createAdder"
+  98: STORE_VAR            "addFive"
+  99: PUSH_INT             10
+ 100: CALL                 "addFive"
+ 101: STORE_VAR            "result1"
+ 102: PUSH_STRING          "addFive(10) = "
+ 103: LOAD_VAR             "result1"
+ 104: ADD                 
+ 105: PRINT               
+ 106: PUSH_INT             10
+ 107: CALL                 "createAdder"
+ 108: STORE_VAR            "addTen"
+ 109: PUSH_INT             20
+ 110: CALL                 "addTen"
+ 111: STORE_VAR            "result2"
+ 112: PUSH_STRING          "addTen(20) = "
+ 113: LOAD_VAR             "result2"
+ 114: ADD                 
+ 115: PRINT               
+ 116: PUSH_STRING          "
+--- Test 3: Nested Higher-Order Functions ---"
+ 117: PRINT               
+ 118: BEGIN_FUNCTION       "createMultiplier"
+ 119: DEFINE_PARAM        
+ 120: BEGIN_SCOPE         
+ 121: BEGIN_FUNCTION       "__lambda_1"
+ 122: DEFINE_PARAM        
+ 123: BEGIN_SCOPE         
+ 124: LOAD_VAR             "x"
+ 125: LOAD_VAR             "factor"
+ 126: MULTIPLY            
+ 127: RETURN              
+ 128: END_SCOPE           
+ 129: PUSH_NULL           
+ 130: RETURN              
+ 131: END_FUNCTION        
+ 132: PUSH_LAMBDA         
+ 133: CAPTURE_VAR          "factor"
+ 134: PUSH_INT             1
+ 135: CREATE_CLOSURE       "__lambda_1"
+ 136: RETURN              
+ 137: END_SCOPE           
+ 138: PUSH_NULL           
+ 139: RETURN              
+ 140: END_FUNCTION        
+ 141: PUSH_FUNCTION       
+ 142: STORE_VAR            "createMultiplier"
+ 143: BEGIN_FUNCTION       "applyTwice"
+ 144: DEFINE_PARAM        
+ 145: DEFINE_PARAM        
+ 146: BEGIN_SCOPE         
+ 147: LOAD_VAR             "f"
+ 148: LOAD_VAR             "f"
+ 149: LOAD_VAR             "x"
+ 150: PUSH_INT             1
+ 151: CALL_HIGHER_ORDER   
+ 152: PUSH_INT             1
+ 153: CALL_HIGHER_ORDER   
+ 154: RETURN              
+ 155: END_SCOPE           
+ 156: PUSH_NULL           
+ 157: RETURN              
+ 158: END_FUNCTION        
+ 159: PUSH_FUNCTION       
+ 160: STORE_VAR            "applyTwice"
+ 161: PUSH_INT             2
+ 162: CALL                 "createMultiplier"
+ 163: STORE_VAR            "double"
+ 164: LOAD_VAR             "double"
+ 165: PUSH_INT             3
+ 166: CALL                 "applyTwice"
+ 167: STORE_VAR            "quadrupleResult"
+ 168: PUSH_STRING          "applyTwice(double, 3) = "
+ 169: LOAD_VAR             "quadrupleResult"
+ 170: ADD                 
+ 171: PRINT               
+ 172: PUSH_STRING          "
+--- Test 4: Function Composition ---"
+ 173: PRINT               
+ 174: BEGIN_FUNCTION       "compose"
+ 175: DEFINE_PARAM        
+ 176: DEFINE_PARAM        
+ 177: BEGIN_SCOPE         
+ 178: BEGIN_FUNCTION       "__lambda_2"
+ 179: DEFINE_PARAM        
+ 180: BEGIN_SCOPE         
+ 181: LOAD_VAR             "f"
+ 182: LOAD_VAR             "g"
+ 183: LOAD_VAR             "x"
+ 184: PUSH_INT             1
+ 185: CALL_HIGHER_ORDER   
+ 186: PUSH_INT             1
+ 187: CALL_HIGHER_ORDER   
+ 188: RETURN              
+ 189: END_SCOPE           
+ 190: PUSH_NULL           
+ 191: RETURN              
+ 192: END_FUNCTION        
+ 193: PUSH_LAMBDA         
+ 194: CAPTURE_VAR          "f"
+ 195: CAPTURE_VAR          "g"
+ 196: PUSH_INT             2
+ 197: CREATE_CLOSURE       "__lambda_2"
+ 198: RETURN              
+ 199: END_SCOPE           
+ 200: PUSH_NULL           
+ 201: RETURN              
+ 202: END_FUNCTION        
+ 203: PUSH_FUNCTION       
+ 204: STORE_VAR            "compose"
+ 205: BEGIN_FUNCTION       "square"
+ 206: DEFINE_PARAM        
+ 207: BEGIN_SCOPE         
+ 208: LOAD_VAR             "x"
+ 209: LOAD_VAR             "x"
+ 210: MULTIPLY            
+ 211: RETURN              
+ 212: END_SCOPE           
+ 213: PUSH_NULL           
+ 214: RETURN              
+ 215: END_FUNCTION        
+ 216: PUSH_FUNCTION       
+ 217: STORE_VAR            "square"
+ 218: BEGIN_FUNCTION       "increment"
+ 219: DEFINE_PARAM        
+ 220: BEGIN_SCOPE         
+ 221: LOAD_VAR             "x"
+ 222: PUSH_INT             1
+ 223: ADD                 
+ 224: RETURN              
+ 225: END_SCOPE           
+ 226: PUSH_NULL           
+ 227: RETURN              
+ 228: END_FUNCTION        
+ 229: PUSH_FUNCTION       
+ 230: STORE_VAR            "increment"
+ 231: LOAD_VAR             "compose"
+ 232: PUSH_FUNCTION_REF    "increment"
+ 233: PUSH_FUNCTION_REF    "square"
+ 234: PUSH_INT             2
+ 235: CALL_HIGHER_ORDER   
+ 236: STORE_VAR            "squareThenIncrement"
+ 237: LOAD_VAR             "squareThenIncrement"
+ 238: PUSH_INT             4
+ 239: PUSH_INT             1
+ 240: CALL_HIGHER_ORDER   
+ 241: STORE_VAR            "compositionResult"
+ 242: PUSH_STRING          "squareThenIncrement(4) = "
+ 243: LOAD_VAR             "compositionResult"
+ 244: ADD                 
+ 245: PRINT               
+ 246: PUSH_STRING          "
+=== Higher-Order Functions Tests Complete ==="
+ 247: PRINT               
+ 248: HALT                
+

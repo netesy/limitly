@@ -1,0 +1,2772 @@
+Tokens for tests\comprehensive_language_test.lm
+Parser: New Unified Parser (CST mode)
+Mode: CST with trivia preservation
+========================================
+
+=== Tokens with Trivia ===
+Line 3: PRINT = 'print' [leading: COMMENT_LINE('// Comprehensive Language Feature Test') NEWLINE('
+') COMMENT_LINE('// This file tests all major language features in one place') NEWLINE('
+') ]
+Line 3: LEFT_PAREN = '('
+Line 3: STRING = '"=== COMPREHENSIVE LANGUAGE FEATURE TEST ==="'
+Line 3: RIGHT_PAREN = ')'
+Line 3: SEMICOLON = ';'
+Line 8: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') COMMENT_LINE('// 1. BASIC LITERALS AND VARIABLES') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') ]
+Line 8: LEFT_PAREN = '('
+Line 8: STRING = '"\n=== 1. LITERALS AND VARIABLES ==="'
+Line 8: RIGHT_PAREN = ')'
+Line 8: SEMICOLON = ';'
+Line 11: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Integer literals') NEWLINE('
+') ]
+Line 11: LEFT_PAREN = '('
+Line 11: STRING = '"Integers:"'
+Line 11: RIGHT_PAREN = ')'
+Line 11: SEMICOLON = ';'
+Line 12: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 12: LEFT_PAREN = '('
+Line 12: NUMBER = '0'
+Line 12: RIGHT_PAREN = ')'
+Line 12: SEMICOLON = ';'
+Line 13: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 13: LEFT_PAREN = '('
+Line 13: NUMBER = '42'
+Line 13: RIGHT_PAREN = ')'
+Line 13: SEMICOLON = ';'
+Line 14: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 14: LEFT_PAREN = '('
+Line 14: MINUS = '-'
+Line 14: NUMBER = '17'
+Line 14: RIGHT_PAREN = ')'
+Line 14: SEMICOLON = ';'
+Line 15: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 15: LEFT_PAREN = '('
+Line 15: NUMBER = '999999'
+Line 15: RIGHT_PAREN = ')'
+Line 15: SEMICOLON = ';'
+Line 18: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Float literals') NEWLINE('
+') ]
+Line 18: LEFT_PAREN = '('
+Line 18: STRING = '"Floats:"'
+Line 18: RIGHT_PAREN = ')'
+Line 18: SEMICOLON = ';'
+Line 19: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 19: LEFT_PAREN = '('
+Line 19: NUMBER = '0.0'
+Line 19: RIGHT_PAREN = ')'
+Line 19: SEMICOLON = ';'
+Line 20: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 20: LEFT_PAREN = '('
+Line 20: NUMBER = '3.14159'
+Line 20: RIGHT_PAREN = ')'
+Line 20: SEMICOLON = ';'
+Line 21: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 21: LEFT_PAREN = '('
+Line 21: MINUS = '-'
+Line 21: NUMBER = '2.71828'
+Line 21: RIGHT_PAREN = ')'
+Line 21: SEMICOLON = ';'
+Line 24: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// String literals') NEWLINE('
+') ]
+Line 24: LEFT_PAREN = '('
+Line 24: STRING = '"Strings:"'
+Line 24: RIGHT_PAREN = ')'
+Line 24: SEMICOLON = ';'
+Line 25: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 25: LEFT_PAREN = '('
+Line 25: STRING = '"Hello, World!"'
+Line 25: RIGHT_PAREN = ')'
+Line 25: SEMICOLON = ';'
+Line 26: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 26: LEFT_PAREN = '('
+Line 26: STRING = '""'
+Line 26: RIGHT_PAREN = ')'
+Line 26: SEMICOLON = ';'
+Line 27: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 27: LEFT_PAREN = '('
+Line 27: STRING = '"Special chars: \n\t\\\""'
+Line 27: RIGHT_PAREN = ')'
+Line 27: SEMICOLON = ';'
+Line 30: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Boolean literals') NEWLINE('
+') ]
+Line 30: LEFT_PAREN = '('
+Line 30: STRING = '"Booleans:"'
+Line 30: RIGHT_PAREN = ')'
+Line 30: SEMICOLON = ';'
+Line 31: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 31: LEFT_PAREN = '('
+Line 31: TRUE = 'true'
+Line 31: RIGHT_PAREN = ')'
+Line 31: SEMICOLON = ';'
+Line 32: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 32: LEFT_PAREN = '('
+Line 32: FALSE = 'false'
+Line 32: RIGHT_PAREN = ')'
+Line 32: SEMICOLON = ';'
+Line 35: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Null literal') NEWLINE('
+') ]
+Line 35: LEFT_PAREN = '('
+Line 35: STRING = '"Null:"'
+Line 35: RIGHT_PAREN = ')'
+Line 35: SEMICOLON = ';'
+Line 36: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 36: LEFT_PAREN = '('
+Line 36: NIL = 'nil'
+Line 36: RIGHT_PAREN = ')'
+Line 36: SEMICOLON = ';'
+Line 39: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Variable declarations') NEWLINE('
+') ]
+Line 39: IDENTIFIER = 'x' [leading: WHITESPACE(' ') ]
+Line 39: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 39: NUMBER = '42' [leading: WHITESPACE(' ') ]
+Line 39: SEMICOLON = ';'
+Line 40: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 40: IDENTIFIER = 'y' [leading: WHITESPACE(' ') ]
+Line 40: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 40: NUMBER = '3.14' [leading: WHITESPACE(' ') ]
+Line 40: SEMICOLON = ';'
+Line 41: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 41: IDENTIFIER = 'name' [leading: WHITESPACE(' ') ]
+Line 41: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 41: STRING = '"Limit"' [leading: WHITESPACE(' ') ]
+Line 41: SEMICOLON = ';'
+Line 42: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 42: IDENTIFIER = 'isActive' [leading: WHITESPACE(' ') ]
+Line 42: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 42: TRUE = 'true' [leading: WHITESPACE(' ') ]
+Line 42: SEMICOLON = ';'
+Line 44: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 44: LEFT_PAREN = '('
+Line 44: STRING = '"Variables:"'
+Line 44: RIGHT_PAREN = ')'
+Line 44: SEMICOLON = ';'
+Line 45: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 45: LEFT_PAREN = '('
+Line 45: INTERPOLATION_START = '"Integer: "'
+Line 45: IDENTIFIER = 'x'
+Line 45: INTERPOLATION_END = ''
+Line 45: STRING = '""'
+Line 45: RIGHT_PAREN = ')'
+Line 45: SEMICOLON = ';'
+Line 46: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 46: LEFT_PAREN = '('
+Line 46: INTERPOLATION_START = '"Float: "'
+Line 46: IDENTIFIER = 'y'
+Line 46: INTERPOLATION_END = ''
+Line 46: STRING = '""'
+Line 46: RIGHT_PAREN = ')'
+Line 46: SEMICOLON = ';'
+Line 47: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 47: LEFT_PAREN = '('
+Line 47: INTERPOLATION_START = '"String: "'
+Line 47: IDENTIFIER = 'name'
+Line 47: INTERPOLATION_END = ''
+Line 47: STRING = '""'
+Line 47: RIGHT_PAREN = ')'
+Line 47: SEMICOLON = ';'
+Line 48: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 48: LEFT_PAREN = '('
+Line 48: INTERPOLATION_START = '"Boolean: "'
+Line 48: IDENTIFIER = 'isActive'
+Line 48: INTERPOLATION_END = ''
+Line 48: STRING = '""'
+Line 48: RIGHT_PAREN = ')'
+Line 48: SEMICOLON = ';'
+Line 51: IDENTIFIER = 'x' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Variable reassignment') NEWLINE('
+') ]
+Line 51: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 51: NUMBER = '100' [leading: WHITESPACE(' ') ]
+Line 51: SEMICOLON = ';'
+Line 52: IDENTIFIER = 'y' [leading: NEWLINE('
+') ]
+Line 52: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 52: NUMBER = '2.71' [leading: WHITESPACE(' ') ]
+Line 52: SEMICOLON = ';'
+Line 53: IDENTIFIER = 'name' [leading: NEWLINE('
+') ]
+Line 53: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 53: STRING = '"Language"' [leading: WHITESPACE(' ') ]
+Line 53: SEMICOLON = ';'
+Line 54: IDENTIFIER = 'isActive' [leading: NEWLINE('
+') ]
+Line 54: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 54: FALSE = 'false' [leading: WHITESPACE(' ') ]
+Line 54: SEMICOLON = ';'
+Line 56: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 56: LEFT_PAREN = '('
+Line 56: STRING = '"After reassignment:"'
+Line 56: RIGHT_PAREN = ')'
+Line 56: SEMICOLON = ';'
+Line 57: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 57: LEFT_PAREN = '('
+Line 57: INTERPOLATION_START = '"Integer: "'
+Line 57: IDENTIFIER = 'x'
+Line 57: INTERPOLATION_END = ''
+Line 57: STRING = '""'
+Line 57: RIGHT_PAREN = ')'
+Line 57: SEMICOLON = ';'
+Line 58: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 58: LEFT_PAREN = '('
+Line 58: INTERPOLATION_START = '"Float: "'
+Line 58: IDENTIFIER = 'y'
+Line 58: INTERPOLATION_END = ''
+Line 58: STRING = '""'
+Line 58: RIGHT_PAREN = ')'
+Line 58: SEMICOLON = ';'
+Line 59: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 59: LEFT_PAREN = '('
+Line 59: INTERPOLATION_START = '"String: "'
+Line 59: IDENTIFIER = 'name'
+Line 59: INTERPOLATION_END = ''
+Line 59: STRING = '""'
+Line 59: RIGHT_PAREN = ')'
+Line 59: SEMICOLON = ';'
+Line 60: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 60: LEFT_PAREN = '('
+Line 60: INTERPOLATION_START = '"Boolean: "'
+Line 60: IDENTIFIER = 'isActive'
+Line 60: INTERPOLATION_END = ''
+Line 60: STRING = '""'
+Line 60: RIGHT_PAREN = ')'
+Line 60: SEMICOLON = ';'
+Line 65: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') COMMENT_LINE('// 2. EXPRESSIONS AND OPERATORS') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') ]
+Line 65: LEFT_PAREN = '('
+Line 65: STRING = '"\n=== 2. EXPRESSIONS AND OPERATORS ==="'
+Line 65: RIGHT_PAREN = ')'
+Line 65: SEMICOLON = ';'
+Line 67: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 67: IDENTIFIER = 'a' [leading: WHITESPACE(' ') ]
+Line 67: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 67: NUMBER = '10' [leading: WHITESPACE(' ') ]
+Line 67: SEMICOLON = ';'
+Line 68: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 68: IDENTIFIER = 'b' [leading: WHITESPACE(' ') ]
+Line 68: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 68: NUMBER = '3' [leading: WHITESPACE(' ') ]
+Line 68: SEMICOLON = ';'
+Line 71: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Arithmetic operations') NEWLINE('
+') ]
+Line 71: LEFT_PAREN = '('
+Line 71: STRING = '"Arithmetic:"'
+Line 71: RIGHT_PAREN = ')'
+Line 71: SEMICOLON = ';'
+Line 72: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 72: LEFT_PAREN = '('
+Line 72: INTERPOLATION_START = '"Addition: "'
+Line 72: IDENTIFIER = 'a'
+Line 72: INTERPOLATION_END = ''
+Line 72: INTERPOLATION_START = '" + "'
+Line 72: IDENTIFIER = 'b'
+Line 72: INTERPOLATION_END = ''
+Line 72: INTERPOLATION_START = '" = "'
+Line 72: IDENTIFIER = 'a'
+Line 72: PLUS = '+'
+Line 72: IDENTIFIER = 'b'
+Line 72: INTERPOLATION_END = ''
+Line 72: STRING = '""'
+Line 72: RIGHT_PAREN = ')'
+Line 72: SEMICOLON = ';'
+Line 73: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 73: LEFT_PAREN = '('
+Line 73: INTERPOLATION_START = '"Subtraction: "'
+Line 73: IDENTIFIER = 'a'
+Line 73: INTERPOLATION_END = ''
+Line 73: INTERPOLATION_START = '" - "'
+Line 73: IDENTIFIER = 'b'
+Line 73: INTERPOLATION_END = ''
+Line 73: INTERPOLATION_START = '" = "'
+Line 73: IDENTIFIER = 'a'
+Line 73: MINUS = '-'
+Line 73: IDENTIFIER = 'b'
+Line 73: INTERPOLATION_END = ''
+Line 73: STRING = '""'
+Line 73: RIGHT_PAREN = ')'
+Line 73: SEMICOLON = ';'
+Line 74: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 74: LEFT_PAREN = '('
+Line 74: INTERPOLATION_START = '"Multiplication: "'
+Line 74: IDENTIFIER = 'a'
+Line 74: INTERPOLATION_END = ''
+Line 74: INTERPOLATION_START = '" * "'
+Line 74: IDENTIFIER = 'b'
+Line 74: INTERPOLATION_END = ''
+Line 74: INTERPOLATION_START = '" = "'
+Line 74: IDENTIFIER = 'a'
+Line 74: STAR = '*'
+Line 74: IDENTIFIER = 'b'
+Line 74: INTERPOLATION_END = ''
+Line 74: STRING = '""'
+Line 74: RIGHT_PAREN = ')'
+Line 74: SEMICOLON = ';'
+Line 75: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 75: LEFT_PAREN = '('
+Line 75: INTERPOLATION_START = '"Division: "'
+Line 75: IDENTIFIER = 'a'
+Line 75: INTERPOLATION_END = ''
+Line 75: INTERPOLATION_START = '" / "'
+Line 75: IDENTIFIER = 'b'
+Line 75: INTERPOLATION_END = ''
+Line 75: INTERPOLATION_START = '" = "'
+Line 75: IDENTIFIER = 'a'
+Line 75: SLASH = '/'
+Line 75: IDENTIFIER = 'b'
+Line 75: INTERPOLATION_END = ''
+Line 75: STRING = '""'
+Line 75: RIGHT_PAREN = ')'
+Line 75: SEMICOLON = ';'
+Line 76: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 76: LEFT_PAREN = '('
+Line 76: INTERPOLATION_START = '"Modulo: "'
+Line 76: IDENTIFIER = 'a'
+Line 76: INTERPOLATION_END = ''
+Line 76: INTERPOLATION_START = '" % "'
+Line 76: IDENTIFIER = 'b'
+Line 76: INTERPOLATION_END = ''
+Line 76: INTERPOLATION_START = '" = "'
+Line 76: IDENTIFIER = 'a'
+Line 76: MODULUS = '%'
+Line 76: IDENTIFIER = 'b'
+Line 76: INTERPOLATION_END = ''
+Line 76: STRING = '""'
+Line 76: RIGHT_PAREN = ')'
+Line 76: SEMICOLON = ';'
+Line 79: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Unary operations') NEWLINE('
+') ]
+Line 79: LEFT_PAREN = '('
+Line 79: STRING = '"Unary:"'
+Line 79: RIGHT_PAREN = ')'
+Line 79: SEMICOLON = ';'
+Line 80: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 80: LEFT_PAREN = '('
+Line 80: INTERPOLATION_START = '"Negation: -"'
+Line 80: IDENTIFIER = 'a'
+Line 80: INTERPOLATION_END = ''
+Line 80: INTERPOLATION_START = '" = "'
+Line 80: MINUS = '-'
+Line 80: IDENTIFIER = 'a'
+Line 80: INTERPOLATION_END = ''
+Line 80: STRING = '""'
+Line 80: RIGHT_PAREN = ')'
+Line 80: SEMICOLON = ';'
+Line 81: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 81: LEFT_PAREN = '('
+Line 81: INTERPOLATION_START = '"Positive: +"'
+Line 81: IDENTIFIER = 'a'
+Line 81: INTERPOLATION_END = ''
+Line 81: INTERPOLATION_START = '" = "'
+Line 81: PLUS = '+'
+Line 81: IDENTIFIER = 'a'
+Line 81: INTERPOLATION_END = ''
+Line 81: STRING = '""'
+Line 81: RIGHT_PAREN = ')'
+Line 81: SEMICOLON = ';'
+Line 84: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Comparison operations') NEWLINE('
+') ]
+Line 84: LEFT_PAREN = '('
+Line 84: STRING = '"Comparison:"'
+Line 84: RIGHT_PAREN = ')'
+Line 84: SEMICOLON = ';'
+Line 85: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 85: LEFT_PAREN = '('
+Line 85: INTERPOLATION_START = '""'
+Line 85: IDENTIFIER = 'a'
+Line 85: INTERPOLATION_END = ''
+Line 85: INTERPOLATION_START = '" == "'
+Line 85: IDENTIFIER = 'b'
+Line 85: INTERPOLATION_END = ''
+Line 85: INTERPOLATION_START = '": "'
+Line 85: IDENTIFIER = 'a'
+Line 85: EQUAL_EQUAL = '=='
+Line 85: IDENTIFIER = 'b'
+Line 85: INTERPOLATION_END = ''
+Line 85: STRING = '""'
+Line 85: RIGHT_PAREN = ')'
+Line 85: SEMICOLON = ';'
+Line 86: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 86: LEFT_PAREN = '('
+Line 86: INTERPOLATION_START = '""'
+Line 86: IDENTIFIER = 'a'
+Line 86: INTERPOLATION_END = ''
+Line 86: INTERPOLATION_START = '" != "'
+Line 86: IDENTIFIER = 'b'
+Line 86: INTERPOLATION_END = ''
+Line 86: INTERPOLATION_START = '": "'
+Line 86: IDENTIFIER = 'a'
+Line 86: BANG_EQUAL = '!='
+Line 86: IDENTIFIER = 'b'
+Line 86: INTERPOLATION_END = ''
+Line 86: STRING = '""'
+Line 86: RIGHT_PAREN = ')'
+Line 86: SEMICOLON = ';'
+Line 87: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 87: LEFT_PAREN = '('
+Line 87: INTERPOLATION_START = '""'
+Line 87: IDENTIFIER = 'a'
+Line 87: INTERPOLATION_END = ''
+Line 87: INTERPOLATION_START = '" < "'
+Line 87: IDENTIFIER = 'b'
+Line 87: INTERPOLATION_END = ''
+Line 87: INTERPOLATION_START = '": "'
+Line 87: IDENTIFIER = 'a'
+Line 87: LESS = '<'
+Line 87: IDENTIFIER = 'b'
+Line 87: INTERPOLATION_END = ''
+Line 87: STRING = '""'
+Line 87: RIGHT_PAREN = ')'
+Line 87: SEMICOLON = ';'
+Line 88: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 88: LEFT_PAREN = '('
+Line 88: INTERPOLATION_START = '""'
+Line 88: IDENTIFIER = 'a'
+Line 88: INTERPOLATION_END = ''
+Line 88: INTERPOLATION_START = '" > "'
+Line 88: IDENTIFIER = 'b'
+Line 88: INTERPOLATION_END = ''
+Line 88: INTERPOLATION_START = '": "'
+Line 88: IDENTIFIER = 'a'
+Line 88: GREATER = '>'
+Line 88: IDENTIFIER = 'b'
+Line 88: INTERPOLATION_END = ''
+Line 88: STRING = '""'
+Line 88: RIGHT_PAREN = ')'
+Line 88: SEMICOLON = ';'
+Line 89: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 89: LEFT_PAREN = '('
+Line 89: INTERPOLATION_START = '""'
+Line 89: IDENTIFIER = 'a'
+Line 89: INTERPOLATION_END = ''
+Line 89: INTERPOLATION_START = '" <= "'
+Line 89: IDENTIFIER = 'b'
+Line 89: INTERPOLATION_END = ''
+Line 89: INTERPOLATION_START = '": "'
+Line 89: IDENTIFIER = 'a'
+Line 89: LESS_EQUAL = '<='
+Line 89: IDENTIFIER = 'b'
+Line 89: INTERPOLATION_END = ''
+Line 89: STRING = '""'
+Line 89: RIGHT_PAREN = ')'
+Line 89: SEMICOLON = ';'
+Line 90: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 90: LEFT_PAREN = '('
+Line 90: INTERPOLATION_START = '""'
+Line 90: IDENTIFIER = 'a'
+Line 90: INTERPOLATION_END = ''
+Line 90: INTERPOLATION_START = '" >= "'
+Line 90: IDENTIFIER = 'b'
+Line 90: INTERPOLATION_END = ''
+Line 90: INTERPOLATION_START = '": "'
+Line 90: IDENTIFIER = 'a'
+Line 90: GREATER_EQUAL = '>='
+Line 90: IDENTIFIER = 'b'
+Line 90: INTERPOLATION_END = ''
+Line 90: STRING = '""'
+Line 90: RIGHT_PAREN = ')'
+Line 90: SEMICOLON = ';'
+Line 93: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Logical operations') NEWLINE('
+') ]
+Line 93: IDENTIFIER = 'p' [leading: WHITESPACE(' ') ]
+Line 93: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 93: TRUE = 'true' [leading: WHITESPACE(' ') ]
+Line 93: SEMICOLON = ';'
+Line 94: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 94: IDENTIFIER = 'q' [leading: WHITESPACE(' ') ]
+Line 94: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 94: FALSE = 'false' [leading: WHITESPACE(' ') ]
+Line 94: SEMICOLON = ';'
+Line 95: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 95: LEFT_PAREN = '('
+Line 95: STRING = '"Logical:"'
+Line 95: RIGHT_PAREN = ')'
+Line 95: SEMICOLON = ';'
+Line 96: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 96: LEFT_PAREN = '('
+Line 96: INTERPOLATION_START = '"p && q: "'
+Line 96: IDENTIFIER = 'p'
+Line 96: AND = 'and'
+Line 96: IDENTIFIER = 'q'
+Line 96: INTERPOLATION_END = ''
+Line 96: STRING = '""'
+Line 96: RIGHT_PAREN = ')'
+Line 96: SEMICOLON = ';'
+Line 97: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 97: LEFT_PAREN = '('
+Line 97: INTERPOLATION_START = '"p || q: "'
+Line 97: IDENTIFIER = 'p'
+Line 97: OR = 'or'
+Line 97: IDENTIFIER = 'q'
+Line 97: INTERPOLATION_END = ''
+Line 97: STRING = '""'
+Line 97: RIGHT_PAREN = ')'
+Line 97: SEMICOLON = ';'
+Line 98: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 98: LEFT_PAREN = '('
+Line 98: INTERPOLATION_START = '"!p: "'
+Line 98: BANG = '!'
+Line 98: IDENTIFIER = 'p'
+Line 98: INTERPOLATION_END = ''
+Line 98: STRING = '""'
+Line 98: RIGHT_PAREN = ')'
+Line 98: SEMICOLON = ';'
+Line 101: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Complex expressions') NEWLINE('
+') ]
+Line 101: IDENTIFIER = 'result' [leading: WHITESPACE(' ') ]
+Line 101: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 101: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 101: IDENTIFIER = 'a'
+Line 101: PLUS = '+' [leading: WHITESPACE(' ') ]
+Line 101: IDENTIFIER = 'b' [leading: WHITESPACE(' ') ]
+Line 101: RIGHT_PAREN = ')'
+Line 101: STAR = '*' [leading: WHITESPACE(' ') ]
+Line 101: NUMBER = '2' [leading: WHITESPACE(' ') ]
+Line 101: MINUS = '-' [leading: WHITESPACE(' ') ]
+Line 101: IDENTIFIER = 'a' [leading: WHITESPACE(' ') ]
+Line 101: SLASH = '/' [leading: WHITESPACE(' ') ]
+Line 101: IDENTIFIER = 'b' [leading: WHITESPACE(' ') ]
+Line 101: SEMICOLON = ';'
+Line 102: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 102: LEFT_PAREN = '('
+Line 102: INTERPOLATION_START = '"Complex: ("'
+Line 102: IDENTIFIER = 'a'
+Line 102: INTERPOLATION_END = ''
+Line 102: INTERPOLATION_START = '" + "'
+Line 102: IDENTIFIER = 'b'
+Line 102: INTERPOLATION_END = ''
+Line 102: INTERPOLATION_START = '") * 2 - "'
+Line 102: IDENTIFIER = 'a'
+Line 102: INTERPOLATION_END = ''
+Line 102: INTERPOLATION_START = '" / "'
+Line 102: IDENTIFIER = 'b'
+Line 102: INTERPOLATION_END = ''
+Line 102: INTERPOLATION_START = '" = "'
+Line 102: IDENTIFIER = 'result'
+Line 102: INTERPOLATION_END = ''
+Line 102: STRING = '""'
+Line 102: RIGHT_PAREN = ')'
+Line 102: SEMICOLON = ';'
+Line 107: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') COMMENT_LINE('// 3. STRING INTERPOLATION') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') ]
+Line 107: LEFT_PAREN = '('
+Line 107: STRING = '"\n=== 3. STRING INTERPOLATION ==="'
+Line 107: RIGHT_PAREN = ')'
+Line 107: SEMICOLON = ';'
+Line 109: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 109: IDENTIFIER = 'userName' [leading: WHITESPACE(' ') ]
+Line 109: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 109: STRING = '"Alice"' [leading: WHITESPACE(' ') ]
+Line 109: SEMICOLON = ';'
+Line 110: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 110: IDENTIFIER = 'userAge' [leading: WHITESPACE(' ') ]
+Line 110: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 110: NUMBER = '25' [leading: WHITESPACE(' ') ]
+Line 110: SEMICOLON = ';'
+Line 111: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 111: IDENTIFIER = 'pi' [leading: WHITESPACE(' ') ]
+Line 111: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 111: NUMBER = '3.14159' [leading: WHITESPACE(' ') ]
+Line 111: SEMICOLON = ';'
+Line 114: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Basic interpolation') NEWLINE('
+') ]
+Line 114: LEFT_PAREN = '('
+Line 114: INTERPOLATION_START = '"Hello, "'
+Line 114: IDENTIFIER = 'userName'
+Line 114: INTERPOLATION_END = ''
+Line 114: STRING = '"!"'
+Line 114: RIGHT_PAREN = ')'
+Line 114: SEMICOLON = ';'
+Line 115: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 115: LEFT_PAREN = '('
+Line 115: INTERPOLATION_START = '"Age: "'
+Line 115: IDENTIFIER = 'userAge'
+Line 115: INTERPOLATION_END = ''
+Line 115: STRING = '""'
+Line 115: RIGHT_PAREN = ')'
+Line 115: SEMICOLON = ';'
+Line 116: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 116: LEFT_PAREN = '('
+Line 116: INTERPOLATION_START = '"Pi: "'
+Line 116: IDENTIFIER = 'pi'
+Line 116: INTERPOLATION_END = ''
+Line 116: STRING = '""'
+Line 116: RIGHT_PAREN = ')'
+Line 116: SEMICOLON = ';'
+Line 119: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Expression interpolation') NEWLINE('
+') ]
+Line 119: LEFT_PAREN = '('
+Line 119: INTERPOLATION_START = '"Next year: "'
+Line 119: IDENTIFIER = 'userAge'
+Line 119: PLUS = '+'
+Line 119: NUMBER = '1'
+Line 119: INTERPOLATION_END = ''
+Line 119: STRING = '""'
+Line 119: RIGHT_PAREN = ')'
+Line 119: SEMICOLON = ';'
+Line 120: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 120: LEFT_PAREN = '('
+Line 120: INTERPOLATION_START = '"Area of circle: "'
+Line 120: IDENTIFIER = 'pi'
+Line 120: STAR = '*'
+Line 120: NUMBER = '2'
+Line 120: STAR = '*'
+Line 120: NUMBER = '2'
+Line 120: INTERPOLATION_END = ''
+Line 120: STRING = '""'
+Line 120: RIGHT_PAREN = ')'
+Line 120: SEMICOLON = ';'
+Line 123: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Multiple interpolations') NEWLINE('
+') ]
+Line 123: LEFT_PAREN = '('
+Line 123: INTERPOLATION_START = '"Name: "'
+Line 123: IDENTIFIER = 'userName'
+Line 123: INTERPOLATION_END = ''
+Line 123: INTERPOLATION_START = '", Age: "'
+Line 123: IDENTIFIER = 'userAge'
+Line 123: INTERPOLATION_END = ''
+Line 123: STRING = '""'
+Line 123: RIGHT_PAREN = ')'
+Line 123: SEMICOLON = ';'
+Line 124: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 124: LEFT_PAREN = '('
+Line 124: INTERPOLATION_START = '""'
+Line 124: IDENTIFIER = 'userName'
+Line 124: INTERPOLATION_END = ''
+Line 124: INTERPOLATION_START = '" is "'
+Line 124: IDENTIFIER = 'userAge'
+Line 124: INTERPOLATION_END = ''
+Line 124: STRING = '" years old"'
+Line 124: RIGHT_PAREN = ')'
+Line 124: SEMICOLON = ';'
+Line 127: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Interpolation at start') NEWLINE('
+') ]
+Line 127: LEFT_PAREN = '('
+Line 127: INTERPOLATION_START = '""'
+Line 127: IDENTIFIER = 'userName'
+Line 127: INTERPOLATION_END = ''
+Line 127: STRING = '" says hello"'
+Line 127: RIGHT_PAREN = ')'
+Line 127: SEMICOLON = ';'
+Line 128: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 128: LEFT_PAREN = '('
+Line 128: INTERPOLATION_START = '""'
+Line 128: IDENTIFIER = 'userAge'
+Line 128: INTERPOLATION_END = ''
+Line 128: STRING = '" is the age"'
+Line 128: RIGHT_PAREN = ')'
+Line 128: SEMICOLON = ';'
+Line 131: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Complex expressions in interpolation') NEWLINE('
+') ]
+Line 131: IDENTIFIER = 'x1' [leading: WHITESPACE(' ') ]
+Line 131: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 131: NUMBER = '10' [leading: WHITESPACE(' ') ]
+Line 131: SEMICOLON = ';'
+Line 132: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 132: IDENTIFIER = 'y1' [leading: WHITESPACE(' ') ]
+Line 132: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 132: NUMBER = '5' [leading: WHITESPACE(' ') ]
+Line 132: SEMICOLON = ';'
+Line 133: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 133: LEFT_PAREN = '('
+Line 133: INTERPOLATION_START = '"Math: "'
+Line 133: IDENTIFIER = 'x1'
+Line 133: INTERPOLATION_END = ''
+Line 133: INTERPOLATION_START = '" + "'
+Line 133: IDENTIFIER = 'y1'
+Line 133: INTERPOLATION_END = ''
+Line 133: INTERPOLATION_START = '" = "'
+Line 133: IDENTIFIER = 'x1'
+Line 133: PLUS = '+'
+Line 133: IDENTIFIER = 'y1'
+Line 133: INTERPOLATION_END = ''
+Line 133: STRING = '""'
+Line 133: RIGHT_PAREN = ')'
+Line 133: SEMICOLON = ';'
+Line 134: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 134: LEFT_PAREN = '('
+Line 134: INTERPOLATION_START = '"Comparison: "'
+Line 134: IDENTIFIER = 'x1'
+Line 134: INTERPOLATION_END = ''
+Line 134: INTERPOLATION_START = '" > "'
+Line 134: IDENTIFIER = 'y1'
+Line 134: INTERPOLATION_END = ''
+Line 134: INTERPOLATION_START = '" is "'
+Line 134: IDENTIFIER = 'x1'
+Line 134: GREATER = '>'
+Line 134: IDENTIFIER = 'y1'
+Line 134: INTERPOLATION_END = ''
+Line 134: STRING = '""'
+Line 134: RIGHT_PAREN = ')'
+Line 134: SEMICOLON = ';'
+Line 135: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 135: LEFT_PAREN = '('
+Line 135: INTERPOLATION_START = '"Complex: "'
+Line 135: LEFT_PAREN = '('
+Line 135: IDENTIFIER = 'x1'
+Line 135: PLUS = '+'
+Line 135: IDENTIFIER = 'y1'
+Line 135: RIGHT_PAREN = ')'
+Line 135: STAR = '*'
+Line 135: NUMBER = '2'
+Line 135: MINUS = '-'
+Line 135: NUMBER = '1'
+Line 135: INTERPOLATION_END = ''
+Line 135: STRING = '""'
+Line 135: RIGHT_PAREN = ')'
+Line 135: SEMICOLON = ';'
+Line 140: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') COMMENT_LINE('// 4. CONTROL FLOW - IF/ELSE') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') ]
+Line 140: LEFT_PAREN = '('
+Line 140: STRING = '"\n=== 4. CONTROL FLOW - IF/ELSE ==="'
+Line 140: RIGHT_PAREN = ')'
+Line 140: SEMICOLON = ';'
+Line 142: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 142: IDENTIFIER = 'score' [leading: WHITESPACE(' ') ]
+Line 142: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 142: NUMBER = '85' [leading: WHITESPACE(' ') ]
+Line 142: SEMICOLON = ';'
+Line 144: IF = 'if' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 144: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 144: IDENTIFIER = 'score'
+Line 144: GREATER_EQUAL = '>=' [leading: WHITESPACE(' ') ]
+Line 144: NUMBER = '90' [leading: WHITESPACE(' ') ]
+Line 144: RIGHT_PAREN = ')'
+Line 144: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 145: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 145: LEFT_PAREN = '('
+Line 145: STRING = '"Grade: A"'
+Line 145: RIGHT_PAREN = ')'
+Line 145: SEMICOLON = ';'
+Line 146: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 146: ELIF = 'elif' [leading: WHITESPACE(' ') ]
+Line 146: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 146: IDENTIFIER = 'score'
+Line 146: GREATER_EQUAL = '>=' [leading: WHITESPACE(' ') ]
+Line 146: NUMBER = '80' [leading: WHITESPACE(' ') ]
+Line 146: RIGHT_PAREN = ')'
+Line 146: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 147: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 147: LEFT_PAREN = '('
+Line 147: STRING = '"Grade: B"'
+Line 147: RIGHT_PAREN = ')'
+Line 147: SEMICOLON = ';'
+Line 148: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 148: ELIF = 'elif' [leading: WHITESPACE(' ') ]
+Line 148: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 148: IDENTIFIER = 'score'
+Line 148: GREATER_EQUAL = '>=' [leading: WHITESPACE(' ') ]
+Line 148: NUMBER = '70' [leading: WHITESPACE(' ') ]
+Line 148: RIGHT_PAREN = ')'
+Line 148: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 149: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 149: LEFT_PAREN = '('
+Line 149: STRING = '"Grade: C"'
+Line 149: RIGHT_PAREN = ')'
+Line 149: SEMICOLON = ';'
+Line 150: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 150: ELSE = 'else' [leading: WHITESPACE(' ') ]
+Line 150: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 151: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 151: LEFT_PAREN = '('
+Line 151: STRING = '"Grade: F"'
+Line 151: RIGHT_PAREN = ')'
+Line 151: SEMICOLON = ';'
+Line 152: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 155: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Nested if statements') NEWLINE('
+') ]
+Line 155: IDENTIFIER = 'weather' [leading: WHITESPACE(' ') ]
+Line 155: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 155: STRING = '"sunny"' [leading: WHITESPACE(' ') ]
+Line 155: SEMICOLON = ';'
+Line 156: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 156: IDENTIFIER = 'temperature' [leading: WHITESPACE(' ') ]
+Line 156: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 156: NUMBER = '75' [leading: WHITESPACE(' ') ]
+Line 156: SEMICOLON = ';'
+Line 158: IF = 'if' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 158: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 158: IDENTIFIER = 'weather'
+Line 158: EQUAL_EQUAL = '==' [leading: WHITESPACE(' ') ]
+Line 158: STRING = '"sunny"' [leading: WHITESPACE(' ') ]
+Line 158: RIGHT_PAREN = ')'
+Line 158: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 159: IF = 'if' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 159: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 159: IDENTIFIER = 'temperature'
+Line 159: GREATER = '>' [leading: WHITESPACE(' ') ]
+Line 159: NUMBER = '70' [leading: WHITESPACE(' ') ]
+Line 159: RIGHT_PAREN = ')'
+Line 159: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 160: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 160: LEFT_PAREN = '('
+Line 160: STRING = '"Perfect day for outdoor activities!"'
+Line 160: RIGHT_PAREN = ')'
+Line 160: SEMICOLON = ';'
+Line 161: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 161: ELSE = 'else' [leading: WHITESPACE(' ') ]
+Line 161: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 162: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 162: LEFT_PAREN = '('
+Line 162: STRING = '"Sunny but a bit cold."'
+Line 162: RIGHT_PAREN = ')'
+Line 162: SEMICOLON = ';'
+Line 163: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 164: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 164: ELSE = 'else' [leading: WHITESPACE(' ') ]
+Line 164: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 165: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 165: LEFT_PAREN = '('
+Line 165: STRING = '"Not ideal weather."'
+Line 165: RIGHT_PAREN = ')'
+Line 165: SEMICOLON = ';'
+Line 166: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 171: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') COMMENT_LINE('// 5. LOOPS - FOR LOOPS') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') ]
+Line 171: LEFT_PAREN = '('
+Line 171: STRING = '"\n=== 5. LOOPS - FOR LOOPS ==="'
+Line 171: RIGHT_PAREN = ')'
+Line 171: SEMICOLON = ';'
+Line 174: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Basic for loop') NEWLINE('
+') ]
+Line 174: LEFT_PAREN = '('
+Line 174: STRING = '"Basic for loop (0 to 4):"'
+Line 174: RIGHT_PAREN = ')'
+Line 174: SEMICOLON = ';'
+Line 175: FOR = 'for' [leading: NEWLINE('
+') ]
+Line 175: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 175: VAR = 'var'
+Line 175: IDENTIFIER = 'i' [leading: WHITESPACE(' ') ]
+Line 175: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 175: NUMBER = '0' [leading: WHITESPACE(' ') ]
+Line 175: SEMICOLON = ';'
+Line 175: IDENTIFIER = 'i' [leading: WHITESPACE(' ') ]
+Line 175: LESS = '<' [leading: WHITESPACE(' ') ]
+Line 175: NUMBER = '5' [leading: WHITESPACE(' ') ]
+Line 175: SEMICOLON = ';'
+Line 175: IDENTIFIER = 'i' [leading: WHITESPACE(' ') ]
+Line 175: PLUS_EQUAL = '+=' [leading: WHITESPACE(' ') ]
+Line 175: NUMBER = '1' [leading: WHITESPACE(' ') ]
+Line 175: RIGHT_PAREN = ')'
+Line 175: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 176: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 176: LEFT_PAREN = '('
+Line 176: INTERPOLATION_START = '"i = "'
+Line 176: IDENTIFIER = 'i'
+Line 176: INTERPOLATION_END = ''
+Line 176: STRING = '""'
+Line 176: RIGHT_PAREN = ')'
+Line 176: SEMICOLON = ';'
+Line 177: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 180: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// For loop with different increment') NEWLINE('
+') ]
+Line 180: LEFT_PAREN = '('
+Line 180: STRING = '"For loop with increment 2:"'
+Line 180: RIGHT_PAREN = ')'
+Line 180: SEMICOLON = ';'
+Line 181: FOR = 'for' [leading: NEWLINE('
+') ]
+Line 181: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 181: VAR = 'var'
+Line 181: IDENTIFIER = 'j' [leading: WHITESPACE(' ') ]
+Line 181: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 181: NUMBER = '0' [leading: WHITESPACE(' ') ]
+Line 181: SEMICOLON = ';'
+Line 181: IDENTIFIER = 'j' [leading: WHITESPACE(' ') ]
+Line 181: LESS = '<' [leading: WHITESPACE(' ') ]
+Line 181: NUMBER = '10' [leading: WHITESPACE(' ') ]
+Line 181: SEMICOLON = ';'
+Line 181: IDENTIFIER = 'j' [leading: WHITESPACE(' ') ]
+Line 181: PLUS_EQUAL = '+=' [leading: WHITESPACE(' ') ]
+Line 181: NUMBER = '2' [leading: WHITESPACE(' ') ]
+Line 181: RIGHT_PAREN = ')'
+Line 181: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 182: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 182: LEFT_PAREN = '('
+Line 182: INTERPOLATION_START = '"j = "'
+Line 182: IDENTIFIER = 'j'
+Line 182: INTERPOLATION_END = ''
+Line 182: STRING = '""'
+Line 182: RIGHT_PAREN = ')'
+Line 182: SEMICOLON = ';'
+Line 183: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 186: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Countdown loop') NEWLINE('
+') ]
+Line 186: LEFT_PAREN = '('
+Line 186: STRING = '"Countdown loop:"'
+Line 186: RIGHT_PAREN = ')'
+Line 186: SEMICOLON = ';'
+Line 187: FOR = 'for' [leading: NEWLINE('
+') ]
+Line 187: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 187: VAR = 'var'
+Line 187: IDENTIFIER = 'k' [leading: WHITESPACE(' ') ]
+Line 187: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 187: NUMBER = '5' [leading: WHITESPACE(' ') ]
+Line 187: SEMICOLON = ';'
+Line 187: IDENTIFIER = 'k' [leading: WHITESPACE(' ') ]
+Line 187: GREATER = '>' [leading: WHITESPACE(' ') ]
+Line 187: NUMBER = '0' [leading: WHITESPACE(' ') ]
+Line 187: SEMICOLON = ';'
+Line 187: IDENTIFIER = 'k' [leading: WHITESPACE(' ') ]
+Line 187: MINUS_EQUAL = '-=' [leading: WHITESPACE(' ') ]
+Line 187: NUMBER = '1' [leading: WHITESPACE(' ') ]
+Line 187: RIGHT_PAREN = ')'
+Line 187: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 188: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 188: LEFT_PAREN = '('
+Line 188: INTERPOLATION_START = '"k = "'
+Line 188: IDENTIFIER = 'k'
+Line 188: INTERPOLATION_END = ''
+Line 188: STRING = '""'
+Line 188: RIGHT_PAREN = ')'
+Line 188: SEMICOLON = ';'
+Line 189: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 192: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Nested for loops') NEWLINE('
+') ]
+Line 192: LEFT_PAREN = '('
+Line 192: STRING = '"Nested for loops (2x3 grid):"'
+Line 192: RIGHT_PAREN = ')'
+Line 192: SEMICOLON = ';'
+Line 193: FOR = 'for' [leading: NEWLINE('
+') ]
+Line 193: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 193: VAR = 'var'
+Line 193: IDENTIFIER = 'row' [leading: WHITESPACE(' ') ]
+Line 193: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 193: NUMBER = '0' [leading: WHITESPACE(' ') ]
+Line 193: SEMICOLON = ';'
+Line 193: IDENTIFIER = 'row' [leading: WHITESPACE(' ') ]
+Line 193: LESS = '<' [leading: WHITESPACE(' ') ]
+Line 193: NUMBER = '2' [leading: WHITESPACE(' ') ]
+Line 193: SEMICOLON = ';'
+Line 193: IDENTIFIER = 'row' [leading: WHITESPACE(' ') ]
+Line 193: PLUS_EQUAL = '+=' [leading: WHITESPACE(' ') ]
+Line 193: NUMBER = '1' [leading: WHITESPACE(' ') ]
+Line 193: RIGHT_PAREN = ')'
+Line 193: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 194: FOR = 'for' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 194: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 194: VAR = 'var'
+Line 194: IDENTIFIER = 'col' [leading: WHITESPACE(' ') ]
+Line 194: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 194: NUMBER = '0' [leading: WHITESPACE(' ') ]
+Line 194: SEMICOLON = ';'
+Line 194: IDENTIFIER = 'col' [leading: WHITESPACE(' ') ]
+Line 194: LESS = '<' [leading: WHITESPACE(' ') ]
+Line 194: NUMBER = '3' [leading: WHITESPACE(' ') ]
+Line 194: SEMICOLON = ';'
+Line 194: IDENTIFIER = 'col' [leading: WHITESPACE(' ') ]
+Line 194: PLUS_EQUAL = '+=' [leading: WHITESPACE(' ') ]
+Line 194: NUMBER = '1' [leading: WHITESPACE(' ') ]
+Line 194: RIGHT_PAREN = ')'
+Line 194: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 195: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 195: LEFT_PAREN = '('
+Line 195: INTERPOLATION_START = '"("'
+Line 195: IDENTIFIER = 'row'
+Line 195: INTERPOLATION_END = ''
+Line 195: INTERPOLATION_START = '", "'
+Line 195: IDENTIFIER = 'col'
+Line 195: INTERPOLATION_END = ''
+Line 195: STRING = '")"'
+Line 195: RIGHT_PAREN = ')'
+Line 195: SEMICOLON = ';'
+Line 196: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 197: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 202: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') COMMENT_LINE('// 6. LOOPS - ITER LOOPS') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') ]
+Line 202: LEFT_PAREN = '('
+Line 202: STRING = '"\n=== 6. LOOPS - ITER LOOPS ==="'
+Line 202: RIGHT_PAREN = ')'
+Line 202: SEMICOLON = ';'
+Line 205: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Basic range iteration') NEWLINE('
+') ]
+Line 205: LEFT_PAREN = '('
+Line 205: STRING = '"Basic range (1 to 5):"'
+Line 205: RIGHT_PAREN = ')'
+Line 205: SEMICOLON = ';'
+Line 206: ITER = 'iter' [leading: NEWLINE('
+') ]
+Line 206: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 206: IDENTIFIER = 'i'
+Line 206: IN = 'in' [leading: WHITESPACE(' ') ]
+Line 206: NUMBER = '1' [leading: WHITESPACE(' ') ]
+Line 206: RANGE = '..'
+Line 206: NUMBER = '6'
+Line 206: RIGHT_PAREN = ')'
+Line 206: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 207: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 207: LEFT_PAREN = '('
+Line 207: INTERPOLATION_START = '"i = "'
+Line 207: IDENTIFIER = 'i'
+Line 207: INTERPOLATION_END = ''
+Line 207: STRING = '""'
+Line 207: RIGHT_PAREN = ')'
+Line 207: SEMICOLON = ';'
+Line 208: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 211: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Range with different bounds') NEWLINE('
+') ]
+Line 211: LEFT_PAREN = '('
+Line 211: STRING = '"Range (0 to 3):"'
+Line 211: RIGHT_PAREN = ')'
+Line 211: SEMICOLON = ';'
+Line 212: ITER = 'iter' [leading: NEWLINE('
+') ]
+Line 212: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 212: IDENTIFIER = 'x'
+Line 212: IN = 'in' [leading: WHITESPACE(' ') ]
+Line 212: NUMBER = '0' [leading: WHITESPACE(' ') ]
+Line 212: RANGE = '..'
+Line 212: NUMBER = '4'
+Line 212: RIGHT_PAREN = ')'
+Line 212: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 213: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 213: LEFT_PAREN = '('
+Line 213: INTERPOLATION_START = '"x = "'
+Line 213: IDENTIFIER = 'x'
+Line 213: INTERPOLATION_END = ''
+Line 213: STRING = '""'
+Line 213: RIGHT_PAREN = ')'
+Line 213: SEMICOLON = ';'
+Line 214: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 217: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Nested iter loops') NEWLINE('
+') ]
+Line 217: LEFT_PAREN = '('
+Line 217: STRING = '"Nested iter loops:"'
+Line 217: RIGHT_PAREN = ')'
+Line 217: SEMICOLON = ';'
+Line 218: ITER = 'iter' [leading: NEWLINE('
+') ]
+Line 218: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 218: IDENTIFIER = 'i'
+Line 218: IN = 'in' [leading: WHITESPACE(' ') ]
+Line 218: NUMBER = '1' [leading: WHITESPACE(' ') ]
+Line 218: RANGE = '..'
+Line 218: NUMBER = '3'
+Line 218: RIGHT_PAREN = ')'
+Line 218: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 219: ITER = 'iter' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 219: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 219: IDENTIFIER = 'j'
+Line 219: IN = 'in' [leading: WHITESPACE(' ') ]
+Line 219: NUMBER = '10' [leading: WHITESPACE(' ') ]
+Line 219: RANGE = '..'
+Line 219: NUMBER = '12'
+Line 219: RIGHT_PAREN = ')'
+Line 219: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 220: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 220: LEFT_PAREN = '('
+Line 220: INTERPOLATION_START = '"("'
+Line 220: IDENTIFIER = 'i'
+Line 220: INTERPOLATION_END = ''
+Line 220: INTERPOLATION_START = '", "'
+Line 220: IDENTIFIER = 'j'
+Line 220: INTERPOLATION_END = ''
+Line 220: STRING = '")"'
+Line 220: RIGHT_PAREN = ')'
+Line 220: SEMICOLON = ';'
+Line 221: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 222: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 225: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Mixed nested loops') NEWLINE('
+') ]
+Line 225: LEFT_PAREN = '('
+Line 225: STRING = '"Mixed loops (for outer, iter inner):"'
+Line 225: RIGHT_PAREN = ')'
+Line 225: SEMICOLON = ';'
+Line 226: FOR = 'for' [leading: NEWLINE('
+') ]
+Line 226: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 226: VAR = 'var'
+Line 226: IDENTIFIER = 'i' [leading: WHITESPACE(' ') ]
+Line 226: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 226: NUMBER = '0' [leading: WHITESPACE(' ') ]
+Line 226: SEMICOLON = ';'
+Line 226: IDENTIFIER = 'i' [leading: WHITESPACE(' ') ]
+Line 226: LESS = '<' [leading: WHITESPACE(' ') ]
+Line 226: NUMBER = '2' [leading: WHITESPACE(' ') ]
+Line 226: SEMICOLON = ';'
+Line 226: IDENTIFIER = 'i' [leading: WHITESPACE(' ') ]
+Line 226: PLUS_EQUAL = '+=' [leading: WHITESPACE(' ') ]
+Line 226: NUMBER = '1' [leading: WHITESPACE(' ') ]
+Line 226: RIGHT_PAREN = ')'
+Line 226: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 227: ITER = 'iter' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 227: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 227: IDENTIFIER = 'j'
+Line 227: IN = 'in' [leading: WHITESPACE(' ') ]
+Line 227: NUMBER = '5' [leading: WHITESPACE(' ') ]
+Line 227: RANGE = '..'
+Line 227: NUMBER = '7'
+Line 227: RIGHT_PAREN = ')'
+Line 227: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 228: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 228: LEFT_PAREN = '('
+Line 228: INTERPOLATION_START = '"for-iter: ("'
+Line 228: IDENTIFIER = 'i'
+Line 228: INTERPOLATION_END = ''
+Line 228: INTERPOLATION_START = '", "'
+Line 228: IDENTIFIER = 'j'
+Line 228: INTERPOLATION_END = ''
+Line 228: STRING = '")"'
+Line 228: RIGHT_PAREN = ')'
+Line 228: SEMICOLON = ';'
+Line 229: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 230: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 235: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') COMMENT_LINE('// 7. LOOPS - WHILE LOOPS') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') ]
+Line 235: LEFT_PAREN = '('
+Line 235: STRING = '"\n=== 7. LOOPS - WHILE LOOPS ==="'
+Line 235: RIGHT_PAREN = ')'
+Line 235: SEMICOLON = ';'
+Line 238: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Basic while loop') NEWLINE('
+') ]
+Line 238: IDENTIFIER = 'count' [leading: WHITESPACE(' ') ]
+Line 238: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 238: NUMBER = '0' [leading: WHITESPACE(' ') ]
+Line 238: SEMICOLON = ';'
+Line 239: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 239: LEFT_PAREN = '('
+Line 239: STRING = '"While loop (count to 3):"'
+Line 239: RIGHT_PAREN = ')'
+Line 239: SEMICOLON = ';'
+Line 240: WHILE = 'while' [leading: NEWLINE('
+') ]
+Line 240: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 240: IDENTIFIER = 'count'
+Line 240: LESS = '<' [leading: WHITESPACE(' ') ]
+Line 240: NUMBER = '3' [leading: WHITESPACE(' ') ]
+Line 240: RIGHT_PAREN = ')'
+Line 240: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 241: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 241: LEFT_PAREN = '('
+Line 241: INTERPOLATION_START = '"count = "'
+Line 241: IDENTIFIER = 'count'
+Line 241: INTERPOLATION_END = ''
+Line 241: STRING = '""'
+Line 241: RIGHT_PAREN = ')'
+Line 241: SEMICOLON = ';'
+Line 242: IDENTIFIER = 'count' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 242: PLUS_EQUAL = '+=' [leading: WHITESPACE(' ') ]
+Line 242: NUMBER = '1' [leading: WHITESPACE(' ') ]
+Line 242: SEMICOLON = ';'
+Line 243: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 246: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// While loop with complex condition') NEWLINE('
+') ]
+Line 246: IDENTIFIER = 'num' [leading: WHITESPACE(' ') ]
+Line 246: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 246: NUMBER = '1' [leading: WHITESPACE(' ') ]
+Line 246: SEMICOLON = ';'
+Line 247: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 247: LEFT_PAREN = '('
+Line 247: STRING = '"Powers of 2 less than 20:"'
+Line 247: RIGHT_PAREN = ')'
+Line 247: SEMICOLON = ';'
+Line 248: WHILE = 'while' [leading: NEWLINE('
+') ]
+Line 248: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 248: IDENTIFIER = 'num'
+Line 248: LESS = '<' [leading: WHITESPACE(' ') ]
+Line 248: NUMBER = '20' [leading: WHITESPACE(' ') ]
+Line 248: RIGHT_PAREN = ')'
+Line 248: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 249: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 249: LEFT_PAREN = '('
+Line 249: INTERPOLATION_START = '"num = "'
+Line 249: IDENTIFIER = 'num'
+Line 249: INTERPOLATION_END = ''
+Line 249: STRING = '""'
+Line 249: RIGHT_PAREN = ')'
+Line 249: SEMICOLON = ';'
+Line 250: IDENTIFIER = 'num' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 250: STAR_EQUAL = '*=' [leading: WHITESPACE(' ') ]
+Line 250: NUMBER = '2' [leading: WHITESPACE(' ') ]
+Line 250: SEMICOLON = ';'
+Line 251: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 256: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') COMMENT_LINE('// 8. FUNCTIONS - BASIC') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') ]
+Line 256: LEFT_PAREN = '('
+Line 256: STRING = '"\n=== 8. FUNCTIONS - BASIC ==="'
+Line 256: RIGHT_PAREN = ')'
+Line 256: SEMICOLON = ';'
+Line 259: FN = 'fn' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Simple function without parameters') NEWLINE('
+') ]
+Line 259: IDENTIFIER = 'sayHello' [leading: WHITESPACE(' ') ]
+Line 259: LEFT_PAREN = '('
+Line 259: RIGHT_PAREN = ')'
+Line 259: COLON = ':'
+Line 259: NIL = 'nil' [leading: WHITESPACE(' ') ]
+Line 259: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 260: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 260: LEFT_PAREN = '('
+Line 260: STRING = '"Hello from function!"'
+Line 260: RIGHT_PAREN = ')'
+Line 260: SEMICOLON = ';'
+Line 261: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 263: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 263: LEFT_PAREN = '('
+Line 263: STRING = '"Calling simple function:"'
+Line 263: RIGHT_PAREN = ')'
+Line 263: SEMICOLON = ';'
+Line 264: IDENTIFIER = 'sayHello' [leading: NEWLINE('
+') ]
+Line 264: LEFT_PAREN = '('
+Line 264: RIGHT_PAREN = ')'
+Line 264: SEMICOLON = ';'
+Line 267: FN = 'fn' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Function with parameters') NEWLINE('
+') ]
+Line 267: IDENTIFIER = 'add' [leading: WHITESPACE(' ') ]
+Line 267: LEFT_PAREN = '('
+Line 267: IDENTIFIER = 'a'
+Line 267: COLON = ':'
+Line 267: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 267: COMMA = ','
+Line 267: IDENTIFIER = 'b' [leading: WHITESPACE(' ') ]
+Line 267: COLON = ':'
+Line 267: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 267: RIGHT_PAREN = ')'
+Line 267: COLON = ':'
+Line 267: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 267: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 268: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 268: IDENTIFIER = 'a' [leading: WHITESPACE(' ') ]
+Line 268: PLUS = '+' [leading: WHITESPACE(' ') ]
+Line 268: IDENTIFIER = 'b' [leading: WHITESPACE(' ') ]
+Line 268: SEMICOLON = ';'
+Line 269: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 271: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 271: LEFT_PAREN = '('
+Line 271: STRING = '"Function with parameters:"'
+Line 271: RIGHT_PAREN = ')'
+Line 271: SEMICOLON = ';'
+Line 272: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 272: IDENTIFIER = 'addResult' [leading: WHITESPACE(' ') ]
+Line 272: COLON = ':'
+Line 272: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 272: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 272: IDENTIFIER = 'add' [leading: WHITESPACE(' ') ]
+Line 272: LEFT_PAREN = '('
+Line 272: NUMBER = '5'
+Line 272: COMMA = ','
+Line 272: NUMBER = '3' [leading: WHITESPACE(' ') ]
+Line 272: RIGHT_PAREN = ')'
+Line 272: SEMICOLON = ';'
+Line 273: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 273: LEFT_PAREN = '('
+Line 273: INTERPOLATION_START = '"add(5, 3) = "'
+Line 273: IDENTIFIER = 'addResult'
+Line 273: INTERPOLATION_END = ''
+Line 273: STRING = '""'
+Line 273: RIGHT_PAREN = ')'
+Line 273: SEMICOLON = ';'
+Line 276: FN = 'fn' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Function with return value') NEWLINE('
+') ]
+Line 276: IDENTIFIER = 'square' [leading: WHITESPACE(' ') ]
+Line 276: LEFT_PAREN = '('
+Line 276: IDENTIFIER = 'x'
+Line 276: COLON = ':'
+Line 276: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 276: RIGHT_PAREN = ')'
+Line 276: COLON = ':'
+Line 276: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 276: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 277: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 277: IDENTIFIER = 'x' [leading: WHITESPACE(' ') ]
+Line 277: STAR = '*' [leading: WHITESPACE(' ') ]
+Line 277: IDENTIFIER = 'x' [leading: WHITESPACE(' ') ]
+Line 277: SEMICOLON = ';'
+Line 278: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 280: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 280: LEFT_PAREN = '('
+Line 280: STRING = '"Square function:"'
+Line 280: RIGHT_PAREN = ')'
+Line 280: SEMICOLON = ';'
+Line 281: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 281: LEFT_PAREN = '('
+Line 281: INTERPOLATION_START = '"square(4) = "'
+Line 281: IDENTIFIER = 'square'
+Line 281: LEFT_PAREN = '('
+Line 281: NUMBER = '4'
+Line 281: RIGHT_PAREN = ')'
+Line 281: INTERPOLATION_END = ''
+Line 281: STRING = '""'
+Line 281: RIGHT_PAREN = ')'
+Line 281: SEMICOLON = ';'
+Line 282: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 282: LEFT_PAREN = '('
+Line 282: INTERPOLATION_START = '"square(7) = "'
+Line 282: IDENTIFIER = 'square'
+Line 282: LEFT_PAREN = '('
+Line 282: NUMBER = '7'
+Line 282: RIGHT_PAREN = ')'
+Line 282: INTERPOLATION_END = ''
+Line 282: STRING = '""'
+Line 282: RIGHT_PAREN = ')'
+Line 282: SEMICOLON = ';'
+Line 285: FN = 'fn' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Function with string parameter') NEWLINE('
+') ]
+Line 285: IDENTIFIER = 'greet' [leading: WHITESPACE(' ') ]
+Line 285: LEFT_PAREN = '('
+Line 285: IDENTIFIER = 'name'
+Line 285: COLON = ':'
+Line 285: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 285: RIGHT_PAREN = ')'
+Line 285: COLON = ':'
+Line 285: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 285: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 286: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 286: LEFT_PAREN = '('
+Line 286: INTERPOLATION_START = '"Hello, "'
+Line 286: IDENTIFIER = 'name'
+Line 286: INTERPOLATION_END = ''
+Line 286: STRING = '"!"'
+Line 286: RIGHT_PAREN = ')'
+Line 286: SEMICOLON = ';'
+Line 287: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 287: STRING = '"greeted"' [leading: WHITESPACE(' ') ]
+Line 287: SEMICOLON = ';'
+Line 288: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 290: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 290: LEFT_PAREN = '('
+Line 290: STRING = '"Function with string parameter:"'
+Line 290: RIGHT_PAREN = ')'
+Line 290: SEMICOLON = ';'
+Line 291: IDENTIFIER = 'greet' [leading: NEWLINE('
+') ]
+Line 291: LEFT_PAREN = '('
+Line 291: STRING = '"Bob"'
+Line 291: RIGHT_PAREN = ')'
+Line 291: SEMICOLON = ';'
+Line 294: FN = 'fn' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Function with local variables') NEWLINE('
+') ]
+Line 294: IDENTIFIER = 'calculate' [leading: WHITESPACE(' ') ]
+Line 294: LEFT_PAREN = '('
+Line 294: IDENTIFIER = 'x'
+Line 294: COLON = ':'
+Line 294: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 294: COMMA = ','
+Line 294: IDENTIFIER = 'y' [leading: WHITESPACE(' ') ]
+Line 294: COLON = ':'
+Line 294: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 294: RIGHT_PAREN = ')'
+Line 294: COLON = ':'
+Line 294: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 294: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 295: VAR = 'var' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 295: IDENTIFIER = 'sum' [leading: WHITESPACE(' ') ]
+Line 295: COLON = ':'
+Line 295: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 295: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 295: IDENTIFIER = 'x' [leading: WHITESPACE(' ') ]
+Line 295: PLUS = '+' [leading: WHITESPACE(' ') ]
+Line 295: IDENTIFIER = 'y' [leading: WHITESPACE(' ') ]
+Line 295: SEMICOLON = ';'
+Line 296: VAR = 'var' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 296: IDENTIFIER = 'product' [leading: WHITESPACE(' ') ]
+Line 296: COLON = ':'
+Line 296: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 296: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 296: IDENTIFIER = 'x' [leading: WHITESPACE(' ') ]
+Line 296: STAR = '*' [leading: WHITESPACE(' ') ]
+Line 296: IDENTIFIER = 'y' [leading: WHITESPACE(' ') ]
+Line 296: SEMICOLON = ';'
+Line 297: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 297: LEFT_PAREN = '('
+Line 297: INTERPOLATION_START = '"Local calculations: sum="'
+Line 297: IDENTIFIER = 'sum'
+Line 297: INTERPOLATION_END = ''
+Line 297: INTERPOLATION_START = '", product="'
+Line 297: IDENTIFIER = 'product'
+Line 297: INTERPOLATION_END = ''
+Line 297: STRING = '""'
+Line 297: RIGHT_PAREN = ')'
+Line 297: SEMICOLON = ';'
+Line 298: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 298: IDENTIFIER = 'sum' [leading: WHITESPACE(' ') ]
+Line 298: STAR = '*' [leading: WHITESPACE(' ') ]
+Line 298: IDENTIFIER = 'product' [leading: WHITESPACE(' ') ]
+Line 298: SEMICOLON = ';'
+Line 299: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 301: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 301: LEFT_PAREN = '('
+Line 301: STRING = '"Function with locals:"'
+Line 301: RIGHT_PAREN = ')'
+Line 301: SEMICOLON = ';'
+Line 302: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 302: IDENTIFIER = 'calcResult' [leading: WHITESPACE(' ') ]
+Line 302: COLON = ':'
+Line 302: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 302: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 302: IDENTIFIER = 'calculate' [leading: WHITESPACE(' ') ]
+Line 302: LEFT_PAREN = '('
+Line 302: NUMBER = '3'
+Line 302: COMMA = ','
+Line 302: NUMBER = '4' [leading: WHITESPACE(' ') ]
+Line 302: RIGHT_PAREN = ')'
+Line 302: SEMICOLON = ';'
+Line 303: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 303: LEFT_PAREN = '('
+Line 303: INTERPOLATION_START = '"Result: "'
+Line 303: IDENTIFIER = 'calcResult'
+Line 303: INTERPOLATION_END = ''
+Line 303: STRING = '""'
+Line 303: RIGHT_PAREN = ')'
+Line 303: SEMICOLON = ';'
+Line 306: FN = 'fn' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Recursive function') NEWLINE('
+') ]
+Line 306: IDENTIFIER = 'factorial' [leading: WHITESPACE(' ') ]
+Line 306: LEFT_PAREN = '('
+Line 306: IDENTIFIER = 'n'
+Line 306: COLON = ':'
+Line 306: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 306: RIGHT_PAREN = ')'
+Line 306: COLON = ':'
+Line 306: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 306: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 307: IF = 'if' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 307: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 307: IDENTIFIER = 'n'
+Line 307: LESS_EQUAL = '<=' [leading: WHITESPACE(' ') ]
+Line 307: NUMBER = '1' [leading: WHITESPACE(' ') ]
+Line 307: RIGHT_PAREN = ')'
+Line 307: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 308: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 308: NUMBER = '1' [leading: WHITESPACE(' ') ]
+Line 308: SEMICOLON = ';'
+Line 309: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 310: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 310: IDENTIFIER = 'n' [leading: WHITESPACE(' ') ]
+Line 310: STAR = '*' [leading: WHITESPACE(' ') ]
+Line 310: IDENTIFIER = 'factorial' [leading: WHITESPACE(' ') ]
+Line 310: LEFT_PAREN = '('
+Line 310: IDENTIFIER = 'n'
+Line 310: MINUS = '-' [leading: WHITESPACE(' ') ]
+Line 310: NUMBER = '1' [leading: WHITESPACE(' ') ]
+Line 310: RIGHT_PAREN = ')'
+Line 310: SEMICOLON = ';'
+Line 311: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 313: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 313: LEFT_PAREN = '('
+Line 313: STRING = '"Recursive function:"'
+Line 313: RIGHT_PAREN = ')'
+Line 313: SEMICOLON = ';'
+Line 314: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 314: LEFT_PAREN = '('
+Line 314: INTERPOLATION_START = '"factorial(5) = "'
+Line 314: IDENTIFIER = 'factorial'
+Line 314: LEFT_PAREN = '('
+Line 314: NUMBER = '5'
+Line 314: RIGHT_PAREN = ')'
+Line 314: INTERPOLATION_END = ''
+Line 314: STRING = '""'
+Line 314: RIGHT_PAREN = ')'
+Line 314: SEMICOLON = ';'
+Line 319: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') COMMENT_LINE('// 9. FUNCTIONS - OPTIONAL PARAMETERS') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') ]
+Line 319: LEFT_PAREN = '('
+Line 319: STRING = '"\n=== 9. FUNCTIONS - OPTIONAL PARAMETERS ==="'
+Line 319: RIGHT_PAREN = ')'
+Line 319: SEMICOLON = ';'
+Line 322: FN = 'fn' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Function with optional parameter') NEWLINE('
+') ]
+Line 322: IDENTIFIER = 'greetOptional' [leading: WHITESPACE(' ') ]
+Line 322: LEFT_PAREN = '('
+Line 322: IDENTIFIER = 'name'
+Line 322: COLON = ':'
+Line 322: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 322: QUESTION = '?'
+Line 322: RIGHT_PAREN = ')'
+Line 322: COLON = ':'
+Line 322: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 322: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 323: IF = 'if' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 323: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 323: IDENTIFIER = 'name'
+Line 323: RIGHT_PAREN = ')'
+Line 323: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 324: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 324: LEFT_PAREN = '('
+Line 324: INTERPOLATION_START = '"Hello, "'
+Line 324: IDENTIFIER = 'name'
+Line 324: INTERPOLATION_END = ''
+Line 324: STRING = '"!"'
+Line 324: RIGHT_PAREN = ')'
+Line 324: SEMICOLON = ';'
+Line 325: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 325: INTERPOLATION_START = '"greeted "' [leading: WHITESPACE(' ') ]
+Line 325: IDENTIFIER = 'name'
+Line 325: INTERPOLATION_END = ''
+Line 325: STRING = '""'
+Line 325: SEMICOLON = ';'
+Line 326: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 326: ELSE = 'else' [leading: WHITESPACE(' ') ]
+Line 326: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 327: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 327: LEFT_PAREN = '('
+Line 327: STRING = '"Hello, stranger!"'
+Line 327: RIGHT_PAREN = ')'
+Line 327: SEMICOLON = ';'
+Line 328: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 328: STRING = '"greeted stranger"' [leading: WHITESPACE(' ') ]
+Line 328: SEMICOLON = ';'
+Line 329: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 330: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 332: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 332: LEFT_PAREN = '('
+Line 332: STRING = '"Testing optional parameter:"'
+Line 332: RIGHT_PAREN = ')'
+Line 332: SEMICOLON = ';'
+Line 333: IDENTIFIER = 'greetOptional' [leading: NEWLINE('
+') ]
+Line 333: LEFT_PAREN = '('
+Line 333: STRING = '"Charlie"'
+Line 333: RIGHT_PAREN = ')'
+Line 333: SEMICOLON = ';'
+Line 334: IDENTIFIER = 'greetOptional' [leading: WHITESPACE('     ') COMMENT_LINE('// Should print "Hello, Charlie!"') NEWLINE('
+') ]
+Line 334: LEFT_PAREN = '('
+Line 334: RIGHT_PAREN = ')'
+Line 334: SEMICOLON = ';'
+Line 337: FN = 'fn' [leading: WHITESPACE('              ') COMMENT_LINE('// Should print "Hello, stranger!"') NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Function with multiple optional parameters') NEWLINE('
+') ]
+Line 337: IDENTIFIER = 'createUser' [leading: WHITESPACE(' ') ]
+Line 337: LEFT_PAREN = '('
+Line 337: IDENTIFIER = 'username'
+Line 337: COLON = ':'
+Line 337: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 337: COMMA = ','
+Line 337: IDENTIFIER = 'email' [leading: WHITESPACE(' ') ]
+Line 337: COLON = ':'
+Line 337: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 337: QUESTION = '?'
+Line 337: COMMA = ','
+Line 337: IDENTIFIER = 'age' [leading: WHITESPACE(' ') ]
+Line 337: COLON = ':'
+Line 337: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 337: QUESTION = '?'
+Line 337: RIGHT_PAREN = ')'
+Line 337: COLON = ':'
+Line 337: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 337: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 338: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 338: LEFT_PAREN = '('
+Line 338: INTERPOLATION_START = '"Creating user: "'
+Line 338: IDENTIFIER = 'username'
+Line 338: INTERPOLATION_END = ''
+Line 338: STRING = '""'
+Line 338: RIGHT_PAREN = ')'
+Line 338: SEMICOLON = ';'
+Line 339: IF = 'if' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 339: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 339: IDENTIFIER = 'email'
+Line 339: RIGHT_PAREN = ')'
+Line 339: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 340: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 340: LEFT_PAREN = '('
+Line 340: INTERPOLATION_START = '"Email: "'
+Line 340: IDENTIFIER = 'email'
+Line 340: INTERPOLATION_END = ''
+Line 340: STRING = '""'
+Line 340: RIGHT_PAREN = ')'
+Line 340: SEMICOLON = ';'
+Line 341: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 342: IF = 'if' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 342: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 342: IDENTIFIER = 'age'
+Line 342: RIGHT_PAREN = ')'
+Line 342: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 343: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 343: LEFT_PAREN = '('
+Line 343: INTERPOLATION_START = '"Age: "'
+Line 343: IDENTIFIER = 'age'
+Line 343: INTERPOLATION_END = ''
+Line 343: STRING = '""'
+Line 343: RIGHT_PAREN = ')'
+Line 343: SEMICOLON = ';'
+Line 344: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 345: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 345: STRING = '"user created"' [leading: WHITESPACE(' ') ]
+Line 345: SEMICOLON = ';'
+Line 346: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 348: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 348: LEFT_PAREN = '('
+Line 348: STRING = '"Testing multiple optional parameters:"'
+Line 348: RIGHT_PAREN = ')'
+Line 348: SEMICOLON = ';'
+Line 349: IDENTIFIER = 'createUser' [leading: NEWLINE('
+') ]
+Line 349: LEFT_PAREN = '('
+Line 349: STRING = '"alice"'
+Line 349: RIGHT_PAREN = ')'
+Line 349: SEMICOLON = ';'
+Line 350: IDENTIFIER = 'createUser' [leading: WHITESPACE('                           ') COMMENT_LINE('// Only username') NEWLINE('
+') ]
+Line 350: LEFT_PAREN = '('
+Line 350: STRING = '"bob"'
+Line 350: COMMA = ','
+Line 350: STRING = '"bob@email.com"' [leading: WHITESPACE(' ') ]
+Line 350: RIGHT_PAREN = ')'
+Line 350: SEMICOLON = ';'
+Line 351: IDENTIFIER = 'createUser' [leading: WHITESPACE('           ') COMMENT_LINE('// Username and email') NEWLINE('
+') ]
+Line 351: LEFT_PAREN = '('
+Line 351: STRING = '"charlie"'
+Line 351: COMMA = ','
+Line 351: STRING = '"charlie@email.com"' [leading: WHITESPACE(' ') ]
+Line 351: COMMA = ','
+Line 351: NUMBER = '25' [leading: WHITESPACE(' ') ]
+Line 351: RIGHT_PAREN = ')'
+Line 351: SEMICOLON = ';'
+Line 356: PRINT = 'print' [leading: WHITESPACE(' ') COMMENT_LINE('// All parameters') NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') COMMENT_LINE('// 10. FUNCTIONS - DEFAULT PARAMETERS') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') ]
+Line 356: LEFT_PAREN = '('
+Line 356: STRING = '"\n=== 10. FUNCTIONS - DEFAULT PARAMETERS ==="'
+Line 356: RIGHT_PAREN = ')'
+Line 356: SEMICOLON = ';'
+Line 359: FN = 'fn' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Function with default parameter value') NEWLINE('
+') ]
+Line 359: IDENTIFIER = 'greetDefault' [leading: WHITESPACE(' ') ]
+Line 359: LEFT_PAREN = '('
+Line 359: IDENTIFIER = 'name'
+Line 359: COLON = ':'
+Line 359: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 359: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 359: STRING = '"World"' [leading: WHITESPACE(' ') ]
+Line 359: RIGHT_PAREN = ')'
+Line 359: COLON = ':'
+Line 359: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 359: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 360: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 360: LEFT_PAREN = '('
+Line 360: INTERPOLATION_START = '"Hello, "'
+Line 360: IDENTIFIER = 'name'
+Line 360: INTERPOLATION_END = ''
+Line 360: STRING = '"!"'
+Line 360: RIGHT_PAREN = ')'
+Line 360: SEMICOLON = ';'
+Line 361: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 361: INTERPOLATION_START = '"greeted "' [leading: WHITESPACE(' ') ]
+Line 361: IDENTIFIER = 'name'
+Line 361: INTERPOLATION_END = ''
+Line 361: STRING = '""'
+Line 361: SEMICOLON = ';'
+Line 362: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 364: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 364: LEFT_PAREN = '('
+Line 364: STRING = '"Testing default parameter:"'
+Line 364: RIGHT_PAREN = ')'
+Line 364: SEMICOLON = ';'
+Line 365: IDENTIFIER = 'greetDefault' [leading: NEWLINE('
+') ]
+Line 365: LEFT_PAREN = '('
+Line 365: RIGHT_PAREN = ')'
+Line 365: SEMICOLON = ';'
+Line 366: IDENTIFIER = 'greetDefault' [leading: WHITESPACE('          ') COMMENT_LINE('// Should print "Hello, World!"') NEWLINE('
+') ]
+Line 366: LEFT_PAREN = '('
+Line 366: STRING = '"Dave"'
+Line 366: RIGHT_PAREN = ')'
+Line 366: SEMICOLON = ';'
+Line 369: FN = 'fn' [leading: WHITESPACE('    ') COMMENT_LINE('// Should print "Hello, Dave!"') NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Function with multiple default parameters') NEWLINE('
+') ]
+Line 369: IDENTIFIER = 'createMessage' [leading: WHITESPACE(' ') ]
+Line 369: LEFT_PAREN = '('
+Line 369: IDENTIFIER = 'greeting'
+Line 369: COLON = ':'
+Line 369: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 369: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 369: STRING = '"Hello"' [leading: WHITESPACE(' ') ]
+Line 369: COMMA = ','
+Line 369: IDENTIFIER = 'name' [leading: WHITESPACE(' ') ]
+Line 369: COLON = ':'
+Line 369: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 369: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 369: STRING = '"User"' [leading: WHITESPACE(' ') ]
+Line 369: COMMA = ','
+Line 369: IDENTIFIER = 'punctuation' [leading: WHITESPACE(' ') ]
+Line 369: COLON = ':'
+Line 369: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 369: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 369: STRING = '"!"' [leading: WHITESPACE(' ') ]
+Line 369: RIGHT_PAREN = ')'
+Line 369: COLON = ':'
+Line 369: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 369: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 370: VAR = 'var' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 370: IDENTIFIER = 'message' [leading: WHITESPACE(' ') ]
+Line 370: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 370: INTERPOLATION_START = '""' [leading: WHITESPACE(' ') ]
+Line 370: IDENTIFIER = 'greeting'
+Line 370: INTERPOLATION_END = ''
+Line 370: INTERPOLATION_START = '", "'
+Line 370: IDENTIFIER = 'name'
+Line 370: INTERPOLATION_END = ''
+Line 370: INTERPOLATION_START = '""'
+Line 370: IDENTIFIER = 'punctuation'
+Line 370: INTERPOLATION_END = ''
+Line 370: STRING = '""'
+Line 370: SEMICOLON = ';'
+Line 371: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 371: LEFT_PAREN = '('
+Line 371: IDENTIFIER = 'message'
+Line 371: RIGHT_PAREN = ')'
+Line 371: SEMICOLON = ';'
+Line 372: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 372: IDENTIFIER = 'message' [leading: WHITESPACE(' ') ]
+Line 372: SEMICOLON = ';'
+Line 373: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 375: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 375: LEFT_PAREN = '('
+Line 375: STRING = '"Testing multiple default parameters:"'
+Line 375: RIGHT_PAREN = ')'
+Line 375: SEMICOLON = ';'
+Line 376: IDENTIFIER = 'createMessage' [leading: NEWLINE('
+') ]
+Line 376: LEFT_PAREN = '('
+Line 376: RIGHT_PAREN = ')'
+Line 376: SEMICOLON = ';'
+Line 377: IDENTIFIER = 'createMessage' [leading: WHITESPACE('                                    ') COMMENT_LINE('// All defaults') NEWLINE('
+') ]
+Line 377: LEFT_PAREN = '('
+Line 377: STRING = '"Hi"'
+Line 377: RIGHT_PAREN = ')'
+Line 377: SEMICOLON = ';'
+Line 378: IDENTIFIER = 'createMessage' [leading: WHITESPACE('                               ') COMMENT_LINE('// Custom greeting') NEWLINE('
+') ]
+Line 378: LEFT_PAREN = '('
+Line 378: STRING = '"Hey"'
+Line 378: COMMA = ','
+Line 378: STRING = '"Alice"' [leading: WHITESPACE(' ') ]
+Line 378: RIGHT_PAREN = ')'
+Line 378: SEMICOLON = ';'
+Line 379: IDENTIFIER = 'createMessage' [leading: WHITESPACE('                     ') COMMENT_LINE('// Custom greeting and name') NEWLINE('
+') ]
+Line 379: LEFT_PAREN = '('
+Line 379: STRING = '"Greetings"'
+Line 379: COMMA = ','
+Line 379: STRING = '"Bob"' [leading: WHITESPACE(' ') ]
+Line 379: COMMA = ','
+Line 379: STRING = '"."' [leading: WHITESPACE(' ') ]
+Line 379: RIGHT_PAREN = ')'
+Line 379: SEMICOLON = ';'
+Line 384: PRINT = 'print' [leading: WHITESPACE('           ') COMMENT_LINE('// All custom') NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') COMMENT_LINE('// 11. TYPE SYSTEM - TYPE ALIASES') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') ]
+Line 384: LEFT_PAREN = '('
+Line 384: STRING = '"\n=== 11. TYPE SYSTEM - TYPE ALIASES ==="'
+Line 384: RIGHT_PAREN = ')'
+Line 384: SEMICOLON = ';'
+Line 387: TYPE = 'type' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Basic type aliases') NEWLINE('
+') ]
+Line 387: IDENTIFIER = 'Id' [leading: WHITESPACE(' ') ]
+Line 387: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 387: UINT_TYPE = 'uint' [leading: WHITESPACE(' ') ]
+Line 387: SEMICOLON = ';'
+Line 388: TYPE = 'type' [leading: NEWLINE('
+') ]
+Line 388: IDENTIFIER = 'Name' [leading: WHITESPACE(' ') ]
+Line 388: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 388: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 388: SEMICOLON = ';'
+Line 389: TYPE = 'type' [leading: NEWLINE('
+') ]
+Line 389: IDENTIFIER = 'Age' [leading: WHITESPACE(' ') ]
+Line 389: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 389: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 389: SEMICOLON = ';'
+Line 390: TYPE = 'type' [leading: NEWLINE('
+') ]
+Line 390: IDENTIFIER = 'Score' [leading: WHITESPACE(' ') ]
+Line 390: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 390: FLOAT_TYPE = 'float' [leading: WHITESPACE(' ') ]
+Line 390: SEMICOLON = ';'
+Line 391: TYPE = 'type' [leading: NEWLINE('
+') ]
+Line 391: IDENTIFIER = 'IsActive' [leading: WHITESPACE(' ') ]
+Line 391: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 391: BOOL_TYPE = 'bool' [leading: WHITESPACE(' ') ]
+Line 391: SEMICOLON = ';'
+Line 394: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test usage of type aliases') NEWLINE('
+') ]
+Line 394: IDENTIFIER = 'userId' [leading: WHITESPACE(' ') ]
+Line 394: COLON = ':'
+Line 394: IDENTIFIER = 'Id' [leading: WHITESPACE(' ') ]
+Line 394: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 394: NUMBER = '12345' [leading: WHITESPACE(' ') ]
+Line 394: SEMICOLON = ';'
+Line 395: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 395: IDENTIFIER = 'userName' [leading: WHITESPACE(' ') ]
+Line 395: COLON = ':'
+Line 395: IDENTIFIER = 'Name' [leading: WHITESPACE(' ') ]
+Line 395: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 395: STRING = '"Alice"' [leading: WHITESPACE(' ') ]
+Line 395: SEMICOLON = ';'
+Line 396: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 396: IDENTIFIER = 'userAge' [leading: WHITESPACE(' ') ]
+Line 396: COLON = ':'
+Line 396: IDENTIFIER = 'Age' [leading: WHITESPACE(' ') ]
+Line 396: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 396: NUMBER = '25' [leading: WHITESPACE(' ') ]
+Line 396: SEMICOLON = ';'
+Line 397: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 397: IDENTIFIER = 'userScore' [leading: WHITESPACE(' ') ]
+Line 397: COLON = ':'
+Line 397: IDENTIFIER = 'Score' [leading: WHITESPACE(' ') ]
+Line 397: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 397: NUMBER = '95.5' [leading: WHITESPACE(' ') ]
+Line 397: SEMICOLON = ';'
+Line 398: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 398: IDENTIFIER = 'isUserActive' [leading: WHITESPACE(' ') ]
+Line 398: COLON = ':'
+Line 398: IDENTIFIER = 'IsActive' [leading: WHITESPACE(' ') ]
+Line 398: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 398: TRUE = 'true' [leading: WHITESPACE(' ') ]
+Line 398: SEMICOLON = ';'
+Line 400: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 400: LEFT_PAREN = '('
+Line 400: STRING = '"Type aliases:"'
+Line 400: RIGHT_PAREN = ')'
+Line 400: SEMICOLON = ';'
+Line 401: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 401: LEFT_PAREN = '('
+Line 401: INTERPOLATION_START = '"User ID: "'
+Line 401: IDENTIFIER = 'userId'
+Line 401: INTERPOLATION_END = ''
+Line 401: STRING = '""'
+Line 401: RIGHT_PAREN = ')'
+Line 401: SEMICOLON = ';'
+Line 402: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 402: LEFT_PAREN = '('
+Line 402: INTERPOLATION_START = '"User Name: "'
+Line 402: IDENTIFIER = 'userName'
+Line 402: INTERPOLATION_END = ''
+Line 402: STRING = '""'
+Line 402: RIGHT_PAREN = ')'
+Line 402: SEMICOLON = ';'
+Line 403: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 403: LEFT_PAREN = '('
+Line 403: INTERPOLATION_START = '"User Age: "'
+Line 403: IDENTIFIER = 'userAge'
+Line 403: INTERPOLATION_END = ''
+Line 403: STRING = '""'
+Line 403: RIGHT_PAREN = ')'
+Line 403: SEMICOLON = ';'
+Line 404: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 404: LEFT_PAREN = '('
+Line 404: INTERPOLATION_START = '"User Score: "'
+Line 404: IDENTIFIER = 'userScore'
+Line 404: INTERPOLATION_END = ''
+Line 404: STRING = '""'
+Line 404: RIGHT_PAREN = ')'
+Line 404: SEMICOLON = ';'
+Line 405: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 405: LEFT_PAREN = '('
+Line 405: INTERPOLATION_START = '"Is Active: "'
+Line 405: IDENTIFIER = 'isUserActive'
+Line 405: INTERPOLATION_END = ''
+Line 405: STRING = '""'
+Line 405: RIGHT_PAREN = ')'
+Line 405: SEMICOLON = ';'
+Line 410: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') COMMENT_LINE('// 12. TYPE SYSTEM - UNION TYPES') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') ]
+Line 410: LEFT_PAREN = '('
+Line 410: STRING = '"\n=== 12. TYPE SYSTEM - UNION TYPES ==="'
+Line 410: RIGHT_PAREN = ')'
+Line 410: SEMICOLON = ';'
+Line 413: TYPE = 'type' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Basic union type') NEWLINE('
+') ]
+Line 413: IDENTIFIER = 'StringOrInt' [leading: WHITESPACE(' ') ]
+Line 413: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 413: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 413: PIPE = '|' [leading: WHITESPACE(' ') ]
+Line 413: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 413: SEMICOLON = ';'
+Line 415: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 415: IDENTIFIER = 'value1' [leading: WHITESPACE(' ') ]
+Line 415: COLON = ':'
+Line 415: IDENTIFIER = 'StringOrInt' [leading: WHITESPACE(' ') ]
+Line 415: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 415: STRING = '"hello"' [leading: WHITESPACE(' ') ]
+Line 415: SEMICOLON = ';'
+Line 416: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 416: IDENTIFIER = 'value2' [leading: WHITESPACE(' ') ]
+Line 416: COLON = ':'
+Line 416: IDENTIFIER = 'StringOrInt' [leading: WHITESPACE(' ') ]
+Line 416: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 416: NUMBER = '42' [leading: WHITESPACE(' ') ]
+Line 416: SEMICOLON = ';'
+Line 418: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 418: LEFT_PAREN = '('
+Line 418: STRING = '"Union types:"'
+Line 418: RIGHT_PAREN = ')'
+Line 418: SEMICOLON = ';'
+Line 419: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 419: LEFT_PAREN = '('
+Line 419: INTERPOLATION_START = '"String value: "'
+Line 419: IDENTIFIER = 'value1'
+Line 419: INTERPOLATION_END = ''
+Line 419: STRING = '""'
+Line 419: RIGHT_PAREN = ')'
+Line 419: SEMICOLON = ';'
+Line 420: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 420: LEFT_PAREN = '('
+Line 420: INTERPOLATION_START = '"Int value: "'
+Line 420: IDENTIFIER = 'value2'
+Line 420: INTERPOLATION_END = ''
+Line 420: STRING = '""'
+Line 420: RIGHT_PAREN = ')'
+Line 420: SEMICOLON = ';'
+Line 425: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') COMMENT_LINE('// 13. TYPE SYSTEM - OPTION TYPES') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') ]
+Line 425: LEFT_PAREN = '('
+Line 425: STRING = '"\n=== 13. TYPE SYSTEM - OPTION TYPES ==="'
+Line 425: RIGHT_PAREN = ')'
+Line 425: SEMICOLON = ';'
+Line 428: TYPE = 'type' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Option type usage') NEWLINE('
+') ]
+Line 428: IDENTIFIER = 'IntOption' [leading: WHITESPACE(' ') ]
+Line 428: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 428: IDENTIFIER = 'Some' [leading: WHITESPACE(' ') ]
+Line 428: PIPE = '|' [leading: WHITESPACE(' ') ]
+Line 428: IDENTIFIER = 'None' [leading: WHITESPACE(' ') ]
+Line 428: SEMICOLON = ';'
+Line 430: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 430: IDENTIFIER = 'someValue' [leading: WHITESPACE(' ') ]
+Line 430: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 430: IDENTIFIER = 'Some' [leading: WHITESPACE(' ') ]
+Line 430: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 430: IDENTIFIER = 'kind' [leading: WHITESPACE(' ') ]
+Line 430: COLON = ':'
+Line 430: STRING = '"Some"' [leading: WHITESPACE(' ') ]
+Line 430: COMMA = ','
+Line 430: IDENTIFIER = 'value' [leading: WHITESPACE(' ') ]
+Line 430: COLON = ':'
+Line 430: NUMBER = '42' [leading: WHITESPACE(' ') ]
+Line 430: RIGHT_BRACE = '}' [leading: WHITESPACE(' ') ]
+Line 430: SEMICOLON = ';'
+Line 431: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 431: IDENTIFIER = 'noneValue' [leading: WHITESPACE(' ') ]
+Line 431: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 431: IDENTIFIER = 'None' [leading: WHITESPACE(' ') ]
+Line 431: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 431: IDENTIFIER = 'kind' [leading: WHITESPACE(' ') ]
+Line 431: COLON = ':'
+Line 431: STRING = '"None"' [leading: WHITESPACE(' ') ]
+Line 431: RIGHT_BRACE = '}' [leading: WHITESPACE(' ') ]
+Line 431: SEMICOLON = ';'
+Line 433: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 433: LEFT_PAREN = '('
+Line 433: STRING = '"Option types:"'
+Line 433: RIGHT_PAREN = ')'
+Line 433: SEMICOLON = ';'
+Line 434: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 434: LEFT_PAREN = '('
+Line 434: INTERPOLATION_START = '"Some value: "'
+Line 434: IDENTIFIER = 'someValue'
+Line 434: INTERPOLATION_END = ''
+Line 434: STRING = '""'
+Line 434: RIGHT_PAREN = ')'
+Line 434: SEMICOLON = ';'
+Line 435: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 435: LEFT_PAREN = '('
+Line 435: INTERPOLATION_START = '"None value: "'
+Line 435: IDENTIFIER = 'noneValue'
+Line 435: INTERPOLATION_END = ''
+Line 435: STRING = '""'
+Line 435: RIGHT_PAREN = ')'
+Line 435: SEMICOLON = ';'
+Line 440: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') COMMENT_LINE('// 14. ERROR HANDLING - WORKING') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') ]
+Line 440: LEFT_PAREN = '('
+Line 440: STRING = '"\n=== 14. ERROR HANDLING - WORKING ==="'
+Line 440: RIGHT_PAREN = ')'
+Line 440: SEMICOLON = ';'
+Line 443: FN = 'fn' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Function with error union return type') NEWLINE('
+') ]
+Line 443: IDENTIFIER = 'divide' [leading: WHITESPACE(' ') ]
+Line 443: LEFT_PAREN = '('
+Line 443: IDENTIFIER = 'a'
+Line 443: COLON = ':'
+Line 443: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 443: COMMA = ','
+Line 443: IDENTIFIER = 'b' [leading: WHITESPACE(' ') ]
+Line 443: COLON = ':'
+Line 443: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 443: RIGHT_PAREN = ')'
+Line 443: COLON = ':'
+Line 443: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 443: QUESTION = '?'
+Line 443: IDENTIFIER = 'DivisionByZero'
+Line 443: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 444: IF = 'if' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 444: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 444: IDENTIFIER = 'b'
+Line 444: EQUAL_EQUAL = '==' [leading: WHITESPACE(' ') ]
+Line 444: NUMBER = '0' [leading: WHITESPACE(' ') ]
+Line 444: RIGHT_PAREN = ')'
+Line 444: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 445: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 445: ERR = 'err' [leading: WHITESPACE(' ') ]
+Line 445: LEFT_PAREN = '('
+Line 445: IDENTIFIER = 'DivisionByZero'
+Line 445: RIGHT_PAREN = ')'
+Line 445: SEMICOLON = ';'
+Line 446: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 447: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 447: OK = 'ok' [leading: WHITESPACE(' ') ]
+Line 447: LEFT_PAREN = '('
+Line 447: IDENTIFIER = 'a'
+Line 447: SLASH = '/' [leading: WHITESPACE(' ') ]
+Line 447: IDENTIFIER = 'b' [leading: WHITESPACE(' ') ]
+Line 447: RIGHT_PAREN = ')'
+Line 447: SEMICOLON = ';'
+Line 448: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 451: FN = 'fn' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Function that propagates errors') NEWLINE('
+') ]
+Line 451: IDENTIFIER = 'safeDivide' [leading: WHITESPACE(' ') ]
+Line 451: LEFT_PAREN = '('
+Line 451: IDENTIFIER = 'x'
+Line 451: COLON = ':'
+Line 451: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 451: COMMA = ','
+Line 451: IDENTIFIER = 'y' [leading: WHITESPACE(' ') ]
+Line 451: COLON = ':'
+Line 451: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 451: RIGHT_PAREN = ')'
+Line 451: COLON = ':'
+Line 451: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 451: QUESTION = '?'
+Line 451: IDENTIFIER = 'DivisionByZero'
+Line 451: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 452: VAR = 'var' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 452: IDENTIFIER = 'result' [leading: WHITESPACE(' ') ]
+Line 452: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 452: IDENTIFIER = 'divide' [leading: WHITESPACE(' ') ]
+Line 452: LEFT_PAREN = '('
+Line 452: IDENTIFIER = 'x'
+Line 452: COMMA = ','
+Line 452: IDENTIFIER = 'y' [leading: WHITESPACE(' ') ]
+Line 452: RIGHT_PAREN = ')'
+Line 452: QUESTION = '?'
+Line 452: SEMICOLON = ';'
+Line 453: RETURN = 'return' [leading: WHITESPACE('  ') COMMENT_LINE('// Error propagation') NEWLINE('
+') WHITESPACE('    ') ]
+Line 453: OK = 'ok' [leading: WHITESPACE(' ') ]
+Line 453: LEFT_PAREN = '('
+Line 453: IDENTIFIER = 'result'
+Line 453: RIGHT_PAREN = ')'
+Line 453: SEMICOLON = ';'
+Line 454: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 456: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 456: LEFT_PAREN = '('
+Line 456: STRING = '"Testing error handling:"'
+Line 456: RIGHT_PAREN = ')'
+Line 456: SEMICOLON = ';'
+Line 459: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test successful division') NEWLINE('
+') ]
+Line 459: IDENTIFIER = 'successResult' [leading: WHITESPACE(' ') ]
+Line 459: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 459: IDENTIFIER = 'divide' [leading: WHITESPACE(' ') ]
+Line 459: LEFT_PAREN = '('
+Line 459: NUMBER = '10'
+Line 459: COMMA = ','
+Line 459: NUMBER = '2' [leading: WHITESPACE(' ') ]
+Line 459: RIGHT_PAREN = ')'
+Line 459: SEMICOLON = ';'
+Line 460: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 460: LEFT_PAREN = '('
+Line 460: INTERPOLATION_START = '"divide(10, 2) = "'
+Line 460: IDENTIFIER = 'successResult'
+Line 460: INTERPOLATION_END = ''
+Line 460: STRING = '""'
+Line 460: RIGHT_PAREN = ')'
+Line 460: SEMICOLON = ';'
+Line 463: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test division by zero (should return error)') NEWLINE('
+') ]
+Line 463: IDENTIFIER = 'errorResult' [leading: WHITESPACE(' ') ]
+Line 463: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 463: IDENTIFIER = 'divide' [leading: WHITESPACE(' ') ]
+Line 463: LEFT_PAREN = '('
+Line 463: NUMBER = '10'
+Line 463: COMMA = ','
+Line 463: NUMBER = '0' [leading: WHITESPACE(' ') ]
+Line 463: RIGHT_PAREN = ')'
+Line 463: SEMICOLON = ';'
+Line 464: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 464: LEFT_PAREN = '('
+Line 464: INTERPOLATION_START = '"divide(10, 0) = "'
+Line 464: IDENTIFIER = 'errorResult'
+Line 464: INTERPOLATION_END = ''
+Line 464: STRING = '""'
+Line 464: RIGHT_PAREN = ')'
+Line 464: SEMICOLON = ';'
+Line 467: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test error propagation') NEWLINE('
+') ]
+Line 467: IDENTIFIER = 'propagatedResult' [leading: WHITESPACE(' ') ]
+Line 467: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 467: IDENTIFIER = 'safeDivide' [leading: WHITESPACE(' ') ]
+Line 467: LEFT_PAREN = '('
+Line 467: NUMBER = '15'
+Line 467: COMMA = ','
+Line 467: NUMBER = '3' [leading: WHITESPACE(' ') ]
+Line 467: RIGHT_PAREN = ')'
+Line 467: SEMICOLON = ';'
+Line 468: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 468: LEFT_PAREN = '('
+Line 468: INTERPOLATION_START = '"safeDivide(15, 3) = "'
+Line 468: IDENTIFIER = 'propagatedResult'
+Line 468: INTERPOLATION_END = ''
+Line 468: STRING = '""'
+Line 468: RIGHT_PAREN = ')'
+Line 468: SEMICOLON = ';'
+Line 470: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 470: LEFT_PAREN = '('
+Line 470: STRING = '"Error handling working with ? operator and error propagation"'
+Line 470: RIGHT_PAREN = ')'
+Line 470: SEMICOLON = ';'
+Line 475: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') COMMENT_LINE('// 15. CLASSES - BASIC SYNTAX') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') ]
+Line 475: LEFT_PAREN = '('
+Line 475: STRING = '"\n=== 15. CLASSES - BASIC SYNTAX ==="'
+Line 475: RIGHT_PAREN = ')'
+Line 475: SEMICOLON = ';'
+Line 478: CLASS = 'class' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Simple class definition') NEWLINE('
+') ]
+Line 478: IDENTIFIER = 'Person' [leading: WHITESPACE(' ') ]
+Line 478: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 479: FN = 'fn' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 479: IDENTIFIER = 'init' [leading: WHITESPACE(' ') ]
+Line 479: LEFT_PAREN = '('
+Line 479: IDENTIFIER = 'name'
+Line 479: COMMA = ','
+Line 479: IDENTIFIER = 'age' [leading: WHITESPACE(' ') ]
+Line 479: RIGHT_PAREN = ')'
+Line 479: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 480: SELF = 'self' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 480: DOT = '.'
+Line 480: IDENTIFIER = 'name'
+Line 480: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 480: IDENTIFIER = 'name' [leading: WHITESPACE(' ') ]
+Line 480: SEMICOLON = ';'
+Line 481: SELF = 'self' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 481: DOT = '.'
+Line 481: IDENTIFIER = 'age'
+Line 481: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 481: IDENTIFIER = 'age' [leading: WHITESPACE(' ') ]
+Line 481: SEMICOLON = ';'
+Line 482: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 484: FN = 'fn' [leading: NEWLINE('
+') WHITESPACE('    ') NEWLINE('
+') WHITESPACE('    ') ]
+Line 484: IDENTIFIER = 'greet' [leading: WHITESPACE(' ') ]
+Line 484: LEFT_PAREN = '('
+Line 484: RIGHT_PAREN = ')'
+Line 484: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 485: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 485: LEFT_PAREN = '('
+Line 485: INTERPOLATION_START = '"Hello, I'm "'
+Line 485: SELF = 'self'
+Line 485: DOT = '.'
+Line 485: IDENTIFIER = 'name'
+Line 485: INTERPOLATION_END = ''
+Line 485: INTERPOLATION_START = '" and I'm "'
+Line 485: SELF = 'self'
+Line 485: DOT = '.'
+Line 485: IDENTIFIER = 'age'
+Line 485: INTERPOLATION_END = ''
+Line 485: STRING = '" years old"'
+Line 485: RIGHT_PAREN = ')'
+Line 485: SEMICOLON = ';'
+Line 486: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 488: FN = 'fn' [leading: NEWLINE('
+') WHITESPACE('    ') NEWLINE('
+') WHITESPACE('    ') ]
+Line 488: IDENTIFIER = 'birthday' [leading: WHITESPACE(' ') ]
+Line 488: LEFT_PAREN = '('
+Line 488: RIGHT_PAREN = ')'
+Line 488: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 489: SELF = 'self' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 489: DOT = '.'
+Line 489: IDENTIFIER = 'age'
+Line 489: PLUS_EQUAL = '+=' [leading: WHITESPACE(' ') ]
+Line 489: NUMBER = '1' [leading: WHITESPACE(' ') ]
+Line 489: SEMICOLON = ';'
+Line 490: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 490: LEFT_PAREN = '('
+Line 490: INTERPOLATION_START = '""'
+Line 490: SELF = 'self'
+Line 490: DOT = '.'
+Line 490: IDENTIFIER = 'name'
+Line 490: INTERPOLATION_END = ''
+Line 490: INTERPOLATION_START = '" is now "'
+Line 490: SELF = 'self'
+Line 490: DOT = '.'
+Line 490: IDENTIFIER = 'age'
+Line 490: INTERPOLATION_END = ''
+Line 490: STRING = '" years old"'
+Line 490: RIGHT_PAREN = ')'
+Line 490: SEMICOLON = ';'
+Line 491: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 492: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 494: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 494: LEFT_PAREN = '('
+Line 494: STRING = '"Class syntax defined (VM implementation in progress)"'
+Line 494: RIGHT_PAREN = ')'
+Line 494: SEMICOLON = ';'
+Line 499: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') COMMENT_LINE('// 16. MODULES - BASIC SYNTAX') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') ]
+Line 499: LEFT_PAREN = '('
+Line 499: STRING = '"\n=== 16. MODULES - BASIC SYNTAX ==="'
+Line 499: RIGHT_PAREN = ')'
+Line 499: SEMICOLON = ';'
+Line 506: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Module import syntax (commented out to avoid file dependencies)') NEWLINE('
+') COMMENT_LINE('// import tests.modules.basic_module as basic;') NEWLINE('
+') COMMENT_LINE('// print("Module variable: {basic.moduleVar}");') NEWLINE('
+') COMMENT_LINE('// basic.greet();') NEWLINE('
+') NEWLINE('
+') ]
+Line 506: LEFT_PAREN = '('
+Line 506: STRING = '"Module syntax defined (import/export working)"'
+Line 506: RIGHT_PAREN = ')'
+Line 506: SEMICOLON = ';'
+Line 511: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') COMMENT_LINE('// 17. CONCURRENCY - BASIC SYNTAX') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') ]
+Line 511: LEFT_PAREN = '('
+Line 511: STRING = '"\n=== 17. CONCURRENCY - BASIC SYNTAX ==="'
+Line 511: RIGHT_PAREN = ')'
+Line 511: SEMICOLON = ';'
+Line 524: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Parallel block syntax (commented out - VM implementation pending)') NEWLINE('
+') COMMENT_BLOCK('/*
+var messages = channel();
+parallel(ch=messages, mode=batch, cores=Auto) {
+    task(i in 1..3) {
+        print("Task {i} running");
+        messages.send("Task {i} done");
+    }
+}
+*/') NEWLINE('
+') NEWLINE('
+') ]
+Line 524: LEFT_PAREN = '('
+Line 524: STRING = '"Concurrency syntax defined (VM implementation pending)"'
+Line 524: RIGHT_PAREN = ')'
+Line 524: SEMICOLON = ';'
+Line 529: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') COMMENT_LINE('// 18. PATTERN MATCHING - BASIC SYNTAX') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') ]
+Line 529: LEFT_PAREN = '('
+Line 529: STRING = '"\n=== 18. PATTERN MATCHING - BASIC SYNTAX ==="'
+Line 529: RIGHT_PAREN = ')'
+Line 529: SEMICOLON = ';'
+Line 541: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Match expression syntax (commented out - VM implementation pending)') NEWLINE('
+') COMMENT_BLOCK('/*
+var testValue = 42;
+match testValue {
+    0 => print("Zero"),
+    1..10 => print("Small number"),
+    _ => print("Other number")
+}
+*/') NEWLINE('
+') NEWLINE('
+') ]
+Line 541: LEFT_PAREN = '('
+Line 541: STRING = '"Pattern matching syntax defined (VM implementation pending)"'
+Line 541: RIGHT_PAREN = ')'
+Line 541: SEMICOLON = ';'
+Line 546: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') COMMENT_LINE('// SUMMARY') NEWLINE('
+') COMMENT_LINE('// ==========================================') NEWLINE('
+') ]
+Line 546: LEFT_PAREN = '('
+Line 546: STRING = '"\n=== COMPREHENSIVE TEST SUMMARY ==="'
+Line 546: RIGHT_PAREN = ')'
+Line 546: SEMICOLON = ';'
+Line 547: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 547: LEFT_PAREN = '('
+Line 547: STRING = '"✅ Literals and variables"'
+Line 547: RIGHT_PAREN = ')'
+Line 547: SEMICOLON = ';'
+Line 548: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 548: LEFT_PAREN = '('
+Line 548: STRING = '"✅ Expressions and operators"'
+Line 548: RIGHT_PAREN = ')'
+Line 548: SEMICOLON = ';'
+Line 549: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 549: LEFT_PAREN = '('
+Line 549: STRING = '"✅ String interpolation"'
+Line 549: RIGHT_PAREN = ')'
+Line 549: SEMICOLON = ';'
+Line 550: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 550: LEFT_PAREN = '('
+Line 550: STRING = '"✅ Control flow (if/else)"'
+Line 550: RIGHT_PAREN = ')'
+Line 550: SEMICOLON = ';'
+Line 551: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 551: LEFT_PAREN = '('
+Line 551: STRING = '"✅ Loops (for, iter, while)"'
+Line 551: RIGHT_PAREN = ')'
+Line 551: SEMICOLON = ';'
+Line 552: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 552: LEFT_PAREN = '('
+Line 552: STRING = '"✅ Functions (basic, optional params, default params)"'
+Line 552: RIGHT_PAREN = ')'
+Line 552: SEMICOLON = ';'
+Line 553: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 553: LEFT_PAREN = '('
+Line 553: STRING = '"✅ Type system (aliases, unions, options)"'
+Line 553: RIGHT_PAREN = ')'
+Line 553: SEMICOLON = ';'
+Line 554: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 554: LEFT_PAREN = '('
+Line 554: STRING = '"✅ Error handling (? operator, error propagation working)"'
+Line 554: RIGHT_PAREN = ')'
+Line 554: SEMICOLON = ';'
+Line 555: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 555: LEFT_PAREN = '('
+Line 555: STRING = '"🔄 Classes (syntax complete, VM in progress)"'
+Line 555: RIGHT_PAREN = ')'
+Line 555: SEMICOLON = ';'
+Line 556: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 556: LEFT_PAREN = '('
+Line 556: STRING = '"✅ Modules (import/export working)"'
+Line 556: RIGHT_PAREN = ')'
+Line 556: SEMICOLON = ';'
+Line 557: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 557: LEFT_PAREN = '('
+Line 557: STRING = '"🔄 Concurrency (syntax complete, VM pending)"'
+Line 557: RIGHT_PAREN = ')'
+Line 557: SEMICOLON = ';'
+Line 558: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 558: LEFT_PAREN = '('
+Line 558: STRING = '"🔄 Pattern matching (match expressions - VM pending)"'
+Line 558: RIGHT_PAREN = ')'
+Line 558: SEMICOLON = ';'
+Line 560: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 560: LEFT_PAREN = '('
+Line 560: STRING = '"\n=== TEST COMPLETE ==="'
+Line 560: RIGHT_PAREN = ')'
+Line 560: SEMICOLON = ';'
+Line 560: EOF_TOKEN = ''

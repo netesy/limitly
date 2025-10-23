@@ -1,0 +1,10 @@
+// Simple test for function type assignment
+
+fn myFunc(x: int): int {
+    return x * 2;
+}
+
+// This should work without type mismatch error
+var funcVar: function = myFunc;
+
+print("Simple function type test completed");

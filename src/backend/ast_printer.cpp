@@ -52,11 +52,11 @@ namespace {
                 if (i > 0) result += ", ";
                 result += typeToString(type->functionParams[i]);
             }
-            result += ") -> ";
+            result += ") : ";
             if (type->returnType) {
                 result += typeToString(type->returnType);
             } else {
-                result += "void";
+                result += "nil";
             }
         }
         

@@ -1,0 +1,25 @@
+// Simple test for function calling through variables
+
+fn addOne(x: int): int {
+    return x + 1;
+}
+
+print("Testing simple function call...");
+
+// Direct function call (should work)
+var direct = addOne(5);
+print("Direct call addOne(5) = " + direct);
+
+// Function through variable
+var funcVar: function = addOne;
+print("Function assigned to variable");
+
+// Try to call through variable
+fn callFunction(f: function, value: int): int {
+    return f(value);
+}
+
+var indirect = callFunction(funcVar, 5);
+print("Indirect call through variable = " + indirect);
+
+print("Test completed");

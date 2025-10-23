@@ -1,0 +1,29 @@
+// Test that exactly matches our original failing case
+
+fn addOne(x: int): int {
+    return x + 1;
+}
+
+fn multiplyByTwo(x: int): int {
+    return x * 2;
+}
+
+// This is the exact function from our failing test
+fn processValue(input: int, processor: function): int {
+    return processor(input);
+}
+
+print("Testing exact match to original failing case...");
+
+var result1 = processValue(5, addOne);
+var result2 = processValue(10, multiplyByTwo);
+
+print("processValue(5, addOne) = " + result1);
+print("processValue(10, multiplyByTwo) = " + result2);
+
+if (result1 == 6 and result2 == 20) {
+    print("SUCCESS: Higher-order functions work!");
+} else {
+    print("FAILED: Expected result1=6, result2=20");
+    print("Got result1=" + result1 + ", result2=" + result2);
+}

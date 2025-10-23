@@ -97,8 +97,8 @@ void executeFile(const std::string& filename, bool printAst = false, bool printC
             }
             
             BytecodeGenerator generator;
-            generator.process(ast);
             generator.setSourceContext(source, filename);
+            generator.process(ast);
 
             // Print bytecode if requested
             if (printBytecode) {

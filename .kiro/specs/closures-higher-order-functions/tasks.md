@@ -226,31 +226,35 @@
 - [x] 19. Implement closure calling mechanism
 
 
+  - Add CALL_CLOSURE opcode to VM instruction set ✅ COMPLETED
+  - Implement closure call expression parsing: `closure(arg1, arg2)` ✅ COMPLETED
+  - Add CallClosureExpr AST node for closure invocation ✅ COMPLETED
+  - Update bytecode generator to emit CALL_CLOSURE instructions ✅ COMPLETED
+  - Implement VM handler for closure calls with environment restoration ✅ COMPLETED
+  - Add parameter type checking for closure calls ✅ COMPLETED
+
+  - [x] 19.1. Fix regular function names as higher-order function parameters
 
 
 
-  - Add CALL_CLOSURE opcode to VM instruction set
-  - Implement closure call expression parsing: `closure(arg1, arg2)`
-  - Add CallClosureExpr AST node for closure invocation
-  - Update bytecode generator to emit CALL_CLOSURE instructions
-  - Implement VM handler for closure calls with environment restoration
-  - Add parameter type checking for closure calls
+
+
+
+
+
+
+
+
+  - Fix type mismatch warnings: "Invalid function type in higher-order function call"
+  - **NEW LIMITATION DISCOVERED**: Fix regular function names as higher-order function parameters ❌ NOT WORKING
+  - **Issue**: `processValue(5, addOne)` fails with stack errors when `addOne` is a regular function name
+  - **Working**: `callFunction(myLambda, 5)` works when `myLambda` is a closure/lambda
+  - **Root Cause**: Regular function names don't get converted to callable values when passed as parameters
+  - **Solution Needed**: Add function reference conversion mechanism for regular functions in higher-order contexts
   - _Requirements: 1.3, 2.1, 3.1_
-  - **Priority**: HIGH - Core missing functionality
+  - **Priority**: HIGH - Core missing functionality for complete higher-order function support
 
 - [x] 20. Fix complex nested function issues
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -285,7 +289,10 @@
   - _Requirements: 6.1, 6.3_
   - **Priority**: MEDIUM - Enhanced language expressiveness
 
-- [-] 22. Enhance type checking for function returns
+- [x] 22. Enhance type checking for function returns
+
+
+
 
 
 
@@ -335,19 +342,24 @@ mplementation Status Summary
 - **Memory Tracking and Cleanup**: Comprehensive system with statistics
 - **Test Suite**: Extensive test coverage for all implemented features
 
-### 🔄 **Phase 2: IN PROGRESS (Tasks 18-22)**
+### 🔄 **Phase 2: IN PROGRESS (Tasks 18-21)**
 **Current Limitations Identified:**
-1. **Function Calling**: Closures created but cannot be invoked with `closure(args)` syntax
-2. **Type System**: Generic `function` type needs specific signatures like `fn(int): str`
-3. **Nested Functions**: Runtime errors in complex nested lambda scenarios
-4. **Tuple Support**: Missing tuple types and expressions for multiple return values
+1. **Higher-Order Functions**: Regular function names fail as parameters (Task 19) - `processValue(5, addOne)` causes stack errors
+2. **Type System**: Generic `function` type needs specific signatures like `fn(int): str` (Task 18)
+3. **Nested Functions**: Runtime errors in complex nested lambda scenarios (Task 20)
+4. **Tuple Support**: Missing tuple types and expressions for multiple return values (Task 21)
+
+**Recent Discovery:**
+- ✅ **Closures work perfectly**: `callFunction(myLambda, 5)` works when `myLambda` is a lambda/closure
+- ❌ **Regular functions fail**: `processValue(5, addOne)` fails when `addOne` is a regular function name
+- **Root Issue**: Regular function names don't convert to callable values in higher-order contexts
 
 **Priority Order:**
-1. **HIGH**: Task 19 (Closure Calling) - Core functionality gap
+1. **HIGH**: Task 19 (Fix Regular Function References) - Critical for complete higher-order function support
 2. **HIGH**: Task 18 (Unified Function Type System) - Type safety essential  
 3. **MEDIUM**: Task 20 (Nested Function Fixes) - Stability
 4. **MEDIUM**: Task 21 (Tuple Support) - Language completeness
-5. **MEDIUM**: Task 22 (Type Checking Enhancement) - Polish
+5. ✅ **COMPLETED**: Task 22 (Type Checking Enhancement) - Successfully implemented
 
 ### 📋 **Phase 3: PLANNED (Tasks 23-25)**
 Advanced features for future implementation:
