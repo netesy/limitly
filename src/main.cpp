@@ -36,7 +36,7 @@ std::string readFile(const std::string& filename) {
     return buffer.str();
 }
 
-void executeFile(const std::string& filename, bool printAst = false, bool printCst = false, bool printTokens = false, bool printBytecode = false, bool useJit = false, bool enableDebug = false) {
+int executeFile(const std::string& filename, bool printAst = false, bool printCst = false, bool printTokens = false, bool printBytecode = false, bool useJit = false, bool enableDebug = false) {
     try {
         // Read source file
         std::string source = readFile(filename);
@@ -119,12 +119,16 @@ void executeFile(const std::string& filename, bool printAst = false, bool printC
                 }
             } catch (const std::exception& e) {
                 std::cerr << "Error: " << e.what() << std::endl;
+                return 1;
             }
         // }
         
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
+        return 1;
     }
+    
+    return 0;
 }
 
 void startRepl() {
@@ -218,25 +222,24 @@ int main(int argc, char* argv[]) {
     
     if (arg == "-repl") {
         startRepl();
+        return 0;
     } else if (arg == "-ast" && argc >= 3) {
-        executeFile(argv[2], true, false, false, false);
+        return executeFile(argv[2], true, false, false, false);
     } else if (arg == "-cst" && argc >= 3) {
-        executeFile(argv[2], false, true, false, false);
+        return executeFile(argv[2], false, true, false, false);
     } else if (arg == "-tokens" && argc >= 3) {
-        executeFile(argv[2], false, false, true, false);
+        return executeFile(argv[2], false, false, true, false);
     } else if (arg == "-bytecode" && argc >= 3) {
-        executeFile(argv[2], false, false, false, true);
+        return executeFile(argv[2], false, false, false, true);
     } else if (arg == "-debug" && argc >= 3) {
-        executeFile(argv[2], false, false, false, false, false, true);
+        return executeFile(argv[2], false, false, false, false, false, true);
     // } else if (arg == "-jit" && argc >= 3) {
-    //     executeFile(argv[2], false, false, false, true);
+    //     return executeFile(argv[2], false, false, false, true);
     } else if (arg[0] == '-') {
         std::cerr << "Unknown option: " << arg << std::endl;
         printUsage(argv[0]);
         return 1;
     } else {
-        executeFile(arg);
+        return executeFile(arg);
     }
-    
-    return 0;
 }
