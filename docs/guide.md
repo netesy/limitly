@@ -47,9 +47,8 @@ Welcome to the official guide for the Limit programming language. This document 
 8.  [The Type System](#the-type-system)
     *   [Type Aliases](#type-aliases)
     *   [Union Types](#union-types)
-8.  [Error Handling](#error-handling)
-    *   [The `Option` Type](#the-option-type)
-    *   [The `Result` Type](#the-result-type)
+    *   [Optional Values and Error Handling](#optional-values-and-error-handling)
+    *   [The Unified `Type?` System](#the-unified-type-system)
     *   [The `?` Operator](#the--operator)
 9.  [Concurrency](#concurrency)
     *   [Structured Concurrency](#structured-concurrency)
@@ -671,13 +670,13 @@ greet(); // greet is imported
 
 ## The Type System
 
-Limit has a rich type system that allows for creating complex and expressive data structures.
+Limit has a rich type system that allows for creating complex and expressive data structures while maintaining null-safety by design.
 
 ### Type Aliases
 
 You can create an alias for an existing type using the `type` keyword. This is useful for making your code more readable.
 
-```
+```limit
 type UserID = int;
 type Email = str;
 
@@ -689,7 +688,7 @@ var my_email: Email = "test@example.com";
 
 A union type is a type that can hold a value of one of several different types. Union types are defined using the pipe (`|`) character.
 
-```
+```limit
 type Number = int | float;
 
 var my_num: Number = 10;       // This is valid
@@ -698,112 +697,107 @@ my_num = 3.14;                 // This is also valid
 
 Union types are especially powerful when combined with `match` statements to handle all possible types that a variable could be.
 
-## Error Handling
+### Optional Values and Error Handling
 
-Limit provides a robust system for handling errors based on the `Option` and `Result` types.
+**Key Design Principle**: Limit is null-free by design. There are no null pointers, null references, or null values. Instead, Limit uses a unified system where "absence of value" is treated as an error condition.
 
-### The `Option` Type
+### The Unified `Type?` System
 
-The `Option` type is a union type used to represent a value that could be absent. It has two variants:
+Limit uses a single, unified system for both optional values and error handling:
 
-*   **`Some`**: Represents the presence of a value.
-*   **`None`**: Represents the absence of a value.
+- **`Type?`** - Represents a value that might be present or absent (absence is an error condition)
+- **`Type?ErrorType`** - Represents a value that might succeed or fail with specific error types
+- **`ok(value)`** - Creates a success/present value
+- **`err()`** - Creates an error/absent value (no nulls - absence is an error)
 
-This is a safer alternative to using `nil` or `null` because the compiler will force you to handle the `None` case.
-
-```
-type IntOption = Some | None;
-
-fn find_user(id: int): IntOption {
+```limit
+// Optional value (might be absent)
+fn find_user(id: int): str? {
     if (id == 1) {
-        return Some { value: 42 };
+        return ok("Alice");  // Present value
     }
-    return None;
+    return err();  // Absent value (treated as error, not null)
 }
 
-var user_id = find_user(1);
-match (user_id) {
-    Some(id) => { print("Found user with ID: {id}"); },
-    None     => { print("User not found."); }
+// Specific error types
+fn divide(a: int, b: int): int?DivisionByZero {
+    if (b == 0) {
+        return err(DivisionByZero("Cannot divide by zero"));
+    }
+    return ok(a / b);
 }
 ```
 
-### The `Result` Type
+### Pattern Matching with Optional Values
 
-The `Result` type is a union type used for functions that can either succeed or fail. It has two variants:
+Use `match` statements to handle both present and absent cases:
 
-*   **`Success`**: Represents a successful outcome, containing a value.
-*   **`Error`**: Represents a failure, containing an error value.
-
-```
-type DivisionResult = Success | Error;
-
-fn divide(numerator: int, denominator: int): DivisionResult {
-    if (denominator == 0) {
-        return Error { error: "Division by zero!" };
-    }
-    return Success { value: numerator / denominator };
+```limit
+var user = find_user(1);
+match user {
+    Ok(name) => print("Found user: {name}"),
+    Err => print("User not found")  // No null - absence is an error
 }
 
 var result = divide(10, 2);
-match (result) {
-    Success(value) => { print("Result: {value}"); },
-    Error(err)     => { print("Error: {err}"); }
+match result {
+    Ok(value) => print("Result: {value}"),
+    Err => print("Division failed")
 }
 ```
+
+
 
 ### The `?` Operator
 
-The `?` operator provides a convenient way to **propagate** errors. When you append `?` to an expression that returns a `Result` or an `Option`:
+The `?` operator provides a convenient way to **propagate** both errors and absent values. When you append `?` to an expression that returns a `Type?`:
 
-*   If the value is a `Success` or `Some`, the operator unwraps the value and the program continues.
-*   If the value is an `Error` or `None`, the `?` operator will cause the current function to immediately return that `Error` or `None`.
+*   If the value is `Ok(value)`, the operator unwraps the value and the program continues.
+*   If the value is `Err`, the `?` operator will cause the current function to immediately return that `Err`.
 
-This allows you to write cleaner code by avoiding deeply nested `match` statements when you simply want to pass an error up the call stack.
+This allows you to write cleaner code by avoiding deeply nested `match` statements when you simply want to pass an error or absent value up the call stack.
 
-```
-// Assume this function exists and can fail
-fn to_int(s: str): Result<int, str> {
-    // ... implementation ...
+```limit
+// Function that might fail to parse
+fn to_int(s: str): int? {
+    // ... implementation that returns ok(parsed_int) or err()
 }
 
-// This function uses '?' to propagate the error from to_int
-fn get_number_from_string(s: str): Result<int, str> {
-    var number: int = to_int(s)?; // If to_int returns an Error, this function also returns it.
+// This function uses '?' to propagate errors/absent values from to_int
+fn get_number_from_string(s: str): int? {
+    var number: int = to_int(s)?; // If to_int returns Err, this function also returns Err
 
     // This code only runs if to_int was successful
     print("Parsing was successful!");
-    return Success(number * 2);
+    return ok(number * 2);
 }
 
 // Example usage:
-var result1 = get_number_from_string("10"); // result1 will be Success(20)
-var result2 = get_number_from_string("abc"); // result2 will be Error(...)
+var result1 = get_number_from_string("10"); // result1 will be Ok(20)
+var result2 = get_number_from_string("abc"); // result2 will be Err
 ```
 
 ### Inline Error Handling with `? else`
 
-The `? else error` construct provides a concise way to handle an error inline, providing a fallback value or executing a block of code without a full `match` statement.
-
-The expression to the left of the `?` is evaluated. If it is a `Success` or `Some`, the value is unwrapped and assigned. If it is an `Error` or `None`, the `else` block is executed. The `error` variable inside the block is bound to the error value. The value returned from the `else` block is then used as the result of the entire expression.
+The `? else` construct provides a concise way to handle errors or absent values inline, providing a fallback value without a full `match` statement.
 
 ```limit
-fn divide(a: int, b: int): Result<int, str> {
+fn divide(a: int, b: int): int? {
     if (b == 0) {
-        return Error("DivisionByZero");
+        return err(); // Division by zero results in absent value (error condition)
     }
-    return Success(a / b);
+    return ok(a / b);
 }
 
-// Use `? else` to provide a default value on failure.
-var value: int = divide(10, 0)? else err {
-    print("An error occurred: {err}");
-    return 0; // Default value
+// Use `? else` to provide a default value on failure or absence
+var value: int = divide(10, 0)? else {
+    print("Division failed or result absent");
+    return 0; // Default value (not null - Limit is null-free)
 };
 // `value` will be 0.
 ```
 
-This syntax is particularly useful for providing default values or for logging an error while allowing the program to continue with a sensible fallback.
+This syntax is particularly useful for providing default values while maintaining Limit's null-free design principles.
 
 ## Concurrency
 

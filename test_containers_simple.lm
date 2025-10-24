@@ -1,0 +1,10 @@
+// Test typed container parsing
+type IntList = [int];
+type StringDict = {str: int};
+type NestedList = [[int]];
+type ComplexDict = {str: [int]};
+
+var numbers: [int] = [1, 2, 3];
+var ages: {str: int} = {"Alice": 25, "Bob": 30};
+
+print("Typed container parsing works!");

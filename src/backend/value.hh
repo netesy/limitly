@@ -883,6 +883,9 @@ struct Value {
                 >
         data;
 
+    // Union type runtime support
+    size_t activeUnionVariant = 0;  // Which variant is active in union types
+
     // Default constructor
     Value() : type(nullptr) {}
 
@@ -1043,6 +1046,44 @@ struct Value {
             return std::get_if<ErrorValue>(&data);
         }
         return nullptr;
+    }
+
+    // Union type helper methods
+    bool isUnionType() const {
+        return type && type->tag == TypeTag::Union;
+    }
+
+    size_t getActiveUnionVariant() const {
+        return activeUnionVariant;
+    }
+
+    void setActiveUnionVariant(size_t variantIndex) {
+        activeUnionVariant = variantIndex;
+    }
+
+    // Get the type of the currently active union variant
+    TypePtr getActiveUnionVariantType() const {
+        if (!isUnionType()) {
+            return type; // Not a union, return the type itself
+        }
+        
+        if (const auto* unionType = std::get_if<UnionType>(&type->extra)) {
+            if (activeUnionVariant < unionType->types.size()) {
+                return unionType->types[activeUnionVariant];
+            }
+        }
+        
+        return nullptr; // Invalid variant index
+    }
+
+    // Check if union value matches a specific variant type
+    bool matchesUnionVariant(TypePtr variantType) const {
+        if (!isUnionType() || !variantType) {
+            return false;
+        }
+        
+        TypePtr activeType = getActiveUnionVariantType();
+        return activeType && activeType->tag == variantType->tag;
     }
 
     friend std::ostream &operator<<(std::ostream &os, const Value &value);

@@ -1,0 +1,154 @@
+// Simple Union Type Pattern Matching Tests
+// Testing core pattern matching functionality for union types
+
+print("=== Simple Union Type Pattern Matching Tests ===");
+
+// Test 1: Basic union type pattern matching with primitives
+print("Test 1: Basic union type pattern matching");
+type NumberOrString = int | str;
+
+var value1: NumberOrString = 42;
+var value2: NumberOrString = "hello";
+
+// Test exhaustive pattern matching
+match (value1) {
+    int => print("Got integer: " + value1),
+    str => print("Got string: " + value1)
+}
+
+match (value2) {
+    int => print("Got integer: " + value2),
+    str => print("Got string: " + value2)
+}
+
+// Test 2: Multi-variant union with type discrimination
+print("Test 2: Multi-variant union types");
+type Value = int | f64 | str | bool;
+
+var intValue: Value = 123;
+var floatValue: Value = 3.14;
+var stringValue: Value = "test";
+var boolValue: Value = true;
+
+match (intValue) {
+    int => print("Value is integer: " + intValue),
+    f64 => print("Value is float: " + intValue),
+    str => print("Value is string: " + intValue),
+    bool => print("Value is boolean: " + intValue)
+}
+
+match (floatValue) {
+    int => print("Value is integer: " + floatValue),
+    f64 => print("Value is float: " + floatValue),
+    str => print("Value is string: " + floatValue),
+    bool => print("Value is boolean: " + floatValue)
+}
+
+match (stringValue) {
+    int => print("Value is integer: " + stringValue),
+    f64 => print("Value is float: " + stringValue),
+    str => print("Value is string: " + stringValue),
+    bool => print("Value is boolean: " + stringValue)
+}
+
+match (boolValue) {
+    int => print("Value is integer: " + boolValue),
+    f64 => print("Value is float: " + boolValue),
+    str => print("Value is string: " + boolValue),
+    bool => print("Value is boolean: " + boolValue)
+}
+
+// Test 3: Union type with guards
+print("Test 3: Union type with guards");
+type IntOrFloat = int | f64;
+
+var numValue1: IntOrFloat = 42;
+var numValue2: IntOrFloat = 5;
+var floatValue1: IntOrFloat = 15.5;
+
+match (numValue1) {
+    int where numValue1 > 10 => print("Large integer: " + numValue1),
+    int => print("Small integer: " + numValue1),
+    f64 => print("Float value: " + numValue1)
+}
+
+match (numValue2) {
+    int where numValue2 > 10 => print("Large integer: " + numValue2),
+    int => print("Small integer: " + numValue2),
+    f64 => print("Float value: " + numValue2)
+}
+
+match (floatValue1) {
+    int => print("Integer value: " + floatValue1),
+    f64 where floatValue1 > 10.0 => print("Large float: " + floatValue1),
+    f64 => print("Small float: " + floatValue1)
+}
+
+// Test 4: Wildcard pattern matching
+print("Test 4: Wildcard pattern matching");
+type ManyTypes = int | str | bool | f64;
+
+var wildValue1: ManyTypes = 42;
+var wildValue2: ManyTypes = "text";
+
+match (wildValue1) {
+    int => print("Specific match - integer: " + wildValue1),
+    _ => print("Wildcard match: " + wildValue1)
+}
+
+match (wildValue2) {
+    int => print("Specific match - integer: " + wildValue2),
+    _ => print("Wildcard match: " + wildValue2)
+}
+
+// Test 5: Function returning union types
+print("Test 5: Function returning union types");
+fn getNumberOrString(flag: bool): NumberOrString {
+    if (flag) {
+        return 100;
+    } else {
+        return "function result";
+    }
+}
+
+var result1 = getNumberOrString(true);
+var result2 = getNumberOrString(false);
+
+match (result1) {
+    int => print("Function returned int: " + result1),
+    str => print("Function returned str: " + result1)
+}
+
+match (result2) {
+    int => print("Function returned int: " + result2),
+    str => print("Function returned str: " + result2)
+}
+
+// Test 6: Nested union types (flattening)
+print("Test 6: Nested union types");
+type InnerUnion = int | str;
+type OuterUnion = InnerUnion | bool;  // Should flatten to int | str | bool
+
+var nestedValue1: OuterUnion = 42;
+var nestedValue2: OuterUnion = "nested";
+var nestedValue3: OuterUnion = true;
+
+match (nestedValue1) {
+    int => print("Nested union - int: " + nestedValue1),
+    str => print("Nested union - str: " + nestedValue1),
+    bool => print("Nested union - bool: " + nestedValue1)
+}
+
+match (nestedValue2) {
+    int => print("Nested union - int: " + nestedValue2),
+    str => print("Nested union - str: " + nestedValue2),
+    bool => print("Nested union - bool: " + nestedValue2)
+}
+
+match (nestedValue3) {
+    int => print("Nested union - int: " + nestedValue3),
+    str => print("Nested union - str: " + nestedValue3),
+    bool => print("Nested union - bool: " + nestedValue3)
+}
+
+print("=== Simple Union Type Pattern Matching Tests Completed ===");

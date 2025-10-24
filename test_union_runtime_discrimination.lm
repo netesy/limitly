@@ -1,0 +1,54 @@
+// Test union type runtime discrimination and variant checking
+
+// Create user-defined types
+type Success = str;
+type Error = str;
+type Warning = str;
+
+// Create union type
+type Result = Success | Error | Warning;
+
+// Test runtime discrimination
+var result: Result;
+
+// Test with Success variant
+var success: Success;
+success = "Operation completed";
+result = success;
+
+print("Result contains: ");
+print(result);
+
+// Test with Error variant  
+var error: Error;
+error = "Something went wrong";
+result = error;
+
+print("Result contains: ");
+print(result);
+
+// Test with Warning variant
+var warning: Warning;
+warning = "This is a warning";
+result = warning;
+
+print("Result contains: ");
+print(result);
+
+// Test multi-type union
+type MixedValue = int | str | bool;
+var mixed: MixedValue;
+
+mixed = 123;
+print("Mixed (int): ");
+print(mixed);
+
+mixed = "text";
+print("Mixed (str): ");
+print(mixed);
+
+mixed = true;
+print("Mixed (bool): ");
+print(mixed);
+
+print("Union runtime discrimination test completed");

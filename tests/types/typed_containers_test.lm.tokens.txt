@@ -1,0 +1,365 @@
+Tokens for tests/types/typed_containers_test.lm
+Parser: New Unified Parser (CST mode)
+Mode: CST with trivia preservation
+========================================
+
+=== Tokens with Trivia ===
+Line 4: TYPE = 'type' [leading: COMMENT_LINE('// Comprehensive test for typed containers') NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 1: Basic typed list declarations') NEWLINE('
+') ]
+Line 4: IDENTIFIER = 'IntList' [leading: WHITESPACE(' ') ]
+Line 4: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 4: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 4: INT_TYPE = 'int'
+Line 4: RIGHT_BRACKET = ']'
+Line 4: SEMICOLON = ';'
+Line 5: TYPE = 'type' [leading: NEWLINE('
+') ]
+Line 5: IDENTIFIER = 'StringList' [leading: WHITESPACE(' ') ]
+Line 5: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 5: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 5: STR_TYPE = 'str'
+Line 5: RIGHT_BRACKET = ']'
+Line 5: SEMICOLON = ';'
+Line 6: TYPE = 'type' [leading: NEWLINE('
+') ]
+Line 6: IDENTIFIER = 'FloatList' [leading: WHITESPACE(' ') ]
+Line 6: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 6: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 6: FLOAT_TYPE = 'float'
+Line 6: RIGHT_BRACKET = ']'
+Line 6: SEMICOLON = ';'
+Line 7: TYPE = 'type' [leading: NEWLINE('
+') ]
+Line 7: IDENTIFIER = 'BoolList' [leading: WHITESPACE(' ') ]
+Line 7: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 7: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 7: BOOL_TYPE = 'bool'
+Line 7: RIGHT_BRACKET = ']'
+Line 7: SEMICOLON = ';'
+Line 10: TYPE = 'type' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 2: Basic typed dictionary declarations  ') NEWLINE('
+') ]
+Line 10: IDENTIFIER = 'IntToStringDict' [leading: WHITESPACE(' ') ]
+Line 10: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 10: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 10: INT_TYPE = 'int'
+Line 10: COLON = ':'
+Line 10: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 10: RIGHT_BRACE = '}'
+Line 10: SEMICOLON = ';'
+Line 11: TYPE = 'type' [leading: NEWLINE('
+') ]
+Line 11: IDENTIFIER = 'StringToIntDict' [leading: WHITESPACE(' ') ]
+Line 11: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 11: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 11: STR_TYPE = 'str'
+Line 11: COLON = ':'
+Line 11: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 11: RIGHT_BRACE = '}'
+Line 11: SEMICOLON = ';'
+Line 12: TYPE = 'type' [leading: NEWLINE('
+') ]
+Line 12: IDENTIFIER = 'StringToFloatDict' [leading: WHITESPACE(' ') ]
+Line 12: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 12: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 12: STR_TYPE = 'str'
+Line 12: COLON = ':'
+Line 12: FLOAT_TYPE = 'float' [leading: WHITESPACE(' ') ]
+Line 12: RIGHT_BRACE = '}'
+Line 12: SEMICOLON = ';'
+Line 13: TYPE = 'type' [leading: NEWLINE('
+') ]
+Line 13: IDENTIFIER = 'IntToFloatDict' [leading: WHITESPACE(' ') ]
+Line 13: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 13: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 13: INT_TYPE = 'int'
+Line 13: COLON = ':'
+Line 13: FLOAT_TYPE = 'float' [leading: WHITESPACE(' ') ]
+Line 13: RIGHT_BRACE = '}'
+Line 13: SEMICOLON = ';'
+Line 16: TYPE = 'type' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 3: Nested typed containers') NEWLINE('
+') ]
+Line 16: IDENTIFIER = 'ListOfIntLists' [leading: WHITESPACE(' ') ]
+Line 16: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 16: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 16: LEFT_BRACKET = '['
+Line 16: INT_TYPE = 'int'
+Line 16: RIGHT_BRACKET = ']'
+Line 16: RIGHT_BRACKET = ']'
+Line 16: SEMICOLON = ';'
+Line 17: TYPE = 'type' [leading: NEWLINE('
+') ]
+Line 17: IDENTIFIER = 'DictOfStringToIntList' [leading: WHITESPACE(' ') ]
+Line 17: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 17: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 17: STR_TYPE = 'str'
+Line 17: COLON = ':'
+Line 17: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 17: INT_TYPE = 'int'
+Line 17: RIGHT_BRACKET = ']'
+Line 17: RIGHT_BRACE = '}'
+Line 17: SEMICOLON = ';'
+Line 18: TYPE = 'type' [leading: NEWLINE('
+') ]
+Line 18: IDENTIFIER = 'ListOfStringToIntDict' [leading: WHITESPACE(' ') ]
+Line 18: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 18: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 18: LEFT_BRACE = '{'
+Line 18: STR_TYPE = 'str'
+Line 18: COLON = ':'
+Line 18: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 18: RIGHT_BRACE = '}'
+Line 18: RIGHT_BRACKET = ']'
+Line 18: SEMICOLON = ';'
+Line 21: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 4: Variable declarations with typed containers') NEWLINE('
+') ]
+Line 21: IDENTIFIER = 'numbers' [leading: WHITESPACE(' ') ]
+Line 21: COLON = ':'
+Line 21: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 21: INT_TYPE = 'int'
+Line 21: RIGHT_BRACKET = ']'
+Line 21: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 21: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 21: NUMBER = '1'
+Line 21: COMMA = ','
+Line 21: NUMBER = '2' [leading: WHITESPACE(' ') ]
+Line 21: COMMA = ','
+Line 21: NUMBER = '3' [leading: WHITESPACE(' ') ]
+Line 21: COMMA = ','
+Line 21: NUMBER = '4' [leading: WHITESPACE(' ') ]
+Line 21: COMMA = ','
+Line 21: NUMBER = '5' [leading: WHITESPACE(' ') ]
+Line 21: RIGHT_BRACKET = ']'
+Line 21: SEMICOLON = ';'
+Line 22: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 22: IDENTIFIER = 'words' [leading: WHITESPACE(' ') ]
+Line 22: COLON = ':'
+Line 22: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 22: STR_TYPE = 'str'
+Line 22: RIGHT_BRACKET = ']'
+Line 22: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 22: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 22: STRING = '"hello"'
+Line 22: COMMA = ','
+Line 22: STRING = '"world"' [leading: WHITESPACE(' ') ]
+Line 22: COMMA = ','
+Line 22: STRING = '"test"' [leading: WHITESPACE(' ') ]
+Line 22: RIGHT_BRACKET = ']'
+Line 22: SEMICOLON = ';'
+Line 23: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 23: IDENTIFIER = 'flags' [leading: WHITESPACE(' ') ]
+Line 23: COLON = ':'
+Line 23: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 23: BOOL_TYPE = 'bool'
+Line 23: RIGHT_BRACKET = ']'
+Line 23: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 23: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 23: TRUE = 'true'
+Line 23: COMMA = ','
+Line 23: FALSE = 'false' [leading: WHITESPACE(' ') ]
+Line 23: COMMA = ','
+Line 23: TRUE = 'true' [leading: WHITESPACE(' ') ]
+Line 23: RIGHT_BRACKET = ']'
+Line 23: SEMICOLON = ';'
+Line 24: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 24: IDENTIFIER = 'scores' [leading: WHITESPACE(' ') ]
+Line 24: COLON = ':'
+Line 24: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 24: FLOAT_TYPE = 'float'
+Line 24: RIGHT_BRACKET = ']'
+Line 24: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 24: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 24: NUMBER = '95.5'
+Line 24: COMMA = ','
+Line 24: NUMBER = '87.2' [leading: WHITESPACE(' ') ]
+Line 24: COMMA = ','
+Line 24: NUMBER = '92.8' [leading: WHITESPACE(' ') ]
+Line 24: RIGHT_BRACKET = ']'
+Line 24: SEMICOLON = ';'
+Line 27: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 5: Dictionary variables with typed containers') NEWLINE('
+') ]
+Line 27: IDENTIFIER = 'ageMap' [leading: WHITESPACE(' ') ]
+Line 27: COLON = ':'
+Line 27: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 27: STR_TYPE = 'str'
+Line 27: COLON = ':'
+Line 27: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 27: RIGHT_BRACE = '}'
+Line 27: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 27: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 27: STRING = '"Alice"'
+Line 27: COLON = ':'
+Line 27: NUMBER = '25' [leading: WHITESPACE(' ') ]
+Line 27: COMMA = ','
+Line 27: STRING = '"Bob"' [leading: WHITESPACE(' ') ]
+Line 27: COLON = ':'
+Line 27: NUMBER = '30' [leading: WHITESPACE(' ') ]
+Line 27: COMMA = ','
+Line 27: STRING = '"Charlie"' [leading: WHITESPACE(' ') ]
+Line 27: COLON = ':'
+Line 27: NUMBER = '35' [leading: WHITESPACE(' ') ]
+Line 27: RIGHT_BRACE = '}'
+Line 27: SEMICOLON = ';'
+Line 28: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 28: IDENTIFIER = 'priceMap' [leading: WHITESPACE(' ') ]
+Line 28: COLON = ':'
+Line 28: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 28: INT_TYPE = 'int'
+Line 28: COLON = ':'
+Line 28: FLOAT_TYPE = 'float' [leading: WHITESPACE(' ') ]
+Line 28: RIGHT_BRACE = '}'
+Line 28: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 28: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 28: NUMBER = '1'
+Line 28: COLON = ':'
+Line 28: NUMBER = '9.99' [leading: WHITESPACE(' ') ]
+Line 28: COMMA = ','
+Line 28: NUMBER = '2' [leading: WHITESPACE(' ') ]
+Line 28: COLON = ':'
+Line 28: NUMBER = '19.99' [leading: WHITESPACE(' ') ]
+Line 28: COMMA = ','
+Line 28: NUMBER = '3' [leading: WHITESPACE(' ') ]
+Line 28: COLON = ':'
+Line 28: NUMBER = '29.99' [leading: WHITESPACE(' ') ]
+Line 28: RIGHT_BRACE = '}'
+Line 28: SEMICOLON = ';'
+Line 29: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 29: IDENTIFIER = 'nameMap' [leading: WHITESPACE(' ') ]
+Line 29: COLON = ':'
+Line 29: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 29: INT_TYPE = 'int'
+Line 29: COLON = ':'
+Line 29: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 29: RIGHT_BRACE = '}'
+Line 29: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 29: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 29: NUMBER = '1'
+Line 29: COLON = ':'
+Line 29: STRING = '"First"' [leading: WHITESPACE(' ') ]
+Line 29: COMMA = ','
+Line 29: NUMBER = '2' [leading: WHITESPACE(' ') ]
+Line 29: COLON = ':'
+Line 29: STRING = '"Second"' [leading: WHITESPACE(' ') ]
+Line 29: COMMA = ','
+Line 29: NUMBER = '3' [leading: WHITESPACE(' ') ]
+Line 29: COLON = ':'
+Line 29: STRING = '"Third"' [leading: WHITESPACE(' ') ]
+Line 29: RIGHT_BRACE = '}'
+Line 29: SEMICOLON = ';'
+Line 32: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 6: Empty typed containers') NEWLINE('
+') ]
+Line 32: IDENTIFIER = 'emptyNumbers' [leading: WHITESPACE(' ') ]
+Line 32: COLON = ':'
+Line 32: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 32: INT_TYPE = 'int'
+Line 32: RIGHT_BRACKET = ']'
+Line 32: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 32: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 32: RIGHT_BRACKET = ']'
+Line 32: SEMICOLON = ';'
+Line 33: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 33: IDENTIFIER = 'emptyAges' [leading: WHITESPACE(' ') ]
+Line 33: COLON = ':'
+Line 33: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 33: STR_TYPE = 'str'
+Line 33: COLON = ':'
+Line 33: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 33: RIGHT_BRACE = '}'
+Line 33: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 33: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 33: RIGHT_BRACE = '}'
+Line 33: SEMICOLON = ';'
+Line 36: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 7: Complex nested containers') NEWLINE('
+') ]
+Line 36: IDENTIFIER = 'matrix' [leading: WHITESPACE(' ') ]
+Line 36: COLON = ':'
+Line 36: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 36: LEFT_BRACKET = '['
+Line 36: INT_TYPE = 'int'
+Line 36: RIGHT_BRACKET = ']'
+Line 36: RIGHT_BRACKET = ']'
+Line 36: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 36: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 36: LEFT_BRACKET = '['
+Line 36: NUMBER = '1'
+Line 36: COMMA = ','
+Line 36: NUMBER = '2' [leading: WHITESPACE(' ') ]
+Line 36: RIGHT_BRACKET = ']'
+Line 36: COMMA = ','
+Line 36: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 36: NUMBER = '3'
+Line 36: COMMA = ','
+Line 36: NUMBER = '4' [leading: WHITESPACE(' ') ]
+Line 36: RIGHT_BRACKET = ']'
+Line 36: COMMA = ','
+Line 36: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 36: NUMBER = '5'
+Line 36: COMMA = ','
+Line 36: NUMBER = '6' [leading: WHITESPACE(' ') ]
+Line 36: RIGHT_BRACKET = ']'
+Line 36: RIGHT_BRACKET = ']'
+Line 36: SEMICOLON = ';'
+Line 37: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 37: IDENTIFIER = 'studentGrades' [leading: WHITESPACE(' ') ]
+Line 37: COLON = ':'
+Line 37: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 37: STR_TYPE = 'str'
+Line 37: COLON = ':'
+Line 37: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 37: FLOAT_TYPE = 'float'
+Line 37: RIGHT_BRACKET = ']'
+Line 37: RIGHT_BRACE = '}'
+Line 37: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 37: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 38: STRING = '"Alice"' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 38: COLON = ':'
+Line 38: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 38: NUMBER = '95.5'
+Line 38: COMMA = ','
+Line 38: NUMBER = '87.2' [leading: WHITESPACE(' ') ]
+Line 38: COMMA = ','
+Line 38: NUMBER = '92.8' [leading: WHITESPACE(' ') ]
+Line 38: RIGHT_BRACKET = ']'
+Line 38: COMMA = ','
+Line 39: STRING = '"Bob"' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 39: COLON = ':'
+Line 39: LEFT_BRACKET = '[' [leading: WHITESPACE(' ') ]
+Line 39: NUMBER = '88.1'
+Line 39: COMMA = ','
+Line 39: NUMBER = '91.5' [leading: WHITESPACE(' ') ]
+Line 39: COMMA = ','
+Line 39: NUMBER = '89.7' [leading: WHITESPACE(' ') ]
+Line 39: RIGHT_BRACKET = ']'
+Line 40: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 40: SEMICOLON = ';'
+Line 42: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 42: LEFT_PAREN = '('
+Line 42: STRING = '"All typed container tests completed successfully"'
+Line 42: RIGHT_PAREN = ')'
+Line 42: SEMICOLON = ';'
+Line 42: EOF_TOKEN = ''

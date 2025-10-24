@@ -720,6 +720,18 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                         case Opcode::CALL_HIGHER_ORDER:
                             handleCallHigherOrder(instruction);
                             break;
+                        case Opcode::CREATE_UNION:
+                            handleCreateUnion(instruction);
+                            break;
+                        case Opcode::GET_UNION_VARIANT:
+                            handleGetUnionVariant(instruction);
+                            break;
+                        case Opcode::CHECK_UNION_TYPE:
+                            handleCheckUnionType(instruction);
+                            break;
+                        case Opcode::SET_UNION_VARIANT:
+                            handleSetUnionVariant(instruction);
+                            break;
                         case Opcode::HALT:
                             return stack.empty() ? memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE) : stack.back();
                         default:
@@ -2738,8 +2750,7 @@ void VM::handleCall(const Instruction& instruction) {
         std::string methodName = funcName.substr(funcName.find(":") + 1);
         try {
             ValuePtr funcValue = moduleEnv->get(methodName);
-            //executeFunction(funcValue, args);
-            push(memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
+            push(funcValue);
             return;
         } catch (const std::runtime_error& e) {
             error("Function '" + methodName + "' not found in module.");
@@ -4947,8 +4958,10 @@ void VM::handleMatchPattern(const Instruction& /*unused*/) {
                     valueTypeName = "int"; 
                     break;
                 case TypeTag::Float32:
+                    valueTypeName = "f32"; 
+                    break;
                 case TypeTag::Float64: 
-                    valueTypeName = "float"; 
+                    valueTypeName = "f64"; 
                     break;
                 case TypeTag::String: 
                     valueTypeName = "str"; 
@@ -4972,6 +4985,11 @@ void VM::handleMatchPattern(const Instruction& /*unused*/) {
 
             // Direct type matching
             if (typeName == valueTypeName) {
+                match = true;
+            }
+            // Legacy float type matching for backward compatibility
+            else if ((typeName == "float" || typeName == "f64") && 
+                     (value->type->tag == TypeTag::Float32 || value->type->tag == TypeTag::Float64)) {
                 match = true;
             }
             // Generic type matching (basic support)
@@ -7390,6 +7408,155 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
         std::cout << "[DEBUG] Called higher-order function with " << argCount << " arguments" << std::endl;
     }
 }
+
+// Union type operation handlers
+void VM::handleCreateUnion(const Instruction& instruction) {
+    // CREATE_UNION: Creates a union value with a specific variant
+    // Expected stack: [value, variant_index, union_type_name]
+    // instruction.intValue contains the variant index
+    // instruction.stringValue contains the union type name
+    
+    if (stack.size() < 1) {
+        error("CREATE_UNION requires value on stack");
+        return;
+    }
+    
+    ValuePtr value = pop();
+    size_t variantIndex = static_cast<size_t>(instruction.intValue);
+    std::string unionTypeName = instruction.stringValue;
+    
+    // Get the union type from the type system
+    TypePtr unionType = typeSystem->getType(unionTypeName);
+    if (!unionType || unionType->tag != TypeTag::Union) {
+        error("CREATE_UNION: invalid union type: " + unionTypeName);
+        return;
+    }
+    
+    try {
+        // Create the union value using TypeSystem helper
+        ValuePtr unionValue = typeSystem->createUnionValue(unionType, variantIndex, value);
+        push(unionValue);
+        
+        if (debugMode) {
+            std::cout << "[DEBUG] CREATE_UNION: Created union value with variant " 
+                      << variantIndex << " for type " << unionTypeName << std::endl;
+        }
+    } catch (const std::exception& e) {
+        error("CREATE_UNION: " + std::string(e.what()));
+    }
+}
+
+void VM::handleGetUnionVariant(const Instruction& instruction) {
+    // GET_UNION_VARIANT: Gets the active variant index from a union value
+    // Expected stack: [union_value]
+    // Pushes the variant index as an integer
+    
+    if (stack.empty()) {
+        error("GET_UNION_VARIANT requires union value on stack");
+        return;
+    }
+    
+    ValuePtr unionValue = pop();
+    if (!unionValue || !unionValue->isUnionType()) {
+        error("GET_UNION_VARIANT: expected union type, got " + 
+              (unionValue ? unionValue->type->toString() : "null"));
+        return;
+    }
+    
+    size_t variantIndex = unionValue->getActiveUnionVariant();
+    ValuePtr indexValue = memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, 
+                                                       static_cast<int32_t>(variantIndex));
+    push(indexValue);
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] GET_UNION_VARIANT: Retrieved variant index " 
+                  << variantIndex << std::endl;
+    }
+}
+
+void VM::handleCheckUnionType(const Instruction& instruction) {
+    // CHECK_UNION_TYPE: Checks if union value matches a specific variant type
+    // Expected stack: [union_value]
+    // instruction.stringValue contains the type name to check against
+    // Pushes boolean result
+    
+    if (stack.empty()) {
+        error("CHECK_UNION_TYPE requires union value on stack");
+        return;
+    }
+    
+    ValuePtr unionValue = pop();
+    if (!unionValue || !unionValue->isUnionType()) {
+        error("CHECK_UNION_TYPE: expected union type, got " + 
+              (unionValue ? unionValue->type->toString() : "null"));
+        return;
+    }
+    
+    std::string targetTypeName = instruction.stringValue;
+    TypePtr targetType = typeSystem->getType(targetTypeName);
+    if (!targetType) {
+        error("CHECK_UNION_TYPE: unknown type: " + targetTypeName);
+        return;
+    }
+    
+    bool matches = unionValue->matchesUnionVariant(targetType);
+    ValuePtr result = memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, matches);
+    push(result);
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] CHECK_UNION_TYPE: Union matches " << targetTypeName 
+                  << ": " << (matches ? "true" : "false") << std::endl;
+    }
+}
+
+void VM::handleSetUnionVariant(const Instruction& instruction) {
+    // SET_UNION_VARIANT: Sets the active variant in a union value
+    // Expected stack: [union_value, new_value]
+    // instruction.intValue contains the new variant index
+    
+    if (stack.size() < 2) {
+        error("SET_UNION_VARIANT requires union value and new value on stack");
+        return;
+    }
+    
+    ValuePtr newValue = pop();
+    ValuePtr unionValue = pop();
+    
+    if (!unionValue || !unionValue->isUnionType()) {
+        error("SET_UNION_VARIANT: expected union type, got " + 
+              (unionValue ? unionValue->type->toString() : "null"));
+        return;
+    }
+    
+    size_t newVariantIndex = static_cast<size_t>(instruction.intValue);
+    
+    // Validate the new variant index
+    std::vector<TypePtr> variantTypes = typeSystem->getUnionVariantTypes(unionValue->type);
+    if (newVariantIndex >= variantTypes.size()) {
+        error("SET_UNION_VARIANT: variant index " + std::to_string(newVariantIndex) + 
+              " out of range (max: " + std::to_string(variantTypes.size() - 1) + ")");
+        return;
+    }
+    
+    // Validate that the new value matches the target variant type
+    TypePtr targetVariantType = variantTypes[newVariantIndex];
+    if (!typeSystem->isCompatible(newValue->type, targetVariantType)) {
+        error("SET_UNION_VARIANT: value type " + newValue->type->toString() + 
+              " not compatible with variant type " + targetVariantType->toString());
+        return;
+    }
+    
+    // Update the union value
+    unionValue->setActiveUnionVariant(newVariantIndex);
+    unionValue->data = newValue->data;
+    
+    push(unionValue);
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] SET_UNION_VARIANT: Set variant to " << newVariantIndex << std::endl;
+    }
+}
+
 // Closure memory management methods
 
 std::string VM::trackClosure(ValuePtr closureValue) {

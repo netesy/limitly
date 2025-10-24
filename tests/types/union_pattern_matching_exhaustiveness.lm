@@ -1,0 +1,82 @@
+// Union Type Pattern Matching Exhaustiveness Tests
+// Testing that type checker properly validates exhaustiveness
+
+print(" === Union Type Pattern Matching Exhaustiveness Tests === ");
+
+// Test 1: Valid exhaustive pattern matching (should pass)
+print("Test 1: Valid exhaustive pattern matching");
+type NumberOrString = int | str;
+
+    var value: NumberOrString = "42";
+
+    // ✅ This should pass - all variants covered
+    match (value) {
+        int => print("Got integer: " + value),
+        str => print("Got string: " + value)
+        }
+
+        // Test 2: Valid pattern matching with wildcard (should pass)
+        print("Test 2: Valid pattern matching with wildcard");
+        type ManyTypes = int | str | bool | f64;
+
+            var manyValue: ManyTypes = 123;
+
+            // ✅ This should pass - wildcard covers remaining cases
+            match (manyValue) {
+                int => print("Got integer: " + manyValue),
+                _ => print("Got other type: " + manyValue)
+                }
+
+                // Test 3: Valid complex union pattern matching (should pass)
+                print("Test 3: Valid complex union pattern matching");
+                type ComplexUnion = int | f64 | str | bool;
+
+                    var complexValue: ComplexUnion = 3.14;
+
+                    // ✅ This should pass - all variants covered
+                    match (complexValue) {
+                        int => print("Integer: " + complexValue),
+                        f64 => print("Float64: " + complexValue),
+                        f32 => print("Float32: " + complexValue),
+                        float => print("Float: " + complexValue),
+                        str => print("String: " + complexValue),
+                        bool => print("Boolean: " + complexValue),
+                        _ => print("Got other type: " + complexValue)
+                        }
+
+                        print(" === All Valid Pattern Matching Tests Completed === ");
+
+                        // The following tests would cause type checker errors if uncommented:
+
+                        // Test 4: Non-exhaustive pattern matching (should fail)
+                        // type TwoTypes = int | str;
+                        // var twoValue: TwoTypes = 42;
+
+                        // // ❌ This should fail - missing str case
+                        // match (twoValue) {
+                        //     int => print("Got integer: " + twoValue)
+                        //     // Missing str case - should cause exhaustiveness error
+                        // }
+
+                        // Test 5: Invalid variant in pattern (should fail)
+                        // type Colors = str; // Represents Red, Green, Blue
+                        // var color: Colors = "Red";
+
+                        // // ❌ This should fail - Purple is not a valid variant
+                        // match (color) {
+                        //     "Red" => print("Red color"),
+                        //     "Green" => print("Green color"),
+                        //     "Purple" => print("Purple color")  // Invalid variant
+                        // }
+
+                        // // Test 6: Pattern type mismatch (should fail)
+                        type IntOrFloat = int | f64;
+                            var numValue: IntOrFloat = 42;
+
+                            // ❌ This should fail - str is not a variant of IntOrFloat
+                            match (numValue) {
+                                int => print("Integer: " + numValue),
+                                str => print("String: " + numValue) // str not in int | f64
+                                }
+
+                                print(" === Union Type Pattern Matching Exhaustiveness Tests Completed === ");

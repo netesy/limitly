@@ -1,0 +1,156 @@
+// Union Type Inference and Compatibility Tests
+// Testing type inference and compatibility for union types
+
+print("=== Union Type Inference and Compatibility Tests ===");
+
+// Test 1: Union type inference from match expressions
+print("Test 1: Union type inference from match expressions");
+type NumberOrString = int | str;
+
+fn processValue(value: NumberOrString): str {
+    // Return type should be inferred correctly from match branches
+    match (value) {
+        int => return "Number: " + value,
+        str => return "String: " + value
+    }
+}
+
+var result1 = processValue(42);
+var result2 = processValue("hello");
+print("Result 1: " + result1);
+print("Result 2: " + result2);
+
+// Test 2: Union type compatibility in assignments
+print("Test 2: Union type compatibility in assignments");
+type IntOrFloat = int | f64;
+type NumberOrString2 = int | str;
+
+var intFloat: IntOrFloat = 42;      // int compatible with int | f64
+intFloat = 3.14;                    // f64 compatible with int | f64
+
+var numString: NumberOrString2 = 123;  // int compatible with int | str
+numString = "test";                     // str compatible with int | str
+
+print("IntOrFloat: " + intFloat);
+print("NumberOrString: " + numString);
+
+// Test 3: Union type compatibility in function calls
+print("Test 3: Union type compatibility in function calls");
+fn acceptsIntOrFloat(value: IntOrFloat): str {
+    match (value) {
+        int => return "Integer: " + value,
+        f64 => return "Float: " + value
+    }
+}
+
+fn acceptsNumberOrString(value: NumberOrString): str {
+    match (value) {
+        int => return "Number: " + value,
+        str => return "String: " + value
+    }
+}
+
+// These should work - compatible types
+var intResult = acceptsIntOrFloat(42);      // int -> int | f64
+var floatResult = acceptsIntOrFloat(2.5);   // f64 -> int | f64
+var numResult = acceptsNumberOrString(100); // int -> int | str
+var strResult = acceptsNumberOrString("hi"); // str -> int | str
+
+print("Int result: " + intResult);
+print("Float result: " + floatResult);
+print("Num result: " + numResult);
+print("Str result: " + strResult);
+
+// Test 4: Union type inference in conditional expressions
+print("Test 4: Union type inference in conditionals");
+fn getValueBasedOnCondition(flag: bool): NumberOrString {
+    if (flag) {
+        return 42;      // int should be compatible with NumberOrString
+    } else {
+        return "text";  // str should be compatible with NumberOrString
+    }
+}
+
+var conditionalResult1 = getValueBasedOnCondition(true);
+var conditionalResult2 = getValueBasedOnCondition(false);
+
+match (conditionalResult1) {
+    int => print("Conditional result 1 is int: " + conditionalResult1),
+    str => print("Conditional result 1 is str: " + conditionalResult1)
+}
+
+match (conditionalResult2) {
+    int => print("Conditional result 2 is int: " + conditionalResult2),
+    str => print("Conditional result 2 is str: " + conditionalResult2)
+}
+
+// Test 5: Nested union type inference
+print("Test 5: Nested union type inference");
+type InnerUnion = int | str;
+type OuterUnion = InnerUnion | bool;  // Should flatten to int | str | bool
+
+fn processNestedUnion(value: OuterUnion): str {
+    match (value) {
+        int => return "Integer: " + value,
+        str => return "String: " + value,
+        bool => return "Boolean: " + value
+    }
+}
+
+var nestedResult1 = processNestedUnion(42);
+var nestedResult2 = processNestedUnion("nested");
+var nestedResult3 = processNestedUnion(true);
+
+print("Nested result 1: " + nestedResult1);
+print("Nested result 2: " + nestedResult2);
+print("Nested result 3: " + nestedResult3);
+
+// Test 6: Union type common type inference
+print("Test 6: Union type common type inference");
+type Value = int | f64 | str;
+
+fn combineValues(a: Value, b: Value): str {
+    // Both parameters are union types, should work in expressions
+    match (a) {
+        int => {
+            match (b) {
+                int => return "Both integers: " + a + ", " + b,
+                f64 => return "Int and float: " + a + ", " + b,
+                str => return "Int and string: " + a + ", " + b
+            }
+        },
+        f64 => {
+            match (b) {
+                int => return "Float and int: " + a + ", " + b,
+                f64 => return "Both floats: " + a + ", " + b,
+                str => return "Float and string: " + a + ", " + b
+            }
+        },
+        str => {
+            match (b) {
+                int => return "String and int: " + a + ", " + b,
+                f64 => return "String and float: " + a + ", " + b,
+                str => return "Both strings: " + a + ", " + b
+            }
+        }
+    }
+}
+
+var combineResult = combineValues(42, "hello");
+print("Combine result: " + combineResult);
+
+// Test 7: Union type in container types
+print("Test 7: Union type in container types");
+type ElementType = int | str;
+type ListOfUnion = [ElementType];
+
+var unionList: ListOfUnion = [42, "hello", 123, "world"];
+
+for (element in unionList) {
+    match (element) {
+        int => print("List element (int): " + element),
+        str => print("List element (str): " + element)
+    }
+}
+
+print("=== Union Type Inference and Compatibility Tests Completed ===");

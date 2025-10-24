@@ -1,0 +1,14 @@
+// Test module function calls
+print("=== Module Function Debug ===");
+
+import tests.modules.basic_module as basic;
+
+print("Testing function without parameters:");
+basic.greet();
+
+print("Testing function with parameters:");
+var result = basic.add(5, 3);
+print("Result type and value:");
+print(result);
+
+print("=== End Debug ===");

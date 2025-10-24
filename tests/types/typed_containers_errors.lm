@@ -1,0 +1,12 @@
+// Test type errors for incompatible container elements
+
+// Test 1: Incompatible list element types
+var badNumbers: [int] = [1, "hello", 3];  // Should error: string in int list
+
+// Test 2: Incompatible dictionary value types  
+var badAges: {str: int} = {"Alice": 25, "Bob": "thirty"};  // Should error: string value in int dict
+
+// Test 3: Incompatible dictionary key types
+var badMap: {int: str} = {1: "one", "two": "two"};  // Should error: string key in int key dict
+
+print("This should not execute due to type errors");

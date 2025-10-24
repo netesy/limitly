@@ -1,0 +1,43 @@
+// Test union types with user-defined types using type declarations
+
+// Create user-defined types using type declarations
+type Red = str;
+type Green = str;
+type Blue = str;
+type Yellow = str;
+
+// Create union type with user-defined types
+type Color = Red | Green | Blue | Yellow;
+
+// Test basic union with primitives (this should work)
+type NumberOrString = int | str;
+
+var value1: NumberOrString;
+value1 = 42;
+print("NumberOrString (int): ");
+print(value1);
+
+value1 = "hello";
+print("NumberOrString (str): ");
+print(value1);
+
+// Test union with user-defined types
+var color: Color;
+
+// Create instances of user-defined types
+var red: Red;
+red = "red";
+
+var blue: Blue;
+blue = "blue";
+
+// Try to assign user-defined type instances to union
+color = red;
+print("Color (Red): ");
+print(color);
+
+color = blue;
+print("Color (Blue): ");
+print(color);
+
+print("Union with user-defined types test completed");

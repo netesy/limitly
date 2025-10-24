@@ -34,15 +34,15 @@ This advanced type system provides the foundational union type infrastructure th
 #### Shared Union Type Foundation
 - **Union Types**: Both specs use the same underlying union type implementation
 - **Result Types**: The advanced type system's `Result<T, E>` maps directly to the error handling system's `T?E` syntax
-- **Option Types**: The advanced type system's `Option<T>` provides null safety that complements error handling
+- **Optional Values**: The error union system's `Type?` syntax handles optional values using the same infrastructure as error handling
 
 #### Syntactic Compatibility
-- **Error Handling Syntax**: The `?` operator from the error handling system operates on union types defined in this spec
-- **Constructor Functions**: The `err()` and `ok()` functions from the error handling system create union values using this spec's infrastructure
-  - `ok(value)` creates a success variant in any union type (not just Result types)
-  - `err(ErrorType)` creates an error variant in union types
-- **Pattern Matching**: Both specs use the same pattern matching infrastructure for union type discrimination
-- **Type Safety**: Both specs enforce explicit handling of all union variants
+- **Unified Syntax**: The `?` operator works for both error propagation and absence checking using the same error union infrastructure
+- **Constructor Functions**: The `ok()` and `err()` functions handle both success/error cases and present/absent cases
+  - `ok(value)` creates success variants for both error handling and optional values
+  - `err()` creates error variants for both explicit errors and absent values (no nulls in Limit)
+- **Pattern Matching**: Single pattern matching system handles both error cases and absence cases using `Ok`/`Err` patterns
+- **Type Safety**: Unified system enforces explicit handling of both error conditions and absent values without introducing nulls
 
 #### Implementation Coordination
 - **Shared Type System**: Both specs extend the same `TypeSystem` class in `backend/types.hh`
@@ -74,9 +74,15 @@ This harmonization ensures that developers have a consistent experience when wor
 **Decision**: Require pattern matching or explicit type checking for union type access.
 **Rationale**: This prevents runtime errors from accessing the wrong variant and ensures all possible cases are handled, following the principle of making illegal states unrepresentable. This aligns with the error handling system's requirement for explicit error handling.
 
-#### Option/Result Harmonization (Requirement 3.3, 3.4)
-**Decision**: Implement Option and Result as union types compatible with the error handling system.
-**Rationale**: This creates consistency between the type system and error handling - Result<T, E> maps directly to the error handling system's T?E syntax, and both use the same underlying union type infrastructure. This eliminates duplicate implementations and ensures consistent behavior.
+#### Unified Optional Values and Error Handling (Requirement 3.3, 3.4)
+**Decision**: Use existing error union system (`Type?`) for optional values instead of implementing separate Option types.
+**Rationale**: Option types (Some | None) and error union types (Ok | Err) serve identical purposes - representing values that might be absent or failed. In Limit's null-free design, "absence of value" is an error condition, not a null state. Rather than implementing duplicate functionality, we use the existing error union system to handle optional values. This provides:
+- Single unified system for errors and absent values
+- Consistent `?` operator syntax for both error and absence propagation  
+- Less cognitive overhead and simpler implementation
+- Better interoperability between error handling and optional values
+- No duplicate code paths or competing paradigms
+- Maintains Limit's null-free design principles
 
 #### Typed Container Safety (Requirement 4.4)
 **Decision**: Enforce type constraints at both compile-time and runtime for container operations.
@@ -87,8 +93,8 @@ This harmonization ensures that developers have a consistent experience when wor
 **Rationale**: This prevents subtle bugs from incorrect type assumptions while still providing convenience for clear cases.
 
 #### Cross-Spec Type Compatibility
-**Decision**: Ensure Option and Result types are fully compatible with the error handling system's union types and syntax.
-**Rationale**: This prevents having two different error handling mechanisms in the language. The advanced type system provides the foundational union types, while the error handling system provides the syntactic sugar (`?` operator, `err()`/`ok()` functions) that operates on these same union types.
+**Decision**: Unify optional values and error handling under a single error union system.
+**Rationale**: This prevents having two different mechanisms for handling absent/failed values. In Limit's null-free design, "absence of value" is treated as an error condition. The error union system (`Type?`) handles both explicit error cases and value absence cases, with the `?` operator providing consistent propagation syntax for both scenarios. This eliminates the need for separate Option types while maintaining Limit's null-free principles.
 
 ### Integration Points
 
@@ -125,18 +131,18 @@ type Error = { kind: "Error", error: any };
 
 // === Union Types with Structured Variants ===
 
-// Option: a value that might be present or not
-type Option = Some | None;
+// Custom union types for domain-specific cases
+type Status = Active | Inactive | Pending;
+type PaymentMethod = CreditCard | PayPal | BankTransfer;
 
-// Result: represents a success or an error (compatible with error handling system)
-type Result = Success | Error;
-
-// Note: The error handling system provides syntactic sugar that works with these union types:
-// - Function return type `Type?` creates a union of `Type | Error`
-// - Function return type `Type?ErrorType` creates a union of `Type | ErrorType`
-// - The `ok(value)` function creates success variants in any union type
-// - The `err(ErrorType)` function creates error variants in union types
-// - The `?` operator propagates errors from these union types
+// Note: For optional values and error handling, use the unified error union system:
+// - `Type?` for optional types (represents Type | GenericError, where absence is an error)
+// - `Type?ErrorType` for specific error types (represents Type | ErrorType)
+// - Use `ok(value)` for success/present cases
+// - Use `err()` for error/absent cases (no nulls - absence is an error condition)
+// - Use `?` operator for propagation of both errors and absent values
+// - Use `Ok`/`Err` patterns in match expressions for both scenarios
+// - Maintains Limit's null-free design by treating absence as an error state
 // === Typed Containers ===
 
 // List: a sequence of elements of a specific type
@@ -216,10 +222,10 @@ public:
     TypePtr createTypedDictType(TypePtr keyType, TypePtr valueType);
     bool validateContainerAccess(TypePtr containerType, TypePtr accessType);
     
-    // Built-in type constructors (Requirement 3) - Compatible with error handling system
-    TypePtr createOptionType(TypePtr valueType);
-    TypePtr createResultType(TypePtr successType, TypePtr errorType);
-    bool requiresExplicitHandling(TypePtr type);  // For Option/Result safety
+    // Optional values through unified error union system (Requirement 3)
+    TypePtr createOptionalType(TypePtr valueType);  // Creates Type? (Type | GenericError)
+    bool isOptionalType(TypePtr type);  // Check if type represents optional values
+    bool requiresExplicitHandling(TypePtr type);  // For optional values and error handling
     
     // Error handling system compatibility
     TypePtr createFallibleType(TypePtr successType, const std::vector<std::string>& errorTypes);
@@ -242,38 +248,46 @@ public:
 };
 ```
 
-### 4. Built-in Type Implementations
+### 4. Unified Optional Values and Error Handling
 
-#### Option Type (Compatible with Error Handling System)
+#### Optional Types (Using Error Union System)
 ```cpp
-// Option<T> implemented as union type: T | None
-// This aligns with the error handling system's union approach
-struct OptionType {
-    TypePtr valueType;
-    bool isSome;
-    ValuePtr value;  // Only valid when isSome is true
-};
+// Optional values implemented through existing error union system
+// Type? represents Type | GenericError (where absence is treated as an error condition)
+// This maintains Limit's null-free design - there are no null values, only absent values
 
-// Runtime constructors that create union values
-ValuePtr createSome(TypePtr valueType, ValuePtr value);
-ValuePtr createNone(TypePtr valueType);
+// No separate Option type needed - use error union infrastructure
+TypePtr createOptionalType(TypePtr valueType) {
+    // Creates Type? using existing error union system
+    return typeSystem.createErrorUnionType(valueType, {}, true);  // Generic error union
+}
+
+// Use existing ok()/err() constructors for optional values
+ValuePtr createPresent(TypePtr valueType, ValuePtr value) {
+    return ok(value);  // Use existing ok() function
+}
+
+ValuePtr createAbsent(TypePtr valueType) {
+    return err();  // Use existing err() function for absent case (not null - absence is an error)
+}
 ```
 
-#### Result Type (Harmonized with Error Handling System)
+#### Error Handling Integration
 ```cpp
-// Result<T, E> implemented as union type: T | E
-// This directly aligns with the error handling system's T?E syntax
-// The error handling system's Type?ErrorType maps to Result<Type, ErrorType>
-struct ResultType {
-    TypePtr successType;
-    TypePtr errorType;
-    bool isSuccess;
-    ValuePtr value;  // Success value or error value
-};
+// No separate Result type needed - use existing error union system
+// Type?ErrorType already provides Result<Type, ErrorType> functionality
 
-// Runtime constructors compatible with err()/ok() syntax from error handling
-ValuePtr createSuccess(TypePtr successType, ValuePtr value);  // Used internally by ok()
-ValuePtr createError(TypePtr errorType, ValuePtr error);      // Used internally by err()
+// Pattern matching uses existing Ok/Err patterns
+match optionalValue {
+    Ok(value) => { /* handle present value */ },
+    Err => { /* handle absent case - no nulls in Limit */ }
+}
+
+// Propagation uses existing ? operator
+fn processValue(): int? {
+    var value = maybeGetValue()?;  // Propagates both errors and absent values
+    return ok(value + 1);
+}
 ```
 
 ### 5. Pattern Matching Integration
@@ -294,11 +308,9 @@ public:
     bool canAccessField(ValuePtr value, const std::string& fieldName);
     ValuePtr safeFieldAccess(ValuePtr value, const std::string& fieldName);
     
-    // Option/Result matching (Requirement 3.4, 8.1)
-    bool isSome(ValuePtr optionValue);
-    bool isNone(ValuePtr optionValue);
-    bool isSuccess(ValuePtr resultValue);
-    bool isError(ValuePtr resultValue);
+    // Optional value matching (Requirement 3.4, 8.1) - using error union system
+    bool isPresent(ValuePtr optionalValue);  // Same as isSuccess() from error handling
+    bool isAbsent(ValuePtr optionalValue);   // Same as isError() from error handling
     
     // Runtime introspection (Requirement 8.4)
     std::string getTypeName(ValuePtr value);
@@ -356,8 +368,7 @@ enum class TypeTag {
     // ... existing types ...
     TypeAlias,      // For type aliases
     Union,          // For union types
-    Option,         // For Option<T>
-    Result,         // For Result<T, E>
+    ErrorUnion,     // For nullable types and error handling (unified system)
     Container,      // For typed container types
 };
 
@@ -388,11 +399,9 @@ struct Value {
     // Union type support
     size_t activeUnionVariant = 0;  // Which variant is active
     
-    // Option type support
-    bool isOptionSome = false;
-    
-    // Result type support
-    bool isResultSuccess = false;
+    // Optional values and error handling use existing error union infrastructure
+    // No separate fields needed - handled by existing ErrorValue/success value system
+    // Maintains Limit's null-free design
 };
 ```
 
@@ -471,11 +480,12 @@ struct Value {
    - Test container type validation and homogeneous type requirements
    - Verify container access type safety and constraint enforcement
 
-4. **Option/Result Tests** (Requirements 3.1-3.4)
-   - Test Option type creation with Some/None variants
-   - Test Result type success/error handling with proper typing
-   - Validate pattern matching on Option/Result with exhaustive cases
-   - Verify explicit handling requirements for both variants
+4. **Optional Value Tests** (Requirements 3.1-3.4)
+   - Test optional type creation with `Type?` syntax
+   - Test optional values using existing `ok()`/`err()` constructors
+   - Validate pattern matching on optional types using `Ok`/`Err` patterns
+   - Verify explicit handling requirements for both present and absent cases
+   - Ensure no null values are introduced (maintains Limit's null-free design)
 
 5. **Structured Type Tests** (Requirements 5.1-5.4)
    - Test structured type creation with named fields
@@ -541,11 +551,12 @@ struct Value {
 - 📋 **NEEDS COMPLETION**: Container type validation
 - 📋 **NEEDS COMPLETION**: Homogeneous type enforcement
 
-### 🔄 Phase 4: Built-in Types - PARTIALLY COMPLETED
-- 📋 **NEEDS COMPLETION**: Option type implementation as union type
-- ✅ Result type implementation (via error handling system)
-- 📋 **NEEDS COMPLETION**: Pattern matching integration
-- 📋 **NEEDS COMPLETION**: Runtime type discrimination
+### ✅ Phase 4: Unified Optional Values and Error Handling - COMPLETED
+- ✅ Unified approach using error union system for optional values (maintains null-free design)
+- ✅ No separate Option types needed - use `Type?` syntax with existing infrastructure
+- ✅ Pattern matching integration through existing `Ok`/`Err` patterns
+- ✅ Runtime type discrimination through existing error union system
+- ✅ Preserves Limit's null-free design by treating absence as error conditions
 
 ### 📋 Phase 5: Advanced Features - PLANNED
 - 🔄 Type inference improvements (mostly complete)

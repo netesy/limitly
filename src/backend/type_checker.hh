@@ -137,11 +137,21 @@ private:
                           const std::vector<std::string>& targetErrors);
     std::vector<std::string> getErrorTypesFromType(TypePtr type);
     bool isErrorUnionType(TypePtr type);
+    bool isUnionType(TypePtr type);
     bool requiresErrorHandling(TypePtr type);
     
     // Pattern matching validation for error types
     void checkMatchStatement(const std::shared_ptr<AST::MatchStatement>& stmt);
     bool isExhaustiveErrorMatch(const std::vector<std::shared_ptr<AST::MatchCase>>& cases, TypePtr type);
+    
+    // Union type pattern matching validation
+    bool isExhaustiveUnionMatch(TypePtr unionType, const std::vector<std::shared_ptr<AST::MatchCase>>& cases);
+    void validateUnionVariantAccess(TypePtr unionType, const std::string& variantName, int line);
+    void validatePatternCompatibility(const std::shared_ptr<AST::Expression>& pattern, TypePtr matchType, int line);
+    std::string getMissingUnionVariants(TypePtr unionType, const std::vector<std::shared_ptr<AST::MatchCase>>& cases);
+    
+    // Option type pattern matching validation
+    bool isExhaustiveOptionMatch(const std::vector<std::shared_ptr<AST::MatchCase>>& cases);
     
     // Helper methods for error reporting
     std::string joinErrorTypes(const std::vector<std::string>& errorTypes);
@@ -171,6 +181,17 @@ private:
     
     // Type checking helper functions
     bool isOptionalType(TypePtr type);
+    
+    // Option type validation methods
+    bool isOptionType(TypePtr type);
+    void validateOptionTypeUsage(const std::shared_ptr<AST::Expression>& expr, TypePtr optionType);
+    void checkOptionTypeAssignment(TypePtr sourceType, TypePtr targetType, int line);
+    bool requiresOptionHandling(TypePtr type);
+    void validateOptionPatternMatching(const std::shared_ptr<AST::MatchStatement>& stmt, TypePtr optionType);
+    
+    // Option type constructor validation
+    void checkSomeConstructor(const std::shared_ptr<AST::CallExpr>& expr);
+    void checkNoneConstructor(const std::shared_ptr<AST::CallExpr>& expr);
     
 public:
     TypeChecker(TypeSystem& ts) : typeSystem(ts), currentScope(std::make_shared<Scope>()) {

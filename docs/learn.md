@@ -290,70 +290,91 @@ iter (color: str in colors) {
 }
 ```
 
-## 🧪 Errors and Debugging
+## 🧪 Errors and Optional Values
 
-In Limit, errors are not seen as crashes, but as a normal part of a program's flow that you should plan for. The language gives you powerful tools to handle situations where things might go wrong, like a user entering text when you expect a number.
+In Limit, errors and absent values are not seen as crashes, but as a normal part of a program's flow that you should plan for. The language gives you powerful tools to handle situations where things might go wrong or where values might be absent.
 
-There are two main ways to deal with potential errors: **handling** them immediately with a `match` statement, or **propagating** (passing) them up to the function that called your function.
+**Key Principle**: Limit is null-free by design. There are no null pointers or null references. Instead, we use a unified system where "absence of value" is treated as an error condition.
+
+There are two main ways to deal with potential errors or absent values: **handling** them immediately with a `match` statement, or **propagating** (passing) them up to the function that called your function.
+
+### The Unified Error and Optional Value System
+
+Limit uses a single system for both error handling and optional values:
+- **`Type?`** represents a value that might be present or absent (where absence is an error condition)
+- **`Type?ErrorType`** represents a value that might succeed or fail with specific error types
+- **`ok(value)`** creates a success/present value
+- **`err()`** creates an error/absent value (no nulls - absence is an error)
 
 ### Handling Errors with `match`
 
-When you have a function that returns a `Result` (like `Success` or `Error`), you can use a `match` statement to handle both possibilities right away. You'll see this in our mini-project below.
+When you have a function that might fail or return an absent value, you can use a `match` statement to handle both possibilities:
+
+```limit
+fn might_fail(): int? {
+    // This function might return a value or be absent (error condition)
+    return err(); // Absence is treated as an error
+}
+
+fn do_something(): int? {
+    var result = might_fail();
+    
+    match result {
+        Ok(value) => {
+            print("Got value: {value}");
+            return ok(value * 2);
+        },
+        Err => {
+            print("No value available");
+            return err();
+        }
+    }
+}
+```
 
 ### Propagating Errors with `?`
 
-Sometimes, a function doesn't know how to handle an error. In that case, it can pass the error up to the calling function. The `?` operator is a shortcut for this.
-
-Imagine a function `do_something` that calls a function `might_fail`.
+The `?` operator works for both error propagation and absence propagation:
 
 ```limit
-fn might_fail(): Result<int, str> {
-    // This function might return a Success or an Error
-    return Error("Something went wrong!");
+fn might_fail(): int? {
+    return err(); // Absent value (treated as error)
 }
 
-fn do_something(): Result<int, str> {
-    // We call might_fail() and add a '?' at the end.
-    // If might_fail() returns an Error, the '?' will immediately
-    // stop do_something() and return that same Error.
-    // If it's a Success, the '?' will unwrap the value and continue.
+fn do_something(): int? {
+    // If might_fail() returns Err (absent), the '?' will immediately
+    // stop do_something() and return that same Err.
+    // If it's Ok(value), the '?' will unwrap the value and continue.
     var result: int = might_fail()?;
 
-    // This part only runs if might_fail() was a success
+    // This part only runs if might_fail() had a value
     print("It worked!");
-    return Success(result);
+    return ok(result);
 }
-
-// Let's see what happens when we call it:
-var final_result = do_something();
-// do_something() will return the Error from might_fail().
-// The "It worked!" message will never be printed.
 ```
-The `?` operator helps you write cleaner code by avoiding nested `match` statements when you just want to pass an error along.
 
 ### Inline Error Handling with `? else`
 
-What if you want to handle an error right where it happens, but without writing a full `match` block? Limit provides a handy `? else error { ... }` syntax for this.
-
-It works like this: try the operation on the left of the `?`. If it succeeds, give me the value. If it fails, execute the `else` block.
+Handle errors or absent values inline without a full `match` block:
 
 ```limit
-fn divide(a: int, b: int): Result<int, str> {
+fn divide(a: int, b: int): int? {
     if (b == 0) {
-        return Error("Cannot divide by zero!");
+        return err(); // Division by zero is an error (no null values)
     }
-    return Success(a / b);
+    return ok(a / b);
 }
 
-// We'll provide a default value of -1 if the division fails.
-var result: int = divide(10, 0)? else err {
-    print("Caught an error: {err}");
-    return -1; // The value to use instead
+// Provide a default value if division fails or is absent
+var result: int = divide(10, 0)? else {
+    print("Division failed or result absent");
+    return -1; // Default value (not null - Limit is null-free)
 };
 
 print("The final result is: {result}"); // Output: The final result is: -1
 ```
-This is a very concise way to provide a fallback value or run some code when an operation fails, without stopping the entire function.
+
+This unified approach means you learn one pattern that works for both error handling and optional values, while maintaining Limit's null-free design.
 
 ## 🚀 Mini Project: Number Guessing Game
 
@@ -367,7 +388,7 @@ The goal is for the user to guess a secret number. The program will tell them if
 // Let's assume the language provides these built-in functions.
 // fn randint(min: int, max: int): int { ... }
 // fn read_line(): str { ... }
-// fn to_int(s: str): Result<int, ParseError> { ... }
+// fn to_int(s: str): int? { ... }
 
 // --- The Game Code ---
 
@@ -381,10 +402,10 @@ loop { // An infinite loop
     // In a real program, you would use: var input_str: str = read_line();
     var input_str: str = "7"; // Let's pretend the user guessed "7"
 
-    var guess_result: Result<int, ParseError> = to_int(input_str);
+    var guess_result: int? = to_int(input_str);
 
     match (guess_result) {
-        Success(guess) => {
+        Ok(guess) => {
             print("You guessed: {guess}");
             if (guess < secret_number) {
                 print("Too low!");
@@ -395,7 +416,7 @@ loop { // An infinite loop
                 break; // Exit the loop
             }
         },
-        Error(err) => {
+        Err => {
             print("That's not a number! Please try again.");
         }
     }
@@ -406,7 +427,7 @@ loop { // An infinite loop
 ```
 
 **How it works:**
-*   **Error Handling with `match`:** The `to_int` function returns a `Result`. We use a `match` statement to **handle** the error immediately. We do this because if the user enters bad input, we don't want the game to crash; we just want to print a message and let them try again. This is a perfect example of handling an error at the point where it occurs.
+*   **Error Handling with `match`:** The `to_int` function returns `int?` (an optional integer). We use a `match` statement to **handle** both the success case (`Ok`) and the error/absent case (`Err`). If the user enters bad input, we don't want the game to crash; we just want to print a message and let them try again. This demonstrates Limit's null-free approach where parsing failures result in absent values (treated as errors) rather than null values.
 *   **Looping:** The `loop` creates an infinite loop. The `break` keyword is used to exit the loop once the correct number has been guessed.
 
 **Your Challenge:**

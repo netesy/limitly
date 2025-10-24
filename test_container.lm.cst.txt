@@ -1,0 +1,13 @@
+CST for test_container.lm
+Parser: New Unified Parser (CST mode)
+Mode: CST (cstMode=true)
+========================================
+
+CST Statistics:
+- CST nodes created: 1
+- Trivia attachments: 0
+- Parse errors: 0
+
+=== Full CST Structure ===
++ Node: PROGRAM [0-27] (Program root node with trivia)
+

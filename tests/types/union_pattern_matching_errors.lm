@@ -1,0 +1,129 @@
+// Union Type Pattern Matching Error Validation Tests
+// Testing that type checker properly validates union type pattern matching
+
+print("=== Union Type Pattern Matching Error Validation Tests ===");
+
+// Test 1: Non-exhaustive union pattern matching (should cause type checker error)
+print("Test 1: Non-exhaustive pattern matching");
+type NumberOrString = int | str;
+
+var value: NumberOrString = 42;
+
+// ❌ SHOULD FAIL - Missing str case
+// match (value) {
+//     int => print("Got integer: " + value)
+//     // Missing str case - should cause exhaustiveness error
+// }
+
+// ✅ SHOULD PASS - Exhaustive pattern matching
+match (value) {
+    int => print("Got integer: " + value),
+    str => print("Got string: " + value)
+}
+
+// Test 2: Invalid variant access (should cause type checker error)
+print("Test 2: Invalid variant access");
+type Color = str; // Red, Green, Blue
+var color: Color = "Red";
+
+// ❌ SHOULD FAIL - Purple is not a valid variant
+// match (color) {
+//     "Red" => print("Red color"),
+//     "Green" => print("Green color"),
+//     "Purple" => print("Purple color")  // Invalid variant
+// }
+
+// ✅ SHOULD PASS - Valid variants with wildcard
+match (color) {
+    "Red" => print("Red color"),
+    "Green" => print("Green color"),
+    "Blue" => print("Blue color"),
+    _ => print("Other color")
+}
+
+// Test 3: Pattern type mismatch (should cause type checker error)
+print("Test 3: Pattern type mismatch");
+type IntOrFloat = int | f64;
+var numValue: IntOrFloat = 42;
+
+// ❌ SHOULD FAIL - str is not a variant of IntOrFloat
+// match (numValue) {
+//     int => print("Integer: " + numValue),
+//     str => print("String: " + numValue)  // str not in int | f64
+// }
+
+// ✅ SHOULD PASS - Correct pattern types
+match (numValue) {
+    int => print("Integer: " + numValue),
+    f64 => print("Float: " + numValue)
+}
+
+// Test 4: Complex union exhaustiveness (should cause type checker error)
+print("Test 4: Complex union exhaustiveness");
+type Value = int | f64 | str | bool;
+var complexValue: Value = 123;
+
+// ❌ SHOULD FAIL - Missing bool case
+// match (complexValue) {
+//     int => print("Integer: " + complexValue),
+//     f64 => print("Float: " + complexValue),
+//     str => print("String: " + complexValue)
+//     // Missing bool case
+// }
+
+// ✅ SHOULD PASS - All cases covered
+match (complexValue) {
+    int => print("Integer: " + complexValue),
+    f64 => print("Float: " + complexValue),
+    str => print("String: " + complexValue),
+    bool => print("Boolean: " + complexValue)
+}
+
+// Test 5: Wildcard makes match exhaustive
+print("Test 5: Wildcard exhaustiveness");
+type ManyVariants = int | str | bool | f64;
+var manyValue: ManyVariants = 42;
+
+// ✅ SHOULD PASS - Wildcard covers all remaining cases
+match (manyValue) {
+    int => print("Integer: " + manyValue),
+    _ => print("Other type: " + manyValue)
+}
+
+// Test 6: Guard validation
+print("Test 6: Guard validation");
+type NumberType = int | f64;
+var numberValue: NumberType = 42;
+
+// ❌ SHOULD FAIL - Guard must be boolean
+// match (numberValue) {
+//     int where "not boolean" => print("Invalid guard"),  // Non-boolean guard
+//     f64 => print("Float: " + numberValue)
+// }
+
+// ✅ SHOULD PASS - Boolean guard
+match (numberValue) {
+    int where numberValue > 10 => print("Large integer: " + numberValue),
+    int => print("Small integer: " + numberValue),
+    f64 => print("Float: " + numberValue)
+}
+
+// Test 7: Option type exhaustiveness
+print("Test 7: Option type exhaustiveness");
+type OptionalInt = int | nil; // Option-like type
+
+var optValue: OptionalInt = 42;
+
+// ❌ SHOULD FAIL - Missing nil case for option-like type
+// match (optValue) {
+//     int => print("Has value: " + optValue)
+//     // Missing nil case
+// }
+
+// ✅ SHOULD PASS - Both cases covered
+match (optValue) {
+    int => print("Has value: " + optValue),
+    nil => print("No value")
+}
+
+print("=== Union Type Pattern Matching Error Validation Tests Completed ===");

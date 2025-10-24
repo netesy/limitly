@@ -536,6 +536,12 @@ private:
     void handlePushFunctionRef(const Instruction& instruction);
     void handleCallHigherOrder(const Instruction& instruction);
     
+    // Union type operations
+    void handleCreateUnion(const Instruction& instruction);
+    void handleGetUnionVariant(const Instruction& instruction);
+    void handleCheckUnionType(const Instruction& instruction);
+    void handleSetUnionVariant(const Instruction& instruction);
+    
     // Closure memory management methods
     std::string trackClosure(ValuePtr closureValue);
     void untrackClosure(const std::string& closureId);
