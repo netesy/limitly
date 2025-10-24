@@ -1,0 +1,24 @@
+var a = 10;
+var b = 3;
+
+// Test simple subtraction
+var simple = a - b;
+print("a - b = {simple}");
+
+// Test subtraction with parentheses
+var left = (a + b) * 2;
+var right = a / b;
+print("left = {left}");
+print("right = {right}");
+
+// Test subtraction of variables
+var result1 = left - right;
+print("left - right = {result1}");
+
+// Test the problematic expression step by step
+var result2 = (a + b) * 2 - right;
+print("(a + b) * 2 - right = {result2}");
+
+// Test the full expression
+var result3 = (a + b) * 2 - a / b;
+print("(a + b) * 2 - a / b = {result3}");

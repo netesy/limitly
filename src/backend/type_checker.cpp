@@ -207,7 +207,13 @@ TypePtr TypeChecker::resolveTypeAnnotation(const std::shared_ptr<AST::TypeAnnota
         return typeSystem.FUNCTION_TYPE;
     }
     
-    // Handle error union types (Type? or Type?Error1,Error2)
+    // Handle optional types (Type?) - these are for null safety
+    if (annotation->isOptional) {
+        // Optional types are error unions with no specific error types (generic)
+        return typeSystem.createErrorUnionType(baseType, {}, true);
+    }
+    
+    // Handle error union types (Type?Error1,Error2) - these are for error handling
     if (annotation->isFallible) {
         std::vector<std::string> errorTypeNames = annotation->errorTypes;
         bool isGeneric = errorTypeNames.empty();
@@ -1532,8 +1538,16 @@ bool TypeChecker::isOptionalType(TypePtr type) {
         return false;
     }
     
-    // Check if it's a generic error union (Type?) which represents optional types
+    // Both optional types (str?) and fallible types (int?DivisionByZero) 
+    // should be allowed in if conditions for null/error checking
     auto errorUnion = std::get<ErrorUnionType>(type->extra);
-    return errorUnion.isGenericError;
+    
+    // Optional types: empty error types and marked as generic (str?)
+    bool isOptional = errorUnion.errorTypes.empty() && errorUnion.isGenericError;
+    
+    // Fallible types: have specific error types (int?DivisionByZero)
+    bool isFallible = !errorUnion.errorTypes.empty();
+    
+    return isOptional || isFallible;
 }
 

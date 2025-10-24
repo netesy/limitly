@@ -340,7 +340,13 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                 instruction.opcode != Opcode::BEGIN_FUNCTION &&
                 instruction.opcode != Opcode::DEFINE_PARAM &&
                 instruction.opcode != Opcode::DEFINE_OPTIONAL_PARAM &&
-                instruction.opcode != Opcode::SET_DEFAULT_VALUE) {
+                instruction.opcode != Opcode::SET_DEFAULT_VALUE &&
+                // Allow default value expressions to be evaluated
+                instruction.opcode != Opcode::PUSH_STRING &&
+                instruction.opcode != Opcode::PUSH_INT &&
+                instruction.opcode != Opcode::PUSH_FLOAT &&
+                instruction.opcode != Opcode::PUSH_BOOL &&
+                instruction.opcode != Opcode::PUSH_NULL) {
                 if (debugMode) {
                     std::cout << "[DEBUG] Skipping instruction at IP " << ip << ": " << static_cast<int>(instruction.opcode) << std::endl;
                 }
@@ -1416,7 +1422,19 @@ void VM::handleStoreVar(const Instruction& instruction) {
         // variable doesn't exist yet; fallthrough to define
     }
 
-    environment->define(instruction.stringValue, value);
+    // Try to assign to existing variable first, then define if it doesn't exist
+    try {
+        environment->assign(instruction.stringValue, value);
+        if (debugMode) {
+            std::cout << "[DEBUG] STORE_VAR: Updated existing variable '" << instruction.stringValue << "'" << std::endl;
+        }
+    } catch (const std::runtime_error&) {
+        // Variable doesn't exist, define it
+        environment->define(instruction.stringValue, value);
+        if (debugMode) {
+            std::cout << "[DEBUG] STORE_VAR: Defined new variable '" << instruction.stringValue << "'" << std::endl;
+        }
+    }
     
     if (debugMode) {
         std::cout << "[DEBUG] STORE_VAR: Successfully stored variable '" << instruction.stringValue << "'" << std::endl;
@@ -1524,11 +1542,34 @@ void VM::handleAdd(const Instruction& /*unused*/) {
         return;
     }
 
+    // Handle ErrorUnion types by extracting success values
+    ValuePtr actualA = a;
+    ValuePtr actualB = b;
+    
+    // Extract success value from ErrorUnion if needed
+    if (a->type->tag == TypeTag::ErrorUnion) {
+        if (auto errorUnionDetails = std::get_if<ErrorUnionType>(&a->type->extra)) {
+            actualA = memoryManager.makeRef<Value>(*region, errorUnionDetails->successType);
+            actualA->data = a->data;
+        }
+    }
+    
+    if (b->type->tag == TypeTag::ErrorUnion) {
+        if (auto errorUnionDetails = std::get_if<ErrorUnionType>(&b->type->extra)) {
+            actualB = memoryManager.makeRef<Value>(*region, errorUnionDetails->successType);
+            actualB->data = b->data;
+        }
+    }
+    
     // Check if either operand is a number for numeric addition
-    bool aIsNumeric = (a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64 || a->type->tag == TypeTag::Float64);
-    bool bIsNumeric = (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64 || b->type->tag == TypeTag::Float64);
+    bool aIsNumeric = typeSystem->isNumericType(actualA->type->tag);
+    bool bIsNumeric = typeSystem->isNumericType(actualB->type->tag);
 
     if (aIsNumeric && bIsNumeric) {
+        // Use the extracted values for the rest of the operation
+        a = actualA;
+        b = actualB;
+        
         // Numeric addition - promote to double if either operand is double
         if (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64) {
             // Convert to double if needed
@@ -1593,13 +1634,36 @@ void VM::handleSubtract(const Instruction& /*unused*/) {
         return;
     }
     
+    // Handle ErrorUnion types by extracting success values
+    ValuePtr actualA = a;
+    ValuePtr actualB = b;
+    
+    // Extract success value from ErrorUnion if needed
+    if (a->type->tag == TypeTag::ErrorUnion) {
+        if (auto errorUnionDetails = std::get_if<ErrorUnionType>(&a->type->extra)) {
+            actualA = memoryManager.makeRef<Value>(*region, errorUnionDetails->successType);
+            actualA->data = a->data;
+        }
+    }
+    
+    if (b->type->tag == TypeTag::ErrorUnion) {
+        if (auto errorUnionDetails = std::get_if<ErrorUnionType>(&b->type->extra)) {
+            actualB = memoryManager.makeRef<Value>(*region, errorUnionDetails->successType);
+            actualB->data = b->data;
+        }
+    }
+    
     // Check if either operand is a number for numeric subtraction
-    bool aIsNumeric = (a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64 || a->type->tag == TypeTag::Float64);
-    bool bIsNumeric = (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64 || b->type->tag == TypeTag::Float64);
+    bool aIsNumeric = typeSystem->isNumericType(actualA->type->tag);
+    bool bIsNumeric = typeSystem->isNumericType(actualB->type->tag);
     
     if (!aIsNumeric || !bIsNumeric) {
         error("Both operands must be numbers for subtraction");
     }
+    
+    // Use the extracted values for the rest of the operation
+    a = actualA;
+    b = actualB;
     
     // Numeric subtraction - promote to double if either operand is double
     if (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64) {
@@ -3000,14 +3064,9 @@ void VM::handleCall(const Instruction& instruction) {
                 std::cout << "[DEBUG] CALL: Calling closure from variable: " << funcName << " -> " << closure.getFunctionName() << std::endl;
             }
             
-            // Save current environment
+            // Save current environment and use captured environment directly
             std::shared_ptr<Environment> savedEnv = environment;
-            
-            // Create a new environment for the closure call that includes captured variables
-            std::shared_ptr<Environment> closureCallEnv = std::make_shared<Environment>(closure.capturedEnvironment);
-            
-            // Set the closure environment as current
-            environment = closureCallEnv;
+            environment = closure.capturedEnvironment;
             
             // Create a call frame for the closure
             backend::CallFrame closureFrame(
@@ -3022,7 +3081,7 @@ void VM::handleCall(const Instruction& instruction) {
             auto funcIt = userDefinedFunctions.find(closure.functionName);
             if (funcIt != userDefinedFunctions.end()) {
                 // Bind function parameters
-                if (!bindFunctionParameters(funcIt->second, args, closureCallEnv, closure.functionName)) {
+                if (!bindFunctionParameters(funcIt->second, args, environment, closure.functionName)) {
                     // Restore environment on error
                     environment = savedEnv;
                     error("Failed to bind parameters for closure call: " + funcName);
@@ -3128,14 +3187,9 @@ void VM::handleCall(const Instruction& instruction) {
             std::cout << "[DEBUG] CALL: Calling closure function: " << closure.getFunctionName() << std::endl;
         }
         
-        // Save current environment
+        // Save current environment and use captured environment directly
         std::shared_ptr<Environment> savedEnv = environment;
-        
-        // Create a new environment for the closure call that includes captured variables
-        std::shared_ptr<Environment> closureCallEnv = std::make_shared<Environment>(closure.capturedEnvironment);
-        
-        // Set the closure environment as current
-        environment = closureCallEnv;
+        environment = closure.capturedEnvironment;
         
         // Create a call frame for the closure
         backend::CallFrame closureFrame(
@@ -3150,7 +3204,7 @@ void VM::handleCall(const Instruction& instruction) {
         auto funcIt = userDefinedFunctions.find(closure.functionName);
         if (funcIt != userDefinedFunctions.end()) {
             // Bind function parameters
-            if (!bindFunctionParameters(funcIt->second, args, closureCallEnv, closure.functionName)) {
+            if (!bindFunctionParameters(funcIt->second, args, environment, closure.functionName)) {
                 // Restore environment on error
                 environment = savedEnv;
                 error("Failed to bind parameters for closure call");
@@ -3787,14 +3841,12 @@ void VM::handleDefineOptionalParam(const Instruction& instruction) {
             // Don't modify lambda functions that are already registered with parameters
             if (currentFunc.find("__lambda_") == 0 && 
                 (!funcIt->second.parameters.empty() || !funcIt->second.optionalParameters.empty())) {
-                std::cout << "[DEBUG] handleDefineOptionalParam: Skipping optional parameter addition for already-registered lambda " 
-                          << currentFunc << " (has " << funcIt->second.parameters.size() << " required and " 
-                          << funcIt->second.optionalParameters.size() << " optional parameters)" << std::endl;
+                // std::cout << "[DEBUG] handleDefineOptionalParam: Skipping optional parameter addition for already-registered lambda " 
+                //           << currentFunc << " (has " << funcIt->second.parameters.size() << " required and " 
+                //           << funcIt->second.optionalParameters.size() << " optional parameters)" << std::endl;
                 return;
             }
             
-            std::cout << "[DEBUG] handleDefineOptionalParam: Adding optional parameter '" << instruction.stringValue 
-                      << "' to function " << currentFunc << std::endl;
             funcIt->second.optionalParameters.push_back(std::make_pair(instruction.stringValue, nullptr));
         }
     }
@@ -3812,6 +3864,7 @@ void VM::handleSetDefaultValue(const Instruction& /*unused*/) {
     if (funcIt != userDefinedFunctions.end() && !funcIt->second.optionalParameters.empty()) {
         backend::Function& currentFunc = funcIt->second;
         std::string paramName = currentFunc.optionalParameters.back().first; // Get the parameter name
+        
         ValuePtr defaultValue = pop();
         TypePtr paramType = currentFunc.optionalParameters.back().second; // Get the parameter type
         currentFunc.defaultValues[paramName] = std::make_pair(defaultValue, paramType);
@@ -6909,14 +6962,9 @@ void VM::handleCallClosure(const Instruction& instruction) {
         return;
     }
     
-    // Save current environment
+    // Save current environment and use captured environment directly
     std::shared_ptr<Environment> savedEnv = environment;
-    
-    // Create a new environment for the closure call
-    std::shared_ptr<Environment> closureCallEnv = std::make_shared<Environment>(closure.capturedEnvironment);
-    
-    // Set the closure environment as current
-    environment = closureCallEnv;
+    environment = closure.capturedEnvironment;
     
     // Get the lambda function from the registry
     auto funcIt = userDefinedFunctions.find(closure.functionName);
@@ -6937,7 +6985,7 @@ void VM::handleCallClosure(const Instruction& instruction) {
     
     // Bind function parameters to arguments
     const backend::Function& lambdaFunc = funcIt->second;
-    if (!bindFunctionParameters(lambdaFunc, args, closureCallEnv, closure.functionName)) {
+    if (!bindFunctionParameters(lambdaFunc, args, environment, closure.functionName)) {
         // Restore environment on error
         environment = savedEnv;
         error("CALL_CLOSURE: failed to bind parameters");
@@ -7250,8 +7298,7 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
         // For closures, we need to set up the captured environment
         // This is similar to handleCallClosure but integrated into higher-order call
         std::shared_ptr<Environment> savedEnv = environment;
-        std::shared_ptr<Environment> closureCallEnv = std::make_shared<Environment>(closure.capturedEnvironment);
-        environment = closureCallEnv;
+        environment = closure.capturedEnvironment;
         
         try {
             // Find the lambda function in the registry
@@ -7264,7 +7311,7 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
             
             // Bind parameters and execute the closure
             const backend::Function& lambdaFunc = funcIt->second;
-            if (!bindFunctionParameters(lambdaFunc, args, closureCallEnv, closure.functionName)) {
+            if (!bindFunctionParameters(lambdaFunc, args, environment, closure.functionName)) {
                 environment = savedEnv;
                 error("CALL_HIGHER_ORDER: failed to bind parameters");
                 return;
