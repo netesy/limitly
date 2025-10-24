@@ -3713,18 +3713,13 @@ std::shared_ptr<AST::Statement> Parser::typeDeclaration() {
             
             if (match({TokenType::COLON})) {
                 // We have a colon, now check what comes after
-                if (check(TokenType::IDENTIFIER) || isPrimitiveType(peek().type)) {
-                    Token secondToken = peek();
-                    advance(); // Consume the second token
+                // Value type can be: primitive type, identifier, [elementType], or {nestedDict}
+                if (check(TokenType::IDENTIFIER) || isPrimitiveType(peek().type) || 
+                    check(TokenType::LEFT_BRACKET) || check(TokenType::LEFT_BRACE)) {
                     
-                    // If we immediately hit a closing brace, it's a dictionary type
-                    if (check(TokenType::RIGHT_BRACE)) {
-                        isDictionary = true;
-                    }
-                    // If the first token is a primitive type and second is also a type, it's likely a dictionary
-                    else if (isPrimitiveType(firstToken.type) && (isPrimitiveType(secondToken.type) || 
-                             secondToken.lexeme == "any" || secondToken.lexeme == "str" || 
-                             secondToken.lexeme == "int" || secondToken.lexeme == "float")) {
+                    // If the first token is a type (primitive or known type name), it's a dictionary
+                    if (isPrimitiveType(firstToken.type) || 
+                        (firstToken.type == TokenType::IDENTIFIER && isKnownTypeName(firstToken.lexeme))) {
                         isDictionary = true;
                     }
                 }
@@ -4018,19 +4013,21 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseUnionType() {
 std::shared_ptr<AST::TypeAnnotation> Parser::parseBasicType() {
     auto type = std::make_shared<AST::TypeAnnotation>();
 
-    // Check for list types (e.g., [int], [str], [Person])
+    // Check for container types (e.g., [int], {str: int})
     if (match({TokenType::LEFT_BRACKET})) {
+        // Parse list type [elementType] - [ is already consumed
+        auto type = std::make_shared<AST::TypeAnnotation>();
         type->isList = true;
         type->typeName = "list";
         
         // Parse element type (e.g., int in [int])
         if (!check(TokenType::RIGHT_BRACKET)) {
-            // Parse the element type
+            // Use parseBasicType to avoid recursion issues
             type->elementType = parseBasicType();
         } else {
             // Default to any if no element type is specified
             auto anyType = std::make_shared<AST::TypeAnnotation>();
-            anyType->typeName = "any";
+            anyType->typeName = "list";
             anyType->isPrimitive = true;
             type->elementType = anyType;
         }
@@ -4057,7 +4054,7 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseBasicType() {
 
     // Check for dictionary types (e.g., {str: int}) or structural types (e.g., { name: str, age: int })
     if (match({TokenType::LEFT_BRACE})) {
-        return parseBraceType();
+         return parseBraceType();
     }
 
     // Parse primitive and user-defined types
@@ -4235,61 +4232,130 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseBasicType() {
 
 // Parse brace type - either dictionary {keyType: valueType} or structural {field: type, ...}
 std::shared_ptr<AST::TypeAnnotation> Parser::parseBraceType() {
-    // Look ahead to determine if this is a dictionary type or structural type
-    size_t savedCurrent = current;
+    // Opening brace is already consumed by parseBasicType()
+    
+    // Improved heuristic to distinguish dictionary from structural type:
+    // Dictionary: {keyType: valueType} - first token is a type (primitive or known type name)
+    // Structural: {fieldName: fieldType, ...} - first token is an identifier (field name)
     bool isDictionary = false;
     
-    // Check the pattern to distinguish dictionary from structural type
-    if (check(TokenType::IDENTIFIER) || isPrimitiveType(peek().type)) {
+    if (!check(TokenType::RIGHT_BRACE)) { // Not empty
         Token firstToken = peek();
-        advance();
         
-        if (match({TokenType::COLON})) {
-            // We have a colon, check what comes after
-            // Dictionary types can have complex value types like [int] or {str: int}
-            if (check(TokenType::IDENTIFIER) || isPrimitiveType(peek().type) || 
-                check(TokenType::LEFT_BRACKET) || check(TokenType::LEFT_BRACE)) {
-                
-                // If the first token is a primitive type, it's likely a dictionary
-                if (isPrimitiveType(firstToken.type)) {
-                    isDictionary = true;
-                } else {
-                    // For identifiers, check if it's a known type name
-                    if (isKnownTypeName(firstToken.lexeme)) {
-                        isDictionary = true;
-                    } else {
-                        // Look at the value type to make a decision
-                        if (check(TokenType::LEFT_BRACKET) || check(TokenType::LEFT_BRACE) ||
-                            isPrimitiveType(peek().type) || isKnownTypeName(peek().lexeme)) {
-                            isDictionary = true;
-                        }
-                    }
-                }
-            }
+        // Dictionary type heuristic:
+        // 1. First token is a primitive type token (STR_TYPE, INT_TYPE, etc.)
+        // 2. OR first token is an identifier that's a known type name
+        if (isPrimitiveType(firstToken.type)) {
+            isDictionary = true;
+        } else if (firstToken.type == TokenType::IDENTIFIER && isKnownTypeName(firstToken.lexeme)) {
+            isDictionary = true;
         }
+        // Otherwise, assume it's a structural type with field names
     }
     
-    // Reset parser position
-    current = savedCurrent;
-    
     if (isDictionary) {
-        return parseDictionaryType();
+        // Parse dictionary type - { is already consumed
+        auto type = std::make_shared<AST::TypeAnnotation>();
+        type->isDict = true;
+        type->typeName = "dict";
+        
+        // Parse key type - use parseBasicType to avoid recursion issues
+        auto keyType = parseBasicType();
+        consume(TokenType::COLON, "Expected ':' in dictionary type.");
+        
+        // Parse value type - use parseBasicType to avoid recursion issues
+        auto valueType = parseBasicType();
+        
+        type->keyType = keyType;
+        type->valueType = valueType;
+        
+        consume(TokenType::RIGHT_BRACE, "Expected '}' after dictionary type.");
+        return type;
     } else {
-        return parseStructuralType();
+        // Parse structural type - { is already consumed
+        auto type = std::make_shared<AST::TypeAnnotation>();
+        type->isStructural = true;
+        type->typeName = "struct";
+
+        // Parse fields until we hit a closing brace
+        while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
+            // Check for rest parameter (...) or extensible record (...baseRecord)
+            if (match({TokenType::ELLIPSIS})) {
+                type->hasRest = true;
+                
+                // Check if there's a base record identifier after ...
+                if (check(TokenType::IDENTIFIER)) {
+                    // This is an extensible record with a base record
+                    std::string baseRecordName = consume(TokenType::IDENTIFIER, "Expected base record name after '...'.").lexeme;
+                    
+                    // Store the base record name
+                    if (type->baseRecord.empty()) {
+                        type->baseRecord = baseRecordName;
+                    }
+                    
+                    // Also add to the list of base records for multiple inheritance
+                    type->baseRecords.push_back(baseRecordName);
+                }
+                
+                // Check for comma to continue with more fields
+                if (check(TokenType::COMMA)) {
+                    consume(TokenType::COMMA, "Expected ',' after rest parameter.");
+                    continue;
+                } else if (check(TokenType::RIGHT_BRACE)) {
+                    // End of record definition
+                    break;
+                } else {
+                    error("Expected ',' or '}' after rest parameter.");
+                }
+            }
+
+            // Parse field name
+            std::string fieldName;
+            if (check(TokenType::IDENTIFIER)) {
+                fieldName = consume(TokenType::IDENTIFIER, "Expected field name.").lexeme;
+            } else if (check(TokenType::STRING)) {
+                // Handle string literals as field names (e.g., { "kind": "Some" })
+                Token stringToken = consume(TokenType::STRING, "Expected field name.");
+                fieldName = stringToken.lexeme;
+                // Remove quotes if present
+                if (fieldName.size() >= 2 && (fieldName[0] == '"' || fieldName[0] == '\'') && 
+                    (fieldName[fieldName.size()-1] == '"' || fieldName[fieldName.size()-1] == '\'')) {
+                    fieldName = fieldName.substr(1, fieldName.size() - 2);
+                }
+            } else {
+                error("Expected field name.");
+                break;
+            }
+
+            // Parse field type
+            consume(TokenType::COLON, "Expected ':' after field name.");
+            auto fieldType = parseBasicType();
+
+            // Add field to structural type
+            type->structuralFields.push_back({fieldName, fieldType});
+
+            // Check for comma or end of struct
+            if (!check(TokenType::RIGHT_BRACE)) {
+                match({TokenType::COMMA}); // Optional comma
+            }
+        }
+
+        consume(TokenType::RIGHT_BRACE, "Expected '}' after structural type.");
+        return type;
     }
 }
 
-// Parse dictionary type {keyType: valueType}
+// Parse dictionary type {keyType: valueType} - assumes '{' is already consumed
 std::shared_ptr<AST::TypeAnnotation> Parser::parseDictionaryType() {
     auto type = std::make_shared<AST::TypeAnnotation>();
     type->isDict = true;
     type->typeName = "dict";
     
-    // Parse key type
+    // Parse key type - use parseBasicType to avoid recursion issues
     auto keyType = parseBasicType();
     consume(TokenType::COLON, "Expected ':' in dictionary type.");
     
-    // Parse value type
+    // Parse value type - use parseBasicType to avoid recursion issues
     auto valueType = parseBasicType();
     
     type->keyType = keyType;
@@ -4303,7 +4369,10 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseDictionaryType() {
 bool Parser::isKnownTypeName(const std::string& name) {
     return name == "any" || name == "str" || name == "int" || name == "float" || 
            name == "bool" || name == "list" || name == "dict" || name == "option" || 
-           name == "result";
+           name == "result" || name == "i8" || name == "i16" || name == "i32" || 
+           name == "i64" || name == "u8" || name == "u16" || name == "u32" || 
+           name == "u64" || name == "f32" || name == "f64" || name == "uint" ||
+           name == "nil" || name == "tuple" || name == "function";
 }
 
 // Parse structural type (e.g., { name: str, age: int, ...baseRecord })
@@ -4378,6 +4447,60 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseStructuralType(const std::stri
     consume(TokenType::RIGHT_BRACE, "Expected '}' after structural type.");
     return type;
 }
+
+// Parse container type - handles both [elementType] and {keyType: valueType} syntax
+std::shared_ptr<AST::TypeAnnotation> Parser::parseContainerType() {
+    // Check for list type [elementType]
+    if (check(TokenType::LEFT_BRACKET)) {
+        advance(); // consume '['
+        
+        auto type = std::make_shared<AST::TypeAnnotation>();
+        type->isList = true;
+        type->typeName = "list";
+        
+        // Parse element type (e.g., int in [int])
+        if (!check(TokenType::RIGHT_BRACKET)) {
+            // Use parseTypeAnnotation to handle complex element types like [int] or {str: int}
+            type->elementType = parseTypeAnnotation();
+        } else {
+            // Default to any if no element type is specified
+            auto anyType = std::make_shared<AST::TypeAnnotation>();
+            anyType->typeName = "any";
+            anyType->isPrimitive = true;
+            type->elementType = anyType;
+        }
+        
+        consume(TokenType::RIGHT_BRACKET, "Expected ']' after list element type.");
+        return type;
+    }
+    
+    // Check for dictionary type {keyType: valueType}
+    if (check(TokenType::LEFT_BRACE)) {
+        advance(); // consume '{'
+        
+        auto type = std::make_shared<AST::TypeAnnotation>();
+        type->isDict = true;
+        type->typeName = "dict";
+        
+        // Parse key type - use parseBasicType to avoid recursion issues
+        auto keyType = parseBasicType();
+        consume(TokenType::COLON, "Expected ':' in dictionary type.");
+        
+        // Parse value type - use parseBasicType to avoid recursion issues
+        auto valueType = parseBasicType();
+        
+        type->keyType = keyType;
+        type->valueType = valueType;
+        
+        consume(TokenType::RIGHT_BRACE, "Expected '}' after dictionary type.");
+        return type;
+    }
+    
+    // If we get here, it's not a container type
+    error("Expected '[' or '{' for container type.");
+    return nullptr;
+}
+
 // Error pattern parsing methods
 
 // Parse val pattern: val identifier

@@ -64,6 +64,8 @@ namespace AST {
     struct FallibleExpr;
     struct ErrorConstructExpr;
     struct OkConstructExpr;
+    struct SomeConstructExpr;
+    struct NoneConstructExpr;
     struct EnumDeclaration;
     struct MatchStatement;
     struct MatchCase;
@@ -664,6 +666,15 @@ namespace AST {
     // Success value construction (ok() calls)
     struct OkConstructExpr : public Expression {
         std::shared_ptr<Expression> value;
+    };
+
+    // Option type construction expressions
+    struct SomeConstructExpr : public Expression {
+        std::shared_ptr<Expression> value;
+    };
+
+    struct NoneConstructExpr : public Expression {
+        // None takes no arguments, but may have type annotation context
     };
 
     // Lambda expression (e.g., fn(x, y) {x + y})

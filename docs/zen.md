@@ -10,7 +10,7 @@
 
 *Clarity is king; code is read more often than it is written.*
 
-*The absence of a value is a case to be handled, not a `nil` to be feared.*
+*The absence of a value is an error condition to be handled, not a `null` to be feared.*
 
 *If the implementation is hard to explain, it's a bad idea.*
 

@@ -181,6 +181,7 @@ public:
     std::shared_ptr<AST::TypeAnnotation> parseBraceType();
     std::shared_ptr<AST::TypeAnnotation> parseDictionaryType();
     std::shared_ptr<AST::TypeAnnotation> parseStructuralType(const std::string& typeName = "");
+    std::shared_ptr<AST::TypeAnnotation> parseContainerType();
     bool isPrimitiveType(TokenType type);
     bool isKnownTypeName(const std::string& name);
     std::string tokenTypeToString(TokenType type);

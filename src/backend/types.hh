@@ -527,7 +527,9 @@ public:
             // For union types, we'll set it to the first type with a default value
             if (const auto *unionType = std::get_if<UnionType>(&type->extra)) {
                 if (!unionType->types.empty()) {
-                    value->data = createValue(unionType->types[0])->data;
+                    ValuePtr firstVariantValue = createValue(unionType->types[0]);
+                    value->data = firstVariantValue->data;
+                    value->activeUnionVariant = 0; // Set to first variant
                 } else {
                     throw std::runtime_error("Empty union type");
                 }
@@ -694,6 +696,218 @@ public:
         return std::make_shared<Type>(TypeTag::Union, unionType);
     }
 
+    // Create union value with specific variant
+    ValuePtr createUnionValue(TypePtr unionType, size_t variantIndex, ValuePtr variantValue) {
+        if (!unionType || unionType->tag != TypeTag::Union) {
+            throw std::runtime_error("Invalid union type");
+        }
+        
+        const auto* unionTypeInfo = std::get_if<UnionType>(&unionType->extra);
+        if (!unionTypeInfo || variantIndex >= unionTypeInfo->types.size()) {
+            throw std::runtime_error("Invalid union variant index");
+        }
+        
+        // Validate that the variant value matches the expected type
+        if (variantValue && !isCompatible(variantValue->type, unionTypeInfo->types[variantIndex])) {
+            throw std::runtime_error("Union variant value type mismatch");
+        }
+        
+        ValuePtr unionValue = memoryManager.makeRef<Value>(region);
+        unionValue->type = unionType;
+        unionValue->activeUnionVariant = variantIndex;
+        
+        if (variantValue) {
+            unionValue->data = variantValue->data;
+        } else {
+            // Create default value for the variant type
+            ValuePtr defaultValue = createValue(unionTypeInfo->types[variantIndex]);
+            unionValue->data = defaultValue->data;
+        }
+        
+        return unionValue;
+    }
+
+    // Get union variant types
+    std::vector<TypePtr> getUnionVariantTypes(TypePtr unionType) {
+        if (!unionType || unionType->tag != TypeTag::Union) {
+            return {};
+        }
+        
+        const auto* unionTypeInfo = std::get_if<UnionType>(&unionType->extra);
+        if (!unionTypeInfo) {
+            return {};
+        }
+        
+        return unionTypeInfo->types;
+    }
+
+    // Check if a type is a union type
+    bool isUnionType(TypePtr type) {
+        return type && type->tag == TypeTag::Union;
+    }
+
+    // Get the number of variants in a union type
+    size_t getUnionVariantCount(TypePtr unionType) {
+        if (!unionType || unionType->tag != TypeTag::Union) {
+            return 0;
+        }
+        
+        const auto* unionTypeInfo = std::get_if<UnionType>(&unionType->extra);
+        if (!unionTypeInfo) {
+            return 0;
+        }
+        
+        return unionTypeInfo->types.size();
+    }
+
+    // Option type support - implemented as union type (T | Nil) for null safety
+    TypePtr createOptionType(TypePtr valueType) {
+        if (!valueType) {
+            valueType = ANY_TYPE;
+        }
+        
+        // Option<T> is simply T | Nil - this provides true null safety
+        // The value can either be of type T or be nil (absence of value)
+        std::vector<TypePtr> optionVariants = {valueType, NIL_TYPE};
+        return createUnionType(optionVariants);
+    }
+    
+    // Check if a type is an Option type (T | Nil)
+    bool isOptionType(TypePtr type) {
+        if (!type || type->tag != TypeTag::Union) {
+            return false;
+        }
+        
+        const auto* unionType = std::get_if<UnionType>(&type->extra);
+        if (!unionType || unionType->types.size() != 2) {
+            return false;
+        }
+        
+        // Check if the union has exactly one non-nil type and nil
+        bool hasNil = false;
+        bool hasNonNil = false;
+        for (const auto& variantType : unionType->types) {
+            if (variantType->tag == TypeTag::Nil) {
+                hasNil = true;
+            } else {
+                hasNonNil = true;
+            }
+        }
+        
+        return hasNil && hasNonNil;
+    }
+    
+    // Create Some value using existing union infrastructure
+    ValuePtr createSome(TypePtr valueType, ValuePtr value) {
+        if (!value) {
+            throw std::runtime_error("Cannot create Some with null value");
+        }
+        
+        // Validate that the value type is compatible with the expected type
+        if (!isCompatible(value->type, valueType)) {
+            throw std::runtime_error("Value type incompatible with Option value type");
+        }
+        
+        TypePtr optionType = createOptionType(valueType);
+        
+        // Use existing union infrastructure - variant 0 is the value type
+        return createUnionValue(optionType, 0, value);
+    }
+    
+    // Create None value using existing union infrastructure
+    ValuePtr createNone(TypePtr valueType) {
+        TypePtr optionType = createOptionType(valueType);
+        
+        // Create nil value
+        ValuePtr nilValue = memoryManager.makeRef<Value>(region);
+        nilValue->type = NIL_TYPE;
+        nilValue->data = std::monostate{};
+        
+        // Use existing union infrastructure - variant 1 is nil
+        return createUnionValue(optionType, 1, nilValue);
+    }
+    
+    // Check if a value is Some (has a non-nil value)
+    bool isSome(ValuePtr value) {
+        if (!value || !isOptionType(value->type)) {
+            return false;
+        }
+        
+        // Some means the value is not nil
+        return !std::holds_alternative<std::monostate>(value->data);
+    }
+    
+    // Check if a value is None (is nil)
+    bool isNone(ValuePtr value) {
+        if (!value || !isOptionType(value->type)) {
+            return false;
+        }
+        
+        // None means the value is nil
+        return std::holds_alternative<std::monostate>(value->data);
+    }
+    
+    // Extract value from Some (throws if None)
+    ValuePtr unwrapSome(ValuePtr optionValue) {
+        if (!isSome(optionValue)) {
+            throw std::runtime_error("Attempted to unwrap None as Some");
+        }
+        
+        // Get the value type from the Option<T>
+        TypePtr valueType = getOptionValueType(optionValue->type);
+        if (!valueType) {
+            throw std::runtime_error("Invalid Option type structure");
+        }
+        
+        // Create a new value with the extracted data and correct type
+        ValuePtr extractedValue = memoryManager.makeRef<Value>(region);
+        extractedValue->type = valueType;
+        extractedValue->data = optionValue->data;
+        
+        return extractedValue;
+    }
+    
+    // Extract value from Some safely (returns nullptr if None)
+    ValuePtr unwrapSomeSafe(ValuePtr optionValue) {
+        if (!isSome(optionValue)) {
+            return nullptr;
+        }
+        
+        // Get the value type from the Option<T>
+        TypePtr valueType = getOptionValueType(optionValue->type);
+        if (!valueType) {
+            return nullptr;
+        }
+        
+        // Create a new value with the extracted data and correct type
+        ValuePtr extractedValue = memoryManager.makeRef<Value>(region);
+        extractedValue->type = valueType;
+        extractedValue->data = optionValue->data;
+        
+        return extractedValue;
+    }
+    
+    // Get Option value type (the T in Option<T>)
+    TypePtr getOptionValueType(TypePtr optionType) {
+        if (!isOptionType(optionType)) {
+            return nullptr;
+        }
+        
+        const auto* unionType = std::get_if<UnionType>(&optionType->extra);
+        if (!unionType || unionType->types.size() != 2) {
+            return nullptr;
+        }
+        
+        // Find the non-nil type in the union (T | Nil)
+        for (const auto& variantType : unionType->types) {
+            if (variantType->tag != TypeTag::Nil) {
+                return variantType;
+            }
+        }
+        
+        return nullptr; // Should not happen for valid Option types
+    }
+
     // Create function type (legacy)
     TypePtr createFunctionType(const std::vector<TypePtr>& paramTypes, TypePtr returnType) {
         FunctionType functionType(paramTypes, returnType);
@@ -716,6 +930,32 @@ public:
         return std::make_shared<Type>(TypeTag::Tuple, tupleType);
     }
     
+    // Create typed list type (e.g., [int], [str])
+    TypePtr createTypedListType(TypePtr elementType) {
+        if (!elementType) {
+            elementType = ANY_TYPE; // Default to any if no element type specified
+        }
+        
+        ListType listType;
+        listType.elementType = elementType;
+        return std::make_shared<Type>(TypeTag::List, listType);
+    }
+    
+    // Create typed dictionary type (e.g., {str: int}, {int: float})
+    TypePtr createTypedDictType(TypePtr keyType, TypePtr valueType) {
+        if (!keyType) {
+            keyType = STRING_TYPE; // Default key type to string
+        }
+        if (!valueType) {
+            valueType = ANY_TYPE; // Default value type to any
+        }
+        
+        DictType dictType;
+        dictType.keyType = keyType;
+        dictType.valueType = valueType;
+        return std::make_shared<Type>(TypeTag::Dict, dictType);
+    }
+    
     // Create function type from AST function type annotation (implemented below)
     TypePtr createFunctionTypeFromAST(const AST::FunctionTypeAnnotation& funcTypeAnnotation);
     
@@ -734,6 +974,68 @@ public:
         auto toFuncType = std::get<FunctionType>(toFunc->extra);
         
         return fromFuncType.isCompatibleWith(toFuncType);
+    }
+    
+    // Container type validation methods
+    bool validateContainerHomogeneity(TypePtr containerType, const std::vector<ValuePtr>& elements) {
+        if (!containerType || elements.empty()) {
+            return true; // Empty containers are valid
+        }
+        
+        if (containerType->tag == TypeTag::List) {
+            auto listType = std::get<ListType>(containerType->extra);
+            for (const auto& element : elements) {
+                if (!isCompatible(element->type, listType.elementType)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        
+        return true; // Other container types handled elsewhere
+    }
+    
+    bool validateDictHomogeneity(TypePtr dictType, const std::vector<std::pair<ValuePtr, ValuePtr>>& entries) {
+        if (!dictType || entries.empty()) {
+            return true; // Empty dictionaries are valid
+        }
+        
+        if (dictType->tag == TypeTag::Dict) {
+            auto dictTypeInfo = std::get<DictType>(dictType->extra);
+            for (const auto& [key, value] : entries) {
+                if (!isCompatible(key->type, dictTypeInfo.keyType) || 
+                    !isCompatible(value->type, dictTypeInfo.valueType)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        
+        return true;
+    }
+    
+    // Get container element type for type inference
+    TypePtr getContainerElementType(TypePtr containerType) {
+        if (!containerType) {
+            return ANY_TYPE;
+        }
+        
+        if (containerType->tag == TypeTag::List) {
+            auto listType = std::get<ListType>(containerType->extra);
+            return listType.elementType;
+        }
+        
+        return ANY_TYPE;
+    }
+    
+    // Get dictionary key and value types
+    std::pair<TypePtr, TypePtr> getDictTypes(TypePtr dictType) {
+        if (!dictType || dictType->tag != TypeTag::Dict) {
+            return {STRING_TYPE, ANY_TYPE}; // Default types
+        }
+        
+        auto dictTypeInfo = std::get<DictType>(dictType->extra);
+        return {dictTypeInfo.keyType, dictTypeInfo.valueType};
     }
     
     // Function overloading support

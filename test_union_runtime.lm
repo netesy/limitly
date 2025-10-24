@@ -1,0 +1,19 @@
+// Test union type runtime value support
+
+// Basic union type declaration
+type NumberOrString = int | str;
+
+// Variable declaration with union type
+var value: NumberOrString;
+
+// Test assignment of int to union
+value = 42;
+print("Assigned int to union: ");
+print(value);
+
+// Test assignment of string to union
+value = "hello";
+print("Assigned string to union: ");
+print(value);
+
+print("Union type runtime test completed");

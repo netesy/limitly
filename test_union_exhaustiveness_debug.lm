@@ -1,0 +1,32 @@
+// Debug test for union exhaustiveness checking
+
+print("=== Union Exhaustiveness Debug Test ===");
+
+// Test 1: Simple exhaustive match (should pass)
+type NumberOrString = int | str;
+var value1: NumberOrString = 42;
+
+match (value1) {
+    int => print("Got int: " + value1),
+    str => print("Got str: " + value1)
+}
+
+// Test 2: Wildcard match (should pass)
+type ManyTypes = int | str | bool;
+var value2: ManyTypes = 123;
+
+match (value2) {
+    int => print("Got int: " + value2),
+    _ => print("Got other: " + value2)
+}
+
+// Test 3: Non-exhaustive match (should fail)
+var value3: NumberOrString = "hello";
+
+// This should trigger exhaustiveness error
+match (value3) {
+    int => print("Got int: " + value3)
+    // Missing str case
+}
+
+print("=== Union Exhaustiveness Debug Test Completed ===");

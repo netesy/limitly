@@ -164,6 +164,12 @@ enum class Opcode {
     PUSH_FUNCTION_REF,  // Push function reference onto stack
     CALL_HIGHER_ORDER,  // Call function with function parameters
 
+    // Union type operations
+    CREATE_UNION,       // Create union value with specific variant
+    GET_UNION_VARIANT,  // Get active variant index from union
+    CHECK_UNION_TYPE,   // Check if union is specific variant type
+    SET_UNION_VARIANT,  // Set active variant in union value
+
     // Memory operations
     LOAD_CONST,         // Load constant onto stack
     STORE_CONST,        // Store constant onto stack

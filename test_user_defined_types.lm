@@ -1,0 +1,33 @@
+// Test user-defined types and enums
+
+// First, let's test enum types (which should work)
+enum Color {
+    Red,
+    Green,
+    Blue,
+    Yellow
+}
+
+// Test enum usage
+var color: Color;
+color = Color.Red;
+print("Color is: ");
+print(color);
+
+color = Color.Blue;
+print("Color is: ");
+print(color);
+
+// Test union with enum variants
+type ColorOrNumber = Color | int;
+
+var colorOrNum: ColorOrNumber;
+colorOrNum = Color.Green;
+print("ColorOrNumber (enum): ");
+print(colorOrNum);
+
+colorOrNum = 42;
+print("ColorOrNumber (int): ");
+print(colorOrNum);
+
+print("User-defined type test completed");

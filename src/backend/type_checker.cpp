@@ -221,6 +221,34 @@ TypePtr TypeChecker::resolveTypeAnnotation(const std::shared_ptr<AST::TypeAnnota
         return typeSystem.createErrorUnionType(baseType, errorTypeNames, isGeneric);
     }
     
+    // Handle typed list types (e.g., [int], [str])
+    if (annotation->isList && annotation->elementType) {
+        TypePtr elementType = resolveTypeAnnotation(annotation->elementType);
+        return typeSystem.createTypedListType(elementType);
+    }
+    
+    // Handle typed dictionary types (e.g., {str: int}, {int: float})
+    if (annotation->isDict && annotation->keyType && annotation->valueType) {
+        TypePtr keyType = resolveTypeAnnotation(annotation->keyType);
+        TypePtr valueType = resolveTypeAnnotation(annotation->valueType);
+        return typeSystem.createTypedDictType(keyType, valueType);
+    }
+    
+    // Handle tuple types (e.g., (int, str, bool))
+    if (annotation->isTuple && !annotation->tupleTypes.empty()) {
+        std::vector<TypePtr> elementTypes;
+        for (const auto& tupleType : annotation->tupleTypes) {
+            TypePtr resolvedType = resolveTypeAnnotation(tupleType);
+            if (resolvedType) {
+                elementTypes.push_back(resolvedType);
+            }
+        }
+        
+        if (!elementTypes.empty()) {
+            return typeSystem.createTupleType(elementTypes);
+        }
+    }
+    
     return baseType;
 }
 
@@ -262,10 +290,44 @@ void TypeChecker::checkStatement(const std::shared_ptr<AST::Statement>& stmt) {
                 }
             }
             
-            // Enhanced type compatibility checking for error unions and function types
+            // Enhanced type compatibility checking for union types, error unions and function types
             if (varType != typeSystem.ANY_TYPE && !typeSystem.isCompatible(initType, varType)) {
-                // Provide more specific error messages for error union types
-                if (isErrorUnionType(varType) || isErrorUnionType(initType)) {
+                // Provide more specific error messages for union types
+                if (isUnionType(varType) || isUnionType(initType)) {
+                    std::string varTypeStr = varType->toString();
+                    std::string initTypeStr = initType->toString();
+                    
+                    if (isUnionType(varType) && !isUnionType(initType)) {
+                        // Check if the init type is compatible with any variant of the union
+                        if (const auto* unionType = std::get_if<UnionType>(&varType->extra)) {
+                            bool compatibleWithAnyVariant = false;
+                            for (const auto& variantType : unionType->types) {
+                                if (typeSystem.isCompatible(initType, variantType)) {
+                                    compatibleWithAnyVariant = true;
+                                    break;
+                                }
+                            }
+                            
+                            if (!compatibleWithAnyVariant) {
+                                addError("Type mismatch in variable declaration '" + varDecl->name + 
+                                        "': type " + initTypeStr + " is not compatible with any variant of union type " + 
+                                        varTypeStr, varDecl->line);
+                            }
+                        }
+                    } else if (!isUnionType(varType) && isUnionType(initType)) {
+                        addError("Type mismatch in variable declaration '" + varDecl->name + 
+                                "': cannot assign union type " + initTypeStr + 
+                                " to non-union type " + varTypeStr + 
+                                ". Consider using pattern matching to extract the value", 
+                                varDecl->line);
+                    } else {
+                        // Both are union types but incompatible
+                        addError("Type mismatch in variable declaration '" + varDecl->name + 
+                                "': incompatible union types " + initTypeStr + 
+                                " and " + varTypeStr, 
+                                varDecl->line);
+                    }
+                } else if (isErrorUnionType(varType) || isErrorUnionType(initType)) {
                     std::string varTypeStr = varType->toString();
                     std::string initTypeStr = initType->toString();
                     
@@ -320,6 +382,38 @@ void TypeChecker::checkStatement(const std::shared_ptr<AST::Statement>& stmt) {
                                 "': cannot assign function " + initTypeStr + 
                                 " to variable of type " + varTypeStr + 
                                 ". Function signatures must be compatible", 
+                                varDecl->line);
+                    }
+                } else if (varType->tag == TypeTag::List && initType->tag == TypeTag::List) {
+                    // Enhanced list type error messages
+                    auto varListType = std::get<ListType>(varType->extra);
+                    auto initListType = std::get<ListType>(initType->extra);
+                    addError("List element type mismatch in variable declaration '" + varDecl->name + 
+                            "': cannot assign [" + initListType.elementType->toString() + 
+                            "] to variable of type [" + varListType.elementType->toString() + "]", 
+                            varDecl->line);
+                } else if (varType->tag == TypeTag::Dict && initType->tag == TypeTag::Dict) {
+                    // Enhanced dictionary type error messages
+                    auto varDictType = std::get<DictType>(varType->extra);
+                    auto initDictType = std::get<DictType>(initType->extra);
+                    addError("Dictionary type mismatch in variable declaration '" + varDecl->name + 
+                            "': cannot assign {" + initDictType.keyType->toString() + 
+                            ": " + initDictType.valueType->toString() + "} to variable of type {" + 
+                            varDictType.keyType->toString() + ": " + varDictType.valueType->toString() + "}", 
+                            varDecl->line);
+                } else if (varType->tag == TypeTag::Tuple && initType->tag == TypeTag::Tuple) {
+                    // Enhanced tuple type error messages
+                    auto varTupleType = std::get<TupleType>(varType->extra);
+                    auto initTupleType = std::get<TupleType>(initType->extra);
+                    
+                    if (varTupleType.elementTypes.size() != initTupleType.elementTypes.size()) {
+                        addError("Tuple size mismatch in variable declaration '" + varDecl->name + 
+                                "': cannot assign tuple with " + std::to_string(initTupleType.elementTypes.size()) + 
+                                " elements to variable expecting " + std::to_string(varTupleType.elementTypes.size()) + 
+                                " elements", varDecl->line);
+                    } else {
+                        addError("Tuple element type mismatch in variable declaration '" + varDecl->name + 
+                                "': tuple element types are incompatible", 
                                 varDecl->line);
                     }
                 } else {
@@ -442,6 +536,10 @@ void TypeChecker::checkStatement(const std::shared_ptr<AST::Statement>& stmt) {
 }
 
 TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& expr) {
+    return checkExpression(expr, nullptr);
+}
+
+TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& expr, TypePtr expectedType) {
     if (auto literalExpr = std::dynamic_pointer_cast<AST::LiteralExpr>(expr)) {
         // Infer type from literal value using variant index
         switch (literalExpr->value.index()) {
@@ -590,6 +688,91 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
         
         return valueType;
         
+    } else if (auto listExpr = std::dynamic_pointer_cast<AST::ListExpr>(expr)) {
+        // Handle list expressions [1, 2, 3] or [expr1, expr2, ...]
+        if (listExpr->elements.empty()) {
+            // Empty list - return generic list type
+            return typeSystem.createTypedListType(typeSystem.ANY_TYPE);
+        }
+        
+        // Check all elements and infer common element type
+        std::vector<TypePtr> elementTypes;
+        for (const auto& element : listExpr->elements) {
+            TypePtr elementType = checkExpression(element);
+            elementTypes.push_back(elementType);
+        }
+        
+        // Find common type for all elements
+        TypePtr commonElementType = elementTypes[0];
+        for (size_t i = 1; i < elementTypes.size(); ++i) {
+            try {
+                commonElementType = typeSystem.getCommonType(commonElementType, elementTypes[i]);
+            } catch (const std::runtime_error& e) {
+                addError("Inconsistent element types in list literal: cannot mix " + 
+                        commonElementType->toString() + " and " + elementTypes[i]->toString(), 
+                        expr->line);
+                return typeSystem.createTypedListType(typeSystem.ANY_TYPE);
+            }
+        }
+        
+        return typeSystem.createTypedListType(commonElementType);
+        
+    } else if (auto dictExpr = std::dynamic_pointer_cast<AST::DictExpr>(expr)) {
+        // Handle dictionary expressions {"key": value, ...}
+        if (dictExpr->entries.empty()) {
+            // Empty dictionary - return generic dict type
+            return typeSystem.createTypedDictType(typeSystem.STRING_TYPE, typeSystem.ANY_TYPE);
+        }
+        
+        // Check all entries and infer common key and value types
+        std::vector<TypePtr> keyTypes;
+        std::vector<TypePtr> valueTypes;
+        
+        for (const auto& [keyExpr, valueExpr] : dictExpr->entries) {
+            TypePtr keyType = checkExpression(keyExpr);
+            TypePtr valueType = checkExpression(valueExpr);
+            keyTypes.push_back(keyType);
+            valueTypes.push_back(valueType);
+        }
+        
+        // Find common types for keys and values
+        TypePtr commonKeyType = keyTypes[0];
+        TypePtr commonValueType = valueTypes[0];
+        
+        for (size_t i = 1; i < keyTypes.size(); ++i) {
+            try {
+                commonKeyType = typeSystem.getCommonType(commonKeyType, keyTypes[i]);
+            } catch (const std::runtime_error& e) {
+                addError("Inconsistent key types in dictionary literal: cannot mix " + 
+                        commonKeyType->toString() + " and " + keyTypes[i]->toString(), 
+                        expr->line);
+                return typeSystem.createTypedDictType(typeSystem.ANY_TYPE, typeSystem.ANY_TYPE);
+            }
+        }
+        
+        for (size_t i = 1; i < valueTypes.size(); ++i) {
+            try {
+                commonValueType = typeSystem.getCommonType(commonValueType, valueTypes[i]);
+            } catch (const std::runtime_error& e) {
+                addError("Inconsistent value types in dictionary literal: cannot mix " + 
+                        commonValueType->toString() + " and " + valueTypes[i]->toString(), 
+                        expr->line);
+                return typeSystem.createTypedDictType(commonKeyType, typeSystem.ANY_TYPE);
+            }
+        }
+        
+        return typeSystem.createTypedDictType(commonKeyType, commonValueType);
+        
+    } else if (auto tupleExpr = std::dynamic_pointer_cast<AST::TupleExpr>(expr)) {
+        // Handle tuple expressions (expr1, expr2, ...)
+        std::vector<TypePtr> elementTypes;
+        for (const auto& element : tupleExpr->elements) {
+            TypePtr elementType = checkExpression(element);
+            elementTypes.push_back(elementType);
+        }
+        
+        return typeSystem.createTupleType(elementTypes);
+        
     } else if (auto lambdaExpr = std::dynamic_pointer_cast<AST::LambdaExpr>(expr)) {
         // Handle lambda expressions
         enterScope(); // Create new scope for lambda parameters
@@ -641,49 +824,7 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
     return typeSystem.ANY_TYPE;
 }
 
-TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& expr, TypePtr expectedType) {
-    if (auto errorExpr = std::dynamic_pointer_cast<AST::ErrorConstructExpr>(expr)) {
-        checkErrorConstructExpression(errorExpr);
-        
-        // Error construction with expected type context
-        if (typeSystem.isErrorType(errorExpr->errorType)) {
-            // If expected type is an error union, return the expected type directly
-            if (expectedType && expectedType->tag == TypeTag::ErrorUnion) {
-                auto expectedErrorUnion = std::get<ErrorUnionType>(expectedType->extra);
-                // Verify that the error type is compatible with the expected error types
-                if (expectedErrorUnion.isGenericError || 
-                    std::find(expectedErrorUnion.errorTypes.begin(), expectedErrorUnion.errorTypes.end(), 
-                             errorExpr->errorType) != expectedErrorUnion.errorTypes.end()) {
-                    return expectedType;
-                }
-            }
-            // Fallback to creating new error union if no compatible expected type
-            return typeSystem.createErrorUnionType(typeSystem.ANY_TYPE, {errorExpr->errorType}, false);
-        }
-        addError("Unknown error type: " + errorExpr->errorType, expr->line);
-        return typeSystem.ANY_TYPE;
-        
-    } else if (auto okExpr = std::dynamic_pointer_cast<AST::OkConstructExpr>(expr)) {
-        checkOkConstructExpression(okExpr);
-        
-        // Ok construction with expected type context
-        TypePtr valueType = checkExpression(okExpr->value);
-        
-        // If expected type is an error union, return the expected type directly
-        if (expectedType && expectedType->tag == TypeTag::ErrorUnion) {
-            auto expectedErrorUnion = std::get<ErrorUnionType>(expectedType->extra);
-            // Verify that the value type is compatible with the expected success type
-            if (typeSystem.isCompatible(valueType, expectedErrorUnion.successType)) {
-                return expectedType;
-            }
-        }
-        // Fallback to creating new error union if no compatible expected type
-        return typeSystem.createErrorUnionType(valueType, {}, true);
-    }
-    
-    // For all other expressions, delegate to the original method
-    return checkExpression(expr);
-}
+
 
 TypePtr TypeChecker::inferLambdaReturnType(const std::shared_ptr<AST::Statement>& body) {
     // Try to infer return type from lambda body
@@ -1024,9 +1165,12 @@ void TypeChecker::checkMatchStatement(const std::shared_ptr<AST::MatchStatement>
         
         // Check the case body
         checkStatement(matchCase.body);
+        
+        // Validate pattern compatibility with matched type
+        validatePatternCompatibility(matchCase.pattern, matchType, stmt->line);
     }
     
-    // Enhanced exhaustiveness checking for error types
+    // Enhanced exhaustiveness checking for different type categories
     if (isErrorUnionType(matchType)) {
         std::vector<std::shared_ptr<AST::MatchCase>> cases;
         for (const auto& c : stmt->cases) {
@@ -1045,6 +1189,30 @@ void TypeChecker::checkMatchStatement(const std::shared_ptr<AST::MatchStatement>
                 addError("Match statement is not exhaustive for error union type. " + missingPatterns, 
                         stmt->line);
             }
+        }
+    } else if (isUnionType(matchType)) {
+        // Union type exhaustiveness checking
+        std::vector<std::shared_ptr<AST::MatchCase>> cases;
+        for (const auto& c : stmt->cases) {
+            cases.push_back(std::make_shared<AST::MatchCase>(c));
+        }
+        
+        if (!isExhaustiveUnionMatch(matchType, cases)) {
+            auto unionType = std::get<UnionType>(matchType->extra);
+            std::string missingVariants = getMissingUnionVariants(matchType, cases);
+            addError("Match statement is not exhaustive for union type " + matchType->toString() + 
+                    ". Missing patterns for: " + missingVariants, stmt->line);
+        }
+    } else if (typeSystem.isOptionType(matchType)) {
+        // Option type exhaustiveness checking
+        std::vector<std::shared_ptr<AST::MatchCase>> cases;
+        for (const auto& c : stmt->cases) {
+            cases.push_back(std::make_shared<AST::MatchCase>(c));
+        }
+        
+        if (!isExhaustiveOptionMatch(cases)) {
+            addError("Match statement is not exhaustive for Option type. Must handle both Some and None cases", 
+                    stmt->line);
         }
     }
 }
@@ -1094,6 +1262,10 @@ std::vector<std::string> TypeChecker::getErrorTypesFromType(TypePtr type) {
 
 bool TypeChecker::isErrorUnionType(TypePtr type) {
     return type && type->tag == TypeTag::ErrorUnion;
+}
+
+bool TypeChecker::isUnionType(TypePtr type) {
+    return type && type->tag == TypeTag::Union;
 }
 
 bool TypeChecker::requiresErrorHandling(TypePtr type) {
@@ -1549,5 +1721,309 @@ bool TypeChecker::isOptionalType(TypePtr type) {
     bool isFallible = !errorUnion.errorTypes.empty();
     
     return isOptional || isFallible;
+}
+
+// Union type pattern matching validation methods
+
+bool TypeChecker::isExhaustiveUnionMatch(TypePtr unionType, const std::vector<std::shared_ptr<AST::MatchCase>>& cases) {
+    if (!unionType || unionType->tag != TypeTag::Union) {
+        return true; // Non-union types don't need union exhaustiveness checking
+    }
+    
+    const auto* unionTypeInfo = std::get_if<UnionType>(&unionType->extra);
+    if (!unionTypeInfo) {
+        return true;
+    }
+    
+    std::set<TypeTag> coveredTypeTags;
+    std::set<std::string> coveredTypeNames;
+    bool hasWildcard = false;
+    
+    for (const auto& matchCase : cases) {
+        if (auto bindingPattern = std::dynamic_pointer_cast<AST::BindingPatternExpr>(matchCase->pattern)) {
+            // Pattern like Some(x), None, etc.
+            coveredTypeNames.insert(bindingPattern->typeName);
+        } else if (auto typePattern = std::dynamic_pointer_cast<AST::TypePatternExpr>(matchCase->pattern)) {
+            // Pattern matching specific types
+            if (typePattern->type) {
+                coveredTypeNames.insert(typePattern->type->typeName);
+                // Also resolve the type to get its tag
+                TypePtr resolvedType = resolveTypeAnnotation(typePattern->type);
+                if (resolvedType) {
+                    coveredTypeTags.insert(resolvedType->tag);
+                }
+            }
+        } else if (auto literalExpr = std::dynamic_pointer_cast<AST::LiteralExpr>(matchCase->pattern)) {
+            // Literal patterns - check if they match union variant types
+            if (std::holds_alternative<std::string>(literalExpr->value)) {
+                std::string literalValue = std::get<std::string>(literalExpr->value);
+                coveredTypeNames.insert(literalValue);
+            }
+        } else if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(matchCase->pattern)) {
+            // Variable patterns - check for wildcard or specific variant names
+            if (varExpr->name == "_") {
+                hasWildcard = true;
+            } else {
+                // This is a type pattern like 'int', 'str', 'bool', 'f64'
+                coveredTypeNames.insert(varExpr->name);
+                
+                // Map type names to type tags for better matching
+                if (varExpr->name == "int") coveredTypeTags.insert(TypeTag::Int);
+                else if (varExpr->name == "str") coveredTypeTags.insert(TypeTag::String);
+                else if (varExpr->name == "bool") coveredTypeTags.insert(TypeTag::Bool);
+                else if (varExpr->name == "f64") coveredTypeTags.insert(TypeTag::Float64);
+                else if (varExpr->name == "float") coveredTypeTags.insert(TypeTag::Float64);
+                else if (varExpr->name == "i64") coveredTypeTags.insert(TypeTag::Int64);
+                else if (varExpr->name == "u64") coveredTypeTags.insert(TypeTag::UInt64);
+            }
+        }
+    }
+    
+    // If we have a wildcard, the match is exhaustive
+    if (hasWildcard) {
+        return true;
+    }
+    
+    // Check if all union variants are covered
+    for (const auto& variantType : unionTypeInfo->types) {
+        bool variantCovered = false;
+        
+        // Check by type tag (most reliable for primitive types)
+        if (coveredTypeTags.find(variantType->tag) != coveredTypeTags.end()) {
+            variantCovered = true;
+        }
+        
+        // Check by type name
+        std::string variantName = variantType->toString();
+        if (coveredTypeNames.find(variantName) != coveredTypeNames.end()) {
+            variantCovered = true;
+        }
+        
+        // Additional checks for common type name variations
+        if (variantType->tag == TypeTag::Int && 
+            (coveredTypeNames.find("int") != coveredTypeNames.end() || 
+             coveredTypeNames.find("Int") != coveredTypeNames.end())) {
+            variantCovered = true;
+        }
+        
+        if (variantType->tag == TypeTag::String && 
+            (coveredTypeNames.find("str") != coveredTypeNames.end() || 
+             coveredTypeNames.find("String") != coveredTypeNames.end())) {
+            variantCovered = true;
+        }
+        
+        if (variantType->tag == TypeTag::Bool && 
+            (coveredTypeNames.find("bool") != coveredTypeNames.end() || 
+             coveredTypeNames.find("Bool") != coveredTypeNames.end())) {
+            variantCovered = true;
+        }
+        
+        if (variantType->tag == TypeTag::Float64 && 
+            (coveredTypeNames.find("f64") != coveredTypeNames.end() || 
+             coveredTypeNames.find("Float64") != coveredTypeNames.end() ||
+             coveredTypeNames.find("float") != coveredTypeNames.end())) {
+            variantCovered = true;
+        }
+        
+        if (!variantCovered) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+void TypeChecker::validateUnionVariantAccess(TypePtr unionType, const std::string& variantName, int line) {
+    if (!unionType || unionType->tag != TypeTag::Union) {
+        addError("Attempted to access variant '" + variantName + "' on non-union type " + 
+                unionType->toString(), line);
+        return;
+    }
+    
+    const auto* unionTypeInfo = std::get_if<UnionType>(&unionType->extra);
+    if (!unionTypeInfo) {
+        addError("Invalid union type structure for variant access", line);
+        return;
+    }
+    
+    // Check if the variant exists in the union
+    bool variantExists = false;
+    for (const auto& variantType : unionTypeInfo->types) {
+        if (variantType->toString() == variantName) {
+            variantExists = true;
+            break;
+        }
+    }
+    
+    if (!variantExists) {
+        std::string availableVariants;
+        for (size_t i = 0; i < unionTypeInfo->types.size(); ++i) {
+            if (i > 0) availableVariants += ", ";
+            availableVariants += unionTypeInfo->types[i]->toString();
+        }
+        
+        addError("Variant '" + variantName + "' does not exist in union type " + 
+                unionType->toString() + ". Available variants: " + availableVariants, line);
+    }
+}
+
+void TypeChecker::validatePatternCompatibility(const std::shared_ptr<AST::Expression>& pattern, TypePtr matchType, int line) {
+    if (!pattern || !matchType) {
+        return;
+    }
+    
+    // Validate that the pattern is compatible with the matched type
+    if (auto bindingPattern = std::dynamic_pointer_cast<AST::BindingPatternExpr>(pattern)) {
+        // For union types, validate that the variant exists
+        if (isUnionType(matchType)) {
+            validateUnionVariantAccess(matchType, bindingPattern->typeName, line);
+        }
+    } else if (auto typePattern = std::dynamic_pointer_cast<AST::TypePatternExpr>(pattern)) {
+        // Type patterns should be compatible with the matched type
+        if (typePattern->type) {
+            TypePtr patternType = resolveTypeAnnotation(typePattern->type);
+            if (patternType && !typeSystem.isCompatible(patternType, matchType) && 
+                !typeSystem.isCompatible(matchType, patternType)) {
+                // For union types, check if the pattern type is one of the variants
+                if (isUnionType(matchType)) {
+                    const auto* unionTypeInfo = std::get_if<UnionType>(&matchType->extra);
+                    bool isVariant = false;
+                    if (unionTypeInfo) {
+                        for (const auto& variantType : unionTypeInfo->types) {
+                            if (typeSystem.isCompatible(patternType, variantType)) {
+                                isVariant = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (!isVariant) {
+                        addError("Pattern type " + patternType->toString() + 
+                                " is not a variant of union type " + matchType->toString(), line);
+                    }
+                } else {
+                    addError("Pattern type " + patternType->toString() + 
+                            " is not compatible with matched type " + matchType->toString(), line);
+                }
+            }
+        }
+    }
+}
+
+std::string TypeChecker::getMissingUnionVariants(TypePtr unionType, const std::vector<std::shared_ptr<AST::MatchCase>>& cases) {
+    if (!unionType || unionType->tag != TypeTag::Union) {
+        return "";
+    }
+    
+    const auto* unionTypeInfo = std::get_if<UnionType>(&unionType->extra);
+    if (!unionTypeInfo) {
+        return "";
+    }
+    
+    std::set<TypeTag> coveredTypeTags;
+    std::set<std::string> coveredTypeNames;
+    bool hasWildcard = false;
+    
+    for (const auto& matchCase : cases) {
+        if (auto bindingPattern = std::dynamic_pointer_cast<AST::BindingPatternExpr>(matchCase->pattern)) {
+            coveredTypeNames.insert(bindingPattern->typeName);
+        } else if (auto typePattern = std::dynamic_pointer_cast<AST::TypePatternExpr>(matchCase->pattern)) {
+            if (typePattern->type) {
+                coveredTypeNames.insert(typePattern->type->typeName);
+                TypePtr resolvedType = resolveTypeAnnotation(typePattern->type);
+                if (resolvedType) {
+                    coveredTypeTags.insert(resolvedType->tag);
+                }
+            }
+        } else if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(matchCase->pattern)) {
+            if (varExpr->name == "_") {
+                hasWildcard = true;
+            } else {
+                coveredTypeNames.insert(varExpr->name);
+                
+                // Map type names to type tags
+                if (varExpr->name == "int") coveredTypeTags.insert(TypeTag::Int);
+                else if (varExpr->name == "str") coveredTypeTags.insert(TypeTag::String);
+                else if (varExpr->name == "bool") coveredTypeTags.insert(TypeTag::Bool);
+                else if (varExpr->name == "f64") coveredTypeTags.insert(TypeTag::Float64);
+                else if (varExpr->name == "float") coveredTypeTags.insert(TypeTag::Float64);
+            }
+        }
+    }
+    
+    if (hasWildcard) {
+        return ""; // Wildcard covers everything
+    }
+    
+    std::vector<std::string> missingVariants;
+    for (const auto& variantType : unionTypeInfo->types) {
+        bool variantCovered = false;
+        
+        // Check by type tag
+        if (coveredTypeTags.find(variantType->tag) != coveredTypeTags.end()) {
+            variantCovered = true;
+        }
+        
+        // Check by type name with variations
+        if (variantType->tag == TypeTag::Int && 
+            (coveredTypeNames.find("int") != coveredTypeNames.end() || 
+             coveredTypeNames.find("Int") != coveredTypeNames.end())) {
+            variantCovered = true;
+        } else if (variantType->tag == TypeTag::String && 
+                  (coveredTypeNames.find("str") != coveredTypeNames.end() || 
+                   coveredTypeNames.find("String") != coveredTypeNames.end())) {
+            variantCovered = true;
+        } else if (variantType->tag == TypeTag::Bool && 
+                  (coveredTypeNames.find("bool") != coveredTypeNames.end() || 
+                   coveredTypeNames.find("Bool") != coveredTypeNames.end())) {
+            variantCovered = true;
+        } else if (variantType->tag == TypeTag::Float64 && 
+                  (coveredTypeNames.find("f64") != coveredTypeNames.end() || 
+                   coveredTypeNames.find("Float64") != coveredTypeNames.end() ||
+                   coveredTypeNames.find("float") != coveredTypeNames.end())) {
+            variantCovered = true;
+        }
+        
+        if (!variantCovered) {
+            // Use canonical type names for missing variants
+            switch (variantType->tag) {
+                case TypeTag::Int: missingVariants.push_back("int"); break;
+                case TypeTag::String: missingVariants.push_back("str"); break;
+                case TypeTag::Bool: missingVariants.push_back("bool"); break;
+                case TypeTag::Float64: missingVariants.push_back("f64"); break;
+                default: missingVariants.push_back(variantType->toString()); break;
+            }
+        }
+    }
+    
+    std::string result;
+    for (size_t i = 0; i < missingVariants.size(); ++i) {
+        if (i > 0) result += ", ";
+        result += missingVariants[i];
+    }
+    
+    return result;
+}
+
+bool TypeChecker::isExhaustiveOptionMatch(const std::vector<std::shared_ptr<AST::MatchCase>>& cases) {
+    bool hasSomeCase = false;
+    bool hasNoneCase = false;
+    bool hasWildcard = false;
+    
+    for (const auto& matchCase : cases) {
+        if (auto bindingPattern = std::dynamic_pointer_cast<AST::BindingPatternExpr>(matchCase->pattern)) {
+            if (bindingPattern->typeName == "Some") {
+                hasSomeCase = true;
+            } else if (bindingPattern->typeName == "None") {
+                hasNoneCase = true;
+            }
+        } else if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(matchCase->pattern)) {
+            if (varExpr->name == "_") {
+                hasWildcard = true;
+            }
+        }
+    }
+    
+    return (hasSomeCase && hasNoneCase) || hasWildcard;
 }
 

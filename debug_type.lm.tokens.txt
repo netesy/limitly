@@ -1,0 +1,16 @@
+Tokens for debug_type.lm
+Parser: New Unified Parser (CST mode)
+Mode: CST with trivia preservation
+========================================
+
+=== Tokens with Trivia ===
+Line 1: TYPE = 'type'
+Line 1: IDENTIFIER = 'SimpleDict' [leading: WHITESPACE(' ') ]
+Line 1: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 1: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 1: INT_TYPE = 'int'
+Line 1: COLON = ':'
+Line 1: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 1: RIGHT_BRACE = '}'
+Line 1: SEMICOLON = ';'
+Line 1: EOF_TOKEN = ''

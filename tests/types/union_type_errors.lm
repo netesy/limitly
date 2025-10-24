@@ -1,0 +1,69 @@
+// Union Type Error Validation Tests
+// Testing that type checker properly validates union type assignments
+
+print("=== Union Type Error Validation Tests ===");
+
+// Test 1: Valid union type assignments (should work)
+print("Test 1: Valid assignments");
+type NumberOrString = int | str;
+
+var validUnion: NumberOrString;
+validUnion = 42;        // int is compatible with int | str
+validUnion = "hello";   // str is compatible with int | str
+
+print("Valid assignments completed");
+
+// Test 2: Union type compatibility with different types
+print("Test 2: Union compatibility");
+type IntOrFloat = int | f64;
+type StringOrBool = str | bool;
+
+var numUnion: IntOrFloat;
+var strUnion: StringOrBool;
+
+numUnion = 123;     // int compatible with int | f64
+numUnion = 3.14;    // f64 compatible with int | f64
+
+strUnion = "test";  // str compatible with str | bool
+strUnion = true;    // bool compatible with str | bool
+
+print("Union compatibility tests completed");
+
+// Test 3: Union type inference validation
+print("Test 3: Union type inference");
+type Value = int | str | bool;
+
+var inferredValue: Value = 42;      // Should infer int variant
+print("Inferred int: ");
+print(inferredValue);
+
+inferredValue = "string";           // Should work with str variant
+print("Inferred str: ");
+print(inferredValue);
+
+inferredValue = false;              // Should work with bool variant
+print("Inferred bool: ");
+print(inferredValue);
+
+// Test 4: Complex union types
+print("Test 4: Complex union types");
+type ComplexUnion = int | str | f64 | bool;
+
+var complex: ComplexUnion;
+complex = 100;
+print("Complex (int): ");
+print(complex);
+
+complex = "complex";
+print("Complex (str): ");
+print(complex);
+
+complex = 2.71;
+print("Complex (f64): ");
+print(complex);
+
+complex = true;
+print("Complex (bool): ");
+print(complex);
+
+print("=== Union Type Error Validation Tests Completed ===");

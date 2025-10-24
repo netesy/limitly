@@ -1,50 +1,70 @@
-# Error Handling System Documentation
+# Unified Error Handling and Optional Value System Documentation
 
 ## Overview
 
-The Limit programming language implements a zero-cost, union-type based error handling system that provides type-safe error propagation without the overhead of exceptions. The system is designed to be both performant and ergonomic, ensuring that errors cannot be silently ignored while maintaining excellent runtime performance.
+The Limit programming language implements a zero-cost, union-type based system that handles both errors and optional values through a unified `Type?` syntax. This system provides type-safe error propagation and null-safety without the overhead of exceptions or null pointers. The system is designed to be both performant and ergonomic, ensuring that errors and absent values cannot be silently ignored while maintaining excellent runtime performance and Limit's null-free design principles.
 
 ## Core Concepts
 
-### Error Union Types
+### Unified Optional and Error Types
 
-Error union types represent values that can either be successful results or errors. They are declared using the `?` syntax:
+The `Type?` syntax represents values that can either be successful results or error/absent conditions. This unified system handles both explicit errors and optional values (where absence is treated as an error condition):
 
 ```limit
-fn divide(a: int, b: int) : int?DivisionByZero {
+// Optional value (absence treated as error)
+fn find_user(id: int): str? {
+    if (id == 1) {
+        return ok("Alice");  // Present value
+    }
+    return err();  // Absent value (error condition, not null)
+}
+
+// Specific error type
+fn divide(a: int, b: int): int?DivisionByZero {
     if (b == 0) {
         return err(DivisionByZero("Cannot divide by zero"));
     }
-    return a / b;
+    return ok(a / b);
 }
 ```
 
-### Error Propagation
+### Error and Absence Propagation
 
-The `?` operator automatically propagates errors up the call stack:
+The `?` operator automatically propagates both errors and absent values up the call stack:
 
 ```limit
-fn calculate() : int?DivisionByZero {
-    let result = divide(10, 0)?;  // Error propagates automatically
-    return result * 2;
+fn calculate(): int? {
+    var result = divide(10, 0)?;  // Error/absence propagates automatically
+    return ok(result * 2);
+}
+
+fn process_user(id: int): str? {
+    var user = find_user(id)?;  // Absent value propagates as error
+    return ok("Processing " + user);
 }
 ```
 
-### Error Handling
+### Handling Errors and Absent Values
 
-Errors can be handled using the `?else` syntax or pattern matching:
+Both errors and absent values can be handled using the `?else` syntax or pattern matching:
 
 ```limit
-# Using ?else
-var result = divide(10, 0) ?else {
-    print("Division failed");
-    return 0;
+// Using ?else for inline handling
+var result = divide(10, 0)? else {
+    print("Division failed or result absent");
+    return 0;  // Default value (not null - Limit is null-free)
 };
 
-# Using pattern matching
+// Using pattern matching
 match divide(10, 0) {
-    val result => print("Success: " + result),
-    err DivisionByZero(msg) => print("Error: " + msg)
+    Ok(result) => print("Success: " + result),
+    Err => print("Division failed")  // Handles both errors and absence
+}
+
+// Pattern matching with specific error types
+match divide_with_error(10, 0) {
+    Ok(result) => print("Success: " + result),
+    Err(DivisionByZero(msg)) => print("Division error: " + msg)
 }
 ```
 
@@ -210,31 +230,41 @@ vm.printErrorStats();  // Print performance statistics
 
 ### Function Signatures
 
-Error types are part of function signatures:
+Optional and error types are part of function signatures:
 
 ```limit
-fn risky_operation() : Result?Error1, Error2 {
-    // Can return Error1 or Error2
+fn risky_operation(): int?Error1, Error2 {
+    // Can return int, Error1, or Error2
+}
+
+fn optional_operation(): str? {
+    // Can return str or be absent (treated as error)
 }
 ```
 
 ### Type System Integration
 
-Error unions integrate seamlessly with the type system:
+The unified optional/error system integrates seamlessly with the type system:
 
-- Type inference works with error unions
-- Generic functions can be fallible
-- Error types participate in type checking
+- Type inference works with optional and error types
+- Generic functions can be fallible or return optional values
+- The system maintains Limit's null-free design principles
+- Error and optional types participate in type checking
 
 ### Pattern Matching
 
-Error unions work with pattern matching:
+The unified system works seamlessly with pattern matching:
 
 ```limit
 match some_operation() {
-    val result => handle_success(result),
-    err Error1(msg) => handle_error1(msg),
-    err Error2(code, msg) => handle_error2(code, msg)
+    Ok(result) => handle_success(result),
+    Err => handle_absence_or_generic_error()
+}
+
+match specific_operation() {
+    Ok(result) => handle_success(result),
+    Err(Error1(msg)) => handle_error1(msg),
+    Err(Error2(code, msg)) => handle_error2(code, msg)
 }
 ```
 
@@ -256,6 +286,13 @@ match some_operation() {
 
 ## Conclusion
 
-The Limit error handling system provides a robust, performant, and ergonomic approach to error management. By combining zero-cost abstractions with comprehensive type safety, it enables developers to write reliable code without sacrificing performance.
+The Limit unified optional value and error handling system provides a robust, performant, and ergonomic approach to managing both errors and absent values. By combining zero-cost abstractions with comprehensive type safety and null-free design principles, it enables developers to write reliable code without sacrificing performance.
 
-The system's design prioritizes the common case (success) while providing efficient handling of error conditions. Through careful optimization and thoughtful API design, it achieves the goal of making error handling both safe and fast.
+The system's design prioritizes the common case (success/present values) while providing efficient handling of error conditions and absent values. Through careful optimization and thoughtful API design, it achieves the goal of making both error handling and optional value management safe, fast, and consistent.
+
+Key benefits of the unified approach:
+- **Single learning curve**: One system handles both errors and optional values
+- **Null-free safety**: No null pointers or null references
+- **Consistent syntax**: `?` operator works for both error and absence propagation
+- **Type safety**: Compiler enforces handling of both error and absence cases
+- **Performance**: Zero-cost abstractions with optimized success paths

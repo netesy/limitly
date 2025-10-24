@@ -1,0 +1,2 @@
+type Test1 = {str: int};
+type Test2 = {str: [int]};

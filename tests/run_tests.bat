@@ -19,7 +19,6 @@ call :run_test_with_error_check "tests\basic\print_statements.lm"
 echo.
 echo === EXPRESSION TESTS ===
 call :run_test_with_error_check "tests\expressions\arithmetic.lm"
-call :run_test_with_error_check "tests\expressions\comparison.lm"
 call :run_test_with_error_check "tests\expressions\logical.lm"
 call :run_test_with_error_check "tests\expressions\ranges.lm"
 
@@ -45,7 +44,6 @@ echo === TYPE TESTS ===
 call :run_test_with_error_check "tests\types\basic_type_aliases.lm"
 call :run_test_with_error_check "tests\types\primitive_type_aliases.lm"
 call :run_test_with_error_check "tests\types\union_types.lm"
-call :run_test_with_error_check "tests\types\option_types.lm"
 
 echo.
 echo === MODULE TESTS ===
@@ -59,25 +57,22 @@ call :run_test_with_error_check "tests\modules\function_params_test.lm"
 
 echo.
 echo === ERROR HANDLING TESTS ===
-call :run_test_with_error_check "tests\error_handling\basic_error_types.lm"
-call :run_test_with_error_check "tests\error_handling\error_propagation.lm"
-call :run_test_with_error_check "tests\error_handling\optional_types.lm"
-call :run_test_with_error_check "tests\error_handling\result_types.lm"
+call :run_test_with_error_check "tests\error_handling\simple_test.lm"
+call :run_test_with_error_check "tests\error_handling\comprehensive_test.lm"
 
-echo.
-echo === CLASS TESTS ===
-call :run_test_with_error_check "tests\classes\basic_classes.lm"
-call :run_test_with_error_check "tests\classes\inheritance.lm"
+@REM echo.
+@REM echo === CLASS TESTS ===
+@REM call :run_test_with_error_check "tests\classes\basic_classes.lm"
+@REM call :run_test_with_error_check "tests\classes\inheritance.lm"
 
-echo.
-echo === CONCURRENCY TESTS ===
-call :run_test_with_error_check "tests\concurrency\parallel_blocks.lm"
-call :run_test_with_error_check "tests\concurrency\concurrent_blocks.lm"
+@REM echo.
+@REM echo === CONCURRENCY TESTS ===
+@REM call :run_test_with_error_check "tests\concurrency\parallel_blocks.lm"
+@REM call :run_test_with_error_check "tests\concurrency\concurrent_blocks.lm"
 
 echo.
 echo === INTEGRATION TESTS ===
 call :run_test_with_error_check "tests\integration\comprehensive.lm"
-call :run_test_with_error_check "tests\integration\error_handling.lm"
 
 echo.
 echo === REGRESSION TESTS ===

@@ -13,9 +13,9 @@ This document provides a high-level comparison between the Limit programming lan
 | Feature             | Limit                                                                                             | Python                                                                                              |
 | ------------------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | **Typing**          | **Static:** Types are checked at compile time.                                                    | **Dynamic:** Types are checked at runtime.                                                          |
-| **Error Handling**  | **Explicit:** Uses `Result<T, E>` and `Option<T>` types. Errors are values that must be handled.    | **Exceptions:** Uses `try...except` blocks. Errors can be caught anywhere in the call stack.        |
+| **Error Handling**  | **Explicit:** Uses unified `Type?` system. Errors and absent values are conditions that must be handled.    | **Exceptions:** Uses `try...except` blocks. Errors can be caught anywhere in the call stack.        |
 | **Concurrency**     | **Structured:** Built-in `parallel` and `concurrent` blocks with clear lifetimes for tasks.        | **Unstructured:** Relies on threads, `asyncio`, and other libraries. Managing task lifetimes is manual. |
-| **Null Values**     | **No `null` by default:** The `Option<T>` type is used to represent the absence of a value.         | **`None`:** `None` is a first-class object that can be passed around freely.                       |
+| **Null Values**     | **Null-free by design:** The `Type?` system treats absence as an error condition, not a null value.         | **`None`:** `None` is a first-class object that can be passed around freely.                       |
 | **Performance**     | **Compiled:** Compiled to efficient bytecode, with the potential for JIT/AOT compilation.         | **Interpreted:** Generally slower than compiled languages, though libraries like NumPy can be fast. |
 | **Syntax**          | C-style syntax with `fn`, `class`, and `{}` block delimiters.                                     | Indentation-based syntax.                                                                           |
 
@@ -54,7 +54,7 @@ add(5, "10")    # Runtime error (TypeError)
 
 ### Error Handling
 
-**Limit** uses the `Result` and `Option` types for error handling. This makes error handling explicit and part of the function's signature. The `?` operator provides a concise way to propagate errors. This approach forces the programmer to deal with potential errors, leading to more robust code.
+**Limit** uses a unified `Type?` system for both error handling and optional values. This makes error handling explicit and part of the function's signature. The `?` operator provides a concise way to propagate both errors and absent values. This approach forces the programmer to deal with potential errors and absent values, leading to more robust code while maintaining a null-free design.
 
 **Python** uses exceptions for error handling. When an error occurs, an exception is "raised." If it's not "caught" by a `try...except` block, it will crash the program. This can sometimes lead to unexpected failures if an exception is not caught at the right level.
 

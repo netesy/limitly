@@ -30,10 +30,6 @@ type Employee = {
     startDate: str
 };
 
-// Test literal string types in structural types (as mentioned in task details)
-type SomeVariant = { kind: "Some", value: any };
-type NoneVariant = { kind: "None" };
-type OptionType = SomeVariant; // This would be a union in practice
 
 // Test complex nested structures
 type DatabaseConfig = {
@@ -53,8 +49,6 @@ var product: ProductRecord;
 var user: UserProfile;
 var complete: CompleteRecord;
 var employee: Employee;
-var someValue: SomeVariant;
-var noneValue: NoneVariant;
 var dbConfig: DatabaseConfig;
 var extended: ExtendedEntity;
 

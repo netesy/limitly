@@ -1,0 +1,45 @@
+// Test union type discrimination - this should reveal missing runtime support
+
+type IntOrString = int | str;
+
+// Function that should be able to discriminate union variants
+fn processValue(value: IntOrString) {
+    print("Processing value: ");
+    print(value);
+    
+    // This would require runtime type discrimination
+    // Currently not implemented - would need pattern matching or type checking
+}
+
+// Test different variants
+var value: IntOrString;
+
+print("=== Testing Union Discrimination ===");
+
+value = 42;
+processValue(value);
+
+value = "hello";
+processValue(value);
+
+// Test with more complex union
+type Result = int | str | bool;
+
+fn handleResult(result: Result) {
+    print("Handling result: ");
+    print(result);
+    // Would need to discriminate between int, str, and bool variants
+}
+
+var result: Result;
+
+result = 123;
+handleResult(result);
+
+result = "success";
+handleResult(result);
+
+result = true;
+handleResult(result);
+
+print("=== Union Discrimination Test Completed ===");

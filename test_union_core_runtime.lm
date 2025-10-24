@@ -1,0 +1,72 @@
+// Test core union type runtime support with built-in types
+
+// Test 1: Basic union with primitive types
+type IntOrString = int | str;
+var value1: IntOrString;
+
+print("=== Test 1: Basic Union Types ===");
+value1 = 42;
+print("IntOrString with int: ");
+print(value1);
+
+value1 = "hello world";
+print("IntOrString with str: ");
+print(value1);
+
+// Test 2: Multi-variant union with primitives
+type MultiType = int | str | bool;
+var value2: MultiType;
+
+print("=== Test 2: Multi-variant Union ===");
+value2 = 123;
+print("MultiType with int: ");
+print(value2);
+
+value2 = "test string";
+print("MultiType with str: ");
+print(value2);
+
+value2 = true;
+print("MultiType with bool: ");
+print(value2);
+
+// Test 3: Union with type aliases
+type UserId = int;
+type UserName = str;
+type UserInfo = UserId | UserName;
+
+var userInfo: UserInfo;
+
+print("=== Test 3: Union with Type Aliases ===");
+var userId: UserId;
+userId = 12345;
+userInfo = userId;
+print("UserInfo with UserId: ");
+print(userInfo);
+
+var userName: UserName;
+userName = "john_doe";
+userInfo = userName;
+print("UserInfo with UserName: ");
+print(userInfo);
+
+// Test 4: Nested union assignment
+type NumberType = int | f64;
+type ValueType = NumberType | str;
+
+var nestedValue: ValueType;
+
+print("=== Test 4: Nested Union Types ===");
+nestedValue = 42;
+print("ValueType with int: ");
+print(nestedValue);
+
+nestedValue = 3.14;
+print("ValueType with f64: ");
+print(nestedValue);
+
+nestedValue = "nested string";
+print("ValueType with str: ");
+print(nestedValue);
+
+print("=== Union Core Runtime Test Completed ===");

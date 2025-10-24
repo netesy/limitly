@@ -1,0 +1,101 @@
+// Comprehensive Union Type Runtime Tests
+// Testing complete union type functionality with type checker validation
+
+print(" === Union Type Runtime Tests === ");
+
+// Test 1: Basic union type creation and assignment
+print("Test 1: Basic union type creation");
+type NumberOrString = int | str;
+
+    var value1: NumberOrString;
+    value1 = 42;
+    print("Assigned int to union: ");
+    print(value1);
+
+    value1 = "hello";
+    print("Assigned string to union: ");
+    print(value1);
+
+    // Test 2: Multi-variant union types with string-based types
+    print("Test 2: Multi - variant union types");
+    
+    // Define color types as string aliases
+    type Red = str;
+    type Green = str;
+    type Blue = str;
+    type Yellow = str;
+    
+    type Color = Red | Green | Blue | Yellow;
+
+        var color: Color;
+        color = "Red";
+        print("Color is: ");
+        print(color);
+
+        color = "Blue";
+        print("Color is: ");
+        print(color);
+
+        // Test 3: Union with different primitive types
+        print("Test 3: Mixed primitive union");
+        type MixedValue = int | f64 | str | bool;
+
+            var mixed: MixedValue;
+            mixed = 123;
+            print("Mixed value (int): ");
+            print(mixed);
+
+            mixed = 3.14;
+            print("Mixed value (f64): ");
+            print(mixed);
+
+            mixed = "test";
+            print("Mixed value (str): ");
+            print(mixed);
+
+            mixed = true;
+            print("Mixed value (bool): ");
+            print(mixed);
+
+            // Test 4: Union type compatibility checking
+            print("Test 4: Union type compatibility");
+            type IntOrFloat = int | f64;
+                var numValue: IntOrFloat;
+
+                numValue = 42;// int should be compatible
+                print("Int in IntOrFloat: ");
+                print(numValue);
+
+                numValue = 3.14;// f64 should be compatible
+                print("Float in IntOrFloat: ");
+                print(numValue);
+
+                // Test 5: Union type inference
+                print("Test 5: Union type inference");
+                var inferredUnion: NumberOrString = 100;// Should infer as int variant
+                print("Inferred union (int): ");
+                print(inferredUnion);
+
+                inferredUnion = "inferred";// Should work with str variant
+                print("Inferred union (str): ");
+                print(inferredUnion);
+
+                // Test 6: Nested union types (should be flattened)
+                print("Test 6: Nested union types");
+                type InnerUnion = int | str;
+                    type OuterUnion = InnerUnion | bool;// Should flatten to int | str | bool
+
+                        var nested: OuterUnion;
+                        nested = 42;// int should work
+                        print("Nested union (int): ");
+                        print(nested);
+
+                        nested = "nested";// str should work
+                        print("Nested union (str): ");
+                        print(nested);
+
+                        nested = false;// bool should work
+                        print("Nested union (bool): ");
+                        print(nested);
+
+                        print(" === Union Type Runtime Tests Completed === ");
