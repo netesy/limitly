@@ -1,1 +1,0 @@
-type SimpleDict = {int: str};

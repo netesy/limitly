@@ -155,6 +155,8 @@ public:
     std::shared_ptr<ClassDefinition> getOwnerClass() const { return ownerClass; }
 };
 
+
+
 // Constructor implementation
 class ConstructorImplementation : public FunctionImplementation {
 private:

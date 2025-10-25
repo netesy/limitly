@@ -1,0 +1,141 @@
+// Closure Tests
+// Tests closure functionality: variable capture, state modification, nested closures
+
+print("=== Closure Tests ===");
+
+// Test 1: Simple closure with variable capture
+print("\n--- Test 1: Simple Closure ---");
+fn createGreeter(greeting: str): fn(str): str {
+    return fn(name: str): str {
+        return greeting + ", " + name + "!";
+    };
+}
+
+var sayHello = createGreeter("Hello");
+var sayGoodbye = createGreeter("Goodbye");
+
+var greeting1 = sayHello("World");
+var greeting2 = sayGoodbye("Friend");
+print("sayHello('World') = {greeting1}");
+print("sayGoodbye('Friend') = {greeting2}");
+
+// Test 2: Counter closure with state modification
+print("\n--- Test 2: Counter Closure ---");
+fn createCounter(): fn(): int {
+    var count: int = 0;
+    return fn(): int {
+        count = count + 1;
+        return count;
+    };
+}
+
+var counter1 = createCounter();
+var counter2 = createCounter();
+
+var c1_1 = counter1();
+var c1_2 = counter1();
+var c1_3 = counter1();
+var c2_1 = counter2();
+var c2_2 = counter2();
+
+print("counter1: {c1_1}, {c1_2}, {c1_3}");
+print("counter2: {c2_1}, {c2_2}");
+
+// Test 3: Closure with multiple captured variables
+print("\n--- Test 3: Multiple Variable Capture ---");
+fn createCalculator(initial: int): fn(int): int {
+    var value: int = initial;
+    return fn(x: int): int {
+        value = value + x;
+        return value;
+    };
+}
+
+var calc = createCalculator(10);
+var calc1 = calc(5);
+var calc2 = calc(3);
+var calc3 = calc(7);
+print("Calculator starting at 10: +5={calc1}, +3={calc2}, +7={calc3}");
+
+// Test 4: Nested closures
+print("\n--- Test 4: Nested Closures ---");
+fn createNestedCounter(step: int): fn(): fn(): int {
+    var outerCount: int = 0;
+    return fn(): fn(): int {
+        outerCount = outerCount + step;
+        var innerCount: int = outerCount;
+        return fn(): int {
+            innerCount = innerCount + 1;
+            return innerCount;
+        };
+    };
+}
+
+var nestedFactory = createNestedCounter(10);
+var inner1 = nestedFactory();
+var inner2 = nestedFactory();
+
+var i1_1 = inner1();
+var i1_2 = inner1();
+var i2_1 = inner2();
+var i2_2 = inner2();
+
+print("inner1: {i1_1}, {i1_2}");
+print("inner2: {i2_1}, {i2_2}");
+
+// Test 5: Closure with arithmetic operations
+print("\n--- Test 5: Arithmetic Closures ---");
+fn createAdder(x: int): fn(int): int {
+    return fn(y: int): int {
+        return x + y;
+    };
+}
+
+fn createMultiplier(factor: int): fn(int): int {
+    return fn(value: int): int {
+        return value * factor;
+    };
+}
+
+var add5 = createAdder(5);
+var mult3 = createMultiplier(3);
+
+var add_result = add5(7);
+var mult_result = mult3(4);
+print("add5(7) = {add_result}");
+print("mult3(4) = {mult_result}");
+
+// Test 6: Closure memory management
+print("\n--- Test 6: Closure Memory Management ---");
+fn createTemporaryClosure(value: int): fn(): int {
+    var captured: int = value;
+    return fn(): int {
+        return captured * 2;
+    };
+}
+
+iter (i in 1..5) {
+    var tempClosure = createTemporaryClosure(i);
+    var result = tempClosure();
+    print("Temporary closure {i} result: {result}");
+}
+
+// Test 7: Closure with conditional logic
+print("\n--- Test 7: Conditional Closures ---");
+fn createConditionalClosure(threshold: int): fn(int): str {
+    return fn(value: int): str {
+        if (value > threshold) {
+            return "Above threshold: {value} > {threshold}";
+        } else {
+            return "Below threshold: {value} <= {threshold}";
+        }
+    };
+}
+
+var checker = createConditionalClosure(10);
+var check1 = checker(15);
+var check2 = checker(5);
+print(check1);
+print(check2);
+
+print("\n=== Closure Tests Complete ===");

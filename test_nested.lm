@@ -1,1 +1,0 @@
-type NestedTest = {str: [int]};

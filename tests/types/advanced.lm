@@ -1,0 +1,194 @@
+// Advanced Type Tests
+// Tests advanced type system features: complex unions, type inference, compatibility
+
+print("=== Advanced Type Tests ===");
+
+// Test 1: Complex type alias chains
+print("\n--- Test 1: Complex Type Alias Chains ---");
+type BaseId = int;
+type UserId = BaseId;
+type AdminId = UserId;
+type SuperAdminId = AdminId;
+
+var base: BaseId = 1000;
+var user: UserId = 2000;
+var admin: AdminId = 3000;
+var superAdmin: SuperAdminId = 4000;
+
+print("Base ID: {base}");
+print("User ID: {user}");
+print("Admin ID: {admin}");
+print("Super Admin ID: {superAdmin}");
+
+// Test 2: Union type combinations
+print("\n--- Test 2: Union Type Combinations ---");
+type NumberTypes = int | float;
+type TextTypes = str;
+type BooleanTypes = bool;
+type AllTypes = NumberTypes | TextTypes | BooleanTypes;
+
+var all1: AllTypes = 42;
+var all2: AllTypes = 3.14;
+var all3: AllTypes = "text";
+var all4: AllTypes = true;
+
+print("All types 1 (int): {all1}");
+print("All types 2 (float): {all2}");
+print("All types 3 (str): {all3}");
+print("All types 4 (bool): {all4}");
+
+// Test 3: Type compatibility in function parameters
+print("\n--- Test 3: Function Parameter Compatibility ---");
+type InputType = int | str;
+type OutputType = str;
+
+fn formatInput(input: InputType): OutputType {
+    return "Formatted: " + input;
+}
+
+var input1: InputType = 123;
+var input2: InputType = "hello";
+
+var output1: OutputType = formatInput(input1);
+var output2: OutputType = formatInput(input2);
+
+print("Format output 1: {output1}");
+print("Format output 2: {output2}");
+
+// Test 4: Recursive type-like structures
+print("\n--- Test 4: Recursive-like Type Structures ---");
+type NodeValue = int | str;
+type NodeType = NodeValue;
+
+var node1: NodeType = 100;
+var node2: NodeType = "leaf";
+
+print("Node 1: {node1}");
+print("Node 2: {node2}");
+
+// Test 5: Type inference with unions
+print("\n--- Test 5: Type Inference with Unions ---");
+type FlexibleType = int | str | bool;
+
+fn inferType(value: FlexibleType): str {
+    return "Type inferred for: " + value;
+}
+
+var infer1 = inferType(42);
+var infer2 = inferType("test");
+var infer3 = inferType(true);
+
+print("Infer 1: {infer1}");
+print("Infer 2: {infer2}");
+print("Infer 3: {infer3}");
+
+// Test 6: Union types with function return values
+print("\n--- Test 6: Union Return Types ---");
+type ProcessResult = int | str | bool;
+
+fn processData(mode: int): ProcessResult {
+    if (mode == 1) {
+        return 42;
+    } else if (mode == 2) {
+        return "processed";
+    } else {
+        return true;
+    }
+}
+
+var proc1: ProcessResult = processData(1);
+var proc2: ProcessResult = processData(2);
+var proc3: ProcessResult = processData(3);
+
+print("Process 1: {proc1}");
+print("Process 2: {proc2}");
+print("Process 3: {proc3}");
+
+// Test 7: Type alias with union combinations
+print("\n--- Test 7: Complex Type Alias Unions ---");
+type PrimaryType = int | str;
+type SecondaryType = bool | float;
+type CombinedType = PrimaryType | SecondaryType;
+
+var combined1: CombinedType = 123;
+var combined2: CombinedType = "combined";
+var combined3: CombinedType = true;
+var combined4: CombinedType = 2.71;
+
+print("Combined 1 (int): {combined1}");
+print("Combined 2 (str): {combined2}");
+print("Combined 3 (bool): {combined3}");
+print("Combined 4 (float): {combined4}");
+
+// Test 8: Type system stress test
+print("\n--- Test 8: Type System Stress Test ---");
+type Level1 = int | str;
+type Level2 = Level1 | bool;
+type Level3 = Level2 | float;
+
+var stress1: Level3 = 999;
+var stress2: Level3 = "stress";
+var stress3: Level3 = false;
+var stress4: Level3 = 1.23;
+
+print("Stress 1: {stress1}");
+print("Stress 2: {stress2}");
+print("Stress 3: {stress3}");
+print("Stress 4: {stress4}");
+
+// Test 9: Typed Collections (Lists)
+print("\n--- Test 9: Typed Collections (Lists) ---");
+type IntList = [int];
+type StringList = [str];
+type FloatList = [float];
+type BoolList = [bool];
+
+var numbers: [int] = [1, 2, 3, 4, 5];
+var words: [str] = ["hello", "world", "test"];
+var flags: [bool] = [true, false, true];
+var scores: [float] = [95.5, 87.2, 92.8];
+
+print("Numbers: {numbers}");
+print("Words: {words}");
+print("Flags: {flags}");
+print("Scores: {scores}");
+
+// Test 10: Typed Collections (Dictionaries)
+print("\n--- Test 10: Typed Collections (Dictionaries) ---");
+type IntToStringDict = {int: str};
+type StringToIntDict = {str: int};
+type StringToFloatDict = {str: float};
+
+var ageMap: {str: int} = {"Alice": 25, "Bob": 30, "Charlie": 35};
+var priceMap: {int: float} = {1: 9.99, 2: 19.99, 3: 29.99};
+var nameMap: {int: str} = {1: "First", 2: "Second", 3: "Third"};
+
+print("Age map: {ageMap}");
+print("Price map: {priceMap}");
+print("Name map: {nameMap}");
+
+// Test 11: Nested Collections
+print("\n--- Test 11: Nested Collections ---");
+type ListOfIntLists = [[int]];
+type DictOfStringToIntList = {str: [int]};
+
+var matrix: [[int]] = [[1, 2], [3, 4], [5, 6]];
+var studentGrades: {str: [float]} = {
+    "Alice": [95.5, 87.2, 92.8],
+    "Bob": [88.1, 91.5, 89.7]
+};
+
+print("Matrix: {matrix}");
+print("Student grades: {studentGrades}");
+
+// Test 12: Structural Types
+print("\n--- Test 12: Structural Types ---");
+type Person = { name: str, age: int, active: bool };
+type Address = { street: str, city: str, zipCode: int };
+type Employee = { person: Person, address: Address, salary: float };
+
+// Note: Structural type instantiation syntax may vary based on implementation
+print("Structural types defined successfully");
+
+
+print("\n=== Advanced Type Tests Complete ===");

@@ -31,6 +31,10 @@ struct CallFrame;
 class VM;
 class TaskVM;
 
+namespace backend {
+    class VMMethodImplementation;
+}
+
 namespace builtin {
     class BuiltinFunctions;
 }
@@ -583,6 +587,33 @@ public:
     size_t getEndAddress() const { return endAddress; }
     void setEndAddress(size_t end) { endAddress = end; }
 };
+
+// VM-based method implementation that executes bytecode
+namespace backend {
+    class VMMethodImplementation : public FunctionImplementation {
+        friend class ::VM;
+    private:
+        VM* vm;
+        FunctionSignature signature;
+        std::shared_ptr<ClassDefinition> ownerClass;
+        size_t startAddress;
+        size_t endAddress;
+        
+    public:
+        VMMethodImplementation(VM* vmInstance, const std::string& methodName, 
+                              std::shared_ptr<ClassDefinition> owner,
+                              size_t start, size_t end);
+        
+        const FunctionSignature& getSignature() const override { return signature; }
+        ValuePtr execute(const std::vector<ValuePtr>& args) override;
+        bool isNative() const override { return false; }
+        
+        std::shared_ptr<ClassDefinition> getOwnerClass() const { return ownerClass; }
+        size_t getStartAddress() const { return startAddress; }
+        size_t getEndAddress() const { return endAddress; }
+        void setEndAddress(size_t end) { endAddress = end; }
+    };
+}
 
 // Environment for variable scopes
 class Environment : public std::enable_shared_from_this<Environment> {

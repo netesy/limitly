@@ -1,2 +1,0 @@
-type IntList = [int];
-type NestedList = [[int]];

@@ -1,9 +1,0 @@
-Bytecode for debug_type.lm
-Parser: New Unified Parser (CST mode)
-========================================
-
-=== Bytecode ===
-Generated 1 instructions
-
-   0: HALT                
-

@@ -1,0 +1,112 @@
+// Union Type Tests
+// Tests union type functionality: basic unions, multi-variant types, compatibility
+
+print("=== Union Type Tests ===");
+
+// Test 1: Basic union types
+print("\n--- Test 1: Basic Union Types ---");
+type NumberOrString = int | str;
+type BoolOrFloat = bool | float;
+
+var numStr1: NumberOrString = 42;
+var numStr2: NumberOrString = "hello";
+var boolFloat1: BoolOrFloat = true;
+var boolFloat2: BoolOrFloat = 3.14;
+
+print("NumberOrString (int): {numStr1}");
+print("NumberOrString (str): {numStr2}");
+print("BoolOrFloat (bool): {boolFloat1}");
+print("BoolOrFloat (float): {boolFloat2}");
+
+// Test 2: Multi-variant union types
+print("\n--- Test 2: Multi-variant Union Types ---");
+type Color = str;  // Base type for color variants
+type Status = str; // Base type for status variants
+
+type ColorVariant = Color;
+type StatusVariant = Status;
+
+var red: ColorVariant = "Red";
+var green: ColorVariant = "Green";
+var blue: ColorVariant = "Blue";
+
+var success: StatusVariant = "Success";
+var warning: StatusVariant = "Warning";
+var error: StatusVariant = "Error";
+
+print("Colors: {red}, {green}, {blue}");
+print("Statuses: {success}, {warning}, {error}");
+
+// Test 3: Union with primitive types
+print("\n--- Test 3: Primitive Union Types ---");
+type Value = int | float | str | bool;
+
+var val1: Value = 123;
+var val2: Value = 3.14;
+var val3: Value = "test";
+var val4: Value = true;
+
+print("Value (int): {val1}");
+print("Value (float): {val2}");
+print("Value (str): {val3}");
+print("Value (bool): {val4}");
+
+// Test 4: Nested union types (flattening)
+print("\n--- Test 4: Nested Union Types ---");
+type InnerUnion = int | str;
+type OuterUnion = InnerUnion | bool;  // Should flatten to int | str | bool
+
+var nested1: OuterUnion = 42;
+var nested2: OuterUnion = "text";
+var nested3: OuterUnion = false;
+
+print("Nested (int): {nested1}");
+print("Nested (str): {nested2}");
+print("Nested (bool): {nested3}");
+
+// Test 5: Union type compatibility
+print("\n--- Test 5: Union Type Compatibility ---");
+type IntOrStr = int | str;
+type StrOrBool = str | bool;
+
+var intStr: IntOrStr = 100;
+var strBool: StrOrBool = "shared";
+
+print("IntOrStr: {intStr}");
+print("StrOrBool: {strBool}");
+
+// Test 6: Union types in functions
+print("\n--- Test 6: Union Types in Functions ---");
+type Result = int | str;
+
+fn processValue(input: int): Result {
+    if (input > 0) {
+        return input * 2;
+    } else {
+        return "Invalid input";
+    }
+}
+
+var result1: Result = processValue(5);
+var result2: Result = processValue(-1);
+
+print("Process result 1: {result1}");
+print("Process result 2: {result2}");
+
+// Test 7: Complex union combinations
+print("\n--- Test 7: Complex Union Combinations ---");
+type NumberType = int | float;
+type TextType = str;
+type DataType = NumberType | TextType | bool;
+
+var data1: DataType = 42;
+var data2: DataType = 3.14;
+var data3: DataType = "data";
+var data4: DataType = true;
+
+print("Data 1 (int): {data1}");
+print("Data 2 (float): {data2}");
+print("Data 3 (str): {data3}");
+print("Data 4 (bool): {data4}");
+
+print("\n=== Union Type Tests Complete ===");

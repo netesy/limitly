@@ -6,6 +6,7 @@
 #include "../common/builtin_functions.hh"  // For builtin functions
 #include "concurrency/task_vm.hh"
 #include "bytecode_printer.hh"  // For opcodeToString function
+#include "classes.hh"  // For VMMethodImplementation
 
 // Forward declare ErrorValue from the global namespace
 struct ErrorValue;
@@ -2497,14 +2498,27 @@ void VM::handleCall(const Instruction& instruction) {
             }
         }
         
-        // Function should be on top of the stack, above the arguments
+        // Function should be on the stack, either at the top (no arguments) or below arguments
         if (stack.size() < static_cast<size_t>(argCount + 1)) {
             error("Not enough values on stack for function call");
             return;
         }
         
-        // Get the function from the stack (it's at the top, above the arguments)
-        ValuePtr functionValue = stack.back();
+        // For method calls with arguments, the function is below the arguments
+        // For calls without arguments, the function is on top
+        ValuePtr functionValue;
+        if (argCount > 0) {
+            // Function is at position (stack.size() - argCount - 1) from the beginning
+            // or equivalently at position argCount from the end
+            if (stack.size() <= static_cast<size_t>(argCount)) {
+                error("Not enough values on stack for method call with arguments");
+                return;
+            }
+            functionValue = stack[stack.size() - argCount - 1];
+        } else {
+            // Function is at the top for calls without arguments
+            functionValue = stack.back();
+        }
         
         if (debugMode) {
             std::cout << "[DEBUG] CALL: Function value type: " << static_cast<int>(functionValue->type->tag) << std::endl;
@@ -2513,8 +2527,14 @@ void VM::handleCall(const Instruction& instruction) {
             }
         }
         
-        // Remove the function from the stack (it's at the top)
-        stack.pop_back();
+        // Remove the function from the stack
+        if (argCount > 0) {
+            // Function is below the arguments, remove it from the middle
+            stack.erase(stack.begin() + (stack.size() - argCount - 1));
+        } else {
+            // Function is at the top, remove it normally
+            stack.pop_back();
+        }
         
         // Check if it's a function value (stored as string name)
         if (std::holds_alternative<std::string>(functionValue->data)) {
@@ -2524,12 +2544,6 @@ void VM::handleCall(const Instruction& instruction) {
                 std::cout << "[DEBUG] CALL: Function from stack has name: " << storedFuncName << std::endl;
             }
             
-            // Collect arguments
-            std::vector<ValuePtr> args;
-            for (int i = 0; i < argCount; i++) {
-                args.insert(args.begin(), pop());
-            }
-            
             // Extract the actual function name (handle module function references)
             std::string actualFuncName = storedFuncName;
             if (storedFuncName.substr(0, 16) == "module_function:") {
@@ -2537,6 +2551,130 @@ void VM::handleCall(const Instruction& instruction) {
                 if (debugMode) {
                     std::cout << "[DEBUG] CALL: Module function call, using function name: " << actualFuncName << std::endl;
                 }
+            }
+            
+            // Check if this is a class method call (stored as "ClassName::methodName")
+            if (storedFuncName.find("::") != std::string::npos) {
+                if (debugMode) {
+                    std::cout << "[DEBUG] CALL: Class method call detected: " << storedFuncName << std::endl;
+                    std::cout << "[DEBUG] CALL: Stack contents before processing arguments:" << std::endl;
+                    for (size_t i = 0; i < std::min(stack.size(), size_t(5)); i++) {
+                        auto& val = stack[stack.size() - 1 - i];
+                        std::cout << "[DEBUG] CALL:   Stack[" << (stack.size() - 1 - i) << "]: type=" 
+                                  << static_cast<int>(val->type->tag) << ", variant=" << val->data.index() << std::endl;
+                    }
+                }
+                
+                // For method calls, the stack layout after popping method_reference is:
+                // [object] [arg1] [arg2] ... [argN] (top)
+                // We need to collect arguments first, then get the object
+                
+                std::vector<ValuePtr> args;
+                for (int i = 0; i < argCount; i++) {
+                    ValuePtr arg = pop();
+                    if (debugMode) {
+                        std::cout << "[DEBUG] CALL: Popped argument " << i << ": type=" 
+                                  << static_cast<int>(arg->type->tag) << ", variant=" << arg->data.index() << std::endl;
+                    }
+                    args.insert(args.begin(), arg);
+                }
+                
+                // Now get the object (it should be on top after arguments are removed)
+                if (stack.empty()) {
+                    error("Method call without object on stack");
+                    return;
+                }
+                
+                ValuePtr objectValue = pop(); // Get the object from the stack
+                
+                if (debugMode) {
+                    std::cout << "[DEBUG] CALL: Retrieved object for method call" << std::endl;
+                    std::cout << "[DEBUG] CALL: Object value type tag: " << static_cast<int>(objectValue->type->tag) << std::endl;
+                    std::cout << "[DEBUG] CALL: Object data variant index: " << objectValue->data.index() << std::endl;
+                }
+                
+                // Handle the method call using the existing method call logic
+                if (std::holds_alternative<ObjectInstancePtr>(objectValue->data)) {
+                    auto objectInstance = std::get<ObjectInstancePtr>(objectValue->data);
+                    std::string className = objectInstance->getClassName();
+                    
+                    // Extract method name from the stored function name
+                    size_t colonPos = storedFuncName.find("::");
+                    std::string methodName = storedFuncName.substr(colonPos + 2);
+                    
+                    if (debugMode) {
+                        std::cout << "[DEBUG] CALL: Calling method '" << methodName << "' on class '" << className << "'" << std::endl;
+                    }
+                    
+                    // Look for the method in the class definition
+                    auto methodImpl = objectInstance->getMethod(methodName);
+                    
+                    if (methodImpl) {
+                        // Check if this is a VM-based method implementation
+                        auto vmMethodImpl = std::dynamic_pointer_cast<backend::VMMethodImplementation>(methodImpl);
+                        if (vmMethodImpl) {
+                            // This is a VM-based method - execute it through bytecode
+                            
+                            // Create a new environment for the method
+                            auto methodEnv = std::make_shared<Environment>(environment);
+                            
+                            // Bind 'this' parameter (implicit first parameter)
+                            methodEnv->define("this", objectValue);
+                            
+                            // Look up the method in userDefinedFunctions to get parameter info
+                            auto methodIt = userDefinedFunctions.find(storedFuncName);
+                            
+                            if (methodIt != userDefinedFunctions.end()) {
+                                const backend::Function& method = methodIt->second;
+                                
+                                // Bind method parameters
+                                size_t paramIndex = 0;
+                                for (const auto& param : method.parameters) {
+                                    if (paramIndex < args.size()) {
+                                        methodEnv->define(param.first, args[paramIndex]);
+                                        paramIndex++;
+                                    }
+                                }
+                                
+                                // Create call frame
+                                backend::CallFrame frame(storedFuncName, ip + 1, nullptr);
+                                frame.setPreviousEnvironment(environment);
+                                callStack.push_back(frame);
+                                
+                                // Switch to method environment
+                                environment = methodEnv;
+                                
+                                // Jump to method start
+                                ip = vmMethodImpl->getStartAddress() - 1; // -1 because ip will be incremented
+                                return;
+                            } else {
+                                error("Method bytecode not found: " + storedFuncName);
+                                return;
+                            }
+                        } else {
+                            // This is a different type of method implementation
+                            std::vector<ValuePtr> allArgs;
+                            allArgs.push_back(objectValue); // Add 'this' as first argument
+                            allArgs.insert(allArgs.end(), args.begin(), args.end());
+                            
+                            ValuePtr result = methodImpl->execute(allArgs);
+                            push(result);
+                            return;
+                        }
+                    } else {
+                        error("Method '" + methodName + "' not found in class '" + className + "'");
+                        return;
+                    }
+                } else {
+                    error("Method call on non-object value");
+                    return;
+                }
+            }
+            
+            // For non-method calls, collect arguments now
+            std::vector<ValuePtr> args;
+            for (int i = 0; i < argCount; i++) {
+                args.insert(args.begin(), pop());
             }
             
             // For module functions, we need to find the module environment and execute there
@@ -2862,42 +3000,69 @@ void VM::handleCall(const Instruction& instruction) {
                 return;
             }
             
-            std::string superClassName = superClass->getName();
-            std::string methodKey = superClassName + "::" + methodName;
-            auto methodIt = userDefinedFunctions.find(methodKey);
+            // Look for the method in the superclass
+            auto methodImpl = superClass->resolveMethod(methodName);
             
-            if (methodIt != userDefinedFunctions.end()) {
-                // Found the super method, execute it
-                const backend::Function& method = methodIt->second;
-                
-                // Create a new environment for the method
-                auto methodEnv = std::make_shared<Environment>(environment);
-                
-                // Bind 'this' parameter (implicit first parameter)
-                methodEnv->define("this", objectValue);
-                
-                // Bind method parameters
-                size_t paramIndex = 0;
-                for (const auto& param : method.parameters) {
-                    if (paramIndex < methodArgs.size()) {
-                        methodEnv->define(param.first, methodArgs[paramIndex]);
-                        paramIndex++;
+            if (methodImpl) {
+                // Check if this is a VM-based method implementation
+                auto vmMethodImpl = std::dynamic_pointer_cast<backend::VMMethodImplementation>(methodImpl);
+                if (vmMethodImpl) {
+                    // This is a VM-based method - execute it through bytecode
+                    
+                    // Create a new environment for the method
+                    auto methodEnv = std::make_shared<Environment>(environment);
+                    
+                    // Bind 'this' parameter (implicit first parameter)
+                    methodEnv->define("this", objectValue);
+                    
+                    // Look up the method in userDefinedFunctions to get parameter info
+                    std::string superClassName = superClass->getName();
+                    std::string methodKey = superClassName + "::" + methodName;
+                    auto methodIt = userDefinedFunctions.find(methodKey);
+                    
+                    if (methodIt != userDefinedFunctions.end()) {
+                        const backend::Function& method = methodIt->second;
+                        
+                        // Bind method parameters
+                        size_t paramIndex = 0;
+                        for (const auto& param : method.parameters) {
+                            if (paramIndex < methodArgs.size()) {
+                                methodEnv->define(param.first, methodArgs[paramIndex]);
+                                paramIndex++;
+                            }
+                        }
+                        
+                        // Create call frame
+                        backend::CallFrame frame(methodKey, ip + 1, nullptr);
+                        frame.setPreviousEnvironment(environment);
+                        callStack.push_back(frame);
+                        
+                        // Switch to method environment
+                        environment = methodEnv;
+                        
+                        // Jump to method start
+                        ip = vmMethodImpl->getStartAddress() - 1; // -1 because ip will be incremented
+                        return;
+                    } else {
+                        error("Super method bytecode not found: " + methodKey);
+                        return;
                     }
+                } else {
+                    // This is a different type of method implementation
+                    std::vector<ValuePtr> allArgs;
+                    allArgs.push_back(objectValue); // Add 'this' as first argument
+                    allArgs.insert(allArgs.end(), methodArgs.begin(), methodArgs.end());
+                    
+                    ValuePtr result = methodImpl->execute(allArgs);
+                    push(result);
+                    
+                    if (canFail) {
+                        popErrorFrame();
+                    }
+                    return;
                 }
-                
-                // Create call frame
-                backend::CallFrame frame(methodKey, ip + 1, nullptr);
-                frame.setPreviousEnvironment(environment);
-                callStack.push_back(frame);
-                
-                // Switch to method environment
-                environment = methodEnv;
-                
-                // Jump to method start
-                ip = method.startAddress - 1; // -1 because ip will be incremented
-                return;
             } else {
-                error("Super method not found: " + methodKey);
+                error("Super method not found: " + methodName + " in class " + superClass->getName());
                 return;
             }
         } else {
@@ -2932,40 +3097,67 @@ void VM::handleCall(const Instruction& instruction) {
             auto objectInstance = std::get<ObjectInstancePtr>(objectValue->data);
             std::string className = objectInstance->getClassName();
             
-            // Look for the method in the VM's function registry
-            std::string methodKey = className + "::" + methodName;
-            auto methodIt = userDefinedFunctions.find(methodKey);
+            // Look for the method in the class definition
+            auto methodImpl = objectInstance->getMethod(methodName);
             
-            if (methodIt != userDefinedFunctions.end()) {
-                // Found the method, execute it
-                const backend::Function& method = methodIt->second;
-                
-                // Create a new environment for the method
-                auto methodEnv = std::make_shared<Environment>(environment);
-                
-                // Bind 'this' parameter (implicit first parameter)
-                methodEnv->define("this", objectValue);
-                
-                // Bind method parameters
-                size_t paramIndex = 0;
-                for (const auto& param : method.parameters) {
-                    if (paramIndex < methodArgs.size()) {
-                        methodEnv->define(param.first, methodArgs[paramIndex]);
-                        paramIndex++;
+            if (methodImpl) {
+                // Check if this is a VM-based method implementation
+                auto vmMethodImpl = std::dynamic_pointer_cast<backend::VMMethodImplementation>(methodImpl);
+                if (vmMethodImpl) {
+                    // This is a VM-based method - execute it through bytecode
+                    
+                    // Create a new environment for the method
+                    auto methodEnv = std::make_shared<Environment>(environment);
+                    
+                    // Bind 'this' parameter (implicit first parameter)
+                    methodEnv->define("this", objectValue);
+                    
+                    // Look up the method in userDefinedFunctions to get parameter info
+                    std::string methodKey = className + "::" + methodName;
+                    auto methodIt = userDefinedFunctions.find(methodKey);
+                    
+                    if (methodIt != userDefinedFunctions.end()) {
+                        const backend::Function& method = methodIt->second;
+                        
+                        // Bind method parameters
+                        size_t paramIndex = 0;
+                        for (const auto& param : method.parameters) {
+                            if (paramIndex < methodArgs.size()) {
+                                methodEnv->define(param.first, methodArgs[paramIndex]);
+                                paramIndex++;
+                            }
+                        }
+                        
+                        // Create call frame
+                        backend::CallFrame frame(methodKey, ip + 1, nullptr);
+                        frame.setPreviousEnvironment(environment);
+                        callStack.push_back(frame);
+                        
+                        // Switch to method environment
+                        environment = methodEnv;
+                        
+                        // Jump to method start
+                        ip = vmMethodImpl->getStartAddress() - 1; // -1 because ip will be incremented
+                        return;
+                    } else {
+                        error("Method bytecode not found: " + methodKey);
+                        return;
                     }
+                } else {
+                    // This is a different type of method implementation
+                    // For now, call execute directly (this may need more work for proper VM integration)
+                    std::vector<ValuePtr> allArgs;
+                    allArgs.push_back(objectValue); // Add 'this' as first argument
+                    allArgs.insert(allArgs.end(), methodArgs.begin(), methodArgs.end());
+                    
+                    ValuePtr result = methodImpl->execute(allArgs);
+                    push(result);
+                    
+                    if (canFail) {
+                        popErrorFrame();
+                    }
+                    return;
                 }
-                
-                // Create call frame
-                backend::CallFrame frame(methodKey, ip + 1, nullptr);
-                frame.setPreviousEnvironment(environment);
-                callStack.push_back(frame);
-                
-                // Switch to method environment
-                environment = methodEnv;
-                
-                // Jump to method start
-                ip = method.startAddress - 1; // -1 because ip will be incremented
-                return;
             } else {
                 error("Method call failed: Method '" + methodName + "' not found in class '" + className + "'");
                 return;
@@ -2999,6 +3191,79 @@ void VM::handleCall(const Instruction& instruction) {
     }
     
     // Check if this is a class constructor call
+    // First check if the function name refers to a class value in the environment
+    try {
+        ValuePtr classValue = environment->get(funcName);
+        if (classValue && classValue->type && classValue->type->tag == TypeTag::Class) {
+            // This is a class constructor call
+            auto classDef = std::get<std::shared_ptr<backend::ClassDefinition>>(classValue->data);
+            
+            // Create instance of the class
+            auto instance = classDef->createInstance();
+            auto objectType = std::make_shared<Type>(TypeTag::Object);
+            auto objectValue = memoryManager.makeRef<Value>(*region, objectType, instance);
+            
+            // Initialize fields with default values
+            const auto& fields = instance->getClassDefinition()->getFields();
+            for (const auto& field : fields) {
+                std::string fieldKey = funcName + "::" + field.name;
+                auto defaultValueIt = fieldDefaultValues.find(fieldKey);
+                if (defaultValueIt != fieldDefaultValues.end()) {
+                    instance->setField(field.name, defaultValueIt->second);
+                }
+            }
+            
+            // Check if the class has an "init" method (constructor)
+            std::string initMethodKey = funcName + "::init";
+            auto initMethodIt = userDefinedFunctions.find(initMethodKey);
+            
+            if (initMethodIt != userDefinedFunctions.end()) {
+                // Call the init method with the provided arguments
+                const backend::Function& initMethod = initMethodIt->second;
+                
+                // Create a new environment for the constructor
+                auto constructorEnv = std::make_shared<Environment>(environment);
+                
+                // Bind 'this' parameter (implicit first parameter)
+                constructorEnv->define("this", objectValue);
+                
+                // Bind constructor parameters
+                size_t paramIndex = 0;
+                for (const auto& param : initMethod.parameters) {
+                    if (paramIndex < args.size()) {
+                        constructorEnv->define(param.first, args[paramIndex]);
+                        paramIndex++;
+                    }
+                }
+                
+                // Create call frame for constructor
+                backend::CallFrame frame(initMethodKey, ip + 1, nullptr);
+                frame.setPreviousEnvironment(environment);
+                callStack.push_back(frame);
+                
+                // Switch to constructor environment
+                environment = constructorEnv;
+                
+                // Jump to constructor start
+                ip = initMethod.startAddress; // Set directly since we return early
+                
+                // The constructor will return, and we need to make sure the object is on the stack
+                // We'll handle this in the return handler
+                return;
+            } else {
+                // No constructor, just return the instance
+                push(objectValue);
+                if (canFail) {
+                    popErrorFrame();
+                }
+                return;
+            }
+        }
+    } catch (const std::runtime_error&) {
+        // Variable not found or not a class, continue with other checks
+    }
+    
+    // Fallback: Check if this is a class constructor call by class registry
     if (classRegistry.hasClass(funcName)) {
         // Create instance of the class
         auto instance = classRegistry.createInstance(funcName);
@@ -3055,6 +3320,9 @@ void VM::handleCall(const Instruction& instruction) {
         } else {
             // No constructor, just return the instance
             push(objectValue);
+            if (canFail) {
+                popErrorFrame();
+            }
             return;
         }
     }
@@ -3723,8 +3991,8 @@ void VM::handleBeginFunction(const Instruction& instruction) {
         auto classDef = classRegistry.getClass(currentClassBeingDefined);
         if (classDef) {
             // Create a VM-based method implementation that will execute the bytecode
-            auto methodImpl = std::make_shared<VMMethodImplementation>(
-                this, funcName, func.startAddress, func.endAddress);
+            auto methodImpl = std::make_shared<backend::VMMethodImplementation>(
+                this, funcName, classDef, func.startAddress, func.endAddress);
             
             // Create the class method and add it to the class
             backend::ClassMethod classMethod(funcName, methodImpl);
@@ -3909,8 +4177,26 @@ void VM::handleBeginClass(const Instruction& instruction) {
 }
 void VM::handleEndClass(const Instruction& /*unused*/) {
     // End of class definition
+    std::string className = currentClassBeingDefined;
     insideClassDefinition = false;
     currentClassBeingDefined = "";
+    
+    // Make the class name available as a constructor function in the global environment
+    if (!className.empty()) {
+        auto classDef = classRegistry.getClass(className);
+        if (classDef) {
+            // Create a class value that can be called as a constructor
+            auto classType = std::make_shared<Type>(TypeTag::Class);
+            auto classValue = memoryManager.makeRef<Value>(*region, classType, classDef);
+            
+            // Register the class name as a callable function in the global environment
+            globals->define(className, classValue);
+            
+            if (debugMode) {
+                std::cout << "[DEBUG] Registered class '" << className << "' as constructor function" << std::endl;
+            }
+        }
+    }
 }
 
 void VM::handleSetSuperclass(const Instruction& instruction) {
@@ -6051,6 +6337,31 @@ void VM::handlePushFunction(const Instruction& instruction) {
         return;
     }
     
+    // Check if this is a class method that was recently defined
+    // Look for methods with class prefix in userDefinedFunctions
+    for (const auto& [fullName, func] : userDefinedFunctions) {
+        // Check if this is a method name that matches (e.g., "Person::init" matches "init")
+        size_t colonPos = fullName.find("::");
+        if (colonPos != std::string::npos) {
+            std::string methodName = fullName.substr(colonPos + 2);
+            if (methodName == functionName) {
+                if (debugMode) {
+                    std::cout << "[DEBUG] PUSH_FUNCTION: Found class method " << fullName << " for " << functionName << std::endl;
+                }
+                
+                // Create a function value that stores the full method name
+                ValuePtr functionValue = memoryManager.makeRef<Value>(*region, typeSystem->FUNCTION_TYPE, fullName);
+                
+                if (debugMode) {
+                    std::cout << "[DEBUG] PUSH_FUNCTION: Successfully pushed class method to stack" << std::endl;
+                }
+                
+                push(functionValue);
+                return;
+            }
+        }
+    }
+    
     // Check if it's a native function
     auto nativeIt = nativeFunctions.find(functionName);
     if (nativeIt != nativeFunctions.end()) {
@@ -6144,17 +6455,51 @@ void VM::handleGetProperty(const Instruction& instruction) {
     // --- Handle Object property access ---
     if (std::holds_alternative<ObjectInstancePtr>(object->data)) {
         auto objectInstance = std::get<ObjectInstancePtr>(object->data);
+        
+        // First try to get it as a field
         try {
             ValuePtr property = objectInstance->getField(propertyName);
             if (debugMode) {
-                std::cout << "[DEBUG] GET_PROPERTY: Found object property '" << propertyName << "'" << std::endl;
+                std::cout << "[DEBUG] GET_PROPERTY: Found object field '" << propertyName << "'" << std::endl;
             }
             push(property);
             return;
         } catch (const std::runtime_error& e) {
-            error("Property '" + propertyName + "' not found in object");
+            // Field not found, try to get it as a method
+            if (debugMode) {
+                std::cout << "[DEBUG] GET_PROPERTY: Field '" << propertyName << "' not found, checking for method" << std::endl;
+            }
+        }
+        
+        // Try to get it as a method
+        auto methodImpl = objectInstance->getMethod(propertyName);
+        if (methodImpl) {
+            if (debugMode) {
+                std::cout << "[DEBUG] GET_PROPERTY: Found object method '" << propertyName << "'" << std::endl;
+            }
+            
+            // For method calls, we need to keep the object on the stack and push the method reference
+            // The CALL instruction will handle the method call with the object as 'this'
+            std::string className = objectInstance->getClassName();
+            std::string methodKey = className + "::" + propertyName;
+            
+            // Push the object back onto the stack (it was popped at the beginning)
+            push(object);
+            
+            // Create a method reference value (not using FUNCTION_TYPE to avoid the first code path in handleCall)
+            auto methodValue = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, methodKey);
+            
+            if (debugMode) {
+                std::cout << "[DEBUG] GET_PROPERTY: Created method reference: " << methodKey << std::endl;
+                std::cout << "[DEBUG] GET_PROPERTY: Object and method both on stack for method call" << std::endl;
+            }
+            
+            push(methodValue);
             return;
         }
+        
+        error("Property '" + propertyName + "' not found in object");
+        return;
     }
 
     // --- Handle Dictionary property access ---
@@ -7411,6 +7756,75 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
             environment = savedEnv; // Restore environment on error
             error("CALL_HIGHER_ORDER: error calling closure: " + std::string(e.what()));
         }
+    } else if (functionValue->type->tag == TypeTag::Class) {
+        // Handle class constructor calls
+        auto classDef = std::get<std::shared_ptr<backend::ClassDefinition>>(functionValue->data);
+        
+        if (debugMode) {
+            std::cout << "[DEBUG] CALL_HIGHER_ORDER: Class constructor call for " << classDef->getName() << std::endl;
+        }
+        
+        // Create instance of the class
+        auto instance = classDef->createInstance();
+        auto objectType = std::make_shared<Type>(TypeTag::Object);
+        auto objectValue = memoryManager.makeRef<Value>(*region, objectType, instance);
+        
+        // Initialize fields with default values
+        const auto& fields = instance->getClassDefinition()->getFields();
+        for (const auto& field : fields) {
+            std::string fieldKey = classDef->getName() + "::" + field.name;
+            auto defaultValueIt = fieldDefaultValues.find(fieldKey);
+            if (defaultValueIt != fieldDefaultValues.end()) {
+                instance->setField(field.name, defaultValueIt->second);
+            }
+        }
+        
+        // Check if the class has an "init" method (constructor)
+        std::string initMethodKey = classDef->getName() + "::init";
+        auto initMethodIt = userDefinedFunctions.find(initMethodKey);
+        
+        if (initMethodIt != userDefinedFunctions.end()) {
+            // Call the init method with the provided arguments
+            const backend::Function& initMethod = initMethodIt->second;
+            
+            // Create a new environment for the constructor
+            auto constructorEnv = std::make_shared<Environment>(environment);
+            
+            // Bind 'this' parameter (implicit first parameter)
+            constructorEnv->define("this", objectValue);
+            
+            // Bind constructor parameters
+            size_t paramIndex = 0;
+            for (const auto& param : initMethod.parameters) {
+                if (paramIndex < args.size()) {
+                    constructorEnv->define(param.first, args[paramIndex]);
+                    paramIndex++;
+                }
+            }
+            
+            // Create call frame for constructor
+            backend::CallFrame frame(initMethodKey, ip + 1, nullptr);
+            frame.setPreviousEnvironment(environment);
+            callStack.push_back(frame);
+            
+            // Switch to constructor environment
+            environment = constructorEnv;
+            
+            // Jump to constructor start
+            ip = initMethod.startAddress - 1; // -1 because ip will be incremented
+            
+            if (debugMode) {
+                std::cout << "[DEBUG] CALL_HIGHER_ORDER: Calling constructor " << initMethodKey 
+                          << " at address " << initMethod.startAddress << std::endl;
+            }
+            return; // Don't increment IP, we've jumped to the constructor
+        } else {
+            // No constructor, just return the instance
+            push(objectValue);
+            if (debugMode) {
+                std::cout << "[DEBUG] CALL_HIGHER_ORDER: No constructor found, returning instance directly" << std::endl;
+            }
+        }
     } else {
         error("CALL_HIGHER_ORDER: expected function or closure, got " + functionValue->type->toString());
     }
@@ -7861,3 +8275,23 @@ std::string VM::getCurrentFunctionBeingDefined() const {
     }
     return functionDefinitionStack.top();
 }
+
+// VMMethodImplementation implementation
+namespace backend {
+
+VMMethodImplementation::VMMethodImplementation(VM* vmInstance, const std::string& methodName,
+                                             std::shared_ptr<ClassDefinition> owner,
+                                             size_t start, size_t end)
+    : vm(vmInstance), ownerClass(owner), startAddress(start), endAddress(end) {
+    
+    signature.name = methodName;
+    // Parameters will be set when the method is defined
+}
+
+ValuePtr VMMethodImplementation::execute(const std::vector<ValuePtr>& args) {
+    // This method should not be called directly - the VM handles method execution
+    // through the bytecode execution mechanism in handleCall
+    return std::make_shared<Value>(nullptr);
+}
+
+} // namespace backend

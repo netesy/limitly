@@ -1,6 +1,7 @@
 # Complete Class Integration Implementation
 
-- [-] Fix class method registration in VM
+- [x] Fix class method registration in VM
+
 
 
 
@@ -12,11 +13,20 @@
   - Fix method lookup in ObjectInstance to find class methods
   - Update handleCall to properly dispatch class method calls
 
-- [ ] Fix class constructor calls
+- [x] Fix class constructor calls
   - Make class names callable as constructor functions
   - Implement proper constructor dispatch in handleCall
   - Ensure constructor creates ObjectInstance and calls init method if present
   - Fix parameter passing to class constructors
+
+- [x] Fix method calls with parameters (bytecode generation issue)
+
+
+
+  - Method calls without parameters work correctly
+  - Method calls with parameters fail because arguments are not included in bytecode
+  - Need to fix backend compilation to generate PUSH instructions for method call arguments
+  - Issue is in bytecode generation, not VM execution
 
 - [ ] Add visibility keywords to scanner and parser
   - Add `pub`, `prot`, `static`, `abstract`, `final`, `data` tokens to scanner
@@ -63,7 +73,7 @@
   - _Requirements: 12.5_
 
 - [ ] 2.4 Implement data class syntactic sugar
-  - Add DataClassDeclaration AST node for data class parsing
+  - Add DataClassDeclaration AST/CST node for data class parsing
   - Implement automatic conversion from data class to final class with pub(read) fields
   - Auto-generate constructor, equals, hash, and toString methods for data classes
   - Add data class optimization flags for region-safe allocation
@@ -97,7 +107,7 @@
 
 - [ ] 3.3 Implement constructor inheritance with visibility
   - Support inline constructor syntax: class Dog(name: str) : Animal(name)
-  - Make `init` method public by default (or require explicit visibility)
+  - Make `init` method public by default 
   - Ensure super constructor calls work properly with visibility
   - Fix parameter passing through inheritance chain
   - Implement proper initialization order

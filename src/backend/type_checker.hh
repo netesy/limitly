@@ -169,6 +169,9 @@ private:
     // Register builtin functions for semantic analysis
     void registerBuiltinFunctions();
     
+    // Class declaration validation
+    void checkClassDeclaration(const std::shared_ptr<AST::ClassDeclaration>& classDecl);
+    
     // Contract and assert validation
     void checkContractStatement(const std::shared_ptr<AST::ContractStatement>& stmt);
     void checkAssertCall(const std::shared_ptr<AST::CallExpr>& expr);
