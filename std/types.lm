@@ -1,0 +1,100 @@
+// Standard Library Types Module
+// Provides foundation types and common type definitions
+
+// Standard ordering enumeration
+type Ordering = Less | Equal | Greater;
+
+// Common error types for standard library
+type StdError = {
+    message: str,
+    source: str?,
+    debug_info: {str: str}
+};
+
+// Category-specific error types
+type CollectionError = IndexOutOfBounds | EmptyCollection | CapacityExceeded;
+type StringError = InvalidEncoding | PatternNotFound | InvalidFormat;
+type MathError = DomainError | OverflowError | UnderflowError | DivisionByZero;
+type TimeError = InvalidDateTime | ParseError | TimezoneError;
+
+// Collection error variants
+type IndexOutOfBounds = { index: int, length: int };
+type EmptyCollection = { operation: str };
+type CapacityExceeded = { requested: int, maximum: int };
+
+// String error variants
+type InvalidEncoding = { position: int, byte_value: int };
+type PatternNotFound = { pattern: str, text: str };
+type InvalidFormat = { expected: str, actual: str };
+
+// Math error variants
+type DomainError = { function: str, value: float };
+type OverflowError = { operation: str };
+type UnderflowError = { operation: str };
+type DivisionByZero = { numerator: float };
+
+// Time error variants
+type InvalidDateTime = { year: int, month: int, day: int };
+type ParseError = { input: str, position: int };
+type TimezoneError = { timezone: str };
+
+// Memory management types
+type IntMemoryPool = {
+    blocks: [int],
+    free_list: [int]
+};
+
+type StrMemoryPool = {
+    blocks: [str],
+    free_list: [int]
+};
+
+// Reference counting for shared ownership
+type IntRc = {
+    data: int,
+    ref_count: int
+};
+
+type StrRc = {
+    data: str,
+    ref_count: int
+};
+
+// Utility functions for reference counting
+fn new_int_rc(value: int): IntRc {
+    return IntRc {
+        data: value,
+        ref_count: 1
+    };
+}
+
+fn clone_int_rc(self: IntRc): IntRc {
+    // Clone reference (increment count)
+    return IntRc {
+        data: self.data,
+        ref_count: self.ref_count + 1
+    };
+}
+
+fn strong_count_int(self: IntRc): int {
+    return self.ref_count;
+}
+
+fn new_str_rc(value: str): StrRc {
+    return StrRc {
+        data: value,
+        ref_count: 1
+    };
+}
+
+fn clone_str_rc(self: StrRc): StrRc {
+    // Clone reference (increment count)
+    return StrRc {
+        data: self.data,
+        ref_count: self.ref_count + 1
+    };
+}
+
+fn strong_count_str(self: StrRc): int {
+    return self.ref_count;
+}

@@ -42,7 +42,40 @@ This specification defines the complete integration of classes into the Limit pr
 4. WHEN I use guards with class patterns THEN they SHALL evaluate class methods and fields
 5. WHEN I combine class patterns with union types THEN they SHALL work together seamlessly
 
-### Requirement 4: Class Type System Integration
+### Requirement 4: Class Visibility and Access Control
+
+**User Story:** As a developer, I want fine-grained control over class member visibility, so that I can create well-encapsulated classes with proper access control.
+
+#### Acceptance Criteria
+
+1. WHEN I declare a class member without visibility THEN it SHALL be private by default
+2. WHEN I use the `pub` keyword THEN the member SHALL be publicly accessible
+3. WHEN I use the `prot` keyword THEN the member SHALL be accessible to subclasses only
+4. WHEN I use `pub(read)` syntax THEN the field SHALL be read-only from outside the class
+5. WHEN I use the `static` keyword THEN the member SHALL be accessible at the class level
+6. WHEN I use the `abstract` keyword THEN the class or method SHALL require implementation in subclasses
+7. WHEN I use the `final` keyword THEN the class or method SHALL prevent inheritance or override
+8. WHEN I use the `data` keyword THEN it SHALL create an immutable, final, region-safe class with auto-generated methods
+
+### Requirement 5: Data Classes for Immutable Value Types
+
+**User Story:** As a developer, I want to create immutable data classes with minimal boilerplate, so that I can build efficient value types optimized for pattern matching and data storage.
+
+#### Acceptance Criteria
+
+1. WHEN I declare a `data` class THEN it SHALL be automatically final and immutable
+2. WHEN I declare fields in a `data` class THEN they SHALL be automatically `pub(read)` (read-only public)
+3. WHEN I create a `data` class THEN it SHALL auto-generate constructor, equals, hash, and toString methods
+4. WHEN I use a `data` class in pattern matching THEN it SHALL be optimized for efficient destructuring
+5. WHEN I instantiate a `data` class THEN it SHALL be region-safe and optimized for stack allocation
+6. WHEN I copy a `data` class THEN it SHALL use value semantics, not reference semantics
+7. WHEN I use a `data` class with union types THEN it SHALL support structural typing correctly
+
+### Requirement 6: Class Type System Integration
+
+**User Story:** As a developer, I want classes to work seamlessly with the type system, so that I can use them in type aliases, union types, and generic contexts.
+
+#### Acceptance Criteria
 
 **User Story:** As a developer, I want classes to work seamlessly with the type system, so that I can use them in type aliases, union types, and generic contexts.
 
@@ -54,7 +87,7 @@ This specification defines the complete integration of classes into the Limit pr
 4. WHEN I use class types in function signatures THEN they SHALL enforce type checking correctly
 5. WHEN I use class inheritance THEN it SHALL respect subtyping relationships in the type system
 
-### Requirement 5: Class Method Error Handling
+### Requirement 7: Class Method Error Handling
 
 **User Story:** As a developer, I want class methods to participate in error handling, so that I can write robust object-oriented code with proper error propagation.
 
@@ -66,7 +99,7 @@ This specification defines the complete integration of classes into the Limit pr
 4. WHEN class constructors fail THEN they SHALL return appropriate error types
 5. WHEN I use class methods in concurrent contexts THEN error handling SHALL work across threads
 
-### Requirement 6: Class Concurrency Integration
+### Requirement 8: Class Concurrency Integration
 
 **User Story:** As a developer, I want to use classes in concurrent and parallel contexts, so that I can build thread-safe object-oriented applications.
 
@@ -78,7 +111,7 @@ This specification defines the complete integration of classes into the Limit pr
 4. WHEN I use class-based synchronization primitives THEN they SHALL integrate with the concurrency system
 5. WHEN class methods are called concurrently THEN they SHALL handle thread safety appropriately
 
-### Requirement 7: Class Module System Integration
+### Requirement 9: Class Module System Integration
 
 **User Story:** As a developer, I want to organize classes in modules and control their visibility, so that I can build well-structured applications with proper encapsulation.
 

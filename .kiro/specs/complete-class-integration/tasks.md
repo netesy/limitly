@@ -1,304 +1,265 @@
-# Implementation Tasks
+# Complete Class Integration Implementation
 
-## Phase 1: Core Integration Foundation
+- [-] Fix class method registration in VM
 
-### Task 1: Enhance Type System for Class Integration
-- [ ] 1.1 Extend ClassType in backend/types.hh with integration fields
-  - Add isErrorType, isAbstract, interfaces fields to ClassType struct
-  - Add fieldDefaults map for default field values
-  - Implement canConvertTo and isSubtypeOf methods for inheritance checking
-  - Add implementsInterface method for interface compatibility
-  - _Requirements: 1.1, 4.1, 4.5, 12.1_
 
-- [ ] 1.2 Create InterfaceType and SelfType for class contracts
-  - Add InterfaceType struct to backend/types.hh with methods and properties
-  - Add SelfType struct for inheritance with Self return types
-  - Add AbstractClassType for abstract classes and interfaces
-  - Implement interface compatibility checking in TypeSystem
-  - Add interface registration and lookup methods
-  - _Requirements: 4.4, 7.5, 13.1, 13.4, 13.5_
 
-- [ ] 1.3 Enhance TypeSystem class with class integration methods
-  - Add registerClass, getClassType, isClassType methods to TypeSystem
-  - Implement registerInterface and getInterfaceType methods
-  - Add resolveSelfType method for inheritance type resolution
-  - Enhance canAssign method to handle class inheritance and interfaces
-  - Add createUnionWithClass and createOptionType methods for class integration
-  - _Requirements: 1.1, 4.1, 4.2, 4.3, 13.2_
 
-### Task 2: Implement Class Instantiation and Fluent Interfaces
-- [ ] 2.1 Create ClassInstantiation AST node
-  - Add ClassInstantiation struct to frontend/ast.hh with className and fieldOverrides
-  - Add support for Class() and Class(field = value) syntax
-  - Add chainedCalls field for fluent method chaining
-  - Update parser to handle class instantiation syntax
-  - _Requirements: 11.1, 11.2_
 
-- [ ] 2.2 Enhance ClassDeclaration with default values and fluent support
-  - Add fieldDefaults map to ClassDeclaration for default field values
-  - Add initMethod field for optional init() method support
-  - Add fluentSetters list and supportsFluentInterface flag
-  - Update parser to handle field defaults and init() method
-  - _Requirements: 11.3, 11.4, 12.1, 12.3_
 
-- [ ] 2.3 Implement FluentInterfaceManager for method chaining
-  - Create FluentInterfaceManager class in backend/vm.hh
-  - Implement optimizeMethodChain for fluent interface optimization
-  - Add resolveSelfType method for inheritance with fluent interfaces
-  - Implement inlineSetterChain for zero-cost abstractions
-  - _Requirements: 11.3, 11.5, 13.1, 13.2_
+  - Modify handleBeginFunction to properly register methods within class context
+  - Ensure class methods are stored in ClassDefinition during class parsing
+  - Fix method lookup in ObjectInstance to find class methods
+  - Update handleCall to properly dispatch class method calls
 
-- [ ] 2.4 Add class instantiation opcodes to VM
-  - Add CREATE_CLASS_WITH_DEFAULTS opcode for default field initialization
-  - Add CREATE_CLASS_WITH_OVERRIDES opcode for field override syntax
-  - Add CALL_FLUENT_SETTER and CHAIN_FLUENT_METHODS opcodes
-  - Add CALL_INIT_METHOD opcode for optional init() validation
-  - Implement corresponding VM handler methods
-  - _Requirements: 11.1, 11.2, 11.3, 11.4_
+- [ ] Fix class constructor calls
+  - Make class names callable as constructor functions
+  - Implement proper constructor dispatch in handleCall
+  - Ensure constructor creates ObjectInstance and calls init method if present
+  - Fix parameter passing to class constructors
 
-### Task 3: Implement Class Error Handling Integration
-- [ ] 3.1 Create ErrorClassDeclaration AST node
-  - Add ErrorClassDeclaration struct extending ClassDeclaration in frontend/ast.hh
-  - Add errorCode, errorFields, isBuiltinError fields
-  - Update parser to handle error class syntax
-  - _Requirements: 2.1, 2.2_
+- [ ] Add visibility keywords to scanner and parser
+  - Add `pub`, `prot`, `static`, `abstract`, `final`, `data` tokens to scanner
+  - Update parser to handle visibility modifiers on class members
+  - Add `pub(read)` syntax for read-only public fields
+  - Implement parsing for visibility annotations on fields and methods
 
-- [ ] 3.2 Implement ErrorClassValue runtime representation
-  - Add ErrorClassValue struct to backend/value.hh extending Value
-  - Include errorType, errorFields, message, stackTrace fields
-  - Implement toString, getField, setField methods
-  - _Requirements: 2.1, 2.3, 2.4_
+- [ ] Implement visibility enforcement in type system
+  - Make all class members private by default
+  - Add visibility checking for field and method access
+  - Implement `pub` keyword for explicit public visibility
+  - Add `prot` keyword for protected visibility in inheritance
 
-- [ ] 3.3 Add class error handling opcodes to VM
-  - Add THROW_CLASS_ERROR, CATCH_CLASS_ERROR, PROPAGATE_CLASS_ERROR opcodes
-  - Add CHECK_CLASS_ERROR opcode for method error checking
-  - Implement corresponding VM handler methods
-  - _Requirements: 2.2, 2.3, 5.1, 5.2_
+- [ ] 1.3 Fix class method execution context
+  - Ensure 'self' is properly bound in method calls
+  - Fix method environment setup with correct 'this' reference
+  - Implement proper method resolution including inheritance
+  - Fix method return value handling
+  - _Requirements: 1.1, 1.2, 1.3_
 
-- [ ] 3.4 Enhance MethodDeclaration with error handling support
-  - Add canThrow, throwableTypes, errorReturnType fields to MethodDeclaration
-  - Update parser to handle method error annotations
-  - Implement bytecode generation for method error handling
-  - _Requirements: 5.1, 5.2, 5.4_
+### Task 2: Implement Class Visibility and Access Control
 
-### Task 3: Implement Class Pattern Matching Integration
-- [ ] 3.1 Create class pattern AST nodes
-  - Add ClassPattern struct to frontend/ast.hh with className and fieldPatterns
-  - Add InheritancePattern struct for inheritance-based matching
-  - Add InterfacePattern struct for interface-based matching
-  - _Requirements: 3.1, 3.2, 3.4_
+- [ ]  Add visibility keywords to scanner and parser
+  - Add `pub`, `prot`, `static`, `abstract`, `final`, `data` tokens to scanner
+  - Update parser to handle visibility modifiers on class members
+  - Add `pub(read)` syntax for read-only public fields
+  - Implement parsing for visibility annotations on fields and methods
+  - Add `data` keyword parsing for data class declarations
+  - _Requirements: 1.1, 4.1, 7.2, 7.5_
 
-- [ ] 3.2 Implement ClassPatternMatcher runtime support
-  - Create ClassPatternMatcher class in backend/vm.hh
-  - Implement matchesClassPattern, matchesInheritancePattern methods
-  - Add extractClassFields and extractInheritanceValue methods
-  - Implement isCompatibleWithUnionPattern for integration
-  - _Requirements: 3.1, 3.2, 3.3, 3.5_
-
-- [ ] 3.3 Add class pattern matching opcodes
-  - Add MATCH_CLASS_TYPE, MATCH_CLASS_FIELDS, MATCH_INHERITANCE opcodes
-  - Implement VM handlers for class pattern matching
-  - Integrate with existing pattern matching system
-  - _Requirements: 3.1, 3.2, 3.3_
-
-- [ ] 3.4 Update parser for class pattern syntax
-  - Extend pattern parsing to handle class patterns
-  - Add support for field destructuring in class patterns
-  - Implement inheritance pattern parsing
-  - _Requirements: 3.1, 3.3, 3.4_
-
-## Phase 2: Advanced Feature Integration
-
-### Task 4: Implement Class Concurrency Support
-- [ ] 4.1 Create ConcurrentClassInstance for thread safety
-  - Add ConcurrentClassInstance struct extending ClassInstance in backend/value.hh
-  - Include instanceMutex, isBeingModified fields for synchronization
-  - Implement getFieldSafe, setFieldSafe, callMethodSafe methods
-  - _Requirements: 6.1, 6.2, 6.5_
-
-- [ ] 4.2 Implement class-based synchronization primitives
-  - Create ClassMutex class extending ClassInstance
-  - Create ClassChannel class for class instance communication
-  - Implement lock, unlock, tryLock methods for ClassMutex
-  - Implement send, receive, tryReceive methods for ClassChannel
-  - _Requirements: 6.3, 6.4_
-
-- [ ] 4.3 Add concurrent class opcodes to VM
-  - Add CALL_CLASS_METHOD_SAFE, GET_CLASS_FIELD_SAFE, SET_CLASS_FIELD_SAFE opcodes
-  - Add LOCK_CLASS_INSTANCE, UNLOCK_CLASS_INSTANCE opcodes
-  - Add SEND_CLASS_TO_CHANNEL, RECEIVE_CLASS_FROM_CHANNEL opcodes
-  - Implement corresponding VM handler methods
-  - _Requirements: 6.1, 6.2, 6.3_
-
-- [ ] 4.4 Enhance VM with class synchronization support
-  - Add handleConcurrentMethodCall and handleParallelClassOperation methods
-  - Implement synchronizeClassAccess and releaseClassAccess methods
-  - Add classMutexes map and threadPool integration
-  - _Requirements: 6.1, 6.2, 6.5_
-
-### Task 5: Implement Class Module System Integration
-- [ ] 5.1 Enhance ClassDeclaration with module support
-  - Add visibility, exportedMethods, exportedFields to ClassDeclaration
-  - Add isExported and implementedInterfaces fields
-  - Update parser to handle class visibility annotations
-  - _Requirements: 7.1, 7.2, 7.5_
-
-- [ ] 5.2 Create ModuleClassRegistry for class organization
-  - Implement ModuleClassRegistry class in backend/modules.hh
-  - Add registerClass, importClass, isClassVisible methods
-  - Maintain moduleClasses and exportedClasses maps
-  - _Requirements: 7.1, 7.3, 7.4_
-
-- [ ] 5.3 Integrate class registry with module system
-  - Update module loading to register exported classes
-  - Implement class import resolution with aliasing support
-  - Add cross-module inheritance dependency resolution
-  - _Requirements: 7.3, 7.4, 7.5_
-
-- [ ] 5.4 Add class visibility enforcement
-  - Implement visibility checking in class access operations
-  - Add compile-time visibility validation
-  - Integrate with existing module visibility system
+- [ ] Implement visibility enforcement in type system
+  - Make all class members private by default
+  - Add visibility checking for field and method access
+  - Implement `pub` keyword for explicit public visibility
+  - Add `prot` keyword for protected visibility in inheritance
+  - Enforce visibility rules during compilation and runtime
   - _Requirements: 7.2, 7.5_
 
-### Task 6: Enhance Class Memory Management
-- [ ] 6.1 Optimize ClassInstance memory layout
-  - Update ClassInstance struct with optimized field storage
-  - Add memoryRegion, instanceSize fields for memory tracking
-  - Implement markReachable and cleanup methods for garbage collection
-  - _Requirements: 8.1, 8.2, 8.5_
+- [ ] 2.3 Add static member support
+  - Implement `static` keyword for class-level members
+  - Add static field and method storage in ClassDefinition
+  - Implement static member access syntax (ClassName.member)
+  - Add static method calls and static field access to VM
+  - _Requirements: 12.5_
 
-- [ ] 6.2 Create ClassMemoryManager for optimized allocation
-  - Implement ClassMemoryManager class in backend/memory.hh
-  - Add allocateInstance, deallocateInstance methods
-  - Implement allocateWithInheritance for inheritance support
-  - Maintain classRegion and typeSizes for optimization
-  - _Requirements: 8.1, 8.3, 8.4_
+- [ ] 2.4 Implement data class syntactic sugar
+  - Add DataClassDeclaration AST node for data class parsing
+  - Implement automatic conversion from data class to final class with pub(read) fields
+  - Auto-generate constructor, equals, hash, and toString methods for data classes
+  - Add data class optimization flags for region-safe allocation
+  - Ensure data classes work with pattern matching and destructuring
+  - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7_
 
-- [ ] 6.3 Integrate class memory management with VM
-  - Update VM to use ClassMemoryManager for class operations
-  - Implement automatic cleanup for class instances
-  - Add memory region tracking for class hierarchies
-  - _Requirements: 8.1, 8.2, 8.5_
+- [ ] 2.5 Fix class field initialization with visibility
+  - Ensure class fields are properly initialized with default values
+  - Fix field access through self.fieldName syntax with visibility checks
+  - Implement proper field assignment in class methods
+  - Add `pub(read)` syntax for read-only public fields
+  - Handle data class immutable field restrictions
+  - _Requirements: 1.1, 5.2, 12.1, 12.2_
 
-- [ ] 6.4 Add class-aware garbage collection
-  - Enhance garbage collector to handle class inheritance chains
-  - Implement cycle detection for recursive class structures
-  - Add memory leak prevention for class closures
-  - _Requirements: 8.4, 8.5_
+### Task 3: Implement Class Inheritance and Abstract Classes
 
-## Phase 3: VM Integration and Optimization
+- [ ] 3.1 Add abstract and final class support
+  - Implement `abstract` keyword for abstract classes and methods
+  - Add `final` keyword to prevent inheritance and method override
+  - Add abstract method validation (must be overridden in concrete classes)
+  - Prevent instantiation of abstract classes
+  - _Requirements: 4.4, 13.4, 13.5_
 
-### Task 7: Implement Enhanced VM Class Operations
-- [ ] 7.1 Add comprehensive class VM opcodes
-  - Implement CREATE_CLASS_INSTANCE with error handling support
-  - Add CHECK_CLASS_ERROR and PROPAGATE_CLASS_ERROR handlers
-  - Implement HANDLE_CLASS_EXCEPTION for exception processing
-  - _Requirements: 1.1, 2.2, 5.3_
+- [ ] 3.2 Fix class inheritance parsing and registration
+  - Ensure superclass relationships are properly parsed
+  - Fix handleSetSuperclass to establish inheritance chains
+  - Implement proper method resolution order for inheritance
+  - Add support for super method calls with visibility checks
+  - Enforce `final` class inheritance restrictions
+  - _Requirements: 4.1, 4.2, 13.1, 13.2_
 
-- [ ] 7.2 Enhance VM with class integration methods
-  - Implement handleCreateClassInstance with memory management
-  - Add handleClassMethodCall with error propagation
-  - Implement handleClassFieldAccess with thread safety
-  - _Requirements: 1.1, 5.1, 6.1_
+- [ ] 3.3 Implement constructor inheritance with visibility
+  - Support inline constructor syntax: class Dog(name: str) : Animal(name)
+  - Make `init` method public by default (or require explicit visibility)
+  - Ensure super constructor calls work properly with visibility
+  - Fix parameter passing through inheritance chain
+  - Implement proper initialization order
+  - _Requirements: 11.1, 11.2, 13.1, 13.2_
 
-- [ ] 7.3 Add class pattern matching VM support
-  - Implement handleClassPatternMatch for type-based matching
-  - Add handleInheritanceMatch for inheritance hierarchy matching
-  - Integrate with existing pattern matching VM infrastructure
-  - _Requirements: 3.1, 3.2, 3.5_
+- [ ] 3.4 Add protected member inheritance
+  - Implement `prot` keyword for protected visibility
+  - Allow protected members to be accessed by subclasses
+  - Add protected method and field inheritance
+  - Enforce protected visibility rules in inheritance chains
+  - _Requirements: 7.2, 7.5, 13.1_
 
-- [ ] 7.4 Implement class error handling VM integration
-  - Add handleClassErrorPropagation for method error chains
-  - Implement handleClassExceptionHandling for try-catch integration
-  - Integrate with existing error handling VM infrastructure
-  - _Requirements: 2.2, 2.3, 5.2, 5.3_
+## Phase 2: Advanced Class Features
 
-### Task 8: Optimize Class Performance
-- [ ] 8.1 Implement efficient method dispatch
-  - Add virtual method table (vtable) support for class inheritance
-  - Implement method caching for frequently called methods
-  - Add inline caching for monomorphic method calls
-  - _Requirements: 10.1, 10.2_
+### Task 4: Implement Typed Fields and Property Access
 
-- [ ] 8.2 Optimize class field access
-  - Implement direct field offset calculation for known types
-  - Add field access caching for repeated operations
-  - Optimize inheritance chain field lookup
-  - _Requirements: 10.3, 10.4_
+- [ ] 4.1 Require explicit field declarations with types
+  - Enforce explicit type annotations on all class fields
+  - Add compile-time type checking for field declarations
+  - Implement field type validation during assignment
+  - Add support for field default values with type checking
+  - _Requirements: 11.1, 11.2, 12.1, 12.2_
 
-- [ ] 8.3 Add class-aware JIT optimizations
-  - Implement type specialization for class methods
-  - Add devirtualization for final classes and methods
-  - Implement class-specific optimization passes
-  - _Requirements: 10.5_
+- [ ] 4.2 Fix property access for class instances with visibility
+  - Ensure handleGetProperty works correctly with visibility rules
+  - Fix handleSetProperty for class field assignment with access control
+  - Implement proper field lookup including inheritance and visibility
+  - Add support for `pub(read)` read-only field access
+  - Prevent access to private fields from outside the class
+  - _Requirements: 1.1, 1.2, 1.3, 7.2_
 
-- [ ] 8.4 Optimize class memory usage
-  - Implement field layout optimization for cache efficiency
-  - Add class instance pooling for frequently created types
-  - Optimize inheritance memory layout for minimal overhead
-  - _Requirements: 8.3, 10.4_
+- [ ] 4.3 Implement optional init() method support
+  - Add support for optional init() method in classes
+  - Make init() public by default or require explicit visibility
+  - Ensure init() is called when explicitly invoked
+  - Implement validation and error handling in init() methods
+  - Add compiler warnings for missing init() calls where needed
+  - _Requirements: 11.3, 11.4, 12.3, 12.4_
 
-## Phase 4: Testing and Documentation
+### Task 5: Implement Class Type System Integration
 
-### Task 9: Create Comprehensive Test Suite
-- [ ] 9.1 Implement class-error integration tests
-  - Create tests for error classes and inheritance hierarchies
-  - Test method error handling and constructor failures
-  - Add tests for error propagation through class method chains
-  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
+- [ ] 5.1 Extend TypeSystem for class types
+  - Add ClassType struct to backend/types.hh with proper integration
+  - Implement registerClass, getClassType, isClassType methods
+  - Add class type compatibility checking with inheritance
+  - Integrate classes with union types and Option types
+  - _Requirements: 1.1, 4.1, 4.2, 4.3_
 
-- [ ] 9.2 Implement class-pattern integration tests
-  - Create tests for class type pattern matching
-  - Test inheritance pattern matching and field destructuring
-  - Add tests for class patterns in union types
-  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
+- [ ] 5.2 Add class types to error handling system
+  - Enable classes to be used as error types
+  - Implement class-based error propagation
+  - Add support for class methods in error handling
+  - Integrate class inheritance with error type hierarchies
+  - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
-- [ ] 9.3 Implement class-concurrency integration tests
-  - Create tests for thread-safe class operations
-  - Test concurrent method calls and field access
-  - Add tests for class instances in channels and parallel blocks
-  - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
+## Phase 3: Integration with Language Features
 
-- [ ] 9.4 Implement class-module integration tests
-  - Create tests for class import/export across modules
-  - Test class visibility and access control
-  - Add tests for cross-module inheritance and interfaces
-  - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
+### Task 6: Implement Class Pattern Matching Integration
 
-### Task 10: Performance Testing and Optimization
-- [ ] 10.1 Create class performance benchmarks
-  - Implement method dispatch performance tests
-  - Add memory usage benchmarks for class instances
-  - Create concurrency performance tests for class operations
-  - _Requirements: 10.1, 10.2, 10.3, 10.4_
+- [ ] 6.1 Add basic class pattern matching support
+  - Implement class type patterns in match expressions
+  - Add support for class field destructuring in patterns
+  - Integrate class patterns with existing pattern matching system
+  - Add class instance type checking in patterns
+  - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 10.2 Add class debugging and introspection support
-  - Implement class instance debugging with field inspection
-  - Add class method call stack tracing
-  - Create class inheritance chain visualization
-  - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
+- [ ] 6.2 Add inheritance pattern matching
+  - Implement inheritance-based pattern matching
+  - Add support for matching on class hierarchies
+  - Integrate with polymorphic method dispatch
+  - Add pattern guards for class methods and fields
+  - _Requirements: 3.1, 3.2, 3.4, 3.5_
 
-- [ ] 10.3 Create integration documentation
-  - Document class integration with all language features
-  - Create migration guide for existing class code
-  - Add examples for all integration patterns
-  - Update language specification with class integration details
+### Task 7: Implement Class Concurrency Integration
 
-### Task 11: End-to-End Integration Testing
-- [ ] 11.1 Create comprehensive integration scenarios
-  - Test classes with error handling, pattern matching, and concurrency together
-  - Create complex inheritance hierarchies with all language features
-  - Test class-based applications with modules and type system integration
-  - _Requirements: All requirements integrated_
+- [ ] 7.1 Add basic class concurrency support
+  - Ensure class instances work in parallel/concurrent blocks
+  - Implement thread-safe class field access
+  - Add support for passing class instances through channels
+  - Integrate with existing concurrency primitives
+  - _Requirements: 6.1, 6.2, 6.3_
 
-- [ ] 11.2 Performance regression testing
-  - Ensure class integration doesn't degrade existing performance
-  - Test memory usage remains within acceptable bounds
-  - Verify concurrency performance meets requirements
-  - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
+- [ ] 7.2 Add class-based synchronization
+  - Implement class-based mutex and synchronization primitives
+  - Add support for concurrent class method calls
+  - Ensure thread safety for class inheritance chains
+  - Integrate with existing thread pool and task system
+  - _Requirements: 6.1, 6.2, 6.4, 6.5_
 
-- [ ] 11.3 Create production-ready examples
-  - Build sample applications demonstrating all integrations
-  - Create best practices documentation
-  - Add troubleshooting guide for common integration issues
+## Phase 4: Testing and Validation
+
+### Task 8: Create Comprehensive Class Test Suite
+
+- [ ] 8.1 Fix existing class tests with visibility features
+  - Update tests/classes/basic_classes.lm to use explicit field types
+  - Add visibility modifiers (pub, prot, static) to test classes
+  - Fix class constructor calls and method dispatch
+  - Test private-by-default behavior and explicit pub visibility
+  - Add comprehensive field access and method call tests with visibility
+  - _Requirements: 1.1, 1.2, 1.3, 7.2_
+
+- [ ] 8.2 Add visibility and access control tests
+  - Test private field access restrictions
+  - Validate pub keyword for public visibility
+  - Test prot keyword for protected inheritance access
+  - Add pub(read) read-only field tests
+  - Test static member access and restrictions
+  - _Requirements: 7.2, 7.5, 12.5_
+
+- [ ] 8.3 Add data class tests
+  - Test data class declaration and auto-generated methods
+  - Validate data class immutability and final behavior
+  - Test data class pattern matching and destructuring
+  - Add data class value semantics and copying tests
+  - Test data class with union types and structural typing
+  - Validate data class region-safe allocation optimization
+  - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7_
+
+- [ ] 8.4 Add abstract and final class tests
+  - Test abstract class and method declarations
+  - Validate abstract method override requirements
+  - Test final class inheritance prevention
+  - Add final method override prevention tests
+  - Test abstract class instantiation prevention
+  - _Requirements: 4.4, 13.4, 13.5_
+
+- [ ] 8.5 Add inheritance test validation with visibility
+  - Fix tests/classes/inheritance.lm to work with visibility rules
+  - Test super constructor calls with protected/public init methods
+  - Validate polymorphic method dispatch with visibility
+  - Add comprehensive inheritance chain tests with access control
+  - Test protected member access in inheritance
+  - _Requirements: 4.1, 4.2, 13.1, 13.2, 7.2_
+
+### Task 9: Integration Testing
+
+- [ ] 9.1 Test class integration with existing features
+  - Ensure classes work with existing type system
+  - Test class instances in function parameters and return values
+  - Validate class field access in expressions and loops
+  - Test class methods with optional parameters and default values
+  - _Requirements: 1.1, 4.1, 4.2, 4.3_
+
+- [ ] 9.2 Add comprehensive class feature tests
+  - Test class field default values and initialization
+  - Validate optional init() method functionality
+  - Test class inheritance with field and method resolution
+  - Add error handling tests for class operations
+  - _Requirements: 11.1, 11.2, 11.3, 11.4, 12.1, 12.2, 12.3_
+
+### Task 10: Performance and Optimization
+
+- [ ] 10.1 Optimize class method dispatch
+  - Implement efficient method lookup for class instances
+  - Add method caching for frequently called methods
+  - Optimize inheritance chain method resolution
+  - Ensure minimal overhead for class operations
+  - _Requirements: 10.1, 10.2, 10.3_
+
+- [ ] 10.2 Add class debugging support
+  - Implement proper error messages for class operations
+  - Add class instance inspection in debug mode
+  - Ensure clear error reporting for method and field access
+  - Add class inheritance chain debugging
+  - _Requirements: 9.1, 9.2, 9.3, 9.4_

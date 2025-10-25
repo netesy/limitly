@@ -1,0 +1,139 @@
+// Standard Library Functional Module
+// Provides functional programming utilities for working with collections
+
+// Higher-order collection functions for integers
+fn map_int(arr: [int], transform: fn(int): int): [int] {
+    // Transform list elements
+    var result: [int] = [];
+    var i: int = 0;
+    while (i < arr.length) {
+        result[i] = transform(arr[i]);
+        i = i + 1;
+    }
+    return result;
+}
+
+fn filter_int(arr: [int], predicate: fn(int): bool): [int] {
+    // Select elements by predicate
+    var result: [int] = [];
+    var resultIndex: int = 0;
+    var i: int = 0;
+    while (i < arr.length) {
+        if (predicate(arr[i])) {
+            result[resultIndex] = arr[i];
+            resultIndex = resultIndex + 1;
+        }
+        i = i + 1;
+    }
+    return result;
+}
+
+fn reduce_int(arr: [int], initial: int, combine: fn(int, int): int): int {
+    // Accumulate values
+    var accumulator: int = initial;
+    var i: int = 0;
+    while (i < arr.length) {
+        accumulator = combine(accumulator, arr[i]);
+        i = i + 1;
+    }
+    return accumulator;
+}
+
+fn find_int(arr: [int], predicate: fn(int): bool): int? {
+    // Find first matching element
+    var i: int = 0;
+    while (i < arr.length) {
+        if (predicate(arr[i])) {
+            return arr[i];
+        }
+        i = i + 1;
+    }
+    return nil;
+}
+
+fn any_int(arr: [int], predicate: fn(int): bool): bool {
+    // Check if any element matches predicate
+    var i: int = 0;
+    while (i < arr.length) {
+        if (predicate(arr[i])) {
+            return true;
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+fn all_int(arr: [int], predicate: fn(int): bool): bool {
+    // Check if all elements match predicate
+    var i: int = 0;
+    while (i < arr.length) {
+        if (!predicate(arr[i])) {
+            return false;
+        }
+        i = i + 1;
+    }
+    return true;
+}
+
+// Higher-order collection functions for strings
+fn map_str(arr: [str], transform: fn(str): str): [str] {
+    // Transform string list elements
+    var result: [str] = [];
+    var i: int = 0;
+    while (i < arr.length) {
+        result[i] = transform(arr[i]);
+        i = i + 1;
+    }
+    return result;
+}
+
+fn filter_str(arr: [str], predicate: fn(str): bool): [str] {
+    // Select string elements by predicate
+    var result: [str] = [];
+    var resultIndex: int = 0;
+    var i: int = 0;
+    while (i < arr.length) {
+        if (predicate(arr[i])) {
+            result[resultIndex] = arr[i];
+            resultIndex = resultIndex + 1;
+        }
+        i = i + 1;
+    }
+    return result;
+}
+
+fn find_str(arr: [str], predicate: fn(str): bool): str? {
+    // Find first matching string element
+    var i: int = 0;
+    while (i < arr.length) {
+        if (predicate(arr[i])) {
+            return arr[i];
+        }
+        i = i + 1;
+    }
+    return nil;
+}
+
+fn any_str(arr: [str], predicate: fn(str): bool): bool {
+    // Check if any string element matches predicate
+    var i: int = 0;
+    while (i < arr.length) {
+        if (predicate(arr[i])) {
+            return true;
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+fn all_str(arr: [str], predicate: fn(str): bool): bool {
+    // Check if all string elements match predicate
+    var i: int = 0;
+    while (i < arr.length) {
+        if (!predicate(arr[i])) {
+            return false;
+        }
+        i = i + 1;
+    }
+    return true;
+}

@@ -1,0 +1,145 @@
+Tokens for test_union_exhaustiveness_debug.lm
+Parser: New Unified Parser (CST mode)
+Mode: CST with trivia preservation
+========================================
+
+=== Tokens with Trivia ===
+Line 3: PRINT = 'print' [leading: COMMENT_LINE('// Debug test for union exhaustiveness checking') NEWLINE('
+') NEWLINE('
+') ]
+Line 3: LEFT_PAREN = '('
+Line 3: STRING = '"=== Union Exhaustiveness Debug Test ==="'
+Line 3: RIGHT_PAREN = ')'
+Line 3: SEMICOLON = ';'
+Line 6: TYPE = 'type' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 1: Simple exhaustive match (should pass)') NEWLINE('
+') ]
+Line 6: IDENTIFIER = 'NumberOrString' [leading: WHITESPACE(' ') ]
+Line 6: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 6: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 6: PIPE = '|' [leading: WHITESPACE(' ') ]
+Line 6: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 6: SEMICOLON = ';'
+Line 7: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 7: IDENTIFIER = 'value1' [leading: WHITESPACE(' ') ]
+Line 7: COLON = ':'
+Line 7: IDENTIFIER = 'NumberOrString' [leading: WHITESPACE(' ') ]
+Line 7: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 7: NUMBER = '42' [leading: WHITESPACE(' ') ]
+Line 7: SEMICOLON = ';'
+Line 9: MATCH = 'match' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 9: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 9: IDENTIFIER = 'value1'
+Line 9: RIGHT_PAREN = ')'
+Line 9: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 10: INT_TYPE = 'int' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 10: ARROW = '=>' [leading: WHITESPACE(' ') ]
+Line 10: PRINT = 'print' [leading: WHITESPACE(' ') ]
+Line 10: LEFT_PAREN = '('
+Line 10: STRING = '"Got int: "'
+Line 10: PLUS = '+' [leading: WHITESPACE(' ') ]
+Line 10: IDENTIFIER = 'value1' [leading: WHITESPACE(' ') ]
+Line 10: RIGHT_PAREN = ')'
+Line 10: COMMA = ','
+Line 11: STR_TYPE = 'str' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 11: ARROW = '=>' [leading: WHITESPACE(' ') ]
+Line 11: PRINT = 'print' [leading: WHITESPACE(' ') ]
+Line 11: LEFT_PAREN = '('
+Line 11: STRING = '"Got str: "'
+Line 11: PLUS = '+' [leading: WHITESPACE(' ') ]
+Line 11: IDENTIFIER = 'value1' [leading: WHITESPACE(' ') ]
+Line 11: RIGHT_PAREN = ')'
+Line 12: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 15: TYPE = 'type' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 2: Wildcard match (should pass)') NEWLINE('
+') ]
+Line 15: IDENTIFIER = 'ManyTypes' [leading: WHITESPACE(' ') ]
+Line 15: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 15: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 15: PIPE = '|' [leading: WHITESPACE(' ') ]
+Line 15: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 15: PIPE = '|' [leading: WHITESPACE(' ') ]
+Line 15: BOOL_TYPE = 'bool' [leading: WHITESPACE(' ') ]
+Line 15: SEMICOLON = ';'
+Line 16: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 16: IDENTIFIER = 'value2' [leading: WHITESPACE(' ') ]
+Line 16: COLON = ':'
+Line 16: IDENTIFIER = 'ManyTypes' [leading: WHITESPACE(' ') ]
+Line 16: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 16: NUMBER = '123' [leading: WHITESPACE(' ') ]
+Line 16: SEMICOLON = ';'
+Line 18: MATCH = 'match' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 18: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 18: IDENTIFIER = 'value2'
+Line 18: RIGHT_PAREN = ')'
+Line 18: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 19: INT_TYPE = 'int' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 19: ARROW = '=>' [leading: WHITESPACE(' ') ]
+Line 19: PRINT = 'print' [leading: WHITESPACE(' ') ]
+Line 19: LEFT_PAREN = '('
+Line 19: STRING = '"Got int: "'
+Line 19: PLUS = '+' [leading: WHITESPACE(' ') ]
+Line 19: IDENTIFIER = 'value2' [leading: WHITESPACE(' ') ]
+Line 19: RIGHT_PAREN = ')'
+Line 19: COMMA = ','
+Line 20: DEFAULT = '_' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 20: ARROW = '=>' [leading: WHITESPACE(' ') ]
+Line 20: PRINT = 'print' [leading: WHITESPACE(' ') ]
+Line 20: LEFT_PAREN = '('
+Line 20: STRING = '"Got other: "'
+Line 20: PLUS = '+' [leading: WHITESPACE(' ') ]
+Line 20: IDENTIFIER = 'value2' [leading: WHITESPACE(' ') ]
+Line 20: RIGHT_PAREN = ')'
+Line 21: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 24: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 3: Non-exhaustive match (should fail)') NEWLINE('
+') ]
+Line 24: IDENTIFIER = 'value3' [leading: WHITESPACE(' ') ]
+Line 24: COLON = ':'
+Line 24: IDENTIFIER = 'NumberOrString' [leading: WHITESPACE(' ') ]
+Line 24: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 24: STRING = '"hello"' [leading: WHITESPACE(' ') ]
+Line 24: SEMICOLON = ';'
+Line 27: MATCH = 'match' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// This should trigger exhaustiveness error') NEWLINE('
+') ]
+Line 27: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 27: IDENTIFIER = 'value3'
+Line 27: RIGHT_PAREN = ')'
+Line 27: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 28: INT_TYPE = 'int' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 28: ARROW = '=>' [leading: WHITESPACE(' ') ]
+Line 28: PRINT = 'print' [leading: WHITESPACE(' ') ]
+Line 28: LEFT_PAREN = '('
+Line 28: STRING = '"Got int: "'
+Line 28: PLUS = '+' [leading: WHITESPACE(' ') ]
+Line 28: IDENTIFIER = 'value3' [leading: WHITESPACE(' ') ]
+Line 28: RIGHT_PAREN = ')'
+Line 30: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') COMMENT_LINE('// Missing str case') NEWLINE('
+') ]
+Line 32: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 32: LEFT_PAREN = '('
+Line 32: STRING = '"=== Union Exhaustiveness Debug Test Completed ==="'
+Line 32: RIGHT_PAREN = ')'
+Line 32: SEMICOLON = ';'
+Line 32: EOF_TOKEN = ''

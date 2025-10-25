@@ -1,0 +1,94 @@
+AST for test_union_exhaustiveness_debug.lm
+Parser: New Unified Parser (CST mode)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+  Literal: === Union Exhaustiveness Debug Test ===
+TypeDeclaration: NumberOrString = int | str
+VarDeclaration: value1
+  Type: NumberOrString
+  Initializer:
+    Literal: 42
+MatchStatement:
+  Value:
+    Variable: value1
+  Cases:
+    Case:
+      Pattern:
+      TypePattern: int
+      Body:
+      PrintStatement:
+        BinaryExpression: +
+          Left:
+            Literal: Got int: 
+          Operator: +
+          Right:
+            Variable: value1
+    Case:
+      Pattern:
+      TypePattern: str
+      Body:
+      PrintStatement:
+        BinaryExpression: +
+          Left:
+            Literal: Got str: 
+          Operator: +
+          Right:
+            Variable: value1
+TypeDeclaration: ManyTypes = int | str | bool
+VarDeclaration: value2
+  Type: ManyTypes
+  Initializer:
+    Literal: 123
+MatchStatement:
+  Value:
+    Variable: value2
+  Cases:
+    Case:
+      Pattern:
+      TypePattern: int
+      Body:
+      PrintStatement:
+        BinaryExpression: +
+          Left:
+            Literal: Got int: 
+          Operator: +
+          Right:
+            Variable: value2
+    Case:
+      Pattern:
+      Literal: nil
+      Body:
+      PrintStatement:
+        BinaryExpression: +
+          Left:
+            Literal: Got other: 
+          Operator: +
+          Right:
+            Variable: value2
+VarDeclaration: value3
+  Type: NumberOrString
+  Initializer:
+    Literal: hello
+MatchStatement:
+  Value:
+    Variable: value3
+  Cases:
+    Case:
+      Pattern:
+      TypePattern: int
+      Body:
+      PrintStatement:
+        BinaryExpression: +
+          Left:
+            Literal: Got int: 
+          Operator: +
+          Right:
+            Variable: value3
+PrintStatement:
+  Literal: === Union Exhaustiveness Debug Test Completed ===

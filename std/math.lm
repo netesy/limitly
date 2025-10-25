@@ -1,0 +1,164 @@
+// Standard Library Math Module
+// Provides mathematical functions and constants
+
+// Mathematical constants
+var PI: float = 3.141592653589793;
+var E: float = 2.718281828459045;
+var TAU: float = 6.283185307179586;
+
+// Trigonometric functions
+fn sin(x: float): float {
+    // Sine function
+    // Note: This would need proper implementation using math libraries
+    return 0.0;
+}
+
+fn cos(x: float): float {
+    // Cosine function
+    return 0.0;
+}
+
+fn tan(x: float): float {
+    // Tangent function
+    return 0.0;
+}
+
+fn asin(x: float): float? {
+    // Arcsine with domain checking
+    if (x < -1.0 or x > 1.0) {
+        return nil;
+    }
+    return 0.0;
+}
+
+fn acos(x: float): float? {
+    // Arccosine with domain checking
+    if (x < -1.0 or x > 1.0) {
+        return nil;
+    }
+    return 0.0;
+}
+
+fn atan(x: float): float {
+    // Arctangent function
+    return 0.0;
+}
+
+// Power and logarithmic functions
+fn sqrt(x: float): float? {
+    // Square root with non-negative check
+    if (x < 0.0) {
+        return nil;
+    }
+    // Note: This would need proper implementation
+    return 0.0;
+}
+
+fn pow(base: float, exponent: float): float {
+    // Power function
+    return 0.0;
+}
+
+fn log(x: float): float? {
+    // Natural logarithm with positive check
+    if (x <= 0.0) {
+        return nil;
+    }
+    return 0.0;
+}
+
+fn log10(x: float): float? {
+    // Base-10 logarithm with positive check
+    if (x <= 0.0) {
+        return nil;
+    }
+    return 0.0;
+}
+
+fn exp(x: float): float {
+    // Exponential function
+    return 0.0;
+}
+
+// Utility functions for integers
+fn abs_int(x: int): int {
+    // Absolute value for int
+    if (x < 0) {
+        return -x;
+    }
+    return x;
+}
+
+fn min_int(a: int, b: int): int {
+    // Minimum of two integers
+    if (a < b) {
+        return a;
+    }
+    return b;
+}
+
+fn max_int(a: int, b: int): int {
+    // Maximum of two integers
+    if (a > b) {
+        return a;
+    }
+    return b;
+}
+
+// Utility functions for floats
+fn abs_float(x: float): float {
+    // Absolute value for float
+    if (x < 0.0) {
+        return -x;
+    }
+    return x;
+}
+
+fn min_float(a: float, b: float): float {
+    // Minimum of two floats
+    if (a < b) {
+        return a;
+    }
+    return b;
+}
+
+fn max_float(a: float, b: float): float {
+    // Maximum of two floats
+    if (a > b) {
+        return a;
+    }
+    return b;
+}
+
+fn floor(x: float): int {
+    // Floor function
+    // Note: This would need proper implementation
+    return 0;
+}
+
+fn ceil(x: float): int {
+    // Ceiling function
+    return 0;
+}
+
+fn round(x: float): int {
+    // Round to nearest integer
+    return 0;
+}
+
+// Random number generation
+fn random(): float {
+    // Random float between 0.0 and 1.0
+    // Note: This would need proper implementation with random number generator
+    return 0.5;
+}
+
+fn random_int(min: int, max: int): int {
+    // Random integer in range [min, max]
+    return min;
+}
+
+fn random_float(min: float, max: float): float {
+    // Random float in range [min, max]
+    return min;
+}

@@ -3654,6 +3654,8 @@ void VM::handleBeginFunction(const Instruction& instruction) {
         std::cout << "[DEBUG] BEGIN_FUNCTION: " << funcName << " at IP " << ip << std::endl;
         std::cout << "[DEBUG] BEGIN_FUNCTION: Current function being defined: " << getCurrentFunctionBeingDefined() << std::endl;
         std::cout << "[DEBUG] BEGIN_FUNCTION: Inside function definition: " << isInsideFunctionDefinition() << std::endl;
+        std::cout << "[DEBUG] BEGIN_FUNCTION: Inside class definition: " << insideClassDefinition << std::endl;
+        std::cout << "[DEBUG] BEGIN_FUNCTION: Current class: " << currentClassBeingDefined << std::endl;
     }
     
     // Use the stack-based approach for nested function support
@@ -3713,18 +3715,27 @@ void VM::handleBeginFunction(const Instruction& instruction) {
     
     // If we're inside a class definition, this is a method
     if (insideClassDefinition && !currentClassBeingDefined.empty()) {
-        // This is a class method - we'll handle it differently
-        // For now, still store it as a regular function but mark it as a method
+        // This is a class method - register it properly in the class definition
         std::string methodKey = currentClassBeingDefined + "::" + funcName;
         userDefinedFunctions[methodKey] = func;
         
-        // Also add it to the class definition
+        // Add the method to the class definition
         auto classDef = classRegistry.getClass(currentClassBeingDefined);
         if (classDef) {
-            // Create a method implementation
-            // For now, we'll create a placeholder - the actual method execution
-            // will be handled by the VM when the method is called
-            // TODO: Create proper method implementation
+            // Create a VM-based method implementation that will execute the bytecode
+            auto methodImpl = std::make_shared<VMMethodImplementation>(
+                this, funcName, func.startAddress, func.endAddress);
+            
+            // Create the class method and add it to the class
+            backend::ClassMethod classMethod(funcName, methodImpl);
+            classDef->addMethod(classMethod);
+            
+            if (debugMode) {
+                std::cout << "[DEBUG] Added method '" << funcName << "' to class '" 
+                          << currentClassBeingDefined << "'" << std::endl;
+            }
+        } else {
+            error("Class definition not found for method: " + currentClassBeingDefined);
         }
     } else {
         // Regular function

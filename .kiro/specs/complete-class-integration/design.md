@@ -47,7 +47,258 @@ This design document outlines the complete integration of classes into the Limit
 
 ## Detailed Design
 
-### 1. Enhanced Type System Integration
+### 1. Class Visibility and Access Control System
+
+The class system implements comprehensive visibility controls with private-by-default semantics:
+
+```limit
+// Private by default - explicit types required
+class BankAccount {
+    balance: float = 0.0;           // Private field with default value
+    accountNumber: str;             // Private field, must be initialized
+    
+    pub fn deposit(amount: float) { // Public method
+        self.balance += amount;
+    }
+    
+    prot fn validateAmount(amount: float) : bool { // Protected method
+        return amount > 0.0;
+    }
+    
+    static pub fn createAccount(number: str) : BankAccount { // Static public method
+        return BankAccount { accountNumber: number };
+    }
+    
+    pub(read) balance: float;       // Read-only public field
+}
+
+// Abstract class with final methods
+abstract class Shape {
+    abstract fn area() : float;     // Must be implemented
+    final fn describe() {           // Cannot be overridden
+        print("Area: {self.area()}");
+    }
+}
+
+// Final class - cannot be inherited
+final class Circle : Shape {
+    pub radius: float;
+    
+    fn area() : float {             // Implements abstract method
+        return 3.14159 * self.radius * self.radius;
+    }
+}
+```
+
+#### Data Classes - Immutable Value Types
+
+The `data` keyword provides syntactic sugar for creating immutable, final, region-safe classes optimized for data storage and pattern matching:
+
+```limit
+// Data class - syntactic sugar for immutable, final class
+data Point {
+    x: float;
+    y: float;
+}
+
+// Equivalent to:
+final class Point {
+    pub(read) x: float;
+    pub(read) y: float;
+    
+    // Auto-generated constructor
+    pub fn init(x: float, y: float) {
+        self.x = x;
+        self.y = y;
+    }
+    
+    // Auto-generated equality
+    pub fn equals(other: Point) : bool {
+        return self.x == other.x && self.y == other.y;
+    }
+    
+    // Auto-generated hash
+    pub fn hash() : int {
+        return hash(self.x) ^ hash(self.y);
+    }
+    
+    // Auto-generated toString
+    pub fn toString() : str {
+        return "Point(x: {self.x}, y: {self.y})";
+    }
+}
+
+// Data classes work seamlessly with pattern matching
+data Result {
+    value: int | None;
+    error: str | None;
+}
+
+fn processResult(result: Result) {
+    match result {
+        Result { value: Some(v), error: None } => print("Success: {v}"),
+        Result { value: None, error: Some(e) } => print("Error: {e}"),
+        _ => print("Invalid result state")
+    }
+}
+```
+
+#### Comprehensive Data Class Examples
+
+```limit
+// Simple data class for coordinates
+data Point {
+    x: float;
+    y: float;
+}
+
+// Usage with auto-generated methods
+var p1 = Point(3.0, 4.0);
+var p2 = Point(3.0, 4.0);
+print(p1.toString());           // "Point(x: 3.0, y: 4.0)"
+print(p1.equals(p2));           // true
+print(p1.hash());               // auto-generated hash value
+
+// Data class with union types for optional values
+data Person {
+    name: str;
+    age: int | None;
+    email: str | None;
+}
+
+// Pattern matching with data classes
+fn describePerson(person: Person) {
+    match person {
+        Person { name: n, age: Some(a), email: Some(e) } => 
+            print("{n} is {a} years old, email: {e}"),
+        Person { name: n, age: Some(a), email: None } => 
+            print("{n} is {a} years old, no email"),
+        Person { name: n, age: None, email: Some(e) } => 
+            print("{n}, age unknown, email: {e}"),
+        Person { name: n, age: None, email: None } => 
+            print("{n}, minimal info")
+    }
+}
+
+// Data class for error handling
+data ValidationError {
+    field: str;
+    message: str;
+    code: int;
+}
+
+// Data class for results with structural typing
+data ApiResponse {
+    status: int;
+    data: str | None;
+    error: ValidationError | None;
+}
+
+fn handleResponse(response: ApiResponse) {
+    match response {
+        ApiResponse { status: 200, data: Some(d), error: None } => 
+            print("Success: {d}"),
+        ApiResponse { status: s, data: None, error: Some(e) } => 
+            print("Error {s}: {e.message} in field {e.field}"),
+        _ => print("Unexpected response format")
+    }
+}
+
+// Data classes are immutable - this would be a compile error:
+// p1.x = 5.0;  // Error: Cannot modify immutable field
+
+// But you can create new instances
+var p3 = Point(p1.x + 1.0, p1.y + 1.0);
+```
+
+#### Data Class Features
+- **Immutable by default**: All fields are `pub(read)` - readable but not writable after construction
+- **Final**: Cannot be inherited (automatically `final`)
+- **Region-safe**: Optimized for stack allocation and efficient copying
+- **Auto-generated methods**: Constructor, equality, hash, and toString methods
+- **Pattern matching optimized**: Efficient destructuring in match expressions
+- **Value semantics**: Copied by value, not reference
+- **Structural typing**: Works seamlessly with union types and Option types
+
+#### Visibility Rules
+- **Private by default**: All members are private unless explicitly marked
+- **`pub`**: Explicitly public, accessible from anywhere
+- **`prot`**: Protected, accessible from subclasses only
+- **`pub(read)`**: Read-only public access, write access is private
+- **`static`**: Class-level members, accessed via ClassName.member
+- **`abstract`**: Must be implemented in concrete subclasses
+- **`final`**: Cannot be inherited (classes) or overridden (methods)
+- **`data`**: Syntactic sugar for immutable, final, region-safe classes
+
+### 2. Enhanced Type System Integration
+
+#### Scanner and Parser Extensions
+
+```cpp
+// New tokens in frontend/scanner.hh
+enum class TokenType {
+    // ... existing tokens ...
+    PUB,        // pub
+    PROT,       // prot  
+    STATIC,     // static
+    ABSTRACT,   // abstract
+    FINAL,      // final
+    DATA,       // data
+    READ,       // read (for pub(read))
+    // ... existing tokens ...
+};
+```
+
+```cpp
+// Enhanced ClassDeclaration in frontend/ast.hh
+struct ClassDeclaration : public Statement {
+    std::string name;
+    std::vector<std::shared_ptr<VarDeclaration>> fields;
+    std::vector<std::shared_ptr<FunctionDeclaration>> methods;
+    
+    // Visibility and inheritance
+    std::string superClassName;
+    std::vector<std::shared_ptr<Expression>> superConstructorArgs;
+    std::vector<std::pair<std::string, std::shared_ptr<TypeAnnotation>>> constructorParams;
+    bool hasInlineConstructor = false;
+    
+    // New visibility features
+    bool isAbstract = false;
+    bool isFinal = false;
+    bool isDataClass = false;  // Data class flag
+    std::vector<std::string> interfaces;
+    
+    // Field and method visibility
+    std::map<std::string, VisibilityLevel> fieldVisibility;
+    std::map<std::string, VisibilityLevel> methodVisibility;
+    std::set<std::string> staticMembers;
+    std::set<std::string> abstractMethods;
+    std::set<std::string> finalMethods;
+    std::set<std::string> readOnlyFields;
+};
+
+enum class VisibilityLevel {
+    Private,    // Default
+    Protected,  // prot
+    Public,     // pub
+    ReadOnly    // pub(read)
+};
+
+// Data class declaration - syntactic sugar for immutable classes
+struct DataClassDeclaration : public Statement {
+    std::string name;
+    std::vector<std::shared_ptr<VarDeclaration>> fields;
+    
+    // Auto-generated methods (created during parsing)
+    std::shared_ptr<FunctionDeclaration> constructor;
+    std::shared_ptr<FunctionDeclaration> equalsMethod;
+    std::shared_ptr<FunctionDeclaration> hashMethod;
+    std::shared_ptr<FunctionDeclaration> toStringMethod;
+    
+    // Converts to equivalent ClassDeclaration during parsing
+    std::shared_ptr<ClassDeclaration> toClassDeclaration() const;
+};
+```
 
 #### Class Type Representation
 ```cpp
@@ -58,13 +309,26 @@ struct ClassType : public Type {
     std::vector<std::string> fieldNames;
     std::shared_ptr<ClassType> superClass;
     std::vector<std::shared_ptr<InterfaceType>> interfaces;
+    
+    // Visibility and access control
+    std::map<std::string, VisibilityLevel> fieldVisibility;
+    std::map<std::string, VisibilityLevel> methodVisibility;
+    std::set<std::string> staticMembers;
+    std::set<std::string> abstractMethods;
+    std::set<std::string> finalMethods;
+    std::set<std::string> readOnlyFields;
+    
+    // Class modifiers
     bool isErrorType = false;
     bool isAbstract = false;
+    bool isFinal = false;
+    bool isDataClass = false;  // Data class optimization flag
     
     // Integration methods
     bool canConvertTo(const Type& other) const override;
     bool isSubtypeOf(const ClassType& other) const;
     bool implementsInterface(const InterfaceType& interface) const;
+    bool canAccess(const std::string& member, const ClassType* accessingClass) const;
 };
 
 // Interface type for class contracts

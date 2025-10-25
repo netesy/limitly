@@ -330,6 +330,7 @@
   - Implement tail call optimization for recursive closures
   - Add closure escape analysis to optimize memory allocation
   - Implement function specialization for common parameter types
+  - Make sure all function tests are okay
   - _Requirements: 7.1, 7.2, 7.3_
   - **Priority**: LOW - Performance enhancement
 ## I
