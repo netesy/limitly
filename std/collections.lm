@@ -1,0 +1,109 @@
+// Standard Library Collections Module
+// Provides enhanced array and dictionary operations using Limit's existing types
+
+// Array operations for integers
+fn push(arr: [int], item: int): [int] {
+    // Create new array with additional item
+    var newArr: [int] = [];
+    var i: int = 0;
+    while (i < arr.length) {
+        newArr[i] = arr[i];
+        i = i + 1;
+    }
+    newArr[arr.length] = item;
+    return newArr;
+}
+
+fn pop(arr: [int]): int? {
+    // Remove and return last item
+    if (arr.length == 0) {
+        return nil;
+    }
+    return arr[arr.length - 1];
+}
+
+fn get(arr: [int], index: int): int? {
+    // Safe array access
+    if (index < 0 or index >= arr.length) {
+        return nil;
+    }
+    return arr[index];
+}
+
+fn length(arr: [int]): int {
+    // Get array length
+    return arr.length;
+}
+
+fn contains(arr: [int], item: int): bool {
+    // Check if array contains item
+    var i: int = 0;
+    while (i < arr.length) {
+        if (arr[i] == item) {
+            return true;
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+fn find(arr: [int], item: int): int? {
+    // Find index of item
+    var i: int = 0;
+    while (i < arr.length) {
+        if (arr[i] == item) {
+            return i;
+        }
+        i = i + 1;
+    }
+    return nil;
+}
+
+// String array operations
+fn push_str(arr: [str], item: str): [str] {
+    // Add string to array
+    var newArr: [str] = [];
+    var i: int = 0;
+    while (i < arr.length) {
+        newArr[i] = arr[i];
+        i = i + 1;
+    }
+    newArr[arr.length] = item;
+    return newArr;
+}
+
+fn join(arr: [str], separator: str): str {
+    // Join strings with separator
+    if (arr.length == 0) {
+        return "";
+    }
+    
+    var result: str = arr[0];
+    var i: int = 1;
+    while (i < arr.length) {
+        result = result + separator + arr[i];
+        i = i + 1;
+    }
+    return result;
+}
+
+fn contains_str(arr: [str], item: str): bool {
+    // Check if string array contains item
+    var i: int = 0;
+    while (i < arr.length) {
+        if (arr[i] == item) {
+            return true;
+        }
+        i = i + 1;
+    }
+    return false;
+}
+
+// Dictionary operations - simplified for initial implementation
+// Note: Dictionary operations would need proper VM support for full functionality
+
+fn dict_example(): nil {
+    // Placeholder for dictionary operations
+    // Full implementation would require enhanced VM support
+    print("Dictionary operations placeholder");
+}

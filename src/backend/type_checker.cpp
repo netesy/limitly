@@ -1758,6 +1758,9 @@ bool TypeChecker::isExhaustiveUnionMatch(TypePtr unionType, const std::vector<st
             if (std::holds_alternative<std::string>(literalExpr->value)) {
                 std::string literalValue = std::get<std::string>(literalExpr->value);
                 coveredTypeNames.insert(literalValue);
+            } else if (std::holds_alternative<std::nullptr_t>(literalExpr->value)) {
+                // This is a wildcard pattern represented as nil literal
+                hasWildcard = true;
             }
         } else if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(matchCase->pattern)) {
             // Variable patterns - check for wildcard or specific variant names
@@ -1935,6 +1938,11 @@ std::string TypeChecker::getMissingUnionVariants(TypePtr unionType, const std::v
                     coveredTypeTags.insert(resolvedType->tag);
                 }
             }
+        } else if (auto literalExpr = std::dynamic_pointer_cast<AST::LiteralExpr>(matchCase->pattern)) {
+            // Check for wildcard pattern represented as nil literal
+            if (std::holds_alternative<std::nullptr_t>(literalExpr->value)) {
+                hasWildcard = true;
+            }
         } else if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(matchCase->pattern)) {
             if (varExpr->name == "_") {
                 hasWildcard = true;
@@ -2016,6 +2024,11 @@ bool TypeChecker::isExhaustiveOptionMatch(const std::vector<std::shared_ptr<AST:
                 hasSomeCase = true;
             } else if (bindingPattern->typeName == "None") {
                 hasNoneCase = true;
+            }
+        } else if (auto literalExpr = std::dynamic_pointer_cast<AST::LiteralExpr>(matchCase->pattern)) {
+            // Check for wildcard pattern represented as nil literal
+            if (std::holds_alternative<std::nullptr_t>(literalExpr->value)) {
+                hasWildcard = true;
             }
         } else if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(matchCase->pattern)) {
             if (varExpr->name == "_") {

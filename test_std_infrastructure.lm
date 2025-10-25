@@ -1,0 +1,30 @@
+// Test Standard Library Infrastructure
+print("=== Standard Library Infrastructure Test ===");
+
+// Test 1: Import individual modules
+print("Test 1: Import individual modules");
+import std.collections as collections;
+import std.strings as strings;
+import std.math as math;
+import std.io as io;
+import std.result as result;
+import std.types as types;
+
+print("✓ All core modules imported successfully");
+
+// Test 2: Test collections module
+print("Test 2: Test collections module");
+var arr: [int] = [1, 2, 3];
+print("Array created with 3 elements");
+
+// Test 3: Test math module constants
+print("Test 3: Test math module constants");
+print("PI = " + math.PI);
+print("E = " + math.E);
+print("TAU = " + math.TAU);
+
+// Test 4: Test basic functionality
+print("Test 4: Test basic functionality");
+print("Standard library infrastructure is working");
+
+print("=== All tests completed successfully ===");

@@ -1,0 +1,138 @@
+// Standard Library Result Module
+// Provides utility functions for working with Option and Result types
+
+// Standard result types using existing union types
+type IntResult = IntOk | IntErr;
+type StrResult = StrOk | StrErr;
+type BoolResult = BoolOk | BoolErr;
+
+type IntOk = { value: int };
+type IntErr = { error: str };
+type StrOk = { value: str };
+type StrErr = { error: str };
+type BoolOk = { value: bool };
+type BoolErr = { error: str };
+
+// Option utility functions for integers
+fn some_int(value: int): int? {
+    // Create Some option with integer value
+    return value;
+}
+
+fn none_int(): int? {
+    // Create None option for integer
+    return nil;
+}
+
+fn is_some_int(option: int?): bool {
+    // Check if option is Some
+    if (option) {
+        return true;
+    }
+    return false;
+}
+
+fn is_none_int(option: int?): bool {
+    // Check if option is None
+    if (option) {
+        return false;
+    }
+    return true;
+}
+
+fn unwrap_or_int(option: int?, default: int): int {
+    // Return the value or the default
+    if (option) {
+        return option;
+    }
+    return default;
+}
+
+// Option utility functions for strings
+fn some_str(value: str): str? {
+    // Create Some option with string value
+    return value;
+}
+
+fn none_str(): str? {
+    // Create None option for string
+    return nil;
+}
+
+fn is_some_str(option: str?): bool {
+    // Check if option is Some
+    if (option) {
+        return true;
+    }
+    return false;
+}
+
+fn is_none_str(option: str?): bool {
+    // Check if option is None
+    if (option) {
+        return false;
+    }
+    return true;
+}
+
+fn unwrap_or_str(option: str?, default: str): str {
+    // Return the value or the default
+    if (option) {
+        return option;
+    }
+    return default;
+}
+
+// Result utility functions for integers
+fn ok_int(value: int): IntResult {
+    // Create Ok result with integer value
+    return IntOk { value: value };
+}
+
+fn err_int(error: str): IntResult {
+    // Create Error result with message
+    return IntErr { error: error };
+}
+
+fn is_ok_int(result: IntResult): bool {
+    // Check if result is Ok
+    match (result) {
+        IntOk => return true;
+        IntErr => return false;
+    }
+}
+
+fn is_err_int(result: IntResult): bool {
+    // Check if result is Error
+    match (result) {
+        IntOk => return false;
+        IntErr => return true;
+    }
+}
+
+// Result utility functions for strings
+fn ok_str(value: str): StrResult {
+    // Create Ok result with string value
+    return StrOk { value: value };
+}
+
+fn err_str(error: str): StrResult {
+    // Create Error result with message
+    return StrErr { error: error };
+}
+
+fn is_ok_str(result: StrResult): bool {
+    // Check if result is Ok
+    match (result) {
+        StrOk => return true;
+        StrErr => return false;
+    }
+}
+
+fn is_err_str(result: StrResult): bool {
+    // Check if result is Error
+    match (result) {
+        StrOk => return false;
+        StrErr => return true;
+    }
+}

@@ -747,6 +747,118 @@ match result {
 ```
 
 
+## 🧠 Memory Model
+
+Limitly uses a **region-based, deterministic memory model** designed for **low-level performance** without garbage collection.
+All allocation and cleanup are **fully deterministic** and **scope-bound**, but the language automatically manages this through **compiler inference**, not explicit user code.
+
+### Overview
+
+In Limitly, every block of code — whether a function, loop, or local scope — defines a **region**.
+A region owns all values created within it, and when that scope ends, the region and all its allocations are **destroyed automatically** in a predictable order.
+
+You never allocate or free memory manually.
+Instead, the compiler inserts the appropriate region operations behind the scenes.
+
+```limitly
+fn main() {
+    var message: str = "Hello Limitly!"
+    print(message)
+} // region ends here — memory for `message` is deterministically released
+```
+
+### How Regions Work
+
+* Each **lexical scope** (function, loop, or block) forms a **region**.
+* All variables created inside that scope belong to that region.
+* When the scope exits (normally or through error propagation), the region is destroyed.
+* Destruction is **deterministic** and happens in **reverse declaration order**.
+
+Nested scopes form **nested regions**, which are cleaned up hierarchically — the inner region is always destroyed before the outer one.
+
+```limitly
+fn compute() {
+    var data: str = "temporary"
+    {
+        var temp: str = data
+        print(temp)
+    } // `temp` destroyed here
+    print(data)
+} // `data` destroyed here
+```
+
+### Compiler-Inserted Memory Operations
+
+Limitly’s compiler internally uses `makeLinear` and `makeRef` to manage memory, but these are **not visible in user code**.
+They appear during AST lowering to mark ownership and reference semantics.
+
+* **Linear values** (created internally via `makeLinear`) have single ownership.
+  They must be consumed, moved, or destroyed once.
+* **References** (created internally via `makeRef`) are safe handles to linear values within the same or outer region.
+  They are invalidated automatically when their region ends.
+
+This allows the compiler to reason about lifetimes, avoid dangling references, and ensure every allocation is destroyed exactly once — all without runtime tracing.
+
+### Region Inference
+
+Regions are **implicit**.
+The compiler determines where regions begin and end based on lexical scope — you never need to write region code or think about region models directly.
+
+```limitly
+fn process() {
+    var buffer: str = "data"
+    print(buffer)
+} // compiler-inferred region ensures `buffer` is released here
+```
+
+Because the compiler handles region setup, Limitly behaves like a **manual-memory language with automatic discipline**:
+deterministic cleanup, but no runtime cost or garbage collection.
+
+### Deterministic Runtime
+
+Limitly’s runtime is **fully deterministic**.
+Since every region is tied to scope lifetime and cleaned up predictably, there’s no background thread, collector, or delayed deallocation queue.
+This makes it ideal for **systems programming**, **embedded**, and **real-time** environments where timing precision matters.
+
+The runtime is only a thin layer that orchestrates region destruction when the compiler marks a scope exit — it does not track allocations dynamically.
+
+### Region Safety and Error Propagation
+
+Error propagation integrates directly with the region system.
+When an error is propagated (`?`) or handled inline (`?else{}`), all active regions in that scope are cleaned up before control moves.
+
+This guarantees **no leaks** and **no invalid memory access** even in exceptional paths.
+
+```limitly
+fn open_file(path: str): File? {
+    var f: File = File.open(path) ?else {
+        print("Could not open file")
+        return None
+    }
+    return f
+} // if `open()` fails, region for `f` is cleaned up before returning
+```
+
+### Summary
+
+| Feature                         | Description                                          |
+| ------------------------------- | ---------------------------------------------------- |
+| **Region-based memory**         | Every scope is a deterministic memory region         |
+| **Compiler-managed lifetimes**  | No manual `makeRef` or `makeLinear` calls            |
+| **Linear and reference safety** | Ownership and borrowing are verified at compile time |
+| **No GC or tracing runtime**    | Cleanup is static and predictable                    |
+| **Error-safe regions**          | Errors trigger automatic region cleanup              |
+
+### Why It Matters
+
+This model gives Limitly **predictable performance** and **memory safety** while keeping the syntax clean and intuitive.
+It combines the control of C, the safety of Rust, and the simplicity of Swift — but with **no annotations, lifetimes, or garbage collector**.
+
+The result is a **deterministic, region-scoped runtime** that feels automatic yet remains fully transparent and suitable for **system-level** development.
+
+
+
+
 
 ### The `?` Operator
 

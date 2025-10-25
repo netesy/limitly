@@ -1,0 +1,116 @@
+// Standard Library I/O Module
+// Provides file and console I/O capabilities
+
+// Error types for I/O operations using union types
+type IOError = FileNotFound | PermissionDenied | DiskFull | NetworkError | UnknownError;
+
+type FileNotFound = { path: str };
+type PermissionDenied = { path: str, operation: str };
+type DiskFull = { path: str };
+type NetworkError = { message: str };
+type UnknownError = { message: str };
+
+// File operations
+fn read_file(path: str): str?IOError {
+    // Read entire file content
+    // Note: This would need proper implementation in the VM
+    // For now, return an error as placeholder
+    return FileNotFound { path: path };
+}
+
+fn write_file(path: str, content: str): nil?IOError {
+    // Write content to file, overwriting existing
+    return FileNotFound { path: path };
+}
+
+fn append_file(path: str, content: str): nil?IOError {
+    // Append content to file
+    return FileNotFound { path: path };
+}
+
+fn file_exists(path: str): bool {
+    // Check if file exists
+    // Note: This would need proper implementation
+    return false;
+}
+
+fn file_size(path: str): int?IOError {
+    // Get file size in bytes
+    return FileNotFound { path: path };
+}
+
+fn delete_file(path: str): nil?IOError {
+    // Delete file
+    return FileNotFound { path: path };
+}
+
+fn copy_file(source: str, destination: str): nil?IOError {
+    // Copy file from source to destination
+    return FileNotFound { path: source };
+}
+
+fn move_file(source: str, destination: str): nil?IOError {
+    // Move/rename file
+    return FileNotFound { path: source };
+}
+
+// Directory operations
+fn create_directory(path: str): nil?IOError {
+    // Create directory and parent directories
+    return PermissionDenied { path: path, operation: "create" };
+}
+
+fn list_directory(path: str): [str]?IOError {
+    // List directory contents
+    return FileNotFound { path: path };
+}
+
+fn directory_exists(path: str): bool {
+    // Check if directory exists
+    return false;
+}
+
+// Console I/O
+fn read_line(): str?IOError {
+    // Read line from console input
+    // Note: This would need proper implementation
+    return UnknownError { message: "Console input not implemented" };
+}
+
+fn print_line(message: str): nil {
+    // Print message with newline
+    print(message);
+}
+
+fn print_no_newline(message: str): nil {
+    // Print message without newline
+    // Note: This would need a different print implementation
+    print(message);
+}
+
+// Stream-based I/O
+type FileStream = {
+    path: str,
+    mode: str, // "read", "write", "append"
+    position: int
+};
+
+fn open_file(path: str, mode: str): FileStream?IOError {
+    // Open file stream
+    return FileNotFound { path: path };
+}
+
+fn read_from_stream(self: FileStream, bytes: int): str?IOError {
+    // Read specified number of bytes
+    return UnknownError { message: "Stream reading not implemented" };
+}
+
+fn write_to_stream(self: FileStream, data: str): nil?IOError {
+    // Write data to stream
+    return UnknownError { message: "Stream writing not implemented" };
+}
+
+fn close_stream(self: FileStream): nil?IOError {
+    // Close stream and flush buffers
+    return nil;
+}
