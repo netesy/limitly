@@ -1382,8 +1382,12 @@ void BytecodeGenerator::visitCallExpr(const std::shared_ptr<AST::CallExpr>& expr
         // The VM will handle the call.
         emit(Opcode::GET_PROPERTY, expr->line, 0, 0.0f, false, memberExpr->name);
         
-        // Now, we have the function on the stack, so we just need to call it.
-        // The arguments are already on the stack.
+        // Now evaluate and push the arguments onto the stack
+        for (const auto& arg : expr->arguments) {
+            visitExpression(arg);
+        }
+        
+        // Now, we have the function and arguments on the stack, so we can call it.
         // We need to tell the call instruction to not look for a function by name.
         // We can do this by passing an empty function name.
         emit(Opcode::CALL, expr->line, static_cast<int32_t>(expr->arguments.size()), 0.0f, false, "");

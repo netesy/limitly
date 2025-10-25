@@ -1,0 +1,111 @@
+// Basic Type Tests
+// Tests fundamental type system features: type aliases, primitive types, basic declarations
+
+print("=== Basic Type Tests ===");
+
+// Test 1: Basic type aliases for primitive types
+print("\n--- Test 1: Basic Type Aliases ---");
+type Id = uint;
+type Name = str;
+type Age = int;
+type Score = float;
+type IsActive = bool;
+
+var userId: Id = 12345;
+var userName: Name = "Alice";
+var userAge: Age = 25;
+var userScore: Score = 95.5;
+var isUserActive: IsActive = true;
+
+print("User ID: {userId}");
+print("User Name: {userName}");
+print("User Age: {userAge}");
+print("User Score: {userScore}");
+print("Is Active: {isUserActive}");
+
+// Test 2: All primitive type aliases
+print("\n--- Test 2: Primitive Type Aliases ---");
+type MyInt = int;
+type MyUInt = uint;
+type MyFloat = float;
+type MyStr = str;
+type MyBool = bool;
+
+var intVal: MyInt = 42;
+var uintVal: MyUInt = 100;
+var strVal: MyStr = "hello";
+var boolVal: MyBool = true;
+var floatVal: MyFloat = 3.14;
+
+print("Int: {intVal}");
+print("UInt: {uintVal}");
+print("String: {strVal}");
+print("Bool: {boolVal}");
+print("Float: {floatVal}");
+
+// Test 3: Type alias compatibility
+print("\n--- Test 3: Type Alias Compatibility ---");
+type UserId = int;
+type ProductId = int;
+
+var user: UserId = 1001;
+var product: ProductId = 2002;
+
+print("User ID: {user}");
+print("Product ID: {product}");
+
+// Test 4: Type aliases in function signatures
+print("\n--- Test 4: Type Aliases in Functions ---");
+type Distance = float;
+type Time = float;
+type Speed = float;
+
+fn calculateSpeed(distance: Distance, time: Time): Speed {
+    if (time > 0.0) {
+        return distance / time;
+    } else {
+        return 0.0;
+    }
+}
+
+var dist: Distance = 100.0;
+var duration: Time = 2.0;
+var velocity: Speed = calculateSpeed(dist, duration);
+
+print("Distance: {dist}");
+print("Time: {duration}");
+print("Speed: {velocity}");
+
+// Test 5: Nested type usage
+print("\n--- Test 5: Nested Type Usage ---");
+type FirstName = str;
+type LastName = str;
+type FullName = str;
+
+fn createFullName(first: FirstName, last: LastName): FullName {
+    return first + " " + last;
+}
+
+var firstName: FirstName = "John";
+var lastName: LastName = "Doe";
+var fullName: FullName = createFullName(firstName, lastName);
+
+print("First Name: {firstName}");
+print("Last Name: {lastName}");
+print("Full Name: {fullName}");
+
+// Test 6: Type aliases with different scopes
+print("\n--- Test 6: Type Alias Scopes ---");
+type GlobalType = int;
+
+{
+    var globalVar: GlobalType = 999;
+    var localVar: str = "local";
+    print("Global in local scope: {globalVar}");
+    print("Local variable: {localVar}");
+}
+
+var anotherGlobal: GlobalType = 888;
+print("Another global: {anotherGlobal}");
+
+print("\n=== Basic Type Tests Complete ===");

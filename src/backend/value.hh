@@ -1023,6 +1023,10 @@ struct Value {
         // Constructor for ObjectInstancePtr
         Value(TypePtr t, const ObjectInstancePtr& obj) : type(std::move(t)), data(obj) {
         }
+        
+        // Constructor for ClassDefinition
+        Value(TypePtr t, const std::shared_ptr<backend::ClassDefinition>& classDef) : type(std::move(t)), data(classDef) {
+        }
 
         // Constructor for UserDefinedFunction
         Value(TypePtr t, const std::shared_ptr<backend::UserDefinedFunction>& func) : type(std::move(t)), data(func) {}

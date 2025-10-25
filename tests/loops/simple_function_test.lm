@@ -1,8 +1,0 @@
-print("=== Simple Function Test ===");
-
-fn test_function(x) {
-    print("Function called with: {x}");
-}
-
-test_function(42);
-print("=== Test completed ===");

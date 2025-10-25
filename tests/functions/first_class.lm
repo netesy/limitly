@@ -1,0 +1,147 @@
+// First-Class Function Tests
+// Tests functions as first-class values: function parameters, return values, variables
+
+print(" === First - Class Function Tests === ");
+
+// Test 1: Functions as variables
+print("\n --- Test 1: Functions as Variables --- ");
+fn add(a: int, b: int): int {
+    return a + b;
+}
+
+fn multiply(a: int, b: int): int {
+    return a * b;
+}
+
+// Store functions in variables
+var addFunc = add;
+var multFunc = multiply;
+
+var result1 = addFunc(3, 4);
+var result2 = multFunc(3, 4);
+print("addFunc(3, 4) = {result1}");
+print("multFunc(3, 4) = {result2}");
+
+// Test 2: Functions as parameters
+print("\n --- Test 2: Functions as Parameters --- ");
+fn applyOperation(x: int, y: int, operation: fn(int, int): int): int {
+    return operation(x, y);
+}
+
+var opResult1 = applyOperation(6, 7, add);
+var opResult2 = applyOperation(6, 7, multiply);
+print("applyOperation(6, 7, add) = {opResult1}");
+print("applyOperation(6, 7, multiply) = {opResult2}");
+
+// Test 3: Functions returning functions
+print("\n --- Test 3: Functions Returning Functions --- ");
+fn createAdder(increment: int): fn(int): int {
+    return fn(value: int): int {
+        return value + increment;
+        };
+    }
+
+    var addFive = createAdder(5);
+    var addTen = createAdder(10);
+
+    var add5_result = addFive(3);
+    var add10_result = addTen(7);
+    print("addFive(3) = {add5_result}");
+    print("addTen(7) = {add10_result}");
+
+    // Test 4: Lambda expressions
+    print("\n --- Test 4: Lambda Expressions --- ");
+    var doubler = fn(x: int): int {
+        return x * 2;
+    };
+
+    var tripler = fn(x: int): int {
+        return x * 3;
+    };
+
+    var double_result = doubler(5);
+    var triple_result = tripler(5);
+    print("doubler(5) = {double_result}");
+    print("tripler(5) = {triple_result}");
+
+    // Test 5: Higher-order function composition
+    print("\n --- Test 5: Function Composition --- ");
+    fn compose(f: fn(int): int, g: fn(int): int): fn(int): int {
+        return fn(x: int): int {
+            return f(g(x));
+            };
+        }
+
+        fn increment(x: int): int {
+            return x + 1;
+        }
+
+        fn square(x: int): int {
+            return x * x;
+        }
+
+        var squareThenIncrement = compose(increment, square);
+        var incrementThenSquare = compose(square, increment);
+
+        var comp1 = squareThenIncrement(4);
+        var comp2 = incrementThenSquare(4);
+        print("squareThenIncrement(4) = {comp1}");
+        print("incrementThenSquare(4) = {comp2}");
+
+        // Test 6: Function arrays simulation
+        print("\n --- Test 6: Function Collections --- ");
+        fn createFunctionSet(): (fn(int): int, fn(int): int, fn(int): int) {
+            var f1 = fn(x: int): int { return x + 1;};
+            var f2 = fn(x: int): int { return x * 2;};
+            var f3 = fn(x: int): int { return x * x;};
+            return (f1, f2, f3);
+        }
+
+        var (func1, func2, func3) = createFunctionSet();
+        var f1_result = func1(5);
+        var f2_result = func2(5);
+        var f3_result = func3(5);
+        print("func1(5) = {f1_result}");
+        print("func2(5) = {f2_result}");
+        print("func3(5) = {f3_result}");
+
+        // Test 7: Conditional function selection
+        print("\n --- Test 7: Conditional Function Selection --- ");
+        fn selectOperation(useAdd: bool): fn(int, int): int {
+            if (useAdd) {
+                return fn(a: int, b: int): int {
+                    return a + b;
+                    };
+                    } else {
+                        return fn(a: int, b: int): int {
+                            return a * b;
+                            };
+                            }
+                        }
+
+                        var addOp = selectOperation(true);
+                        var multOp = selectOperation(false);
+
+                        var sel1 = addOp(3, 4);
+                        var sel2 = multOp(3, 4);
+                        print("addOp(3, 4) = {sel1}");
+                        print("multOp(3, 4) = {sel2}");
+
+                        // Test 8: Function factory with parameters
+                        print("\n --- Test 8: Function Factory --- ");
+                        fn createProcessor(prefix: str, multiplier: int): fn(int): str {
+                            return fn(value: int): str {
+                                var result = value * multiplier;
+                                return "{prefix}: {result}";
+                                };
+                            }
+
+                            var processor1 = createProcessor("Result", 2);
+                            var processor2 = createProcessor("Value", 5);
+
+                            var proc1_result = processor1(10);
+                            var proc2_result = processor2(3);
+                            print(proc1_result);
+                            print(proc2_result);
+
+                            print("\n === First - Class Function Tests Complete === ");

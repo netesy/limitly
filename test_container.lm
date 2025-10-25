@@ -1,1 +1,0 @@
-type DictTest = {str: int};

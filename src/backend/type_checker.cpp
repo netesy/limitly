@@ -528,6 +528,8 @@ void TypeChecker::checkStatement(const std::shared_ptr<AST::Statement>& stmt) {
                         "expression of type " + currentFunction->returnType->toString());
             }
         }
+    } else if (auto classDecl = std::dynamic_pointer_cast<AST::ClassDeclaration>(stmt)) {
+        checkClassDeclaration(classDecl);
     } else if (auto contractStmt = std::dynamic_pointer_cast<AST::ContractStatement>(stmt)) {
         checkContractStatement(contractStmt);
     }
@@ -2040,3 +2042,49 @@ bool TypeChecker::isExhaustiveOptionMatch(const std::vector<std::shared_ptr<AST:
     return (hasSomeCase && hasNoneCase) || hasWildcard;
 }
 
+
+void TypeChecker::checkClassDeclaration(const std::shared_ptr<AST::ClassDeclaration>& classDecl) {
+    // Register the class name as a callable constructor function
+    // This allows the class name to be used as a function call for creating instances
+    
+    // Create a function signature for the class constructor
+    FunctionSignature constructorSignature;
+    constructorSignature.name = classDecl->name;
+    constructorSignature.returnType = typeSystem.OBJECT_TYPE; // Classes return object instances
+    
+    // Check if the class has an 'init' method to determine constructor parameters
+    for (const auto& method : classDecl->methods) {
+        if (method->name == "init") {
+            // Use the init method's parameters as constructor parameters
+            for (const auto& param : method->params) {
+                TypePtr paramType = typeSystem.ANY_TYPE;
+                if (param.second) {
+                    paramType = resolveTypeAnnotation(param.second);
+                }
+                constructorSignature.paramTypes.push_back(paramType);
+                constructorSignature.optionalParams.push_back(false); // Regular parameters
+                constructorSignature.hasDefaultValues.push_back(false);
+            }
+            
+            // Handle optional parameters
+            for (const auto& optParam : method->optionalParams) {
+                TypePtr paramType = typeSystem.ANY_TYPE;
+                if (optParam.second.first) {
+                    paramType = resolveTypeAnnotation(optParam.second.first);
+                }
+                constructorSignature.paramTypes.push_back(paramType);
+                constructorSignature.optionalParams.push_back(true); // Optional parameters
+                constructorSignature.hasDefaultValues.push_back(optParam.second.second != nullptr);
+            }
+            break;
+        }
+    }
+    
+    // Register the constructor signature in the current scope
+    currentScope->functions[classDecl->name] = constructorSignature;
+    
+    // Type check all methods in the class
+    for (const auto& method : classDecl->methods) {
+        checkFunctionDeclaration(method);
+    }
+}

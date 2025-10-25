@@ -1,0 +1,112 @@
+// Advanced Function Tests
+// Tests advanced function features: optional parameters, default values, complex signatures
+
+print("=== Advanced Function Tests ===");
+
+// Test 1: Optional parameters
+print("\n--- Test 1: Optional Parameters ---");
+fn greetOptional(name: str?) {
+    if (name) {
+        print("Hello, {name}!");
+    } else {
+        print("Hello, stranger!");
+    }
+}
+
+greetOptional("Charlie");
+greetOptional();
+
+// Test 2: Default parameters
+print("\n--- Test 2: Default Parameters ---");
+fn greetWithDefault(name: str = "World") {
+    print("Hello, {name}!");
+}
+
+greetWithDefault();
+greetWithDefault("Alice");
+
+// Test 3: Multiple optional parameters
+print("\n--- Test 3: Multiple Optional Parameters ---");
+fn createUser(name: str, age: int = 18, active: bool = true) {
+    print("User: {name}, Age: {age}, Active: {active}");
+}
+
+createUser("Bob");
+createUser("Charlie", 25);
+createUser("Diana", 30, false);
+
+// Test 4: Optional math parameters
+print("\n--- Test 4: Optional Math Parameters ---");
+fn power(base: int, exponent: int = 2): int {
+    var result = 1;
+    iter (i in 1..exponent) {
+        result = result * base;
+    }
+    return result;
+}
+
+var power1 = power(3);
+var power2 = power(3, 4);
+print("power(3) = {power1}");
+print("power(3, 4) = {power2}");
+
+// Test 5: Complex function signatures
+print("\n--- Test 5: Complex Signatures ---");
+fn processData(data: str, transform: bool = false, multiplier: int = 1): str {
+    var result = data;
+    if (transform) {
+        result = "TRANSFORMED: " + result;
+    }
+    if (multiplier > 1) {
+        var temp = result;
+        iter (i in 2..multiplier) {
+            result = result + " " + temp;
+        }
+    }
+    return result;
+}
+
+var proc1 = processData("test");
+var proc2 = processData("test", true);
+var proc3 = processData("test", false, 2);
+print("processData('test') = {proc1}");
+print("processData('test', true) = {proc2}");
+print("processData('test', false, 2) = {proc3}");
+
+// Test 6: Function overloading simulation
+print("\n--- Test 6: Function Variants ---");
+fn formatNumber(n: int): str {
+    return "Number: {n}";
+}
+
+fn formatFloat(f: float): str {
+    return "Float: {f}";
+}
+
+fn formatBool(b: bool): str {
+    return "Boolean: {b}";
+}
+
+var fmt1 = formatNumber(42);
+var fmt2 = formatFloat(3.14);
+var fmt3 = formatBool(true);
+print(fmt1);
+print(fmt2);
+print(fmt3);
+
+// Test 7: Nested function calls
+print("\n--- Test 7: Nested Function Calls ---");
+fn double(x: int): int {
+    return x * 2;
+}
+
+fn addOne(x: int): int {
+    return x + 1;
+}
+
+var nested1 = double(addOne(5));
+var nested2 = addOne(double(5));
+print("double(addOne(5)) = {nested1}");
+print("addOne(double(5)) = {nested2}");
+
+print("\n=== Advanced Function Tests Complete ===");

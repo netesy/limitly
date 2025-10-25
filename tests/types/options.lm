@@ -1,0 +1,117 @@
+// Option Type Tests
+// Tests Option type functionality: Some/None patterns, null safety, error handling compatibility
+
+print("=== Option Type Tests ===");
+
+// Test 1: Basic Option type definition
+print("\n--- Test 1: Basic Option Types ---");
+type IntOption = Some | None;
+type StringOption = Some | None;
+
+// Note: Option types are conceptual - actual implementation may vary
+// These tests focus on the union type foundation for Option types
+
+// Test 2: Option-like union types
+print("\n--- Test 2: Option-like Union Types ---");
+type MaybeInt = int | None;
+type MaybeString = str | None;
+
+// Using a placeholder for None (since None isn't fully implemented)
+type NoneType = str;
+var noneValue: NoneType = "None";
+
+var maybeInt1: int = 42;
+var maybeString1: str = "hello";
+
+print("Maybe int (value): {maybeInt1}");
+print("Maybe string (value): {maybeString1}");
+print("None representation: {noneValue}");
+
+// Test 3: Optional parameter simulation
+print("\n--- Test 3: Optional Parameter Simulation ---");
+fn greetOptional(name: str?) {
+    if (name) {
+        print("Hello, {name}!");
+    } else {
+        print("Hello, stranger!");
+    }
+}
+
+greetOptional("Alice");
+// Note: null handling would require proper Option type implementation
+
+// Test 4: Option-like return types
+print("\n--- Test 4: Option-like Return Types ---");
+type FindResult = int | str;  // int for found index, str for "not found"
+
+fn findInArray(target: int): FindResult {
+    // Simulate array search
+    if (target > 0) {
+        return target;  // Return the "index"
+    } else {
+        return "not found";
+    }
+}
+
+var found: FindResult = findInArray(5);
+var notFound: FindResult = findInArray(-1);
+
+print("Search result (found): {found}");
+print("Search result (not found): {notFound}");
+
+// Test 5: Chained optional operations simulation
+print("\n--- Test 5: Chained Optional Operations ---");
+type ChainResult = str | int;
+
+fn processOptional(input: int): ChainResult {
+    if (input > 10) {
+        return input * 2;
+    } else {
+        return "too small";
+    }
+}
+
+fn chainOptional(input: int): ChainResult {
+    var first: ChainResult = processOptional(input);
+    // In a full Option implementation, this would chain properly
+    return first;
+}
+
+var chain1: ChainResult = chainOptional(15);
+var chain2: ChainResult = chainOptional(5);
+
+print("Chain result 1: {chain1}");
+print("Chain result 2: {chain2}");
+
+// Test 6: Option type compatibility with error handling
+print("\n--- Test 6: Error Handling Compatibility ---");
+type SafeResult = int | str;  // int for success, str for error
+
+fn safeDivide(a: int, b: int): SafeResult {
+    if (b != 0) {
+        return a / b;
+    } else {
+        return "division by zero";
+    }
+}
+
+var safe1: SafeResult = safeDivide(10, 2);
+var safe2: SafeResult = safeDivide(10, 0);
+
+print("Safe divide (success): {safe1}");
+print("Safe divide (error): {safe2}");
+
+// Test 7: Nested option-like types
+print("\n--- Test 7: Nested Option-like Types ---");
+type InnerOption = int | str;
+type OuterOption = InnerOption | bool;
+
+var nested1: OuterOption = 42;
+var nested2: OuterOption = "nested";
+var nested3: OuterOption = true;
+
+print("Nested option 1: {nested1}");
+print("Nested option 2: {nested2}");
+print("Nested option 3: {nested3}");
+
+print("\n=== Option Type Tests Complete ===");

@@ -2,6 +2,9 @@
 #include <stdexcept>
 #include <sstream>
 
+// Forward declare VM to avoid circular dependency
+class VM;
+
 namespace backend {
 
 // ClassDefinition implementation
@@ -240,6 +243,8 @@ ValuePtr ClassMethodImplementation::execute(const std::vector<ValuePtr>& args) {
     // For now, return null
     return std::make_shared<Value>(nullptr);
 }
+
+
 
 // ConstructorImplementation
 ConstructorImplementation::ConstructorImplementation(

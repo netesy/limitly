@@ -1,7 +1,0 @@
-fn test(name: str?) {
-    if (name) {
-        print("Has name");
-    }
-}
-
-test("hello");

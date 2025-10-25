@@ -1,3 +1,0 @@
-// This should cause an error
-var x = undefined_variable;
-print("This should not print");
