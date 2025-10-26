@@ -1,0 +1,76 @@
+// Test module-level visibility modifiers
+
+// Module-level variables with different visibility
+pub var publicVar: str = "accessible from other modules";
+prot var protectedVar: int = 42;
+const var constVar: float = 3.14159;
+static var staticVar: bool = true;
+var privateVar: str = "only accessible within this module";
+
+// Module-level functions with different visibility
+pub fn publicFunction(): str {
+    return "public function result";
+}
+
+prot fn protectedFunction(x: int): int {
+    return x * 2;
+}
+
+static fn staticFunction(): str {
+    return "static function result";
+}
+
+abstract fn abstractFunction(): bool;
+
+final fn finalFunction() {
+    print("This function cannot be overridden");
+}
+
+fn privateFunction() {
+    print("This is a private function");
+}
+
+// Classes with member visibility
+class TestClass {
+    pub name: str = "test";
+    prot internal: int = 100;
+    const id: int = 1;
+    static count: int = 0;
+    privateData: str = "private";
+
+    pub fn getName(): str {
+        return self.name;
+        }
+
+        prot fn getInternal(): int {
+            return self.internal;
+            }
+
+            static fn getCount(): int {
+                return TestClass.count;
+                }
+
+                abstract fn abstractMethod();
+
+                final fn finalMethod() {
+                    print("Final method");
+                    }
+
+                    fn privateMethod() {
+                        print("Private method");
+                        }
+                        }
+
+                        abstract class AbstractBase {
+                            pub name: str = "base";
+                            abstract fn process(): int;
+                            }
+
+                            final class FinalClass {
+                                const value: int = 42;
+                                }
+
+                                data class DataClass {
+                                    x: int;
+                                    y: int;
+                                    }

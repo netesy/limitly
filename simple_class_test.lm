@@ -1,0 +1,5 @@
+class Simple {
+    pub name: str = "test";
+}
+
+print("Simple class test complete");

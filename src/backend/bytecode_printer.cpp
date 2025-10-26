@@ -88,12 +88,6 @@ std::string BytecodePrinter::opcodeToString(Opcode opcode) {
         case Opcode::END_PARALLEL: return "END_PARALLEL";
         case Opcode::BEGIN_CONCURRENT: return "BEGIN_CONCURRENT";
         case Opcode::END_CONCURRENT: return "END_CONCURRENT";
-        case Opcode::BEGIN_TRY: return "BEGIN_TRY";
-        case Opcode::END_TRY: return "END_TRY";
-        case Opcode::BEGIN_HANDLER: return "BEGIN_HANDLER";
-        case Opcode::END_HANDLER: return "END_HANDLER";
-        case Opcode::THROW: return "THROW";
-        case Opcode::STORE_EXCEPTION: return "STORE_EXCEPTION";
         case Opcode::AWAIT: return "AWAIT";
         case Opcode::IMPORT_MODULE: return "IMPORT_MODULE";
         case Opcode::IMPORT_ALIAS: return "IMPORT_ALIAS";

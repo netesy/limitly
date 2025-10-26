@@ -149,8 +149,6 @@ void BytecodeGenerator::visitStatement(const std::shared_ptr<AST::Statement>& st
         visitPrintStatement(printStmt);
     } else if (auto exprStmt = std::dynamic_pointer_cast<AST::ExprStatement>(stmt)) {
         visitExprStatement(exprStmt);
-    } else if (auto attemptStmt = std::dynamic_pointer_cast<AST::AttemptStatement>(stmt)) {
-        visitAttemptStatement(attemptStmt);
     } else if (auto parallelStmt = std::dynamic_pointer_cast<AST::ParallelStatement>(stmt)) {
         visitParallelStatement(parallelStmt);
     } else if (auto concurrentStmt = std::dynamic_pointer_cast<AST::ConcurrentStatement>(stmt)) {
@@ -288,11 +286,13 @@ void BytecodeGenerator::visitVarDeclaration(const std::shared_ptr<AST::VarDeclar
     }
     
     // If the declared type is 'atomic' emit DEFINE_ATOMIC so the VM can create
-    // an atomic wrapper. Otherwise store the value normally.
+    // an atomic wrapper. Otherwise store the value with visibility information.
     if (stmt->type && *stmt->type && (*stmt->type)->typeName == "atomic") {
         emit(Opcode::DEFINE_ATOMIC, stmt->line, 0, 0.0f, false, stmt->name);
     } else {
-        emit(Opcode::STORE_VAR, stmt->line, 0, 0.0f, false, stmt->name);
+        // Store variable with visibility information in intValue field
+        int visibilityInt = static_cast<int>(stmt->visibility);
+        emit(Opcode::STORE_VAR, stmt->line, visibilityInt, 0.0f, false, stmt->name);
     }
 }
 
@@ -351,24 +351,45 @@ void BytecodeGenerator::visitFunctionDeclaration(const std::shared_ptr<AST::Func
         }
     }
     
-    // Process function body
-    visitBlockStatement(stmt->body);
-    
-    // If function doesn't end with an explicit return, add implicit nil return
-    // This ensures all functions return a value
-    emit(Opcode::PUSH_NULL, stmt->line);
-    emit(Opcode::RETURN, stmt->line);
+    // Process function body (if it exists - abstract methods don't have bodies)
+    if (stmt->body) {
+        visitBlockStatement(stmt->body);
+        
+        // If function doesn't end with an explicit return, add implicit nil return
+        // This ensures all functions return a value
+        emit(Opcode::PUSH_NULL, stmt->line);
+        emit(Opcode::RETURN, stmt->line);
+    } else {
+        // Abstract method - no body to generate
+        // Return an error value if called
+        emit(Opcode::PUSH_STRING, stmt->line, 0, 0.0f, false, "Abstract method '" + stmt->name + "' called");
+        emit(Opcode::CONSTRUCT_ERROR, stmt->line);
+        emit(Opcode::RETURN, stmt->line);
+    }
     
     // End function definition
     emit(Opcode::END_FUNCTION, stmt->line);
 
-    // Define a variable for the function
-    emit(Opcode::PUSH_FUNCTION, stmt->line, 0, 0.0f, false, stmt->name);
-    emit(Opcode::STORE_VAR, stmt->line, 0, 0.0f, false, stmt->name);
+    // Define a variable for the function with visibility information
+    int visibilityInt = static_cast<int>(stmt->visibility);
+    emit(Opcode::PUSH_FUNCTION, stmt->line, visibilityInt, 0.0f, false, stmt->name);
+    
+    // Only store as variable if this is not a class method
+    // Class methods are handled by the VM during class definition
+    if (!isInsideClassDefinition()) {
+        emit(Opcode::STORE_VAR, stmt->line, visibilityInt, 0.0f, false, stmt->name);
+    } else {
+        // For class methods, just pop the function from the stack since it's already registered
+        emit(Opcode::POP, stmt->line);
+    }
 }
 
 void BytecodeGenerator::visitClassDeclaration(const std::shared_ptr<AST::ClassDeclaration>& stmt) {
     // Generate bytecode for class declaration
+    
+    // Track that we're inside a class definition
+    insideClassDefinition = true;
+    currentClassBeingDefined = stmt->name;
     
     // Start class definition
     emit(Opcode::BEGIN_CLASS, stmt->line, 0, 0.0f, false, stmt->name);
@@ -385,7 +406,16 @@ void BytecodeGenerator::visitClassDeclaration(const std::shared_ptr<AST::ClassDe
         } else {
             emit(Opcode::PUSH_NULL, field->line);
         }
-        emit(Opcode::DEFINE_FIELD, field->line, 0, 0.0f, false, field->name);
+        
+        // Get field visibility from the class declaration
+        AST::VisibilityLevel fieldVisibility = AST::VisibilityLevel::Private; // Default
+        auto visIt = stmt->fieldVisibility.find(field->name);
+        if (visIt != stmt->fieldVisibility.end()) {
+            fieldVisibility = visIt->second;
+        }
+        
+        int visibilityInt = static_cast<int>(fieldVisibility);
+        emit(Opcode::DEFINE_FIELD, field->line, visibilityInt, 0.0f, false, field->name);
     }
     
     // Generate constructor if this is a derived class
@@ -404,13 +434,23 @@ void BytecodeGenerator::visitClassDeclaration(const std::shared_ptr<AST::ClassDe
         emit(Opcode::END_FUNCTION, stmt->line);
     }
     
-    // Process methods
+    // Process methods with visibility information
     for (const auto& method : stmt->methods) {
+        // Get method visibility from the class declaration
+        AST::VisibilityLevel methodVisibility = method->visibility; // Methods have visibility in AST
+        
+        // Set the method visibility in the AST node before processing
+        method->visibility = methodVisibility;
+        
         visitFunctionDeclaration(method);
     }
     
     // End class definition
     emit(Opcode::END_CLASS, stmt->line);
+    
+    // Reset class definition tracking
+    insideClassDefinition = false;
+    currentClassBeingDefined.clear();
 }
 
 void BytecodeGenerator::visitBlockStatement(const std::shared_ptr<AST::BlockStatement>& stmt) {
@@ -671,44 +711,6 @@ void BytecodeGenerator::visitExprStatement(const std::shared_ptr<AST::ExprStatem
     
     // Discard the result
     emit(Opcode::POP, stmt->line);
-}
-
-void BytecodeGenerator::visitAttemptStatement(const std::shared_ptr<AST::AttemptStatement>& stmt) {
-    // Generate bytecode for attempt-handle statement
-    
-    // Start try block
-    emit(Opcode::BEGIN_TRY, stmt->line);
-    
-    // Process try block
-    visitBlockStatement(stmt->tryBlock);
-    
-    // Jump over handlers if no exception
-    size_t jumpOverHandlersIndex = bytecode.size();
-    emit(Opcode::JUMP, stmt->line);
-    
-    // Process handlers
-    for (const auto& handler : stmt->handlers) {
-        // Start handler
-        emit(Opcode::BEGIN_HANDLER, stmt->line, 0, 0.0f, false, handler.errorType);
-        
-        // Store error in variable if specified
-        if (!handler.errorVar.empty()) {
-            emit(Opcode::STORE_EXCEPTION, stmt->line, 0, 0.0f, false, handler.errorVar);
-        }
-        
-        // Process handler body
-        visitBlockStatement(handler.body);
-        
-        // End handler
-        emit(Opcode::END_HANDLER, stmt->line);
-    }
-    
-    // Update jump over handlers instruction
-    size_t endIndex = bytecode.size();
-    bytecode[jumpOverHandlersIndex].intValue = static_cast<int32_t>(endIndex - jumpOverHandlersIndex - 1);
-    
-    // End try block
-    emit(Opcode::END_TRY, stmt->line);
 }
 
 void BytecodeGenerator::visitTaskStatement(const std::shared_ptr<AST::TaskStatement>& stmt) {

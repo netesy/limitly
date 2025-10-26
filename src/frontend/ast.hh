@@ -7,6 +7,8 @@
 #include <variant>
 #include <optional>
 #include <unordered_map>
+#include <map>
+#include <set>
 #include <sstream>
 #include <algorithm>
 #include "scanner.hh"
@@ -52,7 +54,6 @@ namespace AST {
     struct BreakStatement;
     struct ContinueStatement;
     struct PrintStatement;
-    struct AttemptStatement;
     struct HandleClause;
     struct ParallelStatement;
     struct ConcurrentStatement;
@@ -93,6 +94,14 @@ namespace AST {
 
 // AST Node definitions
 namespace AST {
+    // Visibility levels for module-level declarations and class members
+    enum class VisibilityLevel {
+        Private,    // Default - no keyword
+        Protected,  // prot
+        Public,     // pub
+        Const       // const (read-only public)
+    };
+
     // Base node type
     struct Node {
         int line;
@@ -343,6 +352,10 @@ namespace AST {
         std::string name;
         std::optional<std::shared_ptr<TypeAnnotation>> type;
         std::shared_ptr<Expression> initializer;
+        
+        // Module-level visibility (for module-level variables)
+        VisibilityLevel visibility = VisibilityLevel::Private;  // Default to private
+        bool isStatic = false;                                  // For static variables
     };
 
     // Destructuring assignment (e.g., var (x, y, z) = tuple)
@@ -365,6 +378,12 @@ namespace AST {
         // Error type annotations for function signature
         bool canFail = false;                                    // Whether function can return errors
         std::vector<std::string> declaredErrorTypes;             // Specific error types function can return
+        
+        // Module-level visibility (for module-level functions)
+        VisibilityLevel visibility = VisibilityLevel::Private;  // Default to private
+        bool isStatic = false;                                  // For static functions
+        bool isAbstract = false;                                // For abstract functions
+        bool isFinal = false;                                   // For final functions
     };
 
     // Async function declaration
@@ -398,6 +417,20 @@ namespace AST {
         // Inline constructor support
         std::vector<std::pair<std::string, std::shared_ptr<TypeAnnotation>>> constructorParams;  // Constructor parameters
         bool hasInlineConstructor = false;
+        
+        // Visibility and modifiers
+        bool isAbstract = false;
+        bool isFinal = false;
+        bool isDataClass = false;
+        std::vector<std::string> interfaces;
+        
+        // Field and method visibility
+        std::map<std::string, VisibilityLevel> fieldVisibility;
+        std::map<std::string, VisibilityLevel> methodVisibility;
+        std::set<std::string> staticMembers;
+        std::set<std::string> abstractMethods;
+        std::set<std::string> finalMethods;
+        std::set<std::string> readOnlyFields;
     };
 
     // Block statement (sequence of statements)
@@ -454,11 +487,6 @@ namespace AST {
         std::string errorType;
         std::string errorVar;
         std::shared_ptr<BlockStatement> body;
-    };
-
-    struct AttemptStatement : public Statement {
-        std::shared_ptr<BlockStatement> tryBlock;
-        std::vector<HandleClause> handlers;
     };
 
     // Concurrency constructs

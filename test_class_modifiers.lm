@@ -1,0 +1,20 @@
+// Test class-level modifiers
+
+abstract class AbstractShape {
+    pub name: str = "abstract";
+    
+    abstract fn getArea() : float;
+}
+
+final class FinalCircle {
+    pub radius: float = 1.0;
+    
+    fn getArea() : float {
+        return 3.14159 * self.radius * self.radius;
+    }
+}
+
+data class DataPoint {
+    x: float;
+    y: float;
+}

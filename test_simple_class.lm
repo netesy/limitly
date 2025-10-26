@@ -1,0 +1,24 @@
+// Simple class test to debug method issues
+
+class TestClass {
+    pub var name: str = "test";
+    
+    fn getName(): str {
+        return self.name;
+    }
+    
+    pub fn testMethod(): str {
+        // This public method calls the private method
+        return self.getName();
+    }
+}
+
+var obj = TestClass();
+print("Field access:");
+print(obj.name);
+
+print("Calling private method (should fail):");
+print(obj.getName());
+
+print("Calling public method:");
+print(obj.testMethod());

@@ -28,76 +28,65 @@
   - Need to fix backend compilation to generate PUSH instructions for method call arguments
   - Issue is in bytecode generation, not VM execution
 
-- [ ] Add visibility keywords to scanner and parser
-  - Add `pub`, `prot`, `static`, `abstract`, `final`, `data` tokens to scanner
-  - Update parser to handle visibility modifiers on class members
-  - Add `pub(read)` syntax for read-only public fields
-  - Implement parsing for visibility annotations on fields and methods
+- [x] Add visibility keywords to scanner and parser
+  - Add `pub`, `prot`, `static`, `abstract`, `final`, `data` tokens to scanner ✅
+  - Update parser to handle visibility modifiers on class members and module members ✅
+  - Add `const` syntax for read-only public fields ✅
+  - Implement parsing for visibility annotations on fields and methods ✅
 
-- [ ] Implement visibility enforcement in type system
+- [x] Implement visibility enforcement in type system ✅
+
+
+
+
+
+
   - Make all class members private by default
-  - Add visibility checking for field and method access
+  - Make all module variables and function private by default
+  - Add visibility checking for modules, field and method access
   - Implement `pub` keyword for explicit public visibility
   - Add `prot` keyword for protected visibility in inheritance
 
-- [ ] 1.3 Fix class method execution context
+- [ ] Fix class method execution context
   - Ensure 'self' is properly bound in method calls
-  - Fix method environment setup with correct 'this' reference
+  - Fix method environment setup with correct 'self' reference
   - Implement proper method resolution including inheritance
   - Fix method return value handling
   - _Requirements: 1.1, 1.2, 1.3_
 
-### Task 2: Implement Class Visibility and Access Control
-
-- [ ]  Add visibility keywords to scanner and parser
-  - Add `pub`, `prot`, `static`, `abstract`, `final`, `data` tokens to scanner
-  - Update parser to handle visibility modifiers on class members
-  - Add `pub(read)` syntax for read-only public fields
-  - Implement parsing for visibility annotations on fields and methods
-  - Add `data` keyword parsing for data class declarations
-  - _Requirements: 1.1, 4.1, 7.2, 7.5_
-
-- [ ] Implement visibility enforcement in type system
-  - Make all class members private by default
-  - Add visibility checking for field and method access
-  - Implement `pub` keyword for explicit public visibility
-  - Add `prot` keyword for protected visibility in inheritance
-  - Enforce visibility rules during compilation and runtime
-  - _Requirements: 7.2, 7.5_
-
-- [ ] 2.3 Add static member support
-  - Implement `static` keyword for class-level members
+- [ ] Add static member support
+  - Implement `static` keyword for class-level members and module level members
   - Add static field and method storage in ClassDefinition
   - Implement static member access syntax (ClassName.member)
   - Add static method calls and static field access to VM
   - _Requirements: 12.5_
 
-- [ ] 2.4 Implement data class syntactic sugar
+- [ ]  Implement data class syntactic sugar
   - Add DataClassDeclaration AST/CST node for data class parsing
-  - Implement automatic conversion from data class to final class with pub(read) fields
+  - Implement automatic conversion from data class to final class with const fields
   - Auto-generate constructor, equals, hash, and toString methods for data classes
   - Add data class optimization flags for region-safe allocation
   - Ensure data classes work with pattern matching and destructuring
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7_
 
-- [ ] 2.5 Fix class field initialization with visibility
+- [ ]  Fix class field initialization with visibility
   - Ensure class fields are properly initialized with default values
   - Fix field access through self.fieldName syntax with visibility checks
   - Implement proper field assignment in class methods
-  - Add `pub(read)` syntax for read-only public fields
+  - Add `const` syntax for read-only public fields
   - Handle data class immutable field restrictions
   - _Requirements: 1.1, 5.2, 12.1, 12.2_
 
 ### Task 3: Implement Class Inheritance and Abstract Classes
 
-- [ ] 3.1 Add abstract and final class support
+- [ ]  Add abstract and final class support
   - Implement `abstract` keyword for abstract classes and methods
   - Add `final` keyword to prevent inheritance and method override
   - Add abstract method validation (must be overridden in concrete classes)
   - Prevent instantiation of abstract classes
   - _Requirements: 4.4, 13.4, 13.5_
 
-- [ ] 3.2 Fix class inheritance parsing and registration
+- [ ]  Fix class inheritance parsing and registration
   - Ensure superclass relationships are properly parsed
   - Fix handleSetSuperclass to establish inheritance chains
   - Implement proper method resolution order for inheritance
@@ -105,7 +94,7 @@
   - Enforce `final` class inheritance restrictions
   - _Requirements: 4.1, 4.2, 13.1, 13.2_
 
-- [ ] 3.3 Implement constructor inheritance with visibility
+- [ ]  Implement constructor inheritance with visibility
   - Support inline constructor syntax: class Dog(name: str) : Animal(name)
   - Make `init` method public by default 
   - Ensure super constructor calls work properly with visibility
@@ -113,7 +102,7 @@
   - Implement proper initialization order
   - _Requirements: 11.1, 11.2, 13.1, 13.2_
 
-- [ ] 3.4 Add protected member inheritance
+- [ ]  Add protected member inheritance
   - Implement `prot` keyword for protected visibility
   - Allow protected members to be accessed by subclasses
   - Add protected method and field inheritance
@@ -124,7 +113,7 @@
 
 ### Task 4: Implement Typed Fields and Property Access
 
-- [ ] 4.1 Require explicit field declarations with types
+- [ ] 1 Require explicit field declarations with types
   - Enforce explicit type annotations on all class fields
   - Add compile-time type checking for field declarations
   - Implement field type validation during assignment
@@ -135,7 +124,7 @@
   - Ensure handleGetProperty works correctly with visibility rules
   - Fix handleSetProperty for class field assignment with access control
   - Implement proper field lookup including inheritance and visibility
-  - Add support for `pub(read)` read-only field access
+  - Add support for `const` read-only field access
   - Prevent access to private fields from outside the class
   - _Requirements: 1.1, 1.2, 1.3, 7.2_
 
@@ -213,7 +202,7 @@
   - Test private field access restrictions
   - Validate pub keyword for public visibility
   - Test prot keyword for protected inheritance access
-  - Add pub(read) read-only field tests
+  - Add const read-only field tests
   - Test static member access and restrictions
   - _Requirements: 7.2, 7.5, 12.5_
 

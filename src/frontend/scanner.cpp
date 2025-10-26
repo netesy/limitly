@@ -684,6 +684,15 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "err") return TokenType::ERR;
     if (rest == "ok") return TokenType::OK;
     if (rest == "val") return TokenType::VAL;
+    
+    // Visibility keywords
+    if (rest == "pub") return TokenType::PUB;
+    if (rest == "prot") return TokenType::PROT;
+    if (rest == "static") return TokenType::STATIC;
+    if (rest == "abstract") return TokenType::ABSTRACT;
+    if (rest == "final") return TokenType::FINAL;
+    if (rest == "data") return TokenType::DATA;
+    if (rest == "const") return TokenType::CONST;
 
     // Check if the identifier matches a type keyword
     if (rest == "int") return TokenType::INT_TYPE;
@@ -1012,6 +1021,20 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "OK";
     case TokenType::VAL:
         return "VAL";
+    case TokenType::PUB:
+        return "PUB";
+    case TokenType::PROT:
+        return "PROT";
+    case TokenType::STATIC:
+        return "STATIC";
+    case TokenType::ABSTRACT:
+        return "ABSTRACT";
+    case TokenType::FINAL:
+        return "FINAL";
+    case TokenType::DATA:
+        return "DATA";
+    case TokenType::CONST:
+        return "CONST";
         break;
     }
     return "UNKNOWN";

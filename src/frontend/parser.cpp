@@ -294,7 +294,6 @@ CST::NodeKind Parser::mapASTNodeKind(const std::string& astNodeType) {
     if (className.find("BreakStatement") != std::string::npos) return CST::NodeKind::BREAK_STATEMENT;
     if (className.find("ContinueStatement") != std::string::npos) return CST::NodeKind::CONTINUE_STATEMENT;
     if (className.find("PrintStatement") != std::string::npos) return CST::NodeKind::PRINT_STATEMENT;
-    if (className.find("AttemptStatement") != std::string::npos) return CST::NodeKind::ATTEMPT_STATEMENT;
     if (className.find("ParallelStatement") != std::string::npos) return CST::NodeKind::PARALLEL_STATEMENT;
     if (className.find("ConcurrentStatement") != std::string::npos) return CST::NodeKind::CONCURRENT_STATEMENT;
     if (className.find("ContractStatement") != std::string::npos) return CST::NodeKind::CONTRACT_STATEMENT;
@@ -405,7 +404,6 @@ bool Parser::isContainerNode(CST::NodeKind kind) {
         case CST::NodeKind::MATCH_STATEMENT:
         case CST::NodeKind::PARALLEL_STATEMENT:
         case CST::NodeKind::CONCURRENT_STATEMENT:
-        case CST::NodeKind::ATTEMPT_STATEMENT:
             return true;
         default:
             return false;
@@ -530,6 +528,8 @@ std::shared_ptr<AST::Program> Parser::parse() {
 std::vector<Token> Parser::collectAnnotations() {
     std::vector<Token> annotations;
     while (check(TokenType::PUBLIC) || check(TokenType::PRIVATE) || check(TokenType::PROTECTED)) {
+        // Note: PUB, PROT, STATIC, ABSTRACT, FINAL, and DATA are not collected as annotations
+        // They are handled as visibility/class modifiers in the declaration() function
         annotations.push_back(advance());
     }
     return annotations;
@@ -566,25 +566,78 @@ std::shared_ptr<AST::Statement> Parser::declaration() {
     try {
         // Collect leading annotations
         std::vector<Token> annotations = collectAnnotations();
+        
+        // Parse modifiers for module-level declarations
+        AST::VisibilityLevel visibility = AST::VisibilityLevel::Private; // Default to private
+        bool isStatic = false;
+        bool isAbstract = false;
+        bool isFinal = false;
+        bool isDataClass = false;
+        
+        // Parse visibility and modifiers
+        while (check(TokenType::PUB) || check(TokenType::PROT) || check(TokenType::CONST) || 
+               check(TokenType::STATIC) || check(TokenType::ABSTRACT) || check(TokenType::FINAL) || 
+               check(TokenType::DATA)) {
+            
+            if (match({TokenType::PUB})) {
+                visibility = AST::VisibilityLevel::Public;
+            } else if (match({TokenType::PROT})) {
+                visibility = AST::VisibilityLevel::Protected;
+            } else if (match({TokenType::CONST})) {
+                visibility = AST::VisibilityLevel::Const;
+            } else if (match({TokenType::STATIC})) {
+                isStatic = true;
+            } else if (match({TokenType::ABSTRACT})) {
+                isAbstract = true;
+            } else if (match({TokenType::FINAL})) {
+                isFinal = true;
+            } else if (match({TokenType::DATA})) {
+                isDataClass = true;
+                isFinal = true; // Data classes are automatically final
+            }
+        }
+        
         if (match({TokenType::CLASS})) {
             auto decl = classDeclaration();
-            if (decl) decl->annotations = annotations;
+            if (decl) {
+                decl->annotations = annotations;
+                decl->isAbstract = isAbstract;
+                decl->isFinal = isFinal;
+                decl->isDataClass = isDataClass;
+            }
             return decl;
         }
         if (match({TokenType::FN})) {
             auto decl = function("function");
-            if (decl) decl->annotations = annotations;
+            if (decl) {
+                decl->annotations = annotations;
+                decl->visibility = visibility;
+                decl->isStatic = isStatic;
+                decl->isAbstract = isAbstract;
+                decl->isFinal = isFinal;
+            }
             return decl;
         }
         if (match({TokenType::ASYNC})) {
             consume(TokenType::FN, "Expected 'fn' after 'async'.");
             auto asyncFn = std::make_shared<AST::AsyncFunctionDeclaration>(*function("async function"));
             asyncFn->annotations = annotations;
+            asyncFn->visibility = visibility;
+            asyncFn->isStatic = isStatic;
+            asyncFn->isAbstract = isAbstract;
+            asyncFn->isFinal = isFinal;
             return asyncFn;
         }
         if (match({TokenType::VAR})) {
             auto decl = varDeclaration();
-            if (decl) decl->annotations = annotations;
+            if (decl) {
+                decl->annotations = annotations;
+                // Cast to VarDeclaration to access visibility fields
+                if (auto varDecl = std::dynamic_pointer_cast<AST::VarDeclaration>(decl)) {
+                    varDecl->visibility = visibility;
+                    varDecl->isStatic = isStatic;
+                }
+            }
             return decl;
         }
         if (match({TokenType::ENUM})) {
@@ -1782,11 +1835,18 @@ std::shared_ptr<AST::FunctionDeclaration> Parser::function(const std::string& ki
         }
     }
 
-    // Parse function body
-    Token leftBrace = consume(TokenType::LEFT_BRACE, "Expected '{' before " + kind + " body.");
-    pushBlockContext("function", leftBrace);
-    func->body = block();
-    popBlockContext();
+    // Parse function body (or semicolon for abstract methods)
+    if (check(TokenType::SEMICOLON)) {
+        // Abstract method - no body
+        advance(); // consume ';'
+        func->body = nullptr; // No body for abstract methods
+    } else {
+        // Regular method with body
+        Token leftBrace = consume(TokenType::LEFT_BRACE, "Expected '{' before " + kind + " body.");
+        pushBlockContext("function", leftBrace);
+        func->body = block();
+        popBlockContext();
+    }
 
     // Pop CST context when exiting function declaration
     if (cstMode && !cstContextStack.empty()) {
@@ -1862,17 +1922,88 @@ std::shared_ptr<AST::ClassDeclaration> Parser::classDeclaration() {
 
     // Parse class members
     while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
+        // Parse visibility modifiers
+        AST::VisibilityLevel visibility = AST::VisibilityLevel::Private; // Default to private
+        bool isStatic = false;
+        bool isAbstract = false;
+        bool isFinal = false;
+        bool isConst = false;
+        
+        // Parse visibility and modifier keywords
+        while (check(TokenType::PUB) || check(TokenType::PROT) || check(TokenType::CONST) || 
+               check(TokenType::STATIC) || check(TokenType::ABSTRACT) || check(TokenType::FINAL)) {
+            
+            if (match({TokenType::PUB})) {
+                visibility = AST::VisibilityLevel::Public;
+            } else if (match({TokenType::PROT})) {
+                visibility = AST::VisibilityLevel::Protected;
+            } else if (match({TokenType::CONST})) {
+                visibility = AST::VisibilityLevel::Const;
+                isConst = true;
+            } else if (match({TokenType::STATIC})) {
+                isStatic = true;
+            } else if (match({TokenType::ABSTRACT})) {
+                isAbstract = true;
+            } else if (match({TokenType::FINAL})) {
+                isFinal = true;
+            }
+        }
+        
         if (match({TokenType::VAR})) {
             // Parse field
             auto field = std::dynamic_pointer_cast<AST::VarDeclaration>(varDeclaration());
             if (field) {
                 classDecl->fields.push_back(field);
+                
+                // Store visibility information
+                classDecl->fieldVisibility[field->name] = visibility;
+                if (isStatic) {
+                    classDecl->staticMembers.insert(field->name);
+                }
+                if (isConst) {
+                    classDecl->readOnlyFields.insert(field->name);
+                }
             }
         } else if (match({TokenType::FN})) {
             // Parse method
             auto method = function("method");
             if (method) {
                 classDecl->methods.push_back(method);
+                
+                // Store visibility information
+                classDecl->methodVisibility[method->name] = visibility;
+                method->visibility = visibility; // Set visibility on the method itself
+                if (isStatic) {
+                    classDecl->staticMembers.insert(method->name);
+                }
+                if (isAbstract) {
+                    classDecl->abstractMethods.insert(method->name);
+                    
+                    // Abstract methods don't have a body - handle this case
+                    if (method->body && method->body->statements.empty()) {
+                        // This is fine for abstract methods
+                    }
+                }
+                if (isFinal) {
+                    classDecl->finalMethods.insert(method->name);
+                }
+            }
+        } else if (check(TokenType::VAR)) {
+            // Handle var without visibility modifiers
+            match({TokenType::VAR});
+            auto field = std::dynamic_pointer_cast<AST::VarDeclaration>(varDeclaration());
+            if (field) {
+                classDecl->fields.push_back(field);
+                classDecl->fieldVisibility[field->name] = AST::VisibilityLevel::Private; // Default to private
+            }
+        } else if (check(TokenType::FN)) {
+            // Handle fn without visibility modifiers
+            match({TokenType::FN});
+            auto method = function("method");
+            if (method) {
+                classDecl->methods.push_back(method);
+                classDecl->methodVisibility[method->name] = AST::VisibilityLevel::Private; // Default to private
+                method->visibility = AST::VisibilityLevel::Private; // Set visibility on the method itself
             }
         } else if (check(TokenType::IDENTIFIER) && peek().lexeme == classDecl->name) {
             // Parse constructor
@@ -1903,6 +2034,41 @@ std::shared_ptr<AST::ClassDeclaration> Parser::classDeclaration() {
             constructor->body = block();
             
             classDecl->methods.push_back(constructor);
+        } else if (check(TokenType::IDENTIFIER)) {
+            // Parse direct field declaration (without 'var' keyword)
+            // Format: [visibility] fieldName: type [= initializer];
+            Token fieldName = advance(); // consume field name
+            
+            if (check(TokenType::COLON)) {
+                advance(); // consume ':'
+                
+                // Create a VarDeclaration for this field
+                auto field = std::make_shared<AST::VarDeclaration>();
+                field->line = fieldName.line;
+                field->name = fieldName.lexeme;
+                field->type = parseTypeAnnotation();
+                
+                // Check for initializer
+                if (match({TokenType::EQUAL})) {
+                    field->initializer = expression();
+                }
+                
+                consume(TokenType::SEMICOLON, "Expected ';' after field declaration.");
+                
+                classDecl->fields.push_back(field);
+                
+                // Store visibility information
+                classDecl->fieldVisibility[field->name] = visibility;
+                if (isStatic) {
+                    classDecl->staticMembers.insert(field->name);
+                }
+                if (isConst) {
+                    classDecl->readOnlyFields.insert(field->name);
+                }
+            } else {
+                error("Expected ':' after field name in class member declaration.");
+                break;
+            }
         } else {
             error("Expected class member declaration.");
             break;
@@ -1998,36 +2164,6 @@ std::shared_ptr<AST::ClassDeclaration> Parser::classDeclaration() {
     }
 
     return classDecl;
-}
-
-std::shared_ptr<AST::Statement> Parser::attemptStatement() {
-    auto stmt = std::make_shared<AST::AttemptStatement>();
-    stmt->line = previous().line;
-
-    consume(TokenType::LEFT_BRACE, "Expected '{' after 'attempt'.");
-    stmt->tryBlock = block();
-
-    // Parse handlers
-    while (match({TokenType::HANDLE})) {
-        AST::HandleClause handler;
-
-        // Parse error type
-        handler.errorType = consume(TokenType::IDENTIFIER, "Expected error type after 'handle'.").lexeme;
-
-        // Parse optional error variable
-        if (match({TokenType::LEFT_PAREN})) {
-            handler.errorVar = consume(TokenType::IDENTIFIER, "Expected error variable name.").lexeme;
-            consume(TokenType::RIGHT_PAREN, "Expected ')' after error variable.");
-        }
-
-        // Parse handler body
-        consume(TokenType::LEFT_BRACE, "Expected '{' after handle clause.");
-        handler.body = block();
-
-        stmt->handlers.push_back(handler);
-    }
-
-    return stmt;
 }
 
 void Parser::parseConcurrencyParams(

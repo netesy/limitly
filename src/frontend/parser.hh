@@ -146,7 +146,6 @@ public:
     std::shared_ptr<AST::FunctionDeclaration> function(const std::string &kind);
     std::shared_ptr<AST::Statement> returnStatement();
     std::shared_ptr<AST::ClassDeclaration> classDeclaration();
-    std::shared_ptr<AST::Statement> attemptStatement();
     std::shared_ptr<AST::Statement> parallelStatement();
     std::shared_ptr<AST::Statement> concurrentStatement();
     std::shared_ptr<AST::Statement> taskStatement();

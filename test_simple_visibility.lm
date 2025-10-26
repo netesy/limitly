@@ -1,0 +1,40 @@
+// Test basic visibility keywords in class declarations
+
+abstract class Shape {
+    pub name: str = "shape";
+    prot area: float = 0.0;
+    const id: int = 0;
+    static count: int = 0;
+    
+    pub fn getName() : str {
+        return self.name;
+    }
+    
+    prot fn setArea(newArea: float) {
+        self.area = newArea;
+    }
+    
+    abstract fn calculateArea() : float;
+    
+    final fn describe() {
+        print("Shape: {self.name}, Area: {self.area}");
+    }
+    
+    static fn getCount() : int {
+        return Shape.count;
+    }
+}
+
+final class Circle : Shape {
+    pub radius: float;
+    
+    pub fn init(radius: float) {
+        self.radius = radius;
+        self.name = "circle";
+        self.setArea(self.calculateArea());
+    }
+    
+    fn calculateArea() : float {
+        return 3.14159 * self.radius * self.radius;
+    }
+}

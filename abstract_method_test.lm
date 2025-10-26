@@ -1,0 +1,5 @@
+abstract class Test {
+    abstract fn draw();
+}
+
+print("Abstract method test complete");

@@ -22,27 +22,29 @@ struct ClassField {
     std::string name;
     std::shared_ptr<AST::TypeAnnotation> type;
     std::shared_ptr<AST::Expression> defaultValue;
-    bool isPrivate = false;
-    bool isProtected = false;
+    AST::VisibilityLevel visibility = AST::VisibilityLevel::Private; // Default to private
     bool isStatic = false;
+    bool isConst = false; // For read-only fields
     
     ClassField(const std::string& n, std::shared_ptr<AST::TypeAnnotation> t,
-               std::shared_ptr<AST::Expression> def = nullptr)
-        : name(n), type(t), defaultValue(def) {}
+               std::shared_ptr<AST::Expression> def = nullptr,
+               AST::VisibilityLevel vis = AST::VisibilityLevel::Private)
+        : name(n), type(t), defaultValue(def), visibility(vis) {}
 };
 
 // Class method definition
 struct ClassMethod {
     std::string name;
     std::shared_ptr<FunctionImplementation> implementation;
-    bool isPrivate = false;
-    bool isProtected = false;
+    AST::VisibilityLevel visibility = AST::VisibilityLevel::Private; // Default to private
     bool isStatic = false;
     bool isVirtual = false;
     bool isAbstract = false;
+    bool isFinal = false;
     
-    ClassMethod(const std::string& n, std::shared_ptr<FunctionImplementation> impl)
-        : name(n), implementation(impl) {}
+    ClassMethod(const std::string& n, std::shared_ptr<FunctionImplementation> impl,
+                AST::VisibilityLevel vis = AST::VisibilityLevel::Private)
+        : name(n), implementation(impl), visibility(vis) {}
 };
 
 // Class definition containing fields and methods
@@ -100,6 +102,11 @@ public:
     // Type checking
     bool isInstanceOf(const std::string& className) const;
     bool isSubclassOf(const std::string& className) const;
+    
+    // Visibility checking
+    bool canAccessField(const std::string& fieldName, std::shared_ptr<ClassDefinition> accessingClass) const;
+    bool canAccessMethod(const std::string& methodName, std::shared_ptr<ClassDefinition> accessingClass) const;
+    bool isFieldReadOnly(const std::string& fieldName) const;
 };
 
 // Object instance representing a runtime object
@@ -121,9 +128,18 @@ public:
     void defineField(const std::string& fieldName, ValuePtr value);
     bool hasField(const std::string& fieldName) const;
     
+    // Visibility-aware field access
+    ValuePtr getField(const std::string& fieldName, std::shared_ptr<ClassDefinition> accessingClass) const;
+    void setField(const std::string& fieldName, ValuePtr value, std::shared_ptr<ClassDefinition> accessingClass);
+    bool canAccessField(const std::string& fieldName, std::shared_ptr<ClassDefinition> accessingClass) const;
+    
     // Method calls
     std::shared_ptr<FunctionImplementation> getMethod(const std::string& methodName) const;
     ValuePtr callMethod(const std::string& methodName, const std::vector<ValuePtr>& args);
+    
+    // Visibility-aware method access
+    std::shared_ptr<FunctionImplementation> getMethod(const std::string& methodName, std::shared_ptr<ClassDefinition> accessingClass) const;
+    bool canAccessMethod(const std::string& methodName, std::shared_ptr<ClassDefinition> accessingClass) const;
     
     // Type checking
     bool isInstanceOf(const std::string& className) const;

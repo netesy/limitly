@@ -51,7 +51,7 @@ This specification defines the complete integration of classes into the Limit pr
 1. WHEN I declare a class member without visibility THEN it SHALL be private by default
 2. WHEN I use the `pub` keyword THEN the member SHALL be publicly accessible
 3. WHEN I use the `prot` keyword THEN the member SHALL be accessible to subclasses only
-4. WHEN I use `pub(read)` syntax THEN the field SHALL be read-only from outside the class
+4. WHEN I use `const` syntax THEN the field SHALL be read-only from outside the class
 5. WHEN I use the `static` keyword THEN the member SHALL be accessible at the class level
 6. WHEN I use the `abstract` keyword THEN the class or method SHALL require implementation in subclasses
 7. WHEN I use the `final` keyword THEN the class or method SHALL prevent inheritance or override
@@ -64,7 +64,7 @@ This specification defines the complete integration of classes into the Limit pr
 #### Acceptance Criteria
 
 1. WHEN I declare a `data` class THEN it SHALL be automatically final and immutable
-2. WHEN I declare fields in a `data` class THEN they SHALL be automatically `pub(read)` (read-only public)
+2. WHEN I declare fields in a `data` class THEN they SHALL be automatically `const` (read-only public)
 3. WHEN I create a `data` class THEN it SHALL auto-generate constructor, equals, hash, and toString methods
 4. WHEN I use a `data` class in pattern matching THEN it SHALL be optimized for efficient destructuring
 5. WHEN I instantiate a `data` class THEN it SHALL be region-safe and optimized for stack allocation

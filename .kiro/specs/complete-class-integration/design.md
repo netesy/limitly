@@ -69,7 +69,7 @@ class BankAccount {
         return BankAccount { accountNumber: number };
     }
     
-    pub(read) balance: float;       // Read-only public field
+    const balance: float;       // Read-only public field
 }
 
 // Abstract class with final methods
@@ -103,8 +103,8 @@ data Point {
 
 // Equivalent to:
 final class Point {
-    pub(read) x: float;
-    pub(read) y: float;
+    const x: float;
+    const y: float;
     
     // Auto-generated constructor
     pub fn init(x: float, y: float) {
@@ -212,7 +212,7 @@ var p3 = Point(p1.x + 1.0, p1.y + 1.0);
 ```
 
 #### Data Class Features
-- **Immutable by default**: All fields are `pub(read)` - readable but not writable after construction
+- **Immutable by default**: All fields are `const` - readable but not writable after construction
 - **Final**: Cannot be inherited (automatically `final`)
 - **Region-safe**: Optimized for stack allocation and efficient copying
 - **Auto-generated methods**: Constructor, equality, hash, and toString methods
@@ -224,7 +224,7 @@ var p3 = Point(p1.x + 1.0, p1.y + 1.0);
 - **Private by default**: All members are private unless explicitly marked
 - **`pub`**: Explicitly public, accessible from anywhere
 - **`prot`**: Protected, accessible from subclasses only
-- **`pub(read)`**: Read-only public access, write access is private
+- **`const`**: Read-only public access, write access is private
 - **`static`**: Class-level members, accessed via ClassName.member
 - **`abstract`**: Must be implemented in concrete subclasses
 - **`final`**: Cannot be inherited (classes) or overridden (methods)
@@ -244,7 +244,7 @@ enum class TokenType {
     ABSTRACT,   // abstract
     FINAL,      // final
     DATA,       // data
-    READ,       // read (for pub(read))
+    READ,       // read (for const)
     // ... existing tokens ...
 };
 ```
@@ -281,7 +281,7 @@ enum class VisibilityLevel {
     Private,    // Default
     Protected,  // prot
     Public,     // pub
-    ReadOnly    // pub(read)
+    ReadOnly    // const
 };
 
 // Data class declaration - syntactic sugar for immutable classes

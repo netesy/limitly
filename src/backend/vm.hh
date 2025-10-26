@@ -260,6 +260,12 @@ private:
     
     // Map to store runtime default values for class fields
     std::unordered_map<std::string, ValuePtr> fieldDefaultValues;
+    
+    // Map to store method visibility during class definition
+    std::unordered_map<std::string, AST::VisibilityLevel> methodVisibility;
+    
+    // Store the current method being defined for class methods
+    std::string currentMethodBeingDefined;
 
     // Module loading state
     struct ImportState {
@@ -464,6 +470,9 @@ private:
     void createAndPushCallFrame(const std::string& funcName, size_t returnAddress, 
                                std::shared_ptr<Environment> funcEnv);
     
+    // Get current class context for visibility checking
+    std::shared_ptr<backend::ClassDefinition> getCurrentClassContext() const;
+    
     // Concurrency helper methods
     void parseBlockParameters(const std::string& paramString, BlockExecutionState& state);
     void waitForTasksToComplete(BlockExecutionState& state);
@@ -488,12 +497,6 @@ private:
     void distributeParallelTasks(BlockExecutionState& state);
     void balanceParallelWorkload(BlockExecutionState& state);
     void handleTaskCompletionSynchronization(BlockExecutionState& state);
-    void handleBeginTry(const Instruction& instruction);
-    void handleEndTry(const Instruction& instruction);
-    void handleBeginHandler(const Instruction& instruction);
-    void handleEndHandler(const Instruction& instruction);
-    void handleThrow(const Instruction& instruction);
-    void handleStoreException(const Instruction& instruction);
     void handleBeginParallel(const Instruction& instruction);
     void handleEndParallel(const Instruction& instruction);
     void handleBeginConcurrent(const Instruction& instruction);
@@ -623,6 +626,14 @@ public:
     void define(const std::string& name, const ValuePtr& value) {
         std::lock_guard<std::mutex> lock(mutex);
         values[name] = value;
+        // Default to private visibility for module-level variables
+        visibility[name] = AST::VisibilityLevel::Private;
+    }
+    
+    void define(const std::string& name, const ValuePtr& value, AST::VisibilityLevel vis) {
+        std::lock_guard<std::mutex> lock(mutex);
+        values[name] = value;
+        visibility[name] = vis;
     }
     
     ValuePtr get(const std::string& name) {
@@ -652,6 +663,38 @@ public:
         if (enclosing) {
             // The recursive call will lock the enclosing environment
             return enclosing->get(name);
+        }
+        
+        throw std::runtime_error("Undefined variable '" + name + "'");
+    }
+    
+    // Visibility-aware get method for module access
+    ValuePtr get(const std::string& name, bool isExternalAccess) {
+        if (!isExternalAccess) {
+            return get(name); // Internal access - use normal get
+        }
+        
+        std::lock_guard<std::mutex> lock(mutex);
+        
+        // Check if variable exists and is accessible externally
+        auto it = values.find(name);
+        if (it != values.end()) {
+            auto visIt = visibility.find(name);
+            if (visIt != visibility.end()) {
+                // Only allow public access from external modules
+                if (visIt->second == AST::VisibilityLevel::Public || 
+                    visIt->second == AST::VisibilityLevel::Const) {
+                    return it->second;
+                } else {
+                    throw std::runtime_error("Cannot access private variable '" + name + "' from external module");
+                }
+            }
+            return it->second; // No visibility info - allow access (backward compatibility)
+        }
+        
+        // Check enclosing environments
+        if (enclosing) {
+            return enclosing->get(name, isExternalAccess);
         }
         
         throw std::runtime_error("Undefined variable '" + name + "'");
@@ -739,11 +782,25 @@ public:
         return capturedVariables.find(name) != capturedVariables.end();
     }
     
+    // Get visibility level of a variable
+    AST::VisibilityLevel getVisibility(const std::string& name) const {
+        std::lock_guard<std::mutex> lock(mutex);
+        auto it = visibility.find(name);
+        return (it != visibility.end()) ? it->second : AST::VisibilityLevel::Private;
+    }
+    
+    // Check if a variable can be accessed externally
+    bool canAccessExternally(const std::string& name) const {
+        AST::VisibilityLevel vis = getVisibility(name);
+        return vis == AST::VisibilityLevel::Public || vis == AST::VisibilityLevel::Const;
+    }
+    
     std::shared_ptr<Environment> enclosing;
     
 private:
     std::unordered_map<std::string, ValuePtr> values;
     std::unordered_map<std::string, ValuePtr> capturedVariables;  // Captured variables for closures
+    std::unordered_map<std::string, AST::VisibilityLevel> visibility; // Variable visibility levels
     std::shared_ptr<Environment> closureParent;  // Parent environment for closures
     mutable std::mutex mutex;
 };
