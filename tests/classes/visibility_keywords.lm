@@ -1,0 +1,74 @@
+// Test visibility keywords and class modifiers
+
+abstract class BaseShape {
+    pub name: str = "base";
+    prot area: float = 0.0;
+    pub(read) id: int = 1;
+    static count: int = 0;
+
+    pub fn getName(): str {
+        return self.name;
+        }
+
+        prot fn setArea(newArea: float) {
+            self.area = newArea;
+            }
+
+            abstract fn calculateArea(): float;
+
+            final fn describe() {
+                print("Shape: {self.name}");
+                }
+
+                static fn getCount(): int {
+                    return BaseShape.count;
+                    }
+                    }
+
+                    final class Circle: BaseShape {
+                        pub radius: float = 1.0;
+
+                        pub fn init(r: float) {
+                            self.radius = r;
+                            self.name = "circle";
+                            }
+
+                            fn calculateArea(): float {
+                                return 3.14159 * self.radius * self.radius;
+                                }
+                                }
+
+                                data class Point {
+                                    x: float;
+                                    y: float;
+                                    }
+
+                                    class TestVisibility {
+                                        pub publicField: str = "public";
+                                        prot protectedField: int = 42;
+                                        pub(read) readOnlyField: float = 3.14;
+                                        static staticField: bool = true;
+                                        privateField: str = "private";
+
+                                        pub fn publicMethod() {
+                                            print("public method");
+                                            }
+
+                                            prot fn protectedMethod() {
+                                                print("protected method");
+                                                }
+
+                                                static fn staticMethod() {
+                                                    print("static method");
+                                                    }
+
+                                                    abstract fn abstractMethod();
+
+                                                    final fn finalMethod() {
+                                                        print("final method");
+                                                        }
+
+                                                        fn privateMethod() {
+                                                            print("private method");
+                                                            }
+                                                            }

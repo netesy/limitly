@@ -1,0 +1,74 @@
+// Test visibility enforcement in classes and modules
+
+// Test class visibility
+class TestClass {
+    // Private field (default)
+    var privateField: str = "private";
+    
+    // Public field
+    pub var publicField: str = "public";
+    
+    // Protected field
+    prot var protectedField: str = "protected";
+    
+    // Const field (read-only public)
+    const var constField: str = "constant";
+    
+    // Private method (default)
+    fn privateMethod(): str {
+        return "private method";
+    }
+    
+    // Public method
+    pub fn publicMethod(): str {
+        return "public method";
+    }
+    
+    // Protected method
+    prot fn protectedMethod(): str {
+        return "protected method";
+    }
+    
+    // Public method that accesses private members (should work)
+    pub fn accessPrivate(): str {
+        return self.privateField + " accessed from " + self.privateMethod();
+    }
+}
+
+// Test module-level visibility
+var privateVar: str = "private module var";
+pub var publicVar: str = "public module var";
+prot var protectedVar: str = "protected module var";
+
+fn privateFunction(): str {
+    return "private module function";
+}
+
+pub fn publicFunction(): str {
+    return "public module function";
+}
+
+prot fn protectedFunction(): str {
+    return "protected module function";
+}
+
+// Test class instantiation and access
+var obj = TestClass();
+
+print("Testing public access:");
+print(obj.publicField);
+print(obj.publicMethod());
+print(obj.accessPrivate());
+
+print("Testing const field:");
+print(obj.constField);
+
+print("Testing module-level public access:");
+print(publicVar);
+print(publicFunction());
+
+// These should fail with visibility errors:
+// print(obj.privateField);     // Should fail - private field
+// print(obj.privateMethod());  // Should fail - private method
+// print(privateVar);           // Should fail - private module var
+// print(privateFunction());    // Should fail - private module function

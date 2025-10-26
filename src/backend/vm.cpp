@@ -577,24 +577,6 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                     case Opcode::END_CONCURRENT:
                         handleEndConcurrent(instruction);
                         break;
-                        case Opcode::BEGIN_TRY:
-                            handleBeginTry(instruction);
-                            break;
-                        case Opcode::END_TRY:
-                            handleEndTry(instruction);
-                            break;
-                        case Opcode::BEGIN_HANDLER:
-                            handleBeginHandler(instruction);
-                            break;
-                        case Opcode::END_HANDLER:
-                            handleEndHandler(instruction);
-                            break;
-                        case Opcode::THROW:
-                            handleThrow(instruction);
-                            break;
-                        case Opcode::STORE_EXCEPTION:
-                            handleStoreException(instruction);
-                            break;
                         case Opcode::AWAIT:
                             handleAwait(instruction);
                             break;
@@ -1435,6 +1417,9 @@ void VM::handleStoreVar(const Instruction& instruction) {
         // variable doesn't exist yet; fallthrough to define
     }
 
+    // Get visibility information from instruction (default to Private if not specified)
+    AST::VisibilityLevel visibility = static_cast<AST::VisibilityLevel>(instruction.intValue);
+    
     // Try to assign to existing variable first, then define if it doesn't exist
     try {
         environment->assign(instruction.stringValue, value);
@@ -1442,10 +1427,10 @@ void VM::handleStoreVar(const Instruction& instruction) {
             std::cout << "[DEBUG] STORE_VAR: Updated existing variable '" << instruction.stringValue << "'" << std::endl;
         }
     } catch (const std::runtime_error&) {
-        // Variable doesn't exist, define it
-        environment->define(instruction.stringValue, value);
+        // Variable doesn't exist, define it with visibility
+        environment->define(instruction.stringValue, value, visibility);
         if (debugMode) {
-            std::cout << "[DEBUG] STORE_VAR: Defined new variable '" << instruction.stringValue << "'" << std::endl;
+            std::cout << "[DEBUG] STORE_VAR: Defined new variable '" << instruction.stringValue << "' with visibility " << static_cast<int>(visibility) << std::endl;
         }
     }
     
@@ -3987,22 +3972,20 @@ void VM::handleBeginFunction(const Instruction& instruction) {
         std::string methodKey = currentClassBeingDefined + "::" + funcName;
         userDefinedFunctions[methodKey] = func;
         
-        // Add the method to the class definition
+        // Store the method name for later use in handleEndFunction
+        currentMethodBeingDefined = funcName;
+        
+        // We'll get the visibility later in handlePushFunction, so for now just store a placeholder
+        methodVisibility[methodKey] = AST::VisibilityLevel::Private; // Placeholder, will be updated in PUSH_FUNCTION
+        
+        // Method will be added to the class definition in handleEndFunction with correct visibility
+        if (debugMode) {
+            std::cout << "[DEBUG] Registered class method '" << funcName << "' for class '" 
+                      << currentClassBeingDefined << "' (will be added with visibility in END_FUNCTION)" << std::endl;
+        }
+        
         auto classDef = classRegistry.getClass(currentClassBeingDefined);
-        if (classDef) {
-            // Create a VM-based method implementation that will execute the bytecode
-            auto methodImpl = std::make_shared<backend::VMMethodImplementation>(
-                this, funcName, classDef, func.startAddress, func.endAddress);
-            
-            // Create the class method and add it to the class
-            backend::ClassMethod classMethod(funcName, methodImpl);
-            classDef->addMethod(classMethod);
-            
-            if (debugMode) {
-                std::cout << "[DEBUG] Added method '" << funcName << "' to class '" 
-                          << currentClassBeingDefined << "'" << std::endl;
-            }
-        } else {
+        if (!classDef) {
             error("Class definition not found for method: " + currentClassBeingDefined);
         }
     } else {
@@ -4062,6 +4045,20 @@ void VM::handleEndFunction(const Instruction& /*unused*/) {
                 }
             }
         }
+        
+        // If this is a class method, add it to the class definition
+        if (debugMode) {
+            std::cout << "[DEBUG] END_FUNCTION: Checking if method should be added to class" << std::endl;
+            std::cout << "[DEBUG] END_FUNCTION: insideClassDefinition=" << insideClassDefinition << std::endl;
+            std::cout << "[DEBUG] END_FUNCTION: currentClassBeingDefined='" << currentClassBeingDefined << "'" << std::endl;
+        }
+        
+        // Method addition is now handled in handlePushFunction where visibility is known
+        if (insideClassDefinition && !currentMethodBeingDefined.empty()) {
+            // Clear the current method being defined
+            currentMethodBeingDefined.clear();
+        }
+        
         if (debugMode) {
             std::cout << "[DEBUG] END_FUNCTION: Resuming normal execution" << std::endl;
         }
@@ -4245,6 +4242,9 @@ void VM::handleDefineField(const Instruction& instruction) {
         return;
     }
     
+    // Get visibility information from instruction
+    AST::VisibilityLevel visibility = static_cast<AST::VisibilityLevel>(instruction.intValue);
+    
     // Create a class field
     // Note: We need to convert the runtime value back to an AST expression
     // For now, we'll create a simple literal expression
@@ -4254,7 +4254,7 @@ void VM::handleDefineField(const Instruction& instruction) {
     // This is a simplified approach - in a full implementation, we'd need
     // to properly convert runtime values back to AST expressions
     
-    backend::ClassField field(fieldName, nullptr, defaultExpr);
+    backend::ClassField field(fieldName, nullptr, defaultExpr, visibility);
     classDef->addField(field);
     
     // Store the runtime default value in a temporary map for object initialization
@@ -4392,6 +4392,28 @@ void VM::createAndPushCallFrame(const std::string& funcName, size_t returnAddres
     
     // Switch to function environment
     environment = funcEnv;
+}
+
+std::shared_ptr<backend::ClassDefinition> VM::getCurrentClassContext() const {
+    // Check if we're currently inside a class method
+    if (!callStack.empty()) {
+        const auto& currentFrame = callStack.back();
+        std::string functionName = currentFrame.functionName;
+        
+        // Check if this is a method call (contains "::")
+        size_t pos = functionName.find("::");
+        if (pos != std::string::npos) {
+            std::string className = functionName.substr(0, pos);
+            return classRegistry.getClass(className);
+        }
+    }
+    
+    // Check if we're currently defining a class
+    if (!currentClassBeingDefined.empty()) {
+        return classRegistry.getClass(currentClassBeingDefined);
+    }
+    
+    return nullptr; // No class context
 }
 
 
@@ -5497,62 +5519,6 @@ void VM::clearListPatternFromStack() {
     }
 }
 
-void VM::handleBeginTry(const Instruction& instruction) {
-    if (debugMode) {
-        std::cout << "[DEBUG] Beginning try block at line " << instruction.line << std::endl;
-    }
-    // For now, just mark the beginning of a try block
-    // In a full implementation, this would set up exception handling context
-}
-
-void VM::handleEndTry(const Instruction& instruction) {
-    if (debugMode) {
-        std::cout << "[DEBUG] Ending try block at line " << instruction.line << std::endl;
-    }
-    // Clean up exception handling context
-}
-
-void VM::handleBeginHandler(const Instruction& instruction) {
-    if (debugMode) {
-        std::cout << "[DEBUG] Beginning exception handler for type: " << instruction.stringValue << std::endl;
-    }
-    // Set up handler for specific exception type
-}
-
-void VM::handleEndHandler(const Instruction& instruction) {
-    if (debugMode) {
-        std::cout << "[DEBUG] Ending exception handler at line " << instruction.line << std::endl;
-    }
-    // Clean up handler context
-}
-
-void VM::handleThrow(const Instruction& instruction) {
-    if (debugMode) {
-        std::cout << "[DEBUG] Throwing exception at line " << instruction.line << std::endl;
-    }
-    
-    // Pop the exception value from the stack
-    ValuePtr exception = pop();
-    lastException = exception;
-    
-    // For now, just throw a runtime error with the exception value
-    std::string message = "Exception thrown: " + valueToString(exception);
-    error(message);
-}
-
-void VM::handleStoreException(const Instruction& instruction) {
-    if (debugMode) {
-        std::cout << "[DEBUG] Storing exception in variable: " << instruction.stringValue << std::endl;
-    }
-    
-    // Store the last exception in the specified variable
-    if (lastException) {
-        environment->define(instruction.stringValue, lastException);
-    } else {
-        environment->define(instruction.stringValue, memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
-    }
-}
-
 void VM::handleAwait(const Instruction& instruction) {
     if (debugMode) {
         std::cout << "[DEBUG] Awaiting async result at line " << instruction.line << std::endl;
@@ -6314,8 +6280,45 @@ void VM::handleUnwrapValue(const Instruction& instruction) {
 void VM::handlePushFunction(const Instruction& instruction) {
     std::string functionName = instruction.stringValue;
     
+    // Get visibility information from instruction
+    AST::VisibilityLevel visibility = static_cast<AST::VisibilityLevel>(instruction.intValue);
+    
     if (debugMode) {
-        std::cout << "[DEBUG] PUSH_FUNCTION: " << functionName << std::endl;
+        std::cout << "[DEBUG] PUSH_FUNCTION: " << functionName << " with visibility " << static_cast<int>(visibility) << std::endl;
+    }
+    
+    // If we're inside a class definition, add the method to the class with correct visibility
+    if (insideClassDefinition && !currentClassBeingDefined.empty()) {
+        std::string methodKey = currentClassBeingDefined + "::" + functionName;
+        methodVisibility[methodKey] = visibility; // Update the visibility
+        
+        if (debugMode) {
+            std::cout << "[DEBUG] PUSH_FUNCTION: Adding method '" << functionName << "' to class '" << currentClassBeingDefined << "' with visibility " << static_cast<int>(visibility) << std::endl;
+        }
+        
+        auto classDef = classRegistry.getClass(currentClassBeingDefined);
+        if (classDef) {
+            auto funcIt = userDefinedFunctions.find(methodKey);
+            if (funcIt != userDefinedFunctions.end()) {
+                // Create a VM method implementation
+                auto methodImpl = std::make_shared<backend::VMMethodImplementation>(
+                    this, functionName, classDef, 
+                    funcIt->second.startAddress, funcIt->second.endAddress);
+                
+                backend::ClassMethod classMethod(functionName, methodImpl, visibility);
+                classDef->addMethod(classMethod);
+                
+                if (debugMode) {
+                    std::cout << "[DEBUG] PUSH_FUNCTION: Successfully added method '" << functionName 
+                              << "' to class '" << currentClassBeingDefined 
+                              << "' with visibility " << static_cast<int>(visibility) << std::endl;
+                }
+            } else {
+                if (debugMode) {
+                    std::cout << "[DEBUG] PUSH_FUNCTION: Function '" << methodKey << "' not found in userDefinedFunctions" << std::endl;
+                }
+            }
+        }
     }
     
     // Check if the function exists in userDefinedFunctions
@@ -6397,6 +6400,9 @@ void VM::handleGetProperty(const Instruction& instruction) {
             std::cout << "[DEBUG] GET_PROPERTY: Object type tag: " << static_cast<int>(object->type->tag) << std::endl;
         }
     }
+    
+    // Get current class context for visibility checking
+    std::shared_ptr<backend::ClassDefinition> currentClass = getCurrentClassContext();
 
     // --- Handle Module property access ---
     if (object->type && object->type->tag == TypeTag::Module) {
@@ -6414,7 +6420,8 @@ void VM::handleGetProperty(const Instruction& instruction) {
             }
 
             try {
-                ValuePtr property = moduleEnv->get(propertyName);
+                // Use visibility-aware access for external module access
+                ValuePtr property = moduleEnv->get(propertyName, true); // true = external access
 
                 // Special handling if property is a function
                 if (property->type && property->type->tag == TypeTag::Function) {
@@ -6456,23 +6463,65 @@ void VM::handleGetProperty(const Instruction& instruction) {
     if (std::holds_alternative<ObjectInstancePtr>(object->data)) {
         auto objectInstance = std::get<ObjectInstancePtr>(object->data);
         
-        // First try to get it as a field
-        try {
-            ValuePtr property = objectInstance->getField(propertyName);
-            if (debugMode) {
-                std::cout << "[DEBUG] GET_PROPERTY: Found object field '" << propertyName << "'" << std::endl;
-            }
-            push(property);
-            return;
-        } catch (const std::runtime_error& e) {
-            // Field not found, try to get it as a method
-            if (debugMode) {
-                std::cout << "[DEBUG] GET_PROPERTY: Field '" << propertyName << "' not found, checking for method" << std::endl;
+        // First check if this is actually a field (not a method)
+        bool isActualField = objectInstance->hasField(propertyName);
+        
+        if (isActualField) {
+            // This is a field, check visibility and access it
+            try {
+                ValuePtr property;
+                if (currentClass) {
+                    // Use visibility-aware access
+                    property = objectInstance->getField(propertyName, currentClass);
+                } else {
+                    // No class context - only allow public access
+                    if (!objectInstance->canAccessField(propertyName, nullptr)) {
+                        error("Cannot access private field '" + propertyName + "' from outside class context");
+                        return;
+                    }
+                    property = objectInstance->getField(propertyName);
+                }
+                
+                if (debugMode) {
+                    std::cout << "[DEBUG] GET_PROPERTY: Found object field '" << propertyName << "'" << std::endl;
+                }
+                push(property);
+                return;
+            } catch (const std::runtime_error& e) {
+                error(e.what());
+                return;
             }
         }
         
-        // Try to get it as a method
-        auto methodImpl = objectInstance->getMethod(propertyName);
+        // Not a field, try to get it as a method
+        if (debugMode) {
+            std::cout << "[DEBUG] GET_PROPERTY: '" << propertyName << "' is not a field, checking for method" << std::endl;
+        }
+        
+        // Try to get it as a method with visibility checking
+        std::shared_ptr<backend::FunctionImplementation> methodImpl;
+        if (currentClass) {
+            // Use visibility-aware access
+            try {
+                methodImpl = objectInstance->getMethod(propertyName, currentClass);
+            } catch (const std::runtime_error& e) {
+                error(e.what());
+                return;
+            }
+        } else {
+            // No class context - only allow public access
+            // First check if the method exists at all
+            methodImpl = objectInstance->getMethod(propertyName);
+            if (methodImpl) {
+                // Method exists, now check if it's accessible from outside class context
+                if (!objectInstance->canAccessMethod(propertyName, nullptr)) {
+                    error("Cannot access private method '" + propertyName + "' from outside class context");
+                    return;
+                }
+            }
+            // If method doesn't exist, methodImpl will be nullptr and we'll fall through to "method not found"
+        }
+        
         if (methodImpl) {
             if (debugMode) {
                 std::cout << "[DEBUG] GET_PROPERTY: Found object method '" << propertyName << "'" << std::endl;
@@ -6568,6 +6617,9 @@ void VM::handleSetProperty(const Instruction& instruction) {
     if (debugMode) {
         std::cout << "[DEBUG] SET_PROPERTY: Setting property '" << propertyName << "' on object" << std::endl;
     }
+    
+    // Get current class context for visibility checking
+    std::shared_ptr<backend::ClassDefinition> currentClass = getCurrentClassContext();
 
     // --- Handle Module property assignment ---
     if (object->type && object->type->tag == TypeTag::Module) {
@@ -6591,10 +6643,32 @@ void VM::handleSetProperty(const Instruction& instruction) {
     if (std::holds_alternative<ObjectInstancePtr>(object->data)) {
         auto objectInstance = std::get<ObjectInstancePtr>(object->data);
 
-        if (!objectInstance->hasField(propertyName)) {
-            objectInstance->defineField(propertyName, value);
-        } else {
-            objectInstance->setField(propertyName, value);
+        try {
+            if (!objectInstance->hasField(propertyName)) {
+                // For new fields, check if we can define them (only from within the class)
+                if (currentClass && currentClass->getName() == objectInstance->getClassName()) {
+                    objectInstance->defineField(propertyName, value);
+                } else {
+                    error("Cannot define new field '" + propertyName + "' from outside class '" + 
+                          objectInstance->getClassName() + "'");
+                    return;
+                }
+            } else {
+                // Use visibility-aware field assignment
+                if (currentClass) {
+                    objectInstance->setField(propertyName, value, currentClass);
+                } else {
+                    // No class context - only allow public access
+                    if (!objectInstance->canAccessField(propertyName, nullptr)) {
+                        error("Cannot access private field '" + propertyName + "' from outside class context");
+                        return;
+                    }
+                    objectInstance->setField(propertyName, value);
+                }
+            }
+        } catch (const std::runtime_error& e) {
+            error(e.what());
+            return;
         }
 
         if (debugMode) {

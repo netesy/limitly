@@ -130,8 +130,6 @@ namespace frontend {
                 return buildExprStatement(cst);
             case CST::NodeKind::MATCH_STATEMENT:
                 return buildMatchStatement(cst);
-            case CST::NodeKind::ATTEMPT_STATEMENT:
-                return buildAttemptStatement(cst);
             case CST::NodeKind::PARALLEL_STATEMENT:
                 return buildParallelStatement(cst);
             case CST::NodeKind::CONCURRENT_STATEMENT:
@@ -710,10 +708,6 @@ namespace frontend {
 
     std::shared_ptr<AST::MatchStatement> ASTBuilder::buildMatchStatement(const CST::Node& cst) {
         return std::make_shared<AST::MatchStatement>();
-    }
-
-    std::shared_ptr<AST::AttemptStatement> ASTBuilder::buildAttemptStatement(const CST::Node& cst) {
-        return std::make_shared<AST::AttemptStatement>();
     }
 
     std::shared_ptr<AST::ParallelStatement> ASTBuilder::buildParallelStatement(const CST::Node& cst) {

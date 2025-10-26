@@ -181,7 +181,6 @@ namespace frontend {
         std::shared_ptr<AST::PrintStatement> buildPrintStatement(const CST::Node& cst);
         std::shared_ptr<AST::ExprStatement> buildExprStatement(const CST::Node& cst);
         std::shared_ptr<AST::MatchStatement> buildMatchStatement(const CST::Node& cst);
-        std::shared_ptr<AST::AttemptStatement> buildAttemptStatement(const CST::Node& cst);
         std::shared_ptr<AST::ParallelStatement> buildParallelStatement(const CST::Node& cst);
         std::shared_ptr<AST::ConcurrentStatement> buildConcurrentStatement(const CST::Node& cst);
         

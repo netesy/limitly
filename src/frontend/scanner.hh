@@ -149,6 +149,15 @@ enum class TokenType {
     ERR,        // err
     OK,         // ok
     VAL,        // val
+    
+    // Visibility keywords
+    PUB,        // pub
+    PROT,       // prot
+    STATIC,     // static
+    ABSTRACT,   // abstract
+    FINAL,      // final
+    DATA,       // data
+    CONST,      // const (for read-only public)
 
     // CST Support - Trivia tokens
     WHITESPACE,     // spaces, tabs

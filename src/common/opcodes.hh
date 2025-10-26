@@ -18,7 +18,7 @@ enum class Opcode {
     SWAP,               // Swap top two values on stack
 
     // Variable operations
-    STORE_VAR,          // Store value in variable
+    STORE_VAR,          // Store value in variable (with optional visibility in intValue)
     DEFINE_ATOMIC,      // Define an atomic variable (initialize atomic wrapper)
     LOAD_VAR,           // Load variable onto stack
     STORE_TEMP,         // Store value in temporary variable
@@ -98,14 +98,6 @@ enum class Opcode {
     // Scope operations
     BEGIN_SCOPE,        // Begin new scope
     END_SCOPE,          // End current scope
-
-    // Exception handling operations
-    BEGIN_TRY,          // Begin try block
-    END_TRY,            // End try block
-    BEGIN_HANDLER,      // Begin exception handler
-    END_HANDLER,        // End exception handler
-    THROW,              // Throw exception
-    STORE_EXCEPTION,    // Store exception in variable
 
     // Concurrency operations
     BEGIN_PARALLEL,     // Begin parallel block

@@ -13,9 +13,25 @@ ClassDefinition::ClassDefinition(const std::string& className) : name(className)
 ClassDefinition::ClassDefinition(const std::shared_ptr<AST::ClassDeclaration>& decl) 
     : name(decl->name) {
     
-    // Convert fields
+    // Convert fields with visibility information
     for (const auto& field : decl->fields) {
-        ClassField classField(field->name, field->type.value_or(nullptr), field->initializer);
+        // Get visibility from the class declaration's field visibility map
+        AST::VisibilityLevel visibility = AST::VisibilityLevel::Private; // Default to private
+        auto visIt = decl->fieldVisibility.find(field->name);
+        if (visIt != decl->fieldVisibility.end()) {
+            visibility = visIt->second;
+        }
+        
+        ClassField classField(field->name, field->type.value_or(nullptr), field->initializer, visibility);
+        
+        // Set additional field properties
+        if (decl->readOnlyFields.find(field->name) != decl->readOnlyFields.end()) {
+            classField.isConst = true;
+        }
+        if (decl->staticMembers.find(field->name) != decl->staticMembers.end()) {
+            classField.isStatic = true;
+        }
+        
         addField(classField);
     }
     
@@ -70,17 +86,25 @@ bool ClassDefinition::implementsInterface(const std::string& interfaceName) cons
 }
 
 std::shared_ptr<FunctionImplementation> ClassDefinition::resolveMethod(const std::string& methodName) const {
+    // std::cout << "[DEBUG] resolveMethod: Looking for method '" << methodName << "' in class '" << name << "'" << std::endl;
+    // std::cout << "[DEBUG] resolveMethod: Class has " << methods.size() << " methods" << std::endl;
+    
     // First check this class
     auto impl = getMethodImplementation(methodName);
     if (impl) {
+        // std::cout << "[DEBUG] resolveMethod: Found method '" << methodName << "' in class '" << name << "'" << std::endl;
         return impl;
     }
     
+    // std::cout << "[DEBUG] resolveMethod: Method '" << methodName << "' not found in class '" << name << "'" << std::endl;
+    
     // Then check superclass
     if (superClass) {
+        // std::cout << "[DEBUG] resolveMethod: Checking superclass for method '" << methodName << "'" << std::endl;
         return superClass->resolveMethod(methodName);
     }
     
+    // std::cout << "[DEBUG] resolveMethod: Method '" << methodName << "' not found anywhere" << std::endl;
     return nullptr;
 }
 
@@ -100,10 +124,20 @@ const ClassField* ClassDefinition::resolveField(const std::string& fieldName) co
 }
 
 void ClassDefinition::initializeMethods(const std::vector<std::shared_ptr<AST::FunctionDeclaration>>& methodDecls) {
-    // Convert methods
+    // Convert methods with visibility information
     for (const auto& method : methodDecls) {
         auto methodImpl = std::make_shared<ClassMethodImplementation>(method, shared_from_this());
-        ClassMethod classMethod(method->name, methodImpl);
+        
+        // Get visibility from the method's visibility property
+        AST::VisibilityLevel visibility = method->visibility; // Methods have visibility in AST
+        
+        ClassMethod classMethod(method->name, methodImpl, visibility);
+        
+        // Set additional method properties
+        classMethod.isStatic = method->isStatic;
+        classMethod.isAbstract = method->isAbstract;
+        classMethod.isFinal = method->isFinal;
+        
         addMethod(classMethod);
     }
 }
@@ -134,6 +168,93 @@ bool ClassDefinition::isSubclassOf(const std::string& className) const {
     }
     
     return false;
+}
+
+// Visibility checking methods
+bool ClassDefinition::canAccessField(const std::string& fieldName, std::shared_ptr<ClassDefinition> accessingClass) const {
+    const ClassField* field = resolveField(fieldName);
+    if (!field) {
+        return false; // Field doesn't exist
+    }
+    
+    // Check visibility rules
+    switch (field->visibility) {
+        case AST::VisibilityLevel::Public:
+        case AST::VisibilityLevel::Const:
+            return true; // Public and const fields are always accessible
+            
+        case AST::VisibilityLevel::Protected:
+            // Protected fields are accessible from the same class or subclasses
+            if (!accessingClass) {
+                return false; // No accessing class context
+            }
+            return accessingClass->getName() == name || 
+                   accessingClass->isSubclassOf(name) ||
+                   isSubclassOf(accessingClass->getName());
+            
+        case AST::VisibilityLevel::Private:
+        default:
+            // Private fields are only accessible from the same class
+            if (!accessingClass) {
+                return false; // No accessing class context
+            }
+            return accessingClass->getName() == name;
+    }
+}
+
+bool ClassDefinition::canAccessMethod(const std::string& methodName, std::shared_ptr<ClassDefinition> accessingClass) const {
+    const ClassMethod* method = getMethod(methodName);
+    if (!method) {
+        // Check superclass
+        if (superClass) {
+            return superClass->canAccessMethod(methodName, accessingClass);
+        }
+        return false; // Method doesn't exist
+    }
+    
+    // Debug output (commented out for clean output)
+    // std::cout << "[DEBUG] canAccessMethod: method='" << methodName 
+    //           << "', visibility=" << static_cast<int>(method->visibility)
+    //           << ", accessingClass=" << (accessingClass ? accessingClass->getName() : "nullptr") << std::endl;
+    
+    // Check visibility rules
+    switch (method->visibility) {
+        case AST::VisibilityLevel::Public:
+            // std::cout << "[DEBUG] canAccessMethod: Public method, returning true" << std::endl;
+            return true; // Public methods are always accessible
+            
+        case AST::VisibilityLevel::Protected:
+            // Protected methods are accessible from the same class or subclasses
+            if (!accessingClass) {
+                // std::cout << "[DEBUG] canAccessMethod: Protected method, no accessing class, returning false" << std::endl;
+                return false; // No accessing class context
+            }
+            return accessingClass->getName() == name || 
+                   accessingClass->isSubclassOf(name) ||
+                   isSubclassOf(accessingClass->getName());
+            
+        case AST::VisibilityLevel::Private:
+        default:
+            // Private methods are only accessible from the same class
+            if (!accessingClass) {
+                // std::cout << "[DEBUG] canAccessMethod: Private method, no accessing class, returning false" << std::endl;
+                return false; // No accessing class context
+            }
+            // std::cout << "[DEBUG] canAccessMethod: Private method check - accessingClass='" << accessingClass->getName() 
+            //           << "', ownerClass='" << name << "'" << std::endl;
+            bool result = accessingClass->getName() == name;
+            // std::cout << "[DEBUG] canAccessMethod: Private method result=" << result << std::endl;
+            return result;
+    }
+}
+
+bool ClassDefinition::isFieldReadOnly(const std::string& fieldName) const {
+    const ClassField* field = resolveField(fieldName);
+    if (!field) {
+        return false; // Field doesn't exist
+    }
+    
+    return field->visibility == AST::VisibilityLevel::Const || field->isConst;
 }
 
 // ObjectInstance implementation
@@ -175,8 +296,65 @@ bool ObjectInstance::hasField(const std::string& fieldName) const {
            classDefinition->resolveField(fieldName) != nullptr;
 }
 
+// Visibility-aware field access methods
+ValuePtr ObjectInstance::getField(const std::string& fieldName, std::shared_ptr<ClassDefinition> accessingClass) const {
+    // Check if access is allowed
+    if (!canAccessField(fieldName, accessingClass)) {
+        throw std::runtime_error("Cannot access private field '" + fieldName + "' from class '" + 
+                                (accessingClass ? accessingClass->getName() : "unknown") + "'");
+    }
+    
+    return getField(fieldName); // Use the existing implementation
+}
+
+void ObjectInstance::setField(const std::string& fieldName, ValuePtr value, std::shared_ptr<ClassDefinition> accessingClass) {
+    // Check if access is allowed
+    if (!canAccessField(fieldName, accessingClass)) {
+        throw std::runtime_error("Cannot access private field '" + fieldName + "' from class '" + 
+                                (accessingClass ? accessingClass->getName() : "unknown") + "'");
+    }
+    
+    // Check if field is read-only
+    if (classDefinition->isFieldReadOnly(fieldName)) {
+        throw std::runtime_error("Cannot modify read-only field '" + fieldName + "'");
+    }
+    
+    setField(fieldName, value); // Use the existing implementation
+}
+
+bool ObjectInstance::canAccessField(const std::string& fieldName, std::shared_ptr<ClassDefinition> accessingClass) const {
+    return classDefinition->canAccessField(fieldName, accessingClass);
+}
+
 std::shared_ptr<FunctionImplementation> ObjectInstance::getMethod(const std::string& methodName) const {
     return classDefinition->resolveMethod(methodName);
+}
+
+// Visibility-aware method access methods
+std::shared_ptr<FunctionImplementation> ObjectInstance::getMethod(const std::string& methodName, std::shared_ptr<ClassDefinition> accessingClass) const {
+    // std::cout << "[DEBUG] ObjectInstance::getMethod: Checking access for method '" << methodName << "'" << std::endl;
+    
+    // Check if access is allowed
+    if (!canAccessMethod(methodName, accessingClass)) {
+        // std::cout << "[DEBUG] ObjectInstance::getMethod: Access denied, throwing exception" << std::endl;
+        throw std::runtime_error("Cannot access private method '" + methodName + "' from class '" + 
+                                (accessingClass ? accessingClass->getName() : "unknown") + "'");
+    }
+    
+    // std::cout << "[DEBUG] ObjectInstance::getMethod: Access allowed, calling getMethod(methodName)" << std::endl;
+    auto result = getMethod(methodName); // Use the existing implementation
+    // std::cout << "[DEBUG] ObjectInstance::getMethod: getMethod returned " << (result ? "non-null" : "null") << std::endl;
+    
+    if (!result) {
+        // std::cout << "[DEBUG] ObjectInstance::getMethod: Method implementation is null, throwing exception" << std::endl;
+        throw std::runtime_error("Method '" + methodName + "' not found in class");
+    }
+    
+    return result;
+}
+
+bool ObjectInstance::canAccessMethod(const std::string& methodName, std::shared_ptr<ClassDefinition> accessingClass) const {
+    return classDefinition->canAccessMethod(methodName, accessingClass);
 }
 
 ValuePtr ObjectInstance::callMethod(const std::string& methodName, const std::vector<ValuePtr>& args) {

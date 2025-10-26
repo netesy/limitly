@@ -1,0 +1,5 @@
+final class Circle {
+    pub radius: float;
+}
+
+print("Test complete");

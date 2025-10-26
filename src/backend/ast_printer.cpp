@@ -88,7 +88,25 @@ void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
         }
     }
     else if (auto varDecl = std::dynamic_pointer_cast<AST::VarDeclaration>(node)) {
-        std::cout << indentation << "VarDeclaration: " << varDecl->name << std::endl;
+        std::cout << indentation << "VarDeclaration: ";
+        
+        // Show visibility modifiers
+        auto getVisibilityString = [](AST::VisibilityLevel vis) -> std::string {
+            switch (vis) {
+                case AST::VisibilityLevel::Private: return "private";
+                case AST::VisibilityLevel::Protected: return "prot";
+                case AST::VisibilityLevel::Public: return "pub";
+                case AST::VisibilityLevel::Const: return "const";
+                default: return "unknown";
+            }
+        };
+        
+        std::cout << "[" << getVisibilityString(varDecl->visibility) << "] ";
+        if (varDecl->isStatic) {
+            std::cout << "[static] ";
+        }
+        
+        std::cout << varDecl->name << std::endl;
         
         if (varDecl->type) {
             std::cout << indentation << "  Type: " << typeToString(*varDecl->type) << std::endl;
@@ -113,7 +131,31 @@ void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
         }
     }
     else if (auto funcDecl = std::dynamic_pointer_cast<AST::FunctionDeclaration>(node)) {
-        std::cout << indentation << "FunctionDeclaration: " << funcDecl->name << std::endl;
+        std::cout << indentation << "FunctionDeclaration: ";
+        
+        // Show visibility modifiers
+        auto getVisibilityString = [](AST::VisibilityLevel vis) -> std::string {
+            switch (vis) {
+                case AST::VisibilityLevel::Private: return "private";
+                case AST::VisibilityLevel::Protected: return "prot";
+                case AST::VisibilityLevel::Public: return "pub";
+                case AST::VisibilityLevel::Const: return "const";
+                default: return "unknown";
+            }
+        };
+        
+        std::cout << "[" << getVisibilityString(funcDecl->visibility) << "] ";
+        if (funcDecl->isStatic) {
+            std::cout << "[static] ";
+        }
+        if (funcDecl->isAbstract) {
+            std::cout << "[abstract] ";
+        }
+        if (funcDecl->isFinal) {
+            std::cout << "[final] ";
+        }
+        
+        std::cout << funcDecl->name << std::endl;
         
         if (!funcDecl->genericParams.empty()) {
             std::cout << indentation << "  GenericParams: <";
@@ -167,6 +209,11 @@ void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
     else if (auto classDecl = std::dynamic_pointer_cast<AST::ClassDeclaration>(node)) {
         std::cout << indentation << "ClassDeclaration: " << classDecl->name;
         
+        // Show class modifiers
+        if (classDecl->isAbstract) std::cout << " (abstract)";
+        if (classDecl->isFinal) std::cout << " (final)";
+        if (classDecl->isDataClass) std::cout << " (data)";
+        
         // Show inheritance information
         if (!classDecl->superClassName.empty()) {
             std::cout << " : " << classDecl->superClassName;
@@ -192,9 +239,39 @@ void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
         
         std::cout << std::endl;
         
+        // Helper function to get visibility string
+        auto getVisibilityString = [](AST::VisibilityLevel vis) -> std::string {
+            switch (vis) {
+                case AST::VisibilityLevel::Private: return "private";
+                case AST::VisibilityLevel::Protected: return "prot";
+                case AST::VisibilityLevel::Public: return "pub";
+                case AST::VisibilityLevel::Const: return "const";
+                default: return "unknown";
+            }
+        };
+        
         if (!classDecl->fields.empty()) {
             std::cout << indentation << "  Fields:" << std::endl;
             for (const auto& field : classDecl->fields) {
+                std::cout << indentation << "    ";
+                
+                // Show field visibility
+                auto visIt = classDecl->fieldVisibility.find(field->name);
+                if (visIt != classDecl->fieldVisibility.end()) {
+                    std::cout << "[" << getVisibilityString(visIt->second) << "] ";
+                }
+                
+                // Show static modifier
+                if (classDecl->staticMembers.count(field->name)) {
+                    std::cout << "[static] ";
+                }
+                
+                // Show read-only modifier
+                if (classDecl->readOnlyFields.count(field->name)) {
+                    std::cout << "[readonly] ";
+                }
+                
+                std::cout << std::endl;
                 printNode(field, indent + 2);
             }
         }
@@ -202,6 +279,26 @@ void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
         if (!classDecl->methods.empty()) {
             std::cout << indentation << "  Methods:" << std::endl;
             for (const auto& method : classDecl->methods) {
+                std::cout << indentation << "    ";
+                
+                // Show method visibility
+                auto visIt = classDecl->methodVisibility.find(method->name);
+                if (visIt != classDecl->methodVisibility.end()) {
+                    std::cout << "[" << getVisibilityString(visIt->second) << "] ";
+                }
+                
+                // Show method modifiers
+                if (classDecl->staticMembers.count(method->name)) {
+                    std::cout << "[static] ";
+                }
+                if (classDecl->abstractMethods.count(method->name)) {
+                    std::cout << "[abstract] ";
+                }
+                if (classDecl->finalMethods.count(method->name)) {
+                    std::cout << "[final] ";
+                }
+                
+                std::cout << std::endl;
                 printNode(method, indent + 2);
             }
         }
@@ -270,27 +367,6 @@ void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
         printNode(whileStmt->body, indent + 2);
     }
     // Handle ReturnStatement and PrintStatement in their respective cases below
-    // to avoid duplicate cases
-    else if (auto attemptStmt = std::dynamic_pointer_cast<AST::AttemptStatement>(node)) {
-        std::cout << indentation << "AttemptStatement:" << std::endl;
-        std::cout << indentation << "  Try:" << std::endl;
-        printNode(attemptStmt->tryBlock, indent + 2);
-        
-        if (!attemptStmt->handlers.empty()) {
-            std::cout << indentation << "  Handlers:" << std::endl;
-            for (const auto& handler : attemptStmt->handlers) {
-                std::cout << indentation << "    Handler (";
-                if (!handler.errorType.empty()) {
-                    std::cout << handler.errorType;
-                    if (!handler.errorVar.empty()) {
-                        std::cout << " as " << handler.errorVar;
-                    }
-                }
-                std::cout << "):" << std::endl;
-                printNode(handler.body, indent + 3);
-            }
-        }
-    }
     else if (auto parallelStmt = std::dynamic_pointer_cast<AST::ParallelStatement>(node)) {
         std::cout << indentation << "ParallelStatement:" << std::endl;
         printNode(parallelStmt->body, indent + 1);
@@ -625,7 +701,31 @@ void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
         }
     }
     else if (auto asyncFuncDecl = std::dynamic_pointer_cast<AST::AsyncFunctionDeclaration>(node)) {
-        std::cout << indentation << "AsyncFunctionDeclaration: " << asyncFuncDecl->name << std::endl;
+        std::cout << indentation << "AsyncFunctionDeclaration: ";
+        
+        // Show visibility modifiers
+        auto getVisibilityString = [](AST::VisibilityLevel vis) -> std::string {
+            switch (vis) {
+                case AST::VisibilityLevel::Private: return "private";
+                case AST::VisibilityLevel::Protected: return "prot";
+                case AST::VisibilityLevel::Public: return "pub";
+                case AST::VisibilityLevel::Const: return "const";
+                default: return "unknown";
+            }
+        };
+        
+        std::cout << "[" << getVisibilityString(asyncFuncDecl->visibility) << "] ";
+        if (asyncFuncDecl->isStatic) {
+            std::cout << "[static] ";
+        }
+        if (asyncFuncDecl->isAbstract) {
+            std::cout << "[abstract] ";
+        }
+        if (asyncFuncDecl->isFinal) {
+            std::cout << "[final] ";
+        }
+        
+        std::cout << asyncFuncDecl->name << std::endl;
         
         if (!asyncFuncDecl->genericParams.empty()) {
             std::cout << indentation << "  GenericParams: <";
