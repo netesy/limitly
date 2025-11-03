@@ -68,7 +68,7 @@ print(publicVar);
 print(publicFunction());
 
 // These should fail with visibility errors:
-// print(obj.privateField);     // Should fail - private field
+print(obj.privateField);     // Should fail - private field
 // print(obj.privateMethod());  // Should fail - private method
-// print(privateVar);           // Should fail - private module var
-// print(privateFunction());    // Should fail - private module function
+// print(privateVar);           // Should fail when imported - private module var
+// print(privateFunction());    // Should fail wen imported - private module function

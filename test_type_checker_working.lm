@@ -1,0 +1,21 @@
+// Test if type checker is working for member access
+
+class TestClass {
+    pub name: str;
+    
+    pub fn init(name: str) {
+        self.name = name;
+    }
+}
+
+fn test() {
+    var obj = TestClass("test");
+    
+    // This should work
+    print("Name: " + obj.name);
+    
+    // This should cause a type checker error (accessing non-existent member)
+    print("Invalid: " + obj.nonexistent);
+}
+
+test();

@@ -1,0 +1,366 @@
+AST for tests/classes/basic_classes.lm
+Parser: New Unified Parser (CST mode)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+  Literal: === Basic Class Tests ===
+ClassDeclaration: Person
+  Methods:
+    [private] 
+    FunctionDeclaration: [private] init
+      Parameters:
+        name
+        age
+      Body:
+        BlockStatement:
+          ExpressionStatement:
+            Assignment: =
+              Member: name
+              Object:
+                This
+              Value:
+              Variable: name
+          ExpressionStatement:
+            Assignment: =
+              Member: age
+              Object:
+                This
+              Value:
+              Variable: age
+    [private] 
+    FunctionDeclaration: [private] greet
+      Body:
+        BlockStatement:
+          PrintStatement:
+            InterpolatedString:
+              String: "Hello, I'm "
+              Expression:
+                MemberExpression: .name
+                  Object:
+                    This
+              String: " and I'm "
+              Expression:
+                MemberExpression: .age
+                  Object:
+                    This
+              String: " years old"
+    [private] 
+    FunctionDeclaration: [private] birthday
+      Body:
+        BlockStatement:
+          ExpressionStatement:
+            Assignment: +=
+              Member: age
+              Object:
+                This
+              Value:
+              Literal: 1
+          PrintStatement:
+            InterpolatedString:
+              String: ""
+              Expression:
+                MemberExpression: .name
+                  Object:
+                    This
+              String: " is now "
+              Expression:
+                MemberExpression: .age
+                  Object:
+                    This
+              String: " years old"
+PrintStatement:
+  Literal: Creating Person objects:
+VarDeclaration: [private] person1
+  Initializer:
+    CallExpression:
+      Callee:
+        Variable: Person
+      Arguments:
+        Literal: Alice
+        Literal: 25
+VarDeclaration: [private] person2
+  Initializer:
+    CallExpression:
+      Callee:
+        Variable: Person
+      Arguments:
+        Literal: Bob
+        Literal: 30
+PrintStatement:
+  Literal: Calling methods:
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      MemberExpression: .greet
+        Object:
+          Variable: person1
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      MemberExpression: .greet
+        Object:
+          Variable: person2
+PrintStatement:
+  Literal: Birthday test:
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      MemberExpression: .birthday
+        Object:
+          Variable: person1
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      MemberExpression: .greet
+        Object:
+          Variable: person1
+ClassDeclaration: Rectangle
+  Fields:
+    [private] 
+    VarDeclaration: [private] width
+      Type: int
+      Initializer:
+        Literal: 0
+    [private] 
+    VarDeclaration: [private] height
+      Type: int
+      Initializer:
+        Literal: 0
+  Methods:
+    [private] 
+    FunctionDeclaration: [private] init
+      Parameters:
+        width
+        height
+      Body:
+        BlockStatement:
+          ExpressionStatement:
+            Assignment: =
+              Member: width
+              Object:
+                This
+              Value:
+              Variable: width
+          ExpressionStatement:
+            Assignment: =
+              Member: height
+              Object:
+                This
+              Value:
+              Variable: height
+    [private] 
+    FunctionDeclaration: [private] area
+      Body:
+        BlockStatement:
+          ReturnStatement:
+            Value:
+              BinaryExpression: *
+                Left:
+                  MemberExpression: .width
+                    Object:
+                      This
+                Operator: *
+                Right:
+                  MemberExpression: .height
+                    Object:
+                      This
+    [private] 
+    FunctionDeclaration: [private] perimeter
+      Body:
+        BlockStatement:
+          ReturnStatement:
+            Value:
+              BinaryExpression: *
+                Left:
+                  Literal: 2
+                Operator: *
+                Right:
+                  Grouping:
+                    BinaryExpression: +
+                      Left:
+                        MemberExpression: .width
+                          Object:
+                            This
+                      Operator: +
+                      Right:
+                        MemberExpression: .height
+                          Object:
+                            This
+PrintStatement:
+  Literal: Rectangle class:
+VarDeclaration: [private] rect
+  Initializer:
+    CallExpression:
+      Callee:
+        Variable: Rectangle
+      Arguments:
+        Literal: 5
+        Literal: 3
+PrintStatement:
+  InterpolatedString:
+    String: "Area: "
+    Expression:
+      CallExpression:
+        Callee:
+          MemberExpression: .area
+            Object:
+              Variable: rect
+    String: ""
+PrintStatement:
+  InterpolatedString:
+    String: "Perimeter: "
+    Expression:
+      CallExpression:
+        Callee:
+          MemberExpression: .perimeter
+            Object:
+              Variable: rect
+    String: ""
+ClassDeclaration: BankAccount
+  Fields:
+    [private] 
+    VarDeclaration: [private] balance
+      Type: float
+      Initializer:
+        Literal: 
+  Methods:
+    [private] 
+    FunctionDeclaration: [private] deposit
+      Parameters:
+        amount: float
+      ReturnType: float
+      Body:
+        BlockStatement:
+          ExpressionStatement:
+            Assignment: =
+              Member: balance
+              Object:
+                This
+              Value:
+              BinaryExpression: +
+                Left:
+                  MemberExpression: .balance
+                    Object:
+                      This
+                Operator: +
+                Right:
+                  Variable: amount
+          ReturnStatement:
+            Value:
+              MemberExpression: .balance
+                Object:
+                  This
+    [private] 
+    FunctionDeclaration: [private] withdraw
+      Parameters:
+        amount: float
+      ReturnType: float
+      Body:
+        BlockStatement:
+          IfStatement:
+            Condition:
+              BinaryExpression: >
+                Left:
+                  Variable: amount
+                Operator: >
+                Right:
+                  MemberExpression: .balance
+                    Object:
+                      This
+            Then:
+              BlockStatement:
+                PrintStatement:
+                  Literal: Insufficient funds!
+                ReturnStatement:
+                  Value:
+                    MemberExpression: .balance
+                      Object:
+                        This
+          ExpressionStatement:
+            Assignment: =
+              Member: balance
+              Object:
+                This
+              Value:
+              BinaryExpression: -
+                Left:
+                  MemberExpression: .balance
+                    Object:
+                      This
+                Operator: -
+                Right:
+                  Variable: amount
+          ReturnStatement:
+            Value:
+              Variable: amount
+FunctionDeclaration: [private] test_bank_account
+  Body:
+    BlockStatement:
+      VarDeclaration: [private] account
+        Initializer:
+          CallExpression:
+            Callee:
+              Variable: BankAccount
+      ExpressionStatement:
+        CallExpression:
+          Callee:
+            MemberExpression: .deposit
+              Object:
+                Variable: account
+          Arguments:
+            Literal: 1
+      PrintStatement:
+        InterpolatedString:
+          String: "Balance after deposit: "
+          Expression:
+            MemberExpression: .balance
+              Object:
+                Variable: account
+          String: ""
+      VarDeclaration: [private] withdrawn
+        Initializer:
+          CallExpression:
+            Callee:
+              MemberExpression: .withdraw
+                Object:
+                  Variable: account
+            Arguments:
+              Literal: 3
+      PrintStatement:
+        InterpolatedString:
+          String: "Withdrawn: "
+          Expression:
+            Variable: withdrawn
+          String: ""
+      PrintStatement:
+        InterpolatedString:
+          String: "Balance after withdrawal: "
+          Expression:
+            MemberExpression: .balance
+              Object:
+                Variable: account
+          String: ""
+      VarDeclaration: [private] failed_withdraw
+        Initializer:
+          CallExpression:
+            Callee:
+              MemberExpression: .withdraw
+                Object:
+                  Variable: account
+            Arguments:
+              Literal: 1
+      PrintStatement:
+        InterpolatedString:
+          String: "Failed withdrawal: "
+          Expression:
+            Variable: failed_withdraw
+          String: ""
+ExpressionStatement:
+  CallExpression:
+    Callee:
+      Variable: test_bank_account

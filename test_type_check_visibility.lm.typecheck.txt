@@ -1,0 +1,14 @@
+Type Checking Results for test_type_check_visibility.lm
+Parser: New Unified Parser (CST mode)
+========================================
+
+❌ Found 2 type error(s):
+
+Error 1:
+  Line: 70
+  Message: Cannot access private field 'name' of class 'Person' from outside any class (private fields can only be accessed from within the same class)
+
+Error 2:
+  Line: 74
+  Message: Cannot access protected field 'id' of class 'Person' from outside any class (protected fields can only be accessed from the same class or subclasses)
+

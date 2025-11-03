@@ -1,0 +1,49 @@
+// Test compile-time visibility checking
+
+// Private function - should not be accessible from outside
+fn privateFunction(): str {
+    return "private";
+}
+
+// Public function - should be accessible
+pub fn publicFunction(): str {
+    return "public";
+}
+
+// Private variable - should not be accessible from outside
+var privateVar: str = "hidden";
+
+// Public variable - should be accessible
+pub var publicVar: int = 42;
+
+// Class with mixed visibility
+class TestClass {
+    var privateField: str;
+    pub var publicField: int;
+    
+    fn privateMethod(): str {
+        return "private method";
+    }
+    
+    pub fn publicMethod(): int {
+        return 10;
+    }
+}
+
+fn testAccess() {
+    // These should work - accessing public members
+    var pub1 = publicFunction();
+    var pub2 = publicVar;
+    
+    var obj = TestClass();
+    var pub3 = obj.publicField;
+    var pub4 = obj.publicMethod();
+    
+    // These should fail at compile time - accessing private members
+    var priv1 = privateFunction();  // Private function access
+    var priv2 = privateVar;         // Private variable access
+    var priv3 = obj.privateField;   // Private field access
+    var priv4 = obj.privateMethod(); // Private method access
+}
+
+testAccess();

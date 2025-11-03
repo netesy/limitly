@@ -1,0 +1,502 @@
+Tokens for tests/classes/basic_classes.lm
+Parser: New Unified Parser (CST mode)
+Mode: CST with trivia preservation
+========================================
+
+=== Tokens with Trivia ===
+Line 2: PRINT = 'print' [leading: COMMENT_LINE('// Test basic class declarations (if implemented)') NEWLINE('
+') ]
+Line 2: LEFT_PAREN = '('
+Line 2: STRING = '"=== Basic Class Tests ==="'
+Line 2: RIGHT_PAREN = ')'
+Line 2: SEMICOLON = ';'
+Line 5: CLASS = 'class' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Simple class definition') NEWLINE('
+') ]
+Line 5: IDENTIFIER = 'Person' [leading: WHITESPACE(' ') ]
+Line 5: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 6: FN = 'fn' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 6: IDENTIFIER = 'init' [leading: WHITESPACE(' ') ]
+Line 6: LEFT_PAREN = '('
+Line 6: IDENTIFIER = 'name'
+Line 6: COMMA = ','
+Line 6: IDENTIFIER = 'age' [leading: WHITESPACE(' ') ]
+Line 6: RIGHT_PAREN = ')'
+Line 6: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 7: SELF = 'self' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 7: DOT = '.'
+Line 7: IDENTIFIER = 'name'
+Line 7: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 7: IDENTIFIER = 'name' [leading: WHITESPACE(' ') ]
+Line 7: SEMICOLON = ';'
+Line 8: SELF = 'self' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 8: DOT = '.'
+Line 8: IDENTIFIER = 'age'
+Line 8: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 8: IDENTIFIER = 'age' [leading: WHITESPACE(' ') ]
+Line 8: SEMICOLON = ';'
+Line 9: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 11: FN = 'fn' [leading: NEWLINE('
+') WHITESPACE('    ') NEWLINE('
+') WHITESPACE('    ') ]
+Line 11: IDENTIFIER = 'greet' [leading: WHITESPACE(' ') ]
+Line 11: LEFT_PAREN = '('
+Line 11: RIGHT_PAREN = ')'
+Line 11: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 12: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 12: LEFT_PAREN = '('
+Line 12: INTERPOLATION_START = '"Hello, I'm "'
+Line 12: SELF = 'self'
+Line 12: DOT = '.'
+Line 12: IDENTIFIER = 'name'
+Line 12: INTERPOLATION_END = ''
+Line 12: INTERPOLATION_START = '" and I'm "'
+Line 12: SELF = 'self'
+Line 12: DOT = '.'
+Line 12: IDENTIFIER = 'age'
+Line 12: INTERPOLATION_END = ''
+Line 12: STRING = '" years old"'
+Line 12: RIGHT_PAREN = ')'
+Line 12: SEMICOLON = ';'
+Line 13: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 15: FN = 'fn' [leading: NEWLINE('
+') WHITESPACE('    ') NEWLINE('
+') WHITESPACE('    ') ]
+Line 15: IDENTIFIER = 'birthday' [leading: WHITESPACE(' ') ]
+Line 15: LEFT_PAREN = '('
+Line 15: RIGHT_PAREN = ')'
+Line 15: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 16: SELF = 'self' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 16: DOT = '.'
+Line 16: IDENTIFIER = 'age'
+Line 16: PLUS_EQUAL = '+=' [leading: WHITESPACE(' ') ]
+Line 16: NUMBER = '1' [leading: WHITESPACE(' ') ]
+Line 16: SEMICOLON = ';'
+Line 17: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 17: LEFT_PAREN = '('
+Line 17: INTERPOLATION_START = '""'
+Line 17: SELF = 'self'
+Line 17: DOT = '.'
+Line 17: IDENTIFIER = 'name'
+Line 17: INTERPOLATION_END = ''
+Line 17: INTERPOLATION_START = '" is now "'
+Line 17: SELF = 'self'
+Line 17: DOT = '.'
+Line 17: IDENTIFIER = 'age'
+Line 17: INTERPOLATION_END = ''
+Line 17: STRING = '" years old"'
+Line 17: RIGHT_PAREN = ')'
+Line 17: SEMICOLON = ';'
+Line 18: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 19: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 21: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 21: LEFT_PAREN = '('
+Line 21: STRING = '"Creating Person objects:"'
+Line 21: RIGHT_PAREN = ')'
+Line 21: SEMICOLON = ';'
+Line 22: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 22: IDENTIFIER = 'person1' [leading: WHITESPACE(' ') ]
+Line 22: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 22: IDENTIFIER = 'Person' [leading: WHITESPACE(' ') ]
+Line 22: LEFT_PAREN = '('
+Line 22: STRING = '"Alice"'
+Line 22: COMMA = ','
+Line 22: NUMBER = '25' [leading: WHITESPACE(' ') ]
+Line 22: RIGHT_PAREN = ')'
+Line 22: SEMICOLON = ';'
+Line 23: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 23: IDENTIFIER = 'person2' [leading: WHITESPACE(' ') ]
+Line 23: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 23: IDENTIFIER = 'Person' [leading: WHITESPACE(' ') ]
+Line 23: LEFT_PAREN = '('
+Line 23: STRING = '"Bob"'
+Line 23: COMMA = ','
+Line 23: NUMBER = '30' [leading: WHITESPACE(' ') ]
+Line 23: RIGHT_PAREN = ')'
+Line 23: SEMICOLON = ';'
+Line 25: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 25: LEFT_PAREN = '('
+Line 25: STRING = '"Calling methods:"'
+Line 25: RIGHT_PAREN = ')'
+Line 25: SEMICOLON = ';'
+Line 26: IDENTIFIER = 'person1' [leading: NEWLINE('
+') ]
+Line 26: DOT = '.'
+Line 26: IDENTIFIER = 'greet'
+Line 26: LEFT_PAREN = '('
+Line 26: RIGHT_PAREN = ')'
+Line 26: SEMICOLON = ';'
+Line 27: IDENTIFIER = 'person2' [leading: NEWLINE('
+') ]
+Line 27: DOT = '.'
+Line 27: IDENTIFIER = 'greet'
+Line 27: LEFT_PAREN = '('
+Line 27: RIGHT_PAREN = ')'
+Line 27: SEMICOLON = ';'
+Line 29: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 29: LEFT_PAREN = '('
+Line 29: STRING = '"Birthday test:"'
+Line 29: RIGHT_PAREN = ')'
+Line 29: SEMICOLON = ';'
+Line 30: IDENTIFIER = 'person1' [leading: NEWLINE('
+') ]
+Line 30: DOT = '.'
+Line 30: IDENTIFIER = 'birthday'
+Line 30: LEFT_PAREN = '('
+Line 30: RIGHT_PAREN = ')'
+Line 30: SEMICOLON = ';'
+Line 31: IDENTIFIER = 'person1' [leading: NEWLINE('
+') ]
+Line 31: DOT = '.'
+Line 31: IDENTIFIER = 'greet'
+Line 31: LEFT_PAREN = '('
+Line 31: RIGHT_PAREN = ')'
+Line 31: SEMICOLON = ';'
+Line 34: CLASS = 'class' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Class with properties') NEWLINE('
+') ]
+Line 34: IDENTIFIER = 'Rectangle' [leading: WHITESPACE(' ') ]
+Line 34: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 35: VAR = 'var' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 35: IDENTIFIER = 'width' [leading: WHITESPACE(' ') ]
+Line 35: COLON = ':'
+Line 35: INT_TYPE = 'int'
+Line 35: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 35: NUMBER = '0' [leading: WHITESPACE(' ') ]
+Line 35: SEMICOLON = ';'
+Line 36: VAR = 'var' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 36: IDENTIFIER = 'height' [leading: WHITESPACE(' ') ]
+Line 36: COLON = ':'
+Line 36: INT_TYPE = 'int'
+Line 36: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 36: NUMBER = '0' [leading: WHITESPACE(' ') ]
+Line 36: SEMICOLON = ';'
+Line 38: FN = 'fn' [leading: NEWLINE('
+') NEWLINE('
+') WHITESPACE('    ') ]
+Line 38: IDENTIFIER = 'init' [leading: WHITESPACE(' ') ]
+Line 38: LEFT_PAREN = '('
+Line 38: IDENTIFIER = 'width'
+Line 38: COMMA = ','
+Line 38: IDENTIFIER = 'height' [leading: WHITESPACE(' ') ]
+Line 38: RIGHT_PAREN = ')'
+Line 38: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 39: SELF = 'self' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 39: DOT = '.'
+Line 39: IDENTIFIER = 'width'
+Line 39: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 39: IDENTIFIER = 'width' [leading: WHITESPACE(' ') ]
+Line 39: SEMICOLON = ';'
+Line 40: SELF = 'self' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 40: DOT = '.'
+Line 40: IDENTIFIER = 'height'
+Line 40: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 40: IDENTIFIER = 'height' [leading: WHITESPACE(' ') ]
+Line 40: SEMICOLON = ';'
+Line 41: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 43: FN = 'fn' [leading: NEWLINE('
+') WHITESPACE('    ') NEWLINE('
+') WHITESPACE('    ') ]
+Line 43: IDENTIFIER = 'area' [leading: WHITESPACE(' ') ]
+Line 43: LEFT_PAREN = '('
+Line 43: RIGHT_PAREN = ')'
+Line 43: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 44: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 44: SELF = 'self' [leading: WHITESPACE(' ') ]
+Line 44: DOT = '.'
+Line 44: IDENTIFIER = 'width'
+Line 44: STAR = '*' [leading: WHITESPACE(' ') ]
+Line 44: SELF = 'self' [leading: WHITESPACE(' ') ]
+Line 44: DOT = '.'
+Line 44: IDENTIFIER = 'height'
+Line 44: SEMICOLON = ';'
+Line 45: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 47: FN = 'fn' [leading: NEWLINE('
+') WHITESPACE('    ') NEWLINE('
+') WHITESPACE('    ') ]
+Line 47: IDENTIFIER = 'perimeter' [leading: WHITESPACE(' ') ]
+Line 47: LEFT_PAREN = '('
+Line 47: RIGHT_PAREN = ')'
+Line 47: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 48: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 48: NUMBER = '2' [leading: WHITESPACE(' ') ]
+Line 48: STAR = '*' [leading: WHITESPACE(' ') ]
+Line 48: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 48: SELF = 'self'
+Line 48: DOT = '.'
+Line 48: IDENTIFIER = 'width'
+Line 48: PLUS = '+' [leading: WHITESPACE(' ') ]
+Line 48: SELF = 'self' [leading: WHITESPACE(' ') ]
+Line 48: DOT = '.'
+Line 48: IDENTIFIER = 'height'
+Line 48: RIGHT_PAREN = ')'
+Line 48: SEMICOLON = ';'
+Line 49: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 50: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 52: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 52: LEFT_PAREN = '('
+Line 52: STRING = '"Rectangle class:"'
+Line 52: RIGHT_PAREN = ')'
+Line 52: SEMICOLON = ';'
+Line 53: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 53: IDENTIFIER = 'rect' [leading: WHITESPACE(' ') ]
+Line 53: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 53: IDENTIFIER = 'Rectangle' [leading: WHITESPACE(' ') ]
+Line 53: LEFT_PAREN = '('
+Line 53: NUMBER = '5'
+Line 53: COMMA = ','
+Line 53: NUMBER = '3' [leading: WHITESPACE(' ') ]
+Line 53: RIGHT_PAREN = ')'
+Line 53: SEMICOLON = ';'
+Line 54: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 54: LEFT_PAREN = '('
+Line 54: INTERPOLATION_START = '"Area: "'
+Line 54: IDENTIFIER = 'rect'
+Line 54: DOT = '.'
+Line 54: IDENTIFIER = 'area'
+Line 54: LEFT_PAREN = '('
+Line 54: RIGHT_PAREN = ')'
+Line 54: INTERPOLATION_END = ''
+Line 54: STRING = '""'
+Line 54: RIGHT_PAREN = ')'
+Line 54: SEMICOLON = ';'
+Line 55: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 55: LEFT_PAREN = '('
+Line 55: INTERPOLATION_START = '"Perimeter: "'
+Line 55: IDENTIFIER = 'rect'
+Line 55: DOT = '.'
+Line 55: IDENTIFIER = 'perimeter'
+Line 55: LEFT_PAREN = '('
+Line 55: RIGHT_PAREN = ')'
+Line 55: INTERPOLATION_END = ''
+Line 55: STRING = '""'
+Line 55: RIGHT_PAREN = ')'
+Line 55: SEMICOLON = ';'
+Line 60: CLASS = 'class' [leading: NEWLINE('
+') NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test file for self keyword and member access') NEWLINE('
+') NEWLINE('
+') ]
+Line 60: IDENTIFIER = 'BankAccount' [leading: WHITESPACE(' ') ]
+Line 60: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 61: VAR = 'var' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 61: IDENTIFIER = 'balance' [leading: WHITESPACE(' ') ]
+Line 61: COLON = ':'
+Line 61: FLOAT_TYPE = 'float' [leading: WHITESPACE(' ') ]
+Line 61: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 61: NUMBER = '0.0' [leading: WHITESPACE(' ') ]
+Line 61: SEMICOLON = ';'
+Line 63: FN = 'fn' [leading: NEWLINE('
+') WHITESPACE('    ') NEWLINE('
+') WHITESPACE('    ') ]
+Line 63: IDENTIFIER = 'deposit' [leading: WHITESPACE(' ') ]
+Line 63: LEFT_PAREN = '('
+Line 63: IDENTIFIER = 'amount'
+Line 63: COLON = ':'
+Line 63: FLOAT_TYPE = 'float' [leading: WHITESPACE(' ') ]
+Line 63: RIGHT_PAREN = ')'
+Line 63: COLON = ':' [leading: WHITESPACE(' ') ]
+Line 63: FLOAT_TYPE = 'float' [leading: WHITESPACE(' ') ]
+Line 63: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 64: SELF = 'self' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 64: DOT = '.'
+Line 64: IDENTIFIER = 'balance'
+Line 64: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 64: SELF = 'self' [leading: WHITESPACE(' ') ]
+Line 64: DOT = '.'
+Line 64: IDENTIFIER = 'balance'
+Line 64: PLUS = '+' [leading: WHITESPACE(' ') ]
+Line 64: IDENTIFIER = 'amount' [leading: WHITESPACE(' ') ]
+Line 64: SEMICOLON = ';'
+Line 65: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 65: SELF = 'self' [leading: WHITESPACE(' ') ]
+Line 65: DOT = '.'
+Line 65: IDENTIFIER = 'balance'
+Line 65: SEMICOLON = ';'
+Line 66: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 68: FN = 'fn' [leading: NEWLINE('
+') WHITESPACE('    ') NEWLINE('
+') WHITESPACE('    ') ]
+Line 68: IDENTIFIER = 'withdraw' [leading: WHITESPACE(' ') ]
+Line 68: LEFT_PAREN = '('
+Line 68: IDENTIFIER = 'amount'
+Line 68: COLON = ':'
+Line 68: FLOAT_TYPE = 'float' [leading: WHITESPACE(' ') ]
+Line 68: RIGHT_PAREN = ')'
+Line 68: COLON = ':' [leading: WHITESPACE(' ') ]
+Line 68: FLOAT_TYPE = 'float' [leading: WHITESPACE(' ') ]
+Line 68: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 69: IF = 'if' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 69: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 69: IDENTIFIER = 'amount'
+Line 69: GREATER = '>' [leading: WHITESPACE(' ') ]
+Line 69: SELF = 'self' [leading: WHITESPACE(' ') ]
+Line 69: DOT = '.'
+Line 69: IDENTIFIER = 'balance'
+Line 69: RIGHT_PAREN = ')'
+Line 69: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 70: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('            ') ]
+Line 70: LEFT_PAREN = '('
+Line 70: STRING = '"Insufficient funds!"'
+Line 70: RIGHT_PAREN = ')'
+Line 71: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('            ') ]
+Line 71: SELF = 'self' [leading: WHITESPACE(' ') ]
+Line 71: DOT = '.'
+Line 71: IDENTIFIER = 'balance'
+Line 71: SEMICOLON = ';'
+Line 72: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 73: SELF = 'self' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 73: DOT = '.'
+Line 73: IDENTIFIER = 'balance'
+Line 73: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 73: SELF = 'self' [leading: WHITESPACE(' ') ]
+Line 73: DOT = '.'
+Line 73: IDENTIFIER = 'balance'
+Line 73: MINUS = '-' [leading: WHITESPACE(' ') ]
+Line 73: IDENTIFIER = 'amount' [leading: WHITESPACE(' ') ]
+Line 73: SEMICOLON = ';'
+Line 74: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 74: IDENTIFIER = 'amount' [leading: WHITESPACE(' ') ]
+Line 74: SEMICOLON = ';'
+Line 75: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 76: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 79: FN = 'fn' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test the BankAccount') NEWLINE('
+') ]
+Line 79: IDENTIFIER = 'test_bank_account' [leading: WHITESPACE(' ') ]
+Line 79: LEFT_PAREN = '('
+Line 79: RIGHT_PAREN = ')'
+Line 79: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 80: VAR = 'var' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 80: IDENTIFIER = 'account' [leading: WHITESPACE(' ') ]
+Line 80: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 80: IDENTIFIER = 'BankAccount' [leading: WHITESPACE(' ') ]
+Line 80: LEFT_PAREN = '('
+Line 80: RIGHT_PAREN = ')'
+Line 83: IDENTIFIER = 'account' [leading: NEWLINE('
+') WHITESPACE('    ') NEWLINE('
+') WHITESPACE('    ') COMMENT_LINE('// Test deposit') NEWLINE('
+') WHITESPACE('    ') ]
+Line 83: DOT = '.'
+Line 83: IDENTIFIER = 'deposit'
+Line 83: LEFT_PAREN = '('
+Line 83: NUMBER = '100.0'
+Line 83: RIGHT_PAREN = ')'
+Line 84: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 84: LEFT_PAREN = '('
+Line 84: INTERPOLATION_START = '"Balance after deposit: "'
+Line 84: IDENTIFIER = 'account'
+Line 84: DOT = '.'
+Line 84: IDENTIFIER = 'balance'
+Line 84: INTERPOLATION_END = ''
+Line 84: STRING = '""'
+Line 84: RIGHT_PAREN = ')'
+Line 87: VAR = 'var' [leading: WHITESPACE('  ') COMMENT_LINE('// Should be 100.0') NEWLINE('
+') WHITESPACE('    ') NEWLINE('
+') WHITESPACE('    ') COMMENT_LINE('// Test withdraw') NEWLINE('
+') WHITESPACE('    ') ]
+Line 87: IDENTIFIER = 'withdrawn' [leading: WHITESPACE(' ') ]
+Line 87: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 87: IDENTIFIER = 'account' [leading: WHITESPACE(' ') ]
+Line 87: DOT = '.'
+Line 87: IDENTIFIER = 'withdraw'
+Line 87: LEFT_PAREN = '('
+Line 87: NUMBER = '30.0'
+Line 87: RIGHT_PAREN = ')'
+Line 88: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 88: LEFT_PAREN = '('
+Line 88: INTERPOLATION_START = '"Withdrawn: "'
+Line 88: IDENTIFIER = 'withdrawn'
+Line 88: INTERPOLATION_END = ''
+Line 88: STRING = '""'
+Line 88: RIGHT_PAREN = ')'
+Line 89: PRINT = 'print' [leading: WHITESPACE('  ') COMMENT_LINE('// Should be 30.0') NEWLINE('
+') WHITESPACE('    ') ]
+Line 89: LEFT_PAREN = '('
+Line 89: INTERPOLATION_START = '"Balance after withdrawal: "'
+Line 89: IDENTIFIER = 'account'
+Line 89: DOT = '.'
+Line 89: IDENTIFIER = 'balance'
+Line 89: INTERPOLATION_END = ''
+Line 89: STRING = '""'
+Line 89: RIGHT_PAREN = ')'
+Line 92: VAR = 'var' [leading: WHITESPACE('  ') COMMENT_LINE('// Should be 70.0') NEWLINE('
+') WHITESPACE('    ') NEWLINE('
+') WHITESPACE('    ') COMMENT_LINE('// Test insufficient funds') NEWLINE('
+') WHITESPACE('    ') ]
+Line 92: IDENTIFIER = 'failed_withdraw' [leading: WHITESPACE(' ') ]
+Line 92: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 92: IDENTIFIER = 'account' [leading: WHITESPACE(' ') ]
+Line 92: DOT = '.'
+Line 92: IDENTIFIER = 'withdraw'
+Line 92: LEFT_PAREN = '('
+Line 92: NUMBER = '100.0'
+Line 92: RIGHT_PAREN = ')'
+Line 93: PRINT = 'print' [leading: WHITESPACE('  ') COMMENT_LINE('// Should print "Insufficient funds!"') NEWLINE('
+') WHITESPACE('    ') ]
+Line 93: LEFT_PAREN = '('
+Line 93: INTERPOLATION_START = '"Failed withdrawal: "'
+Line 93: IDENTIFIER = 'failed_withdraw'
+Line 93: INTERPOLATION_END = ''
+Line 93: STRING = '""'
+Line 93: RIGHT_PAREN = ')'
+Line 94: RIGHT_BRACE = '}' [leading: WHITESPACE('  ') COMMENT_LINE('// Should be 70.0 (unchanged)') NEWLINE('
+') ]
+Line 96: IDENTIFIER = 'test_bank_account' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 96: LEFT_PAREN = '('
+Line 96: RIGHT_PAREN = ')'
+Line 97: EOF_TOKEN = ''

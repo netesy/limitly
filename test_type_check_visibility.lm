@@ -1,0 +1,82 @@
+// Test visibility enforcement in type checker
+// This file is a module, so all declarations are module members
+
+// Private function - only accessible within this file/module
+fn privateHelper(): str {
+    return "private helper";
+}
+
+// Public function - accessible from other modules
+pub fn publicHelper(): str {
+    return "public helper";
+}
+
+// Protected function - accessible from same module and submodules
+prot fn protectedHelper(): str {
+    return "protected helper";
+}
+
+class Person {
+    name: str;           // Private by default - accessible within same class
+    pub age: int;        // Public - accessible from any module
+    prot id: str;        // Protected - accessible from same module and subclasses
+    
+    pub fn getName(): str {
+        return self.name;  // Should work - same class and same module
+    }
+    
+    fn privateMethod(): str {  // Private by default - accessible within same module
+        return privateHelper(); // Should work - same module
+    }
+    
+    pub fn publicMethod(): str {
+        return "public";
+    }
+    
+    prot fn protectedMethod(): str {
+        return "protected";
+    }
+}
+
+class Employee : Person {
+    pub fn getEmployeeId(): str {
+        return self.id;    // Should work - protected member in subclass
+    }
+    
+    pub fn testPrivateAccess(): str {
+        return self.name;  // Should work - private member but same module
+    }
+    
+    pub fn testProtectedAccess(): str {
+        return self.protectedMethod(); // Should work - protected method in subclass
+    }
+}
+
+// Test function visibility within same module
+fn testModuleAccess() {
+    var helper1 = privateHelper();    // Should work - same module
+    var helper2 = protectedHelper();  // Should work - same module
+    var helper3 = publicHelper();     // Should work - always accessible
+}
+
+var person = Person();
+    
+// These should work - public members
+var age = person.age;           
+var name = person.getName();    
+var result = person.publicMethod();
+
+// These should work - same module access
+var privateName = person.name;        // Private field but same module
+var privateResult = person.privateMethod(); // Private method but same module
+
+// These should work - protected access within same module
+var id = person.id;                   // Protected field, same module
+var protectedResult = person.protectedMethod(); // Protected method, same module
+
+var employee = Employee();
+var empId = employee.getEmployeeId();     // Should work
+var empName = employee.testPrivateAccess(); // Should work - same module
+var empProt = employee.testProtectedAccess(); // Should work - inheritance
+
+testModuleAccess(); // Should work - same module

@@ -1,10 +1,14 @@
 #include "type_checker.hh"
 #include "types.hh"
 #include "../common/debugger.hh"
+#include "../frontend/scanner.hh"
+#include "../frontend/parser.hh"
 #include <algorithm>
 #include <sstream>
 #include <string>
 #include <variant>
+#include <fstream>
+#include <set>
 
 void TypeChecker::addError(const std::string& message, int line, int column, const std::string& context) {
     errors.emplace_back(message, line, column, context);
@@ -38,6 +42,9 @@ void TypeChecker::exitScope() {
 
 std::vector<TypeCheckError> TypeChecker::checkProgram(const std::shared_ptr<AST::Program>& program) {
     errors.clear();
+    
+    // Extract visibility information from AST
+    extractModuleVisibility(program);
     
     // First pass: collect type aliases and function signatures
     for (const auto& stmt : program->statements) {
@@ -254,6 +261,9 @@ TypePtr TypeChecker::resolveTypeAnnotation(const std::shared_ptr<AST::TypeAnnota
 
 void TypeChecker::checkStatement(const std::shared_ptr<AST::Statement>& stmt) {
     if (auto varDecl = std::dynamic_pointer_cast<AST::VarDeclaration>(stmt)) {
+        // Store top-level variable declaration for visibility checking
+        topLevelVariables[varDecl->name] = varDecl;
+        
         TypePtr varType = typeSystem.ANY_TYPE;
         
         if (varDecl->type && *varDecl->type) {
@@ -443,6 +453,9 @@ void TypeChecker::checkStatement(const std::shared_ptr<AST::Statement>& stmt) {
         }
         
     } else if (auto funcDecl = std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt)) {
+        // Store top-level function declaration for visibility checking
+        topLevelFunctions[funcDecl->name] = funcDecl;
+        
         checkFunctionDeclaration(funcDecl);
         
     } else if (auto blockStmt = std::dynamic_pointer_cast<AST::BlockStatement>(stmt)) {
@@ -530,6 +543,10 @@ void TypeChecker::checkStatement(const std::shared_ptr<AST::Statement>& stmt) {
         }
     } else if (auto classDecl = std::dynamic_pointer_cast<AST::ClassDeclaration>(stmt)) {
         checkClassDeclaration(classDecl);
+    } else if (auto moduleDecl = std::dynamic_pointer_cast<AST::ModuleDeclaration>(stmt)) {
+        checkModuleDeclaration(moduleDecl);
+    } else if (auto importStmt = std::dynamic_pointer_cast<AST::ImportStatement>(stmt)) {
+        checkImportStatement(importStmt);
     } else if (auto contractStmt = std::dynamic_pointer_cast<AST::ContractStatement>(stmt)) {
         checkContractStatement(contractStmt);
     }
@@ -561,12 +578,66 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
     } else if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(expr)) {
         TypePtr varType = currentScope->getVariableType(varExpr->name);
         if (varType) {
+            // Check variable visibility if it's a module-level variable
+            // Note: We need to check if this is actually a module-level variable first
+            // For now, we'll check visibility for all variables
+            AST::VisibilityLevel varVisibility = getModuleMemberVisibility(currentModulePath, varExpr->name);
+            if (varVisibility != AST::VisibilityLevel::Public && varVisibility != AST::VisibilityLevel::Const) {
+                // For non-public variables, check if access is allowed
+                if (!canAccessModuleMember(currentModulePath, varExpr->name)) {
+                    std::string visibilityStr;
+                    switch (varVisibility) {
+                        case AST::VisibilityLevel::Private:
+                            visibilityStr = "private";
+                            break;
+                        case AST::VisibilityLevel::Protected:
+                            visibilityStr = "protected";
+                            break;
+                        case AST::VisibilityLevel::Public:
+                            visibilityStr = "public";
+                            break;
+                        case AST::VisibilityLevel::Const:
+                            visibilityStr = "const";
+                            break;
+                    }
+                    
+                    addError("Cannot access " + visibilityStr + " variable '" + varExpr->name + 
+                            "' from current context", expr->line);
+                    return typeSystem.ANY_TYPE;
+                }
+            }
             return varType;
         }
         
         // Check if it's a function being referenced (not called)
         FunctionSignature* signature = currentScope->getFunctionSignature(varExpr->name);
         if (signature) {
+            // Check function visibility for function references too
+            AST::VisibilityLevel funcVisibility = getModuleMemberVisibility(currentModulePath, varExpr->name);
+            if (funcVisibility != AST::VisibilityLevel::Public && funcVisibility != AST::VisibilityLevel::Const) {
+                // For non-public functions, check if access is allowed
+                if (!canAccessModuleMember(currentModulePath, varExpr->name)) {
+                    std::string visibilityStr;
+                    switch (funcVisibility) {
+                        case AST::VisibilityLevel::Private:
+                            visibilityStr = "private";
+                            break;
+                        case AST::VisibilityLevel::Protected:
+                            visibilityStr = "protected";
+                            break;
+                        case AST::VisibilityLevel::Public:
+                            visibilityStr = "public";
+                            break;
+                        case AST::VisibilityLevel::Const:
+                            visibilityStr = "const";
+                            break;
+                    }
+                    
+                    addError("Cannot access " + visibilityStr + " function '" + varExpr->name + 
+                            "' from current context", expr->line);
+                    return typeSystem.ANY_TYPE;
+                }
+            }
          
             // Return a function type for the function reference
             TypePtr funcType = typeSystem.createFunctionType(signature->paramTypes, signature->returnType);
@@ -581,6 +652,16 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
         
         // Get function signature or function type to determine return type
         if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(callExpr->callee)) {
+            // Check if this is a class constructor call
+            if (classDeclarations.find(varExpr->name) != classDeclarations.end()) {
+                // This is a constructor call - return a UserDefined type with the class name
+                UserDefinedType userType;
+                userType.name = varExpr->name;
+                TypePtr classType = std::make_shared<Type>(TypeTag::UserDefined);
+                classType->extra = userType;
+                return classType;
+            }
+            
             // First check if it's a regular function
             FunctionSignature* signature = currentScope->getFunctionSignature(varExpr->name);
             if (signature) {
@@ -820,6 +901,10 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
 
         
         return functionType;
+        
+    } else if (auto memberExpr = std::dynamic_pointer_cast<AST::MemberExpr>(expr)) {
+        // Check member access with visibility enforcement
+        return checkMemberAccess(memberExpr);
     }
     
     // Default case for other expression types
@@ -979,9 +1064,43 @@ void TypeChecker::checkFunctionCall(const std::shared_ptr<AST::CallExpr>& expr) 
             return;
         }
         
+        // Check if this is a class constructor call first
+        if (classDeclarations.find(varExpr->name) != classDeclarations.end()) {
+            // This is a constructor call - no additional validation needed here
+            // The constructor call will be handled by the VM
+            return;
+        }
+        
         // First check if it's a regular function
         FunctionSignature* signature = currentScope->getFunctionSignature(varExpr->name);
         if (signature) {
+            // Check function visibility before allowing the call
+            AST::VisibilityLevel funcVisibility = getModuleMemberVisibility(currentModulePath, varExpr->name);
+            if (funcVisibility != AST::VisibilityLevel::Public && funcVisibility != AST::VisibilityLevel::Const) {
+                // For non-public functions, check if access is allowed
+                if (!canAccessModuleMember(currentModulePath, varExpr->name)) {
+                    std::string visibilityStr;
+                    switch (funcVisibility) {
+                        case AST::VisibilityLevel::Private:
+                            visibilityStr = "private";
+                            break;
+                        case AST::VisibilityLevel::Protected:
+                            visibilityStr = "protected";
+                            break;
+                        case AST::VisibilityLevel::Public:
+                            visibilityStr = "public";
+                            break;
+                        case AST::VisibilityLevel::Const:
+                            visibilityStr = "const";
+                            break;
+                    }
+                    
+                    addError("Cannot access " + visibilityStr + " function '" + varExpr->name + 
+                            "' from current context", expr->line);
+                    return;
+                }
+            }
+            
             // Handle regular function call
             checkRegularFunctionCall(signature, argTypes, expr);
             return;
@@ -998,6 +1117,14 @@ void TypeChecker::checkFunctionCall(const std::shared_ptr<AST::CallExpr>& expr) 
         addError("Undefined function", expr->line, 0, "Function call", varExpr->name, "declared function name");
         return;
     }
+    
+    // Handle module member function calls (e.g., module.function())
+    if (auto memberExpr = std::dynamic_pointer_cast<AST::MemberExpr>(expr->callee)) {
+        checkModuleMemberFunctionCall(memberExpr, argTypes, expr);
+        return;
+    }
+    
+    addError("Invalid function call expression", expr->line);
 }
 
 void TypeChecker::checkRegularFunctionCall(FunctionSignature* signature, const std::vector<TypePtr>& argTypes, const std::shared_ptr<AST::CallExpr>& expr) {
@@ -2044,6 +2171,18 @@ bool TypeChecker::isExhaustiveOptionMatch(const std::vector<std::shared_ptr<AST:
 
 
 void TypeChecker::checkClassDeclaration(const std::shared_ptr<AST::ClassDeclaration>& classDecl) {
+    // Store the class declaration for visibility checking
+    classDeclarations[classDecl->name] = classDecl;
+    
+    // Track which module this class is defined in
+    classToModuleMap[classDecl->name] = currentModulePath;
+    
+    // Set current class context for visibility checking
+    std::string previousClassName = currentClassName;
+    auto previousClassDecl = currentClassDecl;
+    currentClassName = classDecl->name;
+    currentClassDecl = classDecl;
+    
     // Register the class name as a callable constructor function
     // This allows the class name to be used as a function call for creating instances
     
@@ -2083,8 +2222,1141 @@ void TypeChecker::checkClassDeclaration(const std::shared_ptr<AST::ClassDeclarat
     // Register the constructor signature in the current scope
     currentScope->functions[classDecl->name] = constructorSignature;
     
-    // Type check all methods in the class
+    // Type check all methods in the class (with class context set)
     for (const auto& method : classDecl->methods) {
         checkFunctionDeclaration(method);
     }
+    
+    // Restore previous class context
+    currentClassName = previousClassName;
+    currentClassDecl = previousClassDecl;
+}
+
+void TypeChecker::checkModuleDeclaration(const std::shared_ptr<AST::ModuleDeclaration>& moduleDecl) {
+    // Store the module declaration for visibility checking
+    moduleDeclarations[moduleDecl->name] = moduleDecl;
+    
+    // Check public members
+    for (const auto& member : moduleDecl->publicMembers) {
+        checkStatement(member);
+    }
+    
+    // Check protected members
+    for (const auto& member : moduleDecl->protectedMembers) {
+        checkStatement(member);
+    }
+    
+    // Check private members
+    for (const auto& member : moduleDecl->privateMembers) {
+        checkStatement(member);
+    }
+}
+// Visibility enforcement methods
+
+TypePtr TypeChecker::checkMemberAccess(const std::shared_ptr<AST::MemberExpr>& expr) {
+    // First, check the object type
+    TypePtr objectType = checkExpression(expr->object);
+    
+    if (!objectType) {
+        addError("Cannot access member '" + expr->name + "' on invalid object", expr->line);
+        return typeSystem.ANY_TYPE;
+    }
+    
+    // Handle class member access using the new validateClassMemberAccess method
+    if (objectType->tag == TypeTag::Object || objectType->tag == TypeTag::UserDefined) {
+        // Use the new validateClassMemberAccess method for proper class-based validation
+        bool accessValid = validateClassMemberAccess(expr);
+        
+        if (!accessValid) {
+            // Error already reported by validateClassMemberAccess
+            return typeSystem.ANY_TYPE;
+        }
+        
+        // TODO: Return proper member type based on class field/method definitions
+        return typeSystem.ANY_TYPE;
+    }
+    
+    // Handle module member access
+    if (objectType->tag == TypeTag::Module) {
+        // Get the module name from the object expression
+        std::string moduleName;
+        if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(expr->object)) {
+            moduleName = varExpr->name; // This would be the module alias or name
+        }
+        
+        if (!moduleName.empty()) {
+            // Resolve the module alias to the actual module path
+            std::string targetModulePath = resolveModuleAlias(moduleName);
+            
+            if (targetModulePath.empty()) {
+                // Check if it's a direct module path (not an alias)
+                targetModulePath = moduleName;
+                
+                // Verify the module exists in our registry
+                if (moduleRegistry.find(targetModulePath) == moduleRegistry.end()) {
+                    addError("Undefined module '" + moduleName + "'", expr->line);
+                    return typeSystem.ANY_TYPE;
+                }
+            }
+            
+            // Get member visibility from the target module
+            AST::VisibilityLevel memberVisibility = getModuleMemberVisibility(targetModulePath, expr->name);
+            
+            // Check if cross-module access is allowed
+            if (memberVisibility == AST::VisibilityLevel::Private) {
+                // Private members are not accessible across modules
+                addError("Cannot access private member '" + expr->name + 
+                        "' of module '" + moduleName + "' from different module", expr->line);
+                return typeSystem.ANY_TYPE;
+            } else if (memberVisibility == AST::VisibilityLevel::Protected) {
+                // Protected members have limited cross-module access
+                // For now, we'll be conservative and block cross-module protected access
+                addError("Cannot access protected member '" + expr->name + 
+                        "' of module '" + moduleName + "' from different module", expr->line);
+                return typeSystem.ANY_TYPE;
+            }
+            
+            // Public and const members are accessible across modules
+            return typeSystem.ANY_TYPE;
+        }
+        
+        // If we can't determine the module name, allow access for now
+        return typeSystem.ANY_TYPE;
+    }
+    
+    // Handle dict/object literal access
+    if (objectType->tag == TypeTag::Dict) {
+        // Dict access is always allowed
+        return typeSystem.ANY_TYPE;
+    }
+    
+    // For other types, allow access but warn if it doesn't make sense
+    return typeSystem.ANY_TYPE;
+}
+
+bool TypeChecker::canAccessMember(const std::string& className, const std::string& memberName, AST::VisibilityLevel memberVisibility) {
+    switch (memberVisibility) {
+        case AST::VisibilityLevel::Public:
+        case AST::VisibilityLevel::Const:
+            return true; // Public and const members are always accessible across modules
+            
+        case AST::VisibilityLevel::Protected: {
+            // Protected members are accessible from:
+            // 1. The same class
+            // 2. Subclasses (even across modules)
+            // 3. The same module (file)
+            
+            if (!currentClassName.empty() && currentClassName == className) {
+                return true; // Same class can always access
+            }
+            
+            if (!currentClassName.empty() && currentClassDecl) {
+                if (isSubclassOf(currentClassName, className)) {
+                    return true; // Subclass can access protected members
+                }
+            }
+            
+            // Check if accessing from the same module
+            auto classModuleIt = classToModuleMap.find(className);
+            if (classModuleIt != classToModuleMap.end()) {
+                return classModuleIt->second == currentModulePath;
+            }
+            
+            return false;
+        }
+            
+        case AST::VisibilityLevel::Private:
+        default: {
+            // Private members are accessible from:
+            // 1. The same class
+            // 2. The same module (file) - since each file is a module
+            
+            if (!currentClassName.empty() && currentClassName == className) {
+                return true; // Same class can always access
+            }
+            
+            // Check if accessing from the same module (file)
+            auto classModuleIt = classToModuleMap.find(className);
+            if (classModuleIt != classToModuleMap.end()) {
+                return classModuleIt->second == currentModulePath;
+            }
+            
+            return false;
+        }
+    }
+}
+
+bool TypeChecker::canAccessClassMember(const std::string& className, const std::string& memberName, AST::VisibilityLevel memberVisibility) {
+    // Class-based access checking logic (independent from module rules)
+    switch (memberVisibility) {
+        case AST::VisibilityLevel::Public:
+        case AST::VisibilityLevel::Const:
+            return true; // Public and const members are always accessible
+            
+        case AST::VisibilityLevel::Protected: {
+            // Protected members are accessible from:
+            // 1. The same class
+            // 2. Subclasses (even across modules)
+            
+            if (!currentClassName.empty() && currentClassName == className) {
+                return true; // Same class can always access
+            }
+            
+            if (!currentClassName.empty()) {
+                if (isSubclassOf(currentClassName, className)) {
+                    return true; // Subclass can access protected members
+                }
+            }
+            
+            return false; // Protected access denied
+        }
+            
+        case AST::VisibilityLevel::Private:
+        default: {
+            // Private members are accessible only from the same class
+            if (!currentClassName.empty() && currentClassName == className) {
+                return true; // Same class can always access
+            }
+            
+            return false; // Private access denied
+        }
+    }
+}
+
+bool TypeChecker::canAccessModuleMember(AST::VisibilityLevel visibility, const std::string& declaringModule, const std::string& accessingModule) {
+    // Module-based access checking logic (independent from class rules)
+    switch (visibility) {
+        case AST::VisibilityLevel::Public:
+        case AST::VisibilityLevel::Const:
+            return true; // Public and const members are always accessible across modules
+            
+        case AST::VisibilityLevel::Protected:
+            // Protected members are accessible within the same module
+            return declaringModule == accessingModule;
+            
+        case AST::VisibilityLevel::Private:
+        default:
+            // Private members are only accessible within the same module
+            return declaringModule == accessingModule;
+    }
+}
+
+std::string TypeChecker::getCurrentClassName() {
+    return currentClassName;
+}
+
+AST::VisibilityLevel TypeChecker::getModuleMemberVisibility(const std::string& moduleName, const std::string& memberName) {
+    if (memberName.empty() || moduleName.empty()) {
+        return AST::VisibilityLevel::Private;
+    }
+    
+    // First try to get visibility from the extracted module registry
+    auto moduleIt = moduleRegistry.find(moduleName);
+    if (moduleIt != moduleRegistry.end()) {
+        const ModuleVisibilityInfo& moduleInfo = moduleIt->second;
+        
+        // Check functions first
+        auto funcIt = moduleInfo.functions.find(memberName);
+        if (funcIt != moduleInfo.functions.end()) {
+            return funcIt->second.visibility;
+        }
+        
+        // Check variables
+        auto varIt = moduleInfo.variables.find(memberName);
+        if (varIt != moduleInfo.variables.end()) {
+            return varIt->second.visibility;
+        }
+        
+        // Check classes
+        auto classIt = moduleInfo.classes.find(memberName);
+        if (classIt != moduleInfo.classes.end()) {
+            // For classes, we assume they are public by default unless explicitly marked
+            // This is a design decision - classes are typically public to be usable
+            return AST::VisibilityLevel::Public;
+        }
+    }
+    
+    // Fallback to legacy module declarations for backward compatibility
+    auto legacyModuleIt = moduleDeclarations.find(moduleName);
+    if (legacyModuleIt != moduleDeclarations.end()) {
+        auto moduleDecl = legacyModuleIt->second;
+        
+        // Helper lambda to check member visibility in a list
+        auto checkMemberInList = [&memberName](const std::vector<std::shared_ptr<AST::Statement>>& members) -> std::optional<AST::VisibilityLevel> {
+            for (const auto& member : members) {
+                if (auto varDecl = std::dynamic_pointer_cast<AST::VarDeclaration>(member)) {
+                    if (varDecl->name == memberName) {
+                        return varDecl->visibility; // Use the declaration's own visibility
+                    }
+                } else if (auto funcDecl = std::dynamic_pointer_cast<AST::FunctionDeclaration>(member)) {
+                    if (funcDecl->name == memberName) {
+                        return funcDecl->visibility; // Use the declaration's own visibility
+                    }
+                } else if (auto classDecl = std::dynamic_pointer_cast<AST::ClassDeclaration>(member)) {
+                    if (classDecl->name == memberName) {
+                        // Classes don't have individual visibility, use the list they're in
+                        return std::nullopt; // Will be handled by caller
+                    }
+                }
+            }
+            return std::nullopt;
+        };
+        
+        // Check public members
+        auto visibility = checkMemberInList(moduleDecl->publicMembers);
+        if (visibility.has_value()) {
+            return visibility.value();
+        }
+        // If found in public list but no individual visibility, it's public
+        for (const auto& member : moduleDecl->publicMembers) {
+            if (auto classDecl = std::dynamic_pointer_cast<AST::ClassDeclaration>(member)) {
+                if (classDecl->name == memberName) {
+                    return AST::VisibilityLevel::Public;
+                }
+            }
+        }
+        
+        // Check protected members
+        visibility = checkMemberInList(moduleDecl->protectedMembers);
+        if (visibility.has_value()) {
+            return visibility.value();
+        }
+        // If found in protected list but no individual visibility, it's protected
+        for (const auto& member : moduleDecl->protectedMembers) {
+            if (auto classDecl = std::dynamic_pointer_cast<AST::ClassDeclaration>(member)) {
+                if (classDecl->name == memberName) {
+                    return AST::VisibilityLevel::Protected;
+                }
+            }
+        }
+        
+        // Check private members
+        visibility = checkMemberInList(moduleDecl->privateMembers);
+        if (visibility.has_value()) {
+            return visibility.value();
+        }
+        // If found in private list but no individual visibility, it's private
+        for (const auto& member : moduleDecl->privateMembers) {
+            if (auto classDecl = std::dynamic_pointer_cast<AST::ClassDeclaration>(member)) {
+                if (classDecl->name == memberName) {
+                    return AST::VisibilityLevel::Private;
+                }
+            }
+        }
+    }
+    
+    // All module members are private by default according to language design
+    return AST::VisibilityLevel::Private;
+}
+
+bool TypeChecker::canAccessModuleMember(const std::string& moduleName, const std::string& memberName) {
+    AST::VisibilityLevel memberVisibility = getModuleMemberVisibility(moduleName, memberName);
+    
+    switch (memberVisibility) {
+        case AST::VisibilityLevel::Public:
+        case AST::VisibilityLevel::Const:
+            return true; // Public and const members are always accessible across modules
+            
+        case AST::VisibilityLevel::Protected:
+            // Protected members are accessible from the same module
+            return moduleName == currentModulePath;
+            
+        case AST::VisibilityLevel::Private:
+        default:
+            // Private members are only accessible from the same module
+            return moduleName == currentModulePath;
+    }
+}
+
+bool TypeChecker::isSubclassOf(const std::string& subclass, const std::string& superclass) {
+    if (subclass == superclass) {
+        return true; // A class is considered a subclass of itself
+    }
+    
+    // Find the subclass declaration
+    auto subclassIt = classDeclarations.find(subclass);
+    if (subclassIt == classDeclarations.end()) {
+        return false; // Subclass not found
+    }
+    
+    auto subclassDecl = subclassIt->second;
+    
+    // Check if it has a superclass
+    if (subclassDecl->superClassName.empty()) {
+        return false; // No inheritance
+    }
+    
+    // Check if the direct superclass matches
+    if (subclassDecl->superClassName == superclass) {
+        return true;
+    }
+    
+    // Recursively check the inheritance chain
+    return isSubclassOf(subclassDecl->superClassName, superclass);
+}
+
+AST::VisibilityLevel TypeChecker::getTopLevelDeclarationVisibility(const std::string& name) {
+    // Check top-level variables
+    auto varIt = topLevelVariables.find(name);
+    if (varIt != topLevelVariables.end()) {
+        return varIt->second->visibility;
+    }
+    
+    // Check top-level functions
+    auto funcIt = topLevelFunctions.find(name);
+    if (funcIt != topLevelFunctions.end()) {
+        return funcIt->second->visibility;
+    }
+    
+    // Check top-level classes
+    auto classIt = classDeclarations.find(name);
+    if (classIt != classDeclarations.end()) {
+        // Classes don't have individual visibility at top level, they're public by default
+        // unless they're inside a module
+        return AST::VisibilityLevel::Public;
+    }
+    
+    // Default to private if not found
+    return AST::VisibilityLevel::Private;
+}
+
+bool TypeChecker::canAccessFromCurrentModule(AST::VisibilityLevel visibility, const std::string& declaringModule) {
+    switch (visibility) {
+        case AST::VisibilityLevel::Public:
+        case AST::VisibilityLevel::Const:
+            return true; // Public and const members are accessible from any module
+            
+        case AST::VisibilityLevel::Protected:
+            // Protected members are accessible from the same module or subclasses
+            // For now, we'll allow access from the same module and let inheritance handle the rest
+            if (declaringModule.empty() || currentModulePath.empty()) {
+                return true; // Conservative approach when module info is missing
+            }
+            return declaringModule == currentModulePath;
+            
+        case AST::VisibilityLevel::Private:
+        default:
+            // Private members are only accessible from the same module (file)
+            if (declaringModule.empty() || currentModulePath.empty()) {
+                return true; // Conservative approach when module info is missing
+            }
+            return declaringModule == currentModulePath;
+    }
+}
+
+bool TypeChecker::isValidModuleFunctionReference(const std::string& functionRef) {
+    // Check if this is a module function reference (format: "module_function:functionName")
+    if (functionRef.substr(0, 16) == "module_function:") {
+        std::string functionName = functionRef.substr(16);
+        
+        // Validate that the function name is not empty
+        if (functionName.empty()) {
+            return false;
+        }
+        
+        // Check if the function exists in any loaded module
+        for (const auto& [modulePath, moduleInfo] : moduleRegistry) {
+            auto funcIt = moduleInfo.functions.find(functionName);
+            if (funcIt != moduleInfo.functions.end()) {
+                // Check if the function is accessible (public or const)
+                AST::VisibilityLevel visibility = funcIt->second.visibility;
+                return (visibility == AST::VisibilityLevel::Public || 
+                        visibility == AST::VisibilityLevel::Const);
+            }
+        }
+        
+        return false; // Function not found in any module
+    }
+    
+    return false; // Not a module function reference
+}
+
+std::string TypeChecker::extractModuleFunctionName(const std::string& functionRef) {
+    // Extract function name from module function reference
+    if (functionRef.substr(0, 16) == "module_function:") {
+        return functionRef.substr(16);
+    }
+    return ""; // Not a module function reference
+}
+
+void TypeChecker::validateImportFilter(const AST::ImportFilter& filter, const std::string& modulePath) {
+    // Get module visibility info
+    auto moduleIt = moduleRegistry.find(modulePath);
+    if (moduleIt == moduleRegistry.end()) {
+        return; // Module not loaded, can't validate
+    }
+    
+    const ModuleVisibilityInfo& moduleInfo = moduleIt->second;
+    
+    // Collect all public/const symbols from the module
+    std::set<std::string> availableSymbols;
+    
+    // Add public/const functions
+    for (const auto& [funcName, funcInfo] : moduleInfo.functions) {
+        if (funcInfo.visibility == AST::VisibilityLevel::Public || 
+            funcInfo.visibility == AST::VisibilityLevel::Const) {
+            availableSymbols.insert(funcName);
+        }
+    }
+    
+    // Add public/const variables
+    for (const auto& [varName, varInfo] : moduleInfo.variables) {
+        if (varInfo.visibility == AST::VisibilityLevel::Public || 
+            varInfo.visibility == AST::VisibilityLevel::Const) {
+            availableSymbols.insert(varName);
+        }
+    }
+    
+    // Validate filter identifiers
+    for (const std::string& identifier : filter.identifiers) {
+        if (availableSymbols.find(identifier) == availableSymbols.end()) {
+            if (filter.type == AST::ImportFilterType::Show) {
+                addError("Cannot import '" + identifier + "' from module '" + modulePath + 
+                        "': symbol not found or not accessible", 0);
+            }
+            // For hide filters, we don't error on non-existent symbols
+        }
+    }
+}
+
+void TypeChecker::checkModuleMemberFunctionCall(const std::shared_ptr<AST::MemberExpr>& memberExpr, 
+                                               const std::vector<TypePtr>& argTypes, 
+                                               const std::shared_ptr<AST::CallExpr>& callExpr) {
+    // Get the object name from the member expression
+    std::string objectName;
+    if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(memberExpr->object)) {
+        objectName = varExpr->name;
+    } else {
+        addError("Invalid object reference in function call", callExpr->line);
+        return;
+    }
+    
+    // First check if this is actually a module (not an object instance)
+    TypePtr objectType = currentScope->getVariableType(objectName);
+    if (!objectType || objectType->tag != TypeTag::Module) {
+        // This is not a module call - it's likely an object method call
+        // Let the regular expression checking handle it
+        return;
+    }
+    
+    // Resolve module alias to actual path
+    std::string targetModulePath = resolveModuleAlias(objectName);
+    if (targetModulePath.empty()) {
+        addError("Undefined module '" + objectName + "' in function call", callExpr->line);
+        return;
+    }
+    
+    // Check if the function exists in the target module
+    auto moduleIt = moduleRegistry.find(targetModulePath);
+    if (moduleIt == moduleRegistry.end()) {
+        addError("Module '" + objectName + "' not loaded", callExpr->line);
+        return;
+    }
+    
+    const ModuleVisibilityInfo& moduleInfo = moduleIt->second;
+    auto funcIt = moduleInfo.functions.find(memberExpr->name);
+    if (funcIt == moduleInfo.functions.end()) {
+        addError("Function '" + memberExpr->name + "' not found in module '" + objectName + "'", callExpr->line);
+        return;
+    }
+    
+    const MemberVisibilityInfo& funcInfo = funcIt->second;
+    
+    // Check visibility
+    if (funcInfo.visibility == AST::VisibilityLevel::Private) {
+        addError("Cannot access private function '" + memberExpr->name + 
+                "' from module '" + objectName + "'", callExpr->line);
+        return;
+    }
+    
+    // TODO: Add parameter count and type validation here
+    // For now, we'll just validate that the function is accessible
+}
+
+void TypeChecker::checkImportStatement(const std::shared_ptr<AST::ImportStatement>& importStmt) {
+    // Handle the import during type checking phase
+    handleImportStatement(importStmt);
+    
+    // Determine the alias name (same logic as in handleImportStatement)
+    std::string aliasName;
+    if (importStmt->alias) {
+        aliasName = *importStmt->alias;
+    } else {
+        // Use the last component of the module path as the default alias
+        size_t lastDot = importStmt->modulePath.find_last_of('.');
+        if (lastDot != std::string::npos) {
+            aliasName = importStmt->modulePath.substr(lastDot + 1);
+        } else {
+            aliasName = importStmt->modulePath;
+        }
+    }
+    
+    // Register the module alias as a variable of Module type in the current scope
+    // This allows expressions like `math.add()` to be type-checked properly
+    currentScope->variables[aliasName] = typeSystem.MODULE_TYPE;
+}
+
+AST::VisibilityLevel TypeChecker::getMemberVisibility(const std::string& className, const std::string& memberName) {
+    if (memberName.empty() || className.empty()) {
+        return AST::VisibilityLevel::Private;
+    }
+    
+    // First try to get visibility from the extracted class registry
+    auto classIt = classRegistry.find(className);
+    if (classIt != classRegistry.end()) {
+        const ClassVisibilityInfo& classInfo = classIt->second;
+        
+        // Check fields first
+        auto fieldIt = classInfo.fields.find(memberName);
+        if (fieldIt != classInfo.fields.end()) {
+            return fieldIt->second.visibility;
+        }
+        
+        // Check methods
+        auto methodIt = classInfo.methods.find(memberName);
+        if (methodIt != classInfo.methods.end()) {
+            return methodIt->second.visibility;
+        }
+    }
+    
+    // Fallback to legacy class declarations for backward compatibility
+    auto legacyClassIt = classDeclarations.find(className);
+    if (legacyClassIt != classDeclarations.end()) {
+        auto classDecl = legacyClassIt->second;
+        
+        // First check the class-level visibility maps (these take precedence)
+        auto fieldVisIt = classDecl->fieldVisibility.find(memberName);
+        if (fieldVisIt != classDecl->fieldVisibility.end()) {
+            return fieldVisIt->second;
+        }
+        
+        auto methodVisIt = classDecl->methodVisibility.find(memberName);
+        if (methodVisIt != classDecl->methodVisibility.end()) {
+            return methodVisIt->second;
+        }
+        
+        // If not found in visibility maps, check individual field/method declarations
+        // Check fields
+        for (const auto& field : classDecl->fields) {
+            if (field->name == memberName) {
+                return field->visibility;
+            }
+        }
+        
+        // Check methods
+        for (const auto& method : classDecl->methods) {
+            if (method->name == memberName) {
+                return method->visibility;
+            }
+        }
+    }
+    
+    // All members are private by default according to language design
+    return AST::VisibilityLevel::Private;
+}
+
+// Visibility information extraction methods
+
+void TypeChecker::extractModuleVisibility(const std::shared_ptr<AST::Program>& program) {
+    // Create or get module visibility info for current module
+    ModuleVisibilityInfo& moduleInfo = moduleRegistry[currentModulePath];
+    moduleInfo.modulePath = currentModulePath;
+    
+    // Traverse Program AST node to extract top-level declarations
+    for (const auto& stmt : program->statements) {
+        if (auto funcDecl = std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt)) {
+            extractFunctionVisibility(funcDecl);
+        } else if (auto varDecl = std::dynamic_pointer_cast<AST::VarDeclaration>(stmt)) {
+            extractVariableVisibility(varDecl);
+        } else if (auto classDecl = std::dynamic_pointer_cast<AST::ClassDeclaration>(stmt)) {
+            extractClassVisibility(classDecl);
+        } else if (auto importStmt = std::dynamic_pointer_cast<AST::ImportStatement>(stmt)) {
+            handleImportStatement(importStmt);
+        }
+    }
+}
+
+void TypeChecker::extractClassVisibility(const std::shared_ptr<AST::ClassDeclaration>& classDecl) {
+    // Create class visibility info
+    ClassVisibilityInfo classInfo(classDecl->name, currentModulePath, classDecl->superClassName);
+    
+    // Extract field visibility information
+    for (const auto& field : classDecl->fields) {
+        AST::VisibilityLevel fieldVisibility = AST::VisibilityLevel::Private; // Default
+        
+        // Check if field has explicit visibility in the class declaration
+        auto visibilityIt = classDecl->fieldVisibility.find(field->name);
+        if (visibilityIt != classDecl->fieldVisibility.end()) {
+            fieldVisibility = visibilityIt->second;
+        } else {
+            // Use field's own visibility if available
+            fieldVisibility = field->visibility;
+        }
+        
+        MemberVisibilityInfo memberInfo(field->name, fieldVisibility, currentModulePath, classDecl->name, field->line);
+        classInfo.fields[field->name] = memberInfo;
+    }
+    
+    // Extract method visibility information
+    for (const auto& method : classDecl->methods) {
+        AST::VisibilityLevel methodVisibility = AST::VisibilityLevel::Private; // Default
+        
+        // Check if method has explicit visibility in the class declaration
+        auto visibilityIt = classDecl->methodVisibility.find(method->name);
+        if (visibilityIt != classDecl->methodVisibility.end()) {
+            methodVisibility = visibilityIt->second;
+        } else {
+            // Use method's own visibility if available
+            methodVisibility = method->visibility;
+        }
+        
+        MemberVisibilityInfo memberInfo(method->name, methodVisibility, currentModulePath, classDecl->name, method->line);
+        classInfo.methods[method->name] = memberInfo;
+    }
+    
+    // Store class visibility information in registries
+    classRegistry[classDecl->name] = classInfo;
+    classToModuleMap[classDecl->name] = currentModulePath;
+    
+    // Also store in module registry
+    ModuleVisibilityInfo& moduleInfo = moduleRegistry[currentModulePath];
+    moduleInfo.classes[classDecl->name] = classInfo;
+}
+
+void TypeChecker::extractFunctionVisibility(const std::shared_ptr<AST::FunctionDeclaration>& funcDecl) {
+    // Handle default visibility rules (private for module members)
+    AST::VisibilityLevel visibility = funcDecl->visibility;
+    if (visibility == AST::VisibilityLevel::Private && funcDecl->visibility == AST::VisibilityLevel::Private) {
+        // Default to private for module-level functions
+        visibility = AST::VisibilityLevel::Private;
+    }
+    
+    // Create member visibility info
+    MemberVisibilityInfo memberInfo(funcDecl->name, visibility, currentModulePath, "", funcDecl->line);
+    
+    // Store in module registry
+    ModuleVisibilityInfo& moduleInfo = moduleRegistry[currentModulePath];
+    moduleInfo.functions[funcDecl->name] = memberInfo;
+}
+
+void TypeChecker::extractVariableVisibility(const std::shared_ptr<AST::VarDeclaration>& varDecl) {
+    // Handle default visibility rules (private for module members)
+    AST::VisibilityLevel visibility = varDecl->visibility;
+    if (visibility == AST::VisibilityLevel::Private && varDecl->visibility == AST::VisibilityLevel::Private) {
+        // Default to private for module-level variables
+        visibility = AST::VisibilityLevel::Private;
+    }
+    
+    // Create member visibility info
+    MemberVisibilityInfo memberInfo(varDecl->name, visibility, currentModulePath, "", varDecl->line);
+    
+    // Store in module registry
+    ModuleVisibilityInfo& moduleInfo = moduleRegistry[currentModulePath];
+    moduleInfo.variables[varDecl->name] = memberInfo;
+}
+// Import  handling methods
+
+void TypeChecker::handleImportStatement(const std::shared_ptr<AST::ImportStatement>& importStmt) {
+    // Resolve the module path to actual file path
+    std::string actualModulePath = resolveModulePath(importStmt->modulePath);
+    
+    // Determine the alias name
+    std::string aliasName;
+    if (importStmt->alias) {
+        aliasName = *importStmt->alias;
+    } else {
+        // Use the last component of the module path as the default alias
+        size_t lastDot = importStmt->modulePath.find_last_of('.');
+        if (lastDot != std::string::npos) {
+            aliasName = importStmt->modulePath.substr(lastDot + 1);
+        } else {
+            aliasName = importStmt->modulePath;
+        }
+    }
+    
+    // Store the alias mapping
+    moduleAliases[aliasName] = actualModulePath;
+    
+    // Load visibility information for the imported module
+    loadModuleVisibilityInfo(actualModulePath);
+    
+    // Validate import filters against available symbols
+    if (importStmt->filter) {
+        validateImportFilter(*importStmt->filter, actualModulePath);
+    }
+}
+
+std::string TypeChecker::resolveModulePath(const std::string& modulePath) {
+    // Convert module path (e.g., "tests.modules.math_module") to file path
+    std::string filePath = modulePath;
+    
+    // Replace dots with directory separators
+    for (char& c : filePath) {
+        if (c == '.') {
+            c = '/';
+        }
+    }
+    
+    // Add .lm extension
+    filePath += ".lm";
+    
+    return filePath;
+}
+
+std::string TypeChecker::resolveModuleAlias(const std::string& alias) {
+    auto it = moduleAliases.find(alias);
+    if (it != moduleAliases.end()) {
+        return it->second;
+    }
+    return ""; // Alias not found
+}
+
+void TypeChecker::loadModuleVisibilityInfo(const std::string& modulePath) {
+    // Check if we already have visibility info for this module
+    if (moduleRegistry.find(modulePath) != moduleRegistry.end()) {
+        return; // Already loaded
+    }
+    
+    // Load and parse the module to extract visibility information
+    std::ifstream file(modulePath);
+    if (!file.is_open()) {
+        // Module file not found - this will be handled elsewhere
+        return;
+    }
+    
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string source = buffer.str();
+    
+    // Parse the module
+    Scanner scanner(source);
+    scanner.scanTokens();
+    Parser parser(scanner);
+    auto moduleAst = parser.parse();
+    
+    // Temporarily set the current module path to the imported module
+    std::string originalModulePath = currentModulePath;
+    currentModulePath = modulePath;
+    
+    // Extract visibility information from the imported module
+    extractModuleVisibility(moduleAst);
+    
+    // Restore the original module path
+    currentModulePath = originalModulePath;
+}
+
+// Core access validation logic methods
+
+bool TypeChecker::validateClassMemberAccess(const std::shared_ptr<AST::MemberExpr>& expr) {
+    // Check class member access against stored visibility rules using only class-based context
+    // Validate access context (same class, subclass) without considering module boundaries
+    // Return validation result with error details
+    // Ensure no mixing of class and module visibility rules
+    
+    // First, determine the class type of the object being accessed
+    TypePtr objectType = checkExpression(expr->object);
+    if (!objectType) {
+        addError("Cannot access member '" + expr->name + "' on invalid object", expr->line);
+        return false;
+    }
+    
+    // Only handle class member access - not module or other types
+    // This ensures no mixing of class and module visibility rules
+    if (objectType->tag != TypeTag::Object && objectType->tag != TypeTag::UserDefined) {
+        return true; // Not a class member access, let other validators handle it
+    }
+    
+    // Extract class name from the object type
+    std::string className;
+    if (objectType->tag == TypeTag::UserDefined) {
+        if (std::holds_alternative<UserDefinedType>(objectType->extra)) {
+            auto userType = std::get<UserDefinedType>(objectType->extra);
+            className = userType.name;
+        }
+    } else if (objectType->tag == TypeTag::Object) {
+        // Try to infer class name from variable expression
+        if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(expr->object)) {
+            TypePtr varType = currentScope->getVariableType(varExpr->name);
+            if (varType) {
+                if (varType->tag == TypeTag::UserDefined) {
+                    if (std::holds_alternative<UserDefinedType>(varType->extra)) {
+                        auto userType = std::get<UserDefinedType>(varType->extra);
+                        className = userType.name;
+                    }
+                } else if (varType->tag == TypeTag::Object) {
+                    // For Object types, we cannot determine the class name
+                    // This should not happen with proper type tracking
+                    // If we reach here, it means the type system needs improvement
+                    return true; // Let other validators handle it
+                }
+            }
+        }
+    }
+    
+    if (className.empty()) {
+        // Cannot determine class name - this might not be a class member access
+        return true; // Let other validators handle non-class member access
+    }
+    
+    // Get member visibility from class registry (class-based context only)
+    // This uses stored visibility rules from AST extraction
+    AST::VisibilityLevel memberVisibility = getMemberVisibility(className, expr->name);
+    
+    // Check if the member exists in the class using both new and legacy systems
+    bool memberExists = false;
+    bool isField = false;
+    bool isMethod = false;
+    
+    // Check new class registry first
+    auto classIt = classRegistry.find(className);
+    if (classIt != classRegistry.end()) {
+        const ClassVisibilityInfo& classInfo = classIt->second;
+        if (classInfo.fields.find(expr->name) != classInfo.fields.end()) {
+            memberExists = true;
+            isField = true;
+        } else if (classInfo.methods.find(expr->name) != classInfo.methods.end()) {
+            memberExists = true;
+            isMethod = true;
+        }
+    }
+    
+    // If member doesn't exist in class registry, check legacy declarations
+    if (!memberExists) {
+        auto legacyClassIt = classDeclarations.find(className);
+        if (legacyClassIt != classDeclarations.end()) {
+            auto classDecl = legacyClassIt->second;
+            
+            // Check fields
+            for (const auto& field : classDecl->fields) {
+                if (field->name == expr->name) {
+                    memberExists = true;
+                    isField = true;
+                    break;
+                }
+            }
+            
+            // Check methods if not found in fields
+            if (!memberExists) {
+                for (const auto& method : classDecl->methods) {
+                    if (method->name == expr->name) {
+                        memberExists = true;
+                        isMethod = true;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    // If member doesn't exist, report error with helpful context
+    if (!memberExists) {
+        addError("Class '" + className + "' has no member named '" + expr->name + "'", expr->line);
+        return false;
+    }
+    
+    // Validate access context using only class-based rules (no module boundaries)
+    // This ensures proper separation between class and module visibility systems
+    bool accessAllowed = canAccessClassMember(className, expr->name, memberVisibility);
+    
+    if (!accessAllowed) {
+        // Return validation result with error details
+        std::string visibilityStr;
+        switch (memberVisibility) {
+            case AST::VisibilityLevel::Private:
+                visibilityStr = "private";
+                break;
+            case AST::VisibilityLevel::Protected:
+                visibilityStr = "protected";
+                break;
+            case AST::VisibilityLevel::Public:
+                visibilityStr = "public";
+                break;
+            case AST::VisibilityLevel::Const:
+                visibilityStr = "const";
+                break;
+        }
+        
+        // Provide detailed context information for error reporting
+        std::string memberType = isField ? "field" : (isMethod ? "method" : "member");
+        std::string contextInfo;
+        std::string accessSuggestion;
+        
+        if (currentClassName.empty()) {
+            contextInfo = "from outside any class";
+            if (memberVisibility == AST::VisibilityLevel::Protected) {
+                accessSuggestion = " (protected " + memberType + "s can only be accessed from the same class or subclasses)";
+            } else if (memberVisibility == AST::VisibilityLevel::Private) {
+                accessSuggestion = " (private " + memberType + "s can only be accessed from within the same class)";
+            }
+        } else {
+            contextInfo = "from class '" + currentClassName + "'";
+            if (memberVisibility == AST::VisibilityLevel::Protected) {
+                if (!isSubclassOf(currentClassName, className)) {
+                    accessSuggestion = " (protected " + memberType + "s require inheritance relationship - '" + 
+                                     currentClassName + "' must inherit from '" + className + "')";
+                } else {
+                    // This shouldn't happen if canAccessClassMember is working correctly
+                    accessSuggestion = " (inheritance check failed)";
+                }
+            } else if (memberVisibility == AST::VisibilityLevel::Private) {
+                if (currentClassName != className) {
+                    accessSuggestion = " (private " + memberType + "s can only be accessed from within the same class '" + className + "')";
+                } else {
+                    // This shouldn't happen if canAccessClassMember is working correctly
+                    accessSuggestion = " (same class check failed)";
+                }
+            }
+        }
+        
+        addError("Cannot access " + visibilityStr + " " + memberType + " '" + expr->name + 
+                "' of class '" + className + "' " + contextInfo + accessSuggestion, expr->line);
+        return false;
+    }
+    
+    return true;
+}
+
+bool TypeChecker::validateModuleFunctionCall(const std::shared_ptr<AST::CallExpr>& expr) {
+    // Validate module-level function call access based on function visibility
+    
+    // Check if this is a direct function call (not a method call)
+    auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(expr->callee);
+    if (!varExpr) {
+        return true; // Not a direct function call, let other validators handle it
+    }
+    
+    // Check if it's a function-typed variable (higher-order function)
+    TypePtr varType = currentScope->getVariableType(varExpr->name);
+    if (varType && varType->tag == TypeTag::Function) {
+        return true; // Function-typed variable, not a module function
+    }
+    
+    // Check if it's a regular function signature
+    FunctionSignature* signature = currentScope->getFunctionSignature(varExpr->name);
+    if (!signature) {
+        return true; // Function not found, let other error handling deal with it
+    }
+    
+    // Distinguish between class method calls and module function calls
+    if (!currentClassName.empty()) {
+        // We're inside a class - check if this is a method of the current class
+        AST::VisibilityLevel methodVisibility = getMemberVisibility(currentClassName, varExpr->name);
+        if (methodVisibility != AST::VisibilityLevel::Private || 
+            classRegistry.find(currentClassName) != classRegistry.end()) {
+            // This might be a method call, not a module function call
+            return true;
+        }
+    }
+    
+    // Check module-level function access rules using only module-based context
+    AST::VisibilityLevel funcVisibility = getModuleMemberVisibility(currentModulePath, varExpr->name);
+    
+    // Get the declaring module of the function
+    std::string declaringModule = currentModulePath; // Default to current module
+    auto moduleIt = moduleRegistry.find(currentModulePath);
+    if (moduleIt != moduleRegistry.end()) {
+        auto funcIt = moduleIt->second.functions.find(varExpr->name);
+        if (funcIt != moduleIt->second.functions.end()) {
+            declaringModule = funcIt->second.declaringModule;
+        }
+    }
+    
+    // Validate access using module-based rules only
+    bool accessAllowed = canAccessModuleMember(funcVisibility, declaringModule, currentModulePath);
+    
+    if (!accessAllowed) {
+        std::string visibilityStr;
+        switch (funcVisibility) {
+            case AST::VisibilityLevel::Private:
+                visibilityStr = "private";
+                break;
+            case AST::VisibilityLevel::Protected:
+                visibilityStr = "protected";
+                break;
+            case AST::VisibilityLevel::Public:
+                visibilityStr = "public";
+                break;
+            case AST::VisibilityLevel::Const:
+                visibilityStr = "const";
+                break;
+        }
+        
+        addError("Cannot access " + visibilityStr + " function '" + varExpr->name + 
+                "' from module '" + currentModulePath + "' (declared in '" + declaringModule + "')", 
+                expr->line);
+        return false;
+    }
+    
+    return true;
+}
+
+bool TypeChecker::validateModuleVariableAccess(const std::shared_ptr<AST::VariableExpr>& expr) {
+    // Validate module-level variable access based on variable visibility
+    
+    // Check if this is a local variable (in current scope)
+    TypePtr varType = currentScope->getVariableType(expr->name);
+    if (varType) {
+        // Check if this is actually a module-level variable
+        auto moduleIt = moduleRegistry.find(currentModulePath);
+        if (moduleIt != moduleRegistry.end()) {
+            auto varIt = moduleIt->second.variables.find(expr->name);
+            if (varIt == moduleIt->second.variables.end()) {
+                return true; // Not a module-level variable, it's a local variable
+            }
+        } else {
+            return true; // No module registry info, assume it's local
+        }
+    }
+    
+    // Distinguish between class field access and module variable access
+    if (!currentClassName.empty()) {
+        // We're inside a class - check if this is a field of the current class
+        AST::VisibilityLevel fieldVisibility = getMemberVisibility(currentClassName, expr->name);
+        if (fieldVisibility != AST::VisibilityLevel::Private || 
+            classRegistry.find(currentClassName) != classRegistry.end()) {
+            // This might be a field access, not a module variable access
+            return true;
+        }
+    }
+    
+    // Check module-level variable access rules using only module-based context
+    AST::VisibilityLevel varVisibility = getModuleMemberVisibility(currentModulePath, expr->name);
+    
+    // Get the declaring module of the variable
+    std::string declaringModule = currentModulePath; // Default to current module
+    auto moduleIt = moduleRegistry.find(currentModulePath);
+    if (moduleIt != moduleRegistry.end()) {
+        auto varIt = moduleIt->second.variables.find(expr->name);
+        if (varIt != moduleIt->second.variables.end()) {
+            declaringModule = varIt->second.declaringModule;
+        }
+    }
+    
+    // Validate access using module-based rules only
+    bool accessAllowed = canAccessModuleMember(varVisibility, declaringModule, currentModulePath);
+    
+    if (!accessAllowed) {
+        std::string visibilityStr;
+        switch (varVisibility) {
+            case AST::VisibilityLevel::Private:
+                visibilityStr = "private";
+                break;
+            case AST::VisibilityLevel::Protected:
+                visibilityStr = "protected";
+                break;
+            case AST::VisibilityLevel::Public:
+                visibilityStr = "public";
+                break;
+            case AST::VisibilityLevel::Const:
+                visibilityStr = "const";
+                break;
+        }
+        
+        addError("Cannot access " + visibilityStr + " variable '" + expr->name + 
+                "' from module '" + currentModulePath + "' (declared in '" + declaringModule + "')", 
+                expr->line);
+        return false;
+    }
+    
+    return true;
 }

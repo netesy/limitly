@@ -1,0 +1,16 @@
+// Test cross-module visibility enforcement during import
+
+import tests.modules.math_module as math;
+
+fn testModuleAccess() {
+    // These should work - accessing public members
+    var result1 = math.add(5, 3);
+    var result2 = math.multiply(4, 2);
+    var result3 = math.pi;
+    
+    // This should fail at compile time - accessing private function
+    // The factorial function is private (no 'pub' keyword)
+    var result4 = math.factorial(5);  // Should cause compile-time error
+}
+
+testModuleAccess();

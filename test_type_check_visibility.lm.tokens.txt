@@ -1,0 +1,371 @@
+Tokens for test_type_check_visibility.lm
+Parser: New Unified Parser (CST mode)
+Mode: CST with trivia preservation
+========================================
+
+=== Tokens with Trivia ===
+Line 5: FN = 'fn' [leading: COMMENT_LINE('// Test visibility enforcement in type checker') NEWLINE('
+') COMMENT_LINE('// This file is a module, so all declarations are module members') NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Private function - only accessible within this file/module') NEWLINE('
+') ]
+Line 5: IDENTIFIER = 'privateHelper' [leading: WHITESPACE(' ') ]
+Line 5: LEFT_PAREN = '('
+Line 5: RIGHT_PAREN = ')'
+Line 5: COLON = ':'
+Line 5: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 5: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 6: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 6: STRING = '"private helper"' [leading: WHITESPACE(' ') ]
+Line 6: SEMICOLON = ';'
+Line 7: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 10: PUB = 'pub' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Public function - accessible from other modules') NEWLINE('
+') ]
+Line 10: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 10: IDENTIFIER = 'publicHelper' [leading: WHITESPACE(' ') ]
+Line 10: LEFT_PAREN = '('
+Line 10: RIGHT_PAREN = ')'
+Line 10: COLON = ':'
+Line 10: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 10: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 11: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 11: STRING = '"public helper"' [leading: WHITESPACE(' ') ]
+Line 11: SEMICOLON = ';'
+Line 12: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 15: PROT = 'prot' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Protected function - accessible from same module and submodules') NEWLINE('
+') ]
+Line 15: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 15: IDENTIFIER = 'protectedHelper' [leading: WHITESPACE(' ') ]
+Line 15: LEFT_PAREN = '('
+Line 15: RIGHT_PAREN = ')'
+Line 15: COLON = ':'
+Line 15: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 15: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 16: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 16: STRING = '"protected helper"' [leading: WHITESPACE(' ') ]
+Line 16: SEMICOLON = ';'
+Line 17: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 19: CLASS = 'class' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 19: IDENTIFIER = 'Person' [leading: WHITESPACE(' ') ]
+Line 19: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 20: IDENTIFIER = 'name' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 20: COLON = ':'
+Line 20: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 20: SEMICOLON = ';'
+Line 21: PUB = 'pub' [leading: WHITESPACE('           ') COMMENT_LINE('// Private by default - accessible within same class') NEWLINE('
+') WHITESPACE('    ') ]
+Line 21: IDENTIFIER = 'age' [leading: WHITESPACE(' ') ]
+Line 21: COLON = ':'
+Line 21: INT_TYPE = 'int' [leading: WHITESPACE(' ') ]
+Line 21: SEMICOLON = ';'
+Line 22: PROT = 'prot' [leading: WHITESPACE('        ') COMMENT_LINE('// Public - accessible from any module') NEWLINE('
+') WHITESPACE('    ') ]
+Line 22: IDENTIFIER = 'id' [leading: WHITESPACE(' ') ]
+Line 22: COLON = ':'
+Line 22: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 22: SEMICOLON = ';'
+Line 24: PUB = 'pub' [leading: WHITESPACE('        ') COMMENT_LINE('// Protected - accessible from same module and subclasses') NEWLINE('
+') WHITESPACE('    ') NEWLINE('
+') WHITESPACE('    ') ]
+Line 24: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 24: IDENTIFIER = 'getName' [leading: WHITESPACE(' ') ]
+Line 24: LEFT_PAREN = '('
+Line 24: RIGHT_PAREN = ')'
+Line 24: COLON = ':'
+Line 24: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 24: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 25: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 25: SELF = 'self' [leading: WHITESPACE(' ') ]
+Line 25: DOT = '.'
+Line 25: IDENTIFIER = 'name'
+Line 25: SEMICOLON = ';'
+Line 26: RIGHT_BRACE = '}' [leading: WHITESPACE('  ') COMMENT_LINE('// Should work - same class and same module') NEWLINE('
+') WHITESPACE('    ') ]
+Line 28: FN = 'fn' [leading: NEWLINE('
+') WHITESPACE('    ') NEWLINE('
+') WHITESPACE('    ') ]
+Line 28: IDENTIFIER = 'privateMethod' [leading: WHITESPACE(' ') ]
+Line 28: LEFT_PAREN = '('
+Line 28: RIGHT_PAREN = ')'
+Line 28: COLON = ':'
+Line 28: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 28: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 29: RETURN = 'return' [leading: WHITESPACE('  ') COMMENT_LINE('// Private by default - accessible within same module') NEWLINE('
+') WHITESPACE('        ') ]
+Line 29: IDENTIFIER = 'privateHelper' [leading: WHITESPACE(' ') ]
+Line 29: LEFT_PAREN = '('
+Line 29: RIGHT_PAREN = ')'
+Line 29: SEMICOLON = ';'
+Line 30: RIGHT_BRACE = '}' [leading: WHITESPACE(' ') COMMENT_LINE('// Should work - same module') NEWLINE('
+') WHITESPACE('    ') ]
+Line 32: PUB = 'pub' [leading: NEWLINE('
+') WHITESPACE('    ') NEWLINE('
+') WHITESPACE('    ') ]
+Line 32: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 32: IDENTIFIER = 'publicMethod' [leading: WHITESPACE(' ') ]
+Line 32: LEFT_PAREN = '('
+Line 32: RIGHT_PAREN = ')'
+Line 32: COLON = ':'
+Line 32: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 32: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 33: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 33: STRING = '"public"' [leading: WHITESPACE(' ') ]
+Line 33: SEMICOLON = ';'
+Line 34: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 36: PROT = 'prot' [leading: NEWLINE('
+') WHITESPACE('    ') NEWLINE('
+') WHITESPACE('    ') ]
+Line 36: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 36: IDENTIFIER = 'protectedMethod' [leading: WHITESPACE(' ') ]
+Line 36: LEFT_PAREN = '('
+Line 36: RIGHT_PAREN = ')'
+Line 36: COLON = ':'
+Line 36: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 36: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 37: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 37: STRING = '"protected"' [leading: WHITESPACE(' ') ]
+Line 37: SEMICOLON = ';'
+Line 38: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 39: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 41: CLASS = 'class' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 41: IDENTIFIER = 'Employee' [leading: WHITESPACE(' ') ]
+Line 41: COLON = ':' [leading: WHITESPACE(' ') ]
+Line 41: IDENTIFIER = 'Person' [leading: WHITESPACE(' ') ]
+Line 41: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 42: PUB = 'pub' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 42: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 42: IDENTIFIER = 'getEmployeeId' [leading: WHITESPACE(' ') ]
+Line 42: LEFT_PAREN = '('
+Line 42: RIGHT_PAREN = ')'
+Line 42: COLON = ':'
+Line 42: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 42: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 43: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 43: SELF = 'self' [leading: WHITESPACE(' ') ]
+Line 43: DOT = '.'
+Line 43: IDENTIFIER = 'id'
+Line 43: SEMICOLON = ';'
+Line 44: RIGHT_BRACE = '}' [leading: WHITESPACE('    ') COMMENT_LINE('// Should work - protected member in subclass') NEWLINE('
+') WHITESPACE('    ') ]
+Line 46: PUB = 'pub' [leading: NEWLINE('
+') WHITESPACE('    ') NEWLINE('
+') WHITESPACE('    ') ]
+Line 46: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 46: IDENTIFIER = 'testPrivateAccess' [leading: WHITESPACE(' ') ]
+Line 46: LEFT_PAREN = '('
+Line 46: RIGHT_PAREN = ')'
+Line 46: COLON = ':'
+Line 46: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 46: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 47: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 47: SELF = 'self' [leading: WHITESPACE(' ') ]
+Line 47: DOT = '.'
+Line 47: IDENTIFIER = 'name'
+Line 47: SEMICOLON = ';'
+Line 48: RIGHT_BRACE = '}' [leading: WHITESPACE('  ') COMMENT_LINE('// Should work - private member but same module') NEWLINE('
+') WHITESPACE('    ') ]
+Line 50: PUB = 'pub' [leading: NEWLINE('
+') WHITESPACE('    ') NEWLINE('
+') WHITESPACE('    ') ]
+Line 50: FN = 'fn' [leading: WHITESPACE(' ') ]
+Line 50: IDENTIFIER = 'testProtectedAccess' [leading: WHITESPACE(' ') ]
+Line 50: LEFT_PAREN = '('
+Line 50: RIGHT_PAREN = ')'
+Line 50: COLON = ':'
+Line 50: STR_TYPE = 'str' [leading: WHITESPACE(' ') ]
+Line 50: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 51: RETURN = 'return' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 51: SELF = 'self' [leading: WHITESPACE(' ') ]
+Line 51: DOT = '.'
+Line 51: IDENTIFIER = 'protectedMethod'
+Line 51: LEFT_PAREN = '('
+Line 51: RIGHT_PAREN = ')'
+Line 51: SEMICOLON = ';'
+Line 52: RIGHT_BRACE = '}' [leading: WHITESPACE(' ') COMMENT_LINE('// Should work - protected method in subclass') NEWLINE('
+') WHITESPACE('    ') ]
+Line 53: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 56: FN = 'fn' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test function visibility within same module') NEWLINE('
+') ]
+Line 56: IDENTIFIER = 'testModuleAccess' [leading: WHITESPACE(' ') ]
+Line 56: LEFT_PAREN = '('
+Line 56: RIGHT_PAREN = ')'
+Line 56: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 57: VAR = 'var' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 57: IDENTIFIER = 'helper1' [leading: WHITESPACE(' ') ]
+Line 57: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 57: IDENTIFIER = 'privateHelper' [leading: WHITESPACE(' ') ]
+Line 57: LEFT_PAREN = '('
+Line 57: RIGHT_PAREN = ')'
+Line 57: SEMICOLON = ';'
+Line 58: VAR = 'var' [leading: WHITESPACE('    ') COMMENT_LINE('// Should work - same module') NEWLINE('
+') WHITESPACE('    ') ]
+Line 58: IDENTIFIER = 'helper2' [leading: WHITESPACE(' ') ]
+Line 58: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 58: IDENTIFIER = 'protectedHelper' [leading: WHITESPACE(' ') ]
+Line 58: LEFT_PAREN = '('
+Line 58: RIGHT_PAREN = ')'
+Line 58: SEMICOLON = ';'
+Line 59: VAR = 'var' [leading: WHITESPACE('  ') COMMENT_LINE('// Should work - same module') NEWLINE('
+') WHITESPACE('    ') ]
+Line 59: IDENTIFIER = 'helper3' [leading: WHITESPACE(' ') ]
+Line 59: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 59: IDENTIFIER = 'publicHelper' [leading: WHITESPACE(' ') ]
+Line 59: LEFT_PAREN = '('
+Line 59: RIGHT_PAREN = ')'
+Line 59: SEMICOLON = ';'
+Line 60: RIGHT_BRACE = '}' [leading: WHITESPACE('     ') COMMENT_LINE('// Should work - always accessible') NEWLINE('
+') ]
+Line 62: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 62: IDENTIFIER = 'person' [leading: WHITESPACE(' ') ]
+Line 62: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 62: IDENTIFIER = 'Person' [leading: WHITESPACE(' ') ]
+Line 62: LEFT_PAREN = '('
+Line 62: RIGHT_PAREN = ')'
+Line 62: SEMICOLON = ';'
+Line 65: VAR = 'var' [leading: NEWLINE('
+') WHITESPACE('    ') NEWLINE('
+') COMMENT_LINE('// These should work - public members') NEWLINE('
+') ]
+Line 65: IDENTIFIER = 'age' [leading: WHITESPACE(' ') ]
+Line 65: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 65: IDENTIFIER = 'person' [leading: WHITESPACE(' ') ]
+Line 65: DOT = '.'
+Line 65: IDENTIFIER = 'age'
+Line 65: SEMICOLON = ';'
+Line 66: VAR = 'var' [leading: WHITESPACE('           ') NEWLINE('
+') ]
+Line 66: IDENTIFIER = 'name' [leading: WHITESPACE(' ') ]
+Line 66: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 66: IDENTIFIER = 'person' [leading: WHITESPACE(' ') ]
+Line 66: DOT = '.'
+Line 66: IDENTIFIER = 'getName'
+Line 66: LEFT_PAREN = '('
+Line 66: RIGHT_PAREN = ')'
+Line 66: SEMICOLON = ';'
+Line 67: VAR = 'var' [leading: WHITESPACE('    ') NEWLINE('
+') ]
+Line 67: IDENTIFIER = 'result' [leading: WHITESPACE(' ') ]
+Line 67: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 67: IDENTIFIER = 'person' [leading: WHITESPACE(' ') ]
+Line 67: DOT = '.'
+Line 67: IDENTIFIER = 'publicMethod'
+Line 67: LEFT_PAREN = '('
+Line 67: RIGHT_PAREN = ')'
+Line 67: SEMICOLON = ';'
+Line 70: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// These should work - same module access') NEWLINE('
+') ]
+Line 70: IDENTIFIER = 'privateName' [leading: WHITESPACE(' ') ]
+Line 70: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 70: IDENTIFIER = 'person' [leading: WHITESPACE(' ') ]
+Line 70: DOT = '.'
+Line 70: IDENTIFIER = 'name'
+Line 70: SEMICOLON = ';'
+Line 71: VAR = 'var' [leading: WHITESPACE('        ') COMMENT_LINE('// Private field but same module') NEWLINE('
+') ]
+Line 71: IDENTIFIER = 'privateResult' [leading: WHITESPACE(' ') ]
+Line 71: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 71: IDENTIFIER = 'person' [leading: WHITESPACE(' ') ]
+Line 71: DOT = '.'
+Line 71: IDENTIFIER = 'privateMethod'
+Line 71: LEFT_PAREN = '('
+Line 71: RIGHT_PAREN = ')'
+Line 71: SEMICOLON = ';'
+Line 74: VAR = 'var' [leading: WHITESPACE(' ') COMMENT_LINE('// Private method but same module') NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// These should work - protected access within same module') NEWLINE('
+') ]
+Line 74: IDENTIFIER = 'id' [leading: WHITESPACE(' ') ]
+Line 74: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 74: IDENTIFIER = 'person' [leading: WHITESPACE(' ') ]
+Line 74: DOT = '.'
+Line 74: IDENTIFIER = 'id'
+Line 74: SEMICOLON = ';'
+Line 75: VAR = 'var' [leading: WHITESPACE('                   ') COMMENT_LINE('// Protected field, same module') NEWLINE('
+') ]
+Line 75: IDENTIFIER = 'protectedResult' [leading: WHITESPACE(' ') ]
+Line 75: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 75: IDENTIFIER = 'person' [leading: WHITESPACE(' ') ]
+Line 75: DOT = '.'
+Line 75: IDENTIFIER = 'protectedMethod'
+Line 75: LEFT_PAREN = '('
+Line 75: RIGHT_PAREN = ')'
+Line 75: SEMICOLON = ';'
+Line 77: VAR = 'var' [leading: WHITESPACE(' ') COMMENT_LINE('// Protected method, same module') NEWLINE('
+') NEWLINE('
+') ]
+Line 77: IDENTIFIER = 'employee' [leading: WHITESPACE(' ') ]
+Line 77: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 77: IDENTIFIER = 'Employee' [leading: WHITESPACE(' ') ]
+Line 77: LEFT_PAREN = '('
+Line 77: RIGHT_PAREN = ')'
+Line 77: SEMICOLON = ';'
+Line 78: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 78: IDENTIFIER = 'empId' [leading: WHITESPACE(' ') ]
+Line 78: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 78: IDENTIFIER = 'employee' [leading: WHITESPACE(' ') ]
+Line 78: DOT = '.'
+Line 78: IDENTIFIER = 'getEmployeeId'
+Line 78: LEFT_PAREN = '('
+Line 78: RIGHT_PAREN = ')'
+Line 78: SEMICOLON = ';'
+Line 79: VAR = 'var' [leading: WHITESPACE('     ') COMMENT_LINE('// Should work') NEWLINE('
+') ]
+Line 79: IDENTIFIER = 'empName' [leading: WHITESPACE(' ') ]
+Line 79: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 79: IDENTIFIER = 'employee' [leading: WHITESPACE(' ') ]
+Line 79: DOT = '.'
+Line 79: IDENTIFIER = 'testPrivateAccess'
+Line 79: LEFT_PAREN = '('
+Line 79: RIGHT_PAREN = ')'
+Line 79: SEMICOLON = ';'
+Line 80: VAR = 'var' [leading: WHITESPACE(' ') COMMENT_LINE('// Should work - same module') NEWLINE('
+') ]
+Line 80: IDENTIFIER = 'empProt' [leading: WHITESPACE(' ') ]
+Line 80: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 80: IDENTIFIER = 'employee' [leading: WHITESPACE(' ') ]
+Line 80: DOT = '.'
+Line 80: IDENTIFIER = 'testProtectedAccess'
+Line 80: LEFT_PAREN = '('
+Line 80: RIGHT_PAREN = ')'
+Line 80: SEMICOLON = ';'
+Line 82: IDENTIFIER = 'testModuleAccess' [leading: WHITESPACE(' ') COMMENT_LINE('// Should work - inheritance') NEWLINE('
+') NEWLINE('
+') ]
+Line 82: LEFT_PAREN = '('
+Line 82: RIGHT_PAREN = ')'
+Line 82: SEMICOLON = ';'
+Line 82: EOF_TOKEN = ''

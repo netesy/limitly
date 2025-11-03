@@ -806,6 +806,12 @@ void BytecodeGenerator::visitImportStatement(const std::shared_ptr<AST::ImportSt
     // Collect the names of functions and variables defined in the module
     std::vector<std::string> allModuleSymbols;
     
+    // First, extract visibility information from the imported module
+    // Set the type checker context to the imported module temporarily
+    std::string originalModulePath = typeChecker->getCurrentModulePath();
+    typeChecker->setSourceContext(source, filePath);
+    typeChecker->extractModuleVisibility(moduleAst);
+    
     // Generate bytecode for the module's statements
     // This will include all function definitions and variable declarations
     for (const auto& moduleStmt : moduleAst->statements) {
@@ -814,15 +820,26 @@ void BytecodeGenerator::visitImportStatement(const std::shared_ptr<AST::ImportSt
             continue;
         }
         
-        // Track symbols being defined
+        // Track symbols being defined and check their visibility
         if (auto varDecl = std::dynamic_pointer_cast<AST::VarDeclaration>(moduleStmt)) {
-            allModuleSymbols.push_back(varDecl->name);
+            // Only include variables that are visible to the importing module
+            AST::VisibilityLevel visibility = typeChecker->getModuleMemberVisibility(filePath, varDecl->name);
+            if (visibility == AST::VisibilityLevel::Public || visibility == AST::VisibilityLevel::Const) {
+                allModuleSymbols.push_back(varDecl->name);
+            }
         } else if (auto funcDecl = std::dynamic_pointer_cast<AST::FunctionDeclaration>(moduleStmt)) {
-            allModuleSymbols.push_back(funcDecl->name);
+            // Only include functions that are visible to the importing module
+            AST::VisibilityLevel visibility = typeChecker->getModuleMemberVisibility(filePath, funcDecl->name);
+            if (visibility == AST::VisibilityLevel::Public || visibility == AST::VisibilityLevel::Const) {
+                allModuleSymbols.push_back(funcDecl->name);
+            }
         }
         
         visitStatement(moduleStmt);
     }
+    
+    // Restore the original module context
+    typeChecker->setSourceContext(sourceCode, originalModulePath);
     
     // Apply import filters to determine which symbols to include in the module object
     std::vector<std::string> moduleSymbols;

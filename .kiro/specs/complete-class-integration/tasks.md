@@ -148,7 +148,7 @@
 - [ ] 5.2 Add class types to error handling system
   - Enable classes to be used as error types
   - Implement class-based error propagation
-  - Add support for class methods in error handling
+  - Add support for class methods in   error handling
   - Integrate class inheritance with error type hierarchies
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
 

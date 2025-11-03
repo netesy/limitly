@@ -1,5 +1,6 @@
 #include "backend/ast_printer.hh"
 #include "backend/bytecode_printer.hh"
+#include "backend/type_checker.hh"
 #include "frontend/scanner.hh"
 #include "frontend/parser.hh"
 // CST parser functionality is now integrated into parser.hh
@@ -362,10 +363,65 @@ int main(int argc, char* argv[]) {
             std::cout << "❌ No AST available - parsing failed\n";
         }
         
+        // Type Checking
+        std::cout << "=== Type Checking ===\n";
+        if (ast) {
+            BytecodeGenerator generator;
+            generator.setSourceContext(source, filename);
+            std::vector<TypeCheckError> typeErrors = generator.performTypeChecking(ast);
+            
+            // Print type checking results to console
+            if (typeErrors.empty()) {
+                std::cout << "✓ No type errors found\n";
+            } else {
+                std::cout << "❌ Found " << typeErrors.size() << " type error(s):\n";
+                for (const auto& error : typeErrors) {
+                    std::cout << "  Line " << error.line << ": " << error.message << "\n";
+                }
+            }
+            
+            // Output type checking results to file
+            std::string typeCheckFilename = filename + ".typecheck.txt";
+            std::ofstream typeCheckFile(typeCheckFilename);
+            if (typeCheckFile.is_open()) {
+                typeCheckFile << "Type Checking Results for " << filename << "\n";
+                typeCheckFile << "Parser: " << (useCSTParser ? "New Unified Parser (CST mode)" : "New Unified Parser (Legacy mode)") << "\n";
+                typeCheckFile << "========================================\n\n";
+                
+                if (typeErrors.empty()) {
+                    typeCheckFile << "✓ No type errors found\n";
+                    typeCheckFile << "All visibility rules and type constraints are satisfied.\n";
+                } else {
+                    typeCheckFile << "❌ Found " << typeErrors.size() << " type error(s):\n\n";
+                    for (size_t i = 0; i < typeErrors.size(); ++i) {
+                        const auto& error = typeErrors[i];
+                        typeCheckFile << "Error " << (i + 1) << ":\n";
+                        typeCheckFile << "  Line: " << error.line;
+                        if (error.column > 0) {
+                            typeCheckFile << ", Column: " << error.column;
+                        }
+                        typeCheckFile << "\n";
+                        typeCheckFile << "  Message: " << error.message << "\n";
+                        if (!error.context.empty()) {
+                            typeCheckFile << "  Context: " << error.context << "\n";
+                        }
+                        typeCheckFile << "\n";
+                    }
+                }
+                
+                std::cout << "Type checking output saved to " << typeCheckFilename << std::endl;
+            } else {
+                std::cerr << "Warning: Could not open " << typeCheckFilename << " for writing" << std::endl;
+            }
+        } else {
+            std::cout << "❌ No type checking performed - AST not available\n";
+        }
+
         // Backend: Generate bytecode
         std::cout << "=== Bytecode Generation ===\n";
         if (ast) {
             BytecodeGenerator generator;
+            generator.setSourceContext(source, filename);
             generator.process(ast);
             
             // Print bytecode to console

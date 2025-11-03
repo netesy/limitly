@@ -1,0 +1,296 @@
+Bytecode for tests/classes/basic_classes.lm
+Parser: New Unified Parser (CST mode)
+========================================
+
+=== Bytecode ===
+Generated 288 instructions
+
+   0: PUSH_STRING          "=== Basic Class Tests ==="
+   1: PRINT               
+   2: BEGIN_CLASS          "Person"
+   3: BEGIN_FUNCTION       "init"
+   4: DEFINE_PARAM        
+   5: DEFINE_PARAM        
+   6: BEGIN_SCOPE         
+   7: LOAD_THIS           
+   8: LOAD_VAR             "name"
+   9: SET_PROPERTY         "name"
+  10: POP                 
+  11: LOAD_THIS           
+  12: LOAD_VAR             "age"
+  13: SET_PROPERTY         "age"
+  14: POP                 
+  15: END_SCOPE           
+  16: PUSH_NULL           
+  17: RETURN              
+  18: END_FUNCTION        
+  19: PUSH_FUNCTION       
+  20: POP                 
+  21: BEGIN_FUNCTION       "greet"
+  22: BEGIN_SCOPE         
+  23: PUSH_STRING          "Hello, I'm "
+  24: LOAD_THIS           
+  25: GET_PROPERTY         "name"
+  26: PUSH_STRING         
+  27: CONCAT              
+  28: PUSH_STRING          " and I'm "
+  29: LOAD_THIS           
+  30: GET_PROPERTY         "age"
+  31: PUSH_STRING         
+  32: CONCAT              
+  33: PUSH_STRING          " years old"
+  34: INTERPOLATE_STRING  
+  35: PRINT               
+  36: END_SCOPE           
+  37: PUSH_NULL           
+  38: RETURN              
+  39: END_FUNCTION        
+  40: PUSH_FUNCTION       
+  41: POP                 
+  42: BEGIN_FUNCTION       "birthday"
+  43: BEGIN_SCOPE         
+  44: LOAD_THIS           
+  45: PUSH_INT             1
+  46: SET_PROPERTY         "age"
+  47: POP                 
+  48: PUSH_STRING         
+  49: LOAD_THIS           
+  50: GET_PROPERTY         "name"
+  51: PUSH_STRING         
+  52: CONCAT              
+  53: PUSH_STRING          " is now "
+  54: LOAD_THIS           
+  55: GET_PROPERTY         "age"
+  56: PUSH_STRING         
+  57: CONCAT              
+  58: PUSH_STRING          " years old"
+  59: INTERPOLATE_STRING  
+  60: PRINT               
+  61: END_SCOPE           
+  62: PUSH_NULL           
+  63: RETURN              
+  64: END_FUNCTION        
+  65: PUSH_FUNCTION       
+  66: POP                 
+  67: END_CLASS           
+  68: PUSH_STRING          "Creating Person objects:"
+  69: PRINT               
+  70: PUSH_STRING          "Alice"
+  71: PUSH_INT             25
+  72: CALL                 "Person"
+  73: STORE_VAR            "person1"
+  74: PUSH_STRING          "Bob"
+  75: PUSH_INT             30
+  76: CALL                 "Person"
+  77: STORE_VAR            "person2"
+  78: PUSH_STRING          "Calling methods:"
+  79: PRINT               
+  80: LOAD_VAR             "person1"
+  81: GET_PROPERTY         "greet"
+  82: CALL                
+  83: POP                 
+  84: LOAD_VAR             "person2"
+  85: GET_PROPERTY         "greet"
+  86: CALL                
+  87: POP                 
+  88: PUSH_STRING          "Birthday test:"
+  89: PRINT               
+  90: LOAD_VAR             "person1"
+  91: GET_PROPERTY         "birthday"
+  92: CALL                
+  93: POP                 
+  94: LOAD_VAR             "person1"
+  95: GET_PROPERTY         "greet"
+  96: CALL                
+  97: POP                 
+  98: BEGIN_CLASS          "Rectangle"
+  99: PUSH_INT             0
+ 100: DEFINE_FIELD         "width"
+ 101: PUSH_INT             0
+ 102: DEFINE_FIELD         "height"
+ 103: BEGIN_FUNCTION       "init"
+ 104: DEFINE_PARAM        
+ 105: DEFINE_PARAM        
+ 106: BEGIN_SCOPE         
+ 107: LOAD_THIS           
+ 108: LOAD_VAR             "width"
+ 109: SET_PROPERTY         "width"
+ 110: POP                 
+ 111: LOAD_THIS           
+ 112: LOAD_VAR             "height"
+ 113: SET_PROPERTY         "height"
+ 114: POP                 
+ 115: END_SCOPE           
+ 116: PUSH_NULL           
+ 117: RETURN              
+ 118: END_FUNCTION        
+ 119: PUSH_FUNCTION       
+ 120: POP                 
+ 121: BEGIN_FUNCTION       "area"
+ 122: BEGIN_SCOPE         
+ 123: LOAD_THIS           
+ 124: GET_PROPERTY         "width"
+ 125: LOAD_THIS           
+ 126: GET_PROPERTY         "height"
+ 127: MULTIPLY            
+ 128: RETURN              
+ 129: END_SCOPE           
+ 130: PUSH_NULL           
+ 131: RETURN              
+ 132: END_FUNCTION        
+ 133: PUSH_FUNCTION       
+ 134: POP                 
+ 135: BEGIN_FUNCTION       "perimeter"
+ 136: BEGIN_SCOPE         
+ 137: PUSH_INT             2
+ 138: LOAD_THIS           
+ 139: GET_PROPERTY         "width"
+ 140: LOAD_THIS           
+ 141: GET_PROPERTY         "height"
+ 142: ADD                 
+ 143: MULTIPLY            
+ 144: RETURN              
+ 145: END_SCOPE           
+ 146: PUSH_NULL           
+ 147: RETURN              
+ 148: END_FUNCTION        
+ 149: PUSH_FUNCTION       
+ 150: POP                 
+ 151: END_CLASS           
+ 152: PUSH_STRING          "Rectangle class:"
+ 153: PRINT               
+ 154: PUSH_INT             5
+ 155: PUSH_INT             3
+ 156: CALL                 "Rectangle"
+ 157: STORE_VAR            "rect"
+ 158: PUSH_STRING          "Area: "
+ 159: LOAD_VAR             "rect"
+ 160: GET_PROPERTY         "area"
+ 161: CALL                
+ 162: PUSH_STRING         
+ 163: CONCAT              
+ 164: PUSH_STRING         
+ 165: INTERPOLATE_STRING  
+ 166: PRINT               
+ 167: PUSH_STRING          "Perimeter: "
+ 168: LOAD_VAR             "rect"
+ 169: GET_PROPERTY         "perimeter"
+ 170: CALL                
+ 171: PUSH_STRING         
+ 172: CONCAT              
+ 173: PUSH_STRING         
+ 174: INTERPOLATE_STRING  
+ 175: PRINT               
+ 176: BEGIN_CLASS          "BankAccount"
+ 177: PUSH_FLOAT           0
+ 178: DEFINE_FIELD         "balance"
+ 179: BEGIN_FUNCTION       "deposit"
+ 180: DEFINE_PARAM        
+ 181: BEGIN_SCOPE         
+ 182: LOAD_THIS           
+ 183: LOAD_THIS           
+ 184: GET_PROPERTY         "balance"
+ 185: LOAD_VAR             "amount"
+ 186: ADD                 
+ 187: SET_PROPERTY         "balance"
+ 188: POP                 
+ 189: LOAD_THIS           
+ 190: GET_PROPERTY         "balance"
+ 191: RETURN              
+ 192: END_SCOPE           
+ 193: PUSH_NULL           
+ 194: RETURN              
+ 195: END_FUNCTION        
+ 196: PUSH_FUNCTION       
+ 197: POP                 
+ 198: BEGIN_FUNCTION       "withdraw"
+ 199: DEFINE_PARAM        
+ 200: BEGIN_SCOPE         
+ 201: LOAD_VAR             "amount"
+ 202: LOAD_THIS           
+ 203: GET_PROPERTY         "balance"
+ 204: GREATER             
+ 205: JUMP_IF_FALSE        8
+ 206: BEGIN_SCOPE         
+ 207: PUSH_STRING          "Insufficient funds!"
+ 208: PRINT               
+ 209: LOAD_THIS           
+ 210: GET_PROPERTY         "balance"
+ 211: RETURN              
+ 212: END_SCOPE           
+ 213: JUMP                 0
+ 214: LOAD_THIS           
+ 215: LOAD_THIS           
+ 216: GET_PROPERTY         "balance"
+ 217: LOAD_VAR             "amount"
+ 218: SUBTRACT            
+ 219: SET_PROPERTY         "balance"
+ 220: POP                 
+ 221: LOAD_VAR             "amount"
+ 222: RETURN              
+ 223: END_SCOPE           
+ 224: PUSH_NULL           
+ 225: RETURN              
+ 226: END_FUNCTION        
+ 227: PUSH_FUNCTION       
+ 228: POP                 
+ 229: END_CLASS           
+ 230: BEGIN_FUNCTION       "test_bank_account"
+ 231: BEGIN_SCOPE         
+ 232: CALL                 "BankAccount"
+ 233: STORE_VAR            "account"
+ 234: LOAD_VAR             "account"
+ 235: GET_PROPERTY         "deposit"
+ 236: PUSH_FLOAT           100
+ 237: CALL                
+ 238: POP                 
+ 239: PUSH_STRING          "Balance after deposit: "
+ 240: LOAD_VAR             "account"
+ 241: GET_PROPERTY         "balance"
+ 242: PUSH_STRING         
+ 243: CONCAT              
+ 244: PUSH_STRING         
+ 245: INTERPOLATE_STRING  
+ 246: PRINT               
+ 247: LOAD_VAR             "account"
+ 248: GET_PROPERTY         "withdraw"
+ 249: PUSH_FLOAT           30
+ 250: CALL                
+ 251: STORE_VAR            "withdrawn"
+ 252: PUSH_STRING          "Withdrawn: "
+ 253: LOAD_VAR             "withdrawn"
+ 254: PUSH_STRING         
+ 255: CONCAT              
+ 256: PUSH_STRING         
+ 257: INTERPOLATE_STRING  
+ 258: PRINT               
+ 259: PUSH_STRING          "Balance after withdrawal: "
+ 260: LOAD_VAR             "account"
+ 261: GET_PROPERTY         "balance"
+ 262: PUSH_STRING         
+ 263: CONCAT              
+ 264: PUSH_STRING         
+ 265: INTERPOLATE_STRING  
+ 266: PRINT               
+ 267: LOAD_VAR             "account"
+ 268: GET_PROPERTY         "withdraw"
+ 269: PUSH_FLOAT           100
+ 270: CALL                
+ 271: STORE_VAR            "failed_withdraw"
+ 272: PUSH_STRING          "Failed withdrawal: "
+ 273: LOAD_VAR             "failed_withdraw"
+ 274: PUSH_STRING         
+ 275: CONCAT              
+ 276: PUSH_STRING         
+ 277: INTERPOLATE_STRING  
+ 278: PRINT               
+ 279: END_SCOPE           
+ 280: PUSH_NULL           
+ 281: RETURN              
+ 282: END_FUNCTION        
+ 283: PUSH_FUNCTION       
+ 284: STORE_VAR            "test_bank_account"
+ 285: CALL                 "test_bank_account"
+ 286: POP                 
+ 287: HALT                
+
