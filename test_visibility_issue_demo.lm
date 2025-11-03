@@ -1,0 +1,94 @@
+// Demonstration of the key visibility issue:
+// Visibility checking happens at RUNTIME instead of COMPILE-TIME
+
+// ===== SAME MODULE CLASS =====
+class LocalPerson {
+    pub name: str;        // Public
+    prot age: int;        // Protected  
+    ssn: str;            // Private
+    
+    pub fn init(name: str, age: int, ssn: str) {
+        this.name = name;
+        this.age = age;
+        this.ssn = ssn;
+    }
+    
+    pub fn getName(): str {
+        return this.name;
+    }
+    
+    prot fn getAge(): int {
+        return this.age;
+    }
+    
+    fn getSSN(): str {    // Private
+        return this.ssn;
+    }
+}
+
+// Function in SAME MODULE accessing class members
+fn testSameModuleAccess() {
+    let person = LocalPerson("Alice", 25, "123-45-6789");
+    
+    print("=== SAME MODULE ACCESS ===");
+    
+    // Public access - should work
+    print("Public name: " + person.name);
+    
+    // Protected access - should work in SAME MODULE but currently fails at RUNTIME
+    print("Protected age: " + person.age);     // ISSUE: This should work but fails at runtime
+    
+    // Private access - should work in SAME MODULE but currently fails at RUNTIME  
+    print("Private SSN: " + person.ssn);      // ISSUE: This should work but fails at runtime
+    
+    // Method calls
+    print("Public method: " + person.getName());
+    print("Protected method: " + person.getAge());  // ISSUE: Should work in same module
+    print("Private method: " + person.getSSN());    // ISSUE: Should work in same module
+}
+
+// ===== IMPORTED CLASS =====
+import person_module show Person;
+
+fn testCrossModuleAccess() {
+    let person = Person("Bob", 30, "987-65-4321");
+    
+    print("=== CROSS MODULE ACCESS ===");
+    
+    // Public access - should work
+    print("Public name: " + person.name);
+    
+    // Protected access - should be blocked by TYPE_CHECKER at COMPILE-TIME
+    print("Protected age: " + person.age);     // Should be compile-time error, not runtime
+    
+    // Private access - should be blocked by TYPE_CHECKER at COMPILE-TIME
+    print("Private SSN: " + person.ssn);      // Should be compile-time error, not runtime
+    
+    // Method calls
+    print("Public method: " + person.getName());
+    print("Protected method: " + person.getAge());  // Should be compile-time error
+    print("Private method: " + person.getSSN());    // Should be compile-time error
+}
+
+// ===== THE PROBLEM =====
+/*
+CURRENT BEHAVIOR (WRONG):
+- All visibility violations are caught at RUNTIME by the VM
+- Even same-module access to protected/private members fails
+- No distinction between same-module and cross-module access
+
+EXPECTED BEHAVIOR (CORRECT):
+- Visibility violations should be caught at COMPILE-TIME by type_checker
+- Same-module access should allow protected/private member access
+- Cross-module access should only allow public member access
+- Type_checker should prevent compilation of invalid access patterns
+
+KEY DIFFERENCES:
+1. SAME MODULE: All visibility levels accessible (pub, prot, private)
+2. CROSS MODULE: Only public members accessible
+3. INHERITANCE: Subclasses can access protected members even across modules
+4. TIMING: Compile-time checking, not runtime checking
+*/
+
+testSameModuleAccess();
+testCrossModuleAccess();

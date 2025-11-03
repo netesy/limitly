@@ -1,0 +1,29 @@
+// Debug test to understand visibility checking
+
+class TestPerson {
+    pub name: str;
+    prot age: int;
+    ssn: str;  // private
+    
+    pub fn init(name: str, age: int, ssn: str) {
+        self.name = name;
+        self.age = age;
+        self.ssn = ssn;
+    }
+}
+
+fn testAccess() {
+    var person = TestPerson("Alice", 25, "123-45-6789");
+    
+    print("Testing same-module access...");
+    
+    // This should work - public
+    print("Public name: " + person.name);
+    
+    // These should work in same module but currently fail at runtime
+    // Let's see what happens
+    print("About to test protected access...");
+    print("Protected age: " + person.age);
+}
+
+testAccess();

@@ -1,0 +1,45 @@
+// Enhanced debug test to understand visibility checking
+
+class TestPerson {
+    pub name: str;
+    prot age: int;
+    ssn: str;  // private
+    
+    pub fn init(name: str, age: int, ssn: str) {
+        this.name = name;
+        this.age = age;
+        this.ssn = ssn;
+    }
+    
+    pub fn testInternalAccess() {
+        // This should work - accessing from within the same class
+        print("Internal access to name: " + this.name);
+        print("Internal access to age: " + this.age);
+        print("Internal access to ssn: " + this.ssn);
+    }
+}
+
+fn testExternalAccess() {
+    var person = TestPerson("Alice", 25, "123-45-6789");
+    
+    print("=== Testing external access from same module ===");
+    
+    // Public access - should work
+    print("Public name: " + person.name);
+    
+    // Protected access - should work in same module
+    print("Protected age: " + person.age);
+    
+    // Private access - should work in same module  
+    print("Private ssn: " + person.ssn);
+}
+
+fn testInternalAccess() {
+    var person = TestPerson("Bob", 30, "987-65-4321");
+    
+    print("=== Testing internal access from class method ===");
+    person.testInternalAccess();
+}
+
+testExternalAccess();
+testInternalAccess();

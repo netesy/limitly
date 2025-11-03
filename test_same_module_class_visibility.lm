@@ -1,0 +1,70 @@
+// Test case: Class member visibility within the same module
+// This should be checked at compile-time by the type_checker
+
+// Define a class with different visibility levels
+class Person {
+    pub name: str;
+    prot age: int;
+    ssn: str;  // private by default
+    
+    fn init(name: str, age: int, ssn: str) {
+        self.name = name;
+        self.age = age;
+        self.ssn = ssn;
+    }
+    
+    pub fn getName(): str {
+        return self.name;
+    }
+    
+    prot fn getAge(): int {
+        return self.age;
+    }
+    
+    fn getSSN(): str {  // private by default
+        return self.ssn;
+    }
+}
+
+// Another class in the same module that inherits from Person
+class Employee : Person {
+    salary: float;  // private by default
+    
+    fn init(name: str, age: int, ssn: str, salary: float) {
+        super.init(name, age, ssn);
+        self.salary = salary;
+    }
+    
+    pub fn displayInfo() {
+        // Should work: accessing public member from same module
+        print("Name: {self.name}");
+        
+        // Should work: accessing protected member from subclass
+        print("Age: {self.age}");
+        
+        // Should NOT work: accessing private member from subclass
+        // This should be caught by type_checker at compile-time
+        print("SSN: {self.ssn}");  // ERROR: Cannot access private member
+    }
+}
+
+// Function in the same module accessing class members
+fn processPersonData() {
+    var person = Person("John", 30, "123-45-6789");
+    
+    // Should work: accessing public member from same module
+    print("Public name: {person.name}");
+    
+    // Should work: accessing protected member from same module
+    print("Protected age: {person.age}");
+    
+    // Should work: accessing private member from same module (same file)
+    print("Private SSN: {person.ssn}");
+    
+    // Method calls with same visibility rules
+    print("Public method: {person.getName()}");
+    print("Protected method age: {person.getAge()}");
+    print("Private method SSN: {person.getSSN()}");
+}
+
+processPersonData();

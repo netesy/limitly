@@ -1,0 +1,14 @@
+// Test cross-module private access - should fail at compile time
+
+import tests.modules.math_module as math;
+
+fn testCrossModuleAccess() {
+    // These should work - accessing public members
+    var result1 = math.add(5, 3);
+    var result2 = math.pi;
+    
+    // This should fail at compile time - accessing private function
+    var result3 = math.factorial(5);  // factorial is private in math_module
+}
+
+testCrossModuleAccess();

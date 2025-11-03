@@ -1,0 +1,19 @@
+// Simple test for member access
+
+class Simple {
+    pub name: str;
+    
+    pub fn init(name: str) {
+        this.name = name;
+    }
+}
+
+fn test() {
+    var obj = Simple("test");
+    print("Name: " + obj.name);
+    
+    // Try to access non-existent member - should be caught by type_checker
+    print("Invalid: " + obj.invalid);
+}
+
+test();

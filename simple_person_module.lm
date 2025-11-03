@@ -1,0 +1,25 @@
+// Simple module for testing visibility without inheritance
+
+pub class Person {
+    pub name: str;
+    prot age: int;
+    ssn: str;  // private by default
+    
+    pub fn init(name: str, age: int, ssn: str) {
+        this.name = name;
+        this.age = age;
+        this.ssn = ssn;
+    }
+    
+    pub fn getName(): str {
+        return this.name;
+    }
+    
+    prot fn getAge(): int {
+        return this.age;
+    }
+    
+    fn getSSN(): str {  // private by default
+        return this.ssn;
+    }
+}

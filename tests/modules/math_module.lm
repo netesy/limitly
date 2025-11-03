@@ -1,17 +1,17 @@
 // Math module with functions that return values
-fn add(a, b) {
+pub fn add(a, b) {
     return a + b;
 }
 
-fn multiply(x, y) {
+pub fn multiply(x, y) {
     return x * y;
 }
 
 
-fn square(x: int): int {
+pub fn square(x: int): int {
     return x * x;
 }
-fn subtract(a: int, b: int): int {
+pub fn subtract(a: int, b: int): int {
     return a - b;
 }
 
@@ -20,15 +20,15 @@ fn factorial(n: int): int {
     return n * factorial(n - 1);
 }
 
-fn is_even(n: int): bool {
+pub fn is_even(n: int): bool {
     return n % 2 == 0;
 }
 
-fn is_odd(n: int): bool {
+pub fn is_odd(n: int): bool {
     return !is_even(n);
 }
 
-fn is_prime(n: int): bool {
+pub fn is_prime(n: int): bool {
     if (n <= 1) { return false; }
     if (n == 2) { return true; }
     if (is_even(n)) { return false; }
@@ -40,4 +40,4 @@ fn is_prime(n: int): bool {
     }
     return true;
 }
-var pi = 3.14159;
+pub var pi = 3.14159;
