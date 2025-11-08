@@ -325,6 +325,11 @@ public:
     void checkModuleMemberFunctionCall(const std::shared_ptr<AST::MemberExpr>& memberExpr, 
                                       const std::vector<TypePtr>& argTypes, 
                                       const std::shared_ptr<AST::CallExpr>& callExpr);
+
+    // Class method call validation
+    TypePtr checkClassMethodCall(const std::shared_ptr<AST::MemberExpr>& memberExpr,
+                                 const std::vector<TypePtr>& argTypes,
+                                 const std::shared_ptr<AST::CallExpr>& callExpr);
     
     // Import statement checking
     void checkImportStatement(const std::shared_ptr<AST::ImportStatement>& importStmt);

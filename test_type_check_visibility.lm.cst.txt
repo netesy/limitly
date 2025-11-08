@@ -142,7 +142,7 @@ CST Statistics:
  [1525-1526]
                     │     ├─ + Node: WHITESPACE_NODE | Token:      [1526-1530]
                     │     └─ Token: } [1530-1531]
-                    └─ + Node: FUNCTION_DECLARATION [0-2638]
+                    └─ + Node: FUNCTION_DECLARATION [0-2618]
                       ├─ + Node: BLOCK_STATEMENT [1603-1605]
                       │ └─ + Node: BLOCK_STATEMENT [0-1814] (block statement)
                       │   ├─ + Node: WHITESPACE_NODE | Token:   [1603-1604]
@@ -194,63 +194,63 @@ CST Statistics:
                       │ ├─ + Node: WHITESPACE_NODE | Token:   [1960-1961]
                       │ └─ Token: person [1961-1967]
                       ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
-                      ├─ + Node: VAR_DECLARATION [2031-2042]
-                      ├─ + Node: VARIABLE_EXPR [2051-2052]
-                      ├─ + Node: VARIABLE_EXPR [2045-2051] (variable reference)
-                      │ ├─ + Node: WHITESPACE_NODE | Token:   [2044-2045]
-                      │ └─ Token: person [2045-2051]
+                      ├─ + Node: VAR_DECLARATION [2011-2022]
+                      ├─ + Node: VARIABLE_EXPR [2031-2032]
+                      ├─ + Node: VARIABLE_EXPR [2025-2031] (variable reference)
+                      │ ├─ + Node: WHITESPACE_NODE | Token:   [2024-2025]
+                      │ └─ Token: person [2025-2031]
                       ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
-                      ├─ + Node: VAR_DECLARATION [2102-2115]
-                      ├─ + Node: VARIABLE_EXPR [2124-2125]
-                      ├─ + Node: VARIABLE_EXPR [2118-2124] (variable reference)
-                      │ ├─ + Node: WHITESPACE_NODE | Token:   [2117-2118]
-                      │ └─ Token: person [2118-2124]
+                      ├─ + Node: VAR_DECLARATION [2082-2095]
+                      ├─ + Node: VARIABLE_EXPR [2104-2105]
+                      ├─ + Node: VARIABLE_EXPR [2098-2104] (variable reference)
+                      │ ├─ + Node: WHITESPACE_NODE | Token:   [2097-2098]
+                      │ └─ Token: person [2098-2104]
                       ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
-                      ├─ + Node: VAR_DECLARATION [2240-2242]
-                      ├─ + Node: VARIABLE_EXPR [2251-2252]
-                      ├─ + Node: VARIABLE_EXPR [2245-2251] (variable reference)
-                      │ ├─ + Node: WHITESPACE_NODE | Token:   [2244-2245]
-                      │ └─ Token: person [2245-2251]
+                      ├─ + Node: VAR_DECLARATION [2220-2222]
+                      ├─ + Node: VARIABLE_EXPR [2231-2232]
+                      ├─ + Node: VARIABLE_EXPR [2225-2231] (variable reference)
+                      │ ├─ + Node: WHITESPACE_NODE | Token:   [2224-2225]
+                      │ └─ Token: person [2225-2231]
                       ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
-                      ├─ + Node: VAR_DECLARATION [2310-2325]
-                      ├─ + Node: VARIABLE_EXPR [2334-2335]
-                      ├─ + Node: VARIABLE_EXPR [2328-2334] (variable reference)
-                      │ ├─ + Node: WHITESPACE_NODE | Token:   [2327-2328]
-                      │ └─ Token: person [2328-2334]
+                      ├─ + Node: VAR_DECLARATION [2290-2305]
+                      ├─ + Node: VARIABLE_EXPR [2314-2315]
+                      ├─ + Node: VARIABLE_EXPR [2308-2314] (variable reference)
+                      │ ├─ + Node: WHITESPACE_NODE | Token:   [2307-2308]
+                      │ └─ Token: person [2308-2314]
                       ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
-                      ├─ + Node: VAR_DECLARATION [2392-2400]
-                      ├─ + Node: VARIABLE_EXPR [2411-2412]
-                      ├─ + Node: VARIABLE_EXPR [2403-2411] (variable reference)
-                      │ ├─ + Node: WHITESPACE_NODE | Token:   [2402-2403]
-                      │ └─ Token: Employee [2403-2411]
+                      ├─ + Node: VAR_DECLARATION [2372-2380]
+                      ├─ + Node: VARIABLE_EXPR [2391-2392]
+                      ├─ + Node: VARIABLE_EXPR [2383-2391] (variable reference)
+                      │ ├─ + Node: WHITESPACE_NODE | Token:   [2382-2383]
+                      │ └─ Token: Employee [2383-2391]
                       ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
-                      ├─ + Node: VAR_DECLARATION [2419-2424]
-                      ├─ + Node: VARIABLE_EXPR [2435-2436]
-                      ├─ + Node: VARIABLE_EXPR [2427-2435] (variable reference)
-                      │ ├─ + Node: WHITESPACE_NODE | Token:   [2426-2427]
-                      │ └─ Token: employee [2427-2435]
+                      ├─ + Node: VAR_DECLARATION [2399-2404]
+                      ├─ + Node: VARIABLE_EXPR [2415-2416]
+                      ├─ + Node: VARIABLE_EXPR [2407-2415] (variable reference)
+                      │ ├─ + Node: WHITESPACE_NODE | Token:   [2406-2407]
+                      │ └─ Token: employee [2407-2415]
                       ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
-                      ├─ + Node: VAR_DECLARATION [2476-2483]
-                      ├─ + Node: VARIABLE_EXPR [2494-2495]
-                      ├─ + Node: VARIABLE_EXPR [2486-2494] (variable reference)
-                      │ ├─ + Node: WHITESPACE_NODE | Token:   [2485-2486]
-                      │ └─ Token: employee [2486-2494]
+                      ├─ + Node: VAR_DECLARATION [2456-2463]
+                      ├─ + Node: VARIABLE_EXPR [2474-2475]
+                      ├─ + Node: VARIABLE_EXPR [2466-2474] (variable reference)
+                      │ ├─ + Node: WHITESPACE_NODE | Token:   [2465-2466]
+                      │ └─ Token: employee [2466-2474]
                       ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
-                      ├─ + Node: VAR_DECLARATION [2549-2556]
-                      ├─ + Node: VARIABLE_EXPR [2567-2568]
-                      ├─ + Node: VARIABLE_EXPR [2559-2567] (variable reference)
-                      │ ├─ + Node: WHITESPACE_NODE | Token:   [2558-2559]
-                      │ └─ Token: employee [2559-2567]
+                      ├─ + Node: VAR_DECLARATION [2529-2536]
+                      ├─ + Node: VARIABLE_EXPR [2547-2548]
+                      ├─ + Node: VARIABLE_EXPR [2539-2547] (variable reference)
+                      │ ├─ + Node: WHITESPACE_NODE | Token:   [2538-2539]
+                      │ └─ Token: employee [2539-2547]
                       ├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
-                      ├─ + Node: EXPRESSION_STATEMENT [2621-2637]
-                      ├─ + Node: VARIABLE_EXPR [2637-2638]
-                      ├─ + Node: VARIABLE_EXPR [2621-2637] (variable reference)
-                      │ ├─ + Node: WHITESPACE_NODE | Token:   [2590-2591]
-                      │ ├─ + Node: COMMENT_NODE | Token: // Should work - inheritance [2591-2619]
+                      ├─ + Node: EXPRESSION_STATEMENT [2601-2617]
+                      ├─ + Node: VARIABLE_EXPR [2617-2618]
+                      ├─ + Node: VARIABLE_EXPR [2601-2617] (variable reference)
+                      │ ├─ + Node: WHITESPACE_NODE | Token:   [2570-2571]
+                      │ ├─ + Node: COMMENT_NODE | Token: // Should work - inheritance [2571-2599]
                       │ ├─ + Node: WHITESPACE_NODE | Token: 
- [2619-2620]
+ [2599-2600]
                       │ ├─ + Node: WHITESPACE_NODE | Token: 
- [2620-2621]
-                      │ └─ Token: testModuleAccess [2621-2637]
+ [2600-2601]
+                      │ └─ Token: testModuleAccess [2601-2617]
                       └─ + Node: LITERAL_EXPR [0-0] (top-level expression)
 
