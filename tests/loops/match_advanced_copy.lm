@@ -57,6 +57,6 @@ fn test_combined(value) {
     }
 }
 
-// test_combined(Some(200));
-// test_combined(Some(50));
-// test_combined(None);
+test_combined(Some(200));
+test_combined(Some(50));
+test_combined(None);

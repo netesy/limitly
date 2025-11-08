@@ -21,7 +21,7 @@ fn test_types(value) {
         str => { print("String: {value}"); },
         list => { print("List: {value}"); },
         dict => { print("Dictionary: {value}"); },
-        _ => { print("Unknown type: {value}"); }
+        _ => { print("Unknown type: ({value}) of type: {typeOf(value)}"); }
     }
 }
 
