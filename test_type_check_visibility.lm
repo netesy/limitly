@@ -66,11 +66,11 @@ var age = person.age;
 var name = person.getName();    
 var result = person.publicMethod();
 
-// These should work - same module access
+// These should fail 
 var privateName = person.name;        // Private field but same module
 var privateResult = person.privateMethod(); // Private method but same module
 
-// These should work - protected access within same module
+// These should fail - protected access within same module
 var id = person.id;                   // Protected field, same module
 var protectedResult = person.protectedMethod(); // Protected method, same module
 

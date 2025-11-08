@@ -684,6 +684,14 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
                     return typeSystem.ANY_TYPE;
                 }
             }
+        } else if (auto memberExpr = std::dynamic_pointer_cast<AST::MemberExpr>(callExpr->callee)) {
+            // This is likely a method call. The validation is done in checkFunctionCall.
+            // Here, we just need to get the return type.
+            std::vector<TypePtr> argTypes;
+            for (const auto& arg : callExpr->arguments) {
+                argTypes.push_back(checkExpression(arg));
+            }
+            return checkClassMethodCall(memberExpr, argTypes, callExpr);
         }
         return typeSystem.ANY_TYPE;
         
@@ -2771,6 +2779,93 @@ void TypeChecker::checkModuleMemberFunctionCall(const std::shared_ptr<AST::Membe
     
     // TODO: Add parameter count and type validation here
     // For now, we'll just validate that the function is accessible
+}
+
+TypePtr TypeChecker::checkClassMethodCall(const std::shared_ptr<AST::MemberExpr>& memberExpr,
+                                          const std::vector<TypePtr>& argTypes,
+                                          const std::shared_ptr<AST::CallExpr>& callExpr) {
+    // 1. Get object and class information
+    TypePtr objectType = checkExpression(memberExpr->object);
+    if (!objectType || (objectType->tag != TypeTag::Object && objectType->tag != TypeTag::UserDefined)) {
+        // This isn't a class instance, so it can't be a method call.
+        // Let other parts of the type checker handle it (e.g., function-typed fields).
+        return typeSystem.ANY_TYPE;
+    }
+
+    std::string className;
+    if (objectType->tag == TypeTag::UserDefined) {
+        if (std::holds_alternative<UserDefinedType>(objectType->extra)) {
+            className = std::get<UserDefinedType>(objectType->extra).name;
+        }
+    }
+
+    if (className.empty()) {
+        addError("Could not determine class for method call '" + memberExpr->name + "'", callExpr->line);
+        return typeSystem.ANY_TYPE;
+    }
+
+    // 2. Find the method and check for its existence
+    auto classIt = classDeclarations.find(className);
+    if (classIt == classDeclarations.end()) {
+        addError("Class '" + className + "' not found for method call.", callExpr->line);
+        return typeSystem.ANY_TYPE;
+    }
+    auto classDecl = classIt->second;
+
+    std::shared_ptr<AST::FunctionDeclaration> methodDecl = nullptr;
+    for (const auto& method : classDecl->methods) {
+        if (method->name == memberExpr->name) {
+            methodDecl = method;
+            break;
+        }
+    }
+
+    if (!methodDecl) {
+        addError("Method '" + memberExpr->name + "' not found in class '" + className + "'", callExpr->line);
+        return typeSystem.ANY_TYPE;
+    }
+
+    // 3. Check visibility
+    AST::VisibilityLevel visibility = getMemberVisibility(className, memberExpr->name);
+    if (!canAccessClassMember(className, memberExpr->name, visibility)) {
+        std::string visibilityStr = "private";
+        if (visibility == AST::VisibilityLevel::Protected) {
+            visibilityStr = "protected";
+        }
+        addError("Cannot access " + visibilityStr + " method '" + memberExpr->name + "' of class '" + className + "'", callExpr->line);
+        return typeSystem.ANY_TYPE;
+    }
+
+    // 4. Check arguments
+    // Construct a temporary FunctionSignature for validation
+    std::vector<TypePtr> paramTypes;
+    for (const auto& param : methodDecl->params) {
+        paramTypes.push_back(param.second ? resolveTypeAnnotation(param.second) : typeSystem.ANY_TYPE);
+    }
+     for (const auto& optParam : methodDecl->optionalParams) {
+        paramTypes.push_back(optParam.second.first ? resolveTypeAnnotation(optParam.second.first) : typeSystem.ANY_TYPE);
+    }
+
+    if (argTypes.size() != paramTypes.size()) {
+         addError("Method '" + methodDecl->name + "' expects " + std::to_string(paramTypes.size()) + " arguments, but got " + std::to_string(argTypes.size()), callExpr->line);
+        return typeSystem.ANY_TYPE;
+    }
+
+    for (size_t i = 0; i < argTypes.size(); ++i) {
+        if (!typeSystem.isCompatible(argTypes[i], paramTypes[i])) {
+            addError("Argument " + std::to_string(i + 1) + " type mismatch in call to '" + methodDecl->name + "': expected " +
+                     paramTypes[i]->toString() + ", got " + argTypes[i]->toString(),
+                     callExpr->line);
+        }
+    }
+
+
+    // 5. Return type
+    if (methodDecl->returnType && *methodDecl->returnType) {
+        return resolveTypeAnnotation(*methodDecl->returnType);
+    }
+
+    return typeSystem.NIL_TYPE;
 }
 
 void TypeChecker::checkImportStatement(const std::shared_ptr<AST::ImportStatement>& importStmt) {

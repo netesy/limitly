@@ -285,7 +285,7 @@ Line 67: RIGHT_PAREN = ')'
 Line 67: SEMICOLON = ';'
 Line 70: VAR = 'var' [leading: NEWLINE('
 ') NEWLINE('
-') COMMENT_LINE('// These should work - same module access') NEWLINE('
+') COMMENT_LINE('// These should fail ') NEWLINE('
 ') ]
 Line 70: IDENTIFIER = 'privateName' [leading: WHITESPACE(' ') ]
 Line 70: EQUAL = '=' [leading: WHITESPACE(' ') ]
@@ -305,7 +305,7 @@ Line 71: RIGHT_PAREN = ')'
 Line 71: SEMICOLON = ';'
 Line 74: VAR = 'var' [leading: WHITESPACE(' ') COMMENT_LINE('// Private method but same module') NEWLINE('
 ') NEWLINE('
-') COMMENT_LINE('// These should work - protected access within same module') NEWLINE('
+') COMMENT_LINE('// These should fail - protected access within same module') NEWLINE('
 ') ]
 Line 74: IDENTIFIER = 'id' [leading: WHITESPACE(' ') ]
 Line 74: EQUAL = '=' [leading: WHITESPACE(' ') ]
