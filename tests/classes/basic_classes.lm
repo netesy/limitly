@@ -3,16 +3,19 @@ print("=== Basic Class Tests ===");
 
 // Simple class definition
 class Person {
+    var name:str;
+    var age:int;
+     
     fn init(name, age) {
         self.name = name;
         self.age = age;
     }
     
-    fn greet() {
+    pub fn greet() {
         print("Hello, I'm {self.name} and I'm {self.age} years old");
     }
     
-    fn birthday() {
+    pub fn birthday() {
         self.age += 1;
         print("{self.name} is now {self.age} years old");
     }
@@ -40,11 +43,11 @@ class Rectangle {
         self.height = height;
     }
     
-    fn area() {
+    pub fn area() {
         return self.width * self.height;
     }
     
-    fn perimeter() {
+    pub fn perimeter() {
         return 2 * (self.width + self.height);
     }
 }
@@ -58,14 +61,14 @@ print("Perimeter: {rect.perimeter()}");
 // Test file for self keyword and member access
 
 class BankAccount {
-    var balance: float = 0.0;
+    pub balance: float = 0.0;
     
-    fn deposit(amount: float) : float {
+    pub fn deposit(amount: float) : float {
         self.balance = self.balance + amount;
         return self.balance;
     }
     
-    fn withdraw(amount: float) : float {
+    pub fn withdraw(amount: float) : float {
         if (amount > self.balance) {
             print("Insufficient funds!")
             return self.balance;

@@ -2,15 +2,17 @@
 print("=== Class Inheritance Tests ===")
 
 class Animal {
+    pub name:str;
+
     fn init(name: str) {
         self.name = name;
     }
     
-    fn speak() {
+    pub fn speak() {
         print("{self.name} makes a sound");
     }
     
-    fn info() {
+    pub fn info() {
         print("Animal is {self.name}");
     }
 }
@@ -18,15 +20,17 @@ class Animal {
 print("Dog Class:")
 // Derived class with super constructor call
 class Dog(name: str, breed: str) : Animal(name) {
-    fn speak() {
+    pub breed:str;
+
+    pub fn speak() {
         print("{self.name} barks!");
     }
     
-    fn wagTail() {
+    pub fn wagTail() {
         print("{self.name} wags tail happily");
     }
     
-    fn info() {
+    pub fn info() {
         print("Dog {self.name} is a {self.breed}");
     }
 }
@@ -35,17 +39,19 @@ print("Cat Class:")
 
 // Another derived class
 class Cat(name: str) : Animal(name) {
-    fn speak() {
+    pub fn speak() {
         print("{self.name} meows");
     }
     
-    fn purr() {
+    pub fn purr() {
         print("{self.name} purrs contentedly");
     }
 }
 
 // Alternative syntax for more complex inheritance scenarios
 class SmartDog(name: str, breed: str, iq: int) : Dog(name, breed) {
+    pub iq:int;
+
     fn speak() {
         super.speak();  // Call parent method
         print("Woof woof! (intelligently)");
@@ -62,11 +68,11 @@ class SmartDog(name: str, breed: str, iq: int) : Dog(name, breed) {
 
 // Additional inline constructor examples for testing
 class Bird(name: str, species: str, canFly: bool) : Animal(name) {
-    fn speak() {
+    pub canFly:bool;    pub fn speak() {
         print("{self.name} chirps melodiously");
     }
     
-    fn fly() {
+    pub fn fly() {
         if (self.canFly) {
             print("{self.name} soars through the sky");
         } else {
@@ -74,21 +80,23 @@ class Bird(name: str, species: str, canFly: bool) : Animal(name) {
         }
     }
     
-    fn info() {
+    pub fn info() {
         print("Bird {self.name} is a {self.species}");
     }
 }
 
 class Fish(name: str, waterType: str) : Animal(name) {
-    fn speak() {
+    pub waterType:str;
+
+    pub fn speak() {
         print("{self.name} makes bubbles");
     }
     
-    fn swim() {
+    pub fn swim() {
         print("{self.name} swims gracefully in {self.waterType} water");
     }
     
-    fn info() {
+    pub fn info() {
         print("Fish {self.name} lives in {self.waterType} water");
     }
 }
@@ -127,7 +135,7 @@ class HybridPet : Animal {
         }
     }
     
-    fn validateHybrid() {
+    pub fn validateHybrid() {
         // Simple validation - real hybrids are typically within animal families
         var validCombos = [
             ["Cat", "Lion"], ["Dog", "Wolf"], ["Horse", "Donkey"],
@@ -143,7 +151,7 @@ class HybridPet : Animal {
         return false;
     }
     
-    fn generateTraits() {
+    pub fn generateTraits() {
         var traits = [];
         
         // Add traits based on species combination
@@ -163,7 +171,7 @@ class HybridPet : Animal {
         return traits;
     }
     
-    fn speak() {
+    pub fn speak() {
         if (self.isValidHybrid) {
             print("{self.name} makes a unique {self.species1}-{self.species2} sound");
         } else {
@@ -171,13 +179,13 @@ class HybridPet : Animal {
         }
     }
     
-    fn getHybridInfo() {
+    pub fn getHybridInfo() {
         print("{self.name} is {self.age} years old and is a mix of {self.species1} and {self.species2}");
         print("Valid hybrid: {self.isValidHybrid}");
         print("Traits: {self.traits.join(', ')}");
     }
     
-    fn displayTraits() {
+    pub fn displayTraits() {
         print("{self.name}'s traits:");
         iter (traity in self.traits) {
             print("  - {traity}");

@@ -52,8 +52,8 @@ print("power(3, 4) = {power2}");
 
 // Test 5: Complex function signatures
 print("\n--- Test 5: Complex Signatures ---");
-fn processData(data: str, transform: bool = false, multiplier: int = 1): str {
-    var result = data;
+fn processData(datas: str, transform: bool = false, multiplier: int = 1): str {
+    var result = datas;
     if (transform) {
         result = "TRANSFORMED: " + result;
     }
