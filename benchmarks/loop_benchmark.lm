@@ -1,0 +1,27 @@
+// benchmarks/loop_benchmark.lm
+
+// Test 1: For loop
+print("Starting for loop benchmark...");
+var startTime = time();
+
+for (var i = 0; i < 2000000000; i++) {
+    // Empty loop
+}
+
+var endTime = time();
+var elapsedTime = endTime - startTime;
+print("For loop elapsed time: {elapsedTime} seconds");
+
+print("");
+
+// Test 2: Iterator loop
+print("Starting iterator loop benchmark...");
+startTime = time();
+
+iter (var i in 0..2000000000) {
+    // Empty loop
+}
+
+endTime = time();
+elapsedTime = endTime - startTime;
+print("Iterator loop elapsed time: {elapsedTime} seconds");

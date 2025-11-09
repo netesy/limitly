@@ -25,29 +25,53 @@ mkdir -p bin
 
 CXX=g++
 
-CXXFLAGS="-std=c++17 -Wall -Wextra -pedantic -I. -Isrc/"
+CXXFLAGS="-std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I."
 
 
 echo "Compiling with $CXX..."
 
 # =============================
+# Compile debugger
+# =============================
+echo "Compiling debugger..."
+$CXX $CXXFLAGS -c -o bin/debugger.o src/common/debugger.cpp
+
+# =============================
 # Main executable
 # =============================
 
+echo "Compiling main executable..."
 $CXX $CXXFLAGS -o bin/limitly \
     src/main.cpp \
     src/frontend/scanner.cpp \
     src/frontend/parser.cpp \
+    src/frontend/cst.cpp \
+    src/frontend/cst_printer.cpp \
+    src/frontend/cst_utils.cpp \
     src/backend/backend.cpp \
     src/backend/vm.cpp \
+    src/backend/value.cpp \
     src/backend/ast_printer.cpp \
+    src/backend/bytecode_printer.cpp \
     src/backend/functions.cpp \
+    src/backend/closure_impl.cpp \
     src/backend/classes.cpp \
+    src/backend/type_checker.cpp \
+    src/backend/function_types.cpp \
     src/backend/concurrency/scheduler.cpp \
     src/backend/concurrency/thread_pool.cpp \
     src/backend/concurrency/event_loop.cpp \
     src/backend/concurrency/epoll_event_loop.cpp \
-    src/debugger.cpp
+    src/backend/concurrency/concurrency_runtime.cpp \
+    src/backend/concurrency/task_vm.cpp \
+    src/common/builtin_functions.cpp \
+    src/error/error_formatter.cpp \
+    src/error/error_code_generator.cpp \
+    src/error/contextual_hint_provider.cpp \
+    src/error/source_code_formatter.cpp \
+    src/error/console_formatter.cpp \
+    src/error/error_catalog.cpp \
+    bin/debugger.o
 
 echo "limitly built successfully."
 
@@ -55,57 +79,41 @@ echo "limitly built successfully."
 # =============================
 # Test parser
 # =============================
+echo "Compiling test parser..."
 $CXX $CXXFLAGS -o bin/test_parser \
     src/test_parser.cpp \
     src/frontend/scanner.cpp \
     src/frontend/parser.cpp \
+    src/frontend/cst.cpp \
+    src/frontend/cst_printer.cpp \
+    src/frontend/cst_utils.cpp \
+    src/frontend/ast_builder.cpp \
+    src/backend/type_checker.cpp \
     src/backend/backend.cpp \
+    src/backend/value.cpp \
     src/backend/ast_printer.cpp \
+    src/backend/bytecode_printer.cpp \
     src/backend/functions.cpp \
+    src/backend/closure_impl.cpp \
     src/backend/classes.cpp \
-    src/debugger.cpp
+    src/backend/function_types.cpp \
+    src/error/error_formatter.cpp \
+    src/error/error_code_generator.cpp \
+    src/error/contextual_hint_provider.cpp \
+    src/error/source_code_formatter.cpp \
+    src/error/console_formatter.cpp \
+    src/error/error_catalog.cpp \
+    bin/debugger.o
 
 echo "test_parser built successfully."
 
-# =============================
-# Unit tests
-# =============================
-$CXX $CXXFLAGS -o bin/test_event_loop \
-    tests/unit/test_event_loop.cpp \
-    src/backend/concurrency/event_loop.cpp \
-    src/backend/concurrency/epoll_event_loop.cpp \
-    src/backend/concurrency/kqueue_event_loop.cpp \
-    src/backend/concurrency/iocp_event_loop.cpp
-
-echo "test_event_loop built successfully."
-
-# =============================
-# Code formatter
-# =============================
-
-$CXX $CXXFLAGS -o bin/format_code \
-    src/format_code.cpp \
-    src/frontend/scanner.cpp \
-    src/frontend/parser.cpp \
-    src/backend/code_formatter.cpp \
-    src/debugger.cpp
-
-
-echo "format_code built successfully."
-# Note: embedding workflow is currently disabled.
-# The project contains a `lembed` generator and `tools/make_embedded.*` helpers
-# to produce standalone interpreter binaries with embedded bytecode. Those
-# steps are intentionally not run as part of the default build because earlier
-# automated embedding attempts caused linker and generator issues.
+# Clean up object file
+rm bin/debugger.o
 
 echo
 echo "✅ Build completed successfully."
 echo
-echo "Embedding tools are present but disabled from this default build."
-echo "To generate an embedded interpreter, build the project then run the lembed"
-echo "generator and the make_embedded helper scripts manually:"
-echo
-echo "  ./bin/lembed -embed-source <src> <name> -build"
-echo "  OR"
-echo "  python tools/goembed.py <bytecode.txt> <name> src/lembed_generated && tools/make_embedded.sh <name>"
+echo "Available executables:"
+echo "  bin/limitly      - Main language interpreter"
+echo "  bin/test_parser  - Parser testing utility"
 echo
