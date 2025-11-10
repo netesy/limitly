@@ -205,10 +205,11 @@ struct AllocationInfo
     size_t generation;
 };
 
+// REFACRORED: AllocationTracker for faster remove (O(1) average)
 class AllocationTracker
 {
-    std::map<size_t, std::vector<void *>> sizeTree;
-    std::unordered_map<void *, std::unique_ptr<AllocationInfo>> skiplist;
+    // The main map for tracking all allocations
+    std::unordered_map<void *, std::unique_ptr<AllocationInfo>> allocationMap;
     std::mutex mutex;
 
 public:
@@ -217,36 +218,29 @@ public:
         std::lock_guard lock(mutex);
         auto info = std::make_unique<AllocationInfo>(
             AllocationInfo{size, std::chrono::steady_clock::now(), stackTrace, generation});
-        sizeTree[size].push_back(ptr);
-        skiplist[ptr] = std::move(info);
+        // O(1) average insertion
+        allocationMap[ptr] = std::move(info);
     }
 
     void remove(void *ptr)
     {
         std::lock_guard lock(mutex);
-        if (auto it = skiplist.find(ptr); it != skiplist.end()) {
-            sizeTree[it->second->size].erase(std::remove(sizeTree[it->second->size].begin(),
-                                                         sizeTree[it->second->size].end(),
-                                                         ptr),
-                                             sizeTree[it->second->size].end());
-            if (sizeTree[it->second->size].empty())
-                sizeTree.erase(it->second->size);
-            skiplist.erase(it);
-        }
+        // O(1) average removal
+        allocationMap.erase(ptr);
     }
 
     AllocationInfo *get(void *ptr)
     {
         std::lock_guard lock(mutex);
-        auto it = skiplist.find(ptr);
-        return it != skiplist.end() ? it->second.get() : nullptr;
+        auto it = allocationMap.find(ptr);
+        return it != allocationMap.end() ? it->second.get() : nullptr;
     }
 
     // Add these methods to make AllocationTracker iterable
-    auto begin() const { return skiplist.begin(); }
-    auto end() const { return skiplist.end(); }
-    auto begin() { return skiplist.begin(); }
-    auto end() { return skiplist.end(); }
+    auto begin() const { return allocationMap.begin(); }
+    auto end() const { return allocationMap.end(); }
+    auto begin() { return allocationMap.begin(); }
+    auto end() { return allocationMap.end(); }
 };
 
 template<typename Allocator = DefaultAllocator>
@@ -319,7 +313,12 @@ public:
     {
     private:
         MemoryManager &manager;
+        // Map: Pointer -> Generation ID (still needed for generation checks/Ref)
         std::unordered_map<void *, size_t> objectGenerations;
+        
+        // REFACRORED: Map Generation ID -> List of Pointers (for O(N_scope) cleanup)
+        std::unordered_map<size_t, std::vector<void *>> generationObjects; 
+        
         size_t currentGeneration;
 
     public:
@@ -327,12 +326,17 @@ public:
             : manager(mgr)
             , currentGeneration(0)
         {
+            // Initialize generation 0 list
+            generationObjects[0] = {}; 
         }
 
         ~Region()
         {
-            for (const auto &[ptr, gen] : objectGenerations) {
-                manager.deallocate(ptr);
+            // On Region destruction, deallocate all objects regardless of generation
+            for (auto const& [gen, ptrs] : generationObjects) {
+                for (void* ptr : ptrs) {
+                    manager.deallocate(ptr);
+                }
             }
         }
 
@@ -345,7 +349,11 @@ public:
             }
             try {
                 T *obj = new (memory) T(std::forward<Args>(args)...);
-                objectGenerations[memory] = currentGeneration; //mke it scoped 
+                
+                // Store in both maps:
+                objectGenerations[memory] = currentGeneration;
+                generationObjects[currentGeneration].push_back(memory); // O(1) average push_back
+                
                 return obj;
             } catch (...) {
                 manager.deallocate(memory);
@@ -370,9 +378,16 @@ public:
                 manager.deallocate(ptr);
 
                 // Remove from generations map
-                auto it = objectGenerations.find(ptr);
-                if (it != objectGenerations.end()) {
-                    objectGenerations.erase(it);
+                auto gen_it = objectGenerations.find(ptr);
+                if (gen_it != objectGenerations.end()) {
+                    size_t gen = gen_it->second;
+                    
+                    // Remove from the objectGenerations tracking map
+                    objectGenerations.erase(gen_it);
+
+                    // Remove from the generationObjects list (O(N) cost here)
+                    std::vector<void*>& ptr_list = generationObjects[gen];
+                    ptr_list.erase(std::remove(ptr_list.begin(), ptr_list.end(), ptr), ptr_list.end());
                 }
             } catch (const std::exception& e) {
                 std::cerr << "[ERROR] Exception in Region::deallocate: " << e.what() << std::endl;
@@ -401,32 +416,39 @@ public:
             return (it != objectGenerations.end()) ? it->second : 0;
         }
 
-        // add addGeneration() this adds a new generation based on scope 
-        void addGeneration()
+        // REFACRORED: Renamed and implemented for scope management
+        void enterScope()
         {
             ++currentGeneration;
+            generationObjects[currentGeneration] = {}; // Initialize new list for the scope
         }
 
-        // add removeGeneration() removes the generations based on scope this code needs further work
-        void removeGeneration()
+        // REFACRORED: Renamed and implemented for O(N_scope) cleanup
+        void exitScope()
         {
             if (currentGeneration == 0){
-                //cannot remove the base generations
                 return ;
             }
 
-            // size_t removable = currentGeneration;
-            // for (auto it = objectGenerations.begin() ; it != objectGenerations.end(); )
-            // {
-            //     if(it->second == removable)
-            //     {
-            //         void* ptr = it->first;
-            //         manager.deallocate(ptr);
-                    
-            //         it = objectGenerations.erase(it); //remove the entry
-            //     }
-            // }
-            //decrement genertion counter
+            size_t removable = currentGeneration;
+            
+            auto it = generationObjects.find(removable);
+            if (it != generationObjects.end())
+            {
+                // Deallocate all objects in this scope's list (O(N_scope))
+                for (void* ptr : it->second)
+                {
+                    // Deallocate the memory block
+                    manager.deallocate(ptr);
+                    // Remove from the objectGenerations tracking map
+                    objectGenerations.erase(ptr);
+                }
+                
+                // Remove the list itself
+                generationObjects.erase(it);
+            }
+            
+            // Decrement generation counter to return to the parent scope
             --currentGeneration;
         }
     };

@@ -4885,7 +4885,7 @@ void VM::handleIteratorNextKeyValue(const Instruction& /*unused*/) {
 }
 
 void VM::handleBeginScope(const Instruction& /*unused*/) {
-    region->addGeneration();
+    region->enterScope();
     // Create a new environment that extends the current one
     environment = std::make_shared<Environment>(environment);
 }
@@ -4896,7 +4896,7 @@ void VM::handleEndScope(const Instruction& /*unused*/) {
     if (environment && environment->enclosing) {
         environment = environment->enclosing;
     }
-    region->removeGeneration();
+    region->exitScope();
 }
 
 void VM::handleBeginParallel(const Instruction& instruction) {
