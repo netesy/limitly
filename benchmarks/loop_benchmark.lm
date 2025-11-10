@@ -17,14 +17,14 @@ print("For loop elapsed time: {elapsedTime} seconds");
 
 print("");
 
-// // Test 2: Iterator loop
-print("Starting iterator loop benchmark...");
-startTime = time();
+// // // Test 2: Iterator loop
+// print("Starting iterator loop benchmark...");
+// startTime = time();
 
-iter (var i in 0..count) {
-   // print(i);
-}
+// iter (var i in 0..count) {
+//    // print(i);
+// }
 
-endTime = time();
-elapsedTime = endTime - startTime;
-print("Iterator loop elapsed time: {elapsedTime} seconds");
+// endTime = time();
+// elapsedTime = endTime - startTime;
+// print("Iterator loop elapsed time: {elapsedTime} seconds");

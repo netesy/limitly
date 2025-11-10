@@ -2,9 +2,7 @@
 
 #include "memory_analyzer.hh"
 #include <algorithm>
-#include <array>
 #include <atomic>
-#include <bitset>
 #include <cassert>
 #include <chrono>
 #include <cstddef>
@@ -12,7 +10,6 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
-#include <map>
 #include <memory>
 #include <mutex>
 #include <new>
@@ -20,12 +17,7 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
-#ifdef _MSC_VER
-#include <intrin.h>
-#endif
-
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
@@ -33,210 +25,212 @@
 
 constexpr size_t MIN_ALLOC_SIZE = 4;
 constexpr size_t MAX_ALLOC_SIZE = 256;
-constexpr size_t POOL_CHUNK_SIZE = 256;
+constexpr size_t POOL_CHUNK_SIZE = 128;  // Reduced from 256
+constexpr size_t LARGE_ALLOC_THRESHOLD = 512;  // New threshold for large allocations
+
+// Lightweight allocation header (only 16 bytes)
+struct AllocationHeader {
+    uint32_t size;           // 4 bytes
+    uint16_t poolIndex;      // 2 bytes (which pool this came from)
+    uint16_t flags;          // 2 bytes (alignment, etc.)
+    uint64_t padding;        // 8 bytes (for alignment)
+};
 
 class MemoryPool {
 private:
     std::vector<void*> freeBlocks;
-    std::vector<void*> allocatedBlocks;
-    std::mutex poolMutex;
+    std::vector<void*> allocatedChunks;  // Track chunks for cleanup
     size_t blockSize;
-    size_t poolSize;
+    size_t freeCount;
+    
+    // Use a simple spinlock for better performance
+    std::atomic_flag lock = ATOMIC_FLAG_INIT;
+    
+    void spinLock() {
+        while (lock.test_and_set(std::memory_order_acquire)) {
+            // Spin
+        }
+    }
+    
+    void spinUnlock() {
+        lock.clear(std::memory_order_release);
+    }
 
 public:
-    MemoryPool(size_t blockSize, size_t poolSize)
-        : blockSize(blockSize), poolSize(poolSize) {
-        allocatedBlocks.reserve(poolSize);
-        for (size_t i = 0; i < poolSize; ++i) {
-            void* block = std::malloc(blockSize);
-            freeBlocks.push_back(block);
-            allocatedBlocks.push_back(block);
-        }
+    MemoryPool(size_t blockSize, size_t initialSize)
+        : blockSize(blockSize), freeCount(0) {
+        freeBlocks.reserve(initialSize);
+        expandPool(initialSize);
     }
 
     ~MemoryPool() {
-        for (void* block : allocatedBlocks) {
-            std::free(block);
+        for (void* chunk : allocatedChunks) {
+            std::free(chunk);
         }
     }
 
-    void* allocate() {
-        std::lock_guard<std::mutex> lock(poolMutex);
-        if (freeBlocks.empty()) {
-            return std::malloc(blockSize);
+    void expandPool(size_t count) {
+        // Allocate one large chunk and subdivide it
+        size_t chunkSize = blockSize * count;
+        void* chunk = std::malloc(chunkSize);
+        if (!chunk) return;
+        
+        allocatedChunks.push_back(chunk);
+        
+        // Subdivide the chunk into blocks
+        char* ptr = static_cast<char*>(chunk);
+        for (size_t i = 0; i < count; ++i) {
+            freeBlocks.push_back(ptr);
+            ptr += blockSize;
         }
+        freeCount += count;
+    }
+
+    void* allocate() {
+        spinLock();
+        
+        if (freeBlocks.empty()) {
+            spinUnlock();
+            // Expand pool by 50% when exhausted
+            size_t expandSize = std::max(size_t(32), allocatedChunks.size() * POOL_CHUNK_SIZE / 2);
+            expandPool(expandSize);
+            spinLock();
+            
+            if (freeBlocks.empty()) {
+                spinUnlock();
+                return nullptr;
+            }
+        }
+        
         void* block = freeBlocks.back();
         freeBlocks.pop_back();
+        freeCount--;
+        
+        spinUnlock();
         return block;
     }
 
     void deallocate(void* ptr) {
-        std::lock_guard<std::mutex> lock(poolMutex);
+        if (!ptr) return;
+        
+        spinLock();
         freeBlocks.push_back(ptr);
+        freeCount++;
+        spinUnlock();
     }
-};
-
-class ObjectPool {
-private:
-    std::stack<void*> pool;
-    std::mutex poolMutex;
-    size_t objectSize;
-
-public:
-    ObjectPool(size_t objectSize, size_t initialSize) : objectSize(objectSize) {
-        for (size_t i = 0; i < initialSize; ++i) {
-            pool.push(std::malloc(objectSize));
-        }
-    }
-
-    ~ObjectPool() {
-        while (!pool.empty()) {
-            std::free(pool.top());
-            pool.pop();
-        }
-    }
-
-    void* allocate() {
-        std::lock_guard<std::mutex> lock(poolMutex);
-        if (pool.empty()) {
-            return std::malloc(objectSize);
-        }
-        void* obj = pool.top();
-        pool.pop();
-        return obj;
-    }
-
-    void deallocate(void* obj) {
-        std::lock_guard<std::mutex> lock(poolMutex);
-        pool.push(obj);
-    }
+    
+    size_t getFreeCount() const { return freeCount; }
+    size_t getBlockSize() const { return blockSize; }
 };
 
 class DefaultAllocator {
 private:
-    std::unordered_map<size_t, MemoryPool*> memoryPools;
-    ObjectPool objectPool;
-
-public:
-    DefaultAllocator()
-        : objectPool(256, POOL_CHUNK_SIZE) {
-        for (size_t size = MIN_ALLOC_SIZE; size <= MAX_ALLOC_SIZE; size *= 2) {
-            memoryPools[size] = new MemoryPool(size, POOL_CHUNK_SIZE);
-        }
+    static constexpr size_t NUM_POOLS = 6;  // 4, 8, 16, 32, 64, 128, 256 bytes
+    std::array<std::unique_ptr<MemoryPool>, NUM_POOLS> memoryPools;
+    
+    // Size to pool index lookup
+    uint8_t sizeToPoolIndex(size_t size) const {
+        if (size <= 4) return 0;
+        if (size <= 8) return 1;
+        if (size <= 16) return 2;
+        if (size <= 32) return 3;
+        if (size <= 64) return 4;
+        if (size <= 128) return 5;
+        if (size <= 256) return 6;
+        return 255;  // Not in pool
     }
 
-    ~DefaultAllocator() {
-        for (auto& pair : memoryPools) {
-            delete pair.second;
+public:
+    DefaultAllocator() {
+        size_t poolSize = MIN_ALLOC_SIZE;
+        for (size_t i = 0; i < NUM_POOLS; ++i) {
+            memoryPools[i] = std::make_unique<MemoryPool>(poolSize, POOL_CHUNK_SIZE);
+            poolSize *= 2;
         }
     }
 
     void* allocate(size_t size, size_t alignment = alignof(std::max_align_t)) {
-        // Calculate the actual size needed to satisfy alignment
-        // // size_t actualSize = size + (alignment - 1) + sizeof(void*);
+        // Add header size
+        size_t totalSize = size + sizeof(AllocationHeader);
         
-        if (size <= MAX_ALLOC_SIZE) {
-            // Find the next power of two that can hold the requested size
-            size_t poolSize = 1;
-            while (poolSize < size) {
-                poolSize <<= 1;
-            }
-            
-            void* mem = memoryPools[poolSize]->allocate();
-            if (!mem) {
-                std::cerr << "[ERROR] Failed to allocate " << size 
-                          << " bytes from pool of size " << poolSize << std::endl;
-                return nullptr;
-            }
-            
-            // Align the memory
-            void* alignedPtr = reinterpret_cast<void*>(
-                (reinterpret_cast<size_t>(mem) + sizeof(void*) + alignment - 1) & ~(alignment - 1)
-            );
-            
-            // Store the original pointer right before the aligned memory
-            *(reinterpret_cast<void**>(alignedPtr) - 1) = mem;
-            return alignedPtr;
+        uint8_t poolIdx = sizeToPoolIndex(totalSize);
+        
+        void* mem = nullptr;
+        if (poolIdx < NUM_POOLS) {
+            mem = memoryPools[poolIdx]->allocate();
         }
         
-        // For large allocations, use the object pool
-        void* mem = objectPool.allocate();
         if (!mem) {
-            std::cerr << "[ERROR] Failed to allocate " << size 
-                      << " bytes from object pool" << std::endl;
-            return nullptr;
+            // Fallback to system allocator for large allocations
+            mem = std::malloc(totalSize);
+            if (!mem) return nullptr;
+            poolIdx = 255;  // Mark as system allocated
         }
         
-        // For object pool allocations, we don't need to handle alignment specially
-        // since they're already aligned to the object size
-        return mem;
+        // Setup header
+        AllocationHeader* header = static_cast<AllocationHeader*>(mem);
+        header->size = static_cast<uint32_t>(size);
+        header->poolIndex = poolIdx;
+        header->flags = 0;
+        
+        // Return pointer after header
+        return static_cast<char*>(mem) + sizeof(AllocationHeader);
     }
 
     void deallocate(void* ptr, size_t size) {
         if (!ptr) return;
         
-        if (size <= MAX_ALLOC_SIZE) {
-            // For aligned allocations, we need to get the original pointer
-            // which is stored right before the aligned memory
-            void* originalPtr = *(reinterpret_cast<void**>(ptr) - 1);
-            
-            // Find the pool size (next power of two >= size)
-            size_t poolSize = 1;
-            while (poolSize < size) {
-                poolSize <<= 1;
-            }
-            
-            memoryPools[poolSize]->deallocate(originalPtr);
+        // Get header
+        void* mem = static_cast<char*>(ptr) - sizeof(AllocationHeader);
+        AllocationHeader* header = static_cast<AllocationHeader*>(mem);
+        
+        uint8_t poolIdx = header->poolIndex;
+        
+        if (poolIdx < NUM_POOLS) {
+            memoryPools[poolIdx]->deallocate(mem);
         } else {
-            objectPool.deallocate(ptr);
+            std::free(mem);
         }
     }
 
     void deallocate(void* ptr) {
-        objectPool.deallocate(ptr);
+        if (!ptr) return;
+        
+        void* mem = static_cast<char*>(ptr) - sizeof(AllocationHeader);
+        AllocationHeader* header = static_cast<AllocationHeader*>(mem);
+        deallocate(ptr, header->size);
     }
 };
 
-struct AllocationInfo
-{
+struct AllocationInfo {
     size_t size;
-    std::chrono::steady_clock::time_point timestamp;
-    std::string stackTrace;
     size_t generation;
+    // Removed: timestamp and stackTrace to save memory
 };
 
-// REFACRORED: AllocationTracker for faster remove (O(1) average)
-class AllocationTracker
-{
-    // The main map for tracking all allocations
-    std::unordered_map<void *, std::unique_ptr<AllocationInfo>> allocationMap;
+class AllocationTracker {
+    std::unordered_map<void*, std::unique_ptr<AllocationInfo>> allocationMap;
     std::mutex mutex;
 
 public:
-    void add(void *ptr, size_t size, const std::string &stackTrace, size_t generation)
-    {
+    void add(void* ptr, size_t size, size_t generation) {
         std::lock_guard lock(mutex);
-        auto info = std::make_unique<AllocationInfo>(
-            AllocationInfo{size, std::chrono::steady_clock::now(), stackTrace, generation});
-        // O(1) average insertion
-        allocationMap[ptr] = std::move(info);
+        allocationMap[ptr] = std::make_unique<AllocationInfo>(
+            AllocationInfo{size, generation});
     }
 
-    void remove(void *ptr)
-    {
+    void remove(void* ptr) {
         std::lock_guard lock(mutex);
-        // O(1) average removal
         allocationMap.erase(ptr);
     }
 
-    AllocationInfo *get(void *ptr)
-    {
+    AllocationInfo* get(void* ptr) {
         std::lock_guard lock(mutex);
         auto it = allocationMap.find(ptr);
         return it != allocationMap.end() ? it->second.get() : nullptr;
     }
 
-    // Add these methods to make AllocationTracker iterable
+        // Add these methods to make AllocationTracker iterable
     auto begin() const { return allocationMap.begin(); }
     auto end() const { return allocationMap.end(); }
     auto begin() { return allocationMap.begin(); }
@@ -244,95 +238,74 @@ public:
 };
 
 template<typename Allocator = DefaultAllocator>
-class MemoryManager
-{
+class MemoryManager {
 private:
-    mutable std::ofstream logFile;
-    mutable std::mutex logMutex;
-    bool auditMode;
     Allocator allocator;
     AllocationTracker tracker;
     MemoryAnalyzer analyzer;
+    bool auditMode;
 
 public:
     MemoryManager(bool enableAudit = false)
-        : auditMode(enableAudit)
-    {
-    }
+        : auditMode(enableAudit) {}
 
-    ~MemoryManager()
-    {
-        //analyzeMemoryUsage();
-    }
-
-    void setAuditMode(bool enable)
-    {
+    void setAuditMode(bool enable) {
         auditMode = enable;
     }
 
-    void* allocate(size_t size, size_t alignment = alignof(std::max_align_t))
-    {
+    void* allocate(size_t size, size_t alignment = alignof(std::max_align_t)) {
         if (size == 0) {
             throw std::invalid_argument("Attempt to allocate zero bytes");
         }
 
-        void *ptr = allocator.allocate(size, alignment);
-
+        void* ptr = allocator.allocate(size, alignment);
         if (!ptr) {
-            std::cerr << "[ERROR] MemoryManager::allocate failed to allocate "
-                        << size << " bytes" << std::endl;
             throw std::bad_alloc();
         }
 
-        // Zero-initialize the memory
-        std::memset(ptr, 0, size);
+        // Only zero-initialize for small allocations in debug mode
+        #ifdef DEBUG
+        if (size <= 256) {
+            std::memset(ptr, 0, size);
+        }
+        #endif
 
-        analyzer.recordAllocation(ptr, size, auditMode ? TRACE_INFO() : "");
+        if (auditMode) {
+            analyzer.recordAllocation(ptr, size, TRACE_INFO());
+        }
+        
         return ptr;
     }
 
-    void deallocate(void *ptr)
-    {
-        // Get the size from the allocation tracker
-        MemoryAnalyzer::AllocationInfo* info = analyzer.getAllocationInfo(ptr);
-        size_t size = info ? info->size : 0;
-
-        // Record deallocation
-        analyzer.recordDeallocation(ptr);
-
-        // Deallocate with the size parameter
-        allocator.deallocate(ptr, size);
+    void deallocate(void* ptr) {
+        if (!ptr) return;
+        
+        if (auditMode) {
+            analyzer.recordDeallocation(ptr);
+        }
+        
+        allocator.deallocate(ptr);
     }
 
     void analyzeMemoryUsage() const {
         auto reports = analyzer.getMemoryUsage();
         analyzer.printMemoryUsageReport(reports);
-    }   
+    }
 
-    class Region
-    {
+    class Region {
     private:
-        MemoryManager &manager;
-        // Map: Pointer -> Generation ID (still needed for generation checks/Ref)
-        std::unordered_map<void *, size_t> objectGenerations;
-        
-        // REFACRORED: Map Generation ID -> List of Pointers (for O(N_scope) cleanup)
-        std::unordered_map<size_t, std::vector<void *>> generationObjects; 
-        
+        MemoryManager& manager;
+        std::unordered_map<void*, size_t> objectGenerations;
+        std::unordered_map<size_t, std::vector<void*>> generationObjects;
         size_t currentGeneration;
 
     public:
-        explicit Region(MemoryManager &mgr)
-            : manager(mgr)
-            , currentGeneration(0)
-        {
-            // Initialize generation 0 list
-            generationObjects[0] = {}; 
+        explicit Region(MemoryManager& mgr)
+            : manager(mgr), currentGeneration(0) {
+            generationObjects[0] = {};
         }
 
-        ~Region()
-        {
-            // On Region destruction, deallocate all objects regardless of generation
+        ~Region() {
             for (auto const& [gen, ptrs] : generationObjects) {
                 for (void* ptr : ptrs) {
                     manager.deallocate(ptr);
@@ -340,20 +313,15 @@ public:
             }
         }
 
-        template <typename T, typename... Args>
-        T *create(Args &&...args)
-        {
-            void *memory = manager.allocate(sizeof(T), alignof(T));
-            if (!memory) {
-                return nullptr;
-            }
+        template<typename T, typename... Args>
+        T* create(Args&&... args) {
+            void* memory = manager.allocate(sizeof(T), alignof(T));
+            if (!memory) return nullptr;
+            
             try {
-                T *obj = new (memory) T(std::forward<Args>(args)...);
-                
-                // Store in both maps:
+                T* obj = new (memory) T(std::forward<Args>(args)...);
                 objectGenerations[memory] = currentGeneration;
-                generationObjects[currentGeneration].push_back(memory); // O(1) average push_back
-                
+                generationObjects[currentGeneration].push_back(memory);
                 return obj;
             } catch (...) {
                 manager.deallocate(memory);
@@ -362,138 +330,88 @@ public:
         }
 
         template<typename T>
-        void deallocate(void *ptr, size_t size, size_t alignment)
-        {
-            if (!ptr) {
-                return;
-            }
+        void deallocate(void* ptr) {
+            if (!ptr) return;
 
             try {
-                // Call destructor if it's a non-trivial type
                 if constexpr (!std::is_trivially_destructible_v<T>) {
                     static_cast<T*>(ptr)->~T();
                 }
 
-                // Deallocate the memory
                 manager.deallocate(ptr);
 
-                // Remove from generations map
                 auto gen_it = objectGenerations.find(ptr);
                 if (gen_it != objectGenerations.end()) {
                     size_t gen = gen_it->second;
-                    
-                    // Remove from the objectGenerations tracking map
                     objectGenerations.erase(gen_it);
 
-                    // Remove from the generationObjects list (O(N) cost here)
-                    std::vector<void*>& ptr_list = generationObjects[gen];
+                    auto& ptr_list = generationObjects[gen];
                     ptr_list.erase(std::remove(ptr_list.begin(), ptr_list.end(), ptr), ptr_list.end());
                 }
-            } catch (const std::exception& e) {
-                std::cerr << "[ERROR] Exception in Region::deallocate: " << e.what() << std::endl;
-                // Still try to deallocate the memory even if destructor fails
-                manager.deallocate(ptr);
-                objectGenerations.erase(ptr);
-                throw;
             } catch (...) {
-                std::cerr << "[ERROR] Unknown exception in Region::deallocate" << std::endl;
                 manager.deallocate(ptr);
                 objectGenerations.erase(ptr);
                 throw;
             }
         }
 
-        // Add convenience overload for deallocate
-        template<typename T>
-        void deallocate(void* ptr)
-        {
-            deallocate<T>(ptr, sizeof(T), alignof(T));
-        }
-
-        size_t getGeneration(void *ptr) const
-        {
+        size_t getGeneration(void* ptr) const {
             auto it = objectGenerations.find(ptr);
             return (it != objectGenerations.end()) ? it->second : 0;
         }
 
-        // REFACRORED: Renamed and implemented for scope management
-        void enterScope()
-        {
+        void enterScope() {
             ++currentGeneration;
-            generationObjects[currentGeneration] = {}; // Initialize new list for the scope
+            generationObjects[currentGeneration] = {};
         }
 
-        // REFACRORED: Renamed and implemented for O(N_scope) cleanup
-        void exitScope()
-        {
-            if (currentGeneration == 0){
-                return ;
-            }
+        void exitScope() {
+            if (currentGeneration == 0) return;
 
             size_t removable = currentGeneration;
-            
             auto it = generationObjects.find(removable);
-            if (it != generationObjects.end())
-            {
-                // Deallocate all objects in this scope's list (O(N_scope))
-                for (void* ptr : it->second)
-                {
-                    // Deallocate the memory block
+            
+            if (it != generationObjects.end()) {
+                for (void* ptr : it->second) {
                     manager.deallocate(ptr);
-                    // Remove from the objectGenerations tracking map
                     objectGenerations.erase(ptr);
                 }
-                
-                // Remove the list itself
                 generationObjects.erase(it);
             }
             
-            // Decrement generation counter to return to the parent scope
             --currentGeneration;
         }
     };
 
     template<typename T>
-    class Linear
-    {
+    class Linear {
     private:
-        T *ptr;
-        Region *region;
+        T* ptr;
+        Region* region;
         bool ownsResource;
-        MemoryManager &manager;
+        MemoryManager& manager;
 
     public:
-        explicit Linear(Region &r, T *p, MemoryManager &mgr)
-            : ptr(p)
-            , region(&r)
-            , ownsResource(true)
-            , manager(mgr)
-        {
-        }
+        explicit Linear(Region& r, T* p, MemoryManager& mgr)
+            : ptr(p), region(&r), ownsResource(true), manager(mgr) {}
 
-        Linear(const Linear &) = delete;
-        Linear &operator=(const Linear &) = delete;
+        Linear(const Linear&) = delete;
+        Linear& operator=(const Linear&) = delete;
 
-        Linear(Linear &&other) noexcept
-            : ptr(other.ptr)
-            , region(other.region)
-            , ownsResource(other.ownsResource)
-            , manager(other.manager)
-        {
+        Linear(Linear&& other) noexcept
+            : ptr(other.ptr), region(other.region), 
+              ownsResource(other.ownsResource), manager(other.manager) {
             other.ptr = nullptr;
-            other.region = nullptr;
             other.ownsResource = false;
         }
 
-        Linear &operator=(Linear &&other) noexcept
-        {
+        Linear& operator=(Linear&& other) noexcept {
             if (this != &other) {
                 release();
                 ptr = other.ptr;
                 region = other.region;
                 ownsResource = other.ownsResource;
                 other.ptr = nullptr;
-                other.region = nullptr;
                 other.ownsResource = false;
             }
             return *this;
@@ -501,22 +419,15 @@ public:
 
         ~Linear() { release(); }
 
-        T *operator->() const { return ptr; }
-        T &operator*() const { return *ptr; }
-        T *get() const { return ptr; }
+        T* operator->() const { return ptr; }
+        T& operator*() const { return *ptr; }
+        T* get() const { return ptr; }
+        T* borrow() const { return ptr; }
+        Region& getRegion() const { return *region; }
 
-        T *borrow() const
-        {
-            return ptr;
-        }
-
-        Region &getRegion() const { return *region; }
-
-        void release()
-        {
+        void release() {
             if (ptr && ownsResource) {
-                ptr->~T();
-                region->template deallocate<T>(ptr);  // Use convenience overload
+                region->template deallocate<T>(ptr);
                 ptr = nullptr;
                 ownsResource = false;
             }
@@ -524,29 +435,24 @@ public:
     };
 
     template<typename T>
-    class Ref
-    {
+    class Ref {
     private:
-        T *ptr;
-        Region *region;
+        T* ptr;
+        Region* region;
         size_t expectedGeneration;
-        std::atomic<int> *refCount;
-        MemoryManager &manager;
+        std::atomic<int>* refCount;
 
-        void incrementRefCount()
-        {
+        void incrementRefCount() {
             if (refCount) {
                 refCount->fetch_add(1, std::memory_order_relaxed);
             }
         }
 
-        void decrementRefCount()
-        {
+        void decrementRefCount() {
             if (refCount && refCount->fetch_sub(1, std::memory_order_acq_rel) == 1) {
                 delete refCount;
                 if (ptr && isValid()) {
-                    ptr->~T();
-                    region->template deallocate<T>(ptr);  // Use convenience overload
+                    region->template deallocate<T>(ptr);
                 }
                 ptr = nullptr;
                 region = nullptr;
@@ -555,35 +461,21 @@ public:
         }
 
     public:
-        Ref()
-            : ptr(nullptr)
-            , region(nullptr)
-            , expectedGeneration(0)
-            , refCount(nullptr)
-            , manager(MemoryManager::getInstance())
-        {}
+        Ref() : ptr(nullptr), region(nullptr), 
+                expectedGeneration(0), refCount(nullptr) {}
 
-        Ref(Region &r, T *p)
-            : ptr(p)
-            , region(&r)
-            , expectedGeneration(r.getGeneration(p))
-            , refCount(new std::atomic<int>(1))
-            , manager(MemoryManager::getInstance())
-        {
-        }
+        Ref(Region& r, T* p)
+            : ptr(p), region(&r), expectedGeneration(r.getGeneration(p)),
+              refCount(new std::atomic<int>(1)) {}
 
-        Ref(const Ref &other)
-            : ptr(other.ptr)
-            , region(other.region)
-            , expectedGeneration(other.expectedGeneration)
-            , refCount(other.refCount)
-            , manager(other.manager)
-        {
+        Ref(const Ref& other)
+            : ptr(other.ptr), region(other.region),
+              expectedGeneration(other.expectedGeneration),
+              refCount(other.refCount) {
             incrementRefCount();
         }
 
-        Ref &operator=(const Ref &other)
-        {
+        Ref& operator=(const Ref& other) {
             if (this != &other) {
                 decrementRefCount();
                 ptr = other.ptr;
@@ -595,20 +487,16 @@ public:
             return *this;
         }
 
-        Ref(Ref &&other) noexcept
-            : ptr(other.ptr)
-            , region(other.region)
-            , expectedGeneration(other.expectedGeneration)
-            , refCount(other.refCount)
-            , manager(other.manager)
-        {
+        Ref(Ref&& other) noexcept
+            : ptr(other.ptr), region(other.region),
+              expectedGeneration(other.expectedGeneration),
+              refCount(other.refCount) {
             other.ptr = nullptr;
             other.region = nullptr;
             other.refCount = nullptr;
         }
 
-        Ref &operator=(Ref &&other) noexcept
-        {
+        Ref& operator=(Ref&& other) noexcept {
             if (this != &other) {
                 decrementRefCount();
                 ptr = other.ptr;
@@ -624,94 +512,59 @@ public:
 
         ~Ref() { decrementRefCount(); }
 
-        T *operator->() const
-        {
+        T* operator->() const {
             if (!isValid()) {
                 throw std::runtime_error("Accessing invalid generational reference");
             }
             return ptr;
         }
 
-        T &operator*() const
-        {
+        T& operator*() const {
             if (!isValid()) {
                 throw std::runtime_error("Accessing invalid generational reference");
             }
             return *ptr;
         }
 
-        T *get() const { return ptr; }
-        bool isValid() const
-        {
+        T* get() const { return ptr; }
+        bool isValid() const {
             return ptr != nullptr && region->getGeneration(ptr) == expectedGeneration;
         }
-        Region &getRegion() const { return *region; }
+        Region& getRegion() const { return *region; }
     };
 
     template<typename T, typename... Args>
-    Linear<T> makeLinear(Region &region, Args &&...args)
-    {
-        static_assert(std::is_nothrow_destructible<T>::value,
-                      "Type must be nothrow destructible for safe cleanup");
-
-        T *obj = region.template create<T>(std::forward<Args>(args)...);
-
-        if (!obj) {
-            throw std::bad_alloc();
-        }
-
+    Linear<T> makeLinear(Region& region, Args&&... args) {
+        T* obj = region.template create<T>(std::forward<Args>(args)...);
+        if (!obj) throw std::bad_alloc();
         return Linear<T>(region, obj, *this);
     }
 
     template<typename T, typename... Args>
-    std::shared_ptr<T> makeRef(Region &region, Args &&...args)
-    {
-        static_assert(std::is_nothrow_destructible<T>::value,
-                      "Type must be nothrow destructible for safe cleanup");
+    std::shared_ptr<T> makeRef(Region& region, Args&&... args) {
+        T* obj = region.template create<T>(std::forward<Args>(args)...);
+        if (!obj) throw std::bad_alloc();
 
-        try {
-            T *obj = region.template create<T>(std::forward<Args>(args)...);
+        auto deleter = [&region](T* ptr) {
+            region.template deallocate<T>(ptr);
+        };
 
-            if (!obj) {
-                std::cerr << "[ERROR] makeRef: Failed to create object - returned nullptr" << std::endl;
-                throw std::bad_alloc();
-            }
-
-            size_t generation = region.getGeneration(obj);
-
-            auto deleter = [&region](T* ptr) {
-                region.template deallocate<T>(ptr);
-            };
-
-            return std::shared_ptr<T>(obj, deleter);
-
-        } catch (const std::exception& e) {
-            std::cerr << "[EXCEPTION] makeRef: " << e.what() << std::endl;
-            throw;
-        } catch (...) {
-            std::cerr << "[EXCEPTION] makeRef: Unknown exception" << std::endl;
-            throw;
-        }
+        return std::shared_ptr<T>(obj, deleter);
     }
 
-    class Unsafe
-    {
+    class Unsafe {
     public:
-        static void *allocate(std::size_t size, std::size_t alignment = alignof(std::max_align_t))
-        {
+        static void* allocate(std::size_t size, std::size_t alignment = alignof(std::max_align_t)) {
             return DefaultAllocator().allocate(size, alignment);
         }
 
-        static void deallocate(void *ptr) noexcept
-        {
+        static void deallocate(void* ptr) noexcept {
             DefaultAllocator().deallocate(ptr);
         }
 
-        static void *resize(void *ptr,
-                            std::size_t new_size,
-                            std::size_t alignment = alignof(std::max_align_t))
-        {
-            void *new_ptr = DefaultAllocator().allocate(new_size, alignment);
+        static void* resize(void* ptr, std::size_t new_size, 
+                           std::size_t alignment = alignof(std::max_align_t)) {
+            void* new_ptr = DefaultAllocator().allocate(new_size, alignment);
             if (ptr) {
                 std::memcpy(new_ptr, ptr, new_size);
                 DefaultAllocator().deallocate(ptr);
@@ -719,37 +572,31 @@ public:
             return new_ptr;
         }
 
-        static void *allocateZeroed(std::size_t num, std::size_t size)
-        {
+        static void* allocateZeroed(std::size_t num, std::size_t size) {
             std::size_t total = num * size;
-            void *ptr = allocate(total);
-            if (ptr) {
-                std::memset(ptr, 0, total);
-            }
+            void* ptr = allocate(total);
+            if (ptr) std::memset(ptr, 0, total);
             return ptr;
         }
 
-        static void copy(void *dest, const void *src, std::size_t num)
-        {
+        static void copy(void* dest, const void* src, std::size_t num) {
             std::memcpy(dest, src, num);
         }
 
-        static void set(void *ptr, int value, std::size_t num) { std::memset(ptr, value, num); }
+        static void set(void* ptr, int value, std::size_t num) {
+            std::memset(ptr, value, num);
+        }
 
-        static int compare(const void *ptr1, const void *ptr2, std::size_t num)
-        {
+        static int compare(const void* ptr1, const void* ptr2, std::size_t num) {
             return std::memcmp(ptr1, ptr2, num);
         }
 
-        static void move(void *dest, const void *src, std::size_t num)
-        {
+        static void move(void* dest, const void* src, std::size_t num) {
             std::memmove(dest, src, num);
         }
     };
 
-    // Singleton instance
-    static MemoryManager &getInstance()
-    {
+    static MemoryManager& getInstance() {
         static MemoryManager instance;
         return instance;
     }
