@@ -1,0 +1,103 @@
+AST for benchmarks/loop_benchmark.lm
+Parser: New Unified Parser (CST mode)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+  Literal: Starting for loop benchmark...
+VarDeclaration: [private] startTime
+  Initializer:
+    CallExpression:
+      Callee:
+        Variable: time
+VarDeclaration: [private] count
+  Type: int
+  Initializer:
+    Literal: 20000000
+ForStatement (traditional):
+  Initializer:
+    VarDeclaration: [private] i
+      Initializer:
+        Literal: 0
+  Condition:
+    BinaryExpression: <
+      Left:
+        Variable: i
+      Operator: <
+      Right:
+        Variable: count
+  Increment:
+    Assignment: +=
+      Target: i
+      Value:
+      Literal: 1
+  Body:
+    BlockStatement:
+VarDeclaration: [private] endTime
+  Initializer:
+    CallExpression:
+      Callee:
+        Variable: time
+VarDeclaration: [private] elapsedTime
+  Initializer:
+    BinaryExpression: -
+      Left:
+        Variable: endTime
+      Operator: -
+      Right:
+        Variable: startTime
+PrintStatement:
+  InterpolatedString:
+    String: "For loop elapsed time: "
+    Expression:
+      Variable: elapsedTime
+    String: " seconds"
+PrintStatement:
+  Literal: 
+PrintStatement:
+  Literal: Starting iterator loop benchmark...
+ExpressionStatement:
+  Assignment: =
+    Target: startTime
+    Value:
+    CallExpression:
+      Callee:
+        Variable: time
+IterStatement:
+  Variables: i
+  Iterable:
+    RangeExpression:
+      Start:
+        Literal: 0
+      End:
+        Variable: count
+      Inclusive: true
+  Body:
+    BlockStatement:
+ExpressionStatement:
+  Assignment: =
+    Target: endTime
+    Value:
+    CallExpression:
+      Callee:
+        Variable: time
+ExpressionStatement:
+  Assignment: =
+    Target: elapsedTime
+    Value:
+    BinaryExpression: -
+      Left:
+        Variable: endTime
+      Operator: -
+      Right:
+        Variable: startTime
+PrintStatement:
+  InterpolatedString:
+    String: "Iterator loop elapsed time: "
+    Expression:
+      Variable: elapsedTime
+    String: " seconds"

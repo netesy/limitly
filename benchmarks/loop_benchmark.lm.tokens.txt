@@ -1,0 +1,140 @@
+Tokens for benchmarks/loop_benchmark.lm
+Parser: New Unified Parser (CST mode)
+Mode: CST with trivia preservation
+========================================
+
+=== Tokens with Trivia ===
+Line 4: PRINT = 'print' [leading: COMMENT_LINE('// benchmarks/loop_benchmark.lm') NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 1: For loop') NEWLINE('
+') ]
+Line 4: LEFT_PAREN = '('
+Line 4: STRING = '"Starting for loop benchmark..."'
+Line 4: RIGHT_PAREN = ')'
+Line 4: SEMICOLON = ';'
+Line 5: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 5: IDENTIFIER = 'startTime' [leading: WHITESPACE(' ') ]
+Line 5: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 5: IDENTIFIER = 'time' [leading: WHITESPACE(' ') ]
+Line 5: LEFT_PAREN = '('
+Line 5: RIGHT_PAREN = ')'
+Line 5: SEMICOLON = ';'
+Line 7: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 7: IDENTIFIER = 'count' [leading: WHITESPACE(' ') ]
+Line 7: COLON = ':'
+Line 7: INT_TYPE = 'int'
+Line 7: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 7: NUMBER = '20000000' [leading: WHITESPACE(' ') ]
+Line 7: SEMICOLON = ';' [leading: WHITESPACE(' ') ]
+Line 9: FOR = 'for' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 9: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 9: VAR = 'var'
+Line 9: IDENTIFIER = 'i' [leading: WHITESPACE(' ') ]
+Line 9: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 9: NUMBER = '0' [leading: WHITESPACE(' ') ]
+Line 9: SEMICOLON = ';'
+Line 9: IDENTIFIER = 'i' [leading: WHITESPACE(' ') ]
+Line 9: LESS = '<' [leading: WHITESPACE(' ') ]
+Line 9: IDENTIFIER = 'count' [leading: WHITESPACE(' ') ]
+Line 9: SEMICOLON = ';'
+Line 9: IDENTIFIER = 'i' [leading: WHITESPACE(' ') ]
+Line 9: PLUS_EQUAL = '+=' [leading: WHITESPACE(' ') ]
+Line 9: NUMBER = '1' [leading: WHITESPACE(' ') ]
+Line 9: RIGHT_PAREN = ')'
+Line 9: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 11: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') COMMENT_LINE('// Empty loop') NEWLINE('
+') ]
+Line 13: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 13: IDENTIFIER = 'endTime' [leading: WHITESPACE(' ') ]
+Line 13: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 13: IDENTIFIER = 'time' [leading: WHITESPACE(' ') ]
+Line 13: LEFT_PAREN = '('
+Line 13: RIGHT_PAREN = ')'
+Line 13: SEMICOLON = ';'
+Line 14: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 14: IDENTIFIER = 'elapsedTime' [leading: WHITESPACE(' ') ]
+Line 14: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 14: IDENTIFIER = 'endTime' [leading: WHITESPACE(' ') ]
+Line 14: MINUS = '-' [leading: WHITESPACE(' ') ]
+Line 14: IDENTIFIER = 'startTime' [leading: WHITESPACE(' ') ]
+Line 14: SEMICOLON = ';'
+Line 15: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 15: LEFT_PAREN = '('
+Line 15: INTERPOLATION_START = '"For loop elapsed time: "'
+Line 15: IDENTIFIER = 'elapsedTime'
+Line 15: INTERPOLATION_END = ''
+Line 15: STRING = '" seconds"'
+Line 15: RIGHT_PAREN = ')'
+Line 15: SEMICOLON = ';'
+Line 17: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 17: LEFT_PAREN = '('
+Line 17: STRING = '""'
+Line 17: RIGHT_PAREN = ')'
+Line 17: SEMICOLON = ';'
+Line 20: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test 2: Iterator loop') NEWLINE('
+') ]
+Line 20: LEFT_PAREN = '('
+Line 20: STRING = '"Starting iterator loop benchmark..."'
+Line 20: RIGHT_PAREN = ')'
+Line 20: SEMICOLON = ';'
+Line 21: IDENTIFIER = 'startTime' [leading: NEWLINE('
+') ]
+Line 21: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 21: IDENTIFIER = 'time' [leading: WHITESPACE(' ') ]
+Line 21: LEFT_PAREN = '('
+Line 21: RIGHT_PAREN = ')'
+Line 21: SEMICOLON = ';'
+Line 23: ITER = 'iter' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 23: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 23: VAR = 'var'
+Line 23: IDENTIFIER = 'i' [leading: WHITESPACE(' ') ]
+Line 23: IN = 'in' [leading: WHITESPACE(' ') ]
+Line 23: NUMBER = '0' [leading: WHITESPACE(' ') ]
+Line 23: RANGE = '..'
+Line 23: IDENTIFIER = 'count'
+Line 23: RIGHT_PAREN = ')'
+Line 23: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 25: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('   ') COMMENT_LINE('// print(i);') NEWLINE('
+') ]
+Line 27: IDENTIFIER = 'endTime' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 27: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 27: IDENTIFIER = 'time' [leading: WHITESPACE(' ') ]
+Line 27: LEFT_PAREN = '('
+Line 27: RIGHT_PAREN = ')'
+Line 27: SEMICOLON = ';'
+Line 28: IDENTIFIER = 'elapsedTime' [leading: NEWLINE('
+') ]
+Line 28: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 28: IDENTIFIER = 'endTime' [leading: WHITESPACE(' ') ]
+Line 28: MINUS = '-' [leading: WHITESPACE(' ') ]
+Line 28: IDENTIFIER = 'startTime' [leading: WHITESPACE(' ') ]
+Line 28: SEMICOLON = ';'
+Line 29: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 29: LEFT_PAREN = '('
+Line 29: INTERPOLATION_START = '"Iterator loop elapsed time: "'
+Line 29: IDENTIFIER = 'elapsedTime'
+Line 29: INTERPOLATION_END = ''
+Line 29: STRING = '" seconds"'
+Line 29: RIGHT_PAREN = ')'
+Line 29: SEMICOLON = ';'
+Line 30: EOF_TOKEN = ''

@@ -1,0 +1,13 @@
+var start = now();
+var started = time();
+print("Started {start}");
+print("Nested for loops (2000000000x3000000000 grid):");
+for (var row = 0; row < 115000; row += 1) {
+            print("({row})");
+    // for (var col = 0; col < 30000; col += 1) {
+    //     print("({row}, {col})");
+    // }
+}
+var end = now();
+var finished = time();
+print("Ended at {end} with Total time taken :{finished - started}s");

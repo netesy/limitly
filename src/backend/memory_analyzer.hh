@@ -179,6 +179,9 @@ public:
             historicalAllocations.push_back(it->second);
             activeAllocations.erase(it);
         }
+
+        log("Deallocated ptr at " +
+            std::to_string(reinterpret_cast<uintptr_t>(ptr)));
     }
 
     struct AllocationInfo {
@@ -273,11 +276,11 @@ public:
     };
 
     void log(const std::string& message) const {
-        std::lock_guard lock(logMutex);
-        if (logFile.is_open()) {
-            logFile << "[" << getTimestamp() << "] " << message << std::endl;
-            logFile.flush();
-        }
+        // std::lock_guard lock(logMutex);
+        // if (logFile.is_open()) {
+        //     logFile << "[" << getTimestamp() << "] " << message << std::endl;
+        //     logFile.flush();
+        // }
     }
 
     MemoryUsageReport getMemoryUsage() const {

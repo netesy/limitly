@@ -31,9 +31,9 @@
 #define TOSTRING(x) STRINGIFY(x)
 #define TRACE_INFO() (std::string(__FUNCTION__) + " at line " + TOSTRING(__LINE__))
 
-constexpr size_t MIN_ALLOC_SIZE = 8;
+constexpr size_t MIN_ALLOC_SIZE = 4;
 constexpr size_t MAX_ALLOC_SIZE = 256;
-constexpr size_t POOL_CHUNK_SIZE = 1024;
+constexpr size_t POOL_CHUNK_SIZE = 256;
 
 class MemoryPool {
 private:
@@ -345,7 +345,7 @@ public:
             }
             try {
                 T *obj = new (memory) T(std::forward<Args>(args)...);
-                objectGenerations[memory] = ++currentGeneration;
+                objectGenerations[memory] = currentGeneration; //mke it scoped 
                 return obj;
             } catch (...) {
                 manager.deallocate(memory);
@@ -399,6 +399,35 @@ public:
         {
             auto it = objectGenerations.find(ptr);
             return (it != objectGenerations.end()) ? it->second : 0;
+        }
+
+        // add addGeneration() this adds a new generation based on scope 
+        void addGeneration()
+        {
+            ++currentGeneration;
+        }
+
+        // add removeGeneration() removes the generations based on scope this code needs further work
+        void removeGeneration()
+        {
+            if (currentGeneration == 0){
+                //cannot remove the base generations
+                return ;
+            }
+
+            // size_t removable = currentGeneration;
+            // for (auto it = objectGenerations.begin() ; it != objectGenerations.end(); )
+            // {
+            //     if(it->second == removable)
+            //     {
+            //         void* ptr = it->first;
+            //         manager.deallocate(ptr);
+                    
+            //         it = objectGenerations.erase(it); //remove the entry
+            //     }
+            // }
+            //decrement genertion counter
+            --currentGeneration;
         }
     };
 
