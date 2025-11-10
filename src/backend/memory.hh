@@ -229,12 +229,6 @@ public:
         auto it = allocationMap.find(ptr);
         return it != allocationMap.end() ? it->second.get() : nullptr;
     }
-
-        // Add these methods to make AllocationTracker iterable
-    auto begin() const { return allocationMap.begin(); }
-    auto end() const { return allocationMap.end(); }
-    auto begin() { return allocationMap.begin(); }
-    auto end() { return allocationMap.end(); }
 };
 
 template<typename Allocator = DefaultAllocator>
@@ -298,6 +292,10 @@ public:
         std::unordered_map<void*, size_t> objectGenerations;
         std::unordered_map<size_t, std::vector<void*>> generationObjects;
         size_t currentGeneration;
+        
+        // Object reuse pools by size
+        std::unordered_map<size_t, std::vector<void*>> reusePool;
+        static constexpr size_t MAX_REUSE_POOL_SIZE = 1000;
 
     public:
         explicit Region(MemoryManager& mgr)
@@ -306,6 +304,14 @@ public:
         }
 
         ~Region() {
+            // Clean up reuse pools
+            for (auto& [size, pool] : reusePool) {
+                for (void* ptr : pool) {
+                    manager.deallocate(ptr);
+                }
+            }
+            
+            // Clean up active allocations
             for (auto const& [gen, ptrs] : generationObjects) {
                 for (void* ptr : ptrs) {
                     manager.deallocate(ptr);
@@ -315,7 +321,18 @@ public:
 
         template<typename T, typename... Args>
         T* create(Args&&... args) {
-            void* memory = manager.allocate(sizeof(T), alignof(T));
+            size_t objSize = sizeof(T);
+            void* memory = nullptr;
+            
+            // Try to reuse an object from the pool
+            auto& pool = reusePool[objSize];
+            if (!pool.empty()) {
+                memory = pool.back();
+                pool.pop_back();
+            } else {
+                memory = manager.allocate(sizeof(T), alignof(T));
+            }
+            
             if (!memory) return nullptr;
             
             try {
@@ -324,7 +341,12 @@ public:
                 generationObjects[currentGeneration].push_back(memory);
                 return obj;
             } catch (...) {
-                manager.deallocate(memory);
+                // Return to pool instead of deallocating
+                if (pool.size() < MAX_REUSE_POOL_SIZE) {
+                    pool.push_back(memory);
+                } else {
+                    manager.deallocate(memory);
+                }
                 throw;
             }
         }
@@ -338,8 +360,6 @@ public:
                     static_cast<T*>(ptr)->~T();
                 }
 
-                manager.deallocate(ptr);
-
                 auto gen_it = objectGenerations.find(ptr);
                 if (gen_it != objectGenerations.end()) {
                     size_t gen = gen_it->second;
@@ -347,6 +367,15 @@ public:
 
                     auto& ptr_list = generationObjects[gen];
                     ptr_list.erase(std::remove(ptr_list.begin(), ptr_list.end(), ptr), ptr_list.end());
+                }
+                
+                // Try to add to reuse pool instead of deallocating
+                size_t objSize = sizeof(T);
+                auto& pool = reusePool[objSize];
+                if (pool.size() < MAX_REUSE_POOL_SIZE) {
+                    pool.push_back(ptr);
+                } else {
+                    manager.deallocate(ptr);
                 }
             } catch (...) {
                 manager.deallocate(ptr);
@@ -380,6 +409,30 @@ public:
             }
             
             --currentGeneration;
+        }
+
+        // New method: Clean up dead objects in current scope without exiting
+        void collectGarbage() {
+            if (currentGeneration == 0) return;
+            
+            auto it = generationObjects.find(currentGeneration);
+            if (it != generationObjects.end()) {
+                // Move objects to reuse pool or deallocate
+                for (void* ptr : it->second) {
+                    objectGenerations.erase(ptr);
+                    // Objects will be moved to reuse pool during cleanup
+                    manager.deallocate(ptr);
+                }
+                
+                it->second.clear();
+                it->second.reserve(128); // Reserve some space for future allocations
+            }
+        }
+        
+        // Get current allocation count for this scope
+        size_t getScopeAllocationCount() const {
+            auto it = generationObjects.find(currentGeneration);
+            return (it != generationObjects.end()) ? it->second.size() : 0;
         }
     };
 
