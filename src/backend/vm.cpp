@@ -557,10 +557,10 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                         handleSetProperty(instruction);
                         break;
                     case Opcode::BEGIN_SCOPE:
-                        // No action needed for BEGIN_SCOPE in this implementation
+                        handleBeginScope(instruction);
                         break;
                     case Opcode::END_SCOPE:
-                        // No action needed for END_SCOPE in this implementation
+                        handleEndScope(instruction);
                         break;
                     case Opcode::MATCH_PATTERN:
                         handleMatchPattern(instruction);
@@ -4885,15 +4885,18 @@ void VM::handleIteratorNextKeyValue(const Instruction& /*unused*/) {
 }
 
 void VM::handleBeginScope(const Instruction& /*unused*/) {
+    region->addGeneration();
     // Create a new environment that extends the current one
     environment = std::make_shared<Environment>(environment);
 }
 
 void VM::handleEndScope(const Instruction& /*unused*/) {
+   
     // Restore the previous environment
     if (environment && environment->enclosing) {
         environment = environment->enclosing;
     }
+    region->removeGeneration();
 }
 
 void VM::handleBeginParallel(const Instruction& instruction) {
