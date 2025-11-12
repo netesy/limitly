@@ -4799,8 +4799,9 @@ void VM::handleCreateRange(const Instruction& instruction) {
     );
 
     if (debugMode) {
-        std::cout << "[DEBUG] Iterator Value: " << rangeIterator->rangeCurrent << " And the Iterable: "<< rangeIterator->iterable << std::endl;
-    }  
+        std::cout << "[DEBUG] Created lazy range iterator: start=" << start 
+                  << ", end=" << end << ", step=" << step << std::endl;
+    }
     // // Wrap in a Value
     auto result = memoryManager.makeRef<Value>(*region, typeSystem->ANY_TYPE, rangeIterator);
     push(result);
@@ -4810,6 +4811,15 @@ void VM::handleGetIterator(const Instruction& /*unused*/) {
     // Get the iterable from the stack
     auto iterable = pop();
     
+    // CRITICAL FIX: If it's already an iterator (like a lazy range), just push it back
+    if (std::holds_alternative<IteratorValuePtr>(iterable->data)) {
+        if (debugMode) {
+            std::cout << "[DEBUG] GET_ITERATOR: Value is already an iterator, passing through" << std::endl;
+        }
+        push(iterable);
+        return;
+    }
+    
     // Create an iterator for the iterable
     if (std::holds_alternative<ListValue>(iterable->data)) {
         // For lists, create a list iterator
@@ -4817,7 +4827,6 @@ void VM::handleGetIterator(const Instruction& /*unused*/) {
             IteratorValue::IteratorType::LIST,
             iterable
         );
-        // Wrap the iterator in a Value and push it onto the stack
         auto iteratorValue = memoryManager.makeRef<Value>(
             *region,
             typeSystem->ANY_TYPE,
@@ -4826,21 +4835,16 @@ void VM::handleGetIterator(const Instruction& /*unused*/) {
         push(iteratorValue);
     } else if (std::holds_alternative<DictValue>(iterable->data)) {
         // For dictionaries, we'll use the same approach as lists for now
-        // but with a different iterator type
         auto iterator = std::make_shared<IteratorValue>(
-            IteratorValue::IteratorType::LIST, // TODO: Add DICT iterator type
+            IteratorValue::IteratorType::LIST,
             iterable
         );
-        // Wrap the iterator in a Value and push it onto the stack
         auto iteratorValue = memoryManager.makeRef<Value>(
             *region,
             typeSystem->ANY_TYPE,
             iterator
         );
         push(iteratorValue);
-    } else if (std::holds_alternative<IteratorValuePtr>(iterable->data)) {
-        // If it's already an iterator, just push it back
-        push(iterable);
     } else if (std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(iterable->data)) {
         // Create a channel-backed iterator
         auto iterator = std::make_shared<IteratorValue>(
@@ -4864,12 +4868,17 @@ void VM::handleIteratorHasNext(const Instruction& /*unused*/) {
     
     // Check if the value is an iterator
     if (!std::holds_alternative<IteratorValuePtr>(iteratorVal->data)) {
-        error("Expected iterator value");
+        error("Expected iterator value in ITERATOR_HAS_NEXT, got type: " + 
+              typeTagToString(iteratorVal->type->tag));
         return;
     }
     
     auto iterator = std::get<IteratorValuePtr>(iteratorVal->data);
     bool hasNext = iterator->hasNext();
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] ITERATOR_HAS_NEXT: " << (hasNext ? "true" : "false") << std::endl;
+    }
     
     // Push the result back onto the stack
     auto result = memoryManager.makeRef<Value>(
@@ -4886,7 +4895,8 @@ void VM::handleIteratorNext(const Instruction& /*unused*/) {
     
     // Check if the value is an iterator
     if (!std::holds_alternative<IteratorValuePtr>(iteratorVal->data)) {
-        error("Expected iterator value");
+        error("Expected iterator value in ITERATOR_NEXT, got type: " + 
+              typeTagToString(iteratorVal->type->tag));
         return;
     }
     
@@ -4899,6 +4909,11 @@ void VM::handleIteratorNext(const Instruction& /*unused*/) {
     
     // Get the next value and push it onto the stack
     ValuePtr nextValue = iterator->next();
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] ITERATOR_NEXT: Got value: " << nextValue->toString() << std::endl;
+    }
+    
     push(nextValue);
 }
 
