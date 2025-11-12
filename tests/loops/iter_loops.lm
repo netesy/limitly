@@ -15,7 +15,7 @@ iter (x in 0..4) {
 
 // Nested iter loops
 print("Nested iter loops:");
-iter (i in 1..3) {
+iter (var i in 1..3) {
     iter (j in 10..12) {
         print("({i}, {j})");
     }

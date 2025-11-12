@@ -1537,6 +1537,10 @@ struct IteratorValue {
           hasBuffered(false), bufferedValue(nullptr) {}
     
     bool hasNext() const {
+            // CRITICAL FIX: Range iterators don't need an iterable backing value
+    if (type == IteratorType::RANGE) {
+        return (rangeStep > 0) ? (rangeCurrent < rangeEnd) : (rangeCurrent > rangeEnd);
+    } 
         if (!iterable) return false;
         
         if (type == IteratorType::RANGE) {
@@ -1577,23 +1581,27 @@ struct IteratorValue {
             throw std::runtime_error("No more elements in iterator");
         }
         
-        if (type == IteratorType::RANGE) {
-            // Create value on-demand, reuse if possible
-            int64_t value = rangeCurrent;
-            rangeCurrent += rangeStep;
-            
-            // OPTIMIZATION: Reuse a single Value object
-            static thread_local ValuePtr cachedRangeValue = nullptr;
-            if (!cachedRangeValue) {
-                cachedRangeValue = std::make_shared<Value>(
-                    std::make_shared<Type>(TypeTag::Int64),
-                    value
-                );
-            } else {
-                cachedRangeValue->data = value; // Reuse!
-            }
-            return cachedRangeValue;
+    if (type == IteratorType::RANGE) {
+        // Create value on-demand
+        int64_t value = rangeCurrent;
+        rangeCurrent += rangeStep;
+        
+        // OPTIMIZATION: Reuse a single Value object per thread
+        // Note: This is safe because the value is immediately consumed by the VM
+        static thread_local ValuePtr cachedRangeValue = nullptr;
+        
+        if (!cachedRangeValue) {
+            // Create initial cached value with correct type
+            auto int64Type = std::make_shared<Type>(TypeTag::Int64);
+            cachedRangeValue = std::make_shared<Value>(int64Type, value);
+        } else {
+            // Reuse existing value by updating data
+            cachedRangeValue->data = value;
         }
+        
+        return cachedRangeValue;
+    }
+        
         
         if (type == IteratorType::LIST) {
             if (auto list = std::get_if<ListValue>(&iterable->data)) {
