@@ -12,14 +12,12 @@ print(basic.number);
 print("Test 1.3: Call module function");
 basic.greet();
 
-print("Test 1.4: Call function with parameters (KNOWN ISSUE)");
+print("Test 1.4: Call function with parameters");
 var result = basic.add(5, 3);
 print("5 + 3 = " + result);
-//print("SKIPPED: Function calls with parameters not working yet");
 
 print("Test 1.5: Call function that returns module variable (KNOWN ISSUE)");
-// var moduleVarResult = basic.getModuleVar();
-// print("Module variable via function: " + moduleVarResult);
-print("SKIPPED: Function calls with return values not working yet");
+var moduleVarResult = basic.getModuleVar();
+print("Module variable via function: " + moduleVarResult);
 
 print("=== Basic Import Test Complete ===");

@@ -1,7 +1,7 @@
 // Module in nested directory
-var deep_value = "I'm deep in the directory structure";
+pub var deep_value = "I'm deep in the directory structure";
 
-fn deep_function() {
+pub fn deep_function() {
     print("Called from deep module");
     return deep_value;
 }

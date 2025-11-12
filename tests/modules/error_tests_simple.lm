@@ -24,6 +24,6 @@ print("=== Valid Operations Complete ===");
 
 // Test 4: Wrong parameter count (would cause compile error)
 // var result = math_module.add(5); // Too few parameters
-// var result2 = math_module.add(5, 10, 15); // Too many parameters
+var result2 = math_module.add(5, 10, 15); // Too many parameters
 
 print("Error handling tests completed (see comments for error conditions)");

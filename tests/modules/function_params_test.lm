@@ -3,26 +3,20 @@ print("=== Function Parameters Test ===");
 
 import tests.modules.math_module as math;
 
-print("Test 1: Function call with parameters (KNOWN ISSUE)");
+print("Test 1: Function call with parameters");
 print("Expected: Function should be called with parameters");
-// This is currently not working:
-// var result = math.add(5, 3);
-// print("5 + 3 = " + result);
-print("SKIPPED: Function calls with parameters not implemented yet");
+var result = math.add(5, 3);
+print("5 + 3 = " + result);
 
-print("Test 2: Function call with return value (KNOWN ISSUE)");
+print("Test 2: Function call with return value");
 print("Expected: Function should return a value");
-// This is currently not working:
 var squared = math.square(4);
 print("4 squared = " + squared);
-print("SKIPPED: Function calls with return values not implemented yet");
 
-print("Test 3: Nested function calls (KNOWN ISSUE)");
+print("Test 3: Nested function calls ");
 print("Expected: Functions should be callable in expressions");
-// This is currently not working:
-// var result = math.add(math.square(2), math.cube(2));
-// print("square(2) + cube(2) = " + result);
-print("SKIPPED: Nested function calls not implemented yet");
+var result = math.add(math.square(2), math.cube(2));
+print("square(2) + cube(2) = " + result);
 
 print("=== Function Parameters Test Complete ===");
 print("NOTE: All tests are currently skipped due to known limitations");

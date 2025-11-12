@@ -197,6 +197,7 @@ VM::~VM() {
     performClosureGarbageCollection();
     
     if (debugMode) {
+        memoryManager.analyzeMemoryUsage();
         printClosureMemoryStats();
     }
     
@@ -1396,6 +1397,24 @@ void VM::handleStoreVar(const Instruction& instruction) {
         std::cout << "[DEBUG] STORE_VAR: Popped value of type: " << static_cast<int>(value->type->tag) << std::endl;
         std::cout << "[DEBUG] STORE_VAR: Popped value: " << value->toString() << std::endl;
     }
+
+        // CRITICAL FIX: Reuse existing Value objects for loop variables
+    try {
+        ValuePtr existing = environment->get(instruction.stringValue);
+        
+        // If it's a simple numeric type, reuse the Value object
+        if (existing->type->tag == value->type->tag &&
+            (existing->type->tag == TypeTag::Int || 
+             existing->type->tag == TypeTag::Int64 ||
+             existing->type->tag == TypeTag::Float64)) {
+            
+            // Reuse the existing Value object by updating its data
+            existing->data = value->data;
+            return; // No new allocation!
+        }
+    } catch (...) {
+        // Variable doesn't exist yet
+    }
     // If variable already exists and is an AtomicValue, perform atomic store
     try {
         ValuePtr existing = environment->get(instruction.stringValue);
@@ -1437,6 +1456,7 @@ void VM::handleStoreVar(const Instruction& instruction) {
     if (debugMode) {
         std::cout << "[DEBUG] STORE_VAR: Successfully stored variable '" << instruction.stringValue << "'" << std::endl;
     }
+    environment->define(instruction.stringValue, value);
 }
 
 void VM::handleDefineAtomic(const Instruction& instruction) {
@@ -4128,9 +4148,6 @@ void VM::handleDefineOptionalParam(const Instruction& instruction) {
             // Don't modify lambda functions that are already registered with parameters
             if (currentFunc.find("__lambda_") == 0 && 
                 (!funcIt->second.parameters.empty() || !funcIt->second.optionalParameters.empty())) {
-                // std::cout << "[DEBUG] handleDefineOptionalParam: Skipping optional parameter addition for already-registered lambda " 
-                //           << currentFunc << " (has " << funcIt->second.parameters.size() << " required and " 
-                //           << funcIt->second.optionalParameters.size() << " optional parameters)" << std::endl;
                 return;
             }
             
@@ -4719,11 +4736,7 @@ void VM::handleSetIndex(const Instruction& /*unused*/) {
 
 void VM::handleCreateRange(const Instruction& instruction) {
     // Get the step value (default is 1 if not specified)
-    int64_t step = 1;
-    if (instruction.intValue != 0) {
-        step = instruction.intValue;
-    }
-
+    int64_t step = instruction.intValue != 0 ? instruction.intValue : 1;
     // Get end value from stack
     auto endVal = pop();
     // Get start value from stack
@@ -4757,24 +4770,39 @@ void VM::handleCreateRange(const Instruction& instruction) {
         error("Range end must be an integer");
         return;
     }
-
+   
     // Create a list to hold the range values
-    ListValue rangeList;
+    // ListValue rangeList;
     
-    if (step > 0) {
-        for (int64_t i = start; i < end; i += step) {
-            auto val = memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, i);
-            rangeList.elements.push_back(val);
-        }
-    } else if (step < 0) {
-        for (int64_t i = start; i > end; i += step) {
-            auto val = memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, i);
-            rangeList.elements.push_back(val);
-        }
-    }
-    
-    // Push the range list onto the stack
-    auto result = memoryManager.makeRef<Value>(*region, typeSystem->LIST_TYPE, rangeList);
+    // if (step > 0) {
+    //     for (int64_t i = start; i < end; i += step) {
+    //         auto val = memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, i);
+    //         rangeList.elements.push_back(val);
+    //     }
+    // } else if (step < 0) {
+    //     for (int64_t i = start; i > end; i += step) {
+    //         auto val = memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, i);
+    //         rangeList.elements.push_back(val);
+    //     }
+    // }    
+    // // Push the range list onto the stack
+    // auto result = memoryManager.makeRef<Value>(*region, typeSystem->LIST_TYPE, rangeList);
+    // push(result);
+  
+    // CRITICAL FIX: Create a lazy range iterator instead of materializing all values
+    auto rangeIterator = std::make_shared<IteratorValue>(
+        IteratorValue::IteratorType::RANGE,
+        nullptr,  // No backing collection
+        start,    // Pass range parameters directly
+        end,
+        step
+    );
+
+    if (debugMode) {
+        std::cout << "[DEBUG] Iterator Value: " << rangeIterator->rangeCurrent << " And the Iterable: "<< rangeIterator->iterable << std::endl;
+    }  
+    // // Wrap in a Value
+    auto result = memoryManager.makeRef<Value>(*region, typeSystem->ANY_TYPE, rangeIterator);
     push(result);
 }
 
@@ -4887,15 +4915,15 @@ void VM::handleIteratorNextKeyValue(const Instruction& /*unused*/) {
 void VM::handleBeginScope(const Instruction& /*unused*/) {
     region->enterScope();
     // Create a new environment that extends the current one
-    environment = std::make_shared<Environment>(environment);
+  //  environment = std::make_shared<Environment>(environment);
 }
 
 void VM::handleEndScope(const Instruction& /*unused*/) {
    
     // Restore the previous environment
-    if (environment && environment->enclosing) {
-        environment = environment->enclosing;
-    }
+    // if (environment && environment->enclosing) {
+    //     environment = environment->enclosing;
+    // }
     region->exitScope();
 }
 

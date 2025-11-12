@@ -1504,33 +1504,48 @@ namespace ErrorUtils {
 struct IteratorValue {
     enum class IteratorType {
         LIST,
-        RANGE,
-        CHANNEL
+        DICT,
+        CHANNEL,
+        RANGE
     };
 
     IteratorType type;
-    size_t index;
-    ValuePtr container;
+    ValuePtr iterable;
+    size_t currentIndex;
+    
+    // For lazy ranges
+    int64_t rangeStart;
+    int64_t rangeEnd;
+    int64_t rangeStep;
+    int64_t rangeCurrent;
+    
     // For channel iterators: a buffered value received by hasNext()
-    bool hasBuffered = false;
-    ValuePtr bufferedValue;
+    // Marked mutable because hasNext() needs to modify these while being logically const
+    mutable bool hasBuffered;
+    mutable ValuePtr bufferedValue;
     
-    IteratorValue(IteratorType t, ValuePtr c) 
-        : type(t), index(0), container(std::move(c)) {}
+    // Constructor for general iterators (list, dict, channel)
+    IteratorValue(IteratorType type, ValuePtr iterable)
+        : type(type), iterable(std::move(iterable)), currentIndex(0),
+          rangeStart(0), rangeEnd(0), rangeStep(0), rangeCurrent(0),
+          hasBuffered(false), bufferedValue(nullptr) {}
     
-    bool hasNext() {
-        if (!container) return false;
+    // Constructor for lazy ranges
+    IteratorValue(IteratorType type, ValuePtr iterable, int64_t start, int64_t end, int64_t step)
+        : type(type), iterable(std::move(iterable)), currentIndex(0),
+          rangeStart(start), rangeEnd(end), rangeStep(step), rangeCurrent(start),
+          hasBuffered(false), bufferedValue(nullptr) {}
+    
+    bool hasNext() const {
+        if (!iterable) return false;
+        
+        if (type == IteratorType::RANGE) {
+            return (rangeStep > 0) ? (rangeCurrent < rangeEnd) : (rangeCurrent > rangeEnd);
+        }
         
         if (type == IteratorType::LIST) {
-            // For LIST type, the data should be a ListValue
-            if (auto list = std::get_if<ListValue>(&container->data)) {
-                return index < list->elements.size();
-            }
-        } else if (type == IteratorType::RANGE) { // RANGE
-            // For RANGE, we need to get the range bounds from the container
-            // First, check if the container has a ListValue (materialized range)
-            if (auto list = std::get_if<ListValue>(&container->data)) {
-                return index < list->elements.size();
+            if (auto list = std::get_if<ListValue>(&iterable->data)) {
+                return currentIndex < list->elements.size();
             }
         } else if (type == IteratorType::CHANNEL) {
             // If we already buffered a value, we have next
@@ -1538,7 +1553,7 @@ struct IteratorValue {
 
             // Attempt to receive from the channel (this will block until value or closed)
             try {
-                if (auto chPtr = std::get_if<std::shared_ptr<Channel<ValuePtr>>>(&container->data)) {
+                if (auto chPtr = std::get_if<std::shared_ptr<Channel<ValuePtr>>>(&iterable->data)) {
                     ValuePtr v;
                     bool ok = (*chPtr)->receive(v);
                     if (ok) {
@@ -1552,6 +1567,8 @@ struct IteratorValue {
                 return false;
             }
         }
+        // Add DICT handling here if needed
+        
         return false;
     }
     
@@ -1560,23 +1577,31 @@ struct IteratorValue {
             throw std::runtime_error("No more elements in iterator");
         }
         
+        if (type == IteratorType::RANGE) {
+            // Create value on-demand, reuse if possible
+            int64_t value = rangeCurrent;
+            rangeCurrent += rangeStep;
+            
+            // OPTIMIZATION: Reuse a single Value object
+            static thread_local ValuePtr cachedRangeValue = nullptr;
+            if (!cachedRangeValue) {
+                cachedRangeValue = std::make_shared<Value>(
+                    std::make_shared<Type>(TypeTag::Int64),
+                    value
+                );
+            } else {
+                cachedRangeValue->data = value; // Reuse!
+            }
+            return cachedRangeValue;
+        }
+        
         if (type == IteratorType::LIST) {
-            if (auto list = std::get_if<ListValue>(&container->data)) {
-                if (index < list->elements.size()) {
-                    return list->elements[index++];
+            if (auto list = std::get_if<ListValue>(&iterable->data)) {
+                if (currentIndex < list->elements.size()) {
+                    return list->elements[currentIndex++];
                 }
             }
             throw std::runtime_error("Invalid list iterator state");
-        } else if (type == IteratorType::RANGE) { // RANGE
-            // Handle both materialized (ListValue) and unmaterialized ranges
-            if (auto list = std::get_if<ListValue>(&container->data)) {
-                // If this is a materialized range (list of values)
-                if (index < list->elements.size()) {
-                    return list->elements[index++];
-                }
-            }
-            
-            throw std::runtime_error("Invalid range iterator state");
         } else if (type == IteratorType::CHANNEL) {
             if (hasBuffered) {
                 auto res = bufferedValue;
@@ -1585,7 +1610,7 @@ struct IteratorValue {
                 return res;
             }
             // As a fallback, try to receive directly
-            if (auto chPtr = std::get_if<std::shared_ptr<Channel<ValuePtr>>>(&container->data)) {
+            if (auto chPtr = std::get_if<std::shared_ptr<Channel<ValuePtr>>>(&iterable->data)) {
                 ValuePtr v;
                 bool ok = (*chPtr)->receive(v);
                 if (ok) return v;
@@ -1593,12 +1618,11 @@ struct IteratorValue {
             }
             throw std::runtime_error("Invalid channel iterator state");
         }
+        // Add DICT handling here if needed
+        
         throw std::runtime_error("Invalid iterator type");
     }
-    
 };
-
-
 
 // Implementation of operator<< for Value
 inline std::ostream &operator<<(std::ostream &os, const Value &value) {
