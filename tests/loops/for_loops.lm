@@ -27,16 +27,16 @@ for (var x = 1; x * x < 20; x += 1) {
 
 // Nested for loops
 print("Nested for loops (2x3 grid):");
-for (var row = 0; row < 2; row += 1) {
+for (var row = 0; row <= 2; row += 1) {
     for (var col = 0; col < 3; col += 1) {
         print("({row}, {col})");
     }
 }
 
 // For loop with variable scope
-print("Variable scope test:");
-var outer = 100;
-for (var i = 0; i < 3; i += 1) {
+print("Variable scope test: new Issue");
+var outer:int = 100;
+for (var i = 0; i < 4; i += 1) {
     var inner = i * 10;
     print("outer: {outer}, inner: {inner}");
 }

@@ -16,14 +16,18 @@ var elapsedTime = endTime - startTime;
 print("For loop elapsed time: {elapsedTime} seconds");
 
 print("");
+// debug(0..20000000);
+print("");
 
-// // // Test 2: Iterator loop
+// // Test 2: Iterator loop
 // print("Starting iterator loop benchmark...");
 // startTime = time();
 
-// iter (var i in 0..count) {
-//    // print(i);
-// }
+// // iter (var i in 0..count) {
+
+// //    // print(i);
+// //    // print(0..20000000);
+// // }
 
 // endTime = time();
 // elapsedTime = endTime - startTime;

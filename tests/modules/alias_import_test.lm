@@ -10,12 +10,12 @@ print("Test 2.2: Call aliased module function");
 var squared = math.square(5);
 print("5 squared = " + squared);
 
-// print("Test 2.3: Call complex aliased function");
-// var area = math.circle_area(3);
+print("Test 2.3: Call complex aliased function");
+// var area = math.circle_area(3); //shold fail
 // print("Circle area (radius 3) = " + area);
 
-print("Test 2.3: Call recursive function through alias should fail");
-var fact = math.factorial(5); //shold fail
+print("Test 2.4: Call recursive function through alias");
+var fact = math.factorial(5); 
 print("5! = " + fact);
 
 print("=== Alias Import Test Complete ===");

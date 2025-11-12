@@ -7,8 +7,6 @@ Note: CST nodes were created internally with trivia preservation
 
 AST Dump:
 ==========
-PrintStatement:
-  Literal: Starting for loop benchmark...
 VarDeclaration: [private] startTime
   Initializer:
     CallExpression:
@@ -18,25 +16,6 @@ VarDeclaration: [private] count
   Type: int
   Initializer:
     Literal: 20000000
-ForStatement (traditional):
-  Initializer:
-    VarDeclaration: [private] i
-      Initializer:
-        Literal: 0
-  Condition:
-    BinaryExpression: <
-      Left:
-        Variable: i
-      Operator: <
-      Right:
-        Variable: count
-  Increment:
-    Assignment: +=
-      Target: i
-      Value:
-      Literal: 1
-  Body:
-    BlockStatement:
 VarDeclaration: [private] endTime
   Initializer:
     CallExpression:
@@ -50,14 +29,6 @@ VarDeclaration: [private] elapsedTime
       Operator: -
       Right:
         Variable: startTime
-PrintStatement:
-  InterpolatedString:
-    String: "For loop elapsed time: "
-    Expression:
-      Variable: elapsedTime
-    String: " seconds"
-PrintStatement:
-  Literal: 
 PrintStatement:
   Literal: Starting iterator loop benchmark...
 ExpressionStatement:
@@ -74,10 +45,12 @@ IterStatement:
       Start:
         Literal: 0
       End:
-        Variable: count
+        Literal: 20000000
       Inclusive: true
   Body:
     BlockStatement:
+      PrintStatement:
+        Variable: i
 ExpressionStatement:
   Assignment: =
     Target: endTime

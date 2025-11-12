@@ -1,4 +1,4 @@
-var x:int = 5;
+var x:int = 10;
 
 match (x) {
     5 => {
@@ -28,7 +28,7 @@ match (value) {
 }
 
 
-    match(18) {
+    match(10) {
         x where x > 10 => { print("{x} is greater than 10"); },
         x where x < 10 => { print("{x} is less than 10"); },
         x => { print("{x} is 10"); }

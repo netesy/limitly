@@ -501,66 +501,18 @@ void BytecodeGenerator::visitIfStatement(const std::shared_ptr<AST::IfStatement>
 
 void BytecodeGenerator::visitForStatement(const std::shared_ptr<AST::ForStatement>& stmt) {
     // Generate bytecode for for statement
-    
-    // Start loop scope
-    emit(Opcode::BEGIN_SCOPE, stmt->line);
+
     loopBreakPatches.emplace_back();
     
-    if (stmt->isIterableLoop) {
-        // Iterable-based for loop
-        
-        // Evaluate iterable
-        visitExpression(stmt->iterable);
-        
-        // Get iterator
-        emit(Opcode::GET_ITERATOR, stmt->line);
-        
-        // Start of loop
-        size_t loopStartIndex = bytecode.size();
-        loopStartAddresses.push_back(loopStartIndex);
-        loopContinueAddresses.push_back(loopStartIndex); // Continue jumps to the loop condition check
-
-        // Check if iterator has next
-        emit(Opcode::ITERATOR_HAS_NEXT, stmt->line);
-        
-        // Jump to end if no more items
-        size_t jumpToEndIndex = bytecode.size();
-        emit(Opcode::JUMP_IF_FALSE, stmt->line);
-        
-        // Get next item(s) from iterator
-        if (stmt->loopVars.size() == 1) {
-            // Single variable (key or value)
-            emit(Opcode::ITERATOR_NEXT, stmt->line);
-            emit(Opcode::STORE_VAR, stmt->line, 0, 0.0f, false, stmt->loopVars[0]);
-        } else if (stmt->loopVars.size() == 2) {
-            // Two variables (key and value)
-            emit(Opcode::ITERATOR_NEXT_KEY_VALUE, stmt->line);
-            emit(Opcode::STORE_VAR, stmt->line, 0, 0.0f, false, stmt->loopVars[0]); // Store key
-            emit(Opcode::STORE_VAR, stmt->line, 0, 0.0f, false, stmt->loopVars[1]); // Store value
-        }
-        
-        // Process loop body
-        visitStatement(stmt->body);
-        
-        // Jump back to start of loop
-        emit(Opcode::JUMP, stmt->line, static_cast<int32_t>(loopStartIndex) - static_cast<int32_t>(bytecode.size()) - 1);
-        
-        // Update jump to end instruction
-        size_t endIndex = bytecode.size();
-        bytecode[jumpToEndIndex].intValue = static_cast<int32_t>(endIndex - jumpToEndIndex - 1);
-
-        // Patch break statements
-        for (size_t patchAddr : loopBreakPatches.back()) {
-            bytecode[patchAddr].intValue = endIndex - patchAddr - 1;
-        }
-    } else {
+ 
         // Traditional for loop
         
         // Process initializer if it exists
         if (stmt->initializer) {
             visitStatement(stmt->initializer);
         }
-        
+        // Begin loop scope (for loop variable and body)
+        emit(Opcode::BEGIN_SCOPE, stmt->line);
         // Start of loop
         size_t loopStartIndex = bytecode.size();
         loopStartAddresses.push_back(loopStartIndex);
@@ -612,13 +564,13 @@ void BytecodeGenerator::visitForStatement(const std::shared_ptr<AST::ForStatemen
         for (size_t patchAddr : loopBreakPatches.back()) {
             bytecode[patchAddr].intValue = endIndex - patchAddr - 1;
         }
-    }
+
+        // End loop scope
+        emit(Opcode::END_SCOPE, stmt->line);
+
     
     // End loop scope
     loopBreakPatches.pop_back();
-    loopStartAddresses.pop_back();
-    loopContinueAddresses.pop_back();
-    emit(Opcode::END_SCOPE, stmt->line);
 }
 
 void BytecodeGenerator::visitWhileStatement(const std::shared_ptr<AST::WhileStatement>& stmt) {
@@ -638,7 +590,9 @@ void BytecodeGenerator::visitWhileStatement(const std::shared_ptr<AST::WhileStat
     emit(Opcode::JUMP_IF_FALSE, stmt->line);
     
     // Process loop body
+    emit(Opcode::BEGIN_SCOPE, stmt->line);
     visitStatement(stmt->body);
+    emit(Opcode::END_SCOPE, stmt->line);
     
     // Jump back to start of loop
     emit(Opcode::JUMP, stmt->line, static_cast<int32_t>(loopStartIndex) - static_cast<int32_t>(bytecode.size()) - 1);
@@ -1660,7 +1614,10 @@ void BytecodeGenerator::visitIterStatement(const std::shared_ptr<AST::IterStatem
     }
     
     // Generate code for the loop body
-    visitStatement(stmt->body);
+    // emit(Opcode::BEGIN_SCOPE, stmt->line);
+    // visitStatement(stmt->body);
+    // emit(Opcode::END_SCOPE, stmt->line);
+        visitStatement(stmt->body);
     
     // Jump back to the start of the loop
     emit(Opcode::JUMP, stmt->line, loopStart - bytecode.size() - 1);

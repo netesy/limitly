@@ -1,15 +1,15 @@
 // Basic module for testing
-var moduleVar = "Hello from basic module";
-var number = 42;
+pub var moduleVar = "Hello from basic module";
+pub var number = 42;
 
-fn greet() {
+pub fn greet() {
     print("Greetings from basic module!");
 }
 
-fn add(a, b) {
+pub fn add(a, b) {
     return a + b;
 }
 
-fn getModuleVar() {
+pub fn getModuleVar() {
     return moduleVar;
 }

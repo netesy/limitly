@@ -3,85 +3,57 @@ Parser: New Unified Parser (CST mode)
 ========================================
 
 === Bytecode ===
-Generated 79 instructions
+Generated 51 instructions
 
-   0: PUSH_STRING          "Starting for loop benchmark..."
-   1: PRINT               
-   2: CALL                 "time"
-   3: STORE_VAR            "startTime"
-   4: PUSH_INT             20000000
-   5: STORE_VAR            "count"
-   6: BEGIN_SCOPE         
-   7: PUSH_INT             0
-   8: STORE_VAR            "i"
-   9: LOAD_VAR             "i"
-  10: LOAD_VAR             "count"
-  11: LESS                
-  12: JUMP_IF_FALSE        11
-  13: JUMP                 7
-  14: LOAD_VAR             "i"
-  15: PUSH_INT             1
-  16: ADD                 
-  17: DUP                 
-  18: STORE_VAR            "i"
-  19: POP                 
-  20: JUMP                 -12
-  21: BEGIN_SCOPE         
-  22: END_SCOPE           
-  23: JUMP                 -10
-  24: END_SCOPE           
-  25: CALL                 "time"
-  26: STORE_VAR            "endTime"
-  27: LOAD_VAR             "endTime"
-  28: LOAD_VAR             "startTime"
-  29: SUBTRACT            
-  30: STORE_VAR            "elapsedTime"
-  31: PUSH_STRING          "For loop elapsed time: "
-  32: LOAD_VAR             "elapsedTime"
-  33: PUSH_STRING         
-  34: CONCAT              
-  35: PUSH_STRING          " seconds"
-  36: INTERPOLATE_STRING  
-  37: PRINT               
-  38: PUSH_STRING         
-  39: PRINT               
-  40: PUSH_STRING          "Starting iterator loop benchmark..."
-  41: PRINT               
-  42: CALL                 "time"
-  43: DUP                 
-  44: STORE_VAR            "startTime"
-  45: POP                 
-  46: PUSH_INT             0
-  47: LOAD_VAR             "count"
-  48: CREATE_RANGE        
-  49: GET_ITERATOR        
-  50: STORE_TEMP          
-  51: LOAD_TEMP           
-  52: ITERATOR_HAS_NEXT   
-  53: JUMP_IF_FALSE        6
-  54: LOAD_TEMP           
-  55: ITERATOR_NEXT       
-  56: STORE_VAR            "i"
-  57: BEGIN_SCOPE         
-  58: END_SCOPE           
-  59: JUMP                 -9
-  60: CLEAR_TEMP          
-  61: CALL                 "time"
-  62: DUP                 
-  63: STORE_VAR            "endTime"
-  64: POP                 
-  65: LOAD_VAR             "endTime"
-  66: LOAD_VAR             "startTime"
-  67: SUBTRACT            
-  68: DUP                 
-  69: STORE_VAR            "elapsedTime"
-  70: POP                 
-  71: PUSH_STRING          "Iterator loop elapsed time: "
-  72: LOAD_VAR             "elapsedTime"
-  73: PUSH_STRING         
-  74: CONCAT              
-  75: PUSH_STRING          " seconds"
-  76: INTERPOLATE_STRING  
-  77: PRINT               
-  78: HALT                
+   0: CALL                 "time"
+   1: STORE_VAR            "startTime"
+   2: PUSH_INT             20000000
+   3: STORE_VAR            "count"
+   4: CALL                 "time"
+   5: STORE_VAR            "endTime"
+   6: LOAD_VAR             "endTime"
+   7: LOAD_VAR             "startTime"
+   8: SUBTRACT            
+   9: STORE_VAR            "elapsedTime"
+  10: PUSH_STRING          "Starting iterator loop benchmark..."
+  11: PRINT               
+  12: CALL                 "time"
+  13: DUP                 
+  14: STORE_VAR            "startTime"
+  15: POP                 
+  16: PUSH_INT             0
+  17: PUSH_INT             20000000
+  18: CREATE_RANGE        
+  19: GET_ITERATOR        
+  20: STORE_TEMP          
+  21: LOAD_TEMP           
+  22: ITERATOR_HAS_NEXT   
+  23: JUMP_IF_FALSE        8
+  24: LOAD_TEMP           
+  25: ITERATOR_NEXT       
+  26: STORE_VAR            "i"
+  27: BEGIN_SCOPE         
+  28: LOAD_VAR             "i"
+  29: PRINT               
+  30: END_SCOPE           
+  31: JUMP                 -11
+  32: CLEAR_TEMP          
+  33: CALL                 "time"
+  34: DUP                 
+  35: STORE_VAR            "endTime"
+  36: POP                 
+  37: LOAD_VAR             "endTime"
+  38: LOAD_VAR             "startTime"
+  39: SUBTRACT            
+  40: DUP                 
+  41: STORE_VAR            "elapsedTime"
+  42: POP                 
+  43: PUSH_STRING          "Iterator loop elapsed time: "
+  44: LOAD_VAR             "elapsedTime"
+  45: PUSH_STRING         
+  46: CONCAT              
+  47: PUSH_STRING          " seconds"
+  48: INTERPOLATE_STRING  
+  49: PRINT               
+  50: HALT                
 
