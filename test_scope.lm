@@ -1,0 +1,23 @@
+// Mixed nested loops (iter + for)
+print("Mixed loops (iter outer, for inner):");
+iter (i in 1..3) {
+    for (var j = 0; j < 5; j += 1) {
+        print("iter-for: ({i}, {j})");
+    }
+}
+
+// Range with expressions
+var start = 2;
+var end = 7;
+print("Range with variables ({start} to {end}):");
+iter (k in start..end) {
+    print("k = {k}");
+}
+
+// For loop with variable scope
+print("Variable scope test: new Issue");
+var outer:int = 100;
+for (var i = 0; i < 4; i += 1) {
+    var inner = i * 10;
+    print("outer: {outer}, inner: {inner}");
+}
