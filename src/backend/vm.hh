@@ -1,5 +1,8 @@
-#ifndef VM_H
-#define VM_H
+#ifndef VM_HH
+#define VM_HH
+
+#include <functional>
+#include <unordered_set>
 
 #include "../common/opcodes.hh"
 #include "../frontend/ast.hh"
