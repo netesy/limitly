@@ -1456,7 +1456,7 @@ void VM::handleStoreVar(const Instruction& instruction) {
     if (debugMode) {
         std::cout << "[DEBUG] STORE_VAR: Successfully stored variable '" << instruction.stringValue << "'" << std::endl;
     }
-    environment->define(instruction.stringValue, value);
+    //environment->define(instruction.stringValue, value);
 }
 
 void VM::handleDefineAtomic(const Instruction& instruction) {
@@ -4930,15 +4930,14 @@ void VM::handleIteratorNextKeyValue(const Instruction& /*unused*/) {
 void VM::handleBeginScope(const Instruction& /*unused*/) {
     region->enterScope();
     // Create a new environment that extends the current one
-  //  environment = std::make_shared<Environment>(environment);
+    environment = std::make_shared<Environment>(environment);
 }
 
 void VM::handleEndScope(const Instruction& /*unused*/) {
-   
     // Restore the previous environment
-    // if (environment && environment->enclosing) {
-    //     environment = environment->enclosing;
-    // }
+    if (environment && environment->enclosing) {
+        environment = environment->enclosing;
+    }
     region->exitScope();
 }
 

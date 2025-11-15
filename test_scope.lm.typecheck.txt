@@ -1,0 +1,6 @@
+Type Checking Results for test_scope.lm
+Parser: New Unified Parser (CST mode)
+========================================
+
+✓ No type errors found
+All visibility rules and type constraints are satisfied.

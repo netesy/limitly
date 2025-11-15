@@ -112,3 +112,352 @@ std::string TupleValue::toString() const {
     oss << ")";
     return oss.str();
 }
+
+bool IteratorValue::hasNext() const {
+    if (type == IteratorType::RANGE) {
+        return (rangeStep > 0) ? (rangeCurrent < rangeEnd) : (rangeCurrent > rangeEnd);
+    }
+    if (!iterable) return false;
+
+    if (type == IteratorType::LIST) {
+        if (auto list = std::get_if<ListValue>(&iterable->data)) {
+            return currentIndex < list->elements.size();
+        }
+    } else if (type == IteratorType::CHANNEL) {
+        // If we already buffered a value, we have next
+        if (hasBuffered) return true;
+
+        // Attempt to receive from the channel (this will block until value or closed)
+        try {
+            if (auto chPtr = std::get_if<std::shared_ptr<Channel<ValuePtr>>>(&iterable->data)) {
+                ValuePtr v;
+                bool ok = (*chPtr)->receive(v);
+                if (ok) {
+                    bufferedValue = v;
+                    hasBuffered = true;
+                    return true;
+                }
+                return false; // channel closed and no value
+            }
+        } catch (...) {
+            return false;
+        }
+    }
+    // Add DICT handling here if needed
+
+    return false;
+}
+
+ValuePtr IteratorValue::next() {
+    if (!hasNext()) {
+        throw std::runtime_error("No more elements in iterator");
+    }
+
+    if (type == IteratorType::RANGE) {
+        // Create value on-demand
+        int64_t value = rangeCurrent;
+        rangeCurrent += rangeStep;
+
+        // OPTIMIZATION: Reuse a single Value object per thread
+        // Note: This is safe because the value is immediately consumed by the VM
+        static thread_local ValuePtr cachedRangeValue = nullptr;
+
+        if (!cachedRangeValue) {
+            // Create initial cached value with correct type
+            auto int64Type = std::make_shared<Type>(TypeTag::Int64);
+            cachedRangeValue = std::make_shared<Value>(int64Type, value);
+        } else {
+            // Reuse existing value by updating data
+            cachedRangeValue->data = value;
+        }
+
+        return cachedRangeValue;
+    }
+
+
+    if (type == IteratorType::LIST) {
+        if (auto list = std::get_if<ListValue>(&iterable->data)) {
+            if (currentIndex < list->elements.size()) {
+                return list->elements[currentIndex++];
+            }
+        }
+        throw std::runtime_error("Invalid list iterator state");
+    } else if (type == IteratorType::CHANNEL) {
+        if (hasBuffered) {
+            auto res = bufferedValue;
+            bufferedValue = nullptr;
+            hasBuffered = false;
+            return res;
+        }
+        // As a fallback, try to receive directly
+        if (auto chPtr = std::get_if<std::shared_ptr<Channel<ValuePtr>>>(&iterable->data)) {
+            ValuePtr v;
+            bool ok = (*chPtr)->receive(v);
+            if (ok) return v;
+            throw std::runtime_error("No more elements in iterator");
+        }
+        throw std::runtime_error("Invalid channel iterator state");
+    }
+    // Add DICT handling here if needed
+
+    throw std::runtime_error("Invalid iterator type");
+}
+
+std::string IteratorValue::toString() const {
+    std::ostringstream oss;
+    oss << "<iterator type=";
+    
+    switch (type) {
+        case IteratorType::LIST:
+            oss << "list";
+            break;
+        case IteratorType::DICT:
+            oss << "dict";
+            break;
+        case IteratorType::CHANNEL:
+            oss << "channel";
+            break;
+        case IteratorType::RANGE:
+            oss << "range";
+            break;
+        default:
+            oss << "unknown";
+    }
+    
+    // Show the iterable content if available
+    if (iterable) {
+        oss << " over=" << iterable->toString();
+    } else if (type == IteratorType::RANGE) {
+        oss << " range=(" << rangeStart << ".." << rangeEnd;
+        if (rangeStep != 1) {
+            oss << " step=" << rangeStep;
+        }
+        oss << ")";
+    }
+    
+    // Show current position
+    if (type == IteratorType::RANGE) {
+        oss << " current=" << rangeCurrent;
+    } else if (iterable) {
+        oss << " index=" << currentIndex;
+        
+        // Show current element if available
+        if (type == IteratorType::LIST) {
+            if (auto list = std::get_if<ListValue>(&iterable->data)) {
+                if (currentIndex < list->elements.size()) {
+                    oss << " current=" << list->elements[currentIndex]->toString();
+                }
+            }
+        } else if (type == IteratorType::DICT) {
+            if (auto dict = std::get_if<DictValue>(&iterable->data)) {
+                size_t i = 0;
+                for (const auto& [key, value] : dict->elements) {
+                    if (i == currentIndex) {
+                        oss << " current=(" << key->toString() << ": " << value->toString() << ")";
+                        break;
+                    }
+                    i++;
+                }
+            }
+        }
+    }
+    
+    if (hasBuffered) {
+        oss << " hasBuffered=true";
+    }
+    
+    oss << ">";
+    return oss.str();
+}
+
+std::string Value::toString() const {
+        std::ostringstream oss;
+        std::visit(overloaded{
+            [&](const std::monostate&) { oss << "nil"; },
+            [&](bool b) { oss << (b ? "true" : "false"); },
+            [&](int8_t i) { oss << static_cast<int>(i); },
+            [&](int16_t i) { oss << i; },
+            [&](int32_t i) { oss << i; },
+            [&](int64_t i) { oss << i; },
+            [&](uint8_t u) { oss << static_cast<unsigned>(u); },
+            [&](uint16_t u) { oss << u; },
+            [&](uint32_t u) { oss << u; },
+            [&](uint64_t u) { oss << u; },
+            [&](float f) { oss << f; },
+            [&](double d) { oss << d; },
+            [&](const std::string& s) { oss << '"' << s << '"'; },
+            [&](const ListValue& lv) {
+                oss << "[";
+                for (size_t i = 0; i < lv.elements.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << lv.elements[i]->toString();
+                }
+                oss << "]";
+            },
+            [&](const DictValue& dv) {
+                oss << "{";
+                bool first = true;
+                for (const auto& [key, value] : dv.elements) {
+                    if (!first) oss << ", ";
+                    first = false;
+                    oss << key->toString() << ": " << value->toString();
+                }
+                oss << "}";
+            },
+            [&](const TupleValue& tv) {
+                oss << tv.toString();
+            },
+            [&](const SumValue& sv) {
+                oss << "Sum(" << sv.activeVariant << ", " << sv.value->toString() << ")";
+            },
+            [&](const EnumValue& ev) { oss << ev.toString(); },
+            [&](const ErrorValue& erv) { oss << erv.toString(); },
+            [&](const UserDefinedValue& udv) {
+                oss << udv.variantName << "{";
+                bool first = true;
+                for (const auto& [field, value] : udv.fields) {
+                    if (!first) oss << ", ";
+                    first = false;
+                    oss << field << ": " << value->toString();
+                }
+                oss << "}";
+            },
+            [&](const IteratorValuePtr& iter) {
+                if (iter) {
+                    oss << iter->toString();
+                } else {
+                    oss << "<null iterator>";
+                }
+            },
+            [&](const std::shared_ptr<Channel<ValuePtr>>&){
+                oss << "<channel>";
+            },
+            [&](const AtomicValue& av) {
+                if (av.inner) {
+                    oss << av.inner->load();
+                } else {
+                    oss << "<atomic(nil)>";
+                }
+            },
+            [&](const ObjectInstancePtr& obj) {
+                oss << "<object>";
+            },
+            [&](const std::shared_ptr<backend::ClassDefinition>&) {
+                oss << "<class>";
+            },
+            [&](const ModuleValue&) {
+                oss << "<module>";
+            },
+            [&](const std::shared_ptr<backend::UserDefinedFunction>&) {
+                oss << "<function>";
+            },
+            [&](const backend::Function& func) {
+                oss << "<function:" << func.name << ">";
+            },
+            [&](const ClosureValue& closure) {
+                oss << closure.toString();
+            }
+        }, data);
+        return oss.str();
+}
+
+std::string Value::getRawString() const {
+        std::ostringstream oss;
+        std::visit(overloaded{
+            [&](const std::monostate&) { oss << "nil"; },
+            [&](bool b) { oss << (b ? "true" : "false"); },
+            [&](int8_t i) { oss << static_cast<int>(i); },
+            [&](int16_t i) { oss << i; },
+            [&](int32_t i) { oss << i; },
+            [&](int64_t i) { oss << i; },
+            [&](uint8_t u) { oss << static_cast<unsigned>(u); },
+            [&](uint16_t u) { oss << u; },
+            [&](uint32_t u) { oss << u; },
+            [&](uint64_t u) { oss << u; },
+            [&](float f) { oss << f; },
+            [&](double d) { oss << d; },
+            [&](const std::string& s) { oss << s; }, // No quotes for raw string
+            [&](const ListValue& lv) {
+                oss << "[";
+                for (size_t i = 0; i < lv.elements.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << lv.elements[i]->getRawString();
+                }
+                oss << "]";
+            },
+            [&](const DictValue& dv) {
+                oss << "{";
+                bool first = true;
+                for (const auto& [key, value] : dv.elements) {
+                    if (!first) oss << ", ";
+                    first = false;
+                    oss << key->getRawString() << ": " << value->getRawString();
+                }
+                oss << "}";
+            },
+            [&](const TupleValue& tv) {
+                oss << "(";
+                for (size_t i = 0; i < tv.elements.size(); ++i) {
+                    if (i > 0) oss << ", ";
+                    oss << tv.elements[i]->getRawString();
+                }
+                oss << ")";
+            },
+            [&](const SumValue& sv) {
+                oss << "Sum(" << sv.activeVariant << ", " << sv.value->getRawString() << ")";
+            },
+            [&](const EnumValue& ev) {
+                oss << ev.toString(); // Use existing enum toString
+            },
+            [&](const ErrorValue& erv) {
+                oss << erv.toString();
+            },
+            [&](const UserDefinedValue& udv) {
+                oss << udv.variantName << "{";
+                bool first = true;
+                for (const auto& [field, value] : udv.fields) {
+                    if (!first) oss << ", ";
+                    first = false;
+                    oss << field << ": " << value->getRawString();
+                }
+                oss << "}";
+            },
+            [&](const IteratorValuePtr& iter) {
+                if (iter) {
+                    oss << iter->toString();
+                } else {
+                    oss << "<null iterator>";
+                }
+            },
+            [&](const std::shared_ptr<Channel<ValuePtr>>&){
+                oss << "<channel>";
+            },
+            [&](const AtomicValue& av) {
+                // Print the current atomic integer value
+                if (av.inner) {
+                    oss << av.inner->load();
+                } else {
+                    oss << "<atomic(nil)>";
+                }
+            },
+            [&](const ObjectInstancePtr& obj) {
+                oss << "<object>";
+            },
+            [&](const std::shared_ptr<backend::ClassDefinition>&) {
+                oss << "<class>";
+            },
+            [&](const ModuleValue&) {
+                oss << "<module>";
+            },
+            [&](const std::shared_ptr<backend::UserDefinedFunction>&) {
+                oss << "<function>";
+            },
+            [&](const backend::Function& func) {
+                oss << "<function:" << func.name << ">";
+            },
+            [&](const ClosureValue& closure) {
+                oss << closure.toString();
+            }
+        }, data);
+        return oss.str();
+}

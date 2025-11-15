@@ -295,6 +295,18 @@ namespace CST {
         // Analysis utilities
         size_t countNodes(const Node* root);
         size_t countTokens(const Node* root);
+
+        // Simple printing utilities
+        namespace Printer {
+
+        // Forward declaration
+        void printNode(const Node* node, std::ostream& out, int indent, bool includeTrivia);
+
+        std::string printCST(const Node* root, bool includeTrivia);
+
+        std::string serializeToJSON(const Node* root);
+
+        } // namespace Printer
         
     } // namespace Utils
 

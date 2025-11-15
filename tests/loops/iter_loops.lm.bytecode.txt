@@ -1,0 +1,233 @@
+Bytecode for tests\loops\iter_loops.lm
+Parser: New Unified Parser (CST mode)
+========================================
+
+=== Bytecode ===
+Generated 225 instructions
+
+   0: PUSH_STRING          "=== Iter Loop Tests ==="
+   1: PRINT               
+   2: PUSH_STRING          "Basic range (1 to 5):"
+   3: PRINT               
+   4: PUSH_INT             1
+   5: PUSH_INT             6
+   6: CREATE_RANGE        
+   7: GET_ITERATOR        
+   8: STORE_TEMP          
+   9: LOAD_TEMP           
+  10: ITERATOR_HAS_NEXT   
+  11: JUMP_IF_FALSE        13
+  12: LOAD_TEMP           
+  13: ITERATOR_NEXT       
+  14: STORE_VAR            "i"
+  15: BEGIN_SCOPE         
+  16: PUSH_STRING          "i = "
+  17: LOAD_VAR             "i"
+  18: PUSH_STRING         
+  19: CONCAT              
+  20: PUSH_STRING         
+  21: INTERPOLATE_STRING  
+  22: PRINT               
+  23: END_SCOPE           
+  24: JUMP                 -16
+  25: CLEAR_TEMP          
+  26: PUSH_STRING          "Range (0 to 3):"
+  27: PRINT               
+  28: PUSH_INT             0
+  29: PUSH_INT             4
+  30: CREATE_RANGE        
+  31: GET_ITERATOR        
+  32: STORE_TEMP          
+  33: LOAD_TEMP           
+  34: ITERATOR_HAS_NEXT   
+  35: JUMP_IF_FALSE        13
+  36: LOAD_TEMP           
+  37: ITERATOR_NEXT       
+  38: STORE_VAR            "x"
+  39: BEGIN_SCOPE         
+  40: PUSH_STRING          "x = "
+  41: LOAD_VAR             "x"
+  42: PUSH_STRING         
+  43: CONCAT              
+  44: PUSH_STRING         
+  45: INTERPOLATE_STRING  
+  46: PRINT               
+  47: END_SCOPE           
+  48: JUMP                 -16
+  49: CLEAR_TEMP          
+  50: PUSH_STRING          "Nested iter loops:"
+  51: PRINT               
+  52: PUSH_INT             1
+  53: PUSH_INT             3
+  54: CREATE_RANGE        
+  55: GET_ITERATOR        
+  56: STORE_TEMP          
+  57: LOAD_TEMP           
+  58: ITERATOR_HAS_NEXT   
+  59: JUMP_IF_FALSE        32
+  60: LOAD_TEMP           
+  61: ITERATOR_NEXT       
+  62: STORE_VAR            "i"
+  63: BEGIN_SCOPE         
+  64: PUSH_INT             10
+  65: PUSH_INT             12
+  66: CREATE_RANGE        
+  67: GET_ITERATOR        
+  68: STORE_TEMP          
+  69: LOAD_TEMP           
+  70: ITERATOR_HAS_NEXT   
+  71: JUMP_IF_FALSE        17
+  72: LOAD_TEMP           
+  73: ITERATOR_NEXT       
+  74: STORE_VAR            "j"
+  75: BEGIN_SCOPE         
+  76: PUSH_STRING          "("
+  77: LOAD_VAR             "i"
+  78: PUSH_STRING         
+  79: CONCAT              
+  80: PUSH_STRING          ", "
+  81: LOAD_VAR             "j"
+  82: PUSH_STRING         
+  83: CONCAT              
+  84: PUSH_STRING          ")"
+  85: INTERPOLATE_STRING  
+  86: PRINT               
+  87: END_SCOPE           
+  88: JUMP                 -20
+  89: CLEAR_TEMP          
+  90: END_SCOPE           
+  91: JUMP                 -35
+  92: CLEAR_TEMP          
+  93: PUSH_STRING          "Mixed loops (for outer, iter inner):"
+  94: PRINT               
+  95: PUSH_INT             0
+  96: STORE_VAR            "i"
+  97: BEGIN_SCOPE         
+  98: LOAD_VAR             "i"
+  99: PUSH_INT             2
+ 100: LESS                
+ 101: JUMP_IF_FALSE        37
+ 102: JUMP                 7
+ 103: LOAD_VAR             "i"
+ 104: PUSH_INT             1
+ 105: ADD                 
+ 106: DUP                 
+ 107: STORE_VAR            "i"
+ 108: POP                 
+ 109: JUMP                 -12
+ 110: BEGIN_SCOPE         
+ 111: PUSH_INT             5
+ 112: PUSH_INT             7
+ 113: CREATE_RANGE        
+ 114: GET_ITERATOR        
+ 115: STORE_TEMP          
+ 116: LOAD_TEMP           
+ 117: ITERATOR_HAS_NEXT   
+ 118: JUMP_IF_FALSE        17
+ 119: LOAD_TEMP           
+ 120: ITERATOR_NEXT       
+ 121: STORE_VAR            "j"
+ 122: BEGIN_SCOPE         
+ 123: PUSH_STRING          "for-iter: ("
+ 124: LOAD_VAR             "i"
+ 125: PUSH_STRING         
+ 126: CONCAT              
+ 127: PUSH_STRING          ", "
+ 128: LOAD_VAR             "j"
+ 129: PUSH_STRING         
+ 130: CONCAT              
+ 131: PUSH_STRING          ")"
+ 132: INTERPOLATE_STRING  
+ 133: PRINT               
+ 134: END_SCOPE           
+ 135: JUMP                 -20
+ 136: CLEAR_TEMP          
+ 137: END_SCOPE           
+ 138: JUMP                 -36
+ 139: END_SCOPE           
+ 140: PUSH_STRING          "Mixed loops (iter outer, for inner):"
+ 141: PRINT               
+ 142: PUSH_INT             1
+ 143: PUSH_INT             3
+ 144: CREATE_RANGE        
+ 145: GET_ITERATOR        
+ 146: STORE_TEMP          
+ 147: LOAD_TEMP           
+ 148: ITERATOR_HAS_NEXT   
+ 149: JUMP_IF_FALSE        36
+ 150: LOAD_TEMP           
+ 151: ITERATOR_NEXT       
+ 152: STORE_VAR            "i"
+ 153: BEGIN_SCOPE         
+ 154: PUSH_INT             0
+ 155: STORE_VAR            "j"
+ 156: BEGIN_SCOPE         
+ 157: LOAD_VAR             "j"
+ 158: PUSH_INT             2
+ 159: LESS                
+ 160: JUMP_IF_FALSE        22
+ 161: JUMP                 7
+ 162: LOAD_VAR             "j"
+ 163: PUSH_INT             1
+ 164: ADD                 
+ 165: DUP                 
+ 166: STORE_VAR            "j"
+ 167: POP                 
+ 168: JUMP                 -12
+ 169: BEGIN_SCOPE         
+ 170: PUSH_STRING          "iter-for: ("
+ 171: LOAD_VAR             "i"
+ 172: PUSH_STRING         
+ 173: CONCAT              
+ 174: PUSH_STRING          ", "
+ 175: LOAD_VAR             "j"
+ 176: PUSH_STRING         
+ 177: CONCAT              
+ 178: PUSH_STRING          ")"
+ 179: INTERPOLATE_STRING  
+ 180: PRINT               
+ 181: END_SCOPE           
+ 182: JUMP                 -21
+ 183: END_SCOPE           
+ 184: END_SCOPE           
+ 185: JUMP                 -39
+ 186: CLEAR_TEMP          
+ 187: PUSH_INT             2
+ 188: STORE_VAR            "start"
+ 189: PUSH_INT             5
+ 190: STORE_VAR            "end"
+ 191: PUSH_STRING          "Range with variables ("
+ 192: LOAD_VAR             "start"
+ 193: PUSH_STRING         
+ 194: CONCAT              
+ 195: PUSH_STRING          " to "
+ 196: LOAD_VAR             "end"
+ 197: PUSH_STRING         
+ 198: CONCAT              
+ 199: PUSH_STRING          "):"
+ 200: INTERPOLATE_STRING  
+ 201: PRINT               
+ 202: LOAD_VAR             "start"
+ 203: LOAD_VAR             "end"
+ 204: CREATE_RANGE        
+ 205: GET_ITERATOR        
+ 206: STORE_TEMP          
+ 207: LOAD_TEMP           
+ 208: ITERATOR_HAS_NEXT   
+ 209: JUMP_IF_FALSE        13
+ 210: LOAD_TEMP           
+ 211: ITERATOR_NEXT       
+ 212: STORE_VAR            "k"
+ 213: BEGIN_SCOPE         
+ 214: PUSH_STRING          "k = "
+ 215: LOAD_VAR             "k"
+ 216: PUSH_STRING         
+ 217: CONCAT              
+ 218: PUSH_STRING         
+ 219: INTERPOLATE_STRING  
+ 220: PRINT               
+ 221: END_SCOPE           
+ 222: JUMP                 -16
+ 223: CLEAR_TEMP          
+ 224: HALT                
+

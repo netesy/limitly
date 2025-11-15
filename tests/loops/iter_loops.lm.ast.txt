@@ -1,0 +1,196 @@
+AST for tests\loops\iter_loops.lm
+Parser: New Unified Parser (CST mode)
+Mode: CST with AST compatibility
+Note: CST nodes were created internally with trivia preservation
+      AST output shown below for compatibility testing
+========================================
+
+AST Dump:
+==========
+PrintStatement:
+  Literal: === Iter Loop Tests ===
+PrintStatement:
+  Literal: Basic range (1 to 5):
+IterStatement:
+  Variables: i
+  Iterable:
+    RangeExpression:
+      Start:
+        Literal: 1
+      End:
+        Literal: 6
+      Inclusive: true
+  Body:
+    BlockStatement:
+      PrintStatement:
+        InterpolatedString:
+          String: "i = "
+          Expression:
+            Variable: i
+          String: ""
+PrintStatement:
+  Literal: Range (0 to 3):
+IterStatement:
+  Variables: x
+  Iterable:
+    RangeExpression:
+      Start:
+        Literal: 0
+      End:
+        Literal: 4
+      Inclusive: true
+  Body:
+    BlockStatement:
+      PrintStatement:
+        InterpolatedString:
+          String: "x = "
+          Expression:
+            Variable: x
+          String: ""
+PrintStatement:
+  Literal: Nested iter loops:
+IterStatement:
+  Variables: i
+  Iterable:
+    RangeExpression:
+      Start:
+        Literal: 1
+      End:
+        Literal: 3
+      Inclusive: true
+  Body:
+    BlockStatement:
+      IterStatement:
+        Variables: j
+        Iterable:
+          RangeExpression:
+            Start:
+              Literal: 10
+            End:
+              Literal: 12
+            Inclusive: true
+        Body:
+          BlockStatement:
+            PrintStatement:
+              InterpolatedString:
+                String: "("
+                Expression:
+                  Variable: i
+                String: ", "
+                Expression:
+                  Variable: j
+                String: ")"
+PrintStatement:
+  Literal: Mixed loops (for outer, iter inner):
+ForStatement (traditional):
+  Initializer:
+    VarDeclaration: [private] i
+      Initializer:
+        Literal: 0
+  Condition:
+    BinaryExpression: <
+      Left:
+        Variable: i
+      Operator: <
+      Right:
+        Literal: 2
+  Increment:
+    Assignment: +=
+      Target: i
+      Value:
+      Literal: 1
+  Body:
+    BlockStatement:
+      IterStatement:
+        Variables: j
+        Iterable:
+          RangeExpression:
+            Start:
+              Literal: 5
+            End:
+              Literal: 7
+            Inclusive: true
+        Body:
+          BlockStatement:
+            PrintStatement:
+              InterpolatedString:
+                String: "for-iter: ("
+                Expression:
+                  Variable: i
+                String: ", "
+                Expression:
+                  Variable: j
+                String: ")"
+PrintStatement:
+  Literal: Mixed loops (iter outer, for inner):
+IterStatement:
+  Variables: i
+  Iterable:
+    RangeExpression:
+      Start:
+        Literal: 1
+      End:
+        Literal: 3
+      Inclusive: true
+  Body:
+    BlockStatement:
+      ForStatement (traditional):
+        Initializer:
+          VarDeclaration: [private] j
+            Initializer:
+              Literal: 0
+        Condition:
+          BinaryExpression: <
+            Left:
+              Variable: j
+            Operator: <
+            Right:
+              Literal: 2
+        Increment:
+          Assignment: +=
+            Target: j
+            Value:
+            Literal: 1
+        Body:
+          BlockStatement:
+            PrintStatement:
+              InterpolatedString:
+                String: "iter-for: ("
+                Expression:
+                  Variable: i
+                String: ", "
+                Expression:
+                  Variable: j
+                String: ")"
+VarDeclaration: [private] start
+  Initializer:
+    Literal: 2
+VarDeclaration: [private] end
+  Initializer:
+    Literal: 5
+PrintStatement:
+  InterpolatedString:
+    String: "Range with variables ("
+    Expression:
+      Variable: start
+    String: " to "
+    Expression:
+      Variable: end
+    String: "):"
+IterStatement:
+  Variables: k
+  Iterable:
+    RangeExpression:
+      Start:
+        Variable: start
+      End:
+        Variable: end
+      Inclusive: true
+  Body:
+    BlockStatement:
+      PrintStatement:
+        InterpolatedString:
+          String: "k = "
+          Expression:
+            Variable: k
+          String: ""

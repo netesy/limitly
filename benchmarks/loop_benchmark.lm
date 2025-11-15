@@ -4,7 +4,7 @@
 print("Starting for loop benchmark...");
 var startTime = time();
 
-var count:int = 200000000;
+var count:int = 2000000000;
 
 for (var i = 0; i < count; i += 1) {
     // Empty loop
@@ -16,7 +16,7 @@ var elapsedTime = endTime - startTime;
 print("For loop elapsed time: {elapsedTime} seconds");
 
 print("");
-// debug(0..20000000);
+debug(0..count);
 print("");
 
 // Test 2: Iterator loop
