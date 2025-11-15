@@ -1,0 +1,175 @@
+Tokens for test_scope.lm
+Parser: New Unified Parser (CST mode)
+Mode: CST with trivia preservation
+========================================
+
+=== Tokens with Trivia ===
+Line 2: PRINT = 'print' [leading: COMMENT_LINE('// Mixed nested loops (iter + for)') NEWLINE('
+') ]
+Line 2: LEFT_PAREN = '('
+Line 2: STRING = '"Mixed loops (iter outer, for inner):"'
+Line 2: RIGHT_PAREN = ')'
+Line 2: SEMICOLON = ';'
+Line 3: ITER = 'iter' [leading: NEWLINE('
+') ]
+Line 3: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 3: IDENTIFIER = 'i'
+Line 3: IN = 'in' [leading: WHITESPACE(' ') ]
+Line 3: NUMBER = '1' [leading: WHITESPACE(' ') ]
+Line 3: RANGE = '..'
+Line 3: NUMBER = '3'
+Line 3: RIGHT_PAREN = ')'
+Line 3: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 4: FOR = 'for' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 4: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 4: VAR = 'var'
+Line 4: IDENTIFIER = 'j' [leading: WHITESPACE(' ') ]
+Line 4: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 4: NUMBER = '0' [leading: WHITESPACE(' ') ]
+Line 4: SEMICOLON = ';'
+Line 4: IDENTIFIER = 'j' [leading: WHITESPACE(' ') ]
+Line 4: LESS = '<' [leading: WHITESPACE(' ') ]
+Line 4: NUMBER = '5' [leading: WHITESPACE(' ') ]
+Line 4: SEMICOLON = ';'
+Line 4: IDENTIFIER = 'j' [leading: WHITESPACE(' ') ]
+Line 4: PLUS_EQUAL = '+=' [leading: WHITESPACE(' ') ]
+Line 4: NUMBER = '1' [leading: WHITESPACE(' ') ]
+Line 4: RIGHT_PAREN = ')'
+Line 4: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 5: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('        ') ]
+Line 5: LEFT_PAREN = '('
+Line 5: INTERPOLATION_START = '"iter-for: ("'
+Line 5: IDENTIFIER = 'i'
+Line 5: INTERPOLATION_END = ''
+Line 5: INTERPOLATION_START = '", "'
+Line 5: IDENTIFIER = 'j'
+Line 5: INTERPOLATION_END = ''
+Line 5: STRING = '")"'
+Line 5: RIGHT_PAREN = ')'
+Line 5: SEMICOLON = ';'
+Line 6: RIGHT_BRACE = '}' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 7: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 10: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Range with expressions') NEWLINE('
+') ]
+Line 10: IDENTIFIER = 'start' [leading: WHITESPACE(' ') ]
+Line 10: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 10: NUMBER = '2' [leading: WHITESPACE(' ') ]
+Line 10: SEMICOLON = ';'
+Line 11: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 11: IDENTIFIER = 'end' [leading: WHITESPACE(' ') ]
+Line 11: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 11: NUMBER = '7' [leading: WHITESPACE(' ') ]
+Line 11: SEMICOLON = ';'
+Line 12: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 12: LEFT_PAREN = '('
+Line 12: INTERPOLATION_START = '"Range with variables ("'
+Line 12: IDENTIFIER = 'start'
+Line 12: INTERPOLATION_END = ''
+Line 12: INTERPOLATION_START = '" to "'
+Line 12: IDENTIFIER = 'end'
+Line 12: INTERPOLATION_END = ''
+Line 12: STRING = '"):"'
+Line 12: RIGHT_PAREN = ')'
+Line 12: SEMICOLON = ';'
+Line 13: ITER = 'iter' [leading: NEWLINE('
+') ]
+Line 13: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 13: IDENTIFIER = 'k'
+Line 13: IN = 'in' [leading: WHITESPACE(' ') ]
+Line 13: IDENTIFIER = 'start' [leading: WHITESPACE(' ') ]
+Line 13: RANGE = '..'
+Line 13: IDENTIFIER = 'end'
+Line 13: RIGHT_PAREN = ')'
+Line 13: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 14: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 14: LEFT_PAREN = '('
+Line 14: INTERPOLATION_START = '"k = "'
+Line 14: IDENTIFIER = 'k'
+Line 14: INTERPOLATION_END = ''
+Line 14: STRING = '""'
+Line 14: RIGHT_PAREN = ')'
+Line 14: SEMICOLON = ';'
+Line 15: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 17: IDENTIFIER = 'debug' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 17: LEFT_PAREN = '('
+Line 17: NUMBER = '0'
+Line 17: RANGE = '..'
+Line 17: NUMBER = '2000'
+Line 17: RIGHT_PAREN = ')'
+Line 17: SEMICOLON = ';'
+Line 18: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 18: LEFT_PAREN = '('
+Line 18: NUMBER = '0'
+Line 18: RANGE = '..'
+Line 18: NUMBER = '2000'
+Line 18: RIGHT_PAREN = ')'
+Line 18: SEMICOLON = ';'
+Line 21: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// For loop with variable scope') NEWLINE('
+') ]
+Line 21: LEFT_PAREN = '('
+Line 21: STRING = '"Variable scope test: new Issue"'
+Line 21: RIGHT_PAREN = ')'
+Line 21: SEMICOLON = ';'
+Line 22: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 22: IDENTIFIER = 'outer' [leading: WHITESPACE(' ') ]
+Line 22: COLON = ':'
+Line 22: INT_TYPE = 'int'
+Line 22: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 22: NUMBER = '100' [leading: WHITESPACE(' ') ]
+Line 22: SEMICOLON = ';'
+Line 23: FOR = 'for' [leading: NEWLINE('
+') ]
+Line 23: LEFT_PAREN = '(' [leading: WHITESPACE(' ') ]
+Line 23: VAR = 'var'
+Line 23: IDENTIFIER = 'i' [leading: WHITESPACE(' ') ]
+Line 23: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 23: NUMBER = '0' [leading: WHITESPACE(' ') ]
+Line 23: SEMICOLON = ';'
+Line 23: IDENTIFIER = 'i' [leading: WHITESPACE(' ') ]
+Line 23: LESS = '<' [leading: WHITESPACE(' ') ]
+Line 23: NUMBER = '4' [leading: WHITESPACE(' ') ]
+Line 23: SEMICOLON = ';'
+Line 23: IDENTIFIER = 'i' [leading: WHITESPACE(' ') ]
+Line 23: PLUS_EQUAL = '+=' [leading: WHITESPACE(' ') ]
+Line 23: NUMBER = '1' [leading: WHITESPACE(' ') ]
+Line 23: RIGHT_PAREN = ')'
+Line 23: LEFT_BRACE = '{' [leading: WHITESPACE(' ') ]
+Line 24: VAR = 'var' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 24: IDENTIFIER = 'inner' [leading: WHITESPACE(' ') ]
+Line 24: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 24: IDENTIFIER = 'i' [leading: WHITESPACE(' ') ]
+Line 24: STAR = '*' [leading: WHITESPACE(' ') ]
+Line 24: NUMBER = '10' [leading: WHITESPACE(' ') ]
+Line 24: SEMICOLON = ';'
+Line 25: PRINT = 'print' [leading: NEWLINE('
+') WHITESPACE('    ') ]
+Line 25: LEFT_PAREN = '('
+Line 25: INTERPOLATION_START = '"outer: "'
+Line 25: IDENTIFIER = 'outer'
+Line 25: INTERPOLATION_END = ''
+Line 25: INTERPOLATION_START = '", inner: "'
+Line 25: IDENTIFIER = 'inner'
+Line 25: INTERPOLATION_END = ''
+Line 25: STRING = '""'
+Line 25: RIGHT_PAREN = ')'
+Line 25: SEMICOLON = ';'
+Line 26: RIGHT_BRACE = '}' [leading: NEWLINE('
+') ]
+Line 26: EOF_TOKEN = ''

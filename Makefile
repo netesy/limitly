@@ -13,7 +13,7 @@ else
     PLATFORM := linux
     EXE_EXT :=
     CXX := g++
-    CXXFLAGS := -std=c++17 -Wall -Wextra -pedantic -I.
+    CXXFLAGS := -std=c++17 -O2 -Wall -Wextra -pedantic -I.
     LDFLAGS += -L/usr/lib/gcc/x86_64-linux-gnu/12
     LIBS :=
 endif
@@ -24,10 +24,12 @@ BIN_DIR := bin
 TARGETS := limitly$(EXE_EXT) test_parser$(EXE_EXT)
 
 # Sources
-COMMON_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp src/common/debugger.cpp
-BACKEND_COMMON_SRCS := src/backend/backend.cpp src/backend/functions.cpp src/backend/classes.cpp src/backend/ast_printer.cpp src/backend/bytecode_printer.cpp src/backend/type_checker.cpp
+FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp src/common/debugger.cpp src/frontend/cst.cpp src/frontend/cst_printer.cpp src/frontend/cst_utils.cpp src/frontend/ast_builder.cpp
+BACK_SRCS := src/backend/vm.cpp
+COMMON_SRCS := src/common/builtin_functions.cpp
+BACKEND_COMMON_SRCS := src/backend/backend.cpp src/backend/value.cpp src/backend/ast_printer.cpp src/backend/bytecode_printer.cpp src/backend/functions.cpp src/backend/closure_impl.cpp src/backend/classes.cpp src/backend/type_checker.cpp src/backend/function_types.cpp 
 ERROR_SRCS := src/error/error_formatter.cpp src/error/error_code_generator.cpp src/error/contextual_hint_provider.cpp src/error/source_code_formatter.cpp src/error/console_formatter.cpp src/error/error_catalog.cpp
-CST_SRCS := src/frontend/cst.cpp src/frontend/cst_printer.cpp src/frontend/cst_utils.cpp src/frontend/cst_utils_simple.cpp src/frontend/ast_builder.cpp
+CST_SRCS := src/frontend/cst.cpp src/frontend/cst_printer.cpp src/frontend/cst_utils.cpp src/frontend/ast_builder.cpp
 
 # Platform-specific concurrency sources
 ifeq ($(PLATFORM),windows)
@@ -36,8 +38,9 @@ else
     CONCURRENCY_SRCS := src/backend/concurrency/scheduler.cpp src/backend/concurrency/thread_pool.cpp src/backend/concurrency/event_loop.cpp src/backend/concurrency/epoll_event_loop.cpp src/backend/concurrency/concurrency_runtime.cpp src/backend/concurrency/task_vm.cpp
 endif
 
-MAIN_SRCS := src/main.cpp src/backend/vm.cpp $(BACKEND_COMMON_SRCS) $(COMMON_SRCS) $(CONCURRENCY_SRCS) src/backend/closure_impl.cpp src/common/builtin_functions.cpp $(ERROR_SRCS) $(CST_SRCS)
-TEST_SRCS := src/test_parser.cpp $(CST_SRCS) $(BACKEND_COMMON_SRCS) $(COMMON_SRCS) $(ERROR_SRCS)
+MAIN_SRCS := src/main.cpp $(BACKEND_COMMON_SRCS) $(BACK_SRCS) $(COMMON_SRCS) $(CONCURRENCY_SRCS) $(ERROR_SRCS) $(FRONT_SRCS)
+
+TEST_SRCS := src/test_parser.cpp $(BACKEND_COMMON_SRCS) $(ERROR_SRCS) $(FRONT_SRCS)
 
 # Objects
 OBJ_DIR := obj
@@ -64,10 +67,10 @@ endif
 # Build rules
 # =============================
 limitly$(EXE_EXT): $(MAIN_OBJS) | $(BIN_DIR)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $(BIN_DIR)/$@ $^ $(LIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $(BIN_DIR)/$@ $\ $(LIBS)
 
 test_parser$(EXE_EXT): $(TEST_OBJS) | $(BIN_DIR)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $(BIN_DIR)/$@ $^ $(LIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $(BIN_DIR)/$@ $\ $(LIBS)
 
 
 $(OBJ_DIR)/%.o: %.cpp | $(OBJ_DIR)
@@ -125,10 +128,20 @@ endif
 # Platform-specific builds using build script commands
 # =============================
 
-# Windows build using build.bat
+# Windows build 
 windows:
-	@echo "🔨 Building for Windows using build.bat..."
-	./build.bat
+	@echo "🔨 Building for Windows ..."
+	@echo "Compiling main executable..."
+
+	g++ -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -lws2_32 -static-libgcc -static-libstdc++ -o $(BIN_DIR)/limitly.exe \
+    $(MAIN_SRCS) 
+	@echo "✅ limitly built successfully."
+	
+	@echo "Compiling test parser..."
+
+	g++ -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -lws2_32 -static-libgcc -static-libstdc++ -o $(BIN_DIR)/test_parser.exe $(TEST_SRCS)	
+	@echo "✅ test_parser built successfully."
+
 	@echo ""
 	@echo "Available executables:"
 	@echo "  bin/limitly.exe      - Main language interpreter"
@@ -141,63 +154,14 @@ linux: | $(BIN_DIR)
 	@command -v g++ >/dev/null || (echo "Error: g++ not found." && exit 1)
 	@echo "✅ All dependencies found."
 	
-	@echo "Compiling debugger..."
-	g++ -std=c++17 -Wall -Wextra -pedantic -c -o $(BIN_DIR)/debugger.o src/common/debugger.cpp -I.
-	
 	@echo "Compiling main executable..."
 	g++ -std=c++17 -Wall -Wextra -pedantic -I. -o $(BIN_DIR)/limitly \
-		src/main.cpp \
-		src/frontend/scanner.cpp \
-		src/frontend/parser.cpp \
-		src/frontend/cst.cpp \
-		src/frontend/cst_printer.cpp \
-		src/frontend/cst_utils.cpp \
-		src/backend/backend.cpp \
-		src/backend/vm.cpp \
-		src/backend/ast_printer.cpp \
-		src/backend/bytecode_printer.cpp \
-		src/backend/functions.cpp \
-		src/backend/closure_impl.cpp \
-		src/backend/classes.cpp \
-		src/backend/type_checker.cpp \
-		src/backend/concurrency/scheduler.cpp \
-		src/backend/concurrency/thread_pool.cpp \
-		src/backend/concurrency/event_loop.cpp \
-		src/backend/concurrency/epoll_event_loop.cpp \
-		src/backend/concurrency/concurrency_runtime.cpp \
-		src/common/builtin_functions.cpp \
-		src/error/error_formatter.cpp \
-		src/error/error_code_generator.cpp \
-		src/error/contextual_hint_provider.cpp \
-		src/error/source_code_formatter.cpp \
-		src/error/console_formatter.cpp \
-		src/error/error_catalog.cpp \
-		$(BIN_DIR)/debugger.o
+    $(MAIN_SRCS) 
 	@echo "✅ limitly built successfully."
 	
 	@echo "Compiling test parser..."
 	g++ -std=c++17 -Wall -Wextra -pedantic -I. -o $(BIN_DIR)/test_parser \
-		src/test_parser.cpp \
-		src/frontend/scanner.cpp \
-		src/frontend/parser.cpp \
-		src/frontend/cst.cpp \
-		src/frontend/cst_printer.cpp \
-		src/frontend/cst_utils.cpp \
-		src/frontend/ast_builder.cpp \
-		src/backend/type_checker.cpp \
-		src/backend/backend.cpp \
-		src/backend/ast_printer.cpp \
-		src/backend/bytecode_printer.cpp \
-		src/backend/functions.cpp \
-		src/backend/closure_impl.cpp \
-		src/backend/classes.cpp \
-		src/error/error_formatter.cpp \
-		src/error/error_code_generator.cpp \
-		src/error/contextual_hint_provider.cpp \
-		src/error/source_code_formatter.cpp \
-		src/error/console_formatter.cpp \
-		src/error/error_catalog.cpp \
-		$(BIN_DIR)/debugger.o
+    $(TEST_SRCS)	
 	@echo "✅ test_parser built successfully."
 	
 	@echo "Cleaning up object file..."
@@ -220,8 +184,8 @@ help:
 	@echo "  test_parser$(EXE_EXT)       - Build parser testing utility"
 	@echo "  clean                        - Clean build artifacts (obj/, bin/)"
 	@echo "  clear                        - Clear generated .txt files (.ast, .bytecode, .cst, .tokens)"
-	@echo "  windows                      - Build using build.bat commands (Windows only)"
-	@echo "  linux                        - Build using build.sh commands (Linux only)"
+	@echo "  windows                      - Build (Windows only)"
+	@echo "  linux                        - Build (Linux only)"
 	@echo "  check-deps                   - Check build dependencies"
 	@echo ""
 	@echo "Platform: $(PLATFORM)"

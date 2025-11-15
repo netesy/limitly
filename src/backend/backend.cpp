@@ -1571,6 +1571,9 @@ void BytecodeGenerator::visitRangeExpr(const std::shared_ptr<AST::RangeExpr>& ex
 }
 
 void BytecodeGenerator::visitIterStatement(const std::shared_ptr<AST::IterStatement>& stmt) {
+    // Set up loop context for nested loops
+    loopBreakPatches.emplace_back();
+    
     // Allocate a unique temporary variable for this iterator
     int iteratorTempIndex = tempVarCounter++;
     
@@ -1585,6 +1588,11 @@ void BytecodeGenerator::visitIterStatement(const std::shared_ptr<AST::IterStatem
     
     // Start of loop
     size_t loopStart = bytecode.size();
+    loopStartAddresses.push_back(loopStart);
+    
+    // Continue target: check if iterator has next value
+    size_t continueStart = bytecode.size();
+    loopContinueAddresses.push_back(continueStart);
     
     // Check if iterator has next value
     emit(Opcode::LOAD_TEMP, stmt->line, iteratorTempIndex);
@@ -1624,6 +1632,14 @@ void BytecodeGenerator::visitIterStatement(const std::shared_ptr<AST::IterStatem
     
     // Update the jump to end of loop with the correct offset
     bytecode[jumpToEnd].intValue = bytecode.size() - jumpToEnd - 1;
+    
+    // Patch break statements
+    for (size_t patchAddr : loopBreakPatches.back()) {
+        bytecode[patchAddr].intValue = bytecode.size() - patchAddr - 1;
+    }
+    loopBreakPatches.pop_back();
+    loopStartAddresses.pop_back();
+    loopContinueAddresses.pop_back();
     
     // Clean up the temporary iterator
     emit(Opcode::CLEAR_TEMP, stmt->line, iteratorTempIndex);

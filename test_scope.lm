@@ -14,6 +14,9 @@ iter (k in start..end) {
     print("k = {k}");
 }
 
+debug(0..2000);
+print(0..2000);
+
 // For loop with variable scope
 print("Variable scope test: new Issue");
 var outer:int = 100;
