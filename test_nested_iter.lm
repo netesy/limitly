@@ -16,7 +16,7 @@ iter (var x in outer_list) {
 // Test break/continue in nested loops
 print("Testing break/continue in nested loops:");
 iter (var i in [1, 2, 3, 4, 5]) {
-    if( i == 3) {
+    if( i == 4) {
         break;
     }
     print("Before inner: {i}");

@@ -355,6 +355,31 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                 ip++;
                 continue;
             }
+
+                // Enhanced debug output for iterator operations
+    if (debugMode && (instruction.opcode == Opcode::LOAD_TEMP || 
+                      instruction.opcode == Opcode::CLEAR_TEMP ||
+                      instruction.opcode == Opcode::ITERATOR_HAS_NEXT ||
+                      instruction.opcode == Opcode::JUMP)) {
+        std::cout << "[DEBUG] IP=" << ip << " Opcode=" << BytecodePrinter::opcodeToString(instruction.opcode)
+                  << " tempValues.size()=" << tempValues.size()
+                  << " stack.size()=" << stack.size() << std::endl;
+        
+        if (instruction.opcode == Opcode::JUMP) {
+            size_t targetIP = ip + 1 + instruction.intValue;
+            std::cout << "[DEBUG] JUMP: current IP=" << ip 
+                      << ", offset=" << instruction.intValue
+                      << ", target IP=" << targetIP
+                      << ", bytecode.size()=" << bytecodeRef.size() << std::endl;
+            
+            // Bounds check
+            if (targetIP >= bytecodeRef.size()) {
+                std::cout << "[ERROR] JUMP would go out of bounds!" << std::endl;
+                error("Jump instruction would exceed bytecode bounds");
+                break;
+            }
+        }
+    }
             
             // Don't skip task definition instructions - let them execute normally in main thread
             // The tasks will execute the same bytecode but with their own loop variables
@@ -1502,6 +1527,11 @@ void VM::handleStoreTemp(const Instruction& instruction) {
     }
     
     tempValues[index] = pop();
+        if (debugMode) {
+        std::cout << "[DEBUG] STORE_TEMP: Stored at index " << index 
+                  
+                  << ", tempValues.size(): " << tempValues.size() << std::endl;
+    }
 }
 
 void VM::handleLoadTemp(const Instruction& instruction) {
@@ -1512,7 +1542,10 @@ void VM::handleLoadTemp(const Instruction& instruction) {
         error("Invalid temporary variable index: " + std::to_string(index));
         return;
     }
-    
+        if (debugMode) {
+        std::cout << "[DEBUG] LOAD_TEMP: Loading from index " << index 
+                  << ", tempValues.size(): " << tempValues.size() << std::endl;
+    }
     push(tempValues[index]);
 }
 
@@ -1522,6 +1555,10 @@ void VM::handleClearTemp(const Instruction& instruction) {
     
     if (index >= 0 && index < static_cast<int>(tempValues.size())) {
         tempValues[index] = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
+    }
+    if (debugMode) {
+        std::cout << "[DEBUG] CLEAR_TEMP: Cleared at index " << index 
+                  << ", tempValues.size(): " << tempValues.size() << std::endl;
     }
 }
 
@@ -2363,8 +2400,28 @@ void VM::handleConcat(const Instruction& /*unused*/) {
 }
 
 void VM::handleJump(const Instruction& instruction) {
-    (void)instruction; // Mark as unused
-    ip += instruction.intValue;
+    int64_t offset = instruction.intValue;
+    size_t newIP = ip + offset;
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] handleJump: current IP=" << ip 
+                  << ", offset=" << offset
+                  << ", new IP will be=" << newIP
+                  << " (after main loop increment: " << (newIP + 1) << ")"
+                  << ", bytecode size=" << bytecode->size() << std::endl;
+    }
+
+    // Bounds check before jumping
+    if (newIP >= bytecode->size()) {
+        error("Jump instruction would exceed bytecode bounds (IP=" + std::to_string(ip) + 
+              ", offset=" + std::to_string(offset) + 
+              ", would jump to=" + std::to_string(newIP) + 
+              ", bytecode size=" + std::to_string(bytecode->size()) + ")");
+        return;
+    }
+    
+    // Update IP after bounds check
+    ip = newIP;
 }
 
 void VM::handleJumpIfTrue(const Instruction& instruction) {
@@ -4935,8 +4992,18 @@ void VM::handleBeginScope(const Instruction& /*unused*/) {
 
 void VM::handleEndScope(const Instruction& /*unused*/) {
     // Restore the previous environment
+    if (debugMode) {
+        std::cout << "[DEBUG] END_SCOPE: Current environment = " << (environment ? "valid" : "null") 
+                  << ", has enclosing = " << (environment && environment->enclosing ? "yes" : "no") << std::endl;
+    }
+    
+    // Restore the previous environment
     if (environment && environment->enclosing) {
         environment = environment->enclosing;
+    } else if (!environment) {
+        error("END_SCOPE: environment is null");
+    } else if (!environment->enclosing) {
+        error("END_SCOPE: no enclosing environment to restore (scope mismatch)");
     }
     region->exitScope();
 }
