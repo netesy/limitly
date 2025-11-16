@@ -1,6 +1,0 @@
-Type Checking Results for tests\loops\iter_loops.lm
-Parser: New Unified Parser (CST mode)
-========================================
-
-✓ No type errors found
-All visibility rules and type constraints are satisfied.
