@@ -1585,7 +1585,7 @@ void BytecodeGenerator::visitIterStatement(const std::shared_ptr<AST::IterStatem
     
     // Store the iterator in a temporary variable
     emit(Opcode::STORE_TEMP, stmt->line, iteratorTempIndex);
-    
+  
     // Start of loop
     size_t loopStart = bytecode.size();
     loopStartAddresses.push_back(loopStart);
@@ -1622,13 +1622,10 @@ void BytecodeGenerator::visitIterStatement(const std::shared_ptr<AST::IterStatem
     }
     
     // Generate code for the loop body
-    // emit(Opcode::BEGIN_SCOPE, stmt->line);
-    // visitStatement(stmt->body);
-    // emit(Opcode::END_SCOPE, stmt->line);
-        visitStatement(stmt->body);
+    visitStatement(stmt->body);
     
     // Jump back to the start of the loop
-    emit(Opcode::JUMP, stmt->line, loopStart - bytecode.size() - 1);
+    emit(Opcode::JUMP, stmt->line, static_cast<int32_t>(loopStart) - static_cast<int32_t>(bytecode.size()) - 1);
     
     // Update the jump to end of loop with the correct offset
     bytecode[jumpToEnd].intValue = bytecode.size() - jumpToEnd - 1;
