@@ -75,10 +75,8 @@ all: check-deps windows
 # =============================
 check-deps:
 ifeq ($(PLATFORM),windows)
-	@if not exist "$(MSYS2_PATH)" (echo "Error: MSYS2 not found at $(MSYS2_PATH)" && exit 1)
-	@if not exist "$(CXX)" (echo "Error: g++ not found in MSYS2" && exit 1)
-else
-	@command -v $(CXX) >/dev/null || (echo "Error: g++ not found." && exit 1)
+	@powershell -Command "if (-not (Test-Path '$(MSYS2_PATH)')) { Write-Error 'MSYS2 not found at $(MSYS2_PATH)'; exit 1 }"
+	@powershell -Command "if (-not (Test-Path '$(CXX)')) { Write-Error 'g++ not found in MSYS2'; exit 1 }"
 endif
 	@echo "✅ Dependencies OK for $(PLATFORM) in $(MODE) mode."
 
@@ -149,9 +147,9 @@ debug:
 # =============================
 clean:
 ifeq ($(PLATFORM),windows)
-	@cmd /c "if exist $(OBJ_DIR) rmdir /s /q $(OBJ_DIR)"
-	@cmd /c "if exist $(BIN_DIR) (cd $(BIN_DIR) && del /q *.exe 2>nul)"
-	@cmd /c "if exist $(RSP_DIR) rmdir /s /q $(RSP_DIR)"
+	@powershell -Command "if (Test-Path 'obj') { Remove-Item -Recurse -Force 'obj' }"
+	@powershell -Command "if (Test-Path 'rsp') { Remove-Item -Recurse -Force 'rsp' }"
+	@powershell -Command "if (Test-Path 'bin') { Remove-Item -Recurse -Force 'bin\*.exe' }"
 else
 	rm -rf $(OBJ_DIR) $(BIN_DIR) $(RSP_DIR)
 endif
