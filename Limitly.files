@@ -1,7 +1,3 @@
-build/CMakeFiles/3.28.0-rc4/CompilerIdC/CMakeCCompilerId.c
-build/CMakeFiles/3.28.0-rc4/CompilerIdCXX/CMakeCXXCompilerId.cpp
-build/Desktop_x86_windows_msys_pe_64bit-Release/CMakeFiles/3.28.0-rc4/CompilerIdC/CMakeCCompilerId.c
-build/Desktop_x86_windows_msys_pe_64bit-Release/CMakeFiles/3.28.0-rc4/CompilerIdCXX/CMakeCXXCompilerId.cpp
 src/backend/ast_printer.cpp
 src/backend/ast_printer.hh
 src/backend/backend.cpp

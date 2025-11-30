@@ -21,9 +21,9 @@ endif
 # =============================
 MODE ?= release
 ifeq ($(MODE),debug)
-    CXXFLAGS := -std=c++17 -g -Wall -Wextra -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+    CXXFLAGS := -std=c++17 -g -Wall -Wextra -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++) -Wl,--stack,16777216
 else
-    CXXFLAGS := -std=c++17 -O2 -Wall -Wextra -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+    CXXFLAGS := -std=c++17 -O3 -Wall -Wextra -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++) -Wl,--stack,16777216
 endif
 
 # =============================
