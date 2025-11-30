@@ -6,7 +6,7 @@ class Person {
     var name:str;
     var age:int;
      
-    fn init(name, age) {
+    fn init(name:str, age:int) {
         self.name = name;
         self.age = age;
     }
@@ -38,7 +38,7 @@ class Rectangle {
     var width:int = 0;
     var height:int = 0;
 
-    fn init(width, height) {
+    fn init(width:int, height:int) {
         self.width = width;
         self.height = height;
     }

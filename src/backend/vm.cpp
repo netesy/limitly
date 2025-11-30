@@ -37,38 +37,38 @@ struct ErrorValue;
 // Required for std::get with variants
 #if __cplusplus >= 201703L
 namespace std {
-    template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
-    template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 }
 #endif
 
 // Helper function to convert TypeTag to string
 static std::string typeTagToString(TypeTag tag) {
     switch (tag) {
-        case TypeTag::Nil: return "Nil";
-        case TypeTag::Bool: return "Bool";
-        case TypeTag::Int: return "Int";
-        case TypeTag::Int8: return "Int8";
-        case TypeTag::Int16: return "Int16";
-        case TypeTag::Int32: return "Int32";
-        case TypeTag::Int64: return "Int64";
-        case TypeTag::UInt: return "UInt";
-        case TypeTag::UInt8: return "UInt8";
-        case TypeTag::UInt16: return "UInt16";
-        case TypeTag::UInt32: return "UInt32";
-        case TypeTag::UInt64: return "UInt64";
-        case TypeTag::Float32: return "Float32";
-        case TypeTag::Float64: return "Float64";
-        case TypeTag::String: return "String";
-        case TypeTag::List: return "List";
-        case TypeTag::Dict: return "Dict";
-        case TypeTag::Enum: return "Enum";
-        case TypeTag::Function: return "Function";
-        case TypeTag::Any: return "Any";
-        case TypeTag::Sum: return "Sum";
-        case TypeTag::Union: return "Union";
-        case TypeTag::UserDefined: return "UserDefined";
-        default: return "Unknown";
+    case TypeTag::Nil: return "Nil";
+    case TypeTag::Bool: return "Bool";
+    case TypeTag::Int: return "Int";
+    case TypeTag::Int8: return "Int8";
+    case TypeTag::Int16: return "Int16";
+    case TypeTag::Int32: return "Int32";
+    case TypeTag::Int64: return "Int64";
+    case TypeTag::UInt: return "UInt";
+    case TypeTag::UInt8: return "UInt8";
+    case TypeTag::UInt16: return "UInt16";
+    case TypeTag::UInt32: return "UInt32";
+    case TypeTag::UInt64: return "UInt64";
+    case TypeTag::Float32: return "Float32";
+    case TypeTag::Float64: return "Float64";
+    case TypeTag::String: return "String";
+    case TypeTag::List: return "List";
+    case TypeTag::Dict: return "Dict";
+    case TypeTag::Enum: return "Enum";
+    case TypeTag::Function: return "Function";
+    case TypeTag::Any: return "Any";
+    case TypeTag::Sum: return "Sum";
+    case TypeTag::Union: return "Union";
+    case TypeTag::UserDefined: return "UserDefined";
+    default: return "Unknown";
     }
 }
 
@@ -77,12 +77,12 @@ int VM::matchCounter = 0;
 // VM implementation
 // VMUserDefinedFunction implementation
 VMUserDefinedFunction::VMUserDefinedFunction(VM* vmInstance, const std::shared_ptr<AST::FunctionDeclaration>& decl, 
-                                           size_t start, size_t end)
+                                             size_t start, size_t end)
     : backend::UserDefinedFunction(decl), vm(vmInstance), startAddress(start), endAddress(end) {
 }
 
 VMUserDefinedFunction::VMUserDefinedFunction(VM* vmInstance, const std::shared_ptr<AST::AsyncFunctionDeclaration>& decl,
-                                           size_t start, size_t end)
+                                             size_t start, size_t end)
     : backend::UserDefinedFunction(decl), vm(vmInstance), startAddress(start), endAddress(end) {
 }
 
@@ -101,8 +101,8 @@ VM::VM(bool create_runtime)
       environment(globals),
       bytecode(nullptr),
       ip(0),
-    debugMode(false),
-    debugOutput(false),
+      debugMode(false),
+      debugOutput(false),
       isPreProcessing(false),
       currentClassBeingDefined(""),
       insideClassDefinition(false),
@@ -115,49 +115,49 @@ VM::VM(bool create_runtime)
 
 
     
-        // Register a native function for channel creation
-        registerNativeFunction("channel", [this](const std::vector<ValuePtr>& args) -> ValuePtr {
-                // Create a new Channel<ValuePtr> and wrap it in a VM value
-                auto ch = std::make_shared<Channel<ValuePtr>>();
-                // Use ANY_TYPE for now as channel's type
-                return memoryManager.makeRef<Value>(*region, typeSystem->ANY_TYPE, ch);
-        });
+    // Register a native function for channel creation
+    registerNativeFunction("channel", [this](const std::vector<ValuePtr>& args) -> ValuePtr {
+        // Create a new Channel<ValuePtr> and wrap it in a VM value
+        auto ch = std::make_shared<Channel<ValuePtr>>();
+        // Use ANY_TYPE for now as channel's type
+        return memoryManager.makeRef<Value>(*region, typeSystem->ANY_TYPE, ch);
+    });
 
-        // Register free functions for channel operations
-        registerNativeFunction("send", [this](const std::vector<ValuePtr>& args) -> ValuePtr {
-            if (args.size() != 2) throw std::runtime_error("send(channel, value) expects 2 args");
-            auto chVal = args[0];
-            if (!std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(chVal->data)) {
-                throw std::runtime_error("First argument to send must be a channel");
-            }
-            auto ch = std::get<std::shared_ptr<Channel<ValuePtr>>>(chVal->data);
-            ch->send(args[1]);
-            return memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
-        });
+    // Register free functions for channel operations
+    registerNativeFunction("send", [this](const std::vector<ValuePtr>& args) -> ValuePtr {
+        if (args.size() != 2) throw std::runtime_error("send(channel, value) expects 2 args");
+        auto chVal = args[0];
+        if (!std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(chVal->data)) {
+            throw std::runtime_error("First argument to send must be a channel");
+        }
+        auto ch = std::get<std::shared_ptr<Channel<ValuePtr>>>(chVal->data);
+        ch->send(args[1]);
+        return memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
+    });
 
-        registerNativeFunction("receive", [this](const std::vector<ValuePtr>& args) -> ValuePtr {
-            if (args.size() != 1) throw std::runtime_error("receive(channel) expects 1 arg");
-            auto chVal = args[0];
-            if (!std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(chVal->data)) {
-                throw std::runtime_error("Argument to receive must be a channel");
-            }
-            auto ch = std::get<std::shared_ptr<Channel<ValuePtr>>>(chVal->data);
-            ValuePtr v;
-            bool ok = ch->receive(v);
-            if (!ok) return memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
-            return v;
-        });
+    registerNativeFunction("receive", [this](const std::vector<ValuePtr>& args) -> ValuePtr {
+        if (args.size() != 1) throw std::runtime_error("receive(channel) expects 1 arg");
+        auto chVal = args[0];
+        if (!std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(chVal->data)) {
+            throw std::runtime_error("Argument to receive must be a channel");
+        }
+        auto ch = std::get<std::shared_ptr<Channel<ValuePtr>>>(chVal->data);
+        ValuePtr v;
+        bool ok = ch->receive(v);
+        if (!ok) return memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
+        return v;
+    });
 
-        registerNativeFunction("close", [this](const std::vector<ValuePtr>& args) -> ValuePtr {
-            if (args.size() != 1) throw std::runtime_error("close(channel) expects 1 arg");
-            auto chVal = args[0];
-            if (!std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(chVal->data)) {
-                throw std::runtime_error("Argument to close must be a channel");
-            }
-            auto ch = std::get<std::shared_ptr<Channel<ValuePtr>>>(chVal->data);
-            ch->close();
-            return memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
-        });
+    registerNativeFunction("close", [this](const std::vector<ValuePtr>& args) -> ValuePtr {
+        if (args.size() != 1) throw std::runtime_error("close(channel) expects 1 arg");
+        auto chVal = args[0];
+        if (!std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(chVal->data)) {
+            throw std::runtime_error("Argument to close must be a channel");
+        }
+        auto ch = std::get<std::shared_ptr<Channel<ValuePtr>>>(chVal->data);
+        ch->close();
+        return memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
+    });
     
     // Register builtin functions with enhanced error handling and performance optimization
     try {
@@ -174,7 +174,7 @@ VM::VM(bool create_runtime)
         }
         
         if (debugMode) {
-            std::cout << "[DEBUG] Successfully registered " << builtinNames.size() 
+            std::cout << "[DEBUG] Successfully registered " << builtinNames.size()
                       << " builtin functions in global environment" << std::endl;
         }
     } catch (const std::exception& e) {
@@ -285,8 +285,8 @@ void VM::registerVMBuiltinFunction(const std::string& name, std::function<ValueP
 }
 
 ValuePtr VM::execute(const std::vector<Instruction>& code) {
-                if (debugMode) {
-    std::cout << "[DEBUG] VM::execute() called with " << code.size() << " instructions" << std::endl;
+    if (debugMode) {
+        std::cout << "[DEBUG] VM::execute() called with " << code.size() << " instructions" << std::endl;
     }
     this->bytecode = &code;
     ip = 0;
@@ -302,9 +302,9 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
             const Instruction& instruction = bytecodeRef[ip];
             
             // Add debug output for function execution
-            if (debugMode && (instruction.opcode == Opcode::CALL || instruction.opcode == Opcode::RETURN || 
-                             instruction.opcode == Opcode::BEGIN_FUNCTION || instruction.opcode == Opcode::END_FUNCTION)) {
-                std::cout << "[DEBUG] EXEC: IP=" << ip << " Opcode=" << static_cast<int>(instruction.opcode) 
+            if (debugMode && (instruction.opcode == Opcode::CALL || instruction.opcode == Opcode::RETURN ||
+                              instruction.opcode == Opcode::BEGIN_FUNCTION || instruction.opcode == Opcode::END_FUNCTION)) {
+                std::cout << "[DEBUG] EXEC: IP=" << ip << " Opcode=" << static_cast<int>(instruction.opcode)
                           << " CallStack=" << callStack.size() << " ExecutionCount=" << executionCount << std::endl;
             }
             
@@ -337,18 +337,18 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
             
             // Skip execution if we're inside a function definition (except for function definition and parameter instructions)
             // Use the stack-based approach for better nested function support
-            if (isInsideFunctionDefinition() && 
-                instruction.opcode != Opcode::END_FUNCTION &&
-                instruction.opcode != Opcode::BEGIN_FUNCTION &&
-                instruction.opcode != Opcode::DEFINE_PARAM &&
-                instruction.opcode != Opcode::DEFINE_OPTIONAL_PARAM &&
-                instruction.opcode != Opcode::SET_DEFAULT_VALUE &&
-                // Allow default value expressions to be evaluated
-                instruction.opcode != Opcode::PUSH_STRING &&
-                instruction.opcode != Opcode::PUSH_INT &&
-                instruction.opcode != Opcode::PUSH_FLOAT &&
-                instruction.opcode != Opcode::PUSH_BOOL &&
-                instruction.opcode != Opcode::PUSH_NULL) {
+            if (isInsideFunctionDefinition() &&
+                    instruction.opcode != Opcode::END_FUNCTION &&
+                    instruction.opcode != Opcode::BEGIN_FUNCTION &&
+                    instruction.opcode != Opcode::DEFINE_PARAM &&
+                    instruction.opcode != Opcode::DEFINE_OPTIONAL_PARAM &&
+                    instruction.opcode != Opcode::SET_DEFAULT_VALUE &&
+                    // Allow default value expressions to be evaluated
+                    instruction.opcode != Opcode::PUSH_STRING &&
+                    instruction.opcode != Opcode::PUSH_INT &&
+                    instruction.opcode != Opcode::PUSH_FLOAT &&
+                    instruction.opcode != Opcode::PUSH_BOOL &&
+                    instruction.opcode != Opcode::PUSH_NULL) {
                 if (debugMode) {
                     std::cout << "[DEBUG] Skipping instruction at IP " << ip << ": " << static_cast<int>(instruction.opcode) << std::endl;
                 }
@@ -356,30 +356,30 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                 continue;
             }
 
-                // Enhanced debug output for iterator operations
-    if (debugMode && (instruction.opcode == Opcode::LOAD_TEMP || 
-                      instruction.opcode == Opcode::CLEAR_TEMP ||
-                      instruction.opcode == Opcode::ITERATOR_HAS_NEXT ||
-                      instruction.opcode == Opcode::JUMP)) {
-        std::cout << "[DEBUG] IP=" << ip << " Opcode=" << BytecodePrinter::opcodeToString(instruction.opcode)
-                  << " tempValues.size()=" << tempValues.size()
-                  << " stack.size()=" << stack.size() << std::endl;
-        
-        if (instruction.opcode == Opcode::JUMP) {
-            size_t targetIP = ip + 1 + instruction.intValue;
-            std::cout << "[DEBUG] JUMP: current IP=" << ip 
-                      << ", offset=" << instruction.intValue
-                      << ", target IP=" << targetIP
-                      << ", bytecode.size()=" << bytecodeRef.size() << std::endl;
-            
-            // Bounds check
-            if (targetIP >= bytecodeRef.size()) {
-                std::cout << "[ERROR] JUMP would go out of bounds!" << std::endl;
-                error("Jump instruction would exceed bytecode bounds");
-                break;
+            // Enhanced debug output for iterator operations
+            if (debugMode && (instruction.opcode == Opcode::LOAD_TEMP ||
+                              instruction.opcode == Opcode::CLEAR_TEMP ||
+                              instruction.opcode == Opcode::ITERATOR_HAS_NEXT ||
+                              instruction.opcode == Opcode::JUMP)) {
+                std::cout << "[DEBUG] IP=" << ip << " Opcode=" << BytecodePrinter::opcodeToString(instruction.opcode)
+                          << " tempValues.size()=" << tempValues.size()
+                          << " stack.size()=" << stack.size() << std::endl;
+
+                if (instruction.opcode == Opcode::JUMP) {
+                    size_t targetIP = ip + 1 + instruction.intValue;
+                    std::cout << "[DEBUG] JUMP: current IP=" << ip
+                              << ", offset=" << instruction.intValue
+                              << ", target IP=" << targetIP
+                              << ", bytecode.size()=" << bytecodeRef.size() << std::endl;
+
+                    // Bounds check
+                    if (targetIP >= bytecodeRef.size()) {
+                        std::cout << "[ERROR] JUMP would go out of bounds!" << std::endl;
+                        error("Jump instruction would exceed bytecode bounds");
+                        break;
+                    }
+                }
             }
-        }
-    }
             
             // Don't skip task definition instructions - let them execute normally in main thread
             // The tasks will execute the same bytecode but with their own loop variables
@@ -390,369 +390,369 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
             
             try {
                 switch (instruction.opcode) {
-                    case Opcode::PUSH_INT:
-                        handlePushInt(instruction);
-                        break;
-                    case Opcode::PUSH_FLOAT:
-                        handlePushFloat(instruction);
-                        break;
-                    case Opcode::PUSH_STRING:
-                        handlePushString(instruction);
-                        break;
-                    case Opcode::PUSH_BOOL:
-                        handlePushBool(instruction);
-                        break;
-                    case Opcode::PUSH_NULL:
-                        handlePushNull(instruction);
-                        break;
-                    case Opcode::POP:
-                        handlePop(instruction);
-                        break;
-                    case Opcode::DUP:
-                        handleDup(instruction);
-                        break;
-                    case Opcode::SWAP:
-                        handleSwap(instruction);
-                        break;
-                    case Opcode::STORE_VAR:
-                        handleStoreVar(instruction);
-                        break;
-                    case Opcode::LOAD_VAR:
-                        handleLoadVar(instruction);
-                        break;
-                    case Opcode::STORE_TEMP:
-                        handleStoreTemp(instruction);
-                        break;
-                    case Opcode::LOAD_TEMP:
-                        handleLoadTemp(instruction);
-                        break;
-                    case Opcode::CLEAR_TEMP:
-                        handleClearTemp(instruction);
-                        break;
-                    case Opcode::ADD:
-                        handleAdd(instruction);
-                        break;
-                    case Opcode::SUBTRACT:
-                        handleSubtract(instruction);
-                        break;
-                    case Opcode::MULTIPLY:
-                        handleMultiply(instruction);
-                        break;
-                    case Opcode::DIVIDE:
-                        handleDivide(instruction);
-                        break;
-                    case Opcode::MODULO:
-                        handleModulo(instruction);
-                        break;
-                    case Opcode::NEGATE:
-                        handleNegate(instruction);
-                        break;
-                    case Opcode::EQUAL:
-                        handleEqual(instruction);
-                        break;
-                    case Opcode::NOT_EQUAL:
-                        handleNotEqual(instruction);
-                        break;
-                    case Opcode::LESS:
-                        handleLess(instruction);
-                        break;
-                    case Opcode::LESS_EQUAL:
-                        handleLessEqual(instruction);
-                        break;
-                    case Opcode::GREATER:
-                        handleGreater(instruction);
-                        break;
-                    case Opcode::GREATER_EQUAL:
-                        handleGreaterEqual(instruction);
-                        break;
-                    case Opcode::AND:
-                        handleAnd(instruction);
-                        break;
-                    case Opcode::OR:
-                        handleOr(instruction);
-                        break;
-                    case Opcode::NOT:
-                        handleNot(instruction);
-                        break;
-                    case Opcode::INTERPOLATE_STRING:
-                        handleInterpolateString(instruction);
-                        break;
-                    case Opcode::CONCAT:
-                        handleConcat(instruction);
-                        break;
-                    case Opcode::JUMP:
-                        handleJump(instruction);
-                        break;
-                    case Opcode::JUMP_IF_TRUE:
-                        handleJumpIfTrue(instruction);
-                        break;
-                    case Opcode::JUMP_IF_FALSE:
-                        handleJumpIfFalse(instruction);
-                        break;
-                    case Opcode::CALL:
-                        handleCall(instruction);
-                        break;
-                    case Opcode::RETURN:
-                        handleReturn(instruction);
-                        break;
-                    case Opcode::BEGIN_FUNCTION:
-                        handleBeginFunction(instruction);
-                        break;
-                    case Opcode::END_FUNCTION:
-                        handleEndFunction(instruction);
-                        break;
-                    case Opcode::DEFINE_PARAM:
-                        handleDefineParam(instruction);
-                        break;
-                    case Opcode::DEFINE_OPTIONAL_PARAM:
-                        handleDefineOptionalParam(instruction);
-                        break;
-                    case Opcode::SET_DEFAULT_VALUE:
-                        handleSetDefaultValue(instruction);
-                        break;
-                    case Opcode::PUSH_FUNCTION:
-                        handlePushFunction(instruction);
-                        break;
-                    case Opcode::PRINT:
-                        handlePrint(instruction);
-                        break;
-                    case Opcode::CONTRACT:
-                        handleContract(instruction);
-                        break;
-                    case Opcode::CREATE_LIST:
-                        handleCreateList(instruction);
-                        break;
-                    case Opcode::LIST_APPEND:
-                        handleListAppend(instruction);
-                        break;
-                    case Opcode::CREATE_TUPLE:
-                        handleCreateTuple(instruction);
-                        break;
-                    case Opcode::CREATE_DICT:
-                        handleCreateDict(instruction);
-                        break;
-                    case Opcode::DICT_SET:
-                        handleDictSet(instruction);
-                        break;
-                    case Opcode::GET_INDEX:
-                        handleGetIndex(instruction);
-                        break;
-                    case Opcode::SET_INDEX:
-                        handleSetIndex(instruction);
-                        break;
-                    case Opcode::CREATE_RANGE:
-                        handleCreateRange(instruction);
-                        break;
-                    case Opcode::GET_ITERATOR:
-                        handleGetIterator(instruction);
-                        break;
-                    case Opcode::ITERATOR_HAS_NEXT:
-                        handleIteratorHasNext(instruction);
-                        break;
-                    case Opcode::ITERATOR_NEXT:
-                        handleIteratorNext(instruction);
-                        break;
-                    case Opcode::ITERATOR_NEXT_KEY_VALUE:
-                        handleIteratorNextKeyValue(instruction);
-                        break;
-                    case Opcode::BEGIN_CLASS:
-                        handleBeginClass(instruction);
-                        break;
-                    case Opcode::END_CLASS:
-                        handleEndClass(instruction);
-                        break;
-                    case Opcode::SET_SUPERCLASS:
-                        handleSetSuperclass(instruction);
-                        break;
-                    case Opcode::DEFINE_FIELD:
-                        handleDefineField(instruction);
-                        break;
-                    case Opcode::DEFINE_ATOMIC:
-                        handleDefineAtomic(instruction);
-                        break;
-                    case Opcode::LOAD_THIS:
-                        handleLoadThis(instruction);
-                        break;
-                    case Opcode::LOAD_SUPER:
-                        handleLoadSuper(instruction);
-                        break;
-                    case Opcode::GET_PROPERTY:
-                        handleGetProperty(instruction);
-                        break;
-                    case Opcode::SET_PROPERTY:
-                        handleSetProperty(instruction);
-                        break;
-                    case Opcode::BEGIN_SCOPE:
-                        handleBeginScope(instruction);
-                        break;
-                    case Opcode::END_SCOPE:
-                        handleEndScope(instruction);
-                        break;
-                    case Opcode::MATCH_PATTERN:
-                        handleMatchPattern(instruction);
-                        break;
-                    case Opcode::BEGIN_PARALLEL:
-                        handleBeginParallel(instruction);
-                        break;
-                    case Opcode::END_PARALLEL:
-                        handleEndParallel(instruction);
-                        break;
-                    case Opcode::BEGIN_CONCURRENT:
-                        handleBeginConcurrent(instruction);
-                        break;
-                    case Opcode::END_CONCURRENT:
-                        handleEndConcurrent(instruction);
-                        break;
-                        case Opcode::AWAIT:
-                            handleAwait(instruction);
-                            break;
-                        case Opcode::IMPORT_MODULE:
-                            handleImportModule(instruction);
-                            break;
-                        case Opcode::IMPORT_ALIAS:
-                            handleImportAlias(instruction);
-                            break;
-                        case Opcode::IMPORT_FILTER_SHOW:
-                            handleImportFilterShow(instruction);
-                            break;
-                        case Opcode::IMPORT_FILTER_HIDE:
-                            handleImportFilterHide(instruction);
-                            break;
-                        case Opcode::IMPORT_ADD_IDENTIFIER:
-                            handleImportAddIdentifier(instruction);
-                            break;
-                        case Opcode::IMPORT_EXECUTE:
-                            handleImportExecute(instruction);
-                            break;
-                        case Opcode::BEGIN_ENUM:
-                            handleBeginEnum(instruction);
-                            break;
-                        case Opcode::END_ENUM:
-                            handleEndEnum(instruction);
-                            break;
-                        case Opcode::DEFINE_ENUM_VARIANT:
-                            handleDefineEnumVariant(instruction);
-                            break;
-                        case Opcode::DEFINE_ENUM_VARIANT_WITH_TYPE:
-                            handleDefineEnumVariantWithType(instruction);
-                            break;
-                        case Opcode::DEBUG_PRINT:
-                            handleDebugPrint(instruction);
-                            break;
-                        case Opcode::CHECK_ERROR:
-                            handleCheckError(instruction);
-                            break;
-                        case Opcode::PROPAGATE_ERROR:
-                            handlePropagateError(instruction);
-                            break;
-                        case Opcode::CONSTRUCT_ERROR:
-                            handleConstructError(instruction);
-                            break;
-                        case Opcode::CONSTRUCT_OK:
-                            handleConstructOk(instruction);
-                            break;
-                        case Opcode::IS_ERROR:
-                            handleIsError(instruction);
-                            break;
-                        case Opcode::IS_SUCCESS:
-                             handleIsSuccess(instruction);
-                             break;    
-                        case Opcode::UNWRAP_VALUE:
-                             handleUnwrapValue(instruction);
-                              break;         
-                        case Opcode::BREAK:
-                          //  handleBreak(instruction);
-                            break;
-                        case Opcode::CONTINUE:
-                         //   handleContinue(instruction);
-                            break;    
-                        case Opcode::SET_RANGE_STEP:
-                           // handleSetRangeStep(instruction);
-                            break;
-                        case Opcode::BEGIN_TASK:
-                            handleBeginTask(instruction);
-                            break;    
-                        case Opcode::END_TASK:
-                            handleEndTask(instruction);
-                            break;    
-                        case Opcode::BEGIN_WORKER:
-                           // handleBeginWorker(instruction);
-                            break;    
-                        case Opcode::END_WORKER:
-                           // handleEndWorker(instruction);
-                            break;    
-                        case Opcode::STORE_ITERABLE:
-                            handleStoreIterable(instruction);
-                            break;    
-                        case Opcode::LOAD_CONST :
-                           // handleLoadConst(instruction);
-                            break;      
-                        case Opcode::STORE_CONST:
-                           // handleStoreConst(instruction);
-                            break;      
-                        case Opcode::LOAD_MEMBER:
-                            //handleLoadMember(instruction);
-                            break;      
-                        case Opcode::STORE_MEMBER:
-                          //  handleStoreMember(instruction);
-                            break;
-                         
-                        case Opcode::CREATE_CLOSURE:
-                            handleCreateClosure(instruction);
-                            break;
-                        case Opcode::CAPTURE_VAR:
-                            if (debugMode) {
-                                std::cout << "[DEBUG] MAIN LOOP: Executing CAPTURE_VAR at IP " << ip << std::endl;
-                            }
-                            handleCaptureVar(instruction);
-                            break;
-                        case Opcode::CALL_CLOSURE:
-                            handleCallClosure(instruction);
-                            break;
-                        case Opcode::PUSH_LAMBDA:
-                            if (debugMode) {
-                            std::cout << "[DEBUG] About to execute PUSH_LAMBDA for: " << instruction.stringValue << std::endl;
-                            std::cout << "[DEBUG] Registry state before PUSH_LAMBDA:" << std::endl;
-                            for (const auto& [name, func] : userDefinedFunctions) {
-                                if (name.find("__lambda_") == 0) {
-                                    std::cout << "[DEBUG]   " << name << ": startAddress=" << func.startAddress 
-                                              << ", endAddress=" << func.endAddress << std::endl;
-                                }
-                            }                                                     
+                case Opcode::PUSH_INT:
+                    handlePushInt(instruction);
+                    break;
+                case Opcode::PUSH_FLOAT:
+                    handlePushFloat(instruction);
+                    break;
+                case Opcode::PUSH_STRING:
+                    handlePushString(instruction);
+                    break;
+                case Opcode::PUSH_BOOL:
+                    handlePushBool(instruction);
+                    break;
+                case Opcode::PUSH_NULL:
+                    handlePushNull(instruction);
+                    break;
+                case Opcode::POP:
+                    handlePop(instruction);
+                    break;
+                case Opcode::DUP:
+                    handleDup(instruction);
+                    break;
+                case Opcode::SWAP:
+                    handleSwap(instruction);
+                    break;
+                case Opcode::STORE_VAR:
+                    handleStoreVar(instruction);
+                    break;
+                case Opcode::LOAD_VAR:
+                    handleLoadVar(instruction);
+                    break;
+                case Opcode::STORE_TEMP:
+                    handleStoreTemp(instruction);
+                    break;
+                case Opcode::LOAD_TEMP:
+                    handleLoadTemp(instruction);
+                    break;
+                case Opcode::CLEAR_TEMP:
+                    handleClearTemp(instruction);
+                    break;
+                case Opcode::ADD:
+                    handleAdd(instruction);
+                    break;
+                case Opcode::SUBTRACT:
+                    handleSubtract(instruction);
+                    break;
+                case Opcode::MULTIPLY:
+                    handleMultiply(instruction);
+                    break;
+                case Opcode::DIVIDE:
+                    handleDivide(instruction);
+                    break;
+                case Opcode::MODULO:
+                    handleModulo(instruction);
+                    break;
+                case Opcode::NEGATE:
+                    handleNegate(instruction);
+                    break;
+                case Opcode::EQUAL:
+                    handleEqual(instruction);
+                    break;
+                case Opcode::NOT_EQUAL:
+                    handleNotEqual(instruction);
+                    break;
+                case Opcode::LESS:
+                    handleLess(instruction);
+                    break;
+                case Opcode::LESS_EQUAL:
+                    handleLessEqual(instruction);
+                    break;
+                case Opcode::GREATER:
+                    handleGreater(instruction);
+                    break;
+                case Opcode::GREATER_EQUAL:
+                    handleGreaterEqual(instruction);
+                    break;
+                case Opcode::AND:
+                    handleAnd(instruction);
+                    break;
+                case Opcode::OR:
+                    handleOr(instruction);
+                    break;
+                case Opcode::NOT:
+                    handleNot(instruction);
+                    break;
+                case Opcode::INTERPOLATE_STRING:
+                    handleInterpolateString(instruction);
+                    break;
+                case Opcode::CONCAT:
+                    handleConcat(instruction);
+                    break;
+                case Opcode::JUMP:
+                    handleJump(instruction);
+                    break;
+                case Opcode::JUMP_IF_TRUE:
+                    handleJumpIfTrue(instruction);
+                    break;
+                case Opcode::JUMP_IF_FALSE:
+                    handleJumpIfFalse(instruction);
+                    break;
+                case Opcode::CALL:
+                    handleCall(instruction);
+                    break;
+                case Opcode::RETURN:
+                    handleReturn(instruction);
+                    break;
+                case Opcode::BEGIN_FUNCTION:
+                    handleBeginFunction(instruction);
+                    break;
+                case Opcode::END_FUNCTION:
+                    handleEndFunction(instruction);
+                    break;
+                case Opcode::DEFINE_PARAM:
+                    handleDefineParam(instruction);
+                    break;
+                case Opcode::DEFINE_OPTIONAL_PARAM:
+                    handleDefineOptionalParam(instruction);
+                    break;
+                case Opcode::SET_DEFAULT_VALUE:
+                    handleSetDefaultValue(instruction);
+                    break;
+                case Opcode::PUSH_FUNCTION:
+                    handlePushFunction(instruction);
+                    break;
+                case Opcode::PRINT:
+                    handlePrint(instruction);
+                    break;
+                case Opcode::CONTRACT:
+                    handleContract(instruction);
+                    break;
+                case Opcode::CREATE_LIST:
+                    handleCreateList(instruction);
+                    break;
+                case Opcode::LIST_APPEND:
+                    handleListAppend(instruction);
+                    break;
+                case Opcode::CREATE_TUPLE:
+                    handleCreateTuple(instruction);
+                    break;
+                case Opcode::CREATE_DICT:
+                    handleCreateDict(instruction);
+                    break;
+                case Opcode::DICT_SET:
+                    handleDictSet(instruction);
+                    break;
+                case Opcode::GET_INDEX:
+                    handleGetIndex(instruction);
+                    break;
+                case Opcode::SET_INDEX:
+                    handleSetIndex(instruction);
+                    break;
+                case Opcode::CREATE_RANGE:
+                    handleCreateRange(instruction);
+                    break;
+                case Opcode::GET_ITERATOR:
+                    handleGetIterator(instruction);
+                    break;
+                case Opcode::ITERATOR_HAS_NEXT:
+                    handleIteratorHasNext(instruction);
+                    break;
+                case Opcode::ITERATOR_NEXT:
+                    handleIteratorNext(instruction);
+                    break;
+                case Opcode::ITERATOR_NEXT_KEY_VALUE:
+                    handleIteratorNextKeyValue(instruction);
+                    break;
+                case Opcode::BEGIN_CLASS:
+                    handleBeginClass(instruction);
+                    break;
+                case Opcode::END_CLASS:
+                    handleEndClass(instruction);
+                    break;
+                case Opcode::SET_SUPERCLASS:
+                    handleSetSuperclass(instruction);
+                    break;
+                case Opcode::DEFINE_FIELD:
+                    handleDefineField(instruction);
+                    break;
+                case Opcode::DEFINE_ATOMIC:
+                    handleDefineAtomic(instruction);
+                    break;
+                case Opcode::LOAD_THIS:
+                    handleLoadThis(instruction);
+                    break;
+                case Opcode::LOAD_SUPER:
+                    handleLoadSuper(instruction);
+                    break;
+                case Opcode::GET_PROPERTY:
+                    handleGetProperty(instruction);
+                    break;
+                case Opcode::SET_PROPERTY:
+                    handleSetProperty(instruction);
+                    break;
+                case Opcode::BEGIN_SCOPE:
+                    handleBeginScope(instruction);
+                    break;
+                case Opcode::END_SCOPE:
+                    handleEndScope(instruction);
+                    break;
+                case Opcode::MATCH_PATTERN:
+                    handleMatchPattern(instruction);
+                    break;
+                case Opcode::BEGIN_PARALLEL:
+                    handleBeginParallel(instruction);
+                    break;
+                case Opcode::END_PARALLEL:
+                    handleEndParallel(instruction);
+                    break;
+                case Opcode::BEGIN_CONCURRENT:
+                    handleBeginConcurrent(instruction);
+                    break;
+                case Opcode::END_CONCURRENT:
+                    handleEndConcurrent(instruction);
+                    break;
+                case Opcode::AWAIT:
+                    handleAwait(instruction);
+                    break;
+                case Opcode::IMPORT_MODULE:
+                    handleImportModule(instruction);
+                    break;
+                case Opcode::IMPORT_ALIAS:
+                    handleImportAlias(instruction);
+                    break;
+                case Opcode::IMPORT_FILTER_SHOW:
+                    handleImportFilterShow(instruction);
+                    break;
+                case Opcode::IMPORT_FILTER_HIDE:
+                    handleImportFilterHide(instruction);
+                    break;
+                case Opcode::IMPORT_ADD_IDENTIFIER:
+                    handleImportAddIdentifier(instruction);
+                    break;
+                case Opcode::IMPORT_EXECUTE:
+                    handleImportExecute(instruction);
+                    break;
+                case Opcode::BEGIN_ENUM:
+                    handleBeginEnum(instruction);
+                    break;
+                case Opcode::END_ENUM:
+                    handleEndEnum(instruction);
+                    break;
+                case Opcode::DEFINE_ENUM_VARIANT:
+                    handleDefineEnumVariant(instruction);
+                    break;
+                case Opcode::DEFINE_ENUM_VARIANT_WITH_TYPE:
+                    handleDefineEnumVariantWithType(instruction);
+                    break;
+                case Opcode::DEBUG_PRINT:
+                    handleDebugPrint(instruction);
+                    break;
+                case Opcode::CHECK_ERROR:
+                    handleCheckError(instruction);
+                    break;
+                case Opcode::PROPAGATE_ERROR:
+                    handlePropagateError(instruction);
+                    break;
+                case Opcode::CONSTRUCT_ERROR:
+                    handleConstructError(instruction);
+                    break;
+                case Opcode::CONSTRUCT_OK:
+                    handleConstructOk(instruction);
+                    break;
+                case Opcode::IS_ERROR:
+                    handleIsError(instruction);
+                    break;
+                case Opcode::IS_SUCCESS:
+                    handleIsSuccess(instruction);
+                    break;
+                case Opcode::UNWRAP_VALUE:
+                    handleUnwrapValue(instruction);
+                    break;
+                case Opcode::BREAK:
+                    //  handleBreak(instruction);
+                    break;
+                case Opcode::CONTINUE:
+                    //   handleContinue(instruction);
+                    break;
+                case Opcode::SET_RANGE_STEP:
+                    // handleSetRangeStep(instruction);
+                    break;
+                case Opcode::BEGIN_TASK:
+                    handleBeginTask(instruction);
+                    break;
+                case Opcode::END_TASK:
+                    handleEndTask(instruction);
+                    break;
+                case Opcode::BEGIN_WORKER:
+                    // handleBeginWorker(instruction);
+                    break;
+                case Opcode::END_WORKER:
+                    // handleEndWorker(instruction);
+                    break;
+                case Opcode::STORE_ITERABLE:
+                    handleStoreIterable(instruction);
+                    break;
+                case Opcode::LOAD_CONST :
+                    // handleLoadConst(instruction);
+                    break;
+                case Opcode::STORE_CONST:
+                    // handleStoreConst(instruction);
+                    break;
+                case Opcode::LOAD_MEMBER:
+                    //handleLoadMember(instruction);
+                    break;
+                case Opcode::STORE_MEMBER:
+                    //  handleStoreMember(instruction);
+                    break;
 
+                case Opcode::CREATE_CLOSURE:
+                    handleCreateClosure(instruction);
+                    break;
+                case Opcode::CAPTURE_VAR:
+                    if (debugMode) {
+                        std::cout << "[DEBUG] MAIN LOOP: Executing CAPTURE_VAR at IP " << ip << std::endl;
+                    }
+                    handleCaptureVar(instruction);
+                    break;
+                case Opcode::CALL_CLOSURE:
+                    handleCallClosure(instruction);
+                    break;
+                case Opcode::PUSH_LAMBDA:
+                    if (debugMode) {
+                        std::cout << "[DEBUG] About to execute PUSH_LAMBDA for: " << instruction.stringValue << std::endl;
+                        std::cout << "[DEBUG] Registry state before PUSH_LAMBDA:" << std::endl;
+                        for (const auto& [name, func] : userDefinedFunctions) {
+                            if (name.find("__lambda_") == 0) {
+                                std::cout << "[DEBUG]   " << name << ": startAddress=" << func.startAddress
+                                          << ", endAddress=" << func.endAddress << std::endl;
                             }
-                            handlePushLambda(instruction);
-                            break;
-                        case Opcode::PUSH_FUNCTION_REF:
-                            handlePushFunctionRef(instruction);
-                            break;
-                        case Opcode::CALL_HIGHER_ORDER:
-                            handleCallHigherOrder(instruction);
-                            break;
-                        case Opcode::CREATE_UNION:
-                            handleCreateUnion(instruction);
-                            break;
-                        case Opcode::GET_UNION_VARIANT:
-                            handleGetUnionVariant(instruction);
-                            break;
-                        case Opcode::CHECK_UNION_TYPE:
-                            handleCheckUnionType(instruction);
-                            break;
-                        case Opcode::SET_UNION_VARIANT:
-                            handleSetUnionVariant(instruction);
-                            break;
-                        case Opcode::HALT:
-                            return stack.empty() ? memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE) : stack.back();
-                        default:
-                            error("Unknown opcode: " + std::to_string(static_cast<int>(instruction.opcode)));
-                            break;        
-     
+                        }
+
+                    }
+                    handlePushLambda(instruction);
+                    break;
+                case Opcode::PUSH_FUNCTION_REF:
+                    handlePushFunctionRef(instruction);
+                    break;
+                case Opcode::CALL_HIGHER_ORDER:
+                    handleCallHigherOrder(instruction);
+                    break;
+                case Opcode::CREATE_UNION:
+                    handleCreateUnion(instruction);
+                    break;
+                case Opcode::GET_UNION_VARIANT:
+                    handleGetUnionVariant(instruction);
+                    break;
+                case Opcode::CHECK_UNION_TYPE:
+                    handleCheckUnionType(instruction);
+                    break;
+                case Opcode::SET_UNION_VARIANT:
+                    handleSetUnionVariant(instruction);
+                    break;
+                case Opcode::HALT:
+                    return stack.empty() ? memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE) : stack.back();
+                default:
+                    error("Unknown opcode: " + std::to_string(static_cast<int>(instruction.opcode)));
+                    break;
+
                 }
             } catch (const std::exception& e) {
                 // Check if this is an assertion failure or contract violation - let them propagate to terminate execution
                 std::string errorMsg = e.what();
-                if (errorMsg.find("Assertion failed:") != std::string::npos || 
-                    errorMsg.find("Contract violation:") != std::string::npos) {
+                if (errorMsg.find("Assertion failed:") != std::string::npos ||
+                        errorMsg.find("Contract violation:") != std::string::npos) {
                     throw; // Re-throw assertion failures and contract violations to terminate execution
                 }
                 // Handle other exceptions that occur during instruction execution
@@ -763,8 +763,8 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
     } catch (const std::exception& e) {
         // Check if this is an assertion failure or contract violation - let them propagate to terminate execution
         std::string errorMsg = e.what();
-        if (errorMsg.find("Assertion failed:") != std::string::npos || 
-            errorMsg.find("Contract violation:") != std::string::npos) {
+        if (errorMsg.find("Assertion failed:") != std::string::npos ||
+                errorMsg.find("Contract violation:") != std::string::npos) {
             throw; // Re-throw assertion failures and contract violations to terminate execution
         }
         // Handle other exceptions that occur during execution
@@ -789,7 +789,7 @@ void VM::preProcessBytecode(const std::vector<Instruction>& code) {
             std::string functionName = instruction.stringValue;
             if (functionName.find("__lambda_") == 0) {
                 lambdaPositions.push_back({i, functionName});
-              //  std::cout << "[DEBUG] Found lambda function: " << functionName << " at IP " << i << std::endl;
+                //  std::cout << "[DEBUG] Found lambda function: " << functionName << " at IP " << i << std::endl;
             }
         }
     }
@@ -800,10 +800,10 @@ void VM::preProcessBytecode(const std::vector<Instruction>& code) {
         
         // Check if this lambda is already registered
         if (userDefinedFunctions.find(functionName) != userDefinedFunctions.end()) {
-         //   std::cout << "[DEBUG] WARNING: Lambda function " << functionName << " is already registered!" << std::endl;
+            //   std::cout << "[DEBUG] WARNING: Lambda function " << functionName << " is already registered!" << std::endl;
             const auto& existing = userDefinedFunctions[functionName];
-         //   std::cout << "[DEBUG] Existing function addresses - startAddress: " << existing.startAddress 
-         //             << ", endAddress: " << existing.endAddress << std::endl;
+            //   std::cout << "[DEBUG] Existing function addresses - startAddress: " << existing.startAddress
+            //             << ", endAddress: " << existing.endAddress << std::endl;
             continue; // Skip if already registered
         }
         
@@ -840,18 +840,18 @@ void VM::preProcessBytecode(const std::vector<Instruction>& code) {
         
         // Parse parameters between BEGIN_FUNCTION and function body
         size_t paramIndex = startAddress + 1;
-        //std::cout << "[DEBUG] Parsing lambda parameters for " << functionName 
+        //std::cout << "[DEBUG] Parsing lambda parameters for " << functionName
         //          << " from index " << paramIndex << " to " << endAddress << std::endl;
         
-        while (paramIndex < endAddress && 
-               (code[paramIndex].opcode == Opcode::DEFINE_PARAM || 
+        while (paramIndex < endAddress &&
+               (code[paramIndex].opcode == Opcode::DEFINE_PARAM ||
                 code[paramIndex].opcode == Opcode::DEFINE_OPTIONAL_PARAM)) {
             
             std::string paramName = code[paramIndex].stringValue;
             bool isOptional = (code[paramIndex].opcode == Opcode::DEFINE_OPTIONAL_PARAM);
             
-           // std::cout << "[DEBUG] Found parameter: " << paramName 
-                 //     << " (optional: " << (isOptional ? "true" : "false") << ")" << std::endl;
+            // std::cout << "[DEBUG] Found parameter: " << paramName
+            //     << " (optional: " << (isOptional ? "true" : "false") << ")" << std::endl;
             
             // For lambda functions, we'll use a generic type for now
             TypePtr paramType = typeSystem->ANY_TYPE;
@@ -865,53 +865,53 @@ void VM::preProcessBytecode(const std::vector<Instruction>& code) {
             // Check for default value
             if (paramIndex + 1 < endAddress && code[paramIndex + 1].opcode == Opcode::SET_DEFAULT_VALUE) {
                 // Default value will be handled during execution
-               // std::cout << "[DEBUG] Parameter " << paramName << " has default value" << std::endl;
+                // std::cout << "[DEBUG] Parameter " << paramName << " has default value" << std::endl;
                 paramIndex++; // Skip SET_DEFAULT_VALUE instruction
             }
             
             paramIndex++;
         }
         
-        // std::cout << "[DEBUG] Lambda " << functionName << " has " 
-        //           << lambdaFunc.parameters.size() << " regular parameters and " 
+        // std::cout << "[DEBUG] Lambda " << functionName << " has "
+        //           << lambdaFunc.parameters.size() << " regular parameters and "
         //           << lambdaFunc.optionalParameters.size() << " optional parameters" << std::endl;
         
         // // Register the lambda function
-        // std::cout << "[DEBUG] Registering lambda function " << functionName 
+        // std::cout << "[DEBUG] Registering lambda function " << functionName
         //           << " with " << lambdaFunc.parameters.size() << " parameters" << std::endl;
         userDefinedFunctions[functionName] = lambdaFunc;
         
         if (debugMode) {
-            std::cout << "[DEBUG] Registered lambda function: " << functionName 
-                      << " (start: " << startAddress << ", end: " << endAddress 
+            std::cout << "[DEBUG] Registered lambda function: " << functionName
+                      << " (start: " << startAddress << ", end: " << endAddress
                       << ", params: " << lambdaFunc.parameters.size() << ")" << std::endl;
         }
     }
 
     if (debugMode) {
-    std::cout << "[DEBUG] Pre-processing complete. Registered " 
-              << userDefinedFunctions.size() << " functions total." << std::endl;
-    
-    // Debug: Check what's in the registry after preprocessing
-    for (const auto& [name, func] : userDefinedFunctions) {
-        if (name.find("__lambda_") == 0) {
-            std::cout << "[DEBUG] POST-PREPROCESSING: Lambda " << name 
-                      << " has " << func.parameters.size() << " parameters" << std::endl;
-            for (size_t i = 0; i < func.parameters.size(); i++) {
-                std::cout << "[DEBUG] POST-PREPROCESSING: param[" << i << "]: " << func.parameters[i].first << std::endl;
+        std::cout << "[DEBUG] Pre-processing complete. Registered "
+                  << userDefinedFunctions.size() << " functions total." << std::endl;
+
+        // Debug: Check what's in the registry after preprocessing
+        for (const auto& [name, func] : userDefinedFunctions) {
+            if (name.find("__lambda_") == 0) {
+                std::cout << "[DEBUG] POST-PREPROCESSING: Lambda " << name
+                          << " has " << func.parameters.size() << " parameters" << std::endl;
+                for (size_t i = 0; i < func.parameters.size(); i++) {
+                    std::cout << "[DEBUG] POST-PREPROCESSING: param[" << i << "]: " << func.parameters[i].first << std::endl;
+                }
             }
         }
+
+        std::cout << "[DEBUG] ===== END PRE-PROCESSING =====" << std::endl;
     }
-    
-    std::cout << "[DEBUG] ===== END PRE-PROCESSING =====" << std::endl;
-        }
 
     isPreProcessing = false; // Clear pre-processing flag
 }
 
 
 //     nativeFunctions[name] = function;
-    
+
 //     // Also register with the function registry for consistency
 //     std::vector<backend::Parameter> params; // Empty for now, could be enhanced
 //     functionRegistry.registerNativeFunction(name, params, std::nullopt, function);
@@ -952,7 +952,7 @@ ValuePtr VM::peek(int distance) const {
         if (ip < bytecode->size()) {
             line = (*bytecode)[ip].line;
         }
-        error("Stack underflow - attempted to peek at distance " + std::to_string(distance) + " but stack only has " + std::to_string(stack.size()) + " elements", 
+        error("Stack underflow - attempted to peek at distance " + std::to_string(distance) + " but stack only has " + std::to_string(stack.size()) + " elements",
               line, 0, "", "expression that provides enough values on the stack");
     }
     
@@ -1005,9 +1005,9 @@ void VM::error(const std::string& message) const {
         const auto& instruction = (*bytecode)[ip];
         
         // Get lexeme from instruction context if available
-        if (instruction.opcode == Opcode::LOAD_VAR || 
-            instruction.opcode == Opcode::STORE_VAR ||
-            instruction.opcode == Opcode::CALL) {
+        if (instruction.opcode == Opcode::LOAD_VAR ||
+                instruction.opcode == Opcode::STORE_VAR ||
+                instruction.opcode == Opcode::CALL) {
             // For variable/function operations, try to get the name
             // if (instruction.opcode < constants.size()) {
             //     auto constant = constants[instruction.opcode];
@@ -1019,43 +1019,43 @@ void VM::error(const std::string& message) const {
         
         // Provide expected values based on operation type
         switch (instruction.opcode) {
-            case Opcode::ADD:
-            case Opcode::SUBTRACT:
-            case Opcode::MULTIPLY:
-            case Opcode::DIVIDE:
-            case Opcode::MODULO:
-                expectedValue = "numeric operands (int or float)";
-                break;
-            case Opcode::EQUAL:
-            case Opcode::NOT_EQUAL:
-            case Opcode::LESS:
-            case Opcode::LESS_EQUAL:
-            case Opcode::GREATER:
-            case Opcode::GREATER_EQUAL:
-                expectedValue = "comparable values of the same type";
-                break;
-            case Opcode::AND:
-            case Opcode::OR:
-                expectedValue = "boolean operands";
-                break;
-            case Opcode::JUMP_IF_FALSE:
-                expectedValue = "boolean condition";
-                break;
-            default:
-                expectedValue = "valid operand for " + BytecodePrinter::opcodeToString(instruction.opcode);
-                break;
+        case Opcode::ADD:
+        case Opcode::SUBTRACT:
+        case Opcode::MULTIPLY:
+        case Opcode::DIVIDE:
+        case Opcode::MODULO:
+            expectedValue = "numeric operands (int or float)";
+            break;
+        case Opcode::EQUAL:
+        case Opcode::NOT_EQUAL:
+        case Opcode::LESS:
+        case Opcode::LESS_EQUAL:
+        case Opcode::GREATER:
+        case Opcode::GREATER_EQUAL:
+            expectedValue = "comparable values of the same type";
+            break;
+        case Opcode::AND:
+        case Opcode::OR:
+            expectedValue = "boolean operands";
+            break;
+        case Opcode::JUMP_IF_FALSE:
+            expectedValue = "boolean condition";
+            break;
+        default:
+            expectedValue = "valid operand for " + BytecodePrinter::opcodeToString(instruction.opcode);
+            break;
         }
     }
     
     // Always use Debugger::error - no runtime fallback
-    Debugger::error(message, line, column, InterpretationStage::INTERPRETING, 
-                   sourceCode, filePath, lexeme, expectedValue);
+    Debugger::error(message, line, column, InterpretationStage::INTERPRETING,
+                    sourceCode, filePath, lexeme, expectedValue);
 }
 
 void VM::error(const std::string& message, int line, int column, const std::string& lexeme, const std::string& expectedValue) const {
     // Always use Debugger::error - no runtime fallback
-    Debugger::error(message, line, column, InterpretationStage::INTERPRETING, 
-                   sourceCode, filePath, lexeme, expectedValue);
+    Debugger::error(message, line, column, InterpretationStage::INTERPRETING,
+                    sourceCode, filePath, lexeme, expectedValue);
 }
 
 // Error handling helper methods - optimized for zero-cost success path
@@ -1102,72 +1102,72 @@ bool VM::propagateError(ValuePtr errorValue) {
         return false;
     }
 
-    // Walk frames from top to bottom - optimized for shallow error nesting
-    while (!errorFrames.empty()) {
-        //const ErrorFrame& frame = errorFrames.back();
-        ErrorFrame frame = errorFrames.back();
+        // Walk frames from top to bottom - optimized for shallow error nesting
+        while (!errorFrames.empty()) {
+            //const ErrorFrame& frame = errorFrames.back();
+            ErrorFrame frame = errorFrames.back();
 
-        // Validate frame is properly initialized (silence compiler warning)
-        if (frame.handlerAddress == 0) [[unlikely]] {
-            errorFrames.pop_back();
-            continue;
-        }
-
-        // Wildcard frame matches any error - most common case
-        if (!frame.expectedErrorType) [[likely]] {
-            // Consume the frame so it won't be reused
-            errorFrames.pop_back();
-            
-            ip = frame.handlerAddress - 1;
-            
-            // Efficient stack cleanup
-            if (stack.size() > frame.stackBase) {
-                stack.erase(stack.begin() + frame.stackBase, stack.end());
+            // Validate frame is properly initialized (silence compiler warning)
+            if (frame.handlerAddress == 0) [[unlikely]] {
+                errorFrames.pop_back();
+                continue;
             }
-            
-            push(errorValue);
-            return true;
-        }
 
-        // ErrorUnion expected type treats as wildcard
-        if (frame.expectedErrorType->tag == TypeTag::ErrorUnion) {
+                // Wildcard frame matches any error - most common case
+                if (!frame.expectedErrorType) [[likely]] {
+                    // Consume the frame so it won't be reused
+                    errorFrames.pop_back();
+
+                    ip = frame.handlerAddress - 1;
+
+                    // Efficient stack cleanup
+                    if (stack.size() > frame.stackBase) {
+                        stack.erase(stack.begin() + frame.stackBase, stack.end());
+                    }
+
+                    push(errorValue);
+                    return true;
+                }
+
+                    // ErrorUnion expected type treats as wildcard
+                    if (frame.expectedErrorType->tag == TypeTag::ErrorUnion) {
+                        errorFrames.pop_back();
+                        ip = frame.handlerAddress - 1;
+
+                        if (stack.size() > frame.stackBase) {
+                            stack.erase(stack.begin() + frame.stackBase, stack.end());
+                        }
+
+                        push(errorValue);
+                        return true;
+                    }
+
+            // Try to match user-defined or named type
+            bool matched = false;
+            if (frame.expectedErrorType->tag == TypeTag::UserDefined) {
+                if (const auto* ud = std::get_if<UserDefinedType>(&frame.expectedErrorType->extra)) {
+                    matched = (ud->name == errorType);
+                }
+            } else {
+                // Avoid expensive toString() call by caching or using faster comparison
+                matched = (frame.expectedErrorType->toString() == errorType);
+            }
+
+            if (matched) {
+                errorFrames.pop_back();
+                ip = frame.handlerAddress - 1;
+
+                if (stack.size() > frame.stackBase) {
+                    stack.erase(stack.begin() + frame.stackBase, stack.end());
+                }
+
+                push(errorValue);
+                return true;
+            }
+
+            // No match: pop and continue
             errorFrames.pop_back();
-            ip = frame.handlerAddress - 1;
-            
-            if (stack.size() > frame.stackBase) {
-                stack.erase(stack.begin() + frame.stackBase, stack.end());
-            }
-            
-            push(errorValue);
-            return true;
         }
-
-        // Try to match user-defined or named type
-        bool matched = false;
-        if (frame.expectedErrorType->tag == TypeTag::UserDefined) {
-            if (const auto* ud = std::get_if<UserDefinedType>(&frame.expectedErrorType->extra)) {
-                matched = (ud->name == errorType);
-            }
-        } else {
-            // Avoid expensive toString() call by caching or using faster comparison
-            matched = (frame.expectedErrorType->toString() == errorType);
-        }
-
-        if (matched) {
-            errorFrames.pop_back();
-            ip = frame.handlerAddress - 1;
-            
-            if (stack.size() > frame.stackBase) {
-                stack.erase(stack.begin() + frame.stackBase, stack.end());
-            }
-            
-            push(errorValue);
-            return true;
-        }
-
-        // No match: pop and continue
-        errorFrames.pop_back();
-    }
 
     return false;
 }
@@ -1220,7 +1220,7 @@ bool VM::functionCanFail(const std::string& functionName) const {
 
     // Legacy registry fallback
     if (auto it = userDefinedFunctions.find(functionName);
-        it != userDefinedFunctions.end()) {
+            it != userDefinedFunctions.end()) {
         const backend::Function& func = it->second;
         if (func.returnType) {
             return func.returnType->tag == TypeTag::ErrorUnion;
@@ -1232,7 +1232,7 @@ bool VM::functionCanFail(const std::string& functionName) const {
 
 // Error value creation helpers - optimized for performance
 ValuePtr VM::createErrorValue(const std::string& errorType, const std::string& message, 
-                             const std::vector<ValuePtr>& args) {
+                              const std::vector<ValuePtr>& args) {
     ++errorStats.errorValueAllocations;
     
     // Look up error type in the type system
@@ -1411,7 +1411,7 @@ void VM::handleStoreVar(const Instruction& instruction) {
     }
     
     if (stack.empty()) {
-        error("Stack underflow in STORE_VAR for variable '" + instruction.stringValue + "'", 
+        error("Stack underflow in STORE_VAR for variable '" + instruction.stringValue + "'",
               instruction.line, 0, instruction.stringValue, "expression that produces a value to store");
         return;
     }
@@ -1423,15 +1423,15 @@ void VM::handleStoreVar(const Instruction& instruction) {
         std::cout << "[DEBUG] STORE_VAR: Popped value: " << value->toString() << std::endl;
     }
 
-        // CRITICAL FIX: Reuse existing Value objects for loop variables
+    // CRITICAL FIX: Reuse existing Value objects for loop variables
     try {
         ValuePtr existing = environment->get(instruction.stringValue);
         
         // If it's a simple numeric type, reuse the Value object
         if (existing->type->tag == value->type->tag &&
-            (existing->type->tag == TypeTag::Int || 
-             existing->type->tag == TypeTag::Int64 ||
-             existing->type->tag == TypeTag::Float64)) {
+                (existing->type->tag == TypeTag::Int ||
+                 existing->type->tag == TypeTag::Int64 ||
+                 existing->type->tag == TypeTag::Float64)) {
             
             // Reuse the existing Value object by updating its data
             existing->data = value->data;
@@ -1512,7 +1512,7 @@ void VM::handleLoadVar(const Instruction& instruction) {
         ValuePtr value = environment->get(instruction.stringValue);
         push(value);
     } catch (const std::exception& e) {
-        error("Undefined variable '" + instruction.stringValue + "'", 
+        error("Undefined variable '" + instruction.stringValue + "'",
               instruction.line, 0, instruction.stringValue, "declared variable or function parameter");
     }
 }
@@ -1527,9 +1527,9 @@ void VM::handleStoreTemp(const Instruction& instruction) {
     }
     
     tempValues[index] = pop();
-        if (debugMode) {
-        std::cout << "[DEBUG] STORE_TEMP: Stored at index " << index 
-                  
+    if (debugMode) {
+        std::cout << "[DEBUG] STORE_TEMP: Stored at index " << index
+
                   << ", tempValues.size(): " << tempValues.size() << std::endl;
     }
 }
@@ -1542,8 +1542,8 @@ void VM::handleLoadTemp(const Instruction& instruction) {
         error("Invalid temporary variable index: " + std::to_string(index));
         return;
     }
-        if (debugMode) {
-        std::cout << "[DEBUG] LOAD_TEMP: Loading from index " << index 
+    if (debugMode) {
+        std::cout << "[DEBUG] LOAD_TEMP: Loading from index " << index
                   << ", tempValues.size(): " << tempValues.size() << std::endl;
     }
     push(tempValues[index]);
@@ -1557,7 +1557,7 @@ void VM::handleClearTemp(const Instruction& instruction) {
         tempValues[index] = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
     }
     if (debugMode) {
-        std::cout << "[DEBUG] CLEAR_TEMP: Cleared at index " << index 
+        std::cout << "[DEBUG] CLEAR_TEMP: Cleared at index " << index
                   << ", tempValues.size(): " << tempValues.size() << std::endl;
     }
 }
@@ -1628,13 +1628,13 @@ void VM::handleAdd(const Instruction& /*unused*/) {
         // Numeric addition - promote to double if either operand is double
         if (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64) {
             // Convert to double if needed
-            double aVal = (a->type->tag == TypeTag::Float64) ? 
-                std::get<double>(a->data) : 
-                static_cast<double>(std::get<int32_t>(a->data));
+            double aVal = (a->type->tag == TypeTag::Float64) ?
+                        std::get<double>(a->data) :
+                        static_cast<double>(std::get<int32_t>(a->data));
 
-            double bVal = (b->type->tag == TypeTag::Float64) ? 
-                std::get<double>(b->data) : 
-                static_cast<double>(std::get<int32_t>(b->data));
+            double bVal = (b->type->tag == TypeTag::Float64) ?
+                        std::get<double>(b->data) :
+                        static_cast<double>(std::get<int32_t>(b->data));
 
             // Check for floating-point edge cases
             double result = aVal + bVal;
@@ -1658,7 +1658,7 @@ void VM::handleAdd(const Instruction& /*unused*/) {
 
             // Check for integer overflow using well-defined behavior
             if ((bVal > 0 && aVal > std::numeric_limits<int64_t>::max() - bVal) ||
-                (bVal < 0 && aVal < std::numeric_limits<int64_t>::min() - bVal)) {
+                    (bVal < 0 && aVal < std::numeric_limits<int64_t>::min() - bVal)) {
                 error("Integer addition overflow");
             }
 
@@ -1666,8 +1666,8 @@ void VM::handleAdd(const Instruction& /*unused*/) {
         }
     } else {
         // If we get here, the operands are not compatible for addition
-        error("Cannot add operands of types " + 
-              typeTagToString(a->type->tag) + " and " + 
+        error("Cannot add operands of types " +
+              typeTagToString(a->type->tag) + " and " +
               typeTagToString(b->type->tag));
     }
 }
@@ -1723,13 +1723,13 @@ void VM::handleSubtract(const Instruction& /*unused*/) {
     // Numeric subtraction - promote to double if either operand is double
     if (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64) {
         // Convert to double if needed
-        double aVal = (a->type->tag == TypeTag::Float64) ? 
-            std::get<double>(a->data) : 
-            static_cast<double>(std::get<int32_t>(a->data));
+        double aVal = (a->type->tag == TypeTag::Float64) ?
+                    std::get<double>(a->data) :
+                    static_cast<double>(std::get<int32_t>(a->data));
         
-        double bVal = (b->type->tag == TypeTag::Float64) ? 
-            std::get<double>(b->data) : 
-            static_cast<double>(std::get<int32_t>(b->data));
+        double bVal = (b->type->tag == TypeTag::Float64) ?
+                    std::get<double>(b->data) :
+                    static_cast<double>(std::get<int32_t>(b->data));
         
         // Check for floating-point edge cases
         double result = aVal - bVal;
@@ -1757,7 +1757,7 @@ void VM::handleSubtract(const Instruction& /*unused*/) {
         
         // Check for integer overflow
         if ((bVal > 0 && aVal < std::numeric_limits<int64_t>::min() + bVal) ||
-            (bVal < 0 && aVal > std::numeric_limits<int64_t>::max() + bVal)) {
+                (bVal < 0 && aVal > std::numeric_limits<int64_t>::max() + bVal)) {
             error("Integer subtraction overflow");
         }
         
@@ -1771,7 +1771,7 @@ void VM::handleMultiply(const Instruction& /*unused*/) {
     
     // String multiplication (string * int or int * string)
     if ((a->type->tag == TypeTag::String && b->type->tag == TypeTag::Int) ||
-        (a->type->tag == TypeTag::Int && b->type->tag == TypeTag::String)) {
+            (a->type->tag == TypeTag::Int && b->type->tag == TypeTag::String)) {
         
         std::string str;
         int32_t count;
@@ -1802,16 +1802,16 @@ void VM::handleMultiply(const Instruction& /*unused*/) {
     // Numeric multiplication
     if (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64) {
         // Convert to double if needed
-        double aVal = (a->type->tag == TypeTag::Float64) ? 
-            std::get<double>(a->data) : 
-            static_cast<double>(std::get<int32_t>(a->data));
+        double aVal = (a->type->tag == TypeTag::Float64) ?
+                    std::get<double>(a->data) :
+                    static_cast<double>(std::get<int32_t>(a->data));
         
-        double bVal = (b->type->tag == TypeTag::Float64) ? 
-            std::get<double>(b->data) : 
-            static_cast<double>(std::get<int32_t>(b->data));
+        double bVal = (b->type->tag == TypeTag::Float64) ?
+                    std::get<double>(b->data) :
+                    static_cast<double>(std::get<int32_t>(b->data));
         
         push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, aVal * bVal));
-    } else if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && 
+    } else if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) &&
                (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
         // Integer multiplication with mixed int32/int64 support
         int64_t aVal, bVal;
@@ -1832,8 +1832,8 @@ void VM::handleMultiply(const Instruction& /*unused*/) {
         int64_t result = aVal * bVal;
         
         // Check for overflow
-        if (result > std::numeric_limits<int64_t>::max() || 
-            result < std::numeric_limits<int64_t>::min()) {
+        if (result > std::numeric_limits<int64_t>::max() ||
+                result < std::numeric_limits<int64_t>::min()) {
             error("Integer multiplication overflow");
         }
         
@@ -1878,9 +1878,9 @@ void VM::handleDivide(const Instruction& /*unused*/) {
     
     if (isZero) {
         // Create error union with DivisionByZero error
-        TypePtr resultType = (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64) 
-            ? typeSystem->FLOAT64_TYPE 
-            : typeSystem->INT_TYPE;
+        TypePtr resultType = (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64)
+                ? typeSystem->FLOAT64_TYPE
+                : typeSystem->INT_TYPE;
         auto errorUnionType = typeSystem->createErrorUnionType(resultType, {"DivisionByZero"}, false);
         
         auto errorUnionValue = memoryManager.makeRef<Value>(*region, errorUnionType);
@@ -1892,13 +1892,13 @@ void VM::handleDivide(const Instruction& /*unused*/) {
     
     // Numeric division - always promote to double if either operand is double
     if (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64) {
-        double aVal = (a->type->tag == TypeTag::Float64) ? 
-            std::get<double>(a->data) : 
-            static_cast<double>(std::get<int32_t>(a->data));
+        double aVal = (a->type->tag == TypeTag::Float64) ?
+                    std::get<double>(a->data) :
+                    static_cast<double>(std::get<int32_t>(a->data));
         
-        double bVal = (b->type->tag == TypeTag::Float64) ? 
-            std::get<double>(b->data) : 
-            static_cast<double>(std::get<int32_t>(b->data));
+        double bVal = (b->type->tag == TypeTag::Float64) ?
+                    std::get<double>(b->data) :
+                    static_cast<double>(std::get<int32_t>(b->data));
         
         // Check for floating-point edge cases
         if (std::isinf(aVal / bVal)) {
@@ -1978,48 +1978,48 @@ void VM::handleEqual(const Instruction& /*unused*/) {
     bool result = false;
     
     // Handle mixed integer types
-    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && 
-        (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
+    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) &&
+            (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
         // Convert both to int64_t for comparison
-        int64_t aVal = (a->type->tag == TypeTag::Int) ? 
-            static_cast<int64_t>(std::get<int32_t>(a->data)) : 
-            std::get<int64_t>(a->data);
-        int64_t bVal = (b->type->tag == TypeTag::Int) ? 
-            static_cast<int64_t>(std::get<int32_t>(b->data)) : 
-            std::get<int64_t>(b->data);
+        int64_t aVal = (a->type->tag == TypeTag::Int) ?
+                    static_cast<int64_t>(std::get<int32_t>(a->data)) :
+                    std::get<int64_t>(a->data);
+        int64_t bVal = (b->type->tag == TypeTag::Int) ?
+                    static_cast<int64_t>(std::get<int32_t>(b->data)) :
+                    std::get<int64_t>(b->data);
         result = aVal == bVal;
     }
     // Handle mixed integer/float comparisons
     else if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && b->type->tag == TypeTag::Float64) {
-        int64_t aVal = (a->type->tag == TypeTag::Int) ? 
-            static_cast<int64_t>(std::get<int32_t>(a->data)) : 
-            std::get<int64_t>(a->data);
+        int64_t aVal = (a->type->tag == TypeTag::Int) ?
+                    static_cast<int64_t>(std::get<int32_t>(a->data)) :
+                    std::get<int64_t>(a->data);
         result = static_cast<double>(aVal) == std::get<double>(b->data);
     }
     else if (a->type->tag == TypeTag::Float64 && (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
-        int64_t bVal = (b->type->tag == TypeTag::Int) ? 
-            static_cast<int64_t>(std::get<int32_t>(b->data)) : 
-            std::get<int64_t>(b->data);
+        int64_t bVal = (b->type->tag == TypeTag::Int) ?
+                    static_cast<int64_t>(std::get<int32_t>(b->data)) :
+                    std::get<int64_t>(b->data);
         result = std::get<double>(a->data) == static_cast<double>(bVal);
     }
     // Handle same-type comparisons
     else if (a->type->tag == b->type->tag) {
         switch (a->type->tag) {
-            case TypeTag::Float64:
-                result = std::get<double>(a->data) == std::get<double>(b->data);
-                break;
-            case TypeTag::Bool:
-                result = std::get<bool>(a->data) == std::get<bool>(b->data);
-                break;
-            case TypeTag::String:
-                result = std::get<std::string>(a->data) == std::get<std::string>(b->data);
-                break;
-            case TypeTag::Nil:
-                result = true; // nil == nil
-                break;
-            default:
-                result = false; // Objects are compared by reference
-                break;
+        case TypeTag::Float64:
+            result = std::get<double>(a->data) == std::get<double>(b->data);
+            break;
+        case TypeTag::Bool:
+            result = std::get<bool>(a->data) == std::get<bool>(b->data);
+            break;
+        case TypeTag::String:
+            result = std::get<std::string>(a->data) == std::get<std::string>(b->data);
+            break;
+        case TypeTag::Nil:
+            result = true; // nil == nil
+            break;
+        default:
+            result = false; // Objects are compared by reference
+            break;
         }
     }
     else {
@@ -2036,48 +2036,48 @@ void VM::handleNotEqual(const Instruction& /*unused*/) {
     bool result = true;
     
     // Handle mixed integer types
-    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && 
-        (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
+    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) &&
+            (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
         // Convert both to int64_t for comparison
-        int64_t aVal = (a->type->tag == TypeTag::Int) ? 
-            static_cast<int64_t>(std::get<int32_t>(a->data)) : 
-            std::get<int64_t>(a->data);
-        int64_t bVal = (b->type->tag == TypeTag::Int) ? 
-            static_cast<int64_t>(std::get<int32_t>(b->data)) : 
-            std::get<int64_t>(b->data);
+        int64_t aVal = (a->type->tag == TypeTag::Int) ?
+                    static_cast<int64_t>(std::get<int32_t>(a->data)) :
+                    std::get<int64_t>(a->data);
+        int64_t bVal = (b->type->tag == TypeTag::Int) ?
+                    static_cast<int64_t>(std::get<int32_t>(b->data)) :
+                    std::get<int64_t>(b->data);
         result = aVal != bVal;
     }
     // Handle mixed integer/float comparisons
     else if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && b->type->tag == TypeTag::Float64) {
-        int64_t aVal = (a->type->tag == TypeTag::Int) ? 
-            static_cast<int64_t>(std::get<int32_t>(a->data)) : 
-            std::get<int64_t>(a->data);
+        int64_t aVal = (a->type->tag == TypeTag::Int) ?
+                    static_cast<int64_t>(std::get<int32_t>(a->data)) :
+                    std::get<int64_t>(a->data);
         result = static_cast<double>(aVal) != std::get<double>(b->data);
     }
     else if (a->type->tag == TypeTag::Float64 && (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
-        int64_t bVal = (b->type->tag == TypeTag::Int) ? 
-            static_cast<int64_t>(std::get<int32_t>(b->data)) : 
-            std::get<int64_t>(b->data);
+        int64_t bVal = (b->type->tag == TypeTag::Int) ?
+                    static_cast<int64_t>(std::get<int32_t>(b->data)) :
+                    std::get<int64_t>(b->data);
         result = std::get<double>(a->data) != static_cast<double>(bVal);
     }
     // Handle same-type comparisons
     else if (a->type->tag == b->type->tag) {
         switch (a->type->tag) {
-            case TypeTag::Float64:
-                result = std::get<double>(a->data) != std::get<double>(b->data);
-                break;
-            case TypeTag::Bool:
-                result = std::get<bool>(a->data) != std::get<bool>(b->data);
-                break;
-            case TypeTag::String:
-                result = std::get<std::string>(a->data) != std::get<std::string>(b->data);
-                break;
-            case TypeTag::Nil:
-                result = false; // nil != nil is false
-                break;
-            default:
-                result = true; // Objects are compared by reference
-                break;
+        case TypeTag::Float64:
+            result = std::get<double>(a->data) != std::get<double>(b->data);
+            break;
+        case TypeTag::Bool:
+            result = std::get<bool>(a->data) != std::get<bool>(b->data);
+            break;
+        case TypeTag::String:
+            result = std::get<std::string>(a->data) != std::get<std::string>(b->data);
+            break;
+        case TypeTag::Nil:
+            result = false; // nil != nil is false
+            break;
+        default:
+            result = true; // Objects are compared by reference
+            break;
         }
     }
     else {
@@ -2094,27 +2094,27 @@ void VM::handleLess(const Instruction& instruction) {
     bool result = false;
     
     // Compare based on types - handle mixed integer types
-    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && 
-        (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
+    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) &&
+            (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
         // Convert both to int64_t for comparison
-        int64_t aVal = (a->type->tag == TypeTag::Int) ? 
-            static_cast<int64_t>(std::get<int32_t>(a->data)) : 
-            std::get<int64_t>(a->data);
-        int64_t bVal = (b->type->tag == TypeTag::Int) ? 
-            static_cast<int64_t>(std::get<int32_t>(b->data)) : 
-            std::get<int64_t>(b->data);
+        int64_t aVal = (a->type->tag == TypeTag::Int) ?
+                    static_cast<int64_t>(std::get<int32_t>(a->data)) :
+                    std::get<int64_t>(a->data);
+        int64_t bVal = (b->type->tag == TypeTag::Int) ?
+                    static_cast<int64_t>(std::get<int32_t>(b->data)) :
+                    std::get<int64_t>(b->data);
         result = aVal < bVal;
     } else if (a->type->tag == TypeTag::Float64 && b->type->tag == TypeTag::Float64) {
         result = std::get<double>(a->data) < std::get<double>(b->data);
     } else if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && b->type->tag == TypeTag::Float64) {
-        int64_t aVal = (a->type->tag == TypeTag::Int) ? 
-            static_cast<int64_t>(std::get<int32_t>(a->data)) : 
-            std::get<int64_t>(a->data);
+        int64_t aVal = (a->type->tag == TypeTag::Int) ?
+                    static_cast<int64_t>(std::get<int32_t>(a->data)) :
+                    std::get<int64_t>(a->data);
         result = static_cast<double>(aVal) < std::get<double>(b->data);
     } else if (a->type->tag == TypeTag::Float64 && (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
-        int64_t bVal = (b->type->tag == TypeTag::Int) ? 
-            static_cast<int64_t>(std::get<int32_t>(b->data)) : 
-            std::get<int64_t>(b->data);
+        int64_t bVal = (b->type->tag == TypeTag::Int) ?
+                    static_cast<int64_t>(std::get<int32_t>(b->data)) :
+                    std::get<int64_t>(b->data);
         result = std::get<double>(a->data) < static_cast<double>(bVal);
     } else if (a->type->tag == TypeTag::String && b->type->tag == TypeTag::String) {
         result = std::get<std::string>(a->data) < std::get<std::string>(b->data);
@@ -2132,27 +2132,27 @@ void VM::handleLessEqual(const Instruction& /*unused*/) {
     bool result = false;
     
     // Compare based on types - handle mixed integer types
-    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && 
-        (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
+    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) &&
+            (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
         // Convert both to int64_t for comparison
-        int64_t aVal = (a->type->tag == TypeTag::Int) ? 
-            static_cast<int64_t>(std::get<int32_t>(a->data)) : 
-            std::get<int64_t>(a->data);
-        int64_t bVal = (b->type->tag == TypeTag::Int) ? 
-            static_cast<int64_t>(std::get<int32_t>(b->data)) : 
-            std::get<int64_t>(b->data);
+        int64_t aVal = (a->type->tag == TypeTag::Int) ?
+                    static_cast<int64_t>(std::get<int32_t>(a->data)) :
+                    std::get<int64_t>(a->data);
+        int64_t bVal = (b->type->tag == TypeTag::Int) ?
+                    static_cast<int64_t>(std::get<int32_t>(b->data)) :
+                    std::get<int64_t>(b->data);
         result = aVal <= bVal;
     } else if (a->type->tag == TypeTag::Float64 && b->type->tag == TypeTag::Float64) {
         result = std::get<double>(a->data) <= std::get<double>(b->data);
     } else if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && b->type->tag == TypeTag::Float64) {
-        int64_t aVal = (a->type->tag == TypeTag::Int) ? 
-            static_cast<int64_t>(std::get<int32_t>(a->data)) : 
-            std::get<int64_t>(a->data);
+        int64_t aVal = (a->type->tag == TypeTag::Int) ?
+                    static_cast<int64_t>(std::get<int32_t>(a->data)) :
+                    std::get<int64_t>(a->data);
         result = static_cast<double>(aVal) <= std::get<double>(b->data);
     } else if (a->type->tag == TypeTag::Float64 && (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
-        int64_t bVal = (b->type->tag == TypeTag::Int) ? 
-            static_cast<int64_t>(std::get<int32_t>(b->data)) : 
-            std::get<int64_t>(b->data);
+        int64_t bVal = (b->type->tag == TypeTag::Int) ?
+                    static_cast<int64_t>(std::get<int32_t>(b->data)) :
+                    std::get<int64_t>(b->data);
         result = std::get<double>(a->data) <= static_cast<double>(bVal);
     } else if (a->type->tag == TypeTag::String && b->type->tag == TypeTag::String) {
         result = std::get<std::string>(a->data) <= std::get<std::string>(b->data);
@@ -2170,27 +2170,27 @@ void VM::handleGreater(const Instruction& /*unused*/) {
     bool result = false;
     
     // Compare based on types - handle mixed integer types
-    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && 
-        (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
+    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) &&
+            (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
         // Convert both to int64_t for comparison
-        int64_t aVal = (a->type->tag == TypeTag::Int) ? 
-            static_cast<int64_t>(std::get<int32_t>(a->data)) : 
-            std::get<int64_t>(a->data);
-        int64_t bVal = (b->type->tag == TypeTag::Int) ? 
-            static_cast<int64_t>(std::get<int32_t>(b->data)) : 
-            std::get<int64_t>(b->data);
+        int64_t aVal = (a->type->tag == TypeTag::Int) ?
+                    static_cast<int64_t>(std::get<int32_t>(a->data)) :
+                    std::get<int64_t>(a->data);
+        int64_t bVal = (b->type->tag == TypeTag::Int) ?
+                    static_cast<int64_t>(std::get<int32_t>(b->data)) :
+                    std::get<int64_t>(b->data);
         result = aVal > bVal;
     } else if (a->type->tag == TypeTag::Float64 && b->type->tag == TypeTag::Float64) {
         result = std::get<double>(a->data) > std::get<double>(b->data);
     } else if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && b->type->tag == TypeTag::Float64) {
-        int64_t aVal = (a->type->tag == TypeTag::Int) ? 
-            static_cast<int64_t>(std::get<int32_t>(a->data)) : 
-            std::get<int64_t>(a->data);
+        int64_t aVal = (a->type->tag == TypeTag::Int) ?
+                    static_cast<int64_t>(std::get<int32_t>(a->data)) :
+                    std::get<int64_t>(a->data);
         result = static_cast<double>(aVal) > std::get<double>(b->data);
     } else if (a->type->tag == TypeTag::Float64 && (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
-        int64_t bVal = (b->type->tag == TypeTag::Int) ? 
-            static_cast<int64_t>(std::get<int32_t>(b->data)) : 
-            std::get<int64_t>(b->data);
+        int64_t bVal = (b->type->tag == TypeTag::Int) ?
+                    static_cast<int64_t>(std::get<int32_t>(b->data)) :
+                    std::get<int64_t>(b->data);
         result = std::get<double>(a->data) > static_cast<double>(bVal);
     } else if (a->type->tag == TypeTag::String && b->type->tag == TypeTag::String) {
         result = std::get<std::string>(a->data) > std::get<std::string>(b->data);
@@ -2208,27 +2208,27 @@ void VM::handleGreaterEqual(const Instruction& /*unused*/) {
     bool result = false;
     
     // Compare based on types - handle mixed integer types
-    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && 
-        (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
+    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) &&
+            (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
         // Convert both to int64_t for comparison
-        int64_t aVal = (a->type->tag == TypeTag::Int) ? 
-            static_cast<int64_t>(std::get<int32_t>(a->data)) : 
-            std::get<int64_t>(a->data);
-        int64_t bVal = (b->type->tag == TypeTag::Int) ? 
-            static_cast<int64_t>(std::get<int32_t>(b->data)) : 
-            std::get<int64_t>(b->data);
+        int64_t aVal = (a->type->tag == TypeTag::Int) ?
+                    static_cast<int64_t>(std::get<int32_t>(a->data)) :
+                    std::get<int64_t>(a->data);
+        int64_t bVal = (b->type->tag == TypeTag::Int) ?
+                    static_cast<int64_t>(std::get<int32_t>(b->data)) :
+                    std::get<int64_t>(b->data);
         result = aVal >= bVal;
     } else if (a->type->tag == TypeTag::Float64 && b->type->tag == TypeTag::Float64) {
         result = std::get<double>(a->data) >= std::get<double>(b->data);
     } else if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && b->type->tag == TypeTag::Float64) {
-        int64_t aVal = (a->type->tag == TypeTag::Int) ? 
-            static_cast<int64_t>(std::get<int32_t>(a->data)) : 
-            std::get<int64_t>(a->data);
+        int64_t aVal = (a->type->tag == TypeTag::Int) ?
+                    static_cast<int64_t>(std::get<int32_t>(a->data)) :
+                    std::get<int64_t>(a->data);
         result = static_cast<double>(aVal) >= std::get<double>(b->data);
     } else if (a->type->tag == TypeTag::Float64 && (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
-        int64_t bVal = (b->type->tag == TypeTag::Int) ? 
-            static_cast<int64_t>(std::get<int32_t>(b->data)) : 
-            std::get<int64_t>(b->data);
+        int64_t bVal = (b->type->tag == TypeTag::Int) ?
+                    static_cast<int64_t>(std::get<int32_t>(b->data)) :
+                    std::get<int64_t>(b->data);
         result = std::get<double>(a->data) >= static_cast<double>(bVal);
     } else if (a->type->tag == TypeTag::String && b->type->tag == TypeTag::String) {
         result = std::get<std::string>(a->data) >= std::get<std::string>(b->data);
@@ -2404,7 +2404,7 @@ void VM::handleJump(const Instruction& instruction) {
     size_t newIP = ip + offset;
     
     if (debugMode) {
-        std::cout << "[DEBUG] handleJump: current IP=" << ip 
+        std::cout << "[DEBUG] handleJump: current IP=" << ip
                   << ", offset=" << offset
                   << ", new IP will be=" << newIP
                   << " (after main loop increment: " << (newIP + 1) << ")"
@@ -2413,9 +2413,9 @@ void VM::handleJump(const Instruction& instruction) {
 
     // Bounds check before jumping
     if (newIP >= bytecode->size()) {
-        error("Jump instruction would exceed bytecode bounds (IP=" + std::to_string(ip) + 
-              ", offset=" + std::to_string(offset) + 
-              ", would jump to=" + std::to_string(newIP) + 
+        error("Jump instruction would exceed bytecode bounds (IP=" + std::to_string(ip) +
+              ", offset=" + std::to_string(offset) +
+              ", would jump to=" + std::to_string(newIP) +
               ", bytecode size=" + std::to_string(bytecode->size()) + ")");
         return;
     }
@@ -2622,7 +2622,7 @@ void VM::handleCall(const Instruction& instruction) {
                     std::cout << "[DEBUG] CALL: Stack contents before processing arguments:" << std::endl;
                     for (size_t i = 0; i < std::min(stack.size(), size_t(5)); i++) {
                         auto& val = stack[stack.size() - 1 - i];
-                        std::cout << "[DEBUG] CALL:   Stack[" << (stack.size() - 1 - i) << "]: type=" 
+                        std::cout << "[DEBUG] CALL:   Stack[" << (stack.size() - 1 - i) << "]: type="
                                   << static_cast<int>(val->type->tag) << ", variant=" << val->data.index() << std::endl;
                     }
                 }
@@ -2635,7 +2635,7 @@ void VM::handleCall(const Instruction& instruction) {
                 for (int i = 0; i < argCount; i++) {
                     ValuePtr arg = pop();
                     if (debugMode) {
-                        std::cout << "[DEBUG] CALL: Popped argument " << i << ": type=" 
+                        std::cout << "[DEBUG] CALL: Popped argument " << i << ": type="
                                   << static_cast<int>(arg->type->tag) << ", variant=" << arg->data.index() << std::endl;
                     }
                     args.insert(args.begin(), arg);
@@ -2777,7 +2777,7 @@ void VM::handleCall(const Instruction& instruction) {
                             moduleFunc = funcIt->second;
                             foundInModule = true;
                             if (debugMode) {
-                                std::cout << "[DEBUG] CALL: Found module function '" << actualFuncName 
+                                std::cout << "[DEBUG] CALL: Found module function '" << actualFuncName
                                           << "' in module: " << modulePath << std::endl;
                             }
                             break;
@@ -2812,7 +2812,7 @@ void VM::handleCall(const Instruction& instruction) {
                     const backend::Function& func = funcIt->second;
                     
                     if (debugMode) {
-                        std::cout << "[DEBUG] CALL: Found function '" << actualFuncName 
+                        std::cout << "[DEBUG] CALL: Found function '" << actualFuncName
                                   << "' in current VM, start address: " << func.startAddress << std::endl;
                     }
                     
@@ -2892,7 +2892,7 @@ void VM::handleCall(const Instruction& instruction) {
         if (argCount > 0) {
             // Check if we have enough values on the stack
             if (static_cast<int>(stack.size()) < argCount) {
-                error("Not enough arguments on stack for function call: expected " + 
+                error("Not enough arguments on stack for function call: expected " +
                       std::to_string(argCount) + ", got " + std::to_string(stack.size()));
                 return;
             }
@@ -2907,7 +2907,7 @@ void VM::handleCall(const Instruction& instruction) {
     // or (in some call conventions) included as the last argument. We'll
     // attempt to recover it from either location so the VM tolerates both
     // conventions.
-   // ValuePtr callee = nullptr;
+    // ValuePtr callee = nullptr;
     
     // Check if this function can fail and push an error frame if needed
     bool canFail = functionCanFail(funcName);
@@ -3411,10 +3411,10 @@ void VM::handleCall(const Instruction& instruction) {
             
             // Create a call frame for the closure
             backend::CallFrame closureFrame(
-                closure.functionName,
-                ip + 1, // Return address
-                nullptr // We don't use the function pointer in this implementation
-            );
+                        closure.functionName,
+                        ip + 1, // Return address
+                        nullptr // We don't use the function pointer in this implementation
+                        );
             closureFrame.isClosureCall = true;
             closureFrame.closureEnvironment = closure.capturedEnvironment;
             
@@ -3507,12 +3507,12 @@ void VM::handleCall(const Instruction& instruction) {
     
     // Check if we have a closure value on the stack (for closure calls)
     // This happens when a closure is passed as a value and then called
-                if (debugMode) {
-    std::cout << "[DEBUG] CALL: Checking for closure on stack. Stack size: " << stack.size() << std::endl;
-    if (!stack.empty()) {
-        std::cout << "[DEBUG] CALL: Top stack value type: " << static_cast<int>(stack.back()->type->tag) << std::endl;
-    }
+    if (debugMode) {
+        std::cout << "[DEBUG] CALL: Checking for closure on stack. Stack size: " << stack.size() << std::endl;
+        if (!stack.empty()) {
+            std::cout << "[DEBUG] CALL: Top stack value type: " << static_cast<int>(stack.back()->type->tag) << std::endl;
         }
+    }
 
     if (!stack.empty() && stack.back()->type && stack.back()->type->tag == TypeTag::Closure) {
         //std::cout << "[DEBUG] CALL: Found closure on stack, executing closure call" << std::endl;
@@ -3534,10 +3534,10 @@ void VM::handleCall(const Instruction& instruction) {
         
         // Create a call frame for the closure
         backend::CallFrame closureFrame(
-            closure.functionName,
-            ip + 1, // Return address
-            nullptr // We don't use the function pointer in this implementation
-        );
+                    closure.functionName,
+                    ip + 1, // Return address
+                    nullptr // We don't use the function pointer in this implementation
+                    );
         closureFrame.isClosureCall = true;
         closureFrame.closureEnvironment = closure.capturedEnvironment;
         
@@ -3581,7 +3581,7 @@ void VM::handleCall(const Instruction& instruction) {
         
         // Validate arguments
         if (!backend::FunctionUtils::validateArguments(signature, args)) {
-            error("Function " + funcName + " expects " + std::to_string(signature.getMinParamCount()) + 
+            error("Function " + funcName + " expects " + std::to_string(signature.getMinParamCount()) +
                   " to " + std::to_string(signature.getTotalParamCount()) + " arguments, got " + std::to_string(args.size()));
             return;
         }
@@ -4024,13 +4024,13 @@ void VM::handleBeginFunction(const Instruction& instruction) {
         size_t bodyStart = ip + 1;
         while (bodyStart < bytecode->size()) {
             const Instruction& inst = (*bytecode)[bodyStart];
-            if (inst.opcode == Opcode::DEFINE_PARAM || 
-                inst.opcode == Opcode::DEFINE_OPTIONAL_PARAM ||
-                inst.opcode == Opcode::PUSH_STRING ||
-                inst.opcode == Opcode::PUSH_INT ||
-                inst.opcode == Opcode::PUSH_FLOAT ||
-                inst.opcode == Opcode::PUSH_BOOL ||
-                inst.opcode == Opcode::SET_DEFAULT_VALUE) {
+            if (inst.opcode == Opcode::DEFINE_PARAM ||
+                    inst.opcode == Opcode::DEFINE_OPTIONAL_PARAM ||
+                    inst.opcode == Opcode::PUSH_STRING ||
+                    inst.opcode == Opcode::PUSH_INT ||
+                    inst.opcode == Opcode::PUSH_FLOAT ||
+                    inst.opcode == Opcode::PUSH_BOOL ||
+                    inst.opcode == Opcode::SET_DEFAULT_VALUE) {
                 // These are parameter definition instructions, continue
                 bodyStart++;
             } else {
@@ -4057,7 +4057,7 @@ void VM::handleBeginFunction(const Instruction& instruction) {
         
         // Method will be added to the class definition in handleEndFunction with correct visibility
         if (debugMode) {
-            std::cout << "[DEBUG] Registered class method '" << funcName << "' for class '" 
+            std::cout << "[DEBUG] Registered class method '" << funcName << "' for class '"
                       << currentClassBeingDefined << "' (will be added with visibility in END_FUNCTION)" << std::endl;
         }
         
@@ -4067,22 +4067,22 @@ void VM::handleBeginFunction(const Instruction& instruction) {
         }
     } else {
         // Regular function
-        // std::cout << "[DEBUG] handleBeginFunction: Storing function: " << funcName 
+        // std::cout << "[DEBUG] handleBeginFunction: Storing function: " << funcName
         //           << " with start address: " << func.startAddress << std::endl;
         
         // Check if this is a lambda function that's already registered
         if (funcName.find("__lambda_") == 0) {
             auto existingFunc = userDefinedFunctions.find(funcName);
-            if (existingFunc != userDefinedFunctions.end() && 
-                existingFunc->second.endAddress > 0) {
+            if (existingFunc != userDefinedFunctions.end() &&
+                    existingFunc->second.endAddress > 0) {
                 // Lambda function is already properly registered, don't overwrite it
-                // std::cout << "[DEBUG] handleBeginFunction: Skipping lambda function " << funcName 
-                //           << " - already registered with correct addresses (start=" 
-                //           << existingFunc->second.startAddress << ", end=" 
+                // std::cout << "[DEBUG] handleBeginFunction: Skipping lambda function " << funcName
+                //           << " - already registered with correct addresses (start="
+                //           << existingFunc->second.startAddress << ", end="
                 //           << existingFunc->second.endAddress << ")" << std::endl;
                 return;
             }
-            // std::cout << "[DEBUG] handleBeginFunction: Registering lambda function " << funcName 
+            // std::cout << "[DEBUG] handleBeginFunction: Registering lambda function " << funcName
             //           << " for the first time" << std::endl;
         }
         
@@ -4116,7 +4116,7 @@ void VM::handleEndFunction(const Instruction& /*unused*/) {
                     }
                 } else {
                     if (debugMode) {
-                        std::cout << "[DEBUG] END_FUNCTION: Skipping end address update for lambda " << currentFunc 
+                        std::cout << "[DEBUG] END_FUNCTION: Skipping end address update for lambda " << currentFunc
                                   << " (already set to " << funcIt->second.endAddress << ")" << std::endl;
                     }
                 }
@@ -4182,15 +4182,15 @@ void VM::handleDefineParam(const Instruction& instruction) {
             // Don't modify lambda functions that are already registered with parameters
             if (currentFunc.find("__lambda_") == 0 && !funcIt->second.parameters.empty()) {
                 if (debugMode) {
-                    std::cout << "[DEBUG] handleDefineParam: Skipping parameter addition for already-registered lambda " 
-                          << currentFunc << " (has " << funcIt->second.parameters.size() << " parameters)" << std::endl;
-                }           
+                    std::cout << "[DEBUG] handleDefineParam: Skipping parameter addition for already-registered lambda "
+                              << currentFunc << " (has " << funcIt->second.parameters.size() << " parameters)" << std::endl;
+                }
                 return;
             }
-        if (debugMode) { 
-            std::cout << "[DEBUG] handleDefineParam: Adding parameter '" << instruction.stringValue 
-                      << "' to function " << currentFunc << std::endl;
-           }                  
+            if (debugMode) {
+                std::cout << "[DEBUG] handleDefineParam: Adding parameter '" << instruction.stringValue
+                          << "' to function " << currentFunc << std::endl;
+            }
             funcIt->second.parameters.push_back(std::make_pair(instruction.stringValue, nullptr));
         }
     }
@@ -4203,8 +4203,8 @@ void VM::handleDefineOptionalParam(const Instruction& instruction) {
         auto funcIt = userDefinedFunctions.find(currentFunc);
         if (funcIt != userDefinedFunctions.end()) {
             // Don't modify lambda functions that are already registered with parameters
-            if (currentFunc.find("__lambda_") == 0 && 
-                (!funcIt->second.parameters.empty() || !funcIt->second.optionalParameters.empty())) {
+            if (currentFunc.find("__lambda_") == 0 &&
+                    (!funcIt->second.parameters.empty() || !funcIt->second.optionalParameters.empty())) {
                 return;
             }
             
@@ -4380,50 +4380,50 @@ bool VM::valuesEqual(const ValuePtr& a, const ValuePtr& b) const {
     
     // Compare by value content based on type
     switch (a->type->tag) {
-        case TypeTag::Bool:
-            return std::get<bool>(a->data) == std::get<bool>(b->data);
-        case TypeTag::Int:
-            return std::get<int32_t>(a->data) == std::get<int32_t>(b->data);
-        case TypeTag::Float64:
-            return std::get<double>(a->data) == std::get<double>(b->data);
-        case TypeTag::String:
-            return std::get<std::string>(a->data) == std::get<std::string>(b->data);
-        case TypeTag::Nil:
-            return true; // All nil values are equal
-        default:
-            // For complex types, fall back to pointer comparison
-            return a.get() == b.get();
+    case TypeTag::Bool:
+        return std::get<bool>(a->data) == std::get<bool>(b->data);
+    case TypeTag::Int:
+        return std::get<int32_t>(a->data) == std::get<int32_t>(b->data);
+    case TypeTag::Float64:
+        return std::get<double>(a->data) == std::get<double>(b->data);
+    case TypeTag::String:
+        return std::get<std::string>(a->data) == std::get<std::string>(b->data);
+    case TypeTag::Nil:
+        return true; // All nil values are equal
+    default:
+        // For complex types, fall back to pointer comparison
+        return a.get() == b.get();
     }
 }
 
 // Helper function for parameter binding in function calls
 bool VM::bindFunctionParameters(const backend::Function& func, const std::vector<ValuePtr>& args, 
-                               std::shared_ptr<Environment> funcEnv, const std::string& funcName) {
+                                std::shared_ptr<Environment> funcEnv, const std::string& funcName) {
     // Check argument count
     size_t requiredParams = func.parameters.size();
     size_t totalParams = requiredParams + func.optionalParameters.size();
 
-            if (debugMode) {
-    
-    std::cout << "[DEBUG] bindFunctionParameters for " << funcName << ":" << std::endl;
-    std::cout << "[DEBUG]   Required parameters: " << requiredParams << std::endl;
-    std::cout << "[DEBUG]   Optional parameters: " << func.optionalParameters.size() << std::endl;
-    std::cout << "[DEBUG]   Total parameters: " << totalParams << std::endl;
-    std::cout << "[DEBUG]   Arguments provided: " << args.size() << std::endl;
-    
-    for (size_t i = 0; i < func.parameters.size(); i++) {
-        std::cout << "[DEBUG]   Required param[" << i << "]: " << func.parameters[i].first << std::endl;
-    }
-    for (size_t i = 0; i < func.optionalParameters.size(); i++) {
-        std::cout << "[DEBUG]   Optional param[" << i << "]: " << func.optionalParameters[i].first << std::endl;
-    }
+    if (debugMode) {
+
+        std::cout << "[DEBUG] bindFunctionParameters for " << funcName << ":" << std::endl;
+        std::cout << "[DEBUG]   Required parameters: " << requiredParams << std::endl;
+        std::cout << "[DEBUG]   Optional parameters: " << func.optionalParameters.size() << std::endl;
+        std::cout << "[DEBUG]   Total parameters: " << totalParams << std::endl;
+        std::cout << "[DEBUG]   Arguments provided: " << args.size() << std::endl;
+
+        for (size_t i = 0; i < func.parameters.size(); i++) {
+            std::cout << "[DEBUG]   Required param[" << i << "]: " << func.parameters[i].first << std::endl;
+        }
+        for (size_t i = 0; i < func.optionalParameters.size(); i++) {
+            std::cout << "[DEBUG]   Optional param[" << i << "]: " << func.optionalParameters[i].first << std::endl;
+        }
 
 
         
     }
     
     if (args.size() < requiredParams || args.size() > totalParams) {
-        error("Function " + funcName + " expects " + std::to_string(requiredParams) + 
+        error("Function " + funcName + " expects " + std::to_string(requiredParams) +
               " to " + std::to_string(totalParams) + " arguments, got " + std::to_string(args.size()));
         return false;
     }
@@ -4456,7 +4456,7 @@ bool VM::bindFunctionParameters(const backend::Function& func, const std::vector
 
 // Helper function for consistent call frame management
 void VM::createAndPushCallFrame(const std::string& funcName, size_t returnAddress, 
-                               std::shared_ptr<Environment> funcEnv) {
+                                std::shared_ptr<Environment> funcEnv) {
     // Create call frame
     backend::CallFrame frame(funcName, returnAddress, nullptr);
     frame.setPreviousEnvironment(environment);
@@ -4630,8 +4630,8 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
             // Create and push error value for out of bounds
             auto errorType = typeSystem->getErrorType("IndexOutOfBounds");
             auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
-            ErrorValue errorVal("IndexOutOfBounds", "List index " + std::to_string(idx) + 
-                              " out of bounds for list of size " + std::to_string(listData.elements.size()));
+            ErrorValue errorVal("IndexOutOfBounds", "List index " + std::to_string(idx) +
+                                " out of bounds for list of size " + std::to_string(listData.elements.size()));
             errorValue->data = errorVal;
             push(errorValue);
             return;
@@ -4662,8 +4662,8 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
             // Create and push error value for out of bounds
             auto errorType = typeSystem->getErrorType("IndexOutOfBounds");
             auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
-            ErrorValue errorVal("IndexOutOfBounds", "Tuple index " + std::to_string(idx) + 
-                              " out of bounds for tuple of size " + std::to_string(tupleData.elements.size()));
+            ErrorValue errorVal("IndexOutOfBounds", "Tuple index " + std::to_string(idx) +
+                                " out of bounds for tuple of size " + std::to_string(tupleData.elements.size()));
             errorValue->data = errorVal;
             push(errorValue);
             return;
@@ -4740,8 +4740,8 @@ void VM::handleSetIndex(const Instruction& /*unused*/) {
             // Create and push error value for out of bounds
             auto errorType = typeSystem->getErrorType("IndexOutOfBounds");
             auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
-            ErrorValue errorVal("IndexOutOfBounds", "List index " + std::to_string(idx) + 
-                              " out of bounds for list of size " + std::to_string(listData.elements.size()));
+            ErrorValue errorVal("IndexOutOfBounds", "List index " + std::to_string(idx) +
+                                " out of bounds for list of size " + std::to_string(listData.elements.size()));
             errorValue->data = errorVal;
             push(errorValue);
             return;
@@ -4827,7 +4827,7 @@ void VM::handleCreateRange(const Instruction& instruction) {
         error("Range end must be an integer");
         return;
     }
-   
+
     // Create a list to hold the range values
     // ListValue rangeList;
     
@@ -4841,22 +4841,22 @@ void VM::handleCreateRange(const Instruction& instruction) {
     //         auto val = memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, i);
     //         rangeList.elements.push_back(val);
     //     }
-    // }    
+    // }
     // // Push the range list onto the stack
     // auto result = memoryManager.makeRef<Value>(*region, typeSystem->LIST_TYPE, rangeList);
     // push(result);
-  
+
     // CRITICAL FIX: Create a lazy range iterator instead of materializing all values
     auto rangeIterator = std::make_shared<IteratorValue>(
-        IteratorValue::IteratorType::RANGE,
-        nullptr,  // No backing collection
-        start,    // Pass range parameters directly
-        end,
-        step
-    );
+                IteratorValue::IteratorType::RANGE,
+                nullptr,  // No backing collection
+                start,    // Pass range parameters directly
+                end,
+                step
+                );
 
     if (debugMode) {
-        std::cout << "[DEBUG] Created lazy range iterator: start=" << start 
+        std::cout << "[DEBUG] Created lazy range iterator: start=" << start
                   << ", end=" << end << ", step=" << step << std::endl;
     }
     // // Wrap in a Value
@@ -4881,38 +4881,38 @@ void VM::handleGetIterator(const Instruction& /*unused*/) {
     if (std::holds_alternative<ListValue>(iterable->data)) {
         // For lists, create a list iterator
         auto iterator = std::make_shared<IteratorValue>(
-            IteratorValue::IteratorType::LIST,
-            iterable
-        );
+                    IteratorValue::IteratorType::LIST,
+                    iterable
+                    );
         auto iteratorValue = memoryManager.makeRef<Value>(
-            *region,
-            typeSystem->ANY_TYPE,
-            iterator
-        );
+                    *region,
+                    typeSystem->ANY_TYPE,
+                    iterator
+                    );
         push(iteratorValue);
     } else if (std::holds_alternative<DictValue>(iterable->data)) {
         // For dictionaries, we'll use the same approach as lists for now
         auto iterator = std::make_shared<IteratorValue>(
-            IteratorValue::IteratorType::LIST,
-            iterable
-        );
+                    IteratorValue::IteratorType::LIST,
+                    iterable
+                    );
         auto iteratorValue = memoryManager.makeRef<Value>(
-            *region,
-            typeSystem->ANY_TYPE,
-            iterator
-        );
+                    *region,
+                    typeSystem->ANY_TYPE,
+                    iterator
+                    );
         push(iteratorValue);
     } else if (std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(iterable->data)) {
         // Create a channel-backed iterator
         auto iterator = std::make_shared<IteratorValue>(
-            IteratorValue::IteratorType::CHANNEL,
-            iterable
-        );
+                    IteratorValue::IteratorType::CHANNEL,
+                    iterable
+                    );
         auto iteratorValue = memoryManager.makeRef<Value>(
-            *region,
-            typeSystem->ANY_TYPE,
-            iterator
-        );
+                    *region,
+                    typeSystem->ANY_TYPE,
+                    iterator
+                    );
         push(iteratorValue);
     } else {
         error("Type is not iterable");
@@ -4925,7 +4925,7 @@ void VM::handleIteratorHasNext(const Instruction& /*unused*/) {
     
     // Check if the value is an iterator
     if (!std::holds_alternative<IteratorValuePtr>(iteratorVal->data)) {
-        error("Expected iterator value in ITERATOR_HAS_NEXT, got type: " + 
+        error("Expected iterator value in ITERATOR_HAS_NEXT, got type: " +
               typeTagToString(iteratorVal->type->tag));
         return;
     }
@@ -4939,10 +4939,10 @@ void VM::handleIteratorHasNext(const Instruction& /*unused*/) {
     
     // Push the result back onto the stack
     auto result = memoryManager.makeRef<Value>(
-        *region,
-        typeSystem->BOOL_TYPE,
-        hasNext
-    );
+                *region,
+                typeSystem->BOOL_TYPE,
+                hasNext
+                );
     push(result);
 }
 
@@ -4952,7 +4952,7 @@ void VM::handleIteratorNext(const Instruction& /*unused*/) {
     
     // Check if the value is an iterator
     if (!std::holds_alternative<IteratorValuePtr>(iteratorVal->data)) {
-        error("Expected iterator value in ITERATOR_NEXT, got type: " + 
+        error("Expected iterator value in ITERATOR_NEXT, got type: " +
               typeTagToString(iteratorVal->type->tag));
         return;
     }
@@ -4993,7 +4993,7 @@ void VM::handleBeginScope(const Instruction& /*unused*/) {
 void VM::handleEndScope(const Instruction& /*unused*/) {
     // Restore the previous environment
     if (debugMode) {
-        std::cout << "[DEBUG] END_SCOPE: Current environment = " << (environment ? "valid" : "null") 
+        std::cout << "[DEBUG] END_SCOPE: Current environment = " << (environment ? "valid" : "null")
                   << ", has enclosing = " << (environment && environment->enclosing ? "yes" : "no") << std::endl;
     }
     
@@ -5034,9 +5034,9 @@ void VM::handleBeginParallel(const Instruction& instruction) {
 
     // Extract the bytecode for the parallel block
     std::vector<Instruction> block_bytecode(
-        bytecode->begin() + block_start_ip,
-        bytecode->begin() + block_end_ip
-    );
+                bytecode->begin() + block_start_ip,
+                bytecode->begin() + block_end_ip
+                );
 
     // Get the number of cores to use (from instruction parameters)
     int cores = instruction.intValue > 0 ? instruction.intValue : std::thread::hardware_concurrency();
@@ -5227,7 +5227,7 @@ void VM::handleEndTask(const Instruction& instruction) {
     for (auto& context : state->tasks) {
         try {
             if (debugMode) {
-                std::cout << "[DEBUG] Submitting task with loop var '" << context->loop_var 
+                std::cout << "[DEBUG] Submitting task with loop var '" << context->loop_var
                           << "' = " << context->iteration_value->toString() << std::endl;
             }
             
@@ -5316,11 +5316,11 @@ void VM::handleStoreIterable(const Instruction& instruction) {
         // Copy current error frames to task context
         for (const auto& frame : errorFrames) {
             context->error_frames.emplace_back(
-                frame.handlerAddress,
-                frame.stackBase,
-                frame.expectedErrorType,
-                frame.functionName
-            );
+                        frame.handlerAddress,
+                        frame.stackBase,
+                        frame.expectedErrorType,
+                        frame.functionName
+                        );
         }
         
         // Add task to the current block
@@ -5383,35 +5383,35 @@ void VM::handleMatchPattern(const Instruction& /*unused*/) {
         else {
             std::string valueTypeName;
             switch(value->type->tag) {
-                case TypeTag::Int: 
-                case TypeTag::Int32: 
-                case TypeTag::Int64: 
-                    valueTypeName = "int"; 
-                    break;
-                case TypeTag::Float32:
-                    valueTypeName = "f32"; 
-                    break;
-                case TypeTag::Float64: 
-                    valueTypeName = "f64"; 
-                    break;
-                case TypeTag::String: 
-                    valueTypeName = "str"; 
-                    break;
-                case TypeTag::Bool: 
-                    valueTypeName = "bool"; 
-                    break;
-                case TypeTag::List: 
-                    valueTypeName = "list"; 
-                    break;
-                case TypeTag::Dict: 
-                    valueTypeName = "dict"; 
-                    break;
-                case TypeTag::Nil:
-                    valueTypeName = "nil";
-                    break;
-                default: 
-                    valueTypeName = "unknown"; 
-                    break;
+            case TypeTag::Int:
+            case TypeTag::Int32:
+            case TypeTag::Int64:
+                valueTypeName = "int";
+                break;
+            case TypeTag::Float32:
+                valueTypeName = "f32";
+                break;
+            case TypeTag::Float64:
+                valueTypeName = "f64";
+                break;
+            case TypeTag::String:
+                valueTypeName = "str";
+                break;
+            case TypeTag::Bool:
+                valueTypeName = "bool";
+                break;
+            case TypeTag::List:
+                valueTypeName = "list";
+                break;
+            case TypeTag::Dict:
+                valueTypeName = "dict";
+                break;
+            case TypeTag::Nil:
+                valueTypeName = "nil";
+                break;
+            default:
+                valueTypeName = "unknown";
+                break;
             }
 
             // Direct type matching
@@ -5419,16 +5419,16 @@ void VM::handleMatchPattern(const Instruction& /*unused*/) {
                 match = true;
             }
             // Legacy float type matching for backward compatibility
-            else if ((typeName == "float" || typeName == "f64") && 
+            else if ((typeName == "float" || typeName == "f64") &&
                      (value->type->tag == TypeTag::Float32 || value->type->tag == TypeTag::Float64)) {
                 match = true;
             }
             // Generic type matching (basic support)
-            else if (value->type->tag == TypeTag::List && 
+            else if (value->type->tag == TypeTag::List &&
                      (typeName.find("list") == 0 || typeName == "array")) {
                 match = true;
             }
-            else if (value->type->tag == TypeTag::Dict && 
+            else if (value->type->tag == TypeTag::Dict &&
                      (typeName.find("dict") == 0 || typeName == "map" || typeName == "object")) {
                 match = true;
             }
@@ -5488,9 +5488,9 @@ bool VM::handleDictPatternMatch(const ValuePtr& value) {
         ValuePtr bindingName = pop();
         ValuePtr keyName = pop();
         fieldPatterns.push_back({
-            std::get<std::string>(keyName->data),
-            std::get<std::string>(bindingName->data)
-        });
+                                    std::get<std::string>(keyName->data),
+                                    std::get<std::string>(bindingName->data)
+                                });
     }
     
     // Check if all required fields exist
@@ -5579,7 +5579,7 @@ bool VM::handleListPatternMatch(const ValuePtr& value) {
         
         // Handle variable binding patterns
         if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(
-            std::reinterpret_pointer_cast<AST::Expression>(pattern))) {
+                    std::reinterpret_pointer_cast<AST::Expression>(pattern))) {
             // This is a simplified check - in a full implementation,
             // we'd need to track pattern types differently
             // For now, assume string patterns are variable bindings
@@ -5742,12 +5742,12 @@ void VM::handleImportExecute(const Instruction& instruction) {
         std::cout << "[DEBUG] handleImportExecute: Starting import execution" << std::endl;
         std::cout << "[DEBUG] handleImportExecute: Module path: " << modulePath << std::endl;
         std::cout << "[DEBUG] handleImportExecute: Resolved file path: " << filePath << std::endl;
-        std::cout << "[DEBUG] handleImportExecute: Current import state alias: " 
+        std::cout << "[DEBUG] handleImportExecute: Current import state alias: "
                   << (currentImportState.alias ? *currentImportState.alias : "none") << std::endl;
-        std::cout << "[DEBUG] handleImportExecute: Filter type: " 
-                  << (currentImportState.filterType ? 
-                      (*currentImportState.filterType == AST::ImportFilterType::Show ? "Show" : "Hide") : 
-                      "none") << std::endl;
+        std::cout << "[DEBUG] handleImportExecute: Filter type: "
+                  << (currentImportState.filterType ?
+                          (*currentImportState.filterType == AST::ImportFilterType::Show ? "Show" : "Hide") :
+                          "none") << std::endl;
     }
 
     ValuePtr moduleValue;
@@ -5817,7 +5817,7 @@ void VM::handleImportExecute(const Instruction& instruction) {
         if (!moduleVm.userDefinedFunctions.empty()) {
             moduleUserDefinedFunctions[moduleVm.environment.get()] = moduleVm.userDefinedFunctions;
             if (debugMode) {
-                std::cout << "[DEBUG] handleImportExecute: Stored " << moduleVm.userDefinedFunctions.size() 
+                std::cout << "[DEBUG] handleImportExecute: Stored " << moduleVm.userDefinedFunctions.size()
                           << " function definitions from module" << std::endl;
             }
         }
@@ -6012,11 +6012,11 @@ void VM::parseBlockParameters(const std::string& paramString, BlockExecutionStat
     
     if (debugMode) {
         std::cout << "[DEBUG] Parsed block parameters:" << std::endl;
-        std::cout << "[DEBUG]   mode: " << (state.mode == ExecutionMode::Batch ? "batch" : 
-                                           state.mode == ExecutionMode::Stream ? "stream" : "async") << std::endl;
+        std::cout << "[DEBUG]   mode: " << (state.mode == ExecutionMode::Batch ? "batch" :
+                                                                                 state.mode == ExecutionMode::Stream ? "stream" : "async") << std::endl;
         std::cout << "[DEBUG]   cores: " << state.cores << std::endl;
         std::cout << "[DEBUG]   error_strategy: " << (state.error_strategy == ErrorHandlingStrategy::Stop ? "Stop" :
-                                                     state.error_strategy == ErrorHandlingStrategy::Auto ? "Auto" : "Retry") << std::endl;
+                                                                                                            state.error_strategy == ErrorHandlingStrategy::Auto ? "Auto" : "Retry") << std::endl;
         std::cout << "[DEBUG]   timeout: " << state.timeout.count() << "ms" << std::endl;
         std::cout << "[DEBUG]   grace_period: " << state.grace_period.count() << "ms" << std::endl;
         std::cout << "[DEBUG]   output_channel: " << state.output_channel_name << std::endl;
@@ -6132,9 +6132,9 @@ void VM::handleCheckError(const Instruction& instruction) {
         error("Stack underflow in CHECK_ERROR");
         return;
     }
-    
-    // Peek the top value without consuming it - optimized for success path
-    ValuePtr value = peek();
+
+        // Peek the top value without consuming it - optimized for success path
+        ValuePtr value = peek();
 
     // Fast path: most values are not errors
     bool isError = isErrorValue(value);
@@ -6229,8 +6229,8 @@ void VM::handleConstructError(const Instruction& instruction) {
         error("Stack underflow in CONSTRUCT_ERROR");
         return;
     }
-    
-    recordErrorPath();
+
+        recordErrorPath();
     
     // Pop arguments from stack - optimized for common case of 0-1 args
     std::vector<ValuePtr> args;
@@ -6273,8 +6273,8 @@ void VM::handleConstructOk(const Instruction& instruction) {
         error("Stack underflow in CONSTRUCT_OK");
         return;
     }
-    
-    recordSuccessPath();
+
+        recordSuccessPath();
     
     ValuePtr successValue = pop();
     
@@ -6346,8 +6346,8 @@ void VM::handleUnwrapValue(const Instruction& instruction) {
         error("Stack underflow in UNWRAP_VALUE");
         return;
     }
-    
-    ValuePtr value = pop();
+
+        ValuePtr value = pop();
     
     // Fast path: check if this is an error that should be propagated
     if (isErrorValue(value)) [[unlikely]] {
@@ -6361,7 +6361,7 @@ void VM::handleUnwrapValue(const Instruction& instruction) {
         if (!propagateError(value)) {
             // No error handler found
             if (const auto* errorVal = value->getErrorValue()) {
-                error("Unhandled error during unwrap: " + errorVal->errorType + 
+                error("Unhandled error during unwrap: " + errorVal->errorType +
                       (errorVal->message.empty() ? "" : " - " + errorVal->message));
             } else {
                 error("Unhandled error during unwrap: " + valueToString(value));
@@ -6369,8 +6369,8 @@ void VM::handleUnwrapValue(const Instruction& instruction) {
         }
         return; // Execution continues at error handler or terminates
     }
-    
-    recordSuccessPath();
+
+        recordSuccessPath();
     
     // Success path: extract value from error union if needed
     if (value->type->tag == TypeTag::ErrorUnion) [[likely]] {
@@ -6414,15 +6414,15 @@ void VM::handlePushFunction(const Instruction& instruction) {
             if (funcIt != userDefinedFunctions.end()) {
                 // Create a VM method implementation
                 auto methodImpl = std::make_shared<backend::VMMethodImplementation>(
-                    this, functionName, classDef, 
-                    funcIt->second.startAddress, funcIt->second.endAddress);
+                            this, functionName, classDef,
+                            funcIt->second.startAddress, funcIt->second.endAddress);
                 
                 backend::ClassMethod classMethod(functionName, methodImpl, visibility);
                 classDef->addMethod(classMethod);
                 
                 if (debugMode) {
-                    std::cout << "[DEBUG] PUSH_FUNCTION: Successfully added method '" << functionName 
-                              << "' to class '" << currentClassBeingDefined 
+                    std::cout << "[DEBUG] PUSH_FUNCTION: Successfully added method '" << functionName
+                              << "' to class '" << currentClassBeingDefined
                               << "' with visibility " << static_cast<int>(visibility) << std::endl;
                 }
             } else {
@@ -6761,7 +6761,7 @@ void VM::handleSetProperty(const Instruction& instruction) {
                 if (currentClass && currentClass->getName() == objectInstance->getClassName()) {
                     objectInstance->defineField(propertyName, value);
                 } else {
-                    error("Cannot define new field '" + propertyName + "' from outside class '" + 
+                    error("Cannot define new field '" + propertyName + "' from outside class '" +
                           objectInstance->getClassName() + "'");
                     return;
                 }
@@ -7028,22 +7028,22 @@ std::unique_ptr<TaskContext> VM::createTaskContext(const std::string& loopVar, V
     // Copy current error frames to task context
     for (const auto& frame : errorFrames) {
         context->error_frames.emplace_back(
-            frame.handlerAddress,
-            frame.stackBase,
-            frame.expectedErrorType,
-            frame.functionName
-        );
+                    frame.handlerAddress,
+                    frame.stackBase,
+                    frame.expectedErrorType,
+                    frame.functionName
+                    );
     }
     
     return context;
 }
 
 std::unique_ptr<TaskContext> VM::createTaskContextWithBytecode(
-    const std::string& loopVar, 
-    ValuePtr iterationValue,
-    const std::vector<Instruction>& bytecode,
-    size_t start_ip,
-    size_t end_ip) {
+        const std::string& loopVar,
+        ValuePtr iterationValue,
+        const std::vector<Instruction>& bytecode,
+        size_t start_ip,
+        size_t end_ip) {
     
     // Create base task context
     auto context = createTaskContext(loopVar, iterationValue);
@@ -7072,18 +7072,18 @@ std::unique_ptr<TaskVM> VM::createTaskVM(std::unique_ptr<TaskContext> context) {
     std::shared_ptr<Channel<ErrorValue>> error_channel = nullptr;
     
     // Get output channel from current block if available
-    if (concurrency_state->getCurrentBlock() && 
-        concurrency_state->getCurrentBlock()->output_channel) {
+    if (concurrency_state->getCurrentBlock() &&
+            concurrency_state->getCurrentBlock()->output_channel) {
         result_channel = concurrency_state->getCurrentBlock()->output_channel;
     }
     
     // Create TaskVM using factory
     return TaskVMFactory::createTaskVM(
-        std::move(context),
-        error_collector,
-        result_channel,
-        error_channel
-    );
+                std::move(context),
+                error_collector,
+                result_channel,
+                error_channel
+                );
 }
 
 void VM::submitTaskToScheduler(std::unique_ptr<TaskVM> task_vm) {
@@ -7155,24 +7155,24 @@ std::shared_ptr<IteratorValue> VM::createIterator(ValuePtr iterable) {
     if (std::holds_alternative<ListValue>(iterable->data)) {
         // For lists, create a list iterator
         return std::make_shared<IteratorValue>(
-            IteratorValue::IteratorType::LIST,
-            iterable
-        );
+                    IteratorValue::IteratorType::LIST,
+                    iterable
+                    );
     } else if (std::holds_alternative<DictValue>(iterable->data)) {
         // For dictionaries
         return std::make_shared<IteratorValue>(
-            IteratorValue::IteratorType::LIST, // TODO: Add DICT iterator type
-            iterable
-        );
+                    IteratorValue::IteratorType::LIST, // TODO: Add DICT iterator type
+                    iterable
+                    );
     } else if (std::holds_alternative<IteratorValuePtr>(iterable->data)) {
         // If it's already an iterator, return it
         return std::get<IteratorValuePtr>(iterable->data);
     } else if (std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(iterable->data)) {
         // Create a channel-backed iterator
         return std::make_shared<IteratorValue>(
-            IteratorValue::IteratorType::CHANNEL,
-            iterable
-        );
+                    IteratorValue::IteratorType::CHANNEL,
+                    iterable
+                    );
     }
     
     return nullptr;
@@ -7383,15 +7383,15 @@ void VM::handleCreateClosure(const Instruction& instruction) {
     if (registryIt != userDefinedFunctions.end()) {
         correctStartAddress = registryIt->second.startAddress;
         correctEndAddress = registryIt->second.endAddress;
-        // std::cout << "[DEBUG] CREATE_CLOSURE: Using registry addresses - startAddress: " 
+        // std::cout << "[DEBUG] CREATE_CLOSURE: Using registry addresses - startAddress: "
         //           << correctStartAddress << ", endAddress: " << correctEndAddress << std::endl;
     } else {
-      //  std::cout << "[WARNING] CREATE_CLOSURE: Function not found in registry, using stack addresses" << std::endl;
+        //  std::cout << "[WARNING] CREATE_CLOSURE: Function not found in registry, using stack addresses" << std::endl;
     }
     
     // Create the closure value using the correct addresses
     ClosureValue closure(lambdaFunc->name, correctStartAddress, correctEndAddress,
-                        closureEnv, capturedVarNames);
+                         closureEnv, capturedVarNames);
     
     // Create a closure type
     TypePtr closureType = std::make_shared<Type>(TypeTag::Closure);
@@ -7536,10 +7536,10 @@ void VM::handleCallClosure(const Instruction& instruction) {
     
     // Create a call frame for the closure
     backend::CallFrame closureFrame(
-        closure.functionName,
-        ip + 1, // Return address
-        nullptr // We don't use the function pointer in this implementation
-    );
+                closure.functionName,
+                ip + 1, // Return address
+                nullptr // We don't use the function pointer in this implementation
+                );
     closureFrame.isClosureCall = true;
     closureFrame.closureEnvironment = closure.capturedEnvironment;
     
@@ -7559,7 +7559,7 @@ void VM::handleCallClosure(const Instruction& instruction) {
     ip = closure.startAddress - 1; // -1 because ip will be incremented
     
     if (debugMode) {
-        std::cout << "[DEBUG] Called closure: " << closure.functionName 
+        std::cout << "[DEBUG] Called closure: " << closure.functionName
                   << " with " << argCount << " arguments, jumping to IP " << closure.startAddress << std::endl;
     }
 }
@@ -7582,16 +7582,16 @@ void VM::handlePushLambda(const Instruction& instruction) {
     // Look up the lambda function in the user-defined functions
     auto funcIt = userDefinedFunctions.find(lambdaName);
     if (funcIt == userDefinedFunctions.end()) {
-        error("PUSH_LAMBDA: lambda function not found: " + lambdaName + 
+        error("PUSH_LAMBDA: lambda function not found: " + lambdaName +
               ". Available functions: " + std::to_string(userDefinedFunctions.size()));
         return;
     }
-        if (debugMode) {
-    std::cout << "[DEBUG] PUSH_LAMBDA: Found function in registry with addresses - startAddress: " 
-              << funcIt->second.startAddress << ", endAddress: " << funcIt->second.endAddress << std::endl;
-    
+    if (debugMode) {
+        std::cout << "[DEBUG] PUSH_LAMBDA: Found function in registry with addresses - startAddress: "
+                  << funcIt->second.startAddress << ", endAddress: " << funcIt->second.endAddress << std::endl;
 
-        std::cout << "[DEBUG] Found lambda function: " << lambdaName 
+
+        std::cout << "[DEBUG] Found lambda function: " << lambdaName
                   << " (isLambda: " << funcIt->second.isLambda << ")" << std::endl;
     }
     
@@ -7600,26 +7600,26 @@ void VM::handlePushLambda(const Instruction& instruction) {
     
     // For lambda functions, we store the Function struct directly in the value
     // This allows us to access the bytecode addresses and parameters later
-        if (debugMode) {
-    std::cout << "[DEBUG] PUSH_LAMBDA: About to store function with addresses - startAddress: " 
-              << funcIt->second.startAddress << ", endAddress: " << funcIt->second.endAddress << std::endl;
-                }
+    if (debugMode) {
+        std::cout << "[DEBUG] PUSH_LAMBDA: About to store function with addresses - startAddress: "
+                  << funcIt->second.startAddress << ", endAddress: " << funcIt->second.endAddress << std::endl;
+    }
     ValuePtr functionValue = memoryManager.makeRef<Value>(*region, functionType, funcIt->second);
     push(functionValue);
     
     // Verify what was stored
     if (std::holds_alternative<backend::Function>(functionValue->data)) {
         const auto& storedFunc = std::get<backend::Function>(functionValue->data);
-            if (debugMode) {
-        std::cout << "[DEBUG] PUSH_LAMBDA: Stored function addresses - startAddress: " 
-                  << storedFunc.startAddress << ", endAddress: " << storedFunc.endAddress << std::endl;
-        std::cout << "[DEBUG] PUSH_LAMBDA: Stored function parameters - required: " 
-                  << storedFunc.parameters.size() << ", optional: " << storedFunc.optionalParameters.size() << std::endl;
-                   
-        for (size_t i = 0; i < storedFunc.parameters.size(); i++) {
-            std::cout << "[DEBUG] PUSH_LAMBDA: Required param[" << i << "]: " << storedFunc.parameters[i].first << std::endl;
+        if (debugMode) {
+            std::cout << "[DEBUG] PUSH_LAMBDA: Stored function addresses - startAddress: "
+                      << storedFunc.startAddress << ", endAddress: " << storedFunc.endAddress << std::endl;
+            std::cout << "[DEBUG] PUSH_LAMBDA: Stored function parameters - required: "
+                      << storedFunc.parameters.size() << ", optional: " << storedFunc.optionalParameters.size() << std::endl;
+
+            for (size_t i = 0; i < storedFunc.parameters.size(); i++) {
+                std::cout << "[DEBUG] PUSH_LAMBDA: Required param[" << i << "]: " << storedFunc.parameters[i].first << std::endl;
+            }
         }
-         }
     }
     
     if (debugMode) {
@@ -7711,13 +7711,13 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
     int32_t argCount = std::get<int32_t>(argCountValue->data);
     
     if (debugMode) {
-        std::cout << "[DEBUG] CALL_HIGHER_ORDER: stack.size()=" << stack.size() 
-                  << ", argCount=" << argCount 
+        std::cout << "[DEBUG] CALL_HIGHER_ORDER: stack.size()=" << stack.size()
+                  << ", argCount=" << argCount
                   << ", required=" << (argCount + 1) << std::endl;
     }
     
     if (stack.size() < static_cast<size_t>(argCount + 1)) {
-        error("CALL_HIGHER_ORDER: not enough arguments on stack (have " + 
+        error("CALL_HIGHER_ORDER: not enough arguments on stack (have " +
               std::to_string(stack.size()) + ", need " + std::to_string(argCount + 1) + ")");
         return;
     }
@@ -7771,7 +7771,7 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
                 ip = funcInfo.startAddress;
                 
                 if (debugMode) {
-                    std::cout << "[DEBUG] CALL_HIGHER_ORDER: Called user function " << functionName 
+                    std::cout << "[DEBUG] CALL_HIGHER_ORDER: Called user function " << functionName
                               << " at address " << ip << std::endl;
                 }
                 return; // Don't increment IP, we've jumped to the function
@@ -7805,7 +7805,7 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
                     ip = funcInfo.startAddress;
                     
                     if (debugMode) {
-                        std::cout << "[DEBUG] CALL_HIGHER_ORDER: Called user function " << funcName 
+                        std::cout << "[DEBUG] CALL_HIGHER_ORDER: Called user function " << funcName
                                   << " at address " << ip << std::endl;
                     }
                     return; // Don't increment IP, we've jumped to the function
@@ -7849,8 +7849,8 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
             std::cout << "  endAddress: " << closure.endAddress << std::endl;
             std::cout << "  functionName.empty(): " << (closure.functionName.empty() ? "true" : "false") << std::endl;
             std::cout << "  startAddress < endAddress: " << (closure.startAddress < closure.endAddress ? "true" : "false") << std::endl;
-            error("CALL_HIGHER_ORDER: invalid closure (functionName='" + closure.functionName + 
-                  "', startAddress=" + std::to_string(closure.startAddress) + 
+            error("CALL_HIGHER_ORDER: invalid closure (functionName='" + closure.functionName +
+                  "', startAddress=" + std::to_string(closure.startAddress) +
                   ", endAddress=" + std::to_string(closure.endAddress) + ")");
             return;
         }
@@ -7886,7 +7886,7 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
             // For nested closures, we need to properly calculate the function body start
             // The startAddress points to BEGIN_FUNCTION, we need to skip setup instructions
             size_t bodyStart = closure.startAddress;
-           // std::cout << "[DEBUG] CLOSURE EXEC: Looking for function body start from " << bodyStart << std::endl;
+            // std::cout << "[DEBUG] CLOSURE EXEC: Looking for function body start from " << bodyStart << std::endl;
             
             // Skip past BEGIN_FUNCTION and all parameter definitions and nested functions
             bodyStart++; // Skip BEGIN_FUNCTION
@@ -7898,17 +7898,17 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
                 if (inst.opcode == Opcode::BEGIN_FUNCTION) {
                     // Skip nested function definitions
                     nestedFunctionDepth++;
-                //    std::cout << "[DEBUG] CLOSURE EXEC: Entering nested function at " << bodyStart << ", depth=" << nestedFunctionDepth << std::endl;
+                    //    std::cout << "[DEBUG] CLOSURE EXEC: Entering nested function at " << bodyStart << ", depth=" << nestedFunctionDepth << std::endl;
                     bodyStart++;
                 } else if (inst.opcode == Opcode::END_FUNCTION) {
                     if (nestedFunctionDepth > 0) {
                         // End of nested function
                         nestedFunctionDepth--;
-                     //   std::cout << "[DEBUG] CLOSURE EXEC: Exiting nested function at " << bodyStart << ", depth=" << nestedFunctionDepth << std::endl;
+                        //   std::cout << "[DEBUG] CLOSURE EXEC: Exiting nested function at " << bodyStart << ", depth=" << nestedFunctionDepth << std::endl;
                         bodyStart++;
                     } else {
                         // This is the END_FUNCTION for our current function, we've gone too far
-                    //    std::cout << "[DEBUG] CLOSURE EXEC: Reached end of current function at " << bodyStart << ", no body found" << std::endl;
+                        //    std::cout << "[DEBUG] CLOSURE EXEC: Reached end of current function at " << bodyStart << ", no body found" << std::endl;
                         break;
                     }
                 } else if (nestedFunctionDepth > 0) {
@@ -7921,7 +7921,7 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
                     bodyStart++;
                 } else {
                     // Found the start of the actual function body
-                  //  std::cout << "[DEBUG] CLOSURE EXEC: Found function body start at " << bodyStart << std::endl;
+                    //  std::cout << "[DEBUG] CLOSURE EXEC: Found function body start at " << bodyStart << std::endl;
                     break;
                 }
             }
@@ -7934,7 +7934,7 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
             }
             
             // Jump to the function body start address
-          //  std::cout << "[DEBUG] CLOSURE EXEC: Jumping to " << bodyStart << " (ip will be " << (bodyStart - 1) << ")" << std::endl;
+            //  std::cout << "[DEBUG] CLOSURE EXEC: Jumping to " << bodyStart << " (ip will be " << (bodyStart - 1) << ")" << std::endl;
             ip = bodyStart - 1; // -1 because ip will be incremented in the main loop
             
             // The function will return normally and restore the environment
@@ -8000,7 +8000,7 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
             ip = initMethod.startAddress - 1; // -1 because ip will be incremented
             
             if (debugMode) {
-                std::cout << "[DEBUG] CALL_HIGHER_ORDER: Calling constructor " << initMethodKey 
+                std::cout << "[DEBUG] CALL_HIGHER_ORDER: Calling constructor " << initMethodKey
                           << " at address " << initMethod.startAddress << std::endl;
             }
             return; // Don't increment IP, we've jumped to the constructor
@@ -8049,7 +8049,7 @@ void VM::handleCreateUnion(const Instruction& instruction) {
         push(unionValue);
         
         if (debugMode) {
-            std::cout << "[DEBUG] CREATE_UNION: Created union value with variant " 
+            std::cout << "[DEBUG] CREATE_UNION: Created union value with variant "
                       << variantIndex << " for type " << unionTypeName << std::endl;
         }
     } catch (const std::exception& e) {
@@ -8069,18 +8069,18 @@ void VM::handleGetUnionVariant(const Instruction& instruction) {
     
     ValuePtr unionValue = pop();
     if (!unionValue || !unionValue->isUnionType()) {
-        error("GET_UNION_VARIANT: expected union type, got " + 
+        error("GET_UNION_VARIANT: expected union type, got " +
               (unionValue ? unionValue->type->toString() : "null"));
         return;
     }
     
     size_t variantIndex = unionValue->getActiveUnionVariant();
-    ValuePtr indexValue = memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, 
+    ValuePtr indexValue = memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE,
                                                        static_cast<int32_t>(variantIndex));
     push(indexValue);
     
     if (debugMode) {
-        std::cout << "[DEBUG] GET_UNION_VARIANT: Retrieved variant index " 
+        std::cout << "[DEBUG] GET_UNION_VARIANT: Retrieved variant index "
                   << variantIndex << std::endl;
     }
 }
@@ -8098,7 +8098,7 @@ void VM::handleCheckUnionType(const Instruction& instruction) {
     
     ValuePtr unionValue = pop();
     if (!unionValue || !unionValue->isUnionType()) {
-        error("CHECK_UNION_TYPE: expected union type, got " + 
+        error("CHECK_UNION_TYPE: expected union type, got " +
               (unionValue ? unionValue->type->toString() : "null"));
         return;
     }
@@ -8115,7 +8115,7 @@ void VM::handleCheckUnionType(const Instruction& instruction) {
     push(result);
     
     if (debugMode) {
-        std::cout << "[DEBUG] CHECK_UNION_TYPE: Union matches " << targetTypeName 
+        std::cout << "[DEBUG] CHECK_UNION_TYPE: Union matches " << targetTypeName
                   << ": " << (matches ? "true" : "false") << std::endl;
     }
 }
@@ -8134,7 +8134,7 @@ void VM::handleSetUnionVariant(const Instruction& instruction) {
     ValuePtr unionValue = pop();
     
     if (!unionValue || !unionValue->isUnionType()) {
-        error("SET_UNION_VARIANT: expected union type, got " + 
+        error("SET_UNION_VARIANT: expected union type, got " +
               (unionValue ? unionValue->type->toString() : "null"));
         return;
     }
@@ -8144,7 +8144,7 @@ void VM::handleSetUnionVariant(const Instruction& instruction) {
     // Validate the new variant index
     std::vector<TypePtr> variantTypes = typeSystem->getUnionVariantTypes(unionValue->type);
     if (newVariantIndex >= variantTypes.size()) {
-        error("SET_UNION_VARIANT: variant index " + std::to_string(newVariantIndex) + 
+        error("SET_UNION_VARIANT: variant index " + std::to_string(newVariantIndex) +
               " out of range (max: " + std::to_string(variantTypes.size() - 1) + ")");
         return;
     }
@@ -8152,7 +8152,7 @@ void VM::handleSetUnionVariant(const Instruction& instruction) {
     // Validate that the new value matches the target variant type
     TypePtr targetVariantType = variantTypes[newVariantIndex];
     if (!typeSystem->isCompatible(newValue->type, targetVariantType)) {
-        error("SET_UNION_VARIANT: value type " + newValue->type->toString() + 
+        error("SET_UNION_VARIANT: value type " + newValue->type->toString() +
               " not compatible with variant type " + targetVariantType->toString());
         return;
     }
@@ -8193,7 +8193,7 @@ std::string VM::trackClosure(ValuePtr closureValue) {
     closureTracker.activeClosureCount++;
     
     if (debugMode) {
-        std::cout << "[DEBUG] Tracking closure: " << closureId << " with " 
+        std::cout << "[DEBUG] Tracking closure: " << closureId << " with "
                   << closure.capturedVariables.size() << " captured variables" << std::endl;
     }
     
@@ -8218,8 +8218,8 @@ void VM::untrackClosure(const std::string& closureId) {
             auto varIt = closureTracker.variableToClosures.find(varName);
             if (varIt != closureTracker.variableToClosures.end()) {
                 auto& closureList = varIt->second;
-                closureList.erase(std::remove(closureList.begin(), closureList.end(), closureId), 
-                                closureList.end());
+                closureList.erase(std::remove(closureList.begin(), closureList.end(), closureId),
+                                  closureList.end());
                 
                 if (closureList.empty()) {
                     closureTracker.variableToClosures.erase(varIt);
@@ -8241,8 +8241,8 @@ void VM::untrackClosure(const std::string& closureId) {
 }
 
 std::shared_ptr<Environment> VM::optimizeCapturedEnvironment(
-    const std::vector<std::string>& capturedVars,
-    std::shared_ptr<Environment> sourceEnv) {
+        const std::vector<std::string>& capturedVars,
+        std::shared_ptr<Environment> sourceEnv) {
     
     std::lock_guard<std::mutex> lock(closureTracker.trackerMutex);
     
@@ -8254,8 +8254,8 @@ std::shared_ptr<Environment> VM::optimizeCapturedEnvironment(
             
             // Check if this variable is used by multiple closures (sharing opportunity)
             auto varIt = closureTracker.variableToClosures.find(varName);
-            bool shouldShare = (varIt != closureTracker.variableToClosures.end() && 
-                              varIt->second.size() >= 2);
+            bool shouldShare = (varIt != closureTracker.variableToClosures.end() &&
+                    varIt->second.size() >= 2);
             
             if (shouldShare) {
                 // Use or create shared variable
@@ -8307,8 +8307,8 @@ bool VM::detectCircularReferences(const std::string& closureId) {
         for (const auto& varName : closure.capturedVariables) {
             try {
                 ValuePtr capturedValue = closure.capturedEnvironment->get(varName);
-                if (capturedValue && capturedValue->type && 
-                    capturedValue->type->tag == TypeTag::Closure) {
+                if (capturedValue && capturedValue->type &&
+                        capturedValue->type->tag == TypeTag::Closure) {
                     
                     if (std::holds_alternative<ClosureValue>(capturedValue->data)) {
                         const auto& capturedClosure = std::get<ClosureValue>(capturedValue->data);
@@ -8319,8 +8319,8 @@ bool VM::detectCircularReferences(const std::string& closureId) {
                             for (const auto& capturedVar : capturedClosure.capturedVariables) {
                                 try {
                                     ValuePtr nestedValue = capturedClosure.capturedEnvironment->get(capturedVar);
-                                    if (nestedValue && nestedValue->type && 
-                                        nestedValue->type->tag == TypeTag::Closure) {
+                                    if (nestedValue && nestedValue->type &&
+                                            nestedValue->type->tag == TypeTag::Closure) {
                                         
                                         if (std::holds_alternative<ClosureValue>(nestedValue->data)) {
                                             const auto& nestedClosure = std::get<ClosureValue>(nestedValue->data);
@@ -8414,13 +8414,13 @@ void VM::printClosureMemoryStats() const {
     std::cout << "Variable-to-Closure Mappings: " << closureTracker.variableToClosures.size() << std::endl;
     
     if (closureTracker.totalClosuresCreated > 0) {
-        double cleanupRatio = static_cast<double>(closureTracker.cleanupOperations) / 
-                             closureTracker.totalClosuresCreated * 100.0;
+        double cleanupRatio = static_cast<double>(closureTracker.cleanupOperations) /
+                closureTracker.totalClosuresCreated * 100.0;
         std::cout << "Cleanup Ratio: " << cleanupRatio << "%" << std::endl;
     }
     
     if (closureTracker.memoryOptimizations > 0) {
-        std::cout << "Memory Optimization Efficiency: " << closureTracker.memoryOptimizations 
+        std::cout << "Memory Optimization Efficiency: " << closureTracker.memoryOptimizations
                   << " variables optimized" << std::endl;
     }
     
@@ -8433,7 +8433,7 @@ void VM::pushFunctionDefinition(const std::string& functionName) {
     functionDefinitionModeStack.push(true);
     
     if (debugMode) {
-        std::cout << "[DEBUG] Pushed function definition: " << functionName 
+        std::cout << "[DEBUG] Pushed function definition: " << functionName
                   << " (depth: " << functionDefinitionStack.size() << ")" << std::endl;
     }
 }
@@ -8445,7 +8445,7 @@ void VM::popFunctionDefinition() {
         functionDefinitionModeStack.pop();
         
         if (debugMode) {
-            std::cout << "[DEBUG] Popped function definition: " << functionName 
+            std::cout << "[DEBUG] Popped function definition: " << functionName
                       << " (depth: " << functionDefinitionStack.size() << ")" << std::endl;
         }
     }
@@ -8466,8 +8466,8 @@ std::string VM::getCurrentFunctionBeingDefined() const {
 namespace backend {
 
 VMMethodImplementation::VMMethodImplementation(VM* vmInstance, const std::string& methodName,
-                                             std::shared_ptr<ClassDefinition> owner,
-                                             size_t start, size_t end)
+                                               std::shared_ptr<ClassDefinition> owner,
+                                               size_t start, size_t end)
     : vm(vmInstance), ownerClass(owner), startAddress(start), endAddress(end) {
     
     signature.name = methodName;

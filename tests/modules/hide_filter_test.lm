@@ -4,7 +4,7 @@ print("=== Hide Filter Test ===");
 print("Test 1: Hide single identifier");
 import tests.modules.math_module as math1 hide E;
 print("✓ Imported with hide filter");
-print("✓ Non-hidden variable accessible: PI = " + math1.PI);
+print("✓ Non-hidden variable accessible: PI = " + math1.pi);
 
 print("Test 2: Hide multiple identifiers");
 import tests.modules.string_module as str1 hide farewell, repeat_string;

@@ -16,7 +16,7 @@
 
 // Forward declarations for AST types
 namespace AST {
-    class FunctionDeclaration;
+class FunctionDeclaration;
 }
 
 // Forward declarations
@@ -36,27 +36,27 @@ using IteratorValuePtr = std::shared_ptr<IteratorValue>;
 
 // Forward declare ObjectInstance from classes
 namespace backend {
-    class ObjectInstance;
-    class ClassDefinition;
-    class UserDefinedFunction;
-    
-    // Function definition for user-defined functions
-    struct Function {
-        std::string name;
-        std::shared_ptr<AST::FunctionDeclaration> declaration;
-        std::vector<std::pair<std::string, TypePtr>> parameters;  // name and type
-        std::vector<std::pair<std::string, TypePtr>> optionalParameters;
-        std::map<std::string, std::pair<ValuePtr, TypePtr>> defaultValues;
-        size_t startAddress;
-        size_t endAddress;
-        TypePtr returnType;
-        bool isLambda = false;  // Flag to indicate if this is a lambda function
-        
-        Function() : startAddress(0), endAddress(0), returnType(nullptr), isLambda(false) {}
-        
-        Function(const std::string& n, size_t start) 
-            : name(n), startAddress(start), endAddress(0), returnType(nullptr), isLambda(false) {}
-    };
+class ObjectInstance;
+class ClassDefinition;
+class UserDefinedFunction;
+
+// Function definition for user-defined functions
+struct Function {
+    std::string name;
+    std::shared_ptr<AST::FunctionDeclaration> declaration;
+    std::vector<std::pair<std::string, TypePtr>> parameters;  // name and type
+    std::vector<std::pair<std::string, TypePtr>> optionalParameters;
+    std::map<std::string, std::pair<ValuePtr, TypePtr>> defaultValues;
+    size_t startAddress;
+    size_t endAddress;
+    TypePtr returnType;
+    bool isLambda = false;  // Flag to indicate if this is a lambda function
+
+    Function() : startAddress(0), endAddress(0), returnType(nullptr), isLambda(false) {}
+
+    Function(const std::string& n, size_t start)
+        : name(n), startAddress(start), endAddress(0), returnType(nullptr), isLambda(false) {}
+};
 }
 using ObjectInstancePtr = std::shared_ptr<backend::ObjectInstance>;
 
@@ -77,86 +77,40 @@ struct ClosureValue {
     std::vector<std::string> capturedVariables;             // Names of captured variables
     
     // Constructor
-    ClosureValue() : startAddress(0), endAddress(0) {}
+    ClosureValue();
     
     ClosureValue(const std::string& funcName, size_t start, size_t end,
                  std::shared_ptr<::Environment> capturedEnv,
-                 const std::vector<std::string>& capturedVars)
-        : functionName(funcName), startAddress(start), endAddress(end),
-          capturedEnvironment(capturedEnv), capturedVariables(capturedVars) {}
+                 const std::vector<std::string>& capturedVars);
     
     // Copy constructor
-    ClosureValue(const ClosureValue& other)
-        : functionName(other.functionName), startAddress(other.startAddress), endAddress(other.endAddress),
-          capturedEnvironment(other.capturedEnvironment), capturedVariables(other.capturedVariables) {}
+    ClosureValue(const ClosureValue& other);
     
     // Move constructor
-    ClosureValue(ClosureValue&& other) noexcept
-        : functionName(std::move(other.functionName)), startAddress(other.startAddress), endAddress(other.endAddress),
-          capturedEnvironment(std::move(other.capturedEnvironment)),
-          capturedVariables(std::move(other.capturedVariables)) {}
+    ClosureValue(ClosureValue&& other) noexcept;
     
     // Assignment operators
-    ClosureValue& operator=(const ClosureValue& other) {
-        if (this != &other) {
-            functionName = other.functionName;
-            startAddress = other.startAddress;
-            endAddress = other.endAddress;
-            capturedEnvironment = other.capturedEnvironment;
-            capturedVariables = other.capturedVariables;
-        }
-        return *this;
-    }
+    ClosureValue& operator=(const ClosureValue& other);
     
-    ClosureValue& operator=(ClosureValue&& other) noexcept {
-        if (this != &other) {
-            functionName = std::move(other.functionName);
-            startAddress = other.startAddress;
-            endAddress = other.endAddress;
-            capturedEnvironment = std::move(other.capturedEnvironment);
-            capturedVariables = std::move(other.capturedVariables);
-        }
-        return *this;
-    }
+    ClosureValue& operator=(ClosureValue&& other) noexcept;
     
     // Utility methods
-    bool isValid() const {
-        return !functionName.empty() && startAddress < endAddress;
-    }
+    bool isValid() const;
     
     // Execute the closure with given arguments
-    ValuePtr execute(const std::vector<ValuePtr>& args) {
-        // This will be implemented by the VM when executing closures
-        // For now, return nullptr as a placeholder
-        if (functionName.empty()) {
-            throw std::runtime_error("Cannot execute closure: function name is empty");
-        }
-        
-        // The actual execution will be handled by the VM's closure execution mechanism
-        // This is just a placeholder that will be called by the VM
-        return nullptr;
-    }
+    ValuePtr execute(const std::vector<ValuePtr>& args);
     
     // Get captured variable count
-    size_t getCapturedVariableCount() const {
-        return capturedVariables.size();
-    }
+    size_t getCapturedVariableCount() const;
     
     // Check if variable is captured
-    bool isVariableCaptured(const std::string& varName) const {
-        return std::find(capturedVariables.begin(), capturedVariables.end(), varName) 
-               != capturedVariables.end();
-    }
+    bool isVariableCaptured(const std::string& varName) const;
     
     // Get function name
-    std::string getFunctionName() const {
-        return functionName;
-    }
+    std::string getFunctionName() const;
     
     // Memory management methods
-    std::string getClosureId() const {
-        return functionName + "_" + std::to_string(reinterpret_cast<uintptr_t>(this));
-    }
+    std::string getClosureId() const;
     
     void cleanup();
     
@@ -171,8 +125,8 @@ struct ClosureValue {
     
     // Static factory method for creating closures (defined later after factory namespace)
     static ValuePtr create(std::shared_ptr<backend::UserDefinedFunction> func,
-                          std::shared_ptr<::Environment> capturedEnv,
-                          const std::vector<std::string>& capturedVars);
+                           std::shared_ptr<::Environment> capturedEnv,
+                           const std::vector<std::string>& capturedVars);
 };
 
 enum class TypeTag {
@@ -211,10 +165,10 @@ enum class TypeTag {
 
 // Forward declaration for ClosureValue factory method with proper TypePtr
 namespace ClosureValueFactory {
-    ValuePtr createClosure(std::shared_ptr<backend::UserDefinedFunction> func,
-                          std::shared_ptr<::Environment> capturedEnv,
-                          const std::vector<std::string>& capturedVars,
-                          TypePtr closureType = nullptr);
+ValuePtr createClosure(std::shared_ptr<backend::UserDefinedFunction> func,
+                       std::shared_ptr<::Environment> capturedEnv,
+                       const std::vector<std::string>& capturedVars,
+                       TypePtr closureType = nullptr);
 }
 
 struct ListType
@@ -292,7 +246,7 @@ struct FunctionType
                  const std::vector<bool>& defaults = {},
                  const std::vector<std::string>& typeParams = {})
         : paramTypes(params), returnType(ret), paramNames(names), hasDefaultValues(defaults), 
-          typeParameters(typeParams), isGeneric(!typeParams.empty()) {
+        typeParameters(typeParams), isGeneric(!typeParams.empty()) {
         // Ensure consistent sizes
         if (hasDefaultValues.empty()) {
             hasDefaultValues.resize(params.size(), false);
@@ -305,7 +259,7 @@ struct FunctionType
     bool hasNamedParameters() const { 
         return !paramNames.empty() && 
                std::any_of(paramNames.begin(), paramNames.end(), 
-                          [](const std::string& name) { return !name.empty(); });
+                           [](const std::string& name) { return !name.empty(); });
     }
     
     std::string getParameterName(size_t index) const {
@@ -729,7 +683,7 @@ public:
     }
 
     [[nodiscard]] static ErrorUnion error(const std::string& errorType, const std::string& message = "", 
-                           const std::vector<ValuePtr>& args = {}, size_t location = 0) {
+                                          const std::vector<ValuePtr>& args = {}, size_t location = 0) {
         return ErrorUnion(errorType, message, args, location);
     }
 
@@ -851,7 +805,7 @@ struct DictValue {
 // Add toString method to Value struct
 struct Value {
     TypePtr type;
-                 std::variant<std::monostate,
+    std::variant<std::monostate,
                  bool,
                  int8_t,
                  int16_t,
@@ -874,13 +828,13 @@ struct Value {
                  IteratorValuePtr,
                  ObjectInstancePtr,
                  std::shared_ptr<backend::ClassDefinition>
-    , std::shared_ptr<Channel<ValuePtr>>
-    , AtomicValue
-    , ModuleValue
-    , std::shared_ptr<backend::UserDefinedFunction>
-    , backend::Function
-    , ClosureValue
-                >
+                 , std::shared_ptr<Channel<ValuePtr>>
+                 , AtomicValue
+                 , ModuleValue
+                 , std::shared_ptr<backend::UserDefinedFunction>
+                 , backend::Function
+                 , ClosureValue
+                 >
         data;
 
     // Union type runtime support
@@ -922,96 +876,96 @@ struct Value {
         }
 
         switch (type->tag) {
-            case TypeTag::Int8:
-                data = safe_cast<int8_t>(val);
-                break;
-            case TypeTag::Int16:
-                data = safe_cast<int16_t>(val);
-                break;
-            case TypeTag::Int:
-            case TypeTag::Int32:
-                data = safe_cast<int32_t>(val);
-                break;
-            case TypeTag::Int64:
-                data = safe_cast<int64_t>(val);
-                break;
-            case TypeTag::UInt8:
-                data = safe_cast<uint8_t>(val);
-                break;
-            case TypeTag::UInt16:
-                data = safe_cast<uint16_t>(val);
-                break;
-            case TypeTag::UInt:
-            case TypeTag::UInt32:
-                data = safe_cast<uint32_t>(val);
-                break;
-            case TypeTag::UInt64:
-                data = safe_cast<uint64_t>(val);
-                break;
-            default:
-                // Default to int32_t for unspecified integer types
-                data = static_cast<int32_t>(val);
+        case TypeTag::Int8:
+            data = safe_cast<int8_t>(val);
+            break;
+        case TypeTag::Int16:
+            data = safe_cast<int16_t>(val);
+            break;
+        case TypeTag::Int:
+        case TypeTag::Int32:
+            data = safe_cast<int32_t>(val);
+            break;
+        case TypeTag::Int64:
+            data = safe_cast<int64_t>(val);
+            break;
+        case TypeTag::UInt8:
+            data = safe_cast<uint8_t>(val);
+            break;
+        case TypeTag::UInt16:
+            data = safe_cast<uint16_t>(val);
+            break;
+        case TypeTag::UInt:
+        case TypeTag::UInt32:
+            data = safe_cast<uint32_t>(val);
+            break;
+        case TypeTag::UInt64:
+            data = safe_cast<uint64_t>(val);
+            break;
+        default:
+            // Default to int32_t for unspecified integer types
+            data = static_cast<int32_t>(val);
         }
     }
 
     // Move constructor
     Value(Value&& other) noexcept
         : type(std::move(other.type)),
-          data(std::move(other.data)) {
+        data(std::move(other.data)) {
         
     }
 
     // Copy constructor
     Value(const Value& other)
-    : type(other.type ? std::make_shared<Type>(*other.type) : nullptr),
-      data(other.data) {
-   
-}
+        : type(other.type ? std::make_shared<Type>(*other.type) : nullptr),
+        data(other.data) {
 
-// Update the destructor:
-~Value() {
-   
-}
-        // Constructor for ListValue
-        Value(TypePtr t, const ListValue& lv) : type(std::move(t)), data(lv) {
-           
-        }
+    }
 
-        // Constructor for TupleValue
-        Value(TypePtr t, const TupleValue& tv) : type(std::move(t)), data(tv) {
-           
-        }
+    // Update the destructor:
+    ~Value() {
 
-        // Constructor for DictValue
-        Value(TypePtr t, const DictValue& dv) : type(std::move(t)), data(dv) {
-           
-;
-        }
+    }
+    // Constructor for ListValue
+    Value(TypePtr t, const ListValue& lv) : type(std::move(t)), data(lv) {
 
-        // Constructor for EnumValue
-        Value(TypePtr t, const EnumValue& ev) : type(std::move(t)), data(ev) {
-           
-        }
+    }
 
-        // Constructor for ErrorValue
-        Value(TypePtr t, const ErrorValue& erv) : type(std::move(t)), data(erv) {
-           
-        }
+    // Constructor for TupleValue
+    Value(TypePtr t, const TupleValue& tv) : type(std::move(t)), data(tv) {
 
-        // Constructor for SumValue
-        Value(TypePtr t, const SumValue& sv) : type(std::move(t)), data(sv) {
-           
-;
-        }
+    }
 
-        // Constructor for UserDefinedValue
-        Value(TypePtr t, const UserDefinedValue& udv) : type(std::move(t)), data(udv) {
-           
-        }
+    // Constructor for DictValue
+    Value(TypePtr t, const DictValue& dv) : type(std::move(t)), data(dv) {
 
-        // Constructor for IteratorValuePtr
-        Value(TypePtr t, const IteratorValuePtr& iter) : type(std::move(t)), data(iter) {
-        }
+        ;
+    }
+
+    // Constructor for EnumValue
+    Value(TypePtr t, const EnumValue& ev) : type(std::move(t)), data(ev) {
+
+    }
+
+    // Constructor for ErrorValue
+    Value(TypePtr t, const ErrorValue& erv) : type(std::move(t)), data(erv) {
+
+    }
+
+    // Constructor for SumValue
+    Value(TypePtr t, const SumValue& sv) : type(std::move(t)), data(sv) {
+
+        ;
+    }
+
+    // Constructor for UserDefinedValue
+    Value(TypePtr t, const UserDefinedValue& udv) : type(std::move(t)), data(udv) {
+
+    }
+
+    // Constructor for IteratorValuePtr
+    Value(TypePtr t, const IteratorValuePtr& iter) : type(std::move(t)), data(iter) {
+    }
 
     // Constructor for Channel pointer
     Value(TypePtr t, const std::shared_ptr<Channel<ValuePtr>>& ch) : type(std::move(t)), data(ch) {
@@ -1020,22 +974,22 @@ struct Value {
     // Constructor for AtomicValue
     Value(TypePtr t, const AtomicValue& av) : type(std::move(t)), data(av) {}
 
-        // Constructor for ObjectInstancePtr
-        Value(TypePtr t, const ObjectInstancePtr& obj) : type(std::move(t)), data(obj) {
-        }
-        
-        // Constructor for ClassDefinition
-        Value(TypePtr t, const std::shared_ptr<backend::ClassDefinition>& classDef) : type(std::move(t)), data(classDef) {
-        }
+    // Constructor for ObjectInstancePtr
+    Value(TypePtr t, const ObjectInstancePtr& obj) : type(std::move(t)), data(obj) {
+    }
 
-        // Constructor for UserDefinedFunction
-        Value(TypePtr t, const std::shared_ptr<backend::UserDefinedFunction>& func) : type(std::move(t)), data(func) {}
+    // Constructor for ClassDefinition
+    Value(TypePtr t, const std::shared_ptr<backend::ClassDefinition>& classDef) : type(std::move(t)), data(classDef) {
+    }
 
-        // Constructor for backend::Function
-        Value(TypePtr t, const backend::Function& func) : type(std::move(t)), data(func) {}
+    // Constructor for UserDefinedFunction
+    Value(TypePtr t, const std::shared_ptr<backend::UserDefinedFunction>& func) : type(std::move(t)), data(func) {}
 
-        // Constructor for ClosureValue
-        Value(TypePtr t, const ClosureValue& closure) : type(std::move(t)), data(closure) {}
+    // Constructor for backend::Function
+    Value(TypePtr t, const backend::Function& func) : type(std::move(t)), data(func) {}
+
+    // Constructor for ClosureValue
+    Value(TypePtr t, const ClosureValue& closure) : type(std::move(t)), data(closure) {}
 
     bool isError() const {
         // An error can be a direct ErrorValue or an ErrorUnion holding an ErrorValue.
@@ -1186,139 +1140,139 @@ inline std::string FunctionType::toString() const {
 
 // Error value construction and inspection utility functions
 namespace ErrorUtils {
-    // Create an error value
-    inline ValuePtr createError(const std::string& errorType, const std::string& message = "", 
-                               const std::vector<ValuePtr>& args = {}, size_t location = 0) {
-        auto errorValue = std::make_shared<Value>();
-        errorValue->type = std::make_shared<Type>(TypeTag::UserDefined); // Error types are user-defined
-        errorValue->data = ErrorValue(errorType, message, args, location);
-        return errorValue;
-    }
+// Create an error value
+inline ValuePtr createError(const std::string& errorType, const std::string& message = "",
+                            const std::vector<ValuePtr>& args = {}, size_t location = 0) {
+    auto errorValue = std::make_shared<Value>();
+    errorValue->type = std::make_shared<Type>(TypeTag::UserDefined); // Error types are user-defined
+    errorValue->data = ErrorValue(errorType, message, args, location);
+    return errorValue;
+}
 
-    // Create a success value wrapped in an error union
-    inline ValuePtr createSuccess(ValuePtr successValue, TypePtr errorUnionType) {
-        auto value = std::make_shared<Value>(errorUnionType);
-        value->data = successValue->data;
-        return value;
-    }
+// Create a success value wrapped in an error union
+inline ValuePtr createSuccess(ValuePtr successValue, TypePtr errorUnionType) {
+    auto value = std::make_shared<Value>(errorUnionType);
+    value->data = successValue->data;
+    return value;
+}
 
-    // Create an error union value from ErrorUnion helper
-    inline ValuePtr createErrorUnionValue(const ErrorUnion& errorUnion, TypePtr errorUnionType) {
-        return errorUnion.toValue(errorUnionType);
-    }
+// Create an error union value from ErrorUnion helper
+inline ValuePtr createErrorUnionValue(const ErrorUnion& errorUnion, TypePtr errorUnionType) {
+    return errorUnion.toValue(errorUnionType);
+}
 
-    // Check if a value is an error
-    inline bool isError(const ValuePtr& value) {
-        return std::holds_alternative<ErrorValue>(value->data);
-    }
+// Check if a value is an error
+inline bool isError(const ValuePtr& value) {
+    return std::holds_alternative<ErrorValue>(value->data);
+}
 
-    // Check if a value is a success value (not an error)
-    inline bool isSuccess(const ValuePtr& value) {
-        return !isError(value);
-    }
+// Check if a value is a success value (not an error)
+inline bool isSuccess(const ValuePtr& value) {
+    return !isError(value);
+}
 
-    // Extract error value from a Value (throws if not an error)
-    inline const ErrorValue& getError(const ValuePtr& value) {
-        if (auto errorValue = std::get_if<ErrorValue>(&value->data)) {
-            return *errorValue;
-        }
-        throw std::runtime_error("Value is not an error");
+// Extract error value from a Value (throws if not an error)
+inline const ErrorValue& getError(const ValuePtr& value) {
+    if (auto errorValue = std::get_if<ErrorValue>(&value->data)) {
+        return *errorValue;
     }
+    throw std::runtime_error("Value is not an error");
+}
 
-    // Extract error value safely (returns nullptr if not an error)
-    inline const ErrorValue* getErrorSafe(const ValuePtr& value) {
-        return std::get_if<ErrorValue>(&value->data);
-    }
+// Extract error value safely (returns nullptr if not an error)
+inline const ErrorValue* getErrorSafe(const ValuePtr& value) {
+    return std::get_if<ErrorValue>(&value->data);
+}
 
-    // Get error type from a value (empty string if not an error)
-    inline std::string getErrorType(const ValuePtr& value) {
-        if (auto errorValue = std::get_if<ErrorValue>(&value->data)) {
-            return errorValue->errorType;
-        }
-        return "";
+// Get error type from a value (empty string if not an error)
+inline std::string getErrorType(const ValuePtr& value) {
+    if (auto errorValue = std::get_if<ErrorValue>(&value->data)) {
+        return errorValue->errorType;
     }
+    return "";
+}
 
-    // Get error message from a value (empty string if not an error)
-    inline std::string getErrorMessage(const ValuePtr& value) {
-        if (auto errorValue = std::get_if<ErrorValue>(&value->data)) {
-            return errorValue->message;
-        }
-        return "";
+// Get error message from a value (empty string if not an error)
+inline std::string getErrorMessage(const ValuePtr& value) {
+    if (auto errorValue = std::get_if<ErrorValue>(&value->data)) {
+        return errorValue->message;
     }
+    return "";
+}
 
-    // Get error arguments from a value (empty vector if not an error)
-    inline std::vector<ValuePtr> getErrorArguments(const ValuePtr& value) {
-        if (auto errorValue = std::get_if<ErrorValue>(&value->data)) {
-            return errorValue->arguments;
-        }
-        return {};
+// Get error arguments from a value (empty vector if not an error)
+inline std::vector<ValuePtr> getErrorArguments(const ValuePtr& value) {
+    if (auto errorValue = std::get_if<ErrorValue>(&value->data)) {
+        return errorValue->arguments;
     }
+    return {};
+}
 
-    // Get error source location from a value (0 if not an error)
-    inline size_t getErrorLocation(const ValuePtr& value) {
-        if (auto errorValue = std::get_if<ErrorValue>(&value->data)) {
-            return errorValue->sourceLocation;
-        }
-        return 0;
+// Get error source location from a value (0 if not an error)
+inline size_t getErrorLocation(const ValuePtr& value) {
+    if (auto errorValue = std::get_if<ErrorValue>(&value->data)) {
+        return errorValue->sourceLocation;
     }
+    return 0;
+}
 
-    // Wrap a success value in an error union type
-    inline ValuePtr wrapAsSuccess(ValuePtr successValue, TypePtr errorUnionType) {
-        auto value = std::make_shared<Value>(errorUnionType);
-        value->data = successValue->data;
-        return value;
-    }
+// Wrap a success value in an error union type
+inline ValuePtr wrapAsSuccess(ValuePtr successValue, TypePtr errorUnionType) {
+    auto value = std::make_shared<Value>(errorUnionType);
+    value->data = successValue->data;
+    return value;
+}
 
-    // Wrap an error value in an error union type
-    inline ValuePtr wrapAsError(const ErrorValue& errorValue, TypePtr errorUnionType) {
-        auto value = std::make_shared<Value>(errorUnionType);
-        value->data = errorValue;
-        return value;
-    }
+// Wrap an error value in an error union type
+inline ValuePtr wrapAsError(const ErrorValue& errorValue, TypePtr errorUnionType) {
+    auto value = std::make_shared<Value>(errorUnionType);
+    value->data = errorValue;
+    return value;
+}
 
-    // Create an error union value from ErrorUnion helper
-    inline ValuePtr createErrorUnion(const ErrorUnion& errorUnion, TypePtr errorUnionType) {
-        return errorUnion.toValue(errorUnionType);
-    }
+// Create an error union value from ErrorUnion helper
+inline ValuePtr createErrorUnion(const ErrorUnion& errorUnion, TypePtr errorUnionType) {
+    return errorUnion.toValue(errorUnionType);
+}
 
-    // Unwrap success value (throws if error)
-    inline ValuePtr unwrapSuccess(const ValuePtr& value) {
-        if (isError(value)) {
-            throw std::runtime_error("Attempted to unwrap error as success");
-        }
-        return value;
+// Unwrap success value (throws if error)
+inline ValuePtr unwrapSuccess(const ValuePtr& value) {
+    if (isError(value)) {
+        throw std::runtime_error("Attempted to unwrap error as success");
     }
+    return value;
+}
 
-    // Unwrap success value safely (returns nullptr if error)
-    inline ValuePtr unwrapSuccessSafe(const ValuePtr& value) {
-        return isError(value) ? nullptr : value;
-    }
+// Unwrap success value safely (returns nullptr if error)
+inline ValuePtr unwrapSuccessSafe(const ValuePtr& value) {
+    return isError(value) ? nullptr : value;
+}
 
-    // Built-in error creation functions
-    inline ValuePtr createDivisionByZeroError(const std::string& message = "Division by zero") {
-        return createError("DivisionByZero", message);
-    }
+// Built-in error creation functions
+inline ValuePtr createDivisionByZeroError(const std::string& message = "Division by zero") {
+    return createError("DivisionByZero", message);
+}
 
-    inline ValuePtr createIndexOutOfBoundsError(const std::string& message = "Index out of bounds") {
-        return createError("IndexOutOfBounds", message);
-    }
+inline ValuePtr createIndexOutOfBoundsError(const std::string& message = "Index out of bounds") {
+    return createError("IndexOutOfBounds", message);
+}
 
-    inline ValuePtr createNullReferenceError(const std::string& message = "Null reference access") {
-        return createError("NullReference", message);
-    }
+inline ValuePtr createNullReferenceError(const std::string& message = "Null reference access") {
+    return createError("NullReference", message);
+}
 
-    inline ValuePtr createTypeConversionError(const std::string& message = "Type conversion failed") {
-        return createError("TypeConversion", message);
-    }
+inline ValuePtr createTypeConversionError(const std::string& message = "Type conversion failed") {
+    return createError("TypeConversion", message);
+}
 
-    inline ValuePtr createIOError(const std::string& message = "I/O operation failed") {
-        return createError("IOError", message);
-    }
+inline ValuePtr createIOError(const std::string& message = "I/O operation failed") {
+    return createError("IOError", message);
+}
 
-    // Error type compatibility checking
-    inline bool areErrorTypesCompatible(const std::string& errorType1, const std::string& errorType2) {
-        return errorType1 == errorType2;
-    }
+// Error type compatibility checking
+inline bool areErrorTypesCompatible(const std::string& errorType1, const std::string& errorType2) {
+    return errorType1 == errorType2;
+}
 }
 
 // Iterator for list and range values
@@ -1348,14 +1302,14 @@ struct IteratorValue {
     // Constructor for general iterators (list, dict, channel)
     IteratorValue(IteratorType type, ValuePtr iterable)
         : type(type), iterable(std::move(iterable)), currentIndex(0),
-          rangeStart(0), rangeEnd(0), rangeStep(0), rangeCurrent(0),
-          hasBuffered(false), bufferedValue(nullptr) {}
+        rangeStart(0), rangeEnd(0), rangeStep(0), rangeCurrent(0),
+        hasBuffered(false), bufferedValue(nullptr) {}
     
     // Constructor for lazy ranges
     IteratorValue(IteratorType type, ValuePtr iterable, int64_t start, int64_t end, int64_t step)
         : type(type), iterable(std::move(iterable)), currentIndex(0),
-          rangeStart(start), rangeEnd(end), rangeStep(step), rangeCurrent(start),
-          hasBuffered(false), bufferedValue(nullptr) {}
+        rangeStart(start), rangeEnd(end), rangeStep(step), rangeCurrent(start),
+        hasBuffered(false), bufferedValue(nullptr) {}
     
     bool hasNext() const;
     
@@ -1452,34 +1406,34 @@ inline std::ostream &operator<<(std::ostream &os, const ValuePtr &valuePtr)
 }
 // ClosureValue factory method implementation
 namespace ClosureValueFactory {
-    inline ValuePtr createClosure(std::shared_ptr<backend::UserDefinedFunction> func,
-                                 std::shared_ptr<::Environment> capturedEnv,
-                                 const std::vector<std::string>& capturedVars,
-                                 TypePtr closureType) {
-        if (!func) {
-            throw std::runtime_error("Cannot create closure: function is null");
-        }
-        
-        // Create closure type if not provided
-        if (!closureType) {
-            closureType = std::make_shared<Type>(TypeTag::Closure);
-        }
-        
-        // Create the closure value - for now use placeholder values since this factory
-        // is used for backward compatibility. The VM will create closures directly.
-        ClosureValue closure("closure", 0, 0, capturedEnv, capturedVars);
-        
-        // Return as ValuePtr
-        return std::make_shared<Value>(closureType, closure);
+inline ValuePtr createClosure(std::shared_ptr<backend::UserDefinedFunction> func,
+                              std::shared_ptr<::Environment> capturedEnv,
+                              const std::vector<std::string>& capturedVars,
+                              TypePtr closureType) {
+    if (!func) {
+        throw std::runtime_error("Cannot create closure: function is null");
     }
+
+    // Create closure type if not provided
+    if (!closureType) {
+        closureType = std::make_shared<Type>(TypeTag::Closure);
+    }
+
+    // Create the closure value - for now use placeholder values since this factory
+    // is used for backward compatibility. The VM will create closures directly.
+    ClosureValue closure("closure", 0, 0, capturedEnv, capturedVars);
+
+    // Return as ValuePtr
+    return std::make_shared<Value>(closureType, closure);
+}
 }
 
 
 
 // ClosureValue::create implementation
 inline ValuePtr ClosureValue::create(std::shared_ptr<backend::UserDefinedFunction> func,
-                                    std::shared_ptr<Environment> capturedEnv,
-                                    const std::vector<std::string>& capturedVars) {
+                                     std::shared_ptr<Environment> capturedEnv,
+                                     const std::vector<std::string>& capturedVars) {
     TypePtr closureType = std::make_shared<Type>(TypeTag::Closure);
     return ClosureValueFactory::createClosure(func, capturedEnv, capturedVars, closureType);
 }

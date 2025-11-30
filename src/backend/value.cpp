@@ -5,6 +5,76 @@
 
 // ClosureValue method implementations
 
+ClosureValue::ClosureValue() : startAddress(0), endAddress(0) {}
+
+ClosureValue::ClosureValue(const std::string &funcName, size_t start, size_t end, std::shared_ptr<Environment> capturedEnv, const std::vector<std::string> &capturedVars)
+    : functionName(funcName), startAddress(start), endAddress(end),
+    capturedEnvironment(capturedEnv), capturedVariables(capturedVars) {}
+
+ClosureValue::ClosureValue(const ClosureValue &other)
+    : functionName(other.functionName), startAddress(other.startAddress), endAddress(other.endAddress),
+    capturedEnvironment(other.capturedEnvironment), capturedVariables(other.capturedVariables) {}
+
+ClosureValue::ClosureValue(ClosureValue &&other) noexcept
+    : functionName(std::move(other.functionName)), startAddress(other.startAddress), endAddress(other.endAddress),
+    capturedEnvironment(std::move(other.capturedEnvironment)),
+    capturedVariables(std::move(other.capturedVariables)) {}
+
+ClosureValue &ClosureValue::operator=(const ClosureValue &other) {
+    if (this != &other) {
+        functionName = other.functionName;
+        startAddress = other.startAddress;
+        endAddress = other.endAddress;
+        capturedEnvironment = other.capturedEnvironment;
+        capturedVariables = other.capturedVariables;
+    }
+    return *this;
+}
+
+ClosureValue &ClosureValue::operator=(ClosureValue &&other) noexcept {
+    if (this != &other) {
+        functionName = std::move(other.functionName);
+        startAddress = other.startAddress;
+        endAddress = other.endAddress;
+        capturedEnvironment = std::move(other.capturedEnvironment);
+        capturedVariables = std::move(other.capturedVariables);
+    }
+    return *this;
+}
+
+bool ClosureValue::isValid() const {
+    return !functionName.empty() && startAddress < endAddress;
+}
+
+ValuePtr ClosureValue::execute(const std::vector<ValuePtr> &args) {
+    // This will be implemented by the VM when executing closures
+    // For now, return nullptr as a placeholder
+    if (functionName.empty()) {
+        throw std::runtime_error("Cannot execute closure: function name is empty");
+    }
+
+    // The actual execution will be handled by the VM's closure execution mechanism
+    // This is just a placeholder that will be called by the VM
+    return nullptr;
+}
+
+size_t ClosureValue::getCapturedVariableCount() const {
+    return capturedVariables.size();
+}
+
+bool ClosureValue::isVariableCaptured(const std::string &varName) const {
+    return std::find(capturedVariables.begin(), capturedVariables.end(), varName)
+    != capturedVariables.end();
+}
+
+std::string ClosureValue::getFunctionName() const {
+    return functionName;
+}
+
+std::string ClosureValue::getClosureId() const {
+    return functionName + "_" + std::to_string(reinterpret_cast<uintptr_t>(this));
+}
+
 void ClosureValue::cleanup() {
     // Clear captured environment to help with garbage collection
     if (capturedEnvironment) {
@@ -208,20 +278,20 @@ std::string IteratorValue::toString() const {
     oss << "<iterator type=";
     
     switch (type) {
-        case IteratorType::LIST:
-            oss << "list";
-            break;
-        case IteratorType::DICT:
-            oss << "dict";
-            break;
-        case IteratorType::CHANNEL:
-            oss << "channel";
-            break;
-        case IteratorType::RANGE:
-            oss << "range";
-            break;
-        default:
-            oss << "unknown";
+    case IteratorType::LIST:
+        oss << "list";
+        break;
+    case IteratorType::DICT:
+        oss << "dict";
+        break;
+    case IteratorType::CHANNEL:
+        oss << "channel";
+        break;
+    case IteratorType::RANGE:
+        oss << "range";
+        break;
+    default:
+        oss << "unknown";
     }
     
     // Show the iterable content if available
@@ -271,193 +341,193 @@ std::string IteratorValue::toString() const {
 }
 
 std::string Value::toString() const {
-        std::ostringstream oss;
-        std::visit(overloaded{
-            [&](const std::monostate&) { oss << "nil"; },
-            [&](bool b) { oss << (b ? "true" : "false"); },
-            [&](int8_t i) { oss << static_cast<int>(i); },
-            [&](int16_t i) { oss << i; },
-            [&](int32_t i) { oss << i; },
-            [&](int64_t i) { oss << i; },
-            [&](uint8_t u) { oss << static_cast<unsigned>(u); },
-            [&](uint16_t u) { oss << u; },
-            [&](uint32_t u) { oss << u; },
-            [&](uint64_t u) { oss << u; },
-            [&](float f) { oss << f; },
-            [&](double d) { oss << d; },
-            [&](const std::string& s) { oss << '"' << s << '"'; },
-            [&](const ListValue& lv) {
-                oss << "[";
-                for (size_t i = 0; i < lv.elements.size(); ++i) {
-                    if (i > 0) oss << ", ";
-                    oss << lv.elements[i]->toString();
-                }
-                oss << "]";
-            },
-            [&](const DictValue& dv) {
-                oss << "{";
-                bool first = true;
-                for (const auto& [key, value] : dv.elements) {
-                    if (!first) oss << ", ";
-                    first = false;
-                    oss << key->toString() << ": " << value->toString();
-                }
-                oss << "}";
-            },
-            [&](const TupleValue& tv) {
-                oss << tv.toString();
-            },
-            [&](const SumValue& sv) {
-                oss << "Sum(" << sv.activeVariant << ", " << sv.value->toString() << ")";
-            },
-            [&](const EnumValue& ev) { oss << ev.toString(); },
-            [&](const ErrorValue& erv) { oss << erv.toString(); },
-            [&](const UserDefinedValue& udv) {
-                oss << udv.variantName << "{";
-                bool first = true;
-                for (const auto& [field, value] : udv.fields) {
-                    if (!first) oss << ", ";
-                    first = false;
-                    oss << field << ": " << value->toString();
-                }
-                oss << "}";
-            },
-            [&](const IteratorValuePtr& iter) {
-                if (iter) {
-                    oss << iter->toString();
-                } else {
-                    oss << "<null iterator>";
-                }
-            },
-            [&](const std::shared_ptr<Channel<ValuePtr>>&){
-                oss << "<channel>";
-            },
-            [&](const AtomicValue& av) {
-                if (av.inner) {
-                    oss << av.inner->load();
-                } else {
-                    oss << "<atomic(nil)>";
-                }
-            },
-            [&](const ObjectInstancePtr& obj) {
-                oss << "<object>";
-            },
-            [&](const std::shared_ptr<backend::ClassDefinition>&) {
-                oss << "<class>";
-            },
-            [&](const ModuleValue&) {
-                oss << "<module>";
-            },
-            [&](const std::shared_ptr<backend::UserDefinedFunction>&) {
-                oss << "<function>";
-            },
-            [&](const backend::Function& func) {
-                oss << "<function:" << func.name << ">";
-            },
-            [&](const ClosureValue& closure) {
-                oss << closure.toString();
-            }
-        }, data);
-        return oss.str();
+    std::ostringstream oss;
+    std::visit(overloaded{
+                   [&](const std::monostate&) { oss << "nil"; },
+                   [&](bool b) { oss << (b ? "true" : "false"); },
+                   [&](int8_t i) { oss << static_cast<int>(i); },
+                   [&](int16_t i) { oss << i; },
+                   [&](int32_t i) { oss << i; },
+                   [&](int64_t i) { oss << i; },
+                   [&](uint8_t u) { oss << static_cast<unsigned>(u); },
+                   [&](uint16_t u) { oss << u; },
+                   [&](uint32_t u) { oss << u; },
+                   [&](uint64_t u) { oss << u; },
+                   [&](float f) { oss << f; },
+                   [&](double d) { oss << d; },
+                   [&](const std::string& s) { oss << '"' << s << '"'; },
+                   [&](const ListValue& lv) {
+                       oss << "[";
+                       for (size_t i = 0; i < lv.elements.size(); ++i) {
+                           if (i > 0) oss << ", ";
+                           oss << lv.elements[i]->toString();
+                       }
+                       oss << "]";
+                   },
+                   [&](const DictValue& dv) {
+                       oss << "{";
+                       bool first = true;
+                       for (const auto& [key, value] : dv.elements) {
+                           if (!first) oss << ", ";
+                           first = false;
+                           oss << key->toString() << ": " << value->toString();
+                       }
+                       oss << "}";
+                   },
+                   [&](const TupleValue& tv) {
+                       oss << tv.toString();
+                   },
+                   [&](const SumValue& sv) {
+                       oss << "Sum(" << sv.activeVariant << ", " << sv.value->toString() << ")";
+                   },
+                   [&](const EnumValue& ev) { oss << ev.toString(); },
+                   [&](const ErrorValue& erv) { oss << erv.toString(); },
+                   [&](const UserDefinedValue& udv) {
+                       oss << udv.variantName << "{";
+                       bool first = true;
+                       for (const auto& [field, value] : udv.fields) {
+                           if (!first) oss << ", ";
+                           first = false;
+                           oss << field << ": " << value->toString();
+                       }
+                       oss << "}";
+                   },
+                   [&](const IteratorValuePtr& iter) {
+                       if (iter) {
+                           oss << iter->toString();
+                       } else {
+                           oss << "<null iterator>";
+                       }
+                   },
+                   [&](const std::shared_ptr<Channel<ValuePtr>>&){
+                       oss << "<channel>";
+                   },
+                   [&](const AtomicValue& av) {
+                       if (av.inner) {
+                           oss << av.inner->load();
+                       } else {
+                           oss << "<atomic(nil)>";
+                       }
+                   },
+                   [&](const ObjectInstancePtr& obj) {
+                       oss << "<object>";
+                   },
+                   [&](const std::shared_ptr<backend::ClassDefinition>&) {
+                       oss << "<class>";
+                   },
+                   [&](const ModuleValue&) {
+                       oss << "<module>";
+                   },
+                   [&](const std::shared_ptr<backend::UserDefinedFunction>&) {
+                       oss << "<function>";
+                   },
+                   [&](const backend::Function& func) {
+                       oss << "<function:" << func.name << ">";
+                   },
+                   [&](const ClosureValue& closure) {
+                       oss << closure.toString();
+                   }
+               }, data);
+    return oss.str();
 }
 
 std::string Value::getRawString() const {
-        std::ostringstream oss;
-        std::visit(overloaded{
-            [&](const std::monostate&) { oss << "nil"; },
-            [&](bool b) { oss << (b ? "true" : "false"); },
-            [&](int8_t i) { oss << static_cast<int>(i); },
-            [&](int16_t i) { oss << i; },
-            [&](int32_t i) { oss << i; },
-            [&](int64_t i) { oss << i; },
-            [&](uint8_t u) { oss << static_cast<unsigned>(u); },
-            [&](uint16_t u) { oss << u; },
-            [&](uint32_t u) { oss << u; },
-            [&](uint64_t u) { oss << u; },
-            [&](float f) { oss << f; },
-            [&](double d) { oss << d; },
-            [&](const std::string& s) { oss << s; }, // No quotes for raw string
-            [&](const ListValue& lv) {
-                oss << "[";
-                for (size_t i = 0; i < lv.elements.size(); ++i) {
-                    if (i > 0) oss << ", ";
-                    oss << lv.elements[i]->getRawString();
-                }
-                oss << "]";
-            },
-            [&](const DictValue& dv) {
-                oss << "{";
-                bool first = true;
-                for (const auto& [key, value] : dv.elements) {
-                    if (!first) oss << ", ";
-                    first = false;
-                    oss << key->getRawString() << ": " << value->getRawString();
-                }
-                oss << "}";
-            },
-            [&](const TupleValue& tv) {
-                oss << "(";
-                for (size_t i = 0; i < tv.elements.size(); ++i) {
-                    if (i > 0) oss << ", ";
-                    oss << tv.elements[i]->getRawString();
-                }
-                oss << ")";
-            },
-            [&](const SumValue& sv) {
-                oss << "Sum(" << sv.activeVariant << ", " << sv.value->getRawString() << ")";
-            },
-            [&](const EnumValue& ev) {
-                oss << ev.toString(); // Use existing enum toString
-            },
-            [&](const ErrorValue& erv) {
-                oss << erv.toString();
-            },
-            [&](const UserDefinedValue& udv) {
-                oss << udv.variantName << "{";
-                bool first = true;
-                for (const auto& [field, value] : udv.fields) {
-                    if (!first) oss << ", ";
-                    first = false;
-                    oss << field << ": " << value->getRawString();
-                }
-                oss << "}";
-            },
-            [&](const IteratorValuePtr& iter) {
-                if (iter) {
-                    oss << iter->toString();
-                } else {
-                    oss << "<null iterator>";
-                }
-            },
-            [&](const std::shared_ptr<Channel<ValuePtr>>&){
-                oss << "<channel>";
-            },
-            [&](const AtomicValue& av) {
-                // Print the current atomic integer value
-                if (av.inner) {
-                    oss << av.inner->load();
-                } else {
-                    oss << "<atomic(nil)>";
-                }
-            },
-            [&](const ObjectInstancePtr& obj) {
-                oss << "<object>";
-            },
-            [&](const std::shared_ptr<backend::ClassDefinition>&) {
-                oss << "<class>";
-            },
-            [&](const ModuleValue&) {
-                oss << "<module>";
-            },
-            [&](const std::shared_ptr<backend::UserDefinedFunction>&) {
-                oss << "<function>";
-            },
-            [&](const backend::Function& func) {
-                oss << "<function:" << func.name << ">";
-            },
-            [&](const ClosureValue& closure) {
-                oss << closure.toString();
-            }
-        }, data);
-        return oss.str();
+    std::ostringstream oss;
+    std::visit(overloaded{
+                   [&](const std::monostate&) { oss << "nil"; },
+                   [&](bool b) { oss << (b ? "true" : "false"); },
+                   [&](int8_t i) { oss << static_cast<int>(i); },
+                   [&](int16_t i) { oss << i; },
+                   [&](int32_t i) { oss << i; },
+                   [&](int64_t i) { oss << i; },
+                   [&](uint8_t u) { oss << static_cast<unsigned>(u); },
+                   [&](uint16_t u) { oss << u; },
+                   [&](uint32_t u) { oss << u; },
+                   [&](uint64_t u) { oss << u; },
+                   [&](float f) { oss << f; },
+                   [&](double d) { oss << d; },
+                   [&](const std::string& s) { oss << s; }, // No quotes for raw string
+                   [&](const ListValue& lv) {
+                       oss << "[";
+                       for (size_t i = 0; i < lv.elements.size(); ++i) {
+                           if (i > 0) oss << ", ";
+                           oss << lv.elements[i]->getRawString();
+                       }
+                       oss << "]";
+                   },
+                   [&](const DictValue& dv) {
+                       oss << "{";
+                       bool first = true;
+                       for (const auto& [key, value] : dv.elements) {
+                           if (!first) oss << ", ";
+                           first = false;
+                           oss << key->getRawString() << ": " << value->getRawString();
+                       }
+                       oss << "}";
+                   },
+                   [&](const TupleValue& tv) {
+                       oss << "(";
+                       for (size_t i = 0; i < tv.elements.size(); ++i) {
+                           if (i > 0) oss << ", ";
+                           oss << tv.elements[i]->getRawString();
+                       }
+                       oss << ")";
+                   },
+                   [&](const SumValue& sv) {
+                       oss << "Sum(" << sv.activeVariant << ", " << sv.value->getRawString() << ")";
+                   },
+                   [&](const EnumValue& ev) {
+                       oss << ev.toString(); // Use existing enum toString
+                   },
+                   [&](const ErrorValue& erv) {
+                       oss << erv.toString();
+                   },
+                   [&](const UserDefinedValue& udv) {
+                       oss << udv.variantName << "{";
+                       bool first = true;
+                       for (const auto& [field, value] : udv.fields) {
+                           if (!first) oss << ", ";
+                           first = false;
+                           oss << field << ": " << value->getRawString();
+                       }
+                       oss << "}";
+                   },
+                   [&](const IteratorValuePtr& iter) {
+                       if (iter) {
+                           oss << iter->toString();
+                       } else {
+                           oss << "<null iterator>";
+                       }
+                   },
+                   [&](const std::shared_ptr<Channel<ValuePtr>>&){
+                       oss << "<channel>";
+                   },
+                   [&](const AtomicValue& av) {
+                       // Print the current atomic integer value
+                       if (av.inner) {
+                           oss << av.inner->load();
+                       } else {
+                           oss << "<atomic(nil)>";
+                       }
+                   },
+                   [&](const ObjectInstancePtr& obj) {
+                       oss << "<object>";
+                   },
+                   [&](const std::shared_ptr<backend::ClassDefinition>&) {
+                       oss << "<class>";
+                   },
+                   [&](const ModuleValue&) {
+                       oss << "<module>";
+                   },
+                   [&](const std::shared_ptr<backend::UserDefinedFunction>&) {
+                       oss << "<function>";
+                   },
+                   [&](const backend::Function& func) {
+                       oss << "<function:" << func.name << ">";
+                   },
+                   [&](const ClosureValue& closure) {
+                       oss << closure.toString();
+                   }
+               }, data);
+    return oss.str();
 }

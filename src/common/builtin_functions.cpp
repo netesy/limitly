@@ -1209,7 +1209,7 @@ ValuePtr BuiltinFunctions::debug(const std::vector<ValuePtr>& args) {
                 break;
             }
             default:
-                std::cout << "<complex value>";
+                std::cout << value->toString();
                 break;
         }
         std::cout << std::endl;

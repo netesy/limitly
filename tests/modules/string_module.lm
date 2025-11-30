@@ -1,6 +1,6 @@
 // String utilities module
-var greeting = "Hello";
-var farewell = "Goodbye";
+pub var greeting = "Hello";
+pub var farewell = "Goodbye";
 
 pub fn say_hello(name) {
     return greeting + ", " + name + "!";

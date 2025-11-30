@@ -162,6 +162,9 @@ std::string BytecodePrinter::formatInstruction(const Instruction& instruction, s
         case Opcode::PUSH_STRING:
         case Opcode::STORE_VAR:
         case Opcode::LOAD_VAR:
+        case Opcode::STORE_TEMP:
+        case Opcode::LOAD_TEMP:
+        case Opcode::CLEAR_TEMP:
         case Opcode::BEGIN_FUNCTION:
         case Opcode::CALL:
         case Opcode::IMPORT_MODULE:
@@ -171,9 +174,16 @@ std::string BytecodePrinter::formatInstruction(const Instruction& instruction, s
         case Opcode::BEGIN_CLASS:
         case Opcode::DEFINE_FIELD:
         case Opcode::CAPTURE_VAR:
+        case Opcode::BEGIN_SCOPE:
+        case Opcode::END_SCOPE:
+        case Opcode::INTERPOLATE_STRING:
         case Opcode::PUSH_FUNCTION_REF:
             if (!instruction.stringValue.empty()) {
                 oss << " \"" << instruction.stringValue << "\"";
+            }
+
+            if (instruction.intValue != 0) {
+                oss << " " << instruction.intValue;
             }
             break;
             
