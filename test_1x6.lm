@@ -1,0 +1,15 @@
+// Test 1 outer × 6 inner
+print("=== Testing 1 Outer, 6 Inner ===");
+
+var outer_list = [1];
+var inner_list = ["a", "b", "c", "d", "e", "f"];
+
+print("1 outer, 6 inner:");
+iter (var x in outer_list) {
+    print("Outer: {x}");
+    iter (var y in inner_list) {
+        print("  Inner: {y}");
+    }
+}
+
+print("Done");

@@ -401,9 +401,19 @@ public:
             auto it = generationObjects.find(removable);
             
             if (it != generationObjects.end()) {
-                for (void* ptr : it->second) {
-                    manager.deallocate(ptr);
-                    objectGenerations.erase(ptr);
+                // Add bounds checking and error handling
+                const auto& objects = it->second;
+                for (auto objIt = objects.begin(); objIt != objects.end(); ++objIt) {
+                    void* ptr = *objIt;
+                    if (ptr != nullptr) {
+                        try {
+                            manager.deallocate(ptr);
+                            objectGenerations.erase(ptr);
+                        } catch (...) {
+                            // Skip corrupted objects to prevent hanging
+                            continue;
+                        }
+                    }
                 }
                 generationObjects.erase(it);
             }

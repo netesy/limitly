@@ -241,7 +241,14 @@ private:
     backend::FunctionRegistry functionRegistry; // New function abstraction layer
     backend::ClassRegistry classRegistry; // Class management
     std::unordered_map<std::string, backend::Function> userDefinedFunctions; // Use the proper Function struct
-    std::vector<ValuePtr> tempValues;
+    // Scope-aware temporary variables
+    struct ScopedTempValues {
+        std::shared_ptr<Environment> scope;
+        std::vector<ValuePtr> values;
+        
+        ScopedTempValues(std::shared_ptr<Environment> env) : scope(env) {}
+    };
+    std::vector<ScopedTempValues> tempValueStack;
     ValuePtr lastException;
     
     // Task iteration state

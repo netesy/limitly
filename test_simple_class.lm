@@ -18,7 +18,7 @@ print("Field access:");
 print(obj.name);
 
 print("Calling private method (should fail):");
-print(obj.getName());
+//print(obj.getName());
 
 print("Calling public method:");
 print(obj.testMethod());

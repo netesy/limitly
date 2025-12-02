@@ -618,16 +618,16 @@ std::shared_ptr<AST::Statement> Parser::declaration() {
             }
             return decl;
         }
-        if (match({TokenType::ASYNC})) {
-            consume(TokenType::FN, "Expected 'fn' after 'async'.");
-            auto asyncFn = std::make_shared<AST::AsyncFunctionDeclaration>(*function("async function"));
-            asyncFn->annotations = annotations;
-            asyncFn->visibility = visibility;
-            asyncFn->isStatic = isStatic;
-            asyncFn->isAbstract = isAbstract;
-            asyncFn->isFinal = isFinal;
-            return asyncFn;
-        }
+        // if (match({TokenType::ASYNC})) {
+        //     consume(TokenType::FN, "Expected 'fn' after 'async'.");
+        //     auto asyncFn = std::make_shared<AST::AsyncFunctionDeclaration>(*function("async function"));
+        //     asyncFn->annotations = annotations;
+        //     asyncFn->visibility = visibility;
+        //     asyncFn->isStatic = isStatic;
+        //     asyncFn->isAbstract = isAbstract;
+        //     asyncFn->isFinal = isFinal;
+        //     return asyncFn;
+        // }
         if (match({TokenType::VAR})) {
             auto decl = varDeclaration();
             if (decl) {
@@ -1413,7 +1413,8 @@ std::shared_ptr<AST::BlockStatement> Parser::block() {
     while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
         try {
             if (in_concurrent_block) {
-                bool is_async = match({TokenType::ASYNC});
+                // bool is_async = match({TokenType::ASYNC});
+                bool is_async = false; // Temporarily disabled async support
                 if (peek().type == TokenType::IDENTIFIER) {
                     if (peek().lexeme == "task") {
                         advance(); // consume 'task'
@@ -1822,18 +1823,18 @@ std::shared_ptr<AST::FunctionDeclaration> Parser::function(const std::string& ki
     }
 
     // Check if function throws and parse error types (legacy syntax)
-    if (match({TokenType::THROWS})) {
-        func->throws = true;
-        func->canFail = true;
-        
-        // Parse specific error types if provided
-        if (!check(TokenType::LEFT_BRACE)) {
-            do {
-                Token errorType = consume(TokenType::IDENTIFIER, "Expected error type name after 'throws'.");
-                func->declaredErrorTypes.push_back(errorType.lexeme);
-            } while (match({TokenType::COMMA}));
-        }
-    }
+    // if (match({TokenType::THROWS})) {
+    //     func->throws = true;
+    //     func->canFail = true;
+    //     
+    //     // Parse specific error types if provided
+    //     if (!check(TokenType::LEFT_BRACE)) {
+    //         do {
+    //             Token errorType = consume(TokenType::IDENTIFIER, "Expected error type name after 'throws'.");
+    //             func->declaredErrorTypes.push_back(errorType.lexeme);
+    //         } while (match({TokenType::COMMA}));
+    //     }
+    // }
 
     // Parse function body (or semicolon for abstract methods)
     if (check(TokenType::SEMICOLON)) {
@@ -3037,33 +3038,33 @@ std::shared_ptr<AST::Expression> Parser::unary() {
         return unaryExpr;
     }
 
-    if (match({TokenType::AWAIT})) {
-        auto awaitToken = previous();
-        auto awaitExpr = std::make_shared<AST::AwaitExpr>();
-        awaitExpr->line = awaitToken.line;
-        awaitExpr->expression = unary();
-
-        // Create detailed CST node if enabled
-        if (cstMode && config.detailedExpressionNodes) {
-            auto awaitCSTNode = std::make_unique<CST::Node>(CST::NodeKind::UNARY_EXPR);
-            awaitCSTNode->setDescription("await expression");
-            
-            // Set up hierarchical context for this await expression
-            pushCSTContext(awaitCSTNode.get());
-            
-            // Capture the await token with its trivia
-            awaitCSTNode->addToken(awaitToken);
-            attachTriviaFromToken(awaitToken);
-            
-            // Update source span to cover the entire await expression
-            awaitCSTNode->setSourceSpan(awaitToken.start, awaitToken.end);
-            
-            addChildToCurrentContext(std::move(awaitCSTNode));
-            popCSTContext();
-        }
-
-        return awaitExpr;
-    }
+    // if (match({TokenType::AWAIT})) {
+    //     auto awaitToken = previous();
+    //     auto awaitExpr = std::make_shared<AST::AwaitExpr>();
+    //     awaitExpr->line = awaitToken.line;
+    //     awaitExpr->expression = unary();
+    //
+    //     // Create detailed CST node if enabled
+    //     if (cstMode && config.detailedExpressionNodes) {
+    //         auto awaitCSTNode = std::make_unique<CST::Node>(CST::NodeKind::UNARY_EXPR);
+    //         awaitCSTNode->setDescription("await expression");
+    //         
+    //         // Set up hierarchical context for this await expression
+    //         pushCSTContext(awaitCSTNode.get());
+    //         
+    //         // Capture the await token with its trivia
+    //         awaitCSTNode->addToken(awaitToken);
+    //         attachTriviaFromToken(awaitToken);
+    //         
+    //         // Update source span to cover the entire await expression
+    //         awaitCSTNode->setSourceSpan(awaitToken.start, awaitToken.end);
+    //         
+    //         addChildToCurrentContext(std::move(awaitCSTNode));
+    //         popCSTContext();
+    //     }
+    //
+    //     return awaitExpr;
+    // }
 
     return call();
 }
@@ -3372,13 +3373,13 @@ std::shared_ptr<AST::Expression> Parser::primary() {
         return literalExpr;
     }
 
-    if (match({TokenType::NONE})) {
-        auto literalExpr = createNodeWithContext<AST::LiteralExpr>();
-        literalExpr->line = previous().line;
-        literalExpr->value = nullptr;
-        attachTriviaFromToken(previous());
-        return literalExpr;
-    }
+    // if (match({TokenType::NONE})) {
+    //     auto literalExpr = createNodeWithContext<AST::LiteralExpr>();
+    //     literalExpr->line = previous().line;
+    //     literalExpr->value = nullptr;
+    //     attachTriviaFromToken(previous());
+    //     return literalExpr;
+    // }
 
     if (match({TokenType::NIL})) {
         auto literalExpr = createNodeWithContext<AST::LiteralExpr>();

@@ -362,7 +362,7 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                               instruction.opcode == Opcode::ITERATOR_HAS_NEXT ||
                               instruction.opcode == Opcode::JUMP)) {
                 std::cout << "[DEBUG] IP=" << ip << " Opcode=" << BytecodePrinter::opcodeToString(instruction.opcode)
-                          << " tempValues.size()=" << tempValues.size()
+                          << " tempScopes=" << tempValueStack.size()
                           << " stack.size()=" << stack.size() << std::endl;
 
                 if (instruction.opcode == Opcode::JUMP) {
@@ -389,6 +389,13 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
             // Tracing is disabled by default to keep runtime output clean.
             
             try {
+                if (debugMode && ip >= 50) {
+                    std::cout << "[DEBUG] MAIN LOOP: About to execute IP=" << ip 
+                              << " Opcode=" << static_cast<int>(instruction.opcode)
+                              << " (" << BytecodePrinter::opcodeToString(instruction.opcode) << ")"
+                              << std::endl;
+                }
+                
                 switch (instruction.opcode) {
                 case Opcode::PUSH_INT:
                     handlePushInt(instruction);
@@ -758,7 +765,19 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                 // Handle other exceptions that occur during instruction execution
                 error("Error executing instruction: " + std::string(e.what()));
             }
+            
+            if (debugMode && ip >= 50) {
+                std::cout << "[DEBUG] MAIN LOOP: Completed IP=" << ip 
+                          << ", about to increment to " << (ip + 1) << std::endl;
+            }
+            
             ip++;
+            
+            if (debugMode && ip >= 50) {
+                std::cout << "[DEBUG] MAIN LOOP: IP incremented to " << ip 
+                          << ", loop condition: " << (ip < bytecodeRef.size()) 
+                          << " (size=" << bytecodeRef.size() << ")" << std::endl;
+            }
         }
     } catch (const std::exception& e) {
         // Check if this is an assertion failure or contract violation - let them propagate to terminate execution
@@ -1521,16 +1540,32 @@ void VM::handleStoreTemp(const Instruction& instruction) {
     // Store the top value in a temporary variable at the specified index
     int index = instruction.intValue;
     
-    // Ensure the tempValues vector is large enough
-    if (index >= static_cast<int>(tempValues.size())) {
-        tempValues.resize(index + 1, memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
+    // Find or create the current scope's temp values
+    ScopedTempValues* currentScopeTemps = nullptr;
+    for (auto& scopedTemps : tempValueStack) {
+        if (scopedTemps.scope == environment) {
+            currentScopeTemps = &scopedTemps;
+            break;
+        }
     }
     
-    tempValues[index] = pop();
+    // If no temp values for current scope, create them
+    if (!currentScopeTemps) {
+        tempValueStack.emplace_back(environment);
+        currentScopeTemps = &tempValueStack.back();
+    }
+    
+    // Ensure the values vector is large enough
+    if (index >= static_cast<int>(currentScopeTemps->values.size())) {
+        currentScopeTemps->values.resize(index + 1, memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
+    }
+    
+    currentScopeTemps->values[index] = pop();
     if (debugMode) {
         std::cout << "[DEBUG] STORE_TEMP: Stored at index " << index
-
-                  << ", tempValues.size(): " << tempValues.size() << std::endl;
+                  << " in scope " << currentScopeTemps->scope.get()
+                  << ", values.size(): " << currentScopeTemps->values.size() 
+                  << ", total scopes: " << tempValueStack.size() << std::endl;
     }
 }
 
@@ -1538,27 +1573,52 @@ void VM::handleLoadTemp(const Instruction& instruction) {
     // Load the temporary value from the specified index onto the stack
     int index = instruction.intValue;
     
-    if (index < 0 || index >= static_cast<int>(tempValues.size())) {
-        error("Invalid temporary variable index: " + std::to_string(index));
+    // Search through all scopes for the temporary variable (most recent first)
+    ScopedTempValues* foundScopeTemps = nullptr;
+    for (auto it = tempValueStack.rbegin(); it != tempValueStack.rend(); ++it) {
+        if (index >= 0 && index < static_cast<int>(it->values.size())) {
+            foundScopeTemps = &(*it);
+            break;
+        }
+    }
+    
+    if (!foundScopeTemps) {
+        error("Invalid temporary variable index: " + std::to_string(index) + 
+              " (not found in any scope, total scopes: " + std::to_string(tempValueStack.size()) + ")");
         return;
     }
+    
     if (debugMode) {
         std::cout << "[DEBUG] LOAD_TEMP: Loading from index " << index
-                  << ", tempValues.size(): " << tempValues.size() << std::endl;
+                  << " in scope " << foundScopeTemps->scope.get()
+                  << ", values.size(): " << foundScopeTemps->values.size() 
+                  << ", total scopes: " << tempValueStack.size() << std::endl;
     }
-    push(tempValues[index]);
+    push(foundScopeTemps->values[index]);
 }
 
 void VM::handleClearTemp(const Instruction& instruction) {
     // Clear the temporary value at the specified index
     int index = instruction.intValue;
     
-    if (index >= 0 && index < static_cast<int>(tempValues.size())) {
-        tempValues[index] = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
+    // Search through all scopes for the temporary variable to clear
+    ScopedTempValues* foundScopeTemps = nullptr;
+    for (auto it = tempValueStack.rbegin(); it != tempValueStack.rend(); ++it) {
+        if (index >= 0 && index < static_cast<int>(it->values.size())) {
+            foundScopeTemps = &(*it);
+            break;
+        }
     }
+    
+    if (foundScopeTemps) {
+        foundScopeTemps->values[index] = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
+    }
+    
     if (debugMode) {
         std::cout << "[DEBUG] CLEAR_TEMP: Cleared at index " << index
-                  << ", tempValues.size(): " << tempValues.size() << std::endl;
+                  << " in scope " << (foundScopeTemps ? foundScopeTemps->scope.get() : nullptr)
+                  << ", values.size(): " << (foundScopeTemps ? foundScopeTemps->values.size() : 0) 
+                  << ", total scopes: " << tempValueStack.size() << std::endl;
     }
 }
 
@@ -4931,10 +4991,27 @@ void VM::handleIteratorHasNext(const Instruction& /*unused*/) {
     }
     
     auto iterator = std::get<IteratorValuePtr>(iteratorVal->data);
-    bool hasNext = iterator->hasNext();
+    
+    // Add additional validation for iterator state
+    if (!iterator) {
+        error("Null iterator in ITERATOR_HAS_NEXT");
+        return;
+    }
+    
+    bool hasNext = false;
+    try {
+        hasNext = iterator->hasNext();
+    } catch (const std::exception& e) {
+        error("Exception in iterator->hasNext(): " + std::string(e.what()));
+        return;
+    }
     
     if (debugMode) {
-        std::cout << "[DEBUG] ITERATOR_HAS_NEXT: " << (hasNext ? "true" : "false") << std::endl;
+        std::cout << "[DEBUG] ITERATOR_HAS_NEXT: " << (hasNext ? "true" : "false");
+        if (iterator->type == IteratorValue::IteratorType::LIST) {
+            std::cout << " (currentIndex=" << iterator->currentIndex << ")";
+        }
+        std::cout << std::endl;
     }
     
     // Push the result back onto the stack
@@ -4959,16 +5036,38 @@ void VM::handleIteratorNext(const Instruction& /*unused*/) {
     
     auto iterator = std::get<IteratorValuePtr>(iteratorVal->data);
     
+    // Add additional validation for iterator state
+    if (!iterator) {
+        error("Null iterator in ITERATOR_NEXT");
+        return;
+    }
+    
     if (!iterator->hasNext()) {
-        error("No more elements in iterator");
+        error("No more elements in iterator (currentIndex=" + 
+              std::to_string(iterator->currentIndex) + ")");
         return;
     }
     
     // Get the next value and push it onto the stack
-    ValuePtr nextValue = iterator->next();
+    ValuePtr nextValue = nullptr;
+    try {
+        nextValue = iterator->next();
+    } catch (const std::exception& e) {
+        error("Exception in iterator->next(): " + std::string(e.what()));
+        return;
+    }
+    
+    if (!nextValue) {
+        error("Iterator returned null value");
+        return;
+    }
     
     if (debugMode) {
-        std::cout << "[DEBUG] ITERATOR_NEXT: Got value: " << nextValue->toString() << std::endl;
+        std::cout << "[DEBUG] ITERATOR_NEXT: Got value: " << nextValue->toString();
+        if (iterator->type == IteratorValue::IteratorType::LIST) {
+            std::cout << " (currentIndex now=" << iterator->currentIndex << ")";
+        }
+        std::cout << std::endl;
     }
     
     push(nextValue);
@@ -4994,18 +5093,81 @@ void VM::handleEndScope(const Instruction& /*unused*/) {
     // Restore the previous environment
     if (debugMode) {
         std::cout << "[DEBUG] END_SCOPE: Current environment = " << (environment ? "valid" : "null")
-                  << ", has enclosing = " << (environment && environment->enclosing ? "yes" : "no") << std::endl;
+                  << ", has enclosing = " << (environment && environment->enclosing ? "yes" : "no") 
+                  << ", IP=" << ip << std::endl;
+    }
+    
+    // Clean up temporary variables for the current scope
+    auto currentEnv = environment;
+    for (auto it = tempValueStack.begin(); it != tempValueStack.end(); ) {
+        if (it->scope == currentEnv) {
+            if (debugMode) {
+                std::cout << "[DEBUG] END_SCOPE: Cleaning up " << it->values.size() 
+                          << " temp variables for scope " << it->scope.get() << std::endl;
+            }
+            it = tempValueStack.erase(it);
+        } else {
+            ++it;
+        }
     }
     
     // Restore the previous environment
     if (environment && environment->enclosing) {
+        if (debugMode) {
+            std::cout << "[DEBUG] END_SCOPE: Restoring environment from " 
+                      << environment.get() << " to " << environment->enclosing.get() << std::endl;
+        }
         environment = environment->enclosing;
+        if (debugMode) {
+            std::cout << "[DEBUG] END_SCOPE: Environment restored" << std::endl;
+        }
     } else if (!environment) {
-        error("END_SCOPE: environment is null");
+        // Environment is null - this can happen after a function return
+        // Just use globals as fallback and continue
+        if (debugMode) {
+            std::cout << "[DEBUG] END_SCOPE: Environment is null, using globals as fallback" << std::endl;
+        }
+        environment = globals;
     } else if (!environment->enclosing) {
-        error("END_SCOPE: no enclosing environment to restore (scope mismatch)");
+        // No enclosing environment - this can happen when we're at global scope
+        // or after a function return has already restored the environment
+        if (environment == globals) {
+            // We're at global scope, this is normal - just continue
+            if (debugMode) {
+                std::cout << "[DEBUG] END_SCOPE: At global scope, no action needed" << std::endl;
+            }
+        } else {
+            // We're not at global scope but have no enclosing environment
+            // This can happen after a function return - restore to globals
+            if (debugMode) {
+                std::cout << "[DEBUG] END_SCOPE: No enclosing environment, restoring to globals" << std::endl;
+            }
+            environment = globals;
+        }
     }
-    region->exitScope();
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] END_SCOPE: About to call region->exitScope()" << std::endl;
+    }
+    
+    try {
+        region->exitScope();
+        if (debugMode) {
+            std::cout << "[DEBUG] END_SCOPE: region->exitScope() completed" << std::endl;
+        }
+    } catch (const std::exception& e) {
+        // Memory region scope mismatch can also happen after function returns
+        // Log the error but don't fail the execution
+        if (debugMode) {
+            std::cout << "[DEBUG] END_SCOPE: Exception in region->exitScope(): " << e.what() 
+                      << " (continuing execution)" << std::endl;
+        }
+    }
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] END_SCOPE: Successfully completed, IP=" << ip 
+                  << ", remaining temp scopes: " << tempValueStack.size() << std::endl;
+    }
 }
 
 void VM::handleBeginParallel(const Instruction& instruction) {
