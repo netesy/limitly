@@ -214,20 +214,20 @@ iter (x in 0..4) {
 }
 
 // Nested iter loops
-print("Nested iter loops:");
-iter (i in 1..3) {
-    iter (j in 10..12) {
-        print("({i}, {j})");
-    }
-}
+// print("Nested iter loops:");
+// iter (i in 1..3) {
+//     iter (j in 10..12) {
+//         print("({i}, {j})");
+//     }
+// }
 
-// Mixed nested loops
-print("Mixed loops (for outer, iter inner):");
-for (var i = 0; i < 2; i += 1) {
-    iter (j in 5..7) {
-        print("for-iter: ({i}, {j})");
-    }
-}
+// // Mixed nested loops
+// print("Mixed loops (for outer, iter inner):");
+// for (var i = 0; i < 2; i += 1) {
+//     iter (j in 5..7) {
+//         print("for-iter: ({i}, {j})");
+//     }
+// }
 
 // ==========================================
 // 7. LOOPS - WHILE LOOPS

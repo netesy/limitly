@@ -1,0 +1,16 @@
+// Test exactly 6 inner iterations with different splits
+print("=== Testing 6 Inner Iterations ===");
+
+// Test 6 outer × 1 inner = 6 total inner iterations
+var outer_list = [1, 2, 3, 4, 5, 6];
+var inner_list = ["a"];
+
+print("6 outer, 1 inner (6 total inner iterations):");
+iter (var x in outer_list) {
+    print("Outer: {x}");
+    iter (var y in inner_list) {
+        print("  Inner: {y}");
+    }
+}
+
+print("Done");

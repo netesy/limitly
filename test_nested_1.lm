@@ -1,0 +1,15 @@
+// Test nested loop with 1 inner element
+print("=== Testing Nested Loop with 1 Inner Element ===");
+
+var outer_list = [1, 2, 3];
+var inner_list = ["a"];
+
+print("Nested iter loops:");
+iter (var x in outer_list) {
+    print("Outer: {x}");
+    iter (var y in inner_list) {
+        print("  Inner: {y}");
+    }
+}
+
+print("Done");

@@ -651,16 +651,16 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "true") return TokenType::TRUE;
     if (rest == "var") return TokenType::VAR;
     if (rest == "while") return TokenType::WHILE;
-    if (rest == "attempt") return TokenType::ATTEMPT;
-    if (rest == "handle") return TokenType::HANDLE;
+    // if (rest == "attempt") return TokenType::ATTEMPT;
+    // if (rest == "handle") return TokenType::HANDLE;
     if (rest == "parallel") return TokenType::PARALLEL;
     if (rest == "concurrent") return TokenType::CONCURRENT;
-    if (rest == "async") return TokenType::ASYNC;
-    if (rest == "await") return TokenType::AWAIT;
+    // if (rest == "async") return TokenType::ASYNC;
+    // if (rest == "await") return TokenType::AWAIT;
     if (rest == "break") return TokenType::BREAK;
     if (rest == "continue") return TokenType::CONTINUE;
     if (rest == "import") return TokenType::IMPORT;
-    if (rest == "throws") return TokenType::THROWS;
+    // if (rest == "throws") return TokenType::THROWS;
     if (rest == "match") return TokenType::MATCH;
     if (rest == "in") return TokenType::IN;
     if (rest == "type") return TokenType::TYPE;
@@ -903,28 +903,28 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "TRUE";
     case TokenType::VAR:
         return "VAR";
-    case TokenType::ATTEMPT:
-        return "ATTEMPT";
-    case TokenType::HANDLE:
-        return "HANDLE";
+    // case TokenType::ATTEMPT:
+    //     return "ATTEMPT";
+    // case TokenType::HANDLE:
+    //     return "HANDLE";
     case TokenType::PARALLEL:
         return "PARALLEL";
     case TokenType::CONCURRENT:
         return "CONCURRENT";
-    case TokenType::ASYNC:
-        return "ASYNC";
-    case TokenType::AWAIT:
-        return "AWAIT";
+    // case TokenType::ASYNC:
+    //     return "ASYNC";
+    // case TokenType::AWAIT:
+    //     return "AWAIT";
     case TokenType::BREAK:
         return "BREAK";
     case TokenType::CONTINUE:
         return "CONTINUE";
     case TokenType::IMPORT:
         return "IMPORT";
-    case TokenType::NONE:
-        return "NONE";
-    case TokenType::THROWS:
-        return "THROWS";
+    // case TokenType::NONE:
+    //     return "NONE";
+    // case TokenType::THROWS:
+    //     return "THROWS";
     case TokenType::TYPE:
         return "TYPE";
     case TokenType::TRAIT:

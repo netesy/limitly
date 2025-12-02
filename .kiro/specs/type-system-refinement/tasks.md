@@ -25,6 +25,7 @@
   - _Requirements: 1.1, 1.4_
 
 - [ ]* 1.4 Write unit tests for discriminated union system
+
   - Test union type creation and variant management
   - Validate automatic tag generation
   - Test runtime type identification

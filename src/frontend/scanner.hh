@@ -117,17 +117,17 @@ enum class TokenType {
     SELF,       // self
     TRUE,       // true
     VAR,        // var
-    ATTEMPT,    // attempt
-    HANDLE,     // handle
+    // ATTEMPT,    // attempt
+    // HANDLE,     // handle
     PARALLEL,   // parallel
     CONCURRENT, // concurrent
-    ASYNC,      // async
-    AWAIT,      // await
+    // ASYNC,      // async
+    // AWAIT,      // await
     BREAK,      // break
     CONTINUE,   // continue
     IMPORT,     // import
-    NONE,       // None
-    THROWS,     // throws
+    // NONE,       // None
+    // THROWS,     // throws
     TYPE,       // type
     TRAIT,      // trait
     INTERFACE,  // interface

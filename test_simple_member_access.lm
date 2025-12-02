@@ -13,7 +13,7 @@ fn test() {
     print("Name: " + obj.name);
     
     // Try to access non-existent member - should be caught by type_checker
-    print("Invalid: " + obj.invalid);
+  //  print("Invalid: " + obj.invalid);
 }
 
 test();

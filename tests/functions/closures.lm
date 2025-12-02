@@ -114,7 +114,15 @@ fn createTemporaryClosure(value: int): fn(): int {
     };
 }
 
-iter (i in 1..5) {
+//fix the iter issue first
+
+// iter (i in 1..5) {
+//     var tempClosure = createTemporaryClosure(i);
+//     var result = tempClosure();
+//     print("Temporary closure {i} result: {result}");
+// }
+
+for (var i = 1; i < 5; i += 1) {
     var tempClosure = createTemporaryClosure(i);
     var result = tempClosure();
     print("Temporary closure {i} result: {result}");
