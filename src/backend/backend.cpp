@@ -1574,6 +1574,9 @@ void BytecodeGenerator::visitIterStatement(const std::shared_ptr<AST::IterStatem
     // Set up loop context for nested loops
     loopBreakPatches.emplace_back();
     
+    // Create a new scope for this iterator to ensure proper variable isolation
+    emit(Opcode::BEGIN_SCOPE, stmt->line);
+    
     // Allocate a unique temporary variable for this iterator
     int iteratorTempIndex = tempVarCounter++;
     
@@ -1640,6 +1643,9 @@ void BytecodeGenerator::visitIterStatement(const std::shared_ptr<AST::IterStatem
     
     // Clean up the temporary iterator
     emit(Opcode::CLEAR_TEMP, stmt->line, iteratorTempIndex);
+    
+    // End the scope for this iterator
+    emit(Opcode::END_SCOPE, stmt->line);
 }
 
 void BytecodeGenerator::visitModuleDeclaration(const std::shared_ptr<AST::ModuleDeclaration>& stmt) {

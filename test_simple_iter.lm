@@ -1,0 +1,8 @@
+// Simple single iterator test
+print("=== Simple Single Iterator Test ===");
+
+iter (var i in 1..3) {
+    print("i = {i}");
+}
+
+print("Done");
