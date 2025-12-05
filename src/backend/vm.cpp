@@ -1573,12 +1573,23 @@ void VM::handleLoadTemp(const Instruction& instruction) {
     // Load the temporary value from the specified index onto the stack
     int index = instruction.intValue;
     
-    // Search through all scopes for the temporary variable (most recent first)
+    // First, try to find the temporary variable in the current scope
     ScopedTempValues* foundScopeTemps = nullptr;
-    for (auto it = tempValueStack.rbegin(); it != tempValueStack.rend(); ++it) {
-        if (index >= 0 && index < static_cast<int>(it->values.size())) {
-            foundScopeTemps = &(*it);
+    for (auto& scopedTemps : tempValueStack) {
+        if (scopedTemps.scope == environment && 
+            index >= 0 && index < static_cast<int>(scopedTemps.values.size())) {
+            foundScopeTemps = &scopedTemps;
             break;
+        }
+    }
+    
+    // If not found in current scope, search through all scopes (most recent first)
+    if (!foundScopeTemps) {
+        for (auto it = tempValueStack.rbegin(); it != tempValueStack.rend(); ++it) {
+            if (index >= 0 && index < static_cast<int>(it->values.size())) {
+                foundScopeTemps = &(*it);
+                break;
+            }
         }
     }
     
@@ -1601,12 +1612,23 @@ void VM::handleClearTemp(const Instruction& instruction) {
     // Clear the temporary value at the specified index
     int index = instruction.intValue;
     
-    // Search through all scopes for the temporary variable to clear
+    // First, try to find the temporary variable in the current scope
     ScopedTempValues* foundScopeTemps = nullptr;
-    for (auto it = tempValueStack.rbegin(); it != tempValueStack.rend(); ++it) {
-        if (index >= 0 && index < static_cast<int>(it->values.size())) {
-            foundScopeTemps = &(*it);
+    for (auto& scopedTemps : tempValueStack) {
+        if (scopedTemps.scope == environment && 
+            index >= 0 && index < static_cast<int>(scopedTemps.values.size())) {
+            foundScopeTemps = &scopedTemps;
             break;
+        }
+    }
+    
+    // If not found in current scope, search through all scopes (most recent first)
+    if (!foundScopeTemps) {
+        for (auto it = tempValueStack.rbegin(); it != tempValueStack.rend(); ++it) {
+            if (index >= 0 && index < static_cast<int>(it->values.size())) {
+                foundScopeTemps = &(*it);
+                break;
+            }
         }
     }
     
@@ -5098,12 +5120,12 @@ void VM::handleEndScope(const Instruction& /*unused*/) {
     }
     
     // Clean up temporary variables for the current scope
-    auto currentEnv = environment;
-    for (auto it = tempValueStack.begin(); it != tempValueStack.end(); ) {
-        if (it->scope == currentEnv) {
+    auto it = tempValueStack.begin();
+    while (it != tempValueStack.end()) {
+        if (it->scope == environment) {
             if (debugMode) {
-                std::cout << "[DEBUG] END_SCOPE: Cleaning up " << it->values.size() 
-                          << " temp variables for scope " << it->scope.get() << std::endl;
+                std::cout << "[DEBUG] END_SCOPE: Removing temp variables for scope " 
+                          << it->scope.get() << " with " << it->values.size() << " variables" << std::endl;
             }
             it = tempValueStack.erase(it);
         } else {
