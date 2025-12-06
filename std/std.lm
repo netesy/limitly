@@ -8,8 +8,41 @@ import std.math as math;
 import std.io as io;
 import std.result as result;
 import std.functional as functional;
+import std.types as types;
 
 // Re-export commonly used functions for convenience
+
+// Types
+var Ordering = types.Ordering;
+var StdError = types.StdError;
+var CollectionError = types.CollectionError;
+var StringError = types.StringError;
+var MathError = types.MathError;
+var TimeError = types.TimeError;
+var IndexOutOfBounds = types.IndexOutOfBounds;
+var EmptyCollection = types.EmptyCollection;
+var CapacityExceeded = types.CapacityExceeded;
+var InvalidEncoding = types.InvalidEncoding;
+var PatternNotFound = types.PatternNotFound;
+var InvalidFormat = types.InvalidFormat;
+var DomainError = types.DomainError;
+var OverflowError = types.OverflowError;
+var UnderflowError = types.UnderflowError;
+var DivisionByZero = types.DivisionByZero;
+var InvalidDateTime = types.InvalidDateTime;
+var ParseError = types.ParseError;
+var TimezoneError = types.TimezoneError;
+var IntMemoryPool = types.IntMemoryPool;
+var StrMemoryPool = types.StrMemoryPool;
+var IntRc = types.IntRc;
+var StrRc = types.StrRc;
+var new_int_rc = types.new_int_rc;
+var clone_int_rc = types.clone_int_rc;
+var strong_count_int = types.strong_count_int;
+var new_str_rc = types.new_str_rc;
+var clone_str_rc = types.clone_str_rc;
+var strong_count_str = types.strong_count_str;
+
 
 // Collections
 var push = collections.push;
