@@ -1,0 +1,30 @@
+// Module Function Calls Test
+print("=== Module Function Calls Test ===");
+
+import tests.modules.math_module as math;
+import std.types as types;
+
+print("Test 1: Function call with parameters");
+var result = math.add(5, 3);
+assert(result == 8, "5 + 3 should be 8");
+print("5 + 3 = " + result);
+
+print("Test 2: Function call with return value");
+var squared = math.square(4);
+assert(squared == 16, "4 squared should be 16");
+print("4 squared = " + squared);
+
+print("Test 3: Nested function calls");
+var result = math.add(math.square(2), math.cube(2));
+assert(result == 12, "square(2) + cube(2) should be 12");
+print("square(2) + cube(2) = " + result);
+
+print("Test 4: Calling functions from the types module");
+var rc = types.new_int_rc(42);
+assert(types.strong_count_int(rc) == 1, "Initial reference count should be 1");
+var rc2 = types.clone_int_rc(rc);
+assert(types.strong_count_int(rc) == 2, "Reference count should be 2 after clone");
+assert(types.strong_count_int(rc2) == 2, "Cloned reference count should be 2");
+
+
+print("=== Module Function Calls Test Complete ===");

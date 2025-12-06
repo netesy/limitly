@@ -2791,19 +2791,63 @@ void VM::handleCall(const Instruction& instruction) {
             }
             
             if (foundInModule && moduleEnv) {
-                // Create a new environment for the function in the module context
-                auto funcEnv = std::make_shared<Environment>(moduleEnv);
+                // Correctly execute the module function in its own context.
                 
-                // Check argument count and bind parameters
-                if (!bindFunctionParameters(moduleFunc, args, funcEnv, actualFuncName)) {
-                    return; // Error already reported
+                // Find the module path from the environment.
+                std::string modulePath;
+                for (const auto& [path, moduleValue] : loadedModules) {
+                    if (std::holds_alternative<ModuleValue>(moduleValue->data)) {
+                        auto& modVal = std::get<ModuleValue>(moduleValue->data);
+                        if (modVal.env == moduleEnv) {
+                            modulePath = path;
+                            break;
+                        }
+                    }
                 }
+
+                if (modulePath.empty()) {
+                    error("Could not find module path for the function call.");
+                    return;
+                }
+
+                const auto& moduleInfo = std::get<ModuleValue>(loadedModules[modulePath]->data);
+
+                // Create a temporary VM for the module function execution.
+                VM moduleVm(false);
+                moduleVm.globals = this->globals;
+                moduleVm.environment = moduleInfo.env;
                 
-                // Create call frame and switch environment
-                createAndPushCallFrame(actualFuncName, ip + 1, funcEnv);
+                auto moduleUserFuncsIt = moduleUserDefinedFunctions.find(moduleInfo.env.get());
+                if (moduleUserFuncsIt != moduleUserDefinedFunctions.end()) {
+                    moduleVm.userDefinedFunctions = moduleUserFuncsIt->second;
+                }
+
+                // Push arguments onto the temp VM's stack.
+                for (const auto& arg : args) {
+                    moduleVm.push(arg);
+                }
+
+                // Create a tiny bytecode script to call the function and halt.
+                std::vector<Instruction> callScript;
+                Instruction callInstruction;
+                callInstruction.opcode = Opcode::CALL;
+                callInstruction.stringValue = actualFuncName;
+                callInstruction.intValue = args.size();
+                callScript.push_back(callInstruction);
+
+                Instruction haltInstruction;
+                haltInstruction.opcode = Opcode::HALT;
+                callScript.push_back(haltInstruction);
                 
-                // Jump to function start
-                ip = moduleFunc.startAddress; // Set directly since we return early
+                // Set the module's full bytecode into the temp VM's context before execution.
+                moduleVm.bytecode = &moduleInfo.bytecode;
+
+                // Execute the script.
+                ValuePtr returnValue = moduleVm.execute(callScript);
+
+                // Push the return value onto the original VM's stack.
+                push(returnValue);
+
                 return;
             } else {
                 // Fallback: try to find in current VM's functions (for dictionary-based modules)

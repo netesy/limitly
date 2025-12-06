@@ -50,12 +50,13 @@ call :run_test_with_error_check "tests\types\advanced.lm"
 echo.
 echo === MODULE TESTS ===
 call :run_test_with_error_check "tests\modules\basic_import_test.lm"
-@REM call :run_test_with_error_check "tests\modules\comprehensive_module_test.lm"
-@REM call :run_test_with_error_check "tests\modules\show_filter_test.lm"
-@REM call :run_test_with_error_check "tests\modules\hide_filter_test.lm"
-@REM call :run_test_with_error_check "tests\modules\module_caching_test.lm"
-@REM call :run_test_with_error_check "tests\modules\error_cases_test.lm"
-@REM call :run_test_with_error_check "tests\modules\function_params_test.lm"
+call :run_test_with_error_check "tests\modules\comprehensive_module_test.lm"
+call :run_test_with_error_check "tests\modules\show_filter_test.lm"
+call :run_test_with_error_check "tests\modules\hide_filter_test.lm"
+call :run_test_with_error_check "tests\modules\module_caching_test.lm"
+call :run_test_with_error_check "tests\modules\error_cases_test.lm"
+call :run_test_with_error_check "tests\modules\function_params_test.lm"
+call :run_test_with_error_check "tests\modules\module_function_calls_test.lm"
 
 @REM echo.
 @REM echo === ERROR HANDLING TESTS ===
