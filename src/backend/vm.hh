@@ -237,8 +237,7 @@ private:
     };
     ErrorValuePool errorPool;
     std::unordered_map<std::string, std::function<ValuePtr(const std::vector<ValuePtr>&)>> nativeFunctions;
-    // Removed duplicate userFunctions map - using functionRegistry instead
-    backend::FunctionRegistry functionRegistry; // New function abstraction layer
+    backend::FunctionRegistry functionRegistry; 
     backend::ClassRegistry classRegistry; // Class management
     std::unordered_map<std::string, backend::Function> userDefinedFunctions; // Use the proper Function struct
     // Scope-aware temporary variables
@@ -804,6 +803,12 @@ public:
     bool canAccessExternally(const std::string& name) const {
         AST::VisibilityLevel vis = getVisibility(name);
         return vis == AST::VisibilityLevel::Public || vis == AST::VisibilityLevel::Const;
+    }
+    
+    // Check if a variable exists in the current scope only (not parent scopes)
+    bool existsInCurrentScope(const std::string& name) const {
+        std::lock_guard<std::mutex> lock(mutex);
+        return values.find(name) != values.end();
     }
     
     std::shared_ptr<Environment> enclosing;

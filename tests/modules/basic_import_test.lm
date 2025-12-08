@@ -16,7 +16,7 @@ print("Test 1.4: Call function with parameters");
 var result = basic.add(5, 3);
 print("5 + 3 = " + result);
 
-print("Test 1.5: Call function that returns module variable (KNOWN ISSUE)");
+print("Test 1.5: Call function that returns module variable ");
 var moduleVarResult = basic.getModuleVar();
 print("Module variable via function: " + moduleVarResult);
 

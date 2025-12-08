@@ -41,3 +41,42 @@ print("Function result: " + result);
 // x and y should not be accessible here
 // print("x outside function: " + x);  // Should cause error
 // print("y outside function: " + y);  // Should cause error
+
+print("");
+// Test 5: Nested Iter 
+print("Nested Iter Statement");
+iter (var i in [1, 2, 3, 4, 5]) {
+
+    print("Before inner: {i}");
+    
+    iter (var j in [10, 20, 30]) {
+
+        print("  Inner: {j}");
+    }
+}
+
+// Test 6: Nested Iter Statements with variable scoping
+print("Nested Iter Statements with variable scoping");
+print("Checking the variable scoping inside nested iter");
+
+iter (var i in [1, 2, 3, 4, 5]) {
+
+    print("Before inner: {i}");
+    
+    iter (var j in [10, 20, 30]) {
+
+        print("Outer: {i}  Inner: {j}");
+    }
+}
+
+// Test 7: Complex shadowing
+var a = 1;
+{
+    var a = 2;
+    {
+        var a = 3;
+        print("Innermost a: " + a); // Should print 3
+    }
+    print("Middle a: " + a); // Should print 2
+}
+print("Outermost a: " + a); // Should print 1

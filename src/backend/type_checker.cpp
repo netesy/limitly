@@ -30,14 +30,13 @@ void TypeChecker::addError(const std::string& message, int line, int column, con
     // Don't report immediately - let backend.cpp handle error display with proper context
 }
 
+// No-op. The SymbolTable class now handles this.
 void TypeChecker::enterScope() {
-    currentScope = std::make_shared<Scope>(currentScope);
+    symbolTable.enterScope();
 }
 
 void TypeChecker::exitScope() {
-    if (currentScope->parent) {
-        currentScope = currentScope->parent;
-    }
+    symbolTable.exitScope();
 }
 
 std::vector<TypeCheckError> TypeChecker::checkProgram(const std::shared_ptr<AST::Program>& program) {
@@ -112,11 +111,9 @@ std::vector<TypeCheckError> TypeChecker::checkProgram(const std::shared_ptr<AST:
                 }
             }
             
-            currentScope->functions.emplace(
-                std::piecewise_construct,
-                std::forward_as_tuple(funcDecl->name),
-                std::forward_as_tuple(funcDecl->name, paramTypes, returnType, canFail, errorTypes, funcDecl->line, optionalParams, hasDefaultValues)
-            );
+            // Register function signature in symbol table
+            FunctionSignature signature(funcDecl->name, paramTypes, returnType, canFail, errorTypes, funcDecl->line, optionalParams, hasDefaultValues);
+            symbolTable.addFunction(funcDecl->name, signature);
         }
     }
     
@@ -279,7 +276,7 @@ void TypeChecker::checkStatement(const std::shared_ptr<AST::Statement>& stmt) {
                 // Check if this is a function call that returns an error union
                 if (auto callExpr = std::dynamic_pointer_cast<AST::CallExpr>(varDecl->initializer)) {
                     if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(callExpr->callee)) {
-                        FunctionSignature* signature = currentScope->getFunctionSignature(varExpr->name);
+                        FunctionSignature* signature = symbolTable.findFunction(varExpr->name);
                         if (signature && signature->canFail) {
                             std::string errorTypesList = joinErrorTypes(signature->errorTypes);
                             addError("Unhandled fallible function call to '" + signature->name + 
@@ -440,7 +437,7 @@ void TypeChecker::checkStatement(const std::shared_ptr<AST::Statement>& stmt) {
             }
         }
         
-        currentScope->variables[varDecl->name] = varType;
+        symbolTable.addVariable(varDecl->name, varType, varDecl->line);
         
     } else if (auto destructDecl = std::dynamic_pointer_cast<AST::DestructuringDeclaration>(stmt)) {
         // Type check tuple destructuring assignment
@@ -449,7 +446,7 @@ void TypeChecker::checkStatement(const std::shared_ptr<AST::Statement>& stmt) {
         // For now, assume all destructured variables have ANY_TYPE
         // In a more sophisticated implementation, we could infer types from tuple element types
         for (const std::string& varName : destructDecl->names) {
-            currentScope->variables[varName] = typeSystem.ANY_TYPE;
+            symbolTable.addVariable(varName, typeSystem.ANY_TYPE, destructDecl->line);
         }
         
     } else if (auto funcDecl = std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt)) {
@@ -491,7 +488,7 @@ void TypeChecker::checkStatement(const std::shared_ptr<AST::Statement>& stmt) {
             // Check if this is a function call that returns an error union
             if (auto callExpr = std::dynamic_pointer_cast<AST::CallExpr>(exprStmt->expression)) {
                 if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(callExpr->callee)) {
-                    FunctionSignature* signature = currentScope->getFunctionSignature(varExpr->name);
+                    FunctionSignature* signature = symbolTable.findFunction(varExpr->name);
                     if (signature && signature->canFail) {
                         std::string errorTypesList = joinErrorTypes(signature->errorTypes);
                         addError("Unhandled fallible function call to '" + signature->name + 
@@ -576,8 +573,8 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
         return typeSystem.ANY_TYPE;
         
     } else if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(expr)) {
-        TypePtr varType = currentScope->getVariableType(varExpr->name);
-        if (varType) {
+        Symbol* symbol = symbolTable.findVariable(varExpr->name);
+        if (symbol) {
             // Check variable visibility if it's a module-level variable
             // Note: We need to check if this is actually a module-level variable first
             // For now, we'll check visibility for all variables
@@ -606,11 +603,11 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
                     return typeSystem.ANY_TYPE;
                 }
             }
-            return varType;
+            return symbol->type;
         }
         
         // Check if it's a function being referenced (not called)
-        FunctionSignature* signature = currentScope->getFunctionSignature(varExpr->name);
+        FunctionSignature* signature = symbolTable.findFunction(varExpr->name);
         if (signature) {
             // Check function visibility for function references too
             AST::VisibilityLevel funcVisibility = getModuleMemberVisibility(currentModulePath, varExpr->name);
@@ -663,16 +660,16 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
             }
             
             // First check if it's a regular function
-            FunctionSignature* signature = currentScope->getFunctionSignature(varExpr->name);
+            FunctionSignature* signature = symbolTable.findFunction(varExpr->name);
             if (signature) {
                 return signature->returnType;
             }
             
             // Check if it's a function-typed variable
-            TypePtr varType = currentScope->getVariableType(varExpr->name);
-            if (varType && varType->tag == TypeTag::Function) {
-                if (std::holds_alternative<FunctionType>(varType->extra)) {
-                    auto funcType = std::get<FunctionType>(varType->extra);
+            Symbol* symbol = symbolTable.findVariable(varExpr->name);
+            if (symbol && symbol->type->tag == TypeTag::Function) {
+                if (std::holds_alternative<FunctionType>(symbol->type->extra)) {
+                    auto funcType = std::get<FunctionType>(symbol->type->extra);
                     return funcType.returnType;
                 } else {
                     // Generic function type - try to infer return type from context
@@ -769,12 +766,7 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
         
         // For simple variable assignment (x = value)
         if (!assignExpr->name.empty()) {
-            TypePtr varType = currentScope->getVariableType(assignExpr->name);
-            if (varType && !typeSystem.isCompatible(valueType, varType)) {
-                addError("Type mismatch in assignment: cannot assign " + 
-                        valueType->toString() + " to " + varType->toString(), 
-                        expr->line);
-            }
+            symbolTable.addVariable(assignExpr->name, valueType, assignExpr->line);
         }
         
         return valueType;
@@ -876,7 +868,7 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
                 paramType = resolveTypeAnnotation(param.second);
             }
             paramTypes.push_back(paramType);
-            currentScope->variables[param.first] = paramType;
+            symbolTable.addVariable(param.first, paramType, lambdaExpr->line);
         }
         
         // Determine return type
@@ -1080,7 +1072,7 @@ void TypeChecker::checkFunctionCall(const std::shared_ptr<AST::CallExpr>& expr) 
         }
         
         // First check if it's a regular function
-        FunctionSignature* signature = currentScope->getFunctionSignature(varExpr->name);
+        FunctionSignature* signature = symbolTable.findFunction(varExpr->name);
         if (signature) {
             // Check function visibility before allowing the call
             AST::VisibilityLevel funcVisibility = getModuleMemberVisibility(currentModulePath, varExpr->name);
@@ -1115,7 +1107,7 @@ void TypeChecker::checkFunctionCall(const std::shared_ptr<AST::CallExpr>& expr) 
         }
         
         // Check if it's a function-typed variable (like a function parameter)
-        TypePtr varType = currentScope->getVariableType(varExpr->name);
+        TypePtr varType = symbolTable.getType(varExpr->name);
         if (varType && varType->tag == TypeTag::Function) {
             // Handle higher-order function call
             checkHigherOrderFunctionCall(varType, argTypes, expr);
@@ -1236,7 +1228,7 @@ std::string TypeChecker::joinErrorTypes(const std::vector<std::string>& errorTyp
 
 void TypeChecker::checkFunctionDeclaration(const std::shared_ptr<AST::FunctionDeclaration>& stmt) {
     // Set current function context
-    FunctionSignature* signature = currentScope->getFunctionSignature(stmt->name);
+    FunctionSignature* signature = symbolTable.findFunction(stmt->name);
     FunctionSignature* prevFunction = currentFunction;
     currentFunction = signature;
     
@@ -1252,7 +1244,8 @@ void TypeChecker::checkFunctionDeclaration(const std::shared_ptr<AST::FunctionDe
         if (param.second) {
             paramType = resolveTypeAnnotation(param.second);
         }
-        currentScope->variables[param.first] = paramType;
+        symbolTable.addVariable(param.first, paramType, stmt->line);
+        
     }
     
     // Add optional parameters to scope
@@ -1261,7 +1254,7 @@ void TypeChecker::checkFunctionDeclaration(const std::shared_ptr<AST::FunctionDe
         if (optParam.second.first) {
             paramType = resolveTypeAnnotation(optParam.second.first);
         }
-        currentScope->variables[optParam.first] = paramType;
+        symbolTable.addVariable(optParam.first, paramType, stmt->line);
     }
     
     // Check function body
@@ -1648,7 +1641,7 @@ std::vector<std::string> TypeChecker::inferExpressionErrorTypes(const std::share
     } else if (auto callExpr = std::dynamic_pointer_cast<AST::CallExpr>(expr)) {
         // Function call - check if called function can produce errors
         if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(callExpr->callee)) {
-            FunctionSignature* signature = currentScope->getFunctionSignature(varExpr->name);
+            FunctionSignature* signature = symbolTable.findFunction(varExpr->name);
             if (signature && signature->canFail) {
                 errorTypes.insert(errorTypes.end(), signature->errorTypes.begin(), signature->errorTypes.end());
             }
@@ -1687,86 +1680,82 @@ void TypeChecker::registerBuiltinFunctions() {
     // Register builtin functions so they're recognized during semantic analysis
     
     // Core utility functions
-    currentScope->functions["len"] = FunctionSignature(
-        "len", {typeSystem.ANY_TYPE}, typeSystem.INT_TYPE, false, {}, 0);
+    symbolTable.addFunction("len", FunctionSignature(
+        "len", {typeSystem.ANY_TYPE}, typeSystem.INT_TYPE, false, {}, 0));
     
-    currentScope->functions["typeOf"] = FunctionSignature(
-        "typeOf", {typeSystem.ANY_TYPE}, typeSystem.STRING_TYPE, false, {}, 0);
+    symbolTable.addFunction("typeOf", FunctionSignature(
+        "typeOf", {typeSystem.ANY_TYPE}, typeSystem.STRING_TYPE, false, {}, 0));
     
-    currentScope->functions["time"] = FunctionSignature(
-        "time", {}, typeSystem.INT64_TYPE, false, {}, 0);
+    symbolTable.addFunction("time", FunctionSignature(
+        "time", {}, typeSystem.INT64_TYPE, false, {}, 0));
     
-    currentScope->functions["date"] = FunctionSignature(
-        "date", {}, typeSystem.STRING_TYPE, false, {}, 0);
+    symbolTable.addFunction("date", FunctionSignature(
+        "date", {}, typeSystem.STRING_TYPE, false, {}, 0));
     
-    currentScope->functions["now"] = FunctionSignature(
-        "now", {}, typeSystem.STRING_TYPE, false, {}, 0);
+    symbolTable.addFunction("now", FunctionSignature(
+        "now", {}, typeSystem.STRING_TYPE, false, {}, 0));
     
-    currentScope->functions["clock"] = FunctionSignature(
-        "clock", {}, typeSystem.FLOAT64_TYPE, false, {}, 0);
+    symbolTable.addFunction("clock", FunctionSignature(
+        "clock", {}, typeSystem.FLOAT64_TYPE, false, {}, 0));
     
-    currentScope->functions["sleep"] = FunctionSignature(
-        "sleep", {typeSystem.FLOAT64_TYPE}, typeSystem.NIL_TYPE, false, {}, 0);
+    symbolTable.addFunction("sleep", FunctionSignature(
+        "sleep", {typeSystem.FLOAT64_TYPE}, typeSystem.NIL_TYPE, false, {}, 0));
     
-    currentScope->functions["round"] = FunctionSignature(
-        "round", {typeSystem.FLOAT64_TYPE, typeSystem.INT_TYPE}, typeSystem.FLOAT64_TYPE, false, {}, 0);
+    symbolTable.addFunction("round", FunctionSignature(
+        "round", {typeSystem.FLOAT64_TYPE, typeSystem.INT_TYPE}, typeSystem.FLOAT64_TYPE, false, {}, 0));
     
-    currentScope->functions["debug"] = FunctionSignature(
-        "debug", {typeSystem.ANY_TYPE}, typeSystem.NIL_TYPE, false, {}, 0);
+    symbolTable.addFunction("debug", FunctionSignature(
+        "debug", {typeSystem.ANY_TYPE}, typeSystem.NIL_TYPE, false, {}, 0));
     
-    currentScope->functions["input"] = FunctionSignature(
-        "input", {typeSystem.STRING_TYPE}, typeSystem.STRING_TYPE, false, {}, 0);
+    symbolTable.addFunction("input", FunctionSignature(
+        "input", {typeSystem.STRING_TYPE}, typeSystem.STRING_TYPE, false, {}, 0));
     
-    currentScope->functions["assert"] = FunctionSignature(
-        "assert", {typeSystem.BOOL_TYPE, typeSystem.STRING_TYPE}, typeSystem.NIL_TYPE, false, {}, 0);
+    symbolTable.addFunction("assert", FunctionSignature(
+        "assert", {typeSystem.BOOL_TYPE, typeSystem.STRING_TYPE}, typeSystem.NIL_TYPE, false, {}, 0));
     
     // Higher-order functions
-    currentScope->functions["map"] = FunctionSignature(
-        "map", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0);
+    symbolTable.addFunction("map", FunctionSignature(
+        "map", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0));
     
-    currentScope->functions["filter"] = FunctionSignature(
-        "filter", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0);
+    symbolTable.addFunction("filter", FunctionSignature(
+        "filter", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0));
     
-    currentScope->functions["reduce"] = FunctionSignature(
-        "reduce", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0);
+    symbolTable.addFunction("reduce", FunctionSignature(
+        "reduce", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0));
     
-    currentScope->functions["forEach"] = FunctionSignature(
-        "forEach", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0);
+    symbolTable.addFunction("forEach", FunctionSignature(
+        "forEach", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0));
     
-    currentScope->functions["find"] = FunctionSignature(
-        "find", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0);
+    symbolTable.addFunction("find", FunctionSignature(
+        "find", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0));
     
-    currentScope->functions["some"] = FunctionSignature(
-        "some", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.BOOL_TYPE, false, {}, 0);
+    symbolTable.addFunction("some", FunctionSignature(
+        "some", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.BOOL_TYPE, false, {}, 0));
     
-    currentScope->functions["every"] = FunctionSignature(
-        "every", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.BOOL_TYPE, false, {}, 0);
+    symbolTable.addFunction("every", FunctionSignature(
+        "every", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.BOOL_TYPE, false, {}, 0));
     
-    currentScope->functions["compose"] = FunctionSignature(
-        "compose", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0);
+    symbolTable.addFunction("compose", FunctionSignature(
+        "compose", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0));
     
-    currentScope->functions["curry"] = FunctionSignature(
-        "curry", {typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0);
+    symbolTable.addFunction("curry", FunctionSignature(
+        "curry", {typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0));
     
-    currentScope->functions["partial"] = FunctionSignature(
-        "partial", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0);
+    symbolTable.addFunction("partial", FunctionSignature(
+        "partial", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0));
     
     // Channel functions (VM-implemented)
-    currentScope->functions["channel"] = FunctionSignature(
-        "channel", {}, typeSystem.ANY_TYPE, false, {}, 0);
+    symbolTable.addFunction("channel", FunctionSignature(
+        "channel", {}, typeSystem.ANY_TYPE, false, {}, 0));
     
-    currentScope->functions["send"] = FunctionSignature(
-        "send", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.NIL_TYPE, false, {}, 0);
+    symbolTable.addFunction("send", FunctionSignature(
+        "send", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.NIL_TYPE, false, {}, 0));
     
-    currentScope->functions["receive"] = FunctionSignature(
-        "receive", {typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0);
+    symbolTable.addFunction("receive", FunctionSignature(
+        "receive", {typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0));
     
-    currentScope->functions["close"] = FunctionSignature(
-        "close", {typeSystem.ANY_TYPE}, typeSystem.NIL_TYPE, false, {}, 0);
-    
-    // Register assert function (contract is a statement, not a function)
-    currentScope->functions["assert"] = FunctionSignature(
-        "assert", {typeSystem.BOOL_TYPE, typeSystem.STRING_TYPE}, typeSystem.NIL_TYPE, false, {}, 0);
+    symbolTable.addFunction("close", FunctionSignature(
+        "close", {typeSystem.ANY_TYPE}, typeSystem.NIL_TYPE, false, {}, 0));
 }
 
 void TypeChecker::checkContractStatement(const std::shared_ptr<AST::ContractStatement>& stmt) {
@@ -2227,8 +2216,8 @@ void TypeChecker::checkClassDeclaration(const std::shared_ptr<AST::ClassDeclarat
         }
     }
     
-    // Register the constructor signature in the current scope
-    currentScope->functions[classDecl->name] = constructorSignature;
+    // Register the constructor signature in the symbol table
+    symbolTable.addFunction(classDecl->name, constructorSignature);
     
     // Type check all methods in the class (with class context set)
     for (const auto& method : classDecl->methods) {
@@ -2740,7 +2729,7 @@ void TypeChecker::checkModuleMemberFunctionCall(const std::shared_ptr<AST::Membe
     }
     
     // First check if this is actually a module (not an object instance)
-    TypePtr objectType = currentScope->getVariableType(objectName);
+    TypePtr objectType = symbolTable.getType(objectName);
     if (!objectType || objectType->tag != TypeTag::Module) {
         // This is not a module call - it's likely an object method call
         // Let the regular expression checking handle it
@@ -2888,7 +2877,7 @@ void TypeChecker::checkImportStatement(const std::shared_ptr<AST::ImportStatemen
     
     // Register the module alias as a variable of Module type in the current scope
     // This allows expressions like `math.add()` to be type-checked properly
-    currentScope->variables[aliasName] = typeSystem.MODULE_TYPE;
+    symbolTable.addVariable(aliasName, typeSystem.MODULE_TYPE, importStmt->line);
 }
 
 AST::VisibilityLevel TypeChecker::getMemberVisibility(const std::string& className, const std::string& memberName) {
@@ -3171,7 +3160,7 @@ bool TypeChecker::validateClassMemberAccess(const std::shared_ptr<AST::MemberExp
     } else if (objectType->tag == TypeTag::Object) {
         // Try to infer class name from variable expression
         if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(expr->object)) {
-            TypePtr varType = currentScope->getVariableType(varExpr->name);
+            TypePtr varType = symbolTable.getType(varExpr->name);
             if (varType) {
                 if (varType->tag == TypeTag::UserDefined) {
                     if (std::holds_alternative<UserDefinedType>(varType->extra)) {
@@ -3321,13 +3310,13 @@ bool TypeChecker::validateModuleFunctionCall(const std::shared_ptr<AST::CallExpr
     }
     
     // Check if it's a function-typed variable (higher-order function)
-    TypePtr varType = currentScope->getVariableType(varExpr->name);
+    TypePtr varType = symbolTable.getType(varExpr->name);
     if (varType && varType->tag == TypeTag::Function) {
         return true; // Function-typed variable, not a module function
     }
     
     // Check if it's a regular function signature
-    FunctionSignature* signature = currentScope->getFunctionSignature(varExpr->name);
+    FunctionSignature* signature = symbolTable.findFunction(varExpr->name);
     if (!signature) {
         return true; // Function not found, let other error handling deal with it
     }
@@ -3389,7 +3378,7 @@ bool TypeChecker::validateModuleVariableAccess(const std::shared_ptr<AST::Variab
     // Validate module-level variable access based on variable visibility
     
     // Check if this is a local variable (in current scope)
-    TypePtr varType = currentScope->getVariableType(expr->name);
+    TypePtr varType = symbolTable.getType(expr->name);
     if (varType) {
         // Check if this is actually a module-level variable
         auto moduleIt = moduleRegistry.find(currentModulePath);

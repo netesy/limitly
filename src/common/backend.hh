@@ -160,6 +160,4 @@ private:
     void addDeclaredFunction(const std::string& name);
 };
 
-// AST Printer has been moved to ast_printer.hh
-
 #endif // BACKEND_H
