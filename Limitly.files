@@ -1,6 +1,7 @@
 src/backend/ast_printer.cpp
 src/backend/ast_printer.hh
 src/backend/backend.cpp
+src/backend/symbol_table.cpp
 src/backend/bytecode_printer.cpp
 src/backend/bytecode_printer.hh
 src/backend/classes.cpp

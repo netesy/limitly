@@ -1,5 +1,0 @@
-class Test {
-    pub radius: float;
-}
-
-print("Test complete");

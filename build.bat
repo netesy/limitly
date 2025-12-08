@@ -75,6 +75,7 @@ echo Compiling test parser...
     src\frontend\cst_printer.cpp ^
     src\frontend\cst_utils.cpp ^
     src\frontend\ast_builder.cpp ^
+    src\backend\symbol_table.cpp ^
     src\backend\type_checker.cpp ^
     src\backend\backend.cpp ^
     src\backend\value.cpp ^
