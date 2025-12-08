@@ -1,52 +1,125 @@
-// Concurrency smoke test - exercises atomics and simple tasks without channels
-print("=== Concurrency Smoke Test ===");
+print("=== Concurrent Block Tests ===");
 
-// Atomic counter
-var counter: atomic = 0;
+// ==========================================
+//  Basic concurrent execution (batch mode)
+// ==========================================
+// concurrent = I/O-bound, default mode=batch
+var shared_counter: atomic = 0;  // atomic for primitives, locked for objects
 
-// Start a simple concurrent block that increments the counter and prints values
-concurrent(mode=batch, cores=2, on_error=Stop) {
-    task() {
-        // increment atomically
-        counter += 1;
-        print("Task 1 completed with counter value: {counter}");
+counts = channel();
+concurrent(ch=counts, mode=batch, cores=Auto, on_error=Stop,
+           timeout=20s, grace=500ms, on_timeout=partial) {
+    task(i in 1..3) {
+        print("Concurrent task {i} running");
+        sleep(randint(1, 3));
+        shared_counter += 1;  // atomic add
+        counts.send(shared_counter);
     }
-    task() {
-        // increment atomically
-        counter += 1;
-        print("Task 2 completed with counter value: {counter}");
+} // auto-close counts when done or timeout+grace reached
+
+iter (count in counts) {
+    print("Updated counter: {count}");
+}
+print("Concurrent block finished");
+
+
+// Test parallel blocks 
+print("=== Parallel Block Tests ===");
+
+// ==========================================
+//  Batch parallel block (CPU bound)
+// ==========================================
+messages = channel();
+parallel(ch=messages, mode=batch, cores=Auto, on_error=Auto,
+         timeout=20s, grace=500ms, on_timeout=partial) {
+    task(i in 1..3) {
+        print("Task {i} running");
+        sleep(randint(1, 3));
+        messages.send("Task {i} done");
     }
-    task() {
-        // increment atomically
-        counter += 1;
-        print("Task 3 completed with counter value: {counter}");
+} // auto-close messages
+
+iter (message in messages) {
+    print("Received: {message}");
+}
+
+// ==========================================
+//  Stream processing (CPU bound, retries)
+// ==========================================
+files_out = channel();
+parallel(events: FileChunks, ch=files_out, mode=stream, cores=Auto,
+         on_error=Retry, timeout=60s,
+         grace=500ms, on_timeout=partial) {
+    worker(chunk) {
+        process_chunk(chunk);
+        files_out.send("Chunk {chunk.id} processed");
     }
-    task() {
-        // increment atomically
-        counter += 1;
-        print("Task 4 completed with counter value: {counter}");
+} // auto-close files_out
+
+iter (msg in files_out) {
+    print(msg);
+}
+
+// ==========================================
+//  Concurrent block with no parameters
+// ==========================================
+concurrent {
+    task(i in 1..2) {
+        print("Task {i} with default parameters");
+    }
+}
+
+// ==========================================
+//  Parallel block with invalid parameter
+// ==========================================
+// This should be handled gracefully by the parser
+parallel(invalid_param="test") {
+    task(i in 1..2) {
+        print("This should not be executed");
     }
 }
 
 
+// Test parallel blocks 
+print("=== Parallel Block Tests ===");
 
+// ==========================================
+//  Batch parallel block (CPU bound)
+// ==========================================
 var messages = channel();
-var counters: atomic = 0;
-concurrent(mode=batch, cores=Auto, on_error=Auto) {
+parallel(ch=messages, mode=batch, cores=Auto, on_error=Auto,
+         timeout=20s, grace=500ms, on_timeout=partial) {
     
     // Task statement for parallel execution
     task(i in 1..3) {
-        counters += 1;
-        print("Task {counters} running");
-       // messages.send("Task {i} done");
+        print("Task {i} running");
+        sleep(randint(1, 3)); // these are assumed to be system functions
+        messages.send("Task {i} done");
     }
 } // auto-close messages
 
 // Process messages from parallel tasks
-// iter (message in messages) {
-//     print("Received: {message}");
-// }
+iter (message in messages) {
+    print("Received: {message}");
+}
 
-print("Waiting for tasks to complete...");
-print("Final counter value: {counter}");
-print("Smoke test finished");
+// ==========================================
+//  Stream processing (CPU bound, retries)
+// ==========================================
+var files_out = channel();
+parallel(events: FileChunks, ch=files_out, mode=stream, cores=Auto,
+         on_error=Retry, timeout=60s,
+         grace=500ms, on_timeout=partial) {
+    
+    // Worker definition for processing chunks
+    worker(chunk) {
+        // Process the chunk and send result
+        process_chunk(chunk);
+        files_out.send("Chunk {chunk.id} processed");
+    }
+} // auto-close files_out
+
+// Process output from workers
+iter (msg in files_out) {
+    print(msg);
+}

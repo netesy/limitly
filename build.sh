@@ -49,6 +49,7 @@ $CXX $CXXFLAGS -o bin/limitly \
     src/frontend/cst_printer.cpp \
     src/frontend/cst_utils.cpp \
     src/backend/backend.cpp \
+    src/backend/symbol_table.cpp \
     src/backend/vm.cpp \
     src/backend/value.cpp \
     src/backend/ast_printer.cpp \

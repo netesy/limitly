@@ -1443,54 +1443,76 @@ void VM::handleStoreVar(const Instruction& instruction) {
     }
 
     // CRITICAL FIX: Reuse existing Value objects for loop variables
-    try {
-        ValuePtr existing = environment->get(instruction.stringValue);
-        
-        // If it's a simple numeric type, reuse the Value object
-        if (existing->type->tag == value->type->tag &&
-                (existing->type->tag == TypeTag::Int ||
-                 existing->type->tag == TypeTag::Int64 ||
-                 existing->type->tag == TypeTag::Float64)) {
+    // BUT ONLY if the variable exists in the CURRENT scope (not parent scopes)
+    // This preserves the optimization while respecting variable shadowing
+    if (environment->existsInCurrentScope(instruction.stringValue)) {
+        try {
+            ValuePtr existing = environment->get(instruction.stringValue);
             
-            // Reuse the existing Value object by updating its data
-            existing->data = value->data;
-            return; // No new allocation!
-        }
-    } catch (...) {
-        // Variable doesn't exist yet
-    }
-    // If variable already exists and is an AtomicValue, perform atomic store
-    try {
-        ValuePtr existing = environment->get(instruction.stringValue);
-        // Detect AtomicValue stored inside Value::data
-        if (std::holds_alternative<AtomicValue>(existing->data)) {
-            // Expect the incoming value to be an integer
-            int64_t incoming = 0;
-            if (value->type && (value->type->tag == TypeTag::Int || value->type->tag == TypeTag::Int64)) {
-                if (value->type->tag == TypeTag::Int) incoming = static_cast<int64_t>(std::get<int32_t>(value->data));
-                else incoming = std::get<int64_t>(value->data);
-            } else {
-                error("Cannot store non-integer into atomic variable");
+            // If it's a simple numeric type, reuse the Value object
+            if (existing->type->tag == value->type->tag &&
+                    (existing->type->tag == TypeTag::Int ||
+                     existing->type->tag == TypeTag::Int64 ||
+                     existing->type->tag == TypeTag::Float64)) {
+                
+                // Reuse the existing Value object by updating its data
+                existing->data = value->data;
+                return; // No new allocation!
             }
-            AtomicValue& av = std::get<AtomicValue>(existing->data);
-            av.inner->store(incoming);
-            return;
+        } catch (...) {
+            // Variable doesn't exist yet (shouldn't happen since we checked)
         }
-    } catch (...) {
-        // variable doesn't exist yet; fallthrough to define
+    }
+    // If variable already exists in CURRENT scope and is an AtomicValue, perform atomic store
+    // Only check current scope to respect variable shadowing
+    if (environment->existsInCurrentScope(instruction.stringValue)) {
+        try {
+            ValuePtr existing = environment->get(instruction.stringValue);
+            // Detect AtomicValue stored inside Value::data
+            if (std::holds_alternative<AtomicValue>(existing->data)) {
+                // Expect the incoming value to be an integer
+                int64_t incoming = 0;
+                if (value->type && (value->type->tag == TypeTag::Int || value->type->tag == TypeTag::Int64)) {
+                    if (value->type->tag == TypeTag::Int) incoming = static_cast<int64_t>(std::get<int32_t>(value->data));
+                    else incoming = std::get<int64_t>(value->data);
+                } else {
+                    error("Cannot store non-integer into atomic variable");
+                }
+                AtomicValue& av = std::get<AtomicValue>(existing->data);
+                av.inner->store(incoming);
+                return;
+            }
+        } catch (...) {
+            // variable doesn't exist yet; fallthrough to define
+        }
     }
 
     // Get visibility information from instruction (default to Private if not specified)
     AST::VisibilityLevel visibility = static_cast<AST::VisibilityLevel>(instruction.intValue);
     
-    // Try to assign to existing variable first, then define if it doesn't exist
-    try {
-        environment->assign(instruction.stringValue, value);
-        if (debugMode) {
-            std::cout << "[DEBUG] STORE_VAR: Updated existing variable '" << instruction.stringValue << "'" << std::endl;
+    // FIXED: Check if variable exists in CURRENT scope only (not parent scopes)
+    // This properly handles variable shadowing
+    bool existsInCurrent = environment->existsInCurrentScope(instruction.stringValue);
+    
+    if (debugMode) {
+        std::cout << "[DEBUG] STORE_VAR: Variable '" << instruction.stringValue 
+                  << "' exists in current scope: " << (existsInCurrent ? "YES" : "NO") << std::endl;
+    }
+    
+    if (existsInCurrent) {
+        // Variable exists in current scope - update it
+        try {
+            environment->assign(instruction.stringValue, value);
+            if (debugMode) {
+                std::cout << "[DEBUG] STORE_VAR: Updated existing variable '" << instruction.stringValue << "' in current scope" << std::endl;
+            }
+        } catch (const std::runtime_error& e) {
+            // This shouldn't happen since we checked existsInCurrentScope, but handle it anyway
+            error("Failed to update variable '" + instruction.stringValue + "': " + e.what(),
+                  instruction.line, 0, instruction.stringValue, "valid variable name");
         }
-    } catch (const std::runtime_error&) {
-        // Variable doesn't exist, define it with visibility
+    } else {
+        // Variable doesn't exist in current scope - define it (may shadow outer scope variable)
         environment->define(instruction.stringValue, value, visibility);
         if (debugMode) {
             std::cout << "[DEBUG] STORE_VAR: Defined new variable '" << instruction.stringValue << "' with visibility " << static_cast<int>(visibility) << std::endl;
@@ -1500,7 +1522,6 @@ void VM::handleStoreVar(const Instruction& instruction) {
     if (debugMode) {
         std::cout << "[DEBUG] STORE_VAR: Successfully stored variable '" << instruction.stringValue << "'" << std::endl;
     }
-    //environment->define(instruction.stringValue, value);
 }
 
 void VM::handleDefineAtomic(const Instruction& instruction) {

@@ -21,9 +21,9 @@ endif
 # =============================
 MODE ?= release
 ifeq ($(MODE),debug)
-    CXXFLAGS := -std=c++17 -g -Wall -Wextra -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++) -Wl,--stack,16777216
+    CXXFLAGS := -std=c++17 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++) -Wl,--stack,16777216
 else
-    CXXFLAGS := -std=c++17 -O3 -Wall -Wextra -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++) -Wl,--stack,16777216
+    CXXFLAGS := -std=c++17 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++) -Wl,--stack,16777216
 endif
 
 # =============================
@@ -39,7 +39,7 @@ RSP_DIR := rsp
 FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp src/common/debugger.cpp src/frontend/cst.cpp src/frontend/cst_printer.cpp src/frontend/cst_utils.cpp src/frontend/ast_builder.cpp
 BACK_SRCS := src/backend/vm.cpp
 COMMON_SRCS := src/common/builtin_functions.cpp
-BACKEND_COMMON_SRCS := src/backend/backend.cpp src/backend/value.cpp src/backend/ast_printer.cpp src/backend/bytecode_printer.cpp src/backend/functions.cpp src/backend/closure_impl.cpp src/backend/classes.cpp src/backend/type_checker.cpp src/backend/function_types.cpp 
+BACKEND_COMMON_SRCS := src/backend/backend.cpp src/backend/symbol_table.cpp src/backend/value.cpp src/backend/ast_printer.cpp src/backend/bytecode_printer.cpp src/backend/functions.cpp src/backend/closure_impl.cpp src/backend/classes.cpp src/backend/type_checker.cpp src/backend/function_types.cpp 
 ERROR_SRCS := src/error/error_formatter.cpp src/error/error_code_generator.cpp src/error/contextual_hint_provider.cpp src/error/source_code_formatter.cpp src/error/console_formatter.cpp src/error/error_catalog.cpp
 
 ifeq ($(PLATFORM),windows)
