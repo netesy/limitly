@@ -1,9 +1,0 @@
-class Test {
-    pub name: str = "test";
-    
-    pub fn getName() : str {
-        return self.name;
-    }
-}
-
-print("Class with method test complete");
