@@ -15,6 +15,7 @@
 #include <string>
 #include <variant>
 #include <vector>
+#include <cmath>
 
 // Forward declarations for AST types
 namespace AST {
@@ -329,13 +330,55 @@ private:
         result->type = targetType;
 
         try {
-            if (targetType->tag == TypeTag::Int) {
-                result->data = std::stoll(str);
+            // Enhanced numeric parsing with better error handling and range checking
+            if (targetType->tag == TypeTag::Int || targetType->tag == TypeTag::Int64) {
+                // Check if string contains scientific notation or decimal point
+                if (str.find('e') != std::string::npos || str.find('E') != std::string::npos || 
+                    str.find('.') != std::string::npos) {
+                    // Parse as double first, then convert to int if it's a whole number
+                    double doubleVal = std::stod(str);
+                    if (doubleVal != std::floor(doubleVal)) {
+                        throw std::runtime_error("Cannot convert non-integer value to integer type");
+                    }
+                    if (doubleVal < std::numeric_limits<long long>::min() || 
+                        doubleVal > std::numeric_limits<long long>::max()) {
+                        throw std::runtime_error("Integer value out of range for long long");
+                    }
+                    result->data = static_cast<long long>(doubleVal);
+                } else {
+                    // Try direct integer parsing
+                    try {
+                        result->data = std::stoll(str);
+                    } catch (const std::out_of_range&) {
+                        // Try parsing as unsigned long long and check range
+                        unsigned long long ullVal = std::stoull(str);
+                        if (ullVal > static_cast<unsigned long long>(std::numeric_limits<long long>::max())) {
+                            throw std::runtime_error("Integer value too large for signed long long");
+                        }
+                        result->data = static_cast<long long>(ullVal);
+                    }
+                }
             } else if (targetType->tag == TypeTag::Float32) {
-                result->data = std::stof(str);
+                float floatVal = std::stof(str);
+                // Check for infinity or NaN
+                if (!std::isfinite(floatVal)) {
+                    throw std::runtime_error("Float32 value is infinite or NaN");
+                }
+                result->data = floatVal;
             } else if (targetType->tag == TypeTag::Float64) {
-                result->data = std::stod(str);
+                double doubleVal = std::stod(str);
+                // Check for infinity or NaN (allow infinity for Float64 as it has larger range)
+                if (std::isnan(doubleVal)) {
+                    throw std::runtime_error("Float64 value is NaN");
+                }
+                result->data = doubleVal;
+            } else {
+                throw std::runtime_error("Unsupported target type for numeric conversion");
             }
+        } catch (const std::invalid_argument &e) {
+            throw std::runtime_error("Invalid number format: " + str + " (" + std::string(e.what()) + ")");
+        } catch (const std::out_of_range &e) {
+            throw std::runtime_error("Number out of range: " + str + " (" + std::string(e.what()) + ")");
         } catch (const std::exception &e) {
             throw std::runtime_error("Failed to convert string to number: " + std::string(e.what()));
         }
@@ -758,6 +801,88 @@ public:
         }
         
         return unionTypeInfo->types.size();
+    }
+
+    // Enhanced numeric type inference for literals
+    TypePtr inferNumericType(const std::string& literalStr) {
+        // Check if it contains decimal point or scientific notation
+        bool hasDecimal = literalStr.find('.') != std::string::npos;
+        bool hasScientific = literalStr.find('e') != std::string::npos || literalStr.find('E') != std::string::npos;
+        
+        if (hasDecimal || hasScientific) {
+            // It's a floating-point number
+            try {
+                double val = std::stod(literalStr);
+                
+                // Check if it fits in float32 range without precision loss
+                if (std::abs(val) <= std::numeric_limits<float>::max() && 
+                    (val == 0.0 || std::abs(val) >= std::numeric_limits<float>::min())) {
+                    float floatVal = static_cast<float>(val);
+                    if (static_cast<double>(floatVal) == val) {
+                        return FLOAT32_TYPE;
+                    }
+                }
+                
+                return FLOAT64_TYPE;
+            } catch (const std::exception&) {
+                return FLOAT64_TYPE; // Default to float64 for invalid formats
+            }
+        } else {
+            // It's an integer
+            try {
+                // Try parsing as signed long long first
+                long long val = std::stoll(literalStr);
+                
+                // Check if it fits in smaller integer types
+                if (val >= std::numeric_limits<int32_t>::min() && val <= std::numeric_limits<int32_t>::max()) {
+                    return INT_TYPE; // Use INT_TYPE (which maps to int32/int64 depending on platform)
+                } else {
+                    return INT64_TYPE;
+                }
+            } catch (const std::out_of_range&) {
+                try {
+                    // Try parsing as unsigned long long
+                    unsigned long long val = std::stoull(literalStr);
+                    
+                    // If it fits in signed long long range, use signed type
+                    if (val <= static_cast<unsigned long long>(std::numeric_limits<long long>::max())) {
+                        return INT64_TYPE;
+                    } else {
+                        // Value is too large for signed long long, use double to avoid overflow
+                        return FLOAT64_TYPE;
+                    }
+                } catch (const std::exception&) {
+                    // If all parsing fails, default to double
+                    return FLOAT64_TYPE;
+                }
+            } catch (const std::exception&) {
+                return INT_TYPE; // Default to int for invalid formats
+            }
+        }
+    }
+
+    // Check if a numeric literal string represents a large integer that should be treated as float
+    bool shouldTreatAsFloat(const std::string& literalStr) {
+        if (literalStr.find('.') != std::string::npos || 
+            literalStr.find('e') != std::string::npos || 
+            literalStr.find('E') != std::string::npos) {
+            return true; // Already has decimal or scientific notation
+        }
+        
+        try {
+            std::stoll(literalStr);
+            return false; // Fits in long long, keep as integer
+        } catch (const std::out_of_range&) {
+            try {
+                unsigned long long val = std::stoull(literalStr);
+                // If it's larger than max signed long long, treat as float
+                return val > static_cast<unsigned long long>(std::numeric_limits<long long>::max());
+            } catch (const std::exception&) {
+                return true; // Invalid format, treat as float
+            }
+        } catch (const std::exception&) {
+            return false; // Invalid format, but not due to size
+        }
     }
 
     // Option type support - implemented as union type (T | Nil) for null safety
