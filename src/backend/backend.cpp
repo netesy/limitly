@@ -290,9 +290,9 @@ void BytecodeGenerator::visitVarDeclaration(const std::shared_ptr<AST::VarDeclar
     if (stmt->type && *stmt->type && (*stmt->type)->typeName == "atomic") {
         emit(Opcode::DEFINE_ATOMIC, stmt->line, 0, 0.0f, false, stmt->name);
     } else {
-        // Store variable with visibility information in intValue field
+        // Declare variable with visibility information in intValue field
         int visibilityInt = static_cast<int>(stmt->visibility);
-        emit(Opcode::STORE_VAR, stmt->line, visibilityInt, 0.0f, false, stmt->name);
+        emit(Opcode::DECLARE_VAR, stmt->line, visibilityInt, 0.0f, false, stmt->name);
     }
 }
 
@@ -316,8 +316,8 @@ void BytecodeGenerator::visitDestructuringDeclaration(const std::shared_ptr<AST:
         // Get the element at index i
         emit(Opcode::GET_INDEX, stmt->line);
         
-        // Store the extracted value in the variable
-        emit(Opcode::STORE_VAR, stmt->line, 0, 0.0f, false, stmt->names[i]);
+        // Declare the extracted value as a new variable
+        emit(Opcode::DECLARE_VAR, stmt->line, 0, 0.0f, false, stmt->names[i]);
     }
     
     // Pop the original tuple from the stack (we duplicated it for each extraction)
@@ -374,10 +374,10 @@ void BytecodeGenerator::visitFunctionDeclaration(const std::shared_ptr<AST::Func
     int visibilityInt = static_cast<int>(stmt->visibility);
     emit(Opcode::PUSH_FUNCTION, stmt->line, visibilityInt, 0.0f, false, stmt->name);
     
-    // Only store as variable if this is not a class method
+    // Only declare as variable if this is not a class method
     // Class methods are handled by the VM during class definition
     if (!isInsideClassDefinition()) {
-        emit(Opcode::STORE_VAR, stmt->line, visibilityInt, 0.0f, false, stmt->name);
+        emit(Opcode::DECLARE_VAR, stmt->line, visibilityInt, 0.0f, false, stmt->name);
     } else {
         // For class methods, just pop the function from the stack since it's already registered
         emit(Opcode::POP, stmt->line);
@@ -627,7 +627,8 @@ void BytecodeGenerator::visitContinueStatement(const std::shared_ptr<AST::Contin
         return;
     }
     size_t continueAddr = loopContinueAddresses.back();
-    emit(Opcode::JUMP, stmt->line, static_cast<int32_t>(continueAddr) - static_cast<int32_t>(bytecode.size()) - 1);
+   // CRITICAL FIX: Dont emit any opcode for the continue statement
+  //  emit(Opcode::JUMP, stmt->line, static_cast<int32_t>(continueAddr) - static_cast<int32_t>(bytecode.size()) - 1);
 }
 
 void BytecodeGenerator::visitReturnStatement(const std::shared_ptr<AST::ReturnStatement>& stmt) {
@@ -852,8 +853,8 @@ void BytecodeGenerator::visitImportStatement(const std::shared_ptr<AST::ImportSt
         emit(Opcode::DICT_SET, stmt->line);
     }
     
-    // Store the module dictionary in the module variable
-    emit(Opcode::STORE_VAR, stmt->line, 0, 0.0f, false, varName);
+    // Declare the module dictionary as a new variable
+    emit(Opcode::DECLARE_VAR, stmt->line, 0, 0.0f, false, varName);
 }
 
 void BytecodeGenerator::visitEnumDeclaration(const std::shared_ptr<AST::EnumDeclaration>& stmt) {
@@ -1577,6 +1578,22 @@ void BytecodeGenerator::visitIterStatement(const std::shared_ptr<AST::IterStatem
     // Create a new scope for this iterator to ensure proper variable isolation
     emit(Opcode::BEGIN_SCOPE, stmt->line);
     
+    // Declare the loop variables once at the beginning of the scope
+    // For single variable iteration (like 'for x in iterable')
+    if (stmt->loopVars.size() == 1) {
+        // Push a nil value and declare the variable
+        emit(Opcode::PUSH_NULL, stmt->line);
+        emit(Opcode::DECLARE_VAR, stmt->line, 0, 0.0f, false, stmt->loopVars[0]);
+    }
+    // For key-value iteration (like 'for k, v in dict.items()')
+    else if (stmt->loopVars.size() == 2) {
+        // Push nil values and declare both variables
+        emit(Opcode::PUSH_NULL, stmt->line);
+        emit(Opcode::DECLARE_VAR, stmt->line, 0, 0.0f, false, stmt->loopVars[0]);
+        emit(Opcode::PUSH_NULL, stmt->line);
+        emit(Opcode::DECLARE_VAR, stmt->line, 0, 0.0f, false, stmt->loopVars[1]);
+    }
+    
     // Allocate a unique temporary variable for this iterator
     int iteratorTempIndex = tempVarCounter++;
     
@@ -1609,7 +1626,7 @@ void BytecodeGenerator::visitIterStatement(const std::shared_ptr<AST::IterStatem
     emit(Opcode::LOAD_TEMP, stmt->line, iteratorTempIndex);
     emit(Opcode::ITERATOR_NEXT, stmt->line);
     
-    // Store the value in the loop variable
+    // Store the value in the loop variable on each iteration
     // For single variable iteration (like 'for x in iterable')
     if (stmt->loopVars.size() == 1) {
         // The value is already on the stack, just need to store it

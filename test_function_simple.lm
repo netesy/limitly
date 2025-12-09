@@ -1,0 +1,6 @@
+fn testFunc(x: int): int {
+    return x * 2;
+}
+
+var result = testFunc(5);
+print("Result: " + result);

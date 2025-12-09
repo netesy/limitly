@@ -25,9 +25,7 @@ To learn how to use the Limit language, check out our comprehensive, step-by-ste
 
 ### Build Instructions
 ```bash
-# Using CMake (recommended for cross-platform)
-mkdir build && cd build
-cmake ..
+# Using Make (recommended for cross-platform)
 make
 
 # Using Windows Batch (MSYS2/MinGW64)
@@ -52,8 +50,7 @@ The project includes a comprehensive test suite in the `tests/` directory.
 
 ```bash
 # Run all tests (silent mode)
-./run_tests.bat
+./tests/run_tests.bat
+./tests/run_tests.sh
 
-# Run all tests (verbose mode)  
-./run_tests_verbose.bat
 ```

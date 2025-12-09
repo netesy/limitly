@@ -407,6 +407,7 @@ private:
     void handleDup(const Instruction& instruction);
     void handleSwap(const Instruction& instruction);
     void handleStoreVar(const Instruction& instruction);
+    void handleDeclareVar(const Instruction& instruction);
     void handleLoadVar(const Instruction& instruction);
     void handleStoreTemp(const Instruction& instruction);
     void handleLoadTemp(const Instruction& instruction);
@@ -745,6 +746,28 @@ public:
         }
         
         throw std::runtime_error("Undefined variable '" + name + "'");
+    }
+    
+    // Assign to variable in current scope only (no parent scope search)
+    // This is used for variable shadowing to ensure we update the correct scope
+    void assignInCurrentScope(const std::string& name, const ValuePtr& value) {
+        std::lock_guard<std::mutex> lock(mutex);
+        
+        // Check captured variables first for closures
+        auto capturedIt = capturedVariables.find(name);
+        if (capturedIt != capturedVariables.end()) {
+            capturedIt->second = value;
+            return;
+        }
+        
+        // Check local variables in current scope only
+        auto it = values.find(name);
+        if (it != values.end()) {
+            it->second = value;
+            return;
+        }
+        
+        throw std::runtime_error("Variable '" + name + "' not found in current scope");
     }
     
     std::unordered_map<std::string, ValuePtr> getAllSymbols() {

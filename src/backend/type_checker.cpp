@@ -1108,9 +1108,12 @@ void TypeChecker::checkFunctionCall(const std::shared_ptr<AST::CallExpr>& expr) 
         
         // Check if it's a function-typed variable (like a function parameter)
         TypePtr varType = symbolTable.getType(varExpr->name);
-        if (varType && varType->tag == TypeTag::Function) {
-            // Handle higher-order function call
-            checkHigherOrderFunctionCall(varType, argTypes, expr);
+        if (varType && (varType->tag == TypeTag::Function || varType->tag == TypeTag::Any)) {
+            // Handle higher-order function call or ANY_TYPE (which could be a function at runtime)
+            if (varType->tag == TypeTag::Function) {
+                checkHigherOrderFunctionCall(varType, argTypes, expr);
+            }
+            // For ANY_TYPE, we allow the call but can't do detailed type checking
             return;
         }
         

@@ -18,7 +18,8 @@ enum class Opcode {
     SWAP,               // Swap top two values on stack
 
     // Variable operations
-    STORE_VAR,          // Store value in variable (with optional visibility in intValue)
+    STORE_VAR,          // Store value in variable (assignment)
+    DECLARE_VAR,        // Declare new variable (declaration with optional visibility in intValue)
     DEFINE_ATOMIC,      // Define an atomic variable (initialize atomic wrapper)
     LOAD_VAR,           // Load variable onto stack
     STORE_TEMP,         // Store value in temporary variable
