@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <limits>
 #include <set>
+#include <cmath>
 
 // Helper methods
 Token Parser::peek() {
@@ -3406,44 +3407,78 @@ std::shared_ptr<AST::Expression> Parser::primary() {
             attachTriviaFromToken(token);
         }
 
-        // Check if the number is an integer or a float
-        // Numbers with decimal points or scientific notation are treated as floats
-        if (token.lexeme.find('.') != std::string::npos || 
-            token.lexeme.find('e') != std::string::npos || 
-            token.lexeme.find('E') != std::string::npos) {
+        // Enhanced numeric literal parsing with better type inference
+        bool hasDecimal = token.lexeme.find('.') != std::string::npos;
+        bool hasScientific = token.lexeme.find('e') != std::string::npos || token.lexeme.find('E') != std::string::npos;
+        
+        if (hasDecimal || hasScientific) {
+            // Parse as floating-point number
             try {
-                literalExpr->value = std::stod(token.lexeme);
+                double doubleValue = std::stod(token.lexeme);
+                
+                // Check for special values
+                if (std::isnan(doubleValue)) {
+                    error("Invalid floating-point number (NaN): " + token.lexeme);
+                    literalExpr->value = 0.0;
+                } else if (std::isinf(doubleValue)) {
+                    // Allow infinity for very large scientific notation
+                    literalExpr->value = doubleValue;
+                } else {
+                    literalExpr->value = doubleValue;
+                }
+            } catch (const std::out_of_range& e) {
+                error("Floating-point number out of range: " + token.lexeme);
+                literalExpr->value = 0.0;
+            } catch (const std::invalid_argument& e) {
+                error("Invalid floating-point number format: " + token.lexeme);
+                literalExpr->value = 0.0;
             } catch (const std::exception& e) {
                 error("Invalid floating-point number: " + token.lexeme);
                 literalExpr->value = 0.0;
             }
         } else {
+            // Parse as integer
             try {
                 // Try to parse as signed long long first
-                literalExpr->value = std::stoll(token.lexeme);
+                long long llValue = std::stoll(token.lexeme);
+                literalExpr->value = llValue;
             } catch (const std::out_of_range& e) {
                 try {
-                    // If that fails, try unsigned long long and convert to double if needed
+                    // If that fails, try unsigned long long
                     unsigned long long ullValue = std::stoull(token.lexeme);
                     
-                    // If the value fits in long long, use it as long long
+                    // If the value fits in signed long long range, use it as signed
                     if (ullValue <= static_cast<unsigned long long>(std::numeric_limits<long long>::max())) {
                         literalExpr->value = static_cast<long long>(ullValue);
                     } else {
-                        // Otherwise, convert to double (may lose precision for very large values)
+                        // For values larger than signed long long max, convert to double
+                        // This handles cases like 18446744073709551615 (max uint64)
+                        // We use double to preserve the full precision of large integers
                         literalExpr->value = static_cast<double>(ullValue);
                     }
-                } catch (const std::exception& e2) {
-                    // If both fail, treat as double
+                } catch (const std::out_of_range& e2) {
+                    // If unsigned long long also overflows, the number is too large
+                    // Try parsing as double to handle extremely large numbers
                     try {
-                        literalExpr->value = std::stod(token.lexeme);
+                        double doubleValue = std::stod(token.lexeme);
+                        if (std::isinf(doubleValue)) {
+                            error("Integer literal too large: " + token.lexeme);
+                            literalExpr->value = std::numeric_limits<long long>::max();
+                        } else {
+                            literalExpr->value = doubleValue;
+                        }
                     } catch (const std::exception& e3) {
-                        error("Invalid number: " + token.lexeme);
+                        error("Invalid number: " + token.lexeme + " - number too large or invalid format");
                         literalExpr->value = 0LL;
                     }
+                } catch (const std::invalid_argument& e2) {
+                    // Invalid format for unsigned integer, this shouldn't happen for pure digits
+                    error("Invalid integer format: " + token.lexeme);
+                    literalExpr->value = 0LL;
                 }
-            } catch (const std::exception& e) {
-                error("Invalid integer number: " + token.lexeme);
+            } catch (const std::invalid_argument& e) {
+                // Invalid format for signed long long, this shouldn't happen for pure digits
+                error("Invalid integer format: " + token.lexeme);
                 literalExpr->value = 0LL;
             }
         }

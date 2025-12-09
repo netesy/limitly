@@ -579,23 +579,22 @@ void Scanner::number() {
 
     // Look for scientific notation (e.g., 1.23e+10, 4.56E-7)
     if (peek() == 'e' || peek() == 'E') {
+        size_t savedCurrent = current; // Save position in case we need to backtrack
         advance(); // consume 'e' or 'E'
         
         // Handle optional + or - after e/E
+        bool hasSign = false;
         if (peek() == '+' || peek() == '-') {
             advance();
+            hasSign = true;
         }
         
         // Must have at least one digit after e/E (and optional +/-)
         if (!isDigit(peek())) {
-            // Invalid scientific notation - this is an error
-            // For now, we'll just continue without consuming the 'e'
-            current--; // back up to before the 'e'
-            if (peek() == '+' || peek() == '-') {
-                current--; // back up past the +/- too
-            }
+            // Invalid scientific notation - backtrack
+            current = savedCurrent;
         } else {
-            // Consume the exponent digits
+            // Valid scientific notation - consume the exponent digits
             while (isDigit(peek())) advance();
         }
     }
