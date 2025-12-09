@@ -60,6 +60,7 @@ echo "=== EXPRESSION TESTS ==="
 run_test_with_error_check "tests/expressions/arithmetic.lm"
 run_test_with_error_check "tests/expressions/logical.lm"
 run_test_with_error_check "tests/expressions/ranges.lm"
+run_test_with_error_check "tests/expressions/large_literals.lm"
 
 echo
 echo "=== STRING TESTS ==="

@@ -1189,6 +1189,8 @@ void BytecodeGenerator::visitLiteralExpr(const std::shared_ptr<AST::LiteralExpr>
     // Push literal value onto stack based on its type
     if (std::holds_alternative<long long>(expr->value)) {
         emit(Opcode::PUSH_INT, expr->line, std::get<long long>(expr->value));
+    } else if (std::holds_alternative<unsigned long long>(expr->value)) {
+        emit(Opcode::PUSH_UINT64, expr->line, std::get<unsigned long long>(expr->value));
     } else if (std::holds_alternative<double>(expr->value)) {
         emit(Opcode::PUSH_FLOAT, expr->line, 0, std::get<double>(expr->value));
     } else if (std::holds_alternative<std::string>(expr->value)) {
@@ -1905,6 +1907,16 @@ void BytecodeGenerator::emit(Opcode op, uint32_t lineNumber, int64_t intValue, f
     instruction.boolValue = boolValue;
     instruction.stringValue = stringValue;
     
+    bytecode.push_back(instruction);
+}
+
+void BytecodeGenerator::emit(Opcode op, uint32_t lineNumber, uint64_t uint64Value) {
+    // Create and push instruction onto bytecode vector
+    Instruction instruction;
+    instruction.opcode = op;
+    instruction.line = lineNumber;
+    instruction.uint64Value = uint64Value;
+
     bytecode.push_back(instruction);
 }
 

@@ -141,6 +141,7 @@ private:
               float floatValue = 0.0f, 
               bool boolValue = false, 
               const std::string& stringValue = "");
+    void emit(Opcode op, uint32_t lineNumber, uint64_t uint64Value);
     
     // Variable capture analysis for closures
     std::vector<std::string> analyzeVariableCapture(const std::shared_ptr<AST::LambdaExpr>& lambda);

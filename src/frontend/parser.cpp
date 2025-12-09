@@ -3446,16 +3446,7 @@ std::shared_ptr<AST::Expression> Parser::primary() {
                 try {
                     // If that fails, try unsigned long long
                     unsigned long long ullValue = std::stoull(token.lexeme);
-                    
-                    // If the value fits in signed long long range, use it as signed
-                    if (ullValue <= static_cast<unsigned long long>(std::numeric_limits<long long>::max())) {
-                        literalExpr->value = static_cast<long long>(ullValue);
-                    } else {
-                        // For values larger than signed long long max, convert to double
-                        // This handles cases like 18446744073709551615 (max uint64)
-                        // We use double to preserve the full precision of large integers
-                        literalExpr->value = static_cast<double>(ullValue);
-                    }
+                    literalExpr->value = ullValue;
                 } catch (const std::out_of_range& e2) {
                     // If unsigned long long also overflows, the number is too large
                     // Try parsing as double to handle extremely large numbers

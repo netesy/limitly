@@ -2,17 +2,12 @@
 
 #include "types.hh"
 #include "symbol_table.hh"
+#include "type_system.hh"
 #include "../frontend/ast.hh"
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 #include <string>
-
-// Forward declarations
-class TypeSystem;
-namespace backend {
-    class ClassRegistry;
-}
 
 // Visibility information storage structures
 struct MemberVisibilityInfo {
@@ -201,17 +196,6 @@ private:
     
     // Type checking helper functions
     bool isOptionalType(TypePtr type);
-    
-    // Option type validation methods
-    bool isOptionType(TypePtr type);
-    void validateOptionTypeUsage(const std::shared_ptr<AST::Expression>& expr, TypePtr optionType);
-    void checkOptionTypeAssignment(TypePtr sourceType, TypePtr targetType, int line);
-    bool requiresOptionHandling(TypePtr type);
-    void validateOptionPatternMatching(const std::shared_ptr<AST::MatchStatement>& stmt, TypePtr optionType);
-    
-    // Option type constructor validation
-    void checkSomeConstructor(const std::shared_ptr<AST::CallExpr>& expr);
-    void checkNoneConstructor(const std::shared_ptr<AST::CallExpr>& expr);
     
 public:
     TypeChecker(TypeSystem& ts) : typeSystem(ts), symbolTable() {
