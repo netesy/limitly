@@ -568,8 +568,10 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
                         return expectedType; // Allow int literals to be used as floats
                     }
                 }
-                return typeSystem.INT_TYPE;
-            case 1: // double
+                return typeSystem.INT64_TYPE;
+            case 1: // unsigned long long (uint64_t)
+                return typeSystem.UINT64_TYPE;
+            case 2: // double
                 // Check if we have an expected type context for better inference
                 if (expectedType) {
                     if (expectedType->tag == TypeTag::Int || expectedType->tag == TypeTag::Int64) {
@@ -594,11 +596,11 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
                     }
                 }
                 return typeSystem.FLOAT64_TYPE;
-            case 2: // std::string
+            case 3: // std::string
                 return typeSystem.STRING_TYPE;
-            case 3: // bool
+            case 4: // bool
                 return typeSystem.BOOL_TYPE;
-            case 4: // std::nullptr_t
+            case 5: // std::nullptr_t
                 return typeSystem.NIL_TYPE;
             default:
                 break;

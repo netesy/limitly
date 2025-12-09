@@ -399,6 +399,7 @@ private:
     
     // Instruction handlers
     void handlePushInt(const Instruction& instruction);
+    void handlePushUint64(const Instruction& instruction);
     void handlePushFloat(const Instruction& instruction);
     void handlePushString(const Instruction& instruction);
     void handlePushBool(const Instruction& instruction);

@@ -400,6 +400,9 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                 case Opcode::PUSH_INT:
                     handlePushInt(instruction);
                     break;
+                case Opcode::PUSH_UINT64:
+                    handlePushUint64(instruction);
+                    break;
                 case Opcode::PUSH_FLOAT:
                     handlePushFloat(instruction);
                     break;
@@ -1390,6 +1393,13 @@ void VM::handlePushInt(const Instruction& instruction) {
         std::cout << "[DEBUG] PUSH_INT: instruction.intValue = " << instruction.intValue << std::endl;
     }
     push(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, instruction.intValue));
+}
+
+void VM::handlePushUint64(const Instruction& instruction) {
+    if (debugMode) {
+        std::cout << "[DEBUG] PUSH_UINT64: instruction.uint64Value = " << instruction.uint64Value << std::endl;
+    }
+    push(memoryManager.makeRef<Value>(*region, typeSystem->UINT64_TYPE, instruction.uint64Value));
 }
 
 void VM::handlePushFloat(const Instruction& instruction) {

@@ -9,6 +9,7 @@
 enum class Opcode {
     // Stack operations
     PUSH_INT,           // Push integer onto stack
+    PUSH_UINT64,        // Push unsigned 64-bit integer onto stack
     PUSH_FLOAT,         // Push float onto stack
     PUSH_STRING,        // Push string onto stack
     PUSH_BOOL,          // Push boolean onto stack
@@ -175,6 +176,7 @@ struct Instruction {
     Opcode opcode;
     uint32_t line;
     int64_t intValue = 0;
+    uint64_t uint64Value = 0;
     float floatValue = 0.0f;
     bool boolValue = false;
     std::string stringValue;
