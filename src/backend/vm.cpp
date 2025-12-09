@@ -76,7 +76,7 @@ int VM::matchCounter = 0;
 
 // VM implementation
 // VMUserDefinedFunction implementation
-VMUserDefinedFunction::VMUserDefinedFunction(VM* vmInstance, const std::shared_ptr<AST::FunctionDeclaration>& decl, 
+VMUserDefinedFunction::VMUserDefinedFunction(VM* vmInstance, const std::shared_ptr<AST::FunctionDeclaration>& decl,
                                              size_t start, size_t end)
     : backend::UserDefinedFunction(decl), vm(vmInstance), startAddress(start), endAddress(end) {
 }
@@ -107,14 +107,14 @@ VM::VM(bool create_runtime)
       currentClassBeingDefined(""),
       insideClassDefinition(false),
       insideTaskDefinition(false) {
-    
+
     if (create_runtime) {
         // Initialize concurrency state with integrated runtime
         concurrency_state = std::make_unique<ConcurrencyState>();
     }
 
 
-    
+
     // Register a native function for channel creation
     registerNativeFunction("channel", [this](const std::vector<ValuePtr>& args) -> ValuePtr {
         // Create a new Channel<ValuePtr> and wrap it in a VM value
@@ -158,11 +158,11 @@ VM::VM(bool create_runtime)
         ch->close();
         return memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
     });
-    
+
     // Register builtin functions with enhanced error handling and performance optimization
     try {
         builtin::BuiltinFunctions::registerAll(this);
-        
+
         // Ensure builtin functions are available in global environment
         // This makes them accessible without explicit imports
         auto builtinNames = builtin::BuiltinFunctions::getInstance().getBuiltinFunctionNames();
@@ -172,7 +172,7 @@ VM::VM(bool create_runtime)
             auto funcValue = memoryManager.makeRef<Value>(*region, funcType, name);
             globals->define(name, funcValue);
         }
-        
+
         if (debugMode) {
             std::cout << "[DEBUG] Successfully registered " << builtinNames.size()
                       << " builtin functions in global environment" << std::endl;
@@ -181,7 +181,7 @@ VM::VM(bool create_runtime)
         // Enhanced error handling - provide more context
         std::cerr << "Error: Failed to register builtin functions: " << e.what() << std::endl;
         std::cerr << "This may cause runtime errors when calling builtin functions." << std::endl;
-        
+
         // Don't fail VM initialization, but log the issue for debugging
         if (debugMode) {
             std::cerr << "[DEBUG] VM will continue without builtin functions" << std::endl;
@@ -192,15 +192,15 @@ VM::VM(bool create_runtime)
 VM::~VM() {
     // Clean up all tracked closures
     closureTracker.cleanup();
-    
+
     // Perform final garbage collection
     performClosureGarbageCollection();
-    
+
     if (debugMode) {
         memoryManager.analyzeMemoryUsage();
         printClosureMemoryStats();
     }
-    
+
     // Concurrency state will clean up automatically in its destructor
     delete typeSystem;
 }
@@ -223,16 +223,16 @@ void VM::registerBuiltinFunction(const std::string& name, std::function<ValuePtr
             if (debugMode) {
                 recordSuccessPath();
             }
-            
+
             // Call the actual builtin function
             ValuePtr result = function(args);
-            
+
             return result;
         } catch (const std::exception& e) {
             if (debugMode) {
                 recordErrorPath();
             }
-            
+
             // Special handling for assert function - create proper error with context
             if (name == "assert") {
                 std::string errorMsg = e.what();
@@ -240,38 +240,38 @@ void VM::registerBuiltinFunction(const std::string& name, std::function<ValuePtr
                 if (errorMsg.find("Assertion failed: ") == 0) {
                     errorMsg = errorMsg.substr(18); // Remove "Assertion failed: "
                 }
-                
+
                 // Use VM::error for consistent error reporting
                 error("Assertion failed: " + errorMsg);
-                
+
                 // For assertions, we want to terminate execution
                 throw std::runtime_error("Assertion failed: " + errorMsg);
             }
-            
 
-            
+
+
             // For other functions, create proper error union values for error propagation
             std::string errorMsg = e.what();
             std::string errorType = "BuiltinFunctionError";
-            
+
             // Log the error for debugging
             if (debugMode) {
                 std::cerr << "[DEBUG] Builtin error in " << name << ": " << errorMsg << std::endl;
             }
-            
+
             // Create proper error value using the VM's error system
             ValuePtr errorValue = createErrorValue(errorType, errorMsg);
-            
+
             // Integrate with error handling system for proper propagation
             if (hasErrorFrames()) {
                 return handleError(errorValue, "builtin function error");
             }
-            
+
             // Return the error value for proper error propagation
             return errorValue;
         }
     };
-    
+
     nativeFunctions[name] = optimizedFunction;
     // Don't register in function registry to bypass parameter validation
 }
@@ -291,37 +291,37 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
     this->bytecode = &code;
     ip = 0;
     const std::vector<Instruction>& bytecodeRef = *this->bytecode;
-    
+
     // Pre-process bytecode to register all lambda functions before execution
     preProcessBytecode(code);
-    
+
     try {
         bool verboseTracing = false; // set true manually for full opcode traces
         int executionCount = 0;
         while (ip < bytecodeRef.size()) {
             const Instruction& instruction = bytecodeRef[ip];
-            
+
             // Add debug output for function execution
             if (debugMode && (instruction.opcode == Opcode::CALL || instruction.opcode == Opcode::RETURN ||
                               instruction.opcode == Opcode::BEGIN_FUNCTION || instruction.opcode == Opcode::END_FUNCTION)) {
                 std::cout << "[DEBUG] EXEC: IP=" << ip << " Opcode=" << static_cast<int>(instruction.opcode)
                           << " CallStack=" << callStack.size() << " ExecutionCount=" << executionCount << std::endl;
             }
-            
+
             executionCount++;
-            
+
             // Periodic closure cleanup to prevent memory leaks
             if (executionCount % 1000 == 0) { // Every 1000 instructions
                 performClosureGarbageCollection();
             }
-            
-            // if (executionCount > 200) {
-            //     std::cerr << "[ERROR] Execution count exceeded 200, possible infinite loop at IP " << ip << std::endl;
-            //     break;
-            // }
-            
 
-            
+            if (executionCount > 1500) {
+                std::cerr << "[ERROR] Execution count exceeded 1500, possible infinite loop at IP " << ip << std::endl;
+                break;
+            }
+
+
+
             // Check if we need to start skipping function body
             // This logic is now handled by the stack-based approach in BEGIN_FUNCTION/END_FUNCTION
             std::string currentFunc = getCurrentFunctionBeingDefined();
@@ -334,7 +334,7 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                     // Note: We don't set insideFunctionDefinition here anymore, it's handled by the stack
                 }
             }
-            
+
             // Skip execution if we're inside a function definition (except for function definition and parameter instructions)
             // Use the stack-based approach for better nested function support
             if (isInsideFunctionDefinition() &&
@@ -380,22 +380,22 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                     }
                 }
             }
-            
+
             // Don't skip task definition instructions - let them execute normally in main thread
             // The tasks will execute the same bytecode but with their own loop variables
-            
+
             // Debug output for opcode values
             int opcodeValue = static_cast<int>(instruction.opcode);
             // Tracing is disabled by default to keep runtime output clean.
-            
+
             try {
                 if (debugMode && ip >= 50) {
-                    std::cout << "[DEBUG] MAIN LOOP: About to execute IP=" << ip 
+                    std::cout << "[DEBUG] MAIN LOOP: About to execute IP=" << ip
                               << " Opcode=" << static_cast<int>(instruction.opcode)
                               << " (" << BytecodePrinter::opcodeToString(instruction.opcode) << ")"
                               << std::endl;
                 }
-                
+
                 switch (instruction.opcode) {
                 case Opcode::PUSH_INT:
                     handlePushInt(instruction);
@@ -423,6 +423,9 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                     break;
                 case Opcode::STORE_VAR:
                     handleStoreVar(instruction);
+                    break;
+                case Opcode::DECLARE_VAR:
+                    handleDeclareVar(instruction);
                     break;
                 case Opcode::LOAD_VAR:
                     handleLoadVar(instruction);
@@ -765,17 +768,17 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                 // Handle other exceptions that occur during instruction execution
                 error("Error executing instruction: " + std::string(e.what()));
             }
-            
+
             if (debugMode && ip >= 50) {
-                std::cout << "[DEBUG] MAIN LOOP: Completed IP=" << ip 
+                std::cout << "[DEBUG] MAIN LOOP: Completed IP=" << ip
                           << ", about to increment to " << (ip + 1) << std::endl;
             }
-            
+
             ip++;
-            
+
             if (debugMode && ip >= 50) {
-                std::cout << "[DEBUG] MAIN LOOP: IP incremented to " << ip 
-                          << ", loop condition: " << (ip < bytecodeRef.size()) 
+                std::cout << "[DEBUG] MAIN LOOP: IP incremented to " << ip
+                          << ", loop condition: " << (ip < bytecodeRef.size())
                           << " (size=" << bytecodeRef.size() << ")" << std::endl;
             }
         }
@@ -796,10 +799,10 @@ void VM::preProcessBytecode(const std::vector<Instruction>& code) {
     isPreProcessing = true; // Set pre-processing flag
     static int preprocessCallCount = 0;
     preprocessCallCount++;
-    
+
     // std::cout << "[DEBUG] ===== PRE-PROCESSING BYTECODE (Call #" << preprocessCallCount << ") =====" << std::endl;
     // std::cout << "[DEBUG] Total bytecode instructions: " << code.size() << std::endl;
-    
+
     // First pass: Find all lambda functions and their boundaries
     std::vector<std::pair<size_t, std::string>> lambdaPositions;
     for (size_t i = 0; i < code.size(); i++) {
@@ -812,11 +815,11 @@ void VM::preProcessBytecode(const std::vector<Instruction>& code) {
             }
         }
     }
-    
+
     // Second pass: Process each lambda function to find its end address
     for (const auto& [startPos, functionName] : lambdaPositions) {
         //   std::cout << "[DEBUG] Processing lambda function: " << functionName << " at IP " << startPos << std::endl;
-        
+
         // Check if this lambda is already registered
         if (userDefinedFunctions.find(functionName) != userDefinedFunctions.end()) {
             //   std::cout << "[DEBUG] WARNING: Lambda function " << functionName << " is already registered!" << std::endl;
@@ -825,13 +828,13 @@ void VM::preProcessBytecode(const std::vector<Instruction>& code) {
             //             << ", endAddress: " << existing.endAddress << std::endl;
             continue; // Skip if already registered
         }
-        
+
         // Find the matching END_FUNCTION for this specific lambda
         size_t startAddress = startPos;
         size_t endAddress = 0;
         int functionDepth = 1;
         size_t j = startPos + 1;
-        
+
         while (j < code.size() && functionDepth > 0) {
             if (code[j].opcode == Opcode::BEGIN_FUNCTION) {
                 functionDepth++;
@@ -844,62 +847,62 @@ void VM::preProcessBytecode(const std::vector<Instruction>& code) {
             }
             j++;
         }
-        
+
         if (endAddress == 0) {
             error("Lambda function " + functionName + " has no matching END_FUNCTION");
             return;
         }
-        
+
         // Create a lambda function entry
         backend::Function lambdaFunc;
         lambdaFunc.name = functionName;
         lambdaFunc.startAddress = startAddress;
         lambdaFunc.endAddress = endAddress;
         lambdaFunc.isLambda = true;
-        
+
         // Parse parameters between BEGIN_FUNCTION and function body
         size_t paramIndex = startAddress + 1;
         //std::cout << "[DEBUG] Parsing lambda parameters for " << functionName
         //          << " from index " << paramIndex << " to " << endAddress << std::endl;
-        
+
         while (paramIndex < endAddress &&
                (code[paramIndex].opcode == Opcode::DEFINE_PARAM ||
                 code[paramIndex].opcode == Opcode::DEFINE_OPTIONAL_PARAM)) {
-            
+
             std::string paramName = code[paramIndex].stringValue;
             bool isOptional = (code[paramIndex].opcode == Opcode::DEFINE_OPTIONAL_PARAM);
-            
+
             // std::cout << "[DEBUG] Found parameter: " << paramName
             //     << " (optional: " << (isOptional ? "true" : "false") << ")" << std::endl;
-            
+
             // For lambda functions, we'll use a generic type for now
             TypePtr paramType = typeSystem->ANY_TYPE;
-            
+
             if (isOptional) {
                 lambdaFunc.optionalParameters.push_back(std::make_pair(paramName, paramType));
             } else {
                 lambdaFunc.parameters.push_back(std::make_pair(paramName, paramType));
             }
-            
+
             // Check for default value
             if (paramIndex + 1 < endAddress && code[paramIndex + 1].opcode == Opcode::SET_DEFAULT_VALUE) {
                 // Default value will be handled during execution
                 // std::cout << "[DEBUG] Parameter " << paramName << " has default value" << std::endl;
                 paramIndex++; // Skip SET_DEFAULT_VALUE instruction
             }
-            
+
             paramIndex++;
         }
-        
+
         // std::cout << "[DEBUG] Lambda " << functionName << " has "
         //           << lambdaFunc.parameters.size() << " regular parameters and "
         //           << lambdaFunc.optionalParameters.size() << " optional parameters" << std::endl;
-        
+
         // // Register the lambda function
         // std::cout << "[DEBUG] Registering lambda function " << functionName
         //           << " with " << lambdaFunc.parameters.size() << " parameters" << std::endl;
         userDefinedFunctions[functionName] = lambdaFunc;
-        
+
         if (debugMode) {
             std::cout << "[DEBUG] Registered lambda function: " << functionName
                       << " (start: " << startAddress << ", end: " << endAddress
@@ -955,7 +958,7 @@ ValuePtr VM::pop() {
         auto nilType = std::make_shared<Type>(TypeTag::Nil);
         return std::make_shared<Value>(nilType);
     }
-    
+
     ValuePtr value = stack.back();
     stack.pop_back();
     return value;
@@ -974,7 +977,7 @@ ValuePtr VM::peek(int distance) const {
         error("Stack underflow - attempted to peek at distance " + std::to_string(distance) + " but stack only has " + std::to_string(stack.size()) + " elements",
               line, 0, "", "expression that provides enough values on the stack");
     }
-    
+
     return stack[stack.size() - 1 - distance];
 }
 
@@ -983,7 +986,7 @@ void VM::printStack() const {
         std::cout << "Stack is empty" << std::endl;
         return;
     }
-    
+
     std::cout << "=== Stack (" << stack.size() << " items) ===" << std::endl;
     for (int i = stack.size() - 1; i >= 0; --i) {
         std::cout << "[" << i << "]: " << stack[i]->toString();
@@ -1017,12 +1020,12 @@ void VM::error(const std::string& message) const {
     int column = 0;
     std::string lexeme = "";
     std::string expectedValue = "";
-    
+
     if (ip < bytecode->size()) {
         line = (*bytecode)[ip].line;
         // Try to extract more context from the current instruction
         const auto& instruction = (*bytecode)[ip];
-        
+
         // Get lexeme from instruction context if available
         if (instruction.opcode == Opcode::LOAD_VAR ||
                 instruction.opcode == Opcode::STORE_VAR ||
@@ -1035,7 +1038,7 @@ void VM::error(const std::string& message) const {
             //     }
             // }
         }
-        
+
         // Provide expected values based on operation type
         switch (instruction.opcode) {
         case Opcode::ADD:
@@ -1065,7 +1068,7 @@ void VM::error(const std::string& message) const {
             break;
         }
     }
-    
+
     // Always use Debugger::error - no runtime fallback
     Debugger::error(message, line, column, InterpretationStage::INTERPRETING,
                     sourceCode, filePath, lexeme, expectedValue);
@@ -1083,10 +1086,10 @@ void VM::pushErrorFrame(size_t handlerAddr, TypePtr errorType, const std::string
     if (errorFrames.capacity() == 0) {
         errorFrames.reserve(INLINE_ERROR_FRAMES);
     }
-    
+
     errorFrames.emplace_back(handlerAddr, stack.size(), errorType, functionName);
     ++errorStats.errorFramePushes;
-    
+
     // debug: pushErrorFrame logging removed to reduce noise
 }
 
@@ -1099,7 +1102,7 @@ void VM::popErrorFrame() {
 
 bool VM::propagateError(ValuePtr errorValue) {
     if (!errorValue) [[unlikely]] return false;
-    
+
     recordErrorPath();
 
     // Extract error type string - optimized for common cases
@@ -1201,7 +1204,7 @@ ValuePtr VM::handleError(ValuePtr errorValue, const std::string& expectedType) {
             }
         }
     }
-    
+
     return errorValue;
 }
 
@@ -1250,10 +1253,10 @@ bool VM::functionCanFail(const std::string& functionName) const {
 }
 
 // Error value creation helpers - optimized for performance
-ValuePtr VM::createErrorValue(const std::string& errorType, const std::string& message, 
+ValuePtr VM::createErrorValue(const std::string& errorType, const std::string& message,
                               const std::vector<ValuePtr>& args) {
     ++errorStats.errorValueAllocations;
-    
+
     // Look up error type in the type system
     TypePtr errorTypePtr = typeSystem->getType(errorType);
     if (!errorTypePtr) {
@@ -1263,10 +1266,10 @@ ValuePtr VM::createErrorValue(const std::string& errorType, const std::string& m
         userType.name = errorType;
         errorTypePtr->extra = userType;
     }
-    
+
     // Create error value
     ErrorValue errorVal(errorType, message, args, ip);
-    
+
     // Create error union type
     auto errorUnionType = memoryManager.makeRef<Type>(*region, TypeTag::ErrorUnion);
     ErrorUnionType errorUnionDetails;
@@ -1274,11 +1277,11 @@ ValuePtr VM::createErrorValue(const std::string& errorType, const std::string& m
     errorUnionDetails.errorTypes = {errorType};
     errorUnionDetails.isGenericError = false;
     errorUnionType->extra = errorUnionDetails;
-    
+
     // Create the final value with the error union type
     ValuePtr result = memoryManager.makeRef<Value>(*region, errorUnionType);
     result->data = errorVal;
-    
+
     return result;
 }
 
@@ -1286,7 +1289,7 @@ ValuePtr VM::createOptimizedErrorUnion(ValuePtr successValue, const std::string&
     if (!successValue) {
         successValue = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
     }
-    
+
     // Create optimized error union type with cache-friendly layout
     auto errorUnionType = memoryManager.makeRef<Type>(*region, TypeTag::ErrorUnion);
     ErrorUnionType errorUnionDetails;
@@ -1298,11 +1301,11 @@ ValuePtr VM::createOptimizedErrorUnion(ValuePtr successValue, const std::string&
         errorUnionDetails.isGenericError = true;
     }
     errorUnionType->extra = errorUnionDetails;
-    
+
     // Create the union value containing the success value
     ValuePtr result = memoryManager.makeRef<Value>(*region, errorUnionType);
     result->data = successValue->data;
-    
+
     return result;
 }
 
@@ -1310,7 +1313,7 @@ ValuePtr VM::createPooledErrorValue(const std::string& errorType, const std::str
     // Try to get from pool first
     ErrorValue* pooledError = errorPool.acquire();
     bool fromPool = false;
-    
+
     if (pooledError && pooledError != nullptr) {
         // Reset and reuse pooled error
         pooledError->errorType = errorType;
@@ -1324,7 +1327,7 @@ ValuePtr VM::createPooledErrorValue(const std::string& errorType, const std::str
         pooledError = new ErrorValue(errorType, message, {}, ip);
         ++errorStats.errorValuePoolMisses;
     }
-    
+
     // Create error union type
     auto errorUnionType = memoryManager.makeRef<Type>(*region, TypeTag::ErrorUnion);
     ErrorUnionType errorUnionDetails;
@@ -1332,16 +1335,16 @@ ValuePtr VM::createPooledErrorValue(const std::string& errorType, const std::str
     errorUnionDetails.errorTypes = {errorType};
     errorUnionDetails.isGenericError = false;
     errorUnionType->extra = errorUnionDetails;
-    
+
     // Create the final value
     ValuePtr result = memoryManager.makeRef<Value>(*region, errorUnionType);
     result->data = *pooledError;
-    
+
     // If we allocated a new error, clean it up
     if (!fromPool) {
         delete pooledError;
     }
-    
+
     return result;
 }
 
@@ -1349,7 +1352,7 @@ void VM::releasePooledError(ValuePtr errorValue) {
     if (!errorValue || !errorValue->isError()) {
         return;
     }
-    
+
     if (const auto* errorVal = errorValue->getErrorValue()) {
         // We can't directly release the ErrorValue from the Value variant,
         // but we can clear the pool when appropriate
@@ -1361,7 +1364,7 @@ ValuePtr VM::createSuccessValue(ValuePtr value) {
     if (!value) {
         return memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
     }
-    
+
     // Create error union type that wraps the success value
     auto errorUnionType = memoryManager.makeRef<Type>(*region, TypeTag::ErrorUnion);
     ErrorUnionType errorUnionDetails;
@@ -1369,11 +1372,11 @@ ValuePtr VM::createSuccessValue(ValuePtr value) {
     errorUnionDetails.errorTypes = {}; // No specific error types for generic ok()
     errorUnionDetails.isGenericError = true;
     errorUnionType->extra = errorUnionDetails;
-    
+
     // Create a new value with the error union type but containing the success data
     ValuePtr okValue = memoryManager.makeRef<Value>(*region, errorUnionType);
     okValue->data = value->data; // Copy the success value's data
-    
+
     return okValue;
 }
 
@@ -1425,102 +1428,108 @@ void VM::handleSwap(const Instruction& /*unused*/) {
 
 void VM::handleStoreVar(const Instruction& instruction) {
     if (debugMode) {
-        std::cout << "[DEBUG] STORE_VAR: Storing variable '" << instruction.stringValue << "'" << std::endl;
+        std::cout << "[DEBUG] STORE_VAR: Assigning to variable '" << instruction.stringValue << "'" << std::endl;
         std::cout << "[DEBUG] STORE_VAR: Stack size before pop: " << stack.size() << std::endl;
     }
-    
+
     if (stack.empty()) {
         error("Stack underflow in STORE_VAR for variable '" + instruction.stringValue + "'",
               instruction.line, 0, instruction.stringValue, "expression that produces a value to store");
         return;
     }
-    
+
     ValuePtr value = pop();
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] STORE_VAR: Popped value of type: " << static_cast<int>(value->type->tag) << std::endl;
         std::cout << "[DEBUG] STORE_VAR: Popped value: " << value->toString() << std::endl;
     }
 
-    // CRITICAL FIX: Reuse existing Value objects for loop variables
-    // BUT ONLY if the variable exists in the CURRENT scope (not parent scopes)
-    // This preserves the optimization while respecting variable shadowing
-    if (environment->existsInCurrentScope(instruction.stringValue)) {
-        try {
-            ValuePtr existing = environment->get(instruction.stringValue);
-            
-            // If it's a simple numeric type, reuse the Value object
-            if (existing->type->tag == value->type->tag &&
-                    (existing->type->tag == TypeTag::Int ||
-                     existing->type->tag == TypeTag::Int64 ||
-                     existing->type->tag == TypeTag::Float64)) {
-                
-                // Reuse the existing Value object by updating its data
-                existing->data = value->data;
-                return; // No new allocation!
-            }
-        } catch (...) {
-            // Variable doesn't exist yet (shouldn't happen since we checked)
+    // STORE_VAR is now only used for assignments - assign to existing variable in nearest scope
+    try {
+        environment->assign(instruction.stringValue, value);
+        if (debugMode) {
+            std::cout << "[DEBUG] STORE_VAR: Assigned to existing variable '" << instruction.stringValue << "'" << std::endl;
         }
+    } catch (const std::runtime_error& e) {
+        error("Failed to assign to variable '" + instruction.stringValue + "': " + e.what(),
+              instruction.line, 0, instruction.stringValue, "valid variable name");
     }
-    // If variable already exists in CURRENT scope and is an AtomicValue, perform atomic store
-    // Only check current scope to respect variable shadowing
-    if (environment->existsInCurrentScope(instruction.stringValue)) {
-        try {
-            ValuePtr existing = environment->get(instruction.stringValue);
-            // Detect AtomicValue stored inside Value::data
-            if (std::holds_alternative<AtomicValue>(existing->data)) {
-                // Expect the incoming value to be an integer
-                int64_t incoming = 0;
-                if (value->type && (value->type->tag == TypeTag::Int || value->type->tag == TypeTag::Int64)) {
-                    if (value->type->tag == TypeTag::Int) incoming = static_cast<int64_t>(std::get<int32_t>(value->data));
-                    else incoming = std::get<int64_t>(value->data);
-                } else {
-                    error("Cannot store non-integer into atomic variable");
-                }
-                AtomicValue& av = std::get<AtomicValue>(existing->data);
-                av.inner->store(incoming);
-                return;
-            }
-        } catch (...) {
-            // variable doesn't exist yet; fallthrough to define
-        }
+
+    if (debugMode) {
+        std::cout << "[DEBUG] STORE_VAR: Successfully assigned to variable '" << instruction.stringValue << "'" << std::endl;
+    }
+}
+
+void VM::handleDeclareVar(const Instruction& instruction) {
+    if (debugMode) {
+        std::cout << "[DEBUG] DECLARE_VAR: Declaring variable '" << instruction.stringValue << "'" << std::endl;
+        std::cout << "[DEBUG] DECLARE_VAR: Stack size before pop: " << stack.size() << std::endl;
+    }
+
+    if (stack.empty()) {
+        error("Stack underflow in DECLARE_VAR for variable '" + instruction.stringValue + "'",
+              instruction.line, 0, instruction.stringValue, "expression that produces a value to store");
+        return;
+    }
+
+    ValuePtr value = pop();
+
+    if (debugMode) {
+        std::cout << "[DEBUG] DECLARE_VAR: Popped value of type: " << static_cast<int>(value->type->tag) << std::endl;
+        std::cout << "[DEBUG] DECLARE_VAR: Popped value: " << value->toString() << std::endl;
     }
 
     // Get visibility information from instruction (default to Private if not specified)
     AST::VisibilityLevel visibility = static_cast<AST::VisibilityLevel>(instruction.intValue);
     
-    // FIXED: Check if variable exists in CURRENT scope only (not parent scopes)
-    // This properly handles variable shadowing
-    bool existsInCurrent = environment->existsInCurrentScope(instruction.stringValue);
+    // Always create a new variable in current scope (may shadow outer scope variable)
+    environment->define(instruction.stringValue, value, visibility);
     
     if (debugMode) {
-        std::cout << "[DEBUG] STORE_VAR: Variable '" << instruction.stringValue 
+        std::cout << "[DEBUG] DECLARE_VAR: Declared new variable '" << instruction.stringValue 
+                  << "' with visibility " << static_cast<int>(visibility) << std::endl;
+    }
+}
+
+void VM::handleLoadVar(const Instruction& instruction) {
+    (void)instruction; // Mark as unused
+    bool existsInCurrent = environment->existsInCurrentScope(instruction.stringValue);
+    if (debugMode) {
+        std::cout << "[DEBUG] LOAD_VAR: Variable '" << instruction.stringValue
                   << "' exists in current scope: " << (existsInCurrent ? "YES" : "NO") << std::endl;
     }
-    
     if (existsInCurrent) {
-        // Variable exists in current scope - update it
+        // Variable exists in current scope - get it
         try {
-            environment->assign(instruction.stringValue, value);
-            if (debugMode) {
-                std::cout << "[DEBUG] STORE_VAR: Updated existing variable '" << instruction.stringValue << "' in current scope" << std::endl;
-            }
-        } catch (const std::runtime_error& e) {
-            // This shouldn't happen since we checked existsInCurrentScope, but handle it anyway
-            error("Failed to update variable '" + instruction.stringValue + "': " + e.what(),
-                  instruction.line, 0, instruction.stringValue, "valid variable name");
+        ValuePtr value = environment->get(instruction.stringValue);
+        push(value);
+        if (debugMode) {
+            std::cout << "[DEBUG] LOAD_VAR: Current environment  "
+                      << environment.get() << " and enclosing enviroment " << environment->enclosing.get() << std::endl;
+        }
+        if (debugMode) {
+            std::cout << "[DEBUG] LOAD_VAR: Successfully loaded variable '" << instruction.stringValue << "'"
+                  <<" With Value: "<< value->toString() << "' exists in current scope: "
+                 << (existsInCurrent ? "YES" : "NO") << std::endl;
+        }
+        }  catch (const std::exception& e) {
+        error("Undefined variable '" + instruction.stringValue + "'",
+              instruction.line, 0, instruction.stringValue, "declared variable or function parameter");
         }
     } else {
-        // Variable doesn't exist in current scope - define it (may shadow outer scope variable)
-        environment->define(instruction.stringValue, value, visibility);
+        // Variable doesn't exist in current scope - check every scope
+        ValuePtr value = environment->get(instruction.stringValue);
+        push(value);
         if (debugMode) {
-            std::cout << "[DEBUG] STORE_VAR: Defined new variable '" << instruction.stringValue << "' with visibility " << static_cast<int>(visibility) << std::endl;
+            std::cout << "[DEBUG] LOAD_VAR: Current environment  "
+                      << environment.get() << " and enclosing enviroment " << environment->enclosing.get() << std::endl;
         }
-    }
-    
-    if (debugMode) {
-        std::cout << "[DEBUG] STORE_VAR: Successfully stored variable '" << instruction.stringValue << "'" << std::endl;
+        if (debugMode) {
+            std::cout << "[DEBUG] LOAD_VAR: Successfully loaded variable '" << instruction.stringValue << "'"
+                  <<" With Value: "<< value->toString() << "' exists in current scope: "
+                 << (existsInCurrent ? "YES" : "NO") << std::endl;
+        }
     }
 }
 
@@ -1546,21 +1555,11 @@ void VM::handleDefineAtomic(const Instruction& instruction) {
     environment->define(instruction.stringValue, v);
 }
 
-void VM::handleLoadVar(const Instruction& instruction) {
-    (void)instruction; // Mark as unused
-    try {
-        ValuePtr value = environment->get(instruction.stringValue);
-        push(value);
-    } catch (const std::exception& e) {
-        error("Undefined variable '" + instruction.stringValue + "'",
-              instruction.line, 0, instruction.stringValue, "declared variable or function parameter");
-    }
-}
 
 void VM::handleStoreTemp(const Instruction& instruction) {
     // Store the top value in a temporary variable at the specified index
     int index = instruction.intValue;
-    
+
     // Find or create the current scope's temp values
     ScopedTempValues* currentScopeTemps = nullptr;
     for (auto& scopedTemps : tempValueStack) {
@@ -1569,23 +1568,23 @@ void VM::handleStoreTemp(const Instruction& instruction) {
             break;
         }
     }
-    
+
     // If no temp values for current scope, create them
     if (!currentScopeTemps) {
         tempValueStack.emplace_back(environment);
         currentScopeTemps = &tempValueStack.back();
     }
-    
+
     // Ensure the values vector is large enough
     if (index >= static_cast<int>(currentScopeTemps->values.size())) {
         currentScopeTemps->values.resize(index + 1, memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
     }
-    
+
     currentScopeTemps->values[index] = pop();
     if (debugMode) {
         std::cout << "[DEBUG] STORE_TEMP: Stored at index " << index
                   << " in scope " << currentScopeTemps->scope.get()
-                  << ", values.size(): " << currentScopeTemps->values.size() 
+                  << ", values.size(): " << currentScopeTemps->values.size()
                   << ", total scopes: " << tempValueStack.size() << std::endl;
     }
 }
@@ -1593,17 +1592,17 @@ void VM::handleStoreTemp(const Instruction& instruction) {
 void VM::handleLoadTemp(const Instruction& instruction) {
     // Load the temporary value from the specified index onto the stack
     int index = instruction.intValue;
-    
+
     // First, try to find the temporary variable in the current scope
     ScopedTempValues* foundScopeTemps = nullptr;
     for (auto& scopedTemps : tempValueStack) {
-        if (scopedTemps.scope == environment && 
+        if (scopedTemps.scope == environment &&
             index >= 0 && index < static_cast<int>(scopedTemps.values.size())) {
             foundScopeTemps = &scopedTemps;
             break;
         }
     }
-    
+
     // If not found in current scope, search through all scopes (most recent first)
     if (!foundScopeTemps) {
         for (auto it = tempValueStack.rbegin(); it != tempValueStack.rend(); ++it) {
@@ -1613,17 +1612,17 @@ void VM::handleLoadTemp(const Instruction& instruction) {
             }
         }
     }
-    
+
     if (!foundScopeTemps) {
-        error("Invalid temporary variable index: " + std::to_string(index) + 
+        error("Invalid temporary variable index: " + std::to_string(index) +
               " (not found in any scope, total scopes: " + std::to_string(tempValueStack.size()) + ")");
         return;
     }
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] LOAD_TEMP: Loading from index " << index
                   << " in scope " << foundScopeTemps->scope.get()
-                  << ", values.size(): " << foundScopeTemps->values.size() 
+                  << ", values.size(): " << foundScopeTemps->values.size()
                   << ", total scopes: " << tempValueStack.size() << std::endl;
     }
     push(foundScopeTemps->values[index]);
@@ -1632,36 +1631,34 @@ void VM::handleLoadTemp(const Instruction& instruction) {
 void VM::handleClearTemp(const Instruction& instruction) {
     // Clear the temporary value at the specified index
     int index = instruction.intValue;
-    
-    // First, try to find the temporary variable in the current scope
-    ScopedTempValues* foundScopeTemps = nullptr;
+
+    // CRITICAL FIX: Only clear temporary variables in the CURRENT scope
+    // This prevents nested iterators from interfering with each other
+    ScopedTempValues* currentScopeTemps = nullptr;
     for (auto& scopedTemps : tempValueStack) {
-        if (scopedTemps.scope == environment && 
-            index >= 0 && index < static_cast<int>(scopedTemps.values.size())) {
-            foundScopeTemps = &scopedTemps;
+        if (scopedTemps.scope == environment) {
+            currentScopeTemps = &scopedTemps;
             break;
         }
     }
-    
-    // If not found in current scope, search through all scopes (most recent first)
-    if (!foundScopeTemps) {
-        for (auto it = tempValueStack.rbegin(); it != tempValueStack.rend(); ++it) {
-            if (index >= 0 && index < static_cast<int>(it->values.size())) {
-                foundScopeTemps = &(*it);
-                break;
-            }
+
+    if (currentScopeTemps && index >= 0 && index < static_cast<int>(currentScopeTemps->values.size())) {
+        // Only clear if the index is valid in the current scope
+        currentScopeTemps->values[index] = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
+
+        if (debugMode) {
+            std::cout << "[DEBUG] CLEAR_TEMP: Cleared at index " << index
+                      << " in current scope " << currentScopeTemps->scope.get()
+                      << ", values.size(): " << currentScopeTemps->values.size()
+                      << ", total scopes: " << tempValueStack.size() << std::endl;
         }
-    }
-    
-    if (foundScopeTemps) {
-        foundScopeTemps->values[index] = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
-    }
-    
-    if (debugMode) {
-        std::cout << "[DEBUG] CLEAR_TEMP: Cleared at index " << index
-                  << " in scope " << (foundScopeTemps ? foundScopeTemps->scope.get() : nullptr)
-                  << ", values.size(): " << (foundScopeTemps ? foundScopeTemps->values.size() : 0) 
-                  << ", total scopes: " << tempValueStack.size() << std::endl;
+    } else {
+        if (debugMode) {
+            std::cout << "[DEBUG] CLEAR_TEMP: Skipping clear for index " << index
+                      << " (not found in current scope or invalid index)"
+                      << ", current scope: " << (currentScopeTemps ? "found" : "not found")
+                      << ", total scopes: " << tempValueStack.size() << std::endl;
+        }
     }
 }
 
@@ -1703,7 +1700,7 @@ void VM::handleAdd(const Instruction& /*unused*/) {
     // Handle ErrorUnion types by extracting success values
     ValuePtr actualA = a;
     ValuePtr actualB = b;
-    
+
     // Extract success value from ErrorUnion if needed
     if (a->type->tag == TypeTag::ErrorUnion) {
         if (auto errorUnionDetails = std::get_if<ErrorUnionType>(&a->type->extra)) {
@@ -1711,14 +1708,14 @@ void VM::handleAdd(const Instruction& /*unused*/) {
             actualA->data = a->data;
         }
     }
-    
+
     if (b->type->tag == TypeTag::ErrorUnion) {
         if (auto errorUnionDetails = std::get_if<ErrorUnionType>(&b->type->extra)) {
             actualB = memoryManager.makeRef<Value>(*region, errorUnionDetails->successType);
             actualB->data = b->data;
         }
     }
-    
+
     // Check if either operand is a number for numeric addition
     bool aIsNumeric = typeSystem->isNumericType(actualA->type->tag);
     bool bIsNumeric = typeSystem->isNumericType(actualB->type->tag);
@@ -1727,7 +1724,7 @@ void VM::handleAdd(const Instruction& /*unused*/) {
         // Use the extracted values for the rest of the operation
         a = actualA;
         b = actualB;
-        
+
         // Numeric addition - promote to double if either operand is double
         if (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64) {
             // Convert to double if needed
@@ -1745,14 +1742,14 @@ void VM::handleAdd(const Instruction& /*unused*/) {
         } else {
             // Integer addition with mixed int32/int64 support
             int64_t aVal, bVal;
-            
+
             // Convert both operands to int64_t
             if (a->type->tag == TypeTag::Int) {
                 aVal = static_cast<int64_t>(std::get<int32_t>(a->data));
             } else {
                 aVal = std::get<int64_t>(a->data);
             }
-            
+
             if (b->type->tag == TypeTag::Int) {
                 bVal = static_cast<int64_t>(std::get<int32_t>(b->data));
             } else {
@@ -1791,11 +1788,11 @@ void VM::handleSubtract(const Instruction& /*unused*/) {
         push(memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, result));
         return;
     }
-    
+
     // Handle ErrorUnion types by extracting success values
     ValuePtr actualA = a;
     ValuePtr actualB = b;
-    
+
     // Extract success value from ErrorUnion if needed
     if (a->type->tag == TypeTag::ErrorUnion) {
         if (auto errorUnionDetails = std::get_if<ErrorUnionType>(&a->type->extra)) {
@@ -1803,67 +1800,67 @@ void VM::handleSubtract(const Instruction& /*unused*/) {
             actualA->data = a->data;
         }
     }
-    
+
     if (b->type->tag == TypeTag::ErrorUnion) {
         if (auto errorUnionDetails = std::get_if<ErrorUnionType>(&b->type->extra)) {
             actualB = memoryManager.makeRef<Value>(*region, errorUnionDetails->successType);
             actualB->data = b->data;
         }
     }
-    
+
     // Check if either operand is a number for numeric subtraction
     bool aIsNumeric = typeSystem->isNumericType(actualA->type->tag);
     bool bIsNumeric = typeSystem->isNumericType(actualB->type->tag);
-    
+
     if (!aIsNumeric || !bIsNumeric) {
         error("Both operands must be numbers for subtraction");
     }
-    
+
     // Use the extracted values for the rest of the operation
     a = actualA;
     b = actualB;
-    
+
     // Numeric subtraction - promote to double if either operand is double
     if (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64) {
         // Convert to double if needed
         double aVal = (a->type->tag == TypeTag::Float64) ?
                     std::get<double>(a->data) :
                     static_cast<double>(std::get<int32_t>(a->data));
-        
+
         double bVal = (b->type->tag == TypeTag::Float64) ?
                     std::get<double>(b->data) :
                     static_cast<double>(std::get<int32_t>(b->data));
-        
+
         // Check for floating-point edge cases
         double result = aVal - bVal;
         if (std::isinf(result)) {
             error("Floating-point subtraction resulted in infinity");
         }
-        
+
         push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, result));
     } else {
         // Integer subtraction with mixed int32/int64 support
         int64_t aVal, bVal;
-        
+
         // Convert both operands to int64_t
         if (a->type->tag == TypeTag::Int) {
             aVal = static_cast<int64_t>(std::get<int32_t>(a->data));
         } else {
             aVal = std::get<int64_t>(a->data);
         }
-        
+
         if (b->type->tag == TypeTag::Int) {
             bVal = static_cast<int64_t>(std::get<int32_t>(b->data));
         } else {
             bVal = std::get<int64_t>(b->data);
         }
-        
+
         // Check for integer overflow
         if ((bVal > 0 && aVal < std::numeric_limits<int64_t>::min() + bVal) ||
                 (bVal < 0 && aVal > std::numeric_limits<int64_t>::max() + bVal)) {
             error("Integer subtraction overflow");
         }
-        
+
         push(memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, aVal - bVal));
     }
 }
@@ -1871,14 +1868,14 @@ void VM::handleSubtract(const Instruction& /*unused*/) {
 void VM::handleMultiply(const Instruction& /*unused*/) {
     ValuePtr b = pop();
     ValuePtr a = pop();
-    
+
     // String multiplication (string * int or int * string)
     if ((a->type->tag == TypeTag::String && b->type->tag == TypeTag::Int) ||
             (a->type->tag == TypeTag::Int && b->type->tag == TypeTag::String)) {
-        
+
         std::string str;
         int32_t count;
-        
+
         if (a->type->tag == TypeTag::String) {
             str = std::get<std::string>(a->data);
             count = std::get<int32_t>(b->data);
@@ -1886,60 +1883,60 @@ void VM::handleMultiply(const Instruction& /*unused*/) {
             str = std::get<std::string>(b->data);
             count = std::get<int32_t>(a->data);
         }
-        
+
         if (count < 0) {
             error("String repetition count cannot be negative");
         }
-        
+
         std::string result;
         result.reserve(str.length() * count);
-        
+
         for (int i = 0; i < count; ++i) {
             result += str;
         }
-        
+
         push(memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, result));
         return;
     }
-    
+
     // Numeric multiplication
     if (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64) {
         // Convert to double if needed
         double aVal = (a->type->tag == TypeTag::Float64) ?
                     std::get<double>(a->data) :
                     static_cast<double>(std::get<int32_t>(a->data));
-        
+
         double bVal = (b->type->tag == TypeTag::Float64) ?
                     std::get<double>(b->data) :
                     static_cast<double>(std::get<int32_t>(b->data));
-        
+
         push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, aVal * bVal));
     } else if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) &&
                (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
         // Integer multiplication with mixed int32/int64 support
         int64_t aVal, bVal;
-        
+
         // Convert both operands to int64_t
         if (a->type->tag == TypeTag::Int) {
             aVal = static_cast<int64_t>(std::get<int32_t>(a->data));
         } else {
             aVal = std::get<int64_t>(a->data);
         }
-        
+
         if (b->type->tag == TypeTag::Int) {
             bVal = static_cast<int64_t>(std::get<int32_t>(b->data));
         } else {
             bVal = std::get<int64_t>(b->data);
         }
-        
+
         int64_t result = aVal * bVal;
-        
+
         // Check for overflow
         if (result > std::numeric_limits<int64_t>::max() ||
                 result < std::numeric_limits<int64_t>::min()) {
             error("Integer multiplication overflow");
         }
-        
+
         // Return as int64 to maintain precision
         push(memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, result));
     } else {
@@ -1950,11 +1947,11 @@ void VM::handleMultiply(const Instruction& /*unused*/) {
 void VM::handleDivide(const Instruction& /*unused*/) {
     ValuePtr b = pop();
     ValuePtr a = pop();
-    
+
     // Check for non-numeric operands
     bool aIsNumeric = (a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Float64);
     bool bIsNumeric = (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Float64);
-    
+
     if (!aIsNumeric || !bIsNumeric) {
         // Create error union with TypeError
         auto errorUnionType = typeSystem->createErrorUnionType(typeSystem->INT_TYPE, {"TypeError"}, false);
@@ -1964,11 +1961,11 @@ void VM::handleDivide(const Instruction& /*unused*/) {
         push(errorUnionValue);
         return;
     }
-    
+
     // Check for division by zero with better error message
     bool isZero = false;
     std::string zeroType;
-    
+
     if (b->type->tag == TypeTag::Float64) {
         double bVal = std::get<double>(b->data);
         isZero = bVal == 0.0;
@@ -1978,31 +1975,31 @@ void VM::handleDivide(const Instruction& /*unused*/) {
         isZero = bVal == 0;
         zeroType = isZero ? "integer zero" : "";
     }
-    
+
     if (isZero) {
         // Create error union with DivisionByZero error
         TypePtr resultType = (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64)
                 ? typeSystem->FLOAT64_TYPE
                 : typeSystem->INT_TYPE;
         auto errorUnionType = typeSystem->createErrorUnionType(resultType, {"DivisionByZero"}, false);
-        
+
         auto errorUnionValue = memoryManager.makeRef<Value>(*region, errorUnionType);
         ErrorValue errorVal("DivisionByZero", "Division by " + zeroType + " is not allowed");
         errorUnionValue->data = errorVal;
         push(errorUnionValue);
         return;
     }
-    
+
     // Numeric division - always promote to double if either operand is double
     if (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64) {
         double aVal = (a->type->tag == TypeTag::Float64) ?
                     std::get<double>(a->data) :
                     static_cast<double>(std::get<int32_t>(a->data));
-        
+
         double bVal = (b->type->tag == TypeTag::Float64) ?
                     std::get<double>(b->data) :
                     static_cast<double>(std::get<int32_t>(b->data));
-        
+
         // Check for floating-point edge cases
         if (std::isinf(aVal / bVal)) {
             // Create error union with ArithmeticError
@@ -2013,7 +2010,7 @@ void VM::handleDivide(const Instruction& /*unused*/) {
             push(errorUnionValue);
             return;
         }
-        
+
         // Create success error union
         auto errorUnionType = typeSystem->createErrorUnionType(typeSystem->FLOAT64_TYPE, {"DivisionByZero"}, false);
         auto errorUnionValue = memoryManager.makeRef<Value>(*region, errorUnionType);
@@ -2023,7 +2020,7 @@ void VM::handleDivide(const Instruction& /*unused*/) {
         // Integer division with check for INT_MIN / -1 overflow
         int32_t aVal = std::get<int32_t>(a->data);
         int32_t bVal = std::get<int32_t>(b->data);
-        
+
         if (aVal == std::numeric_limits<int32_t>::min() && bVal == -1) {
             // Create error union with ArithmeticError
             auto errorUnionType = typeSystem->createErrorUnionType(typeSystem->INT_TYPE, {"ArithmeticError"}, false);
@@ -2033,7 +2030,7 @@ void VM::handleDivide(const Instruction& /*unused*/) {
             push(errorUnionValue);
             return;
         }
-        
+
         // Create success error union
         auto errorUnionType = typeSystem->createErrorUnionType(typeSystem->INT_TYPE, {"DivisionByZero"}, false);
         auto errorUnionValue = memoryManager.makeRef<Value>(*region, errorUnionType);
@@ -2045,18 +2042,18 @@ void VM::handleDivide(const Instruction& /*unused*/) {
 void VM::handleModulo(const Instruction& instruction) {
     ValuePtr b = pop();
     ValuePtr a = pop();
-    
+
     // Type checking
     if (a->type->tag != TypeTag::Int || b->type->tag != TypeTag::Int) {
         error("Modulo operation requires integer operands");
     }
-    
+
     // Check for modulo by zero
     int32_t bVal = std::get<int32_t>(b->data);
     if (bVal == 0) {
         error("Modulo by zero", instruction.line, 0, "0", "non-zero integer divisor");
     }
-    
+
     // Integer modulo
     int32_t aVal = std::get<int32_t>(a->data);
     push(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, aVal % bVal));
@@ -2064,7 +2061,7 @@ void VM::handleModulo(const Instruction& instruction) {
 
 void VM::handleNegate(const Instruction& /*unused*/) {
     ValuePtr a = pop();
-    
+
     if (a->type->tag == TypeTag::Float64) {
         double val = std::get<double>(a->data);
         push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, -val));
@@ -2077,9 +2074,9 @@ void VM::handleNegate(const Instruction& /*unused*/) {
 void VM::handleEqual(const Instruction& /*unused*/) {
     ValuePtr b = pop();
     ValuePtr a = pop();
-    
+
     bool result = false;
-    
+
     // Handle mixed integer types
     if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) &&
             (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
@@ -2128,16 +2125,16 @@ void VM::handleEqual(const Instruction& /*unused*/) {
     else {
         result = false; // Different types are not equal
     }
-    
+
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, result));
 }
 
 void VM::handleNotEqual(const Instruction& /*unused*/) {
     ValuePtr b = pop();
     ValuePtr a = pop();
-    
+
     bool result = true;
-    
+
     // Handle mixed integer types
     if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) &&
             (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
@@ -2186,16 +2183,16 @@ void VM::handleNotEqual(const Instruction& /*unused*/) {
     else {
         result = true; // Different types are not equal
     }
-    
+
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, result));
 }
 
 void VM::handleLess(const Instruction& instruction) {
     ValuePtr b = pop();
     ValuePtr a = pop();
-    
+
     bool result = false;
-    
+
     // Compare based on types - handle mixed integer types
     if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) &&
             (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
@@ -2224,16 +2221,16 @@ void VM::handleLess(const Instruction& instruction) {
     } else {
         error("Cannot compare values of different types in less-than operation", instruction.line, 0, "< operator", "values of the same comparable type (int, float, string, or bool)");
     }
-    
+
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, result));
 }
 
 void VM::handleLessEqual(const Instruction& /*unused*/) {
     ValuePtr b = pop();
     ValuePtr a = pop();
-    
+
     bool result = false;
-    
+
     // Compare based on types - handle mixed integer types
     if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) &&
             (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
@@ -2262,16 +2259,16 @@ void VM::handleLessEqual(const Instruction& /*unused*/) {
     } else {
         error("Cannot compare values of different types");
     }
-    
+
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, result));
 }
 
 void VM::handleGreater(const Instruction& /*unused*/) {
     ValuePtr b = pop();
     ValuePtr a = pop();
-    
+
     bool result = false;
-    
+
     // Compare based on types - handle mixed integer types
     if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) &&
             (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
@@ -2300,16 +2297,16 @@ void VM::handleGreater(const Instruction& /*unused*/) {
     } else {
         error("Cannot compare values of different types");
     }
-    
+
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, result));
 }
 
 void VM::handleGreaterEqual(const Instruction& /*unused*/) {
     ValuePtr b = pop();
     ValuePtr a = pop();
-    
+
     bool result = false;
-    
+
     // Compare based on types - handle mixed integer types
     if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) &&
             (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
@@ -2338,17 +2335,17 @@ void VM::handleGreaterEqual(const Instruction& /*unused*/) {
     } else {
         error("Cannot compare values of different types");
     }
-    
+
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, result));
 }
 
 void VM::handleAnd(const Instruction& /*unused*/) {
     ValuePtr b = pop();
     ValuePtr a = pop();
-    
+
     bool aVal = false;
     bool bVal = false;
-    
+
     // Convert to boolean
     if (a->type->tag == TypeTag::Bool) {
         aVal = std::get<bool>(a->data);
@@ -2363,7 +2360,7 @@ void VM::handleAnd(const Instruction& /*unused*/) {
     } else {
         aVal = true; // Objects are truthy
     }
-    
+
     if (b->type->tag == TypeTag::Bool) {
         bVal = std::get<bool>(b->data);
     } else if (b->type->tag == TypeTag::Int) {
@@ -2377,17 +2374,17 @@ void VM::handleAnd(const Instruction& /*unused*/) {
     } else {
         bVal = true; // Objects are truthy
     }
-    
+
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, aVal && bVal));
 }
 
 void VM::handleOr(const Instruction& /*unused*/) {
     ValuePtr b = pop();
     ValuePtr a = pop();
-    
+
     bool aVal = false;
     bool bVal = false;
-    
+
     // Convert to boolean
     if (a->type->tag == TypeTag::Bool) {
         aVal = std::get<bool>(a->data);
@@ -2402,7 +2399,7 @@ void VM::handleOr(const Instruction& /*unused*/) {
     } else {
         aVal = true; // Objects are truthy
     }
-    
+
     if (b->type->tag == TypeTag::Bool) {
         bVal = std::get<bool>(b->data);
     } else if (b->type->tag == TypeTag::Int) {
@@ -2416,7 +2413,7 @@ void VM::handleOr(const Instruction& /*unused*/) {
     } else {
         bVal = true; // Objects are truthy
     }
-    
+
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, aVal || bVal));
 }
 
@@ -2427,7 +2424,7 @@ void VM::handleNot(const Instruction& /*unused*/) {
     }
 
     ValuePtr value = pop();
-    
+
     // Convert value to boolean
     bool boolValue = false;
     if (std::holds_alternative<bool>(value->data)) {
@@ -2448,7 +2445,7 @@ void VM::handleNot(const Instruction& /*unused*/) {
         error("Cannot perform NOT operation on type: " + typeTagToString(value->type->tag));
         return;
     }
-    
+
     auto result = memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, !boolValue);
     push(result);
 }
@@ -2456,25 +2453,25 @@ void VM::handleNot(const Instruction& /*unused*/) {
 void VM::handleInterpolateString(const Instruction& instruction) {
     // The number of parts is stored in the intValue field
     int32_t numParts = instruction.intValue;
-    
+
     if (stack.size() < static_cast<size_t>(numParts)) {
         error("Stack underflow in string interpolation");
         return;
     }
-    
+
     // Pop all parts from the stack
     std::vector<ValuePtr> parts;
     parts.reserve(numParts);
     for (int i = 0; i < numParts; ++i) {
         parts.push_back(pop());
     }
-    
+
     // Concatenate all parts in reverse order (since we popped them)
     std::string result;
     for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
         result += valueToString(*it);
     }
-    
+
     // Push the result string onto the stack
     auto resultValue = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, result);
     push(resultValue);
@@ -2485,18 +2482,18 @@ void VM::handleConcat(const Instruction& /*unused*/) {
         error("Stack underflow in CONCAT operation");
         return;
     }
-    
+
     // Pop the two top values
     ValuePtr right = pop();
     ValuePtr left = pop();
-    
+
     // Convert both values to strings
     std::string leftStr = valueToString(left);
     std::string rightStr = valueToString(right);
-    
+
     // Concatenate the strings
     std::string result = leftStr + rightStr;
-    
+
     // Push the result back onto the stack
     auto resultValue = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, result);
     push(resultValue);
@@ -2505,7 +2502,7 @@ void VM::handleConcat(const Instruction& /*unused*/) {
 void VM::handleJump(const Instruction& instruction) {
     int64_t offset = instruction.intValue;
     size_t newIP = ip + offset;
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] handleJump: current IP=" << ip
                   << ", offset=" << offset
@@ -2522,7 +2519,7 @@ void VM::handleJump(const Instruction& instruction) {
               ", bytecode size=" + std::to_string(bytecode->size()) + ")");
         return;
     }
-    
+
     // Update IP after bounds check
     ip = newIP;
 }
@@ -2532,15 +2529,15 @@ void VM::handleJumpIfTrue(const Instruction& instruction) {
         error("Stack underflow in JUMP_IF_TRUE");
         return;
     }
-    
+
     ValuePtr condition = pop();
     if (!condition || !condition->type) {
         error("Invalid condition in JUMP_IF_TRUE");
         return;
     }
-    
+
     bool condVal = false;
-    
+
     try {
         // Convert to boolean
         if (condition->type->tag == TypeTag::Bool) {
@@ -2560,7 +2557,7 @@ void VM::handleJumpIfTrue(const Instruction& instruction) {
         error("Invalid data type in condition for JUMP_IF_TRUE");
         return;
     }
-    
+
     if (condVal) {
         ip += instruction.intValue;
     }
@@ -2571,15 +2568,15 @@ void VM::handleJumpIfFalse(const Instruction& instruction) {
         error("Stack underflow in JUMP_IF_FALSE");
         return;
     }
-    
+
     ValuePtr condition = pop();
     if (!condition || !condition->type) {
         error("Invalid condition in JUMP_IF_FALSE");
         return;
     }
-    
+
     bool condVal = false;
-    
+
     try {
         // Convert to boolean
         if (condition->type->tag == TypeTag::Bool) {
@@ -2599,7 +2596,7 @@ void VM::handleJumpIfFalse(const Instruction& instruction) {
         error("Invalid data type in condition for JUMP_IF_FALSE");
         return;
     }
-    
+
     if (!condVal) {
         ip += instruction.intValue;
     }
@@ -2609,37 +2606,37 @@ void VM::handleCall(const Instruction& instruction) {
     // Get the function name from the instruction
     const std::string& funcName = instruction.stringValue;
     int argCount = instruction.intValue;
-    
+
     // Check if this is a higher-order function call (function value on stack)
     if (!stack.empty() && stack.back()->type && stack.back()->type->tag == TypeTag::Function) {
         ValuePtr functionValue = pop();
-        
+
         // Collect arguments
         std::vector<ValuePtr> args;
         for (int i = 0; i < argCount; i++) {
             args.insert(args.begin(), pop());
         }
-        
+
         // Execute the function value
         if (std::holds_alternative<std::shared_ptr<backend::UserDefinedFunction>>(functionValue->data)) {
             auto func = std::get<std::shared_ptr<backend::UserDefinedFunction>>(functionValue->data);
-            
+
             // Find the function in the registry to get bytecode information
             auto funcIt = userDefinedFunctions.find(func->getSignature().name);
             if (funcIt != userDefinedFunctions.end()) {
                 const backend::Function& funcInfo = funcIt->second;
-                
+
                 // Create a new environment for the function
                 auto funcEnv = std::make_shared<Environment>(environment);
-                
+
                 // Bind function parameters
                 if (!bindFunctionParameters(funcInfo, args, funcEnv, func->getSignature().name)) {
                     return; // Error already reported
                 }
-                
+
                 // Create call frame and switch environment
                 createAndPushCallFrame(func->getSignature().name, ip + 1, funcEnv);
-                
+
                 // Jump to function start
                 ip = funcInfo.startAddress;
                 return;
@@ -2652,7 +2649,7 @@ void VM::handleCall(const Instruction& instruction) {
             return;
         }
     }
-    
+
     // Handle case where function is on the stack (from property access)
     if (funcName.empty()) {
         if (debugMode) {
@@ -2662,13 +2659,13 @@ void VM::handleCall(const Instruction& instruction) {
                 std::cout << "[DEBUG] CALL: Top stack value type: " << static_cast<int>(stack.back()->type->tag) << std::endl;
             }
         }
-        
+
         // Function should be on the stack, either at the top (no arguments) or below arguments
         if (stack.size() < static_cast<size_t>(argCount + 1)) {
             error("Not enough values on stack for function call");
             return;
         }
-        
+
         // For method calls with arguments, the function is below the arguments
         // For calls without arguments, the function is on top
         ValuePtr functionValue;
@@ -2684,14 +2681,14 @@ void VM::handleCall(const Instruction& instruction) {
             // Function is at the top for calls without arguments
             functionValue = stack.back();
         }
-        
+
         if (debugMode) {
             std::cout << "[DEBUG] CALL: Function value type: " << static_cast<int>(functionValue->type->tag) << std::endl;
             if (std::holds_alternative<std::string>(functionValue->data)) {
                 std::cout << "[DEBUG] CALL: Function name from stack: " << std::get<std::string>(functionValue->data) << std::endl;
             }
         }
-        
+
         // Remove the function from the stack
         if (argCount > 0) {
             // Function is below the arguments, remove it from the middle
@@ -2700,15 +2697,15 @@ void VM::handleCall(const Instruction& instruction) {
             // Function is at the top, remove it normally
             stack.pop_back();
         }
-        
+
         // Check if it's a function value (stored as string name)
         if (std::holds_alternative<std::string>(functionValue->data)) {
             std::string storedFuncName = std::get<std::string>(functionValue->data);
-            
+
             if (debugMode) {
                 std::cout << "[DEBUG] CALL: Function from stack has name: " << storedFuncName << std::endl;
             }
-            
+
             // Extract the actual function name (handle module function references)
             std::string actualFuncName = storedFuncName;
             if (storedFuncName.substr(0, 16) == "module_function:") {
@@ -2717,7 +2714,7 @@ void VM::handleCall(const Instruction& instruction) {
                     std::cout << "[DEBUG] CALL: Module function call, using function name: " << actualFuncName << std::endl;
                 }
             }
-            
+
             // Check if this is a class method call (stored as "ClassName::methodName")
             if (storedFuncName.find("::") != std::string::npos) {
                 if (debugMode) {
@@ -2729,11 +2726,11 @@ void VM::handleCall(const Instruction& instruction) {
                                   << static_cast<int>(val->type->tag) << ", variant=" << val->data.index() << std::endl;
                     }
                 }
-                
+
                 // For method calls, the stack layout after popping method_reference is:
                 // [object] [arg1] [arg2] ... [argN] (top)
                 // We need to collect arguments first, then get the object
-                
+
                 std::vector<ValuePtr> args;
                 for (int i = 0; i < argCount; i++) {
                     ValuePtr arg = pop();
@@ -2743,55 +2740,55 @@ void VM::handleCall(const Instruction& instruction) {
                     }
                     args.insert(args.begin(), arg);
                 }
-                
+
                 // Now get the object (it should be on top after arguments are removed)
                 if (stack.empty()) {
                     error("Method call without object on stack");
                     return;
                 }
-                
+
                 ValuePtr objectValue = pop(); // Get the object from the stack
-                
+
                 if (debugMode) {
                     std::cout << "[DEBUG] CALL: Retrieved object for method call" << std::endl;
                     std::cout << "[DEBUG] CALL: Object value type tag: " << static_cast<int>(objectValue->type->tag) << std::endl;
                     std::cout << "[DEBUG] CALL: Object data variant index: " << objectValue->data.index() << std::endl;
                 }
-                
+
                 // Handle the method call using the existing method call logic
                 if (std::holds_alternative<ObjectInstancePtr>(objectValue->data)) {
                     auto objectInstance = std::get<ObjectInstancePtr>(objectValue->data);
                     std::string className = objectInstance->getClassName();
-                    
+
                     // Extract method name from the stored function name
                     size_t colonPos = storedFuncName.find("::");
                     std::string methodName = storedFuncName.substr(colonPos + 2);
-                    
+
                     if (debugMode) {
                         std::cout << "[DEBUG] CALL: Calling method '" << methodName << "' on class '" << className << "'" << std::endl;
                     }
-                    
+
                     // Look for the method in the class definition
                     auto methodImpl = objectInstance->getMethod(methodName);
-                    
+
                     if (methodImpl) {
                         // Check if this is a VM-based method implementation
                         auto vmMethodImpl = std::dynamic_pointer_cast<backend::VMMethodImplementation>(methodImpl);
                         if (vmMethodImpl) {
                             // This is a VM-based method - execute it through bytecode
-                            
+
                             // Create a new environment for the method
                             auto methodEnv = std::make_shared<Environment>(environment);
-                            
+
                             // Bind 'this' parameter (implicit first parameter)
                             methodEnv->define("this", objectValue);
-                            
+
                             // Look up the method in userDefinedFunctions to get parameter info
                             auto methodIt = userDefinedFunctions.find(storedFuncName);
-                            
+
                             if (methodIt != userDefinedFunctions.end()) {
                                 const backend::Function& method = methodIt->second;
-                                
+
                                 // Bind method parameters
                                 size_t paramIndex = 0;
                                 for (const auto& param : method.parameters) {
@@ -2800,15 +2797,15 @@ void VM::handleCall(const Instruction& instruction) {
                                         paramIndex++;
                                     }
                                 }
-                                
+
                                 // Create call frame
                                 backend::CallFrame frame(storedFuncName, ip + 1, nullptr);
                                 frame.setPreviousEnvironment(environment);
                                 callStack.push_back(frame);
-                                
+
                                 // Switch to method environment
                                 environment = methodEnv;
-                                
+
                                 // Jump to method start
                                 ip = vmMethodImpl->getStartAddress() - 1; // -1 because ip will be incremented
                                 return;
@@ -2821,7 +2818,7 @@ void VM::handleCall(const Instruction& instruction) {
                             std::vector<ValuePtr> allArgs;
                             allArgs.push_back(objectValue); // Add 'this' as first argument
                             allArgs.insert(allArgs.end(), args.begin(), args.end());
-                            
+
                             ValuePtr result = methodImpl->execute(allArgs);
                             push(result);
                             return;
@@ -2835,35 +2832,35 @@ void VM::handleCall(const Instruction& instruction) {
                     return;
                 }
             }
-            
+
             // For non-method calls, collect arguments now
             std::vector<ValuePtr> args;
             for (int i = 0; i < argCount; i++) {
                 args.insert(args.begin(), pop());
             }
-            
+
             // For module functions, we need to find the module environment and execute there
             // First, try to find which module this function belongs to
             std::shared_ptr<Environment> moduleEnv = nullptr;
             backend::Function moduleFunc;
             bool foundInModule = false;
-            
+
             if (debugMode) {
                 std::cout << "[DEBUG] CALL: Looking for module function '" << actualFuncName << "'" << std::endl;
                 std::cout << "[DEBUG] CALL: Have " << loadedModules.size() << " loaded modules" << std::endl;
                 std::cout << "[DEBUG] CALL: Have " << moduleUserDefinedFunctions.size() << " module function maps" << std::endl;
             }
-            
+
             // Search through loaded modules to find the function
             for (const auto& [modulePath, moduleValue] : loadedModules) {
                 if (std::holds_alternative<ModuleValue>(moduleValue->data)) {
                     auto& modVal = std::get<ModuleValue>(moduleValue->data);
                     auto modEnv = modVal.env;
-                    
+
                     if (debugMode) {
                         std::cout << "[DEBUG] CALL: Checking module: " << modulePath << std::endl;
                     }
-                    
+
                     // Check if this module has the function in its userDefinedFunctions
                     auto moduleUserFuncs = moduleUserDefinedFunctions.find(modEnv.get());
                     if (moduleUserFuncs != moduleUserDefinedFunctions.end()) {
@@ -2873,7 +2870,7 @@ void VM::handleCall(const Instruction& instruction) {
                                 std::cout << "[DEBUG] CALL:   - " << fname << std::endl;
                             }
                         }
-                        
+
                         auto funcIt = moduleUserFuncs->second.find(actualFuncName);
                         if (funcIt != moduleUserFuncs->second.end()) {
                             moduleEnv = modEnv;
@@ -2892,19 +2889,19 @@ void VM::handleCall(const Instruction& instruction) {
                     }
                 }
             }
-            
+
             if (foundInModule && moduleEnv) {
                 // Create a new environment for the function in the module context
                 auto funcEnv = std::make_shared<Environment>(moduleEnv);
-                
+
                 // Check argument count and bind parameters
                 if (!bindFunctionParameters(moduleFunc, args, funcEnv, actualFuncName)) {
                     return; // Error already reported
                 }
-                
+
                 // Create call frame and switch environment
                 createAndPushCallFrame(actualFuncName, ip + 1, funcEnv);
-                
+
                 // Jump to function start
                 ip = moduleFunc.startAddress; // Set directly since we return early
                 return;
@@ -2913,20 +2910,20 @@ void VM::handleCall(const Instruction& instruction) {
                 auto funcIt = userDefinedFunctions.find(actualFuncName);
                 if (funcIt != userDefinedFunctions.end()) {
                     const backend::Function& func = funcIt->second;
-                    
+
                     if (debugMode) {
                         std::cout << "[DEBUG] CALL: Found function '" << actualFuncName
                                   << "' in current VM, start address: " << func.startAddress << std::endl;
                     }
-                    
+
                     // Create a new environment for the function
                     auto funcEnv = std::make_shared<Environment>(environment);
-                    
+
                     // Check argument count and bind parameters
                     if (!bindFunctionParameters(func, args, funcEnv, actualFuncName)) {
                         return; // Error already reported
                     }
-                    
+
                     // Create call frame and switch environment
                     if (debugMode) {
                         std::cout << "[DEBUG] CALL: Creating call frame with return address: " << (ip + 1) << std::endl;
@@ -2935,10 +2932,10 @@ void VM::handleCall(const Instruction& instruction) {
                         std::cout << "[DEBUG] CALL: Current IP: " << ip << std::endl;
                     }
                     createAndPushCallFrame(actualFuncName, ip + 1, funcEnv);
-                    
+
                     // Jump to function start
                     ip = func.startAddress; // Set directly since we return early
-                    
+
                     if (debugMode) {
                         std::cout << "[DEBUG] CALL: Jumping to function start at IP " << func.startAddress << " (set IP to " << (func.startAddress - 1) << ")" << std::endl;
                         std::cout << "[DEBUG] CALL: Call stack size after push: " << callStack.size() << std::endl;
@@ -2961,7 +2958,7 @@ void VM::handleCall(const Instruction& instruction) {
             return;
         }
     }
-    
+
     // Determine if this is a method-like call so we can extract the callee
     bool isMethodLike = (funcName.substr(0, 7) == "method:" || funcName.substr(0, 6) == "super:");
 
@@ -2999,7 +2996,7 @@ void VM::handleCall(const Instruction& instruction) {
                       std::to_string(argCount) + ", got " + std::to_string(stack.size()));
                 return;
             }
-            
+
             for (int i = 0; i < argCount; i++) {
                 args.insert(args.begin(), pop()); // Insert at beginning to maintain order
             }
@@ -3011,7 +3008,7 @@ void VM::handleCall(const Instruction& instruction) {
     // attempt to recover it from either location so the VM tolerates both
     // conventions.
     // ValuePtr callee = nullptr;
-    
+
     // Check if this function can fail and push an error frame if needed
     bool canFail = functionCanFail(funcName);
     size_t errorHandlerAddress = 0;
@@ -3022,7 +3019,7 @@ void VM::handleCall(const Instruction& instruction) {
         // a wildcard expectedErrorType so this frame will accept any error.
         pushErrorFrame(errorHandlerAddress, nullptr, funcName);
     }
-    
+
     if (funcName.substr(0, 7) == "method:" || funcName.substr(0, 6) == "super:") {
         // Method or super call - the object may be provided as a separate
         // callee value on the stack, or some compilers place the object as
@@ -3045,7 +3042,7 @@ void VM::handleCall(const Instruction& instruction) {
     } else {
         // Simple function call - no callee required
     }
-    
+
     // Check if this is a module property call
     if (callee && callee->type && callee->type->tag == TypeTag::Module) {
         auto& moduleData = std::get<ModuleValue>(callee->data);
@@ -3062,33 +3059,33 @@ void VM::handleCall(const Instruction& instruction) {
         try {
             // Get the class definition
             auto classDef = std::get<std::shared_ptr<backend::ClassDefinition>>(callee->data);
-            
+
             // Create a new instance
             auto instance = std::make_shared<backend::ObjectInstance>(classDef);
-            
+
             // Push 'this' onto the stack
             auto thisValue = memoryManager.makeRef<Value>(*region, typeSystem->OBJECT_TYPE);
             thisValue->data = instance;
             push(thisValue);
-            
+
             // Look up and call the constructor if it exists
             if (auto constructor = classDef->getMethod("init")) {
                 // Push 'this' as the first argument
                 args.insert(args.begin(), thisValue);
-                
+
                 // Call the constructor
                 constructor->implementation->execute(args);
-                
+
                 // If we get here, the constructor succeeded
                 if (canFail) {
                     popErrorFrame();
                 }
-                
+
                 // Push the new instance onto the stack
                 push(thisValue);
                 return;
             }
-            
+
             // If no constructor is found, just push the new instance onto the stack
             push(thisValue);
             return;
@@ -3096,11 +3093,11 @@ void VM::handleCall(const Instruction& instruction) {
             error("Error in constructor: " + std::string(e.what()));
         }
     }
-    
+
     // Check if this is a super method call (function name starts with "super:")
     if (funcName.substr(0, 6) == "super:") {
         std::string methodName = funcName.substr(6); // Remove "super:" prefix
-        
+
         // Determine the object value. Prefer an explicitly recovered callee
         // (extracted above) when available, otherwise fall back to the
         // last-argument convention.
@@ -3117,7 +3114,7 @@ void VM::handleCall(const Instruction& instruction) {
             objectValue = args.back();
             methodArgs = std::vector<ValuePtr>(args.begin(), args.end() - 1); // Remove object from args
         }
-        
+
         // If the object is a Channel, provide native channel methods (send/receive/close)
         if (std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(objectValue->data)) {
             auto ch = std::get<std::shared_ptr<Channel<ValuePtr>>>(objectValue->data);
@@ -3151,43 +3148,43 @@ void VM::handleCall(const Instruction& instruction) {
         if (std::holds_alternative<ObjectInstancePtr>(objectValue->data)) {
             auto objectInstance = std::get<ObjectInstancePtr>(objectValue->data);
             std::string className = objectInstance->getClassName();
-            
+
             // For super calls, we need to look in the superclass
             auto classDef = classRegistry.getClass(className);
             if (!classDef) {
                 error("Class definition not found: " + className);
                 return;
             }
-            
+
             auto superClass = classDef->getSuperClass();
             if (!superClass) {
                 error("No superclass found for class: " + className);
                 return;
             }
-            
+
             // Look for the method in the superclass
             auto methodImpl = superClass->resolveMethod(methodName);
-            
+
             if (methodImpl) {
                 // Check if this is a VM-based method implementation
                 auto vmMethodImpl = std::dynamic_pointer_cast<backend::VMMethodImplementation>(methodImpl);
                 if (vmMethodImpl) {
                     // This is a VM-based method - execute it through bytecode
-                    
+
                     // Create a new environment for the method
                     auto methodEnv = std::make_shared<Environment>(environment);
-                    
+
                     // Bind 'this' parameter (implicit first parameter)
                     methodEnv->define("this", objectValue);
-                    
+
                     // Look up the method in userDefinedFunctions to get parameter info
                     std::string superClassName = superClass->getName();
                     std::string methodKey = superClassName + "::" + methodName;
                     auto methodIt = userDefinedFunctions.find(methodKey);
-                    
+
                     if (methodIt != userDefinedFunctions.end()) {
                         const backend::Function& method = methodIt->second;
-                        
+
                         // Bind method parameters
                         size_t paramIndex = 0;
                         for (const auto& param : method.parameters) {
@@ -3196,15 +3193,15 @@ void VM::handleCall(const Instruction& instruction) {
                                 paramIndex++;
                             }
                         }
-                        
+
                         // Create call frame
                         backend::CallFrame frame(methodKey, ip + 1, nullptr);
                         frame.setPreviousEnvironment(environment);
                         callStack.push_back(frame);
-                        
+
                         // Switch to method environment
                         environment = methodEnv;
-                        
+
                         // Jump to method start
                         ip = vmMethodImpl->getStartAddress() - 1; // -1 because ip will be incremented
                         return;
@@ -3217,10 +3214,10 @@ void VM::handleCall(const Instruction& instruction) {
                     std::vector<ValuePtr> allArgs;
                     allArgs.push_back(objectValue); // Add 'this' as first argument
                     allArgs.insert(allArgs.end(), methodArgs.begin(), methodArgs.end());
-                    
+
                     ValuePtr result = methodImpl->execute(allArgs);
                     push(result);
-                    
+
                     if (canFail) {
                         popErrorFrame();
                     }
@@ -3235,11 +3232,11 @@ void VM::handleCall(const Instruction& instruction) {
             return;
         }
     }
-    
+
     // Check if this is a method call (function name starts with "method:")
     if (funcName.substr(0, 7) == "method:") {
         std::string methodName = funcName.substr(7); // Remove "method:" prefix
-        
+
         // Determine the object value. Prefer an explicitly recovered callee
         // (extracted above) when available, otherwise fall back to the
         // last-argument convention.
@@ -3256,34 +3253,34 @@ void VM::handleCall(const Instruction& instruction) {
             objectValue = args.back();
             methodArgs = std::vector<ValuePtr>(args.begin(), args.end() - 1); // Remove object from args
         }
-        
+
         // Check if the object is an ObjectInstance
         if (std::holds_alternative<ObjectInstancePtr>(objectValue->data)) {
             auto objectInstance = std::get<ObjectInstancePtr>(objectValue->data);
             std::string className = objectInstance->getClassName();
-            
+
             // Look for the method in the class definition
             auto methodImpl = objectInstance->getMethod(methodName);
-            
+
             if (methodImpl) {
                 // Check if this is a VM-based method implementation
                 auto vmMethodImpl = std::dynamic_pointer_cast<backend::VMMethodImplementation>(methodImpl);
                 if (vmMethodImpl) {
                     // This is a VM-based method - execute it through bytecode
-                    
+
                     // Create a new environment for the method
                     auto methodEnv = std::make_shared<Environment>(environment);
-                    
+
                     // Bind 'this' parameter (implicit first parameter)
                     methodEnv->define("this", objectValue);
-                    
+
                     // Look up the method in userDefinedFunctions to get parameter info
                     std::string methodKey = className + "::" + methodName;
                     auto methodIt = userDefinedFunctions.find(methodKey);
-                    
+
                     if (methodIt != userDefinedFunctions.end()) {
                         const backend::Function& method = methodIt->second;
-                        
+
                         // Bind method parameters
                         size_t paramIndex = 0;
                         for (const auto& param : method.parameters) {
@@ -3292,15 +3289,15 @@ void VM::handleCall(const Instruction& instruction) {
                                 paramIndex++;
                             }
                         }
-                        
+
                         // Create call frame
                         backend::CallFrame frame(methodKey, ip + 1, nullptr);
                         frame.setPreviousEnvironment(environment);
                         callStack.push_back(frame);
-                        
+
                         // Switch to method environment
                         environment = methodEnv;
-                        
+
                         // Jump to method start
                         ip = vmMethodImpl->getStartAddress() - 1; // -1 because ip will be incremented
                         return;
@@ -3314,10 +3311,10 @@ void VM::handleCall(const Instruction& instruction) {
                     std::vector<ValuePtr> allArgs;
                     allArgs.push_back(objectValue); // Add 'this' as first argument
                     allArgs.insert(allArgs.end(), methodArgs.begin(), methodArgs.end());
-                    
+
                     ValuePtr result = methodImpl->execute(allArgs);
                     push(result);
-                    
+
                     if (canFail) {
                         popErrorFrame();
                     }
@@ -3354,7 +3351,7 @@ void VM::handleCall(const Instruction& instruction) {
             return;
         }
     }
-    
+
     // Check if this is a class constructor call
     // First check if the function name refers to a class value in the environment
     try {
@@ -3362,12 +3359,12 @@ void VM::handleCall(const Instruction& instruction) {
         if (classValue && classValue->type && classValue->type->tag == TypeTag::Class) {
             // This is a class constructor call
             auto classDef = std::get<std::shared_ptr<backend::ClassDefinition>>(classValue->data);
-            
+
             // Create instance of the class
             auto instance = classDef->createInstance();
             auto objectType = std::make_shared<Type>(TypeTag::Object);
             auto objectValue = memoryManager.makeRef<Value>(*region, objectType, instance);
-            
+
             // Initialize fields with default values
             const auto& fields = instance->getClassDefinition()->getFields();
             for (const auto& field : fields) {
@@ -3377,21 +3374,21 @@ void VM::handleCall(const Instruction& instruction) {
                     instance->setField(field.name, defaultValueIt->second);
                 }
             }
-            
+
             // Check if the class has an "init" method (constructor)
             std::string initMethodKey = funcName + "::init";
             auto initMethodIt = userDefinedFunctions.find(initMethodKey);
-            
+
             if (initMethodIt != userDefinedFunctions.end()) {
                 // Call the init method with the provided arguments
                 const backend::Function& initMethod = initMethodIt->second;
-                
+
                 // Create a new environment for the constructor
                 auto constructorEnv = std::make_shared<Environment>(environment);
-                
+
                 // Bind 'this' parameter (implicit first parameter)
                 constructorEnv->define("this", objectValue);
-                
+
                 // Bind constructor parameters
                 size_t paramIndex = 0;
                 for (const auto& param : initMethod.parameters) {
@@ -3400,18 +3397,18 @@ void VM::handleCall(const Instruction& instruction) {
                         paramIndex++;
                     }
                 }
-                
+
                 // Create call frame for constructor
                 backend::CallFrame frame(initMethodKey, ip + 1, nullptr);
                 frame.setPreviousEnvironment(environment);
                 callStack.push_back(frame);
-                
+
                 // Switch to constructor environment
                 environment = constructorEnv;
-                
+
                 // Jump to constructor start
                 ip = initMethod.startAddress; // Set directly since we return early
-                
+
                 // The constructor will return, and we need to make sure the object is on the stack
                 // We'll handle this in the return handler
                 return;
@@ -3427,14 +3424,14 @@ void VM::handleCall(const Instruction& instruction) {
     } catch (const std::runtime_error&) {
         // Variable not found or not a class, continue with other checks
     }
-    
+
     // Fallback: Check if this is a class constructor call by class registry
     if (classRegistry.hasClass(funcName)) {
         // Create instance of the class
         auto instance = classRegistry.createInstance(funcName);
         auto objectType = std::make_shared<Type>(TypeTag::Object);
         auto objectValue = memoryManager.makeRef<Value>(*region, objectType, instance);
-        
+
         // Initialize fields with default values
         const auto& fields = instance->getClassDefinition()->getFields();
         for (const auto& field : fields) {
@@ -3444,21 +3441,21 @@ void VM::handleCall(const Instruction& instruction) {
                 instance->setField(field.name, defaultValueIt->second);
             }
         }
-        
+
         // Check if the class has an "init" method (constructor)
         std::string initMethodKey = funcName + "::init";
         auto initMethodIt = userDefinedFunctions.find(initMethodKey);
-        
+
         if (initMethodIt != userDefinedFunctions.end()) {
             // Call the init method with the provided arguments
             const backend::Function& initMethod = initMethodIt->second;
-            
+
             // Create a new environment for the constructor
             auto constructorEnv = std::make_shared<Environment>(environment);
-            
+
             // Bind 'this' parameter (implicit first parameter)
             constructorEnv->define("this", objectValue);
-            
+
             // Bind constructor parameters
             size_t paramIndex = 0;
             for (const auto& param : initMethod.parameters) {
@@ -3467,18 +3464,18 @@ void VM::handleCall(const Instruction& instruction) {
                     paramIndex++;
                 }
             }
-            
+
             // Create call frame for constructor
             backend::CallFrame frame(initMethodKey, ip + 1, nullptr);
             frame.setPreviousEnvironment(environment);
             callStack.push_back(frame);
-            
+
             // Switch to constructor environment
             environment = constructorEnv;
-            
+
             // Jump to constructor start
             ip = initMethod.startAddress; // Set directly since we return early
-            
+
             // The constructor will return, and we need to make sure the object is on the stack
             // We'll handle this in the return handler
             return;
@@ -3491,27 +3488,27 @@ void VM::handleCall(const Instruction& instruction) {
             return;
         }
     }
-    
+
     // Check if the function name refers to a variable containing a closure
     try {
         ValuePtr possibleClosure = environment->get(funcName);
         if (possibleClosure && possibleClosure->type && possibleClosure->type->tag == TypeTag::Closure) {
             // This is a closure stored in a variable
             ClosureValue closure = std::get<ClosureValue>(possibleClosure->data);
-            
+
             if (!closure.isValid()) {
                 error("Invalid closure in function call: " + funcName);
                 return;
             }
-            
+
             if (debugMode) {
                 std::cout << "[DEBUG] CALL: Calling closure from variable: " << funcName << " -> " << closure.getFunctionName() << std::endl;
             }
-            
+
             // Save current environment and use captured environment directly
             std::shared_ptr<Environment> savedEnv = environment;
             environment = closure.capturedEnvironment;
-            
+
             // Create a call frame for the closure
             backend::CallFrame closureFrame(
                         closure.functionName,
@@ -3520,7 +3517,7 @@ void VM::handleCall(const Instruction& instruction) {
                         );
             closureFrame.isClosureCall = true;
             closureFrame.closureEnvironment = closure.capturedEnvironment;
-            
+
             // Find the function in the registry to get parameter information
             auto funcIt = userDefinedFunctions.find(closure.functionName);
             if (funcIt != userDefinedFunctions.end()) {
@@ -3531,22 +3528,22 @@ void VM::handleCall(const Instruction& instruction) {
                     error("Failed to bind parameters for closure call: " + funcName);
                     return;
                 }
-                
+
                 // Push the call frame
                 callStack.push_back(closureFrame);
-                
+
                 // For lambda functions, we need to find the actual function body start
                 // by skipping nested function definitions, similar to CALL_HIGHER_ORDER
                 size_t bodyStart = closure.startAddress;
                 // std::cout << "[DEBUG] CLOSURE CALL: Looking for function body start from " << bodyStart << std::endl;
-                
+
                 // Skip past BEGIN_FUNCTION and all parameter definitions and nested functions
                 bodyStart++; // Skip BEGIN_FUNCTION
                 int nestedFunctionDepth = 0;
                 while (bodyStart < closure.endAddress && bodyStart < bytecode->size()) {
                     const Instruction& inst = (*bytecode)[bodyStart];
                     // std::cout << "[DEBUG] CLOSURE CALL: Instruction at " << bodyStart << ": " << static_cast<int>(inst.opcode) << std::endl;
-                    
+
                     if (inst.opcode == Opcode::BEGIN_FUNCTION) {
                         // Skip nested function definitions
                         nestedFunctionDepth++;
@@ -3577,22 +3574,22 @@ void VM::handleCall(const Instruction& instruction) {
                         break;
                     }
                 }
-                
+
                 // Ensure we don't jump past the function end
                 if (bodyStart >= closure.endAddress) {
                     environment = savedEnv;
                     error("CLOSURE CALL: invalid function body start address");
                     return;
                 }
-                
+
                 // Jump to the function body start address
                 // std::cout << "[DEBUG] CLOSURE CALL: Jumping to " << bodyStart << " (ip will be " << (bodyStart - 1) << ")" << std::endl;
                 ip = bodyStart - 1; // -1 because ip will be incremented in the main loop
-                
+
                 if (debugMode) {
                     std::cout << "[DEBUG] CALL: Closure call successful, jumping to body address " << bodyStart << std::endl;
                 }
-                
+
                 if (canFail) {
                     popErrorFrame();
                 }
@@ -3607,7 +3604,7 @@ void VM::handleCall(const Instruction& instruction) {
     } catch (const std::runtime_error&) {
         // Variable not found or not a closure, continue with regular function call logic
     }
-    
+
     // Check if we have a closure value on the stack (for closure calls)
     // This happens when a closure is passed as a value and then called
     if (debugMode) {
@@ -3621,20 +3618,20 @@ void VM::handleCall(const Instruction& instruction) {
         //std::cout << "[DEBUG] CALL: Found closure on stack, executing closure call" << std::endl;
         ValuePtr closureValue = pop();
         ClosureValue closure = std::get<ClosureValue>(closureValue->data);
-        
+
         if (!closure.isValid()) {
             error("Invalid closure in function call");
             return;
         }
-        
+
         if (debugMode) {
             std::cout << "[DEBUG] CALL: Calling closure function: " << closure.getFunctionName() << std::endl;
         }
-        
+
         // Save current environment and use captured environment directly
         std::shared_ptr<Environment> savedEnv = environment;
         environment = closure.capturedEnvironment;
-        
+
         // Create a call frame for the closure
         backend::CallFrame closureFrame(
                     closure.functionName,
@@ -3643,7 +3640,7 @@ void VM::handleCall(const Instruction& instruction) {
                     );
         closureFrame.isClosureCall = true;
         closureFrame.closureEnvironment = closure.capturedEnvironment;
-        
+
         // Find the function in the registry to get parameter information
         auto funcIt = userDefinedFunctions.find(closure.functionName);
         if (funcIt != userDefinedFunctions.end()) {
@@ -3654,17 +3651,17 @@ void VM::handleCall(const Instruction& instruction) {
                 error("Failed to bind parameters for closure call");
                 return;
             }
-            
+
             // Push the call frame
             callStack.push_back(closureFrame);
-            
+
             // Jump to the function start address
             ip = funcIt->second.startAddress - 1; // -1 because ip will be incremented
-            
+
             if (debugMode) {
                 std::cout << "[DEBUG] CALL: Closure call successful, jumping to address " << funcIt->second.startAddress << std::endl;
             }
-            
+
             if (canFail) {
                 popErrorFrame();
             }
@@ -3681,17 +3678,17 @@ void VM::handleCall(const Instruction& instruction) {
     auto function = functionRegistry.getFunction(funcName);
     if (function) {
         const auto& signature = function->getSignature();
-        
+
         // Validate arguments
         if (!backend::FunctionUtils::validateArguments(signature, args)) {
             error("Function " + funcName + " expects " + std::to_string(signature.getMinParamCount()) +
                   " to " + std::to_string(signature.getTotalParamCount()) + " arguments, got " + std::to_string(args.size()));
             return;
         }
-        
+
         // Apply default values for missing optional parameters
         auto adjustedArgs = backend::FunctionUtils::applyDefaults(signature, args);
-        
+
         if (function->isNative()) {
             // Execute native function directly
             ValuePtr result = function->execute(adjustedArgs);
@@ -3701,10 +3698,10 @@ void VM::handleCall(const Instruction& instruction) {
             // User-defined function - need to execute in VM context
             // Create a new environment for the function
             auto funcEnv = std::make_shared<Environment>(environment);
-            
+
             // Bind parameters to the environment
             size_t paramIndex = 0;
-            
+
             // Bind required parameters
             for (const auto& param : signature.parameters) {
                 if (paramIndex < adjustedArgs.size()) {
@@ -3712,7 +3709,7 @@ void VM::handleCall(const Instruction& instruction) {
                     paramIndex++;
                 }
             }
-            
+
             // Bind optional parameters
             for (const auto& param : signature.optionalParameters) {
                 if (paramIndex < adjustedArgs.size()) {
@@ -3724,15 +3721,15 @@ void VM::handleCall(const Instruction& instruction) {
                     funcEnv->define(param.name, memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
                 }
             }
-            
+
             // Create call frame and switch environment
             createAndPushCallFrame(funcName, ip, funcEnv);
-            
+
             // Bind parameters for the new function registry
             if (function) {
                 callStack.back().bindParameters(adjustedArgs);
             }
-            
+
             // For user-defined functions, we need to find the start address
             auto funcIt = userDefinedFunctions.find(funcName);
             if (funcIt != userDefinedFunctions.end()) {
@@ -3745,21 +3742,21 @@ void VM::handleCall(const Instruction& instruction) {
             }
         }
     }
-    
+
     // Check for module functions
     auto moduleIt = moduleFunctions_.find(funcName);
     if (moduleIt != moduleFunctions_.end()) {
         const ModuleFunctionInfo& moduleFunc = moduleIt->second;
-        
+
         if (debugMode) {
             std::cout << "[DEBUG] CALL: Executing module function: " << funcName << std::endl;
         }
-        
+
         // Create a new VM to execute the function in the module's context
         VM moduleVm(false);
         moduleVm.environment = moduleFunc.moduleEnv;
         moduleVm.userDefinedFunctions.clear();
-        
+
         // Execute the module bytecode to populate function definitions
         try {
             moduleVm.execute(moduleFunc.moduleBytecode);
@@ -3767,42 +3764,42 @@ void VM::handleCall(const Instruction& instruction) {
             error("Failed to execute module for function call: " + std::string(e.what()));
             return;
         }
-        
+
         // Extract the function name from the module qualified name
         std::string actualFuncName = funcName.substr(funcName.find_last_of('_') + 1);
-        
+
         // Find the function in the module VM
         auto funcIt = moduleVm.userDefinedFunctions.find(actualFuncName);
         if (funcIt != moduleVm.userDefinedFunctions.end()) {
             const backend::Function& func = funcIt->second;
-            
+
             // Create a new environment for the function in the module context
             auto funcEnv = std::make_shared<Environment>(moduleFunc.moduleEnv);
-            
+
             // Check argument count and bind parameters
             if (!bindFunctionParameters(func, args, funcEnv, actualFuncName)) {
                 return; // Error already reported
             }
-            
+
             // Set the module VM's environment and execute the function
             moduleVm.environment = funcEnv;
             moduleVm.ip = func.startAddress;
-            
+
             // Execute the function in the module context
             try {
                 moduleVm.execute(moduleFunc.moduleBytecode);
-                
+
                 // Get the result from the module VM's stack
                 if (!moduleVm.stack.empty()) {
                     push(moduleVm.stack.back());
                 } else {
                     push(memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
                 }
-                
+
                 if (debugMode) {
                     std::cout << "[DEBUG] CALL: Module function executed successfully" << std::endl;
                 }
-                
+
                 return;
             } catch (const std::exception& e) {
                 error("Error executing module function: " + std::string(e.what()));
@@ -3813,7 +3810,7 @@ void VM::handleCall(const Instruction& instruction) {
             return;
         }
     }
-    
+
     // Fallback to legacy native function handling
     auto nativeIt = nativeFunctions.find(funcName);
     if (nativeIt != nativeFunctions.end()) {
@@ -3823,28 +3820,28 @@ void VM::handleCall(const Instruction& instruction) {
         push(result);
         return;
     }
-    
+
     // Handle user-defined functions
     auto funcIt = userDefinedFunctions.find(funcName);
     if (funcIt != userDefinedFunctions.end()) {
         const backend::Function& func = funcIt->second;
-        
+
         // Create a new environment for the function
         auto funcEnv = std::make_shared<Environment>(environment);
-        
+
         // Check argument count and bind parameters
         if (!bindFunctionParameters(func, args, funcEnv, funcName)) {
             return; // Error already reported
         }
-        
+
         // Create call frame and switch environment
         createAndPushCallFrame(funcName, ip + 1, funcEnv);
-        
+
         // Jump to function start
         ip = func.startAddress; // Set directly since we return early
         return; // Exit early for user-defined functions
     }
-    
+
     // Final check: see if this is a function-typed variable (function parameter)
     try {
         ValuePtr varValue = environment->get(funcName);
@@ -3856,7 +3853,7 @@ void VM::handleCall(const Instruction& instruction) {
             }
             // Handle both UserDefinedFunction objects and string function names
             std::string actualFuncName;
-            
+
             if (std::holds_alternative<std::shared_ptr<backend::UserDefinedFunction>>(varValue->data)) {
                 auto func = std::get<std::shared_ptr<backend::UserDefinedFunction>>(varValue->data);
                 actualFuncName = func->getSignature().name;
@@ -3869,23 +3866,23 @@ void VM::handleCall(const Instruction& instruction) {
                 error("Function-typed variable contains invalid function data");
                 return;
             }
-            
+
             // Find the function in the registry to get bytecode information
             auto funcIt = userDefinedFunctions.find(actualFuncName);
             if (funcIt != userDefinedFunctions.end()) {
                 const backend::Function& funcInfo = funcIt->second;
-                
+
                 // Create a new environment for the function
                 auto funcEnv = std::make_shared<Environment>(environment);
-                
+
                 // Bind function parameters
                 if (!bindFunctionParameters(funcInfo, args, funcEnv, actualFuncName)) {
                     return; // Error already reported
                 }
-                
+
                 // Create call frame and switch environment
                 createAndPushCallFrame(actualFuncName, ip + 1, funcEnv);
-                
+
                 // Jump to function start
                 ip = funcInfo.startAddress;
                 return;
@@ -3897,7 +3894,7 @@ void VM::handleCall(const Instruction& instruction) {
     } catch (const std::runtime_error&) {
         // Variable not found, continue to error
     }
-    
+
     error("Function not found: " + funcName);
 }
 
@@ -3907,7 +3904,7 @@ void VM::handleReturn(const Instruction& /*unused*/) {
         std::cout << "[DEBUG] RETURN: Call stack size: " << callStack.size() << std::endl;
         std::cout << "[DEBUG] RETURN: Stack size: " << stack.size() << std::endl;
     }
-    
+
     if (callStack.empty()) {
         if (debugMode) {
             std::cout << "[DEBUG] RETURN: No call stack, treating as no-op" << std::endl;
@@ -3917,16 +3914,16 @@ void VM::handleReturn(const Instruction& /*unused*/) {
         push(memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
         return;
     }
-    
+
     // Pop the call frame and get function info
     backend::CallFrame frame = callStack.back();
     callStack.pop_back();
 
     // handleReturn: popped call frame (debug output removed)
-    
+
     // Check if this is a constructor return
     bool isConstructor = frame.functionName.find("::init") != std::string::npos;
-    
+
     ValuePtr returnValue;
     if (isConstructor) {
         // For constructors, return the 'this' object instead of the return value
@@ -3934,7 +3931,7 @@ void VM::handleReturn(const Instruction& /*unused*/) {
         if (!stack.empty()) {
             pop(); // Discard explicit return value
         }
-        
+
         // Get the 'this' object from the environment
         auto thisValue = environment->get("this");
         if (thisValue) {
@@ -3952,7 +3949,7 @@ void VM::handleReturn(const Instruction& /*unused*/) {
             returnValue = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
         }
     }
-    
+
     // Restore the environment
     auto prevEnv = frame.getPreviousEnvironment<Environment>();
     if (prevEnv) {
@@ -3960,11 +3957,11 @@ void VM::handleReturn(const Instruction& /*unused*/) {
     } else {
         environment = globals; // Fallback
     }
-    
+
     // Push the return value
     // handleReturn: pushing return value (debug output removed)
     push(returnValue);
-    
+
     // If an error frame was pushed for this function call, decide whether to pop it.
     // We should only pop the frame on a *successful* return. If the function
     // returned an error union (or direct ErrorValue), keep the frame so the
@@ -3996,7 +3993,7 @@ void VM::handleReturn(const Instruction& /*unused*/) {
     if (++returnCount % 10 == 0) { // Cleanup every 10 returns to avoid overhead
         cleanupInactiveClosures();
     }
-    
+
     // Return to the caller
     if (debugMode) {
         std::cout << "[DEBUG] RETURN: Returning to IP " << frame.returnAddress << std::endl;
@@ -4012,12 +4009,12 @@ void VM::handlePrint(const Instruction& instruction) {
     (void)instruction; // Mark as unused
     int argCount = instruction.intValue;
     std::vector<ValuePtr> args;
-    
+
     // Pop all arguments from the stack
     for (int i = 0; i < argCount; ++i) {
         args.insert(args.begin(), pop());
     }
-    
+
     // Print all arguments separated by spaces
     for (size_t i = 0; i < args.size(); ++i) {
         if (i > 0) {
@@ -4034,49 +4031,49 @@ void VM::handlePrint(const Instruction& instruction) {
         }
     }
     std::cout << std::endl;
-    
+
     // Print is a statement, not an expression - don't push a result
 }
 
 void VM::handleContract(const Instruction& instruction) {
     (void)instruction; // Mark as unused
-    
+
     // Contract expects exactly 2 arguments: condition (bool) and message (string)
     if (stack.size() < 2) {
         throw std::runtime_error("Contract statement requires 2 arguments: condition and message");
     }
-    
+
     // Pop message first (it was pushed last)
     ValuePtr message = pop();
     ValuePtr condition = pop();
-    
+
     // Validate condition argument
     if (!condition || !condition->type || condition->type->tag != TypeTag::Bool) {
         throw std::runtime_error("Contract condition must be a boolean value");
     }
-    
+
     // Validate message argument
     if (!message || !message->type || message->type->tag != TypeTag::String) {
         throw std::runtime_error("Contract message must be a string value");
     }
-    
+
     // Check the condition
     bool conditionValue = std::get<bool>(condition->data);
     if (!conditionValue) {
         std::string messageValue = std::get<std::string>(message->data);
-        
+
         // Record error path for performance monitoring
         if (debugMode) {
             recordErrorPath();
         }
-        
+
         // Use VM::error for consistent error reporting
         error("Contract violation: " + messageValue);
-        
+
         // Contract violations should terminate execution
         throw std::runtime_error("Contract violation: " + messageValue);
     }
-    
+
     // Contract is a statement, not an expression - don't push a result
 }
 
@@ -4090,7 +4087,7 @@ void VM::handleBeginFunction(const Instruction& instruction) {
         std::cout << "[DEBUG] BEGIN_FUNCTION: Inside class definition: " << insideClassDefinition << std::endl;
         std::cout << "[DEBUG] BEGIN_FUNCTION: Current class: " << currentClassBeingDefined << std::endl;
     }
-    
+
     // Use the stack-based approach for nested function support
     std::string fullFunctionName;
     if (insideClassDefinition && !currentClassBeingDefined.empty()) {
@@ -4098,16 +4095,16 @@ void VM::handleBeginFunction(const Instruction& instruction) {
     } else {
         fullFunctionName = funcName;
     }
-    
+
     // Push this function onto the definition stack
     pushFunctionDefinition(fullFunctionName);
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] Current function being defined: " << getCurrentFunctionBeingDefined() << std::endl;
     }
     // Create a new Function struct
     backend::Function func(funcName, 0); // Will set start address later
-    
+
     // For lambda functions, use the preprocessed addresses
     if (funcName.find("__lambda_") == 0) {
         auto existingFunc = userDefinedFunctions.find(funcName);
@@ -4141,29 +4138,29 @@ void VM::handleBeginFunction(const Instruction& instruction) {
                 break;
             }
         }
-        
+
         // Set the function start address to the beginning of the actual body
         func.startAddress = bodyStart;
     }
-    
+
     // If we're inside a class definition, this is a method
     if (insideClassDefinition && !currentClassBeingDefined.empty()) {
         // This is a class method - register it properly in the class definition
         std::string methodKey = currentClassBeingDefined + "::" + funcName;
         userDefinedFunctions[methodKey] = func;
-        
+
         // Store the method name for later use in handleEndFunction
         currentMethodBeingDefined = funcName;
-        
+
         // We'll get the visibility later in handlePushFunction, so for now just store a placeholder
         methodVisibility[methodKey] = AST::VisibilityLevel::Private; // Placeholder, will be updated in PUSH_FUNCTION
-        
+
         // Method will be added to the class definition in handleEndFunction with correct visibility
         if (debugMode) {
             std::cout << "[DEBUG] Registered class method '" << funcName << "' for class '"
                       << currentClassBeingDefined << "' (will be added with visibility in END_FUNCTION)" << std::endl;
         }
-        
+
         auto classDef = classRegistry.getClass(currentClassBeingDefined);
         if (!classDef) {
             error("Class definition not found for method: " + currentClassBeingDefined);
@@ -4172,7 +4169,7 @@ void VM::handleBeginFunction(const Instruction& instruction) {
         // Regular function
         // std::cout << "[DEBUG] handleBeginFunction: Storing function: " << funcName
         //           << " with start address: " << func.startAddress << std::endl;
-        
+
         // Check if this is a lambda function that's already registered
         if (funcName.find("__lambda_") == 0) {
             auto existingFunc = userDefinedFunctions.find(funcName);
@@ -4188,7 +4185,7 @@ void VM::handleBeginFunction(const Instruction& instruction) {
             // std::cout << "[DEBUG] handleBeginFunction: Registering lambda function " << funcName
             //           << " for the first time" << std::endl;
         }
-        
+
         userDefinedFunctions[funcName] = func;
         // std::cout << "[DEBUG] Total functions stored: " << userDefinedFunctions.size() << std::endl;
     }
@@ -4202,10 +4199,10 @@ void VM::handleEndFunction(const Instruction& /*unused*/) {
         if (debugMode) {
             std::cout << "[DEBUG] END_FUNCTION: Ending function definition at IP " << ip << std::endl;
         }
-        
+
         // Pop from the function definition stack
         popFunctionDefinition();
-        
+
         // Also handle the legacy function tracking if needed
         std::string currentFunc = getCurrentFunctionBeingDefined();
         if (!currentFunc.empty()) {
@@ -4225,32 +4222,32 @@ void VM::handleEndFunction(const Instruction& /*unused*/) {
                 }
             }
         }
-        
+
         // If this is a class method, add it to the class definition
         if (debugMode) {
             std::cout << "[DEBUG] END_FUNCTION: Checking if method should be added to class" << std::endl;
             std::cout << "[DEBUG] END_FUNCTION: insideClassDefinition=" << insideClassDefinition << std::endl;
             std::cout << "[DEBUG] END_FUNCTION: currentClassBeingDefined='" << currentClassBeingDefined << "'" << std::endl;
         }
-        
+
         // Method addition is now handled in handlePushFunction where visibility is known
         if (insideClassDefinition && !currentMethodBeingDefined.empty()) {
             // Clear the current method being defined
             currentMethodBeingDefined.clear();
         }
-        
+
         if (debugMode) {
             std::cout << "[DEBUG] END_FUNCTION: Resuming normal execution" << std::endl;
         }
         return;
     }
-    
+
     // This is during function execution - return from a function call
     if (callStack.empty()) {
         error("END_FUNCTION reached outside of function call");
         return;
     }
-    
+
     // Pop the call frame and return to the caller
     backend::CallFrame frame = callStack.back();
     callStack.pop_back();
@@ -4258,7 +4255,7 @@ void VM::handleEndFunction(const Instruction& /*unused*/) {
     if (debugOutput) {
         std::cerr << "[DEBUG] handleEndFunction: popped call frame for '" << frame.functionName << "' new_callStack_size=" << callStack.size() << " ip=" << ip << std::endl;
     }
-    
+
     // Restore the environment
     auto prevEnv = frame.getPreviousEnvironment<Environment>();
     if (prevEnv) {
@@ -4266,12 +4263,12 @@ void VM::handleEndFunction(const Instruction& /*unused*/) {
     } else {
         environment = globals; // Fallback
     }
-    
+
     // If there's no explicit return value on the stack, push nil
     if (stack.empty()) {
         push(memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE));
     }
-    
+
     // Return to the caller
     ip = frame.returnAddress;
 }
@@ -4310,7 +4307,7 @@ void VM::handleDefineOptionalParam(const Instruction& instruction) {
                     (!funcIt->second.parameters.empty() || !funcIt->second.optionalParameters.empty())) {
                 return;
             }
-            
+
             funcIt->second.optionalParameters.push_back(std::make_pair(instruction.stringValue, nullptr));
         }
     }
@@ -4323,12 +4320,12 @@ void VM::handleSetDefaultValue(const Instruction& /*unused*/) {
         error("SET_DEFAULT_VALUE outside of function definition");
         return;
     }
-    
+
     auto funcIt = userDefinedFunctions.find(currentFunc);
     if (funcIt != userDefinedFunctions.end() && !funcIt->second.optionalParameters.empty()) {
         backend::Function& currentFunc = funcIt->second;
         std::string paramName = currentFunc.optionalParameters.back().first; // Get the parameter name
-        
+
         ValuePtr defaultValue = pop();
         TypePtr paramType = currentFunc.optionalParameters.back().second; // Get the parameter type
         currentFunc.defaultValues[paramName] = std::make_pair(defaultValue, paramType);
@@ -4338,14 +4335,14 @@ void VM::handleSetDefaultValue(const Instruction& /*unused*/) {
 void VM::handleBeginClass(const Instruction& instruction) {
     // Get the class name from the instruction
     std::string className = instruction.stringValue;
-    
+
     // Track that we're now inside a class definition
     currentClassBeingDefined = className;
     insideClassDefinition = true;
-    
+
     // Create a basic class definition
     auto classDef = std::make_shared<backend::ClassDefinition>(className);
-    
+
     // Register the class (we'll add methods to it as we encounter them)
     classRegistry.registerClass(classDef);
 }
@@ -4354,7 +4351,7 @@ void VM::handleEndClass(const Instruction& /*unused*/) {
     std::string className = currentClassBeingDefined;
     insideClassDefinition = false;
     currentClassBeingDefined = "";
-    
+
     // Make the class name available as a constructor function in the global environment
     if (!className.empty()) {
         auto classDef = classRegistry.getClass(className);
@@ -4362,10 +4359,10 @@ void VM::handleEndClass(const Instruction& /*unused*/) {
             // Create a class value that can be called as a constructor
             auto classType = std::make_shared<Type>(TypeTag::Class);
             auto classValue = memoryManager.makeRef<Value>(*region, classType, classDef);
-            
+
             // Register the class name as a callable function in the global environment
             globals->define(className, classValue);
-            
+
             if (debugMode) {
                 std::cout << "[DEBUG] Registered class '" << className << "' as constructor function" << std::endl;
             }
@@ -4376,26 +4373,26 @@ void VM::handleEndClass(const Instruction& /*unused*/) {
 void VM::handleSetSuperclass(const Instruction& instruction) {
     // Get the superclass name from the instruction
     std::string superClassName = instruction.stringValue;
-    
+
     // Get the current class being defined
     if (!insideClassDefinition || currentClassBeingDefined.empty()) {
         error("SET_SUPERCLASS outside of class definition");
         return;
     }
-    
+
     auto classDef = classRegistry.getClass(currentClassBeingDefined);
     if (!classDef) {
         error("Class definition not found: " + currentClassBeingDefined);
         return;
     }
-    
+
     // Get the superclass definition
     auto superClassDef = classRegistry.getClass(superClassName);
     if (!superClassDef) {
         error("Superclass not found: " + superClassName);
         return;
     }
-    
+
     // Set the superclass
     classDef->setSuperClass(superClassDef);
 }
@@ -4403,37 +4400,37 @@ void VM::handleSetSuperclass(const Instruction& instruction) {
 void VM::handleDefineField(const Instruction& instruction) {
     // Get the field name from the instruction
     std::string fieldName = instruction.stringValue;
-    
+
     // Pop the default value from the stack
     ValuePtr defaultValue = pop();
-    
+
     // Get the current class being defined
     if (!insideClassDefinition || currentClassBeingDefined.empty()) {
         error("DEFINE_FIELD outside of class definition");
         return;
     }
-    
+
     auto classDef = classRegistry.getClass(currentClassBeingDefined);
     if (!classDef) {
         error("Class definition not found: " + currentClassBeingDefined);
         return;
     }
-    
+
     // Get visibility information from instruction
     AST::VisibilityLevel visibility = static_cast<AST::VisibilityLevel>(instruction.intValue);
-    
+
     // Create a class field
     // Note: We need to convert the runtime value back to an AST expression
     // For now, we'll create a simple literal expression
     std::shared_ptr<AST::Expression> defaultExpr = nullptr;
-    
+
     // TODO: Convert runtime value to AST expression
     // This is a simplified approach - in a full implementation, we'd need
     // to properly convert runtime values back to AST expressions
-    
+
     backend::ClassField field(fieldName, nullptr, defaultExpr, visibility);
     classDef->addField(field);
-    
+
     // Store the runtime default value in a temporary map for object initialization
     // We'll use this during object creation
     fieldDefaultValues[currentClassBeingDefined + "::" + fieldName] = defaultValue;
@@ -4475,12 +4472,12 @@ void VM::handleLoadSuper(const Instruction& /*unused*/) {
 bool VM::valuesEqual(const ValuePtr& a, const ValuePtr& b) const {
     if (!a && !b) return true;
     if (!a || !b) return false;
-    
+
     // Compare by type first
     if (a->type->tag != b->type->tag) {
         return false;
     }
-    
+
     // Compare by value content based on type
     switch (a->type->tag) {
     case TypeTag::Bool:
@@ -4500,7 +4497,7 @@ bool VM::valuesEqual(const ValuePtr& a, const ValuePtr& b) const {
 }
 
 // Helper function for parameter binding in function calls
-bool VM::bindFunctionParameters(const backend::Function& func, const std::vector<ValuePtr>& args, 
+bool VM::bindFunctionParameters(const backend::Function& func, const std::vector<ValuePtr>& args,
                                 std::shared_ptr<Environment> funcEnv, const std::string& funcName) {
     // Check argument count
     size_t requiredParams = func.parameters.size();
@@ -4522,25 +4519,25 @@ bool VM::bindFunctionParameters(const backend::Function& func, const std::vector
         }
 
 
-        
+
     }
-    
+
     if (args.size() < requiredParams || args.size() > totalParams) {
         error("Function " + funcName + " expects " + std::to_string(requiredParams) +
               " to " + std::to_string(totalParams) + " arguments, got " + std::to_string(args.size()));
         return false;
     }
-    
+
     // Bind required parameters
     for (size_t i = 0; i < requiredParams && i < args.size(); i++) {
         funcEnv->define(func.parameters[i].first, args[i]);
     }
-    
+
     // Bind optional parameters
     for (size_t i = 0; i < func.optionalParameters.size(); i++) {
         const std::string& paramName = func.optionalParameters[i].first;
         size_t argIndex = requiredParams + i;
-        
+
         if (argIndex < args.size()) {
             funcEnv->define(paramName, args[argIndex]);
         } else {
@@ -4553,20 +4550,20 @@ bool VM::bindFunctionParameters(const backend::Function& func, const std::vector
             }
         }
     }
-    
+
     return true;
 }
 
 // Helper function for consistent call frame management
-void VM::createAndPushCallFrame(const std::string& funcName, size_t returnAddress, 
+void VM::createAndPushCallFrame(const std::string& funcName, size_t returnAddress,
                                 std::shared_ptr<Environment> funcEnv) {
     // Create call frame
     backend::CallFrame frame(funcName, returnAddress, nullptr);
     frame.setPreviousEnvironment(environment);
-    
+
     // Push call frame
     callStack.push_back(frame);
-    
+
     // Switch to function environment
     environment = funcEnv;
 }
@@ -4576,7 +4573,7 @@ std::shared_ptr<backend::ClassDefinition> VM::getCurrentClassContext() const {
     if (!callStack.empty()) {
         const auto& currentFrame = callStack.back();
         std::string functionName = currentFrame.functionName;
-        
+
         // Check if this is a method call (contains "::")
         size_t pos = functionName.find("::");
         if (pos != std::string::npos) {
@@ -4584,12 +4581,12 @@ std::shared_ptr<backend::ClassDefinition> VM::getCurrentClassContext() const {
             return classRegistry.getClass(className);
         }
     }
-    
+
     // Check if we're currently defining a class
     if (!currentClassBeingDefined.empty()) {
         return classRegistry.getClass(currentClassBeingDefined);
     }
-    
+
     return nullptr; // No class context
 }
 
@@ -4597,22 +4594,22 @@ std::shared_ptr<backend::ClassDefinition> VM::getCurrentClassContext() const {
 void VM::handleListAppend(const Instruction& /*unused*/) {
     // Pop the value to append
     ValuePtr value = pop();
-    
+
     // Pop the list
     ValuePtr listVal = pop();
-    
+
     // Check if it's actually a list
     if (!std::holds_alternative<ListValue>(listVal->data)) {
         error("Cannot append to non-list value");
         return;
     }
-    
+
     // Get the list data
     auto& listData = std::get<ListValue>(listVal->data);
-    
+
     // Append the value
     listData.elements.push_back(value);
-    
+
     // Push the modified list back onto the stack
     push(listVal);
 }
@@ -4620,17 +4617,17 @@ void VM::handleListAppend(const Instruction& /*unused*/) {
 void VM::handleCreateDict(const Instruction& instruction) {
     // Get the number of key-value pairs to include in the dictionary
     int32_t count = instruction.intValue;
-    
+
     // Create a new dictionary
     auto dict = memoryManager.makeRef<Value>(*region, typeSystem->DICT_TYPE);
     auto dictValue = DictValue();
-    
+
     // Pop 'count' key-value pairs from the stack and add them to the dictionary
     // Stack layout: [key1, value1, key2, value2, ..., keyN, valueN] (top)
     for (int32_t i = 0; i < count; i++) {
         ValuePtr value = pop();  // Pop value first (it's on top)
         ValuePtr key = pop();    // Then pop key
-        
+
         // For now, we'll use the first key if there are duplicates
         // In a real implementation, we might want to handle this differently
         bool keyExists = false;
@@ -4641,12 +4638,12 @@ void VM::handleCreateDict(const Instruction& instruction) {
                 break;
             }
         }
-        
+
         if (!keyExists) {
             dictValue.elements[key] = value;
         }
     }
-    
+
     // Store the dictionary in the value and push it onto the stack
     dict->data = dictValue;
     push(dict);
@@ -4655,26 +4652,26 @@ void VM::handleCreateDict(const Instruction& instruction) {
 void VM::handleDictSet(const Instruction& /*unused*/) {
     // Pop the value to set
     ValuePtr value = pop();
-    
+
     // Pop the key
     ValuePtr key = pop();
-    
+
     // Pop the dictionary
     ValuePtr dictVal = pop();
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] DICT_SET: Setting key '" << key->toString() << "' to value '" << value->toString() << "'" << std::endl;
     }
-    
+
     // Check if it's actually a dictionary
     if (!std::holds_alternative<DictValue>(dictVal->data)) {
         error("Cannot set key on non-dictionary value");
         return;
     }
-    
+
     // Get the dictionary data
     auto& dictData = std::get<DictValue>(dictVal->data);
-    
+
     // Find existing key and update, or add new key
     bool keyExists = false;
     for (auto& [existingKey, existingValue] : dictData.elements) {
@@ -4684,7 +4681,7 @@ void VM::handleDictSet(const Instruction& /*unused*/) {
             break;
         }
     }
-    
+
     if (!keyExists) {
         dictData.elements[key] = value;
         if (debugMode) {
@@ -4695,11 +4692,11 @@ void VM::handleDictSet(const Instruction& /*unused*/) {
             std::cout << "[DEBUG] DICT_SET: Updated existing key '" << key->toString() << "'" << std::endl;
         }
     }
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] DICT_SET: Dictionary now has " << dictData.elements.size() << " elements" << std::endl;
     }
-    
+
     // Push the modified dictionary back onto the stack
     push(dictVal);
 }
@@ -4707,14 +4704,14 @@ void VM::handleDictSet(const Instruction& /*unused*/) {
 void VM::handleGetIndex(const Instruction& /*unused*/) {
     // Pop the index
     ValuePtr index = pop();
-    
+
     // Pop the container (list or dictionary)
     ValuePtr container = pop();
-    
+
     if (std::holds_alternative<ListValue>(container->data)) {
         // Handle list indexing
         auto& listData = std::get<ListValue>(container->data);
-        
+
         // Check if index is an integer
         if (!std::holds_alternative<int32_t>(index->data)) {
             // Create and push error value for invalid index type
@@ -4725,9 +4722,9 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
             push(errorValue);
             return;
         }
-        
+
         int32_t idx = std::get<int32_t>(index->data);
-        
+
         // Check bounds
         if (idx < 0 || idx >= static_cast<int32_t>(listData.elements.size())) {
             // Create and push error value for out of bounds
@@ -4739,14 +4736,14 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
             push(errorValue);
             return;
         }
-        
+
         // Push the element at the index (wrapped in success value for consistency)
         push(listData.elements[idx]);
-        
+
     } else if (std::holds_alternative<TupleValue>(container->data)) {
         // Handle tuple indexing
         auto& tupleData = std::get<TupleValue>(container->data);
-        
+
         // Check if index is an integer
         if (!std::holds_alternative<int32_t>(index->data)) {
             // Create and push error value for invalid index type
@@ -4757,9 +4754,9 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
             push(errorValue);
             return;
         }
-        
+
         int32_t idx = std::get<int32_t>(index->data);
-        
+
         // Check bounds
         if (idx < 0 || idx >= static_cast<int32_t>(tupleData.elements.size())) {
             // Create and push error value for out of bounds
@@ -4771,14 +4768,14 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
             push(errorValue);
             return;
         }
-        
+
         // Push the element at the index
         push(tupleData.elements[idx]);
-        
+
     } else if (std::holds_alternative<DictValue>(container->data)) {
         // Handle dictionary indexing
         auto& dictData = std::get<DictValue>(container->data);
-        
+
         // Find the key in the dictionary by comparing values
         ValuePtr foundValue = nullptr;
         for (const auto& [key, value] : dictData.elements) {
@@ -4787,7 +4784,7 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
                 break;
             }
         }
-        
+
         if (!foundValue) {
             // Create and push error value for key not found
             auto errorType = typeSystem->getErrorType("IndexOutOfBounds");
@@ -4797,10 +4794,10 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
             push(errorValue);
             return;
         }
-        
+
         // Push the value for the key
         push(foundValue);
-        
+
     } else {
         // Create and push error value for non-indexable type
         auto errorType = typeSystem->getErrorType("TypeConversion");
@@ -4814,17 +4811,17 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
 void VM::handleSetIndex(const Instruction& /*unused*/) {
     // Pop the value to set
     ValuePtr value = pop();
-    
+
     // Pop the index
     ValuePtr index = pop();
-    
+
     // Pop the container (list or dictionary)
     ValuePtr container = pop();
-    
+
     if (std::holds_alternative<ListValue>(container->data)) {
         // Handle list indexing
         auto& listData = std::get<ListValue>(container->data);
-        
+
         // Check if index is an integer
         if (!std::holds_alternative<int32_t>(index->data)) {
             // Create and push error value for invalid index type
@@ -4835,9 +4832,9 @@ void VM::handleSetIndex(const Instruction& /*unused*/) {
             push(errorValue);
             return;
         }
-        
+
         int32_t idx = std::get<int32_t>(index->data);
-        
+
         // Check bounds
         if (idx < 0 || idx >= static_cast<int32_t>(listData.elements.size())) {
             // Create and push error value for out of bounds
@@ -4849,10 +4846,10 @@ void VM::handleSetIndex(const Instruction& /*unused*/) {
             push(errorValue);
             return;
         }
-        
+
         // Set the element at the index
         listData.elements[idx] = value;
-        
+
     } else if (std::holds_alternative<TupleValue>(container->data)) {
         // Tuples are immutable - cannot set elements
         auto errorType = typeSystem->getErrorType("TypeConversion");
@@ -4861,11 +4858,11 @@ void VM::handleSetIndex(const Instruction& /*unused*/) {
         errorValue->data = errorVal;
         push(errorValue);
         return;
-        
+
     } else if (std::holds_alternative<DictValue>(container->data)) {
         // Handle dictionary indexing
         auto& dictData = std::get<DictValue>(container->data);
-        
+
         // Find existing key and update, or add new key
         bool keyExists = false;
         for (auto& [existingKey, existingValue] : dictData.elements) {
@@ -4875,11 +4872,11 @@ void VM::handleSetIndex(const Instruction& /*unused*/) {
                 break;
             }
         }
-        
+
         if (!keyExists) {
             dictData.elements[index] = value;
         }
-        
+
     } else {
         // Create and push error value for non-indexable type
         auto errorType = typeSystem->getErrorType("TypeConversion");
@@ -4889,7 +4886,7 @@ void VM::handleSetIndex(const Instruction& /*unused*/) {
         push(errorValue);
         return;
     }
-    
+
     // Push the modified container back onto the stack
     push(container);
 }
@@ -4904,7 +4901,7 @@ void VM::handleCreateRange(const Instruction& instruction) {
 
     // Extract integer values
     int64_t start, end;
-    
+
     if (std::holds_alternative<int8_t>(startVal->data)) {
         start = std::get<int8_t>(startVal->data);
     } else if (std::holds_alternative<int16_t>(startVal->data)) {
@@ -4933,7 +4930,7 @@ void VM::handleCreateRange(const Instruction& instruction) {
 
     // Create a list to hold the range values
     // ListValue rangeList;
-    
+
     // if (step > 0) {
     //     for (int64_t i = start; i < end; i += step) {
     //         auto val = memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, i);
@@ -4970,7 +4967,7 @@ void VM::handleCreateRange(const Instruction& instruction) {
 void VM::handleGetIterator(const Instruction& /*unused*/) {
     // Get the iterable from the stack
     auto iterable = pop();
-    
+
     // CRITICAL FIX: If it's already an iterator (like a lazy range), just push it back
     if (std::holds_alternative<IteratorValuePtr>(iterable->data)) {
         if (debugMode) {
@@ -4979,7 +4976,7 @@ void VM::handleGetIterator(const Instruction& /*unused*/) {
         push(iterable);
         return;
     }
-    
+
     // Create an iterator for the iterable
     if (std::holds_alternative<ListValue>(iterable->data)) {
         // For lists, create a list iterator
@@ -5025,22 +5022,22 @@ void VM::handleGetIterator(const Instruction& /*unused*/) {
 void VM::handleIteratorHasNext(const Instruction& /*unused*/) {
     // Get the iterator from the stack
     auto iteratorVal = pop();
-    
+
     // Check if the value is an iterator
     if (!std::holds_alternative<IteratorValuePtr>(iteratorVal->data)) {
         error("Expected iterator value in ITERATOR_HAS_NEXT, got type: " +
               typeTagToString(iteratorVal->type->tag));
         return;
     }
-    
+
     auto iterator = std::get<IteratorValuePtr>(iteratorVal->data);
-    
+
     // Add additional validation for iterator state
     if (!iterator) {
         error("Null iterator in ITERATOR_HAS_NEXT");
         return;
     }
-    
+
     bool hasNext = false;
     try {
         hasNext = iterator->hasNext();
@@ -5048,7 +5045,7 @@ void VM::handleIteratorHasNext(const Instruction& /*unused*/) {
         error("Exception in iterator->hasNext(): " + std::string(e.what()));
         return;
     }
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] ITERATOR_HAS_NEXT: " << (hasNext ? "true" : "false");
         if (iterator->type == IteratorValue::IteratorType::LIST) {
@@ -5056,7 +5053,7 @@ void VM::handleIteratorHasNext(const Instruction& /*unused*/) {
         }
         std::cout << std::endl;
     }
-    
+
     // Push the result back onto the stack
     auto result = memoryManager.makeRef<Value>(
                 *region,
@@ -5069,28 +5066,28 @@ void VM::handleIteratorHasNext(const Instruction& /*unused*/) {
 void VM::handleIteratorNext(const Instruction& /*unused*/) {
     // Get the iterator from the stack
     auto iteratorVal = pop();
-    
+
     // Check if the value is an iterator
     if (!std::holds_alternative<IteratorValuePtr>(iteratorVal->data)) {
         error("Expected iterator value in ITERATOR_NEXT, got type: " +
               typeTagToString(iteratorVal->type->tag));
         return;
     }
-    
+
     auto iterator = std::get<IteratorValuePtr>(iteratorVal->data);
-    
+
     // Add additional validation for iterator state
     if (!iterator) {
         error("Null iterator in ITERATOR_NEXT");
         return;
     }
-    
+
     if (!iterator->hasNext()) {
-        error("No more elements in iterator (currentIndex=" + 
+        error("No more elements in iterator (currentIndex=" +
               std::to_string(iterator->currentIndex) + ")");
         return;
     }
-    
+
     // Get the next value and push it onto the stack
     ValuePtr nextValue = nullptr;
     try {
@@ -5099,12 +5096,12 @@ void VM::handleIteratorNext(const Instruction& /*unused*/) {
         error("Exception in iterator->next(): " + std::string(e.what()));
         return;
     }
-    
+
     if (!nextValue) {
         error("Iterator returned null value");
         return;
     }
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] ITERATOR_NEXT: Got value: " << nextValue->toString();
         if (iterator->type == IteratorValue::IteratorType::LIST) {
@@ -5112,7 +5109,7 @@ void VM::handleIteratorNext(const Instruction& /*unused*/) {
         }
         std::cout << std::endl;
     }
-    
+
     push(nextValue);
 }
 
@@ -5136,16 +5133,16 @@ void VM::handleEndScope(const Instruction& /*unused*/) {
     // Restore the previous environment
     if (debugMode) {
         std::cout << "[DEBUG] END_SCOPE: Current environment = " << (environment ? "valid" : "null")
-                  << ", has enclosing = " << (environment && environment->enclosing ? "yes" : "no") 
+                  << ", has enclosing = " << (environment && environment->enclosing ? "yes" : "no")
                   << ", IP=" << ip << std::endl;
     }
-    
+
     // Clean up temporary variables for the current scope
     auto it = tempValueStack.begin();
     while (it != tempValueStack.end()) {
         if (it->scope == environment) {
             if (debugMode) {
-                std::cout << "[DEBUG] END_SCOPE: Removing temp variables for scope " 
+                std::cout << "[DEBUG] END_SCOPE: Removing temp variables for scope "
                           << it->scope.get() << " with " << it->values.size() << " variables" << std::endl;
             }
             it = tempValueStack.erase(it);
@@ -5153,11 +5150,11 @@ void VM::handleEndScope(const Instruction& /*unused*/) {
             ++it;
         }
     }
-    
+
     // Restore the previous environment
     if (environment && environment->enclosing) {
         if (debugMode) {
-            std::cout << "[DEBUG] END_SCOPE: Restoring environment from " 
+            std::cout << "[DEBUG] END_SCOPE: Restoring environment from "
                       << environment.get() << " to " << environment->enclosing.get() << std::endl;
         }
         environment = environment->enclosing;
@@ -5188,11 +5185,11 @@ void VM::handleEndScope(const Instruction& /*unused*/) {
             environment = globals;
         }
     }
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] END_SCOPE: About to call region->exitScope()" << std::endl;
     }
-    
+
     try {
         region->exitScope();
         if (debugMode) {
@@ -5202,13 +5199,13 @@ void VM::handleEndScope(const Instruction& /*unused*/) {
         // Memory region scope mismatch can also happen after function returns
         // Log the error but don't fail the execution
         if (debugMode) {
-            std::cout << "[DEBUG] END_SCOPE: Exception in region->exitScope(): " << e.what() 
+            std::cout << "[DEBUG] END_SCOPE: Exception in region->exitScope(): " << e.what()
                       << " (continuing execution)" << std::endl;
         }
     }
-    
+
     if (debugMode) {
-        std::cout << "[DEBUG] END_SCOPE: Successfully completed, IP=" << ip 
+        std::cout << "[DEBUG] END_SCOPE: Successfully completed, IP=" << ip
                   << ", remaining temp scopes: " << tempValueStack.size() << std::endl;
     }
 }
@@ -5218,7 +5215,7 @@ void VM::handleBeginParallel(const Instruction& instruction) {
     size_t block_start_ip = ip + 1;
     size_t block_end_ip = block_start_ip;
     int nesting_level = 0;
-    
+
     while (block_end_ip < bytecode->size()) {
         const auto& instr = (*bytecode)[block_end_ip];
         if (instr.opcode == Opcode::BEGIN_PARALLEL) {
@@ -5269,7 +5266,7 @@ void VM::handleBeginParallel(const Instruction& instruction) {
                 // The new environment inherits from the current environment to capture local variables.
                 task_vm.globals = this->globals;
                 task_vm.environment = std::make_shared<Environment>(this->environment);
-                
+
                 // Set debug mode
                 task_vm.setDebug(this->debugMode);
 
@@ -5287,7 +5284,7 @@ void VM::handleBeginParallel(const Instruction& instruction) {
                 std::cerr << "[ERROR] Parallel task " << i << " failed: " << e.what() << std::endl;
             }
         };
-        
+
         tasks.push_back(std::move(task));
     }
 
@@ -5309,36 +5306,36 @@ void VM::handleBeginConcurrent(const Instruction& instruction) {
 
     // Create new block execution state
     auto state = std::make_unique<BlockExecutionState>(BlockType::Concurrent);
-    
+
     // Parse concurrent block parameters from instruction string
     parseBlockParameters(instruction.stringValue, *state);
-    
+
     // Set up output channel if specified in parameters
     if (!state->output_channel_name.empty()) {
         state->output_channel = concurrency_state->runtime->getChannelManager().createChannel(state->output_channel_name);
-        
+
         // Define the channel in the current environment
         auto channelValue = memoryManager.makeRef<Value>(*region, typeSystem->ANY_TYPE, state->output_channel);
         environment->define(state->output_channel_name, channelValue);
-        
+
         if (debugMode) {
             std::cout << "[DEBUG] Created output channel: " << state->output_channel_name << std::endl;
         }
     }
-    
+
     // Initialize error handling strategy and timeout configuration
     concurrency_state->runtime->setErrorHandlingStrategy(state->error_strategy);
-    
+
     if (state->timeout.count() > 0) {
         state->setTimeout(state->timeout);
         if (debugMode) {
             std::cout << "[DEBUG] Set timeout: " << state->timeout.count() << "ms" << std::endl;
         }
     }
-    
+
     // Push state onto concurrency stack
     concurrency_state->pushBlock(std::move(state));
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] Concurrent block state created and pushed to stack" << std::endl;
     }
@@ -5358,13 +5355,13 @@ void VM::handleEndConcurrent(const Instruction& instruction) {
 
     // Wait for all tasks in current block to complete
     waitForTasksToComplete(*state);
-    
+
     // Collect results from tasks and handle any errors according to strategy
     collectTaskResults(*state);
-    
+
     // Handle any collected errors according to the error strategy
     handleCollectedErrors(*state);
-    
+
     // Close output channel and propagate final results
     if (state->output_channel) {
         state->output_channel->close();
@@ -5372,10 +5369,10 @@ void VM::handleEndConcurrent(const Instruction& instruction) {
             std::cout << "[DEBUG] Closed output channel: " << state->output_channel_name << std::endl;
         }
     }
-    
+
     // Clean up block resources
     cleanupBlockResources(*state);
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] Concurrent block completed successfully" << std::endl;
     }
@@ -5396,13 +5393,13 @@ void VM::handleBeginTask(const Instruction& instruction) {
     // Parse task parameters (loop variable and iterable)
     // The instruction string contains the loop variable name
     std::string loopVar = instruction.stringValue;
-    
+
     // Store the loop variable for later use
     concurrency_state->current_task_loop_var = loopVar;
-    
+
     // Store the task body AST (we'll get this from the backend)
     // For now, we'll create it in handleEndTask when we have all the information
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] Stored task loop variable: " << loopVar << std::endl;
     }
@@ -5435,23 +5432,23 @@ void VM::handleEndTask(const Instruction& instruction) {
                 std::cout << "[DEBUG] Submitting task with loop var '" << context->loop_var
                           << "' = " << context->iteration_value->toString() << std::endl;
             }
-            
+
             // Create TaskVM for this context
             auto task_vm = createTaskVM(std::move(context));
-            
+
             // Submit to scheduler
             submitTaskToScheduler(std::move(task_vm));
-            
+
         } catch (const std::exception& e) {
             if (debugMode) {
                 std::cout << "[DEBUG] Error submitting task: " << e.what() << std::endl;
             }
-            
+
             // Handle task submission error
             ErrorValue error;
             error.errorType = "TaskSubmissionError";
             error.message = e.what();
-            
+
             if (concurrency_state->runtime) {
                 concurrency_state->runtime->getErrorCollector().addError(error);
             }
@@ -5470,14 +5467,14 @@ void VM::handleStoreIterable(const Instruction& instruction) {
 
     // Pop the iterable from the stack
     ValuePtr iterable = pop();
-    
+
     // Store it in the current task iteration state
     currentTaskIterable = iterable;
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] Stored iterable: " << iterable->toString() << std::endl;
     }
-    
+
     // Get current block state
     auto* state = concurrency_state->getCurrentBlock();
     if (!state) {
@@ -5486,7 +5483,7 @@ void VM::handleStoreIterable(const Instruction& instruction) {
         }
         return;
     }
-    
+
     // Get the loop variable that was stored in BEGIN_TASK
     std::string loopVar = concurrency_state->current_task_loop_var;
     if (loopVar.empty()) {
@@ -5495,7 +5492,7 @@ void VM::handleStoreIterable(const Instruction& instruction) {
         }
         return;
     }
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] Creating tasks for loop variable: " << loopVar << std::endl;
     }
@@ -5510,14 +5507,14 @@ void VM::handleStoreIterable(const Instruction& instruction) {
     size_t task_count = 0;
     while (hasNext(iterator)) {
         ValuePtr iterationValue = next(iterator);
-        
+
         if (debugMode) {
             std::cout << "[DEBUG] Creating task for iteration value: " << iterationValue->toString() << std::endl;
         }
-        
+
         // Create task context for this iteration
         auto context = createTaskContext(loopVar, iterationValue);
-        
+
         // Copy current error frames to task context
         for (const auto& frame : errorFrames) {
             context->error_frames.emplace_back(
@@ -5527,15 +5524,15 @@ void VM::handleStoreIterable(const Instruction& instruction) {
                         frame.functionName
                         );
         }
-        
+
         // Add task to the current block
         state->tasks.push_back(std::move(context));
         task_count++;
     }
-    
+
     // Update total task count
     state->total_tasks.store(task_count);
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] Created " << task_count << " task contexts" << std::endl;
     }
@@ -5559,7 +5556,7 @@ void VM::handleMatchPattern(const Instruction& /*unused*/) {
     // Type matching with string patterns
     else if (pattern->type->tag == TypeTag::String) {
         std::string typeName = std::get<std::string>(pattern->data);
-        
+
         // Handle special destructuring patterns
         if (typeName == "__dict_pattern__") {
             match = handleDictPatternMatch(value);
@@ -5669,24 +5666,24 @@ bool VM::handleDictPatternMatch(const ValuePtr& value) {
     // - has rest element (bool)
     // - field binding names and keys (pairs)
     // - number of fields
-    
+
     if (value->type->tag != TypeTag::Dict) {
         // Clear the pattern data from stack and return false
         clearDictPatternFromStack();
         return false;
     }
-    
+
     // Pop rest element info
     ValuePtr restBindingName = pop();
     ValuePtr hasRestElement = pop();
-    
+
     // Pop number of fields
     ValuePtr numFieldsValue = pop();
     int numFields = std::get<int32_t>(numFieldsValue->data);
-    
+
     // Get the dictionary data
     auto dictData = std::get<DictValue>(value->data);
-    
+
     // Pop and process field patterns
     std::vector<std::pair<std::string, std::string>> fieldPatterns;
     for (int i = 0; i < numFields; i++) {
@@ -5697,25 +5694,25 @@ bool VM::handleDictPatternMatch(const ValuePtr& value) {
                                     std::get<std::string>(bindingName->data)
                                 });
     }
-    
+
     // Check if all required fields exist
     for (const auto& [key, binding] : fieldPatterns) {
         // Create a string key value for lookup
         auto keyValue = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, key);
         auto foundValue = dictData.get(keyValue);
-        
+
         if (!foundValue) {
             return false; // Required field missing
         }
-        
+
         // Bind the field value to the binding name
         environment->define(binding, foundValue);
     }
-    
+
     // Handle rest element if present
     if (std::get<bool>(hasRestElement->data)) {
         std::string restBinding = std::get<std::string>(restBindingName->data);
-        
+
         // Create a new dictionary with remaining fields
         DictValue restDict;
         for (const auto& [keyPtr, val] : dictData.elements) {
@@ -5734,12 +5731,12 @@ bool VM::handleDictPatternMatch(const ValuePtr& value) {
                 restDict.elements[keyPtr] = val;
             }
         }
-        
+
         // Create and bind the rest dictionary
         auto restValue = memoryManager.makeRef<Value>(*region, typeSystem->DICT_TYPE, restDict);
         environment->define(restBinding, restValue);
     }
-    
+
     return true;
 }
 
@@ -5748,20 +5745,20 @@ bool VM::handleListPatternMatch(const ValuePtr& value) {
     // - pattern marker ("__list_pattern__") [already popped]
     // - pattern elements
     // - number of elements
-    
+
     if (value->type->tag != TypeTag::List) {
         // Clear the pattern data from stack and return false
         clearListPatternFromStack();
         return false;
     }
-    
+
     // Pop number of elements
     ValuePtr numElementsValue = pop();
     int numElements = std::get<int32_t>(numElementsValue->data);
-    
+
     // Get the list data
     auto listData = std::get<ListValue>(value->data);
-    
+
     // Check if list has the expected number of elements
     if (static_cast<int>(listData.elements.size()) != numElements) {
         // Clear remaining pattern elements from stack
@@ -5770,18 +5767,18 @@ bool VM::handleListPatternMatch(const ValuePtr& value) {
         }
         return false;
     }
-    
+
     // Pop and match pattern elements (in reverse order)
     std::vector<ValuePtr> patterns;
     for (int i = 0; i < numElements; i++) {
         patterns.insert(patterns.begin(), pop());
     }
-    
+
     // Match each element
     for (int i = 0; i < numElements; i++) {
         ValuePtr pattern = patterns[i];
         ValuePtr element = listData.elements[i];
-        
+
         // Handle variable binding patterns
         if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(
                     std::reinterpret_pointer_cast<AST::Expression>(pattern))) {
@@ -5797,7 +5794,7 @@ bool VM::handleListPatternMatch(const ValuePtr& value) {
         }
         // For other patterns, we'd need recursive matching
     }
-    
+
     return true;
 }
 
@@ -5806,7 +5803,7 @@ bool VM::handleTuplePatternMatch(const ValuePtr& value) {
     // - pattern marker ("__tuple_pattern__") [already popped]
     // - pattern elements
     // - number of elements
-    
+
     // For now, treat tuples as lists
     // In a full implementation, tuples would be a separate type
     return handleListPatternMatch(value);
@@ -5818,7 +5815,7 @@ void VM::clearDictPatternFromStack() {
     ValuePtr hasRestElement = pop();
     ValuePtr numFieldsValue = pop();
     int numFields = std::get<int32_t>(numFieldsValue->data);
-    
+
     // Pop field patterns
     for (int i = 0; i < numFields * 2; i++) {
         pop();
@@ -5829,7 +5826,7 @@ void VM::clearListPatternFromStack() {
     // Clear list pattern data from stack when match fails
     ValuePtr numElementsValue = pop();
     int numElements = std::get<int32_t>(numElementsValue->data);
-    
+
     // Pop pattern elements
     for (int i = 0; i < numElements; i++) {
         pop();
@@ -5840,10 +5837,10 @@ void VM::handleAwait(const Instruction& instruction) {
     if (debugMode) {
         std::cout << "[DEBUG] Awaiting async result at line " << instruction.line << std::endl;
     }
-    
+
     // Pop the awaitable value from the stack
     ValuePtr awaitable = pop();
-    
+
     // For now, just return the value as-is
     // In a full implementation, this would handle async/await semantics
     push(awaitable);
@@ -6017,7 +6014,7 @@ void VM::handleImportExecute(const Instruction& instruction) {
         if (debugMode) {
             std::cout << "[DEBUG] handleImportExecute: Module execution completed" << std::endl;
         }
-        
+
         // Store the module's function definitions for later access
         if (!moduleVm.userDefinedFunctions.empty()) {
             moduleUserDefinedFunctions[moduleVm.environment.get()] = moduleVm.userDefinedFunctions;
@@ -6047,7 +6044,7 @@ void VM::handleImportExecute(const Instruction& instruction) {
 
     // Handle import scoping - all imports are module-scoped
     // Show/Hide filters control which symbols are accessible, but don't change scoping
-    
+
     std::string varName;
     if (currentImportState.alias) {
         varName = *currentImportState.alias;
@@ -6059,11 +6056,11 @@ void VM::handleImportExecute(const Instruction& instruction) {
             varName = modulePath;
         }
     }
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] handleImportExecute: Module will be imported as variable: " << varName << std::endl;
     }
-    
+
     // If we have filters, create a filtered module view
     if (currentImportState.filterType) {
         if (debugMode) {
@@ -6071,10 +6068,10 @@ void VM::handleImportExecute(const Instruction& instruction) {
         }
         auto& moduleData = std::get<ModuleValue>(moduleValue->data);
         auto moduleEnv = moduleData.env;
-        
+
         // Create a new filtered environment
         auto filteredEnv = std::make_shared<Environment>();
-        
+
         if (*currentImportState.filterType == AST::ImportFilterType::Show) {
             if (debugMode) {
                 std::cout << "[DEBUG] handleImportExecute: Applying SHOW filter for symbols: ";
@@ -6112,7 +6109,7 @@ void VM::handleImportExecute(const Instruction& instruction) {
             // For now, we'll implement a simple version that copies all and removes hidden ones
             // This is a simplified implementation - a full implementation would need
             // access to the module's symbol table
-            
+
             // Copy all symbols first (this is a simplified approach)
             auto allSymbols = moduleEnv->getAllSymbols();
             if (debugMode) {
@@ -6121,7 +6118,7 @@ void VM::handleImportExecute(const Instruction& instruction) {
             for (const auto& [name, value] : allSymbols) {
                 filteredEnv->define(name, value);
             }
-            
+
             // Remove hidden symbols
             for (const auto& id : currentImportState.filterIdentifiers) {
                 try {
@@ -6134,17 +6131,17 @@ void VM::handleImportExecute(const Instruction& instruction) {
                 }
             }
         }
-        
+
         // Create filtered module value
         auto filteredModuleData = ModuleValue{filteredEnv, moduleData.bytecode};
         auto filteredModuleValue = memoryManager.makeRef<Value>(*region, typeSystem->MODULE_TYPE);
         filteredModuleValue->data = filteredModuleData;
         moduleValue = filteredModuleValue;
     }
-    
+
     // Define the module in the current environment
     environment->define(varName, moduleValue);
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] handleImportExecute: Module successfully imported as: " << varName << std::endl;
     }
@@ -6156,28 +6153,28 @@ void VM::parseBlockParameters(const std::string& paramString, BlockExecutionStat
         // Use default values
         return;
     }
-    
+
     // Parse parameter string format: "ch=output,mode=batch,cores=4,on_error=Stop,timeout=5000,grace=1000"
     std::istringstream iss(paramString);
     std::string param;
-    
+
     while (std::getline(iss, param, ',')) {
         // Trim whitespace
         param.erase(0, param.find_first_not_of(" \t"));
         param.erase(param.find_last_not_of(" \t") + 1);
-        
+
         size_t eq_pos = param.find('=');
         if (eq_pos == std::string::npos) continue;
-        
+
         std::string key = param.substr(0, eq_pos);
         std::string value = param.substr(eq_pos + 1);
-        
+
         // Trim key and value
         key.erase(0, key.find_first_not_of(" \t"));
         key.erase(key.find_last_not_of(" \t") + 1);
         value.erase(0, value.find_first_not_of(" \t"));
         value.erase(value.find_last_not_of(" \t") + 1);
-        
+
         if (key == "ch" || key == "channel") {
             state.output_channel_name = value;
         } else if (key == "mode") {
@@ -6214,7 +6211,7 @@ void VM::parseBlockParameters(const std::string& paramString, BlockExecutionStat
             }
         }
     }
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] Parsed block parameters:" << std::endl;
         std::cout << "[DEBUG]   mode: " << (state.mode == ExecutionMode::Batch ? "batch" :
@@ -6232,28 +6229,28 @@ void VM::waitForTasksToComplete(BlockExecutionState& state) {
     if (debugMode) {
         std::cout << "[DEBUG] Waiting for " << state.total_tasks.load() << " tasks to complete" << std::endl;
     }
-    
+
     auto start_time = std::chrono::steady_clock::now();
     bool timeout_reached = false;
-    
+
     while (!state.allTasksCompleted() && !timeout_reached) {
         // Check for timeout
         if (state.timeout.count() > 0 && state.isTimedOut()) {
             timeout_reached = true;
             concurrency_state->stats.timeouts_occurred.fetch_add(1);
-            
+
             if (debugMode) {
                 std::cout << "[DEBUG] Timeout reached, initiating graceful shutdown" << std::endl;
             }
-            
+
             // Initiate graceful shutdown - allow grace period for tasks to complete
             auto grace_start = std::chrono::steady_clock::now();
             auto grace_deadline = grace_start + state.grace_period;
-            
+
             while (!state.allTasksCompleted() && std::chrono::steady_clock::now() < grace_deadline) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
-            
+
             if (!state.allTasksCompleted()) {
                 if (debugMode) {
                     std::cout << "[DEBUG] Grace period expired, forcefully terminating remaining tasks" << std::endl;
@@ -6263,14 +6260,14 @@ void VM::waitForTasksToComplete(BlockExecutionState& state) {
             }
             break;
         }
-        
+
         // Brief sleep to avoid busy waiting
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-    
+
     auto end_time = std::chrono::steady_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] Task completion wait finished in " << duration.count() << "ms" << std::endl;
         std::cout << "[DEBUG] Completed tasks: " << state.completed_tasks.load() << "/" << state.total_tasks.load() << std::endl;
@@ -6288,7 +6285,7 @@ void VM::handleBeginEnum(const Instruction& instruction) {
     if (debugMode) {
         std::cout << "[DEBUG] Beginning enum definition: " << instruction.stringValue << std::endl;
     }
-    
+
     // Start enum definition - for now just track the name
     currentClassBeingDefined = instruction.stringValue;
     insideClassDefinition = true;
@@ -6298,7 +6295,7 @@ void VM::handleEndEnum(const Instruction& instruction) {
     if (debugMode) {
         std::cout << "[DEBUG] Ending enum definition at line " << instruction.line << std::endl;
     }
-    
+
     // End enum definition
     currentClassBeingDefined = "";
     insideClassDefinition = false;
@@ -6308,7 +6305,7 @@ void VM::handleDefineEnumVariant(const Instruction& instruction) {
     if (debugMode) {
         std::cout << "[DEBUG] Defining enum variant: " << instruction.stringValue << std::endl;
     }
-    
+
     // For now, just create a simple enum variant value
     // In a full implementation, this would create proper enum types
     ValuePtr variant = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, instruction.stringValue);
@@ -6319,7 +6316,7 @@ void VM::handleDefineEnumVariantWithType(const Instruction& instruction) {
     if (debugMode) {
         std::cout << "[DEBUG] Defining typed enum variant: " << instruction.stringValue << std::endl;
     }
-    
+
     // For now, just create a simple enum variant value with type info
     // In a full implementation, this would create proper typed enum variants
     ValuePtr variant = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, instruction.stringValue);
@@ -6343,7 +6340,7 @@ void VM::handleCheckError(const Instruction& instruction) {
 
     // Fast path: most values are not errors
     bool isError = isErrorValue(value);
-    
+
     if (isError) {
         recordErrorPath();
     } else {
@@ -6356,14 +6353,14 @@ void VM::handleCheckError(const Instruction& instruction) {
 
 void VM::handlePropagateError(const Instruction& instruction) {
     (void)instruction; // Mark as unused
-    
+
     ValuePtr error_value;
     if (stack.empty()) {
         if (lastException) {
             // Use the last exception if available
             error_value = lastException;
             lastException = nullptr;
-            
+
             // using last exception
         } else {
             // no error value to propagate
@@ -6371,15 +6368,15 @@ void VM::handlePropagateError(const Instruction& instruction) {
         }
     } else {
         error_value = stack.back(); // Peek at the top value
-        
+
         // found error value on stack
     }
-    
+
     if (!error_value) {
         // attempted to propagate null error value
         return;
     }
-    
+
     // Verify this is actually an error value
     if (!error_value->isError()) {
         // not an error value; not propagating
@@ -6390,26 +6387,26 @@ void VM::handlePropagateError(const Instruction& instruction) {
     if (const auto* errorVal = error_value->getErrorValue()) {
         errorType = errorVal->errorType;
     }
-    
+
     // If we got here, we have a valid error value to propagate
     // propagating error (log suppressed)
-    
+
     // Remove the error value from the stack if it was there
     if (!stack.empty() && stack.back() == error_value) {
         stack.pop_back();
     }
-    
+
     // Clear any previous exception since we're handling it now
     lastException = nullptr;
-    
+
     // Try to propagate the error using the error frame stack
     // If no error frame exists, let propagateError return false and treat as unhandled
-    
+
     // Now propagate the error
     if (!propagateError(error_value)) {
         // If propagation failed, try to get error information
         std::string errorMsg = "Unhandled error";
-        
+
         try {
             if (auto errorVal = std::get_if<::ErrorValue>(&error_value->data)) {
                 errorMsg = "Unhandled error: " + errorVal->errorType;
@@ -6420,7 +6417,7 @@ void VM::handlePropagateError(const Instruction& instruction) {
         } catch (const std::exception& e) {
             // suppress diagnostic here
         }
-        
+
         error(errorMsg);
     }
     // If propagation succeeded, execution will continue at the error handler
@@ -6429,14 +6426,14 @@ void VM::handlePropagateError(const Instruction& instruction) {
 void VM::handleConstructError(const Instruction& instruction) {
     const std::string& errorType = instruction.stringValue;
     int32_t argCount = instruction.intValue;
-    
+
     if (stack.size() < static_cast<size_t>(argCount)) [[unlikely]] {
         error("Stack underflow in CONSTRUCT_ERROR");
         return;
     }
 
         recordErrorPath();
-    
+
     // Pop arguments from stack - optimized for common case of 0-1 args
     std::vector<ValuePtr> args;
     if (argCount > 0) {
@@ -6446,7 +6443,7 @@ void VM::handleConstructError(const Instruction& instruction) {
         }
         std::reverse(args.begin(), args.end());  // Maintain correct order
     }
-    
+
     // Create error message - optimized for common patterns
     std::string errorMessage;
     if (!args.empty() && args[0]->type->tag == TypeTag::String) [[likely]] {
@@ -6454,7 +6451,7 @@ void VM::handleConstructError(const Instruction& instruction) {
     } else {
         errorMessage = "Error occurred";
     }
-    
+
     // Use optimized pooled error creation for better performance
     ValuePtr errorValue;
     if (args.empty() || args.size() == 1) {
@@ -6464,7 +6461,7 @@ void VM::handleConstructError(const Instruction& instruction) {
         // Less common case: use full error creation
         errorValue = createErrorValue(errorType, errorMessage, args);
     }
-    
+
     if (debugOutput) {
         std::cerr << "[DEBUG] handleConstructError: created error '" << errorType << "' message='" << errorMessage << "'" << std::endl;
     }
@@ -6480,12 +6477,12 @@ void VM::handleConstructOk(const Instruction& instruction) {
     }
 
         recordSuccessPath();
-    
+
     ValuePtr successValue = pop();
-    
+
     // Use optimized error union creation
     ValuePtr okValue = createOptimizedErrorUnion(successValue);
-    
+
     if (debugOutput) {
         std::cerr << "[DEBUG] handleConstructOk: created ok value of type " << (successValue->type ? successValue->type->toString() : "(unknown)") << std::endl;
     }
@@ -6499,11 +6496,11 @@ void VM::handleIsError(const Instruction& instruction) {
         error("Stack underflow in IS_ERROR");
         return;
     }
-    
+
     ValuePtr value = pop();
-    
+
     bool isError = false;
-    
+
     // Check if the value is an error in various forms
     if (value->type->tag == TypeTag::ErrorUnion) {
         // Check if the error union contains an ErrorValue
@@ -6513,7 +6510,7 @@ void VM::handleIsError(const Instruction& instruction) {
         isError = true;
     }
     // For all other types, isError remains false
-    
+
     // Push boolean result onto stack
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, isError));
 }
@@ -6524,11 +6521,11 @@ void VM::handleIsSuccess(const Instruction& instruction) {
         error("Stack underflow in IS_SUCCESS");
         return;
     }
-    
+
     ValuePtr value = pop();
-    
+
     bool isSuccess = true; // Default to success for non-error types
-    
+
     // Check if the value is NOT an error
     if (value->type->tag == TypeTag::ErrorUnion) {
         // For error unions, success means NOT containing an ErrorValue
@@ -6538,7 +6535,7 @@ void VM::handleIsSuccess(const Instruction& instruction) {
         isSuccess = false;
     }
     // For all other types, isSuccess remains true
-    
+
     // Push boolean result onto stack
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, isSuccess));
 }
@@ -6553,11 +6550,11 @@ void VM::handleUnwrapValue(const Instruction& instruction) {
     }
 
         ValuePtr value = pop();
-    
+
     // Fast path: check if this is an error that should be propagated
     if (isErrorValue(value)) [[unlikely]] {
         recordErrorPath();
-        
+
         // This is an error - propagate it
         push(value); // Put the error back on stack for propagation
         if (debugOutput) {
@@ -6576,7 +6573,7 @@ void VM::handleUnwrapValue(const Instruction& instruction) {
     }
 
         recordSuccessPath();
-    
+
     // Success path: extract value from error union if needed
     if (value->type->tag == TypeTag::ErrorUnion) [[likely]] {
         // This is a success value in an error union - extract the actual value
@@ -6596,23 +6593,23 @@ void VM::handleUnwrapValue(const Instruction& instruction) {
 
 void VM::handlePushFunction(const Instruction& instruction) {
     std::string functionName = instruction.stringValue;
-    
+
     // Get visibility information from instruction
     AST::VisibilityLevel visibility = static_cast<AST::VisibilityLevel>(instruction.intValue);
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] PUSH_FUNCTION: " << functionName << " with visibility " << static_cast<int>(visibility) << std::endl;
     }
-    
+
     // If we're inside a class definition, add the method to the class with correct visibility
     if (insideClassDefinition && !currentClassBeingDefined.empty()) {
         std::string methodKey = currentClassBeingDefined + "::" + functionName;
         methodVisibility[methodKey] = visibility; // Update the visibility
-        
+
         if (debugMode) {
             std::cout << "[DEBUG] PUSH_FUNCTION: Adding method '" << functionName << "' to class '" << currentClassBeingDefined << "' with visibility " << static_cast<int>(visibility) << std::endl;
         }
-        
+
         auto classDef = classRegistry.getClass(currentClassBeingDefined);
         if (classDef) {
             auto funcIt = userDefinedFunctions.find(methodKey);
@@ -6621,10 +6618,10 @@ void VM::handlePushFunction(const Instruction& instruction) {
                 auto methodImpl = std::make_shared<backend::VMMethodImplementation>(
                             this, functionName, classDef,
                             funcIt->second.startAddress, funcIt->second.endAddress);
-                
+
                 backend::ClassMethod classMethod(functionName, methodImpl, visibility);
                 classDef->addMethod(classMethod);
-                
+
                 if (debugMode) {
                     std::cout << "[DEBUG] PUSH_FUNCTION: Successfully added method '" << functionName
                               << "' to class '" << currentClassBeingDefined
@@ -6637,26 +6634,26 @@ void VM::handlePushFunction(const Instruction& instruction) {
             }
         }
     }
-    
+
     // Check if the function exists in userDefinedFunctions
     auto funcIt = userDefinedFunctions.find(functionName);
     if (funcIt != userDefinedFunctions.end()) {
         if (debugMode) {
             std::cout << "[DEBUG] PUSH_FUNCTION: Found function " << functionName << std::endl;
         }
-        
+
         // Create a function value that stores the function name
         // This will be used later when the function is called
         ValuePtr functionValue = memoryManager.makeRef<Value>(*region, typeSystem->FUNCTION_TYPE, functionName);
-        
+
         if (debugMode) {
             std::cout << "[DEBUG] PUSH_FUNCTION: Successfully pushed function to stack" << std::endl;
         }
-        
+
         push(functionValue);
         return;
     }
-    
+
     // Check if this is a class method that was recently defined
     // Look for methods with class prefix in userDefinedFunctions
     for (const auto& [fullName, func] : userDefinedFunctions) {
@@ -6668,37 +6665,37 @@ void VM::handlePushFunction(const Instruction& instruction) {
                 if (debugMode) {
                     std::cout << "[DEBUG] PUSH_FUNCTION: Found class method " << fullName << " for " << functionName << std::endl;
                 }
-                
+
                 // Create a function value that stores the full method name
                 ValuePtr functionValue = memoryManager.makeRef<Value>(*region, typeSystem->FUNCTION_TYPE, fullName);
-                
+
                 if (debugMode) {
                     std::cout << "[DEBUG] PUSH_FUNCTION: Successfully pushed class method to stack" << std::endl;
                 }
-                
+
                 push(functionValue);
                 return;
             }
         }
     }
-    
+
     // Check if it's a native function
     auto nativeIt = nativeFunctions.find(functionName);
     if (nativeIt != nativeFunctions.end()) {
         if (debugMode) {
             std::cout << "[DEBUG] PUSH_FUNCTION: Found native function " << functionName << std::endl;
         }
-        
+
         // Create a function value for native function
         ValuePtr functionValue = memoryManager.makeRef<Value>(*region, typeSystem->FUNCTION_TYPE, functionName);
         push(functionValue);
         return;
     }
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] PUSH_FUNCTION: Function " << functionName << " not found" << std::endl;
     }
-    
+
     error("Function not found: " + functionName);
 }
 
@@ -6717,7 +6714,7 @@ void VM::handleGetProperty(const Instruction& instruction) {
             std::cout << "[DEBUG] GET_PROPERTY: Object type tag: " << static_cast<int>(object->type->tag) << std::endl;
         }
     }
-    
+
     // Get current class context for visibility checking
     std::shared_ptr<backend::ClassDefinition> currentClass = getCurrentClassContext();
 
@@ -6751,14 +6748,14 @@ void VM::handleGetProperty(const Instruction& instruction) {
 
                         // Create a module function reference using the expected format
                         std::string moduleQualifiedName = "module_function:" + functionName;
-                        
+
                         // Create a function value that references this module function
                         auto moduleFunctionValue = memoryManager.makeRef<Value>(*region, typeSystem->FUNCTION_TYPE, moduleQualifiedName);
-                        
+
                         if (debugMode) {
                             std::cout << "[DEBUG] GET_PROPERTY: Created module function reference: " << moduleQualifiedName << std::endl;
                         }
-                        
+
                         push(moduleFunctionValue);
                         return;
                     }
@@ -6779,10 +6776,10 @@ void VM::handleGetProperty(const Instruction& instruction) {
     // --- Handle Object property access ---
     if (std::holds_alternative<ObjectInstancePtr>(object->data)) {
         auto objectInstance = std::get<ObjectInstancePtr>(object->data);
-        
+
         // First check if this is actually a field (not a method)
         bool isActualField = objectInstance->hasField(propertyName);
-        
+
         if (isActualField) {
             // This is a field, check visibility and access it
             try {
@@ -6798,7 +6795,7 @@ void VM::handleGetProperty(const Instruction& instruction) {
                     }
                     property = objectInstance->getField(propertyName);
                 }
-                
+
                 if (debugMode) {
                     std::cout << "[DEBUG] GET_PROPERTY: Found object field '" << propertyName << "'" << std::endl;
                 }
@@ -6809,12 +6806,12 @@ void VM::handleGetProperty(const Instruction& instruction) {
                 return;
             }
         }
-        
+
         // Not a field, try to get it as a method
         if (debugMode) {
             std::cout << "[DEBUG] GET_PROPERTY: '" << propertyName << "' is not a field, checking for method" << std::endl;
         }
-        
+
         // Try to get it as a method with visibility checking
         std::shared_ptr<backend::FunctionImplementation> methodImpl;
         if (currentClass) {
@@ -6838,32 +6835,32 @@ void VM::handleGetProperty(const Instruction& instruction) {
             }
             // If method doesn't exist, methodImpl will be nullptr and we'll fall through to "method not found"
         }
-        
+
         if (methodImpl) {
             if (debugMode) {
                 std::cout << "[DEBUG] GET_PROPERTY: Found object method '" << propertyName << "'" << std::endl;
             }
-            
+
             // For method calls, we need to keep the object on the stack and push the method reference
             // The CALL instruction will handle the method call with the object as 'this'
             std::string className = objectInstance->getClassName();
             std::string methodKey = className + "::" + propertyName;
-            
+
             // Push the object back onto the stack (it was popped at the beginning)
             push(object);
-            
+
             // Create a method reference value (not using FUNCTION_TYPE to avoid the first code path in handleCall)
             auto methodValue = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, methodKey);
-            
+
             if (debugMode) {
                 std::cout << "[DEBUG] GET_PROPERTY: Created method reference: " << methodKey << std::endl;
                 std::cout << "[DEBUG] GET_PROPERTY: Object and method both on stack for method call" << std::endl;
             }
-            
+
             push(methodValue);
             return;
         }
-        
+
         error("Property '" + propertyName + "' not found in object");
         return;
     }
@@ -6888,14 +6885,14 @@ void VM::handleGetProperty(const Instruction& instruction) {
                 return;
             }
         }
-        
+
         if (debugMode) {
             std::cout << "[DEBUG] GET_PROPERTY: Available keys in dictionary:" << std::endl;
             for (const auto& [key, value] : dictData.elements) {
                 std::cout << "[DEBUG] GET_PROPERTY:   - " << key->toString() << std::endl;
             }
         }
-        
+
         error("Property '" + propertyName + "' not found in dictionary");
         return;
     }
@@ -6934,7 +6931,7 @@ void VM::handleSetProperty(const Instruction& instruction) {
     if (debugMode) {
         std::cout << "[DEBUG] SET_PROPERTY: Setting property '" << propertyName << "' on object" << std::endl;
     }
-    
+
     // Get current class context for visibility checking
     std::shared_ptr<backend::ClassDefinition> currentClass = getCurrentClassContext();
 
@@ -7012,33 +7009,33 @@ void VM::handleSetProperty(const Instruction& instruction) {
 }
 void VM::handleCreateList(const Instruction& instruction) {
     int32_t elementCount = instruction.intValue;
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] CREATE_LIST: Creating list with " << elementCount << " elements" << std::endl;
     }
-    
+
     if (stack.size() < static_cast<size_t>(elementCount)) {
         error("Stack underflow in CREATE_LIST");
         return;
     }
-    
+
     // Create a new list value
     ListValue listData;
     listData.elements.reserve(elementCount);
-    
+
     // Pop elements from stack in reverse order (they were pushed in forward order)
     for (int32_t i = 0; i < elementCount; i++) {
         ValuePtr element = pop();
         listData.elements.insert(listData.elements.begin(), element);
     }
-    
+
     // Create the list value
     auto listType = std::make_shared<Type>(TypeTag::List);
     ValuePtr listValue = memoryManager.makeRef<Value>(*region, listType);
     listValue->data = listData;
-    
+
     push(listValue);
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] CREATE_LIST: Created list with " << listData.elements.size() << " elements" << std::endl;
     }
@@ -7046,33 +7043,33 @@ void VM::handleCreateList(const Instruction& instruction) {
 
 void VM::handleCreateTuple(const Instruction& instruction) {
     int32_t elementCount = instruction.intValue;
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] CREATE_TUPLE: Creating tuple with " << elementCount << " elements" << std::endl;
     }
-    
+
     if (stack.size() < static_cast<size_t>(elementCount)) {
         error("Stack underflow in CREATE_TUPLE");
         return;
     }
-    
+
     // Create a new tuple value
     TupleValue tupleData;
     tupleData.elements.reserve(elementCount);
-    
+
     // Pop elements from stack in reverse order (they were pushed in forward order)
     for (int32_t i = 0; i < elementCount; i++) {
         ValuePtr element = pop();
         tupleData.elements.insert(tupleData.elements.begin(), element);
     }
-    
+
     // Create the tuple value
     auto tupleType = std::make_shared<Type>(TypeTag::Tuple);
     ValuePtr tupleValue = memoryManager.makeRef<Value>(*region, tupleType);
     tupleValue->data = tupleData;
-    
+
     push(tupleValue);
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] CREATE_TUPLE: Created tuple with " << tupleData.elements.size() << " elements" << std::endl;
     }
@@ -7084,14 +7081,14 @@ bool VM::handleValPatternMatch(const ValuePtr& value) {
     // Stack layout (from top to bottom):
     // - pattern marker ("__val_pattern__") [already popped]
     // - variable name for binding
-    
+
     ValuePtr variableName = pop();
     std::string varName = std::get<std::string>(variableName->data);
-    
+
     // Check if the value is a success value (not an error)
     bool isSuccess = true;
     ValuePtr actualValue = value;
-    
+
     if (value->type->tag == TypeTag::ErrorUnion) {
         if (std::holds_alternative<ErrorValue>(value->data)) {
             // This is an error in an error union - pattern doesn't match
@@ -7107,10 +7104,10 @@ bool VM::handleValPatternMatch(const ValuePtr& value) {
         // Direct error value - pattern doesn't match
         return false;
     }
-    
+
     // Bind the success value to the variable
     environment->define(varName, actualValue);
-    
+
     return true;
 }
 
@@ -7119,14 +7116,14 @@ bool VM::handleErrPatternMatch(const ValuePtr& value) {
     // - pattern marker ("__err_pattern__") [already popped]
     // - specific error type (or null for any error)
     // - variable name for binding
-    
+
     ValuePtr specificErrorType = pop();
     ValuePtr variableName = pop();
     std::string varName = std::get<std::string>(variableName->data);
-    
+
     // Check if the value is an error
     ErrorValue* errorValue = nullptr;
-    
+
     if (value->type->tag == TypeTag::ErrorUnion) {
         if (std::holds_alternative<ErrorValue>(value->data)) {
             errorValue = &std::get<ErrorValue>(value->data);
@@ -7140,7 +7137,7 @@ bool VM::handleErrPatternMatch(const ValuePtr& value) {
         // Not an error value - pattern doesn't match
         return false;
     }
-    
+
     // Check specific error type if specified
     if (specificErrorType->type->tag != TypeTag::Nil) {
         std::string expectedErrorType = std::get<std::string>(specificErrorType->data);
@@ -7148,14 +7145,14 @@ bool VM::handleErrPatternMatch(const ValuePtr& value) {
             return false;
         }
     }
-    
+
     // Create an error value to bind
     ValuePtr errorValueToBindPtr = memoryManager.makeRef<Value>(*region, typeSystem->ANY_TYPE);
     errorValueToBindPtr->data = *errorValue;
-    
+
     // Bind the error value to the variable
     environment->define(varName, errorValueToBindPtr);
-    
+
     return true;
 }
 
@@ -7165,22 +7162,22 @@ bool VM::handleErrorTypePatternMatch(const ValuePtr& value) {
     // - parameter names (for binding)
     // - number of parameters
     // - error type name
-    
+
     ValuePtr errorTypeName = pop();
     ValuePtr numParamsValue = pop();
     int numParams = std::get<int32_t>(numParamsValue->data);
-    
+
     std::vector<std::string> paramNames;
     for (int i = 0; i < numParams; i++) {
         ValuePtr paramName = pop();
         paramNames.insert(paramNames.begin(), std::get<std::string>(paramName->data));
     }
-    
+
     std::string expectedErrorType = std::get<std::string>(errorTypeName->data);
-    
+
     // Check if the value is an error of the expected type
     ErrorValue* errorValue = nullptr;
-    
+
     if (value->type->tag == TypeTag::ErrorUnion) {
         if (std::holds_alternative<ErrorValue>(value->data)) {
             errorValue = &std::get<ErrorValue>(value->data);
@@ -7194,23 +7191,23 @@ bool VM::handleErrorTypePatternMatch(const ValuePtr& value) {
         // Not an error value - pattern doesn't match
         return false;
     }
-    
+
     // Check if error type matches
     if (errorValue->errorType != expectedErrorType) {
         return false;
     }
-    
+
     // Bind error parameters to variables
     for (size_t i = 0; i < paramNames.size() && i < errorValue->arguments.size(); i++) {
         environment->define(paramNames[i], errorValue->arguments[i]);
     }
-    
+
     // For missing parameters, bind nil
     for (size_t i = errorValue->arguments.size(); i < paramNames.size(); i++) {
         ValuePtr nilValue = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE, nullptr);
         environment->define(paramNames[i], nilValue);
     }
-    
+
     return true;
 }
 // Task Management Methods Implementation
@@ -7219,17 +7216,17 @@ std::unique_ptr<TaskContext> VM::createTaskContext(const std::string& loopVar, V
     // Generate unique task ID
     static std::atomic<size_t> task_id_counter{0};
     size_t task_id = task_id_counter.fetch_add(1);
-    
+
     // Create task context
     auto context = std::make_unique<TaskContext>(task_id, loopVar, iterationValue);
-    
+
     // Set error handling strategy from current block
     if (concurrency_state && concurrency_state->getCurrentBlock()) {
         context->error_strategy = concurrency_state->getCurrentBlock()->error_strategy;
     } else {
         context->error_strategy = ErrorHandlingStrategy::Stop;
     }
-    
+
     // Copy current error frames to task context
     for (const auto& frame : errorFrames) {
         context->error_frames.emplace_back(
@@ -7239,7 +7236,7 @@ std::unique_ptr<TaskContext> VM::createTaskContext(const std::string& loopVar, V
                     frame.functionName
                     );
     }
-    
+
     return context;
 }
 
@@ -7249,20 +7246,20 @@ std::unique_ptr<TaskContext> VM::createTaskContextWithBytecode(
         const std::vector<Instruction>& bytecode,
         size_t start_ip,
         size_t end_ip) {
-    
+
     // Create base task context
     auto context = createTaskContext(loopVar, iterationValue);
-    
+
     // Extract bytecode for this task
     if (start_ip < bytecode.size() && end_ip <= bytecode.size() && start_ip < end_ip) {
         context->task_bytecode.clear();
         context->task_bytecode.reserve(end_ip - start_ip);
-        
+
         for (size_t i = start_ip; i < end_ip; ++i) {
             context->task_bytecode.push_back(bytecode[i]);
         }
     }
-    
+
     return context;
 }
 
@@ -7270,18 +7267,18 @@ std::unique_ptr<TaskVM> VM::createTaskVM(std::unique_ptr<TaskContext> context) {
     if (!concurrency_state || !concurrency_state->runtime) {
         throw std::runtime_error("Concurrency runtime not available");
     }
-    
+
     // Get shared components from concurrency runtime
     auto error_collector = std::make_shared<ConcurrentErrorCollector>();
     std::shared_ptr<Channel<ValuePtr>> result_channel = nullptr;
     std::shared_ptr<Channel<ErrorValue>> error_channel = nullptr;
-    
+
     // Get output channel from current block if available
     if (concurrency_state->getCurrentBlock() &&
             concurrency_state->getCurrentBlock()->output_channel) {
         result_channel = concurrency_state->getCurrentBlock()->output_channel;
     }
-    
+
     // Create TaskVM using factory
     return TaskVMFactory::createTaskVM(
                 std::move(context),
@@ -7295,34 +7292,34 @@ void VM::submitTaskToScheduler(std::unique_ptr<TaskVM> task_vm) {
     if (!concurrency_state || !concurrency_state->runtime) {
         throw std::runtime_error("Concurrency runtime not available");
     }
-    
+
     auto scheduler = concurrency_state->runtime->getScheduler();
     if (!scheduler) {
         throw std::runtime_error("Scheduler not available");
     }
-    
+
     // Get current block state for completion tracking
     auto* current_block = concurrency_state->getCurrentBlock();
     if (!current_block) {
         throw std::runtime_error("No current block for task execution");
     }
-    
+
     // Set up completion callback to update block state
     task_vm->setCompletionCallback([current_block](size_t task_id, ValuePtr result, bool success) {
         if (success && result) {
             current_block->addResult(result);
         }
-        
+
         // Update completion counters
         current_block->completed_tasks.fetch_add(1);
         if (!success) {
             current_block->failed_tasks.fetch_add(1);
         }
     });
-    
+
     // Convert unique_ptr to shared_ptr for lambda capture
     std::shared_ptr<TaskVM> shared_task_vm = std::move(task_vm);
-    
+
     // Create a task function that executes the TaskVM
     auto task_function = [shared_task_vm]() {
         try {
@@ -7334,12 +7331,12 @@ void VM::submitTaskToScheduler(std::unique_ptr<TaskVM> task_vm) {
             error.errorType = "TaskExecutionError";
             error.message = e.what();
             shared_task_vm->handleTaskError(error);
-            
+
             // Complete task with error
             shared_task_vm->completeTask(nullptr);
         }
     };
-    
+
     // Submit task to scheduler
     scheduler->submit(std::move(task_function));
 }
@@ -7347,7 +7344,7 @@ void VM::submitTaskToScheduler(std::unique_ptr<TaskVM> task_vm) {
 void VM::executeTaskInThread(std::unique_ptr<TaskContext> context) {
     // Create TaskVM for this context
     auto task_vm = createTaskVM(std::move(context));
-    
+
     // Submit to scheduler for execution
     submitTaskToScheduler(std::move(task_vm));
 }
@@ -7356,7 +7353,7 @@ std::shared_ptr<IteratorValue> VM::createIterator(ValuePtr iterable) {
     if (!iterable) {
         return nullptr;
     }
-    
+
     if (std::holds_alternative<ListValue>(iterable->data)) {
         // For lists, create a list iterator
         return std::make_shared<IteratorValue>(
@@ -7379,7 +7376,7 @@ std::shared_ptr<IteratorValue> VM::createIterator(ValuePtr iterable) {
                     iterable
                     );
     }
-    
+
     return nullptr;
 }
 
@@ -7387,7 +7384,7 @@ bool VM::hasNext(std::shared_ptr<IteratorValue> iterator) {
     if (!iterator) {
         return false;
     }
-    
+
     return iterator->hasNext();
 }
 
@@ -7395,7 +7392,7 @@ ValuePtr VM::next(std::shared_ptr<IteratorValue> iterator) {
     if (!iterator || !iterator->hasNext()) {
         return nullptr;
     }
-    
+
     return iterator->next();
 }
 
@@ -7408,17 +7405,17 @@ void VM::collectTaskResults(BlockExecutionState& state) {
     if (!concurrency_state) {
         return;
     }
-    
+
     auto* current_block = concurrency_state->getCurrentBlock();
     if (!current_block) {
         return;
     }
-    
+
     // Wait for all tasks to complete
     while (current_block->completed_tasks.load() < current_block->total_tasks) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-    
+
     // Collect all results
     state.results = current_block->getResults();
 }
@@ -7428,18 +7425,18 @@ void VM::handleCollectedErrors(BlockExecutionState& state) {
     if (!concurrency_state) {
         return;
     }
-    
+
     auto* current_block = concurrency_state->getCurrentBlock();
     if (!current_block) {
         return;
     }
-    
+
     // Check if any tasks failed
     if (current_block->failed_tasks.load() > 0) {
         // Create an error value for failed tasks
         std::string errorMsg = "One or more tasks failed during parallel execution";
         ValuePtr errorValue = createErrorValue("ParallelExecutionError", errorMsg);
-        
+
         // Propagate the error if we're in an error handling context
         if (hasErrorFrames()) {
             propagateError(errorValue);
@@ -7455,10 +7452,10 @@ void VM::cleanupBlockResources(BlockExecutionState& state) {
     if (!concurrency_state) {
         return;
     }
-    
+
     // Pop the current block from the stack
     concurrency_state->popBlock();
-    
+
     // Clear any temporary state
     state.results.clear();
     state.tasks.clear();
@@ -7470,25 +7467,25 @@ void VM::handleEndParallel(const Instruction& instruction) {
         error("Concurrency state not initialized for parallel block");
         return;
     }
-    
+
     auto* current_block = concurrency_state->getCurrentBlock();
     if (!current_block) {
         error("No current parallel block to end");
         return;
     }
-    
+
     // Create block execution state
     BlockExecutionState state(BlockType::Parallel);
-    
+
     // Wait for all tasks to complete and collect results
     collectTaskResults(state);
-    
+
     // Handle any errors that occurred
     handleCollectedErrors(state);
-    
+
     // Clean up resources
     cleanupBlockResources(state);
-    
+
     // Push results onto the stack if any
     if (!state.results.empty()) {
         // For now, just push the first result
@@ -7505,7 +7502,7 @@ void VM::handleEndParallel(const Instruction& instruction) {
 void VM::handleCreateClosure(const Instruction& instruction) {
     // CREATE_CLOSURE instruction creates a closure from a function and captured variables
     // Expected stack: [function, captured_var_count, captured_vars...]
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] CREATE_CLOSURE: Stack size = " << stack.size() << std::endl;
         for (size_t i = 0; i < stack.size() && i < 10; i++) {
@@ -7513,51 +7510,51 @@ void VM::handleCreateClosure(const Instruction& instruction) {
             std::cout << "[DEBUG] CREATE_CLOSURE: Stack[" << i << "] = " << value->toString() << " (type: " << static_cast<int>(value->type->tag) << ")" << std::endl;
         }
     }
-    
+
     if (stack.size() < 2) {
         error("CREATE_CLOSURE requires at least function and captured variable count on stack");
         return;
     }
-    
+
     // Get the captured variable count
     ValuePtr countValue = pop();
     if (!countValue || countValue->type->tag != TypeTag::Int) {
         error("CREATE_CLOSURE expected integer count of captured variables");
         return;
     }
-    
+
     int32_t capturedCount = std::get<int32_t>(countValue->data);
-    
+
     if (stack.size() < static_cast<size_t>(capturedCount + 1)) {
         error("CREATE_CLOSURE: not enough values on stack for captured variables");
         return;
     }
-    
+
     // Collect captured variables (they are pushed as name-value pairs)
     std::vector<std::string> capturedVarNames;
     std::unordered_map<std::string, ValuePtr> capturedValues;
-    
+
     for (int32_t i = 0; i < capturedCount; i++) {
         ValuePtr value = pop();
         ValuePtr nameValue = pop();
-        
+
         if (!nameValue || nameValue->type->tag != TypeTag::String) {
             error("CREATE_CLOSURE expected string name for captured variable");
             return;
         }
-        
+
         std::string varName = std::get<std::string>(nameValue->data);
         capturedVarNames.push_back(varName);
         capturedValues[varName] = value;
     }
-    
+
     // Get the function
     ValuePtr functionValue = pop();
     if (!functionValue) {
         error("CREATE_CLOSURE: no function on stack");
         return;
     }
-    
+
     // Check if it's a lambda function (stored as backend::Function)
     backend::Function* lambdaFunc = nullptr;
     if (std::holds_alternative<backend::Function>(functionValue->data)) {
@@ -7566,25 +7563,25 @@ void VM::handleCreateClosure(const Instruction& instruction) {
         error("CREATE_CLOSURE can only create closures from lambda functions");
         return;
     }
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] CREATE_CLOSURE: Creating closure from lambda function: " << lambdaFunc->name << std::endl;
     }
-    
+
     // Create optimized closure environment with captured variables
     auto closureEnv = optimizeCapturedEnvironment(capturedVarNames, environment);
-    
+
     // Add the captured values to the optimized environment
     for (const auto& [name, value] : capturedValues) {
         closureEnv->captureVariable(name, value);
     }
-    
+
     // Look up the function in the registry to get correct addresses
     // (workaround for potential corruption in the stack-stored function)
     auto registryIt = userDefinedFunctions.find(lambdaFunc->name);
     size_t correctStartAddress = lambdaFunc->startAddress;
     size_t correctEndAddress = lambdaFunc->endAddress;
-    
+
     if (registryIt != userDefinedFunctions.end()) {
         correctStartAddress = registryIt->second.startAddress;
         correctEndAddress = registryIt->second.endAddress;
@@ -7593,29 +7590,29 @@ void VM::handleCreateClosure(const Instruction& instruction) {
     } else {
         //  std::cout << "[WARNING] CREATE_CLOSURE: Function not found in registry, using stack addresses" << std::endl;
     }
-    
+
     // Create the closure value using the correct addresses
     ClosureValue closure(lambdaFunc->name, correctStartAddress, correctEndAddress,
                          closureEnv, capturedVarNames);
-    
+
     // Create a closure type
     TypePtr closureType = std::make_shared<Type>(TypeTag::Closure);
-    
+
     // Create the closure value and track it for memory management
     ValuePtr closureValue = memoryManager.makeRef<Value>(*region, closureType, closure);
-    
+
     // Track the closure for memory management
     std::string closureId = trackClosure(closureValue);
-    
+
     // Detect circular references
     if (detectCircularReferences(closureId)) {
         if (debugMode) {
             std::cout << "[DEBUG] Circular reference detected in closure: " << closureId << std::endl;
         }
     }
-    
+
     push(closureValue);
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] Created closure with " << capturedCount << " captured variables" << std::endl;
     }
@@ -7624,9 +7621,9 @@ void VM::handleCreateClosure(const Instruction& instruction) {
 void VM::handleCaptureVar(const Instruction& instruction) {
     // CAPTURE_VAR instruction captures a variable from the current environment
     // The variable name is in instruction.stringValue
-    
+
     const std::string& varName = instruction.stringValue;
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] CAPTURE_VAR: Attempting to capture '" << varName << "'" << std::endl;
         std::cout << "[DEBUG] CAPTURE_VAR: currentFunctionBeingDefined = '" << getCurrentFunctionBeingDefined() << "'" << std::endl;
@@ -7637,7 +7634,7 @@ void VM::handleCaptureVar(const Instruction& instruction) {
             std::cout << "[DEBUG] CAPTURE_VAR:   - " << name << " = " << value->toString() << std::endl;
         }
     }
-    
+
     // Check if we're in pre-processing mode
     // In this case, we can't capture variables yet, so we'll defer this
     if (isPreProcessing) {
@@ -7647,7 +7644,7 @@ void VM::handleCaptureVar(const Instruction& instruction) {
         ValuePtr placeholderValue = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
         push(nameValue);
         push(placeholderValue);
-        
+
         if (debugMode) {
             std::cout << "[DEBUG] CAPTURE_VAR: Deferred capture of variable '" << varName << "' (pre-processing mode)" << std::endl;
         }
@@ -7655,12 +7652,12 @@ void VM::handleCaptureVar(const Instruction& instruction) {
         // We're in normal execution mode, proceed with capture
         try {
             ValuePtr value = environment->get(varName);
-            
+
             // Push the variable name and value onto the stack for CREATE_CLOSURE
             ValuePtr nameValue = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, varName);
             push(nameValue);
             push(value);
-            
+
             if (debugMode) {
                 std::cout << "[DEBUG] CAPTURE_VAR: Captured variable '" << varName << "' with value: " << value->toString() << std::endl;
             }
@@ -7669,14 +7666,14 @@ void VM::handleCaptureVar(const Instruction& instruction) {
                 std::cout << "[DEBUG] CAPTURE_VAR: Exception caught - " << e.what() << std::endl;
                 std::cout << "[DEBUG] CAPTURE_VAR: Variable not available, pushing placeholders" << std::endl;
             }
-            
+
             // Variable not available now, push placeholders
             // This can happen if CAPTURE_VAR is executed at the wrong time
             ValuePtr nameValue = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, varName);
             ValuePtr placeholderValue = memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
             push(nameValue);
             push(placeholderValue);
-            
+
             if (debugMode) {
                 std::cout << "[DEBUG] CAPTURE_VAR: Pushed placeholders for '" << varName << "'" << std::endl;
             }
@@ -7687,50 +7684,50 @@ void VM::handleCaptureVar(const Instruction& instruction) {
 void VM::handleCallClosure(const Instruction& instruction) {
     // CALL_CLOSURE instruction calls a closure with environment restoration
     // Expected stack: [closure, arg_count, args...]
-    
+
     if (stack.size() < 2) {
         error("CALL_CLOSURE requires at least closure and argument count on stack");
         return;
     }
-    
+
     // Get argument count
     ValuePtr argCountValue = pop();
     if (!argCountValue || argCountValue->type->tag != TypeTag::Int) {
         error("CALL_CLOSURE expected integer argument count");
         return;
     }
-    
+
     int32_t argCount = std::get<int32_t>(argCountValue->data);
-    
+
     if (stack.size() < static_cast<size_t>(argCount + 1)) {
         error("CALL_CLOSURE: not enough arguments on stack");
         return;
     }
-    
+
     // Collect arguments
     std::vector<ValuePtr> args;
     for (int32_t i = 0; i < argCount; i++) {
         args.insert(args.begin(), pop()); // Insert at beginning to maintain order
     }
-    
+
     // Get the closure
     ValuePtr closureValue = pop();
     if (!closureValue || closureValue->type->tag != TypeTag::Closure) {
         error("CALL_CLOSURE expected closure value");
         return;
     }
-    
+
     ClosureValue closure = std::get<ClosureValue>(closureValue->data);
-    
+
     if (!closure.isValid()) {
         error("CALL_CLOSURE: invalid closure");
         return;
     }
-    
+
     // Save current environment and use captured environment directly
     std::shared_ptr<Environment> savedEnv = environment;
     environment = closure.capturedEnvironment;
-    
+
     // Get the lambda function from the registry
     auto funcIt = userDefinedFunctions.find(closure.functionName);
     if (funcIt == userDefinedFunctions.end()) {
@@ -7738,7 +7735,7 @@ void VM::handleCallClosure(const Instruction& instruction) {
         error("CALL_CLOSURE: lambda function not found in registry: " + closure.functionName);
         return;
     }
-    
+
     // Create a call frame for the closure
     backend::CallFrame closureFrame(
                 closure.functionName,
@@ -7747,7 +7744,7 @@ void VM::handleCallClosure(const Instruction& instruction) {
                 );
     closureFrame.isClosureCall = true;
     closureFrame.closureEnvironment = closure.capturedEnvironment;
-    
+
     // Bind function parameters to arguments
     const backend::Function& lambdaFunc = funcIt->second;
     if (!bindFunctionParameters(lambdaFunc, args, environment, closure.functionName)) {
@@ -7756,13 +7753,13 @@ void VM::handleCallClosure(const Instruction& instruction) {
         error("CALL_CLOSURE: failed to bind parameters");
         return;
     }
-    
+
     // Push the call frame
     callStack.push_back(closureFrame);
-    
+
     // Jump to the function start address
     ip = closure.startAddress - 1; // -1 because ip will be incremented
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] Called closure: " << closure.functionName
                   << " with " << argCount << " arguments, jumping to IP " << closure.startAddress << std::endl;
@@ -7772,9 +7769,9 @@ void VM::handleCallClosure(const Instruction& instruction) {
 void VM::handlePushLambda(const Instruction& instruction) {
     // PUSH_LAMBDA instruction pushes a lambda function onto the stack
     // The lambda function name is in instruction.stringValue
-    
+
     std::string lambdaName = instruction.stringValue;
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] PUSH_LAMBDA: Looking for lambda function: " << lambdaName << std::endl;
         std::cout << "[DEBUG] Available functions: ";
@@ -7783,7 +7780,7 @@ void VM::handlePushLambda(const Instruction& instruction) {
         }
         std::cout << std::endl;
     }
-    
+
     // Look up the lambda function in the user-defined functions
     auto funcIt = userDefinedFunctions.find(lambdaName);
     if (funcIt == userDefinedFunctions.end()) {
@@ -7799,10 +7796,10 @@ void VM::handlePushLambda(const Instruction& instruction) {
         std::cout << "[DEBUG] Found lambda function: " << lambdaName
                   << " (isLambda: " << funcIt->second.isLambda << ")" << std::endl;
     }
-    
+
     // Create a function type
     TypePtr functionType = std::make_shared<Type>(TypeTag::Function);
-    
+
     // For lambda functions, we store the Function struct directly in the value
     // This allows us to access the bytecode addresses and parameters later
     if (debugMode) {
@@ -7811,7 +7808,7 @@ void VM::handlePushLambda(const Instruction& instruction) {
     }
     ValuePtr functionValue = memoryManager.makeRef<Value>(*region, functionType, funcIt->second);
     push(functionValue);
-    
+
     // Verify what was stored
     if (std::holds_alternative<backend::Function>(functionValue->data)) {
         const auto& storedFunc = std::get<backend::Function>(functionValue->data);
@@ -7826,7 +7823,7 @@ void VM::handlePushLambda(const Instruction& instruction) {
             }
         }
     }
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] PUSH_LAMBDA: Successfully pushed lambda function " << lambdaName << std::endl;
     }
@@ -7838,9 +7835,9 @@ void VM::handlePushLambda(const Instruction& instruction) {
 void VM::handlePushFunctionRef(const Instruction& instruction) {
     // PUSH_FUNCTION_REF instruction pushes a function reference onto the stack
     // The function name is in instruction.stringValue
-    
+
     std::string functionName = instruction.stringValue;
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] PUSH_FUNCTION_REF: Looking for function: " << functionName << std::endl;
         std::cout << "[DEBUG] Available user functions: ";
@@ -7849,172 +7846,172 @@ void VM::handlePushFunctionRef(const Instruction& instruction) {
         }
         std::cout << std::endl;
     }
-    
+
     // First check user-defined functions
     auto userFuncIt = userDefinedFunctions.find(functionName);
     if (userFuncIt != userDefinedFunctions.end()) {
         if (debugMode) {
             std::cout << "[DEBUG] PUSH_FUNCTION_REF: Found user function: " << functionName << std::endl;
         }
-        
+
         // Create a function value that stores the function name (same as PUSH_FUNCTION)
         // This will be used later when the function is called
         ValuePtr functionValue = memoryManager.makeRef<Value>(*region, typeSystem->FUNCTION_TYPE, functionName);
         push(functionValue);
-        
+
         if (debugMode) {
             std::cout << "[DEBUG] Pushed user function reference: " << functionName << std::endl;
         }
         return;
     }
-    
+
     // Check native functions
     auto nativeFuncIt = nativeFunctions.find(functionName);
     if (nativeFuncIt != nativeFunctions.end()) {
         // For native functions, we need to wrap them in a callable form
         // This is a simplified implementation - you might want to create a special
         // NativeFunctionValue type for better type safety
-        
+
         // Create a function type
         TypePtr functionType = std::make_shared<Type>(TypeTag::Function);
-        
+
         // Store the native function as a string identifier for now
         // In a more complete implementation, you'd create a proper wrapper
         ValuePtr functionValue = memoryManager.makeRef<Value>(*region, functionType, functionName);
         push(functionValue);
-        
+
         if (debugMode) {
             std::cout << "[DEBUG] Pushed native function reference: " << functionName << std::endl;
         }
         return;
     }
-    
+
     error("PUSH_FUNCTION_REF: function not found: " + functionName);
 }
 
 void VM::handleCallHigherOrder(const Instruction& instruction) {
     // CALL_HIGHER_ORDER instruction calls a function with function parameters
     // Expected stack: [function, arg_count, args...] where some args may be functions
-    
+
     if (stack.size() < 2) {
         error("CALL_HIGHER_ORDER requires at least function and argument count on stack");
         return;
     }
-    
+
     // Get argument count
     ValuePtr argCountValue = pop();
     if (!argCountValue || argCountValue->type->tag != TypeTag::Int) {
         error("CALL_HIGHER_ORDER expected integer argument count");
         return;
     }
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] argCountValue type: " << static_cast<int>(argCountValue->type->tag) << std::endl;
         std::cout << "[DEBUG] argCountValue data variant index: " << argCountValue->data.index() << std::endl;
     }
-    
+
     int32_t argCount = std::get<int32_t>(argCountValue->data);
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] CALL_HIGHER_ORDER: stack.size()=" << stack.size()
                   << ", argCount=" << argCount
                   << ", required=" << (argCount + 1) << std::endl;
     }
-    
+
     if (stack.size() < static_cast<size_t>(argCount + 1)) {
         error("CALL_HIGHER_ORDER: not enough arguments on stack (have " +
               std::to_string(stack.size()) + ", need " + std::to_string(argCount + 1) + ")");
         return;
     }
-    
+
     // Collect arguments
     std::vector<ValuePtr> args;
     for (int32_t i = 0; i < argCount; i++) {
         args.insert(args.begin(), pop()); // Insert at beginning to maintain order
     }
-    
+
     // Get the function to call
     ValuePtr functionValue = pop();
     if (!functionValue) {
         error("CALL_HIGHER_ORDER: no function on stack");
         return;
     }
-    
+
     // Handle different types of functions
     if (functionValue->type->tag == TypeTag::Function) {
         // Check if it's a user-defined function
         if (std::holds_alternative<std::shared_ptr<backend::UserDefinedFunction>>(functionValue->data)) {
             auto userFunc = std::get<std::shared_ptr<backend::UserDefinedFunction>>(functionValue->data);
-            
+
             // Get the function name from the user function
             std::string functionName = userFunc->getSignature().name;
-            
+
             // Look up the function in the registry to get execution details
             auto funcIt = userDefinedFunctions.find(functionName);
             if (funcIt == userDefinedFunctions.end()) {
                 error("CALL_HIGHER_ORDER: user function not found in registry: " + functionName);
                 return;
             }
-            
+
             // Call the user-defined function using the VM's call mechanism
             try {
                 const backend::Function& funcInfo = funcIt->second;
-                
+
                 // Create a new environment for the function
                 auto funcEnv = std::make_shared<Environment>(environment);
-                
+
                 // Bind function parameters
                 if (!bindFunctionParameters(funcInfo, args, funcEnv, functionName)) {
                     error("CALL_HIGHER_ORDER: failed to bind parameters for " + functionName);
                     return;
                 }
-                
+
                 // Create call frame and switch environment
                 createAndPushCallFrame(functionName, ip + 1, funcEnv);
-                
+
                 // Jump to function start
                 ip = funcInfo.startAddress;
-                
+
                 if (debugMode) {
                     std::cout << "[DEBUG] CALL_HIGHER_ORDER: Called user function " << functionName
                               << " at address " << ip << std::endl;
                 }
                 return; // Don't increment IP, we've jumped to the function
-                
+
             } catch (const std::exception& e) {
                 error("CALL_HIGHER_ORDER: error calling user function: " + std::string(e.what()));
             }
         } else if (std::holds_alternative<std::string>(functionValue->data)) {
             // Function reference stored as string - could be user-defined or native
             std::string funcName = std::get<std::string>(functionValue->data);
-            
+
             // First check if it's a user-defined function
             auto userFuncIt = userDefinedFunctions.find(funcName);
             if (userFuncIt != userDefinedFunctions.end()) {
                 try {
                     const backend::Function& funcInfo = userFuncIt->second;
-                    
+
                     // Create a new environment for the function
                     auto funcEnv = std::make_shared<Environment>(environment);
-                    
+
                     // Bind function parameters
                     if (!bindFunctionParameters(funcInfo, args, funcEnv, funcName)) {
                         error("CALL_HIGHER_ORDER: failed to bind parameters for " + funcName);
                         return;
                     }
-                    
+
                     // Create call frame and switch environment
                     createAndPushCallFrame(funcName, ip + 1, funcEnv);
-                    
+
                     // Jump to function start
                     ip = funcInfo.startAddress;
-                    
+
                     if (debugMode) {
                         std::cout << "[DEBUG] CALL_HIGHER_ORDER: Called user function " << funcName
                                   << " at address " << ip << std::endl;
                     }
                     return; // Don't increment IP, we've jumped to the function
-                    
+
                 } catch (const std::exception& e) {
                     error("CALL_HIGHER_ORDER: error calling user function: " + std::string(e.what()));
                 }
@@ -8038,7 +8035,7 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
     } else if (functionValue->type->tag == TypeTag::Closure) {
         // Handle closure calls
         ClosureValue closure = std::get<ClosureValue>(functionValue->data);
-        
+
         if (debugMode) {
             std::cout << "[DEBUG] CALL_HIGHER_ORDER: Closure details:" << std::endl;
             std::cout << "  functionName: " << closure.functionName << std::endl;
@@ -8046,7 +8043,7 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
             std::cout << "  endAddress: " << closure.endAddress << std::endl;
             std::cout << "  isValid(): " << (closure.isValid() ? "true" : "false") << std::endl;
         }
-        
+
         if (!closure.isValid()) {
             std::cout << "[ERROR] CALL_HIGHER_ORDER: invalid closure details:" << std::endl;
             std::cout << "  functionName: '" << closure.functionName << "'" << std::endl;
@@ -8059,12 +8056,12 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
                   ", endAddress=" + std::to_string(closure.endAddress) + ")");
             return;
         }
-        
+
         // For closures, we need to set up the captured environment
         // This is similar to handleCallClosure but integrated into higher-order call
         std::shared_ptr<Environment> savedEnv = environment;
         environment = closure.capturedEnvironment;
-        
+
         try {
             // Find the lambda function in the registry
             auto funcIt = userDefinedFunctions.find(closure.functionName);
@@ -8073,7 +8070,7 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
                 error("CALL_HIGHER_ORDER: lambda function not found: " + closure.functionName);
                 return;
             }
-            
+
             // Bind parameters and execute the closure
             const backend::Function& lambdaFunc = funcIt->second;
             if (!bindFunctionParameters(lambdaFunc, args, environment, closure.functionName)) {
@@ -8081,25 +8078,25 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
                 error("CALL_HIGHER_ORDER: failed to bind parameters");
                 return;
             }
-            
+
             // Create a call frame and execute
             backend::CallFrame closureFrame(closure.functionName, ip + 1, nullptr);
             closureFrame.isClosureCall = true;
             closureFrame.closureEnvironment = closure.capturedEnvironment;
             callStack.push_back(closureFrame);
-            
+
             // For nested closures, we need to properly calculate the function body start
             // The startAddress points to BEGIN_FUNCTION, we need to skip setup instructions
             size_t bodyStart = closure.startAddress;
             // std::cout << "[DEBUG] CLOSURE EXEC: Looking for function body start from " << bodyStart << std::endl;
-            
+
             // Skip past BEGIN_FUNCTION and all parameter definitions and nested functions
             bodyStart++; // Skip BEGIN_FUNCTION
             int nestedFunctionDepth = 0;
             while (bodyStart < closure.endAddress && bodyStart < bytecode->size()) {
                 const Instruction& inst = (*bytecode)[bodyStart];
                 //std::cout << "[DEBUG] CLOSURE EXEC: Instruction at " << bodyStart << ": " << static_cast<int>(inst.opcode) << std::endl;
-                
+
                 if (inst.opcode == Opcode::BEGIN_FUNCTION) {
                     // Skip nested function definitions
                     nestedFunctionDepth++;
@@ -8130,18 +8127,18 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
                     break;
                 }
             }
-            
+
             // Ensure we don't jump past the function end
             if (bodyStart >= closure.endAddress) {
                 environment = savedEnv;
                 error("CALL_HIGHER_ORDER: invalid function body start address");
                 return;
             }
-            
+
             // Jump to the function body start address
             //  std::cout << "[DEBUG] CLOSURE EXEC: Jumping to " << bodyStart << " (ip will be " << (bodyStart - 1) << ")" << std::endl;
             ip = bodyStart - 1; // -1 because ip will be incremented in the main loop
-            
+
             // The function will return normally and restore the environment
         } catch (const std::exception& e) {
             environment = savedEnv; // Restore environment on error
@@ -8150,16 +8147,16 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
     } else if (functionValue->type->tag == TypeTag::Class) {
         // Handle class constructor calls
         auto classDef = std::get<std::shared_ptr<backend::ClassDefinition>>(functionValue->data);
-        
+
         if (debugMode) {
             std::cout << "[DEBUG] CALL_HIGHER_ORDER: Class constructor call for " << classDef->getName() << std::endl;
         }
-        
+
         // Create instance of the class
         auto instance = classDef->createInstance();
         auto objectType = std::make_shared<Type>(TypeTag::Object);
         auto objectValue = memoryManager.makeRef<Value>(*region, objectType, instance);
-        
+
         // Initialize fields with default values
         const auto& fields = instance->getClassDefinition()->getFields();
         for (const auto& field : fields) {
@@ -8169,21 +8166,21 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
                 instance->setField(field.name, defaultValueIt->second);
             }
         }
-        
+
         // Check if the class has an "init" method (constructor)
         std::string initMethodKey = classDef->getName() + "::init";
         auto initMethodIt = userDefinedFunctions.find(initMethodKey);
-        
+
         if (initMethodIt != userDefinedFunctions.end()) {
             // Call the init method with the provided arguments
             const backend::Function& initMethod = initMethodIt->second;
-            
+
             // Create a new environment for the constructor
             auto constructorEnv = std::make_shared<Environment>(environment);
-            
+
             // Bind 'this' parameter (implicit first parameter)
             constructorEnv->define("this", objectValue);
-            
+
             // Bind constructor parameters
             size_t paramIndex = 0;
             for (const auto& param : initMethod.parameters) {
@@ -8192,18 +8189,18 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
                     paramIndex++;
                 }
             }
-            
+
             // Create call frame for constructor
             backend::CallFrame frame(initMethodKey, ip + 1, nullptr);
             frame.setPreviousEnvironment(environment);
             callStack.push_back(frame);
-            
+
             // Switch to constructor environment
             environment = constructorEnv;
-            
+
             // Jump to constructor start
             ip = initMethod.startAddress - 1; // -1 because ip will be incremented
-            
+
             if (debugMode) {
                 std::cout << "[DEBUG] CALL_HIGHER_ORDER: Calling constructor " << initMethodKey
                           << " at address " << initMethod.startAddress << std::endl;
@@ -8219,7 +8216,7 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
     } else {
         error("CALL_HIGHER_ORDER: expected function or closure, got " + functionValue->type->toString());
     }
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] Called higher-order function with " << argCount << " arguments" << std::endl;
     }
@@ -8231,28 +8228,28 @@ void VM::handleCreateUnion(const Instruction& instruction) {
     // Expected stack: [value, variant_index, union_type_name]
     // instruction.intValue contains the variant index
     // instruction.stringValue contains the union type name
-    
+
     if (stack.size() < 1) {
         error("CREATE_UNION requires value on stack");
         return;
     }
-    
+
     ValuePtr value = pop();
     size_t variantIndex = static_cast<size_t>(instruction.intValue);
     std::string unionTypeName = instruction.stringValue;
-    
+
     // Get the union type from the type system
     TypePtr unionType = typeSystem->getType(unionTypeName);
     if (!unionType || unionType->tag != TypeTag::Union) {
         error("CREATE_UNION: invalid union type: " + unionTypeName);
         return;
     }
-    
+
     try {
         // Create the union value using TypeSystem helper
         ValuePtr unionValue = typeSystem->createUnionValue(unionType, variantIndex, value);
         push(unionValue);
-        
+
         if (debugMode) {
             std::cout << "[DEBUG] CREATE_UNION: Created union value with variant "
                       << variantIndex << " for type " << unionTypeName << std::endl;
@@ -8266,24 +8263,24 @@ void VM::handleGetUnionVariant(const Instruction& instruction) {
     // GET_UNION_VARIANT: Gets the active variant index from a union value
     // Expected stack: [union_value]
     // Pushes the variant index as an integer
-    
+
     if (stack.empty()) {
         error("GET_UNION_VARIANT requires union value on stack");
         return;
     }
-    
+
     ValuePtr unionValue = pop();
     if (!unionValue || !unionValue->isUnionType()) {
         error("GET_UNION_VARIANT: expected union type, got " +
               (unionValue ? unionValue->type->toString() : "null"));
         return;
     }
-    
+
     size_t variantIndex = unionValue->getActiveUnionVariant();
     ValuePtr indexValue = memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE,
                                                        static_cast<int32_t>(variantIndex));
     push(indexValue);
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] GET_UNION_VARIANT: Retrieved variant index "
                   << variantIndex << std::endl;
@@ -8295,30 +8292,30 @@ void VM::handleCheckUnionType(const Instruction& instruction) {
     // Expected stack: [union_value]
     // instruction.stringValue contains the type name to check against
     // Pushes boolean result
-    
+
     if (stack.empty()) {
         error("CHECK_UNION_TYPE requires union value on stack");
         return;
     }
-    
+
     ValuePtr unionValue = pop();
     if (!unionValue || !unionValue->isUnionType()) {
         error("CHECK_UNION_TYPE: expected union type, got " +
               (unionValue ? unionValue->type->toString() : "null"));
         return;
     }
-    
+
     std::string targetTypeName = instruction.stringValue;
     TypePtr targetType = typeSystem->getType(targetTypeName);
     if (!targetType) {
         error("CHECK_UNION_TYPE: unknown type: " + targetTypeName);
         return;
     }
-    
+
     bool matches = unionValue->matchesUnionVariant(targetType);
     ValuePtr result = memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, matches);
     push(result);
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] CHECK_UNION_TYPE: Union matches " << targetTypeName
                   << ": " << (matches ? "true" : "false") << std::endl;
@@ -8329,23 +8326,23 @@ void VM::handleSetUnionVariant(const Instruction& instruction) {
     // SET_UNION_VARIANT: Sets the active variant in a union value
     // Expected stack: [union_value, new_value]
     // instruction.intValue contains the new variant index
-    
+
     if (stack.size() < 2) {
         error("SET_UNION_VARIANT requires union value and new value on stack");
         return;
     }
-    
+
     ValuePtr newValue = pop();
     ValuePtr unionValue = pop();
-    
+
     if (!unionValue || !unionValue->isUnionType()) {
         error("SET_UNION_VARIANT: expected union type, got " +
               (unionValue ? unionValue->type->toString() : "null"));
         return;
     }
-    
+
     size_t newVariantIndex = static_cast<size_t>(instruction.intValue);
-    
+
     // Validate the new variant index
     std::vector<TypePtr> variantTypes = typeSystem->getUnionVariantTypes(unionValue->type);
     if (newVariantIndex >= variantTypes.size()) {
@@ -8353,7 +8350,7 @@ void VM::handleSetUnionVariant(const Instruction& instruction) {
               " out of range (max: " + std::to_string(variantTypes.size() - 1) + ")");
         return;
     }
-    
+
     // Validate that the new value matches the target variant type
     TypePtr targetVariantType = variantTypes[newVariantIndex];
     if (!typeSystem->isCompatible(newValue->type, targetVariantType)) {
@@ -8361,13 +8358,13 @@ void VM::handleSetUnionVariant(const Instruction& instruction) {
               " not compatible with variant type " + targetVariantType->toString());
         return;
     }
-    
+
     // Update the union value
     unionValue->setActiveUnionVariant(newVariantIndex);
     unionValue->data = newValue->data;
-    
+
     push(unionValue);
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] SET_UNION_VARIANT: Set variant to " << newVariantIndex << std::endl;
     }
@@ -8379,45 +8376,45 @@ std::string VM::trackClosure(ValuePtr closureValue) {
     if (!closureValue || !std::holds_alternative<ClosureValue>(closureValue->data)) {
         return "";
     }
-    
+
     const auto& closure = std::get<ClosureValue>(closureValue->data);
     std::string closureId = closure.getClosureId();
-    
+
     std::lock_guard<std::mutex> lock(closureTracker.trackerMutex);
-    
+
     // Track the closure
     closureTracker.activeClosure[closureId] = std::weak_ptr<Value>(closureValue);
-    
+
     // Track variable references
     for (const auto& varName : closure.capturedVariables) {
         closureTracker.variableToClosures[varName].push_back(closureId);
     }
-    
+
     // Update statistics
     closureTracker.totalClosuresCreated++;
     closureTracker.activeClosureCount++;
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] Tracking closure: " << closureId << " with "
                   << closure.capturedVariables.size() << " captured variables" << std::endl;
     }
-    
+
     return closureId;
 }
 
 void VM::untrackClosure(const std::string& closureId) {
     std::lock_guard<std::mutex> lock(closureTracker.trackerMutex);
-    
+
     auto it = closureTracker.activeClosure.find(closureId);
     if (it == closureTracker.activeClosure.end()) {
         return; // Already untracked
     }
-    
+
     // Get the closure to remove variable references
     auto closurePtr = it->second.lock();
     if (closurePtr && std::holds_alternative<ClosureValue>(closurePtr->data)) {
         const auto& closure = std::get<ClosureValue>(closurePtr->data);
-        
+
         // Remove variable references
         for (const auto& varName : closure.capturedVariables) {
             auto varIt = closureTracker.variableToClosures.find(varName);
@@ -8425,7 +8422,7 @@ void VM::untrackClosure(const std::string& closureId) {
                 auto& closureList = varIt->second;
                 closureList.erase(std::remove(closureList.begin(), closureList.end(), closureId),
                                   closureList.end());
-                
+
                 if (closureList.empty()) {
                     closureTracker.variableToClosures.erase(varIt);
                     // Remove shared variable if no longer referenced
@@ -8434,12 +8431,12 @@ void VM::untrackClosure(const std::string& closureId) {
             }
         }
     }
-    
+
     // Remove from active closures
     closureTracker.activeClosure.erase(it);
     closureTracker.activeClosureCount--;
     closureTracker.cleanupOperations++;
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] Untracked closure: " << closureId << std::endl;
     }
@@ -8448,20 +8445,20 @@ void VM::untrackClosure(const std::string& closureId) {
 std::shared_ptr<Environment> VM::optimizeCapturedEnvironment(
         const std::vector<std::string>& capturedVars,
         std::shared_ptr<Environment> sourceEnv) {
-    
+
     std::lock_guard<std::mutex> lock(closureTracker.trackerMutex);
-    
+
     auto optimizedEnv = std::make_shared<Environment>();
-    
+
     for (const auto& varName : capturedVars) {
         try {
             ValuePtr value = sourceEnv->get(varName);
-            
+
             // Check if this variable is used by multiple closures (sharing opportunity)
             auto varIt = closureTracker.variableToClosures.find(varName);
             bool shouldShare = (varIt != closureTracker.variableToClosures.end() &&
                     varIt->second.size() >= 2);
-            
+
             if (shouldShare) {
                 // Use or create shared variable
                 auto sharedIt = closureTracker.sharedVariables.find(varName);
@@ -8483,30 +8480,30 @@ std::shared_ptr<Environment> VM::optimizeCapturedEnvironment(
             continue;
         }
     }
-    
+
     return optimizedEnv;
 }
 
 bool VM::detectCircularReferences(const std::string& closureId) {
     std::lock_guard<std::mutex> lock(closureTracker.trackerMutex);
-    
+
     // Check if already marked as circular
     if (closureTracker.circularReferences.find(closureId) != closureTracker.circularReferences.end()) {
         return true;
     }
-    
+
     auto it = closureTracker.activeClosure.find(closureId);
     if (it == closureTracker.activeClosure.end()) {
         return false;
     }
-    
+
     auto closurePtr = it->second.lock();
     if (!closurePtr || !std::holds_alternative<ClosureValue>(closurePtr->data)) {
         return false;
     }
-    
+
     const auto& closure = std::get<ClosureValue>(closurePtr->data);
-    
+
     // Check if this closure captures other closures
     if (closure.capturedEnvironment) {
         for (const auto& varName : closure.capturedVariables) {
@@ -8514,11 +8511,11 @@ bool VM::detectCircularReferences(const std::string& closureId) {
                 ValuePtr capturedValue = closure.capturedEnvironment->get(varName);
                 if (capturedValue && capturedValue->type &&
                         capturedValue->type->tag == TypeTag::Closure) {
-                    
+
                     if (std::holds_alternative<ClosureValue>(capturedValue->data)) {
                         const auto& capturedClosure = std::get<ClosureValue>(capturedValue->data);
                         std::string capturedClosureId = capturedClosure.getClosureId();
-                        
+
                         // Simple cycle detection: if captured closure also captures this closure
                         if (capturedClosure.capturedEnvironment) {
                             for (const auto& capturedVar : capturedClosure.capturedVariables) {
@@ -8526,7 +8523,7 @@ bool VM::detectCircularReferences(const std::string& closureId) {
                                     ValuePtr nestedValue = capturedClosure.capturedEnvironment->get(capturedVar);
                                     if (nestedValue && nestedValue->type &&
                                             nestedValue->type->tag == TypeTag::Closure) {
-                                        
+
                                         if (std::holds_alternative<ClosureValue>(nestedValue->data)) {
                                             const auto& nestedClosure = std::get<ClosureValue>(nestedValue->data);
                                             if (nestedClosure.getClosureId() == closureId) {
@@ -8550,13 +8547,13 @@ bool VM::detectCircularReferences(const std::string& closureId) {
             }
         }
     }
-    
+
     return false;
 }
 
 void VM::cleanupInactiveClosures() {
     std::vector<std::string> toRemove;
-    
+
     // Find closures that are no longer referenced
     {
         std::lock_guard<std::mutex> lock(closureTracker.trackerMutex);
@@ -8566,12 +8563,12 @@ void VM::cleanupInactiveClosures() {
             }
         }
     }
-    
+
     // Remove them (no lock needed since untrackClosure handles its own locking)
     for (const auto& closureId : toRemove) {
         untrackClosure(closureId);
     }
-    
+
     if (debugMode && !toRemove.empty()) {
         std::cout << "[DEBUG] Cleaned up " << toRemove.size() << " inactive closures" << std::endl;
     }
@@ -8579,12 +8576,12 @@ void VM::cleanupInactiveClosures() {
 
 size_t VM::performClosureGarbageCollection() {
     size_t freedClosures = 0;
-    
+
     // Clean up inactive closures
     cleanupInactiveClosures();
-    
+
     std::lock_guard<std::mutex> lock(closureTracker.trackerMutex);
-    
+
     // Clean up shared variables that are no longer referenced
     std::vector<std::string> varsToRemove;
     for (const auto& [varName, sharedValue] : closureTracker.sharedVariables) {
@@ -8593,22 +8590,22 @@ size_t VM::performClosureGarbageCollection() {
             varsToRemove.push_back(varName);
         }
     }
-    
+
     for (const auto& varName : varsToRemove) {
         closureTracker.sharedVariables.erase(varName);
         freedClosures++;
     }
-    
+
     if (debugMode && freedClosures > 0) {
         std::cout << "[DEBUG] Garbage collected " << freedClosures << " shared variables" << std::endl;
     }
-    
+
     return freedClosures;
 }
 
 void VM::printClosureMemoryStats() const {
     std::lock_guard<std::mutex> lock(closureTracker.trackerMutex);
-    
+
     std::cout << "\n=== Closure Memory Management Statistics ===" << std::endl;
     std::cout << "Total Closures Created: " << closureTracker.totalClosuresCreated << std::endl;
     std::cout << "Active Closures: " << closureTracker.activeClosureCount << std::endl;
@@ -8617,18 +8614,18 @@ void VM::printClosureMemoryStats() const {
     std::cout << "Memory Optimizations: " << closureTracker.memoryOptimizations << std::endl;
     std::cout << "Shared Variables: " << closureTracker.sharedVariables.size() << std::endl;
     std::cout << "Variable-to-Closure Mappings: " << closureTracker.variableToClosures.size() << std::endl;
-    
+
     if (closureTracker.totalClosuresCreated > 0) {
         double cleanupRatio = static_cast<double>(closureTracker.cleanupOperations) /
                 closureTracker.totalClosuresCreated * 100.0;
         std::cout << "Cleanup Ratio: " << cleanupRatio << "%" << std::endl;
     }
-    
+
     if (closureTracker.memoryOptimizations > 0) {
         std::cout << "Memory Optimization Efficiency: " << closureTracker.memoryOptimizations
                   << " variables optimized" << std::endl;
     }
-    
+
     std::cout << "=============================================" << std::endl;
 }
 
@@ -8636,7 +8633,7 @@ void VM::printClosureMemoryStats() const {
 void VM::pushFunctionDefinition(const std::string& functionName) {
     functionDefinitionStack.push(functionName);
     functionDefinitionModeStack.push(true);
-    
+
     if (debugMode) {
         std::cout << "[DEBUG] Pushed function definition: " << functionName
                   << " (depth: " << functionDefinitionStack.size() << ")" << std::endl;
@@ -8648,7 +8645,7 @@ void VM::popFunctionDefinition() {
         std::string functionName = functionDefinitionStack.top();
         functionDefinitionStack.pop();
         functionDefinitionModeStack.pop();
-        
+
         if (debugMode) {
             std::cout << "[DEBUG] Popped function definition: " << functionName
                       << " (depth: " << functionDefinitionStack.size() << ")" << std::endl;
@@ -8674,7 +8671,7 @@ VMMethodImplementation::VMMethodImplementation(VM* vmInstance, const std::string
                                                std::shared_ptr<ClassDefinition> owner,
                                                size_t start, size_t end)
     : vm(vmInstance), ownerClass(owner), startAddress(start), endAddress(end) {
-    
+
     signature.name = methodName;
     // Parameters will be set when the method is defined
 }

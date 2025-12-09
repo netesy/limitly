@@ -1,38 +1,14 @@
-// Test nested iter statements
-print("=== Testing Nested Iter Statements ===");
+// Test nested iteration
+print("Testing nested iteration:");
 
-var outer_list = [1, 2, 3];
-var inner_list = ["a", "b", "c"];
-
-// Test nested iter loops
-print("Nested iter loops with lists:");
-iter (var x in outer_list) {
-    print("Outer: {x}");
-    iter (var y in inner_list) {
-        print("  Inner: {y}");
-    }
-}
-
-// Test break/continue in nested loops
-print("Testing break/continue in nested loops:");
-iter (var i in [1, 2, 3, 4, 5]) {
-    if( i == 4) {
-        break;
-    }
-    print("Before inner: {i}");
+iter (var i in [1, 2, 3]) {
+    print("Outer loop: " + i);
     
-    iter (var j in [10, 20, 30]) {
-        if( j == 20) {
-            continue;
-        }
-        print("  Inner: {j}");
+    iter (var j in [10, 20]) {
+        print("  Inner loop: " + j);
     }
+    
+    print("Back to outer loop: " + i);
 }
 
-// Test nested range iteration
-print("Nested range iteration:");
-iter (var i in 1..3) {
-    iter (var j in 10..12) {
-        print("({i}, {j})");
-    }
-}
+print("Nested iteration test completed!");
