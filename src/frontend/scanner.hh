@@ -66,11 +66,13 @@ enum class TokenType {
     INT16_TYPE,    // i16
     INT32_TYPE,    // i32
     INT64_TYPE,    // i64
+    INT128_TYPE,   // i128
     UINT_TYPE,     // uint
     UINT8_TYPE,    // u8
     UINT16_TYPE,   // u16
     UINT32_TYPE,   // u32
     UINT64_TYPE,   // u64
+    UINT128_TYPE,  // u128
     FLOAT_TYPE,    // float
     FLOAT32_TYPE,  // f32
     FLOAT64_TYPE,  // f64

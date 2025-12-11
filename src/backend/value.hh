@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <sstream>
 #include "../common/opcodes.hh"
+#include "../common/big_int.hh"
 #include "concurrency/channel.hh"
 #include <atomic>
 
@@ -137,11 +138,13 @@ enum class TypeTag {
     Int16,
     Int32,
     Int64,
+    Int128,
     UInt,
     UInt8,
     UInt16,
     UInt32,
     UInt64,
+    UInt128,
     Float32,
     Float64,
     String,
@@ -352,6 +355,8 @@ struct Type
             return "Int32";
         case TypeTag::Int64:
             return "Int64";
+        case TypeTag::Int128:
+            return "Int128";
         case TypeTag::UInt:
             return "UInt";
         case TypeTag::UInt8:
@@ -362,6 +367,8 @@ struct Type
             return "UInt32";
         case TypeTag::UInt64:
             return "UInt64";
+        case TypeTag::UInt128:
+            return "UInt128";
         case TypeTag::Float32:
             return "Float32";
         case TypeTag::Float64:
@@ -418,7 +425,7 @@ struct Type
         case TypeTag::Module:
             return "Module";
         default:
-            return "Unknown";
+            return "Unknown Type";
         }
     }
 
@@ -548,6 +555,17 @@ struct AtomicValue {
     std::shared_ptr<std::atomic<int64_t>> inner;
     AtomicValue() : inner(std::make_shared<std::atomic<int64_t>>(0)) {}
     AtomicValue(int64_t v) : inner(std::make_shared<std::atomic<int64_t>>(v)) {}
+    
+    // Constructor for BigInt - convert to int64_t with overflow check
+    AtomicValue(const BigInt& v) : inner(std::make_shared<std::atomic<int64_t>>(0)) {
+        try {
+            int64_t val = std::stoll(v.to_string());
+            inner->store(val);
+        } catch (const std::exception&) {
+            // If BigInt doesn't fit in int64_t, store max value
+            inner->store(std::numeric_limits<int64_t>::max());
+        }
+    }
 };
 
 // ErrorUnion helper class for efficient tagged union operations - optimized for cache efficiency
@@ -818,6 +836,7 @@ struct Value {
                  double,
                  float,
                  std::string,
+                 BigInt,
                  ListValue,
                  DictValue,
                  TupleValue,
@@ -862,6 +881,10 @@ struct Value {
     Value(TypePtr t, double val) : type(std::move(t)), data(val) {
     }
 
+    // BigInt constructor
+    Value(TypePtr t, const BigInt& val) : type(std::move(t)), data(val) {
+    }
+
     // Template constructor for integer types - eliminates ambiguity
     template<typename T>
     Value(TypePtr t, T val,
@@ -889,6 +912,10 @@ struct Value {
         case TypeTag::Int64:
             data = safe_cast<int64_t>(val);
             break;
+        case TypeTag::Int128:
+            // For i128, use BigInt directly
+            data = BigInt(std::to_string(val));
+            break;
         case TypeTag::UInt8:
             data = safe_cast<uint8_t>(val);
             break;
@@ -901,6 +928,10 @@ struct Value {
             break;
         case TypeTag::UInt64:
             data = safe_cast<uint64_t>(val);
+            break;
+        case TypeTag::UInt128:
+            // For u128, use BigInt directly
+            data = BigInt(std::to_string(val));
             break;
         default:
             // Default to int32_t for unspecified integer types
@@ -1289,10 +1320,10 @@ struct IteratorValue {
     size_t currentIndex;
     
     // For lazy ranges
-    int64_t rangeStart;
-    int64_t rangeEnd;
-    int64_t rangeStep;
-    int64_t rangeCurrent;
+    BigInt rangeStart;
+    BigInt rangeEnd;
+    BigInt rangeStep;
+    BigInt rangeCurrent;
     
     // For channel iterators: a buffered value received by hasNext()
     // Marked mutable because hasNext() needs to modify these while being logically const
@@ -1306,7 +1337,7 @@ struct IteratorValue {
         hasBuffered(false), bufferedValue(nullptr) {}
     
     // Constructor for lazy ranges
-    IteratorValue(IteratorType type, ValuePtr iterable, int64_t start, int64_t end, int64_t step)
+    IteratorValue(IteratorType type, ValuePtr iterable, BigInt start, BigInt end, BigInt step)
         : type(type), iterable(std::move(iterable)), currentIndex(0),
         rangeStart(start), rangeEnd(end), rangeStep(step), rangeCurrent(start),
         hasBuffered(false), bufferedValue(nullptr) {}

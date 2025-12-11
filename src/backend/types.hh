@@ -3,6 +3,7 @@
 
 #include "memory.hh"
 #include "value.hh"
+#include "../common/big_int.hh"
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -208,7 +209,8 @@ private:
             {TypeTag::Int16, 2},   {TypeTag::UInt16, 3},
             {TypeTag::Int32, 4},   {TypeTag::UInt32, 5},
             {TypeTag::Int64, 6},   {TypeTag::UInt64, 7},
-            {TypeTag::Float32, 8}, {TypeTag::Float64, 9}
+            {TypeTag::Int128, 8},  {TypeTag::UInt128, 9},
+            {TypeTag::Float32, 10}, {TypeTag::Float64, 11}
         };
 
         auto itA = typeRanks.find(a->tag);
@@ -223,8 +225,8 @@ private:
 public:
     bool isNumericType(TypeTag tag) {
         return tag == TypeTag::Int || tag == TypeTag::Int8 || tag == TypeTag::Int16 || tag == TypeTag::Int32 ||
-        tag == TypeTag::Int64 || tag == TypeTag::UInt || tag == TypeTag::UInt8 || tag == TypeTag::UInt16 ||
-        tag == TypeTag::UInt32 || tag == TypeTag::UInt64 || tag == TypeTag::Float32 ||
+        tag == TypeTag::Int64 || tag == TypeTag::Int128 || tag == TypeTag::UInt || tag == TypeTag::UInt8 || tag == TypeTag::UInt16 ||
+        tag == TypeTag::UInt32 || tag == TypeTag::UInt64 || tag == TypeTag::UInt128 || tag == TypeTag::Float32 ||
         tag == TypeTag::Float64;
     }
 
@@ -311,6 +313,15 @@ private:
 
         case TypeTag::UInt64:
             return to == TypeTag::UInt64 ||
+                   to == TypeTag::UInt128 ||
+                   to == TypeTag::Float64;
+
+        case TypeTag::Int128:
+            return to == TypeTag::Int128 ||
+                   to == TypeTag::Float64;
+
+        case TypeTag::UInt128:
+            return to == TypeTag::UInt128 ||
                    to == TypeTag::Float64;
 
         case TypeTag::Float32:
@@ -320,43 +331,37 @@ private:
         case TypeTag::Float64:
             return to == TypeTag::Float64;
 
-        default:
-            return false;
-        }
+    default:
+        return false;
     }
-    ValuePtr stringToNumber(const std::string &str, TypePtr targetType)
+}
+ValuePtr stringToNumber(const std::string &str, TypePtr targetType)
     {
         ValuePtr result = memoryManager.makeRef<Value>(region);
         result->type = targetType;
 
         try {
-            // Enhanced numeric parsing with better error handling and range checking
-            if (targetType->tag == TypeTag::Int || targetType->tag == TypeTag::Int64) {
+            // Enhanced numeric parsing with BigInt for better range handling
+            if (targetType->tag == TypeTag::Int || targetType->tag == TypeTag::Int64 || 
+                targetType->tag == TypeTag::Int8 || targetType->tag == TypeTag::Int16 || targetType->tag == TypeTag::Int32 ||
+                targetType->tag == TypeTag::Int128 || targetType->tag == TypeTag::UInt || targetType->tag == TypeTag::UInt8 || targetType->tag == TypeTag::UInt16 || 
+                targetType->tag == TypeTag::UInt32 || targetType->tag == TypeTag::UInt64 || targetType->tag == TypeTag::UInt128) {
+                
                 // Check if string contains scientific notation or decimal point
                 if (str.find('e') != std::string::npos || str.find('E') != std::string::npos || 
                     str.find('.') != std::string::npos) {
-                    // Parse as double first, then convert to int if it's a whole number
+                    // Parse as double first, then convert to BigInt if it's a whole number
                     double doubleVal = std::stod(str);
                     if (doubleVal != std::floor(doubleVal)) {
                         throw std::runtime_error("Cannot convert non-integer value to integer type");
                     }
-                    if (doubleVal < std::numeric_limits<long long>::min() || 
-                        doubleVal > std::numeric_limits<long long>::max()) {
-                        throw std::runtime_error("Integer value out of range for long long");
-                    }
-                    result->data = static_cast<long long>(doubleVal);
+                    // Convert to BigInt then to appropriate type
+                    BigInt bigIntValue(std::to_string(static_cast<long long>(doubleVal)));
+                    result->data = bigIntValue.to_string();
                 } else {
-                    // Try direct integer parsing
-                    try {
-                        result->data = std::stoll(str);
-                    } catch (const std::out_of_range&) {
-                        // Try parsing as unsigned long long and check range
-                        unsigned long long ullVal = std::stoull(str);
-                        if (ullVal > static_cast<unsigned long long>(std::numeric_limits<long long>::max())) {
-                            throw std::runtime_error("Integer value too large for signed long long");
-                        }
-                        result->data = static_cast<long long>(ullVal);
-                    }
+                    // Use BigInt for parsing
+                    BigInt bigIntValue(str);
+                    result->data = bigIntValue.to_string();
                 }
             } else if (targetType->tag == TypeTag::Float32) {
                 float floatVal = std::stof(str);
@@ -413,11 +418,13 @@ public:
     const TypePtr INT16_TYPE = std::make_shared<Type>(TypeTag::Int16);
     const TypePtr INT32_TYPE = std::make_shared<Type>(TypeTag::Int32);
     const TypePtr INT64_TYPE = std::make_shared<Type>(TypeTag::Int64);
+    const TypePtr INT128_TYPE = std::make_shared<Type>(TypeTag::Int128);
     const TypePtr UINT_TYPE = std::make_shared<Type>(TypeTag::UInt);
     const TypePtr UINT8_TYPE = std::make_shared<Type>(TypeTag::UInt8);
     const TypePtr UINT16_TYPE = std::make_shared<Type>(TypeTag::UInt16);
     const TypePtr UINT32_TYPE = std::make_shared<Type>(TypeTag::UInt32);
     const TypePtr UINT64_TYPE = std::make_shared<Type>(TypeTag::UInt64);
+    const TypePtr UINT128_TYPE = std::make_shared<Type>(TypeTag::UInt128);
     const TypePtr FLOAT32_TYPE = std::make_shared<Type>(TypeTag::Float32);
     const TypePtr FLOAT64_TYPE = std::make_shared<Type>(TypeTag::Float64);
     const TypePtr STRING_TYPE = std::make_shared<Type>(TypeTag::String);
@@ -446,8 +453,17 @@ public:
         // First check built-in types
         if (name == "int") return INT_TYPE;
         if (name == "uint") return UINT_TYPE;
+        if (name == "i8") return INT8_TYPE;
+        if (name == "u8") return UINT8_TYPE;
+        if (name == "i16") return INT16_TYPE;
+        if (name == "u16") return UINT16_TYPE;
+        if (name == "i32") return INT32_TYPE;
+        if (name == "u32") return UINT32_TYPE;
         if (name == "i64") return INT64_TYPE;
         if (name == "u64") return UINT64_TYPE;
+        if (name == "i128") return INT128_TYPE;
+        if (name == "u128") return UINT128_TYPE;
+        if (name == "f32") return FLOAT32_TYPE;
         if (name == "f64") return FLOAT64_TYPE;
         if (name == "float") return FLOAT64_TYPE;
         if (name == "string") return STRING_TYPE;
@@ -456,6 +472,9 @@ public:
         if (name == "list") return LIST_TYPE;
         if (name == "dict") return DICT_TYPE;
         if (name == "tuple") return TUPLE_TYPE;
+        if (name == "enum") return ENUM_TYPE;
+        if (name == "sum") return SUM_TYPE;
+        if (name == "closure") return CLOSURE_TYPE;
         if (name == "function") return FUNCTION_TYPE;  // Generic function type
         if (name == "object") return OBJECT_TYPE;
         if (name == "module") return MODULE_TYPE;
@@ -490,6 +509,9 @@ public:
         case TypeTag::Int64:
             value->data = int64_t(0);
             break;
+        case TypeTag::Int128:
+            value->data = BigInt(0);
+            break;
         case TypeTag::Int8:
             value->data = int8_t(0);
             break;
@@ -502,6 +524,9 @@ public:
             break;
         case TypeTag::UInt64:
             value->data = uint64_t(0);
+            break;
+        case TypeTag::UInt128:
+            value->data = BigInt(0);
             break;
         case TypeTag::UInt8:
             value->data = uint8_t(0);
@@ -1202,11 +1227,13 @@ public:
         case TypeTag::Int16:
         case TypeTag::Int32:
         case TypeTag::Int64:
+        case TypeTag::Int128:
         case TypeTag::UInt:
         case TypeTag::UInt8:
         case TypeTag::UInt16:
         case TypeTag::UInt32:
         case TypeTag::UInt64:
+        case TypeTag::UInt128:
         case TypeTag::Float32:
         case TypeTag::Float64:
         case TypeTag::Bool:

@@ -1,0 +1,148 @@
+Tokens for tests\expressions\large_literals.lm
+Parser: New Unified Parser (CST mode)
+Mode: CST with trivia preservation
+========================================
+
+=== Tokens with Trivia ===
+Line 4: VAR = 'var' [leading: COMMENT_LINE('// Test very large numeric literals') NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test maximum values for different types') NEWLINE('
+') ]
+Line 4: IDENTIFIER = 'maxI64' [leading: WHITESPACE(' ') ]
+Line 4: COLON = ':'
+Line 4: INT64_TYPE = 'i64' [leading: WHITESPACE(' ') ]
+Line 4: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 4: NUMBER = '9223372036854775807' [leading: WHITESPACE(' ') ]
+Line 4: SEMICOLON = ';'
+Line 5: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 5: IDENTIFIER = 'maxU64' [leading: WHITESPACE(' ') ]
+Line 5: COLON = ':'
+Line 5: UINT64_TYPE = 'u64' [leading: WHITESPACE(' ') ]
+Line 5: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 5: NUMBER = '18446744073709551615' [leading: WHITESPACE(' ') ]
+Line 5: SEMICOLON = ';'
+Line 6: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 6: IDENTIFIER = 'largeFloat' [leading: WHITESPACE(' ') ]
+Line 6: COLON = ':'
+Line 6: FLOAT64_TYPE = 'f64' [leading: WHITESPACE(' ') ]
+Line 6: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 6: NUMBER = '1.7976931348623157e+308' [leading: WHITESPACE(' ') ]
+Line 6: SEMICOLON = ';'
+Line 8: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 8: LEFT_PAREN = '('
+Line 8: STRING = '"Large literal test:"'
+Line 8: RIGHT_PAREN = ')'
+Line 8: SEMICOLON = ';'
+Line 9: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 9: LEFT_PAREN = '('
+Line 9: STRING = '"Max I64:"'
+Line 9: COMMA = ','
+Line 9: IDENTIFIER = 'maxI64' [leading: WHITESPACE(' ') ]
+Line 9: RIGHT_PAREN = ')'
+Line 9: SEMICOLON = ';'
+Line 10: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 10: LEFT_PAREN = '('
+Line 10: STRING = '"Max U64:"'
+Line 10: COMMA = ','
+Line 10: IDENTIFIER = 'maxU64' [leading: WHITESPACE(' ') ]
+Line 10: RIGHT_PAREN = ')'
+Line 10: SEMICOLON = ';'
+Line 11: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 11: LEFT_PAREN = '('
+Line 11: STRING = '"Large Float:"'
+Line 11: COMMA = ','
+Line 11: IDENTIFIER = 'largeFloat' [leading: WHITESPACE(' ') ]
+Line 11: RIGHT_PAREN = ')'
+Line 11: SEMICOLON = ';'
+Line 14: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test very small values') NEWLINE('
+') ]
+Line 14: IDENTIFIER = 'smallFloat' [leading: WHITESPACE(' ') ]
+Line 14: COLON = ':'
+Line 14: FLOAT64_TYPE = 'f64' [leading: WHITESPACE(' ') ]
+Line 14: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 14: NUMBER = '2.2250738585072014e-308' [leading: WHITESPACE(' ') ]
+Line 14: SEMICOLON = ';'
+Line 15: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 15: IDENTIFIER = 'tinyFloat' [leading: WHITESPACE(' ') ]
+Line 15: COLON = ':'
+Line 15: FLOAT64_TYPE = 'f64' [leading: WHITESPACE(' ') ]
+Line 15: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 15: NUMBER = '1e-100' [leading: WHITESPACE(' ') ]
+Line 15: SEMICOLON = ';'
+Line 17: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 17: LEFT_PAREN = '('
+Line 17: STRING = '"Small literal test:"'
+Line 17: RIGHT_PAREN = ')'
+Line 17: SEMICOLON = ';'
+Line 18: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 18: LEFT_PAREN = '('
+Line 18: STRING = '"Small Float:"'
+Line 18: COMMA = ','
+Line 18: IDENTIFIER = 'smallFloat' [leading: WHITESPACE(' ') ]
+Line 18: RIGHT_PAREN = ')'
+Line 18: SEMICOLON = ';'
+Line 19: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 19: LEFT_PAREN = '('
+Line 19: STRING = '"Tiny Float:"'
+Line 19: COMMA = ','
+Line 19: IDENTIFIER = 'tinyFloat' [leading: WHITESPACE(' ') ]
+Line 19: RIGHT_PAREN = ')'
+Line 19: SEMICOLON = ';'
+Line 22: VAR = 'var' [leading: NEWLINE('
+') NEWLINE('
+') COMMENT_LINE('// Test negative large values') NEWLINE('
+') ]
+Line 22: IDENTIFIER = 'negLarge' [leading: WHITESPACE(' ') ]
+Line 22: COLON = ':'
+Line 22: INT64_TYPE = 'i64' [leading: WHITESPACE(' ') ]
+Line 22: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 22: MINUS = '-' [leading: WHITESPACE(' ') ]
+Line 22: NUMBER = '9223372036854775808'
+Line 22: SEMICOLON = ';'
+Line 23: VAR = 'var' [leading: NEWLINE('
+') ]
+Line 23: IDENTIFIER = 'negFloat' [leading: WHITESPACE(' ') ]
+Line 23: COLON = ':'
+Line 23: FLOAT64_TYPE = 'f64' [leading: WHITESPACE(' ') ]
+Line 23: EQUAL = '=' [leading: WHITESPACE(' ') ]
+Line 23: MINUS = '-' [leading: WHITESPACE(' ') ]
+Line 23: NUMBER = '1.7976931348623157e+308'
+Line 23: SEMICOLON = ';'
+Line 25: PRINT = 'print' [leading: NEWLINE('
+') NEWLINE('
+') ]
+Line 25: LEFT_PAREN = '('
+Line 25: STRING = '"Negative large literal test:"'
+Line 25: RIGHT_PAREN = ')'
+Line 25: SEMICOLON = ';'
+Line 26: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 26: LEFT_PAREN = '('
+Line 26: STRING = '"Negative Large I64:"'
+Line 26: COMMA = ','
+Line 26: IDENTIFIER = 'negLarge' [leading: WHITESPACE(' ') ]
+Line 26: RIGHT_PAREN = ')'
+Line 26: SEMICOLON = ';'
+Line 27: PRINT = 'print' [leading: NEWLINE('
+') ]
+Line 27: LEFT_PAREN = '('
+Line 27: STRING = '"Negative Large Float:"'
+Line 27: COMMA = ','
+Line 27: IDENTIFIER = 'negFloat' [leading: WHITESPACE(' ') ]
+Line 27: RIGHT_PAREN = ')'
+Line 27: SEMICOLON = ';'
+Line 27: EOF_TOKEN = ''

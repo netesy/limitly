@@ -400,6 +400,7 @@ private:
     // Instruction handlers
     void handlePushInt(const Instruction& instruction);
     void handlePushFloat(const Instruction& instruction);
+    void handlePushBigInt(const Instruction& instruction);
     void handlePushString(const Instruction& instruction);
     void handlePushBool(const Instruction& instruction);
     void handlePushNull(const Instruction& instruction);

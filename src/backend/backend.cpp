@@ -1,10 +1,11 @@
 #include "../common/backend.hh"
 #include "../common/debugger.hh"
 #include "value.hh"
-#include "vm.hh"
-#include "memory.hh"
+#include "../common/backend.hh"
+#include "types.hh"
 #include "type_checker.hh"
-#include "../frontend/scanner.hh"
+#include "../common/opcodes.hh"
+#include "../common/big_int.hh"
 #include "../frontend/parser.hh"
 #include <iostream>
 #include <thread>
@@ -1189,6 +1190,10 @@ void BytecodeGenerator::visitLiteralExpr(const std::shared_ptr<AST::LiteralExpr>
     // Push literal value onto stack based on its type
     if (std::holds_alternative<long long>(expr->value)) {
         emit(Opcode::PUSH_INT, expr->line, std::get<long long>(expr->value));
+    } else if (std::holds_alternative<BigInt>(expr->value)) {
+        // Handle BigInt literals
+        BigInt bigIntValue = std::get<BigInt>(expr->value);
+        emit(Opcode::PUSH_BIGINT, expr->line, 0, 0.0f, false, bigIntValue.to_string());
     } else if (std::holds_alternative<double>(expr->value)) {
         emit(Opcode::PUSH_FLOAT, expr->line, 0, std::get<double>(expr->value));
     } else if (std::holds_alternative<std::string>(expr->value)) {

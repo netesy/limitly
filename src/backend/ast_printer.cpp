@@ -990,7 +990,7 @@ std::string ASTPrinter::tokenTypeToString(TokenType type) const {
     }
 }
 
-std::string ASTPrinter::valueToString(const std::variant<long long, double, std::string, bool, std::nullptr_t>& value) const {
+std::string ASTPrinter::valueToString(const std::variant<long long, double, std::string, bool, std::nullptr_t, BigInt>& value) const {
     if (std::holds_alternative<long long>(value)) {
         return std::to_string(std::get<long long>(value));
     } else if (std::holds_alternative<double>(value)) {
@@ -1007,6 +1007,8 @@ std::string ASTPrinter::valueToString(const std::variant<long long, double, std:
         return std::get<bool>(value) ? "true" : "false";
     } else if (std::holds_alternative<std::nullptr_t>(value)) {
         return "nil";
+    } else if (std::holds_alternative<BigInt>(value)) {
+        return std::get<BigInt>(value).to_string();
     }
     return "<unknown>";
 }

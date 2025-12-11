@@ -10,6 +10,7 @@ enum class Opcode {
     // Stack operations
     PUSH_INT,           // Push integer onto stack
     PUSH_FLOAT,         // Push float onto stack
+    PUSH_BIGINT,        // Push BigInt onto stack
     PUSH_STRING,        // Push string onto stack
     PUSH_BOOL,          // Push boolean onto stack
     PUSH_NULL,          // Push null onto stack

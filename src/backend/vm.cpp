@@ -1,9 +1,14 @@
 #include "vm.hh"
 #include "value.hh"  // For Value and ErrorValue definitions
 #include "../frontend/scanner.hh"
-#include "../frontend/parser.hh"
 #include "../common/backend.hh"
+#include "types.hh"
+#include "../common/opcodes.hh"
+#include "../common/debugger.hh"
+#include "../common/big_int.hh"
+#include "../frontend/parser.hh"
 #include "../common/builtin_functions.hh"  // For builtin functions
+#include "../common/big_int.hh"
 #include "concurrency/task_vm.hh"
 #include "bytecode_printer.hh"  // For opcodeToString function
 #include "classes.hh"  // For VMMethodImplementation
@@ -52,11 +57,13 @@ static std::string typeTagToString(TypeTag tag) {
     case TypeTag::Int16: return "Int16";
     case TypeTag::Int32: return "Int32";
     case TypeTag::Int64: return "Int64";
+    case TypeTag::Int128: return "Int128";
     case TypeTag::UInt: return "UInt";
     case TypeTag::UInt8: return "UInt8";
     case TypeTag::UInt16: return "UInt16";
     case TypeTag::UInt32: return "UInt32";
     case TypeTag::UInt64: return "UInt64";
+    case TypeTag::UInt128: return "UInt128";
     case TypeTag::Float32: return "Float32";
     case TypeTag::Float64: return "Float64";
     case TypeTag::String: return "String";
@@ -402,6 +409,9 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                     break;
                 case Opcode::PUSH_FLOAT:
                     handlePushFloat(instruction);
+                    break;
+                case Opcode::PUSH_BIGINT:
+                    handlePushBigInt(instruction);
                     break;
                 case Opcode::PUSH_STRING:
                     handlePushString(instruction);
@@ -1397,6 +1407,85 @@ void VM::handlePushFloat(const Instruction& instruction) {
     push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, static_cast<double>(instruction.floatValue)));
 }
 
+void VM::handlePushBigInt(const Instruction& instruction) {
+    try {
+        BigInt bigIntValue(instruction.stringValue);
+        
+        // Use the type encoded in intValue if available, otherwise infer it
+        TypePtr targetType;
+        
+        if (instruction.intValue != 0) {
+            // Type is encoded in intValue
+            TypeTag typeTag = static_cast<TypeTag>(instruction.intValue);
+            
+            switch (typeTag) {
+                case TypeTag::Int:
+                    targetType = typeSystem->INT_TYPE;
+                    break;
+                case TypeTag::Int64:
+                    targetType = typeSystem->INT64_TYPE;
+                    break;
+                case TypeTag::Int128:
+                    targetType = typeSystem->INT128_TYPE;
+                    break;
+                case TypeTag::UInt64:
+                    targetType = typeSystem->UINT64_TYPE;
+                    break;
+                case TypeTag::UInt128:
+                    targetType = typeSystem->UINT128_TYPE;
+                    break;
+                default:
+                    // Default to INT128_TYPE for safety
+                    targetType = typeSystem->INT128_TYPE;
+                    break;
+            }
+        } else {
+            // No type encoded, need to infer (legacy behavior)
+            targetType = typeSystem->INT128_TYPE; // Default fallback
+            
+            try {
+                // Check if it fits in int64
+                int64_t int64Val = bigIntValue.to_int64();
+                
+                // Value fits in int64
+                if (int64Val >= 0) {
+                    targetType = typeSystem->INT64_TYPE;
+                } else {
+                    targetType = typeSystem->INT64_TYPE;
+                }
+            } catch (const std::overflow_error&) {
+                // Value doesn't fit in int64, check if it could be uint64 or larger
+                std::string bigIntStr = bigIntValue.to_string();
+                if (!bigIntStr.empty() && bigIntStr[0] != '-') {
+                    // Positive number that doesn't fit in int64
+                    if (bigIntStr.length() <= 20) { // UINT64_MAX has 20 digits
+                        // For UINT64_MAX exactly, prefer UINT128_TYPE to preserve precision
+                        if (bigIntStr == "18446744073709551615") {
+                            targetType = typeSystem->UINT128_TYPE;
+                        } else {
+                            targetType = typeSystem->UINT64_TYPE;
+                        }
+                    } else {
+                        // Larger than uint64, must be uint128
+                        targetType = typeSystem->UINT128_TYPE;
+                    }
+                } else {
+                    // Negative large number - use INT128_TYPE
+                    targetType = typeSystem->INT128_TYPE;
+                }
+            }
+        }
+        
+        std::cout << "[DEBUG VM] PUSH_BIGINT: " << instruction.stringValue 
+                  << " with type " << targetType->toString() << std::endl;
+        
+        push(memoryManager.makeRef<Value>(*region, targetType, bigIntValue));
+    } catch (const std::exception& e) {
+        // If BigInt parsing fails, create a BigInt with value 0
+        push(memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, BigInt(0)));
+    }
+}
+
 void VM::handlePushString(const Instruction& instruction) {
     (void)instruction; // Mark as unused
     push(memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, instruction.stringValue));
@@ -1536,15 +1625,30 @@ void VM::handleLoadVar(const Instruction& instruction) {
 void VM::handleDefineAtomic(const Instruction& instruction) {
     // Pop the initializer value and create an AtomicValue wrapper
     ValuePtr initVal = pop();
-    int64_t initial = 0;
-    if (initVal && initVal->type && (initVal->type->tag == TypeTag::Int || initVal->type->tag == TypeTag::Int64)) {
-        if (initVal->type->tag == TypeTag::Int) initial = static_cast<int64_t>(std::get<int32_t>(initVal->data));
-        else initial = std::get<int64_t>(initVal->data);
+    BigInt initial(0);
+    if (initVal && initVal->type && (initVal->type->tag == TypeTag::Int || initVal->type->tag == TypeTag::Int64 ||
+        initVal->type->tag == TypeTag::Int8 || initVal->type->tag == TypeTag::Int16 || initVal->type->tag == TypeTag::Int32 ||
+        initVal->type->tag == TypeTag::UInt || initVal->type->tag == TypeTag::UInt8 || initVal->type->tag == TypeTag::UInt16 || initVal->type->tag == TypeTag::UInt32 || initVal->type->tag == TypeTag::UInt64)) {
+        // Extract integer value as string and convert to BigInt
+        std::string intStr;
+        std::visit([&intStr](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (std::is_same_v<T, int32_t> || std::is_same_v<T, int64_t> || 
+                          std::is_same_v<T, int8_t> || std::is_same_v<T, int16_t> ||
+                          std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t> ||
+                          std::is_same_v<T, uint8_t> || std::is_same_v<T, uint16_t>) {
+                intStr = std::to_string(arg);
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                intStr = arg;
+            }
+        }, initVal->data);
+        initial = BigInt(intStr);
     } else if (initVal && initVal->type && initVal->type->tag == TypeTag::Float64) {
         // allow float to be truncated
-        initial = static_cast<int64_t>(std::get<double>(initVal->data));
+        double doubleVal = std::get<double>(initVal->data);
+        initial = BigInt(std::to_string(static_cast<long long>(doubleVal)));
     } else if (!initVal) {
-        initial = 0;
+        initial = BigInt(0);
     } else {
         error("Invalid initializer for atomic variable");
     }
@@ -1739,6 +1843,48 @@ void VM::handleAdd(const Instruction& /*unused*/) {
             // Check for floating-point edge cases
             double result = aVal + bVal;
             push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, result));
+        } else if (a->type->tag == TypeTag::Int128 || b->type->tag == TypeTag::Int128 ||
+                   a->type->tag == TypeTag::UInt128 || b->type->tag == TypeTag::UInt128) {
+            // BigInt addition for i128 and u128
+            BigInt aVal, bVal;
+            
+            // Extract BigInt values
+            if (a->type->tag == TypeTag::Int128 || a->type->tag == TypeTag::UInt128) {
+                aVal = std::get<BigInt>(a->data);
+            } else {
+                // Convert other integer types to BigInt
+                if (a->type->tag == TypeTag::Int) {
+                    aVal = BigInt(std::to_string(std::get<int32_t>(a->data)));
+                } else if (a->type->tag == TypeTag::Int64) {
+                    aVal = BigInt(std::to_string(std::get<int64_t>(a->data)));
+                } else {
+                    error("Unsupported integer type for BigInt conversion");
+                    return;
+                }
+            }
+            
+            if (b->type->tag == TypeTag::Int128 || b->type->tag == TypeTag::UInt128) {
+                bVal = std::get<BigInt>(b->data);
+            } else {
+                // Convert other integer types to BigInt
+                if (b->type->tag == TypeTag::Int) {
+                    bVal = BigInt(std::to_string(std::get<int32_t>(b->data)));
+                } else if (b->type->tag == TypeTag::Int64) {
+                    bVal = BigInt(std::to_string(std::get<int64_t>(b->data)));
+                } else {
+                    error("Unsupported integer type for BigInt conversion");
+                    return;
+                }
+            }
+            
+            // Perform BigInt addition
+            BigInt result = aVal + bVal;
+            
+            // Determine result type (prefer i128 if either operand is i128, otherwise u128)
+            TypePtr resultType = (a->type->tag == TypeTag::Int128 || b->type->tag == TypeTag::Int128) ? 
+                                typeSystem->INT128_TYPE : typeSystem->UINT128_TYPE;
+            
+            push(memoryManager.makeRef<Value>(*region, resultType, result));
         } else {
             // Integer addition with mixed int32/int64 support
             int64_t aVal, bVal;
@@ -1838,6 +1984,48 @@ void VM::handleSubtract(const Instruction& /*unused*/) {
         }
 
         push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, result));
+    } else if (a->type->tag == TypeTag::Int128 || b->type->tag == TypeTag::Int128 ||
+               a->type->tag == TypeTag::UInt128 || b->type->tag == TypeTag::UInt128) {
+        // BigInt subtraction for i128 and u128
+        BigInt aVal, bVal;
+        
+        // Extract BigInt values
+        if (a->type->tag == TypeTag::Int128 || a->type->tag == TypeTag::UInt128) {
+            aVal = std::get<BigInt>(a->data);
+        } else {
+            // Convert other integer types to BigInt
+            if (a->type->tag == TypeTag::Int) {
+                aVal = BigInt(std::to_string(std::get<int32_t>(a->data)));
+            } else if (a->type->tag == TypeTag::Int64) {
+                aVal = BigInt(std::to_string(std::get<int64_t>(a->data)));
+            } else {
+                error("Unsupported integer type for BigInt conversion");
+                return;
+            }
+        }
+        
+        if (b->type->tag == TypeTag::Int128 || b->type->tag == TypeTag::UInt128) {
+            bVal = std::get<BigInt>(b->data);
+        } else {
+            // Convert other integer types to BigInt
+            if (b->type->tag == TypeTag::Int) {
+                bVal = BigInt(std::to_string(std::get<int32_t>(b->data)));
+            } else if (b->type->tag == TypeTag::Int64) {
+                bVal = BigInt(std::to_string(std::get<int64_t>(b->data)));
+            } else {
+                error("Unsupported integer type for BigInt conversion");
+                return;
+            }
+        }
+        
+        // Perform BigInt subtraction
+        BigInt result = aVal - bVal;
+        
+        // Determine result type (prefer i128 if either operand is i128, otherwise u128)
+        TypePtr resultType = (a->type->tag == TypeTag::Int128 || b->type->tag == TypeTag::Int128) ? 
+                            typeSystem->INT128_TYPE : typeSystem->UINT128_TYPE;
+        
+        push(memoryManager.makeRef<Value>(*region, resultType, result));
     } else {
         // Integer subtraction with mixed int32/int64 support
         int64_t aVal, bVal;
@@ -2065,9 +2253,26 @@ void VM::handleNegate(const Instruction& /*unused*/) {
     if (a->type->tag == TypeTag::Float64) {
         double val = std::get<double>(a->data);
         push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, -val));
-    } else {
+    } else if (a->type->tag == TypeTag::Int) {
         int32_t val = std::get<int32_t>(a->data);
         push(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, -val));
+    } else if (a->type->tag == TypeTag::Int64) {
+        int64_t val = std::get<int64_t>(a->data);
+        push(memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, -val));
+    } else if (a->type->tag == TypeTag::Int128) {
+        BigInt val = std::get<BigInt>(a->data);
+        push(memoryManager.makeRef<Value>(*region, typeSystem->INT128_TYPE, BigInt(0) - val));
+    } else if (a->type->tag == TypeTag::UInt64) {
+        BigInt val = std::get<BigInt>(a->data);
+        // Negating unsigned should become signed
+        push(memoryManager.makeRef<Value>(*region, typeSystem->INT128_TYPE, BigInt(0) - val));
+    } else if (a->type->tag == TypeTag::UInt128) {
+        BigInt val = std::get<BigInt>(a->data);
+        // Negating unsigned should become signed
+        push(memoryManager.makeRef<Value>(*region, typeSystem->INT128_TYPE, BigInt(0) - val));
+    } else {
+        error("Cannot negate type: " + a->type->toString());
+        push(a); // Push back original value
     }
 }
 
@@ -2077,17 +2282,50 @@ void VM::handleEqual(const Instruction& /*unused*/) {
 
     bool result = false;
 
-    // Handle mixed integer types
-    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) &&
-            (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
-        // Convert both to int64_t for comparison
-        int64_t aVal = (a->type->tag == TypeTag::Int) ?
-                    static_cast<int64_t>(std::get<int32_t>(a->data)) :
-                    std::get<int64_t>(a->data);
-        int64_t bVal = (b->type->tag == TypeTag::Int) ?
-                    static_cast<int64_t>(std::get<int32_t>(b->data)) :
-                    std::get<int64_t>(b->data);
-        result = aVal == bVal;
+    // Handle mixed integer types including BigInt
+    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64 ||
+         a->type->tag == TypeTag::Int128 || a->type->tag == TypeTag::UInt64 || a->type->tag == TypeTag::UInt128) &&
+        (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64 ||
+         b->type->tag == TypeTag::Int128 || b->type->tag == TypeTag::UInt64 || b->type->tag == TypeTag::UInt128)) {
+        
+        // If either is BigInt, use BigInt comparison
+        if (a->type->tag == TypeTag::Int128 || a->type->tag == TypeTag::UInt128 ||
+            b->type->tag == TypeTag::Int128 || b->type->tag == TypeTag::UInt128) {
+            
+            BigInt aVal, bVal;
+            
+            // Convert to BigInt
+            if (a->type->tag == TypeTag::Int128 || a->type->tag == TypeTag::UInt128) {
+                aVal = std::get<BigInt>(a->data);
+            } else if (a->type->tag == TypeTag::Int) {
+                aVal = BigInt(std::to_string(std::get<int32_t>(a->data)));
+            } else if (a->type->tag == TypeTag::Int64) {
+                aVal = BigInt(std::to_string(std::get<int64_t>(a->data)));
+            } else if (a->type->tag == TypeTag::UInt64) {
+                aVal = std::get<BigInt>(a->data);
+            }
+            
+            if (b->type->tag == TypeTag::Int128 || b->type->tag == TypeTag::UInt128) {
+                bVal = std::get<BigInt>(b->data);
+            } else if (b->type->tag == TypeTag::Int) {
+                bVal = BigInt(std::to_string(std::get<int32_t>(b->data)));
+            } else if (b->type->tag == TypeTag::Int64) {
+                bVal = BigInt(std::to_string(std::get<int64_t>(b->data)));
+            } else if (b->type->tag == TypeTag::UInt64) {
+                bVal = std::get<BigInt>(b->data);
+            }
+            
+            result = aVal == bVal;
+        } else {
+            // Regular int32/int64 comparison
+            int64_t aVal = (a->type->tag == TypeTag::Int) ?
+                        static_cast<int64_t>(std::get<int32_t>(a->data)) :
+                        std::get<int64_t>(a->data);
+            int64_t bVal = (b->type->tag == TypeTag::Int) ?
+                        static_cast<int64_t>(std::get<int32_t>(b->data)) :
+                        std::get<int64_t>(b->data);
+            result = aVal == bVal;
+        }
     }
     // Handle mixed integer/float comparisons
     else if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && b->type->tag == TypeTag::Float64) {
@@ -2113,6 +2351,11 @@ void VM::handleEqual(const Instruction& /*unused*/) {
             break;
         case TypeTag::String:
             result = std::get<std::string>(a->data) == std::get<std::string>(b->data);
+            break;
+        case TypeTag::Int128:
+        case TypeTag::UInt64:
+        case TypeTag::UInt128:
+            result = std::get<BigInt>(a->data) == std::get<BigInt>(b->data);
             break;
         case TypeTag::Nil:
             result = true; // nil == nil

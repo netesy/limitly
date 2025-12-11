@@ -1,0 +1,182 @@
+CST for tests\expressions\scientific_notation.lm
+Parser: New Unified Parser (CST mode)
+Mode: CST (cstMode=true)
+========================================
+
+CST Statistics:
+- CST nodes created: 46
+- Trivia attachments: 0
+- Parse errors: 0
+
+=== Full CST Structure ===
++ Node: PROGRAM [0-966] (Program root node with trivia)
+├─ + Node: VAR_DECLARATION [90-95]
+├─ + Node: LITERAL_EXPR [111-112]
+├─ + Node: LITERAL_EXPR [103-111] (number literal)
+│ ├─ + Node: TRIVIA_NODE | Token:   [102-103]
+│ └─ Token: 1.23e-10 [103-111]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: VAR_DECLARATION [117-122]
+├─ + Node: LITERAL_EXPR [138-139]
+├─ + Node: LITERAL_EXPR [130-138] (number literal)
+│ ├─ + Node: TRIVIA_NODE | Token:   [129-130]
+│ └─ Token: 4.56e+15 [130-138]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: VAR_DECLARATION [144-152]
+├─ + Node: LITERAL_EXPR [168-169]
+├─ + Node: LITERAL_EXPR [161-168] (number literal)
+│ └─ Token: 7.89e-5 [161-168]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: PRINT_STATEMENT [176-177]
+├─ + Node: LITERAL_EXPR [177-204] (string literal)
+│ └─ Token: "Scientific notat... [177-204]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: PRINT_STATEMENT [212-213]
+├─ + Node: LITERAL_EXPR [213-221] (string literal)
+│ └─ Token: "Small:" [213-221]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: VARIABLE_EXPR [228-229]
+├─ + Node: VARIABLE_EXPR [223-228] (variable reference)
+│ ├─ + Node: TRIVIA_NODE | Token:   [222-223]
+│ └─ Token: small [223-228]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: PRINT_STATEMENT [236-237]
+├─ + Node: LITERAL_EXPR [237-245] (string literal)
+│ └─ Token: "Large:" [237-245]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: VARIABLE_EXPR [252-253]
+├─ + Node: VARIABLE_EXPR [247-252] (variable reference)
+│ ├─ + Node: TRIVIA_NODE | Token:   [246-247]
+│ └─ Token: large [247-252]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: PRINT_STATEMENT [260-261]
+├─ + Node: LITERAL_EXPR [261-272] (string literal)
+│ └─ Token: "Negative:" [261-272]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: VARIABLE_EXPR [282-283]
+├─ + Node: VARIABLE_EXPR [274-282] (variable reference)
+│ ├─ + Node: TRIVIA_NODE | Token:   [273-274]
+│ └─ Token: negative [274-282]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: VAR_DECLARATION [313-321]
+├─ + Node: LITERAL_EXPR [335-336]
+├─ + Node: LITERAL_EXPR [329-335] (number literal)
+│ ├─ + Node: TRIVIA_NODE | Token:   [328-329]
+│ └─ Token: 2.5E+8 [329-335]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: VAR_DECLARATION [341-352]
+├─ + Node: LITERAL_EXPR [367-368]
+├─ + Node: LITERAL_EXPR [360-367] (number literal)
+│ ├─ + Node: TRIVIA_NODE | Token:   [359-360]
+│ └─ Token: 3.14E-3 [360-367]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: PRINT_STATEMENT [375-376]
+├─ + Node: LITERAL_EXPR [376-397] (string literal)
+│ └─ Token: "Capital E notati... [376-397]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: PRINT_STATEMENT [405-406]
+├─ + Node: LITERAL_EXPR [406-427] (string literal)
+│ └─ Token: "Capital E positi... [406-427]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: VARIABLE_EXPR [437-438]
+├─ + Node: VARIABLE_EXPR [429-437] (variable reference)
+│ ├─ + Node: TRIVIA_NODE | Token:   [428-429]
+│ └─ Token: capitalE [429-437]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: PRINT_STATEMENT [445-446]
+├─ + Node: LITERAL_EXPR [446-467] (string literal)
+│ └─ Token: "Capital E negati... [446-467]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: VARIABLE_EXPR [480-481]
+├─ + Node: VARIABLE_EXPR [469-480] (variable reference)
+│ ├─ + Node: TRIVIA_NODE | Token:   [468-469]
+│ └─ Token: capitalENeg [469-480]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: VAR_DECLARATION [553-566]
+├─ + Node: LITERAL_EXPR [578-579]
+├─ + Node: LITERAL_EXPR [574-578] (number literal)
+│ ├─ + Node: TRIVIA_NODE | Token:   [573-574]
+│ └─ Token: 5e10 [574-578]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: VAR_DECLARATION [584-600]
+├─ + Node: LITERAL_EXPR [612-613]
+├─ + Node: LITERAL_EXPR [608-612] (number literal)
+│ ├─ + Node: TRIVIA_NODE | Token:   [607-608]
+│ └─ Token: 2e-6 [608-612]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: PRINT_STATEMENT [620-621]
+├─ + Node: LITERAL_EXPR [621-651] (string literal)
+│ └─ Token: "Integer scientif... [621-651]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: PRINT_STATEMENT [659-660]
+├─ + Node: LITERAL_EXPR [660-677] (string literal)
+│ └─ Token: "Int scientific:" [660-677]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: VARIABLE_EXPR [692-693]
+├─ + Node: VARIABLE_EXPR [679-692] (variable reference)
+│ ├─ + Node: TRIVIA_NODE | Token:   [678-679]
+│ └─ Token: intScientific [679-692]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: PRINT_STATEMENT [700-701]
+├─ + Node: LITERAL_EXPR [701-727] (string literal)
+│ └─ Token: "Int scientific n... [701-727]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: VARIABLE_EXPR [745-746]
+├─ + Node: VARIABLE_EXPR [729-745] (variable reference)
+│ ├─ + Node: TRIVIA_NODE | Token:   [728-729]
+│ └─ Token: intScientificNeg [729-745]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: VAR_DECLARATION [772-776]
+├─ + Node: LITERAL_EXPR [787-788]
+├─ + Node: LITERAL_EXPR [784-787] (number literal)
+│ ├─ + Node: TRIVIA_NODE | Token:   [783-784]
+│ └─ Token: 0e0 [784-787]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: VAR_DECLARATION [793-796]
+├─ + Node: LITERAL_EXPR [807-808]
+├─ + Node: LITERAL_EXPR [804-807] (number literal)
+│ ├─ + Node: TRIVIA_NODE | Token:   [803-804]
+│ └─ Token: 1e0 [804-807]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: PRINT_STATEMENT [815-816]
+├─ + Node: LITERAL_EXPR [816-829] (string literal)
+│ └─ Token: "Edge cases:" [816-829]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: PRINT_STATEMENT [837-838]
+├─ + Node: LITERAL_EXPR [838-845] (string literal)
+│ └─ Token: "Zero:" [838-845]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: VARIABLE_EXPR [851-852]
+├─ + Node: VARIABLE_EXPR [847-851] (variable reference)
+│ ├─ + Node: TRIVIA_NODE | Token:   [846-847]
+│ └─ Token: zero [847-851]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: PRINT_STATEMENT [859-860]
+├─ + Node: LITERAL_EXPR [860-866] (string literal)
+│ └─ Token: "One:" [860-866]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: VARIABLE_EXPR [871-872]
+├─ + Node: VARIABLE_EXPR [868-871] (variable reference)
+│ ├─ + Node: TRIVIA_NODE | Token:   [867-868]
+│ └─ Token: one [868-871]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: VAR_DECLARATION [902-908]
+├─ + Node: LITERAL_EXPR [922-923]
+├─ + Node: LITERAL_EXPR [916-921] (number literal)
+│ ├─ + Node: TRIVIA_NODE | Token:   [915-916]
+│ └─ Token: 1.5e3 [916-921]
+├─ + Node: LITERAL_EXPR [929-930]
+├─ + Node: LITERAL_EXPR [924-929] (number literal)
+│ ├─ + Node: TRIVIA_NODE | Token:   [923-924]
+│ └─ Token: 2.5e2 [924-929]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: PRINT_STATEMENT [936-937]
+├─ + Node: LITERAL_EXPR [937-957] (string literal)
+│ └─ Token: "Expression result:" [937-957]
+├─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+├─ + Node: VARIABLE_EXPR [965-966]
+├─ + Node: VARIABLE_EXPR [959-965] (variable reference)
+│ ├─ + Node: TRIVIA_NODE | Token:   [958-959]
+│ └─ Token: result [959-965]
+└─ + Node: LITERAL_EXPR [0-0] (top-level expression)
+

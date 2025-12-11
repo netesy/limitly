@@ -19,6 +19,8 @@ void BytecodePrinter::print(const std::vector<Instruction>& bytecode, std::ostre
 std::string BytecodePrinter::opcodeToString(Opcode opcode) {
     switch (opcode) {
         case Opcode::PUSH_INT: return "PUSH_INT";
+        case Opcode::PUSH_BIGINT: return "PUSH_BIGINT";
+        case Opcode::DECLARE_VAR: return "DECLARE_VAR";
         case Opcode::PUSH_FLOAT: return "PUSH_FLOAT";
         case Opcode::PUSH_STRING: return "PUSH_STRING";
         case Opcode::PUSH_BOOL: return "PUSH_BOOL";
@@ -145,6 +147,14 @@ std::string BytecodePrinter::formatInstruction(const Instruction& instruction, s
     // Add operands based on instruction type and opcode
     switch (instruction.opcode) {
         case Opcode::PUSH_INT:
+        case Opcode::PUSH_BIGINT:
+            if (!instruction.stringValue.empty()) {
+                oss << " \"" << instruction.stringValue << "\"";
+            }
+            if (instruction.intValue != 0) {
+                oss << " " << instruction.intValue;
+            }
+            break;
         case Opcode::JUMP:
         case Opcode::JUMP_IF_TRUE:
         case Opcode::JUMP_IF_FALSE:
@@ -157,9 +167,20 @@ std::string BytecodePrinter::formatInstruction(const Instruction& instruction, s
             
         case Opcode::PUSH_BOOL:
             oss << " " << (instruction.boolValue ? "true" : "false");
+            if (!instruction.stringValue.empty()) {
+                oss << " \"" << instruction.stringValue << "\"";
+            }
+            if (instruction.intValue != 0) {
+                oss << " " << instruction.intValue;
+            }
+            if (instruction.boolValue != 0) {
+                oss << " " << (instruction.boolValue ? "true" : "false");
+            }
+            break;
             break;
             
         case Opcode::PUSH_STRING:
+        case Opcode::DECLARE_VAR:
         case Opcode::STORE_VAR:
         case Opcode::LOAD_VAR:
         case Opcode::STORE_TEMP:
@@ -200,6 +221,12 @@ std::string BytecodePrinter::formatInstruction(const Instruction& instruction, s
             break;
             
         default:
+            if (!instruction.stringValue.empty()) {
+                oss << " \"" << instruction.stringValue << "\"";
+            }
+            if (instruction.intValue != 0) {
+                oss << " " << instruction.intValue;
+            }
             // No operands for most instructions
             break;
     }

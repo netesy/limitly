@@ -1,0 +1,10 @@
+Type Checking Results for tests\expressions\scientific_notation.lm
+Parser: New Unified Parser (CST mode)
+========================================
+
+❌ Found 1 type error(s):
+
+Error 1:
+  Line: 6
+  Message: Type mismatch in variable declaration 'negative': cannot assign Any to Float64
+

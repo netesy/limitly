@@ -1,0 +1,14 @@
+Type Checking Results for tests\expressions\large_literals.lm
+Parser: New Unified Parser (CST mode)
+========================================
+
+❌ Found 2 type error(s):
+
+Error 1:
+  Line: 22
+  Message: Type mismatch in variable declaration 'negLarge': cannot assign Any to Int64
+
+Error 2:
+  Line: 23
+  Message: Type mismatch in variable declaration 'negFloat': cannot assign Any to Float64
+
