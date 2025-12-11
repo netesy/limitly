@@ -1,5 +1,6 @@
 #include "parser.hh"
 #include "../common/debugger.hh"
+#include "../common/big_int.hh"
 #include <stdexcept>
 #include <limits>
 #include <set>
@@ -3092,13 +3093,13 @@ std::shared_ptr<AST::Expression> Parser::call() {
                 auto indexLiteral = std::make_shared<AST::LiteralExpr>();
                 indexLiteral->line = numberToken.line;
                 
-                // Parse the number as an integer
+                // Parse the number as a BigInt
                 try {
-                    long long indexValue = std::stoll(numberToken.lexeme);
-                    indexLiteral->value = indexValue;
+                    BigInt indexValue(numberToken.lexeme);
+                    indexLiteral->value = indexValue.to_string();
                 } catch (const std::exception&) {
                     error("Invalid tuple index: " + numberToken.lexeme);
-                    indexLiteral->value = 0LL;
+                    indexLiteral->value = "0";
                 }
                 
                 indexExpr->index = indexLiteral;
@@ -3437,49 +3438,13 @@ std::shared_ptr<AST::Expression> Parser::primary() {
                 literalExpr->value = 0.0;
             }
         } else {
-            // Parse as integer
+            // Parse as integer using BigInt
             try {
-                // Try to parse as signed long long first
-                long long llValue = std::stoll(token.lexeme);
-                literalExpr->value = llValue;
-            } catch (const std::out_of_range& e) {
-                try {
-                    // If that fails, try unsigned long long
-                    unsigned long long ullValue = std::stoull(token.lexeme);
-                    
-                    // If the value fits in signed long long range, use it as signed
-                    if (ullValue <= static_cast<unsigned long long>(std::numeric_limits<long long>::max())) {
-                        literalExpr->value = static_cast<long long>(ullValue);
-                    } else {
-                        // For values larger than signed long long max, convert to double
-                        // This handles cases like 18446744073709551615 (max uint64)
-                        // We use double to preserve the full precision of large integers
-                        literalExpr->value = static_cast<double>(ullValue);
-                    }
-                } catch (const std::out_of_range& e2) {
-                    // If unsigned long long also overflows, the number is too large
-                    // Try parsing as double to handle extremely large numbers
-                    try {
-                        double doubleValue = std::stod(token.lexeme);
-                        if (std::isinf(doubleValue)) {
-                            error("Integer literal too large: " + token.lexeme);
-                            literalExpr->value = std::numeric_limits<long long>::max();
-                        } else {
-                            literalExpr->value = doubleValue;
-                        }
-                    } catch (const std::exception& e3) {
-                        error("Invalid number: " + token.lexeme + " - number too large or invalid format");
-                        literalExpr->value = 0LL;
-                    }
-                } catch (const std::invalid_argument& e2) {
-                    // Invalid format for unsigned integer, this shouldn't happen for pure digits
-                    error("Invalid integer format: " + token.lexeme);
-                    literalExpr->value = 0LL;
-                }
-            } catch (const std::invalid_argument& e) {
-                // Invalid format for signed long long, this shouldn't happen for pure digits
-                error("Invalid integer format: " + token.lexeme);
-                literalExpr->value = 0LL;
+                BigInt bigIntValue(token.lexeme);
+                literalExpr->value = bigIntValue;
+            } catch (const std::exception& e) {
+                error("Invalid integer format: " + token.lexeme + " - " + e.what());
+                literalExpr->value = BigInt(0);
             }
         }
 
@@ -4131,9 +4096,9 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseTypeAnnotation() {
 // Helper method to check if a token type is a primitive type
 bool Parser::isPrimitiveType(TokenType type) {
     return type == TokenType::INT_TYPE || type == TokenType::INT8_TYPE || type == TokenType::INT16_TYPE ||
-           type == TokenType::INT32_TYPE || type == TokenType::INT64_TYPE || type == TokenType::UINT_TYPE ||
-           type == TokenType::UINT8_TYPE || type == TokenType::UINT16_TYPE || type == TokenType::UINT32_TYPE ||
-           type == TokenType::UINT64_TYPE || type == TokenType::FLOAT_TYPE || type == TokenType::FLOAT32_TYPE ||
+           type == TokenType::INT32_TYPE || type == TokenType::INT64_TYPE || type == TokenType::INT128_TYPE ||
+           type == TokenType::UINT_TYPE || type == TokenType::UINT8_TYPE || type == TokenType::UINT16_TYPE || type == TokenType::UINT32_TYPE ||
+           type == TokenType::UINT64_TYPE || type == TokenType::UINT128_TYPE || type == TokenType::FLOAT_TYPE || type == TokenType::FLOAT32_TYPE ||
            type == TokenType::FLOAT64_TYPE || type == TokenType::STR_TYPE || type == TokenType::BOOL_TYPE ||
            type == TokenType::ANY_TYPE || type == TokenType::NIL_TYPE;
 }
@@ -4146,11 +4111,13 @@ std::string Parser::tokenTypeToString(TokenType type) {
         case TokenType::INT16_TYPE: return "i16";
         case TokenType::INT32_TYPE: return "i32";
         case TokenType::INT64_TYPE: return "i64";
+        case TokenType::INT128_TYPE: return "i128";
         case TokenType::UINT_TYPE: return "uint";
         case TokenType::UINT8_TYPE: return "u8";
         case TokenType::UINT16_TYPE: return "u16";
         case TokenType::UINT32_TYPE: return "u32";
         case TokenType::UINT64_TYPE: return "u64";
+        case TokenType::UINT128_TYPE: return "u128";
         case TokenType::FLOAT_TYPE: return "float";
         case TokenType::FLOAT32_TYPE: return "f32";
         case TokenType::FLOAT64_TYPE: return "f64";
@@ -4245,6 +4212,9 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseBasicType() {
     } else if (match({TokenType::INT64_TYPE})) {
         type->typeName = "i64";
         type->isPrimitive = true;
+    } else if (match({TokenType::INT128_TYPE})) {
+        type->typeName = "i128";
+        type->isPrimitive = true;
     } else if (match({TokenType::UINT_TYPE})) {
         type->typeName = "uint";
         type->isPrimitive = true;
@@ -4259,6 +4229,9 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseBasicType() {
         type->isPrimitive = true;
     } else if (match({TokenType::UINT64_TYPE})) {
         type->typeName = "u64";
+        type->isPrimitive = true;
+    } else if (match({TokenType::UINT128_TYPE})) {
+        type->typeName = "u128";
         type->isPrimitive = true;
     } else if (match({TokenType::FLOAT_TYPE})) {
         type->typeName = "float";

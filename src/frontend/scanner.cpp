@@ -699,11 +699,13 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "i16") return TokenType::INT16_TYPE;
     if (rest == "i32") return TokenType::INT32_TYPE;
     if (rest == "i64") return TokenType::INT64_TYPE;
+    if (rest == "i128") return TokenType::INT128_TYPE;
     if (rest == "uint") return TokenType::UINT_TYPE;
     if (rest == "u8") return TokenType::UINT8_TYPE;
     if (rest == "u16") return TokenType::UINT16_TYPE;
     if (rest == "u32") return TokenType::UINT32_TYPE;
     if (rest == "u64") return TokenType::UINT64_TYPE;
+    if (rest == "u128") return TokenType::UINT128_TYPE;
     if (rest == "float") return TokenType::FLOAT_TYPE;
     if (rest == "f32") return TokenType::FLOAT32_TYPE;
     if (rest == "f64") return TokenType::FLOAT64_TYPE;
@@ -994,6 +996,8 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "INT32_TYPE";
     case TokenType::INT64_TYPE:
         return "INT64_TYPE";
+    case TokenType::INT128_TYPE:
+        return "INT128_TYPE";
     case TokenType::UINT8_TYPE:
         return "UINT8_TYPE";
     case TokenType::UINT16_TYPE:
@@ -1002,6 +1006,8 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "UINT32_TYPE";
     case TokenType::UINT64_TYPE:
         return "UINT64_TYPE";
+    case TokenType::UINT128_TYPE:
+        return "UINT128_TYPE";
     case TokenType::FLOAT32_TYPE:
         return "FLOAT32_TYPE";
     case TokenType::FLOAT64_TYPE:

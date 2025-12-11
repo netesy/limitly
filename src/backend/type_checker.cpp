@@ -3,6 +3,7 @@
 #include "../common/debugger.hh"
 #include "../frontend/scanner.hh"
 #include "../frontend/parser.hh"
+#include "../common/big_int.hh"
 #include <algorithm>
 #include <sstream>
 #include <string>
@@ -271,7 +272,7 @@ void TypeChecker::checkStatement(const std::shared_ptr<AST::Statement>& stmt) {
         }
         
         if (varDecl->initializer) {
-            TypePtr initType = checkExpression(varDecl->initializer);
+            TypePtr initType = checkExpression(varDecl->initializer, varType);
             
             // Check for unhandled fallible expressions in variable declarations
             if (requiresErrorHandling(initType)) {
@@ -600,6 +601,63 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
                 return typeSystem.BOOL_TYPE;
             case 4: // std::nullptr_t
                 return typeSystem.NIL_TYPE;
+            case 5: // BigInt
+                {
+                    // For BigInt literals, try to infer the most appropriate type
+                    const BigInt& bigIntValue = std::get<BigInt>(literalExpr->value);
+                    
+                    // If we have an expected type context and it's compatible, use it
+                    if (expectedType && typeSystem.isNumericType(expectedType->tag)) {
+                        return expectedType;
+                    }
+                    
+                    // Try to determine the best fit type based on the value
+                    try {
+                        // Check if it fits in int64
+                        int64_t int64Val = bigIntValue.to_int64();
+                        
+                        // Value fits in int64
+                        if (int64Val >= 0) {
+                            // Non-negative value that fits in int64 - default to int64
+                            return typeSystem.INT64_TYPE;
+                        } else {
+                            // Negative value, must be signed int64
+                            return typeSystem.INT64_TYPE;
+                        }
+                    } catch (const std::overflow_error&) {
+                        // Value doesn't fit in int64, check if it could be uint64 or larger
+                        try {
+                            // Check if BigInt is stored as uint64 internally
+                            if (bigIntValue.get_type().find("u64") != std::string::npos) {
+                                // Check if the value actually fits in uint64 range
+                                std::string bigIntStr = bigIntValue.to_string();
+                                if (bigIntStr.length() <= 20) { // UINT64_MAX has 20 digits
+                                    return typeSystem.UINT64_TYPE;
+                                } else {
+                                    // Too large for uint64, must be uint128
+                                    return typeSystem.UINT128_TYPE;
+                                }
+                            }
+                            
+                            // Check if the value is positive and determine size
+                            std::string bigIntStr = bigIntValue.to_string();
+                            if (!bigIntStr.empty() && bigIntStr[0] != '-') {
+                                // Positive number that doesn't fit in int64
+                                if (bigIntStr.length() <= 20) { // UINT64_MAX has 20 digits
+                                    return typeSystem.UINT64_TYPE;
+                                } else {
+                                    // Larger than uint64, must be uint128
+                                    return typeSystem.UINT128_TYPE;
+                                }
+                            }
+                        } catch (...) {
+                            // Fallback to INT128_TYPE
+                        }
+                        
+                        // Default to INT128_TYPE for negative large numbers
+                        return typeSystem.INT128_TYPE;
+                    }
+                }
             default:
                 break;
         }
@@ -724,6 +782,42 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
             return checkClassMethodCall(memberExpr, argTypes, callExpr);
         }
         return typeSystem.ANY_TYPE;
+        
+    } else if (auto unaryExpr = std::dynamic_pointer_cast<AST::UnaryExpr>(expr)) {
+        TypePtr rightType = checkExpression(unaryExpr->right);
+        
+        // Handle unary operators
+        if (unaryExpr->op == TokenType::MINUS) {
+            // Unary minus: special handling for unsigned types that might overflow
+            if (rightType == typeSystem.UINT64_TYPE) {
+                // Check if the operand is a BigInt literal that would overflow int64
+                if (auto literalExpr = std::dynamic_pointer_cast<AST::LiteralExpr>(unaryExpr->right)) {
+                    if (std::holds_alternative<BigInt>(literalExpr->value)) {
+                        const BigInt& bigIntValue = std::get<BigInt>(literalExpr->value);
+                        try {
+                            // Try to convert to int64 - if it overflows, we need int128
+                            bigIntValue.to_int64();
+                            // If we get here, it fits in int64, so int64 is fine
+                            return typeSystem.INT64_TYPE;
+                        } catch (const std::overflow_error&) {
+                            // Overflows int64, need int128 for the negation
+                            return typeSystem.INT128_TYPE;
+                        }
+                    }
+                }
+            }
+            // Default: return the same type as the operand
+            return rightType;
+        } else if (unaryExpr->op == TokenType::BANG) {
+            // Logical NOT: must be boolean
+            if (rightType != typeSystem.BOOL_TYPE) {
+                addError("Logical NOT operator requires boolean operand, got " + rightType->toString(), unaryExpr->line);
+            }
+            return typeSystem.BOOL_TYPE;
+        } else {
+            // Other unary operators (if any)
+            return rightType;
+        }
         
     } else if (auto fallibleExpr = std::dynamic_pointer_cast<AST::FallibleExpr>(expr)) {
         checkFallibleExpression(fallibleExpr);
@@ -943,8 +1037,6 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
     // Default case for other expression types
     return typeSystem.ANY_TYPE;
 }
-
-
 
 TypePtr TypeChecker::inferLambdaReturnType(const std::shared_ptr<AST::Statement>& body) {
     // Try to infer return type from lambda body

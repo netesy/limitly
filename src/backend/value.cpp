@@ -186,31 +186,30 @@ std::string TupleValue::toString() const {
 bool IteratorValue::hasNext() const {
     if (type == IteratorType::RANGE) {
         return (rangeStep > 0) ? (rangeCurrent < rangeEnd) : (rangeCurrent > rangeEnd);
-    }
-    if (!iterable) return false;
-
-    if (type == IteratorType::LIST) {
-        if (auto list = std::get_if<ListValue>(&iterable->data)) {
-            return currentIndex < list->elements.size();
-        }
-    } else if (type == IteratorType::CHANNEL) {
-        // If we already buffered a value, we have next
-        if (hasBuffered) return true;
-
-        // Attempt to receive from the channel (this will block until value or closed)
-        try {
-            if (auto chPtr = std::get_if<std::shared_ptr<Channel<ValuePtr>>>(&iterable->data)) {
-                ValuePtr v;
-                bool ok = (*chPtr)->receive(v);
-                if (ok) {
-                    bufferedValue = v;
-                    hasBuffered = true;
-                    return true;
-                }
-                return false; // channel closed and no value
+    } else if (iterable) {
+        if (type == IteratorType::LIST) {
+            if (auto list = std::get_if<ListValue>(&iterable->data)) {
+                return currentIndex < list->elements.size();
             }
-        } catch (...) {
-            return false;
+        } else if (type == IteratorType::CHANNEL) {
+            // If we already buffered a value, we have next
+            if (hasBuffered) return true;
+
+            // Attempt to receive from the channel (this will block until value or closed)
+            try {
+                if (auto chPtr = std::get_if<std::shared_ptr<Channel<ValuePtr>>>(&iterable->data)) {
+                    ValuePtr v;
+                    bool ok = (*chPtr)->receive(v);
+                    if (ok) {
+                        bufferedValue = v;
+                        hasBuffered = true;
+                        return true;
+                    }
+                    return false; // channel closed and no value
+                }
+            } catch (...) {
+                return false;
+            }
         }
     }
     // Add DICT handling here if needed
@@ -225,7 +224,7 @@ ValuePtr IteratorValue::next() {
 
     if (type == IteratorType::RANGE) {
         // Create value on-demand
-        int64_t value = rangeCurrent;
+        int64_t value = rangeCurrent.to_int64();
         rangeCurrent += rangeStep;
 
         // OPTIMIZATION: Reuse a single Value object per thread
@@ -298,16 +297,16 @@ std::string IteratorValue::toString() const {
     if (iterable) {
         oss << " over=" << iterable->toString();
     } else if (type == IteratorType::RANGE) {
-        oss << " range=(" << rangeStart << ".." << rangeEnd;
+        oss << " range=(" << rangeStart.to_string() << ".." << rangeEnd.to_string();
         if (rangeStep != 1) {
-            oss << " step=" << rangeStep;
+            oss << " step=" << rangeStep.to_string();
         }
         oss << ")";
     }
     
     // Show current position
     if (type == IteratorType::RANGE) {
-        oss << " current=" << rangeCurrent;
+        oss << " current=" << rangeCurrent.to_string();
     } else if (iterable) {
         oss << " index=" << currentIndex;
         
@@ -353,6 +352,7 @@ std::string Value::toString() const {
                    [&](uint16_t u) { oss << u; },
                    [&](uint32_t u) { oss << u; },
                    [&](uint64_t u) { oss << u; },
+                   [&](const BigInt& bi) { oss << bi.to_string(); },
                    [&](float f) { oss << f; },
                    [&](double d) { oss << d; },
                    [&](const std::string& s) { oss << '"' << s << '"'; },

@@ -94,11 +94,11 @@ print("Outer value: " + outer); //should print 20
 
 
 // Test 9: scoping and assignments 
-var outer = 10;
+var k = 10;
 {
     // Should be able to access outer variable
-    print("Outer value in inner scope: " + outer);
-    outer += 20;
-    print("Inner scope value: " + outer);
+    print("Outer value in inner scope: " + k);
+   k += 20;
+    print("Inner scope value: " + k);
 }
-print("Outer value: " + outer); //should print 30
+print("Outer value: " + k); //should print 30
