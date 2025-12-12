@@ -1188,14 +1188,24 @@ void BytecodeGenerator::visitLiteralExpr(const std::shared_ptr<AST::LiteralExpr>
     // Generate bytecode for literal expression
     
     // Push literal value onto stack based on its type
-    if (std::holds_alternative<long long>(expr->value)) {
-        emit(Opcode::PUSH_INT, expr->line, std::get<long long>(expr->value));
-    } else if (std::holds_alternative<BigInt>(expr->value)) {
-        // Handle BigInt literals
+    if (std::holds_alternative<BigInt>(expr->value)) {
+        // Handle all numeric values with BigInt
         BigInt bigIntValue = std::get<BigInt>(expr->value);
-        emit(Opcode::PUSH_BIGINT, expr->line, 0, 0.0f, false, bigIntValue.to_string());
-    } else if (std::holds_alternative<double>(expr->value)) {
-        emit(Opcode::PUSH_FLOAT, expr->line, 0, std::get<double>(expr->value));
+        
+        // Check if it's a float type in BigInt
+        if (bigIntValue.is_float_type()) {
+            // Emit as float for VM compatibility
+            emit(Opcode::PUSH_FLOAT, expr->line, 0, bigIntValue.get_f128_value());
+        } else {
+            // Emit as BigInt
+            emit(Opcode::PUSH_BIGINT, expr->line, 0, 0.0f, false, bigIntValue.to_string());
+        }
+    } else if (std::holds_alternative<long long>(expr->value)) {
+        // Legacy support for old long long values
+        emit(Opcode::PUSH_INT, expr->line, std::get<long long>(expr->value));
+    } else if (std::holds_alternative<long double>(expr->value)) {  
+       // Legacy support for old long double values
+        emit(Opcode::PUSH_FLOAT, expr->line, 0, std::get<long double>(expr->value));
     } else if (std::holds_alternative<std::string>(expr->value)) {
         std::string stringValue = std::get<std::string>(expr->value);
         // String value is already parsed (quotes removed) by the parser
@@ -1900,7 +1910,7 @@ void BytecodeGenerator::visitOkConstructExpr(const std::shared_ptr<AST::OkConstr
     emit(Opcode::CONSTRUCT_OK, expr->line);
 }
 
-void BytecodeGenerator::emit(Opcode op, uint32_t lineNumber, int64_t intValue, float floatValue, bool boolValue, const std::string& stringValue) {
+void BytecodeGenerator::emit(Opcode op, uint32_t lineNumber, int64_t intValue, long double floatValue, bool boolValue, const std::string& stringValue) {
     // Create and push instruction onto bytecode vector
     Instruction instruction;
     instruction.opcode = op;

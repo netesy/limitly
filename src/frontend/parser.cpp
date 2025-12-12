@@ -3408,34 +3408,35 @@ std::shared_ptr<AST::Expression> Parser::primary() {
             attachTriviaFromToken(token);
         }
 
-        // Enhanced numeric literal parsing with better type inference
+        // Enhanced numeric literal parsing with BigInt for all types
         bool hasDecimal = token.lexeme.find('.') != std::string::npos;
         bool hasScientific = token.lexeme.find('e') != std::string::npos || token.lexeme.find('E') != std::string::npos;
         
         if (hasDecimal || hasScientific) {
-            // Parse as floating-point number
+            // Parse as floating-point number using BigInt
             try {
-                double doubleValue = std::stod(token.lexeme);
+                long double doubleValue = std::stold(token.lexeme);
                 
                 // Check for special values
                 if (std::isnan(doubleValue)) {
                     error("Invalid floating-point number (NaN): " + token.lexeme);
-                    literalExpr->value = 0.0;
+                    literalExpr->value = BigInt(0.0);
                 } else if (std::isinf(doubleValue)) {
                     // Allow infinity for very large scientific notation
-                    literalExpr->value = doubleValue;
+                    literalExpr->value = BigInt(doubleValue);
                 } else {
-                    literalExpr->value = doubleValue;
+                    // Use BigInt with f128 precision for all floats
+                    literalExpr->value = BigInt(doubleValue);
                 }
             } catch (const std::out_of_range& e) {
                 error("Floating-point number out of range: " + token.lexeme);
-                literalExpr->value = 0.0;
+                literalExpr->value = BigInt(0.0);
             } catch (const std::invalid_argument& e) {
                 error("Invalid floating-point number format: " + token.lexeme);
-                literalExpr->value = 0.0;
+                literalExpr->value = BigInt(0.0);
             } catch (const std::exception& e) {
                 error("Invalid floating-point number: " + token.lexeme);
-                literalExpr->value = 0.0;
+                literalExpr->value = BigInt(0.0);
             }
         } else {
             // Parse as integer using BigInt
@@ -3450,7 +3451,6 @@ std::shared_ptr<AST::Expression> Parser::primary() {
 
         return literalExpr;
     }
-
     if (match({TokenType::INTERPOLATION_START})) {
         // This is an interpolated string starting directly with interpolation
         return interpolatedString();

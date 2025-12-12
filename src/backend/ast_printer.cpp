@@ -990,12 +990,12 @@ std::string ASTPrinter::tokenTypeToString(TokenType type) const {
     }
 }
 
-std::string ASTPrinter::valueToString(const std::variant<long long, double, std::string, bool, std::nullptr_t, BigInt>& value) const {
+std::string ASTPrinter::valueToString(const std::variant<long long, long double, std::string, bool, std::nullptr_t, BigInt>& value) const {
     if (std::holds_alternative<long long>(value)) {
         return std::to_string(std::get<long long>(value));
-    } else if (std::holds_alternative<double>(value)) {
+    } else if (std::holds_alternative<long double>(value)) {
         std::ostringstream ss;
-        ss << std::setprecision(15) << std::get<double>(value);
+        ss << std::setprecision(15) << std::get<long double>(value);
         std::string s = ss.str();
         // Remove trailing zeros and . if not needed
         s.erase(s.find_last_not_of('0') + 1, std::string::npos);

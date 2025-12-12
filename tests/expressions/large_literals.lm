@@ -3,7 +3,7 @@
 // Test maximum values for different types
 var maxI64: i64 = 9223372036854775807;
 var maxU64: u128 = 18446744073709551615    ;
-var largeFloat: f64 = 1.7976931348623157e+308;
+var largeFloat: float = 1.7976931348623157e+308;
 
 print("Large literal test:");
 print("Max I64:", maxI64);
@@ -11,8 +11,8 @@ print("Max U128:", maxU64);
 print("Large Float:", largeFloat);
 
 // Test very small values
-var smallFloat: f64 = 2.2250738585072014e-308;
-var tinyFloat: f64 = 1e-100;
+var smallFloat: float = 2.2250738585072014e-308;
+var tinyFloat: float = 1e-100;
 
 print("Small literal test:");
 print("Small Float:", smallFloat);

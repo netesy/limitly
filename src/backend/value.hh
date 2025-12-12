@@ -833,7 +833,7 @@ struct Value {
                  uint16_t,
                  uint32_t,
                  uint64_t,
-                 double,
+                 long double,
                  float,
                  std::string,
                  BigInt,
@@ -878,7 +878,7 @@ struct Value {
     Value(TypePtr t, float val) : type(std::move(t)), data(val) {
     }
 
-    Value(TypePtr t, double val) : type(std::move(t)), data(val) {
+    Value(TypePtr t, long double val) : type(std::move(t)), data(val) {
     }
 
     // BigInt constructor
@@ -1333,7 +1333,7 @@ struct IteratorValue {
     // Constructor for general iterators (list, dict, channel)
     IteratorValue(IteratorType type, ValuePtr iterable)
         : type(type), iterable(std::move(iterable)), currentIndex(0),
-        rangeStart(0), rangeEnd(0), rangeStep(0), rangeCurrent(0),
+        rangeStart(BigInt(0)), rangeEnd(BigInt(0)), rangeStep(BigInt(0)), rangeCurrent(BigInt(0)),
         hasBuffered(false), bufferedValue(nullptr) {}
     
     // Constructor for lazy ranges

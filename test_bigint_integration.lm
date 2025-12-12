@@ -1,0 +1,41 @@
+// Test BigInt integration for normal float values
+print("=== BigInt Integration Test ===")
+
+// Test basic float literals
+var f1 = 3.14159
+var f2 = 2.71828
+var f3 = 1.41421
+
+print("Basic floats:")
+print("f1 =", f1)
+print("f2 =", f2)
+print("f3 =", f3)
+
+// Test float operations
+var sum = f1 + f2
+var diff = f2 - f1
+var prod = f1 * f3
+
+print("Float operations:")
+print("sum =", sum)
+print("diff =", diff)
+print("prod =", prod)
+
+// Test mixed integer-float operations
+var i1 = 42
+var mixed1 = i1 + f1
+var mixed2 = f2 * i1
+
+print("Mixed operations:")
+print("mixed1 =", mixed1)
+print("mixed2 =", mixed2)
+
+// Test scientific notation
+var sci1 = 1.23e4
+var sci2 = 5.67e-3
+
+print("Scientific notation:")
+print("sci1 =", sci1)
+print("sci2 =", sci2)
+
+print("=== Test completed successfully ===")

@@ -167,16 +167,16 @@ std::string BytecodePrinter::formatInstruction(const Instruction& instruction, s
             
         case Opcode::PUSH_BOOL:
             oss << " " << (instruction.boolValue ? "true" : "false");
-            if (!instruction.stringValue.empty()) {
-                oss << " \"" << instruction.stringValue << "\"";
-            }
-            if (instruction.intValue != 0) {
-                oss << " " << instruction.intValue;
-            }
-            if (instruction.boolValue != 0) {
-                oss << " " << (instruction.boolValue ? "true" : "false");
-            }
-            break;
+            // if (!instruction.stringValue.empty()) {
+            //     oss << " \"" << instruction.stringValue << "\"";
+            // }
+            // if (instruction.intValue != 0) {
+            //     oss << " " << instruction.intValue;
+            // }
+            // if (instruction.boolValue != 0) {
+            //     oss << " " << (instruction.boolValue ? "true" : "false");
+            // }
+            // break;
             break;
             
         case Opcode::PUSH_STRING:
