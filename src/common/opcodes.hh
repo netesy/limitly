@@ -176,7 +176,7 @@ struct Instruction {
     Opcode opcode;
     uint32_t line;
     int64_t intValue = 0;
-    float floatValue = 0.0f;
+    long double floatValue = 0.0f;
     bool boolValue = false;
     std::string stringValue;
 };

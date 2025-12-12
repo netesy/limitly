@@ -352,9 +352,13 @@ std::string Value::toString() const {
                    [&](uint16_t u) { oss << u; },
                    [&](uint32_t u) { oss << u; },
                    [&](uint64_t u) { oss << u; },
-                   [&](const BigInt& bi) { oss << bi.to_string(); },
+                   [&](const BigInt& bi) { 
+    std::string bi_str = bi.to_string();
+    std::cout << "[DEBUG Value::toString] BigInt = " << bi_str << ", storage_type = " << static_cast<int>(bi.get_storage_type()) << std::endl;
+    oss << bi_str; 
+},
                    [&](float f) { oss << f; },
-                   [&](double d) { oss << d; },
+                   [&](long double d) { oss << d; },
                    [&](const std::string& s) { oss << '"' << s << '"'; },
                    [&](const ListValue& lv) {
                        oss << "[";
@@ -444,8 +448,9 @@ std::string Value::getRawString() const {
                    [&](uint16_t u) { oss << u; },
                    [&](uint32_t u) { oss << u; },
                    [&](uint64_t u) { oss << u; },
+                   [&](const BigInt& bi) { oss << bi.to_string(); },
                    [&](float f) { oss << f; },
-                   [&](double d) { oss << d; },
+                   [&](long double d) { oss << d; },
                    [&](const std::string& s) { oss << s; }, // No quotes for raw string
                    [&](const ListValue& lv) {
                        oss << "[";

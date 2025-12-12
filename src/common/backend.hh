@@ -138,7 +138,7 @@ private:
     // Helper methods
     void emit(Opcode op, uint32_t lineNumber, 
               int64_t intValue = 0, 
-              float floatValue = 0.0f, 
+              long double floatValue = 0.0f, 
               bool boolValue = false, 
               const std::string& stringValue = "");
     

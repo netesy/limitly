@@ -398,7 +398,7 @@ ValuePtr BuiltinFunctions::map(const std::vector<ValuePtr>& args) {
     // This is a placeholder until we have proper lambda function support
     for (const auto& element : listValue.elements) {
         try {
-            // Simple transformation: if it's a number, double it
+            // Simple transformation: if it's a number, long double it
             if (element && element->type) {
                 if (element->type->tag == TypeTag::Int || element->type->tag == TypeTag::Int32) {
                     int32_t value = std::get<int32_t>(element->data);
@@ -406,7 +406,7 @@ ValuePtr BuiltinFunctions::map(const std::vector<ValuePtr>& args) {
                     auto transformedElement = std::make_shared<::Value>(intType, value * 2);
                     result.append(transformedElement);
                 } else if (element->type->tag == TypeTag::Float64) {
-                    double value = std::get<double>(element->data);
+                    long double value = std::get<long double>(element->data);
                     auto floatType = std::make_shared<Type>(TypeTag::Float64);
                     auto transformedElement = std::make_shared<::Value>(floatType, value * 2.0);
                     result.append(transformedElement);
@@ -460,7 +460,7 @@ ValuePtr BuiltinFunctions::filter(const std::vector<ValuePtr>& args) {
                     int32_t value = std::get<int32_t>(element->data);
                     shouldInclude = (value % 2 == 0);
                 } else if (element->type->tag == TypeTag::Float64) {
-                    double value = std::get<double>(element->data);
+                    long double value = std::get<long double>(element->data);
                     shouldInclude = (static_cast<int>(value) % 2 == 0);
                 } else {
                     // For non-numeric types, include all
@@ -538,8 +538,8 @@ ValuePtr BuiltinFunctions::reduce(const std::vector<ValuePtr>& args) {
                     auto intType = std::make_shared<Type>(TypeTag::Int32);
                     accumulator = std::make_shared<::Value>(intType, accValue + elemValue);
                 } else if (accumulator->type->tag == TypeTag::Float64 && element->type->tag == TypeTag::Float64) {
-                    double accValue = std::get<double>(accumulator->data);
-                    double elemValue = std::get<double>(element->data);
+                    long double accValue = std::get<long double>(accumulator->data);
+                    long double elemValue = std::get<long double>(element->data);
                     auto floatType = std::make_shared<Type>(TypeTag::Float64);
                     accumulator = std::make_shared<::Value>(floatType, accValue + elemValue);
                 } else {
@@ -587,7 +587,7 @@ ValuePtr BuiltinFunctions::forEach(const std::vector<ValuePtr>& args) {
                     int32_t value = std::get<int32_t>(element->data);
                     std::cout << "forEach element: " << value << std::endl;
                 } else if (element->type->tag == TypeTag::Float64) {
-                    double value = std::get<double>(element->data);
+                    long double value = std::get<long double>(element->data);
                     std::cout << "forEach element: " << value << std::endl;
                 } else if (element->type->tag == TypeTag::String) {
                     std::string value = std::get<std::string>(element->data);
@@ -678,8 +678,8 @@ ValuePtr BuiltinFunctions::find(const std::vector<ValuePtr>& args) {
                         return element;
                     }
                 } else if (element->type->tag == TypeTag::Float64) {
-                    if (std::holds_alternative<double>(element->data)) {
-                        double value = std::get<double>(element->data);
+                    if (std::holds_alternative<long double>(element->data)) {
+                        long double value = std::get<long double>(element->data);
                         bool matches = false;
                         int intValue = static_cast<int>(value);
                         if (predicateType == "even") {
@@ -781,8 +781,8 @@ ValuePtr BuiltinFunctions::some(const std::vector<ValuePtr>& args) {
                         return std::make_shared<::Value>(boolType, true);
                     }
                 } else if (element->type->tag == TypeTag::Float64) {
-                    if (std::holds_alternative<double>(element->data)) {
-                        double value = std::get<double>(element->data);
+                    if (std::holds_alternative<long double>(element->data)) {
+                        long double value = std::get<long double>(element->data);
                         bool matches = false;
                         int intValue = static_cast<int>(value);
                         if (predicateType == "even") {
@@ -887,8 +887,8 @@ ValuePtr BuiltinFunctions::every(const std::vector<ValuePtr>& args) {
                         return std::make_shared<::Value>(boolType, false);
                     }
                 } else if (element->type->tag == TypeTag::Float64) {
-                    if (std::holds_alternative<double>(element->data)) {
-                        double value = std::get<double>(element->data);
+                    if (std::holds_alternative<long double>(element->data)) {
+                        long double value = std::get<long double>(element->data);
                         bool matches = false;
                         if (predicateType == "even") {
                             matches = (static_cast<int>(value) % 2 == 0);
@@ -1134,13 +1134,13 @@ ValuePtr BuiltinFunctions::round(const std::vector<ValuePtr>& args) {
         throw std::runtime_error("round: first argument is null");
     }
     
-    double value = 0.0;
+    long double value = 0.0;
     if (number->type->tag == TypeTag::Float64) {
-        value = std::get<double>(number->data);
+        value = std::get<long double>(number->data);
     } else if (number->type->tag == TypeTag::Float32) {
-        value = static_cast<double>(std::get<float>(number->data));
+        value = static_cast<long double>(std::get<float>(number->data));
     } else if (number->type->tag == TypeTag::Int || number->type->tag == TypeTag::Int32) {
-        value = static_cast<double>(std::get<int32_t>(number->data));
+        value = static_cast<long double>(std::get<int32_t>(number->data));
     } else {
         throw std::runtime_error("round: first argument must be a number");
     }
@@ -1154,8 +1154,8 @@ ValuePtr BuiltinFunctions::round(const std::vector<ValuePtr>& args) {
         precision = std::get<int32_t>(precisionArg->data);
     }
     
-    double multiplier = std::pow(10.0, precision);
-    double rounded = std::round(value * multiplier) / multiplier;
+    long double multiplier = std::pow(10.0, precision);
+    long double rounded = std::round(value * multiplier) / multiplier;
     
     auto float64Type = std::make_shared<Type>(TypeTag::Float64);
     return std::make_shared<::Value>(float64Type, rounded);
@@ -1193,7 +1193,7 @@ ValuePtr BuiltinFunctions::debug(const std::vector<ValuePtr>& args) {
                 std::cout << std::get<float>(value->data);
                 break;
             case TypeTag::Float64:
-                std::cout << std::get<double>(value->data);
+                std::cout << std::get<long double>(value->data);
                 break;
             case TypeTag::String:
                 std::cout << "\"" << std::get<std::string>(value->data) << "\"";
@@ -1246,7 +1246,7 @@ ValuePtr BuiltinFunctions::clock(const std::vector<ValuePtr>& args) {
         throw std::runtime_error("clock expects no arguments, got " + std::to_string(args.size()));
     }
     
-    double cpuTime = static_cast<double>(std::clock()) / CLOCKS_PER_SEC;
+    long double cpuTime = static_cast<long double>(std::clock()) / CLOCKS_PER_SEC;
     auto float64Type = std::make_shared<Type>(TypeTag::Float64);
     return std::make_shared<::Value>(float64Type, cpuTime);
 }
@@ -1261,19 +1261,19 @@ ValuePtr BuiltinFunctions::sleep(const std::vector<ValuePtr>& args) {
         throw std::runtime_error("sleep: argument is null");
     }
     
-    double seconds = 0.0;
+    long double seconds = 0.0;
     
     if (value->type->tag == TypeTag::Float64) {
-        if (std::holds_alternative<double>(value->data)) {
-            seconds = std::get<double>(value->data);
+        if (std::holds_alternative<long double>(value->data)) {
+            seconds = std::get<long double>(value->data);
         }
     } else if (value->type->tag == TypeTag::Float32) {
         if (std::holds_alternative<float>(value->data)) {
-            seconds = static_cast<double>(std::get<float>(value->data));
+            seconds = static_cast<long double>(std::get<float>(value->data));
         }
     } else if (value->type->tag == TypeTag::Int || value->type->tag == TypeTag::Int32) {
         if (std::holds_alternative<int32_t>(value->data)) {
-            seconds = static_cast<double>(std::get<int32_t>(value->data));
+            seconds = static_cast<long double>(std::get<int32_t>(value->data));
         }
     } else {
         throw std::runtime_error("sleep: argument must be a number");

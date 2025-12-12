@@ -1,0 +1,11 @@
+// Test simple float
+var simple = 3.14
+print("simple: " + simple)
+
+// Test scientific notation  
+var sci = 1.5e2
+print("sci: " + sci)
+
+// Test integer
+var int_val = 42
+print("int: " + int_val)

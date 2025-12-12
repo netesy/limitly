@@ -1,0 +1,37 @@
+// Test BigInt arithmetic operations that might trigger std::get errors
+
+// Test basic BigInt operations
+var bigInt1 = 123456789012345678901234567890
+var bigInt2 = 987654321098765432109876543210
+
+print("BigInt addition:")
+print(bigInt1 + bigInt2)
+
+print("BigInt subtraction:")
+print(bigInt1 - bigInt2)
+
+// Test mixed type operations
+var normalInt = 42
+var normalFloat = 3.14
+
+print("BigInt + int:")
+print(bigInt1 + normalInt)
+
+print("BigInt + float:")
+print(bigInt1 + normalFloat)
+
+print("int + BigInt:")
+print(normalInt + bigInt1)
+
+print("float + BigInt:")
+print(normalFloat + bigInt1)
+
+// Test with smaller numbers that might be stored as different types
+var smallBigInt = 42
+var mediumBigInt = 1000000
+
+print("Small BigInt + Medium BigInt:")
+print(smallBigInt + mediumBigInt)
+
+print("Small BigInt - Medium BigInt:")
+print(smallBigInt - mediumBigInt)

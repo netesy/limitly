@@ -241,6 +241,7 @@ private:
                    to == TypeTag::UInt ||  // Allow Int <-> UInt conversion
                    to == TypeTag::Int32 ||
                    to == TypeTag::Int64 ||
+                   to == TypeTag::Int128 ||
                    to == TypeTag::Float32 ||
                    to == TypeTag::Float64;
 
@@ -249,7 +250,9 @@ private:
                    to == TypeTag::Int ||   // Allow UInt <-> Int conversion
                    to == TypeTag::UInt32 ||
                    to == TypeTag::UInt64 ||
+                   to == TypeTag::UInt128 ||
                    to == TypeTag::Int64 ||
+                   to == TypeTag::Int128 ||
                    to == TypeTag::Float32 ||
                    to == TypeTag::Float64;
 
@@ -259,6 +262,7 @@ private:
                    to == TypeTag::Int ||
                    to == TypeTag::Int32 ||
                    to == TypeTag::Int64 ||
+                   to == TypeTag::Int128 ||
                    to == TypeTag::Float32 ||
                    to == TypeTag::Float64;
 
@@ -267,13 +271,15 @@ private:
                    to == TypeTag::Int ||
                    to == TypeTag::Int32 ||
                    to == TypeTag::Int64 ||
+                   to == TypeTag::Int128 ||
                    to == TypeTag::Float32 ||
                    to == TypeTag::Float64;
 
         case TypeTag::Int32:
             return to == TypeTag::Int32 ||
-            to == TypeTag::Int ||
+                   to == TypeTag::Int ||
                    to == TypeTag::Int64 ||
+                   to == TypeTag::Int128 ||
                    to == TypeTag::Float32 ||
                    to == TypeTag::Float64;
 
@@ -287,10 +293,12 @@ private:
                    to == TypeTag::UInt ||
                    to == TypeTag::UInt32 ||
                    to == TypeTag::UInt64 ||
+                   to == TypeTag::UInt128 ||
                    to == TypeTag::Int16 ||
                    to == TypeTag::Int ||
                    to == TypeTag::Int32 ||
                    to == TypeTag::Int64 ||
+                   to == TypeTag::Int128 ||
                    to == TypeTag::Float32 ||
                    to == TypeTag::Float64;
 
@@ -299,8 +307,10 @@ private:
                    to == TypeTag::UInt ||
                    to == TypeTag::UInt32 ||
                    to == TypeTag::UInt64 ||
+                   to == TypeTag::UInt128 ||
                    to == TypeTag::Int32 ||
                    to == TypeTag::Int64 ||
+                   to == TypeTag::Int128 ||
                    to == TypeTag::Float32 ||
                    to == TypeTag::Float64;
 
@@ -308,7 +318,9 @@ private:
             return to == TypeTag::UInt32 ||
                    to == TypeTag::UInt ||
                    to == TypeTag::UInt64 ||
+                   to == TypeTag::UInt128 ||
                    to == TypeTag::Int64 ||
+                   to == TypeTag::Int128 ||
                    to == TypeTag::Float64;
 
         case TypeTag::UInt64:
@@ -318,6 +330,7 @@ private:
 
         case TypeTag::Int128:
             return to == TypeTag::Int128 ||
+                   to == TypeTag::UInt128 ||
                    to == TypeTag::Float64;
 
         case TypeTag::UInt128:
@@ -350,8 +363,8 @@ ValuePtr stringToNumber(const std::string &str, TypePtr targetType)
                 // Check if string contains scientific notation or decimal point
                 if (str.find('e') != std::string::npos || str.find('E') != std::string::npos || 
                     str.find('.') != std::string::npos) {
-                    // Parse as double first, then convert to BigInt if it's a whole number
-                    double doubleVal = std::stod(str);
+                    // Parse as long double first, then convert to BigInt if it's a whole number
+                    long double doubleVal = std::stod(str);
                     if (doubleVal != std::floor(doubleVal)) {
                         throw std::runtime_error("Cannot convert non-integer value to integer type");
                     }
@@ -371,7 +384,7 @@ ValuePtr stringToNumber(const std::string &str, TypePtr targetType)
                 }
                 result->data = floatVal;
             } else if (targetType->tag == TypeTag::Float64) {
-                double doubleVal = std::stod(str);
+                long double doubleVal = std::stod(str);
                 // Check for infinity or NaN (allow infinity for Float64 as it has larger range)
                 if (std::isnan(doubleVal)) {
                     throw std::runtime_error("Float64 value is NaN");
@@ -396,7 +409,7 @@ ValuePtr stringToNumber(const std::string &str, TypePtr targetType)
         result->type = STRING_TYPE;
 
         std::visit(overloaded{[&](int64_t v) { result->data = std::to_string(v); },
-                              [&](double v) { result->data = std::to_string(v); },
+                              [&](long double v) { result->data = std::to_string(v); },
                               [&](auto) {
                                   throw std::runtime_error("Unexpected type in numberToString");
                               }},
@@ -542,7 +555,7 @@ public:
             value->data = float(0.0);
             break;
         case TypeTag::Float64:
-            value->data = double(0.0);
+            value->data = static_cast<long double>(0.0);
             break;
         case TypeTag::String:
             value->data = std::string("");
@@ -837,7 +850,7 @@ public:
         if (hasDecimal || hasScientific) {
             // It's a floating-point number
             try {
-                double val = std::stod(literalStr);
+                long double val = std::stod(literalStr);
                 
                 // Check if it fits in float32 range without precision loss
                 if (std::abs(val) <= std::numeric_limits<float>::max() && 
@@ -873,7 +886,7 @@ public:
                     if (val <= static_cast<unsigned long long>(std::numeric_limits<long long>::max())) {
                         return INT64_TYPE;
                     } else {
-                        // Value is too large for signed long long, use double to avoid overflow
+                        // Value is too large for signed long long, use long double to avoid overflow
                         return FLOAT64_TYPE;
                     }
                 } catch (const std::exception&) {
@@ -1724,7 +1737,7 @@ public:
                                                         + targetType->toString());
                            }
                        },
-                       [&](double v) {
+                       [&](long double v) {
                            switch (targetType->tag) {
                            case TypeTag::Float64:
                                result->data = v;
@@ -1754,7 +1767,7 @@ public:
                            case TypeTag::UInt:
                            case TypeTag::UInt64:
                                // For large literals that were converted to double, use direct cast
-                               // This handles cases like 18446744073709551615 which becomes double in parser
+                               // This handles cases like 18446744073709551615 which becomes long double in parser
                                if (v >= 0 && v <= static_cast<double>(std::numeric_limits<uint64_t>::max())) {
                                    result->data = static_cast<uint64_t>(v);
                                } else {
@@ -1774,7 +1787,7 @@ public:
                                result->data = std::to_string(v);
                                break;
                            default:
-                               throw std::runtime_error("Unsupported conversion from double to "
+                               throw std::runtime_error("Unsupported conversion from long double to "
                                                         + targetType->toString());
                            }
                        },

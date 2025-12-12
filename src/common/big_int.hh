@@ -10,11 +10,17 @@
 #include <climits>
 #include <type_traits>
 #include <cstring>
+#include <sstream>
+#include <iomanip>
+#include <cmath>
 
 #if defined(__SIZEOF_INT128__)
 #define HAS_INT128 1
 using int128_t = __int128;
 using uint128_t = unsigned __int128;
+// Define INT128 constants
+constexpr int128_t INT128_MIN = (static_cast<int128_t>(1) << 127);
+constexpr int128_t INT128_MAX = static_cast<int128_t>((static_cast<uint128_t>(1) << 127) - 1);
 #else
 #error "Compiler does not support 128-bit integers"
 #endif
@@ -32,6 +38,9 @@ private:
         TYPE_I64,
         TYPE_U64,
         TYPE_I128,
+        TYPE_F32,
+        TYPE_F64,
+        TYPE_F128,
         TYPE_LARGE
     };
     
@@ -58,6 +67,9 @@ private:
         int64_t i64_val;
         uint64_t u64_val;
         int128_t i128_val;
+        float f32_val;
+        double f64_val;
+        long double f128_val;
         LargeRep large_rep;
     };
 
@@ -73,9 +85,77 @@ private:
             case TYPE_I64: return i64_val;
             case TYPE_U64: return static_cast<int128_t>(u64_val);
             case TYPE_I128: return i128_val;
+            case TYPE_F32: return static_cast<int128_t>(f32_val);
+            case TYPE_F64: return static_cast<int128_t>(f64_val);
+            case TYPE_F128: return static_cast<int128_t>(f128_val);
             default: return 0;
         }
     }
+
+    // Get current value as float (for f32)
+    float get_f32_value() const {
+        switch (storage_type) {
+            case TYPE_F32: return f32_val;
+            case TYPE_F64: return static_cast<float>(f64_val);
+            case TYPE_F128: return static_cast<float>(f128_val);
+            case TYPE_I8: return static_cast<float>(i8_val);
+            case TYPE_U8: return static_cast<float>(u8_val);
+            case TYPE_I16: return static_cast<float>(i16_val);
+            case TYPE_U16: return static_cast<float>(u16_val);
+            case TYPE_I32: return static_cast<float>(i32_val);
+            case TYPE_U32: return static_cast<float>(u32_val);
+            case TYPE_I64: return static_cast<float>(i64_val);
+            case TYPE_U64: return static_cast<float>(u64_val);
+            case TYPE_I128: return static_cast<float>(i128_val);
+            default: return 0.0f;
+        }
+    }
+
+    // Get current value as double (for f64)
+    double get_f64_value() const {
+        switch (storage_type) {
+            case TYPE_F32: return static_cast<double>(f32_val);
+            case TYPE_F64: return f64_val;
+            case TYPE_F128: return static_cast<double>(f128_val);
+            case TYPE_I8: return static_cast<double>(i8_val);
+            case TYPE_U8: return static_cast<double>(u8_val);
+            case TYPE_I16: return static_cast<double>(i16_val);
+            case TYPE_U16: return static_cast<double>(u16_val);
+            case TYPE_I32: return static_cast<double>(i32_val);
+            case TYPE_U32: return static_cast<double>(u32_val);
+            case TYPE_I64: return static_cast<double>(i64_val);
+            case TYPE_U64: return static_cast<double>(u64_val);
+            case TYPE_I128: return static_cast<double>(i128_val);
+            default: return 0.0;
+        }
+    }
+
+    // Get current value as long double (for f128)
+public:
+    long double get_f128_value() const {
+        switch (storage_type) {
+            case TYPE_F32: return static_cast<long double>(f32_val);
+            case TYPE_F64: return static_cast<long double>(f64_val);
+            case TYPE_F128: return f128_val;
+            case TYPE_I8: return static_cast<long double>(i8_val);
+            case TYPE_U8: return static_cast<long double>(u8_val);
+            case TYPE_I16: return static_cast<long double>(i16_val);
+            case TYPE_U16: return static_cast<long double>(u16_val);
+            case TYPE_I32: return static_cast<long double>(i32_val);
+            case TYPE_U32: return static_cast<long double>(u32_val);
+            case TYPE_I64: return static_cast<long double>(i64_val);
+            case TYPE_U64: return static_cast<long double>(u64_val);
+            case TYPE_I128: return static_cast<long double>(i128_val);
+            default: return 0.0;
+        }
+    }
+    
+    // Get storage type for debugging
+    uint8_t get_storage_type() const {
+        return storage_type;
+    }
+
+private:
 
     // Check if value fits in current type
     bool fits_in_current_type(int128_t value) const {
@@ -89,6 +169,69 @@ private:
             case TYPE_I64: return value >= INT64_MIN && value <= INT64_MAX;
             case TYPE_U64: return value >= 0;
             case TYPE_I128: return true;
+            case TYPE_F32: return true; // F32 can handle any integer value (with potential precision loss)
+            case TYPE_F64: return true; // F64 can handle any integer value (with potential precision loss)
+            case TYPE_F128: return true; // F128 can handle any integer value (with potential precision loss)
+            case TYPE_LARGE: return false;
+        }
+        return false;
+    }
+
+    // Check if float value fits in current type
+    bool fits_in_current_type(float value) const {
+        switch (storage_type) {
+            case TYPE_F32: return true;
+            case TYPE_F64: return true;
+            case TYPE_F128: return true;
+            case TYPE_I8: return value >= INT8_MIN && value <= INT8_MAX && value == std::trunc(value);
+            case TYPE_U8: return value >= 0 && value <= UINT8_MAX && value == std::trunc(value);
+            case TYPE_I16: return value >= INT16_MIN && value <= INT16_MAX && value == std::trunc(value);
+            case TYPE_U16: return value >= 0 && value <= UINT16_MAX && value == std::trunc(value);
+            case TYPE_I32: return value >= INT32_MIN && value <= INT32_MAX && value == std::trunc(value);
+            case TYPE_U32: return value >= 0 && value <= UINT32_MAX && value == std::trunc(value);
+            case TYPE_I64: return value >= INT64_MIN && value <= INT64_MAX && value == std::trunc(value);
+            case TYPE_U64: return value >= 0 && value <= UINT64_MAX && value == std::trunc(value);
+            case TYPE_I128: return value >= static_cast<float>(INT128_MIN) && value <= static_cast<float>(INT128_MAX) && value == std::trunc(value);
+            case TYPE_LARGE: return false;
+        }
+        return false;
+    }
+
+    // Check if double value fits in current type
+    bool fits_in_current_type(double value) const {
+        switch (storage_type) {
+            case TYPE_F32: return value >= -std::numeric_limits<float>::max() && value <= std::numeric_limits<float>::max();
+            case TYPE_F64: return true;
+            case TYPE_F128: return true;
+            case TYPE_I8: return value >= INT8_MIN && value <= INT8_MAX && value == std::trunc(value);
+            case TYPE_U8: return value >= 0 && value <= UINT8_MAX && value == std::trunc(value);
+            case TYPE_I16: return value >= INT16_MIN && value <= INT16_MAX && value == std::trunc(value);
+            case TYPE_U16: return value >= 0 && value <= UINT16_MAX && value == std::trunc(value);
+            case TYPE_I32: return value >= INT32_MIN && value <= INT32_MAX && value == std::trunc(value);
+            case TYPE_U32: return value >= 0 && value <= UINT32_MAX && value == std::trunc(value);
+            case TYPE_I64: return value >= INT64_MIN && value <= INT64_MAX && value == std::trunc(value);
+            case TYPE_U64: return value >= 0 && value <= UINT64_MAX && value == std::trunc(value);
+            case TYPE_I128: return value >= static_cast<double>(INT128_MIN) && value <= static_cast<double>(INT128_MAX) && value == std::trunc(value);
+            case TYPE_LARGE: return false;
+        }
+        return false;
+    }
+
+    // Check if long double value fits in current type
+    bool fits_in_current_type(long double value) const {
+        switch (storage_type) {
+            case TYPE_F32: return value >= -std::numeric_limits<float>::max() && value <= std::numeric_limits<float>::max();
+            case TYPE_F64: return value >= -std::numeric_limits<double>::max() && value <= std::numeric_limits<double>::max();
+            case TYPE_F128: return true;
+            case TYPE_I8: return value >= INT8_MIN && value <= INT8_MAX && value == std::trunc(value);
+            case TYPE_U8: return value >= 0 && value <= UINT8_MAX && value == std::trunc(value);
+            case TYPE_I16: return value >= INT16_MIN && value <= INT16_MAX && value == std::trunc(value);
+            case TYPE_U16: return value >= 0 && value <= UINT16_MAX && value == std::trunc(value);
+            case TYPE_I32: return value >= INT32_MIN && value <= INT32_MAX && value == std::trunc(value);
+            case TYPE_U32: return value >= 0 && value <= UINT32_MAX && value == std::trunc(value);
+            case TYPE_I64: return value >= INT64_MIN && value <= INT64_MAX && value == std::trunc(value);
+            case TYPE_U64: return value >= 0 && value <= UINT64_MAX && value == std::trunc(value);
+            case TYPE_I128: return value >= static_cast<long double>(INT128_MIN) && value <= static_cast<long double>(INT128_MAX) && value == std::trunc(value);
             case TYPE_LARGE: return false;
         }
         return false;
@@ -246,12 +389,30 @@ public:
     // Constructors
     BigInt() : storage_type(TYPE_I8), fixed_type(false), i8_val(0) {}
     
+    // Constructor for integer literals - use int64_t to avoid ambiguity
     BigInt(int64_t n, bool fix_type = false) : fixed_type(fix_type) {
+        set_small_value(static_cast<int128_t>(n));
+    }
+    
+    // Constructor for zero - specialized to avoid ambiguity
+    BigInt(int n, bool fix_type = false) : fixed_type(fix_type) {
         set_small_value(static_cast<int128_t>(n));
     }
     
     BigInt(const std::string& s, bool fix_type = false) : storage_type(TYPE_I8), fixed_type(fix_type), i8_val(0) {
         from_string(s);
+    }
+    
+    BigInt(long double value, bool fix_type = false) : storage_type(TYPE_F128), fixed_type(fix_type) {
+        f128_val = value;
+    }
+    
+    BigInt(double value, bool fix_type = false) : storage_type(TYPE_F64), fixed_type(fix_type) {
+        f64_val = value;
+    }
+    
+    BigInt(float value, bool fix_type = false) : storage_type(TYPE_F32), fixed_type(fix_type) {
+        f32_val = value;
     }
     
     // Typed constructors for fixed types
@@ -355,12 +516,36 @@ public:
         return result;
     }
     
+    static BigInt f32(float value) {
+        BigInt result;
+        result.storage_type = TYPE_F32;
+        result.f32_val = value;
+        result.fixed_type = true;
+        return result;
+    }
+    
+    static BigInt f64(double value) {
+        BigInt result;
+        result.storage_type = TYPE_F64;
+        result.f64_val = value;
+        result.fixed_type = true;
+        return result;
+    }
+    
+    static BigInt f128(long double value) {
+        BigInt result;
+        result.storage_type = TYPE_F128;
+        result.f128_val = value;
+        result.fixed_type = true;
+        return result;
+    }
+    
     // Copy constructor
     BigInt(const BigInt& other) : storage_type(other.storage_type), fixed_type(other.fixed_type) {
         if (storage_type == TYPE_LARGE) {
             new (&large_rep) LargeRep(other.large_rep);
         } else {
-            i128_val = other.i128_val;
+            i128_val = other.i128_val; // This copies all primitive types including float128_val
         }
     }
     
@@ -500,15 +685,89 @@ public:
             case TYPE_I64: type = "i64"; break;
             case TYPE_U64: type = "u64"; break;
             case TYPE_I128: type = "i128"; break;
+            case TYPE_F32: type = "f32"; break;
+            case TYPE_F64: type = "f64"; break;
+            case TYPE_F128: type = "f128"; break;
             case TYPE_LARGE: type = "large"; break;
             default: type = "unknown"; break;
         }
         return type + (fixed_type ? " (fixed)" : " (auto)");
     }
 
+    // Helper methods for float operations
+    bool is_float_type() const {
+        return storage_type == TYPE_F32 || storage_type == TYPE_F64 || storage_type == TYPE_F128;
+    }
+
+    StorageType get_highest_precision_float_type(const BigInt& other) const {
+        if (storage_type == TYPE_F128 || other.storage_type == TYPE_F128) return TYPE_F128;
+        if (storage_type == TYPE_F64 || other.storage_type == TYPE_F64) return TYPE_F64;
+        return TYPE_F32;
+    }
+
+    long double get_value_as_f128() const {
+        switch (storage_type) {
+            case TYPE_F32: return static_cast<long double>(f32_val);
+            case TYPE_F64: return static_cast<long double>(f64_val);
+            case TYPE_F128: return f128_val;
+            case TYPE_I8: return static_cast<long double>(i8_val);
+            case TYPE_U8: return static_cast<long double>(u8_val);
+            case TYPE_I16: return static_cast<long double>(i16_val);
+            case TYPE_U16: return static_cast<long double>(u16_val);
+            case TYPE_I32: return static_cast<long double>(i32_val);
+            case TYPE_U32: return static_cast<long double>(u32_val);
+            case TYPE_I64: return static_cast<long double>(i64_val);
+            case TYPE_U64: return static_cast<long double>(u64_val);
+            case TYPE_I128: return static_cast<long double>(i128_val);
+            default: return 0.0;
+        }
+    }
+
+    void set_float_value(long double value, StorageType type) {
+        switch (type) {
+            case TYPE_F32: f32_val = static_cast<float>(value); break;
+            case TYPE_F64: f64_val = static_cast<double>(value); break;
+            case TYPE_F128: f128_val = value; break;
+            default: f128_val = value; break;
+        }
+    }
+
     // Arithmetic operators
     BigInt& operator+=(const BigInt& other) {
-        if (storage_type != TYPE_LARGE && other.storage_type != TYPE_LARGE) {
+        // Handle float operations - promote to highest precision
+        if (is_float_type() || other.is_float_type()) {
+            // Determine the highest precision float type
+            StorageType target_type = get_highest_precision_float_type(other);
+            
+            // Get values as the target precision
+            long double a = get_value_as_f128();
+            long double b = other.get_value_as_f128();
+            long double result = a + b;
+            
+            // Check for infinity or NaN
+            if (!std::isfinite(result)) {
+                // Handle overflow - convert to large integer representation
+                convert_to_large();
+                BigInt other_copy = other;
+                other_copy.convert_to_large();
+                add_large(other_copy.large_rep);
+            } else {
+                // Store as the target float type
+                if (!fixed_type || is_float_type()) {
+                    storage_type = target_type;
+                    set_float_value(result, target_type);
+                } else {
+                    // Try to fit in current type if it's a whole number
+                    if (result == std::trunc(result) && fits_in_current_type(static_cast<int128_t>(result))) {
+                        set_value_respecting_type(static_cast<int128_t>(result));
+                    } else {
+                        // Upgrade to float
+                        storage_type = target_type;
+                        set_float_value(result, target_type);
+                    }
+                }
+            }
+        } else if (storage_type != TYPE_LARGE && other.storage_type != TYPE_LARGE) {
             int128_t a = get_small_value();
             int128_t b = other.get_small_value();
             
@@ -637,6 +896,43 @@ public:
 
     // String conversion
     std::string to_string() const {
+        std::cout << "[DEBUG BigInt::to_string] storage_type = " << static_cast<int>(storage_type) << ", is_float_type = " << is_float_type() << std::endl;
+        if (is_float_type()) {
+            // Convert float to string with appropriate precision
+            std::ostringstream oss;
+            switch (storage_type) {
+                case TYPE_F32:
+                    std::cout << "[DEBUG BigInt::to_string] TYPE_F32, f32_val = " << f32_val << std::endl;
+                    oss << std::setprecision(7) << std::fixed << f32_val;
+                    break;
+                case TYPE_F64:
+                    std::cout << "[DEBUG BigInt::to_string] TYPE_F64, f64_val = " << f64_val << std::endl;
+                    oss << std::setprecision(15) << std::fixed << f64_val;
+                    break;
+                case TYPE_F128:
+                    std::cout << "[DEBUG BigInt::to_string] TYPE_F128, f128_val = " << f128_val << std::endl;
+                    oss << std::setprecision(18) << std::fixed << f128_val;
+                    break;
+                default:
+                    std::cout << "[DEBUG BigInt::to_string] DEFAULT, get_value_as_f128 = " << get_value_as_f128() << std::endl;
+                    oss << std::setprecision(15) << std::fixed << get_value_as_f128();
+                    break;
+            }
+            std::string result = oss.str();
+            std::cout << "[DEBUG BigInt::to_string] raw result = " << result << std::endl;
+            
+            // Remove trailing zeros and decimal point if not needed
+            if (result.find('.') != std::string::npos) {
+                result.erase(result.find_last_not_of('0') + 1, std::string::npos);
+                if (result.back() == '.') {
+                    result.pop_back();
+                }
+            }
+            std::cout << "[DEBUG BigInt::to_string] final result = " << result << std::endl;
+            
+            return result;
+        }
+        
         if (storage_type != TYPE_LARGE) {
             int128_t value = get_small_value();
             if (value == 0) return "0";
@@ -869,84 +1165,4 @@ private:
         return result;
     }
 };
-
-// Example usage
-// int main() {
-//     std::cout << "=== Fixed Type Mode ===\n\n";
-    
-//     // Create fixed i32 values
-//     BigInt a = BigInt::i32(100);
-//     BigInt b = BigInt::i32(50);
-//     std::cout << "a = " << a.to_string() << " | Storage: " << a.get_type() << "\n";
-//     std::cout << "b = " << b.to_string() << " | Storage: " << b.get_type() << "\n";
-    
-//     BigInt c = a - b;  // Result stays i32 (50)
-//     std::cout << "a - b = " << c.to_string() << " | Storage: " << c.get_type() << "\n";
-    
-//     BigInt d = c * BigInt::i32(2);  // Still i32 (100)
-//     std::cout << "c * 2 = " << d.to_string() << " | Storage: " << d.get_type() << "\n";
-    
-//     // Overflow forces upgrade
-//     std::cout << "\n=== Overflow in Fixed Type ===\n";
-//     BigInt e = BigInt::i8(100);
-//     BigInt f = BigInt::i8(50);
-//     std::cout << "e = " << e.to_string() << " | Storage: " << e.get_type() << "\n";
-//     std::cout << "f = " << f.to_string() << " | Storage: " << f.get_type() << "\n";
-    
-//     BigInt g = e + f;  // 150, exceeds i8, upgrades
-//     std::cout << "e + f = " << g.to_string() << " | Storage: " << g.get_type() << "\n";
-    
-//     // Automatic mode (default)
-//     std::cout << "\n=== Automatic Type Mode ===\n";
-//     BigInt x(1000);
-//     BigInt y(900);
-//     std::cout << "x = " << x.to_string() << " | Storage: " << x.get_type() << "\n";
-//     std::cout << "y = " << y.to_string() << " | Storage: " << y.get_type() << "\n";
-    
-//     BigInt z = x - y;  // Result is 100, downgrades to u8
-//     std::cout << "x - y = " << z.to_string() << " | Storage: " << z.get_type() << "\n";
-    
-//     // Mixed fixed and auto
-//     std::cout << "\n=== Mixed Mode Operations ===\n";
-//     BigInt fixed_val = BigInt::u32(1000);
-//     BigInt auto_val(50);
-//     std::cout << "fixed_val = " << fixed_val.to_string() << " | Storage: " << fixed_val.get_type() << "\n";
-//     std::cout << "auto_val = " << auto_val.to_string() << " | Storage: " << auto_val.get_type() << "\n";
-    
-//     BigInt mixed = fixed_val + auto_val;
-//     std::cout << "fixed + auto = " << mixed.to_string() << " | Storage: " << mixed.get_type() << "\n";
-    
-//     // Fixed 128-bit operations
-//     std::cout << "\n=== Fixed 128-bit Type ===\n";
-//     BigInt big128 = BigInt::i128("12345678901234567890");
-//     std::cout << "big128 = " << big128.to_string() << " | Storage: " << big128.get_type() << "\n";
-    
-//     BigInt big128_2 = BigInt::i128(static_cast<int128_t>(1000000000000LL));
-//     std::cout << "big128_2 = " << big128_2.to_string() << " | Storage: " << big128_2.get_type() << "\n";
-    
-//     BigInt sum128 = big128 + big128_2;
-//     std::cout << "big128 + big128_2 = " << sum128.to_string() << " | Storage: " << sum128.get_type() << "\n";
-    
-//     // Fixed large (arbitrary precision)
-//     std::cout << "\n=== Fixed Large (Arbitrary Precision) ===\n";
-//     BigInt huge1 = BigInt::large("999999999999999999999999999999999999999999");
-//     BigInt huge2 = BigInt::large("111111111111111111111111111111111111111111");
-//     std::cout << "huge1 = " << huge1.to_string() << " | Storage: " << huge1.get_type() << "\n";
-//     std::cout << "huge2 = " << huge2.to_string() << " | Storage: " << huge2.get_type() << "\n";
-    
-//     BigInt huge_sum = huge1 + huge2;
-//     std::cout << "huge1 + huge2 = " << huge_sum.to_string() << " | Storage: " << huge_sum.get_type() << "\n";
-    
-//     // Demonstrate type preservation
-//     std::cout << "\n=== Type Preservation Demo ===\n";
-//     BigInt large_val = BigInt::large(1000);
-//     std::cout << "large_val (initially 1000) = " << large_val.to_string() << " | Storage: " << large_val.get_type() << "\n";
-    
-//     BigInt large_result = large_val - BigInt::large(500);
-//     std::cout << "large_val - 500 = " << large_result.to_string() << " | Storage: " << large_result.get_type() << "\n";
-//     // std::cout << "  ^ Stays
-    
-//     return 0;
-//     }
-
 #endif // BIG_INT_H

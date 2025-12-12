@@ -575,7 +575,7 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
                 if (expectedType) {
                     if (expectedType->tag == TypeTag::Int || expectedType->tag == TypeTag::Int64) {
                         // If expecting int but got double, check if it's a whole number
-                        double doubleVal = std::get<double>(literalExpr->value);
+                        long double doubleVal = std::get<long double>(literalExpr->value);
                         if (doubleVal == std::floor(doubleVal) && 
                             doubleVal >= std::numeric_limits<long long>::min() && 
                             doubleVal <= std::numeric_limits<long long>::max()) {
@@ -584,8 +584,8 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
                             return expectedType;
                         }
                     } else if (expectedType->tag == TypeTag::Float32) {
-                        // Check if the double value fits in float32 without precision loss
-                        double doubleVal = std::get<double>(literalExpr->value);
+                        // Check if the long double value fits in float32 without precision loss
+                        long double doubleVal = std::get<long double>(literalExpr->value);
                         if (std::abs(doubleVal) <= std::numeric_limits<float>::max()) {
                             float floatVal = static_cast<float>(doubleVal);
                             if (static_cast<double>(floatVal) == doubleVal) {
