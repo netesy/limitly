@@ -19,6 +19,7 @@ else
     ifeq ($(wildcard $(GCCJIT_PATH)),)
         $(error "libgccjit.so not found at $(GCCJIT_PATH). Please install libgccjit-14-dev")
     endif
+    LDFLAGS := -L$(shell dirname $(GCCJIT_PATH))
 endif
 
 # =============================
@@ -26,9 +27,9 @@ endif
 # =============================
 MODE ?= release
 ifeq ($(MODE),debug)
-    CXXFLAGS := -std=c++17 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++) -L$(shell dirname $(GCCJIT_PATH))
+    CXXFLAGS := -std=c++17 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 else
-    CXXFLAGS := -std=c++17 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++) -L$(shell dirname $(GCCJIT_PATH))
+    CXXFLAGS := -std=c++17 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 endif
 
 # =============================
