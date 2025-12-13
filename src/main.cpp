@@ -105,8 +105,12 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             parse_imports(ast);
 
             jit.process(programs);
-            const char* output_filename = "jit_output";
-            jit.compile(output_filename);
+            std::string output_filename = filename;
+            size_t dot_pos = output_filename.rfind(".lm");
+            if (dot_pos != std::string::npos) {
+                output_filename.erase(dot_pos);
+            }
+            jit.compile(output_filename.c_str());
             std::cout << "Compiled to " << output_filename << ". Run ./" << output_filename << " to see the result.\n";
         } else {
 
