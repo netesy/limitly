@@ -14,12 +14,7 @@ else
     EXE_EXT :=
     CXX := g++
     LIBS := -lgccjit
-    # TODO: Find a more portable way to link libgccjit
-    GCCJIT_PATH := /usr/lib/gcc/x86_64-linux-gnu/14/libgccjit.so
-    ifeq ($(wildcard $(GCCJIT_PATH)),)
-        $(error "libgccjit.so not found at $(GCCJIT_PATH). Please install libgccjit-14-dev")
-    endif
-    LDFLAGS := -L$(shell dirname $(GCCJIT_PATH))
+    LDFLAGS := -L$(shell dirname `find /usr -name libgccjit.so 2>/dev/null`)
 endif
 
 # =============================
@@ -27,9 +22,9 @@ endif
 # =============================
 MODE ?= release
 ifeq ($(MODE),debug)
-    CXXFLAGS := -std=c++17 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+    CXXFLAGS := -std=c++17 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++) -Wl,--stack,16777216
 else
-    CXXFLAGS := -std=c++17 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+    CXXFLAGS := -std=c++17 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++) -Wl,--stack,16777216
 endif
 
 # =============================
