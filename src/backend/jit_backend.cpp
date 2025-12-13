@@ -22,6 +22,11 @@ JitBackend::JitBackend() : m_region(m_mem_manager) {
     strcmp_params.push_back(gcc_jit_context_new_param(m_context, NULL, m_const_char_ptr_type, "s1"));
     strcmp_params.push_back(gcc_jit_context_new_param(m_context, NULL, m_const_char_ptr_type, "s2"));
     m_strcmp_func = gcc_jit_context_new_function(m_context, NULL, GCC_JIT_FUNCTION_IMPORTED, m_int_type, "strcmp", strcmp_params.size(), strcmp_params.data(), 0);
+
+    // Get malloc
+    std::vector<gcc_jit_param*> malloc_params;
+    malloc_params.push_back(gcc_jit_context_new_param(m_context, NULL, gcc_jit_context_get_type(m_context, GCC_JIT_TYPE_SIZE_T), "size"));
+    m_malloc_func = gcc_jit_context_new_function(m_context, NULL, GCC_JIT_FUNCTION_IMPORTED, gcc_jit_type_get_pointer(m_void_type), "malloc", malloc_params.size(), malloc_params.data(), 0);
 }
 
 JitBackend::~JitBackend() {
@@ -30,17 +35,21 @@ JitBackend::~JitBackend() {
     }
 }
 
-void JitBackend::process(const std::shared_ptr<AST::Program>& program) {
+void JitBackend::process(const std::vector<std::shared_ptr<AST::Program>>& programs) {
     // First pass: Create forward declarations for all functions
-    for (const auto& stmt : program->statements) {
-        if (auto func_decl = std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt)) {
-            std::vector<gcc_jit_param*> params;
-            for (const auto& p : func_decl->params) {
-                params.push_back(gcc_jit_context_new_param(m_context, NULL, get_jit_type(p.second), p.first.c_str()));
+    for (const auto& program : programs) {
+        for (const auto& stmt : program->statements) {
+            if (auto func_decl = std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt)) {
+                std::vector<gcc_jit_param*> params;
+                for (const auto& p : func_decl->params) {
+                    params.push_back(gcc_jit_context_new_param(m_context, NULL, get_jit_type(p.second), p.first.c_str()));
+                }
+                gcc_jit_type* return_type = get_jit_type(func_decl->returnType.value_or(nullptr));
+                enum gcc_jit_function_kind kind = func_decl->visibility == AST::VisibilityLevel::Public ? GCC_JIT_FUNCTION_EXPORTED : GCC_JIT_FUNCTION_INTERNAL;
+                std::string mangled_name = mangle(func_decl->name);
+                gcc_jit_function* func = gcc_jit_context_new_function(m_context, NULL, kind, return_type, mangled_name.c_str(), params.size(), params.data(), 0);
+                m_functions[mangled_name] = func;
             }
-            gcc_jit_type* return_type = get_jit_type(func_decl->returnType.value_or(nullptr));
-            gcc_jit_function* func = gcc_jit_context_new_function(m_context, NULL, GCC_JIT_FUNCTION_INTERNAL, return_type, func_decl->name.c_str(), params.size(), params.data(), 0);
-            m_functions[func_decl->name] = func;
         }
     }
 
@@ -51,8 +60,10 @@ void JitBackend::process(const std::shared_ptr<AST::Program>& program) {
     m_scopes.emplace_back();
 
     // Second pass: Generate code for all statements
-    for (const auto& stmt : program->statements) {
-        visit(stmt);
+    for (const auto& program : programs) {
+        for (const auto& stmt : program->statements) {
+            visit(stmt);
+        }
     }
 
     gcc_jit_block_end_with_return(m_current_block, NULL, gcc_jit_context_new_rvalue_from_int(m_context, m_int_type, 0));
@@ -78,16 +89,29 @@ void JitBackend::visit(const std::shared_ptr<AST::Statement>& stmt) {
     if (auto s = std::dynamic_pointer_cast<AST::ReturnStatement>(stmt)) return visit(s);
     if (auto s = std::dynamic_pointer_cast<AST::ClassDeclaration>(stmt)) return visit(s);
     if (auto s = std::dynamic_pointer_cast<AST::ParallelStatement>(stmt)) return visit(s);
+    if (auto s = std::dynamic_pointer_cast<AST::ModuleDeclaration>(stmt)) return visit(s);
+    if (auto s = std::dynamic_pointer_cast<AST::ImportStatement>(stmt)) return visit(s);
     throw std::runtime_error("Unsupported statement type for JIT");
 }
 
 void JitBackend::visit(const std::shared_ptr<AST::VarDeclaration>& stmt) {
     gcc_jit_type* type = get_jit_type(stmt->type.value_or(nullptr));
-    gcc_jit_lvalue* lvalue = gcc_jit_function_new_local(m_current_func, NULL, type, stmt->name.c_str());
-    m_scopes.back()[stmt->name] = lvalue;
-    if (stmt->initializer) {
-        gcc_jit_rvalue* rvalue = visit_expr(stmt->initializer);
-        gcc_jit_block_add_assignment(m_current_block, NULL, lvalue, rvalue);
+    if (m_scopes.size() == 1) { // Global variable
+        enum gcc_jit_global_kind kind = stmt->visibility == AST::VisibilityLevel::Public ? GCC_JIT_GLOBAL_EXPORTED : GCC_JIT_GLOBAL_INTERNAL;
+        std::string mangled_name = mangle(stmt->name);
+        gcc_jit_lvalue* lvalue = gcc_jit_context_new_global(m_context, NULL, kind, type, mangled_name.c_str());
+        m_scopes.back()[mangled_name] = lvalue;
+        if (stmt->initializer) {
+            gcc_jit_rvalue* rvalue = visit_expr(stmt->initializer);
+            gcc_jit_global_set_initializer_rvalue(lvalue, rvalue);
+        }
+    } else { // Local variable
+        gcc_jit_lvalue* lvalue = gcc_jit_function_new_local(m_current_func, NULL, type, stmt->name.c_str());
+        m_scopes.back()[stmt->name] = lvalue;
+        if (stmt->initializer) {
+            gcc_jit_rvalue* rvalue = visit_expr(stmt->initializer);
+            gcc_jit_block_add_assignment(m_current_block, NULL, lvalue, rvalue);
+        }
     }
 }
 
@@ -245,8 +269,12 @@ gcc_jit_rvalue* JitBackend::visit_expr(const std::shared_ptr<AST::LambdaExpr>& e
     // Allocate and populate the closure struct
     gcc_jit_lvalue* closure_lvalue = gcc_jit_function_new_local(m_current_func, NULL, closure_type, "closure");
 
-    // Allocate environment in the region
-    gcc_jit_lvalue* env_lvalue = gcc_jit_function_new_local(m_current_func, NULL, env_type, "env");
+    // Allocate environment on the heap
+    gcc_jit_rvalue* size = gcc_jit_context_new_rvalue_from_int(m_context, gcc_jit_context_get_type(m_context, GCC_JIT_TYPE_SIZE_T), gcc_jit_type_get_size(env_type));
+    gcc_jit_rvalue* args[] = {size};
+    gcc_jit_rvalue* env_ptr = gcc_jit_context_new_call(m_context, NULL, m_malloc_func, 1, args);
+    gcc_jit_lvalue* env_lvalue = gcc_jit_rvalue_dereference(gcc_jit_context_new_cast(m_context, NULL, env_ptr, gcc_jit_type_get_pointer(env_type)), NULL);
+
     for (size_t i = 0; i < captured_vars.size(); ++i) {
         for (auto it = m_scopes.rbegin(); it != m_scopes.rend(); ++it) {
             if (it->count(captured_vars[i])) {
@@ -258,7 +286,7 @@ gcc_jit_rvalue* JitBackend::visit_expr(const std::shared_ptr<AST::LambdaExpr>& e
 
     // Allocate closure in the region
     gcc_jit_block_add_assignment(m_current_block, NULL, gcc_jit_lvalue_access_field(closure_lvalue, NULL, fields[0]), gcc_jit_function_get_address(func, NULL));
-    gcc_jit_block_add_assignment(m_current_block, NULL, gcc_jit_lvalue_access_field(closure_lvalue, NULL, fields[1]), gcc_jit_lvalue_get_address(env_lvalue, NULL));
+    gcc_jit_block_add_assignment(m_current_block, NULL, gcc_jit_lvalue_access_field(closure_lvalue, NULL, fields[1]), env_ptr);
 
     return gcc_jit_lvalue_as_rvalue(closure_lvalue);
 }
@@ -326,6 +354,27 @@ void JitBackend::visit(const std::shared_ptr<AST::MatchStatement>& stmt) {
     }
 
     m_current_block = after_block;
+}
+
+void JitBackend::visit(const std::shared_ptr<AST::ImportStatement>& stmt) {
+    // Will be implemented in a later step
+}
+
+std::string JitBackend::mangle(const std::string& name) {
+    return "_Z" + std::to_string(m_current_module_name.length()) + m_current_module_name + std::to_string(name.length()) + name;
+}
+
+void JitBackend::visit(const std::shared_ptr<AST::ModuleDeclaration>& stmt) {
+    m_current_module_name = stmt->name;
+    for (const auto& s : stmt->publicMembers) {
+        visit(s);
+    }
+    for (const auto& s : stmt->protectedMembers) {
+        visit(s);
+    }
+    for (const auto& s : stmt->privateMembers) {
+        visit(s);
+    }
 }
 
 void JitBackend::visit(const std::shared_ptr<AST::ClassDeclaration>& stmt) {
@@ -430,6 +479,9 @@ void JitBackend::visit(const std::shared_ptr<AST::PrintStatement>& stmt) {
             rvalue = gcc_jit_context_new_conditional(m_context, NULL, rvalue, gcc_jit_context_new_string_literal(m_context, "true"), gcc_jit_context_new_string_literal(m_context, "false"));
         } else if (type == m_const_char_ptr_type) {
             format_str = "%s\n";
+        } else if (type == m_void_type) {
+            format_str = "nil\n";
+            rvalue = gcc_jit_context_new_string_literal(m_context, "nil");
         } else {
             throw std::runtime_error("Unsupported type for print");
         }
@@ -441,9 +493,9 @@ void JitBackend::visit(const std::shared_ptr<AST::PrintStatement>& stmt) {
 
 void JitBackend::visit(const std::shared_ptr<AST::IfStatement>& stmt) {
     gcc_jit_rvalue* condition = visit_expr(stmt->condition);
-    gcc_jit_block* then_block = gcc_jit_function_new_block(m_main_func, "then");
-    gcc_jit_block* else_block = gcc_jit_function_new_block(m_main_func, "else");
-    gcc_jit_block* after_block = gcc_jit_function_new_block(m_main_func, "after");
+    gcc_jit_block* then_block = gcc_jit_function_new_block(m_current_func, "then");
+    gcc_jit_block* else_block = gcc_jit_function_new_block(m_current_func, "else");
+    gcc_jit_block* after_block = gcc_jit_function_new_block(m_current_func, "after");
 
     gcc_jit_block_end_with_conditional(m_current_block, NULL, condition, then_block, else_block);
 
@@ -645,6 +697,9 @@ gcc_jit_rvalue* JitBackend::visit_expr(const std::shared_ptr<AST::LiteralExpr>& 
     }
     if (std::holds_alternative<std::string>(expr->value)) {
         return gcc_jit_context_new_string_literal(m_context, std::get<std::string>(expr->value).c_str());
+    }
+    if (std::holds_alternative<std::nullptr_t>(expr->value)) {
+        return gcc_jit_context_null(m_context, m_void_type);
     }
     // Add other literal types here
     return nullptr;

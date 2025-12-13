@@ -14,7 +14,7 @@ public:
     JitBackend();
     ~JitBackend();
 
-    void process(const std::shared_ptr<AST::Program>& program);
+    void process(const std::vector<std::shared_ptr<AST::Program>>& programs);
     void compile(const char* output_filename);
 
 private:
@@ -35,6 +35,8 @@ private:
     void visit(const std::shared_ptr<AST::ReturnStatement>& stmt);
     void visit(const std::shared_ptr<AST::ClassDeclaration>& stmt);
     void visit(const std::shared_ptr<AST::ParallelStatement>& stmt);
+    void visit(const std::shared_ptr<AST::ModuleDeclaration>& stmt);
+    void visit(const std::shared_ptr<AST::ImportStatement>& stmt);
 
     gcc_jit_type* get_jit_type(const std::shared_ptr<AST::TypeAnnotation>& type);
 
@@ -64,6 +66,7 @@ private:
     // Functions
     gcc_jit_function* m_printf_func;
     gcc_jit_function* m_strcmp_func;
+    gcc_jit_function* m_malloc_func;
     std::unordered_map<std::string, gcc_jit_function*> m_functions;
 
     // Loop handling
@@ -72,6 +75,10 @@ private:
     // Memory management
     MemoryManager m_mem_manager;
     MemoryManager::Region m_region;
+
+    // Module handling
+    std::string m_current_module_name;
+    std::string mangle(const std::string& name);
 };
 
 #endif // JIT_BACKEND_H
