@@ -15,6 +15,17 @@ JitBackend::JitBackend() : m_region(m_mem_manager) {
     m_bool_type = gcc_jit_context_get_type(m_context, GCC_JIT_TYPE_BOOL);
     m_const_char_ptr_type = gcc_jit_context_get_type(m_context, GCC_JIT_TYPE_CONST_CHAR_PTR);
 
+    m_int8_type = gcc_jit_context_get_type(m_context, GCC_JIT_TYPE_INT8_T);
+    m_int16_type = gcc_jit_context_get_type(m_context, GCC_JIT_TYPE_INT16_T);
+    m_int32_type = gcc_jit_context_get_type(m_context, GCC_JIT_TYPE_INT32_T);
+    m_int64_type = gcc_jit_context_get_type(m_context, GCC_JIT_TYPE_INT64_T);
+    m_uint8_type = gcc_jit_context_get_type(m_context, GCC_JIT_TYPE_UINT8_T);
+    m_uint16_type = gcc_jit_context_get_type(m_context, GCC_JIT_TYPE_UINT16_T);
+    m_uint32_type = gcc_jit_context_get_type(m_context, GCC_JIT_TYPE_UINT32_T);
+    m_uint64_type = gcc_jit_context_get_type(m_context, GCC_JIT_TYPE_UINT64_T);
+    m_float_type = gcc_jit_context_get_type(m_context, GCC_JIT_TYPE_FLOAT);
+    m_long_double_type = gcc_jit_context_get_type(m_context, GCC_JIT_TYPE_LONG_DOUBLE);
+
     // Get printf
     m_printf_func = gcc_jit_context_get_builtin_function(m_context, "printf");
 
@@ -499,6 +510,36 @@ gcc_jit_type* JitBackend::get_jit_type(const std::shared_ptr<AST::TypeAnnotation
     if (type->typeName == "string") {
         return m_const_char_ptr_type;
     }
+    if (type->typeName == "i8") {
+        return m_int8_type;
+    }
+    if (type->typeName == "i16") {
+        return m_int16_type;
+    }
+    if (type->typeName == "i32") {
+        return m_int32_type;
+    }
+    if (type->typeName == "i64") {
+        return m_int64_type;
+    }
+    if (type->typeName == "u8") {
+        return m_uint8_type;
+    }
+    if (type->typeName == "u16") {
+        return m_uint16_type;
+    }
+    if (type->typeName == "u32") {
+        return m_uint32_type;
+    }
+    if (type->typeName == "u64") {
+        return m_uint64_type;
+    }
+    if (type->typeName == "f32") {
+        return m_float_type;
+    }
+    if (type->typeName == "f64") {
+        return m_long_double_type;
+    }
     if (m_class_types.count(type->typeName)) {
         return gcc_jit_type_get_pointer(m_class_types.at(type->typeName));
     }
@@ -539,13 +580,17 @@ void JitBackend::visit(const std::shared_ptr<AST::PrintStatement>& stmt) {
         gcc_jit_rvalue* rvalue = visit_expr(arg);
         gcc_jit_type* type = gcc_jit_rvalue_get_type(rvalue);
         const char* format_str;
-        if (type == m_int_type) {
-            format_str = "%d\n";
-        } else if (type == m_double_type) {
+        if (type == m_int_type || type == m_int8_type || type == m_int16_type || type == m_int32_type || type == m_int64_type) {
+            format_str = "%ld\n";
+        } else if (type == m_uint8_type || type == m_uint16_type || type == m_uint32_type || type == m_uint64_type) {
+            format_str = "%lu\n";
+        } else if (type == m_double_type || type == m_long_double_type) {
+            format_str = "%Lf\n";
+        } else if (type == m_float_type) {
             format_str = "%f\n";
         } else if (type == m_bool_type) {
             format_str = "%s\n";
-           // rvalue = gcc_jit_context_new_conditional(m_context, NULL, rvalue, gcc_jit_context_new_string_literal(m_context, "true"), gcc_jit_context_new_string_literal(m_context, "false"));
+            // rvalue = gcc_jit_context_new_conditional(m_context, NULL, rvalue, gcc_jit_context_new_string_literal(m_context, "true"), gcc_jit_context_new_string_literal(m_context, "false"));
         } else if (type == m_const_char_ptr_type) {
             format_str = "%s\n";
         } else if (type == m_void_type) {
