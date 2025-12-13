@@ -13,7 +13,12 @@ else
     PLATFORM := linux
     EXE_EXT :=
     CXX := g++
-    LIBS :=
+    LIBS := -lgccjit
+    # TODO: Find a more portable way to link libgccjit
+    GCCJIT_PATH := /usr/lib/gcc/x86_64-linux-gnu/14/libgccjit.so
+    ifeq ($(wildcard $(GCCJIT_PATH)),)
+        $(error "libgccjit.so not found at $(GCCJIT_PATH). Please install libgccjit-14-dev")
+    endif
 endif
 
 # =============================
@@ -21,9 +26,9 @@ endif
 # =============================
 MODE ?= release
 ifeq ($(MODE),debug)
-    CXXFLAGS := -std=c++17 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++) -Wl,--stack,16777216
+    CXXFLAGS := -std=c++17 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++) -L$(shell dirname $(GCCJIT_PATH))
 else
-    CXXFLAGS := -std=c++17 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++) -Wl,--stack,16777216
+    CXXFLAGS := -std=c++17 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++) -L$(shell dirname $(GCCJIT_PATH))
 endif
 
 # =============================
@@ -37,7 +42,7 @@ RSP_DIR := rsp
 # Sources
 # =============================
 FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp src/common/debugger.cpp src/frontend/cst.cpp src/frontend/cst_printer.cpp src/frontend/cst_utils.cpp src/frontend/ast_builder.cpp
-BACK_SRCS := src/backend/vm.cpp
+BACK_SRCS := src/backend/vm.cpp src/backend/jit_backend.cpp
 COMMON_SRCS := src/common/builtin_functions.cpp
 BACKEND_COMMON_SRCS := src/backend/backend.cpp src/backend/symbol_table.cpp src/backend/value.cpp src/backend/ast_printer.cpp src/backend/bytecode_printer.cpp src/backend/functions.cpp src/backend/closure_impl.cpp src/backend/classes.cpp src/backend/type_checker.cpp src/backend/function_types.cpp 
 ERROR_SRCS := src/error/error_formatter.cpp src/error/error_code_generator.cpp src/error/contextual_hint_provider.cpp src/error/source_code_formatter.cpp src/error/console_formatter.cpp src/error/error_catalog.cpp
@@ -126,11 +131,11 @@ windows: $(BIN_DIR) $(MAIN_RSP) $(TEST_RSP)
 
 linux: $(BIN_DIR) $(MAIN_RSP) $(TEST_RSP)
 	@echo "🔨 Linking limitly ..."
-	$(CXX) $(CXXFLAGS) @$(MAIN_RSP) -o $(BIN_DIR)/limitly $(LIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) -o $(BIN_DIR)/limitly $(LIBS)
 	@echo "✅ limitly built."
 
 	@echo "🔨 Linking test_parser ..."
-	$(CXX) $(CXXFLAGS) @$(TEST_RSP) -o $(BIN_DIR)/test_parser $(LIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(TEST_RSP) -o $(BIN_DIR)/test_parser $(LIBS)
 	@echo "✅ test_parser built."
 
 # =============================
