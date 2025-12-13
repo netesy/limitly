@@ -324,8 +324,9 @@ gcc_jit_rvalue* JitBackend::visit_expr(const std::shared_ptr<AST::CallExpr>& exp
         if (member_expr) {
             gcc_jit_rvalue* object = visit_expr(member_expr->object);
             gcc_jit_type* object_type = gcc_jit_rvalue_get_type(object);
-            gcc_jit_type* struct_type = gcc_jit_type_get_pointed_to(object_type);
-            std::string class_name = gcc_jit_type_get_name(struct_type);
+            gcc_jit_lvalue* object_lvalue = gcc_jit_rvalue_dereference(object, NULL);
+            gcc_jit_type* struct_type = gcc_jit_rvalue_get_type(gcc_jit_lvalue_as_rvalue(object_lvalue));
+            std::string class_name = m_type_names[struct_type];
             std::string method_name = class_name + "_" + member_expr->name;
             std::string mangled_method_name = mangle(method_name);
 
@@ -430,6 +431,7 @@ void JitBackend::visit(const std::shared_ptr<AST::ClassDeclaration>& stmt) {
             throw std::runtime_error("Unknown superclass: " + stmt->superClassName);
         }
     }
+    
 
     for (const auto& field : stmt->fields) {
         gcc_jit_type* field_type = get_jit_type(field->type.value_or(nullptr));
@@ -440,8 +442,19 @@ void JitBackend::visit(const std::shared_ptr<AST::ClassDeclaration>& stmt) {
     gcc_jit_struct* class_struct = gcc_jit_context_new_struct_type(m_context, NULL, mangled_name.c_str(), fields.size(), fields.data());
     gcc_jit_type* class_type = gcc_jit_struct_as_type(class_struct);
 
-    m_class_structs[mangled_name] = class_struct;
+    // m_class_structs[mangled_name] = class_struct;
+    // m_class_types[mangled_name] = class_type;
+    // m_type_names[class_type] = stmt->name; 
+
     m_class_types[mangled_name] = class_type;
+    m_type_names[class_type] = stmt->name;  // ADD THIS LINE
+
+    // Store field names for later lookup
+    std::vector<std::string> field_names;
+    for (const auto& field : stmt->fields) {
+        field_names.push_back(field->name);
+    }
+    m_struct_field_names[class_struct] = field_names;
 
     for (const auto& method : stmt->methods) {
         std::vector<gcc_jit_param*> params;
@@ -474,7 +487,7 @@ void JitBackend::visit(const std::shared_ptr<AST::FunctionDeclaration>& stmt) {
     m_current_block = gcc_jit_function_new_block(m_current_func, "entry");
 
     m_scopes.emplace_back();
-    for (int i = 0; i < stmt->params.size(); ++i) {
+    for (size_t i = 0; i < stmt->params.size(); ++i) {
         m_scopes.back()[stmt->params[i].first] = gcc_jit_param_as_lvalue(gcc_jit_function_get_param(func, i));
     }
 
@@ -501,13 +514,13 @@ gcc_jit_type* JitBackend::get_jit_type(const std::shared_ptr<AST::TypeAnnotation
     if (type->typeName == "int") {
         return m_int_type;
     }
-    if (type->typeName == "double") {
+    if (type->typeName == "float") {
         return m_double_type;
     }
     if (type->typeName == "bool") {
         return m_bool_type;
     }
-    if (type->typeName == "string") {
+    if (type->typeName == "str") {
         return m_const_char_ptr_type;
     }
     if (type->typeName == "i8") {
@@ -832,14 +845,17 @@ gcc_jit_rvalue* JitBackend::visit_expr(const std::shared_ptr<AST::VariableExpr>&
 
 gcc_jit_rvalue* JitBackend::visit_expr(const std::shared_ptr<AST::MemberExpr>& expr) {
     gcc_jit_rvalue* object = visit_expr(expr->object);
-    gcc_jit_type* object_type = gcc_jit_rvalue_get_type(object);
-    gcc_jit_type* struct_type = gcc_jit_type_get_pointed_to(object_type);
+    gcc_jit_lvalue* object_lvalue = gcc_jit_rvalue_dereference(object, NULL);
+    gcc_jit_type* struct_type = gcc_jit_rvalue_get_type(gcc_jit_lvalue_as_rvalue(object_lvalue));
     gcc_jit_struct* class_struct = gcc_jit_type_is_struct(struct_type);
 
-    for (int i = 0; i < gcc_jit_struct_get_field_count(class_struct); ++i) {
-        gcc_jit_field* field = gcc_jit_struct_get_field(class_struct, i);
-        if (gcc_jit_field_get_name(field) == expr->name) {
-            return gcc_jit_rvalue_access_field(gcc_jit_rvalue_dereference(object, NULL), NULL, field);
+    const auto& field_names = m_struct_field_names[class_struct];
+    for (size_t i = 0; i < field_names.size(); ++i) {
+        if (field_names[i] == expr->name) {
+            gcc_jit_field* field = gcc_jit_struct_get_field(class_struct, i);
+            return gcc_jit_lvalue_as_rvalue(
+                gcc_jit_lvalue_access_field(object_lvalue, NULL, field)
+            );
         }
     }
 
