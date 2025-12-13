@@ -1,2 +1,1 @@
-var x: u128 = 18446744073709551615;
-print("x:", x);
+print("Hello Limitly Language");
