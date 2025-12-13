@@ -63,6 +63,16 @@ private:
     gcc_jit_type* m_double_type;
     gcc_jit_type* m_bool_type;
     gcc_jit_type* m_const_char_ptr_type;
+    gcc_jit_type* m_int8_type;
+    gcc_jit_type* m_int16_type;
+    gcc_jit_type* m_int32_type;
+    gcc_jit_type* m_int64_type;
+    gcc_jit_type* m_uint8_type;
+    gcc_jit_type* m_uint16_type;
+    gcc_jit_type* m_uint32_type;
+    gcc_jit_type* m_uint64_type;
+    gcc_jit_type* m_float_type;
+    gcc_jit_type* m_long_double_type;
 
     // Functions
     gcc_jit_function* m_printf_func;
