@@ -47,6 +47,10 @@ void JitBackend::visit(const std::shared_ptr<AST::Statement>& stmt) {
     if (auto s = std::dynamic_pointer_cast<AST::BlockStatement>(stmt)) return visit(s);
     if (auto s = std::dynamic_pointer_cast<AST::IfStatement>(stmt)) return visit(s);
     if (auto s = std::dynamic_pointer_cast<AST::PrintStatement>(stmt)) return visit(s);
+    if (auto s = std::dynamic_pointer_cast<AST::BreakStatement>(stmt)) return visit(s);
+    if (auto s = std::dynamic_pointer_cast<AST::ContinueStatement>(stmt)) return visit(s);
+    if (auto s = std::dynamic_pointer_cast<AST::IterStatement>(stmt)) return visit(s);
+    if (auto s = std::dynamic_pointer_cast<AST::MatchStatement>(stmt)) return visit(s);
     throw std::runtime_error("Unsupported statement type for JIT");
 }
 
@@ -78,7 +82,10 @@ void JitBackend::visit(const std::shared_ptr<AST::ForStatement>& stmt) {
 
     gcc_jit_block* cond_block = gcc_jit_function_new_block(m_main_func, "for_cond");
     gcc_jit_block* body_block = gcc_jit_function_new_block(m_main_func, "for_body");
+    gcc_jit_block* increment_block = gcc_jit_function_new_block(m_main_func, "for_increment");
     gcc_jit_block* after_block = gcc_jit_function_new_block(m_main_func, "after_for");
+
+    m_loop_blocks.push_back({increment_block, after_block});
 
     gcc_jit_block_end_with_jump(m_current_block, NULL, cond_block);
 
@@ -92,6 +99,9 @@ void JitBackend::visit(const std::shared_ptr<AST::ForStatement>& stmt) {
 
     m_current_block = body_block;
     visit(stmt->body);
+    gcc_jit_block_end_with_jump(m_current_block, NULL, increment_block);
+
+    m_current_block = increment_block;
     if (stmt->increment) {
         visit_expr(stmt->increment);
     }
@@ -99,12 +109,45 @@ void JitBackend::visit(const std::shared_ptr<AST::ForStatement>& stmt) {
 
     m_current_block = after_block;
     m_scopes.pop_back();
+    m_loop_blocks.pop_back();
+}
+
+void JitBackend::visit(const std::shared_ptr<AST::MatchStatement>& stmt) {
+    gcc_jit_rvalue* value = visit_expr(stmt->value);
+    gcc_jit_block* after_block = gcc_jit_function_new_block(m_main_func, "after_match");
+    std::vector<gcc_jit_block*> case_blocks;
+    std::vector<gcc_jit_case*> cases;
+
+    for (size_t i = 0; i < stmt->cases.size(); ++i) {
+        case_blocks.push_back(gcc_jit_function_new_block(m_main_func, ("case_" + std::to_string(i)).c_str()));
+    }
+
+    for (size_t i = 0; i < stmt->cases.size(); ++i) {
+        auto literal_expr = std::dynamic_pointer_cast<AST::LiteralExpr>(stmt->cases[i].pattern);
+        if (!literal_expr) {
+            throw std::runtime_error("JIT only supports literal patterns in match statements");
+        }
+        gcc_jit_rvalue* case_value = visit_expr(literal_expr);
+        cases.push_back(gcc_jit_context_new_case(m_context, case_value, case_value, case_blocks[i]));
+    }
+
+    gcc_jit_block_end_with_switch(m_current_block, NULL, value, after_block, cases.size(), cases.data());
+
+    for (size_t i = 0; i < stmt->cases.size(); ++i) {
+        m_current_block = case_blocks[i];
+        visit(stmt->cases[i].body);
+        gcc_jit_block_end_with_jump(m_current_block, NULL, after_block);
+    }
+
+    m_current_block = after_block;
 }
 
 void JitBackend::visit(const std::shared_ptr<AST::WhileStatement>& stmt) {
     gcc_jit_block* cond_block = gcc_jit_function_new_block(m_main_func, "while_cond");
     gcc_jit_block* body_block = gcc_jit_function_new_block(m_main_func, "while_body");
     gcc_jit_block* after_block = gcc_jit_function_new_block(m_main_func, "after_while");
+
+    m_loop_blocks.push_back({cond_block, after_block});
 
     gcc_jit_block_end_with_jump(m_current_block, NULL, cond_block);
 
@@ -117,6 +160,7 @@ void JitBackend::visit(const std::shared_ptr<AST::WhileStatement>& stmt) {
     gcc_jit_block_end_with_jump(m_current_block, NULL, cond_block);
 
     m_current_block = after_block;
+    m_loop_blocks.pop_back();
 }
 
 void JitBackend::visit(const std::shared_ptr<AST::BlockStatement>& stmt) {
@@ -164,6 +208,69 @@ void JitBackend::visit(const std::shared_ptr<AST::IfStatement>& stmt) {
     gcc_jit_block_end_with_jump(m_current_block, NULL, after_block);
 
     m_current_block = after_block;
+}
+
+void JitBackend::visit(const std::shared_ptr<AST::BreakStatement>& stmt) {
+    if (m_loop_blocks.empty()) {
+        throw std::runtime_error("Break statement outside of loop");
+    }
+    gcc_jit_block_end_with_jump(m_current_block, NULL, m_loop_blocks.back().second);
+}
+
+void JitBackend::visit(const std::shared_ptr<AST::ContinueStatement>& stmt) {
+    if (m_loop_blocks.empty()) {
+        throw std::runtime_error("Continue statement outside of loop");
+    }
+    gcc_jit_block_end_with_jump(m_current_block, NULL, m_loop_blocks.back().first);
+}
+
+void JitBackend::visit(const std::shared_ptr<AST::IterStatement>& stmt) {
+    if (stmt->loopVars.size() != 1) {
+        throw std::runtime_error("JIT only supports single variable iter loops");
+    }
+
+    auto range_expr = std::dynamic_pointer_cast<AST::RangeExpr>(stmt->iterable);
+    if (!range_expr) {
+        throw std::runtime_error("JIT only supports range-based iter loops");
+    }
+
+    m_scopes.emplace_back();
+
+    // Initializer
+    gcc_jit_lvalue* i = gcc_jit_function_new_local(m_main_func, NULL, m_int_type, stmt->loopVars[0].c_str());
+    m_scopes.back()[stmt->loopVars[0]] = i;
+    gcc_jit_rvalue* start = visit_expr(range_expr->start);
+    gcc_jit_block_add_assignment(m_current_block, NULL, i, start);
+
+    gcc_jit_block* cond_block = gcc_jit_function_new_block(m_main_func, "iter_cond");
+    gcc_jit_block* body_block = gcc_jit_function_new_block(m_main_func, "iter_body");
+    gcc_jit_block* increment_block = gcc_jit_function_new_block(m_main_func, "iter_increment");
+    gcc_jit_block* after_block = gcc_jit_function_new_block(m_main_func, "after_iter");
+
+    m_loop_blocks.push_back({increment_block, after_block});
+
+    gcc_jit_block_end_with_jump(m_current_block, NULL, cond_block);
+
+    // Condition
+    m_current_block = cond_block;
+    gcc_jit_rvalue* end = visit_expr(range_expr->end);
+    gcc_jit_rvalue* condition = gcc_jit_context_new_comparison(m_context, NULL, GCC_JIT_COMPARISON_LT, gcc_jit_lvalue_as_rvalue(i), end);
+    gcc_jit_block_end_with_conditional(m_current_block, NULL, condition, body_block, after_block);
+
+    // Body
+    m_current_block = body_block;
+    visit(stmt->body);
+    gcc_jit_block_end_with_jump(m_current_block, NULL, increment_block);
+
+    // Increment
+    m_current_block = increment_block;
+    gcc_jit_rvalue* one = gcc_jit_context_new_rvalue_from_int(m_context, m_int_type, 1);
+    gcc_jit_block_add_assignment_op(m_current_block, NULL, i, GCC_JIT_BINARY_OP_PLUS, one);
+    gcc_jit_block_end_with_jump(m_current_block, NULL, cond_block);
+
+    m_current_block = after_block;
+    m_scopes.pop_back();
+    m_loop_blocks.pop_back();
 }
 
 gcc_jit_rvalue* JitBackend::visit_expr(const std::shared_ptr<AST::Expression>& expr) {

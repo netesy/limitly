@@ -26,6 +26,10 @@ private:
     void visit(const std::shared_ptr<AST::BlockStatement>& stmt);
     void visit(const std::shared_ptr<AST::IfStatement>& stmt);
     void visit(const std::shared_ptr<AST::PrintStatement>& stmt);
+    void visit(const std::shared_ptr<AST::BreakStatement>& stmt);
+    void visit(const std::shared_ptr<AST::ContinueStatement>& stmt);
+    void visit(const std::shared_ptr<AST::IterStatement>& stmt);
+    void visit(const std::shared_ptr<AST::MatchStatement>& stmt);
 
     gcc_jit_rvalue* visit_expr(const std::shared_ptr<AST::Expression>& expr);
     gcc_jit_rvalue* visit_expr(const std::shared_ptr<AST::BinaryExpr>& expr);
@@ -45,6 +49,9 @@ private:
 
     // Functions
     gcc_jit_function* m_printf_func;
+
+    // Loop handling
+    std::vector<std::pair<gcc_jit_block*, gcc_jit_block*>> m_loop_blocks;
 };
 
 #endif // JIT_BACKEND_H
