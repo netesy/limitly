@@ -110,6 +110,11 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             if (dot_pos != std::string::npos) {
                 output_filename.erase(dot_pos);
             }
+            // Add platform-specific executable extension
+            #ifdef _WIN32
+                output_filename += ".exe";
+            #endif
+            // macOS and Linux don't need an extension
             jit.compile(output_filename.c_str());
             std::cout << "Compiled to " << output_filename << ". Run ./" << output_filename << " to see the result.\n";
         } else {

@@ -309,13 +309,34 @@ gcc_jit_rvalue* JitBackend::visit_expr(const std::shared_ptr<AST::CallExpr>& exp
         }
         return gcc_jit_context_new_call_through_ptr(m_context, NULL, func_ptr, args.size(), args.data());
     } else {
+        auto member_expr = std::dynamic_pointer_cast<AST::MemberExpr>(expr->callee);
+        if (member_expr) {
+            gcc_jit_rvalue* object = visit_expr(member_expr->object);
+            gcc_jit_type* object_type = gcc_jit_rvalue_get_type(object);
+            gcc_jit_type* struct_type = gcc_jit_type_get_pointed_to(object_type);
+            std::string class_name = gcc_jit_type_get_name(struct_type);
+            std::string method_name = class_name + "_" + member_expr->name;
+            std::string mangled_method_name = mangle(method_name);
+
+            if (m_functions.count(mangled_method_name)) {
+                gcc_jit_function* func = m_functions[mangled_method_name];
+                std::vector<gcc_jit_rvalue*> args;
+                args.push_back(object);
+                for (const auto& arg : expr->arguments) {
+                    args.push_back(visit_expr(arg));
+                }
+                return gcc_jit_context_new_call(m_context, NULL, func, args.size(), args.data());
+            }
+        }
+
         auto var_expr = std::dynamic_pointer_cast<AST::VariableExpr>(expr->callee);
         if (!var_expr) {
             throw std::runtime_error("JIT only supports direct function calls");
         }
 
-        if (m_functions.count(var_expr->name)) {
-            gcc_jit_function* func = m_functions[var_expr->name];
+        std::string mangled_name = mangle(var_expr->name);
+        if (m_functions.count(mangled_name)) {
+            gcc_jit_function* func = m_functions[mangled_name];
             std::vector<gcc_jit_rvalue*> args;
             for (const auto& arg : expr->arguments) {
                 args.push_back(visit_expr(arg));
@@ -323,7 +344,15 @@ gcc_jit_rvalue* JitBackend::visit_expr(const std::shared_ptr<AST::CallExpr>& exp
             return gcc_jit_context_new_call(m_context, NULL, func, args.size(), args.data());
         }
 
-        throw std::runtime_error("Unknown function: " + var_expr->name);
+        if (m_class_types.count(mangled_name)) {
+            gcc_jit_type* class_type = m_class_types[mangled_name];
+            gcc_jit_rvalue* size = gcc_jit_context_new_rvalue_from_int(m_context, gcc_jit_context_get_type(m_context, GCC_JIT_TYPE_SIZE_T), gcc_jit_type_get_size(class_type));
+            gcc_jit_rvalue* args[] = {size};
+            gcc_jit_rvalue* instance = gcc_jit_context_new_call(m_context, NULL, m_malloc_func, 1, args);
+            return gcc_jit_context_new_cast(m_context, NULL, instance, gcc_jit_type_get_pointer(class_type));
+        }
+
+        throw std::runtime_error("Unknown function or class: " + var_expr->name);
     }
 }
 
@@ -379,7 +408,43 @@ void JitBackend::visit(const std::shared_ptr<AST::ModuleDeclaration>& stmt) {
 }
 
 void JitBackend::visit(const std::shared_ptr<AST::ClassDeclaration>& stmt) {
-    throw std::runtime_error("Class declarations are not yet supported by JIT");
+    // Create a new struct type for the class
+    std::vector<gcc_jit_field*> fields;
+
+    if (!stmt->superClassName.empty()) {
+        std::string mangled_super_name = mangle(stmt->superClassName);
+        if (m_class_types.count(mangled_super_name)) {
+            fields.push_back(gcc_jit_context_new_field(m_context, NULL, m_class_types[mangled_super_name], "super"));
+        } else {
+            throw std::runtime_error("Unknown superclass: " + stmt->superClassName);
+        }
+    }
+
+    for (const auto& field : stmt->fields) {
+        gcc_jit_type* field_type = get_jit_type(field->type.value_or(nullptr));
+        fields.push_back(gcc_jit_context_new_field(m_context, NULL, field_type, field->name.c_str()));
+    }
+
+    std::string mangled_name = mangle(stmt->name);
+    gcc_jit_struct* class_struct = gcc_jit_context_new_struct_type(m_context, NULL, mangled_name.c_str(), fields.size(), fields.data());
+    gcc_jit_type* class_type = gcc_jit_struct_as_type(class_struct);
+
+    m_class_structs[mangled_name] = class_struct;
+    m_class_types[mangled_name] = class_type;
+
+    for (const auto& method : stmt->methods) {
+        std::vector<gcc_jit_param*> params;
+        params.push_back(gcc_jit_context_new_param(m_context, NULL, gcc_jit_type_get_pointer(class_type), "this"));
+        for (const auto& p : method->params) {
+            params.push_back(gcc_jit_context_new_param(m_context, NULL, get_jit_type(p.second), p.first.c_str()));
+        }
+        gcc_jit_type* return_type = get_jit_type(method->returnType.value_or(nullptr));
+        enum gcc_jit_function_kind kind = method->visibility == AST::VisibilityLevel::Public ? GCC_JIT_FUNCTION_EXPORTED : GCC_JIT_FUNCTION_INTERNAL;
+        std::string method_name = stmt->name + "_" + method->name;
+        std::string mangled_method_name = mangle(method_name);
+        gcc_jit_function* func = gcc_jit_context_new_function(m_context, NULL, kind, return_type, mangled_method_name.c_str(), params.size(), params.data(), 0);
+        m_functions[mangled_method_name] = func;
+    }
 }
 
 void JitBackend::visit(const std::shared_ptr<AST::ParallelStatement>& stmt) {
@@ -433,6 +498,9 @@ gcc_jit_type* JitBackend::get_jit_type(const std::shared_ptr<AST::TypeAnnotation
     }
     if (type->typeName == "string") {
         return m_const_char_ptr_type;
+    }
+    if (m_class_types.count(type->typeName)) {
+        return gcc_jit_type_get_pointer(m_class_types.at(type->typeName));
     }
     throw std::runtime_error("Unsupported type for JIT: " + type->typeName);
 }
@@ -586,6 +654,7 @@ gcc_jit_rvalue* JitBackend::visit_expr(const std::shared_ptr<AST::Expression>& e
     if (auto e = std::dynamic_pointer_cast<AST::CallExpr>(expr)) return visit_expr(e);
     if (auto e = std::dynamic_pointer_cast<AST::LambdaExpr>(expr)) return visit_expr(e);
     if (auto e = std::dynamic_pointer_cast<AST::GroupingExpr>(expr)) return visit_expr(e);
+    if (auto e = std::dynamic_pointer_cast<AST::MemberExpr>(expr)) return visit_expr(e);
     throw std::runtime_error("Unsupported expression type for JIT");
 }
 
@@ -714,6 +783,22 @@ gcc_jit_rvalue* JitBackend::visit_expr(const std::shared_ptr<AST::VariableExpr>&
         }
     }
     throw std::runtime_error("Unknown variable: " + expr->name);
+}
+
+gcc_jit_rvalue* JitBackend::visit_expr(const std::shared_ptr<AST::MemberExpr>& expr) {
+    gcc_jit_rvalue* object = visit_expr(expr->object);
+    gcc_jit_type* object_type = gcc_jit_rvalue_get_type(object);
+    gcc_jit_type* struct_type = gcc_jit_type_get_pointed_to(object_type);
+    gcc_jit_struct* class_struct = gcc_jit_type_is_struct(struct_type);
+
+    for (int i = 0; i < gcc_jit_struct_get_field_count(class_struct); ++i) {
+        gcc_jit_field* field = gcc_jit_struct_get_field(class_struct, i);
+        if (gcc_jit_field_get_name(field) == expr->name) {
+            return gcc_jit_rvalue_access_field(gcc_jit_rvalue_dereference(object, NULL), NULL, field);
+        }
+    }
+
+    throw std::runtime_error("Unknown member: " + expr->name);
 }
 
 gcc_jit_rvalue* JitBackend::visit_expr(const std::shared_ptr<AST::AssignExpr>& expr) {
