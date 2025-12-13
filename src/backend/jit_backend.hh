@@ -58,6 +58,8 @@ private:
     std::vector<std::unordered_map<std::string, gcc_jit_lvalue*>> m_scopes;
 
     // Types
+    std::map<gcc_jit_type*, std::string> m_type_names;
+    std::map<gcc_jit_struct*, std::vector<std::string>> m_struct_field_names;
     gcc_jit_type* m_void_type;
     gcc_jit_type* m_int_type;
     gcc_jit_type* m_double_type;
