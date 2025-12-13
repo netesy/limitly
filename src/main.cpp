@@ -6,7 +6,7 @@
 #include "backend/ast_printer.hh"
 #include "backend/bytecode_printer.hh"
 #include "backend/vm.hh"
-// #include "backend/jit_backend.hh"
+#include "backend/jit_backend.hh"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -22,6 +22,7 @@ void printUsage(const char* programName) {
     std::cout << "  " << programName << " -cst <source_file> - Print the CST for a source file" << std::endl;
     std::cout << "  " << programName << " -tokens <source_file> - Print the tokens for a source file" << std::endl;
     std::cout << "  " << programName << " -bytecode <source_file> - Print the bytecode for a source file" << std::endl;
+    std::cout << "  " << programName << " -jit <source_file>    - JIT compile a source file" << std::endl;
     std::cout << "  " << programName << " -debug <source_file> - Execute with debug output enabled" << std::endl;
     std::cout << "  " << programName << " -repl           - Start the REPL (interactive mode)" << std::endl;
 }
@@ -80,14 +81,14 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             std::cout << std::endl;
         }
 
-        // if (useJit) {
-        //     std::cout << "=== JIT Backend ===\n";
-        //     JitBackend jit;
-        //     jit.process(ast);
-        //     const char* output_filename = "jit_output";
-        //     jit.compile(output_filename);
-        //     std::cout << "Compiled to " << output_filename << ". Run ./" << output_filename << " to see the result.\n";
-        // } else {
+        if (useJit) {
+            std::cout << "=== JIT Backend ===\n";
+            JitBackend jit;
+            jit.process(ast);
+            const char* output_filename = "jit_output";
+            jit.compile(output_filename);
+            std::cout << "Compiled to " << output_filename << ". Run ./" << output_filename << " to see the result.\n";
+        } else {
 
             // Backend: Generate bytecode
             VM vm;
@@ -122,7 +123,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 std::cerr << "Error: " << e.what() << std::endl;
                 return 1;
             }
-        // }
+        }
         
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
@@ -232,10 +233,10 @@ int main(int argc, char* argv[]) {
         return executeFile(argv[2], false, false, true, false);
     } else if (arg == "-bytecode" && argc >= 3) {
         return executeFile(argv[2], false, false, false, true);
+    } else if (arg == "-jit" && argc >= 3) {
+        return executeFile(argv[2], false, false, false, false, true);
     } else if (arg == "-debug" && argc >= 3) {
         return executeFile(argv[2], false, false, false, false, false, true);
-    // } else if (arg == "-jit" && argc >= 3) {
-    //     return executeFile(argv[2], false, false, false, true);
     } else if (arg[0] == '-') {
         std::cerr << "Unknown option: " << arg << std::endl;
         printUsage(argv[0]);
