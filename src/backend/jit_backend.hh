@@ -49,6 +49,7 @@ private:
     gcc_jit_rvalue* visit_expr(const std::shared_ptr<AST::CallExpr>& expr);
     gcc_jit_rvalue* visit_expr(const std::shared_ptr<AST::LambdaExpr>& expr);
     gcc_jit_rvalue* visit_expr(const std::shared_ptr<AST::GroupingExpr>& expr);
+    gcc_jit_rvalue* visit_expr(const std::shared_ptr<AST::MemberExpr>& expr);
 
     gcc_jit_context* m_context;
     gcc_jit_function* m_main_func;
@@ -79,6 +80,10 @@ private:
     // Module handling
     std::string m_current_module_name;
     std::string mangle(const std::string& name);
+
+    // Class handling
+    std::unordered_map<std::string, gcc_jit_struct*> m_class_structs;
+    std::unordered_map<std::string, gcc_jit_type*> m_class_types;
 };
 
 #endif // JIT_BACKEND_H
