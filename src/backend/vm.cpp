@@ -1928,13 +1928,7 @@ void VM::handleAdd(const Instruction& instruction) {
                     aVal = std::get<long double>(a->data);
                 } else if (std::holds_alternative<BigInt>(a->data)) {
                     // Convert BigInt to long double
-                    try {
-                    aVal = static_cast<long double>(std::get<BigInt>(a->data).to_int64());
-                } catch (const std::overflow_error&) {
-                    // BigInt is too large for int64_t, use string conversion as fallback
-                    std::string bigIntStr = std::get<BigInt>(a->data).to_string();
-                    aVal = static_cast<long double>(std::stold(bigIntStr));
-                }
+                    aVal = std::get<BigInt>(a->data).get_f128_value();
                 } else {
                     error("Type mismatch: expected Float64 but got different type", instruction.line, 0, "ADD operation", "compatible numeric types");
                     return;
@@ -1946,13 +1940,7 @@ void VM::handleAdd(const Instruction& instruction) {
                     aVal = static_cast<long double>(extractAsInt64(a));
                 } else if (std::holds_alternative<BigInt>(a->data)) {
                     // Convert BigInt to long double
-                    try {
-                    aVal = static_cast<long double>(std::get<BigInt>(a->data).to_int64());
-                } catch (const std::overflow_error&) {
-                    // BigInt is too large for int64_t, use string conversion as fallback
-                    std::string bigIntStr = std::get<BigInt>(a->data).to_string();
-                    aVal = static_cast<long double>(std::stold(bigIntStr));
-                }
+                    aVal = std::get<BigInt>(a->data).get_f128_value();
                 } else {
                     error("Type mismatch: expected Int64 but got different type", instruction.line, 0, "ADD operation", "compatible numeric types");
                     return;
@@ -1961,13 +1949,7 @@ void VM::handleAdd(const Instruction& instruction) {
                 std::cout << "[DEBUG] Entering Int128/UInt128 branch for aVal, tag: " << static_cast<int>(a->type->tag) << std::endl;
                 if (std::holds_alternative<BigInt>(a->data)) {
                     // Convert BigInt to long double
-                    try {
-                        aVal = static_cast<long double>(std::get<BigInt>(a->data).to_int64());
-                    } catch (const std::overflow_error&) {
-                        // BigInt is too large for int64_t, use string conversion as fallback
-                        std::string bigIntStr = std::get<BigInt>(a->data).to_string();
-                        aVal = static_cast<long double>(std::stold(bigIntStr));
-                    }
+                    aVal = std::get<BigInt>(a->data).get_f128_value();
                 } else {
                     error("Type mismatch: expected Int128/UInt128 but got different type", instruction.line, 0, "ADD operation", "compatible numeric types");
                     return;
@@ -1987,13 +1969,7 @@ void VM::handleAdd(const Instruction& instruction) {
                     bVal = std::get<long double>(b->data);
                 } else if (std::holds_alternative<BigInt>(b->data)) {
                     // Convert BigInt to long double
-                    try {
-                        bVal = static_cast<long double>(std::get<BigInt>(b->data).to_int64());
-                    } catch (const std::overflow_error&) {
-                        // BigInt is too large for int64_t, use string conversion as fallback
-                        std::string bigIntStr = std::get<BigInt>(b->data).to_string();
-                        bVal = static_cast<long double>(std::stold(bigIntStr));
-                    }
+                    bVal = std::get<BigInt>(b->data).get_f128_value();
                 } else {
                     error("Type mismatch: expected Float64 but got different type", instruction.line, 0, "ADD operation", "compatible numeric types");
                     return;
@@ -2005,13 +1981,7 @@ void VM::handleAdd(const Instruction& instruction) {
                     bVal = static_cast<long double>(extractAsInt64(b));
                 } else if (std::holds_alternative<BigInt>(b->data)) {
                     // Convert BigInt to long double
-                    try {
-                        bVal = static_cast<long double>(std::get<BigInt>(b->data).to_int64());
-                    } catch (const std::overflow_error&) {
-                        // BigInt is too large for int64_t, use string conversion as fallback
-                        std::string bigIntStr = std::get<BigInt>(b->data).to_string();
-                        bVal = static_cast<long double>(std::stold(bigIntStr));
-                    }
+                    bVal = std::get<BigInt>(b->data).get_f128_value();
                 } else {
                     error("Type mismatch: expected Int64 but got different type", instruction.line, 0, "ADD operation", "compatible numeric types");
                     return;
@@ -2019,13 +1989,7 @@ void VM::handleAdd(const Instruction& instruction) {
             } else if (b->type->tag == TypeTag::Int128 || b->type->tag == TypeTag::UInt128) {
                 if (std::holds_alternative<BigInt>(b->data)) {
                     // Convert BigInt to long double
-                    try {
-                        bVal = static_cast<long double>(std::get<BigInt>(b->data).to_int64());
-                    } catch (const std::overflow_error&) {
-                        // BigInt is too large for int64_t, use string conversion as fallback
-                        std::string bigIntStr = std::get<BigInt>(b->data).to_string();
-                        bVal = static_cast<long double>(std::stold(bigIntStr));
-                    }
+                    bVal = std::get<BigInt>(b->data).get_f128_value();
                 } else {
                     error("Type mismatch: expected Int128/UInt128 but got different type", instruction.line, 0, "ADD operation", "compatible numeric types");
                     return;
@@ -2216,13 +2180,7 @@ void VM::handleSubtract(const Instruction& instruction) {
                 aVal = std::get<long double>(a->data);
             } else if (std::holds_alternative<BigInt>(a->data)) {
                 // Convert BigInt to long double
-                try {
-                        aVal = static_cast<long double>(std::get<BigInt>(a->data).to_int64());
-                    } catch (const std::overflow_error&) {
-                        // BigInt is too large for int64_t, use string conversion as fallback
-                        std::string bigIntStr = std::get<BigInt>(a->data).to_string();
-                        aVal = static_cast<long double>(std::stold(bigIntStr));
-                    }
+                aVal = std::get<BigInt>(a->data).get_f128_value();
             } else if (std::holds_alternative<int32_t>(a->data)) {
                 // Convert int32 to long double
                 aVal = static_cast<long double>(extractAsInt64(a));
@@ -2248,13 +2206,7 @@ void VM::handleSubtract(const Instruction& instruction) {
                 bVal = std::get<long double>(b->data);
             } else if (std::holds_alternative<BigInt>(b->data)) {
                 // Convert BigInt to long double
-                try {
-                        bVal = static_cast<long double>(std::get<BigInt>(b->data).to_int64());
-                    } catch (const std::overflow_error&) {
-                        // BigInt is too large for int64_t, use string conversion as fallback
-                        std::string bigIntStr = std::get<BigInt>(b->data).to_string();
-                        bVal = static_cast<long double>(std::stold(bigIntStr));
-                    }
+                bVal = std::get<BigInt>(b->data).get_f128_value();
             } else if (std::holds_alternative<int32_t>(b->data)) {
                 // Convert int32 to long double
                 bVal = static_cast<long double>(extractAsInt64(b));
@@ -2435,13 +2387,7 @@ void VM::handleMultiply(const Instruction& instruction) {
                 aVal = std::get<long double>(a->data);
             } else if (std::holds_alternative<BigInt>(a->data)) {
                 // Convert BigInt to long double
-                try {
-                        aVal = static_cast<long double>(std::get<BigInt>(a->data).to_int64());
-                    } catch (const std::overflow_error&) {
-                        // BigInt is too large for int64_t, use string conversion as fallback
-                        std::string bigIntStr = std::get<BigInt>(a->data).to_string();
-                        aVal = static_cast<long double>(std::stold(bigIntStr));
-                    }
+                aVal = std::get<BigInt>(a->data).get_f128_value();
             } else {
                 error("Type mismatch: expected Float64 but got different type", instruction.line, 0, "MULTIPLY operation", "compatible numeric types");
                 return;
@@ -2456,13 +2402,7 @@ void VM::handleMultiply(const Instruction& instruction) {
                 bVal = std::get<long double>(b->data);
             } else if (std::holds_alternative<BigInt>(b->data)) {
                 // Convert BigInt to long double
-                try {
-                        bVal = static_cast<long double>(std::get<BigInt>(b->data).to_int64());
-                    } catch (const std::overflow_error&) {
-                        // BigInt is too large for int64_t, use string conversion as fallback
-                        std::string bigIntStr = std::get<BigInt>(b->data).to_string();
-                        bVal = static_cast<long double>(std::stold(bigIntStr));
-                    }
+                bVal = std::get<BigInt>(b->data).get_f128_value();
             } else {
                 error("Type mismatch: expected Float64 but got different type", instruction.line, 0, "MULTIPLY operation", "compatible numeric types");
                 return;
@@ -2561,13 +2501,7 @@ void VM::handleDivide(const Instruction& instruction) {
                 aVal = std::get<long double>(a->data);
             } else if (std::holds_alternative<BigInt>(a->data)) {
                 // Convert BigInt to long double
-                try {
-                        aVal = static_cast<long double>(std::get<BigInt>(a->data).to_int64());
-                    } catch (const std::overflow_error&) {
-                        // BigInt is too large for int64_t, use string conversion as fallback
-                        std::string bigIntStr = std::get<BigInt>(a->data).to_string();
-                        aVal = static_cast<long double>(std::stold(bigIntStr));
-                    }
+                aVal = std::get<BigInt>(a->data).get_f128_value();
             } else {
                 error("Type mismatch: expected Float64 but got different type", instruction.line, 0, "DIVISION operation", "compatible numeric types");
                 return;
@@ -2582,13 +2516,7 @@ void VM::handleDivide(const Instruction& instruction) {
                 bVal = std::get<long double>(b->data);
             } else if (std::holds_alternative<BigInt>(b->data)) {
                 // Convert BigInt to long double
-                try {
-                        bVal = static_cast<long double>(std::get<BigInt>(b->data).to_int64());
-                    } catch (const std::overflow_error&) {
-                        // BigInt is too large for int64_t, use string conversion as fallback
-                        std::string bigIntStr = std::get<BigInt>(b->data).to_string();
-                        bVal = static_cast<long double>(std::stold(bigIntStr));
-                    }
+                bVal = std::get<BigInt>(b->data).get_f128_value();
             } else {
                 error("Type mismatch: expected Float64 but got different type", instruction.line, 0, "DIVISION operation", "compatible numeric types");
                 return;
@@ -2660,8 +2588,13 @@ void VM::handleNegate(const Instruction& /*unused*/) {
     ValuePtr a = pop();
 
     if (a->type->tag == TypeTag::Float64) {
-        long double val = std::get<long double>(a->data);
-        push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, -val));
+        if (std::holds_alternative<BigInt>(a->data)) {
+            BigInt val = std::get<BigInt>(a->data);
+            push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, BigInt(0) - val));
+        } else if (std::holds_alternative<long double>(a->data)) {
+            long double val = std::get<long double>(a->data);
+            push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, -val));
+        }
     } else if (a->type->tag == TypeTag::Int) {
         int32_t val = extractAsInt64(a);
         push(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, -val));

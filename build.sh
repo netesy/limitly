@@ -91,6 +91,7 @@ $CXX $CXXFLAGS -o bin/test_parser \
     src/frontend/ast_builder.cpp \
     src/backend/type_checker.cpp \
     src/backend/backend.cpp \
+    src/backend/symbol_table.cpp \
     src/backend/value.cpp \
     src/backend/ast_printer.cpp \
     src/backend/bytecode_printer.cpp \
