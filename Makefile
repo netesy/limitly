@@ -9,17 +9,12 @@ ifeq ($(OS),Windows_NT)
     MSYS2_PATH := C:/msys64
     CXX := $(MSYS2_PATH)/mingw64/bin/g++.exe
     LIBS := -lws2_32 -lgccjit
-    GCCJIT_LINK_FLAG :=
 else
     PLATFORM := linux
     EXE_EXT :=
     CXX := g++
     LIBS := -lgccjit
-    GCCJIT_PATH := /usr/lib/gcc/x86_64-linux-gnu/14/libgccjit.so
-    ifeq ($(wildcard $(GCCJIT_PATH)),)
-        $(error "libgccjit.so not found at $(GCCJIT_PATH). Please install libgccjit-14-dev")
-    endif
-    GCCJIT_LINK_FLAG := -L$(shell dirname $(GCCJIT_PATH))
+    LDFLAGS := -L$(shell dirname `find /usr -name libgccjit.so 2>/dev/null`)
 endif
 
 # =============================
@@ -27,9 +22,9 @@ endif
 # =============================
 MODE ?= release
 ifeq ($(MODE),debug)
-    CXXFLAGS := -std=c++17 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++) $(GCCJIT_LINK_FLAG)
+    CXXFLAGS := -std=c++17 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++) -Wl,--stack,16777216
 else
-    CXXFLAGS := -std=c++17 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++) $(GCCJIT_LINK_FLAG)
+    CXXFLAGS := -std=c++17 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++) -Wl,--stack,16777216
 endif
 
 # =============================
@@ -123,11 +118,11 @@ $(TEST_RSP): $(TEST_OBJS) | $(RSP_DIR)
 # =============================
 windows: $(BIN_DIR) $(MAIN_RSP) $(TEST_RSP)
 	@echo "🔨 Linking limitly.exe ..."
-	$(CXX) $(CXXFLAGS) @$(MAIN_RSP) -o $(BIN_DIR)/limitly$(EXE_EXT)
+	$(CXX) $(CXXFLAGS) @$(MAIN_RSP) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS)
 	@echo "✅ limitly.exe built."
 
 	@echo "🔨 Linking test_parser.exe ..."
-	$(CXX) $(CXXFLAGS) @$(TEST_RSP) -o $(BIN_DIR)/test_parser$(EXE_EXT)
+	$(CXX) $(CXXFLAGS) @$(TEST_RSP) -o $(BIN_DIR)/test_parser$(EXE_EXT) $(LIBS)
 	@echo "✅ test_parser.exe built."
 
 linux: $(BIN_DIR) $(MAIN_RSP) $(TEST_RSP)
