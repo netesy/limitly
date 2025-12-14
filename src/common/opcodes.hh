@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include "big_int.hh"
 
 // Bytecode operation codes
 enum class Opcode {
@@ -175,8 +176,7 @@ enum class Opcode {
 struct Instruction {
     Opcode opcode;
     uint32_t line;
-    int64_t intValue = 0;
-    long double floatValue = 0.0f;
+    BigInt bigIntValue;
     bool boolValue = false;
     std::string stringValue;
 };

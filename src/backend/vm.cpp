@@ -83,23 +83,7 @@ static std::string typeTagToString(TypeTag tag) {
 // Safe value extraction helpers to prevent std::get wrong index errors
 template<typename T>
 std::optional<T> safeGet(ValuePtr value) {
-    if constexpr (std::is_same_v<T, int32_t>) {
-        if (std::holds_alternative<int32_t>(value->data)) {
-            return std::get<int32_t>(value->data);
-        }
-    } else if constexpr (std::is_same_v<T, int64_t>) {
-        if (std::holds_alternative<int64_t>(value->data)) {
-            return std::get<int64_t>(value->data);
-        }
-    } else if constexpr (std::is_same_v<T, long double>) {
-        if (std::holds_alternative<long double>(value->data)) {
-            return std::get<long double>(value->data);
-        }
-    } else if constexpr (std::is_same_v<T, float>) {
-        if (std::holds_alternative<float>(value->data)) {
-            return std::get<float>(value->data);
-        }
-    } else if constexpr (std::is_same_v<T, BigInt>) {
+    if constexpr (std::is_same_v<T, BigInt>) {
         if (std::holds_alternative<BigInt>(value->data)) {
             return std::get<BigInt>(value->data);
         }
@@ -452,9 +436,9 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                           << " stack.size()=" << stack.size() << std::endl;
 
                 if (instruction.opcode == Opcode::JUMP) {
-                    size_t targetIP = ip + 1 + instruction.intValue;
+                    size_t targetIP = ip + 1 + instruction.bigIntValue.to_int64();
                     std::cout << "[DEBUG] JUMP: current IP=" << ip
-                              << ", offset=" << instruction.intValue
+                              << ", offset=" << instruction.bigIntValue.to_string()
                               << ", target IP=" << targetIP
                               << ", bytecode.size()=" << bytecodeRef.size() << std::endl;
 
@@ -1476,100 +1460,33 @@ bool VM::isErrorFrame(size_t frameIndex) const {
 // Instruction handlers
 void VM::handlePushInt(const Instruction& instruction) {
     if (debugMode) {
-        std::cout << "[DEBUG] PUSH_INT: instruction.intValue = " << instruction.intValue << std::endl;
+        std::cout << "[DEBUG] PUSH_INT: instruction.bigIntValue = " << instruction.bigIntValue.to_string() << std::endl;
     }
-    push(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, instruction.intValue));
+    push(memoryManager.makeRef<Value>(*region, typeSystem->BIGINT_TYPE, instruction.bigIntValue));
 }
 
 void VM::handlePushFloat(const Instruction& instruction) {
-    (void)instruction; // Mark as unused
-    std::cout << "[DEBUG] PUSH_FLOAT: instruction.floatValue = " << instruction.floatValue << std::endl;
+    if (debugMode) {
+        std::cout << "[DEBUG] PUSH_FLOAT: instruction.bigIntValue = " << instruction.bigIntValue.to_string() << std::endl;
+    }
     
-    // Use BigInt with f128 precision for all float values
-    long double floatValue = static_cast<long double>(instruction.floatValue);
-    std::cout << "[DEBUG] floatValue as long double = " << floatValue << std::endl;
-    BigInt bigFloatValue = BigInt::f128(floatValue);
-    std::cout << "[DEBUG] BigInt f128 value = " << bigFloatValue.to_string() << std::endl;
-    push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, bigFloatValue));
+    // The bigIntValue should already contain the float representation
+    push(memoryManager.makeRef<Value>(*region, typeSystem->BIGINT_TYPE, instruction.bigIntValue));
 }
 
 void VM::handlePushBigInt(const Instruction& instruction) {
-    try {
-        BigInt bigIntValue(instruction.stringValue);
-        
-        // Use the type encoded in intValue if available, otherwise infer it
-        TypePtr targetType;
-        
-        if (instruction.intValue != 0) {
-            // Type is encoded in intValue
-            TypeTag typeTag = static_cast<TypeTag>(instruction.intValue);
-            
-            switch (typeTag) {
-                case TypeTag::Int:
-                    targetType = typeSystem->INT_TYPE;
-                    break;
-                case TypeTag::Int64:
-                    targetType = typeSystem->INT64_TYPE;
-                    break;
-                case TypeTag::Int128:
-                    targetType = typeSystem->INT128_TYPE;
-                    break;
-                case TypeTag::UInt64:
-                    targetType = typeSystem->UINT64_TYPE;
-                    break;
-                case TypeTag::UInt128:
-                    targetType = typeSystem->UINT128_TYPE;
-                    break;
-                default:
-                    // Default to INT128_TYPE for safety
-                    targetType = typeSystem->INT128_TYPE;
-                    break;
-            }
-        } else {
-            // No type encoded, need to infer (legacy behavior)
-            targetType = typeSystem->INT128_TYPE; // Default fallback
-            
-            try {
-                // Check if it fits in int64
-                int64_t int64Val = bigIntValue.to_int64();
-                
-                // Value fits in int64
-                if (int64Val >= 0) {
-                    targetType = typeSystem->INT64_TYPE;
-                } else {
-                    targetType = typeSystem->INT64_TYPE;
-                }
-            } catch (const std::overflow_error&) {
-                // Value doesn't fit in int64, check if it could be uint64 or larger
-                std::string bigIntStr = bigIntValue.to_string();
-                if (!bigIntStr.empty() && bigIntStr[0] != '-') {
-                    // Positive number that doesn't fit in int64
-                    if (bigIntStr.length() <= 20) { // UINT64_MAX has 20 digits
-                        // For UINT64_MAX exactly, prefer UINT128_TYPE to preserve precision
-                        if (bigIntStr == "18446744073709551615") {
-                            targetType = typeSystem->UINT128_TYPE;
-                        } else {
-                            targetType = typeSystem->UINT64_TYPE;
-                        }
-                    } else {
-                        // Larger than uint64, must be uint128
-                        targetType = typeSystem->UINT128_TYPE;
-                    }
-                } else {
-                    // Negative large number - use INT128_TYPE
-                    targetType = typeSystem->INT128_TYPE;
-                }
-            }
-        }
-        
-        std::cout << "[DEBUG VM] PUSH_BIGINT: " << sizeof(long double) << instruction.stringValue 
+    // Use the bigIntValue directly
+    BigInt bigIntValue = instruction.bigIntValue;
+    
+    // Default to INT128_TYPE for BigInt values
+    TypePtr targetType = typeSystem->BIGINT_TYPE;
+    
+    if (debugMode) {
+        std::cout << "[DEBUG VM] PUSH_BIGINT: " << bigIntValue.to_string() 
                   << " with type " << targetType->toString() << std::endl;
-        
-        push(memoryManager.makeRef<Value>(*region, targetType, bigIntValue));
-    } catch (const std::exception& e) {
-        // If BigInt parsing fails, create a BigInt with value 0
-        push(memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, BigInt(0)));
     }
+    
+    push(memoryManager.makeRef<Value>(*region, targetType, bigIntValue));
 }
 
 void VM::handlePushString(const Instruction& instruction) {
@@ -1656,7 +1573,13 @@ void VM::handleDeclareVar(const Instruction& instruction) {
     }
 
     // Get visibility information from instruction (default to Private if not specified)
-    AST::VisibilityLevel visibility = static_cast<AST::VisibilityLevel>(instruction.intValue);
+    AST::VisibilityLevel visibility = AST::VisibilityLevel::Private; // Default
+    try {
+        int64_t visibilityValue = instruction.bigIntValue.to_int64();
+        visibility = static_cast<AST::VisibilityLevel>(visibilityValue);
+    } catch (const std::exception&) {
+        // If conversion fails, keep default Private visibility
+    }
     
     // Always create a new variable in current scope (may shadow outer scope variable)
     environment->define(instruction.stringValue, value, visibility);
@@ -1712,43 +1635,25 @@ void VM::handleDefineAtomic(const Instruction& instruction) {
     // Pop the initializer value and create an AtomicValue wrapper
     ValuePtr initVal = pop();
     BigInt initial(0);
-    if (initVal && initVal->type && (initVal->type->tag == TypeTag::Int || initVal->type->tag == TypeTag::Int64 ||
-        initVal->type->tag == TypeTag::Int8 || initVal->type->tag == TypeTag::Int16 || initVal->type->tag == TypeTag::Int32 ||
-        initVal->type->tag == TypeTag::UInt || initVal->type->tag == TypeTag::UInt8 || initVal->type->tag == TypeTag::UInt16 || initVal->type->tag == TypeTag::UInt32 || initVal->type->tag == TypeTag::UInt64)) {
-        // Extract integer value as string and convert to BigInt
-        std::string intStr;
-        std::visit([&intStr](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, int32_t> || std::is_same_v<T, int64_t> || 
-                          std::is_same_v<T, int8_t> || std::is_same_v<T, int16_t> ||
-                          std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t> ||
-                          std::is_same_v<T, uint8_t> || std::is_same_v<T, uint16_t>) {
-                intStr = std::to_string(arg);
-            } else if constexpr (std::is_same_v<T, std::string>) {
-                intStr = arg;
-            }
-        }, initVal->data);
-        initial = BigInt(intStr);
-    } else if (initVal && initVal->type && initVal->type->tag == TypeTag::Float64) {
-        // allow float to be truncated
-        long double doubleVal = std::get<long double>(initVal->data);
-        initial = BigInt(std::to_string(static_cast<long long>(doubleVal)));
+    if (initVal && initVal->type && initVal->type->tag == TypeTag::BigInt) {
+        // Extract BigInt value
+        initial = extractAsBigInt(initVal);
     } else if (!initVal) {
         initial = BigInt(0);
     } else {
-        error("Invalid initializer for atomic variable");
+        error("Invalid initializer for atomic variable - only BigInt values are supported");
     }
 
     AtomicValue av(initial);
-    // Wrap in a VM Value with ANY_TYPE (no dedicated atomic type yet)
-    auto v = memoryManager.makeRef<Value>(*region, typeSystem->ANY_TYPE, av);
+    // Wrap in a VM Value with BIGINT_TYPE
+    auto v = memoryManager.makeRef<Value>(*region, typeSystem->BIGINT_TYPE, av);
     environment->define(instruction.stringValue, v);
 }
 
 
 void VM::handleStoreTemp(const Instruction& instruction) {
     // Store the top value in a temporary variable at the specified index
-    int index = instruction.intValue;
+    int index = instruction.bigIntValue.to_int64();
 
     // Find or create the current scope's temp values
     ScopedTempValues* currentScopeTemps = nullptr;
@@ -1781,7 +1686,7 @@ void VM::handleStoreTemp(const Instruction& instruction) {
 
 void VM::handleLoadTemp(const Instruction& instruction) {
     // Load the temporary value from the specified index onto the stack
-    int index = instruction.intValue;
+    int index = instruction.bigIntValue.to_int64();
 
     // First, try to find the temporary variable in the current scope
     ScopedTempValues* foundScopeTemps = nullptr;
@@ -1820,7 +1725,7 @@ void VM::handleLoadTemp(const Instruction& instruction) {
 
 void VM::handleClearTemp(const Instruction& instruction) {
     // Clear the temporary value at the specified index
-    int index = instruction.intValue;
+    int index = instruction.bigIntValue.to_int64();
 
     // CRITICAL FIX: Only clear temporary variables in the CURRENT scope
     // This prevents nested iterators from interfering with each other
@@ -1867,14 +1772,16 @@ void VM::handleAdd(const Instruction& instruction) {
 
     // Atomic-aware addition: if left operand is an AtomicValue, perform atomic fetch_add
     if (std::holds_alternative<AtomicValue>(a->data)) {
-        if (!(b->type && (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64))) {
-            error("Cannot add non-integer to atomic variable");
+        if (!(b->type && (b->type->tag == TypeTag::BigInt))) {
+            error("Cannot add non-BigInt to atomic variable");
         }
-        int64_t bVal = (b->type->tag == TypeTag::Int) ? static_cast<int64_t>(extractAsInt64(b)) : extractAsInt64(b);
+        BigInt bVal = extractAsBigInt(b);
         AtomicValue& av = std::get<AtomicValue>(a->data);
-        int64_t prev = av.inner->fetch_add(bVal);
-        int64_t result = prev + bVal;
-        push(memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, result));
+        // Convert BigInt to int64_t for atomic operation (with overflow check)
+        int64_t bInt = bVal.to_int64();
+        int64_t prev = av.inner->fetch_add(bInt);
+        BigInt result = BigInt(prev) + bVal;
+        push(memoryManager.makeRef<Value>(*region, typeSystem->BIGINT_TYPE, result));
         return;
     }
 
@@ -1906,249 +1813,21 @@ void VM::handleAdd(const Instruction& instruction) {
         }
     }
 
-    // Check if either operand is a number for numeric addition
-    bool aIsNumeric = typeSystem->isNumericType(actualA->type->tag);
-    bool bIsNumeric = typeSystem->isNumericType(actualB->type->tag);
+    // Check if either operand is a BigInt for numeric addition
+    bool aIsBigInt = actualA->type->tag == TypeTag::BigInt;
+    bool bIsBigInt = actualB->type->tag == TypeTag::BigInt;
 
-    if (aIsNumeric && bIsNumeric) {
+    if (aIsBigInt && bIsBigInt) {
         // Use the extracted values for the rest of the operation
         a = actualA;
         b = actualB;
 
-        // Numeric addition - promote to long double if either operand is double
-        if (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64) {
-            std::cout << "[DEBUG] Entering float addition section, a->tag: " << static_cast<int>(a->type->tag) 
-                     << ", b->tag: " << static_cast<int>(b->type->tag) << std::endl;
-            // Convert to long double if needed
-            long double aVal, bVal;
-            
-            // Safely extract aVal
-            if (a->type->tag == TypeTag::Float64) {
-                if (std::holds_alternative<long double>(a->data)) {
-                    aVal = std::get<long double>(a->data);
-                } else if (std::holds_alternative<BigInt>(a->data)) {
-                    // Convert BigInt to long double
-                    try {
-                    aVal = static_cast<long double>(std::get<BigInt>(a->data).to_int64());
-                } catch (const std::overflow_error&) {
-                    // BigInt is too large for int64_t, use string conversion as fallback
-                    std::string bigIntStr = std::get<BigInt>(a->data).to_string();
-                    aVal = static_cast<long double>(std::stold(bigIntStr));
-                }
-                } else {
-                    error("Type mismatch: expected Float64 but got different type", instruction.line, 0, "ADD operation", "compatible numeric types");
-                    return;
-                }
-            } else if (a->type->tag == TypeTag::Int) {
-                aVal = static_cast<long double>(extractAsInt64(a));
-            } else if (a->type->tag == TypeTag::Int64) {
-                if (std::holds_alternative<int64_t>(a->data)) {
-                    aVal = static_cast<long double>(extractAsInt64(a));
-                } else if (std::holds_alternative<BigInt>(a->data)) {
-                    // Convert BigInt to long double
-                    try {
-                    aVal = static_cast<long double>(std::get<BigInt>(a->data).to_int64());
-                } catch (const std::overflow_error&) {
-                    // BigInt is too large for int64_t, use string conversion as fallback
-                    std::string bigIntStr = std::get<BigInt>(a->data).to_string();
-                    aVal = static_cast<long double>(std::stold(bigIntStr));
-                }
-                } else {
-                    error("Type mismatch: expected Int64 but got different type", instruction.line, 0, "ADD operation", "compatible numeric types");
-                    return;
-                }
-            } else if (a->type->tag == TypeTag::Int128 || a->type->tag == TypeTag::UInt128) {
-                std::cout << "[DEBUG] Entering Int128/UInt128 branch for aVal, tag: " << static_cast<int>(a->type->tag) << std::endl;
-                if (std::holds_alternative<BigInt>(a->data)) {
-                    // Convert BigInt to long double
-                    try {
-                        aVal = static_cast<long double>(std::get<BigInt>(a->data).to_int64());
-                    } catch (const std::overflow_error&) {
-                        // BigInt is too large for int64_t, use string conversion as fallback
-                        std::string bigIntStr = std::get<BigInt>(a->data).to_string();
-                        aVal = static_cast<long double>(std::stold(bigIntStr));
-                    }
-                } else {
-                    error("Type mismatch: expected Int128/UInt128 but got different type", instruction.line, 0, "ADD operation", "compatible numeric types");
-                    return;
-                }
-            } else {
-                // Debug output to understand the type issue
-                std::cout << "[DEBUG] Float addition failed - a->type->tag: " << static_cast<int>(a->type->tag) 
-                         << ", b->type->tag: " << static_cast<int>(b->type->tag) << std::endl;
-                std::cout << "[DEBUG] a data index: " << a->data.index() << ", b data index: " << b->data.index() << std::endl;
-                error("Unsupported operand type for float addition", instruction.line, 0, "ADD operation", "numeric types");
-                return;
-            }
-            
-            // Safely extract bVal
-            if (b->type->tag == TypeTag::Float64) {
-                if (std::holds_alternative<long double>(b->data)) {
-                    bVal = std::get<long double>(b->data);
-                } else if (std::holds_alternative<BigInt>(b->data)) {
-                    // Convert BigInt to long double
-                    try {
-                        bVal = static_cast<long double>(std::get<BigInt>(b->data).to_int64());
-                    } catch (const std::overflow_error&) {
-                        // BigInt is too large for int64_t, use string conversion as fallback
-                        std::string bigIntStr = std::get<BigInt>(b->data).to_string();
-                        bVal = static_cast<long double>(std::stold(bigIntStr));
-                    }
-                } else {
-                    error("Type mismatch: expected Float64 but got different type", instruction.line, 0, "ADD operation", "compatible numeric types");
-                    return;
-                }
-            } else if (b->type->tag == TypeTag::Int) {
-                bVal = static_cast<long double>(extractAsInt64(b));
-            } else if (b->type->tag == TypeTag::Int64) {
-                if (std::holds_alternative<int64_t>(b->data)) {
-                    bVal = static_cast<long double>(extractAsInt64(b));
-                } else if (std::holds_alternative<BigInt>(b->data)) {
-                    // Convert BigInt to long double
-                    try {
-                        bVal = static_cast<long double>(std::get<BigInt>(b->data).to_int64());
-                    } catch (const std::overflow_error&) {
-                        // BigInt is too large for int64_t, use string conversion as fallback
-                        std::string bigIntStr = std::get<BigInt>(b->data).to_string();
-                        bVal = static_cast<long double>(std::stold(bigIntStr));
-                    }
-                } else {
-                    error("Type mismatch: expected Int64 but got different type", instruction.line, 0, "ADD operation", "compatible numeric types");
-                    return;
-                }
-            } else if (b->type->tag == TypeTag::Int128 || b->type->tag == TypeTag::UInt128) {
-                if (std::holds_alternative<BigInt>(b->data)) {
-                    // Convert BigInt to long double
-                    try {
-                        bVal = static_cast<long double>(std::get<BigInt>(b->data).to_int64());
-                    } catch (const std::overflow_error&) {
-                        // BigInt is too large for int64_t, use string conversion as fallback
-                        std::string bigIntStr = std::get<BigInt>(b->data).to_string();
-                        bVal = static_cast<long double>(std::stold(bigIntStr));
-                    }
-                } else {
-                    error("Type mismatch: expected Int128/UInt128 but got different type", instruction.line, 0, "ADD operation", "compatible numeric types");
-                    return;
-                }
-            } else {
-                // Debug output to understand the type issue
-                std::cout << "[DEBUG] Float addition failed - a->type->tag: " << static_cast<int>(a->type->tag) 
-                         << ", b->type->tag: " << static_cast<int>(b->type->tag) << std::endl;
-                std::cout << "[DEBUG] a data index: " << a->data.index() << ", b data index: " << b->data.index() << std::endl;
-                error("Unsupported operand type for float addition", instruction.line, 0, "ADD operation", "numeric types");
-                return;
-            }
-
-            // Check for floating-point edge cases
-            long double result = aVal + bVal;
-            push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, result));
-        } else if (a->type->tag == TypeTag::Int128 || b->type->tag == TypeTag::Int128 ||
-                   a->type->tag == TypeTag::UInt128 || b->type->tag == TypeTag::UInt128) {
-            // BigInt addition for i128 and u128
-            BigInt aVal, bVal;
-            
-            // Extract BigInt values
-            if (a->type->tag == TypeTag::Int128 || a->type->tag == TypeTag::UInt128) {
-                aVal = extractAsBigInt(a);
-            } else {
-                // Convert other integer types to BigInt
-                if (a->type->tag == TypeTag::Int) {
-                    try {
-                        aVal = BigInt(std::to_string(extractAsInt64(a)));
-                    } catch (const std::runtime_error&) {
-                        // If int64 conversion fails, extract as BigInt directly
-                        aVal = extractAsBigInt(a);
-                    }
-                } else if (a->type->tag == TypeTag::Int64) {
-                    try {
-                        aVal = BigInt(std::to_string(extractAsInt64(a)));
-                    } catch (const std::runtime_error&) {
-                        // If int64 conversion fails, extract as BigInt directly
-                        aVal = extractAsBigInt(a);
-                    }
-                } else {
-                    error("Unsupported integer type for BigInt conversion");
-                    return;
-                }
-            }
-            
-            if (b->type->tag == TypeTag::Int128 || b->type->tag == TypeTag::UInt128) {
-                bVal = extractAsBigInt(b);
-            } else {
-                // Convert other integer types to BigInt
-                if (b->type->tag == TypeTag::Int) {
-                    try {
-                        bVal = BigInt(std::to_string(extractAsInt64(b)));
-                    } catch (const std::runtime_error&) {
-                        // If int64 conversion fails, extract as BigInt directly
-                        bVal = extractAsBigInt(b);
-                    }
-                } else if (b->type->tag == TypeTag::Int64) {
-                    try {
-                        bVal = BigInt(std::to_string(extractAsInt64(b)));
-                    } catch (const std::runtime_error&) {
-                        // If int64 conversion fails, extract as BigInt directly
-                        bVal = extractAsBigInt(b);
-                    }
-                } else {
-                    error("Unsupported integer type for BigInt conversion");
-                    return;
-                }
-            }
-            
-            // Perform BigInt addition
-            BigInt result = aVal + bVal;
-            
-            // Determine result type (prefer i128 if either operand is i128, otherwise u128)
-            TypePtr resultType = (a->type->tag == TypeTag::Int128 || b->type->tag == TypeTag::Int128) ? 
-                                typeSystem->INT128_TYPE : typeSystem->UINT128_TYPE;
-            
-            push(memoryManager.makeRef<Value>(*region, resultType, result));
-        } else {
-            // Integer addition with mixed int32/int64 support, try BigInt promotion on overflow
-            try {
-                int64_t aVal, bVal;
-
-                // Convert both operands to int64_t
-                if (a->type->tag == TypeTag::Int) {
-                    aVal = extractAsInt64(a);
-                } else {
-                    aVal = extractAsInt64(a);
-                }
-
-                if (b->type->tag == TypeTag::Int) {
-                    bVal = extractAsInt64(b);
-                } else {
-                    bVal = extractAsInt64(b);
-                }
-
-                // Check for integer overflow using well-defined behavior
-                if ((bVal > 0 && aVal > std::numeric_limits<int64_t>::max() - bVal) ||
-                        (bVal < 0 && aVal < std::numeric_limits<int64_t>::min() - bVal)) {
-                    error("Integer addition overflow");
-                }
-
-                push(memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, aVal + bVal));
-            } catch (const std::runtime_error&) {
-                // BigInt overflow occurred, promote to BigInt arithmetic
-                BigInt aVal, bVal;
-                
-                try {
-                    aVal = extractAsBigInt(a);
-                } catch (...) {
-                    aVal = BigInt(std::to_string(extractAsInt64(a)));
-                }
-                
-                try {
-                    bVal = extractAsBigInt(b);
-                } catch (...) {
-                    bVal = BigInt(std::to_string(extractAsInt64(b)));
-                }
-                
-                BigInt result = aVal + bVal;
-                push(memoryManager.makeRef<Value>(*region, typeSystem->INT128_TYPE, result));
-            }
-        }
+        // BigInt addition
+        BigInt aVal = extractAsBigInt(a);
+        BigInt bVal = extractAsBigInt(b);
+        BigInt result = aVal + bVal;
+        
+        push(memoryManager.makeRef<Value>(*region, typeSystem->BIGINT_TYPE, result));
     } else {
         // If we get here, the operands are not compatible for addition
         error("Cannot add operands of types " +
@@ -2163,14 +1842,16 @@ void VM::handleSubtract(const Instruction& instruction) {
 
     // Atomic-aware subtraction
     if (std::holds_alternative<AtomicValue>(a->data)) {
-        if (!(b->type && (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64))) {
-            error("Cannot subtract non-integer from atomic variable");
+        if (!(b->type && (b->type->tag == TypeTag::BigInt))) {
+            error("Cannot subtract non-BigInt from atomic variable");
         }
-        int64_t bVal = (b->type->tag == TypeTag::Int) ? static_cast<int64_t>(extractAsInt64(b)) : extractAsInt64(b);
+        BigInt bVal = extractAsBigInt(b);
         AtomicValue& av = std::get<AtomicValue>(a->data);
-        int64_t prev = av.inner->fetch_sub(bVal);
-        int64_t result = prev - bVal;
-        push(memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, result));
+        // Convert BigInt to int64_t for atomic operation (with overflow check)
+        int64_t bInt = bVal.to_int64();
+        int64_t prev = av.inner->fetch_sub(bInt);
+        BigInt result = BigInt(prev) - bVal;
+        push(memoryManager.makeRef<Value>(*region, typeSystem->BIGINT_TYPE, result));
         return;
     }
 
@@ -2193,200 +1874,26 @@ void VM::handleSubtract(const Instruction& instruction) {
         }
     }
 
-    // Check if either operand is a number for numeric subtraction
-    bool aIsNumeric = typeSystem->isNumericType(actualA->type->tag);
-    bool bIsNumeric = typeSystem->isNumericType(actualB->type->tag);
+    // Check if either operand is a BigInt for numeric subtraction
+    bool aIsBigInt = actualA->type->tag == TypeTag::BigInt;
+    bool bIsBigInt = actualB->type->tag == TypeTag::BigInt;
 
-    if (!aIsNumeric || !bIsNumeric) {
-        error("Both operands must be numbers for subtraction");
-    }
+    if (aIsBigInt && bIsBigInt) {
+        // Use the extracted values for the rest of the operation
+        a = actualA;
+        b = actualB;
 
-    // Use the extracted values for the rest of the operation
-    a = actualA;
-    b = actualB;
-
-    // Numeric subtraction - promote to long double if either operand is double
-    if (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64) {
-        // Convert to long double if needed
-        long double aVal, bVal;
-        
-        // Safely extract aVal
-        if (a->type->tag == TypeTag::Float64) {
-            if (std::holds_alternative<long double>(a->data)) {
-                aVal = std::get<long double>(a->data);
-            } else if (std::holds_alternative<BigInt>(a->data)) {
-                // Convert BigInt to long double
-                try {
-                        aVal = static_cast<long double>(std::get<BigInt>(a->data).to_int64());
-                    } catch (const std::overflow_error&) {
-                        // BigInt is too large for int64_t, use string conversion as fallback
-                        std::string bigIntStr = std::get<BigInt>(a->data).to_string();
-                        aVal = static_cast<long double>(std::stold(bigIntStr));
-                    }
-            } else if (std::holds_alternative<int32_t>(a->data)) {
-                // Convert int32 to long double
-                aVal = static_cast<long double>(extractAsInt64(a));
-            } else if (std::holds_alternative<int64_t>(a->data)) {
-                // Convert int64 to long double
-                aVal = static_cast<long double>(extractAsInt64(a));
-            } else {
-                error("Type mismatch: expected Float64 but got incompatible variant type", instruction.line, 0, "SUBTRACT operation", "compatible numeric types");
-                return;
-            }
-        } else if (a->type->tag == TypeTag::Int) {
-            aVal = static_cast<long double>(extractAsInt64(a));
-        } else if (a->type->tag == TypeTag::Int64) {
-            aVal = static_cast<long double>(extractAsInt64(a));
-        } else {
-            error("Unsupported operand type for float subtraction", instruction.line, 0, "SUBTRACT operation", "numeric types");
-            return;
-        }
-        
-        // Safely extract bVal
-        if (b->type->tag == TypeTag::Float64) {
-            if (std::holds_alternative<long double>(b->data)) {
-                bVal = std::get<long double>(b->data);
-            } else if (std::holds_alternative<BigInt>(b->data)) {
-                // Convert BigInt to long double
-                try {
-                        bVal = static_cast<long double>(std::get<BigInt>(b->data).to_int64());
-                    } catch (const std::overflow_error&) {
-                        // BigInt is too large for int64_t, use string conversion as fallback
-                        std::string bigIntStr = std::get<BigInt>(b->data).to_string();
-                        bVal = static_cast<long double>(std::stold(bigIntStr));
-                    }
-            } else if (std::holds_alternative<int32_t>(b->data)) {
-                // Convert int32 to long double
-                bVal = static_cast<long double>(extractAsInt64(b));
-            } else if (std::holds_alternative<int64_t>(b->data)) {
-                // Convert int64 to long double
-                bVal = static_cast<long double>(extractAsInt64(b));
-            } else {
-                error("Type mismatch: expected Float64 but got incompatible variant type", instruction.line, 0, "SUBTRACT operation", "compatible numeric types");
-                return;
-            }
-        } else if (b->type->tag == TypeTag::Int) {
-            bVal = static_cast<long double>(extractAsInt64(b));
-        } else if (b->type->tag == TypeTag::Int64) {
-            bVal = static_cast<long double>(extractAsInt64(b));
-        } else {
-            error("Unsupported operand type for float subtraction", instruction.line, 0, "SUBTRACT operation", "numeric types");
-            return;
-        }
-
-        // Check for floating-point edge cases
-        long double result = aVal - bVal;
-        if (std::isinf(result)) {
-            error("Floating-point subtraction resulted in infinity");
-        }
-
-        push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, result));
-    } else if (a->type->tag == TypeTag::Int128 || b->type->tag == TypeTag::Int128 ||
-               a->type->tag == TypeTag::UInt128 || b->type->tag == TypeTag::UInt128) {
-        // BigInt subtraction for i128 and u128
-        BigInt aVal, bVal;
-        
-        // Extract BigInt values
-        if (a->type->tag == TypeTag::Int128 || a->type->tag == TypeTag::UInt128) {
-            aVal = extractAsBigInt(a);
-        } else {
-            // Convert other integer types to BigInt
-            if (a->type->tag == TypeTag::Int) {
-                try {
-                    aVal = BigInt(std::to_string(extractAsInt64(a)));
-                } catch (const std::runtime_error&) {
-                    // If int64 conversion fails, extract as BigInt directly
-                    aVal = extractAsBigInt(a);
-                }
-            } else if (a->type->tag == TypeTag::Int64) {
-                try {
-                    aVal = BigInt(std::to_string(extractAsInt64(a)));
-                } catch (const std::runtime_error&) {
-                    // If int64 conversion fails, extract as BigInt directly
-                    aVal = extractAsBigInt(a);
-                }
-            } else {
-                error("Unsupported integer type for BigInt conversion");
-                return;
-            }
-        }
-        
-        if (b->type->tag == TypeTag::Int128 || b->type->tag == TypeTag::UInt128) {
-            bVal = extractAsBigInt(b);
-        } else {
-            // Convert other integer types to BigInt
-            if (b->type->tag == TypeTag::Int) {
-                try {
-                    bVal = BigInt(std::to_string(extractAsInt64(b)));
-                } catch (const std::runtime_error&) {
-                    // If int64 conversion fails, extract as BigInt directly
-                    bVal = extractAsBigInt(b);
-                }
-            } else if (b->type->tag == TypeTag::Int64) {
-                try {
-                    bVal = BigInt(std::to_string(extractAsInt64(b)));
-                } catch (const std::runtime_error&) {
-                    // If int64 conversion fails, extract as BigInt directly
-                    bVal = extractAsBigInt(b);
-                }
-            } else {
-                error("Unsupported integer type for BigInt conversion");
-                return;
-            }
-        }
-        
-        // Perform BigInt subtraction
+        // BigInt subtraction
+        BigInt aVal = extractAsBigInt(a);
+        BigInt bVal = extractAsBigInt(b);
         BigInt result = aVal - bVal;
         
-        // Determine result type (prefer i128 if either operand is i128, otherwise u128)
-        TypePtr resultType = (a->type->tag == TypeTag::Int128 || b->type->tag == TypeTag::Int128) ? 
-                            typeSystem->INT128_TYPE : typeSystem->UINT128_TYPE;
-        
-        push(memoryManager.makeRef<Value>(*region, resultType, result));
+        push(memoryManager.makeRef<Value>(*region, typeSystem->BIGINT_TYPE, result));
     } else {
-        // Integer subtraction with mixed int32/int64 support, try BigInt promotion on overflow
-        try {
-            int64_t aVal, bVal;
-
-            // Convert both operands to int64_t
-            if (a->type->tag == TypeTag::Int) {
-                aVal = static_cast<int64_t>(extractAsInt64(a));
-            } else {
-                aVal = extractAsInt64(a);
-            }
-
-            if (b->type->tag == TypeTag::Int) {
-                bVal = static_cast<int64_t>(extractAsInt64(b));
-            } else {
-                bVal = extractAsInt64(b);
-            }
-
-            // Check for integer overflow
-            if ((bVal > 0 && aVal < std::numeric_limits<int64_t>::min() + bVal) ||
-                    (bVal < 0 && aVal > std::numeric_limits<int64_t>::max() + bVal)) {
-                error("Integer subtraction overflow");
-            }
-
-            push(memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, aVal - bVal));
-        } catch (const std::runtime_error&) {
-            // BigInt overflow occurred, promote to BigInt arithmetic
-            BigInt aVal, bVal;
-            
-            try {
-                aVal = extractAsBigInt(a);
-            } catch (...) {
-                aVal = BigInt(std::to_string(extractAsInt64(a)));
-            }
-            
-            try {
-                bVal = extractAsBigInt(b);
-            } catch (...) {
-                bVal = BigInt(std::to_string(extractAsInt64(b)));
-            }
-            
-            BigInt result = aVal - bVal;
-            push(memoryManager.makeRef<Value>(*region, typeSystem->INT128_TYPE, result));
-        }
+        // If we get here, the operands are not compatible for subtraction
+        error("Cannot subtract operands of types " +
+              typeTagToString(a->type->tag) + " and " +
+              typeTagToString(b->type->tag));
     }
 }
 
@@ -2394,19 +1901,19 @@ void VM::handleMultiply(const Instruction& instruction) {
     ValuePtr b = pop();
     ValuePtr a = pop();
 
-    // String multiplication (string * int or int * string)
-    if ((a->type->tag == TypeTag::String && b->type->tag == TypeTag::Int) ||
-            (a->type->tag == TypeTag::Int && b->type->tag == TypeTag::String)) {
+    // String multiplication (string * BigInt or BigInt * string)
+    if ((a->type->tag == TypeTag::String && b->type->tag == TypeTag::BigInt) ||
+            (a->type->tag == TypeTag::BigInt && b->type->tag == TypeTag::String)) {
 
         std::string str;
-        int32_t count;
+        int64_t count;
 
         if (a->type->tag == TypeTag::String) {
             str = std::get<std::string>(a->data);
-            count = extractAsInt64(b);
+            count = extractAsBigInt(b).to_int64();
         } else {
             str = std::get<std::string>(b->data);
-            count = extractAsInt64(a);
+            count = extractAsBigInt(a).to_int64();
         }
 
         if (count < 0) {
@@ -2424,84 +1931,15 @@ void VM::handleMultiply(const Instruction& instruction) {
         return;
     }
 
-    // Numeric multiplication
-    if (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64) {
-        // Convert to long double if needed
-        long double aVal, bVal;
+    // Numeric multiplication - BigInt only
+    if (a->type->tag == TypeTag::BigInt && b->type->tag == TypeTag::BigInt) {
+        BigInt aVal = extractAsBigInt(a);
+        BigInt bVal = extractAsBigInt(b);
+        BigInt result = aVal * bVal;
         
-        // Safely extract aVal
-        if (a->type->tag == TypeTag::Float64) {
-            if (std::holds_alternative<long double>(a->data)) {
-                aVal = std::get<long double>(a->data);
-            } else if (std::holds_alternative<BigInt>(a->data)) {
-                // Convert BigInt to long double
-                try {
-                        aVal = static_cast<long double>(std::get<BigInt>(a->data).to_int64());
-                    } catch (const std::overflow_error&) {
-                        // BigInt is too large for int64_t, use string conversion as fallback
-                        std::string bigIntStr = std::get<BigInt>(a->data).to_string();
-                        aVal = static_cast<long double>(std::stold(bigIntStr));
-                    }
-            } else {
-                error("Type mismatch: expected Float64 but got different type", instruction.line, 0, "MULTIPLY operation", "compatible numeric types");
-                return;
-            }
-        } else {
-            aVal = static_cast<long double>(extractAsInt64(a));
-        }
-        
-        // Safely extract bVal
-        if (b->type->tag == TypeTag::Float64) {
-            if (std::holds_alternative<long double>(b->data)) {
-                bVal = std::get<long double>(b->data);
-            } else if (std::holds_alternative<BigInt>(b->data)) {
-                // Convert BigInt to long double
-                try {
-                        bVal = static_cast<long double>(std::get<BigInt>(b->data).to_int64());
-                    } catch (const std::overflow_error&) {
-                        // BigInt is too large for int64_t, use string conversion as fallback
-                        std::string bigIntStr = std::get<BigInt>(b->data).to_string();
-                        bVal = static_cast<long double>(std::stold(bigIntStr));
-                    }
-            } else {
-                error("Type mismatch: expected Float64 but got different type", instruction.line, 0, "MULTIPLY operation", "compatible numeric types");
-                return;
-            }
-        } else {
-            bVal = static_cast<long double>(extractAsInt64(b));
-        }
-
-        push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, aVal * bVal));
-    } else if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) &&
-               (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
-        // Integer multiplication with mixed int32/int64 support
-        int64_t aVal, bVal;
-
-        // Convert both operands to int64_t
-        if (a->type->tag == TypeTag::Int) {
-            aVal = static_cast<int64_t>(extractAsInt64(a));
-        } else {
-            aVal = extractAsInt64(a);
-        }
-
-        if (b->type->tag == TypeTag::Int) {
-            bVal = static_cast<int64_t>(extractAsInt64(b));
-        } else {
-            bVal = extractAsInt64(b);
-        }
-
-        int64_t result = aVal * bVal;
-
-        // Check for overflow
-        if (result > std::numeric_limits<int64_t>::max() ||
-                result < std::numeric_limits<int64_t>::min()) {
-            error("Integer multiplication overflow");
-        }
-
-        // Return as int64 to maintain precision
-        push(memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, result));
+        push(memoryManager.makeRef<Value>(*region, typeSystem->BIGINT_TYPE, result));
     } else {
-        error("Invalid operands for multiplication");
+        error("Invalid operands for multiplication - only BigInt values are supported");
     }
 }
 
@@ -2510,130 +1948,39 @@ void VM::handleDivide(const Instruction& instruction) {
     ValuePtr a = pop();
 
     // Check for non-numeric operands
-    bool aIsNumeric = (a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Float64);
-    bool bIsNumeric = (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Float64);
+    bool aIsNumeric = (a->type->tag == TypeTag::BigInt);
+    bool bIsNumeric = (b->type->tag == TypeTag::BigInt);
 
     if (!aIsNumeric || !bIsNumeric) {
         // Create error union with TypeError
-        auto errorUnionType = typeSystem->createErrorUnionType(typeSystem->INT_TYPE, {"TypeError"}, false);
+        auto errorUnionType = typeSystem->createErrorUnionType(typeSystem->BIGINT_TYPE, {"TypeError"}, false);
         auto errorUnionValue = memoryManager.makeRef<Value>(*region, errorUnionType);
-        ErrorValue errorVal("TypeError", "Both operands must be numbers for division");
+        ErrorValue errorVal("TypeError", "Both operands must be BigInt for division");
         errorUnionValue->data = errorVal;
         push(errorUnionValue);
         return;
     }
 
-    // Check for division by zero with better error message
-    bool isZero = false;
-    std::string zeroType;
-
-    if (b->type->tag == TypeTag::Float64) {
-        long double bVal = std::get<long double>(b->data);
-        isZero = bVal == 0.0;
-        zeroType = isZero ? "floating-point zero" : "";
-    } else {
-        int32_t bVal = extractAsInt64(b);
-        isZero = bVal == 0;
-        zeroType = isZero ? "integer zero" : "";
-    }
+    // Check for division by zero with BigInt
+    BigInt bVal = extractAsBigInt(b);
+    bool isZero = bVal == BigInt(0);
 
     if (isZero) {
         // Create error union with DivisionByZero error
-        TypePtr resultType = (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64)
-                ? typeSystem->FLOAT64_TYPE
-                : typeSystem->INT_TYPE;
-        auto errorUnionType = typeSystem->createErrorUnionType(resultType, {"DivisionByZero"}, false);
+        auto errorUnionType = typeSystem->createErrorUnionType(typeSystem->BIGINT_TYPE, {"DivisionByZero"}, false);
 
         auto errorUnionValue = memoryManager.makeRef<Value>(*region, errorUnionType);
-        ErrorValue errorVal("DivisionByZero", "Division by " + zeroType + " is not allowed");
+        ErrorValue errorVal("DivisionByZero", "Division by zero is not allowed");
         errorUnionValue->data = errorVal;
         push(errorUnionValue);
         return;
     }
 
-    // Numeric division - always promote to long double if either operand is double
-    if (a->type->tag == TypeTag::Float64 || b->type->tag == TypeTag::Float64) {
-        long double aVal, bVal;
-        
-        // Safely extract aVal
-        if (a->type->tag == TypeTag::Float64) {
-            if (std::holds_alternative<long double>(a->data)) {
-                aVal = std::get<long double>(a->data);
-            } else if (std::holds_alternative<BigInt>(a->data)) {
-                // Convert BigInt to long double
-                try {
-                        aVal = static_cast<long double>(std::get<BigInt>(a->data).to_int64());
-                    } catch (const std::overflow_error&) {
-                        // BigInt is too large for int64_t, use string conversion as fallback
-                        std::string bigIntStr = std::get<BigInt>(a->data).to_string();
-                        aVal = static_cast<long double>(std::stold(bigIntStr));
-                    }
-            } else {
-                error("Type mismatch: expected Float64 but got different type", instruction.line, 0, "DIVISION operation", "compatible numeric types");
-                return;
-            }
-        } else {
-            aVal = static_cast<long double>(extractAsInt64(a));
-        }
-        
-        // Safely extract bVal
-        if (b->type->tag == TypeTag::Float64) {
-            if (std::holds_alternative<long double>(b->data)) {
-                bVal = std::get<long double>(b->data);
-            } else if (std::holds_alternative<BigInt>(b->data)) {
-                // Convert BigInt to long double
-                try {
-                        bVal = static_cast<long double>(std::get<BigInt>(b->data).to_int64());
-                    } catch (const std::overflow_error&) {
-                        // BigInt is too large for int64_t, use string conversion as fallback
-                        std::string bigIntStr = std::get<BigInt>(b->data).to_string();
-                        bVal = static_cast<long double>(std::stold(bigIntStr));
-                    }
-            } else {
-                error("Type mismatch: expected Float64 but got different type", instruction.line, 0, "DIVISION operation", "compatible numeric types");
-                return;
-            }
-        } else {
-            bVal = static_cast<long double>(extractAsInt64(b));
-        }
-
-        // Check for floating-point edge cases
-        if (std::isinf(aVal / bVal)) {
-            // Create error union with ArithmeticError
-            auto errorUnionType = typeSystem->createErrorUnionType(typeSystem->FLOAT64_TYPE, {"ArithmeticError"}, false);
-            auto errorUnionValue = memoryManager.makeRef<Value>(*region, errorUnionType);
-            ErrorValue errorVal("ArithmeticError", "Floating-point division resulted in infinity");
-            errorUnionValue->data = errorVal;
-            push(errorUnionValue);
-            return;
-        }
-
-        // Create success error union
-        auto errorUnionType = typeSystem->createErrorUnionType(typeSystem->FLOAT64_TYPE, {"DivisionByZero"}, false);
-        auto errorUnionValue = memoryManager.makeRef<Value>(*region, errorUnionType);
-        errorUnionValue->data = aVal / bVal;
-        push(errorUnionValue);
-    } else {
-        // Integer division with check for INT_MIN / -1 overflow
-        int32_t aVal = extractAsInt64(a);
-        int32_t bVal = extractAsInt64(b);
-
-        if (aVal == std::numeric_limits<int32_t>::min() && bVal == -1) {
-            // Create error union with ArithmeticError
-            auto errorUnionType = typeSystem->createErrorUnionType(typeSystem->INT_TYPE, {"ArithmeticError"}, false);
-            auto errorUnionValue = memoryManager.makeRef<Value>(*region, errorUnionType);
-            ErrorValue errorVal("ArithmeticError", "Integer division overflow");
-            errorUnionValue->data = errorVal;
-            push(errorUnionValue);
-            return;
-        }
-
-        // Create success error union
-        auto errorUnionType = typeSystem->createErrorUnionType(typeSystem->INT_TYPE, {"DivisionByZero"}, false);
-        auto errorUnionValue = memoryManager.makeRef<Value>(*region, errorUnionType);
-        errorUnionValue->data = aVal / bVal;
-        push(errorUnionValue);
-    }
+    // BigInt division
+    BigInt aVal = extractAsBigInt(a);
+    BigInt result = aVal / bVal;
+    
+    push(memoryManager.makeRef<Value>(*region, typeSystem->BIGINT_TYPE, result));
 }
 
 void VM::handleModulo(const Instruction& instruction) {
@@ -2641,44 +1988,27 @@ void VM::handleModulo(const Instruction& instruction) {
     ValuePtr a = pop();
 
     // Type checking
-    if (a->type->tag != TypeTag::Int || b->type->tag != TypeTag::Int) {
-        error("Modulo operation requires integer operands");
+    if (a->type->tag != TypeTag::BigInt || b->type->tag != TypeTag::BigInt) {
+        error("Modulo operation requires BigInt operands");
     }
 
     // Check for modulo by zero
-    int32_t bVal = extractAsInt64(b);
-    if (bVal == 0) {
-        error("Modulo by zero", instruction.line, 0, "0", "non-zero integer divisor");
+    BigInt bVal = extractAsBigInt(b);
+    if (bVal == BigInt(0)) {
+        error("Modulo by zero", instruction.line, 0, "0", "non-zero BigInt divisor");
     }
 
-    // Integer modulo
-    int32_t aVal = extractAsInt64(a);
-    push(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, aVal % bVal));
+    // BigInt modulo
+    BigInt aVal = extractAsBigInt(a);
+    push(memoryManager.makeRef<Value>(*region, typeSystem->BIGINT_TYPE, aVal % bVal));
 }
 
 void VM::handleNegate(const Instruction& /*unused*/) {
     ValuePtr a = pop();
 
-    if (a->type->tag == TypeTag::Float64) {
-        long double val = std::get<long double>(a->data);
-        push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, -val));
-    } else if (a->type->tag == TypeTag::Int) {
-        int32_t val = extractAsInt64(a);
-        push(memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE, -val));
-    } else if (a->type->tag == TypeTag::Int64) {
-        int64_t val = extractAsInt64(a);
-        push(memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, -val));
-    } else if (a->type->tag == TypeTag::Int128) {
-        BigInt val = std::get<BigInt>(a->data);
-        push(memoryManager.makeRef<Value>(*region, typeSystem->INT128_TYPE, BigInt(0) - val));
-    } else if (a->type->tag == TypeTag::UInt64) {
-        BigInt val = std::get<BigInt>(a->data);
-        // Negating unsigned should become signed
-        push(memoryManager.makeRef<Value>(*region, typeSystem->INT128_TYPE, BigInt(0) - val));
-    } else if (a->type->tag == TypeTag::UInt128) {
-        BigInt val = std::get<BigInt>(a->data);
-        // Negating unsigned should become signed
-        push(memoryManager.makeRef<Value>(*region, typeSystem->INT128_TYPE, BigInt(0) - val));
+    if (a->type->tag == TypeTag::BigInt) {
+        BigInt val = extractAsBigInt(a);
+        push(memoryManager.makeRef<Value>(*region, typeSystem->BIGINT_TYPE, BigInt(0) - val));
     } else {
         error("Cannot negate type: " + a->type->toString());
         push(a); // Push back original value
@@ -2691,80 +2021,20 @@ void VM::handleEqual(const Instruction& /*unused*/) {
 
     bool result = false;
 
-    // Handle mixed integer types including BigInt
-    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64 ||
-         a->type->tag == TypeTag::Int128 || a->type->tag == TypeTag::UInt64 || a->type->tag == TypeTag::UInt128) &&
-        (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64 ||
-         b->type->tag == TypeTag::Int128 || b->type->tag == TypeTag::UInt64 || b->type->tag == TypeTag::UInt128)) {
-        
-        // If either is BigInt, use BigInt comparison
-        if (a->type->tag == TypeTag::Int128 || a->type->tag == TypeTag::UInt128 ||
-            b->type->tag == TypeTag::Int128 || b->type->tag == TypeTag::UInt128) {
-            
-            BigInt aVal, bVal;
-            
-            // Convert to BigInt
-            if (a->type->tag == TypeTag::Int128 || a->type->tag == TypeTag::UInt128) {
-                aVal = std::get<BigInt>(a->data);
-            } else if (a->type->tag == TypeTag::Int) {
-                aVal = BigInt(std::to_string(extractAsInt64(a)));
-            } else if (a->type->tag == TypeTag::Int64) {
-                aVal = BigInt(std::to_string(extractAsInt64(a)));
-            } else if (a->type->tag == TypeTag::UInt64) {
-                aVal = std::get<BigInt>(a->data);
-            }
-            
-            if (b->type->tag == TypeTag::Int128 || b->type->tag == TypeTag::UInt128) {
-                bVal = std::get<BigInt>(b->data);
-            } else if (b->type->tag == TypeTag::Int) {
-                bVal = BigInt(std::to_string(extractAsInt64(b)));
-            } else if (b->type->tag == TypeTag::Int64) {
-                bVal = BigInt(std::to_string(extractAsInt64(b)));
-            } else if (b->type->tag == TypeTag::UInt64) {
-                bVal = std::get<BigInt>(b->data);
-            }
-            
-            result = aVal == bVal;
-        } else {
-            // Regular int32/int64 comparison
-            int64_t aVal = (a->type->tag == TypeTag::Int) ?
-                        static_cast<int64_t>(extractAsInt64(a)) :
-                        extractAsInt64(a);
-            int64_t bVal = (b->type->tag == TypeTag::Int) ?
-                        static_cast<int64_t>(extractAsInt64(b)) :
-                        extractAsInt64(b);
-            result = aVal == bVal;
-        }
-    }
-    // Handle mixed integer/float comparisons
-    else if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && b->type->tag == TypeTag::Float64) {
-        int64_t aVal = (a->type->tag == TypeTag::Int) ?
-                    static_cast<int64_t>(extractAsInt64(a)) :
-                    extractAsInt64(a);
-        result = static_cast<long double>(aVal) == std::get<long double>(b->data);
-    }
-    else if (a->type->tag == TypeTag::Float64 && (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
-        int64_t bVal = (b->type->tag == TypeTag::Int) ?
-                    static_cast<int64_t>(extractAsInt64(b)) :
-                    extractAsInt64(b);
-        result = std::get<long double>(a->data) == static_cast<long double>(bVal);
+    // Handle BigInt comparisons
+    if (a->type->tag == TypeTag::BigInt && b->type->tag == TypeTag::BigInt) {
+        BigInt aVal = extractAsBigInt(a);
+        BigInt bVal = extractAsBigInt(b);
+        result = aVal == bVal;
     }
     // Handle same-type comparisons
     else if (a->type->tag == b->type->tag) {
         switch (a->type->tag) {
-        case TypeTag::Float64:
-            result = std::get<long double>(a->data) == std::get<long double>(b->data);
-            break;
         case TypeTag::Bool:
             result = std::get<bool>(a->data) == std::get<bool>(b->data);
             break;
         case TypeTag::String:
             result = std::get<std::string>(a->data) == std::get<std::string>(b->data);
-            break;
-        case TypeTag::Int128:
-        case TypeTag::UInt64:
-        case TypeTag::UInt128:
-            result = std::get<BigInt>(a->data) == std::get<BigInt>(b->data);
             break;
         case TypeTag::Nil:
             result = true; // nil == nil
@@ -2787,37 +2057,15 @@ void VM::handleNotEqual(const Instruction& /*unused*/) {
 
     bool result = true;
 
-    // Handle mixed integer types
-    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) &&
-            (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
-        // Convert both to int64_t for comparison
-        int64_t aVal = (a->type->tag == TypeTag::Int) ?
-                    static_cast<int64_t>(extractAsInt64(a)) :
-                    extractAsInt64(a);
-        int64_t bVal = (b->type->tag == TypeTag::Int) ?
-                    static_cast<int64_t>(extractAsInt64(b)) :
-                    extractAsInt64(b);
+    // Handle BigInt comparisons
+    if (a->type->tag == TypeTag::BigInt && b->type->tag == TypeTag::BigInt) {
+        BigInt aVal = extractAsBigInt(a);
+        BigInt bVal = extractAsBigInt(b);
         result = aVal != bVal;
-    }
-    // Handle mixed integer/float comparisons
-    else if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && b->type->tag == TypeTag::Float64) {
-        int64_t aVal = (a->type->tag == TypeTag::Int) ?
-                    static_cast<int64_t>(extractAsInt64(a)) :
-                    extractAsInt64(a);
-        result = static_cast<long double>(aVal) != std::get<long double>(b->data);
-    }
-    else if (a->type->tag == TypeTag::Float64 && (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
-        int64_t bVal = (b->type->tag == TypeTag::Int) ?
-                    static_cast<int64_t>(extractAsInt64(b)) :
-                    extractAsInt64(b);
-        result = std::get<long double>(a->data) != static_cast<long double>(bVal);
     }
     // Handle same-type comparisons
     else if (a->type->tag == b->type->tag) {
         switch (a->type->tag) {
-        case TypeTag::Float64:
-            result = std::get<long double>(a->data) != std::get<long double>(b->data);
-            break;
         case TypeTag::Bool:
             result = std::get<bool>(a->data) != std::get<bool>(b->data);
             break;
@@ -2845,33 +2093,15 @@ void VM::handleLess(const Instruction& instruction) {
 
     bool result = false;
 
-    // Compare based on types - handle mixed integer types
-    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) &&
-            (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
-        // Convert both to int64_t for comparison
-        int64_t aVal = (a->type->tag == TypeTag::Int) ?
-                    static_cast<int64_t>(extractAsInt64(a)) :
-                    extractAsInt64(a);
-        int64_t bVal = (b->type->tag == TypeTag::Int) ?
-                    static_cast<int64_t>(extractAsInt64(b)) :
-                    extractAsInt64(b);
+    // Compare based on types - handle BigInt comparisons
+    if (a->type->tag == TypeTag::BigInt && b->type->tag == TypeTag::BigInt) {
+        BigInt aVal = extractAsBigInt(a);
+        BigInt bVal = extractAsBigInt(b);
         result = aVal < bVal;
-    } else if (a->type->tag == TypeTag::Float64 && b->type->tag == TypeTag::Float64) {
-        result = std::get<long double>(a->data) < std::get<long double>(b->data);
-    } else if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && b->type->tag == TypeTag::Float64) {
-        int64_t aVal = (a->type->tag == TypeTag::Int) ?
-                    static_cast<int64_t>(extractAsInt64(a)) :
-                    extractAsInt64(a);
-        result = static_cast<long double>(aVal) < std::get<long double>(b->data);
-    } else if (a->type->tag == TypeTag::Float64 && (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
-        int64_t bVal = (b->type->tag == TypeTag::Int) ?
-                    static_cast<int64_t>(extractAsInt64(b)) :
-                    extractAsInt64(b);
-        result = std::get<long double>(a->data) < static_cast<long double>(bVal);
     } else if (a->type->tag == TypeTag::String && b->type->tag == TypeTag::String) {
         result = std::get<std::string>(a->data) < std::get<std::string>(b->data);
     } else {
-        error("Cannot compare values of different types in less-than operation", instruction.line, 0, "< operator", "values of the same comparable type (int, float, string, or bool)");
+        error("Cannot compare values of different types in less-than operation", instruction.line, 0, "< operator", "values of the same comparable type (BigInt, string, or bool)");
     }
 
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, result));
@@ -3081,14 +2311,8 @@ void VM::handleNot(const Instruction& /*unused*/) {
     bool boolValue = false;
     if (std::holds_alternative<bool>(value->data)) {
         boolValue = std::get<bool>(value->data);
-    } else if (std::holds_alternative<int32_t>(value->data)) {
-        boolValue = std::get<int32_t>(value->data) != 0;
-    } else if (std::holds_alternative<int64_t>(value->data)) {
-        boolValue = std::get<int64_t>(value->data) != 0;
-    } else if (std::holds_alternative<long double>(value->data)) {
-        boolValue = std::get<long double>(value->data) != 0.0;
-    } else if (std::holds_alternative<float>(value->data)) {
-        boolValue = std::get<float>(value->data) != 0.0f;
+    } else if (std::holds_alternative<BigInt>(value->data)) {
+        boolValue = std::get<BigInt>(value->data).to_int64() != 0;
     } else if (std::holds_alternative<std::string>(value->data)) {
         boolValue = !std::get<std::string>(value->data).empty();
     } else if (std::holds_alternative<std::monostate>(value->data)) {
@@ -3103,8 +2327,8 @@ void VM::handleNot(const Instruction& /*unused*/) {
 }
 
 void VM::handleInterpolateString(const Instruction& instruction) {
-    // The number of parts is stored in the intValue field
-    int32_t numParts = instruction.intValue;
+    // The number of parts is stored in the bigIntValue field
+    int32_t numParts = instruction.bigIntValue.to_int64();
 
     if (stack.size() < static_cast<size_t>(numParts)) {
         error("Stack underflow in string interpolation");
@@ -3152,7 +2376,7 @@ void VM::handleConcat(const Instruction& /*unused*/) {
 }
 
 void VM::handleJump(const Instruction& instruction) {
-    int64_t offset = instruction.intValue;
+    int64_t offset = instruction.bigIntValue.to_int64();
     size_t newIP = ip + offset;
 
     if (debugMode) {
@@ -3194,10 +2418,8 @@ void VM::handleJumpIfTrue(const Instruction& instruction) {
         // Convert to boolean
         if (condition->type->tag == TypeTag::Bool) {
             condVal = std::get<bool>(condition->data);
-        } else if (condition->type->tag == TypeTag::Int) {
-            condVal = std::get<int32_t>(condition->data) != 0;
-        } else if (condition->type->tag == TypeTag::Float64) {
-            condVal = std::get<long double>(condition->data) != 0.0;
+        } else if (condition->type->tag == TypeTag::BigInt) {
+            condVal = std::get<BigInt>(condition->data).to_int64() != 0;
         } else if (condition->type->tag == TypeTag::String) {
             condVal = !std::get<std::string>(condition->data).empty();
         } else if (condition->type->tag == TypeTag::Nil) {
@@ -3211,7 +2433,7 @@ void VM::handleJumpIfTrue(const Instruction& instruction) {
     }
 
     if (condVal) {
-        ip += instruction.intValue;
+        ip += instruction.bigIntValue.to_int64();
     }
 }
 
@@ -3233,10 +2455,8 @@ void VM::handleJumpIfFalse(const Instruction& instruction) {
         // Convert to boolean
         if (condition->type->tag == TypeTag::Bool) {
             condVal = std::get<bool>(condition->data);
-        } else if (condition->type->tag == TypeTag::Int) {
-            condVal = std::get<int32_t>(condition->data) != 0;
-        } else if (condition->type->tag == TypeTag::Float64) {
-            condVal = std::get<long double>(condition->data) != 0.0;
+        } else if (condition->type->tag == TypeTag::BigInt) {
+            condVal = std::get<BigInt>(condition->data).to_int64() != 0;
         } else if (condition->type->tag == TypeTag::String) {
             condVal = !std::get<std::string>(condition->data).empty();
         } else if (condition->type->tag == TypeTag::Nil) {
@@ -3250,14 +2470,14 @@ void VM::handleJumpIfFalse(const Instruction& instruction) {
     }
 
     if (!condVal) {
-        ip += instruction.intValue;
+        ip += instruction.bigIntValue.to_int64();
     }
 }
 
 void VM::handleCall(const Instruction& instruction) {
     // Get the function name from the instruction
     const std::string& funcName = instruction.stringValue;
-    int argCount = instruction.intValue;
+    int argCount = instruction.bigIntValue.to_int64();
 
     // Check if this is a higher-order function call (function value on stack)
     if (!stack.empty() && stack.back()->type && stack.back()->type->tag == TypeTag::Function) {
@@ -4659,7 +3879,7 @@ void VM::handleReturn(const Instruction& /*unused*/) {
 
 void VM::handlePrint(const Instruction& instruction) {
     (void)instruction; // Mark as unused
-    int argCount = instruction.intValue;
+    int argCount = instruction.bigIntValue.to_int64();
     std::vector<ValuePtr> args;
 
     // Pop all arguments from the stack
@@ -5069,7 +4289,13 @@ void VM::handleDefineField(const Instruction& instruction) {
     }
 
     // Get visibility information from instruction
-    AST::VisibilityLevel visibility = static_cast<AST::VisibilityLevel>(instruction.intValue);
+    AST::VisibilityLevel visibility = AST::VisibilityLevel::Private; // Default
+    try {
+        int64_t visibilityValue = instruction.bigIntValue.to_int64();
+        visibility = static_cast<AST::VisibilityLevel>(visibilityValue);
+    } catch (const std::exception&) {
+        // If conversion fails, keep default Private visibility
+    }
 
     // Create a class field
     // Note: We need to convert the runtime value back to an AST expression
@@ -5268,7 +4494,7 @@ void VM::handleListAppend(const Instruction& /*unused*/) {
 
 void VM::handleCreateDict(const Instruction& instruction) {
     // Get the number of key-value pairs to include in the dictionary
-    int32_t count = instruction.intValue;
+    int32_t count = instruction.bigIntValue.to_int64();
 
     // Create a new dictionary
     auto dict = memoryManager.makeRef<Value>(*region, typeSystem->DICT_TYPE);
@@ -5365,7 +4591,7 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
         auto& listData = std::get<ListValue>(container->data);
 
         // Check if index is an integer
-        if (!std::holds_alternative<int32_t>(index->data)) {
+        if (!std::holds_alternative<BigInt>(index->data)) {
             // Create and push error value for invalid index type
             auto errorType = typeSystem->getErrorType("TypeConversion");
             auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
@@ -5375,7 +4601,7 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
             return;
         }
 
-        int32_t idx = std::get<int32_t>(index->data);
+        int64_t idx = std::get<BigInt>(index->data).to_int64();
 
         // Check bounds
         if (idx < 0 || idx >= static_cast<int32_t>(listData.elements.size())) {
@@ -5397,7 +4623,7 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
         auto& tupleData = std::get<TupleValue>(container->data);
 
         // Check if index is an integer
-        if (!std::holds_alternative<int32_t>(index->data)) {
+        if (!std::holds_alternative<BigInt>(index->data)) {
             // Create and push error value for invalid index type
             auto errorType = typeSystem->getErrorType("TypeConversion");
             auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
@@ -5407,7 +4633,7 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
             return;
         }
 
-        int32_t idx = std::get<int32_t>(index->data);
+        int64_t idx = std::get<BigInt>(index->data).to_int64();
 
         // Check bounds
         if (idx < 0 || idx >= static_cast<int32_t>(tupleData.elements.size())) {
@@ -5475,7 +4701,7 @@ void VM::handleSetIndex(const Instruction& /*unused*/) {
         auto& listData = std::get<ListValue>(container->data);
 
         // Check if index is an integer
-        if (!std::holds_alternative<int32_t>(index->data)) {
+        if (!std::holds_alternative<BigInt>(index->data)) {
             // Create and push error value for invalid index type
             auto errorType = typeSystem->getErrorType("TypeConversion");
             auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
@@ -5485,7 +4711,7 @@ void VM::handleSetIndex(const Instruction& /*unused*/) {
             return;
         }
 
-        int32_t idx = std::get<int32_t>(index->data);
+        int64_t idx = std::get<BigInt>(index->data).to_int64();
 
         // Check bounds
         if (idx < 0 || idx >= static_cast<int32_t>(listData.elements.size())) {
@@ -5545,7 +4771,7 @@ void VM::handleSetIndex(const Instruction& /*unused*/) {
 
 void VM::handleCreateRange(const Instruction& instruction) {
     // Get the step value (default is 1 if not specified)
-    int64_t step = instruction.intValue != 0 ? instruction.intValue : 1;
+    int64_t step = instruction.bigIntValue.to_int64() != 0 ? instruction.bigIntValue.to_int64() : 1;
     // Get end value from stack
     auto endVal = pop();
     // Get start value from stack
@@ -5559,7 +4785,7 @@ void VM::handleCreateRange(const Instruction& instruction) {
     } else if (std::holds_alternative<int16_t>(startVal->data)) {
         start = std::get<int16_t>(startVal->data);
     } else if (std::holds_alternative<int32_t>(startVal->data)) {
-        start = std::get<int32_t>(startVal->data);
+        start = std::get<BigInt>(startVal->data).to_int64();
     } else if (std::holds_alternative<int64_t>(startVal->data)) {
         start = std::get<int64_t>(startVal->data);
     } else {
@@ -5572,7 +4798,7 @@ void VM::handleCreateRange(const Instruction& instruction) {
     } else if (std::holds_alternative<int16_t>(endVal->data)) {
         end = std::get<int16_t>(endVal->data);
     } else if (std::holds_alternative<int32_t>(endVal->data)) {
-        end = std::get<int32_t>(endVal->data);
+        end = std::get<BigInt>(endVal->data).to_int64();
     } else if (std::holds_alternative<int64_t>(endVal->data)) {
         end = std::get<int64_t>(endVal->data);
     } else {
@@ -5770,7 +4996,7 @@ void VM::handleIteratorNextKeyValue(const Instruction& /*unused*/) {
     // In a real implementation, we would need to handle dictionary iteration differently
     Instruction nextInstr;
     nextInstr.opcode = Opcode::ITERATOR_NEXT;
-    nextInstr.intValue = 0;
+    nextInstr.bigIntValue = BigInt(0);
     nextInstr.boolValue = false;
     handleIteratorNext(nextInstr);
 }
@@ -5893,7 +5119,7 @@ void VM::handleBeginParallel(const Instruction& instruction) {
                 );
 
     // Get the number of cores to use (from instruction parameters)
-    int cores = instruction.intValue > 0 ? instruction.intValue : std::thread::hardware_concurrency();
+    int cores = instruction.bigIntValue.to_int64() > 0 ? instruction.bigIntValue.to_int64() : std::thread::hardware_concurrency();
     std::string mode = instruction.stringValue.empty() ? "fork-join" : instruction.stringValue;
 
     if (debugMode) {
@@ -6331,7 +5557,7 @@ bool VM::handleDictPatternMatch(const ValuePtr& value) {
 
     // Pop number of fields
     ValuePtr numFieldsValue = pop();
-    int numFields = std::get<int32_t>(numFieldsValue->data);
+    int numFields = std::get<BigInt>(numFieldsValue->data).to_int64();
 
     // Get the dictionary data
     auto dictData = std::get<DictValue>(value->data);
@@ -6406,7 +5632,7 @@ bool VM::handleListPatternMatch(const ValuePtr& value) {
 
     // Pop number of elements
     ValuePtr numElementsValue = pop();
-    int numElements = std::get<int32_t>(numElementsValue->data);
+    int numElements = std::get<BigInt>(numElementsValue->data).to_int64();
 
     // Get the list data
     auto listData = std::get<ListValue>(value->data);
@@ -6466,7 +5692,7 @@ void VM::clearDictPatternFromStack() {
     ValuePtr restBindingName = pop();
     ValuePtr hasRestElement = pop();
     ValuePtr numFieldsValue = pop();
-    int numFields = std::get<int32_t>(numFieldsValue->data);
+    int numFields = std::get<BigInt>(numFieldsValue->data).to_int64();
 
     // Pop field patterns
     for (int i = 0; i < numFields * 2; i++) {
@@ -6477,7 +5703,7 @@ void VM::clearDictPatternFromStack() {
 void VM::clearListPatternFromStack() {
     // Clear list pattern data from stack when match fails
     ValuePtr numElementsValue = pop();
-    int numElements = std::get<int32_t>(numElementsValue->data);
+    int numElements = std::get<BigInt>(numElementsValue->data).to_int64();
 
     // Pop pattern elements
     for (int i = 0; i < numElements; i++) {
@@ -7077,7 +6303,7 @@ void VM::handlePropagateError(const Instruction& instruction) {
 
 void VM::handleConstructError(const Instruction& instruction) {
     const std::string& errorType = instruction.stringValue;
-    int32_t argCount = instruction.intValue;
+    int32_t argCount = instruction.bigIntValue.to_int64();
 
     if (stack.size() < static_cast<size_t>(argCount)) [[unlikely]] {
         error("Stack underflow in CONSTRUCT_ERROR");
@@ -7247,7 +6473,13 @@ void VM::handlePushFunction(const Instruction& instruction) {
     std::string functionName = instruction.stringValue;
 
     // Get visibility information from instruction
-    AST::VisibilityLevel visibility = static_cast<AST::VisibilityLevel>(instruction.intValue);
+    AST::VisibilityLevel visibility = AST::VisibilityLevel::Private; // Default
+    try {
+        int64_t visibilityValue = instruction.bigIntValue.to_int64();
+        visibility = static_cast<AST::VisibilityLevel>(visibilityValue);
+    } catch (const std::exception&) {
+        // If conversion fails, keep default Private visibility
+    }
 
     if (debugMode) {
         std::cout << "[DEBUG] PUSH_FUNCTION: " << functionName << " with visibility " << static_cast<int>(visibility) << std::endl;
@@ -7654,13 +6886,11 @@ void VM::handleSetProperty(const Instruction& instruction) {
             std::cout << "[DEBUG] SET_PROPERTY: Set dictionary property '" << propertyName << "'" << std::endl;
         }
         push(value);
-        return;
     }
-
-    error("Cannot set property '" + propertyName + "' on non-object value");
 }
+
 void VM::handleCreateList(const Instruction& instruction) {
-    int32_t elementCount = instruction.intValue;
+    int32_t elementCount = instruction.bigIntValue.to_int64();
 
     if (debugMode) {
         std::cout << "[DEBUG] CREATE_LIST: Creating list with " << elementCount << " elements" << std::endl;
@@ -7694,7 +6924,7 @@ void VM::handleCreateList(const Instruction& instruction) {
 }
 
 void VM::handleCreateTuple(const Instruction& instruction) {
-    int32_t elementCount = instruction.intValue;
+    int32_t elementCount = instruction.bigIntValue.to_int64();
 
     if (debugMode) {
         std::cout << "[DEBUG] CREATE_TUPLE: Creating tuple with " << elementCount << " elements" << std::endl;
@@ -7817,7 +7047,7 @@ bool VM::handleErrorTypePatternMatch(const ValuePtr& value) {
 
     ValuePtr errorTypeName = pop();
     ValuePtr numParamsValue = pop();
-    int numParams = std::get<int32_t>(numParamsValue->data);
+    int numParams = std::get<BigInt>(numParamsValue->data).to_int64();
 
     std::vector<std::string> paramNames;
     for (int i = 0; i < numParams; i++) {
@@ -8175,7 +7405,7 @@ void VM::handleCreateClosure(const Instruction& instruction) {
         return;
     }
 
-    int32_t capturedCount = std::get<int32_t>(countValue->data);
+    int32_t capturedCount = std::get<BigInt>(countValue->data).to_int64();
 
     if (stack.size() < static_cast<size_t>(capturedCount + 1)) {
         error("CREATE_CLOSURE: not enough values on stack for captured variables");
@@ -8349,7 +7579,7 @@ void VM::handleCallClosure(const Instruction& instruction) {
         return;
     }
 
-    int32_t argCount = std::get<int32_t>(argCountValue->data);
+    int32_t argCount = std::get<BigInt>(argCountValue->data).to_int64();
 
     if (stack.size() < static_cast<size_t>(argCount + 1)) {
         error("CALL_CLOSURE: not enough arguments on stack");
@@ -8562,7 +7792,7 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
         std::cout << "[DEBUG] argCountValue data variant index: " << argCountValue->data.index() << std::endl;
     }
 
-    int32_t argCount = std::get<int32_t>(argCountValue->data);
+    int32_t argCount = std::get<BigInt>(argCountValue->data).to_int64();
 
     if (debugMode) {
         std::cout << "[DEBUG] CALL_HIGHER_ORDER: stack.size()=" << stack.size()
@@ -8878,7 +8108,7 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
 void VM::handleCreateUnion(const Instruction& instruction) {
     // CREATE_UNION: Creates a union value with a specific variant
     // Expected stack: [value, variant_index, union_type_name]
-    // instruction.intValue contains the variant index
+    // instruction.bigIntValue contains the variant index
     // instruction.stringValue contains the union type name
 
     if (stack.size() < 1) {
@@ -8887,7 +8117,7 @@ void VM::handleCreateUnion(const Instruction& instruction) {
     }
 
     ValuePtr value = pop();
-    size_t variantIndex = static_cast<size_t>(instruction.intValue);
+    size_t variantIndex = static_cast<size_t>(instruction.bigIntValue.to_int64());
     std::string unionTypeName = instruction.stringValue;
 
     // Get the union type from the type system
@@ -8929,7 +8159,7 @@ void VM::handleGetUnionVariant(const Instruction& instruction) {
     }
 
     size_t variantIndex = unionValue->getActiveUnionVariant();
-    ValuePtr indexValue = memoryManager.makeRef<Value>(*region, typeSystem->INT_TYPE,
+    ValuePtr indexValue = memoryManager.makeRef<Value>(*region, typeSystem->BIGINT_TYPE,
                                                        static_cast<int32_t>(variantIndex));
     push(indexValue);
 
@@ -8977,7 +8207,7 @@ void VM::handleCheckUnionType(const Instruction& instruction) {
 void VM::handleSetUnionVariant(const Instruction& instruction) {
     // SET_UNION_VARIANT: Sets the active variant in a union value
     // Expected stack: [union_value, new_value]
-    // instruction.intValue contains the new variant index
+    // instruction.bigIntValue contains the new variant index
 
     if (stack.size() < 2) {
         error("SET_UNION_VARIANT requires union value and new value on stack");
@@ -8993,7 +8223,7 @@ void VM::handleSetUnionVariant(const Instruction& instruction) {
         return;
     }
 
-    size_t newVariantIndex = static_cast<size_t>(instruction.intValue);
+    size_t newVariantIndex = static_cast<size_t>(instruction.bigIntValue.to_int64());
 
     // Validate the new variant index
     std::vector<TypePtr> variantTypes = typeSystem->getUnionVariantTypes(unionValue->type);

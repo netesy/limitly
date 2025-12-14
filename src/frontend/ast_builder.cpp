@@ -370,16 +370,19 @@ namespace frontend {
             
             switch (token.type) {
                 case TokenType::NUMBER:
-                    // Try to parse as integer first, then as double
+                    // Parse all numbers as BigInt for consistent handling
                     try {
+                        // Use BigInt constructor which handles both integers and floats
                         if (token.lexeme.find('.') != std::string::npos) {
-                            literalExpr->value = std::stod(token.lexeme);
+                            // Float literal - parse as double then convert to BigInt
+                            literalExpr->value = BigInt(std::stod(token.lexeme));
                         } else {
-                            literalExpr->value = std::stoll(token.lexeme);
+                            // Integer literal - parse directly as BigInt
+                            literalExpr->value = BigInt(token.lexeme);
                         }
                     } catch (const std::exception&) {
                         reportError("Invalid number literal: " + token.lexeme, cst);
-                        literalExpr->value = 0LL;
+                        literalExpr->value = BigInt(0);
                     }
                     break;
                     
