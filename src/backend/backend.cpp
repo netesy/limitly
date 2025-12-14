@@ -1200,12 +1200,6 @@ void BytecodeGenerator::visitLiteralExpr(const std::shared_ptr<AST::LiteralExpr>
             // Emit as BigInt
             emit(Opcode::PUSH_BIGINT, expr->line, 0, 0.0f, false, bigIntValue.to_string());
         }
-    } else if (std::holds_alternative<long long>(expr->value)) {
-        // Legacy support for old long long values
-        emit(Opcode::PUSH_INT, expr->line, std::get<long long>(expr->value));
-    } else if (std::holds_alternative<long double>(expr->value)) {  
-       // Legacy support for old long double values
-        emit(Opcode::PUSH_FLOAT, expr->line, 0, std::get<long double>(expr->value));
     } else if (std::holds_alternative<std::string>(expr->value)) {
         std::string stringValue = std::get<std::string>(expr->value);
         // String value is already parsed (quotes removed) by the parser

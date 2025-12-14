@@ -133,6 +133,7 @@ struct ClosureValue {
 enum class TypeTag {
     Nil,
     Bool,
+    BigInt,
     Int,
     Int8,
     Int16,
@@ -825,18 +826,8 @@ struct Value {
     TypePtr type;
     std::variant<std::monostate,
                  bool,
-                 int8_t,
-                 int16_t,
-                 int32_t,
-                 int64_t,
-                 uint8_t,
-                 uint16_t,
-                 uint32_t,
-                 uint64_t,
-                 long double,
-                 float,
-                 std::string,
                  BigInt,
+                 std::string,
                  ListValue,
                  DictValue,
                  TupleValue,
@@ -874,70 +865,19 @@ struct Value {
     // Boolean constructor
     Value(TypePtr t, bool val) : type(std::move(t)), data(val) {}
 
-    // Floating point constructors
-    Value(TypePtr t, float val) : type(std::move(t)), data(val) {
-    }
+    // Numeric constructors - all use BigInt
+    Value(TypePtr t, float val) : type(std::move(t)), data(BigInt(val)) {}
 
-    Value(TypePtr t, long double val) : type(std::move(t)), data(val) {
-    }
+    Value(TypePtr t, long double val) : type(std::move(t)), data(BigInt(val)) {}
 
     // BigInt constructor
-    Value(TypePtr t, const BigInt& val) : type(std::move(t)), data(val) {
-    }
+    Value(TypePtr t, const BigInt& val) : type(std::move(t)), data(val) {}
 
-    // Template constructor for integer types - eliminates ambiguity
+    // Template constructor for integer types - converts to BigInt
     template<typename T>
     Value(TypePtr t, T val,
           typename std::enable_if_t<std::is_integral_v<T> && !std::is_same_v<T, bool>>* = nullptr)
-        : type(std::move(t)) {
-        
-
-        // Store based on the TypeTag, not the input type
-        if (!type) {
-            data = static_cast<int32_t>(val);
-            return;
-        }
-
-        switch (type->tag) {
-        case TypeTag::Int8:
-            data = safe_cast<int8_t>(val);
-            break;
-        case TypeTag::Int16:
-            data = safe_cast<int16_t>(val);
-            break;
-        case TypeTag::Int:
-        case TypeTag::Int32:
-            data = safe_cast<int32_t>(val);
-            break;
-        case TypeTag::Int64:
-            data = safe_cast<int64_t>(val);
-            break;
-        case TypeTag::Int128:
-            // For i128, use BigInt directly
-            data = BigInt(std::to_string(val));
-            break;
-        case TypeTag::UInt8:
-            data = safe_cast<uint8_t>(val);
-            break;
-        case TypeTag::UInt16:
-            data = safe_cast<uint16_t>(val);
-            break;
-        case TypeTag::UInt:
-        case TypeTag::UInt32:
-            data = safe_cast<uint32_t>(val);
-            break;
-        case TypeTag::UInt64:
-            data = safe_cast<uint64_t>(val);
-            break;
-        case TypeTag::UInt128:
-            // For u128, use BigInt directly
-            data = BigInt(std::to_string(val));
-            break;
-        default:
-            // Default to int32_t for unspecified integer types
-            data = static_cast<int32_t>(val);
-        }
-    }
+        : type(std::move(t)), data(BigInt(static_cast<BigInt>(val))) {}
 
     // Move constructor
     Value(Value&& other) noexcept

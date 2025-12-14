@@ -394,6 +394,16 @@ public:
         set_small_value(static_cast<int128_t>(n));
     }
     
+    // Constructor for unsigned integer literals
+    BigInt(uint64_t n, bool fix_type = false) : fixed_type(fix_type) {
+        set_small_value(static_cast<int128_t>(n));
+    }
+    
+    // Constructor for uint32_t to avoid ambiguity
+    BigInt(uint32_t n, bool fix_type = false) : fixed_type(fix_type) {
+        set_small_value(static_cast<int128_t>(n));
+    }
+    
     // Constructor for zero - specialized to avoid ambiguity
     BigInt(int n, bool fix_type = false) : fixed_type(fix_type) {
         set_small_value(static_cast<int128_t>(n));
@@ -893,6 +903,58 @@ public:
         result *= other;
         return result;
     }
+    
+    BigInt& operator/=(const BigInt& other) {
+        if (other == BigInt(0)) {
+            throw std::runtime_error("Division by zero");
+        }
+        
+        if (storage_type != TYPE_LARGE && other.storage_type != TYPE_LARGE) {
+            int128_t a = get_small_value();
+            int128_t b = other.get_small_value();
+            int128_t result = a / b;
+            set_value_respecting_type(result);
+        } else {
+            convert_to_large();
+            BigInt other_copy = other;
+            other_copy.convert_to_large();
+            divide_large(other_copy.large_rep);
+            try_downgrade();
+        }
+        return *this;
+    }
+    
+    BigInt operator/(const BigInt& other) const {
+        BigInt result = *this;
+        result /= other;
+        return result;
+    }
+    
+    BigInt& operator%=(const BigInt& other) {
+        if (other == BigInt(0)) {
+            throw std::runtime_error("Modulo by zero");
+        }
+        
+        if (storage_type != TYPE_LARGE && other.storage_type != TYPE_LARGE) {
+            int128_t a = get_small_value();
+            int128_t b = other.get_small_value();
+            int128_t result = a % b;
+            set_value_respecting_type(result);
+        } else {
+            convert_to_large();
+            BigInt other_copy = other;
+            other_copy.convert_to_large();
+            modulo_large(other_copy.large_rep);
+            try_downgrade();
+        }
+        return *this;
+    }
+    
+    BigInt operator%(const BigInt& other) const {
+        BigInt result = *this;
+        result %= other;
+        return result;
+    }
 
     // String conversion
     std::string to_string() const {
@@ -1132,6 +1194,152 @@ private:
         }
         
         return 0;
+    }
+    
+    void divide_large(const LargeRep& other) {
+        // Handle division by zero (should be caught by operator/=)
+        if (other.limbs.size() == 1 && other.limbs[0] == 0) {
+            throw std::runtime_error("Division by zero");
+        }
+        
+        // Handle sign
+        bool result_negative = (large_rep.is_negative != other.is_negative);
+        large_rep.is_negative = false;
+        
+        // Create a copy of other for magnitude operations
+        LargeRep divisor = other;
+        divisor.is_negative = false;
+        
+        // If dividend is smaller than divisor, result is 0
+        if (compare_magnitude(divisor.limbs) < 0) {
+            large_rep.limbs.clear();
+            large_rep.limbs.push_back(0);
+            large_rep.is_negative = false;
+            return;
+        }
+        
+        // Perform long division
+        std::vector<uint64_t> quotient;
+        std::vector<uint64_t> remainder = large_rep.limbs;
+        
+        // Normalize divisor
+        uint64_t shift = 0;
+        while (divisor.limbs.back() < (static_cast<uint64_t>(1) << 63)) {
+            for (size_t i = 0; i < divisor.limbs.size(); i++) {
+                divisor.limbs[i] <<= 1;
+            }
+            shift++;
+        }
+        
+        // Normalize remainder
+        for (size_t i = 0; i < remainder.size(); i++) {
+            remainder[i] <<= shift;
+        }
+        
+        // Main division loop
+        for (int k = remainder.size() - divisor.limbs.size(); k >= 0; k--) {
+            uint64_t q = 0;
+            uint128_t r = 0;
+            
+            // Estimate quotient digit
+            if (remainder.size() > k + divisor.limbs.size() - 1) {
+                uint128_t high_part = static_cast<uint128_t>(remainder[k + divisor.limbs.size()]) << 64;
+                uint128_t dividend_part = high_part | remainder[k + divisor.limbs.size() - 1];
+                uint128_t divisor_part = divisor.limbs.back();
+                
+                q = static_cast<uint64_t>(dividend_part / (divisor_part + 1));
+                if (q > UINT64_MAX) {
+                    q = UINT64_MAX;
+                }
+            }
+            
+            // Multiply and subtract
+            std::vector<uint64_t> product(divisor.limbs.size() + 1, 0);
+            uint64_t carry = 0;
+            for (size_t i = 0; i < divisor.limbs.size(); i++) {
+                uint128_t prod = static_cast<uint128_t>(divisor.limbs[i]) * q + carry;
+                product[i] = static_cast<uint64_t>(prod);
+                carry = static_cast<uint64_t>(prod >> 64);
+            }
+            product[divisor.limbs.size()] = carry;
+            
+            // Subtract product from remainder
+            int64_t borrow = 0;
+            for (size_t i = 0; i < product.size(); i++) {
+                if (k + i < remainder.size()) {
+                    int128_t diff = static_cast<int128_t>(remainder[k + i]) - product[i] - borrow;
+                    remainder[k + i] = static_cast<uint64_t>(diff);
+                    borrow = (diff < 0) ? 1 : 0;
+                }
+            }
+            
+            // Adjust quotient if necessary
+            while (borrow != 0) {
+                q--;
+                carry = 0;
+                for (size_t i = 0; i < divisor.limbs.size(); i++) {
+                    uint128_t sum = static_cast<uint128_t>(remainder[k + i]) + divisor.limbs[i] + carry;
+                    remainder[k + i] = static_cast<uint64_t>(sum);
+                    carry = static_cast<uint64_t>(sum >> 64);
+                }
+                remainder[k + divisor.limbs.size()] += carry;
+                borrow = 0;
+            }
+            
+            quotient.insert(quotient.begin(), q);
+        }
+        
+        // Set result
+        large_rep.limbs = quotient;
+        large_rep.is_negative = result_negative;
+        normalize_large();
+    }
+    
+    void modulo_large(const LargeRep& other) {
+        // Handle modulo by zero (should be caught by operator%=)
+        if (other.limbs.size() == 1 && other.limbs[0] == 0) {
+            throw std::runtime_error("Modulo by zero");
+        }
+        
+        // For modulo, we keep the sign of the dividend
+        bool original_negative = large_rep.is_negative;
+        large_rep.is_negative = false;
+        
+        // Create a copy of other for magnitude operations
+        LargeRep divisor = other;
+        divisor.is_negative = false;
+        
+        // If dividend is smaller than divisor, remainder is dividend
+        if (compare_magnitude(divisor.limbs) < 0) {
+            large_rep.is_negative = original_negative;
+            return;
+        }
+        
+        // Perform division to get remainder
+        LargeRep original = large_rep;
+        divide_large(divisor);
+        
+        // Calculate remainder: dividend - (quotient * divisor)
+        LargeRep quotient = large_rep;
+        large_rep = original;
+        
+        // Multiply quotient by divisor using the class method
+        BigInt temp_bigint;
+        temp_bigint.storage_type = TYPE_LARGE;
+        temp_bigint.large_rep = divisor;
+        
+        LargeRep quotient_rep;
+        quotient_rep.limbs = quotient.limbs;
+        quotient_rep.is_negative = false;
+        temp_bigint.multiply_large(quotient_rep);
+        
+        // Subtract product from original to get remainder
+        subtract_large(temp_bigint.large_rep);
+        
+        // Restore original sign behavior for modulo
+        // In most languages, modulo keeps the sign of the dividend
+        large_rep.is_negative = original_negative;
+        normalize_large();
     }
 
     std::string to_string_large() const {

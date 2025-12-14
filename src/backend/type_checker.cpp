@@ -562,46 +562,7 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
     if (auto literalExpr = std::dynamic_pointer_cast<AST::LiteralExpr>(expr)) {
         // Infer type from literal value using variant index
         switch (literalExpr->value.index()) {
-            case 0: // long long (int64_t)
-                // Use the expected type if it's a compatible numeric type
-                if (expectedType && typeSystem.isNumericType(expectedType->tag)) {
-                    if (expectedType->tag == TypeTag::Float32 || expectedType->tag == TypeTag::Float64) {
-                        return expectedType; // Allow int literals to be used as floats
-                    }
-                }
-                return typeSystem.INT_TYPE;
-            case 1: // double
-                // Check if we have an expected type context for better inference
-                if (expectedType) {
-                    if (expectedType->tag == TypeTag::Int || expectedType->tag == TypeTag::Int64) {
-                        // If expecting int but got double, check if it's a whole number
-                        long double doubleVal = std::get<long double>(literalExpr->value);
-                        if (doubleVal == std::floor(doubleVal) && 
-                            doubleVal >= std::numeric_limits<long long>::min() && 
-                            doubleVal <= std::numeric_limits<long long>::max()) {
-                            // It's a whole number that fits in long long, but was parsed as double
-                            // This can happen with very large integers or scientific notation like 2e5
-                            return expectedType;
-                        }
-                    } else if (expectedType->tag == TypeTag::Float32) {
-                        // Check if the long double value fits in float32 without precision loss
-                        long double doubleVal = std::get<long double>(literalExpr->value);
-                        if (std::abs(doubleVal) <= std::numeric_limits<float>::max()) {
-                            float floatVal = static_cast<float>(doubleVal);
-                            if (static_cast<double>(floatVal) == doubleVal) {
-                                return typeSystem.FLOAT32_TYPE;
-                            }
-                        }
-                    }
-                }
-                return typeSystem.FLOAT64_TYPE;
-            case 2: // std::string
-                return typeSystem.STRING_TYPE;
-            case 3: // bool
-                return typeSystem.BOOL_TYPE;
-            case 4: // std::nullptr_t
-                return typeSystem.NIL_TYPE;
-            case 5: // BigInt
+            case 0: // BigInt
                 {
                     // For BigInt literals, try to infer the most appropriate type
                     const BigInt& bigIntValue = std::get<BigInt>(literalExpr->value);
@@ -609,6 +570,19 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
                     // If we have an expected type context and it's compatible, use it
                     if (expectedType && typeSystem.isNumericType(expectedType->tag)) {
                         return expectedType;
+                    }
+                    
+                    // Check if it's a float type
+                    if (bigIntValue.is_float_type()) {
+                        // Float values - determine appropriate float type
+                        long double floatVal = bigIntValue.get_f128_value();
+                        if (std::abs(floatVal) <= std::numeric_limits<float>::max()) {
+                            float floatVal32 = static_cast<float>(floatVal);
+                            if (static_cast<long double>(floatVal32) == floatVal) {
+                                return typeSystem.FLOAT32_TYPE;
+                            }
+                        }
+                        return typeSystem.FLOAT64_TYPE;
                     }
                     
                     // Try to determine the best fit type based on the value
@@ -658,6 +632,12 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
                         return typeSystem.INT128_TYPE;
                     }
                 }
+            case 1: // std::string
+                return typeSystem.STRING_TYPE;
+            case 2: // bool
+                return typeSystem.BOOL_TYPE;
+            case 3: // std::nullptr_t
+                return typeSystem.NIL_TYPE;
             default:
                 break;
         }
