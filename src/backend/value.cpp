@@ -3,6 +3,16 @@
 #include "types.hh"
 #include <sstream>
 
+// Helper function to check if a type is an integer type
+static bool isIntegerType(TypePtr type) {
+    return type->tag == TypeTag::Int || type->tag == TypeTag::Int8 ||
+           type->tag == TypeTag::Int16 || type->tag == TypeTag::Int32 ||
+           type->tag == TypeTag::Int64 || type->tag == TypeTag::Int128 ||
+           type->tag == TypeTag::UInt || type->tag == TypeTag::UInt8 ||
+           type->tag == TypeTag::UInt16 || type->tag == TypeTag::UInt32 ||
+           type->tag == TypeTag::UInt64 || type->tag == TypeTag::UInt128;
+}
+
 // ClosureValue method implementations
 
 ClosureValue::ClosureValue() : startAddress(0), endAddress(0) {}
@@ -185,10 +195,15 @@ std::string TupleValue::toString() const {
 
 bool IteratorValue::hasNext() const {
     if (type == IteratorType::RANGE) {
-        return (rangeStep > 0) ? (rangeCurrent < rangeEnd) : (rangeCurrent > rangeEnd);
+        // Convert strings to int64 for comparisons
+        int64_t step = ValueConverters::toInt64(rangeStep).value_or(1);
+        int64_t current = ValueConverters::toInt64(rangeCurrent).value_or(0);
+        int64_t end = ValueConverters::toInt64(rangeEnd).value_or(0);
+        
+        return (step > 0) ? (current < end) : (current > end);
     } else if (iterable) {
         if (type == IteratorType::LIST) {
-            if (auto list = std::get_if<ListValue>(&iterable->data)) {
+            if (auto list = std::get_if<ListValue>(&iterable->complexData)) {
                 return currentIndex < list->elements.size();
             }
         } else if (type == IteratorType::CHANNEL) {
@@ -197,7 +212,7 @@ bool IteratorValue::hasNext() const {
 
             // Attempt to receive from the channel (this will block until value or closed)
             try {
-                if (auto chPtr = std::get_if<std::shared_ptr<Channel<ValuePtr>>>(&iterable->data)) {
+                if (auto chPtr = std::get_if<std::shared_ptr<Channel<ValuePtr>>>(&iterable->complexData)) {
                     ValuePtr v;
                     bool ok = (*chPtr)->receive(v);
                     if (ok) {
@@ -224,8 +239,12 @@ ValuePtr IteratorValue::next() {
 
     if (type == IteratorType::RANGE) {
         // Create value on-demand
-        int64_t value = rangeCurrent.to_int64();
-        rangeCurrent += rangeStep;
+        int64_t value = ValueConverters::toInt64(rangeCurrent).value_or(0);
+        
+        // Increment current by step (convert to int64, add, convert back to string)
+        int64_t step = ValueConverters::toInt64(rangeStep).value_or(1);
+        int64_t newCurrent = value + step;
+        rangeCurrent = std::to_string(newCurrent);
 
         // OPTIMIZATION: Reuse a single Value object per thread
         // Note: This is safe because the value is immediately consumed by the VM
@@ -245,7 +264,7 @@ ValuePtr IteratorValue::next() {
 
 
     if (type == IteratorType::LIST) {
-        if (auto list = std::get_if<ListValue>(&iterable->data)) {
+        if (auto list = std::get_if<ListValue>(&iterable->complexData)) {
             if (currentIndex < list->elements.size()) {
                 return list->elements[currentIndex++];
             }
@@ -259,7 +278,7 @@ ValuePtr IteratorValue::next() {
             return res;
         }
         // As a fallback, try to receive directly
-        if (auto chPtr = std::get_if<std::shared_ptr<Channel<ValuePtr>>>(&iterable->data)) {
+        if (auto chPtr = std::get_if<std::shared_ptr<Channel<ValuePtr>>>(&iterable->complexData)) {
             ValuePtr v;
             bool ok = (*chPtr)->receive(v);
             if (ok) return v;
@@ -297,28 +316,30 @@ std::string IteratorValue::toString() const {
     if (iterable) {
         oss << " over=" << iterable->toString();
     } else if (type == IteratorType::RANGE) {
-        oss << " range=(" << rangeStart.to_string() << ".." << rangeEnd.to_string();
-        if (rangeStep != 1) {
-            oss << " step=" << rangeStep.to_string();
+        oss << " range=(" << rangeStart << ".." << rangeEnd;
+        // Convert step to int64 for comparison and display
+        int64_t stepValue = ValueConverters::toInt64(rangeStep).value_or(1);
+        if (stepValue != 1) {
+            oss << " step=" << rangeStep;
         }
         oss << ")";
     }
     
     // Show current position
     if (type == IteratorType::RANGE) {
-        oss << " current=" << rangeCurrent.to_string();
+        oss << " current=" << rangeCurrent;
     } else if (iterable) {
         oss << " index=" << currentIndex;
         
         // Show current element if available
         if (type == IteratorType::LIST) {
-            if (auto list = std::get_if<ListValue>(&iterable->data)) {
+            if (auto list = std::get_if<ListValue>(&iterable->complexData)) {
                 if (currentIndex < list->elements.size()) {
                     oss << " current=" << list->elements[currentIndex]->toString();
                 }
             }
         } else if (type == IteratorType::DICT) {
-            if (auto dict = std::get_if<DictValue>(&iterable->data)) {
+            if (auto dict = std::get_if<DictValue>(&iterable->complexData)) {
                 size_t i = 0;
                 for (const auto& [key, value] : dict->elements) {
                     if (i == currentIndex) {
@@ -341,25 +362,36 @@ std::string IteratorValue::toString() const {
 
 std::string Value::toString() const {
     std::ostringstream oss;
-    std::visit(overloaded{
-                   [&](const std::monostate&) { oss << "nil"; },
-                   [&](bool b) { oss << (b ? "true" : "false"); },
-                   [&](int8_t i) { oss << static_cast<int>(i); },
-                   [&](int16_t i) { oss << i; },
-                   [&](int32_t i) { oss << i; },
-                   [&](int64_t i) { oss << i; },
-                   [&](uint8_t u) { oss << static_cast<unsigned>(u); },
-                   [&](uint16_t u) { oss << u; },
-                   [&](uint32_t u) { oss << u; },
-                   [&](uint64_t u) { oss << u; },
-                   [&](const BigInt& bi) { 
-    std::string bi_str = bi.to_string();
-    std::cout << "[DEBUG Value::toString] BigInt = " << bi_str << ", storage_type = " << static_cast<int>(bi.get_storage_type()) << std::endl;
-    oss << bi_str; 
-},
-                   [&](float f) { oss << f; },
-                   [&](long double d) { oss << d; },
-                   [&](const std::string& s) { oss << '"' << s << '"'; },
+    
+    // Safety check for null type
+    if (!type) {
+        return "<unknown>";
+    }
+    
+    // Handle primitive types using the data string member
+    if (type->tag == TypeTag::Nil) {
+        oss << "nil";
+    } else if (type->tag == TypeTag::Bool) {
+        oss << (as<bool>() ? "true" : "false");
+    } else if (type->tag == TypeTag::String) {
+        oss << '"' << data << '"'; // Add quotes for string representation
+    } else if (isIntegerType(type)) {
+        // Handle all integer types
+        try {
+            oss << as<int64_t>();
+        } catch (...) {
+            oss << "<error>";
+        }
+    } else if (type->tag == TypeTag::Float32 || type->tag == TypeTag::Float64) {
+        // Handle all float types
+        try {
+            oss << as<double>();
+        } catch (...) {
+            oss << "<error>";
+        }
+    } else {
+        // Handle complex types using complexData
+        std::visit(overloaded{
                    [&](const ListValue& lv) {
                        oss << "[";
                        for (size_t i = 0; i < lv.elements.size(); ++i) {
@@ -430,28 +462,34 @@ std::string Value::toString() const {
                    },
                    [&](const ClosureValue& closure) {
                        oss << closure.toString();
+                   },
+                   [&](const auto&) {
+                       oss << "<unknown>";
                    }
-               }, data);
+               }, complexData);
+    }
     return oss.str();
 }
 
 std::string Value::getRawString() const {
     std::ostringstream oss;
-    std::visit(overloaded{
-                   [&](const std::monostate&) { oss << "nil"; },
-                   [&](bool b) { oss << (b ? "true" : "false"); },
-                   [&](int8_t i) { oss << static_cast<int>(i); },
-                   [&](int16_t i) { oss << i; },
-                   [&](int32_t i) { oss << i; },
-                   [&](int64_t i) { oss << i; },
-                   [&](uint8_t u) { oss << static_cast<unsigned>(u); },
-                   [&](uint16_t u) { oss << u; },
-                   [&](uint32_t u) { oss << u; },
-                   [&](uint64_t u) { oss << u; },
-                   [&](const BigInt& bi) { oss << bi.to_string(); },
-                   [&](float f) { oss << f; },
-                   [&](long double d) { oss << d; },
-                   [&](const std::string& s) { oss << s; }, // No quotes for raw string
+    
+    // Handle primitive types using the data string member
+    if (type->tag == TypeTag::Nil) {
+        oss << "nil";
+    } else if (type->tag == TypeTag::Bool) {
+        oss << (as<bool>() ? "true" : "false");
+    } else if (type->tag == TypeTag::String) {
+        oss << data; // No quotes for raw string
+    } else if (isIntegerType(type)) {
+        // Handle all integer types
+        oss << as<int64_t>();
+    } else if (type->tag == TypeTag::Float32 || type->tag == TypeTag::Float64) {
+        // Handle all float types
+        oss << as<double>();
+    } else {
+        // Handle complex types using complexData
+        std::visit(overloaded{
                    [&](const ListValue& lv) {
                        oss << "[";
                        for (size_t i = 0; i < lv.elements.size(); ++i) {
@@ -532,7 +570,11 @@ std::string Value::getRawString() const {
                    },
                    [&](const ClosureValue& closure) {
                        oss << closure.toString();
+                   },
+                   [&](const auto&) {
+                       oss << "<unknown>";
                    }
-               }, data);
+               }, complexData);
+    }
     return oss.str();
 }

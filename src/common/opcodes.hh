@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include "big_int.hh"
 
 // Bytecode operation codes
 enum class Opcode {
@@ -176,12 +175,27 @@ enum class Opcode {
 struct Instruction {
     Opcode opcode;
     uint32_t line;
-    BigInt bigIntValue;
     bool boolValue = false;
     std::string stringValue;
 };
 
+// Register VM instruction structure
+struct Instruct {
+    Opcode opcode;
+    uint32_t line;
+    bool boolValue = false;
+    std::string stringValue;
+    // Additional fields for register-based VM can be added here
+    uint8_t dest = 0;      // Destination register
+    uint8_t src1 = 0;      // Source register 1
+    uint8_t src2 = 0;      // Source register 2
+    uint8_t src3 = 0;      // Source register 3 (for some operations)
+};
+
 // Bytecode is a vector of instructions
 using Bytecode = std::vector<Instruction>;
+
+// Register bytecode is a vector of register instructions
+using RegisterBytecode = std::vector<Instruct>;
 
 #endif // OPCODES_H

@@ -5,10 +5,8 @@
 #include "types.hh"
 #include "../common/opcodes.hh"
 #include "../common/debugger.hh"
-#include "../common/big_int.hh"
 #include "../frontend/parser.hh"
 #include "../common/builtin_functions.hh"  // For builtin functions
-#include "../common/big_int.hh"
 #include "concurrency/task_vm.hh"
 #include "bytecode_printer.hh"  // For opcodeToString function
 #include "classes.hh"  // For VMMethodImplementation
@@ -83,62 +81,71 @@ static std::string typeTagToString(TypeTag tag) {
 // Safe value extraction helpers to prevent std::get wrong index errors
 template<typename T>
 std::optional<T> safeGet(ValuePtr value) {
-    if constexpr (std::is_same_v<T, BigInt>) {
-        if (std::holds_alternative<BigInt>(value->data)) {
-            return std::get<BigInt>(value->data);
+    if constexpr (std::is_same_v<T, std::string>) {
+        if (value->type && (value->type->tag == TypeTag::String || 
+                           value->type->tag == TypeTag::Int ||
+                           value->type->tag == TypeTag::Int8 ||
+                           value->type->tag == TypeTag::Int16 ||
+                           value->type->tag == TypeTag::Int32 ||
+                           value->type->tag == TypeTag::Int64 ||
+                           value->type->tag == TypeTag::Int128 ||
+                           value->type->tag == TypeTag::UInt ||
+                           value->type->tag == TypeTag::UInt8 ||
+                           value->type->tag == TypeTag::UInt16 ||
+                           value->type->tag == TypeTag::UInt32 ||
+                           value->type->tag == TypeTag::UInt64 ||
+                           value->type->tag == TypeTag::UInt128 ||
+                           value->type->tag == TypeTag::Float64)) {
+            return value->data;
         }
-    } else if constexpr (std::is_same_v<T, std::string>) {
-        if (std::holds_alternative<std::string>(value->data)) {
-            return std::get<std::string>(value->data);
-        }
+    } else if constexpr (std::is_same_v<T, int64_t>) {
+        return value->tryAs<int64_t>();
+    } else if constexpr (std::is_same_v<T, double>) {
+        return value->tryAs<double>();
     } else if constexpr (std::is_same_v<T, bool>) {
-        if (std::holds_alternative<bool>(value->data)) {
-            return std::get<bool>(value->data);
-        }
+        return value->tryAs<bool>();
     }
     return std::nullopt;
 }
 
-// Specialized extraction functions that handle type conversions
 long double extractAsFloat(ValuePtr value) {
-    if (auto ld = safeGet<long double>(value)) return *ld;
-    if (auto f = safeGet<float>(value)) return static_cast<long double>(*f);
-    if (auto bi = safeGet<BigInt>(value)) return static_cast<long double>(bi->to_int64());
-    if (auto i32 = safeGet<int32_t>(value)) return static_cast<long double>(*i32);
+    if (auto ld = safeGet<double>(value)) return static_cast<long double>(*ld);
     if (auto i64 = safeGet<int64_t>(value)) return static_cast<long double>(*i64);
+    if (auto s = safeGet<std::string>(value)) {
+        try {
+            return std::stod(*s);
+        } catch (...) {
+            return 0.0;
+        }
+    }
     throw std::runtime_error("Cannot extract value as float");
 }
 
 int64_t extractAsInt64(ValuePtr value) {
     if (auto i64 = safeGet<int64_t>(value)) return *i64;
-    if (auto i32 = safeGet<int32_t>(value)) return static_cast<int64_t>(*i32);
-    if (auto bi = safeGet<BigInt>(value)) {
+    if (auto s = safeGet<std::string>(value)) {
         try {
-            return bi->to_int64();
-        } catch (const std::overflow_error&) {
-            // BigInt is too large for int64_t, this should be handled by the caller
-            // Re-throw with a more descriptive message
-            throw std::runtime_error("BigInt value too large for int64_t conversion in mixed type operation");
+            return std::stoll(*s);
+        } catch (...) {
+            return 0;
         }
     }
     throw std::runtime_error("Cannot extract value as int64");
 }
 
-BigInt extractAsBigInt(ValuePtr value) {
-    if (auto bi = safeGet<BigInt>(value)) return *bi;
-    if (auto i64 = safeGet<int64_t>(value)) return BigInt(std::to_string(*i64));
-    if (auto i32 = safeGet<int32_t>(value)) return BigInt(std::to_string(*i32));
-    throw std::runtime_error("Cannot extract value as BigInt");
+std::string extractAsString(ValuePtr value) {
+    if (auto s = safeGet<std::string>(value)) return *s;
+    if (auto i64 = safeGet<int64_t>(value)) return std::to_string(*i64);
+    if (auto d = safeGet<double>(value)) return std::to_string(*d);
+    if (auto b = safeGet<bool>(value)) return *b ? "true" : "false";
+    throw std::runtime_error("Cannot extract value as string");
 }
 
 bool extractAsBool(ValuePtr value) {
     if (auto b = safeGet<bool>(value)) return *b;
-    if (auto i32 = safeGet<int32_t>(value)) return *i32 != 0;
+    if (auto s = safeGet<std::string>(value)) return ValueConverters::toBool(*s);
     if (auto i64 = safeGet<int64_t>(value)) return *i64 != 0;
-    if (auto ld = safeGet<long double>(value)) return *ld != 0.0;
-    if (auto f = safeGet<float>(value)) return *f != 0.0f;
-    if (auto s = safeGet<std::string>(value)) return !s->empty();
-    if (auto bi = safeGet<BigInt>(value)) return bi->to_int64() != 0;
+    if (auto d = safeGet<double>(value)) return *d != 0.0;
     return false;
 }
 
@@ -171,7 +178,7 @@ VM::VM(bool create_runtime)
       environment(globals),
       bytecode(nullptr),
       ip(0),
-      debugMode(false),
+      debugMode(true),
       debugOutput(false),
       isPreProcessing(false),
       currentClassBeingDefined(""),
@@ -197,10 +204,10 @@ VM::VM(bool create_runtime)
     registerNativeFunction("send", [this](const std::vector<ValuePtr>& args) -> ValuePtr {
         if (args.size() != 2) throw std::runtime_error("send(channel, value) expects 2 args");
         auto chVal = args[0];
-        if (!std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(chVal->data)) {
+        if (!std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(chVal->complexData)) {
             throw std::runtime_error("First argument to send must be a channel");
         }
-        auto ch = std::get<std::shared_ptr<Channel<ValuePtr>>>(chVal->data);
+        auto ch = std::get<std::shared_ptr<Channel<ValuePtr>>>(chVal->complexData);
         ch->send(args[1]);
         return memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
     });
@@ -208,10 +215,10 @@ VM::VM(bool create_runtime)
     registerNativeFunction("receive", [this](const std::vector<ValuePtr>& args) -> ValuePtr {
         if (args.size() != 1) throw std::runtime_error("receive(channel) expects 1 arg");
         auto chVal = args[0];
-        if (!std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(chVal->data)) {
+        if (!std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(chVal->complexData)) {
             throw std::runtime_error("Argument to receive must be a channel");
         }
-        auto ch = std::get<std::shared_ptr<Channel<ValuePtr>>>(chVal->data);
+        auto ch = std::get<std::shared_ptr<Channel<ValuePtr>>>(chVal->complexData);
         ValuePtr v;
         bool ok = ch->receive(v);
         if (!ok) return memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
@@ -221,10 +228,10 @@ VM::VM(bool create_runtime)
     registerNativeFunction("close", [this](const std::vector<ValuePtr>& args) -> ValuePtr {
         if (args.size() != 1) throw std::runtime_error("close(channel) expects 1 arg");
         auto chVal = args[0];
-        if (!std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(chVal->data)) {
+        if (!std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(chVal->complexData)) {
             throw std::runtime_error("Argument to close must be a channel");
         }
-        auto ch = std::get<std::shared_ptr<Channel<ValuePtr>>>(chVal->data);
+        auto ch = std::get<std::shared_ptr<Channel<ValuePtr>>>(chVal->complexData);
         ch->close();
         return memoryManager.makeRef<Value>(*region, typeSystem->NIL_TYPE);
     });
@@ -436,9 +443,9 @@ ValuePtr VM::execute(const std::vector<Instruction>& code) {
                           << " stack.size()=" << stack.size() << std::endl;
 
                 if (instruction.opcode == Opcode::JUMP) {
-                    size_t targetIP = ip + 1 + instruction.bigIntValue.to_int64();
+                    size_t targetIP = ip + 1 + std::stoll(instruction.stringValue);
                     std::cout << "[DEBUG] JUMP: current IP=" << ip
-                              << ", offset=" << instruction.bigIntValue.to_string()
+                              << ", offset=" << instruction.stringValue
                               << ", target IP=" << targetIP
                               << ", bytecode.size()=" << bytecodeRef.size() << std::endl;
 
@@ -1270,7 +1277,7 @@ bool VM::propagateError(ValuePtr errorValue) {
 ValuePtr VM::handleError(ValuePtr errorValue, const std::string& expectedType) {
     // Check if the error type matches the expected type
     if (!expectedType.empty()) {
-        if (auto errorVal = std::get_if<ErrorValue>(&errorValue->data)) {
+        if (auto errorVal = std::get_if<ErrorValue>(&errorValue->complexData)) {
             if (errorVal->errorType != expectedType) {
                 // Error type mismatch, continue propagation
                 return errorValue;
@@ -1353,7 +1360,7 @@ ValuePtr VM::createErrorValue(const std::string& errorType, const std::string& m
 
     // Create the final value with the error union type
     ValuePtr result = memoryManager.makeRef<Value>(*region, errorUnionType);
-    result->data = errorVal;
+    result->complexData = errorVal;
 
     return result;
 }
@@ -1411,7 +1418,7 @@ ValuePtr VM::createPooledErrorValue(const std::string& errorType, const std::str
 
     // Create the final value
     ValuePtr result = memoryManager.makeRef<Value>(*region, errorUnionType);
-    result->data = *pooledError;
+    result->complexData = *pooledError;
 
     // If we allocated a new error, clean it up
     if (!fromPool) {
@@ -1460,33 +1467,51 @@ bool VM::isErrorFrame(size_t frameIndex) const {
 // Instruction handlers
 void VM::handlePushInt(const Instruction& instruction) {
     if (debugMode) {
-        std::cout << "[DEBUG] PUSH_INT: instruction.bigIntValue = " << instruction.bigIntValue.to_string() << std::endl;
+        std::cout << "[DEBUG] PUSH_INT: instruction.stringValue = " << instruction.stringValue << std::endl;
     }
-    push(memoryManager.makeRef<Value>(*region, typeSystem->BIGINT_TYPE, instruction.bigIntValue));
+    push(memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, instruction.stringValue));
 }
 
 void VM::handlePushFloat(const Instruction& instruction) {
     if (debugMode) {
-        std::cout << "[DEBUG] PUSH_FLOAT: instruction.bigIntValue = " << instruction.bigIntValue.to_string() << std::endl;
+        std::cout << "[DEBUG] PUSH_FLOAT: instruction.stringValue = " << instruction.stringValue << std::endl;
     }
     
-    // The bigIntValue should already contain the float representation
-    push(memoryManager.makeRef<Value>(*region, typeSystem->BIGINT_TYPE, instruction.bigIntValue));
+    // Use stringValue for float values
+    push(memoryManager.makeRef<Value>(*region, typeSystem->FLOAT64_TYPE, instruction.stringValue));
 }
 
 void VM::handlePushBigInt(const Instruction& instruction) {
-    // Use the bigIntValue directly
-    BigInt bigIntValue = instruction.bigIntValue;
+    // Use the stringValue directly (integer values are stored as strings)
+    std::string intValue = instruction.stringValue;
     
-    // Default to INT128_TYPE for BigInt values
-    TypePtr targetType = typeSystem->BIGINT_TYPE;
+    // Determine the appropriate integer type based on the value
+    TypePtr targetType = typeSystem->INT64_TYPE; // Default to Int64
+    
+    try {
+        int64_t val = std::stoll(intValue);
+        if (val >= std::numeric_limits<int8_t>::min() && val <= std::numeric_limits<int8_t>::max()) {
+            targetType = typeSystem->INT8_TYPE;
+        } else if (val >= std::numeric_limits<int16_t>::min() && val <= std::numeric_limits<int16_t>::max()) {
+            targetType = typeSystem->INT16_TYPE;
+        } else if (val >= std::numeric_limits<int32_t>::min() && val <= std::numeric_limits<int32_t>::max()) {
+            targetType = typeSystem->INT32_TYPE;
+        } else if (val >= std::numeric_limits<int64_t>::min() && val <= std::numeric_limits<int64_t>::max()) {
+            targetType = typeSystem->INT64_TYPE;
+        } else {
+            targetType = typeSystem->INT128_TYPE;
+        }
+    } catch (const std::exception&) {
+        // If parsing fails, treat as Int128
+        targetType = typeSystem->INT128_TYPE;
+    }
     
     if (debugMode) {
-        std::cout << "[DEBUG VM] PUSH_BIGINT: " << bigIntValue.to_string() 
+        std::cout << "[DEBUG VM] PUSH_INT: " << intValue 
                   << " with type " << targetType->toString() << std::endl;
     }
     
-    push(memoryManager.makeRef<Value>(*region, targetType, bigIntValue));
+    push(memoryManager.makeRef<Value>(*region, targetType, intValue));
 }
 
 void VM::handlePushString(const Instruction& instruction) {
@@ -1575,7 +1600,7 @@ void VM::handleDeclareVar(const Instruction& instruction) {
     // Get visibility information from instruction (default to Private if not specified)
     AST::VisibilityLevel visibility = AST::VisibilityLevel::Private; // Default
     try {
-        int64_t visibilityValue = instruction.bigIntValue.to_int64();
+        int64_t visibilityValue = std::stoll(instruction.stringValue);
         visibility = static_cast<AST::VisibilityLevel>(visibilityValue);
     } catch (const std::exception&) {
         // If conversion fails, keep default Private visibility
@@ -1587,6 +1612,10 @@ void VM::handleDeclareVar(const Instruction& instruction) {
     if (debugMode) {
         std::cout << "[DEBUG] DECLARE_VAR: Declared new variable '" << instruction.stringValue 
                   << "' with visibility " << static_cast<int>(visibility) << std::endl;
+        std::cout << "[DEBUG] DECLARE_VAR:讨alue type is " << (value->type ? "valid" : "NULL") << std::endl;
+        if (value->type) {
+            std::cout << "[DEBUG] DECLARE_VAR: Value type tag = " << static_cast<int>(value->type->tag) << std::endl;
+        }
     }
 }
 
@@ -1634,26 +1663,26 @@ void VM::handleLoadVar(const Instruction& instruction) {
 void VM::handleDefineAtomic(const Instruction& instruction) {
     // Pop the initializer value and create an AtomicValue wrapper
     ValuePtr initVal = pop();
-    BigInt initial(0);
-    if (initVal && initVal->type && initVal->type->tag == TypeTag::BigInt) {
-        // Extract BigInt value
-        initial = extractAsBigInt(initVal);
+    std::string initial = "0";
+    if (initVal && initVal->type && isIntegerType(initVal->type)) {
+        // Extract integer value as string
+        initial = initVal->data;
     } else if (!initVal) {
-        initial = BigInt(0);
+        initial = "0";
     } else {
-        error("Invalid initializer for atomic variable - only BigInt values are supported");
+        error("Invalid initializer for atomic variable - only integer values are supported");
     }
 
     AtomicValue av(initial);
-    // Wrap in a VM Value with BIGINT_TYPE
-    auto v = memoryManager.makeRef<Value>(*region, typeSystem->BIGINT_TYPE, av);
+    // Wrap in a VM Value with INT64_TYPE
+    auto v = memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, av);
     environment->define(instruction.stringValue, v);
 }
 
 
 void VM::handleStoreTemp(const Instruction& instruction) {
     // Store the top value in a temporary variable at the specified index
-    int index = instruction.bigIntValue.to_int64();
+    int index = std::stoll(instruction.stringValue);
 
     // Find or create the current scope's temp values
     ScopedTempValues* currentScopeTemps = nullptr;
@@ -1686,7 +1715,7 @@ void VM::handleStoreTemp(const Instruction& instruction) {
 
 void VM::handleLoadTemp(const Instruction& instruction) {
     // Load the temporary value from the specified index onto the stack
-    int index = instruction.bigIntValue.to_int64();
+    int index = std::stoll(instruction.stringValue);
 
     // First, try to find the temporary variable in the current scope
     ScopedTempValues* foundScopeTemps = nullptr;
@@ -1725,7 +1754,7 @@ void VM::handleLoadTemp(const Instruction& instruction) {
 
 void VM::handleClearTemp(const Instruction& instruction) {
     // Clear the temporary value at the specified index
-    int index = instruction.bigIntValue.to_int64();
+    int index = std::stoll(instruction.stringValue);
 
     // CRITICAL FIX: Only clear temporary variables in the CURRENT scope
     // This prevents nested iterators from interfering with each other
@@ -1771,17 +1800,17 @@ void VM::handleAdd(const Instruction& instruction) {
     ValuePtr a = pop();
 
     // Atomic-aware addition: if left operand is an AtomicValue, perform atomic fetch_add
-    if (std::holds_alternative<AtomicValue>(a->data)) {
-        if (!(b->type && (b->type->tag == TypeTag::BigInt))) {
-            error("Cannot add non-BigInt to atomic variable");
+    if (std::holds_alternative<AtomicValue>(a->complexData)) {
+        if (!isIntegerType(b->type)) {
+            error("Cannot add non-integer to atomic variable");
         }
-        BigInt bVal = extractAsBigInt(b);
-        AtomicValue& av = std::get<AtomicValue>(a->data);
-        // Convert BigInt to int64_t for atomic operation (with overflow check)
-        int64_t bInt = bVal.to_int64();
+        int64_t bVal = extractAsInt64(b);
+        AtomicValue& av = std::get<AtomicValue>(a->complexData);
+        // Convert to int64_t for atomic operation
+        int64_t bInt = bVal;
         int64_t prev = av.inner->fetch_add(bInt);
-        BigInt result = BigInt(prev) + bVal;
-        push(memoryManager.makeRef<Value>(*region, typeSystem->BIGINT_TYPE, result));
+        int64_t result = prev + bVal;
+        push(memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, std::to_string(result)));
         return;
     }
 
@@ -1813,21 +1842,20 @@ void VM::handleAdd(const Instruction& instruction) {
         }
     }
 
-    // Check if either operand is a BigInt for numeric addition
-    bool aIsBigInt = actualA->type->tag == TypeTag::BigInt;
-    bool bIsBigInt = actualB->type->tag == TypeTag::BigInt;
+    // Check if both operands are numeric for arithmetic operations
+    bool aIsNumeric = isNumericType(a->type);
+    bool bIsNumeric = isNumericType(b->type);
+    
+    if (aIsNumeric && bIsNumeric) {
 
-    if (aIsBigInt && bIsBigInt) {
-        // Use the extracted values for the rest of the operation
-        a = actualA;
-        b = actualB;
-
-        // BigInt addition
-        BigInt aVal = extractAsBigInt(a);
-        BigInt bVal = extractAsBigInt(b);
-        BigInt result = aVal + bVal;
+        // Numeric addition using string arithmetic
+        int64_t aVal = extractAsInt64(a);
+        int64_t bVal = extractAsInt64(b);
+        int64_t result = aVal + bVal;
         
-        push(memoryManager.makeRef<Value>(*region, typeSystem->BIGINT_TYPE, result));
+        // Determine result type (use the larger of the two operand types)
+        TypePtr resultType = determineWiderType(a->type, b->type);
+        push(memoryManager.makeRef<Value>(*region, resultType, std::to_string(result)));
     } else {
         // If we get here, the operands are not compatible for addition
         error("Cannot add operands of types " +
@@ -1836,22 +1864,66 @@ void VM::handleAdd(const Instruction& instruction) {
     }
 }
 
+// Helper function to check if a type is an integer type
+bool VM::isIntegerType(TypePtr type) {
+    return type->tag == TypeTag::Int || type->tag == TypeTag::Int8 ||
+           type->tag == TypeTag::Int16 || type->tag == TypeTag::Int32 ||
+           type->tag == TypeTag::Int64 || type->tag == TypeTag::Int128 ||
+           type->tag == TypeTag::UInt || type->tag == TypeTag::UInt8 ||
+           type->tag == TypeTag::UInt16 || type->tag == TypeTag::UInt32 ||
+           type->tag == TypeTag::UInt64 || type->tag == TypeTag::UInt128;
+}
+
+// Helper function to check if a type is numeric (integer or float)
+bool VM::isNumericType(TypePtr type) {
+    return isIntegerType(type) || type->tag == TypeTag::Float32 || type->tag == TypeTag::Float64;
+}
+
+// Helper function to determine the wider type for arithmetic operations
+TypePtr VM::determineWiderType(TypePtr type1, TypePtr type2) {
+    // If both types are the same, return that type
+    if (type1->tag == type2->tag) {
+        return type1;
+    }
+    
+    // Priority order: UInt128 > Int128 > UInt64 > Int64 > UInt32 > Int32 > UInt16 > Int16 > UInt8 > Int8
+    std::vector<TypeTag> priority = {
+        TypeTag::UInt128, TypeTag::Int128, TypeTag::UInt64, TypeTag::Int64,
+        TypeTag::UInt32, TypeTag::Int32, TypeTag::UInt16, TypeTag::Int16,
+        TypeTag::UInt8, TypeTag::Int8
+    };
+    
+    for (TypeTag tag : priority) {
+        if (type1->tag == tag || type2->tag == tag) {
+            return (type1->tag == tag) ? type1 : type2;
+        }
+    }
+    
+    // Fallback to Int64
+    return typeSystem->INT64_TYPE;
+}
+
 void VM::handleSubtract(const Instruction& instruction) {
     ValuePtr b = pop();
     ValuePtr a = pop();
 
     // Atomic-aware subtraction
-    if (std::holds_alternative<AtomicValue>(a->data)) {
-        if (!(b->type && (b->type->tag == TypeTag::BigInt))) {
-            error("Cannot subtract non-BigInt from atomic variable");
+    if (std::holds_alternative<AtomicValue>(a->complexData)) {
+        if (!(b->type && (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int8 ||
+                          b->type->tag == TypeTag::Int16 || b->type->tag == TypeTag::Int32 ||
+                          b->type->tag == TypeTag::Int64 || b->type->tag == TypeTag::Int128 ||
+                          b->type->tag == TypeTag::UInt || b->type->tag == TypeTag::UInt8 ||
+                          b->type->tag == TypeTag::UInt16 || b->type->tag == TypeTag::UInt32 ||
+                          b->type->tag == TypeTag::UInt64 || b->type->tag == TypeTag::UInt128))) {
+            error("Cannot subtract non-integer from atomic variable");
         }
-        BigInt bVal = extractAsBigInt(b);
-        AtomicValue& av = std::get<AtomicValue>(a->data);
-        // Convert BigInt to int64_t for atomic operation (with overflow check)
-        int64_t bInt = bVal.to_int64();
+        int64_t bVal = extractAsInt64(b);
+        AtomicValue& av = std::get<AtomicValue>(a->complexData);
+        // Convert to int64_t for atomic operation
+        int64_t bInt = bVal;
         int64_t prev = av.inner->fetch_sub(bInt);
-        BigInt result = BigInt(prev) - bVal;
-        push(memoryManager.makeRef<Value>(*region, typeSystem->BIGINT_TYPE, result));
+        int64_t result = prev - bVal;
+        push(memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, std::to_string(result)));
         return;
     }
 
@@ -1874,21 +1946,23 @@ void VM::handleSubtract(const Instruction& instruction) {
         }
     }
 
-    // Check if either operand is a BigInt for numeric subtraction
-    bool aIsBigInt = actualA->type->tag == TypeTag::BigInt;
-    bool bIsBigInt = actualB->type->tag == TypeTag::BigInt;
-
-    if (aIsBigInt && bIsBigInt) {
+    // Check if both operands are numeric for arithmetic operations
+    bool aIsNumeric = isNumericType(a->type);
+    bool bIsNumeric = isNumericType(b->type);
+    
+    if (aIsNumeric && bIsNumeric) {
         // Use the extracted values for the rest of the operation
         a = actualA;
         b = actualB;
 
-        // BigInt subtraction
-        BigInt aVal = extractAsBigInt(a);
-        BigInt bVal = extractAsBigInt(b);
-        BigInt result = aVal - bVal;
+        // Numeric subtraction using string arithmetic
+        int64_t aVal = extractAsInt64(a);
+        int64_t bVal = extractAsInt64(b);
+        int64_t result = aVal - bVal;
         
-        push(memoryManager.makeRef<Value>(*region, typeSystem->BIGINT_TYPE, result));
+        // Determine result type (use the larger of the two operand types)
+        TypePtr resultType = determineWiderType(a->type, b->type);
+        push(memoryManager.makeRef<Value>(*region, resultType, std::to_string(result)));
     } else {
         // If we get here, the operands are not compatible for subtraction
         error("Cannot subtract operands of types " +
@@ -1901,19 +1975,19 @@ void VM::handleMultiply(const Instruction& instruction) {
     ValuePtr b = pop();
     ValuePtr a = pop();
 
-    // String multiplication (string * BigInt or BigInt * string)
-    if ((a->type->tag == TypeTag::String && b->type->tag == TypeTag::BigInt) ||
-            (a->type->tag == TypeTag::BigInt && b->type->tag == TypeTag::String)) {
+    // String multiplication (string * Int64 or Int64 * string)
+    if ((a->type->tag == TypeTag::String && b->type->tag == TypeTag::Int64) ||
+            (a->type->tag == TypeTag::Int64 && b->type->tag == TypeTag::String)) {
 
         std::string str;
         int64_t count;
 
         if (a->type->tag == TypeTag::String) {
-            str = std::get<std::string>(a->data);
-            count = extractAsBigInt(b).to_int64();
+            str = a->data;
+            count = extractAsInt64(b);
         } else {
-            str = std::get<std::string>(b->data);
-            count = extractAsBigInt(a).to_int64();
+            str = b->data;
+            count = extractAsInt64(a);
         }
 
         if (count < 0) {
@@ -1931,15 +2005,19 @@ void VM::handleMultiply(const Instruction& instruction) {
         return;
     }
 
-    // Numeric multiplication - BigInt only
-    if (a->type->tag == TypeTag::BigInt && b->type->tag == TypeTag::BigInt) {
-        BigInt aVal = extractAsBigInt(a);
-        BigInt bVal = extractAsBigInt(b);
-        BigInt result = aVal * bVal;
+    // Check if both operands are numeric for arithmetic operations
+    bool aIsNumeric = isNumericType(a->type);
+    bool bIsNumeric = isNumericType(b->type);
+    
+    if (aIsNumeric && bIsNumeric) {
+        int64_t aVal = extractAsInt64(a);
+        int64_t bVal = extractAsInt64(b);
+        int64_t result = aVal * bVal;
         
-        push(memoryManager.makeRef<Value>(*region, typeSystem->BIGINT_TYPE, result));
+        TypePtr resultType = determineWiderType(a->type, b->type);
+        push(memoryManager.makeRef<Value>(*region, resultType, std::to_string(result)));
     } else {
-        error("Invalid operands for multiplication - only BigInt values are supported");
+        error("Invalid operands for multiplication - only integer values are supported");
     }
 }
 
@@ -1947,40 +2025,41 @@ void VM::handleDivide(const Instruction& instruction) {
     ValuePtr b = pop();
     ValuePtr a = pop();
 
-    // Check for non-numeric operands
-    bool aIsNumeric = (a->type->tag == TypeTag::BigInt);
-    bool bIsNumeric = (b->type->tag == TypeTag::BigInt);
+    // Check for non-numeric
+    bool aIsNumeric = isNumericType(a->type);
+    bool bIsNumeric = isNumericType(b->type);
 
     if (!aIsNumeric || !bIsNumeric) {
         // Create error union with TypeError
-        auto errorUnionType = typeSystem->createErrorUnionType(typeSystem->BIGINT_TYPE, {"TypeError"}, false);
+        auto errorUnionType = typeSystem->createErrorUnionType(typeSystem->INT64_TYPE, {"TypeError"}, false);
         auto errorUnionValue = memoryManager.makeRef<Value>(*region, errorUnionType);
-        ErrorValue errorVal("TypeError", "Both operands must be BigInt for division");
-        errorUnionValue->data = errorVal;
+        ErrorValue errorVal("TypeError", "Both operands must be numeric for division");
+        errorUnionValue->complexData = errorVal;
         push(errorUnionValue);
         return;
     }
 
-    // Check for division by zero with BigInt
-    BigInt bVal = extractAsBigInt(b);
-    bool isZero = bVal == BigInt(0);
+    // Check for division by zero
+    int64_t bVal = extractAsInt64(b);
+    bool isZero = bVal == 0;
 
     if (isZero) {
         // Create error union with DivisionByZero error
-        auto errorUnionType = typeSystem->createErrorUnionType(typeSystem->BIGINT_TYPE, {"DivisionByZero"}, false);
+        auto errorUnionType = typeSystem->createErrorUnionType(typeSystem->INT64_TYPE, {"DivisionByZero"}, false);
 
         auto errorUnionValue = memoryManager.makeRef<Value>(*region, errorUnionType);
         ErrorValue errorVal("DivisionByZero", "Division by zero is not allowed");
-        errorUnionValue->data = errorVal;
+        errorUnionValue->complexData = errorVal;
         push(errorUnionValue);
         return;
     }
 
-    // BigInt division
-    BigInt aVal = extractAsBigInt(a);
-    BigInt result = aVal / bVal;
+    // Numeric division
+    int64_t aVal = extractAsInt64(a);
+    int64_t result = aVal / bVal;
     
-    push(memoryManager.makeRef<Value>(*region, typeSystem->BIGINT_TYPE, result));
+    TypePtr resultType = determineWiderType(a->type, b->type);
+    push(memoryManager.makeRef<Value>(*region, resultType, std::to_string(result)));
 }
 
 void VM::handleModulo(const Instruction& instruction) {
@@ -1988,27 +2067,33 @@ void VM::handleModulo(const Instruction& instruction) {
     ValuePtr a = pop();
 
     // Type checking
-    if (a->type->tag != TypeTag::BigInt || b->type->tag != TypeTag::BigInt) {
-        error("Modulo operation requires BigInt operands");
+    bool aIsInt = isIntegerType(a->type);
+    bool bIsInt = isIntegerType(b->type);
+    
+    if (!aIsInt || !bIsInt) {
+        error("Modulo operation requires integer operands");
     }
 
     // Check for modulo by zero
-    BigInt bVal = extractAsBigInt(b);
-    if (bVal == BigInt(0)) {
-        error("Modulo by zero", instruction.line, 0, "0", "non-zero BigInt divisor");
+    int64_t bVal = extractAsInt64(b);
+    if (bVal == 0) {
+        error("Modulo by zero", instruction.line, 0, "0", "non-zero integer divisor");
     }
 
-    // BigInt modulo
-    BigInt aVal = extractAsBigInt(a);
-    push(memoryManager.makeRef<Value>(*region, typeSystem->BIGINT_TYPE, aVal % bVal));
+    // Integer modulo
+    int64_t aVal = extractAsInt64(a);
+    TypePtr resultType = determineWiderType(a->type, b->type);
+    push(memoryManager.makeRef<Value>(*region, resultType, std::to_string(aVal % bVal)));
 }
 
 void VM::handleNegate(const Instruction& /*unused*/) {
     ValuePtr a = pop();
 
-    if (a->type->tag == TypeTag::BigInt) {
-        BigInt val = extractAsBigInt(a);
-        push(memoryManager.makeRef<Value>(*region, typeSystem->BIGINT_TYPE, BigInt(0) - val));
+    bool isInt = isIntegerType(a->type);
+    
+    if (isInt) {
+        int64_t val = extractAsInt64(a);
+        push(memoryManager.makeRef<Value>(*region, a->type, std::to_string(-val)));
     } else {
         error("Cannot negate type: " + a->type->toString());
         push(a); // Push back original value
@@ -2021,20 +2106,23 @@ void VM::handleEqual(const Instruction& /*unused*/) {
 
     bool result = false;
 
-    // Handle BigInt comparisons
-    if (a->type->tag == TypeTag::BigInt && b->type->tag == TypeTag::BigInt) {
-        BigInt aVal = extractAsBigInt(a);
-        BigInt bVal = extractAsBigInt(b);
+    // Handle integer comparisons
+    bool aIsInt = isIntegerType(a->type);
+    bool bIsInt = isIntegerType(b->type);
+    
+    if (aIsInt && bIsInt) {
+        int64_t aVal = extractAsInt64(a);
+        int64_t bVal = extractAsInt64(b);
         result = aVal == bVal;
     }
     // Handle same-type comparisons
     else if (a->type->tag == b->type->tag) {
         switch (a->type->tag) {
         case TypeTag::Bool:
-            result = std::get<bool>(a->data) == std::get<bool>(b->data);
+            result = a->as<bool>() == b->as<bool>();
             break;
         case TypeTag::String:
-            result = std::get<std::string>(a->data) == std::get<std::string>(b->data);
+            result = a->data == b->data;
             break;
         case TypeTag::Nil:
             result = true; // nil == nil
@@ -2057,20 +2145,23 @@ void VM::handleNotEqual(const Instruction& /*unused*/) {
 
     bool result = true;
 
-    // Handle BigInt comparisons
-    if (a->type->tag == TypeTag::BigInt && b->type->tag == TypeTag::BigInt) {
-        BigInt aVal = extractAsBigInt(a);
-        BigInt bVal = extractAsBigInt(b);
+    // Handle integer comparisons
+    bool aIsInt = isIntegerType(a->type);
+    bool bIsInt = isIntegerType(b->type);
+    
+    if (aIsInt && bIsInt) {
+        int64_t aVal = extractAsInt64(a);
+        int64_t bVal = extractAsInt64(b);
         result = aVal != bVal;
     }
     // Handle same-type comparisons
     else if (a->type->tag == b->type->tag) {
         switch (a->type->tag) {
         case TypeTag::Bool:
-            result = std::get<bool>(a->data) != std::get<bool>(b->data);
+            result = a->as<bool>() != b->as<bool>();
             break;
         case TypeTag::String:
-            result = std::get<std::string>(a->data) != std::get<std::string>(b->data);
+            result = a->data != b->data;
             break;
         case TypeTag::Nil:
             result = false; // nil != nil is false
@@ -2093,15 +2184,27 @@ void VM::handleLess(const Instruction& instruction) {
 
     bool result = false;
 
-    // Compare based on types - handle BigInt comparisons
-    if (a->type->tag == TypeTag::BigInt && b->type->tag == TypeTag::BigInt) {
-        BigInt aVal = extractAsBigInt(a);
-        BigInt bVal = extractAsBigInt(b);
+    if (debugMode) {
+        std::cout << "[DEBUG] handleLess: comparing " << valueToString(a) 
+                  << " (type " << static_cast<int>(a->type->tag) << ") < " 
+                  << valueToString(b) << " (type " << static_cast<int>(b->type->tag) << ")" << std::endl;
+    }
+
+    // Compare based on types - handle integer comparisons
+    bool aIsInt = isIntegerType(a->type);
+    bool bIsInt = isIntegerType(b->type);
+    
+    if (aIsInt && bIsInt) {
+        int64_t aVal = extractAsInt64(a);
+        int64_t bVal = extractAsInt64(b);
         result = aVal < bVal;
+        if (debugMode) {
+            std::cout << "[DEBUG] handleLess: " << aVal << " < " << bVal << " = " << result << std::endl;
+        }
     } else if (a->type->tag == TypeTag::String && b->type->tag == TypeTag::String) {
-        result = std::get<std::string>(a->data) < std::get<std::string>(b->data);
+        result = a->data < b->data;
     } else {
-        error("Cannot compare values of different types in less-than operation", instruction.line, 0, "< operator", "values of the same comparable type (BigInt, string, or bool)");
+        error("Cannot compare values of different types in less-than operation", instruction.line, 0, "< operator", "values of the same comparable type (integer, string, or bool)");
     }
 
     push(memoryManager.makeRef<Value>(*region, typeSystem->BOOL_TYPE, result));
@@ -2114,30 +2217,24 @@ void VM::handleLessEqual(const Instruction& /*unused*/) {
     bool result = false;
 
     // Compare based on types - handle mixed integer types
-    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) &&
-            (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
+    bool aIsInt = isIntegerType(a->type);
+    bool bIsInt = isIntegerType(b->type);
+    
+    if (aIsInt && bIsInt) {
         // Convert both to int64_t for comparison
-        int64_t aVal = (a->type->tag == TypeTag::Int) ?
-                    static_cast<int64_t>(extractAsInt64(a)) :
-                    extractAsInt64(a);
-        int64_t bVal = (b->type->tag == TypeTag::Int) ?
-                    static_cast<int64_t>(extractAsInt64(b)) :
-                    extractAsInt64(b);
+        int64_t aVal = extractAsInt64(a);
+        int64_t bVal = extractAsInt64(b);
         result = aVal <= bVal;
     } else if (a->type->tag == TypeTag::Float64 && b->type->tag == TypeTag::Float64) {
-        result = std::get<long double>(a->data) <= std::get<long double>(b->data);
-    } else if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && b->type->tag == TypeTag::Float64) {
-        int64_t aVal = (a->type->tag == TypeTag::Int) ?
-                    static_cast<int64_t>(extractAsInt64(a)) :
-                    extractAsInt64(a);
-        result = static_cast<long double>(aVal) <= std::get<long double>(b->data);
-    } else if (a->type->tag == TypeTag::Float64 && (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
-        int64_t bVal = (b->type->tag == TypeTag::Int) ?
-                    static_cast<int64_t>(extractAsInt64(b)) :
-                    extractAsInt64(b);
-        result = std::get<long double>(a->data) <= static_cast<long double>(bVal);
+        result = a->as<double>() <= b->as<double>();
+    } else if (aIsInt && b->type->tag == TypeTag::Float64) {
+        int64_t aVal = extractAsInt64(a);
+        result = static_cast<double>(aVal) <= b->as<double>();
+    } else if (a->type->tag == TypeTag::Float64 && bIsInt) {
+        int64_t bVal = extractAsInt64(b);
+        result = a->as<double>() <= static_cast<double>(bVal);
     } else if (a->type->tag == TypeTag::String && b->type->tag == TypeTag::String) {
-        result = std::get<std::string>(a->data) <= std::get<std::string>(b->data);
+        result = a->data <= b->data;
     } else {
         error("Cannot compare values of different types");
     }
@@ -2152,30 +2249,24 @@ void VM::handleGreater(const Instruction& /*unused*/) {
     bool result = false;
 
     // Compare based on types - handle mixed integer types
-    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) &&
-            (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
+    bool aIsInt = isIntegerType(a->type);
+    bool bIsInt = isIntegerType(b->type);
+    
+    if (aIsInt && bIsInt) {
         // Convert both to int64_t for comparison
-        int64_t aVal = (a->type->tag == TypeTag::Int) ?
-                    static_cast<int64_t>(extractAsInt64(a)) :
-                    extractAsInt64(a);
-        int64_t bVal = (b->type->tag == TypeTag::Int) ?
-                    static_cast<int64_t>(extractAsInt64(b)) :
-                    extractAsInt64(b);
+        int64_t aVal = extractAsInt64(a);
+        int64_t bVal = extractAsInt64(b);
         result = aVal > bVal;
     } else if (a->type->tag == TypeTag::Float64 && b->type->tag == TypeTag::Float64) {
-        result = std::get<long double>(a->data) > std::get<long double>(b->data);
-    } else if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && b->type->tag == TypeTag::Float64) {
-        int64_t aVal = (a->type->tag == TypeTag::Int) ?
-                    static_cast<int64_t>(extractAsInt64(a)) :
-                    extractAsInt64(a);
-        result = static_cast<long double>(aVal) > std::get<long double>(b->data);
-    } else if (a->type->tag == TypeTag::Float64 && (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
-        int64_t bVal = (b->type->tag == TypeTag::Int) ?
-                    static_cast<int64_t>(extractAsInt64(b)) :
-                    extractAsInt64(b);
-        result = std::get<long double>(a->data) > static_cast<long double>(bVal);
+        result = a->as<double>() > b->as<double>();
+    } else if (aIsInt && b->type->tag == TypeTag::Float64) {
+        int64_t aVal = extractAsInt64(a);
+        result = static_cast<double>(aVal) > b->as<double>();
+    } else if (a->type->tag == TypeTag::Float64 && bIsInt) {
+        int64_t bVal = extractAsInt64(b);
+        result = a->as<double>() > static_cast<double>(bVal);
     } else if (a->type->tag == TypeTag::String && b->type->tag == TypeTag::String) {
-        result = std::get<std::string>(a->data) > std::get<std::string>(b->data);
+        result = a->data > b->data;
     } else {
         error("Cannot compare values of different types");
     }
@@ -2190,30 +2281,24 @@ void VM::handleGreaterEqual(const Instruction& /*unused*/) {
     bool result = false;
 
     // Compare based on types - handle mixed integer types
-    if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) &&
-            (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
+    bool aIsInt = isIntegerType(a->type);
+    bool bIsInt = isIntegerType(b->type);
+    
+    if (aIsInt && bIsInt) {
         // Convert both to int64_t for comparison
-        int64_t aVal = (a->type->tag == TypeTag::Int) ?
-                    static_cast<int64_t>(extractAsInt64(a)) :
-                    extractAsInt64(a);
-        int64_t bVal = (b->type->tag == TypeTag::Int) ?
-                    static_cast<int64_t>(extractAsInt64(b)) :
-                    extractAsInt64(b);
+        int64_t aVal = extractAsInt64(a);
+        int64_t bVal = extractAsInt64(b);
         result = aVal >= bVal;
     } else if (a->type->tag == TypeTag::Float64 && b->type->tag == TypeTag::Float64) {
-        result = std::get<long double>(a->data) >= std::get<long double>(b->data);
-    } else if ((a->type->tag == TypeTag::Int || a->type->tag == TypeTag::Int64) && b->type->tag == TypeTag::Float64) {
-        int64_t aVal = (a->type->tag == TypeTag::Int) ?
-                    static_cast<int64_t>(extractAsInt64(a)) :
-                    extractAsInt64(a);
-        result = static_cast<long double>(aVal) >= std::get<long double>(b->data);
-    } else if (a->type->tag == TypeTag::Float64 && (b->type->tag == TypeTag::Int || b->type->tag == TypeTag::Int64)) {
-        int64_t bVal = (b->type->tag == TypeTag::Int) ?
-                    static_cast<int64_t>(extractAsInt64(b)) :
-                    extractAsInt64(b);
-        result = std::get<long double>(a->data) >= static_cast<long double>(bVal);
+        result = a->as<double>() >= b->as<double>();
+    } else if (aIsInt && b->type->tag == TypeTag::Float64) {
+        int64_t aVal = extractAsInt64(a);
+        result = static_cast<double>(aVal) >= b->as<double>();
+    } else if (a->type->tag == TypeTag::Float64 && bIsInt) {
+        int64_t bVal = extractAsInt64(b);
+        result = a->as<double>() >= static_cast<double>(bVal);
     } else if (a->type->tag == TypeTag::String && b->type->tag == TypeTag::String) {
-        result = std::get<std::string>(a->data) >= std::get<std::string>(b->data);
+        result = a->data >= b->data;
     } else {
         error("Cannot compare values of different types");
     }
@@ -2230,13 +2315,13 @@ void VM::handleAnd(const Instruction& /*unused*/) {
 
     // Convert to boolean
     if (a->type->tag == TypeTag::Bool) {
-        aVal = std::get<bool>(a->data);
+        aVal = a->as<bool>();
     } else if (a->type->tag == TypeTag::Int) {
         aVal = extractAsInt64(a) != 0;
     } else if (a->type->tag == TypeTag::Float64) {
-        aVal = std::get<long double>(a->data) != 0.0;
+        aVal = a->as<double>() != 0.0;
     } else if (a->type->tag == TypeTag::String) {
-        aVal = !std::get<std::string>(a->data).empty();
+        aVal = !a->data.empty();
     } else if (a->type->tag == TypeTag::Nil) {
         aVal = false;
     } else {
@@ -2244,13 +2329,13 @@ void VM::handleAnd(const Instruction& /*unused*/) {
     }
 
     if (b->type->tag == TypeTag::Bool) {
-        bVal = std::get<bool>(b->data);
+        bVal = b->as<bool>();
     } else if (b->type->tag == TypeTag::Int) {
         bVal = extractAsInt64(b) != 0;
     } else if (b->type->tag == TypeTag::Float64) {
-        bVal = std::get<long double>(b->data) != 0.0;
+        bVal = b->as<double>() != 0.0;
     } else if (b->type->tag == TypeTag::String) {
-        bVal = !std::get<std::string>(b->data).empty();
+        bVal = !b->data.empty();
     } else if (b->type->tag == TypeTag::Nil) {
         bVal = false;
     } else {
@@ -2269,13 +2354,13 @@ void VM::handleOr(const Instruction& /*unused*/) {
 
     // Convert to boolean
     if (a->type->tag == TypeTag::Bool) {
-        aVal = std::get<bool>(a->data);
+        aVal = a->as<bool>();
     } else if (a->type->tag == TypeTag::Int) {
         aVal = extractAsInt64(a) != 0;
     } else if (a->type->tag == TypeTag::Float64) {
-        aVal = std::get<long double>(a->data) != 0.0;
+        aVal = a->as<double>() != 0.0;
     } else if (a->type->tag == TypeTag::String) {
-        aVal = !std::get<std::string>(a->data).empty();
+        aVal = !a->data.empty();
     } else if (a->type->tag == TypeTag::Nil) {
         aVal = false;
     } else {
@@ -2283,13 +2368,13 @@ void VM::handleOr(const Instruction& /*unused*/) {
     }
 
     if (b->type->tag == TypeTag::Bool) {
-        bVal = std::get<bool>(b->data);
+        bVal = b->as<bool>();
     } else if (b->type->tag == TypeTag::Int) {
         bVal = extractAsInt64(b) != 0;
     } else if (b->type->tag == TypeTag::Float64) {
-        bVal = std::get<long double>(b->data) != 0.0;
+        bVal = b->as<double>() != 0.0;
     } else if (b->type->tag == TypeTag::String) {
-        bVal = !std::get<std::string>(b->data).empty();
+        bVal = !b->data.empty();
     } else if (b->type->tag == TypeTag::Nil) {
         bVal = false;
     } else {
@@ -2309,13 +2394,13 @@ void VM::handleNot(const Instruction& /*unused*/) {
 
     // Convert value to boolean
     bool boolValue = false;
-    if (std::holds_alternative<bool>(value->data)) {
-        boolValue = std::get<bool>(value->data);
-    } else if (std::holds_alternative<BigInt>(value->data)) {
-        boolValue = std::get<BigInt>(value->data).to_int64() != 0;
-    } else if (std::holds_alternative<std::string>(value->data)) {
-        boolValue = !std::get<std::string>(value->data).empty();
-    } else if (std::holds_alternative<std::monostate>(value->data)) {
+    if (value->type->tag == TypeTag::Bool) {
+        boolValue = value->as<bool>();
+    } else if (isIntegerType(value->type)) {
+        boolValue = value->as<int64_t>() != 0;
+    } else if (value->type->tag == TypeTag::String) {
+        boolValue = !value->data.empty();
+    } else if (value->type->tag == TypeTag::Nil) {
         boolValue = false; // null is falsy
     } else {
         error("Cannot perform NOT operation on type: " + typeTagToString(value->type->tag));
@@ -2328,7 +2413,7 @@ void VM::handleNot(const Instruction& /*unused*/) {
 
 void VM::handleInterpolateString(const Instruction& instruction) {
     // The number of parts is stored in the bigIntValue field
-    int32_t numParts = instruction.bigIntValue.to_int64();
+    int32_t numParts = std::stoll(instruction.stringValue);
 
     if (stack.size() < static_cast<size_t>(numParts)) {
         error("Stack underflow in string interpolation");
@@ -2376,7 +2461,7 @@ void VM::handleConcat(const Instruction& /*unused*/) {
 }
 
 void VM::handleJump(const Instruction& instruction) {
-    int64_t offset = instruction.bigIntValue.to_int64();
+    int64_t offset = std::stoll(instruction.stringValue);
     size_t newIP = ip + offset;
 
     if (debugMode) {
@@ -2417,11 +2502,11 @@ void VM::handleJumpIfTrue(const Instruction& instruction) {
     try {
         // Convert to boolean
         if (condition->type->tag == TypeTag::Bool) {
-            condVal = std::get<bool>(condition->data);
-        } else if (condition->type->tag == TypeTag::BigInt) {
-            condVal = std::get<BigInt>(condition->data).to_int64() != 0;
+            condVal = condition->as<bool>();
+        } else if (isIntegerType(condition->type)) {
+            condVal = condition->as<int64_t>() != 0;
         } else if (condition->type->tag == TypeTag::String) {
-            condVal = !std::get<std::string>(condition->data).empty();
+            condVal = !condition->data.empty();
         } else if (condition->type->tag == TypeTag::Nil) {
             condVal = false;
         } else {
@@ -2433,7 +2518,7 @@ void VM::handleJumpIfTrue(const Instruction& instruction) {
     }
 
     if (condVal) {
-        ip += instruction.bigIntValue.to_int64();
+        ip += std::stoll(instruction.stringValue);
     }
 }
 
@@ -2451,14 +2536,19 @@ void VM::handleJumpIfFalse(const Instruction& instruction) {
 
     bool condVal = false;
 
+    if (debugMode) {
+        std::cout << "[DEBUG] JUMP_IF_FALSE: condition value = " << valueToString(condition) 
+                  << ", type tag = " << static_cast<int>(condition->type->tag) << std::endl;
+    }
+
     try {
         // Convert to boolean
         if (condition->type->tag == TypeTag::Bool) {
-            condVal = std::get<bool>(condition->data);
-        } else if (condition->type->tag == TypeTag::BigInt) {
-            condVal = std::get<BigInt>(condition->data).to_int64() != 0;
+            condVal = condition->as<bool>();
+        } else if (isIntegerType(condition->type)) {
+            condVal = condition->as<int64_t>() != 0;
         } else if (condition->type->tag == TypeTag::String) {
-            condVal = !std::get<std::string>(condition->data).empty();
+            condVal = !condition->data.empty();
         } else if (condition->type->tag == TypeTag::Nil) {
             condVal = false;
         } else {
@@ -2469,15 +2559,20 @@ void VM::handleJumpIfFalse(const Instruction& instruction) {
         return;
     }
 
+    if (debugMode) {
+        std::cout << "[DEBUG] JUMP_IF_FALSE: condVal = " << condVal 
+                  << ", jump offset = " << instruction.stringValue << std::endl;
+    }
+
     if (!condVal) {
-        ip += instruction.bigIntValue.to_int64();
+        ip += std::stoll(instruction.stringValue);
     }
 }
 
 void VM::handleCall(const Instruction& instruction) {
     // Get the function name from the instruction
     const std::string& funcName = instruction.stringValue;
-    int argCount = instruction.bigIntValue.to_int64();
+    int argCount = std::stoll(instruction.stringValue);
 
     // Check if this is a higher-order function call (function value on stack)
     if (!stack.empty() && stack.back()->type && stack.back()->type->tag == TypeTag::Function) {
@@ -2490,8 +2585,8 @@ void VM::handleCall(const Instruction& instruction) {
         }
 
         // Execute the function value
-        if (std::holds_alternative<std::shared_ptr<backend::UserDefinedFunction>>(functionValue->data)) {
-            auto func = std::get<std::shared_ptr<backend::UserDefinedFunction>>(functionValue->data);
+        if (std::holds_alternative<std::shared_ptr<backend::UserDefinedFunction>>(functionValue->complexData)) {
+            auto func = std::get<std::shared_ptr<backend::UserDefinedFunction>>(functionValue->complexData);
 
             // Find the function in the registry to get bytecode information
             auto funcIt = userDefinedFunctions.find(func->getSignature().name);
@@ -2556,8 +2651,8 @@ void VM::handleCall(const Instruction& instruction) {
 
         if (debugMode) {
             std::cout << "[DEBUG] CALL: Function value type: " << static_cast<int>(functionValue->type->tag) << std::endl;
-            if (std::holds_alternative<std::string>(functionValue->data)) {
-                std::cout << "[DEBUG] CALL: Function name from stack: " << std::get<std::string>(functionValue->data) << std::endl;
+            if (functionValue->type->tag == TypeTag::String) {
+                std::cout << "[DEBUG] CALL: Function name from stack: " << functionValue->data << std::endl;
             }
         }
 
@@ -2571,8 +2666,8 @@ void VM::handleCall(const Instruction& instruction) {
         }
 
         // Check if it's a function value (stored as string name)
-        if (std::holds_alternative<std::string>(functionValue->data)) {
-            std::string storedFuncName = std::get<std::string>(functionValue->data);
+        if (functionValue->type->tag == TypeTag::String) {
+            std::string storedFuncName = functionValue->data;
 
             if (debugMode) {
                 std::cout << "[DEBUG] CALL: Function from stack has name: " << storedFuncName << std::endl;
@@ -2595,7 +2690,7 @@ void VM::handleCall(const Instruction& instruction) {
                     for (size_t i = 0; i < std::min(stack.size(), size_t(5)); i++) {
                         auto& val = stack[stack.size() - 1 - i];
                         std::cout << "[DEBUG] CALL:   Stack[" << (stack.size() - 1 - i) << "]: type="
-                                  << static_cast<int>(val->type->tag) << ", variant=" << val->data.index() << std::endl;
+                                  << static_cast<int>(val->type->tag) << ", data=" << val->data << std::endl;
                     }
                 }
 
@@ -2608,7 +2703,7 @@ void VM::handleCall(const Instruction& instruction) {
                     ValuePtr arg = pop();
                     if (debugMode) {
                         std::cout << "[DEBUG] CALL: Popped argument " << i << ": type="
-                                  << static_cast<int>(arg->type->tag) << ", variant=" << arg->data.index() << std::endl;
+                                  << static_cast<int>(arg->type->tag) << ", data=" << arg->data << std::endl;
                     }
                     args.insert(args.begin(), arg);
                 }
@@ -2624,12 +2719,12 @@ void VM::handleCall(const Instruction& instruction) {
                 if (debugMode) {
                     std::cout << "[DEBUG] CALL: Retrieved object for method call" << std::endl;
                     std::cout << "[DEBUG] CALL: Object value type tag: " << static_cast<int>(objectValue->type->tag) << std::endl;
-                    std::cout << "[DEBUG] CALL: Object data variant index: " << objectValue->data.index() << std::endl;
+                    std::cout << "[DEBUG] CALL: Object data value: " << objectValue->data << std::endl;
                 }
 
                 // Handle the method call using the existing method call logic
-                if (std::holds_alternative<ObjectInstancePtr>(objectValue->data)) {
-                    auto objectInstance = std::get<ObjectInstancePtr>(objectValue->data);
+                if (std::holds_alternative<ObjectInstancePtr>(objectValue->complexData)) {
+                    auto objectInstance = std::get<ObjectInstancePtr>(objectValue->complexData);
                     std::string className = objectInstance->getClassName();
 
                     // Extract method name from the stored function name
@@ -2725,8 +2820,8 @@ void VM::handleCall(const Instruction& instruction) {
 
             // Search through loaded modules to find the function
             for (const auto& [modulePath, moduleValue] : loadedModules) {
-                if (std::holds_alternative<ModuleValue>(moduleValue->data)) {
-                    auto& modVal = std::get<ModuleValue>(moduleValue->data);
+                if (std::holds_alternative<ModuleValue>(moduleValue->complexData)) {
+                    auto& modVal = std::get<ModuleValue>(moduleValue->complexData);
                     auto modEnv = modVal.env;
 
                     if (debugMode) {
@@ -2917,7 +3012,7 @@ void VM::handleCall(const Instruction& instruction) {
 
     // Check if this is a module property call
     if (callee && callee->type && callee->type->tag == TypeTag::Module) {
-        auto& moduleData = std::get<ModuleValue>(callee->data);
+        auto& moduleData = std::get<ModuleValue>(callee->complexData);
         auto moduleEnv = moduleData.env;
         std::string methodName = funcName.substr(funcName.find(":") + 1);
         try {
@@ -2930,14 +3025,14 @@ void VM::handleCall(const Instruction& instruction) {
     } else if (callee && callee->type && callee->type->tag == TypeTag::Class) {
         try {
             // Get the class definition
-            auto classDef = std::get<std::shared_ptr<backend::ClassDefinition>>(callee->data);
+            auto classDef = std::get<std::shared_ptr<backend::ClassDefinition>>(callee->complexData);
 
             // Create a new instance
             auto instance = std::make_shared<backend::ObjectInstance>(classDef);
 
             // Push 'this' onto the stack
             auto thisValue = memoryManager.makeRef<Value>(*region, typeSystem->OBJECT_TYPE);
-            thisValue->data = instance;
+            thisValue->complexData = instance;
             push(thisValue);
 
             // Look up and call the constructor if it exists
@@ -2988,8 +3083,8 @@ void VM::handleCall(const Instruction& instruction) {
         }
 
         // If the object is a Channel, provide native channel methods (send/receive/close)
-        if (std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(objectValue->data)) {
-            auto ch = std::get<std::shared_ptr<Channel<ValuePtr>>>(objectValue->data);
+        if (std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(objectValue->complexData)) {
+            auto ch = std::get<std::shared_ptr<Channel<ValuePtr>>>(objectValue->complexData);
             if (methodName == "send") {
                 if (methodArgs.size() < 1) {
                     error("Channel.send expects 1 argument");
@@ -3017,8 +3112,8 @@ void VM::handleCall(const Instruction& instruction) {
             }
         }
         // Check if the object is an ObjectInstance
-        if (std::holds_alternative<ObjectInstancePtr>(objectValue->data)) {
-            auto objectInstance = std::get<ObjectInstancePtr>(objectValue->data);
+        if (std::holds_alternative<ObjectInstancePtr>(objectValue->complexData)) {
+            auto objectInstance = std::get<ObjectInstancePtr>(objectValue->complexData);
             std::string className = objectInstance->getClassName();
 
             // For super calls, we need to look in the superclass
@@ -3127,8 +3222,8 @@ void VM::handleCall(const Instruction& instruction) {
         }
 
         // Check if the object is an ObjectInstance
-        if (std::holds_alternative<ObjectInstancePtr>(objectValue->data)) {
-            auto objectInstance = std::get<ObjectInstancePtr>(objectValue->data);
+        if (std::holds_alternative<ObjectInstancePtr>(objectValue->complexData)) {
+            auto objectInstance = std::get<ObjectInstancePtr>(objectValue->complexData);
             std::string className = objectInstance->getClassName();
 
             // Look for the method in the class definition
@@ -3203,7 +3298,7 @@ void VM::handleCall(const Instruction& instruction) {
             // Fallback: if this is a channel-like value and methodName matches
             // our native channel functions, call the free-function variant so
             // member-style syntax 'ch.send(x)' works.
-            if (std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(objectValue->data)) {
+            if (std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(objectValue->complexData)) {
                 if (methodName == "send" || methodName == "receive" || methodName == "close") {
                     // Prepare args: channel as first parameter followed by methodArgs
                     std::vector<ValuePtr> nativeArgs;
@@ -3230,7 +3325,7 @@ void VM::handleCall(const Instruction& instruction) {
         ValuePtr classValue = environment->get(funcName);
         if (classValue && classValue->type && classValue->type->tag == TypeTag::Class) {
             // This is a class constructor call
-            auto classDef = std::get<std::shared_ptr<backend::ClassDefinition>>(classValue->data);
+            auto classDef = std::get<std::shared_ptr<backend::ClassDefinition>>(classValue->complexData);
 
             // Create instance of the class
             auto instance = classDef->createInstance();
@@ -3366,7 +3461,7 @@ void VM::handleCall(const Instruction& instruction) {
         ValuePtr possibleClosure = environment->get(funcName);
         if (possibleClosure && possibleClosure->type && possibleClosure->type->tag == TypeTag::Closure) {
             // This is a closure stored in a variable
-            ClosureValue closure = std::get<ClosureValue>(possibleClosure->data);
+            ClosureValue closure = std::get<ClosureValue>(possibleClosure->complexData);
 
             if (!closure.isValid()) {
                 error("Invalid closure in function call: " + funcName);
@@ -3489,7 +3584,7 @@ void VM::handleCall(const Instruction& instruction) {
     if (!stack.empty() && stack.back()->type && stack.back()->type->tag == TypeTag::Closure) {
         //std::cout << "[DEBUG] CALL: Found closure on stack, executing closure call" << std::endl;
         ValuePtr closureValue = pop();
-        ClosureValue closure = std::get<ClosureValue>(closureValue->data);
+        ClosureValue closure = std::get<ClosureValue>(closureValue->complexData);
 
         if (!closure.isValid()) {
             error("Invalid closure in function call");
@@ -3721,16 +3816,16 @@ void VM::handleCall(const Instruction& instruction) {
             // This is a function-typed variable, call it as a higher-order function
             if (debugMode) {
                 std::cout << "[DEBUG] Found function-typed variable: " << funcName << std::endl;
-                std::cout << "[DEBUG] Variable data type index: " << varValue->data.index() << std::endl;
+                std::cout << "[DEBUG] Variable data value: " << varValue->data << std::endl;
             }
             // Handle both UserDefinedFunction objects and string function names
             std::string actualFuncName;
 
-            if (std::holds_alternative<std::shared_ptr<backend::UserDefinedFunction>>(varValue->data)) {
-                auto func = std::get<std::shared_ptr<backend::UserDefinedFunction>>(varValue->data);
+            if (std::holds_alternative<std::shared_ptr<backend::UserDefinedFunction>>(varValue->complexData)) {
+                auto func = std::get<std::shared_ptr<backend::UserDefinedFunction>>(varValue->complexData);
                 actualFuncName = func->getSignature().name;
-            } else if (std::holds_alternative<std::string>(varValue->data)) {
-                actualFuncName = std::get<std::string>(varValue->data);
+            } else if (varValue->type->tag == TypeTag::String) {
+                actualFuncName = varValue->data;
                 if (debugMode) {
                     std::cout << "[DEBUG] Function-typed variable contains function name: " << actualFuncName << std::endl;
                 }
@@ -3843,7 +3938,7 @@ void VM::handleReturn(const Instruction& /*unused*/) {
         if (returnValue->isError()) returnedError = true;
         else if (returnValue->type && returnValue->type->tag == TypeTag::ErrorUnion) {
             // If the ErrorUnion actually contains an ErrorValue, treat as error
-            if (std::holds_alternative<ErrorValue>(returnValue->data)) returnedError = true;
+            if (std::holds_alternative<ErrorValue>(returnValue->complexData)) returnedError = true;
         }
     }
 
@@ -3879,7 +3974,7 @@ void VM::handleReturn(const Instruction& /*unused*/) {
 
 void VM::handlePrint(const Instruction& instruction) {
     (void)instruction; // Mark as unused
-    int argCount = instruction.bigIntValue.to_int64();
+    int argCount = std::stoll(instruction.stringValue);
     std::vector<ValuePtr> args;
 
     // Pop all arguments from the stack
@@ -3930,14 +4025,12 @@ void VM::handleContract(const Instruction& instruction) {
     }
 
     // Check the condition
-    bool conditionValue = std::get<bool>(condition->data);
-    if (!conditionValue) {
-        std::string messageValue = std::get<std::string>(message->data);
+    bool conditionValue = condition->as<bool>();
+    std::string messageValue = message->data;
 
-        // Record error path for performance monitoring
-        if (debugMode) {
-            recordErrorPath();
-        }
+    // Record error path for performance monitoring
+    if (debugMode) {
+        recordErrorPath();
 
         // Use VM::error for consistent error reporting
         error("Contract violation: " + messageValue);
@@ -4291,7 +4384,7 @@ void VM::handleDefineField(const Instruction& instruction) {
     // Get visibility information from instruction
     AST::VisibilityLevel visibility = AST::VisibilityLevel::Private; // Default
     try {
-        int64_t visibilityValue = instruction.bigIntValue.to_int64();
+        int64_t visibilityValue = std::stoll(instruction.stringValue);
         visibility = static_cast<AST::VisibilityLevel>(visibilityValue);
     } catch (const std::exception&) {
         // If conversion fails, keep default Private visibility
@@ -4359,13 +4452,13 @@ bool VM::valuesEqual(const ValuePtr& a, const ValuePtr& b) const {
     // Compare by value content based on type
     switch (a->type->tag) {
     case TypeTag::Bool:
-        return std::get<bool>(a->data) == std::get<bool>(b->data);
+        return a->as<bool>() == b->as<bool>();
     case TypeTag::Int:
         return extractAsInt64(a) == extractAsInt64(b);
     case TypeTag::Float64:
-        return std::get<long double>(a->data) == std::get<long double>(b->data);
+        return a->as<double>() == b->as<double>();
     case TypeTag::String:
-        return std::get<std::string>(a->data) == std::get<std::string>(b->data);
+        return a->data == b->data;
     case TypeTag::Nil:
         return true; // All nil values are equal
     default:
@@ -4477,13 +4570,13 @@ void VM::handleListAppend(const Instruction& /*unused*/) {
     ValuePtr listVal = pop();
 
     // Check if it's actually a list
-    if (!std::holds_alternative<ListValue>(listVal->data)) {
+    if (!std::holds_alternative<ListValue>(listVal->complexData)) {
         error("Cannot append to non-list value");
         return;
     }
 
     // Get the list data
-    auto& listData = std::get<ListValue>(listVal->data);
+    auto& listData = std::get<ListValue>(listVal->complexData);
 
     // Append the value
     listData.elements.push_back(value);
@@ -4494,7 +4587,7 @@ void VM::handleListAppend(const Instruction& /*unused*/) {
 
 void VM::handleCreateDict(const Instruction& instruction) {
     // Get the number of key-value pairs to include in the dictionary
-    int32_t count = instruction.bigIntValue.to_int64();
+    int32_t count = std::stoll(instruction.stringValue);
 
     // Create a new dictionary
     auto dict = memoryManager.makeRef<Value>(*region, typeSystem->DICT_TYPE);
@@ -4523,7 +4616,7 @@ void VM::handleCreateDict(const Instruction& instruction) {
     }
 
     // Store the dictionary in the value and push it onto the stack
-    dict->data = dictValue;
+    dict->complexData = dictValue;
     push(dict);
 }
 
@@ -4542,13 +4635,13 @@ void VM::handleDictSet(const Instruction& /*unused*/) {
     }
 
     // Check if it's actually a dictionary
-    if (!std::holds_alternative<DictValue>(dictVal->data)) {
+    if (!std::holds_alternative<DictValue>(dictVal->complexData)) {
         error("Cannot set key on non-dictionary value");
         return;
     }
 
     // Get the dictionary data
-    auto& dictData = std::get<DictValue>(dictVal->data);
+    auto& dictData = std::get<DictValue>(dictVal->complexData);
 
     // Find existing key and update, or add new key
     bool keyExists = false;
@@ -4586,22 +4679,22 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
     // Pop the container (list or dictionary)
     ValuePtr container = pop();
 
-    if (std::holds_alternative<ListValue>(container->data)) {
+    if (std::holds_alternative<ListValue>(container->complexData)) {
         // Handle list indexing
-        auto& listData = std::get<ListValue>(container->data);
+        auto& listData = std::get<ListValue>(container->complexData);
 
         // Check if index is an integer
-        if (!std::holds_alternative<BigInt>(index->data)) {
+        if (index->type->tag != TypeTag::Int && index->type->tag != TypeTag::Int64) {
             // Create and push error value for invalid index type
             auto errorType = typeSystem->getErrorType("TypeConversion");
             auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
             ErrorValue errorVal("TypeConversion", "List index must be an integer");
-            errorValue->data = errorVal;
+            errorValue->complexData = errorVal;
             push(errorValue);
             return;
         }
 
-        int64_t idx = std::get<BigInt>(index->data).to_int64();
+        int64_t idx = index->as<int64_t>();
 
         // Check bounds
         if (idx < 0 || idx >= static_cast<int32_t>(listData.elements.size())) {
@@ -4610,7 +4703,7 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
             auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
             ErrorValue errorVal("IndexOutOfBounds", "List index " + std::to_string(idx) +
                                 " out of bounds for list of size " + std::to_string(listData.elements.size()));
-            errorValue->data = errorVal;
+            errorValue->complexData = errorVal;
             push(errorValue);
             return;
         }
@@ -4618,22 +4711,22 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
         // Push the element at the index (wrapped in success value for consistency)
         push(listData.elements[idx]);
 
-    } else if (std::holds_alternative<TupleValue>(container->data)) {
+    } else if (std::holds_alternative<TupleValue>(container->complexData)) {
         // Handle tuple indexing
-        auto& tupleData = std::get<TupleValue>(container->data);
+        auto& tupleData = std::get<TupleValue>(container->complexData);
 
         // Check if index is an integer
-        if (!std::holds_alternative<BigInt>(index->data)) {
+        if (index->type->tag != TypeTag::Int && index->type->tag != TypeTag::Int64) {
             // Create and push error value for invalid index type
             auto errorType = typeSystem->getErrorType("TypeConversion");
             auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
             ErrorValue errorVal("TypeConversion", "Tuple index must be an integer");
-            errorValue->data = errorVal;
+            errorValue->complexData = errorVal;
             push(errorValue);
             return;
         }
 
-        int64_t idx = std::get<BigInt>(index->data).to_int64();
+        int64_t idx = index->as<int64_t>();
 
         // Check bounds
         if (idx < 0 || idx >= static_cast<int32_t>(tupleData.elements.size())) {
@@ -4642,7 +4735,7 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
             auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
             ErrorValue errorVal("IndexOutOfBounds", "Tuple index " + std::to_string(idx) +
                                 " out of bounds for tuple of size " + std::to_string(tupleData.elements.size()));
-            errorValue->data = errorVal;
+            errorValue->complexData = errorVal;
             push(errorValue);
             return;
         }
@@ -4650,9 +4743,9 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
         // Push the element at the index
         push(tupleData.elements[idx]);
 
-    } else if (std::holds_alternative<DictValue>(container->data)) {
+    } else if (std::holds_alternative<DictValue>(container->complexData)) {
         // Handle dictionary indexing
-        auto& dictData = std::get<DictValue>(container->data);
+        auto& dictData = std::get<DictValue>(container->complexData);
 
         // Find the key in the dictionary by comparing values
         ValuePtr foundValue = nullptr;
@@ -4668,7 +4761,7 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
             auto errorType = typeSystem->getErrorType("IndexOutOfBounds");
             auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
             ErrorValue errorVal("IndexOutOfBounds", "Key not found in dictionary");
-            errorValue->data = errorVal;
+            errorValue->complexData = errorVal;
             push(errorValue);
             return;
         }
@@ -4681,7 +4774,7 @@ void VM::handleGetIndex(const Instruction& /*unused*/) {
         auto errorType = typeSystem->getErrorType("TypeConversion");
         auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
         ErrorValue errorVal("TypeConversion", "Cannot index non-container value");
-        errorValue->data = errorVal;
+        errorValue->complexData = errorVal;
         push(errorValue);
     }
 }
@@ -4696,22 +4789,22 @@ void VM::handleSetIndex(const Instruction& /*unused*/) {
     // Pop the container (list or dictionary)
     ValuePtr container = pop();
 
-    if (std::holds_alternative<ListValue>(container->data)) {
+    if (std::holds_alternative<ListValue>(container->complexData)) {
         // Handle list indexing
-        auto& listData = std::get<ListValue>(container->data);
+        auto& listData = std::get<ListValue>(container->complexData);
 
         // Check if index is an integer
-        if (!std::holds_alternative<BigInt>(index->data)) {
+        if (index->type->tag != TypeTag::Int && index->type->tag != TypeTag::Int64) {
             // Create and push error value for invalid index type
             auto errorType = typeSystem->getErrorType("TypeConversion");
             auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
             ErrorValue errorVal("TypeConversion", "List index must be an integer");
-            errorValue->data = errorVal;
+            errorValue->complexData = errorVal;
             push(errorValue);
             return;
         }
 
-        int64_t idx = std::get<BigInt>(index->data).to_int64();
+        int64_t idx = index->as<int64_t>();
 
         // Check bounds
         if (idx < 0 || idx >= static_cast<int32_t>(listData.elements.size())) {
@@ -4720,7 +4813,7 @@ void VM::handleSetIndex(const Instruction& /*unused*/) {
             auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
             ErrorValue errorVal("IndexOutOfBounds", "List index " + std::to_string(idx) +
                                 " out of bounds for list of size " + std::to_string(listData.elements.size()));
-            errorValue->data = errorVal;
+            errorValue->complexData = errorVal;
             push(errorValue);
             return;
         }
@@ -4728,18 +4821,18 @@ void VM::handleSetIndex(const Instruction& /*unused*/) {
         // Set the element at the index
         listData.elements[idx] = value;
 
-    } else if (std::holds_alternative<TupleValue>(container->data)) {
+    } else if (std::holds_alternative<TupleValue>(container->complexData)) {
         // Tuples are immutable - cannot set elements
         auto errorType = typeSystem->getErrorType("TypeConversion");
         auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
         ErrorValue errorVal("TypeConversion", "Cannot modify immutable tuple");
-        errorValue->data = errorVal;
+        errorValue->complexData = errorVal;
         push(errorValue);
         return;
 
-    } else if (std::holds_alternative<DictValue>(container->data)) {
+    } else if (std::holds_alternative<DictValue>(container->complexData)) {
         // Handle dictionary indexing
-        auto& dictData = std::get<DictValue>(container->data);
+        auto& dictData = std::get<DictValue>(container->complexData);
 
         // Find existing key and update, or add new key
         bool keyExists = false;
@@ -4760,7 +4853,7 @@ void VM::handleSetIndex(const Instruction& /*unused*/) {
         auto errorType = typeSystem->getErrorType("TypeConversion");
         auto errorValue = memoryManager.makeRef<Value>(*region, errorType);
         ErrorValue errorVal("TypeConversion", "Cannot index non-container value");
-        errorValue->data = errorVal;
+        errorValue->complexData = errorVal;
         push(errorValue);
         return;
     }
@@ -4771,7 +4864,7 @@ void VM::handleSetIndex(const Instruction& /*unused*/) {
 
 void VM::handleCreateRange(const Instruction& instruction) {
     // Get the step value (default is 1 if not specified)
-    int64_t step = instruction.bigIntValue.to_int64() != 0 ? instruction.bigIntValue.to_int64() : 1;
+    int64_t step = std::stoll(instruction.stringValue) != 0 ? std::stoll(instruction.stringValue) : 1;
     // Get end value from stack
     auto endVal = pop();
     // Get start value from stack
@@ -4780,57 +4873,19 @@ void VM::handleCreateRange(const Instruction& instruction) {
     // Extract integer values
     int64_t start, end;
 
-    if (std::holds_alternative<int8_t>(startVal->data)) {
-        start = std::get<int8_t>(startVal->data);
-    } else if (std::holds_alternative<int16_t>(startVal->data)) {
-        start = std::get<int16_t>(startVal->data);
-    } else if (std::holds_alternative<int32_t>(startVal->data)) {
-        start = std::get<BigInt>(startVal->data).to_int64();
-    } else if (std::holds_alternative<int64_t>(startVal->data)) {
-        start = std::get<int64_t>(startVal->data);
-    } else {
-        error("Range start must be an integer");
-        return;
-    }
+    start = extractAsInt64(startVal);
 
-    if (std::holds_alternative<int8_t>(endVal->data)) {
-        end = std::get<int8_t>(endVal->data);
-    } else if (std::holds_alternative<int16_t>(endVal->data)) {
-        end = std::get<int16_t>(endVal->data);
-    } else if (std::holds_alternative<int32_t>(endVal->data)) {
-        end = std::get<BigInt>(endVal->data).to_int64();
-    } else if (std::holds_alternative<int64_t>(endVal->data)) {
-        end = std::get<int64_t>(endVal->data);
-    } else {
-        error("Range end must be an integer");
-        return;
-    }
+    end = extractAsInt64(endVal);
 
-    // Create a list to hold the range values
-    // ListValue rangeList;
 
-    // if (step > 0) {
-    //     for (int64_t i = start; i < end; i += step) {
-    //         auto val = memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, i);
-    //         rangeList.elements.push_back(val);
-    //     }
-    // } else if (step < 0) {
-    //     for (int64_t i = start; i > end; i += step) {
-    //         auto val = memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE, i);
-    //         rangeList.elements.push_back(val);
-    //     }
-    // }
-    // // Push the range list onto the stack
-    // auto result = memoryManager.makeRef<Value>(*region, typeSystem->LIST_TYPE, rangeList);
-    // push(result);
 
     // CRITICAL FIX: Create a lazy range iterator instead of materializing all values
     auto rangeIterator = std::make_shared<IteratorValue>(
                 IteratorValue::IteratorType::RANGE,
                 nullptr,  // No backing collection
-                start,    // Pass range parameters directly
-                end,
-                step
+                std::to_string(start),    // Pass range parameters as strings
+                std::to_string(end),
+                std::to_string(step)
                 );
 
     if (debugMode) {
@@ -4847,7 +4902,7 @@ void VM::handleGetIterator(const Instruction& /*unused*/) {
     auto iterable = pop();
 
     // CRITICAL FIX: If it's already an iterator (like a lazy range), just push it back
-    if (std::holds_alternative<IteratorValuePtr>(iterable->data)) {
+    if (std::holds_alternative<IteratorValuePtr>(iterable->complexData)) {
         if (debugMode) {
             std::cout << "[DEBUG] GET_ITERATOR: Value is already an iterator, passing through" << std::endl;
         }
@@ -4856,7 +4911,7 @@ void VM::handleGetIterator(const Instruction& /*unused*/) {
     }
 
     // Create an iterator for the iterable
-    if (std::holds_alternative<ListValue>(iterable->data)) {
+    if (std::holds_alternative<ListValue>(iterable->complexData)) {
         // For lists, create a list iterator
         auto iterator = std::make_shared<IteratorValue>(
                     IteratorValue::IteratorType::LIST,
@@ -4868,7 +4923,7 @@ void VM::handleGetIterator(const Instruction& /*unused*/) {
                     iterator
                     );
         push(iteratorValue);
-    } else if (std::holds_alternative<DictValue>(iterable->data)) {
+    } else if (std::holds_alternative<DictValue>(iterable->complexData)) {
         // For dictionaries, we'll use the same approach as lists for now
         auto iterator = std::make_shared<IteratorValue>(
                     IteratorValue::IteratorType::LIST,
@@ -4880,7 +4935,7 @@ void VM::handleGetIterator(const Instruction& /*unused*/) {
                     iterator
                     );
         push(iteratorValue);
-    } else if (std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(iterable->data)) {
+    } else if (std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(iterable->complexData)) {
         // Create a channel-backed iterator
         auto iterator = std::make_shared<IteratorValue>(
                     IteratorValue::IteratorType::CHANNEL,
@@ -4902,13 +4957,13 @@ void VM::handleIteratorHasNext(const Instruction& /*unused*/) {
     auto iteratorVal = pop();
 
     // Check if the value is an iterator
-    if (!std::holds_alternative<IteratorValuePtr>(iteratorVal->data)) {
+    if (!std::holds_alternative<IteratorValuePtr>(iteratorVal->complexData)) {
         error("Expected iterator value in ITERATOR_HAS_NEXT, got type: " +
               typeTagToString(iteratorVal->type->tag));
         return;
     }
 
-    auto iterator = std::get<IteratorValuePtr>(iteratorVal->data);
+    auto iterator = std::get<IteratorValuePtr>(iteratorVal->complexData);
 
     // Add additional validation for iterator state
     if (!iterator) {
@@ -4946,13 +5001,13 @@ void VM::handleIteratorNext(const Instruction& /*unused*/) {
     auto iteratorVal = pop();
 
     // Check if the value is an iterator
-    if (!std::holds_alternative<IteratorValuePtr>(iteratorVal->data)) {
+    if (!std::holds_alternative<IteratorValuePtr>(iteratorVal->complexData)) {
         error("Expected iterator value in ITERATOR_NEXT, got type: " +
               typeTagToString(iteratorVal->type->tag));
         return;
     }
 
-    auto iterator = std::get<IteratorValuePtr>(iteratorVal->data);
+    auto iterator = std::get<IteratorValuePtr>(iteratorVal->complexData);
 
     // Add additional validation for iterator state
     if (!iterator) {
@@ -4996,7 +5051,7 @@ void VM::handleIteratorNextKeyValue(const Instruction& /*unused*/) {
     // In a real implementation, we would need to handle dictionary iteration differently
     Instruction nextInstr;
     nextInstr.opcode = Opcode::ITERATOR_NEXT;
-    nextInstr.bigIntValue = BigInt(0);
+    nextInstr.stringValue = "0";
     nextInstr.boolValue = false;
     handleIteratorNext(nextInstr);
 }
@@ -5028,6 +5083,10 @@ void VM::handleEndScope(const Instruction& /*unused*/) {
             ++it;
         }
     }
+
+    // Store current environment pointer before restoration
+    auto currentEnv = environment;
+    auto enclosingEnv = environment ? environment->enclosing : nullptr;
 
     // Restore the previous environment
     if (environment && environment->enclosing) {
@@ -5080,6 +5139,11 @@ void VM::handleEndScope(const Instruction& /*unused*/) {
             std::cout << "[DEBUG] END_SCOPE: Exception in region->exitScope(): " << e.what()
                       << " (continuing execution)" << std::endl;
         }
+    } catch (...) {
+        // Catch any other exceptions to prevent crashes
+        if (debugMode) {
+            std::cout << "[DEBUG] END_SCOPE: Unknown exception in region->exitScope() (continuing execution)" << std::endl;
+        }
     }
 
     if (debugMode) {
@@ -5119,7 +5183,7 @@ void VM::handleBeginParallel(const Instruction& instruction) {
                 );
 
     // Get the number of cores to use (from instruction parameters)
-    int cores = instruction.bigIntValue.to_int64() > 0 ? instruction.bigIntValue.to_int64() : std::thread::hardware_concurrency();
+    int cores = std::stoll(instruction.stringValue) > 0 ? std::stoll(instruction.stringValue) : std::thread::hardware_concurrency();
     std::string mode = instruction.stringValue.empty() ? "fork-join" : instruction.stringValue;
 
     if (debugMode) {
@@ -5433,7 +5497,7 @@ void VM::handleMatchPattern(const Instruction& /*unused*/) {
     }
     // Type matching with string patterns
     else if (pattern->type->tag == TypeTag::String) {
-        std::string typeName = std::get<std::string>(pattern->data);
+        std::string typeName = pattern->data;
 
         // Handle special destructuring patterns
         if (typeName == "__dict_pattern__") {
@@ -5557,10 +5621,10 @@ bool VM::handleDictPatternMatch(const ValuePtr& value) {
 
     // Pop number of fields
     ValuePtr numFieldsValue = pop();
-    int numFields = std::get<BigInt>(numFieldsValue->data).to_int64();
+    int numFields = numFieldsValue->as<int64_t>();
 
     // Get the dictionary data
-    auto dictData = std::get<DictValue>(value->data);
+    auto dictData = std::get<DictValue>(value->complexData);
 
     // Pop and process field patterns
     std::vector<std::pair<std::string, std::string>> fieldPatterns;
@@ -5568,8 +5632,8 @@ bool VM::handleDictPatternMatch(const ValuePtr& value) {
         ValuePtr bindingName = pop();
         ValuePtr keyName = pop();
         fieldPatterns.push_back({
-                                    std::get<std::string>(keyName->data),
-                                    std::get<std::string>(bindingName->data)
+                                    keyName->data,
+                                    bindingName->data
                                 });
     }
 
@@ -5588,8 +5652,8 @@ bool VM::handleDictPatternMatch(const ValuePtr& value) {
     }
 
     // Handle rest element if present
-    if (std::get<bool>(hasRestElement->data)) {
-        std::string restBinding = std::get<std::string>(restBindingName->data);
+    if (hasRestElement->as<bool>()) {
+        std::string restBinding = restBindingName->data;
 
         // Create a new dictionary with remaining fields
         DictValue restDict;
@@ -5597,7 +5661,7 @@ bool VM::handleDictPatternMatch(const ValuePtr& value) {
             // Check if this key was matched
             bool isMatched = false;
             if (keyPtr->type->tag == TypeTag::String) {
-                std::string keyStr = std::get<std::string>(keyPtr->data);
+                std::string keyStr = keyPtr->data;
                 for (const auto& [patternKey, _] : fieldPatterns) {
                     if (keyStr == patternKey) {
                         isMatched = true;
@@ -5632,10 +5696,10 @@ bool VM::handleListPatternMatch(const ValuePtr& value) {
 
     // Pop number of elements
     ValuePtr numElementsValue = pop();
-    int numElements = std::get<BigInt>(numElementsValue->data).to_int64();
+    int numElements = numElementsValue->as<int64_t>();
 
     // Get the list data
-    auto listData = std::get<ListValue>(value->data);
+    auto listData = std::get<ListValue>(value->complexData);
 
     // Check if list has the expected number of elements
     if (static_cast<int>(listData.elements.size()) != numElements) {
@@ -5664,7 +5728,7 @@ bool VM::handleListPatternMatch(const ValuePtr& value) {
             // we'd need to track pattern types differently
             // For now, assume string patterns are variable bindings
             if (pattern->type->tag == TypeTag::String) {
-                std::string varName = std::get<std::string>(pattern->data);
+                std::string varName = pattern->data;
                 if (varName != "_") {
                     environment->define(varName, element);
                 }
@@ -5692,7 +5756,7 @@ void VM::clearDictPatternFromStack() {
     ValuePtr restBindingName = pop();
     ValuePtr hasRestElement = pop();
     ValuePtr numFieldsValue = pop();
-    int numFields = std::get<BigInt>(numFieldsValue->data).to_int64();
+    int numFields = numFieldsValue->as<int64_t>();
 
     // Pop field patterns
     for (int i = 0; i < numFields * 2; i++) {
@@ -5703,7 +5767,7 @@ void VM::clearDictPatternFromStack() {
 void VM::clearListPatternFromStack() {
     // Clear list pattern data from stack when match fails
     ValuePtr numElementsValue = pop();
-    int numElements = std::get<BigInt>(numElementsValue->data).to_int64();
+    int numElements = numElementsValue->as<int64_t>();
 
     // Pop pattern elements
     for (int i = 0; i < numElements; i++) {
@@ -5768,7 +5832,7 @@ void VM::executeFunction(ValuePtr functionValue, const std::vector<ValuePtr>& ar
         return;
     }
 
-    if (auto* userFunc = std::get_if<std::shared_ptr<backend::UserDefinedFunction>>(&functionValue->data)) {
+    if (auto* userFunc = std::get_if<std::shared_ptr<backend::UserDefinedFunction>>(&functionValue->complexData)) {
         auto vmUserFunc = dynamic_cast<VMUserDefinedFunction*>((*userFunc).get());
         if (!vmUserFunc) {
             error("Cannot call non-VM function.");
@@ -5806,7 +5870,7 @@ void VM::executeFunction(ValuePtr functionValue, const std::vector<ValuePtr>& ar
 
         // The main execution loop will now take over.
         // When the function returns, the context will be restored in handleReturn.
-    } else if (auto* nativeFunc = std::get_if<std::function<ValuePtr(const std::vector<ValuePtr>&)>>(&functionValue->data)) {
+    } else if (auto* nativeFunc = std::get_if<std::function<ValuePtr(const std::vector<ValuePtr>&)>>(&functionValue->complexData)) {
         push((*nativeFunc)(args));
     } else {
         error("Invalid function value.");
@@ -5913,7 +5977,7 @@ void VM::handleImportExecute(const Instruction& instruction) {
         }
         auto moduleData = ModuleValue{moduleVm.environment, bytecode};
         moduleValue = memoryManager.makeRef<Value>(*region, typeSystem->MODULE_TYPE);
-        moduleValue->data = moduleData;
+        moduleValue->complexData = moduleData;
         loadedModules[modulePath] = moduleValue;
         if (debugMode) {
             std::cout << "[DEBUG] handleImportExecute: Module cached for future imports" << std::endl;
@@ -5944,7 +6008,7 @@ void VM::handleImportExecute(const Instruction& instruction) {
         if (debugMode) {
             std::cout << "[DEBUG] handleImportExecute: Applying import filters" << std::endl;
         }
-        auto& moduleData = std::get<ModuleValue>(moduleValue->data);
+        auto& moduleData = std::get<ModuleValue>(moduleValue->complexData);
         auto moduleEnv = moduleData.env;
 
         // Create a new filtered environment
@@ -6013,7 +6077,7 @@ void VM::handleImportExecute(const Instruction& instruction) {
         // Create filtered module value
         auto filteredModuleData = ModuleValue{filteredEnv, moduleData.bytecode};
         auto filteredModuleValue = memoryManager.makeRef<Value>(*region, typeSystem->MODULE_TYPE);
-        filteredModuleValue->data = filteredModuleData;
+        filteredModuleValue->complexData = filteredModuleData;
         moduleValue = filteredModuleValue;
     }
 
@@ -6286,7 +6350,7 @@ void VM::handlePropagateError(const Instruction& instruction) {
         std::string errorMsg = "Unhandled error";
 
         try {
-            if (auto errorVal = std::get_if<::ErrorValue>(&error_value->data)) {
+            if (auto errorVal = std::get_if<::ErrorValue>(&error_value->complexData)) {
                 errorMsg = "Unhandled error: " + errorVal->errorType;
                 if (!errorVal->message.empty()) {
                     errorMsg += " - " + errorVal->message;
@@ -6303,7 +6367,7 @@ void VM::handlePropagateError(const Instruction& instruction) {
 
 void VM::handleConstructError(const Instruction& instruction) {
     const std::string& errorType = instruction.stringValue;
-    int32_t argCount = instruction.bigIntValue.to_int64();
+    int32_t argCount = std::stoll(instruction.stringValue);
 
     if (stack.size() < static_cast<size_t>(argCount)) [[unlikely]] {
         error("Stack underflow in CONSTRUCT_ERROR");
@@ -6325,7 +6389,7 @@ void VM::handleConstructError(const Instruction& instruction) {
     // Create error message - optimized for common patterns
     std::string errorMessage;
     if (!args.empty() && args[0]->type->tag == TypeTag::String) [[likely]] {
-        errorMessage = std::get<std::string>(args[0]->data);
+        errorMessage = args[0]->data;
     } else {
         errorMessage = "Error occurred";
     }
@@ -6382,8 +6446,8 @@ void VM::handleIsError(const Instruction& instruction) {
     // Check if the value is an error in various forms
     if (value->type->tag == TypeTag::ErrorUnion) {
         // Check if the error union contains an ErrorValue
-        isError = std::holds_alternative<ErrorValue>(value->data);
-    } else if (std::holds_alternative<ErrorValue>(value->data)) {
+        isError = std::holds_alternative<ErrorValue>(value->complexData);
+    } else if (std::holds_alternative<ErrorValue>(value->complexData)) {
         // Direct ErrorValue
         isError = true;
     }
@@ -6407,8 +6471,8 @@ void VM::handleIsSuccess(const Instruction& instruction) {
     // Check if the value is NOT an error
     if (value->type->tag == TypeTag::ErrorUnion) {
         // For error unions, success means NOT containing an ErrorValue
-        isSuccess = !std::holds_alternative<ErrorValue>(value->data);
-    } else if (std::holds_alternative<ErrorValue>(value->data)) {
+        isSuccess = !std::holds_alternative<ErrorValue>(value->complexData);
+    } else if (std::holds_alternative<ErrorValue>(value->complexData)) {
         // Direct ErrorValue is not success
         isSuccess = false;
     }
@@ -6475,7 +6539,7 @@ void VM::handlePushFunction(const Instruction& instruction) {
     // Get visibility information from instruction
     AST::VisibilityLevel visibility = AST::VisibilityLevel::Private; // Default
     try {
-        int64_t visibilityValue = instruction.bigIntValue.to_int64();
+        int64_t visibilityValue = std::stoll(instruction.stringValue);
         visibility = static_cast<AST::VisibilityLevel>(visibilityValue);
     } catch (const std::exception&) {
         // If conversion fails, keep default Private visibility
@@ -6604,8 +6668,8 @@ void VM::handleGetProperty(const Instruction& instruction) {
 
     // --- Handle Module property access ---
     if (object->type && object->type->tag == TypeTag::Module) {
-        if (std::holds_alternative<ModuleValue>(object->data)) {
-            auto& moduleData = std::get<ModuleValue>(object->data);
+        if (std::holds_alternative<ModuleValue>(object->complexData)) {
+            auto& moduleData = std::get<ModuleValue>(object->complexData);
             auto moduleEnv = moduleData.env;
 
             if (debugMode) {
@@ -6623,26 +6687,36 @@ void VM::handleGetProperty(const Instruction& instruction) {
 
                 // Special handling if property is a function
                 if (property->type && property->type->tag == TypeTag::Function) {
-                    if (std::holds_alternative<std::string>(property->data)) {
-                        std::string functionName = std::get<std::string>(property->data);
-
-                        if (debugMode) {
-                            std::cout << "[DEBUG] GET_PROPERTY: Property is a function: " << functionName << std::endl;
-                        }
-
-                        // Create a module function reference using the expected format
-                        std::string moduleQualifiedName = "module_function:" + functionName;
-
-                        // Create a function value that references this module function
-                        auto moduleFunctionValue = memoryManager.makeRef<Value>(*region, typeSystem->FUNCTION_TYPE, moduleQualifiedName);
-
-                        if (debugMode) {
-                            std::cout << "[DEBUG] GET_PROPERTY: Created module function reference: " << moduleQualifiedName << std::endl;
-                        }
-
-                        push(moduleFunctionValue);
-                        return;
+                    // Check how the function is stored and extract its name
+                    std::string functionName;
+                    
+                    if (std::holds_alternative<std::shared_ptr<backend::UserDefinedFunction>>(property->complexData)) {
+                        auto func = std::get<std::shared_ptr<backend::UserDefinedFunction>>(property->complexData);
+                        functionName = func->getSignature().name;
+                    } else if (std::holds_alternative<backend::Function>(property->complexData)) {
+                        auto func = std::get<backend::Function>(property->complexData);
+                        functionName = func.name;
+                    } else {
+                        // Function stored as string name
+                        functionName = property->data;
                     }
+
+                        if (debugMode) {
+                        std::cout << "[DEBUG] GET_PROPERTY: Property is a function: " << functionName << std::endl;
+                    }
+
+                    // Create a module function reference using the expected format
+                    std::string moduleQualifiedName = "module_function:" + functionName;
+
+                    // Create a function value that references this module function
+                    auto moduleFunctionValue = memoryManager.makeRef<Value>(*region, typeSystem->FUNCTION_TYPE, moduleQualifiedName);
+
+                    if (debugMode) {
+                        std::cout << "[DEBUG] GET_PROPERTY: Created module function reference: " << moduleQualifiedName << std::endl;
+                    }
+
+                    push(moduleFunctionValue);
+                    return;
                 }
 
                 push(property);
@@ -6658,8 +6732,8 @@ void VM::handleGetProperty(const Instruction& instruction) {
     }
 
     // --- Handle Object property access ---
-    if (std::holds_alternative<ObjectInstancePtr>(object->data)) {
-        auto objectInstance = std::get<ObjectInstancePtr>(object->data);
+    if (std::holds_alternative<ObjectInstancePtr>(object->complexData)) {
+        auto objectInstance = std::get<ObjectInstancePtr>(object->complexData);
 
         // First check if this is actually a field (not a method)
         bool isActualField = objectInstance->hasField(propertyName);
@@ -6750,8 +6824,8 @@ void VM::handleGetProperty(const Instruction& instruction) {
     }
 
     // --- Handle Dictionary property access ---
-    if (std::holds_alternative<DictValue>(object->data)) {
-        auto& dictData = std::get<DictValue>(object->data);
+    if (std::holds_alternative<DictValue>(object->complexData)) {
+        auto& dictData = std::get<DictValue>(object->complexData);
         auto keyValue = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, propertyName);
 
         if (debugMode) {
@@ -6782,8 +6856,8 @@ void VM::handleGetProperty(const Instruction& instruction) {
     }
 
     // --- Handle ErrorValue special properties ---
-    if (std::holds_alternative<ErrorValue>(object->data)) {
-        auto errorValue = std::get<ErrorValue>(object->data);
+    if (std::holds_alternative<ErrorValue>(object->complexData)) {
+        auto errorValue = std::get<ErrorValue>(object->complexData);
 
         if (propertyName == "message") {
             auto messageValue = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, errorValue.message);
@@ -6821,8 +6895,8 @@ void VM::handleSetProperty(const Instruction& instruction) {
 
     // --- Handle Module property assignment ---
     if (object->type && object->type->tag == TypeTag::Module) {
-        if (std::holds_alternative<ModuleValue>(object->data)) {
-            auto& moduleData = std::get<ModuleValue>(object->data);
+        if (std::holds_alternative<ModuleValue>(object->complexData)) {
+            auto& moduleData = std::get<ModuleValue>(object->complexData);
             auto moduleEnv = moduleData.env;
 
             moduleEnv->define(propertyName, value);
@@ -6838,8 +6912,8 @@ void VM::handleSetProperty(const Instruction& instruction) {
     }
 
     // --- Handle Object property assignment ---
-    if (std::holds_alternative<ObjectInstancePtr>(object->data)) {
-        auto objectInstance = std::get<ObjectInstancePtr>(object->data);
+    if (std::holds_alternative<ObjectInstancePtr>(object->complexData)) {
+        auto objectInstance = std::get<ObjectInstancePtr>(object->complexData);
 
         try {
             if (!objectInstance->hasField(propertyName)) {
@@ -6877,8 +6951,8 @@ void VM::handleSetProperty(const Instruction& instruction) {
     }
 
     // --- Handle Dictionary property assignment ---
-    if (std::holds_alternative<DictValue>(object->data)) {
-        auto& dictData = std::get<DictValue>(object->data);
+    if (std::holds_alternative<DictValue>(object->complexData)) {
+        auto& dictData = std::get<DictValue>(object->complexData);
         auto keyValue = memoryManager.makeRef<Value>(*region, typeSystem->STRING_TYPE, propertyName);
 
         dictData.elements[keyValue] = value;
@@ -6890,7 +6964,7 @@ void VM::handleSetProperty(const Instruction& instruction) {
 }
 
 void VM::handleCreateList(const Instruction& instruction) {
-    int32_t elementCount = instruction.bigIntValue.to_int64();
+    int32_t elementCount = std::stoll(instruction.stringValue);
 
     if (debugMode) {
         std::cout << "[DEBUG] CREATE_LIST: Creating list with " << elementCount << " elements" << std::endl;
@@ -6914,7 +6988,7 @@ void VM::handleCreateList(const Instruction& instruction) {
     // Create the list value
     auto listType = std::make_shared<Type>(TypeTag::List);
     ValuePtr listValue = memoryManager.makeRef<Value>(*region, listType);
-    listValue->data = listData;
+    listValue->complexData = listData;
 
     push(listValue);
 
@@ -6924,7 +6998,7 @@ void VM::handleCreateList(const Instruction& instruction) {
 }
 
 void VM::handleCreateTuple(const Instruction& instruction) {
-    int32_t elementCount = instruction.bigIntValue.to_int64();
+    int32_t elementCount = std::stoll(instruction.stringValue);
 
     if (debugMode) {
         std::cout << "[DEBUG] CREATE_TUPLE: Creating tuple with " << elementCount << " elements" << std::endl;
@@ -6948,7 +7022,7 @@ void VM::handleCreateTuple(const Instruction& instruction) {
     // Create the tuple value
     auto tupleType = std::make_shared<Type>(TypeTag::Tuple);
     ValuePtr tupleValue = memoryManager.makeRef<Value>(*region, tupleType);
-    tupleValue->data = tupleData;
+    tupleValue->complexData = tupleData;
 
     push(tupleValue);
 
@@ -6965,14 +7039,14 @@ bool VM::handleValPatternMatch(const ValuePtr& value) {
     // - variable name for binding
 
     ValuePtr variableName = pop();
-    std::string varName = std::get<std::string>(variableName->data);
+    std::string varName = variableName->data;
 
     // Check if the value is a success value (not an error)
     bool isSuccess = true;
     ValuePtr actualValue = value;
 
     if (value->type->tag == TypeTag::ErrorUnion) {
-        if (std::holds_alternative<ErrorValue>(value->data)) {
+        if (std::holds_alternative<ErrorValue>(value->complexData)) {
             // This is an error in an error union - pattern doesn't match
             return false;
         } else {
@@ -6982,7 +7056,7 @@ bool VM::handleValPatternMatch(const ValuePtr& value) {
                 actualValue->data = value->data;
             }
         }
-    } else if (std::holds_alternative<ErrorValue>(value->data)) {
+    } else if (std::holds_alternative<ErrorValue>(value->complexData)) {
         // Direct error value - pattern doesn't match
         return false;
     }
@@ -7001,20 +7075,20 @@ bool VM::handleErrPatternMatch(const ValuePtr& value) {
 
     ValuePtr specificErrorType = pop();
     ValuePtr variableName = pop();
-    std::string varName = std::get<std::string>(variableName->data);
+    std::string varName = variableName->data;
 
     // Check if the value is an error
     ErrorValue* errorValue = nullptr;
 
     if (value->type->tag == TypeTag::ErrorUnion) {
-        if (std::holds_alternative<ErrorValue>(value->data)) {
-            errorValue = &std::get<ErrorValue>(value->data);
+        if (std::holds_alternative<ErrorValue>(value->complexData)) {
+            errorValue = &std::get<ErrorValue>(value->complexData);
         } else {
             // This is a success value - pattern doesn't match
             return false;
         }
-    } else if (std::holds_alternative<ErrorValue>(value->data)) {
-        errorValue = &std::get<ErrorValue>(value->data);
+    } else if (std::holds_alternative<ErrorValue>(value->complexData)) {
+        errorValue = &std::get<ErrorValue>(value->complexData);
     } else {
         // Not an error value - pattern doesn't match
         return false;
@@ -7022,7 +7096,7 @@ bool VM::handleErrPatternMatch(const ValuePtr& value) {
 
     // Check specific error type if specified
     if (specificErrorType->type->tag != TypeTag::Nil) {
-        std::string expectedErrorType = std::get<std::string>(specificErrorType->data);
+        std::string expectedErrorType = specificErrorType->data;
         if (errorValue->errorType != expectedErrorType) {
             return false;
         }
@@ -7030,7 +7104,7 @@ bool VM::handleErrPatternMatch(const ValuePtr& value) {
 
     // Create an error value to bind
     ValuePtr errorValueToBindPtr = memoryManager.makeRef<Value>(*region, typeSystem->ANY_TYPE);
-    errorValueToBindPtr->data = *errorValue;
+    errorValueToBindPtr->complexData = *errorValue;
 
     // Bind the error value to the variable
     environment->define(varName, errorValueToBindPtr);
@@ -7047,28 +7121,28 @@ bool VM::handleErrorTypePatternMatch(const ValuePtr& value) {
 
     ValuePtr errorTypeName = pop();
     ValuePtr numParamsValue = pop();
-    int numParams = std::get<BigInt>(numParamsValue->data).to_int64();
+    int numParams = numParamsValue->as<int64_t>();
 
     std::vector<std::string> paramNames;
     for (int i = 0; i < numParams; i++) {
         ValuePtr paramName = pop();
-        paramNames.insert(paramNames.begin(), std::get<std::string>(paramName->data));
+        paramNames.insert(paramNames.begin(), paramName->data);
     }
 
-    std::string expectedErrorType = std::get<std::string>(errorTypeName->data);
+    std::string expectedErrorType = errorTypeName->data;
 
     // Check if the value is an error of the expected type
     ErrorValue* errorValue = nullptr;
 
     if (value->type->tag == TypeTag::ErrorUnion) {
-        if (std::holds_alternative<ErrorValue>(value->data)) {
-            errorValue = &std::get<ErrorValue>(value->data);
+        if (std::holds_alternative<ErrorValue>(value->complexData)) {
+            errorValue = &std::get<ErrorValue>(value->complexData);
         } else {
             // This is a success value - pattern doesn't match
             return false;
         }
-    } else if (std::holds_alternative<ErrorValue>(value->data)) {
-        errorValue = &std::get<ErrorValue>(value->data);
+    } else if (std::holds_alternative<ErrorValue>(value->complexData)) {
+        errorValue = &std::get<ErrorValue>(value->complexData);
     } else {
         // Not an error value - pattern doesn't match
         return false;
@@ -7236,22 +7310,22 @@ std::shared_ptr<IteratorValue> VM::createIterator(ValuePtr iterable) {
         return nullptr;
     }
 
-    if (std::holds_alternative<ListValue>(iterable->data)) {
+    if (std::holds_alternative<ListValue>(iterable->complexData)) {
         // For lists, create a list iterator
         return std::make_shared<IteratorValue>(
                     IteratorValue::IteratorType::LIST,
                     iterable
                     );
-    } else if (std::holds_alternative<DictValue>(iterable->data)) {
+    } else if (std::holds_alternative<DictValue>(iterable->complexData)) {
         // For dictionaries
         return std::make_shared<IteratorValue>(
                     IteratorValue::IteratorType::LIST, // TODO: Add DICT iterator type
                     iterable
                     );
-    } else if (std::holds_alternative<IteratorValuePtr>(iterable->data)) {
+    } else if (std::holds_alternative<IteratorValuePtr>(iterable->complexData)) {
         // If it's already an iterator, return it
-        return std::get<IteratorValuePtr>(iterable->data);
-    } else if (std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(iterable->data)) {
+        return std::get<IteratorValuePtr>(iterable->complexData);
+    } else if (std::holds_alternative<std::shared_ptr<Channel<ValuePtr>>>(iterable->complexData)) {
         // Create a channel-backed iterator
         return std::make_shared<IteratorValue>(
                     IteratorValue::IteratorType::CHANNEL,
@@ -7405,7 +7479,7 @@ void VM::handleCreateClosure(const Instruction& instruction) {
         return;
     }
 
-    int32_t capturedCount = std::get<BigInt>(countValue->data).to_int64();
+    int32_t capturedCount = countValue->as<int64_t>();
 
     if (stack.size() < static_cast<size_t>(capturedCount + 1)) {
         error("CREATE_CLOSURE: not enough values on stack for captured variables");
@@ -7425,7 +7499,7 @@ void VM::handleCreateClosure(const Instruction& instruction) {
             return;
         }
 
-        std::string varName = std::get<std::string>(nameValue->data);
+        std::string varName = nameValue->data;
         capturedVarNames.push_back(varName);
         capturedValues[varName] = value;
     }
@@ -7439,8 +7513,8 @@ void VM::handleCreateClosure(const Instruction& instruction) {
 
     // Check if it's a lambda function (stored as backend::Function)
     backend::Function* lambdaFunc = nullptr;
-    if (std::holds_alternative<backend::Function>(functionValue->data)) {
-        lambdaFunc = &std::get<backend::Function>(functionValue->data);
+    if (std::holds_alternative<backend::Function>(functionValue->complexData)) {
+        lambdaFunc = &std::get<backend::Function>(functionValue->complexData);
     } else {
         error("CREATE_CLOSURE can only create closures from lambda functions");
         return;
@@ -7579,7 +7653,7 @@ void VM::handleCallClosure(const Instruction& instruction) {
         return;
     }
 
-    int32_t argCount = std::get<BigInt>(argCountValue->data).to_int64();
+    int32_t argCount = argCountValue->as<int64_t>();
 
     if (stack.size() < static_cast<size_t>(argCount + 1)) {
         error("CALL_CLOSURE: not enough arguments on stack");
@@ -7599,7 +7673,7 @@ void VM::handleCallClosure(const Instruction& instruction) {
         return;
     }
 
-    ClosureValue closure = std::get<ClosureValue>(closureValue->data);
+    ClosureValue closure = std::get<ClosureValue>(closureValue->complexData);
 
     if (!closure.isValid()) {
         error("CALL_CLOSURE: invalid closure");
@@ -7692,8 +7766,8 @@ void VM::handlePushLambda(const Instruction& instruction) {
     push(functionValue);
 
     // Verify what was stored
-    if (std::holds_alternative<backend::Function>(functionValue->data)) {
-        const auto& storedFunc = std::get<backend::Function>(functionValue->data);
+    if (std::holds_alternative<backend::Function>(functionValue->complexData)) {
+        const auto& storedFunc = std::get<backend::Function>(functionValue->complexData);
         if (debugMode) {
             std::cout << "[DEBUG] PUSH_LAMBDA: Stored function addresses - startAddress: "
                       << storedFunc.startAddress << ", endAddress: " << storedFunc.endAddress << std::endl;
@@ -7789,10 +7863,10 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
 
     if (debugMode) {
         std::cout << "[DEBUG] argCountValue type: " << static_cast<int>(argCountValue->type->tag) << std::endl;
-        std::cout << "[DEBUG] argCountValue data variant index: " << argCountValue->data.index() << std::endl;
+        std::cout << "[DEBUG] argCountValue data value: " << argCountValue->data << std::endl;
     }
 
-    int32_t argCount = std::get<BigInt>(argCountValue->data).to_int64();
+    int32_t argCount = argCountValue->as<int64_t>();
 
     if (debugMode) {
         std::cout << "[DEBUG] CALL_HIGHER_ORDER: stack.size()=" << stack.size()
@@ -7822,8 +7896,8 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
     // Handle different types of functions
     if (functionValue->type->tag == TypeTag::Function) {
         // Check if it's a user-defined function
-        if (std::holds_alternative<std::shared_ptr<backend::UserDefinedFunction>>(functionValue->data)) {
-            auto userFunc = std::get<std::shared_ptr<backend::UserDefinedFunction>>(functionValue->data);
+        if (std::holds_alternative<std::shared_ptr<backend::UserDefinedFunction>>(functionValue->complexData)) {
+            auto userFunc = std::get<std::shared_ptr<backend::UserDefinedFunction>>(functionValue->complexData);
 
             // Get the function name from the user function
             std::string functionName = userFunc->getSignature().name;
@@ -7863,9 +7937,9 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
             } catch (const std::exception& e) {
                 error("CALL_HIGHER_ORDER: error calling user function: " + std::string(e.what()));
             }
-        } else if (std::holds_alternative<std::string>(functionValue->data)) {
+        } else if (functionValue->type->tag == TypeTag::String) {
             // Function reference stored as string - could be user-defined or native
-            std::string funcName = std::get<std::string>(functionValue->data);
+            std::string funcName = functionValue->data;
 
             // First check if it's a user-defined function
             auto userFuncIt = userDefinedFunctions.find(funcName);
@@ -7916,7 +7990,7 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
         }
     } else if (functionValue->type->tag == TypeTag::Closure) {
         // Handle closure calls
-        ClosureValue closure = std::get<ClosureValue>(functionValue->data);
+        ClosureValue closure = std::get<ClosureValue>(functionValue->complexData);
 
         if (debugMode) {
             std::cout << "[DEBUG] CALL_HIGHER_ORDER: Closure details:" << std::endl;
@@ -8028,7 +8102,7 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
         }
     } else if (functionValue->type->tag == TypeTag::Class) {
         // Handle class constructor calls
-        auto classDef = std::get<std::shared_ptr<backend::ClassDefinition>>(functionValue->data);
+        auto classDef = std::get<std::shared_ptr<backend::ClassDefinition>>(functionValue->complexData);
 
         if (debugMode) {
             std::cout << "[DEBUG] CALL_HIGHER_ORDER: Class constructor call for " << classDef->getName() << std::endl;
@@ -8108,7 +8182,7 @@ void VM::handleCallHigherOrder(const Instruction& instruction) {
 void VM::handleCreateUnion(const Instruction& instruction) {
     // CREATE_UNION: Creates a union value with a specific variant
     // Expected stack: [value, variant_index, union_type_name]
-    // instruction.bigIntValue contains the variant index
+    // instruction.stringValue contains the variant index
     // instruction.stringValue contains the union type name
 
     if (stack.size() < 1) {
@@ -8117,7 +8191,7 @@ void VM::handleCreateUnion(const Instruction& instruction) {
     }
 
     ValuePtr value = pop();
-    size_t variantIndex = static_cast<size_t>(instruction.bigIntValue.to_int64());
+    size_t variantIndex = static_cast<size_t>(std::stoll(instruction.stringValue));
     std::string unionTypeName = instruction.stringValue;
 
     // Get the union type from the type system
@@ -8159,7 +8233,7 @@ void VM::handleGetUnionVariant(const Instruction& instruction) {
     }
 
     size_t variantIndex = unionValue->getActiveUnionVariant();
-    ValuePtr indexValue = memoryManager.makeRef<Value>(*region, typeSystem->BIGINT_TYPE,
+    ValuePtr indexValue = memoryManager.makeRef<Value>(*region, typeSystem->INT64_TYPE,
                                                        static_cast<int32_t>(variantIndex));
     push(indexValue);
 
@@ -8207,7 +8281,7 @@ void VM::handleCheckUnionType(const Instruction& instruction) {
 void VM::handleSetUnionVariant(const Instruction& instruction) {
     // SET_UNION_VARIANT: Sets the active variant in a union value
     // Expected stack: [union_value, new_value]
-    // instruction.bigIntValue contains the new variant index
+    // instruction.stringValue contains the new variant index
 
     if (stack.size() < 2) {
         error("SET_UNION_VARIANT requires union value and new value on stack");
@@ -8223,7 +8297,7 @@ void VM::handleSetUnionVariant(const Instruction& instruction) {
         return;
     }
 
-    size_t newVariantIndex = static_cast<size_t>(instruction.bigIntValue.to_int64());
+    size_t newVariantIndex = static_cast<size_t>(std::stoll(instruction.stringValue));
 
     // Validate the new variant index
     std::vector<TypePtr> variantTypes = typeSystem->getUnionVariantTypes(unionValue->type);
@@ -8255,11 +8329,11 @@ void VM::handleSetUnionVariant(const Instruction& instruction) {
 // Closure memory management methods
 
 std::string VM::trackClosure(ValuePtr closureValue) {
-    if (!closureValue || !std::holds_alternative<ClosureValue>(closureValue->data)) {
+    if (!closureValue || !std::holds_alternative<ClosureValue>(closureValue->complexData)) {
         return "";
     }
 
-    const auto& closure = std::get<ClosureValue>(closureValue->data);
+    const auto& closure = std::get<ClosureValue>(closureValue->complexData);
     std::string closureId = closure.getClosureId();
 
     std::lock_guard<std::mutex> lock(closureTracker.trackerMutex);
@@ -8294,8 +8368,8 @@ void VM::untrackClosure(const std::string& closureId) {
 
     // Get the closure to remove variable references
     auto closurePtr = it->second.lock();
-    if (closurePtr && std::holds_alternative<ClosureValue>(closurePtr->data)) {
-        const auto& closure = std::get<ClosureValue>(closurePtr->data);
+    if (closurePtr && std::holds_alternative<ClosureValue>(closurePtr->complexData)) {
+        const auto& closure = std::get<ClosureValue>(closurePtr->complexData);
 
         // Remove variable references
         for (const auto& varName : closure.capturedVariables) {
@@ -8380,11 +8454,11 @@ bool VM::detectCircularReferences(const std::string& closureId) {
     }
 
     auto closurePtr = it->second.lock();
-    if (!closurePtr || !std::holds_alternative<ClosureValue>(closurePtr->data)) {
+    if (!closurePtr || !std::holds_alternative<ClosureValue>(closurePtr->complexData)) {
         return false;
     }
 
-    const auto& closure = std::get<ClosureValue>(closurePtr->data);
+    const auto& closure = std::get<ClosureValue>(closurePtr->complexData);
 
     // Check if this closure captures other closures
     if (closure.capturedEnvironment) {
@@ -8394,8 +8468,8 @@ bool VM::detectCircularReferences(const std::string& closureId) {
                 if (capturedValue && capturedValue->type &&
                         capturedValue->type->tag == TypeTag::Closure) {
 
-                    if (std::holds_alternative<ClosureValue>(capturedValue->data)) {
-                        const auto& capturedClosure = std::get<ClosureValue>(capturedValue->data);
+                    if (std::holds_alternative<ClosureValue>(capturedValue->complexData)) {
+                        const auto& capturedClosure = std::get<ClosureValue>(capturedValue->complexData);
                         std::string capturedClosureId = capturedClosure.getClosureId();
 
                         // Simple cycle detection: if captured closure also captures this closure
@@ -8406,8 +8480,8 @@ bool VM::detectCircularReferences(const std::string& closureId) {
                                     if (nestedValue && nestedValue->type &&
                                             nestedValue->type->tag == TypeTag::Closure) {
 
-                                        if (std::holds_alternative<ClosureValue>(nestedValue->data)) {
-                                            const auto& nestedClosure = std::get<ClosureValue>(nestedValue->data);
+                                        if (std::holds_alternative<ClosureValue>(nestedValue->complexData)) {
+                                            const auto& nestedClosure = std::get<ClosureValue>(nestedValue->complexData);
                                             if (nestedClosure.getClosureId() == closureId) {
                                                 // Found circular reference
                                                 closureTracker.circularReferences.insert(closureId);

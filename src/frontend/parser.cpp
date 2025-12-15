@@ -1,6 +1,5 @@
 #include "parser.hh"
 #include "../common/debugger.hh"
-#include "../common/big_int.hh"
 #include <stdexcept>
 #include <limits>
 #include <set>
@@ -3093,10 +3092,15 @@ std::shared_ptr<AST::Expression> Parser::call() {
                 auto indexLiteral = std::make_shared<AST::LiteralExpr>();
                 indexLiteral->line = numberToken.line;
                 
-                // Parse the number as a BigInt
+                // Parse the number as a string
                 try {
-                    BigInt indexValue(numberToken.lexeme);
-                    indexLiteral->value = indexValue.to_string();
+                    // Validate integer format
+                    size_t pos;
+                    long long indexValue = std::stoll(numberToken.lexeme, &pos);
+                    if (pos != numberToken.lexeme.length()) {
+                        throw std::invalid_argument("Invalid characters in integer");
+                    }
+                    indexLiteral->value = numberToken.lexeme; // Store as string
                 } catch (const std::exception&) {
                     error("Invalid tuple index: " + numberToken.lexeme);
                     indexLiteral->value = "0";
@@ -3396,6 +3400,72 @@ std::shared_ptr<AST::Expression> Parser::primary() {
         auto literalExpr = createNodeWithContext<AST::LiteralExpr>();
         literalExpr->line = token.line;
         
+        // Enhanced numeric literal parsing with string-based values
+        bool hasDecimal = token.lexeme.find('.') != std::string::npos;
+        bool hasScientific = token.lexeme.find('e') != std::string::npos || token.lexeme.find('E') != std::string::npos;
+        
+        if (hasDecimal || hasScientific) {
+            // Parse as floating-point number and store as string
+            try {
+                long double doubleValue = std::stold(token.lexeme);
+                
+                // Check for special values
+                if (std::isnan(doubleValue)) {
+                    error("Invalid floating-point number (NaN): " + token.lexeme);
+                    literalExpr->value = std::string("0.0");
+                } else if (std::isinf(doubleValue)) {
+                    // Allow infinity for very large scientific notation
+                    literalExpr->value = token.lexeme; // Store original string
+                } else {
+                    // Store as string for all floats
+                    literalExpr->value = token.lexeme;
+                }
+            } catch (const std::out_of_range& e) {
+                error("Floating-point number out of range: " + token.lexeme);
+                literalExpr->value = std::string("0.0");
+            } catch (const std::invalid_argument& e) {
+                error("Invalid floating-point number format: " + token.lexeme);
+                literalExpr->value = std::string("0.0");
+            } catch (const std::exception& e) {
+                error("Invalid floating-point number: " + token.lexeme);
+                literalExpr->value = std::string("0.0");
+            }
+        } else {
+            // Parse as integer and store as string
+            try {
+                // Validate integer format
+                size_t pos;
+                unsigned long long uintValue = std::stoull(token.lexeme, &pos);
+                if (pos != token.lexeme.length()) {
+                    throw std::invalid_argument("Invalid characters in integer");
+                }
+                
+                // Check if the value fits in 64-bit unsigned range
+                const unsigned long long MAX_UINT64_VALUE = 0xFFFFFFFFFFFFFFFFULL;
+                if (uintValue > MAX_UINT64_VALUE) {
+                    throw std::out_of_range("Integer value exceeds uint64 range");
+                }
+                
+                literalExpr->value = token.lexeme; // Store as string
+            } catch (const std::out_of_range&) {
+                // If stoull fails with out_of_range, try stoll for very large negative numbers
+                try {
+                    size_t pos;
+                    long long intValue = std::stoll(token.lexeme, &pos);
+                    if (pos != token.lexeme.length()) {
+                        throw std::invalid_argument("Invalid characters in integer");
+                    }
+                    literalExpr->value = token.lexeme; // Store as string
+                } catch (const std::exception& e) {
+                    error("Invalid integer format: " + token.lexeme + " - " + e.what());
+                    literalExpr->value = std::string("0");
+                }
+            } catch (const std::exception& e) {
+                error("Invalid integer format: " + token.lexeme + " - " + e.what());
+                literalExpr->value = std::string("0");
+            }
+        }
+        
         // Create detailed CST node if enabled
         if (cstMode && config.detailedExpressionNodes) {
             auto literalCSTNode = std::make_unique<CST::Node>(CST::NodeKind::LITERAL_EXPR);
@@ -3407,53 +3477,8 @@ std::shared_ptr<AST::Expression> Parser::primary() {
         } else {
             attachTriviaFromToken(token);
         }
-
-        // Enhanced numeric literal parsing with BigInt for all types
-        bool hasDecimal = token.lexeme.find('.') != std::string::npos;
-        bool hasScientific = token.lexeme.find('e') != std::string::npos || token.lexeme.find('E') != std::string::npos;
         
-        if (hasDecimal || hasScientific) {
-            // Parse as floating-point number using BigInt
-            try {
-                long double doubleValue = std::stold(token.lexeme);
-                
-                // Check for special values
-                if (std::isnan(doubleValue)) {
-                    error("Invalid floating-point number (NaN): " + token.lexeme);
-                    literalExpr->value = BigInt(0.0);
-                } else if (std::isinf(doubleValue)) {
-                    // Allow infinity for very large scientific notation
-                    literalExpr->value = BigInt(doubleValue);
-                } else {
-                    // Use BigInt with f128 precision for all floats
-                    literalExpr->value = BigInt(doubleValue);
-                }
-            } catch (const std::out_of_range& e) {
-                error("Floating-point number out of range: " + token.lexeme);
-                literalExpr->value = BigInt(0.0);
-            } catch (const std::invalid_argument& e) {
-                error("Invalid floating-point number format: " + token.lexeme);
-                literalExpr->value = BigInt(0.0);
-            } catch (const std::exception& e) {
-                error("Invalid floating-point number: " + token.lexeme);
-                literalExpr->value = BigInt(0.0);
-            }
-        } else {
-            // Parse as integer using BigInt
-            try {
-                BigInt bigIntValue(token.lexeme);
-                literalExpr->value = bigIntValue;
-            } catch (const std::exception& e) {
-                error("Invalid integer format: " + token.lexeme + " - " + e.what());
-                literalExpr->value = BigInt(0);
-            }
-        }
-
         return literalExpr;
-    }
-    if (match({TokenType::INTERPOLATION_START})) {
-        // This is an interpolated string starting directly with interpolation
-        return interpolatedString();
     }
     
     if (match({TokenType::STRING})) {

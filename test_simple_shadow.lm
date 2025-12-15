@@ -1,8 +1,0 @@
-// Simple shadowing test
-var x = 1;
-print("Outer x: " + x);
-{
-    var x = 2;
-    print("Inner x: " + x);
-}
-print("Outer x again: " + x);

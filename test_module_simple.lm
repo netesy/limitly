@@ -1,5 +1,0 @@
-// Simple module test
-import tests.modules.basic_module as basic;
-
-print("Module imported");
-print("Module variable: " + basic.moduleVar);

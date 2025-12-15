@@ -1,8 +1,0 @@
-fn main() {
-    var x = 3.14
-    var y = 2.0
-    var z = x + y
-    print(z)
-}
-
-main();

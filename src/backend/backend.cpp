@@ -5,7 +5,6 @@
 #include "types.hh"
 #include "type_checker.hh"
 #include "../common/opcodes.hh"
-#include "../common/big_int.hh"
 #include "../frontend/parser.hh"
 #include <iostream>
 #include <thread>
@@ -488,7 +487,7 @@ void BytecodeGenerator::visitIfStatement(const std::shared_ptr<AST::IfStatement>
     
     // Update jump to else branch instruction - jump to start of else branch or end if no else
     size_t elseStartIndex = bytecode.size();
-    bytecode[jumpToElseIndex].intValue = static_cast<int32_t>(elseStartIndex - jumpToElseIndex - 1);
+    bytecode[jumpToElseIndex].stringValue = std::to_string(static_cast<int32_t>(elseStartIndex - jumpToElseIndex - 1));
     
     // Process else branch if it exists
     if (stmt->elseBranch) {
@@ -497,7 +496,7 @@ void BytecodeGenerator::visitIfStatement(const std::shared_ptr<AST::IfStatement>
     
     // Update jump over else branch instruction - jump to end of if statement
     size_t endIndex = bytecode.size();
-    bytecode[jumpOverElseIndex].intValue = static_cast<int32_t>(endIndex - jumpOverElseIndex - 1);
+    bytecode[jumpOverElseIndex].stringValue = std::to_string(static_cast<int32_t>(endIndex - jumpOverElseIndex - 1));
 }
 
 void BytecodeGenerator::visitForStatement(const std::shared_ptr<AST::ForStatement>& stmt) {
@@ -505,7 +504,6 @@ void BytecodeGenerator::visitForStatement(const std::shared_ptr<AST::ForStatemen
 
     loopBreakPatches.emplace_back();
     
- 
         // Traditional for loop
         
         // Process initializer if it exists
@@ -530,10 +528,9 @@ void BytecodeGenerator::visitForStatement(const std::shared_ptr<AST::ForStatemen
         size_t jumpToEndIndex = bytecode.size();
         emit(Opcode::JUMP_IF_FALSE, stmt->line);
         
-        // Jump to body, over increment
-        size_t jumpToBodyIndex = bytecode.size();
-        emit(Opcode::JUMP, stmt->line);
-
+        // Process loop body FIRST (before increment)
+        visitStatement(stmt->body);
+        
         // Continue target: increment
         size_t incrementStartIndex = bytecode.size();
         loopContinueAddresses.push_back(incrementStartIndex);
@@ -546,24 +543,14 @@ void BytecodeGenerator::visitForStatement(const std::shared_ptr<AST::ForStatemen
 
         // Jump back to loop start (condition check)
         emit(Opcode::JUMP, stmt->line, static_cast<int32_t>(loopStartIndex) - static_cast<int32_t>(bytecode.size()) - 1);
-
-        // Patch jump to body
-        size_t bodyStartIndex = bytecode.size();
-        bytecode[jumpToBodyIndex].intValue = bodyStartIndex - jumpToBodyIndex - 1;
-
-        // Process loop body
-        visitStatement(stmt->body);
-
-        // Jump to increment
-        emit(Opcode::JUMP, stmt->line, static_cast<int32_t>(incrementStartIndex) - static_cast<int32_t>(bytecode.size()) - 1);
         
         // Update jump to end instruction
         size_t endIndex = bytecode.size();
-        bytecode[jumpToEndIndex].intValue = static_cast<int32_t>(endIndex - jumpToEndIndex - 1);
+        bytecode[jumpToEndIndex].stringValue = std::to_string(static_cast<int32_t>(endIndex - jumpToEndIndex - 1));
 
         // Patch break statements
         for (size_t patchAddr : loopBreakPatches.back()) {
-            bytecode[patchAddr].intValue = endIndex - patchAddr - 1;
+            bytecode[patchAddr].stringValue = std::to_string(endIndex - patchAddr - 1);
         }
 
         // End loop scope
@@ -590,21 +577,19 @@ void BytecodeGenerator::visitWhileStatement(const std::shared_ptr<AST::WhileStat
     size_t jumpToEndIndex = bytecode.size();
     emit(Opcode::JUMP_IF_FALSE, stmt->line);
     
-    // Process loop body
-    emit(Opcode::BEGIN_SCOPE, stmt->line);
+    // Process loop body (block statement will handle its own scoping)
     visitStatement(stmt->body);
-    emit(Opcode::END_SCOPE, stmt->line);
     
     // Jump back to start of loop
     emit(Opcode::JUMP, stmt->line, static_cast<int32_t>(loopStartIndex) - static_cast<int32_t>(bytecode.size()) - 1);
     
     // Update jump to end instruction
     size_t endIndex = bytecode.size();
-    bytecode[jumpToEndIndex].intValue = static_cast<int32_t>(endIndex - jumpToEndIndex - 1);
+    bytecode[jumpToEndIndex].stringValue = std::to_string(static_cast<int32_t>(endIndex - jumpToEndIndex - 1));
 
     // Patch break statements
     for (size_t patchAddr : loopBreakPatches.back()) {
-        bytecode[patchAddr].intValue = endIndex - patchAddr - 1;
+        bytecode[patchAddr].stringValue = std::to_string(endIndex - patchAddr - 1);
     }
     loopBreakPatches.pop_back();
     loopStartAddresses.pop_back();
@@ -896,7 +881,7 @@ void BytecodeGenerator::visitMatchStatement(const std::shared_ptr<AST::MatchStat
     for (const auto& matchCase : stmt->cases) {
         // Update all previous jumps to point to this case
         for (size_t jumpIndex : jumpToNextCaseIndices) {
-            bytecode[jumpIndex].intValue = bytecode.size() - jumpIndex - 1;
+            bytecode[jumpIndex].stringValue = std::to_string(bytecode.size() - jumpIndex - 1);
         }
         jumpToNextCaseIndices.clear();
 
@@ -991,13 +976,13 @@ void BytecodeGenerator::visitMatchStatement(const std::shared_ptr<AST::MatchStat
 
     // Update any remaining jumps to point to the end
     for (size_t jumpIndex : jumpToNextCaseIndices) {
-        bytecode[jumpIndex].intValue = bytecode.size() - jumpIndex - 1;
+        bytecode[jumpIndex].stringValue = std::to_string(bytecode.size() - jumpIndex - 1);
     }
     
     // Update all jump to end instructions
     size_t endIndex = bytecode.size();
     for (size_t index : jumpToEndIndices) {
-        bytecode[index].intValue = static_cast<int32_t>(endIndex - index - 1);
+        bytecode[index].stringValue = std::to_string(static_cast<int32_t>(endIndex - index - 1));
     }
     
     // Clean up temporary variable
@@ -1013,7 +998,7 @@ void BytecodeGenerator::visitBinaryExpr(const std::shared_ptr<AST::BinaryExpr>& 
         emit(Opcode::JUMP_IF_FALSE, expr->line);
         emit(Opcode::POP, expr->line);
         visitExpression(expr->right);
-        bytecode[jumpToEndIndex].intValue = bytecode.size() - jumpToEndIndex - 1;
+        bytecode[jumpToEndIndex].stringValue = std::to_string(bytecode.size() - jumpToEndIndex - 1);
         return;
     }
 
@@ -1024,7 +1009,7 @@ void BytecodeGenerator::visitBinaryExpr(const std::shared_ptr<AST::BinaryExpr>& 
         emit(Opcode::JUMP_IF_TRUE, expr->line);
         emit(Opcode::POP, expr->line);
         visitExpression(expr->right);
-        bytecode[jumpToEndIndex].intValue = bytecode.size() - jumpToEndIndex - 1;
+        bytecode[jumpToEndIndex].stringValue = std::to_string(bytecode.size() - jumpToEndIndex - 1);
         return;
     }
 
@@ -1188,22 +1173,44 @@ void BytecodeGenerator::visitLiteralExpr(const std::shared_ptr<AST::LiteralExpr>
     // Generate bytecode for literal expression
     
     // Push literal value onto stack based on its type
-    if (std::holds_alternative<BigInt>(expr->value)) {
-        // Handle all numeric values with BigInt
-        BigInt bigIntValue = std::get<BigInt>(expr->value);
-        
-        // Check if it's a float type in BigInt
-        if (bigIntValue.is_float_type()) {
-            // Emit as float for VM compatibility
-            emit(Opcode::PUSH_FLOAT, expr->line, 0, bigIntValue.get_f128_value());
-        } else {
-            // Emit as BigInt
-            emit(Opcode::PUSH_BIGINT, expr->line, 0, 0.0f, false, bigIntValue.to_string());
-        }
-    } else if (std::holds_alternative<std::string>(expr->value)) {
+    if (std::holds_alternative<std::string>(expr->value)) {
         std::string stringValue = std::get<std::string>(expr->value);
-        // String value is already parsed (quotes removed) by the parser
-        emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, stringValue);
+        
+        // Try to determine if this string represents a number
+        bool isNumeric = false;
+        bool isFloat = false;
+        
+        if (!stringValue.empty()) {
+            char first = stringValue[0];
+            if (std::isdigit(first) || first == '+' || first == '-' || first == '.') {
+                isNumeric = true;
+                // Check if it's a float
+                if (stringValue.find('.') != std::string::npos || 
+                    stringValue.find('e') != std::string::npos || 
+                    stringValue.find('E') != std::string::npos) {
+                    isFloat = true;
+                }
+            }
+        }
+        
+        if (isNumeric) {
+            if (isFloat) {
+                // Emit as float
+                try {
+                    double floatVal = std::stod(stringValue);
+                    emit(Opcode::PUSH_FLOAT, expr->line, 0, floatVal);
+                } catch (const std::exception&) {
+                    // If parsing fails, treat as string
+                    emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, stringValue);
+                }
+            } else {
+                // Emit as integer string for integer values
+                emit(Opcode::PUSH_BIGINT, expr->line, 0, 0.0f, false, stringValue);
+            }
+        } else {
+            // String value (already parsed, quotes removed by parser)
+            emit(Opcode::PUSH_STRING, expr->line, 0, 0.0f, false, stringValue);
+        }
     } else if (std::holds_alternative<bool>(expr->value)) {
         emit(Opcode::PUSH_BOOL, expr->line, 0, 0.0f, std::get<bool>(expr->value));
     } else if (std::holds_alternative<std::nullptr_t>(expr->value)) {
@@ -1657,11 +1664,11 @@ void BytecodeGenerator::visitIterStatement(const std::shared_ptr<AST::IterStatem
     emit(Opcode::JUMP, stmt->line, static_cast<int32_t>(loopStart) - static_cast<int32_t>(bytecode.size()) - 1);
     
     // Update the jump to end of loop with the correct offset
-    bytecode[jumpToEnd].intValue = bytecode.size() - jumpToEnd - 1;
+    bytecode[jumpToEnd].stringValue = std::to_string(bytecode.size() - jumpToEnd - 1);
     
     // Patch break statements
     for (size_t patchAddr : loopBreakPatches.back()) {
-        bytecode[patchAddr].intValue = bytecode.size() - patchAddr - 1;
+        bytecode[patchAddr].stringValue = std::to_string(bytecode.size() - patchAddr - 1);
     }
     loopBreakPatches.pop_back();
     loopStartAddresses.pop_back();
@@ -1824,7 +1831,7 @@ void BytecodeGenerator::visitFallibleExpr(const std::shared_ptr<AST::FallibleExp
         
         // Update jump to else handler
         size_t elseStartIndex = bytecode.size();
-        bytecode[jumpToElseIndex].intValue = static_cast<int32_t>(elseStartIndex - jumpToElseIndex - 1);
+        bytecode[jumpToElseIndex].stringValue = std::to_string(static_cast<int32_t>(elseStartIndex - jumpToElseIndex - 1));
         
         // Store error in variable if specified
         if (!expr->elseVariable.empty()) {
@@ -1864,7 +1871,7 @@ void BytecodeGenerator::visitFallibleExpr(const std::shared_ptr<AST::FallibleExp
         
         // Update jump over else handler
         size_t endIndex = bytecode.size();
-        bytecode[jumpOverElseIndex].intValue = static_cast<int32_t>(endIndex - jumpOverElseIndex - 1);
+        bytecode[jumpOverElseIndex].stringValue = std::to_string(static_cast<int32_t>(endIndex - jumpOverElseIndex - 1));
     } else {
         // No else handler, propagate error if present
         size_t jumpOverPropagateIndex = bytecode.size();
@@ -1875,7 +1882,7 @@ void BytecodeGenerator::visitFallibleExpr(const std::shared_ptr<AST::FallibleExp
         
         // Update jump - if not error, unwrap value
         size_t unwrapIndex = bytecode.size();
-        bytecode[jumpOverPropagateIndex].intValue = static_cast<int32_t>(unwrapIndex - jumpOverPropagateIndex - 1);
+        bytecode[jumpOverPropagateIndex].stringValue = std::to_string(static_cast<int32_t>(unwrapIndex - jumpOverPropagateIndex - 1));
         
         // Unwrap the success value
         emit(Opcode::UNWRAP_VALUE, expr->line);
@@ -1909,10 +1916,16 @@ void BytecodeGenerator::emit(Opcode op, uint32_t lineNumber, int64_t intValue, l
     Instruction instruction;
     instruction.opcode = op;
     instruction.line = lineNumber;
-    instruction.intValue = intValue;
-    instruction.floatValue = floatValue;
     instruction.boolValue = boolValue;
-    instruction.stringValue = stringValue;
+    
+    // Store numeric values in stringValue
+    if (op == Opcode::PUSH_FLOAT) {
+        instruction.stringValue = std::to_string(floatValue);
+    } else if (stringValue.empty()) {
+        instruction.stringValue = std::to_string(intValue);
+    } else {
+        instruction.stringValue = stringValue;
+    }
     
     bytecode.push_back(instruction);
 }

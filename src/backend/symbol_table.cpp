@@ -66,10 +66,14 @@ void SymbolTable::addFunction(const std::string& name, const FunctionSignature& 
 FunctionSignature* SymbolTable::findFunction(const std::string& name) {
     for (auto it = functionScopeStack.rbegin(); it != functionScopeStack.rend(); ++it) {
         auto& scope = *it;
-        auto funcIt = scope.find(name);
-        if (funcIt != scope.end()) {
-            return &funcIt->second;
+        auto signatureIt = scope.find(name);
+        if (signatureIt != scope.end()) {
+            return &signatureIt->second;
         }
     }
     return nullptr;
+}
+
+bool SymbolTable::isInGlobalScope() const {
+    return variableScopeStack.size() == 1;
 }

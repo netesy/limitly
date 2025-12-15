@@ -2,20 +2,26 @@
 #define JIT_BACKEND_H
 
 #include "../frontend/ast.hh"
-#include "libgccjit++.h"
+#include <libgccjit++.h>
 #include <memory>
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <stack>
+#include <variant>
 #include "memory.hh"
+#include "functions.hh"
+#include "../common/builtin_functions.hh"
+#include "symbol_table.hh"
 
 class JitBackend {
 public:
     JitBackend();
-    ~JitBackend() = default;
+    ~JitBackend();
 
     void process(const std::vector<std::shared_ptr<AST::Program>>& programs);
     void compile(const char* output_filename);
+    int compile_and_run(); // Debug mode: compile and run directly without saving
 
 private:
     void visit(const std::shared_ptr<AST::Statement>& stmt);
@@ -55,16 +61,27 @@ private:
     gccjit::function m_main_func;
     gccjit::function m_current_func;
     gccjit::block m_current_block;
-    std::vector<std::unordered_map<std::string, gccjit::lvalue>> m_scopes;
+    
+    // Memory management
+    MemoryManager<> m_mem_manager;
+    std::unique_ptr<MemoryManager<>::Region> m_region;
+    
+    // Symbol table for compile-time information
+    SymbolTable m_symbol_table;
+    
+    // JIT variable mapping (name -> lvalue)
+    std::unordered_map<std::string, gccjit::lvalue> m_variable_lvalues;
 
     // Types
-    std::map<gccjit::type, std::string> m_type_names;
-    std::map<gccjit::struct_, std::vector<std::string>> m_struct_field_names;
+    std::map<std::string, std::string> m_type_names;
+    std::map<std::string, std::vector<std::string>> m_struct_field_names;
+    std::unordered_map<std::string, std::vector<gccjit::field>> m_class_fields;
     gccjit::type m_void_type;
     gccjit::type m_int_type;
     gccjit::type m_double_type;
     gccjit::type m_bool_type;
     gccjit::type m_const_char_ptr_type;
+    gccjit::type m_void_ptr_type;
     gccjit::type m_int8_type;
     gccjit::type m_int16_type;
     gccjit::type m_int32_type;
@@ -80,18 +97,29 @@ private:
     gccjit::function m_printf_func;
     gccjit::function m_strcmp_func;
     gccjit::function m_malloc_func;
+    gccjit::function m_strlen_func;
+    gccjit::function m_strcpy_func;
+    gccjit::function m_strcat_func;
     std::unordered_map<std::string, gccjit::function> m_functions;
 
     // Loop handling
     std::vector<std::pair<gccjit::block, gccjit::block>> m_loop_blocks;
 
-    // Memory management
-    MemoryManager<> m_mem_manager;
-    MemoryManager<>::Region m_region;
-
     // Module handling
     std::string m_current_module_name;
     std::string mangle(const std::string& name);
+
+    // Type handling helpers
+    bool is_arithmetic_op(TokenType op);
+    gccjit::type get_common_type(gccjit::type type1, gccjit::type type2);
+    
+    // Builtin functions integration
+    void register_builtin_functions();
+    gccjit::type convert_builtin_type(TypeTag tag);
+    
+    // Type conversion helpers
+    TypePtr convert_ast_type(const std::shared_ptr<AST::TypeAnnotation>& ast_type);
+    TypePtr convert_jit_type(gccjit::type jit_type);
 
     // Class handling
     std::unordered_map<std::string, gcc_jit_struct*> m_class_structs;

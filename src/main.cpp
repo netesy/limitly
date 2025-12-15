@@ -23,6 +23,7 @@ void printUsage(const char* programName) {
     std::cout << "  " << programName << " -tokens <source_file> - Print the tokens for a source file" << std::endl;
     std::cout << "  " << programName << " -bytecode <source_file> - Print the bytecode for a source file" << std::endl;
     std::cout << "  " << programName << " -jit <source_file>    - JIT compile a source file" << std::endl;
+    std::cout << "  " << programName << " -jit-debug <source_file> - JIT compile and run directly (debug mode)" << std::endl;
     std::cout << "  " << programName << " -debug <source_file> - Execute with debug output enabled" << std::endl;
     std::cout << "  " << programName << " -repl           - Start the REPL (interactive mode)" << std::endl;
 }
@@ -38,7 +39,7 @@ std::string readFile(const std::string& filename) {
     return buffer.str();
 }
 
-int executeFile(const std::string& filename, bool printAst = false, bool printCst = false, bool printTokens = false, bool printBytecode = false, bool useJit = false, bool enableDebug = false) {
+int executeFile(const std::string& filename, bool printAst = false, bool printCst = false, bool printTokens = false, bool printBytecode = false, bool useJit = false, bool jitDebug = false, bool enableDebug = false) {
     try {
         // Read source file
         std::string source = readFile(filename);
@@ -105,18 +106,26 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             parse_imports(ast);
 
             jit.process(programs);
-            std::string output_filename = filename;
-            size_t dot_pos = output_filename.rfind(".lm");
-            if (dot_pos != std::string::npos) {
-                output_filename.erase(dot_pos);
+            
+            if (jitDebug) {
+                std::cout << "=== JIT Debug Mode - Running Directly ===\n";
+                int exit_code = jit.compile_and_run();
+                std::cout << "JIT execution completed with exit code: " << exit_code << std::endl;
+                return exit_code;
+            } else {
+                std::string output_filename = filename;
+                size_t dot_pos = output_filename.rfind(".lm");
+                if (dot_pos != std::string::npos) {
+                    output_filename.erase(dot_pos);
+                }
+                // Add platform-specific executable extension
+                #ifdef _WIN32
+                    output_filename += ".exe";
+                #endif
+                // macOS and Linux don't need an extension
+                jit.compile(output_filename.c_str());
+                std::cout << "Compiled to " << output_filename << ". Run ./" << output_filename << " to see the result.\n";
             }
-            // Add platform-specific executable extension
-            #ifdef _WIN32
-                output_filename += ".exe";
-            #endif
-            // macOS and Linux don't need an extension
-            jit.compile(output_filename.c_str());
-            std::cout << "Compiled to " << output_filename << ". Run ./" << output_filename << " to see the result.\n";
         } else {
 
             // Backend: Generate bytecode
@@ -263,9 +272,11 @@ int main(int argc, char* argv[]) {
     } else if (arg == "-bytecode" && argc >= 3) {
         return executeFile(argv[2], false, false, false, true);
     } else if (arg == "-jit" && argc >= 3) {
-        return executeFile(argv[2], false, false, false, false, true);
+        return executeFile(argv[2], false, false, false, false, true, false);
+    } else if (arg == "-jit-debug" && argc >= 3) {
+        return executeFile(argv[2], false, false, false, false, true, true);
     } else if (arg == "-debug" && argc >= 3) {
-        return executeFile(argv[2], false, false, false, false, false, true);
+        return executeFile(argv[2], false, false, false, false, false, false, true);
     } else if (arg[0] == '-') {
         std::cerr << "Unknown option: " << arg << std::endl;
         printUsage(argv[0]);
