@@ -33,6 +33,9 @@ JitBackend::JitBackend() : m_context(gccjit::context::acquire()), m_mem_manager(
     m_uint32_type = m_context.get_type(GCC_JIT_TYPE_UINT32_T);
     m_uint64_type = m_context.get_type(GCC_JIT_TYPE_UINT64_T);
     m_float_type = m_context.get_type(GCC_JIT_TYPE_FLOAT);
+    if (!m_float_type.get_inner_type()) {
+        throw std::runtime_error("Failed to get float type");
+    }
     m_const_char_ptr_type = m_context.get_type(GCC_JIT_TYPE_CONST_CHAR_PTR);
     m_void_ptr_type = m_context.get_type(GCC_JIT_TYPE_VOID_PTR);
     
@@ -49,16 +52,30 @@ JitBackend::JitBackend() : m_context(gccjit::context::acquire()), m_mem_manager(
     printf_params.push_back(m_context.new_param(m_const_char_ptr_type, "format"));
     m_printf_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_int_type, "printf", printf_params, 1);
     
-    // Set up strcmp function
-    std::vector<gccjit::param> strcmp_params;
-    strcmp_params.push_back(m_context.new_param(m_const_char_ptr_type, "s1"));
-    strcmp_params.push_back(m_context.new_param(m_const_char_ptr_type, "s2"));
-    m_strcmp_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_int_type, "strcmp", strcmp_params, 0);
+    // Set up snprintf function
+    std::vector<gccjit::param> snprintf_params;
+    snprintf_params.push_back(m_context.new_param(m_const_char_ptr_type, "buffer"));
+    snprintf_params.push_back(m_context.new_param(m_context.get_type(GCC_JIT_TYPE_SIZE_T), "size"));
+    snprintf_params.push_back(m_context.new_param(m_const_char_ptr_type, "format"));
+    m_snprintf_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_int_type, "snprintf", snprintf_params, 1);
+    
+    // Check if snprintf was created successfully
+    if (!m_snprintf_func.get_inner_function()) {
+        // Fallback: don't use snprintf if not available
+        std::cout << "Warning: snprintf not available, using alternative concatenation" << std::endl;
+    }
     
     // Set up malloc function
     std::vector<gccjit::param> malloc_params;
     malloc_params.push_back(m_context.new_param(m_context.get_type(GCC_JIT_TYPE_SIZE_T), "size"));
     m_malloc_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_void_type.get_pointer(), "malloc", malloc_params, 0);
+    
+    // Set up memset function
+    std::vector<gccjit::param> memset_params;
+    memset_params.push_back(m_context.new_param(m_void_type.get_pointer(), "ptr"));
+    memset_params.push_back(m_context.new_param(m_int_type, "value"));
+    memset_params.push_back(m_context.new_param(m_context.get_type(GCC_JIT_TYPE_SIZE_T), "size"));
+    m_memset_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_void_type.get_pointer(), "memset", memset_params, 0);
     
     // Set up strlen function
     std::vector<gccjit::param> strlen_params;
@@ -70,6 +87,12 @@ JitBackend::JitBackend() : m_context(gccjit::context::acquire()), m_mem_manager(
     strcpy_params.push_back(m_context.new_param(m_const_char_ptr_type, "dest"));
     strcpy_params.push_back(m_context.new_param(m_const_char_ptr_type, "src"));
     m_strcpy_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_const_char_ptr_type, "strcpy", strcpy_params, 0);
+    
+    // Set up strcmp function
+    std::vector<gccjit::param> strcmp_params;
+    strcmp_params.push_back(m_context.new_param(m_const_char_ptr_type, "str1"));
+    strcmp_params.push_back(m_context.new_param(m_const_char_ptr_type, "str2"));
+    m_strcmp_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_int_type, "strcmp", strcmp_params, 0);
     
     // Set up strcat function
     std::vector<gccjit::param> strcat_params;
@@ -238,11 +261,24 @@ void JitBackend::visit(const std::shared_ptr<AST::VarDeclaration>& stmt) {
     
     // Initialize if needed
     if (stmt->initializer) {
-        gccjit::rvalue rvalue = visit_expr(stmt->initializer);
-        // Cast to the correct type if needed
-        if (rvalue.get_type().get_inner_type() != type.get_inner_type()) {
-            rvalue = m_context.new_cast(rvalue, type);
+        gccjit::rvalue rvalue;
+        
+        // If the initializer is a literal, create it with the target type to avoid casting
+        if (auto literal = std::dynamic_pointer_cast<AST::LiteralExpr>(stmt->initializer)) {
+            rvalue = visit_expr(literal, type);
+        } else {
+            rvalue = visit_expr(stmt->initializer);
         }
+        
+        // Cast to the correct type if needed (shouldn't be needed for literals now)
+        if (rvalue.get_type().get_inner_type() != type.get_inner_type()) {
+            // Use C API for casting to handle double-to-float correctly
+            gcc_jit_context* c_ctx = m_context.get_inner_context();
+            gcc_jit_type* c_target_type = type.get_inner_type();
+            gcc_jit_rvalue* c_casted = gcc_jit_context_new_cast(c_ctx, nullptr, rvalue.get_inner_rvalue(), c_target_type);
+            rvalue = gccjit::rvalue(c_casted);
+        }
+        
         m_current_block.add_assignment(lvalue, rvalue);
     }
 }
@@ -887,7 +923,9 @@ void JitBackend::visit(const std::shared_ptr<AST::PrintStatement>& stmt) {
             } else if (c_type == c_double_type || c_type == c_long_double_type) {
                 format_str = "%Lf\n";
             } else if (c_type == c_float_type) {
-                format_str = "%f\n";
+                // Float32 needs to be promoted to double for printf
+                rvalue = m_context.new_cast(rvalue, m_double_type);
+                format_str = "%.6f\n";  // Use 6 decimal places for Float32 for better precision
             } else if (c_type == c_const_char_ptr_type) {
                 format_str = "%s\n";
             } else if (c_type == c_void_type) {
@@ -1006,23 +1044,45 @@ gccjit::rvalue JitBackend::visit_expr(const std::shared_ptr<AST::Expression>& ex
     if (auto e = std::dynamic_pointer_cast<AST::LambdaExpr>(expr)) return visit_expr(e);
     if (auto e = std::dynamic_pointer_cast<AST::GroupingExpr>(expr)) return visit_expr(e);
     if (auto e = std::dynamic_pointer_cast<AST::MemberExpr>(expr)) return visit_expr(e);
+    if (auto e = std::dynamic_pointer_cast<AST::InterpolatedStringExpr>(expr)) return visit_expr(e);
     throw std::runtime_error("Unsupported expression type for JIT");
 }
 
+// Replace the string concatenation section in visit_expr(BinaryExpr) with this:
+
 gccjit::rvalue JitBackend::visit_expr(const std::shared_ptr<AST::BinaryExpr>& expr) {
+    // Handle simple string literal concatenation for AOT
+    if (expr->op == TokenType::PLUS) {
+        auto left_literal = std::dynamic_pointer_cast<AST::LiteralExpr>(expr->left);
+        auto right_literal = std::dynamic_pointer_cast<AST::LiteralExpr>(expr->right);
+        
+        if (left_literal && right_literal && 
+            std::holds_alternative<std::string>(left_literal->value) &&
+            std::holds_alternative<std::string>(right_literal->value)) {
+            
+            std::string result = std::get<std::string>(left_literal->value) + 
+                               std::get<std::string>(right_literal->value);
+            gcc_jit_context* c_ctx = m_context.get_inner_context();
+            gcc_jit_rvalue* c_result_str = gcc_jit_context_new_string_literal(c_ctx, result.c_str());
+            return gccjit::rvalue(c_result_str);
+        }
+    }
+
+    // Normal evaluation for non-string operations or when compile-time evaluation fails
     gccjit::rvalue left = visit_expr(expr->left);
     gccjit::rvalue right = visit_expr(expr->right);
 
     gccjit::type left_type = left.get_type();
     gccjit::type right_type = right.get_type();
 
-    // Get the underlying C objects for type comparison
     gcc_jit_type* c_left_type = left_type.get_inner_type();
     gcc_jit_type* c_right_type = right_type.get_inner_type();
     gcc_jit_type* c_const_char_ptr_type = m_const_char_ptr_type.get_inner_type();
     
+    // Handle string operations (only for runtime cases that couldn't be resolved at compile time)
     if (c_left_type == c_const_char_ptr_type && c_right_type == c_const_char_ptr_type) {
         if (expr->op == TokenType::EQUAL_EQUAL || expr->op == TokenType::BANG_EQUAL) {
+            // String comparison
             std::vector<gccjit::rvalue> args;
             args.push_back(left);
             args.push_back(right);
@@ -1034,53 +1094,58 @@ gccjit::rvalue JitBackend::visit_expr(const std::shared_ptr<AST::BinaryExpr>& ex
                 return m_context.new_comparison(GCC_JIT_COMPARISON_NE, result, zero);
             }
         } else if (expr->op == TokenType::PLUS) {
-            // String concatenation using strcat
-            // First, calculate total length needed
+            // Runtime string concatenation
+            // Calculate total length needed
             std::vector<gccjit::rvalue> strlen_args;
             strlen_args.push_back(left);
             gccjit::rvalue left_len = m_context.new_call(m_strlen_func, strlen_args);
             
-            strlen_args.clear();
-            strlen_args.push_back(right);
-            gccjit::rvalue right_len = m_context.new_call(m_strlen_func, strlen_args);
+            std::vector<gccjit::rvalue> strlen_args2;
+            strlen_args2.push_back(right);
+            gccjit::rvalue right_len = m_context.new_call(m_strlen_func, strlen_args2);
             
             gccjit::rvalue total_len = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_context.get_type(GCC_JIT_TYPE_SIZE_T), left_len, right_len);
             gccjit::rvalue total_len_plus_one = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_context.get_type(GCC_JIT_TYPE_SIZE_T), total_len, m_context.new_rvalue(m_context.get_type(GCC_JIT_TYPE_SIZE_T), 1));
             
-            // Allocate memory for concatenated string
-            gccjit::rvalue result_ptr = m_context.new_call(m_malloc_func, {total_len_plus_one});
-            gccjit::rvalue result_ptr_cast = m_context.new_cast(result_ptr, m_const_char_ptr_type);
+            // Allocate memory for result string
+            std::vector<gccjit::rvalue> malloc_args;
+            malloc_args.push_back(total_len_plus_one);
+            gccjit::rvalue result_ptr = m_context.new_call(m_malloc_func, malloc_args);
+            gccjit::rvalue result = m_context.new_cast(result_ptr, m_const_char_ptr_type);
             
             // Copy left string
             std::vector<gccjit::rvalue> strcpy_args;
-            strcpy_args.push_back(result_ptr_cast);
+            strcpy_args.push_back(result);
             strcpy_args.push_back(left);
-            m_context.new_call(m_strcpy_func, strcpy_args);
+            m_current_block.add_eval(m_context.new_call(m_strcpy_func, strcpy_args));
             
             // Concatenate right string
             std::vector<gccjit::rvalue> strcat_args;
-            strcat_args.push_back(result_ptr_cast);
+            strcat_args.push_back(result);
             strcat_args.push_back(right);
-            m_context.new_call(m_strcat_func, strcat_args);
+            m_current_block.add_eval(m_context.new_call(m_strcat_func, strcat_args));
             
-            return result_ptr_cast;
+            return result;
         }
     }
 
-    // Cast to common type if needed
-    if (c_left_type != c_right_type) {
-        // Prefer the larger type for arithmetic operations
-        if (is_arithmetic_op(expr->op)) {
-            gccjit::type common_type = get_common_type(left_type, right_type);
-            if (c_left_type != common_type.get_inner_type()) {
-                left = m_context.new_cast(left, common_type);
-            }
-            if (c_right_type != common_type.get_inner_type()) {
-                right = m_context.new_cast(right, common_type);
-            }
+    // Cast to common type for arithmetic operations
+    if (c_left_type != c_right_type && is_arithmetic_op(expr->op)) {
+        gccjit::type common_type = get_common_type(left_type, right_type);
+        gcc_jit_context* c_ctx = m_context.get_inner_context();
+        gcc_jit_type* c_common_type = common_type.get_inner_type();
+        
+        if (c_left_type != c_common_type) {
+            gcc_jit_rvalue* c_casted = gcc_jit_context_new_cast(c_ctx, nullptr, left.get_inner_rvalue(), c_common_type);
+            left = gccjit::rvalue(c_casted);
+        }
+        if (c_right_type != c_common_type) {
+            gcc_jit_rvalue* c_casted = gcc_jit_context_new_cast(c_ctx, nullptr, right.get_inner_rvalue(), c_common_type);
+            right = gccjit::rvalue(c_casted);
         }
     }
 
+    // Rest of binary operations...
     switch (expr->op) {
         case TokenType::PLUS:
             return m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, left.get_type(), left, right);
@@ -1161,7 +1226,7 @@ gccjit::rvalue JitBackend::visit_expr(const std::shared_ptr<AST::UnaryExpr>& exp
     return m_context.new_unary_op(op, right.get_type(), right);
 }
 
-gccjit::rvalue JitBackend::visit_expr(const std::shared_ptr<AST::LiteralExpr>& expr) {
+gccjit::rvalue JitBackend::visit_expr(const std::shared_ptr<AST::LiteralExpr>& expr, gccjit::type target_type) {
     if (std::holds_alternative<std::string>(expr->value)) {
         std::string value = std::get<std::string>(expr->value);
         
@@ -1183,8 +1248,21 @@ gccjit::rvalue JitBackend::visit_expr(const std::shared_ptr<AST::LiteralExpr>& e
                 bool hasScientific = value.find('e') != std::string::npos || value.find('E') != std::string::npos;
                 
                 if (hasDecimal || hasScientific) {
-                    // Floating point literal
-                    return m_context.new_rvalue(m_double_type, std::stod(value));
+                    // Floating point literal - create with target type
+                    gcc_jit_context* c_ctx = m_context.get_inner_context();
+                    gcc_jit_type* c_target_type = target_type.get_inner_type();
+                    double double_val = std::stod(value);
+                    
+                    if (c_target_type == m_float_type.get_inner_type()) {
+                        // Create float32 literal directly
+                        float float_val = static_cast<float>(double_val);
+                        gcc_jit_rvalue* c_val = gcc_jit_context_new_rvalue_from_double(c_ctx, c_target_type, float_val);
+                        return gccjit::rvalue(c_val);
+                    } else {
+                        // Create double literal
+                        gcc_jit_rvalue* c_val = gcc_jit_context_new_rvalue_from_double(c_ctx, c_target_type, double_val);
+                        return gccjit::rvalue(c_val);
+                    }
                 } else {
                     // Integer literal - try unsigned first for large values
                     try {
@@ -1279,6 +1357,11 @@ gccjit::rvalue JitBackend::visit_expr(const std::shared_ptr<AST::LiteralExpr>& e
     }
     // Add other literal types here
     return gccjit::rvalue();
+}
+
+gccjit::rvalue JitBackend::visit_expr(const std::shared_ptr<AST::LiteralExpr>& expr) {
+    // Default to double type for floating point literals when no target type is specified
+    return visit_expr(expr, m_double_type);
 }
 
 gccjit::rvalue JitBackend::visit_expr(const std::shared_ptr<AST::VariableExpr>& expr) {
@@ -1515,4 +1598,214 @@ TypePtr JitBackend::convert_jit_type(gccjit::type jit_type) {
     if (inner == m_const_char_ptr_type.get_inner_type()) return std::make_shared<Type>(TypeTag::String);
     
     return std::make_shared<Type>(TypeTag::Any);
+}
+
+gccjit::rvalue JitBackend::visit_expr(const std::shared_ptr<AST::InterpolatedStringExpr>& expr) {
+    // For JIT, we need to build the string at runtime using snprintf
+    // Start with an empty result string that we'll build up
+    gccjit::lvalue result = m_current_func.new_local(m_const_char_ptr_type, "interp_result");
+    
+    // Handle first part separately to initialize result
+    if (!expr->parts.empty()) {
+        const auto& first_part = expr->parts[0];
+        gccjit::rvalue first_rvalue;
+        
+        if (std::holds_alternative<std::string>(first_part)) {
+            // String literal part
+            std::string literal = std::get<std::string>(first_part);
+            gcc_jit_context* c_ctx = m_context.get_inner_context();
+            gcc_jit_rvalue* c_literal_str = gcc_jit_context_new_string_literal(c_ctx, literal.c_str());
+            first_rvalue = gccjit::rvalue(c_literal_str);
+        } else if (std::holds_alternative<std::shared_ptr<AST::Expression>>(first_part)) {
+            // Expression part - convert to string
+            auto expr_part = std::get<std::shared_ptr<AST::Expression>>(first_part);
+            first_rvalue = convert_expr_to_string(expr_part);
+        }
+        
+        // Allocate memory for first part and copy it
+        std::vector<gccjit::rvalue> strlen_args;
+        strlen_args.push_back(first_rvalue);
+        gccjit::rvalue first_len = m_context.new_call(m_strlen_func, strlen_args);
+        gccjit::rvalue first_len_plus_one = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_context.get_type(GCC_JIT_TYPE_SIZE_T), first_len, m_context.new_rvalue(m_context.get_type(GCC_JIT_TYPE_SIZE_T), 1));
+        
+        std::vector<gccjit::rvalue> malloc_args;
+        malloc_args.push_back(first_len_plus_one);
+        gccjit::rvalue result_ptr = m_context.new_call(m_malloc_func, malloc_args);
+        m_current_block.add_assignment(result, m_context.new_cast(result_ptr, m_const_char_ptr_type));
+        
+        std::vector<gccjit::rvalue> strcpy_args;
+        strcpy_args.push_back(result);
+        strcpy_args.push_back(first_rvalue);
+        m_current_block.add_eval(m_context.new_call(m_strcpy_func, strcpy_args));
+    }
+    
+    // Process remaining parts
+    for (size_t i = 1; i < expr->parts.size(); ++i) {
+        const auto& part = expr->parts[i];
+        gccjit::rvalue part_rvalue;
+        
+        if (std::holds_alternative<std::string>(part)) {
+            // String literal part
+            std::string literal = std::get<std::string>(part);
+            gcc_jit_context* c_ctx = m_context.get_inner_context();
+            gcc_jit_rvalue* c_literal_str = gcc_jit_context_new_string_literal(c_ctx, literal.c_str());
+            part_rvalue = gccjit::rvalue(c_literal_str);
+        } else if (std::holds_alternative<std::shared_ptr<AST::Expression>>(part)) {
+            // Expression part - convert to string
+            auto expr_part = std::get<std::shared_ptr<AST::Expression>>(part);
+            part_rvalue = convert_expr_to_string(expr_part);
+        }
+        
+        // Reallocate memory to accommodate the new part
+        std::vector<gccjit::rvalue> current_len_args;
+        current_len_args.push_back(result);
+        gccjit::rvalue current_len = m_context.new_call(m_strlen_func, current_len_args);
+        
+        std::vector<gccjit::rvalue> part_len_args;
+        part_len_args.push_back(part_rvalue);
+        gccjit::rvalue part_len = m_context.new_call(m_strlen_func, part_len_args);
+        
+        gccjit::rvalue new_total_len = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_context.get_type(GCC_JIT_TYPE_SIZE_T), current_len, part_len);
+        gccjit::rvalue new_total_len_plus_one = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_context.get_type(GCC_JIT_TYPE_SIZE_T), new_total_len, m_context.new_rvalue(m_context.get_type(GCC_JIT_TYPE_SIZE_T), 1));
+        
+        std::vector<gccjit::rvalue> realloc_args;
+        realloc_args.push_back(result);
+        realloc_args.push_back(new_total_len_plus_one);
+        gccjit::rvalue new_result_ptr = m_context.new_call(m_malloc_func, realloc_args); // Using malloc for simplicity
+        gccjit::rvalue new_result = m_context.new_cast(new_result_ptr, m_const_char_ptr_type);
+        
+        // Copy old content to new location
+        std::vector<gccjit::rvalue> strcpy_args;
+        strcpy_args.push_back(new_result);
+        strcpy_args.push_back(result);
+        m_current_block.add_eval(m_context.new_call(m_strcpy_func, strcpy_args));
+        
+        // Concatenate new part
+        std::vector<gccjit::rvalue> strcat_args;
+        strcat_args.push_back(new_result);
+        strcat_args.push_back(part_rvalue);
+        m_current_block.add_eval(m_context.new_call(m_strcat_func, strcat_args));
+        
+        // Update result pointer
+        m_current_block.add_assignment(result, new_result);
+    }
+    
+    return result;
+}
+
+gccjit::rvalue JitBackend::convert_expr_to_string(const std::shared_ptr<AST::Expression>& expr) {
+    gccjit::rvalue expr_val = visit_expr(expr);
+    gccjit::type expr_type = expr_val.get_type();
+    gcc_jit_type* c_expr_type = expr_type.get_inner_type();
+    gcc_jit_type* c_const_char_ptr_type = m_const_char_ptr_type.get_inner_type();
+    gcc_jit_type* c_int_type = m_int_type.get_inner_type();
+    gcc_jit_type* c_int8_type = m_int8_type.get_inner_type();
+    gcc_jit_type* c_int16_type = m_int16_type.get_inner_type();
+    gcc_jit_type* c_int32_type = m_int32_type.get_inner_type();
+    gcc_jit_type* c_int64_type = m_int64_type.get_inner_type();
+    gcc_jit_type* c_uint8_type = m_uint8_type.get_inner_type();
+    gcc_jit_type* c_uint16_type = m_uint16_type.get_inner_type();
+    gcc_jit_type* c_uint32_type = m_uint32_type.get_inner_type();
+    gcc_jit_type* c_uint64_type = m_uint64_type.get_inner_type();
+    gcc_jit_type* c_float_type = m_float_type.get_inner_type();
+    gcc_jit_type* c_double_type = m_double_type.get_inner_type();
+    gcc_jit_type* c_bool_type = m_bool_type.get_inner_type();
+    
+    // If it's already a string, just return it
+    if (c_expr_type == c_const_char_ptr_type) {
+        return expr_val;
+    }
+    
+    // For other types, we need to convert to string using snprintf
+    gccjit::lvalue result = m_current_func.new_local(m_const_char_ptr_type, "converted_str");
+    
+    // Determine buffer size and format string based on type
+    gccjit::rvalue buffer_size;
+    const char* format_str;
+    
+    if (c_expr_type == c_bool_type) {
+        buffer_size = m_context.new_rvalue(m_context.get_type(GCC_JIT_TYPE_SIZE_T), 6); // "true" or "false" + null
+        format_str = "%s";
+    } else if (c_expr_type == c_int_type || c_expr_type == c_int8_type || c_expr_type == c_int16_type || 
+               c_expr_type == c_int32_type || c_expr_type == c_int64_type) {
+        buffer_size = m_context.new_rvalue(m_context.get_type(GCC_JIT_TYPE_SIZE_T), 32); // Enough for 64-bit numbers
+        format_str = "%ld";
+    } else if (c_expr_type == c_uint8_type || c_expr_type == c_uint16_type || c_expr_type == c_uint32_type) {
+        buffer_size = m_context.new_rvalue(m_context.get_type(GCC_JIT_TYPE_SIZE_T), 32);
+        format_str = "%u";
+    } else if (c_expr_type == c_uint64_type) {
+        buffer_size = m_context.new_rvalue(m_context.get_type(GCC_JIT_TYPE_SIZE_T), 32);
+        #ifdef _WIN32
+            format_str = "%llu";
+        #else
+            format_str = "%lu";
+        #endif
+    } else if (c_expr_type == c_float_type) {
+        buffer_size = m_context.new_rvalue(m_context.get_type(GCC_JIT_TYPE_SIZE_T), 32);
+        format_str = "%.6f";
+    } else if (c_expr_type == c_double_type) {
+        buffer_size = m_context.new_rvalue(m_context.get_type(GCC_JIT_TYPE_SIZE_T), 64);
+        format_str = "%.15lf";
+    } else {
+        // Default fallback
+        buffer_size = m_context.new_rvalue(m_context.get_type(GCC_JIT_TYPE_SIZE_T), 32);
+        format_str = "%p";
+    }
+    
+    // Allocate buffer
+    std::vector<gccjit::rvalue> malloc_args;
+    malloc_args.push_back(buffer_size);
+    gccjit::rvalue buffer_ptr = m_context.new_call(m_malloc_func, malloc_args);
+    m_current_block.add_assignment(result, m_context.new_cast(buffer_ptr, m_const_char_ptr_type));
+    
+    // Format the value into the buffer
+    std::vector<gccjit::rvalue> snprintf_args;
+    snprintf_args.push_back(result);
+    snprintf_args.push_back(buffer_size);
+    
+    gcc_jit_context* c_ctx = m_context.get_inner_context();
+    gcc_jit_rvalue* c_format = gcc_jit_context_new_string_literal(c_ctx, format_str);
+    gccjit::rvalue format = gccjit::rvalue(c_format);
+    snprintf_args.push_back(format);
+    
+    // Special handling for booleans
+    if (c_expr_type == c_bool_type) {
+        // Create blocks for conditional boolean conversion
+        gccjit::block true_block = m_current_func.new_block("bool_true_str");
+        gccjit::block false_block = m_current_func.new_block("bool_false_str");
+        gccjit::block after_block = m_current_func.new_block("after_bool_str");
+        
+        gcc_jit_rvalue* c_true_str = gcc_jit_context_new_string_literal(c_ctx, "true");
+        gcc_jit_rvalue* c_false_str = gcc_jit_context_new_string_literal(c_ctx, "false");
+        gccjit::rvalue true_str = gccjit::rvalue(c_true_str);
+        gccjit::rvalue false_str = gccjit::rvalue(c_false_str);
+        
+        m_current_block.end_with_conditional(expr_val, true_block, false_block);
+        
+        // True block
+        m_current_block = true_block;
+        std::vector<gccjit::rvalue> true_args;
+        true_args.push_back(result);
+        true_args.push_back(buffer_size);
+        true_args.push_back(true_str);
+        m_current_block.add_eval(m_context.new_call(m_snprintf_func, true_args));
+        m_current_block.end_with_jump(after_block);
+        
+        // False block
+        m_current_block = false_block;
+        std::vector<gccjit::rvalue> false_args;
+        false_args.push_back(result);
+        false_args.push_back(buffer_size);
+        false_args.push_back(false_str);
+        m_current_block.add_eval(m_context.new_call(m_snprintf_func, false_args));
+        m_current_block.end_with_jump(after_block);
+        
+        m_current_block = after_block;
+    } else {
+        // For non-boolean types, just format directly
+        snprintf_args.push_back(expr_val);
+        m_current_block.add_eval(m_context.new_call(m_snprintf_func, snprintf_args));
+    }
+    
+    return result;
 }

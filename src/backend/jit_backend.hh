@@ -50,6 +50,8 @@ private:
     gccjit::rvalue visit_expr(const std::shared_ptr<AST::BinaryExpr>& expr);
     gccjit::rvalue visit_expr(const std::shared_ptr<AST::UnaryExpr>& expr);
     gccjit::rvalue visit_expr(const std::shared_ptr<AST::LiteralExpr>& expr);
+    gccjit::rvalue visit_expr(const std::shared_ptr<AST::LiteralExpr>& expr, gccjit::type target_type);
+    gccjit::rvalue visit_expr(const std::shared_ptr<AST::InterpolatedStringExpr>& expr);
     gccjit::rvalue visit_expr(const std::shared_ptr<AST::VariableExpr>& expr);
     gccjit::rvalue visit_expr(const std::shared_ptr<AST::AssignExpr>& expr);
     gccjit::rvalue visit_expr(const std::shared_ptr<AST::CallExpr>& expr);
@@ -92,14 +94,21 @@ private:
     gccjit::type m_uint64_type;
     gccjit::type m_float_type;
     gccjit::type m_long_double_type;
+    gccjit::type m_closure_type;
+    std::vector<gccjit::field> m_closure_fields;
 
-    // Functions
-    gccjit::function m_printf_func;
-    gccjit::function m_strcmp_func;
-    gccjit::function m_malloc_func;
+    // String functions
     gccjit::function m_strlen_func;
     gccjit::function m_strcpy_func;
     gccjit::function m_strcat_func;
+    gccjit::function m_strcmp_func;
+    // Standard library functions
+    gccjit::function m_printf_func;
+    gccjit::function m_sprintf_func;
+    gccjit::function m_snprintf_func;
+    gccjit::function m_free_func;
+    gccjit::function m_malloc_func;
+    gccjit::function m_memset_func;
     std::unordered_map<std::string, gccjit::function> m_functions;
 
     // Loop handling
@@ -113,6 +122,9 @@ private:
     bool is_arithmetic_op(TokenType op);
     gccjit::type get_common_type(gccjit::type type1, gccjit::type type2);
     
+    // String conversion helper
+    gccjit::rvalue convert_expr_to_string(const std::shared_ptr<AST::Expression>& expr);
+    
     // Builtin functions integration
     void register_builtin_functions();
     gccjit::type convert_builtin_type(TypeTag tag);
@@ -120,6 +132,7 @@ private:
     // Type conversion helpers
     TypePtr convert_ast_type(const std::shared_ptr<AST::TypeAnnotation>& ast_type);
     TypePtr convert_jit_type(gccjit::type jit_type);
+    gccjit::type create_closure_type();
 
     // Class handling
     std::unordered_map<std::string, gcc_jit_struct*> m_class_structs;
