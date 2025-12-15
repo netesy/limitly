@@ -10,8 +10,9 @@
 #include <vector>
 #include <stdexcept>
 #include <sstream>
+#include <optional>
+#include <charconv>
 #include "../common/opcodes.hh"
-#include "../common/big_int.hh"
 #include "concurrency/channel.hh"
 #include <atomic>
 
@@ -133,7 +134,6 @@ struct ClosureValue {
 enum class TypeTag {
     Nil,
     Bool,
-    BigInt,
     Int,
     Int8,
     Int16,
@@ -551,20 +551,59 @@ struct ErrorValue {
     std::string toString() const;  // Declaration only, definition after Value struct
 };
 
+// Conversion helper functions for string-based values
+namespace ValueConverters {
+    // Fast integer conversion using std::from_chars
+    inline std::optional<int64_t> toInt64(const std::string& str) {
+        int64_t result = 0;
+        auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), result);
+        if (ec == std::errc()) {
+            return result;
+        }
+        return std::nullopt;
+    }
+    
+    // Fast double conversion using std::from_chars
+    inline std::optional<double> toDouble(const std::string& str) {
+        double result = 0.0;
+        auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), result);
+        if (ec == std::errc()) {
+            return result;
+        }
+        return std::nullopt;
+    }
+    
+    // Fast bool conversion
+    inline bool toBool(const std::string& str) {
+        return !str.empty() && str != "0" && str != "false";
+    }
+    
+    // Safe conversion with fallback
+    template<typename T>
+    inline T safeConvert(const std::string& str, T defaultValue = T{}) {
+        if constexpr (std::is_same_v<T, int64_t>) {
+            if (auto val = toInt64(str)) return *val;
+        } else if constexpr (std::is_same_v<T, double>) {
+            if (auto val = toDouble(str)) return *val;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return toBool(str);
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            return str;
+        }
+        return defaultValue;
+    }
+}
+
 // Atomic wrapper for integer primitives
 struct AtomicValue {
     std::shared_ptr<std::atomic<int64_t>> inner;
     AtomicValue() : inner(std::make_shared<std::atomic<int64_t>>(0)) {}
     AtomicValue(int64_t v) : inner(std::make_shared<std::atomic<int64_t>>(v)) {}
     
-    // Constructor for BigInt - convert to int64_t with overflow check
-    AtomicValue(const BigInt& v) : inner(std::make_shared<std::atomic<int64_t>>(0)) {
-        try {
-            int64_t val = std::stoll(v.to_string());
-            inner->store(val);
-        } catch (const std::exception&) {
-            // If BigInt doesn't fit in int64_t, store max value
-            inner->store(std::numeric_limits<int64_t>::max());
+    // Constructor for string values - convert to int64_t
+    AtomicValue(const std::string& v) : inner(std::make_shared<std::atomic<int64_t>>(0)) {
+        if (auto val = ValueConverters::toInt64(v)) {
+            inner->store(*val);
         }
     }
 };
@@ -824,10 +863,13 @@ struct DictValue {
 // Add toString method to Value struct
 struct Value {
     TypePtr type;
+    std::string data;  // Unified string storage for all primitive types
+    
+    // Union type runtime support
+    size_t activeUnionVariant = 0;  // Which variant is active in union types
+    
+    // Complex types still use variant storage
     std::variant<std::monostate,
-                 bool,
-                 BigInt,
-                 std::string,
                  ListValue,
                  DictValue,
                  TupleValue,
@@ -837,24 +879,20 @@ struct Value {
                  UserDefinedValue,
                  IteratorValuePtr,
                  ObjectInstancePtr,
-                 std::shared_ptr<backend::ClassDefinition>
-                 , std::shared_ptr<Channel<ValuePtr>>
-                 , AtomicValue
-                 , ModuleValue
-                 , std::shared_ptr<backend::UserDefinedFunction>
-                 , backend::Function
-                 , ClosureValue
-                 >
-        data;
-
-    // Union type runtime support
-    size_t activeUnionVariant = 0;  // Which variant is active in union types
+                 std::shared_ptr<backend::ClassDefinition>,
+                 std::shared_ptr<Channel<ValuePtr>>,
+                 AtomicValue,
+                 ModuleValue,
+                 std::shared_ptr<backend::UserDefinedFunction>,
+                 backend::Function,
+                 ClosureValue
+                 > complexData;
 
     // Default constructor
-    Value() : type(nullptr) {}
+    Value() : type(nullptr), data("") {}
 
     // Constructor with type only
-    explicit Value(TypePtr t) : type(std::move(t)) {}
+    explicit Value(TypePtr t) : type(std::move(t)), data("") {}
 
     // String constructors
     Value(TypePtr t, const std::string& str) : type(std::move(t)), data(str) {}
@@ -863,116 +901,134 @@ struct Value {
     Value(TypePtr t, const char* str) : type(std::move(t)), data(std::string(str)) {}
 
     // Boolean constructor
-    Value(TypePtr t, bool val) : type(std::move(t)), data(val) {}
+    Value(TypePtr t, bool val) : type(std::move(t)), data(val ? "true" : "false") {}
 
-    // Numeric constructors - all use BigInt
-    Value(TypePtr t, float val) : type(std::move(t)), data(BigInt(val)) {}
+    // Numeric constructors - store as string
+    Value(TypePtr t, int64_t val) : type(std::move(t)), data(std::to_string(val)) {}
+    Value(TypePtr t, int32_t val) : type(std::move(t)), data(std::to_string(val)) {}
+    Value(TypePtr t, int16_t val) : type(std::move(t)), data(std::to_string(val)) {}
+    Value(TypePtr t, int8_t val) : type(std::move(t)), data(std::to_string(val)) {}
+    Value(TypePtr t, uint64_t val) : type(std::move(t)), data(std::to_string(val)) {}
+    Value(TypePtr t, uint32_t val) : type(std::move(t)), data(std::to_string(val)) {}
+    Value(TypePtr t, uint16_t val) : type(std::move(t)), data(std::to_string(val)) {}
+    Value(TypePtr t, uint8_t val) : type(std::move(t)), data(std::to_string(val)) {}
+    
+    // Float constructors
+    Value(TypePtr t, float val) : type(std::move(t)), data(std::to_string(val)) {}
+    Value(TypePtr t, double val) : type(std::move(t)), data(std::to_string(val)) {}
+    Value(TypePtr t, long double val) : type(std::move(t)), data(std::to_string(val)) {}
 
-    Value(TypePtr t, long double val) : type(std::move(t)), data(BigInt(val)) {}
-
-    // BigInt constructor
-    Value(TypePtr t, const BigInt& val) : type(std::move(t)), data(val) {}
-
-    // Template constructor for integer types - converts to BigInt
+    // Template constructor for integer types
     template<typename T>
     Value(TypePtr t, T val,
           typename std::enable_if_t<std::is_integral_v<T> && !std::is_same_v<T, bool>>* = nullptr)
-        : type(std::move(t)), data(BigInt(static_cast<BigInt>(val))) {}
+        : type(std::move(t)), data(std::to_string(val)) {}
 
     // Move constructor
     Value(Value&& other) noexcept
         : type(std::move(other.type)),
-        data(std::move(other.data)) {
+        data(std::move(other.data)),
+        complexData(std::move(other.complexData)) {
         
     }
 
     // Copy constructor
     Value(const Value& other)
         : type(other.type ? std::make_shared<Type>(*other.type) : nullptr),
-        data(other.data) {
+        data(other.data),
+        complexData(other.complexData) {
 
     }
 
-    // Update the destructor:
+    // Destructor
     ~Value() {
 
     }
-    // Constructor for ListValue
-    Value(TypePtr t, const ListValue& lv) : type(std::move(t)), data(lv) {
+    
+    // Constructor for complex types
+    Value(TypePtr t, const ListValue& lv) : type(std::move(t)), data(""), complexData(lv) {}
 
+    Value(TypePtr t, const TupleValue& tv) : type(std::move(t)), data(""), complexData(tv) {}
+
+    Value(TypePtr t, const DictValue& dv) : type(std::move(t)), data(""), complexData(dv) {}
+
+    Value(TypePtr t, const EnumValue& ev) : type(std::move(t)), data(""), complexData(ev) {}
+
+    Value(TypePtr t, const ErrorValue& erv) : type(std::move(t)), data(""), complexData(erv) {}
+
+    Value(TypePtr t, const SumValue& sv) : type(std::move(t)), data(""), complexData(sv) {}
+
+    Value(TypePtr t, const UserDefinedValue& udv) : type(std::move(t)), data(""), complexData(udv) {}
+
+    Value(TypePtr t, const IteratorValuePtr& iter) : type(std::move(t)), data(""), complexData(iter) {}
+
+    Value(TypePtr t, const std::shared_ptr<Channel<ValuePtr>>& ch) : type(std::move(t)), data(""), complexData(ch) {}
+
+    Value(TypePtr t, const AtomicValue& av) : type(std::move(t)), data(""), complexData(av) {}
+
+    Value(TypePtr t, const ObjectInstancePtr& obj) : type(std::move(t)), data(""), complexData(obj) {}
+
+    Value(TypePtr t, const std::shared_ptr<backend::ClassDefinition>& classDef) : type(std::move(t)), data(""), complexData(classDef) {}
+
+    Value(TypePtr t, const std::shared_ptr<backend::UserDefinedFunction>& func) : type(std::move(t)), data(""), complexData(func) {}
+
+    Value(TypePtr t, const backend::Function& func) : type(std::move(t)), data(""), complexData(func) {}
+
+    Value(TypePtr t, const ClosureValue& closure) : type(std::move(t)), data(""), complexData(closure) {}
+
+    // Type-safe factory methods
+    static ValuePtr createInt64(int64_t val, TypePtr type) {
+        return std::make_shared<Value>(type, std::to_string(val));
     }
-
-    // Constructor for TupleValue
-    Value(TypePtr t, const TupleValue& tv) : type(std::move(t)), data(tv) {
-
+    
+    static ValuePtr createFloat64(double val, TypePtr type) {
+        return std::make_shared<Value>(type, std::to_string(val));
     }
-
-    // Constructor for DictValue
-    Value(TypePtr t, const DictValue& dv) : type(std::move(t)), data(dv) {
-
-        ;
+    
+    static ValuePtr createBool(bool val, TypePtr type) {
+        return std::make_shared<Value>(type, val ? "true" : "false");
     }
-
-    // Constructor for EnumValue
-    Value(TypePtr t, const EnumValue& ev) : type(std::move(t)), data(ev) {
-
+    
+    static ValuePtr createString(const std::string& val, TypePtr type) {
+        return std::make_shared<Value>(type, val);
     }
-
-    // Constructor for ErrorValue
-    Value(TypePtr t, const ErrorValue& erv) : type(std::move(t)), data(erv) {
-
+    
+    // Efficient conversion methods for VM/JIT
+    template<typename T>
+    T as() const {
+        if constexpr (std::is_same_v<T, int64_t>) {
+            return ValueConverters::safeConvert<int64_t>(data, 0);
+        } else if constexpr (std::is_same_v<T, double>) {
+            return ValueConverters::safeConvert<double>(data, 0.0);
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return ValueConverters::toBool(data);
+        } else if constexpr (std::is_same_v<T, std::string>) {
+            return data;
+        }
+        throw std::runtime_error("Unsupported type conversion");
     }
-
-    // Constructor for SumValue
-    Value(TypePtr t, const SumValue& sv) : type(std::move(t)), data(sv) {
-
-        ;
+    
+    // Safe conversion with error handling
+    template<typename T>
+    std::optional<T> tryAs() const {
+        try {
+            return as<T>();
+        } catch (...) {
+            return std::nullopt;
+        }
     }
-
-    // Constructor for UserDefinedValue
-    Value(TypePtr t, const UserDefinedValue& udv) : type(std::move(t)), data(udv) {
-
-    }
-
-    // Constructor for IteratorValuePtr
-    Value(TypePtr t, const IteratorValuePtr& iter) : type(std::move(t)), data(iter) {
-    }
-
-    // Constructor for Channel pointer
-    Value(TypePtr t, const std::shared_ptr<Channel<ValuePtr>>& ch) : type(std::move(t)), data(ch) {
-    }
-
-    // Constructor for AtomicValue
-    Value(TypePtr t, const AtomicValue& av) : type(std::move(t)), data(av) {}
-
-    // Constructor for ObjectInstancePtr
-    Value(TypePtr t, const ObjectInstancePtr& obj) : type(std::move(t)), data(obj) {
-    }
-
-    // Constructor for ClassDefinition
-    Value(TypePtr t, const std::shared_ptr<backend::ClassDefinition>& classDef) : type(std::move(t)), data(classDef) {
-    }
-
-    // Constructor for UserDefinedFunction
-    Value(TypePtr t, const std::shared_ptr<backend::UserDefinedFunction>& func) : type(std::move(t)), data(func) {}
-
-    // Constructor for backend::Function
-    Value(TypePtr t, const backend::Function& func) : type(std::move(t)), data(func) {}
-
-    // Constructor for ClosureValue
-    Value(TypePtr t, const ClosureValue& closure) : type(std::move(t)), data(closure) {}
 
     bool isError() const {
         // An error can be a direct ErrorValue or an ErrorUnion holding an ErrorValue.
         if (type && type->tag == TypeTag::ErrorUnion) {
-            return std::holds_alternative<ErrorValue>(data);
+            return std::holds_alternative<ErrorValue>(complexData);
         }
-        return std::holds_alternative<ErrorValue>(data);
+        return std::holds_alternative<ErrorValue>(complexData);
     }
 
     const ErrorValue* getErrorValue() const {
         if (isError()) {
-            return std::get_if<ErrorValue>(&data);
+            return std::get_if<ErrorValue>(&complexData);
         }
         return nullptr;
     }
@@ -1116,7 +1172,7 @@ inline ValuePtr createError(const std::string& errorType, const std::string& mes
                             const std::vector<ValuePtr>& args = {}, size_t location = 0) {
     auto errorValue = std::make_shared<Value>();
     errorValue->type = std::make_shared<Type>(TypeTag::UserDefined); // Error types are user-defined
-    errorValue->data = ErrorValue(errorType, message, args, location);
+    errorValue->complexData = ErrorValue(errorType, message, args, location);
     return errorValue;
 }
 
@@ -1124,6 +1180,11 @@ inline ValuePtr createError(const std::string& errorType, const std::string& mes
 inline ValuePtr createSuccess(ValuePtr successValue, TypePtr errorUnionType) {
     auto value = std::make_shared<Value>(errorUnionType);
     value->data = successValue->data;
+    if (std::holds_alternative<ListValue>(successValue->complexData) ||
+        std::holds_alternative<DictValue>(successValue->complexData) ||
+        std::holds_alternative<TupleValue>(successValue->complexData)) {
+        value->complexData = successValue->complexData;
+    }
     return value;
 }
 
@@ -1134,7 +1195,7 @@ inline ValuePtr createErrorUnionValue(const ErrorUnion& errorUnion, TypePtr erro
 
 // Check if a value is an error
 inline bool isError(const ValuePtr& value) {
-    return std::holds_alternative<ErrorValue>(value->data);
+    return std::holds_alternative<ErrorValue>(value->complexData);
 }
 
 // Check if a value is a success value (not an error)
@@ -1144,7 +1205,7 @@ inline bool isSuccess(const ValuePtr& value) {
 
 // Extract error value from a Value (throws if not an error)
 inline const ErrorValue& getError(const ValuePtr& value) {
-    if (auto errorValue = std::get_if<ErrorValue>(&value->data)) {
+    if (auto errorValue = std::get_if<ErrorValue>(&value->complexData)) {
         return *errorValue;
     }
     throw std::runtime_error("Value is not an error");
@@ -1152,12 +1213,12 @@ inline const ErrorValue& getError(const ValuePtr& value) {
 
 // Extract error value safely (returns nullptr if not an error)
 inline const ErrorValue* getErrorSafe(const ValuePtr& value) {
-    return std::get_if<ErrorValue>(&value->data);
+    return std::get_if<ErrorValue>(&value->complexData);
 }
 
 // Get error type from a value (empty string if not an error)
 inline std::string getErrorType(const ValuePtr& value) {
-    if (auto errorValue = std::get_if<ErrorValue>(&value->data)) {
+    if (auto errorValue = std::get_if<ErrorValue>(&value->complexData)) {
         return errorValue->errorType;
     }
     return "";
@@ -1165,7 +1226,7 @@ inline std::string getErrorType(const ValuePtr& value) {
 
 // Get error message from a value (empty string if not an error)
 inline std::string getErrorMessage(const ValuePtr& value) {
-    if (auto errorValue = std::get_if<ErrorValue>(&value->data)) {
+    if (auto errorValue = std::get_if<ErrorValue>(&value->complexData)) {
         return errorValue->message;
     }
     return "";
@@ -1173,7 +1234,7 @@ inline std::string getErrorMessage(const ValuePtr& value) {
 
 // Get error arguments from a value (empty vector if not an error)
 inline std::vector<ValuePtr> getErrorArguments(const ValuePtr& value) {
-    if (auto errorValue = std::get_if<ErrorValue>(&value->data)) {
+    if (auto errorValue = std::get_if<ErrorValue>(&value->complexData)) {
         return errorValue->arguments;
     }
     return {};
@@ -1181,7 +1242,7 @@ inline std::vector<ValuePtr> getErrorArguments(const ValuePtr& value) {
 
 // Get error source location from a value (0 if not an error)
 inline size_t getErrorLocation(const ValuePtr& value) {
-    if (auto errorValue = std::get_if<ErrorValue>(&value->data)) {
+    if (auto errorValue = std::get_if<ErrorValue>(&value->complexData)) {
         return errorValue->sourceLocation;
     }
     return 0;
@@ -1191,13 +1252,18 @@ inline size_t getErrorLocation(const ValuePtr& value) {
 inline ValuePtr wrapAsSuccess(ValuePtr successValue, TypePtr errorUnionType) {
     auto value = std::make_shared<Value>(errorUnionType);
     value->data = successValue->data;
+    if (std::holds_alternative<ListValue>(successValue->complexData) ||
+        std::holds_alternative<DictValue>(successValue->complexData) ||
+        std::holds_alternative<TupleValue>(successValue->complexData)) {
+        value->complexData = successValue->complexData;
+    }
     return value;
 }
 
 // Wrap an error value in an error union type
 inline ValuePtr wrapAsError(const ErrorValue& errorValue, TypePtr errorUnionType) {
     auto value = std::make_shared<Value>(errorUnionType);
-    value->data = errorValue;
+    value->complexData = errorValue;
     return value;
 }
 
@@ -1260,10 +1326,10 @@ struct IteratorValue {
     size_t currentIndex;
     
     // For lazy ranges
-    BigInt rangeStart;
-    BigInt rangeEnd;
-    BigInt rangeStep;
-    BigInt rangeCurrent;
+    std::string rangeStart;
+    std::string rangeEnd;
+    std::string rangeStep;
+    std::string rangeCurrent;
     
     // For channel iterators: a buffered value received by hasNext()
     // Marked mutable because hasNext() needs to modify these while being logically const
@@ -1273,11 +1339,11 @@ struct IteratorValue {
     // Constructor for general iterators (list, dict, channel)
     IteratorValue(IteratorType type, ValuePtr iterable)
         : type(type), iterable(std::move(iterable)), currentIndex(0),
-        rangeStart(BigInt(0)), rangeEnd(BigInt(0)), rangeStep(BigInt(0)), rangeCurrent(BigInt(0)),
+        rangeStart("0"), rangeEnd("0"), rangeStep("0"), rangeCurrent("0"),
         hasBuffered(false), bufferedValue(nullptr) {}
     
     // Constructor for lazy ranges
-    IteratorValue(IteratorType type, ValuePtr iterable, BigInt start, BigInt end, BigInt step)
+    IteratorValue(IteratorType type, ValuePtr iterable, const std::string& start, const std::string& end, const std::string& step)
         : type(type), iterable(std::move(iterable)), currentIndex(0),
         rangeStart(start), rangeEnd(end), rangeStep(step), rangeCurrent(start),
         hasBuffered(false), bufferedValue(nullptr) {}

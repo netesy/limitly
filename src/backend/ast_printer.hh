@@ -21,7 +21,7 @@ private:
     
     // Utility functions
     std::string tokenTypeToString(TokenType type) const;
-    std::string valueToString(const std::variant<BigInt, std::string, bool, std::nullptr_t>& value) const;
+    std::string valueToString(const std::variant<std::string, bool, std::nullptr_t>& value) const;
     std::string typeToString(const std::shared_ptr<AST::TypeAnnotation>& type) const;
 };
 

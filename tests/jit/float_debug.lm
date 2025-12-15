@@ -1,0 +1,5 @@
+print(1.23);
+var f32_val: f32 = 1.23;
+print(f32_val);
+var f64_val: f64 = 1.23;
+print(f64_val);

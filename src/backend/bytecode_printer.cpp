@@ -151,24 +151,23 @@ std::string BytecodePrinter::formatInstruction(const Instruction& instruction, s
             if (!instruction.stringValue.empty()) {
                 oss << " \"" << instruction.stringValue << "\"";
             }
-            if (instruction.intValue != 0) {
-                oss << " " << instruction.intValue;
-            }
             break;
         case Opcode::JUMP:
         case Opcode::JUMP_IF_TRUE:
         case Opcode::JUMP_IF_FALSE:
-            oss << " " << instruction.intValue;
+            if (!instruction.stringValue.empty()) {
+                oss << " " << instruction.stringValue;
+            }
             break;
             
         case Opcode::PUSH_FLOAT:
-            oss << " " << instruction.floatValue;
+            if (!instruction.stringValue.empty()) {
+                oss << " " << instruction.stringValue;
+            }
             break;
             
         case Opcode::PUSH_BOOL:
             oss << " " << (instruction.boolValue ? "true" : "false");
-            // if (!instruction.stringValue.empty()) {
-            //     oss << " \"" << instruction.stringValue << "\"";
             // }
             // if (instruction.intValue != 0) {
             //     oss << " " << instruction.intValue;
@@ -202,30 +201,20 @@ std::string BytecodePrinter::formatInstruction(const Instruction& instruction, s
             if (!instruction.stringValue.empty()) {
                 oss << " \"" << instruction.stringValue << "\"";
             }
-
-            if (instruction.intValue != 0) {
-                oss << " " << instruction.intValue;
-            }
             break;
             
         case Opcode::CREATE_CLOSURE:
         case Opcode::CALL_CLOSURE:
         case Opcode::CALL_HIGHER_ORDER:
-            // These might have both int and string values
+            // These might have string values
             if (!instruction.stringValue.empty()) {
                 oss << " \"" << instruction.stringValue << "\"";
-            }
-            if (instruction.intValue != 0) {
-                oss << " " << instruction.intValue;
             }
             break;
             
         default:
             if (!instruction.stringValue.empty()) {
                 oss << " \"" << instruction.stringValue << "\"";
-            }
-            if (instruction.intValue != 0) {
-                oss << " " << instruction.intValue;
             }
             // No operands for most instructions
             break;

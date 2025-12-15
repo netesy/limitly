@@ -1,0 +1,41 @@
+// Basic Function Tests
+print("=== Basic Function Tests ===");
+
+// Test 1: Simple function declaration and call
+print("--- Test 1: Simple Functions ---");
+fn sayHello() {
+    print("Hello from function!");
+}
+
+sayHello();
+
+// Test 2: Function with parameters
+print("--- Test 2: Functions with Parameters ---");
+fn add(a: int, b: int): int {
+    return a + b;
+}
+
+var sum = add(5, 3);
+print(sum);
+
+// Test 3: Function with string parameters
+print("--- Test 3: String Parameters ---");
+fn greet(name: str) {
+    print("Hello, ");
+    print(name);
+    print("!");
+}
+
+greet("Alice");
+greet("Bob");
+
+// Test 4: Function with return values
+print("--- Test 4: Return Values ---");
+fn square(x: int): int {
+    return x * x;
+}
+
+var result1 = square(4);
+var result2 = square(7);
+print(result1);
+print(result2);

@@ -342,9 +342,9 @@ bool isCallable(const ValuePtr& value) {
     
     return value->type->tag == TypeTag::Function || 
            value->type->tag == TypeTag::Closure ||
-           std::holds_alternative<backend::Function>(value->data) ||
-           std::holds_alternative<ClosureValue>(value->data) ||
-           std::holds_alternative<std::shared_ptr<backend::UserDefinedFunction>>(value->data);
+           std::holds_alternative<backend::Function>(value->complexData) ||
+           std::holds_alternative<ClosureValue>(value->complexData) ||
+           std::holds_alternative<std::shared_ptr<backend::UserDefinedFunction>>(value->complexData);
 }
 
 // Helper function to call a function value with arguments
@@ -356,8 +356,8 @@ ValuePtr callFunction(const ValuePtr& function, const std::vector<ValuePtr>& arg
     // For now, we'll implement a simple mechanism for lambda functions
     // This will be enhanced when we have proper closure support
     
-    if (std::holds_alternative<std::shared_ptr<backend::UserDefinedFunction>>(function->data)) {
-        auto func = std::get<std::shared_ptr<backend::UserDefinedFunction>>(function->data);
+    if (std::holds_alternative<std::shared_ptr<backend::UserDefinedFunction>>(function->complexData)) {
+        auto func = std::get<std::shared_ptr<backend::UserDefinedFunction>>(function->complexData);
         return func->execute(args);
     }
     
@@ -387,11 +387,11 @@ ValuePtr BuiltinFunctions::map(const std::vector<ValuePtr>& args) {
         throw std::runtime_error("map: second argument must be a list");
     }
     
-    if (!std::holds_alternative<ListValue>(list->data)) {
+    if (!std::holds_alternative<ListValue>(list->complexData)) {
         throw std::runtime_error("map: second argument must be a list");
     }
     
-    const auto& listValue = std::get<ListValue>(list->data);
+    const auto& listValue = std::get<ListValue>(list->complexData);
     ListValue result;
     
     // For now, we'll implement a simple transformation that doubles numbers
@@ -401,12 +401,12 @@ ValuePtr BuiltinFunctions::map(const std::vector<ValuePtr>& args) {
             // Simple transformation: if it's a number, long double it
             if (element && element->type) {
                 if (element->type->tag == TypeTag::Int || element->type->tag == TypeTag::Int32) {
-                    int32_t value = std::get<int32_t>(element->data);
+                    int32_t value = std::stoi(element->data);
                     auto intType = std::make_shared<Type>(TypeTag::Int32);
                     auto transformedElement = std::make_shared<::Value>(intType, value * 2);
                     result.append(transformedElement);
                 } else if (element->type->tag == TypeTag::Float64) {
-                    long double value = std::get<long double>(element->data);
+                    long double value = std::stold(element->data);
                     auto floatType = std::make_shared<Type>(TypeTag::Float64);
                     auto transformedElement = std::make_shared<::Value>(floatType, value * 2.0);
                     result.append(transformedElement);
@@ -441,11 +441,11 @@ ValuePtr BuiltinFunctions::filter(const std::vector<ValuePtr>& args) {
         throw std::runtime_error("filter: second argument must be a list");
     }
     
-    if (!std::holds_alternative<ListValue>(list->data)) {
+    if (!std::holds_alternative<ListValue>(list->complexData)) {
         throw std::runtime_error("filter: second argument must be a list");
     }
     
-    const auto& listValue = std::get<ListValue>(list->data);
+    const auto& listValue = std::get<ListValue>(list->complexData);
     ListValue result;
     
     // For now, we'll implement a simple filter that keeps even numbers
@@ -457,10 +457,10 @@ ValuePtr BuiltinFunctions::filter(const std::vector<ValuePtr>& args) {
             // Simple predicate: keep even numbers
             if (element && element->type) {
                 if (element->type->tag == TypeTag::Int || element->type->tag == TypeTag::Int32) {
-                    int32_t value = std::get<int32_t>(element->data);
+                    int32_t value = std::stoi(element->data);
                     shouldInclude = (value % 2 == 0);
                 } else if (element->type->tag == TypeTag::Float64) {
-                    long double value = std::get<long double>(element->data);
+                    long double value = std::stold(element->data);
                     shouldInclude = (static_cast<int>(value) % 2 == 0);
                 } else {
                     // For non-numeric types, include all
@@ -498,11 +498,11 @@ ValuePtr BuiltinFunctions::reduce(const std::vector<ValuePtr>& args) {
         throw std::runtime_error("reduce: second argument must be a list");
     }
     
-    if (!std::holds_alternative<ListValue>(list->data)) {
+    if (!std::holds_alternative<ListValue>(list->complexData)) {
         throw std::runtime_error("reduce: second argument must be a list");
     }
     
-    const auto& listValue = std::get<ListValue>(list->data);
+    const auto& listValue = std::get<ListValue>(list->complexData);
     
     if (listValue.elements.empty()) {
         if (accumulator) {
@@ -533,13 +533,13 @@ ValuePtr BuiltinFunctions::reduce(const std::vector<ValuePtr>& args) {
                 // Handle Int type (which maps to Int32)
                 if ((accumulator->type->tag == TypeTag::Int || accumulator->type->tag == TypeTag::Int32) && 
                     (element->type->tag == TypeTag::Int || element->type->tag == TypeTag::Int32)) {
-                    int32_t accValue = std::get<int32_t>(accumulator->data);
-                    int32_t elemValue = std::get<int32_t>(element->data);
+                    int32_t accValue = std::stoi(accumulator->data);
+                    int32_t elemValue = std::stoi(element->data);
                     auto intType = std::make_shared<Type>(TypeTag::Int32);
                     accumulator = std::make_shared<::Value>(intType, accValue + elemValue);
                 } else if (accumulator->type->tag == TypeTag::Float64 && element->type->tag == TypeTag::Float64) {
-                    long double accValue = std::get<long double>(accumulator->data);
-                    long double elemValue = std::get<long double>(element->data);
+                    long double accValue = std::stold(accumulator->data);
+                    long double elemValue = std::stold(element->data);
                     auto floatType = std::make_shared<Type>(TypeTag::Float64);
                     accumulator = std::make_shared<::Value>(floatType, accValue + elemValue);
                 } else {
@@ -571,11 +571,11 @@ ValuePtr BuiltinFunctions::forEach(const std::vector<ValuePtr>& args) {
         throw std::runtime_error("forEach: second argument must be a list");
     }
     
-    if (!std::holds_alternative<ListValue>(list->data)) {
+    if (!std::holds_alternative<ListValue>(list->complexData)) {
         throw std::runtime_error("forEach: second argument must be a list");
     }
     
-    const auto& listValue = std::get<ListValue>(list->data);
+    const auto& listValue = std::get<ListValue>(list->complexData);
     
     // For now, we'll implement a simple forEach that prints each element
     // This is a placeholder until we have proper lambda function support
@@ -584,13 +584,13 @@ ValuePtr BuiltinFunctions::forEach(const std::vector<ValuePtr>& args) {
             // Simple action: print the element (as a placeholder)
             if (element && element->type) {
                 if (element->type->tag == TypeTag::Int || element->type->tag == TypeTag::Int32) {
-                    int32_t value = std::get<int32_t>(element->data);
+                    int32_t value = std::stoi(element->data);
                     std::cout << "forEach element: " << value << std::endl;
                 } else if (element->type->tag == TypeTag::Float64) {
-                    long double value = std::get<long double>(element->data);
+                    long double value = std::stold(element->data);
                     std::cout << "forEach element: " << value << std::endl;
                 } else if (element->type->tag == TypeTag::String) {
-                    std::string value = std::get<std::string>(element->data);
+                    std::string value = element->data;
                     std::cout << "forEach element: " << value << std::endl;
                 } else {
                     std::cout << "forEach element: <unknown type>" << std::endl;
@@ -620,11 +620,11 @@ ValuePtr BuiltinFunctions::find(const std::vector<ValuePtr>& args) {
         throw std::runtime_error("find: second argument must be a list");
     }
     
-    if (!std::holds_alternative<ListValue>(list->data)) {
+    if (!std::holds_alternative<ListValue>(list->complexData)) {
         throw std::runtime_error("find: second argument must be a list");
     }
     
-    const auto& listValue = std::get<ListValue>(list->data);
+    const auto& listValue = std::get<ListValue>(list->complexData);
     
     // Check predicate type and select appropriate built-in predicate
     std::string predicateType = "even"; // default
@@ -632,8 +632,8 @@ ValuePtr BuiltinFunctions::find(const std::vector<ValuePtr>& args) {
     if (predicate && predicate->type) {
         if (predicate->type->tag == TypeTag::Nil) {
             predicateType = "even"; // default: find first even number
-        } else if (predicate->type->tag == TypeTag::String && std::holds_alternative<std::string>(predicate->data)) {
-            predicateType = std::get<std::string>(predicate->data);
+        } else if (predicate->type->tag == TypeTag::String) {
+            predicateType = predicate->data;
         } else if (predicate->type->tag == TypeTag::Function) {
             // Custom function predicate - for now, return an informative message
             throw std::runtime_error("find: Custom function predicates not yet supported. Use nil or string predicate names like 'even', 'odd', 'positive', 'negative'");
@@ -645,19 +645,8 @@ ValuePtr BuiltinFunctions::find(const std::vector<ValuePtr>& args) {
         try {
             if (element && element->type) {
                 if (element->type->tag == TypeTag::Int || element->type->tag == TypeTag::Int32) {
-                    // Try different integer types that might be in the variant
-                    int32_t value = 0;
-                    if (std::holds_alternative<int32_t>(element->data)) {
-                        value = std::get<int32_t>(element->data);
-                    } else if (std::holds_alternative<int64_t>(element->data)) {
-                        value = static_cast<int32_t>(std::get<int64_t>(element->data));
-                    } else if (std::holds_alternative<int16_t>(element->data)) {
-                        value = static_cast<int32_t>(std::get<int16_t>(element->data));
-                    } else if (std::holds_alternative<int8_t>(element->data)) {
-                        value = static_cast<int32_t>(std::get<int8_t>(element->data));
-                    } else {
-                        continue; // Skip if we can't get the integer value
-                    }
+                    // Use string-based value parsing
+                    int32_t value = std::stoi(element->data);
                     
                     bool matches = false;
                     if (predicateType == "even") {
@@ -678,25 +667,23 @@ ValuePtr BuiltinFunctions::find(const std::vector<ValuePtr>& args) {
                         return element;
                     }
                 } else if (element->type->tag == TypeTag::Float64) {
-                    if (std::holds_alternative<long double>(element->data)) {
-                        long double value = std::get<long double>(element->data);
-                        bool matches = false;
-                        int intValue = static_cast<int>(value);
-                        if (predicateType == "even") {
-                            matches = (intValue % 2 == 0);
-                        } else if (predicateType == "odd") {
-                            matches = (intValue % 2 != 0);
-                        } else if (predicateType == "positive") {
-                            matches = (value > 0.0);
-                        } else if (predicateType == "negative") {
-                            matches = (value < 0.0);
-                        } else if (predicateType == "zero") {
-                            matches = (value == 0.0);
-                        }
-                        
-                        if (matches) {
-                            return element;
-                        }
+                    long double value = std::stold(element->data);
+                    bool matches = false;
+                    int intValue = static_cast<int>(value);
+                    if (predicateType == "even") {
+                        matches = (intValue % 2 == 0);
+                    } else if (predicateType == "odd") {
+                        matches = (intValue % 2 != 0);
+                    } else if (predicateType == "positive") {
+                        matches = (value > 0.0);
+                    } else if (predicateType == "negative") {
+                        matches = (value < 0.0);
+                    } else if (predicateType == "zero") {
+                        matches = (value == 0.0);
+                    }
+                    
+                    if (matches) {
+                        return element;
                     }
                 }
             }
@@ -722,11 +709,11 @@ ValuePtr BuiltinFunctions::some(const std::vector<ValuePtr>& args) {
         throw std::runtime_error("some: second argument must be a list");
     }
     
-    if (!std::holds_alternative<ListValue>(list->data)) {
+    if (!std::holds_alternative<ListValue>(list->complexData)) {
         throw std::runtime_error("some: second argument must be a list");
     }
     
-    const auto& listValue = std::get<ListValue>(list->data);
+    const auto& listValue = std::get<ListValue>(list->complexData);
     
     // Check predicate type and select appropriate built-in predicate
     std::string predicateType = "even"; // default
@@ -734,8 +721,8 @@ ValuePtr BuiltinFunctions::some(const std::vector<ValuePtr>& args) {
     if (predicate && predicate->type) {
         if (predicate->type->tag == TypeTag::Nil) {
             predicateType = "even"; // default: check if any element is even
-        } else if (predicate->type->tag == TypeTag::String && std::holds_alternative<std::string>(predicate->data)) {
-            predicateType = std::get<std::string>(predicate->data);
+        } else if (predicate->type->tag == TypeTag::String) {
+            predicateType = predicate->data;
         } else if (predicate->type->tag == TypeTag::Function) {
             // Custom function predicate - for now, return an informative message
             throw std::runtime_error("some: Custom function predicates not yet supported. Use nil or string predicate names like 'even', 'odd', 'positive', 'negative'");
@@ -747,19 +734,8 @@ ValuePtr BuiltinFunctions::some(const std::vector<ValuePtr>& args) {
         try {
             if (element && element->type) {
                 if (element->type->tag == TypeTag::Int || element->type->tag == TypeTag::Int32) {
-                    // Try different integer types that might be in the variant
-                    int32_t value = 0;
-                    if (std::holds_alternative<int32_t>(element->data)) {
-                        value = std::get<int32_t>(element->data);
-                    } else if (std::holds_alternative<int64_t>(element->data)) {
-                        value = static_cast<int32_t>(std::get<int64_t>(element->data));
-                    } else if (std::holds_alternative<int16_t>(element->data)) {
-                        value = static_cast<int32_t>(std::get<int16_t>(element->data));
-                    } else if (std::holds_alternative<int8_t>(element->data)) {
-                        value = static_cast<int32_t>(std::get<int8_t>(element->data));
-                    } else {
-                        continue; // Skip if we can't get the integer value
-                    }
+                    // Use string-based value parsing
+                    int32_t value = std::stoi(element->data);
                     
                     bool matches = false;
                     if (predicateType == "even") {
@@ -781,26 +757,24 @@ ValuePtr BuiltinFunctions::some(const std::vector<ValuePtr>& args) {
                         return std::make_shared<::Value>(boolType, true);
                     }
                 } else if (element->type->tag == TypeTag::Float64) {
-                    if (std::holds_alternative<long double>(element->data)) {
-                        long double value = std::get<long double>(element->data);
-                        bool matches = false;
-                        int intValue = static_cast<int>(value);
-                        if (predicateType == "even") {
-                            matches = (intValue % 2 == 0);
-                        } else if (predicateType == "odd") {
-                            matches = (intValue % 2 != 0);
-                        } else if (predicateType == "positive") {
-                            matches = (value > 0.0);
-                        } else if (predicateType == "negative") {
-                            matches = (value < 0.0);
-                        } else if (predicateType == "zero") {
-                            matches = (value == 0.0);
-                        }
-                        
-                        if (matches) {
-                            auto boolType = std::make_shared<Type>(TypeTag::Bool);
-                            return std::make_shared<::Value>(boolType, true);
-                        }
+                    long double value = std::stold(element->data);
+                    bool matches = false;
+                    int intValue = static_cast<int>(value);
+                    if (predicateType == "even") {
+                        matches = (intValue % 2 == 0);
+                    } else if (predicateType == "odd") {
+                        matches = (intValue % 2 != 0);
+                    } else if (predicateType == "positive") {
+                        matches = (value > 0.0);
+                    } else if (predicateType == "negative") {
+                        matches = (value < 0.0);
+                    } else if (predicateType == "zero") {
+                        matches = (value == 0.0);
+                    }
+                    
+                    if (matches) {
+                        auto boolType = std::make_shared<Type>(TypeTag::Bool);
+                        return std::make_shared<::Value>(boolType, true);
                     }
                 }
             }
@@ -826,11 +800,11 @@ ValuePtr BuiltinFunctions::every(const std::vector<ValuePtr>& args) {
         throw std::runtime_error("every: second argument must be a list");
     }
     
-    if (!std::holds_alternative<ListValue>(list->data)) {
+    if (!std::holds_alternative<ListValue>(list->complexData)) {
         throw std::runtime_error("every: second argument must be a list");
     }
     
-    const auto& listValue = std::get<ListValue>(list->data);
+    const auto& listValue = std::get<ListValue>(list->complexData);
     
     // Check predicate type and select appropriate built-in predicate
     std::string predicateType = "positive"; // default for every
@@ -838,8 +812,8 @@ ValuePtr BuiltinFunctions::every(const std::vector<ValuePtr>& args) {
     if (predicate && predicate->type) {
         if (predicate->type->tag == TypeTag::Nil) {
             predicateType = "positive"; // default: check if all elements are positive
-        } else if (predicate->type->tag == TypeTag::String && std::holds_alternative<std::string>(predicate->data)) {
-            predicateType = std::get<std::string>(predicate->data);
+        } else if (predicate->type->tag == TypeTag::String) {
+            predicateType = predicate->data;
         } else if (predicate->type->tag == TypeTag::Function) {
             // Custom function predicate - for now, return an informative message
             throw std::runtime_error("every: Custom function predicates not yet supported. Use nil or string predicate names like 'even', 'odd', 'positive', 'negative'");
@@ -851,21 +825,8 @@ ValuePtr BuiltinFunctions::every(const std::vector<ValuePtr>& args) {
         try {
             if (element && element->type) {
                 if (element->type->tag == TypeTag::Int || element->type->tag == TypeTag::Int32) {
-                    // Try different integer types that might be in the variant
-                    int32_t value = 0;
-                    if (std::holds_alternative<int32_t>(element->data)) {
-                        value = std::get<int32_t>(element->data);
-                    } else if (std::holds_alternative<int64_t>(element->data)) {
-                        value = static_cast<int32_t>(std::get<int64_t>(element->data));
-                    } else if (std::holds_alternative<int16_t>(element->data)) {
-                        value = static_cast<int32_t>(std::get<int16_t>(element->data));
-                    } else if (std::holds_alternative<int8_t>(element->data)) {
-                        value = static_cast<int32_t>(std::get<int8_t>(element->data));
-                    } else {
-                        // For unknown integer types, consider them as not satisfying the predicate
-                        auto boolType = std::make_shared<Type>(TypeTag::Bool);
-                        return std::make_shared<::Value>(boolType, false);
-                    }
+                    // Use string-based value parsing
+                    int32_t value = std::stoi(element->data);
                     
                     bool matches = false;
                     if (predicateType == "even") {
@@ -887,25 +848,23 @@ ValuePtr BuiltinFunctions::every(const std::vector<ValuePtr>& args) {
                         return std::make_shared<::Value>(boolType, false);
                     }
                 } else if (element->type->tag == TypeTag::Float64) {
-                    if (std::holds_alternative<long double>(element->data)) {
-                        long double value = std::get<long double>(element->data);
-                        bool matches = false;
-                        if (predicateType == "even") {
-                            matches = (static_cast<int>(value) % 2 == 0);
-                        } else if (predicateType == "odd") {
-                            matches = (static_cast<int>(value) % 2 != 0);
-                        } else if (predicateType == "positive") {
-                            matches = (value > 0.0);
-                        } else if (predicateType == "negative") {
-                            matches = (value < 0.0);
-                        } else if (predicateType == "zero") {
-                            matches = (value == 0.0);
-                        }
-                        
-                        if (!matches) {
-                            auto boolType = std::make_shared<Type>(TypeTag::Bool);
-                            return std::make_shared<::Value>(boolType, false);
-                        }
+                    long double value = std::stold(element->data);
+                    bool matches = false;
+                    if (predicateType == "even") {
+                        matches = (static_cast<int>(value) % 2 == 0);
+                    } else if (predicateType == "odd") {
+                        matches = (static_cast<int>(value) % 2 != 0);
+                    } else if (predicateType == "positive") {
+                        matches = (value > 0.0);
+                    } else if (predicateType == "negative") {
+                        matches = (value < 0.0);
+                    } else if (predicateType == "zero") {
+                        matches = (value == 0.0);
+                    }
+                    
+                    if (!matches) {
+                        auto boolType = std::make_shared<Type>(TypeTag::Bool);
+                        return std::make_shared<::Value>(boolType, false);
                     }
                 } else {
                     // For non-numeric types, consider them as not satisfying the predicate
@@ -1009,20 +968,18 @@ ValuePtr BuiltinFunctions::len(const std::vector<ValuePtr>& args) {
     
     switch (value->type->tag) {
         case TypeTag::String: {
-            if (std::holds_alternative<std::string>(value->data)) {
-                length = std::get<std::string>(value->data).length();
-            }
+            length = value->data.length();
             break;
         }
         case TypeTag::List: {
-            if (std::holds_alternative<ListValue>(value->data)) {
-                length = std::get<ListValue>(value->data).elements.size();
+            if (std::holds_alternative<ListValue>(value->complexData)) {
+                length = std::get<ListValue>(value->complexData).elements.size();
             }
             break;
         }
         case TypeTag::Dict: {
-            if (std::holds_alternative<DictValue>(value->data)) {
-                length = std::get<DictValue>(value->data).elements.size();
+            if (std::holds_alternative<DictValue>(value->complexData)) {
+                length = std::get<DictValue>(value->complexData).elements.size();
             }
             break;
         }
@@ -1093,9 +1050,9 @@ ValuePtr BuiltinFunctions::assertCondition(const std::vector<ValuePtr>& args) {
         throw std::runtime_error("assert: second argument must be a string");
     }
     
-    bool conditionValue = std::get<bool>(condition->data);
+    bool conditionValue = (condition->data == "true");
     if (!conditionValue) {
-        std::string messageValue = std::get<std::string>(message->data);
+        std::string messageValue = message->data;
         throw std::runtime_error("Assertion failed: " + messageValue);
     }
     
@@ -1114,7 +1071,7 @@ ValuePtr BuiltinFunctions::input(const std::vector<ValuePtr>& args) {
         if (!prompt || !prompt->type || prompt->type->tag != TypeTag::String) {
             throw std::runtime_error("input: prompt must be a string");
         }
-        std::cout << std::get<std::string>(prompt->data);
+        std::cout << prompt->data;
     }
     
     std::string line;
@@ -1136,11 +1093,11 @@ ValuePtr BuiltinFunctions::round(const std::vector<ValuePtr>& args) {
     
     long double value = 0.0;
     if (number->type->tag == TypeTag::Float64) {
-        value = std::get<long double>(number->data);
+        value = std::stold(number->data);
     } else if (number->type->tag == TypeTag::Float32) {
-        value = static_cast<long double>(std::get<float>(number->data));
+        value = static_cast<long double>(std::stof(number->data));
     } else if (number->type->tag == TypeTag::Int || number->type->tag == TypeTag::Int32) {
-        value = static_cast<long double>(std::get<int32_t>(number->data));
+        value = static_cast<long double>(std::stoll(number->data));
     } else {
         throw std::runtime_error("round: first argument must be a number");
     }
@@ -1151,7 +1108,7 @@ ValuePtr BuiltinFunctions::round(const std::vector<ValuePtr>& args) {
         if (!precisionArg || !precisionArg->type || precisionArg->type->tag != TypeTag::Int) {
             throw std::runtime_error("round: second argument must be an integer");
         }
-        precision = std::get<int32_t>(precisionArg->data);
+        precision = std::stoi(precisionArg->data);
     }
     
     long double multiplier = std::pow(10.0, precision);
@@ -1180,32 +1137,43 @@ ValuePtr BuiltinFunctions::debug(const std::vector<ValuePtr>& args) {
                 std::cout << "nil";
                 break;
             case TypeTag::Bool:
-                std::cout << (std::get<bool>(value->data) ? "true" : "false");
+                std::cout << (value->data == "true" ? "true" : "false");
                 break;
             case TypeTag::Int:
             case TypeTag::Int32:
-                std::cout << std::get<int32_t>(value->data);
-                break;
             case TypeTag::Int64:
-                std::cout << std::get<int64_t>(value->data);
+            case TypeTag::Int8:
+            case TypeTag::Int16:
+            case TypeTag::Int128:
+            case TypeTag::UInt:
+            case TypeTag::UInt8:
+            case TypeTag::UInt16:
+            case TypeTag::UInt32:
+            case TypeTag::UInt64:
+            case TypeTag::UInt128:
+                std::cout << value->data;
                 break;
             case TypeTag::Float32:
-                std::cout << std::get<float>(value->data);
+                std::cout << std::stof(value->data);
                 break;
             case TypeTag::Float64:
-                std::cout << std::get<long double>(value->data);
+                std::cout << std::stod(value->data);
                 break;
             case TypeTag::String:
-                std::cout << "\"" << std::get<std::string>(value->data) << "\"";
+                std::cout << "\"" << value->data << "\"";
                 break;
             case TypeTag::List: {
-                const auto& list = std::get<ListValue>(value->data);
-                std::cout << "[" << list.elements.size() << " elements]";
+                if (std::holds_alternative<ListValue>(value->complexData)) {
+                    const auto& list = std::get<ListValue>(value->complexData);
+                    std::cout << "[" << list.elements.size() << " elements]";
+                }
                 break;
             }
             case TypeTag::Dict: {
-                const auto& dict = std::get<DictValue>(value->data);
-                std::cout << "{" << dict.elements.size() << " entries}";
+                if (std::holds_alternative<DictValue>(value->complexData)) {
+                    const auto& dict = std::get<DictValue>(value->complexData);
+                    std::cout << "{" << dict.elements.size() << " entries}";
+                }
                 break;
             }
             default:
@@ -1264,17 +1232,11 @@ ValuePtr BuiltinFunctions::sleep(const std::vector<ValuePtr>& args) {
     long double seconds = 0.0;
     
     if (value->type->tag == TypeTag::Float64) {
-        if (std::holds_alternative<long double>(value->data)) {
-            seconds = std::get<long double>(value->data);
-        }
+        seconds = static_cast<long double>(std::stold(value->data));
     } else if (value->type->tag == TypeTag::Float32) {
-        if (std::holds_alternative<float>(value->data)) {
-            seconds = static_cast<long double>(std::get<float>(value->data));
-        }
+        seconds = static_cast<long double>(std::stof(value->data));
     } else if (value->type->tag == TypeTag::Int || value->type->tag == TypeTag::Int32) {
-        if (std::holds_alternative<int32_t>(value->data)) {
-            seconds = static_cast<long double>(std::get<int32_t>(value->data));
-        }
+            seconds = static_cast<long double>(std::stoll(value->data));
     } else {
         throw std::runtime_error("sleep: argument must be a number");
     }

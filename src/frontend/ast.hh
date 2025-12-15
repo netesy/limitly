@@ -12,7 +12,7 @@
 #include <sstream>
 #include <algorithm>
 #include "scanner.hh"
-#include "../common/big_int.hh"
+// #include "../common/big_int.hh"
 
 // Forward declarations
 struct Type;
@@ -245,7 +245,7 @@ namespace AST {
 
     // Literal values (numbers, strings, booleans, nil)
     struct LiteralExpr : public Expression {
-        std::variant<BigInt, std::string, bool, std::nullptr_t> value;
+        std::variant<std::string, bool, std::nullptr_t> value;
     };
 
     // Variable reference

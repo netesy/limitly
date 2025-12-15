@@ -3,7 +3,6 @@
 
 #include "memory.hh"
 #include "value.hh"
-#include "../common/big_int.hh"
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -72,8 +71,29 @@ private:
         return true;
     }   
 
-        // BigInt type conversions - only BigInt is numeric now
-        if (from->tag == TypeTag::BigInt && to->tag == TypeTag::BigInt) {
+        // Numeric type conversions - all integer types are compatible with each other
+        bool fromIsInt = (from->tag == TypeTag::Int || from->tag == TypeTag::Int8 || 
+                         from->tag == TypeTag::Int16 || from->tag == TypeTag::Int32 || 
+                         from->tag == TypeTag::Int64 || from->tag == TypeTag::Int128 ||
+                         from->tag == TypeTag::UInt || from->tag == TypeTag::UInt8 || 
+                         from->tag == TypeTag::UInt16 || from->tag == TypeTag::UInt32 || 
+                         from->tag == TypeTag::UInt64 || from->tag == TypeTag::UInt128);
+        bool toIsInt = (to->tag == TypeTag::Int || to->tag == TypeTag::Int8 || 
+                       to->tag == TypeTag::Int16 || to->tag == TypeTag::Int32 || 
+                       to->tag == TypeTag::Int64 || to->tag == TypeTag::Int128 ||
+                       to->tag == TypeTag::UInt || to->tag == TypeTag::UInt8 || 
+                       to->tag == TypeTag::UInt16 || to->tag == TypeTag::UInt32 || 
+                       to->tag == TypeTag::UInt64 || to->tag == TypeTag::UInt128);
+        
+        if (fromIsInt && toIsInt) {
+            return true;
+        }
+        
+        // Float type conversions
+        bool fromIsFloat = (from->tag == TypeTag::Float32 || from->tag == TypeTag::Float64);
+        bool toIsFloat = (to->tag == TypeTag::Float32 || to->tag == TypeTag::Float64);
+        
+        if (fromIsFloat && toIsFloat) {
             return true;
         }
 
@@ -211,24 +231,37 @@ private:
         result->type = targetType;
 
         try {
-            // BigInt-only numeric parsing
-            if (targetType->tag == TypeTag::BigInt) {
+            // Handle all numeric types
+            if (targetType->tag == TypeTag::Int || targetType->tag == TypeTag::Int8 || 
+                targetType->tag == TypeTag::Int16 || targetType->tag == TypeTag::Int32 || 
+                targetType->tag == TypeTag::Int64 || targetType->tag == TypeTag::Int128 ||
+                targetType->tag == TypeTag::UInt || targetType->tag == TypeTag::UInt8 || 
+                targetType->tag == TypeTag::UInt16 || targetType->tag == TypeTag::UInt32 || 
+                targetType->tag == TypeTag::UInt64 || targetType->tag == TypeTag::UInt128) {
                 // Check if string contains scientific notation or decimal point
                 if (str.find('e') != std::string::npos || str.find('E') != std::string::npos || 
                     str.find('.') != std::string::npos) {
-                    // Parse as long double first, then convert to BigInt if it's a whole number
+                    // Parse as long double first, then convert to integer if it's a whole number
                     long double doubleVal = std::stod(str);
                     if (doubleVal != std::floor(doubleVal)) {
-                        throw std::runtime_error("Cannot convert non-integer value to BigInt");
+                        throw std::runtime_error("Cannot convert non-integer value to integer type");
                     }
-                    // Convert to BigInt
-                    BigInt bigIntValue(std::to_string(static_cast<long long>(doubleVal)));
-                    result->data = bigIntValue;
+                    // Convert to integer string
+                    result->data = std::to_string(static_cast<long long>(doubleVal));
                 } else {
-                    // Use BigInt for parsing
-                    BigInt bigIntValue(str);
-                    result->data = bigIntValue;
+                    // Use string directly for integer values
+                    result->data = str;
                 }
+            } else if (targetType->tag == TypeTag::Float32 || targetType->tag == TypeTag::Float64) {
+                // Parse as floating point
+                long double doubleVal = std::stold(str);
+                std::ostringstream oss;
+                if (targetType->tag == TypeTag::Float32) {
+                    oss << std::setprecision(7) << std::fixed << static_cast<float>(doubleVal);
+                } else {
+                    oss << std::setprecision(15) << std::fixed << static_cast<double>(doubleVal);
+                }
+                result->data = oss.str();
             } else {
                 throw std::runtime_error("Unsupported target type for numeric conversion");
             }
@@ -247,11 +280,18 @@ private:
         ValuePtr result = memoryManager.makeRef<Value>(region);
         result->type = STRING_TYPE;
 
-        std::visit(overloaded{[&](const BigInt& v) { result->data = v.to_string(); },
-                              [&](auto) {
-                                  throw std::runtime_error("Unexpected type in numberToString");
-                              }},
-                   value->data);
+        // For numeric types, the data is already a string representation
+        if (value->type->tag == TypeTag::Int || value->type->tag == TypeTag::Int8 || 
+            value->type->tag == TypeTag::Int16 || value->type->tag == TypeTag::Int32 ||
+            value->type->tag == TypeTag::Int64 || value->type->tag == TypeTag::Int128 ||
+            value->type->tag == TypeTag::UInt || value->type->tag == TypeTag::UInt64 || 
+            value->type->tag == TypeTag::UInt8 || value->type->tag == TypeTag::UInt16 || 
+            value->type->tag == TypeTag::UInt32 || value->type->tag == TypeTag::Float32 || 
+            value->type->tag == TypeTag::Float64) {
+            result->data = value->data;
+        } else {
+            throw std::runtime_error("Unexpected type in numberToString");
+        }
 
         return result;
     }
@@ -264,7 +304,20 @@ public:
 
     const TypePtr NIL_TYPE = std::make_shared<Type>(TypeTag::Nil);
     const TypePtr BOOL_TYPE = std::make_shared<Type>(TypeTag::Bool);
-    const TypePtr BIGINT_TYPE = std::make_shared<Type>(TypeTag::BigInt);
+    const TypePtr INT_TYPE = std::make_shared<Type>(TypeTag::Int);
+    const TypePtr INT8_TYPE = std::make_shared<Type>(TypeTag::Int8);
+    const TypePtr INT16_TYPE = std::make_shared<Type>(TypeTag::Int16);
+    const TypePtr INT32_TYPE = std::make_shared<Type>(TypeTag::Int32);
+    const TypePtr INT64_TYPE = std::make_shared<Type>(TypeTag::Int64);
+    const TypePtr INT128_TYPE = std::make_shared<Type>(TypeTag::Int128);
+    const TypePtr UINT_TYPE = std::make_shared<Type>(TypeTag::UInt);
+    const TypePtr UINT8_TYPE = std::make_shared<Type>(TypeTag::UInt8);
+    const TypePtr UINT16_TYPE = std::make_shared<Type>(TypeTag::UInt16);
+    const TypePtr UINT32_TYPE = std::make_shared<Type>(TypeTag::UInt32);
+    const TypePtr UINT64_TYPE = std::make_shared<Type>(TypeTag::UInt64);
+    const TypePtr UINT128_TYPE = std::make_shared<Type>(TypeTag::UInt128);
+    const TypePtr FLOAT32_TYPE = std::make_shared<Type>(TypeTag::Float32);
+    const TypePtr FLOAT64_TYPE = std::make_shared<Type>(TypeTag::Float64);
     const TypePtr STRING_TYPE = std::make_shared<Type>(TypeTag::String);
     const TypePtr ANY_TYPE = std::make_shared<Type>(TypeTag::Any);
     const TypePtr LIST_TYPE = std::make_shared<Type>(TypeTag::List);
@@ -293,7 +346,20 @@ public:
             name == "i32" || name == "u32" || name == "i16" || name == "u16" ||
             name == "i8" || name == "u8" || name == "i128" || name == "u128" ||
             name == "uint" || name == "f32" || name == "f64" || name == "float") {
-            return BIGINT_TYPE;
+            // Map type names to appropriate types
+            if (name == "i8") return INT8_TYPE;
+            if (name == "u8") return UINT8_TYPE;
+            if (name == "i16") return INT16_TYPE;
+            if (name == "u16") return UINT16_TYPE;
+            if (name == "i32") return INT32_TYPE;
+            if (name == "u32") return UINT32_TYPE;
+            if (name == "i64" || name == "int") return INT64_TYPE;
+            if (name == "u64" || name == "uint") return UINT64_TYPE;
+            if (name == "i128" || name == "bigint") return INT128_TYPE;
+            if (name == "u128") return UINT128_TYPE;
+            if (name == "f32" || name == "float") return FLOAT32_TYPE;
+            if (name == "f64") return FLOAT64_TYPE;
+            return INT64_TYPE; // Default fallback
         }
         if (name == "string") return STRING_TYPE;
         if (name == "str") return STRING_TYPE;
@@ -330,22 +396,33 @@ public:
 
         switch (type->tag) {
         case TypeTag::Nil:
-            value->data = std::monostate{};
+            value->data = ""; // Empty string represents nil
             break;
         case TypeTag::Bool:
             value->data = false;
             break;
-        case TypeTag::BigInt:
-            value->data = BigInt(0);
+        case TypeTag::Int:
+        case TypeTag::Int8:
+        case TypeTag::Int16:
+        case TypeTag::Int32:
+        case TypeTag::Int64:
+        case TypeTag::Int128:
+        case TypeTag::UInt:
+        case TypeTag::UInt8:
+        case TypeTag::UInt16:
+        case TypeTag::UInt32:
+        case TypeTag::UInt64:
+        case TypeTag::UInt128:
+            value->data = std::to_string(0);
             break;
         case TypeTag::String:
             value->data = std::string("");
             break;
         case TypeTag::List:
-            value->data = ListValue{};
+            value->complexData = ListValue{};
             break;
         case TypeTag::Dict:
-            value->data = DictValue{};
+            value->complexData = DictValue{};
             break;
         case TypeTag::Tuple:
             // For tuple types, create tuple with default values for each element
@@ -354,17 +431,17 @@ public:
                 for (const auto& elementType : tupleType->elementTypes) {
                     tupleValue.elements.push_back(createValue(elementType));
                 }
-                value->data = tupleValue;
+                value->complexData = tupleValue;
             } else {
                 // Empty tuple
-                value->data = TupleValue{};
+                value->complexData = TupleValue{};
             }
             break;
         case TypeTag::Enum:
             // For enums, we'll set it to the first value in the enum
             if (const auto *enumType = std::get_if<EnumType>(&type->extra)) {
                 if (!enumType->values.empty()) {
-                    value->data = enumType->values[0];
+                    value->complexData = EnumValue(enumType->values[0], type);
                 } else {
                     value->data = std::string(""); // Empty enum, use empty string as default
                 }
@@ -376,7 +453,7 @@ public:
             // For sum types, we'll set it to the first variant with a default value
             if (const auto *sumType = std::get_if<SumType>(&type->extra)) {
                 if (!sumType->variants.empty()) {
-                    value->data = SumValue{0, createValue(sumType->variants[0])};
+                    value->complexData = SumValue{0, createValue(sumType->variants[0])};
                 } else {
                     throw std::runtime_error("Empty sum type");
                 }
@@ -391,6 +468,7 @@ public:
                 if (!unionType->types.empty()) {
                     ValuePtr firstVariantValue = createValue(unionType->types[0]);
                     value->data = firstVariantValue->data;
+                    value->complexData = firstVariantValue->complexData;
                     value->activeUnionVariant = 0; // Set to first variant
                 } else {
                     throw std::runtime_error("Empty union type");
@@ -402,13 +480,15 @@ public:
         case TypeTag::ErrorUnion:
             // For error union types, create a success value by default
             if (const auto *errorUnionType = std::get_if<ErrorUnionType>(&type->extra)) {
-                value->data = createValue(errorUnionType->successType)->data;
+                ValuePtr successValue = createValue(errorUnionType->successType);
+                value->data = successValue->data;
+                value->complexData = successValue->complexData;
             } else {
                 throw std::runtime_error("Invalid error union type");
             }
             break;
         case TypeTag::UserDefined:
-            value->data = UserDefinedValue{};
+            value->complexData = UserDefinedValue{};
             break;
         case TypeTag::Function:
             // Functions are typically not instantiated as values
@@ -417,8 +497,8 @@ public:
             // Closures are typically not instantiated as default values
             throw std::runtime_error("Cannot create a default value for Closure type");
         case TypeTag::Any:
-            // For Any type, we'll use std::monostate as a placeholder
-            value->data = std::monostate{};
+            // For Any type, we'll use empty string as a placeholder
+            value->data = "";
             break;
         default:
             throw std::runtime_error("Unsupported type tag: "
@@ -617,10 +697,35 @@ public:
         return unionTypeInfo->types.size();
     }
 
-    // Enhanced numeric type inference for literals - BigInt only
+    // Enhanced numeric type inference for literals
     TypePtr inferNumericType(const std::string& literalStr) {
-        // Since we're using BigInt for all numeric types, always return BIGINT_TYPE
-        return BIGINT_TYPE;
+        // Check if it's a floating point number
+        if (literalStr.find('.') != std::string::npos || 
+            literalStr.find('e') != std::string::npos || 
+            literalStr.find('E') != std::string::npos) {
+            return FLOAT64_TYPE;
+        }
+        
+        // For integers, determine the appropriate size
+        try {
+            int64_t intVal = std::stoll(literalStr);
+            
+            if (intVal >= std::numeric_limits<int8_t>::min() && intVal <= std::numeric_limits<int8_t>::max()) {
+                return INT8_TYPE;
+            } else if (intVal >= std::numeric_limits<int16_t>::min() && intVal <= std::numeric_limits<int16_t>::max()) {
+                return INT16_TYPE;
+            } else if (intVal >= std::numeric_limits<int32_t>::min() && intVal <= std::numeric_limits<int32_t>::max()) {
+                return INT32_TYPE;
+            } else if (intVal >= std::numeric_limits<int64_t>::min() && intVal <= std::numeric_limits<int64_t>::max()) {
+                return INT64_TYPE;
+            } else {
+                // If too large for int64, use Int128
+                return INT128_TYPE;
+            }
+        } catch (const std::exception&) {
+            // If parsing fails, treat as string
+            return STRING_TYPE;
+        }
     }
 
     // Check if a numeric literal string represents a large integer that should be treated as float
@@ -708,7 +813,7 @@ public:
         // Create nil value
         ValuePtr nilValue = memoryManager.makeRef<Value>(region);
         nilValue->type = NIL_TYPE;
-        nilValue->data = std::monostate{};
+        nilValue->data = ""; // Empty string represents nil
         
         // Use existing union infrastructure - variant 1 is nil
         return createUnionValue(optionType, 1, nilValue);
@@ -721,7 +826,7 @@ public:
         }
         
         // Some means the value is not nil
-        return !std::holds_alternative<std::monostate>(value->data);
+        return value->type->tag != TypeTag::Nil;
     }
     
     // Check if a value is None (is nil)
@@ -731,7 +836,7 @@ public:
         }
         
         // None means the value is nil
-        return std::holds_alternative<std::monostate>(value->data);
+        return value->type->tag == TypeTag::Nil;
     }
     
     // Extract value from Some (throws if None)
@@ -959,8 +1064,7 @@ public:
         }
 
         switch (expectedType->tag) {
-        case TypeTag::BigInt:    
-        case TypeTag::Int:
+        case TypeTag::Int:    
         case TypeTag::Int8:
         case TypeTag::Int16:
         case TypeTag::Int32:
@@ -981,7 +1085,7 @@ public:
 
         case TypeTag::List: {
             const auto &listType = std::get<ListType>(expectedType->extra);
-            if (const auto *listValue = std::get_if<ListValue>(&value->data)) {
+            if (const auto *listValue = std::get_if<ListValue>(&value->complexData)) {
                 for (const auto &element : listValue->elements) {
                     if (!checkType(element, listType.elementType)) {
                         return false;
@@ -994,7 +1098,7 @@ public:
 
         case TypeTag::Dict: {
             const auto &dictType = std::get<DictType>(expectedType->extra);
-            if (const auto *dictValue = std::get_if<DictValue>(&value->data)) {
+            if (const auto *dictValue = std::get_if<DictValue>(&value->complexData)) {
                 for (const auto &[key, val] : dictValue->elements) {
                     if (!checkType(key, dictType.keyType) || !checkType(val, dictType.valueType)) {
                         return false;
@@ -1007,7 +1111,7 @@ public:
 
         case TypeTag::Tuple: {
             const auto &tupleType = std::get<TupleType>(expectedType->extra);
-            if (const auto *tupleValue = std::get_if<TupleValue>(&value->data)) {
+            if (const auto *tupleValue = std::get_if<TupleValue>(&value->complexData)) {
                 // Check that tuple has correct number of elements
                 if (tupleValue->elements.size() != tupleType.elementTypes.size()) {
                     return false;
@@ -1026,7 +1130,7 @@ public:
 
         case TypeTag::Sum: {
             const auto &sumType = std::get<SumType>(expectedType->extra);
-            if (const auto *sumValue = std::get_if<SumValue>(&value->data)) {
+            if (const auto *sumValue = std::get_if<SumValue>(&value->complexData)) {
                 if (sumValue->activeVariant >= sumType.variants.size()) {
                     return false;
                 }
@@ -1039,7 +1143,7 @@ public:
        case TypeTag::Enum: {
             if (const auto *enumType = std::get_if<EnumType>(&expectedType->extra)) {
                 if (!enumType->values.empty()) {
-                    value->data = EnumValue(enumType->values[0], expectedType);
+                    value->complexData = EnumValue(enumType->values[0], expectedType);
                 } else {
                     value->data = std::string(""); // Empty enum, use empty string as default
                 }
@@ -1056,7 +1160,7 @@ public:
 
         case TypeTag::Closure:
             // Closure type checking - for now, just check if it's a closure
-            return std::holds_alternative<ClosureValue>(value->data);
+            return std::holds_alternative<ClosureValue>(value->complexData);
 
         case TypeTag::Any:
             // Any type always matches
@@ -1097,7 +1201,7 @@ public:
             const auto &errorUnionType = std::get<ErrorUnionType>(expectedType->extra);
             
             // Check if value is an error
-            if (const auto *errorValue = std::get_if<ErrorValue>(&value->data)) {
+            if (const auto *errorValue = std::get_if<ErrorValue>(&value->complexData)) {
                 // If it's a generic error union, any error is valid
                 if (errorUnionType.isGenericError) {
                     return true;
@@ -1125,584 +1229,294 @@ public:
         ValuePtr result = std::make_shared<Value>();
         result->type = targetType;
 
-        std::visit(
-            overloaded{[&](int64_t v) {
-                           switch (targetType->tag) {
-                           case TypeTag::Int:
-                           case TypeTag::Int64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int8:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int16:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt:
-                           case TypeTag::UInt64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt8:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt16:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Float32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Float64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::String:
-                               result->data = std::to_string(v);
-                               break;
-                           default:
-                               throw std::runtime_error("Unsupported conversion from int64_t to "
-                                                        + targetType->toString());
-                           }
-                       },
-                       [&](int32_t v) {
-                           switch (targetType->tag) {
-                           case TypeTag::Int:
-                           case TypeTag::Int64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int8:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int16:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt:
-                           case TypeTag::UInt64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt8:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt16:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Float32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Float64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::String:
-                               result->data = std::to_string(v);
-                               break;
-                           default:
-                               throw std::runtime_error("Unsupported conversion from int32_t to "
-                                                        + targetType->toString());
-                           }
-                       },
-                       [&](int16_t v) {
-                           switch (targetType->tag) {
-                           case TypeTag::Int:
-                           case TypeTag::Int64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int8:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int16:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt:
-                           case TypeTag::UInt64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt8:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt16:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Float32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Float64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::String:
-                               result->data = std::to_string(v);
-                               break;
-                           default:
-                               throw std::runtime_error("Unsupported conversion from int16_t to "
-                                                        + targetType->toString());
-                           }
-                       },
-                       [&](int8_t v) {
-                           switch (targetType->tag) {
-                           case TypeTag::Int:
-                           case TypeTag::Int64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int8:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int16:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt:
-                           case TypeTag::UInt64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt8:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt16:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Float32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Float64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::String:
-                               result->data = std::to_string(v);
-                               break;
-                           default:
-                               throw std::runtime_error("Unsupported conversion from int8_t to "
-                                                        + targetType->toString());
-                           }
-                       },
-                       [&](uint64_t v) {
-                           switch (targetType->tag) {
-                           case TypeTag::UInt:
-                           case TypeTag::UInt64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt8:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt16:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int:
-                           case TypeTag::Int64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int8:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int16:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Float32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Float64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::String:
-                               result->data = std::to_string(v);
-                               break;
-                           default:
-                               throw std::runtime_error("Unsupported conversion from uint64_t to "
-                                                        + targetType->toString());
-                           }
-                       },
-                       [&](uint32_t v) {
-                           switch (targetType->tag) {
-                           case TypeTag::UInt:
-                           case TypeTag::UInt64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt8:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt16:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int:
-                           case TypeTag::Int64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int8:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int16:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Float32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Float64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::String:
-                               result->data = std::to_string(v);
-                               break;
-                           default:
-                               throw std::runtime_error("Unsupported conversion from uint32_t to "
-                                                        + targetType->toString());
-                           }
-                       },
-                       [&](uint16_t v) {
-                           switch (targetType->tag) {
-                           case TypeTag::UInt:
-                           case TypeTag::UInt64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt8:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt16:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int:
-                           case TypeTag::Int64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int8:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int16:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Float32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Float64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::String:
-                               result->data = std::to_string(v);
-                               break;
-                           default:
-                               throw std::runtime_error("Unsupported conversion from uint16_t to "
-                                                        + targetType->toString());
-                           }
-                       },
-                       [&](uint8_t v) {
-                           switch (targetType->tag) {
-                           case TypeTag::UInt:
-                           case TypeTag::UInt64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt8:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt16:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int:
-                           case TypeTag::Int64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int8:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int16:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Float32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Float64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::String:
-                               result->data = std::to_string(v);
-                               break;
-                           default:
-                               throw std::runtime_error("Unsupported conversion from uint8_t to "
-                                                        + targetType->toString());
-                           }
-                       },
-                       [&](long double v) {
-                           switch (targetType->tag) {
-                           case TypeTag::Float64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Float32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int:
-                           case TypeTag::Int64:
-                               // For large literals, use range checking instead of safe_cast
-                               if (v >= static_cast<double>(std::numeric_limits<int64_t>::min()) && 
-                                   v <= static_cast<double>(std::numeric_limits<int64_t>::max())) {
-                                   result->data = BigInt(static_cast<int64_t>(v));
-                               } else {
-                                   throw std::runtime_error("Value out of range for int64_t: " + std::to_string(v));
-                               }
-                               break;
-                           case TypeTag::Int8:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int16:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt:
-                           case TypeTag::UInt64:
-                               // For large literals that were converted to double, use direct cast
-                               // This handles cases like 18446744073709551615 which becomes long double in parser
-                               if (v >= 0 && v <= static_cast<double>(std::numeric_limits<uint64_t>::max())) {
-                                   result->data = BigInt(static_cast<uint64_t>(v));
-                               } else {
-                                   throw std::runtime_error("Value out of range for uint64_t: " + std::to_string(v));
-                               }
-                               break;
-                           case TypeTag::UInt8:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt16:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::String:
-                               result->data = std::to_string(v);
-                               break;
-                           default:
-                               throw std::runtime_error("Unsupported conversion from long double to "
-                                                        + targetType->toString());
-                           }
-                       },
-                       [&](float v) {
-                           switch (targetType->tag) {
-                           case TypeTag::Float32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Float64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int:
-                           case TypeTag::Int64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int8:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int16:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::Int32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt:
-                           case TypeTag::UInt64:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt8:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt16:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::UInt32:
-                               result->data = BigInt(v);
-                               break;
-                           case TypeTag::String:
-                               result->data = std::to_string(v);
-                               break;
-                           default:
-                               throw std::runtime_error("Unsupported conversion from float to "
-                                                        + targetType->toString());
-                           }
-                       },
-                       [&](const std::string &v) {
-                           switch (targetType->tag) {
-                           case TypeTag::String:
-                               result->data = v;
-                               break;
-                           case TypeTag::Int:
-                           case TypeTag::Int64:
-                               result->data = BigInt(std::stoll(v));
-                               break;
-                           case TypeTag::Int8:
-                               result->data = BigInt(std::stoll(v));
-                               break;
-                           case TypeTag::Int16:
-                               result->data = BigInt(std::stoll(v));
-                               break;
-                           case TypeTag::Int32:
-                               result->data = BigInt(std::stoll(v));
-                               break;
-                           case TypeTag::UInt:
-                           case TypeTag::UInt64:
-                               result->data = BigInt(std::stoull(v));
-                               break;
-                           case TypeTag::UInt8:
-                               result->data = BigInt(std::stoull(v));
-                               break;
-                           case TypeTag::UInt16:
-                               result->data = BigInt(std::stoull(v));
-                               break;
-                           case TypeTag::UInt32:
-                               result->data = BigInt(std::stoull(v));
-                               break;
-                           case TypeTag::Float32:
-                               result->data = BigInt(std::stof(v));
-                               break;
-                           case TypeTag::Float64:
-                               result->data = BigInt(std::stod(v));
-                               break;
-                           default:
-                               throw std::runtime_error("Unsupported conversion from string to "
-                                                        + targetType->toString());
-                           }
-                       },
-                       [&](bool v) {
-                           switch (targetType->tag) {
-                           case TypeTag::Bool:
-                               result->data = v;
-                               break;
-                           case TypeTag::Int:
-                           case TypeTag::Int64:
-                               result->data = BigInt(v ? 1LL : 0LL);
-                               break;
-                           case TypeTag::Int8:
-                               result->data = BigInt(v ? int8_t(1) : int8_t(0));
-                               break;
-                           case TypeTag::Int16:
-                               result->data = BigInt(v ? int16_t(1) : int16_t(0));
-                               break;
-                           case TypeTag::Int32:
-                               result->data = BigInt(v ? 1 : 0);
-                               break;
-                           case TypeTag::UInt:
-                           case TypeTag::UInt64:
-                               result->data = BigInt(v ? 1ULL : 0ULL);
-                               break;
-                           case TypeTag::UInt8:
-                               result->data = BigInt(v ? uint8_t(1) : uint8_t(0));
-                               break;
-                           case TypeTag::UInt16:
-                               result->data = BigInt(v ? uint16_t(1) : uint16_t(0));
-                               break;
-                           case TypeTag::UInt32:
-                               result->data = BigInt(v ? 1ULL : 0ULL);
-                               break;
-                           case TypeTag::Float32:
-                               result->data = BigInt(v ? 1.0f : 0.0f);
-                               break;
-                           case TypeTag::Float64:
-                               result->data = BigInt(v ? 1.0 : 0.0);
-                               break;
-                           case TypeTag::String:
-                               result->data = v ? "true" : "false";
-                               break;
-                           default:
-                               throw std::runtime_error("Unsupported conversion from bool to "
-                                                        + targetType->toString());
-                           }
-                       },
-                       [&](const std::monostate &) {
-                           switch (targetType->tag) {
-                           case TypeTag::Nil:
-                               result->data = std::monostate{};
-                               break;
-                           case TypeTag::Bool:
-                               result->data = false;
-                               break;
-                           case TypeTag::Int:
-                               result->data = BigInt(0);
-                               break;
-                           case TypeTag::Int64:
-                               result->data = BigInt(int64_t(0));
-                               break;
-                           case TypeTag::Int8:
-                               result->data = BigInt(int8_t(0));
-                               break;
-                           case TypeTag::Int16:
-                               result->data = BigInt(int16_t(0));
-                               break;
-                           case TypeTag::Int32:
-                               result->data = BigInt(0);
-                               break;
-                           case TypeTag::UInt:
-                               result->data = BigInt(0U);
-                               break;
-                           case TypeTag::UInt64:
-                               result->data = BigInt(0U);
-                               break;
-                           case TypeTag::UInt8:
-                               result->data = BigInt(uint8_t(0));
-                               break;
-                           case TypeTag::UInt16:
-                               result->data = BigInt(uint16_t(0));
-                               break;
-                           case TypeTag::UInt32:
-                               result->data = BigInt(0U);
-                               break;
-                           case TypeTag::Float32:
-                               result->data = BigInt(0.0f);
-                               break;
-                           case TypeTag::Float64:
-                               result->data = BigInt(0.0);
-                               break;
-                           case TypeTag::String:
-                               result->data = "nil";
-                               break;
-                           default:
-                               throw std::runtime_error("Unsupported conversion from nil to "
-                                                        + targetType->toString());
-                           }
-                       },
-                       [&](const auto &) {
-                           throw std::runtime_error("Unsupported conversion from "
-                                                    + value->type->toString() + " to "
-                                                    + targetType->toString());
-                       }},
-            value->data);
+        // Handle primitive types using the data string member
+        switch (value->type->tag) {
+        case TypeTag::Int:
+        case TypeTag::Int64:
+        case TypeTag::Int8:
+        case TypeTag::Int16:
+        case TypeTag::Int32: {
+            int64_t sourceValue = ValueConverters::toInt64(value->data).value_or(0);
+            switch (targetType->tag) {
+            case TypeTag::Int:
+            case TypeTag::Int64:
+                result->data = std::to_string(sourceValue);
+                break;
+            case TypeTag::Int8:
+                result->data = std::to_string(static_cast<int8_t>(sourceValue));
+                break;
+            case TypeTag::Int16:
+                result->data = std::to_string(static_cast<int16_t>(sourceValue));
+                break;
+            case TypeTag::Int32:
+                result->data = std::to_string(static_cast<int32_t>(sourceValue));
+                break;
+            case TypeTag::UInt:
+            case TypeTag::UInt64:
+                result->data = std::to_string(static_cast<uint64_t>(sourceValue));
+                break;
+            case TypeTag::UInt8:
+                result->data = std::to_string(static_cast<uint8_t>(sourceValue));
+                break;
+            case TypeTag::UInt16:
+                result->data = std::to_string(static_cast<uint16_t>(sourceValue));
+                break;
+            case TypeTag::UInt32:
+                result->data = std::to_string(static_cast<uint32_t>(sourceValue));
+                break;
+            case TypeTag::Float32:
+                result->data = std::to_string(static_cast<float>(sourceValue));
+                break;
+            case TypeTag::Float64:
+                result->data = std::to_string(static_cast<double>(sourceValue));
+                break;
+            case TypeTag::String:
+                result->data = std::to_string(sourceValue);
+                break;
+            default:
+                throw std::runtime_error("Unsupported conversion from int to "
+                                         + targetType->toString());
+            }
+            break;
+        }
+        case TypeTag::UInt:
+        case TypeTag::UInt64:
+        case TypeTag::UInt8:
+        case TypeTag::UInt16:
+        case TypeTag::UInt32: {
+            uint64_t sourceValue = static_cast<uint64_t>(ValueConverters::toInt64(value->data).value_or(0));
+            switch (targetType->tag) {
+            case TypeTag::Int:
+            case TypeTag::Int64:
+                result->data = std::to_string(static_cast<int64_t>(sourceValue));
+                break;
+            case TypeTag::Int8:
+                result->data = std::to_string(static_cast<int8_t>(sourceValue));
+                break;
+            case TypeTag::Int16:
+                result->data = std::to_string(static_cast<int16_t>(sourceValue));
+                break;
+            case TypeTag::Int32:
+                result->data = std::to_string(static_cast<int32_t>(sourceValue));
+                break;
+            case TypeTag::UInt:
+            case TypeTag::UInt64:
+                result->data = std::to_string(sourceValue);
+                break;
+            case TypeTag::UInt8:
+                result->data = std::to_string(static_cast<uint8_t>(sourceValue));
+                break;
+            case TypeTag::UInt16:
+                result->data = std::to_string(static_cast<uint16_t>(sourceValue));
+                break;
+            case TypeTag::UInt32:
+                result->data = std::to_string(static_cast<uint32_t>(sourceValue));
+                break;
+            case TypeTag::Float32:
+                result->data = std::to_string(static_cast<float>(sourceValue));
+                break;
+            case TypeTag::Float64:
+                result->data = std::to_string(static_cast<double>(sourceValue));
+                break;
+            case TypeTag::String:
+                result->data = std::to_string(sourceValue);
+                break;
+            default:
+                throw std::runtime_error("Unsupported conversion from uint to "
+                                         + targetType->toString());
+            }
+            break;
+        }
+        case TypeTag::Float32:
+        case TypeTag::Float64: {
+            double sourceValue = ValueConverters::toDouble(value->data).value_or(0.0);
+            switch (targetType->tag) {
+            case TypeTag::Int:
+            case TypeTag::Int64:
+                result->data = std::to_string(static_cast<int64_t>(sourceValue));
+                break;
+            case TypeTag::Int8:
+                result->data = std::to_string(static_cast<int8_t>(sourceValue));
+                break;
+            case TypeTag::Int16:
+                result->data = std::to_string(static_cast<int16_t>(sourceValue));
+                break;
+            case TypeTag::Int32:
+                result->data = std::to_string(static_cast<int32_t>(sourceValue));
+                break;
+            case TypeTag::UInt:
+            case TypeTag::UInt64:
+                result->data = std::to_string(static_cast<uint64_t>(sourceValue));
+                break;
+            case TypeTag::UInt8:
+                result->data = std::to_string(static_cast<uint8_t>(sourceValue));
+                break;
+            case TypeTag::UInt16:
+                result->data = std::to_string(static_cast<uint16_t>(sourceValue));
+                break;
+            case TypeTag::UInt32:
+                result->data = std::to_string(static_cast<uint32_t>(sourceValue));
+                break;
+            case TypeTag::Float32:
+                result->data = std::to_string(static_cast<float>(sourceValue));
+                break;
+            case TypeTag::Float64:
+                result->data = std::to_string(sourceValue);
+                break;
+            case TypeTag::String:
+                result->data = std::to_string(sourceValue);
+                break;
+            default:
+                throw std::runtime_error("Unsupported conversion from float to "
+                                         + targetType->toString());
+            }
+            break;
+        }
+        case TypeTag::String: {
+            const std::string& sourceValue = value->data;
+            switch (targetType->tag) {
+            case TypeTag::String:
+                result->data = sourceValue;
+                break;
+            case TypeTag::Int:
+            case TypeTag::Int64:
+                result->data = std::to_string(std::stoll(sourceValue));
+                break;
+            case TypeTag::Int8:
+                result->data = std::to_string(static_cast<int8_t>(std::stoll(sourceValue)));
+                break;
+            case TypeTag::Int16:
+                result->data = std::to_string(static_cast<int16_t>(std::stoll(sourceValue)));
+                break;
+            case TypeTag::Int32:
+                result->data = std::to_string(std::stoll(sourceValue));
+                break;
+            case TypeTag::UInt:
+            case TypeTag::UInt64:
+                result->data = std::to_string(std::stoull(sourceValue));
+                break;
+            case TypeTag::UInt8:
+                result->data = std::to_string(static_cast<uint8_t>(std::stoull(sourceValue)));
+                break;
+            case TypeTag::UInt16:
+                result->data = std::to_string(static_cast<uint16_t>(std::stoull(sourceValue)));
+                break;
+            case TypeTag::UInt32:
+                result->data = std::to_string(std::stoull(sourceValue));
+                break;
+            case TypeTag::Float32:
+                result->data = std::to_string(std::stof(sourceValue));
+                break;
+            case TypeTag::Float64:
+                result->data = std::to_string(std::stod(sourceValue));
+                break;
+            default:
+                throw std::runtime_error("Unsupported conversion from string to "
+                                         + targetType->toString());
+            }
+            break;
+        }
+        case TypeTag::Bool: {
+            bool sourceValue = ValueConverters::toBool(value->data);
+            switch (targetType->tag) {
+            case TypeTag::Bool:
+                result->data = sourceValue;
+                break;
+            case TypeTag::Int:
+            case TypeTag::Int64:
+                result->data = std::to_string(sourceValue ? 1LL : 0LL);
+                break;
+            case TypeTag::Int8:
+                result->data = std::to_string(sourceValue ? int8_t(1) : int8_t(0));
+                break;
+            case TypeTag::Int16:
+                result->data = std::to_string(sourceValue ? int16_t(1) : int16_t(0));
+                break;
+            case TypeTag::Int32:
+                result->data = std::to_string(sourceValue ? 1 : 0);
+                break;
+            case TypeTag::UInt:
+            case TypeTag::UInt64:
+                result->data = std::to_string(sourceValue ? 1ULL : 0ULL);
+                break;
+            case TypeTag::UInt8:
+                result->data = std::to_string(sourceValue ? uint8_t(1) : uint8_t(0));
+                break;
+            case TypeTag::UInt16:
+                result->data = std::to_string(sourceValue ? uint16_t(1) : uint16_t(0));
+                break;
+            case TypeTag::UInt32:
+                result->data = std::to_string(sourceValue ? 1ULL : 0ULL);
+                break;
+            case TypeTag::Float32:
+                result->data = std::to_string(sourceValue ? 1.0f : 0.0f);
+                break;
+            case TypeTag::Float64:
+                result->data = std::to_string(sourceValue ? 1.0 : 0.0);
+                break;
+            case TypeTag::String:
+                result->data = sourceValue ? "true" : "false";
+                break;
+            default:
+                throw std::runtime_error("Unsupported conversion from bool to "
+                                         + targetType->toString());
+            }
+            break;
+        }
+        case TypeTag::Nil: {
+            switch (targetType->tag) {
+            case TypeTag::Nil:
+                result->data = ""; // Empty string represents nil
+                break;
+            case TypeTag::Bool:
+                result->data = false;
+                break;
+            case TypeTag::Int:
+            case TypeTag::Int64:
+                result->data = std::to_string(0);
+                break;
+            case TypeTag::Int8:
+                result->data = std::to_string(int8_t(0));
+                break;
+            case TypeTag::Int16:
+                result->data = std::to_string(int16_t(0));
+                break;
+            case TypeTag::Int32:
+                result->data = std::to_string(0);
+                break;
+            case TypeTag::UInt:
+            case TypeTag::UInt64:
+                result->data = std::to_string(0U);
+                break;
+            case TypeTag::UInt8:
+                result->data = std::to_string(uint8_t(0));
+                break;
+            case TypeTag::UInt16:
+                result->data = std::to_string(uint16_t(0));
+                break;
+            case TypeTag::UInt32:
+                result->data = std::to_string(0U);
+                break;
+            case TypeTag::Float32:
+                result->data = std::to_string(0.0f);
+                break;
+            case TypeTag::Float64:
+                result->data = std::to_string(0.0);
+                break;
+            case TypeTag::String:
+                result->data = "nil";
+                break;
+            default:
+                throw std::runtime_error("Unsupported conversion from nil to "
+                                         + targetType->toString());
+            }
+            break;
+        }
+        default:
+            // Handle complex types using complexData
+            result->complexData = value->complexData;
+            break;
+        }
 
         return result;
     }

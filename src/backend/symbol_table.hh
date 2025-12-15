@@ -70,6 +70,8 @@ public:
     void addFunction(const std::string& name, const FunctionSignature& signature);
     FunctionSignature* findFunction(const std::string& name);
 
+    bool isInGlobalScope() const;
+
 private:
     std::vector<std::unordered_map<std::string, Symbol>> variableScopeStack;
     std::vector<std::unordered_map<std::string, FunctionSignature>> functionScopeStack;

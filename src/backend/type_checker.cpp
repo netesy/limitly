@@ -3,7 +3,6 @@
 #include "../common/debugger.hh"
 #include "../frontend/scanner.hh"
 #include "../frontend/parser.hh"
-#include "../common/big_int.hh"
 #include <algorithm>
 #include <sstream>
 #include <string>
@@ -560,88 +559,84 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
 
 TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& expr, TypePtr expectedType) {
     if (auto literalExpr = std::dynamic_pointer_cast<AST::LiteralExpr>(expr)) {
-        // Infer type from literal value using variant index
-        switch (literalExpr->value.index()) {
-            case 0: // BigInt
-                {
-                    // For BigInt literals, try to infer the most appropriate type
-                    const BigInt& bigIntValue = std::get<BigInt>(literalExpr->value);
-                    
-                    // If we have an expected type context and it's compatible, use it
-                    if (expectedType && typeSystem.isNumericType(expectedType->tag)) {
-                        return expectedType;
+        // Handle string-based literal values
+        if (std::holds_alternative<std::string>(literalExpr->value)) {
+            std::string stringValue = std::get<std::string>(literalExpr->value);
+            
+            // Try to determine if this string represents a number
+            bool isNumeric = false;
+            bool isFloat = false;
+            
+            if (!stringValue.empty()) {
+                char first = stringValue[0];
+                if (std::isdigit(first) || first == '+' || first == '-' || first == '.') {
+                    isNumeric = true;
+                    // Check if it's a float
+                    if (stringValue.find('.') != std::string::npos || 
+                        stringValue.find('e') != std::string::npos || 
+                        stringValue.find('E') != std::string::npos) {
+                        isFloat = true;
                     }
-                    
-                    // Check if it's a float type
-                    if (bigIntValue.is_float_type()) {
-                        // Float values - determine appropriate float type
-                        long double floatVal = bigIntValue.get_f128_value();
+                }
+            }
+            
+            if (isNumeric) {
+                // If we have an expected type context and it's compatible, use it
+                if (expectedType && (
+                    expectedType->tag == TypeTag::Int || expectedType->tag == TypeTag::Int8 ||
+                    expectedType->tag == TypeTag::Int16 || expectedType->tag == TypeTag::Int32 ||
+                    expectedType->tag == TypeTag::Int64 || expectedType->tag == TypeTag::Int128 ||
+                    expectedType->tag == TypeTag::UInt || expectedType->tag == TypeTag::UInt8 ||
+                    expectedType->tag == TypeTag::UInt16 || expectedType->tag == TypeTag::UInt32 ||
+                    expectedType->tag == TypeTag::UInt64 || expectedType->tag == TypeTag::UInt128 ||
+                    expectedType->tag == TypeTag::Float32 || expectedType->tag == TypeTag::Float64)) {
+                    return expectedType;
+                }
+                
+                if (isFloat) {
+                    // Float values - determine appropriate float type
+                    try {
+                        double floatVal = std::stod(stringValue);
                         if (std::abs(floatVal) <= std::numeric_limits<float>::max()) {
                             float floatVal32 = static_cast<float>(floatVal);
-                            if (static_cast<long double>(floatVal32) == floatVal) {
+                            if (static_cast<double>(floatVal32) == floatVal) {
                                 return typeSystem.FLOAT32_TYPE;
                             }
                         }
                         return typeSystem.FLOAT64_TYPE;
+                    } catch (const std::exception&) {
+                        // If parsing fails, treat as string
+                        return typeSystem.STRING_TYPE;
                     }
-                    
-                    // Try to determine the best fit type based on the value
+                } else {
+                    // Integer values - determine appropriate integer type
                     try {
-                        // Check if it fits in int64
-                        int64_t int64Val = bigIntValue.to_int64();
+                        // Try to fit into the smallest appropriate integer type
+                        int64_t intVal = std::stoll(stringValue);
                         
-                        // Value fits in int64
-                        if (int64Val >= 0) {
-                            // Non-negative value that fits in int64 - default to int64
-                            return typeSystem.INT64_TYPE;
+                        if (intVal >= std::numeric_limits<int8_t>::min() && intVal <= std::numeric_limits<int8_t>::max()) {
+                            return typeSystem.INT8_TYPE;
+                        } else if (intVal >= std::numeric_limits<int16_t>::min() && intVal <= std::numeric_limits<int16_t>::max()) {
+                            return typeSystem.INT16_TYPE;
+                        } else if (intVal >= std::numeric_limits<int32_t>::min() && intVal <= std::numeric_limits<int32_t>::max()) {
+                            return typeSystem.INT32_TYPE;
                         } else {
-                            // Negative value, must be signed int64
                             return typeSystem.INT64_TYPE;
                         }
-                    } catch (const std::overflow_error&) {
-                        // Value doesn't fit in int64, check if it could be uint64 or larger
-                        try {
-                            // Check if BigInt is stored as uint64 internally
-                            if (bigIntValue.get_type().find("u64") != std::string::npos) {
-                                // Check if the value actually fits in uint64 range
-                                std::string bigIntStr = bigIntValue.to_string();
-                                if (bigIntStr.length() <= 20) { // UINT64_MAX has 20 digits
-                                    return typeSystem.UINT64_TYPE;
-                                } else {
-                                    // Too large for uint64, must be uint128
-                                    return typeSystem.UINT128_TYPE;
-                                }
-                            }
-                            
-                            // Check if the value is positive and determine size
-                            std::string bigIntStr = bigIntValue.to_string();
-                            if (!bigIntStr.empty() && bigIntStr[0] != '-') {
-                                // Positive number that doesn't fit in int64
-                                if (bigIntStr.length() <= 20) { // UINT64_MAX has 20 digits
-                                    return typeSystem.UINT64_TYPE;
-                                } else {
-                                    // Larger than uint64, must be uint128
-                                    return typeSystem.UINT128_TYPE;
-                                }
-                            }
-                        } catch (...) {
-                            // Fallback to INT128_TYPE
-                        }
-                        
-                        // Default to INT128_TYPE for negative large numbers
+                    } catch (const std::exception&) {
+                        // If too large for int64, use Int128
                         return typeSystem.INT128_TYPE;
                     }
                 }
-            case 1: // std::string
+            } else {
+                // String literal
                 return typeSystem.STRING_TYPE;
-            case 2: // bool
-                return typeSystem.BOOL_TYPE;
-            case 3: // std::nullptr_t
-                return typeSystem.NIL_TYPE;
-            default:
-                break;
+            }
+        } else if (std::holds_alternative<bool>(literalExpr->value)) {
+            return typeSystem.BOOL_TYPE;
+        } else if (std::holds_alternative<std::nullptr_t>(literalExpr->value)) {
+            return typeSystem.NIL_TYPE;
         }
-        return typeSystem.ANY_TYPE;
         
     } else if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(expr)) {
         Symbol* symbol = symbolTable.findVariable(varExpr->name);
@@ -770,16 +765,16 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
         if (unaryExpr->op == TokenType::MINUS) {
             // Unary minus: special handling for unsigned types that might overflow
             if (rightType == typeSystem.UINT64_TYPE) {
-                // Check if the operand is a BigInt literal that would overflow int64
+                // Check if the operand is a numeric literal that would overflow int64
                 if (auto literalExpr = std::dynamic_pointer_cast<AST::LiteralExpr>(unaryExpr->right)) {
-                    if (std::holds_alternative<BigInt>(literalExpr->value)) {
-                        const BigInt& bigIntValue = std::get<BigInt>(literalExpr->value);
+                    if (std::holds_alternative<std::string>(literalExpr->value)) {
+                        std::string stringValue = std::get<std::string>(literalExpr->value);
                         try {
                             // Try to convert to int64 - if it overflows, we need int128
-                            bigIntValue.to_int64();
+                            int64_t intVal = std::stoll(stringValue);
                             // If we get here, it fits in int64, so int64 is fine
                             return typeSystem.INT64_TYPE;
-                        } catch (const std::overflow_error&) {
+                        } catch (const std::exception&) {
                             // Overflows int64, need int128 for the negation
                             return typeSystem.INT128_TYPE;
                         }
