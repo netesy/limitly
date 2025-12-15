@@ -1,0 +1,14 @@
+print("=== String Tests ===");
+
+// Test 1: Basic string literals
+print("--- Test 1: Basic String Literals ---");
+print("Hello");
+print("World");
+
+// Test 2: String concatenation
+print("--- Test 2: String Concatenation ---");
+var str1 = "Hello";
+var str2 = " ";
+var str3 = "World";
+var result = str1 + str2 + str3;
+print(result);

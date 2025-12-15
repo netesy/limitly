@@ -1,0 +1,15 @@
+var f32_val: f32 = 1.23;
+var f64_val: f64 = 1.23;
+
+// Test arithmetic operations
+var f32_result: f32 = f32_val * 2.0;
+var f64_result: f64 = f64_val * 2.0;
+
+print("f32_val:");
+print(f32_val);
+print("f64_val:");
+print(f64_val);
+print("f32_result:");
+print(f32_result);
+print("f64_result:");
+print(f64_result);

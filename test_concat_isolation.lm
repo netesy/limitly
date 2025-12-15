@@ -1,0 +1,6 @@
+var a = "Hello";
+var b = "World";
+var c = a + b;
+print(a);
+print(b);
+print(c);

@@ -1,0 +1,7 @@
+fn testPrint() {
+    print("Inside function");
+}
+
+print("Before function");
+testPrint();
+print("After function");
