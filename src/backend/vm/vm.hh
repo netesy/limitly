@@ -4,18 +4,18 @@
 #include <functional>
 #include <unordered_set>
 
-#include "../common/opcodes.hh"
-#include "../frontend/ast.hh"
-#include "../common/debugger.hh"
-#include "memory.hh"
-#include "value.hh"
-#include "types.hh"
-#include "functions.hh"
-#include "classes.hh"
-#include "concurrency/scheduler.hh"
-#include "concurrency/thread_pool.hh"
-#include "concurrency/event_loop.hh"
-#include "concurrency/concurrency_state.hh"
+#include "../../common/opcodes.hh"
+#include "../../frontend/ast.hh"
+#include "../../common/debugger.hh"
+#include "../memory.hh"
+#include "../value.hh"
+#include "../types.hh"
+#include "../functions.hh"
+#include "../classes.hh"
+#include "../concurrency/scheduler.hh"
+#include "../concurrency/thread_pool.hh"
+#include "../concurrency/event_loop.hh"
+#include "../concurrency/concurrency_state.hh"
 #include <vector>
 #include <stack>
 #include <unordered_map>
@@ -29,7 +29,7 @@
 #include <thread>
 #include <mutex>
 
-#include "env.hh"
+#include "../env.hh"
 
 // Forward declarations
 struct CallFrame;
