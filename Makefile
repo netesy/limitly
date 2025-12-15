@@ -37,8 +37,8 @@ RSP_DIR := rsp
 # =============================
 # Sources
 # =============================
-FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp src/common/debugger.cpp src/frontend/cst.cpp src/frontend/cst_printer.cpp src/frontend/cst_utils.cpp src/frontend/ast_builder.cpp
-BACK_SRCS := src/backend/vm.cpp src/backend/jit_backend.cpp
+FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp src/common/debugger.cpp src/frontend/cst.cpp src/frontend/cst_printer.cpp src/frontend/cst_utils.cpp src/frontend/ast_builder.cpp src/lir/generator.cpp
+BACK_SRCS := src/backend/vm.cpp src/backend/jit_backend.cpp src/backend/jit/jit.cpp src/lir/lir.cpp src/lir/lir_utils.cpp
 COMMON_SRCS := src/common/builtin_functions.cpp
 BACKEND_COMMON_SRCS := src/backend/backend.cpp src/backend/symbol_table.cpp src/backend/value.cpp src/backend/ast_printer.cpp src/backend/bytecode_printer.cpp src/backend/functions.cpp src/backend/closure_impl.cpp src/backend/classes.cpp src/backend/type_checker.cpp src/backend/function_types.cpp 
 ERROR_SRCS := src/error/error_formatter.cpp src/error/error_code_generator.cpp src/error/contextual_hint_provider.cpp src/error/source_code_formatter.cpp src/error/console_formatter.cpp src/error/error_catalog.cpp
@@ -169,3 +169,13 @@ else
 	@find . -name "*.tokens.txt" -type f -delete 2>/dev/null || true
 endif
 	@echo "✅ Generated files cleaned."
+
+# =============================
+# JIT Test Target
+# =============================
+test-jit: $(BIN_DIR)
+	@echo "🔨 Building JIT test..."
+	$(CXX) $(CXXFLAGS) -I. test_jit_operations.cpp src/backend/jit/jit.cpp src/lir/lir.cpp src/lir/lir_utils.cpp -o $(BIN_DIR)/test_jit$(EXE_EXT) $(LIBS)
+	@echo "✅ JIT test built."
+	@echo "🧪 Running JIT test..."
+	$(BIN_DIR)/test_jit$(EXE_EXT)

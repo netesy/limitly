@@ -1,0 +1,3 @@
+var name: str = "World";
+var message: str = "Hello {name}!";
+print(message);

@@ -13,6 +13,7 @@
 #include "functions.hh"
 #include "../common/builtin_functions.hh"
 #include "symbol_table.hh"
+#include "string_builder.hh"
 
 class JitBackend {
 public:
@@ -109,6 +110,19 @@ private:
     gccjit::function m_free_func;
     gccjit::function m_malloc_func;
     gccjit::function m_memset_func;
+    
+    // JIT string builder functions
+    gccjit::function m_jit_sb_create_func;
+    gccjit::function m_jit_sb_destroy_func;
+    gccjit::function m_jit_sb_finish_func;
+    gccjit::function m_jit_sb_append_cstr_func;
+    gccjit::function m_jit_sb_append_int_func;
+    gccjit::function m_jit_sb_append_float_func;
+    gccjit::function m_jit_sb_append_bool_func;
+    
+    // String builder for code generation
+    limitly_string_builder m_sb;
+    
     std::unordered_map<std::string, gccjit::function> m_functions;
 
     // Loop handling

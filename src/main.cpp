@@ -5,8 +5,9 @@
 #include "common/backend.hh"
 #include "backend/ast_printer.hh"
 #include "backend/bytecode_printer.hh"
-#include "backend/vm.hh"
-#include "backend/jit_backend.hh"
+#include "backend/vm/vm.hh"
+#include "lir/generator.hh"
+#include "backend/jit/jit.hh"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -83,48 +84,70 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         }
 
         if (useJit) {
-            std::cout << "=== JIT Backend ===\n";
-            JitBackend jit;
-            std::vector<std::shared_ptr<AST::Program>> programs;
-            programs.push_back(ast);
-
-            std::function<void(const std::shared_ptr<AST::Program>&)> parse_imports = 
-                [&](const std::shared_ptr<AST::Program>& program) {
-                for (const auto& stmt : program->statements) {
-                    if (auto import_stmt = std::dynamic_pointer_cast<AST::ImportStatement>(stmt)) {
-                        std::string import_path = import_stmt->modulePath + ".lm";
-                        std::string import_source = readFile(import_path);
-                        Scanner import_scanner(import_source, import_path);
-                        import_scanner.scanTokens();
-                        Parser import_parser(import_scanner, false);
-                        std::shared_ptr<AST::Program> import_ast = import_parser.parse();
-                        programs.push_back(import_ast);
-                        parse_imports(import_ast);
+            try {
+                // Generate LIR from AST
+                LIR::Generator lir_generator;
+                auto lir_function = lir_generator.generate_program(*ast);
+                
+                if (!lir_function) {
+                    std::cerr << "Failed to generate LIR function\n";
+                    return 1;
+                }
+                
+                if (lir_generator.has_errors()) {
+                    std::cerr << "LIR generation errors:\n";
+                    for (const auto& error : lir_generator.get_errors()) {
+                        std::cerr << "  " << error << std::endl;
+                    }
+                    return 1;
+                }
+                
+                std::cout << "Generated LIR function with " << lir_function->instructions.size() << " instructions\n";
+                
+                // Initialize JIT backend
+                JIT::JITBackend jit;
+                
+                // Process the LIR function with JIT
+                jit.process_function(*lir_function);
+                
+                if (jitDebug) {
+                    std::cout << "=== JIT Debug Mode - Running Directly ===\n";
+                    auto result = jit.compile(JIT::CompileMode::ToMemory);
+                    if (result.success) {
+                        std::cout << "JIT compilation successful, executing...\n";
+                        int exit_code = jit.execute_compiled_function();
+                        std::cout << "JIT execution completed with exit code: " << exit_code << std::endl;
+                        return exit_code;
+                    } else {
+                        std::cerr << "JIT compilation failed: " << result.error_message << std::endl;
+                        return 1;
+                    }
+                } else {
+                    std::string output_filename = filename;
+                    size_t dot_pos = output_filename.rfind(".lm");
+                    if (dot_pos != std::string::npos) {
+                        output_filename.erase(dot_pos);
+                    }
+                    // Add platform-specific executable extension
+                    #ifdef _WIN32
+                        output_filename += ".exe";
+                    #endif
+                    
+                    std::cout << "Compiling to executable: " << output_filename << "\n";
+                    auto result = jit.compile(JIT::CompileMode::ToExecutable, output_filename);
+                    if (result.success) {
+                        std::cout << "Compiled to " << result.output_file << ". Run ./" << result.output_file << " to see the result.\n";
+                    } else {
+                        std::cerr << "JIT compilation failed: " << result.error_message << std::endl;
+                        return 1;
                     }
                 }
-            };
-            parse_imports(ast);
-
-            jit.process(programs);
-            
-            if (jitDebug) {
-                std::cout << "=== JIT Debug Mode - Running Directly ===\n";
-                int exit_code = jit.compile_and_run();
-                std::cout << "JIT execution completed with exit code: " << exit_code << std::endl;
-                return exit_code;
-            } else {
-                std::string output_filename = filename;
-                size_t dot_pos = output_filename.rfind(".lm");
-                if (dot_pos != std::string::npos) {
-                    output_filename.erase(dot_pos);
-                }
-                // Add platform-specific executable extension
-                #ifdef _WIN32
-                    output_filename += ".exe";
-                #endif
-                // macOS and Linux don't need an extension
-                jit.compile(output_filename.c_str());
-                std::cout << "Compiled to " << output_filename << ". Run ./" << output_filename << " to see the result.\n";
+            } catch (const std::exception& e) {
+                std::cerr << "JIT Error: " << e.what() << std::endl;
+                return 1;
+            } catch (...) {
+                std::cerr << "Unknown JIT error occurred" << std::endl;
+                return 1;
             }
         } else {
 
