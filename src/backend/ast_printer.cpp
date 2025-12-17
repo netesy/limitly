@@ -324,38 +324,27 @@ void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
         }
     }
     else if (auto forStmt = std::dynamic_pointer_cast<AST::ForStatement>(node)) {
-        if (!forStmt->loopVars.empty()) {
-            std::cout << indentation << "ForStatement (iterable):" << std::endl;
-            
-            std::cout << indentation << "  Variables:";
-            for (const auto& var : forStmt->loopVars) {
-                std::cout << " " << var;
-            }
-            std::cout << std::endl;
-            
-            std::cout << indentation << "  Iterable:" << std::endl;
-            printNode(forStmt->iterable, indent + 2);
-        } else {
-            std::cout << indentation << "ForStatement (traditional):" << std::endl;
-            
-            if (forStmt->initializer) {
-                std::cout << indentation << "  Initializer:" << std::endl;
-                printNode(forStmt->initializer, indent + 2);
-            }
-            
-            if (forStmt->condition) {
-                std::cout << indentation << "  Condition:" << std::endl;
-                printNode(forStmt->condition, indent + 2);
-            }
-            
-            if (forStmt->increment) {
-                std::cout << indentation << "  Increment:" << std::endl;
-                printNode(forStmt->increment, indent + 2);
-            }
+        std::cout << indentation << "ForStatement (traditional):" << std::endl;
+        
+        if (forStmt->initializer) {
+            std::cout << indentation << "  Initializer:" << std::endl;
+            printNode(forStmt->initializer, indent + 2);
         }
         
-        std::cout << indentation << "  Body:" << std::endl;
-        printNode(forStmt->body, indent + 2);
+        if (forStmt->condition) {
+            std::cout << indentation << "  Condition:" << std::endl;
+            printNode(forStmt->condition, indent + 2);
+        }
+        
+        if (forStmt->increment) {
+            std::cout << indentation << "  Increment:" << std::endl;
+            printNode(forStmt->increment, indent + 2);
+        }
+        
+        if (forStmt->body) {
+            std::cout << indentation << "  Body:" << std::endl;
+            printNode(forStmt->body, indent + 2);
+        }
     }
     else if (auto whileStmt = std::dynamic_pointer_cast<AST::WhileStatement>(node)) {
         std::cout << indentation << "WhileStatement:" << std::endl;
