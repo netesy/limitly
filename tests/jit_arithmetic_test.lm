@@ -1,0 +1,4 @@
+// Arithmetic-only JIT test
+print(42);
+print(10 + 20);
+print(3.14 * 2);

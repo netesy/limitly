@@ -1,0 +1,6 @@
+// Arithmetic-only JIT test - no strings
+print(1 + 2);
+print(5 - 3);
+print(4 * 2);
+print(8 / 2);
+print(10 + 20);

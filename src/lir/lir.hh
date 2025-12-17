@@ -103,7 +103,7 @@ enum class LIR_Op : uint8_t {
     EndModule
 };
 
-// Source location information
+// Source location for debugging
 struct LIR_SourceLoc {
     std::string filename;
     uint32_t line;
@@ -121,15 +121,7 @@ struct LIR_SourceLoc {
     }
 };
 
-// Debug information for a function
-struct LIR_DebugInfo {
-    std::string function_name;
-    LIR_SourceLoc loc;
-    std::unordered_map<uint32_t, std::string> var_names; // reg -> name
-    std::unordered_map<uint32_t, LIR_SourceLoc> reg_defs; // reg -> definition location
-};
-
-// LIR Instruction Structure (register-based)
+// LIR Instruction structure
 struct LIR_Inst {
     LIR_Op op;     // Operation
     Reg dst;       // Destination register
@@ -151,7 +143,100 @@ struct LIR_Inst {
     std::string to_string() const;
 };
 
+// Forward declaration
+struct LIR_Inst;
 
+// Basic Block for CFG
+struct LIR_BasicBlock {
+    uint32_t id;                     // Unique block identifier
+    std::string label;               // Optional label for debugging
+    std::vector<LIR_Inst> instructions; // Instructions in this block
+    std::vector<uint32_t> successors; // Successor block IDs
+    std::vector<uint32_t> predecessors; // Predecessor block IDs
+    bool is_entry;                   // Is this the entry block?
+    bool is_exit;                    // Is this the exit block?
+    bool terminated;                 // Explicitly marked as terminated
+    
+    LIR_BasicBlock(uint32_t id, const std::string& label = "") 
+        : id(id), label(label), is_entry(false), is_exit(false), terminated(false) {}
+    
+    // Add instruction to block
+    void add_instruction(const LIR_Inst& inst) {
+        instructions.push_back(inst);
+    }
+    
+    // Add successor edge
+    void add_successor(uint32_t block_id) {
+        successors.push_back(block_id);
+    }
+    
+    // Add predecessor edge
+    void add_predecessor(uint32_t block_id) {
+        predecessors.push_back(block_id);
+    }
+    
+    // Check if block has terminator (last instruction is control flow)
+    bool has_terminator() const {
+        if (terminated) return true;
+        if (instructions.empty()) return false;
+        const auto& last = instructions.back();
+        return last.op == LIR_Op::Jump || 
+               last.op == LIR_Op::JumpIfFalse || 
+               last.op == LIR_Op::Return;
+    }
+};
+
+// Control Flow Graph
+class LIR_CFG {
+public:
+    std::vector<std::unique_ptr<LIR_BasicBlock>> blocks;
+    uint32_t entry_block_id;
+    uint32_t exit_block_id;
+    uint32_t next_block_id;
+    
+    LIR_CFG() : entry_block_id(0), exit_block_id(UINT32_MAX), next_block_id(0) {}
+    
+    // Create new basic block
+    LIR_BasicBlock* create_block(const std::string& label = "") {
+        auto block = std::make_unique<LIR_BasicBlock>(next_block_id++, label);
+        LIR_BasicBlock* block_ptr = block.get();
+        blocks.push_back(std::move(block));
+        return block_ptr;
+    }
+    
+    // Get block by ID
+    LIR_BasicBlock* get_block(uint32_t id) {
+        if (id < blocks.size()) {
+            return blocks[id].get();
+        }
+        return nullptr;
+    }
+    
+    // Add edge between blocks
+    void add_edge(uint32_t from_id, uint32_t to_id) {
+        LIR_BasicBlock* from = get_block(from_id);
+        LIR_BasicBlock* to = get_block(to_id);
+        if (from && to) {
+            from->add_successor(to_id);
+            to->add_predecessor(from_id);
+        }
+    }
+    
+    // Validate CFG structure
+    bool validate() const;
+    void dump_dot() const; // For debugging
+};
+
+// Source location information
+// Debug information for a function
+struct LIR_DebugInfo {
+    std::string function_name;
+    LIR_SourceLoc loc;
+    std::unordered_map<uint32_t, std::string> var_names; // reg -> name
+    std::unordered_map<uint32_t, LIR_SourceLoc> reg_defs; // reg -> definition location
+};
+
+// LIR Instruction Structure (register-based)
 // Register allocation context
 class LIR_FunctionContext {
 public:
@@ -207,11 +292,12 @@ struct LIR_OptimizationFlags {
         enable_dead_code_elim(false) {}
 };
 
-// LIR Function with register allocation and debug info
+// LIR Function with register allocation, debug info, and CFG
 class LIR_Function {
 public:
     std::string name;
-    std::vector<LIR_Inst> instructions;
+    std::vector<LIR_Inst> instructions; // Keep for backward compatibility
+    std::unique_ptr<LIR_CFG> cfg;       // New CFG structure
     uint32_t param_count;
     uint32_t register_count;
     LIR_DebugInfo debug_info;
@@ -222,7 +308,7 @@ public:
     std::unordered_map<Reg, TypePtr> register_types;
 
     LIR_Function(const std::string& name, uint32_t param_count = 0)
-        : name(name), param_count(param_count), register_count(0) {
+        : name(name), param_count(param_count), register_count(0), cfg(std::make_unique<LIR_CFG>()) {
         // Ensure the name is properly initialized
         this->name = name;
     }
@@ -231,23 +317,42 @@ public:
     LIR_Function(const LIR_Function& other) 
         : name(other.name),
           instructions(other.instructions),
+          cfg(other.cfg ? std::make_unique<LIR_CFG>() : nullptr),
           param_count(other.param_count),
           register_count(other.register_count),
           debug_info(other.debug_info),
           optimizations(other.optimizations),
           variable_to_reg(other.variable_to_reg),
-          register_types(other.register_types) {}
+          register_types(other.register_types) {
+        // Manually copy CFG blocks if needed
+        if (other.cfg && cfg) {
+            // Copy basic CFG structure but recreate blocks
+            cfg->entry_block_id = other.cfg->entry_block_id;
+            cfg->exit_block_id = other.cfg->exit_block_id;
+            cfg->next_block_id = other.cfg->next_block_id;
+            // Note: We don't copy the blocks themselves since they contain unique_ptr
+        }
+    }
           
     LIR_Function& operator=(const LIR_Function& other) {
         if (this != &other) {
             name = other.name;
             instructions = other.instructions;
+            cfg = other.cfg ? std::make_unique<LIR_CFG>() : nullptr;
             param_count = other.param_count;
             register_count = other.register_count;
             debug_info = other.debug_info;
             optimizations = other.optimizations;
             variable_to_reg = other.variable_to_reg;
             register_types = other.register_types;
+            
+            // Manually copy CFG structure if needed
+            if (other.cfg && cfg) {
+                cfg->entry_block_id = other.cfg->entry_block_id;
+                cfg->exit_block_id = other.cfg->exit_block_id;
+                cfg->next_block_id = other.cfg->next_block_id;
+                // Note: We don't copy the blocks themselves since they contain unique_ptr
+            }
         }
         return *this;
     }

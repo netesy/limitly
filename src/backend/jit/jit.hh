@@ -41,8 +41,7 @@ public:
 
     // Main compilation methods
     void process_function(const LIR::LIR_Function& function);
-    CompileResult compile(CompileMode mode = CompileMode::ToMemory, 
-                         const std::string& output_path = "");
+    CompileResult compile(CompileMode mode = CompileMode::ToMemory, const std::string& output_path = "");
     
     // Execute compiled function (memory mode only)
     int execute_compiled_function(const std::vector<int>& args = {});
@@ -62,6 +61,7 @@ public:
 private:
     // JIT compilation methods
     void compile_function(const LIR::LIR_Function& function);
+    void compile_function_single_pass(const LIR::LIR_Function& function);
     gccjit::rvalue compile_instruction(const LIR::LIR_Inst& inst);
     
     // Register management for JIT
@@ -129,7 +129,7 @@ private:
     
     // Control flow
     void compile_jump(const LIR::LIR_Inst& inst);
-    void compile_conditional_jump(const LIR::LIR_Inst& inst);
+    void compile_conditional_jump(const LIR::LIR_Inst& inst, size_t current_instruction_pos);
     void compile_call(const LIR::LIR_Inst& inst);
     void compile_print_int(const LIR::LIR_Inst& inst);
     void compile_print_float(const LIR::LIR_Inst& inst);
@@ -165,6 +165,21 @@ private:
     std::vector<std::string> errors;
     std::vector<LIR::LIR_Function> processed_functions;
     void* m_compiled_function;
+    gcc_jit_result* m_jit_result; // Keep the result alive
+    
+    // Label to block mapping for jump resolution
+    std::unordered_map<uint32_t, gccjit::block> label_blocks;
+    
+    // Pending jumps that need forward resolution
+    struct PendingJump {
+        std::string source_block_name;
+        uint32_t target_label;
+        std::string continuation_name;
+    };
+    std::vector<PendingJump> pending_jumps;
+    
+    // Map block names to actual blocks for resolution
+    std::unordered_map<std::string, gccjit::block> block_name_map;
     
     // Statistics
     Stats m_stats;
