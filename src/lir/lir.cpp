@@ -1,6 +1,8 @@
 #include "lir.hh"
+#include <iostream>
 #include <sstream>
 #include <iomanip>
+#include <algorithm>
 
 namespace LIR {
 
@@ -154,6 +156,109 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::EndModule: return "end_module";
     }
     return "unknown";
+}
+
+// CFG validation implementation
+bool LIR_CFG::validate() const {
+    // Check entry block exists
+    if (entry_block_id >= blocks.size() || !blocks[entry_block_id]) {
+        std::cerr << "CFG Error: Invalid entry block ID " << entry_block_id << std::endl;
+        return false;
+    }
+    
+    // Each block should have at most one terminator
+    for (const auto& block : blocks) {
+        if (!block) continue;
+        
+        int terminator_count = 0;
+        for (const auto& inst : block->instructions) {
+            if (inst.op == LIR_Op::Jump || 
+                inst.op == LIR_Op::JumpIfFalse || 
+                inst.op == LIR_Op::Return) {
+                terminator_count++;
+            }
+        }
+        
+        if (terminator_count > 1) {
+            std::cerr << "CFG Error: Block " << block->id << " has " << terminator_count << " terminators" << std::endl;
+            return false; // Multiple terminators
+        }
+    }
+    
+    // Check all successor/predecessor relationships are valid
+    for (const auto& block : blocks) {
+        if (!block) continue;
+        
+        for (uint32_t succ_id : block->successors) {
+            if (succ_id >= blocks.size() || !blocks[succ_id]) {
+                std::cerr << "CFG Error: Block " << block->id << " has invalid successor " << succ_id << std::endl;
+                return false; // Invalid successor
+            }
+        }
+        
+        for (uint32_t pred_id : block->predecessors) {
+            if (pred_id >= blocks.size() || !blocks[pred_id]) {
+                std::cerr << "CFG Error: Block " << block->id << " has invalid predecessor " << pred_id << std::endl;
+                return false; // Invalid predecessor
+            }
+        }
+    }
+    
+    // Check that jump targets match successors
+    for (const auto& block : blocks) {
+        if (!block) continue;
+        
+        if (!block->instructions.empty()) {
+            const auto& last_inst = block->instructions.back();
+            
+            if (last_inst.op == LIR_Op::Jump) {
+                uint32_t target = last_inst.imm;
+                if (std::find(block->successors.begin(), block->successors.end(), target) == block->successors.end()) {
+                    std::cerr << "CFG Error: Jump target " << target << " not in successors list for block " << block->id << std::endl;
+                    return false;
+                }
+            } else if (last_inst.op == LIR_Op::JumpIfFalse) {
+                uint32_t target = last_inst.imm;
+                // JumpIfFalse should have two successors: target and fall-through
+                if (block->successors.size() != 2) {
+                    std::cerr << "CFG Error: JumpIfFalse block should have exactly 2 successors, has " << block->successors.size() << std::endl;
+                    return false;
+                }
+                if (std::find(block->successors.begin(), block->successors.end(), target) == block->successors.end()) {
+                    std::cerr << "CFG Error: JumpIfFalse target " << target << " not in successors list for block " << block->id << std::endl;
+                    return false;
+                }
+            }
+        }
+    }
+    
+    return true;
+}
+
+void LIR_CFG::dump_dot() const {
+    std::cout << "digraph CFG {" << std::endl;
+    std::cout << "  node [shape=box];" << std::endl;
+    
+    // Dump blocks
+    for (const auto& block : blocks) {
+        if (!block) continue;
+        
+        std::string label = block->label.empty() ? 
+            "block_" + std::to_string(block->id) : block->label;
+        
+        std::cout << "  " << block->id << " [label=\"" << label << "\"];" << std::endl;
+    }
+    
+    // Dump edges
+    for (const auto& block : blocks) {
+        if (!block) continue;
+        
+        for (uint32_t succ_id : block->successors) {
+            std::cout << "  " << block->id << " -> " << succ_id << ";" << std::endl;
+        }
+    }
+    
+    std::cout << "}" << std::endl;
 }
 
 } // namespace LIR

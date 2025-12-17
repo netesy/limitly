@@ -1,0 +1,12 @@
+// Minimal JIT test without strings
+print("=== Minimal JIT Test ===");
+
+var a = 10;
+var b = 20;
+var c = a + b;
+
+print("a = {a}");
+print("b = {b}");
+print("c = a + b = {c}");
+
+print("=== Test Completed ===");

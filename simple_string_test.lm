@@ -1,0 +1,4 @@
+// Simple string test
+print("Hello World")
+var s = "Hello"
+print(s)

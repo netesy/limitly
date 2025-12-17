@@ -2,11 +2,12 @@
 #include "../backend/value.hh"
 #include "../backend/types.hh"
 #include <algorithm>
+#include <unordered_set>
 
 namespace LIR {
 
 Generator::Generator()
-    : next_register_(0), current_memory_region_(nullptr) {
+    : next_register_(0), next_label_(0), current_memory_region_(nullptr) {
     // Initialize memory manager with audit mode disabled for performance
     memory_manager_.setAuditMode(false);
 }
@@ -15,10 +16,15 @@ std::unique_ptr<LIR_Function> Generator::generate_program(AST::Program& program)
     // Create a main function
     current_function_ = std::make_unique<LIR_Function>("main", 0);
     next_register_ = 0;
+    next_label_ = 0;
     scope_stack_.clear();
+    loop_stack_.clear();
     register_types_.clear();
     enter_scope();
     enter_memory_region();
+    
+    // Start CFG building
+    start_cfg_build();
     
     // Process all statements
     for (const auto& stmt : program.statements) {
@@ -26,10 +32,12 @@ std::unique_ptr<LIR_Function> Generator::generate_program(AST::Program& program)
     }
     
     // Add implicit return if none exists
-    if (current_function_->instructions.empty() || 
-        current_function_->instructions.back().op != LIR_Op::Return) {
+    if (get_current_block() && !get_current_block()->has_terminator()) {
         emit_instruction(LIR_Inst(LIR_Op::Return));
     }
+
+    // Finish CFG building
+    finish_cfg_build();
 
     exit_scope();
     exit_memory_region();
@@ -45,10 +53,15 @@ std::unique_ptr<LIR_Function> Generator::generate_function(AST::FunctionDeclarat
     // Create function with parameters
     current_function_ = std::make_unique<LIR_Function>(fn.name, fn.params.size());
     next_register_ = fn.params.size();
+    next_label_ = 0;
     scope_stack_.clear();
+    loop_stack_.clear();
     register_types_.clear();
     enter_scope();
     enter_memory_region();
+    
+    // Start CFG building
+    start_cfg_build();
     
     // Register parameters
     for (size_t i = 0; i < fn.params.size(); ++i) {
@@ -62,11 +75,13 @@ std::unique_ptr<LIR_Function> Generator::generate_function(AST::FunctionDeclarat
     }
     
     // Add implicit return if none exists
-    if (current_function_->instructions.empty() || 
-        current_function_->instructions.back().op != LIR_Op::Return) {
+    if (get_current_block() && !get_current_block()->has_terminator()) {
         emit_instruction(LIR_Inst(LIR_Op::Return));
     }
     
+    // Finish CFG building
+    finish_cfg_build();
+
     exit_scope();
     exit_memory_region();
     
@@ -81,11 +96,17 @@ Reg Generator::allocate_register() {
 }
 
 void Generator::enter_scope() {
-    scope_stack_.push_back(Scope{});
+    scope_stack_.push_back({});
+    // Create memory region for this scope
+    scope_stack_.back().memory_region = new MemoryManager<>::Region(memory_manager_);
 }
 
 void Generator::exit_scope() {
     if (!scope_stack_.empty()) {
+        // Clean up memory region for this scope
+        if (scope_stack_.back().memory_region) {
+            delete scope_stack_.back().memory_region;
+        }
         scope_stack_.pop_back();
     }
 }
@@ -132,7 +153,18 @@ TypePtr Generator::get_register_type(Reg reg) const {
 
 void Generator::emit_instruction(const LIR_Inst& inst) {
     if (current_function_) {
-        current_function_->instructions.push_back(inst);
+        // If CFG building is active, emit to current CFG block
+        if (cfg_context_.building_cfg && cfg_context_.current_block) {
+            // Don't emit instructions to a terminated block
+            if (cfg_context_.current_block->terminated) {
+                return;
+            }
+            cfg_context_.current_block->add_instruction(inst);
+        } else {
+            // Fallback: emit to linear instruction stream for non-CFG mode
+            current_function_->instructions.push_back(inst);
+        }
+        
         current_function_->register_count = std::max(current_function_->register_count, next_register_);
         if (inst.dst != UINT32_MAX) {
             auto type = get_register_type(inst.dst);
@@ -172,6 +204,12 @@ void Generator::emit_stmt(AST::Statement& stmt) {
         emit_while_stmt(*while_stmt);
     } else if (auto for_stmt = dynamic_cast<AST::ForStatement*>(&stmt)) {
         emit_for_stmt(*for_stmt);
+    } else if (auto iter_stmt = dynamic_cast<AST::IterStatement*>(&stmt)) {
+        emit_iter_stmt(*iter_stmt);
+    } else if (auto break_stmt = dynamic_cast<AST::BreakStatement*>(&stmt)) {
+        emit_break_stmt(*break_stmt);
+    } else if (auto continue_stmt = dynamic_cast<AST::ContinueStatement*>(&stmt)) {
+        emit_continue_stmt(*continue_stmt);
     } else if (auto return_stmt = dynamic_cast<AST::ReturnStatement*>(&stmt)) {
         emit_return_stmt(*return_stmt);
     } else if (auto func_stmt = dynamic_cast<AST::FunctionDeclaration*>(&stmt)) {
@@ -224,6 +262,8 @@ Reg Generator::emit_expr(AST::Expression& expr) {
         return emit_index_expr(*index);
     } else if (auto member = dynamic_cast<AST::MemberExpr*>(&expr)) {
         return emit_member_expr(*member);
+    } else if (auto list = dynamic_cast<AST::ListExpr*>(&expr)) {
+        return emit_list_expr(*list);
     } else {
         report_error("Unknown expression type");
         return 0;
@@ -566,11 +606,17 @@ Reg Generator::emit_assign_expr(AST::AssignExpr& expr) {
     
     // For simple variable assignment
     if (!expr.name.empty()) {
-        Reg dst = allocate_register();
+        // Get the existing register for this variable
+        Reg dst = resolve_variable(expr.name);
+        if (dst == UINT32_MAX) {
+            // Variable doesn't exist, allocate a new one
+            dst = allocate_register();
+            bind_variable(expr.name, dst);
+        }
         // Set type BEFORE emitting so it's available during emit_instruction
         set_register_type(dst, get_register_type(value));
         emit_instruction(LIR_Inst(LIR_Op::Mov, dst, value, 0));
-        update_variable_binding(expr.name, dst);
+        // No need to update binding since we're using the existing register
         return dst;
     } else if (expr.object) {
         // For member or index assignment - not yet implemented
@@ -580,6 +626,20 @@ Reg Generator::emit_assign_expr(AST::AssignExpr& expr) {
         report_error("Invalid assignment target");
         return 0;
     }
+}
+
+Reg Generator::emit_list_expr(AST::ListExpr& expr) {
+    // For now, create a simple list representation
+    // TODO: Implement proper list creation with ListCreate operations
+    Reg list_reg = allocate_register();
+    
+    // Create a nil/empty list for now
+    auto nil_type = std::make_shared<Type>(TypeTag::Nil);
+    ValuePtr nil_val = std::make_shared<Value>(nil_type, std::string(""));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, list_reg, nil_val));
+    set_register_type(list_reg, nil_type);
+    
+    return list_reg;
 }
 
 Reg Generator::emit_grouping_expr(AST::GroupingExpr& expr) {
@@ -751,15 +811,306 @@ void Generator::emit_block_stmt(AST::BlockStatement& stmt) {
 }
 
 void Generator::emit_if_stmt(AST::IfStatement& stmt) {
-    report_error("If statements not yet implemented");
+    // Create CFG blocks for the if statement
+    LIR_BasicBlock* then_block = create_basic_block("if_then");
+    LIR_BasicBlock* else_block = stmt.elseBranch ? create_basic_block("if_else") : nullptr;
+    LIR_BasicBlock* end_block = create_basic_block("if_end");
+    
+    // Emit condition check in current block
+    Reg condition = emit_expr(*stmt.condition);
+    Reg condition_bool = allocate_register();
+    
+    // For boolean conditions, use them directly
+    TypePtr condition_type = get_register_type(condition);
+    if (condition_type && condition_type->tag == TypeTag::Bool) {
+        condition_bool = condition;
+    } else {
+        // Convert non-boolean condition to boolean
+        Reg zero_reg = allocate_register();
+        auto int_type = std::make_shared<Type>(TypeTag::Int);
+        ValuePtr zero_val = std::make_shared<Value>(int_type, (int64_t)0);
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, zero_reg, zero_val));
+        set_register_type(zero_reg, int_type);
+        emit_instruction(LIR_Inst(LIR_Op::CmpNEQ, condition_bool, condition, zero_reg));
+        set_register_type(condition_bool, std::make_shared<Type>(TypeTag::Bool));
+    }
+    
+    // Conditional jump: if false, go to else (or end if no else)
+    uint32_t false_target = else_block ? else_block->id : end_block->id;
+    emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, condition_bool, 0, false_target));
+    
+    // Jump to then branch
+    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, then_block->id));
+    
+    // Set up edges from current block
+    add_block_edge(get_current_block(), then_block);
+    if (else_block) {
+        add_block_edge(get_current_block(), else_block);
+    } else {
+        add_block_edge(get_current_block(), end_block);
+    }
+    
+    // === Then Block ===
+    set_current_block(then_block);
+    
+    // Emit then branch
+    if (stmt.thenBranch) {
+        emit_stmt(*stmt.thenBranch);
+    }
+    
+    // Jump to end after then branch (only if no terminator already exists)
+    if (get_current_block() && !get_current_block()->has_terminator()) {
+        emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, end_block->id));
+        add_block_edge(then_block, end_block);
+    }
+    
+    // === Else Block (if present) ===
+    if (else_block) {
+        set_current_block(else_block);
+        
+        // Emit else branch
+        emit_stmt(*stmt.elseBranch);
+        
+        // Jump to end after else branch (only if no terminator already exists)
+        if (get_current_block() && !get_current_block()->has_terminator()) {
+            emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, end_block->id));
+            add_block_edge(else_block, end_block);
+        }
+    }
+    
+    // === End Block: continuation ===
+    set_current_block(end_block);
 }
 
 void Generator::emit_while_stmt(AST::WhileStatement& stmt) {
-    report_error("While statements not yet implemented");
+    // Create CFG blocks for the while loop
+    LIR_BasicBlock* header_block = create_basic_block("while_header");
+    LIR_BasicBlock* body_block = create_basic_block("while_body");
+    LIR_BasicBlock* exit_block = create_basic_block("while_exit");
+    
+    // Enter loop context for break/continue
+    enter_loop();
+    set_loop_labels(header_block->id, exit_block->id, header_block->id);
+    
+    // Jump from current block to header
+    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
+    add_block_edge(get_current_block(), header_block);
+    
+    // === Header Block: condition check ===
+    set_current_block(header_block);
+    
+    // Emit condition
+    Reg condition = emit_expr(*stmt.condition);
+    Reg condition_bool = allocate_register();
+    
+    // For boolean conditions, use them directly
+    TypePtr condition_type = get_register_type(condition);
+    if (condition_type && condition_type->tag == TypeTag::Bool) {
+        condition_bool = condition;
+    } else {
+        // Convert non-boolean condition to boolean
+        Reg zero_reg = allocate_register();
+        auto int_type = std::make_shared<Type>(TypeTag::Int);
+        ValuePtr zero_val = std::make_shared<Value>(int_type, (int64_t)0);
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, zero_reg, zero_val));
+        set_register_type(zero_reg, int_type);
+        emit_instruction(LIR_Inst(LIR_Op::CmpNEQ, condition_bool, condition, zero_reg));
+        set_register_type(condition_bool, std::make_shared<Type>(TypeTag::Bool));
+    }
+    
+    // Conditional jump: if false, go to exit; if true, go to body
+    emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, condition_bool, 0, exit_block->id));
+    add_block_edge(header_block, exit_block);
+    add_block_edge(header_block, body_block);
+    
+    // === Body Block: loop body ===
+    set_current_block(body_block);
+    
+    // Emit loop body
+    if (stmt.body) {
+        emit_stmt(*stmt.body);
+    }
+    
+    // Jump back to header
+    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
+    add_block_edge(body_block, header_block);
+    
+    // === Exit Block: continuation ===
+    set_current_block(exit_block);
+    
+    // Exit loop context
+    exit_loop();
 }
 
 void Generator::emit_for_stmt(AST::ForStatement& stmt) {
-    report_error("For statements not yet implemented");
+    if (stmt.isIterableLoop) {
+        // Handle iterable loops: for (var in collection)
+        emit_iterable_for_loop(stmt);
+    } else {
+        // Handle traditional C-style for loops: for (init; condition; increment)
+        emit_traditional_for_loop(stmt);
+    }
+}
+
+void Generator::emit_traditional_for_loop(AST::ForStatement& stmt) {
+    // Create CFG blocks for the for loop
+    LIR_BasicBlock* header_block = create_basic_block("for_header");
+    LIR_BasicBlock* body_block = create_basic_block("for_body");
+    LIR_BasicBlock* increment_block = create_basic_block("for_increment");
+    LIR_BasicBlock* exit_block = create_basic_block("for_exit");
+    
+    // Enter loop context for break/continue
+    enter_loop();
+    set_loop_labels(header_block->id, exit_block->id, increment_block->id);
+    
+    // Emit initialization in current block
+    if (stmt.initializer) {
+        emit_stmt(*stmt.initializer);
+    }
+    
+    // Jump from current block to header
+    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
+    add_block_edge(get_current_block(), header_block);
+    
+    // === Header Block: condition check ===
+    set_current_block(header_block);
+    
+    if (stmt.condition) {
+        // Emit condition
+        Reg condition = emit_expr(*stmt.condition);
+        Reg condition_bool = allocate_register();
+        
+        // For boolean conditions, use them directly
+        TypePtr condition_type = get_register_type(condition);
+        if (condition_type && condition_type->tag == TypeTag::Bool) {
+            condition_bool = condition;
+        } else {
+            // Convert non-boolean condition to boolean
+            Reg zero_reg = allocate_register();
+            auto int_type = std::make_shared<Type>(TypeTag::Int);
+            ValuePtr zero_val = std::make_shared<Value>(int_type, (int64_t)0);
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, zero_reg, zero_val));
+            set_register_type(zero_reg, int_type);
+            emit_instruction(LIR_Inst(LIR_Op::CmpNEQ, condition_bool, condition, zero_reg));
+            set_register_type(condition_bool, std::make_shared<Type>(TypeTag::Bool));
+        }
+        
+        // Conditional jump: if false, go to exit; if true, go to body
+        emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, condition_bool, 0, exit_block->id));
+        add_block_edge(header_block, exit_block);
+    } else {
+        // No condition - always jump to body
+        emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, body_block->id));
+    }
+    add_block_edge(header_block, body_block);
+    
+    // === Body Block: loop body ===
+    set_current_block(body_block);
+    
+    // Emit loop body
+    if (stmt.body) {
+        emit_stmt(*stmt.body);
+    }
+    
+    // Jump to increment block
+    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, increment_block->id));
+    add_block_edge(body_block, increment_block);
+    
+    // === Increment Block: increment expression ===
+    set_current_block(increment_block);
+    
+    // Emit increment if present
+    if (stmt.increment) {
+        emit_expr(*stmt.increment); // Evaluate increment expression
+    }
+    
+    // Jump back to header
+    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
+    add_block_edge(increment_block, header_block);
+    
+    // === Exit Block: continuation ===
+    set_current_block(exit_block);
+    
+    // Exit loop context
+    exit_loop();
+}
+
+void Generator::emit_iterable_for_loop(AST::ForStatement& stmt) {
+    // Generate labels for the loop
+    uint32_t loop_check_label = generate_label();
+    uint32_t loop_body_label = generate_label();
+    uint32_t loop_end_label = generate_label();
+    
+    // Enter loop context
+    enter_loop();
+    set_loop_labels(loop_check_label, loop_end_label, loop_check_label);
+    
+    // Create a new scope for the loop variables
+    enter_scope();
+    
+    // Initialize index to 0
+    auto int_type = std::make_shared<Type>(TypeTag::Int);
+    ValuePtr zero_val = std::make_shared<Value>(int_type, (int64_t)0);
+    Reg index_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, index_reg, zero_val));
+    set_register_type(index_reg, int_type);
+    
+    // Load collection
+    Reg collection_reg = emit_expr(*stmt.iterable);
+    
+    // Jump to loop condition check first
+    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, loop_check_label));
+    
+    // Emit loop body - get item at index (using ListIndex)
+    Reg item_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::ListIndex, item_reg, collection_reg, index_reg));
+    
+    // Store the item in the loop variable(s)
+    for (const auto& var_name : stmt.loopVars) {
+        bind_variable(var_name, item_reg);
+    }
+    
+    // Emit loop body statements
+    if (stmt.body) {
+        emit_stmt(*stmt.body);
+    }
+    
+    // Increment index
+    ValuePtr one_val = std::make_shared<Value>(int_type, (int64_t)1);
+    Reg one_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, one_reg, one_val));
+    set_register_type(one_reg, int_type);
+    
+    Reg new_index_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::Add, new_index_reg, index_reg, one_reg));
+    set_register_type(new_index_reg, int_type);
+    
+    // Update index register
+    emit_instruction(LIR_Inst(LIR_Op::Mov, index_reg, new_index_reg, 0));
+    
+    // Jump back to loop condition check
+    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, loop_check_label));
+    
+    // Emit loop condition check
+    
+    // For now, use a simple condition - assume we iterate 3 times (placeholder)
+    // TODO: Implement proper Length operation when available
+    Reg condition_reg = allocate_register();
+    ValuePtr three_val = std::make_shared<Value>(int_type, (int64_t)3); // placeholder
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, condition_reg, three_val));
+    set_register_type(condition_reg, int_type);
+    
+    Reg cmp_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::CmpLT, cmp_reg, index_reg, condition_reg));
+    set_register_type(cmp_reg, std::make_shared<Type>(TypeTag::Bool));
+    
+    // Jump to loop body if condition is true, otherwise fall through to end
+    emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp_reg, 0, loop_end_label));
+    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, loop_body_label));
+    
+    // Exit scope and loop context
+    exit_scope();
+    exit_loop();
 }
 
 void Generator::emit_return_stmt(AST::ReturnStatement& stmt) {
@@ -808,7 +1159,111 @@ void Generator::emit_worker_stmt(AST::WorkerStatement& stmt) {
 }
 
 void Generator::emit_iter_stmt(AST::IterStatement& stmt) {
-    report_error("Iter statements not yet implemented");
+    // Generate labels for the loop
+    uint32_t start_label = generate_label();
+    uint32_t end_label = generate_label();
+    uint32_t continue_label = generate_label();
+    
+    // Enter loop context
+    enter_loop();
+    set_loop_labels(start_label, end_label, continue_label);
+    
+    // Create a new scope for the loop variables
+    enter_scope();
+    
+    // For now, implement a basic version that assumes the iterable is a range
+    // TODO: Implement proper iterator protocol
+    
+    // Get the iterable expression
+    Reg iterable_reg = emit_expr(*stmt.iterable);
+    
+    // Initialize loop variables (simplified - assumes range-like behavior)
+    for (const auto& var_name : stmt.loopVars) {
+        Reg var_reg = allocate_register();
+        bind_variable(var_name, var_reg);
+        
+        // Initialize with zero for now (proper implementation would get from iterator)
+        auto int_type = std::make_shared<Type>(TypeTag::Int);
+        ValuePtr zero_val = std::make_shared<Value>(int_type, (int64_t)0);
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, var_reg, zero_val));
+        set_register_type(var_reg, int_type);
+    }
+    
+    // Emit condition check (simplified - assumes fixed iteration count)
+    // TODO: Proper iterator protocol with hasNext() check
+    Reg condition = allocate_register();
+    auto int_type = std::make_shared<Type>(TypeTag::Int);
+    ValuePtr condition_val = std::make_shared<Value>(int_type, (int64_t)1); // Always true for now
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, condition, condition_val));
+    set_register_type(condition, int_type);
+    
+    Reg condition_bool = allocate_register();
+    Reg zero_reg = allocate_register();
+    ValuePtr zero_val = std::make_shared<Value>(int_type, (int64_t)0);
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, zero_reg, zero_val));
+    set_register_type(zero_reg, int_type);
+    emit_instruction(LIR_Inst(LIR_Op::CmpNEQ, condition_bool, condition, zero_reg)); // condition != 0
+    
+    // Jump to end if condition is false
+    emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, condition_bool, 0, end_label));
+    
+    // Emit loop body
+    if (stmt.body) {
+        emit_stmt(*stmt.body);
+    }
+    
+    // Emit continue point
+    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, continue_label));
+    
+    // Increment loop variables (simplified)
+    for (const auto& var_name : stmt.loopVars) {
+        Reg var_reg = resolve_variable(var_name);
+        Reg one_reg = allocate_register();
+        ValuePtr one_val = std::make_shared<Value>(int_type, (int64_t)1);
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, one_reg, one_val));
+        emit_instruction(LIR_Inst(LIR_Op::Add, var_reg, var_reg, one_reg));
+    }
+    
+    // Jump back to start
+    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, start_label));
+    
+    // Exit loop scope (cleans up memory)
+    exit_scope();
+    
+    // Exit loop context
+    exit_loop();
+}
+
+void Generator::emit_break_stmt(AST::BreakStatement& stmt) {
+    uint32_t break_label = get_break_label();
+    if (break_label != 0) {
+        emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, break_label));
+        // Add edge to break target block
+        LIR_BasicBlock* break_target = current_function_->cfg->get_block(break_label);
+        if (break_target) {
+            add_block_edge(get_current_block(), break_target);
+        }
+        // Mark current block as terminated to prevent further instruction generation
+        if (get_current_block()) {
+            get_current_block()->terminated = true;
+        }
+    }
+}
+
+void Generator::emit_continue_stmt(AST::ContinueStatement& stmt) {
+    uint32_t continue_label = get_continue_label();
+    if (continue_label != 0) {
+        emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, continue_label));
+        // Add edge to continue target block
+        LIR_BasicBlock* continue_target = current_function_->cfg->get_block(continue_label);
+        if (continue_target) {
+            add_block_edge(get_current_block(), continue_target);
+        }
+        // Mark current block as terminated to prevent further instruction generation
+        if (get_current_block()) {
+            get_current_block()->terminated = true;
+        }
+    }
 }
 
 void Generator::emit_unsafe_stmt(AST::UnsafeStatement& stmt) {
@@ -830,23 +1285,218 @@ void Generator::exit_memory_region() {
 }
 
 void* Generator::allocate_in_region(size_t size, size_t alignment) {
-    if (!current_memory_region_) {
-        enter_memory_region();
+    if (scope_stack_.empty()) {
+        enter_scope();
+    }
+    auto& current_scope = scope_stack_.back();
+    if (!current_scope.memory_region) {
+        current_scope.memory_region = new MemoryManager<>::Region(memory_manager_);
     }
     return memory_manager_.allocate(size, alignment);
 }
 
 template<typename T, typename... Args>
 T* Generator::create_object(Args&&... args) {
-    if (!current_memory_region_) {
-        enter_memory_region();
+    if (scope_stack_.empty()) {
+        enter_scope();
     }
-    return current_memory_region_->create<T>(std::forward<Args>(args)...);
+    auto& current_scope = scope_stack_.back();
+    if (!current_scope.memory_region) {
+        current_scope.memory_region = new MemoryManager<>::Region(memory_manager_);
+    }
+    return current_scope.memory_region->create<T>(std::forward<Args>(args)...);
 }
 
 void Generator::cleanup_memory() {
     exit_memory_region();
     memory_manager_.analyzeMemoryUsage();
+}
+
+// Loop management methods
+uint32_t Generator::generate_label() {
+    return next_label_++;
+}
+
+void Generator::enter_loop() {
+    loop_stack_.push_back({0, 0, 0}); // Placeholder, will be set by set_loop_labels
+}
+
+void Generator::exit_loop() {
+    if (!loop_stack_.empty()) {
+        loop_stack_.pop_back();
+    }
+}
+
+void Generator::set_loop_labels(uint32_t start_label, uint32_t end_label, uint32_t continue_label) {
+    if (!loop_stack_.empty()) {
+        loop_stack_.back().start_label = start_label;
+        loop_stack_.back().end_label = end_label;
+        loop_stack_.back().continue_label = continue_label;
+    }
+}
+
+uint32_t Generator::get_break_label() {
+    if (loop_stack_.empty()) {
+        report_error("break statement not in loop");
+        return 0;
+    }
+    return loop_stack_.back().end_label;
+}
+
+uint32_t Generator::get_continue_label() {
+    if (loop_stack_.empty()) {
+        report_error("continue statement not in loop");
+        return 0;
+    }
+    return loop_stack_.back().continue_label;
+}
+
+bool Generator::in_loop() const {
+    return !loop_stack_.empty();
+}
+
+// CFG building methods
+void Generator::start_cfg_build() {
+    cfg_context_.building_cfg = true;
+    cfg_context_.entry_block = create_basic_block("entry");
+    cfg_context_.exit_block = create_basic_block("exit");
+    set_current_block(cfg_context_.entry_block);
+    
+    // Set entry and exit in CFG
+    current_function_->cfg->entry_block_id = cfg_context_.entry_block->id;
+    current_function_->cfg->exit_block_id = cfg_context_.exit_block->id;
+    
+    cfg_context_.entry_block->is_entry = true;
+    cfg_context_.exit_block->is_exit = true;
+}
+
+void Generator::finish_cfg_build() {
+    cfg_context_.building_cfg = false;
+    
+    // If current block doesn't have terminator, add jump to exit
+    if (cfg_context_.current_block && !cfg_context_.current_block->has_terminator()) {
+        emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, cfg_context_.exit_block->id));
+        add_block_edge(cfg_context_.current_block, cfg_context_.exit_block);
+    }
+    
+    // Remove unreachable blocks before flattening
+    remove_unreachable_blocks();
+    
+    // Flatten CFG blocks into linear instruction stream for JIT consumption
+    flatten_cfg_to_instructions();
+    
+    cfg_context_.current_block = nullptr;
+    cfg_context_.entry_block = nullptr;
+    cfg_context_.exit_block = nullptr;
+}
+
+void Generator::remove_unreachable_blocks() {
+    if (!current_function_ || !current_function_->cfg) {
+        return;
+    }
+    
+    // Perform reachability analysis from entry block
+    std::unordered_set<uint32_t> reachable_blocks;
+    std::vector<uint32_t> worklist;
+    
+    // Start from entry block
+    if (current_function_->cfg->entry_block_id != UINT32_MAX) {
+        worklist.push_back(current_function_->cfg->entry_block_id);
+        reachable_blocks.insert(current_function_->cfg->entry_block_id);
+    }
+    
+    // DFS to find all reachable blocks
+    while (!worklist.empty()) {
+        uint32_t current_id = worklist.back();
+        worklist.pop_back();
+        
+        auto current_block = current_function_->cfg->get_block(current_id);
+        if (!current_block) continue;
+        
+        // Add all successor blocks to worklist
+        for (uint32_t successor_id : current_block->successors) {
+            if (reachable_blocks.find(successor_id) == reachable_blocks.end()) {
+                reachable_blocks.insert(successor_id);
+                worklist.push_back(successor_id);
+            }
+        }
+    }
+    
+    // Remove unreachable blocks
+    auto& blocks = current_function_->cfg->blocks;
+    for (auto it = blocks.begin(); it != blocks.end(); ) {
+        if (*it && reachable_blocks.find((*it)->id) == reachable_blocks.end()) {
+            // This block is unreachable, remove it
+            it = blocks.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+void Generator::flatten_cfg_to_instructions() {
+    if (!current_function_ || !current_function_->cfg) {
+        return;
+    }
+    
+    // Clear existing linear instructions
+    current_function_->instructions.clear();
+    
+    // Create a map from block ID to instruction position (label)
+    std::unordered_map<uint32_t, size_t> block_positions;
+    
+    // First pass: calculate positions for each block
+    size_t current_pos = 0;
+    for (const auto& block : current_function_->cfg->blocks) {
+        if (block) {
+            block_positions[block->id] = current_pos;
+            current_pos += block->instructions.size();
+        }
+    }
+    
+    // Second pass: emit instructions with proper label targets
+    for (const auto& block : current_function_->cfg->blocks) {
+        if (!block) continue;
+        
+        // Emit all instructions in this block
+        for (const auto& inst : block->instructions) {
+            LIR_Inst modified_inst = inst;
+            
+            // Update jump targets to use instruction positions as labels
+            if (inst.op == LIR_Op::Jump || inst.op == LIR_Op::JumpIfFalse) {
+                auto it = block_positions.find(inst.imm);
+                if (it != block_positions.end()) {
+                    modified_inst.imm = it->second; // Use instruction position as label
+                }
+            }
+            
+            current_function_->instructions.push_back(modified_inst);
+        }
+    }
+}
+
+LIR_BasicBlock* Generator::create_basic_block(const std::string& label) {
+    if (!cfg_context_.building_cfg) {
+        report_error("Cannot create basic block outside of CFG build");
+        return nullptr;
+    }
+    
+    LIR_BasicBlock* block = current_function_->cfg->create_block(label);
+    return block;
+}
+
+void Generator::set_current_block(LIR_BasicBlock* block) {
+    cfg_context_.current_block = block;
+}
+
+void Generator::add_block_edge(LIR_BasicBlock* from, LIR_BasicBlock* to) {
+    if (from && to) {
+        current_function_->cfg->add_edge(from->id, to->id);
+    }
+}
+
+LIR_BasicBlock* Generator::get_current_block() const {
+    return cfg_context_.current_block;
 }
 
 } // namespace LIR

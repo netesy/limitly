@@ -85,7 +85,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
 
         if (useJit) {
             try {
-                // Generate LIR from AST
+                // Generate LIR from AST (this includes complete CFG building)
                 LIR::Generator lir_generator;
                 auto lir_function = lir_generator.generate_program(*ast);
                 
@@ -103,6 +103,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 }
                 
                 std::cout << "Generated LIR function with " << lir_function->instructions.size() << " instructions\n";
+                std::cout << "CFG generation completed with " << lir_function->cfg->blocks.size() << " blocks\n";
                 
                 if (jitDebug) {
                     std::cout << "\n=== LIR Instructions ===\n";
@@ -110,27 +111,29 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                         const auto& inst = lir_function->instructions[i];
                         std::cout << "[" << i << "] " << inst.to_string() << "\n";
                     }
+                    std::cout << "\n=== CFG Blocks ===\n";
+                    for (size_t i = 0; i < lir_function->cfg->blocks.size(); ++i) {
+                        const auto& block = lir_function->cfg->blocks[i];
+                        std::cout << "Block " << block->id << ": " << block->label << " (";
+                        if (block->is_entry) std::cout << "entry ";
+                        if (block->is_exit) std::cout << "exit ";
+                        std::cout << ")\n";
+                    }
                     std::cout << "\n";
                 }
                 
-                // Initialize JIT backend
+                // Initialize JIT backend only after LIR and CFG is complete
                 JIT::JITBackend jit;
+                jit.set_debug_mode(true); // Enable debug to see what's happening
                 
-                // Process the LIR function with JIT
+                // Process the LIR function with JIT (now that CFG is fully built)
                 jit.process_function(*lir_function);
                 
                 if (jitDebug) {
                     std::cout << "=== JIT Debug Mode - Running Directly ===\n";
-                    auto result = jit.compile(JIT::CompileMode::ToMemory);
-                    if (result.success) {
-                        std::cout << "JIT compilation successful, executing...\n";
-                        int exit_code = jit.execute_compiled_function();
-                        std::cout << "JIT execution completed with exit code: " << exit_code << std::endl;
-                        return exit_code;
-                    } else {
-                        std::cerr << "JIT compilation failed: " << result.error_message << std::endl;
-                        return 1;
-                    }
+                    int exit_code = jit.execute_compiled_function();
+                    std::cout << "JIT execution completed with exit code: " << exit_code << std::endl;
+                    return exit_code;
                 } else {
                     std::string output_filename = filename;
                     size_t dot_pos = output_filename.rfind(".lm");

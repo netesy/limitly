@@ -1,0 +1,104 @@
+// Test LString runtime implementation
+print("=== LString Runtime Tests ===");
+
+// Test 1: Basic string constants
+print("Test 1: String Constants");
+var str1 = "Hello";
+var str2 = "World";
+var empty = "";
+
+print("str1 = {str1}");
+print("str2 = {str2}");  
+print("empty = '{empty}'");
+
+// Test 2: String concatenation with automatic coercion
+print("\nTest 2: String Concatenation with Coercion");
+
+// String + String
+var concat1 = str1 + " " + str2;
+print("String + String: {str1} + {str2} = {concat1}");
+
+// String + Integer (automatic coercion)
+var num = 42;
+var concat2 = "Answer: " + num;
+print("String + Int: \"Answer: \" + {num} = {concat2}");
+
+// String + Float (automatic coercion)
+var pi = 3.14159;
+var concat3 = "Pi: " + pi;
+print("String + Float: \"Pi: \" + {pi} = {concat3}");
+
+// String + Boolean (automatic coercion)
+var flag = true;
+var concat4 = "Flag: " + flag;
+print("String + Bool: \"Flag: \" + {flag} = {concat4}");
+
+// Integer + String (automatic coercion)
+var concat5 = 100 + " percent";
+print("Int + String: {100} + \" percent\" = {concat5}");
+
+// Float + String (automatic coercion)
+var concat6 = 2.718 + " is e";
+print("Float + String: {2.718} + \" is e\" = {concat6}");
+
+// Test 3: Complex concatenation chains
+print("\nTest 3: Complex Concatenation");
+var complex = "Value: " + 42 + " (type: " + "int" + ")";
+print("Complex: {complex}");
+
+// Test 4: String interpolation vs concatenation
+print("\nTest 4: Interpolation vs Concatenation");
+var name = "Alice";
+var age = 30;
+var interpolated = "Name: {name}, Age: {age}";
+var concatenated = "Name: " + name + ", Age: " + age;
+print("Interpolated: {interpolated}");
+print("Concatenated: {concatenated}");
+
+// Test 5: Empty string handling
+print("\nTest 5: Empty String Handling");
+var empty_start = "" + "start";
+var empty_end = "end" + "";
+var empty_middle = "a" + "" + "b";
+print("Empty + start: {empty_start}");
+print("end + Empty: {empty_end}");
+print("a + empty + b: {empty_middle}");
+
+// Test 6: Special characters in strings
+print("\nTest 6: Special Characters");
+var newline_str = "Line 1\nLine 2";
+var tab_str = "Col1\tCol2";
+var quote_str = "He said \"Hello\"";
+var backslash_str = "Path\\to\\file";
+
+print("Newline: {newline_str}");
+print("Tab: {tab_str}");
+print("Quote: {quote_str}");
+print("Backslash: {backslash_str}");
+
+// Test 7: Long strings
+print("\nTest 7: Long Strings");
+var long_str = "This is a very long string that should test the memory allocation and copying capabilities of the LString runtime implementation. It contains multiple words and should demonstrate that the string concatenation works correctly for larger strings.";
+print("Long string length test: {long_str}");
+
+// Test 8: Numeric edge cases
+print("\nTest 8: Numeric Edge Cases");
+var zero = 0;
+var negative = -42;
+var large_num = 999999999;
+var small_float = 0.001;
+var negative_float = -3.14;
+
+var result_zero = "Value: " + zero;
+var result_negative = "Temp: " + negative;
+var result_large = "Count: " + large_num;
+var result_small = "Prec: " + small_float;
+var result_neg_float = "Neg: " + negative_float;
+
+print("Zero: {result_zero}");
+print("Negative: {result_negative}");
+print("Large: {result_large}");
+print("Small float: {result_small}");
+print("Neg float: {result_neg_float}");
+
+print("\n=== All LString Runtime Tests Completed ===");

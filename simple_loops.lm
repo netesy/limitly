@@ -1,0 +1,31 @@
+// Test basic while loop
+var i = 0;
+while (i < 3) {
+    print i;
+    i = i + 1;
+}
+
+print "Done with while loop";
+
+// Test for loop
+for (var j = 0; j < 2; j = j + 1) {
+    print j;
+}
+
+print "Done with for loop";
+
+// Test break and continue
+var k = 0;
+while (k < 5) {
+    if (k == 3) {
+        break;
+    }
+    if (k == 1) {
+        k = k + 1;
+        continue;
+    }
+    print k;
+    k = k + 1;
+}
+
+print "Done with break/continue test";

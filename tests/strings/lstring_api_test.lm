@@ -1,0 +1,65 @@
+// Test LString API functions directly
+print("=== LString API Tests ===");
+
+// These tests verify the LString runtime API works correctly
+// Note: Some of these may need to be implemented as built-in functions
+
+print("Test 1: Basic string creation");
+var hello = "Hello";
+var world = "World";
+
+print("Test 2: String length operations");
+// Note: These would need length() function or similar
+// var len_hello = length(hello);
+// print("Length of '{hello}': {len_hello}");
+
+print("Test 3: String slicing operations");
+// Note: These would need slice() function or similar
+// var slice_hello = slice(hello, 1, 3);
+// print("Slice '{hello}' from 1 to 3: {slice_hello}");
+
+print("Test 4: String comparison");
+var same1 = "test";
+var same2 = "test";
+var diff = "different";
+
+print("same1 == same2: {same1 == same2}");
+print("same1 == diff: {same1 == diff}");
+print("same1 != diff: {same1 != diff}");
+
+print("Test 5: String coercion from different types");
+var int_val = 123;
+var float_val = 45.67;
+var bool_val = true;
+var bool_val_false = false;
+
+var from_int = "Number: " + int_val;
+var from_float = "Decimal: " + float_val;
+var from_bool = "Boolean: " + bool_val;
+var from_bool_false = "Boolean: " + bool_val_false;
+
+print("From int: {from_int}");
+print("From float: {from_float}");
+print("From bool (true): {from_bool}");
+print("From bool (false): {from_bool_false}");
+
+print("Test 6: Nested concatenation");
+var nested = "A" + ("B" + "C") + "D";
+print("Nested: {nested}");
+
+print("Test 7: Multiple concatenations in sequence");
+var multi = "X";
+multi = multi + "Y";
+multi = multi + "Z";
+print("Sequential: {multi}");
+
+print("Test 8: String with various numeric formats");
+var hex_test = "0x" + 255;  // Should show 255 as decimal
+var sci_test = "Science: " + 1.23e-4;
+var big_test = "Big: " + 1000000;
+
+print("Hex test: {hex_test}");
+print("Scientific: {sci_test}");
+print("Big number: {big_test}");
+
+print("=== LString API Tests Completed ===");
