@@ -2,6 +2,7 @@
 #define JIT_H
 
 #include "../../lir/lir.hh"
+#include "../memory.hh"
 #include <libgccjit++.h>
 #include <memory>
 #include <string>
@@ -139,6 +140,14 @@ private:
     // Memory operations
     void compile_memory_op(const LIR::LIR_Inst& inst);
     
+    // Memory management methods
+    void enter_memory_region();
+    void exit_memory_region();
+    void* allocate_in_region(size_t size, size_t alignment = alignof(std::max_align_t));
+    template<typename T, typename... Args>
+    T* create_object(Args&&... args);
+    void cleanup_memory();
+    
     // Error handling
     void report_error(const std::string& message);
     bool has_errors() const;
@@ -147,6 +156,10 @@ private:
     // Configuration
     bool m_optimizations_enabled;
     bool m_debug_mode;
+    
+    // Memory management
+    MemoryManager<> memory_manager_;
+    MemoryManager<>::Region* current_memory_region_ = nullptr;
     
     // State
     std::vector<std::string> errors;

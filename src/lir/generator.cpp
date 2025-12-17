@@ -6,7 +6,10 @@
 namespace LIR {
 
 Generator::Generator()
-    : next_register_(0) {}
+    : next_register_(0), current_memory_region_(nullptr) {
+    // Initialize memory manager with audit mode disabled for performance
+    memory_manager_.setAuditMode(false);
+}
 
 std::unique_ptr<LIR_Function> Generator::generate_program(AST::Program& program) {
     // Create a main function
@@ -15,6 +18,7 @@ std::unique_ptr<LIR_Function> Generator::generate_program(AST::Program& program)
     scope_stack_.clear();
     register_types_.clear();
     enter_scope();
+    enter_memory_region();
     
     // Process all statements
     for (const auto& stmt : program.statements) {
@@ -28,6 +32,7 @@ std::unique_ptr<LIR_Function> Generator::generate_program(AST::Program& program)
     }
 
     exit_scope();
+    exit_memory_region();
 
     auto result = std::move(current_function_);
     current_function_ = nullptr;
@@ -43,6 +48,7 @@ std::unique_ptr<LIR_Function> Generator::generate_function(AST::FunctionDeclarat
     scope_stack_.clear();
     register_types_.clear();
     enter_scope();
+    enter_memory_region();
     
     // Register parameters
     for (size_t i = 0; i < fn.params.size(); ++i) {
@@ -60,6 +66,9 @@ std::unique_ptr<LIR_Function> Generator::generate_function(AST::FunctionDeclarat
         current_function_->instructions.back().op != LIR_Op::Return) {
         emit_instruction(LIR_Inst(LIR_Op::Return));
     }
+    
+    exit_scope();
+    exit_memory_region();
     
     auto result = std::move(current_function_);
     current_function_ = nullptr;
@@ -804,6 +813,40 @@ void Generator::emit_iter_stmt(AST::IterStatement& stmt) {
 
 void Generator::emit_unsafe_stmt(AST::UnsafeStatement& stmt) {
     report_error("Unsafe statements not yet implemented");
+}
+
+// Memory management methods
+void Generator::enter_memory_region() {
+    if (!current_memory_region_) {
+        current_memory_region_ = new MemoryManager<>::Region(memory_manager_);
+    }
+}
+
+void Generator::exit_memory_region() {
+    if (current_memory_region_) {
+        delete current_memory_region_;
+        current_memory_region_ = nullptr;
+    }
+}
+
+void* Generator::allocate_in_region(size_t size, size_t alignment) {
+    if (!current_memory_region_) {
+        enter_memory_region();
+    }
+    return memory_manager_.allocate(size, alignment);
+}
+
+template<typename T, typename... Args>
+T* Generator::create_object(Args&&... args) {
+    if (!current_memory_region_) {
+        enter_memory_region();
+    }
+    return current_memory_region_->create<T>(std::forward<Args>(args)...);
+}
+
+void Generator::cleanup_memory() {
+    exit_memory_region();
+    memory_manager_.analyzeMemoryUsage();
 }
 
 } // namespace LIR

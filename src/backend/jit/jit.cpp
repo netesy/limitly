@@ -16,6 +16,10 @@ extern "C" {
         void* region;
     } jit_string_builder;
     
+    // Memory manager wrapper functions
+    void* limitly_mem_allocate(size_t size);
+    void limitly_mem_deallocate(void* ptr);
+    
     jit_string_builder* jit_sb_create();
     void jit_sb_destroy(jit_string_builder* sb);
     char* jit_sb_finish(jit_string_builder* sb);
@@ -25,18 +29,28 @@ extern "C" {
     void jit_sb_append_bool(jit_string_builder* sb, int v);
 }
 
+// C wrapper implementations
+void* limitly_mem_allocate(size_t size) {
+    return MemoryManager<>::Unsafe::allocate(size);
+}
+
+void limitly_mem_deallocate(void* ptr) {
+    MemoryManager<>::Unsafe::deallocate(ptr);
+}
+
 // C function implementations
 jit_string_builder* jit_sb_create() {
-    jit_string_builder* sb = (jit_string_builder*)malloc(sizeof(jit_string_builder));
+    // Use memory manager for allocation
+    jit_string_builder* sb = (jit_string_builder*)MemoryManager<>::Unsafe::allocate(sizeof(jit_string_builder));
     if (!sb) return NULL;
     
     sb->capacity = 128;
     sb->length = 0;
-    sb->buffer = (char*)malloc(sb->capacity);
+    sb->buffer = (char*)MemoryManager<>::Unsafe::allocate(sb->capacity);
     sb->region = NULL;
     
     if (!sb->buffer) {
-        free(sb);
+        MemoryManager<>::Unsafe::deallocate(sb);
         return NULL;
     }
     
@@ -46,8 +60,8 @@ jit_string_builder* jit_sb_create() {
 
 void jit_sb_destroy(jit_string_builder* sb) {
     if (sb) {
-        if (sb->buffer) free(sb->buffer);
-        free(sb);
+        if (sb->buffer) MemoryManager<>::Unsafe::deallocate(sb->buffer);
+        MemoryManager<>::Unsafe::deallocate(sb);
     }
 }
 
@@ -57,7 +71,7 @@ char* jit_sb_finish(jit_string_builder* sb) {
     sb->buffer = NULL;
     sb->length = 0;
     sb->capacity = 0;
-    free(sb);
+    MemoryManager<>::Unsafe::deallocate(sb);
     return result;
 }
 
@@ -69,7 +83,7 @@ void jit_sb_append_cstr(jit_string_builder* sb, const char* s) {
         size_t new_cap = sb->capacity * 2;
         while (sb->length + len + 1 > new_cap) new_cap *= 2;
         
-        char* new_buf = (char*)realloc(sb->buffer, new_cap);
+        char* new_buf = (char*)MemoryManager<>::Unsafe::resize(sb->buffer, new_cap);
         if (!new_buf) return;
         
         sb->buffer = new_buf;
@@ -106,7 +120,11 @@ JITBackend::JITBackend()
     : m_context(gccjit::context::acquire()), 
       m_optimizations_enabled(false),
       m_debug_mode(false),
-      m_compiled_function(nullptr) {
+      m_compiled_function(nullptr),
+      current_memory_region_(nullptr) {
+    
+    // Initialize memory manager with audit mode disabled for performance
+    memory_manager_.setAuditMode(false);
     
     // Initialize basic types
     m_void_type = m_context.get_type(GCC_JIT_TYPE_VOID);
@@ -210,6 +228,8 @@ JITBackend::JITBackend()
 }
 
 JITBackend::~JITBackend() {
+    // Cleanup memory regions
+    cleanup_memory();
     // Context will be automatically cleaned up by libgccjit++
 }
 
@@ -224,6 +244,9 @@ void JITBackend::compile_function(const LIR::LIR_Function& function) {
     // Clear previous state
     jit_registers.clear();
     register_types.clear();
+    
+    // Enter memory region for this compilation
+    enter_memory_region();
 
     for (const auto& entry : function.register_types) {
         register_types[entry.first] = to_jit_type(entry.second);
@@ -258,6 +281,9 @@ void JITBackend::compile_function(const LIR::LIR_Function& function) {
         m_current_block.add_eval(m_context.new_rvalue(m_int_type, 0));
         m_current_block.end_with_return(m_context.new_rvalue(m_int_type, 0));
     }
+    
+    // Exit memory region after compilation
+    exit_memory_region();
     
     // Update stats
     m_stats.functions_compiled++;
@@ -702,9 +728,15 @@ gccjit::rvalue JITBackend::compile_string_concat(gccjit::rvalue a, gccjit::rvalu
     total_len = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_size_t_type, total_len, 
                                        m_context.new_rvalue(m_size_t_type, 1)); // +1 for null terminator
     
-    // Allocate memory for result
-    std::vector<gccjit::rvalue> malloc_args = {total_len};
-    gccjit::rvalue result_ptr = m_context.new_call(m_malloc_func, malloc_args);
+    // Use memory manager allocation instead of malloc
+    // Create a custom allocation function that uses our memory manager
+    std::vector<gccjit::param> mem_alloc_params;
+    mem_alloc_params.push_back(m_context.new_param(m_size_t_type, "size"));
+    gccjit::function mem_alloc_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "limitly_mem_allocate", mem_alloc_params, 0);
+    
+    // Allocate memory for result using our memory manager
+    std::vector<gccjit::rvalue> alloc_args = {total_len};
+    gccjit::rvalue result_ptr = m_context.new_call(mem_alloc_func, alloc_args);
     
     // Use sprintf to concatenate
     gcc_jit_rvalue* c_format = gcc_jit_context_new_string_literal(m_context.get_inner_context(), "%s%s");
@@ -723,31 +755,43 @@ gccjit::rvalue JITBackend::compile_to_string(gccjit::rvalue value) {
     gcc_jit_type* c_double_type = m_double_type.get_inner_type();
     gcc_jit_type* c_bool_type = m_bool_type.get_inner_type();
     gcc_jit_type* c_const_char_ptr_type = m_const_char_ptr_type.get_inner_type();
-    
+
     if (c_type == c_int_type) {
         // Convert int to string using snprintf
         // Allocate buffer for int string (max 12 digits + sign + null)
         gccjit::rvalue buffer_size = m_context.new_rvalue(m_size_t_type, 13);
-        gccjit::rvalue buffer = m_context.new_call(m_malloc_func, {buffer_size});
-        
+
+        // Use memory manager allocation function
+        std::vector<gccjit::param> mem_alloc_params;
+        mem_alloc_params.push_back(m_context.new_param(m_size_t_type, "size"));
+        gccjit::function mem_alloc_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "limitly_mem_allocate", mem_alloc_params, 0);
+
+        gccjit::rvalue buffer = m_context.new_call(mem_alloc_func, {buffer_size});
+
         gcc_jit_rvalue* c_format = gcc_jit_context_new_string_literal(m_context.get_inner_context(), "%d");
         gccjit::rvalue format_str = gccjit::rvalue(c_format);
         std::vector<gccjit::rvalue> snprintf_args = {buffer, buffer_size, format_str, value};
         m_context.new_call(m_snprintf_func, snprintf_args);
-        
+
         // Cast to const char* before returning
         return m_context.new_cast(buffer, m_const_char_ptr_type);
     } else if (c_type == c_double_type) {
         // Convert double to string using snprintf
         // Allocate buffer for double string (max 32 characters)
         gccjit::rvalue buffer_size = m_context.new_rvalue(m_size_t_type, 33);
-        gccjit::rvalue buffer = m_context.new_call(m_malloc_func, {buffer_size});
-        
+
+        // Use memory manager allocation function
+        std::vector<gccjit::param> mem_alloc_params;
+        mem_alloc_params.push_back(m_context.new_param(m_size_t_type, "size"));
+        gccjit::function mem_alloc_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "limitly_mem_allocate", mem_alloc_params, 0);
+
+        gccjit::rvalue buffer = m_context.new_call(mem_alloc_func, {buffer_size});
+
         gcc_jit_rvalue* c_format = gcc_jit_context_new_string_literal(m_context.get_inner_context(), "%f");
         gccjit::rvalue format_str = gccjit::rvalue(c_format);
         std::vector<gccjit::rvalue> snprintf_args = {buffer, buffer_size, format_str, value};
         m_context.new_call(m_snprintf_func, snprintf_args);
-        
+
         // Cast to const char* before returning
         return m_context.new_cast(buffer, m_const_char_ptr_type);
     } else if (c_type == c_bool_type) {
@@ -755,37 +799,36 @@ gccjit::rvalue JITBackend::compile_to_string(gccjit::rvalue value) {
         gccjit::block true_block = m_current_func.new_block("to_string_true");
         gccjit::block false_block = m_current_func.new_block("to_string_false");
         gccjit::block after_block = m_current_func.new_block("to_string_after");
-        
+
         // Create conditional jump
         m_current_block.end_with_conditional(value, true_block, false_block);
-        
+
         // True block: return "true"
         m_current_block = true_block;
         {
-            gcc_jit_rvalue* c_true = gcc_jit_context_new_string_literal(m_context.get_inner_context(), "true");
-            gccjit::rvalue true_str = gccjit::rvalue(c_true);
-            m_current_block.end_with_jump(after_block);
+            gcc_jit_rvalue* c_true_str = gcc_jit_context_new_string_literal(m_context.get_inner_context(), "true");
+            gccjit::rvalue true_str = gccjit::rvalue(c_true_str);
+            m_current_block.end_with_return(true_str);
         }
-        
+
         // False block: return "false"
         m_current_block = false_block;
         {
-            gcc_jit_rvalue* c_false = gcc_jit_context_new_string_literal(m_context.get_inner_context(), "false");
-            gccjit::rvalue false_str = gccjit::rvalue(c_false);
-            m_current_block.end_with_jump(after_block);
+            gcc_jit_rvalue* c_false_str = gcc_jit_context_new_string_literal(m_context.get_inner_context(), "false");
+            gccjit::rvalue false_str = gccjit::rvalue(c_false_str);
+            m_current_block.end_with_return(false_str);
         }
         
-        // Continue with after block - need phi node or similar
-        // For now, just return true_str as placeholder
-        gcc_jit_rvalue* c_true = gcc_jit_context_new_string_literal(m_context.get_inner_context(), "true");
-        return gccjit::rvalue(c_true);
-    } else if (c_type == c_const_char_ptr_type) {
-        // Already a string, just return it
-        return value;
+        // Set current block to after block for subsequent code
+        m_current_block = after_block;
+        
+        // Return a default value (this won't be reached due to the returns above)
+        gcc_jit_rvalue* c_default_str = gcc_jit_context_new_string_literal(m_context.get_inner_context(), "");
+        return gccjit::rvalue(c_default_str);
     } else {
-        // Default: return "(unknown)" string
-        gcc_jit_rvalue* c_unknown = gcc_jit_context_new_string_literal(m_context.get_inner_context(), "(unknown)");
-        return gccjit::rvalue(c_unknown);
+        // Default case: return empty string
+        gcc_jit_rvalue* c_empty_str = gcc_jit_context_new_string_literal(m_context.get_inner_context(), "");
+        return gccjit::rvalue(c_empty_str);
     }
 }
 
@@ -1010,6 +1053,40 @@ bool JITBackend::has_errors() const {
 
 std::vector<std::string> JITBackend::get_errors() const {
     return errors;
+}
+
+// Memory management methods
+void JITBackend::enter_memory_region() {
+    if (!current_memory_region_) {
+        current_memory_region_ = new MemoryManager<>::Region(memory_manager_);
+    }
+}
+
+void JITBackend::exit_memory_region() {
+    if (current_memory_region_) {
+        delete current_memory_region_;
+        current_memory_region_ = nullptr;
+    }
+}
+
+void* JITBackend::allocate_in_region(size_t size, size_t alignment) {
+    if (!current_memory_region_) {
+        enter_memory_region();
+    }
+    return memory_manager_.allocate(size, alignment);
+}
+
+template<typename T, typename... Args>
+T* JITBackend::create_object(Args&&... args) {
+    if (!current_memory_region_) {
+        enter_memory_region();
+    }
+    return current_memory_region_->create<T>(std::forward<Args>(args)...);
+}
+
+void JITBackend::cleanup_memory() {
+    exit_memory_region();
+    memory_manager_.analyzeMemoryUsage();
 }
 
 } // namespace JIT
