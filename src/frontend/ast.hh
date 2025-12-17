@@ -448,17 +448,11 @@ namespace AST {
 
     // For statement
     struct ForStatement : public Statement {
-        // For traditional loop: for (var i = 0; i < 5; i++)
+        // Traditional C-style for loop: for (var i = 0; i < 5; i++)
         std::shared_ptr<Statement> initializer;
         std::shared_ptr<Expression> condition;
         std::shared_ptr<Expression> increment;
-        
-        // For range/collection loop: for (var i in range(10)) or for (key, value in dict)
-        std::vector<std::string> loopVars;
-        std::shared_ptr<Expression> iterable;
-        
         std::shared_ptr<Statement> body;
-        bool isIterableLoop = false;
     };
 
     // While statement
@@ -481,13 +475,6 @@ namespace AST {
     // Print statement
     struct PrintStatement : public Statement {
         std::vector<std::shared_ptr<Expression>> arguments;
-    };
-
-    // Exception handling
-    struct HandleClause {
-        std::string errorType;
-        std::string errorVar;
-        std::shared_ptr<BlockStatement> body;
     };
 
     // Concurrency constructs

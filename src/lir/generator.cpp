@@ -943,13 +943,8 @@ void Generator::emit_while_stmt(AST::WhileStatement& stmt) {
 }
 
 void Generator::emit_for_stmt(AST::ForStatement& stmt) {
-    if (stmt.isIterableLoop) {
-        // Handle iterable loops: for (var in collection)
-        emit_iterable_for_loop(stmt);
-    } else {
-        // Handle traditional C-style for loops: for (init; condition; increment)
-        emit_traditional_for_loop(stmt);
-    }
+    // Handle traditional C-style for loops: for (init; condition; increment)
+    emit_traditional_for_loop(stmt);
 }
 
 void Generator::emit_traditional_for_loop(AST::ForStatement& stmt) {
@@ -1032,84 +1027,6 @@ void Generator::emit_traditional_for_loop(AST::ForStatement& stmt) {
     set_current_block(exit_block);
     
     // Exit loop context
-    exit_loop();
-}
-
-void Generator::emit_iterable_for_loop(AST::ForStatement& stmt) {
-    // Generate labels for the loop
-    uint32_t loop_check_label = generate_label();
-    uint32_t loop_body_label = generate_label();
-    uint32_t loop_end_label = generate_label();
-    
-    // Enter loop context
-    enter_loop();
-    set_loop_labels(loop_check_label, loop_end_label, loop_check_label);
-    
-    // Create a new scope for the loop variables
-    enter_scope();
-    
-    // Initialize index to 0
-    auto int_type = std::make_shared<Type>(TypeTag::Int);
-    ValuePtr zero_val = std::make_shared<Value>(int_type, (int64_t)0);
-    Reg index_reg = allocate_register();
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, index_reg, zero_val));
-    set_register_type(index_reg, int_type);
-    
-    // Load collection
-    Reg collection_reg = emit_expr(*stmt.iterable);
-    
-    // Jump to loop condition check first
-    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, loop_check_label));
-    
-    // Emit loop body - get item at index (using ListIndex)
-    Reg item_reg = allocate_register();
-    emit_instruction(LIR_Inst(LIR_Op::ListIndex, item_reg, collection_reg, index_reg));
-    
-    // Store the item in the loop variable(s)
-    for (const auto& var_name : stmt.loopVars) {
-        bind_variable(var_name, item_reg);
-    }
-    
-    // Emit loop body statements
-    if (stmt.body) {
-        emit_stmt(*stmt.body);
-    }
-    
-    // Increment index
-    ValuePtr one_val = std::make_shared<Value>(int_type, (int64_t)1);
-    Reg one_reg = allocate_register();
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, one_reg, one_val));
-    set_register_type(one_reg, int_type);
-    
-    Reg new_index_reg = allocate_register();
-    emit_instruction(LIR_Inst(LIR_Op::Add, new_index_reg, index_reg, one_reg));
-    set_register_type(new_index_reg, int_type);
-    
-    // Update index register
-    emit_instruction(LIR_Inst(LIR_Op::Mov, index_reg, new_index_reg, 0));
-    
-    // Jump back to loop condition check
-    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, loop_check_label));
-    
-    // Emit loop condition check
-    
-    // For now, use a simple condition - assume we iterate 3 times (placeholder)
-    // TODO: Implement proper Length operation when available
-    Reg condition_reg = allocate_register();
-    ValuePtr three_val = std::make_shared<Value>(int_type, (int64_t)3); // placeholder
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, condition_reg, three_val));
-    set_register_type(condition_reg, int_type);
-    
-    Reg cmp_reg = allocate_register();
-    emit_instruction(LIR_Inst(LIR_Op::CmpLT, cmp_reg, index_reg, condition_reg));
-    set_register_type(cmp_reg, std::make_shared<Type>(TypeTag::Bool));
-    
-    // Jump to loop body if condition is true, otherwise fall through to end
-    emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp_reg, 0, loop_end_label));
-    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, loop_body_label));
-    
-    // Exit scope and loop context
-    exit_scope();
     exit_loop();
 }
 

@@ -81,7 +81,6 @@ private:
     
     // Loop helper methods
     void emit_traditional_for_loop(AST::ForStatement& stmt);
-    void emit_iterable_for_loop(AST::ForStatement& stmt);
     Reg emit_ternary_expr(AST::TernaryExpr& expr);
     Reg emit_index_expr(AST::IndexExpr& expr);
     Reg emit_member_expr(AST::MemberExpr& expr);

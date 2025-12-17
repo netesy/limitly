@@ -1468,7 +1468,7 @@ std::shared_ptr<AST::Statement> Parser::forStatement() {
     Token forToken = previous();
     stmt->line = forToken.line;
 
-    // Get the current CST parent (should be the FOR_STATEMENT node we just created)
+    // --- CST Setup ---
     CST::Node* forCSTNode = nullptr;
     if (cstMode && !cstContextStack.empty()) {
         forCSTNode = cstContextStack.top();
@@ -1479,236 +1479,81 @@ std::shared_ptr<AST::Statement> Parser::forStatement() {
     }
 
     Token leftParen = consumeWithTrivia(TokenType::LEFT_PAREN, "Expected '(' after 'for'.");
-    if (cstMode && forCSTNode) {
-        forCSTNode->addToken(leftParen);
+    if (cstMode && forCSTNode) forCSTNode->addToken(leftParen);
+
+    // --- 1. Initializer Clause ---
+    if (match({TokenType::SEMICOLON})) {
+        // Case: for (; ...)
+        if (cstMode && forCSTNode) forCSTNode->addToken(previous());
+        stmt->initializer = nullptr;
+    } else if (match({TokenType::VAR})) {
+        // Case: for (var i = 0; ...)
+        Token varToken = previous();
+        if (cstMode && forCSTNode) forCSTNode->addToken(varToken);
+
+        Token name = consumeWithTrivia(TokenType::IDENTIFIER, "Expected variable name.");
+        if (cstMode && forCSTNode) forCSTNode->addToken(name);
+
+        auto varDecl = std::make_shared<AST::VarDeclaration>();
+        varDecl->line = name.line;
+        varDecl->name = name.lexeme;
+
+        if (match({TokenType::COLON})) {
+            if (cstMode && forCSTNode) forCSTNode->addToken(previous());
+            varDecl->type = parseTypeAnnotation();
+        }
+
+        if (match({TokenType::EQUAL})) {
+            if (cstMode && forCSTNode) forCSTNode->addToken(previous());
+            
+            size_t start = current;
+            varDecl->initializer = expression();
+            // Inline CST capture
+            if (cstMode && forCSTNode) {
+                for (size_t i = start; i < current && i < scanner.getTokens().size(); i++) {
+                    forCSTNode->addToken(scanner.getTokens()[i]);
+                }
+            }
+        }
+        stmt->initializer = varDecl;
+        Token semi1 = consumeWithTrivia(TokenType::SEMICOLON, "Expected ';' after var declaration.");
+        if (cstMode && forCSTNode) forCSTNode->addToken(semi1);
+    } else {
+        // Case: for (i = 0; ...)
+        stmt->initializer = expressionStatement();
+        // expressionStatement already consumes the semicolon
     }
 
-    // Check for the type of for loop
-    if (match({TokenType::VAR})) {
-        // Could be either traditional or iterable loop
-        Token varToken = previous();
+    // --- 2. Condition Clause ---
+    if (!check(TokenType::SEMICOLON)) {
+        size_t start = current;
+        stmt->condition = expression();
         if (cstMode && forCSTNode) {
-            forCSTNode->addToken(varToken);
+            for (size_t i = start; i < current && i < scanner.getTokens().size(); i++) {
+                forCSTNode->addToken(scanner.getTokens()[i]);
+            }
         }
-        
-        Token name = consumeWithTrivia(TokenType::IDENTIFIER, "Expected variable name.");
+    }
+    Token semi2 = consumeWithTrivia(TokenType::SEMICOLON, "Expected ';' after loop condition.");
+    if (cstMode && forCSTNode) forCSTNode->addToken(semi2);
+
+    // --- 3. Increment Clause ---
+    if (!check(TokenType::RIGHT_PAREN)) {
+        size_t start = current;
+        stmt->increment = expression();
         if (cstMode && forCSTNode) {
-            forCSTNode->addToken(name);
-        }
-
-        if (match({TokenType::IN})) {
-            // Iterable loop: for (var i in range(10))
-            Token inToken = previous();
-            if (cstMode && forCSTNode) {
-                forCSTNode->addToken(inToken);
+            for (size_t i = start; i < current && i < scanner.getTokens().size(); i++) {
+                forCSTNode->addToken(scanner.getTokens()[i]);
             }
-            
-            stmt->isIterableLoop = true;
-            stmt->loopVars.push_back(name.lexeme);
-            
-            // Capture the current position before parsing iterable expression
-            size_t iterableStart = current;
-            stmt->iterable = expression();
-            size_t iterableEnd = current;
-            
-            // Capture iterable tokens for CST
-            if (cstMode && forCSTNode) {
-                for (size_t i = iterableStart; i < iterableEnd && i < scanner.getTokens().size(); i++) {
-                    forCSTNode->addToken(scanner.getTokens()[i]);
-                }
-            }
-        } else {
-            // Traditional loop: for (var i = 0; i < 5; i++)
-            auto initializer = std::make_shared<AST::VarDeclaration>();
-            initializer->line = name.line;
-            initializer->name = name.lexeme;
-
-            // Parse optional type annotation
-            if (match({TokenType::COLON})) {
-                Token colon = previous();
-                if (cstMode && forCSTNode) {
-                    forCSTNode->addToken(colon);
-                }
-                initializer->type = parseTypeAnnotation();
-            }
-
-            // Parse initializer
-            if (match({TokenType::EQUAL})) {
-                Token equal = previous();
-                if (cstMode && forCSTNode) {
-                    forCSTNode->addToken(equal);
-                }
-                
-                // Capture the current position before parsing initializer expression
-                size_t initStart = current;
-                initializer->initializer = expression();
-                size_t initEnd = current;
-                
-                // Capture initializer tokens for CST
-                if (cstMode && forCSTNode) {
-                    for (size_t i = initStart; i < initEnd && i < scanner.getTokens().size(); i++) {
-                        forCSTNode->addToken(scanner.getTokens()[i]);
-                    }
-                }
-            }
-
-            stmt->initializer = initializer;
-
-            Token semicolon1 = consumeWithTrivia(TokenType::SEMICOLON, "Expected ';' after loop initializer.");
-            if (cstMode && forCSTNode) {
-                forCSTNode->addToken(semicolon1);
-            }
-
-            // Parse condition
-            if (!check(TokenType::SEMICOLON)) {
-                // Capture the current position before parsing condition expression
-                size_t conditionStart = current;
-                stmt->condition = expression();
-                size_t conditionEnd = current;
-                
-                // Capture condition tokens for CST
-                if (cstMode && forCSTNode) {
-                    for (size_t i = conditionStart; i < conditionEnd && i < scanner.getTokens().size(); i++) {
-                        forCSTNode->addToken(scanner.getTokens()[i]);
-                    }
-                }
-            }
-
-            Token semicolon2 = consumeWithTrivia(TokenType::SEMICOLON, "Expected ';' after loop condition.");
-            if (cstMode && forCSTNode) {
-                forCSTNode->addToken(semicolon2);
-            }
-
-            // Parse increment
-            if (!check(TokenType::RIGHT_PAREN)) {
-                // Capture the current position before parsing increment expression
-                size_t incrementStart = current;
-                stmt->increment = expression();
-                size_t incrementEnd = current;
-                
-                // Capture increment tokens for CST
-                if (cstMode && forCSTNode) {
-                    for (size_t i = incrementStart; i < incrementEnd && i < scanner.getTokens().size(); i++) {
-                        forCSTNode->addToken(scanner.getTokens()[i]);
-                    }
-                }
-            }
-        }
-    } else if (match({TokenType::IDENTIFIER})) {
-        // Check if it's an iterable loop with multiple variables
-        Token firstVarToken = previous();
-        std::string firstVar = firstVarToken.lexeme;
-        if (cstMode && forCSTNode) {
-            forCSTNode->addToken(firstVarToken);
-        }
-
-        if (match({TokenType::COMMA})) {
-            // Multiple variables: for (key, value in dict)
-            Token comma = previous();
-            if (cstMode && forCSTNode) {
-                forCSTNode->addToken(comma);
-            }
-            
-            stmt->isIterableLoop = true;
-            stmt->loopVars.push_back(firstVar);
-
-            Token secondVar = consumeWithTrivia(TokenType::IDENTIFIER, "Expected second variable name after comma.");
-            stmt->loopVars.push_back(secondVar.lexeme);
-            if (cstMode && forCSTNode) {
-                forCSTNode->addToken(secondVar);
-            }
-
-            Token inToken = consumeWithTrivia(TokenType::IN, "Expected 'in' after loop variables.");
-            if (cstMode && forCSTNode) {
-                forCSTNode->addToken(inToken);
-            }
-            // Capture the current position before parsing iterable expression
-            size_t iterableStart = current;
-            stmt->iterable = expression();
-            size_t iterableEnd = current;
-            
-            // Capture iterable tokens for CST
-            if (cstMode && forCSTNode) {
-                for (size_t i = iterableStart; i < iterableEnd && i < scanner.getTokens().size(); i++) {
-                    forCSTNode->addToken(scanner.getTokens()[i]);
-                }
-            }
-        } else if (match({TokenType::IN})) {
-            // Single variable: for (key in list)
-            Token inToken = previous();
-            if (cstMode && forCSTNode) {
-                forCSTNode->addToken(inToken);
-            }
-            
-            stmt->isIterableLoop = true;
-            stmt->loopVars.push_back(firstVar);
-            
-            // Capture the current position before parsing iterable expression
-            size_t iterableStart = current;
-            stmt->iterable = expression();
-            size_t iterableEnd = current;
-            
-            // Capture iterable tokens for CST
-            if (cstMode && forCSTNode) {
-                for (size_t i = iterableStart; i < iterableEnd && i < scanner.getTokens().size(); i++) {
-                    forCSTNode->addToken(scanner.getTokens()[i]);
-                }
-            }
-        } else {
-            // Traditional loop with an expression as initializer
-            current--; // Rewind to re-parse the identifier
-            stmt->initializer = expressionStatement();
-
-            // Parse condition
-            if (!check(TokenType::SEMICOLON)) {
-                stmt->condition = expression();
-            }
-
-            consume(TokenType::SEMICOLON, "Expected ';' after loop condition.");
-
-            // Parse increment
-            if (!check(TokenType::RIGHT_PAREN)) {
-                stmt->increment = expression();
-            }
-        }
-    } else if (!match({TokenType::SEMICOLON})) {
-        // Traditional loop with an expression as initializer
-        stmt->initializer = expressionStatement();
-
-        // Parse condition
-        if (!check(TokenType::SEMICOLON)) {
-            stmt->condition = expression();
-        }
-
-        consume(TokenType::SEMICOLON, "Expected ';' after loop condition.");
-
-        // Parse increment
-        if (!check(TokenType::RIGHT_PAREN)) {
-            stmt->increment = expression();
-        }
-    } else {
-        // Traditional loop with no initializer
-        // Parse condition
-        if (!check(TokenType::SEMICOLON)) {
-            stmt->condition = expression();
-        }
-
-        consume(TokenType::SEMICOLON, "Expected ';' after loop condition.");
-
-        // Parse increment
-        if (!check(TokenType::RIGHT_PAREN)) {
-            stmt->increment = expression();
         }
     }
 
     Token rightParen = consumeWithTrivia(TokenType::RIGHT_PAREN, "Expected ')' after for clauses.");
-    if (cstMode && forCSTNode) {
-        forCSTNode->addToken(rightParen);
-    }
-    
+    if (cstMode && forCSTNode) forCSTNode->addToken(rightParen);
+
+    // --- Body ---
     stmt->body = parseStatementWithContext("for", forToken);
 
-    // Pop CST context when exiting for statement
     if (cstMode && !cstContextStack.empty()) {
         popCSTContext();
     }
