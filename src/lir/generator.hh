@@ -3,6 +3,7 @@
 
 #include "lir.hh"
 #include "../frontend/ast.hh"
+#include "../backend/memory.hh"
 #include <unordered_map>
 #include <string>
 #include <memory>
@@ -35,6 +36,14 @@ private:
     void set_register_type(Reg reg, TypePtr type);
     TypePtr get_register_type(Reg reg) const;
     void emit_instruction(const LIR_Inst& inst);
+    
+    // Memory management methods
+    void enter_memory_region();
+    void exit_memory_region();
+    void* allocate_in_region(size_t size, size_t alignment = alignof(std::max_align_t));
+    template<typename T, typename... Args>
+    T* create_object(Args&&... args);
+    void cleanup_memory();
     
     // AST node visitors
     void emit_stmt(AST::Statement& stmt);
@@ -87,6 +96,10 @@ private:
     uint32_t next_register_ = 0;
     std::unordered_map<Reg, TypePtr> register_types_;
     std::vector<std::string> errors_;
+    
+    // Memory management
+    MemoryManager<> memory_manager_;
+    MemoryManager<>::Region* current_memory_region_ = nullptr;
 };
 
 } // namespace LIR
