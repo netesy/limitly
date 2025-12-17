@@ -60,15 +60,15 @@ print(1 != 2);
 
 // // --- Variables ---
 // print("--- Variables ---");
-// var a = 10;
-// var b = 20;
-// print(a + b);
+var a = 10;
+var b = 20;
+print(a + b);
 
-// var c = 3.14;
-// print(c);
+var c = 3.14;
+print(c);
 
-// var d = true;
-// print(d);
+var d = true;
+print(d);
 
-// var e = "hello";
-// print(e);
+var e = "hello";
+print(e);
