@@ -1,5 +1,5 @@
 #include "builtin_functions.hh"
-#include "../backend/vm.hh"
+#include "../backend/vm/vm.hh"
 #include "../backend/value.hh"
 #include "../backend/types.hh"
 #include "../backend/functions.hh"

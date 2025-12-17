@@ -8,7 +8,7 @@
 #include "frontend/cst_utils.hh"
 #include "frontend/ast_builder.hh"
 #include "common/backend.hh"
-#include "backend/vm.hh"
+#include "backend/vm/vm.hh"
 #include "common/opcodes.hh"
 #include <iostream>
 #include <fstream>

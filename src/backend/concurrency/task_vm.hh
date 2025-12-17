@@ -1,7 +1,7 @@
 #ifndef TASK_VM_H
 #define TASK_VM_H
 
-#include "../vm.hh"
+#include "../vm/vm.hh"
 #include "concurrency_state.hh"
 #include "concurrency_runtime.hh"
 #include <memory>

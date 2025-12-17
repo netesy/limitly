@@ -1,0 +1,2 @@
+// Test direct constant in interpolation
+print("Constant: {5}");

@@ -1,15 +1,15 @@
 #include "vm.hh"
-#include "value.hh"  // For Value and ErrorValue definitions
-#include "../frontend/scanner.hh"
-#include "../common/backend.hh"
-#include "types.hh"
-#include "../common/opcodes.hh"
-#include "../common/debugger.hh"
-#include "../frontend/parser.hh"
-#include "../common/builtin_functions.hh"  // For builtin functions
-#include "concurrency/task_vm.hh"
-#include "bytecode_printer.hh"  // For opcodeToString function
-#include "classes.hh"  // For VMMethodImplementation
+#include "../value.hh" // For Value and ErrorValue definitions
+#include "../../frontend/scanner.hh"
+#include "../../common/backend.hh"
+#include "../types.hh"
+#include "../../common/opcodes.hh"
+#include "../../common/debugger.hh"
+#include "../../frontend/parser.hh"
+#include "../../common/builtin_functions.hh"  // For builtin functions
+#include "../concurrency/task_vm.hh"
+#include "../bytecode_printer.hh"  // For opcodeToString function
+#include "../classes.hh"  // For VMMethodImplementation
 
 // Forward declare ErrorValue from the global namespace
 struct ErrorValue;

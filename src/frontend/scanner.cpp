@@ -284,7 +284,7 @@ void Scanner::addToken(TokenType type, const std::string& text) {
     // Add debug output for string interpolation tokens
     if constexpr (false) {  // Disabled debug output
         if (type == TokenType::INTERPOLATION_START) {
-            std::cout << "[SCANNER] Added INTERPOLATION_START token" << std::endl;
+            std::cout << "[SCANNER] Added INTERPOLATION_START token: '" << lexeme << "'" << std::endl;
         } else if (type == TokenType::INTERPOLATION_END) {
             std::cout << "[SCANNER] Added INTERPOLATION_END token" << std::endl;
         } else if (type == TokenType::STRING) {

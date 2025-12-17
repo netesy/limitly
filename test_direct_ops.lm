@@ -1,0 +1,38 @@
+// Test binary and unary operations outside interpolation
+print("=== Direct Operations Test ===");
+
+var a = 5;
+var b = 3;
+
+// Test binary operations
+var sum = a + b;
+var diff = a - b;
+var prod = a * b;
+var quot = a / b;
+var mod = a % b;
+
+print("sum = a + b");
+print("diff = a - b"); 
+print("prod = a * b");
+print("quot = a / b");
+print("mod = a % b");
+
+// Test unary operations
+var neg = -a;
+var pos = +a;
+var not_true = !true;
+
+print("neg = -a");
+print("pos = +a");
+print("not_true = !true");
+
+// Test comparisons
+var equal = (a == b);
+var not_equal = (a != b);
+var less = (a < b);
+var greater = (a > b);
+
+print("equal = (a == b)");
+print("not_equal = (a != b)");
+print("less = (a < b)");
+print("greater = (a > b)");

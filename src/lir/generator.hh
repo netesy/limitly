@@ -7,6 +7,9 @@
 #include <string>
 #include <memory>
 
+
+
+//All semantic decisions about functions, classes, and variables are made in the generator. JIT only sees registers, memory offsets, and low-level types.
 namespace LIR {
 
 class Generator {
@@ -24,8 +27,13 @@ public:
 private:
     // Helper methods
     Reg allocate_register();
-    void set_variable_register(const std::string& name, Reg reg);
-    Reg get_variable_register(const std::string& name);
+    void enter_scope();
+    void exit_scope();
+    void bind_variable(const std::string& name, Reg reg);
+    void update_variable_binding(const std::string& name, Reg reg);
+    Reg resolve_variable(const std::string& name);
+    void set_register_type(Reg reg, TypePtr type);
+    TypePtr get_register_type(Reg reg) const;
     void emit_instruction(const LIR_Inst& inst);
     
     // AST node visitors
@@ -35,6 +43,7 @@ private:
     // Specific expression handlers
     Reg emit_literal_expr(AST::LiteralExpr& expr);
     Reg emit_variable_expr(AST::VariableExpr& expr);
+    Reg emit_interpolated_string_expr(AST::InterpolatedStringExpr& expr);
     Reg emit_binary_expr(AST::BinaryExpr& expr);
     Reg emit_unary_expr(AST::UnaryExpr& expr);
     Reg emit_call_expr(AST::CallExpr& expr);
@@ -69,9 +78,14 @@ private:
     void report_error(const std::string& message);
     
     // Member variables
+    struct Scope {
+        std::unordered_map<std::string, Reg> vars;
+    };
+
     std::unique_ptr<LIR_Function> current_function_;
-    std::unordered_map<std::string, Reg> variable_registers_;
-    uint32_t next_register_;
+    std::vector<Scope> scope_stack_;
+    uint32_t next_register_ = 0;
+    std::unordered_map<Reg, TypePtr> register_types_;
     std::vector<std::string> errors_;
 };
 

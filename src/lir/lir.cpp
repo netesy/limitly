@@ -42,7 +42,10 @@ std::string LIR_Inst::to_string() const {
         case LIR_Op::Call:
             oss << " r" << dst << ", r" << a;
             break;
-        case LIR_Op::Print:
+        case LIR_Op::PrintInt:
+        case LIR_Op::PrintFloat:
+        case LIR_Op::PrintBool:
+        case LIR_Op::PrintString:
             oss << " r" << a;
             break;
         case LIR_Op::Return:
@@ -57,6 +60,9 @@ std::string LIR_Inst::to_string() const {
             break;
         case LIR_Op::Cast:
             oss << " r" << dst << ", r" << a;
+            break;
+        case LIR_Op::ToString:
+            oss << " r" << dst << ", r" << a; // Convert to string
             break;
         case LIR_Op::Concat:
             oss << " r" << dst << ", r" << a << ", r" << b;
@@ -116,12 +122,19 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::JumpIfFalse: return "jmp_if_false";
         case LIR_Op::Call: return "call";
         case LIR_Op::Return: return "ret";
-        case LIR_Op::Print: return "print";
+        case LIR_Op::PrintInt: return "print_int";
+        case LIR_Op::PrintFloat: return "print_float";
+        case LIR_Op::PrintBool: return "print_bool";
+        case LIR_Op::PrintString: return "print_string";
         case LIR_Op::Nop: return "nop";
         case LIR_Op::Load: return "load";
         case LIR_Op::Store: return "store";
         case LIR_Op::Cast: return "cast";
+        case LIR_Op::ToString: return "to_string";
         case LIR_Op::Concat: return "concat";
+        case LIR_Op::SBCreate: return "sb_create";
+        case LIR_Op::SBAppend: return "sb_append";
+        case LIR_Op::SBFinish: return "sb_finish";
         case LIR_Op::ConstructError: return "error";
         case LIR_Op::ConstructOk: return "ok";
         case LIR_Op::AtomicLoad: return "atomic_load";

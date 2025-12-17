@@ -1,6 +1,6 @@
 #include "value.hh"
-#include "vm.hh"  // For Environment class definition
 #include "types.hh"
+#include "env.hh"
 #include <sstream>
 
 // Helper function to check if a type is an integer type
