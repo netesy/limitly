@@ -48,7 +48,13 @@ enum class LIR_Op : uint8_t {
     JumpIfFalse,// Jump if condition is false
     Call,       // Function call (reg = call(func_id, params...))
     Return,     // Return (return from function)
-    Print,      // Print value (print(reg))
+    
+    // Typed print operations
+    PrintInt,   // Print integer (print_int(reg))
+    PrintFloat, // Print float (print_float(reg))
+    PrintBool,  // Print boolean (print_bool(reg))
+    PrintString,// Print string (print_string(reg))
+    
     Nop,        // No operation (debugging)
     
     // Memory operations
@@ -57,9 +63,15 @@ enum class LIR_Op : uint8_t {
     
     // Type operations
     Cast,       // Type casting
+    ToString,   // Convert value to string representation
     
     // String operations
     Concat,     // String concatenation
+    
+    // String builder operations
+    SBCreate,   // Create string builder
+    SBAppend,   // Append string/value to builder
+    SBFinish,   // Finish building string
     
     // Error handling
     ConstructError,
@@ -144,6 +156,7 @@ struct LIR_Inst {
 class LIR_FunctionContext {
 public:
     std::unordered_map<std::string, Reg> variable_to_reg;
+    std::unordered_map<Reg, TypePtr> register_types;
     std::vector<LIR_Inst> instructions;
     uint32_t next_reg = 0;
     
@@ -161,7 +174,16 @@ public:
     void set_variable_register(const std::string& name, Reg reg) {
         variable_to_reg[name] = reg;
     }
-    
+
+    void set_register_type(Reg reg, TypePtr type) {
+        register_types[reg] = type;
+    }
+
+    TypePtr get_register_type(Reg reg) const {
+        auto it = register_types.find(reg);
+        return (it != register_types.end()) ? it->second : nullptr;
+    }
+
     // Instruction emission
     void add_instruction(const LIR_Inst& inst) {
         instructions.push_back(inst);
@@ -197,6 +219,7 @@ public:
     
     // Variable to register mapping
     std::unordered_map<std::string, Reg> variable_to_reg;
+    std::unordered_map<Reg, TypePtr> register_types;
 
     LIR_Function(const std::string& name, uint32_t param_count = 0)
         : name(name), param_count(param_count), register_count(0) {
@@ -212,7 +235,8 @@ public:
           register_count(other.register_count),
           debug_info(other.debug_info),
           optimizations(other.optimizations),
-          variable_to_reg(other.variable_to_reg) {}
+          variable_to_reg(other.variable_to_reg),
+          register_types(other.register_types) {}
           
     LIR_Function& operator=(const LIR_Function& other) {
         if (this != &other) {
@@ -223,6 +247,7 @@ public:
             debug_info = other.debug_info;
             optimizations = other.optimizations;
             variable_to_reg = other.variable_to_reg;
+            register_types = other.register_types;
         }
         return *this;
     }
@@ -241,7 +266,16 @@ public:
     void set_variable_register(const std::string& name, Reg reg) {
         variable_to_reg[name] = reg;
     }
-    
+
+    void set_register_type(Reg reg, TypePtr type) {
+        register_types[reg] = type;
+    }
+
+    TypePtr get_register_type(Reg reg) const {
+        auto it = register_types.find(reg);
+        return (it != register_types.end()) ? it->second : nullptr;
+    }
+
     // Instruction emission
     void add_instruction(const LIR_Inst& inst) {
         instructions.push_back(inst);

@@ -1,6 +1,6 @@
 #include "task_vm.hh"
 #include "concurrency_state.hh"
-#include "../vm.hh"
+#include "../vm/vm.hh"
 #include <stdexcept>
 #include <chrono>
 #include <future>

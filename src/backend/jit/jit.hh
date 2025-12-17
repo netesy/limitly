@@ -65,7 +65,9 @@ private:
     
     // Register management for JIT
     std::unordered_map<LIR::Reg, gccjit::lvalue> jit_registers;
+    std::unordered_map<LIR::Reg, gccjit::type> register_types;
     gccjit::lvalue get_jit_register(LIR::Reg reg);
+    gccjit::lvalue get_jit_register(LIR::Reg reg, gccjit::type type);
     void set_jit_register(LIR::Reg reg, gccjit::lvalue value);
     
     // libgccjit context
@@ -80,33 +82,62 @@ private:
     gccjit::type m_bool_type;
     gccjit::type m_const_char_ptr_type;
     gccjit::type m_void_ptr_type;
+    gccjit::type m_string_builder_type;
+    gccjit::type m_c_int_type;
     
     // Standard library functions
     gccjit::function m_printf_func;
     gccjit::function m_malloc_func;
     gccjit::function m_free_func;
     gccjit::function m_puts_func;
+    gccjit::function m_strlen_func;
+    gccjit::function m_sprintf_func;
+    gccjit::function m_snprintf_func;
+    gccjit::function m_memset_func;
+    gccjit::function m_memcpy_func;
+    gccjit::function m_jit_sb_create_func;
+    gccjit::function m_jit_sb_destroy_func;
+    gccjit::function m_jit_sb_finish_func;
+    gccjit::function m_jit_sb_append_cstr_func;
+    gccjit::function m_jit_sb_append_int_func;
+    gccjit::function m_jit_sb_append_float_func;
+    gccjit::function m_jit_sb_append_bool_func;
+    gccjit::type m_size_t_type;
     
     // Helper methods
     gccjit::rvalue convert_to_jit_type(gccjit::rvalue value, gccjit::type target_type);
+    gccjit::type to_jit_type(TypePtr type);
     
     // Basic operations implementation
     gccjit::rvalue compile_arithmetic_op(LIR::LIR_Op op, gccjit::rvalue a, gccjit::rvalue b);
     gccjit::rvalue compile_comparison_op(LIR::LIR_Op op, gccjit::rvalue a, gccjit::rvalue b);
     gccjit::rvalue compile_bitwise_op(LIR::LIR_Op op, gccjit::rvalue a, gccjit::rvalue b);
     
+    // String operations
+    gccjit::rvalue compile_string_concat(gccjit::rvalue a, gccjit::rvalue b);
+    gccjit::rvalue compile_to_string(gccjit::rvalue value);
+    
+    // String builder operations
+    gccjit::rvalue compile_sb_create();
+    void compile_sb_append(LIR::Reg sb_reg, LIR::Reg value_reg, gccjit::rvalue sb, gccjit::rvalue value);
+    void compile_sb_append_string(gccjit::rvalue sb, gccjit::rvalue str);
+    void compile_sb_append_int(gccjit::rvalue sb, gccjit::rvalue value);
+    void compile_sb_append_double(gccjit::rvalue sb, gccjit::rvalue value);
+    void compile_sb_append_bool(gccjit::rvalue sb, gccjit::rvalue value);
+    gccjit::rvalue compile_sb_finish(gccjit::rvalue sb);
+    
     // Control flow
     void compile_jump(const LIR::LIR_Inst& inst);
     void compile_conditional_jump(const LIR::LIR_Inst& inst);
     void compile_call(const LIR::LIR_Inst& inst);
-    void compile_print(const LIR::LIR_Inst& inst);
+    void compile_print_int(const LIR::LIR_Inst& inst);
+    void compile_print_float(const LIR::LIR_Inst& inst);
+    void compile_print_bool(const LIR::LIR_Inst& inst);
+    void compile_print_string(const LIR::LIR_Inst& inst);
     void compile_return(const LIR::LIR_Inst& inst);
     
     // Memory operations
     void compile_memory_op(const LIR::LIR_Inst& inst);
-    
-    // String operations
-    gccjit::rvalue compile_string_concat(gccjit::rvalue a, gccjit::rvalue b);
     
     // Error handling
     void report_error(const std::string& message);

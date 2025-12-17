@@ -1,0 +1,37 @@
+// Test enhanced unary and binary operations
+
+print("=== Enhanced Operations Test ===");
+
+var a = 10;
+var b = 3;
+
+// Unary operations
+print("Unary minus: {-a}");
+print("Unary plus: {+a}");
+print("Logical NOT: {!true}");
+
+// Binary operations  
+print("Addition: {a + b}");
+print("Subtraction: {a - b}");
+print("Multiplication: {a * b}");
+print("Division: {a / b}");
+print("Modulo: {a % b}");
+
+// Comparisons
+print("Equal: {a == b}");
+print("Not equal: {a != b}");
+print("Less: {a < b}");
+print("Less equal: {a <= b}");
+print("Greater: {a > b}");
+print("Greater equal: {a >= b}");
+
+// Test bitwise operations outside interpolation
+var and_result = a & b;
+var or_result = a | b;
+var xor_result = a ^ b;
+print("Bitwise AND: {and_result}");
+print("Bitwise OR: {or_result}");
+print("Bitwise XOR: {xor_result}");
+
+// Power operation (simplified)
+print("Power: {a ** 2}");

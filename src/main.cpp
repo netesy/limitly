@@ -104,6 +104,15 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 
                 std::cout << "Generated LIR function with " << lir_function->instructions.size() << " instructions\n";
                 
+                if (jitDebug) {
+                    std::cout << "\n=== LIR Instructions ===\n";
+                    for (size_t i = 0; i < lir_function->instructions.size(); ++i) {
+                        const auto& inst = lir_function->instructions[i];
+                        std::cout << "[" << i << "] " << inst.to_string() << "\n";
+                    }
+                    std::cout << "\n";
+                }
+                
                 // Initialize JIT backend
                 JIT::JITBackend jit;
                 

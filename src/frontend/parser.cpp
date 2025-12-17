@@ -3283,61 +3283,6 @@ std::shared_ptr<AST::Expression> Parser::finishCall(std::shared_ptr<AST::Express
     return callExpr;
 }
 
-std::shared_ptr<AST::InterpolatedStringExpr> Parser::interpolatedString() {
-    auto interpolated = std::make_shared<AST::InterpolatedStringExpr>();
-    
-    // Check if we started with a STRING token or INTERPOLATION_START
-    if (previous().type == TokenType::STRING) {
-        // Started with STRING, add it as initial part
-        interpolated->line = previous().line;
-        interpolated->addStringPart(parseStringLiteral(previous().lexeme));
-    } else if (previous().type == TokenType::INTERPOLATION_START) {
-        // Started with INTERPOLATION_START, extract string part from it
-        interpolated->line = previous().line;
-        std::string startPart = previous().lexeme;
-        // Remove quotes: "Hello, " -> Hello, 
-        if (startPart.size() >= 2 && startPart.front() == '"' && startPart.back() == '"') {
-            startPart = startPart.substr(1, startPart.length() - 2);
-        }
-        interpolated->addStringPart(startPart);
-        
-        // Parse the expression inside the interpolation
-        auto expr = expression();
-        interpolated->addExpressionPart(expr);
-        
-        // Expect INTERPOLATION_END
-        consume(TokenType::INTERPOLATION_END, "Expected '}' after interpolation expression.");
-    }
-    
-    // Parse remaining interpolation parts
-    while (check(TokenType::INTERPOLATION_START)) {
-        advance(); // consume INTERPOLATION_START
-        
-        // Extract string part from INTERPOLATION_START token
-        std::string startPart = previous().lexeme;
-        // Remove quotes: " is " -> " is "
-        if (startPart.size() >= 2 && startPart.front() == '"' && startPart.back() == '"') {
-            startPart = startPart.substr(1, startPart.length() - 2);
-        }
-        interpolated->addStringPart(startPart);
-        
-        // Parse the expression inside the interpolation
-        auto expr = expression();
-        interpolated->addExpressionPart(expr);
-        
-        // Expect INTERPOLATION_END
-        consume(TokenType::INTERPOLATION_END, "Expected '}' after interpolation expression.");
-    }
-    
-    // Check if there's a final string part
-    if (check(TokenType::STRING)) {
-        advance();
-        interpolated->addStringPart(parseStringLiteral(previous().lexeme));
-    }
-    
-    return interpolated;
-}
-
 std::shared_ptr<AST::Expression> Parser::primary() {
     if (match({TokenType::FALSE})) {
         auto literalExpr = createNodeWithContext<AST::LiteralExpr>();
@@ -3482,61 +3427,74 @@ std::shared_ptr<AST::Expression> Parser::primary() {
     }
     
     if (match({TokenType::STRING})) {
-        // Check if this is an interpolated string (followed by INTERPOLATION_START)
-        if (check(TokenType::INTERPOLATION_START)) {
-            // This is an interpolated string that started with a string
-            return interpolatedString();
-        } else {
-            // Regular string literal
-            auto literalExpr = std::make_shared<AST::LiteralExpr>();
-            literalExpr->line = previous().line;
-            
-            // AST gets the parsed string value (without quotes)
-            literalExpr->value = parseStringLiteral(previous().lexeme);
-            
-            // Create detailed CST node if enabled
-            if (cstMode && config.detailedExpressionNodes) {
-                auto literalCSTNode = std::make_unique<CST::Node>(CST::NodeKind::LITERAL_EXPR);
-                literalCSTNode->setDescription("string literal");
-                // CST gets the original token (with quotes) for exact source reconstruction
-                literalCSTNode->addToken(previous());
-                attachTriviaFromToken(previous());
-                literalCSTNode->setSourceSpan(previous().start, previous().end);
-                addChildToCurrentContext(std::move(literalCSTNode));
-            }
-            
-            return literalExpr;
+        // Regular string literal (interpolated strings start with INTERPOLATION_START, not STRING)
+        auto literalExpr = std::make_shared<AST::LiteralExpr>();
+        literalExpr->line = previous().line;
+        
+        // AST gets the parsed string value (without quotes)
+        literalExpr->value = parseStringLiteral(previous().lexeme);
+        
+        // Create detailed CST node if enabled
+        if (cstMode && config.detailedExpressionNodes) {
+            auto literalCSTNode = std::make_unique<CST::Node>(CST::NodeKind::LITERAL_EXPR);
+            literalCSTNode->setDescription("string literal");
+            // CST gets the original token (with quotes) for exact source reconstruction
+            literalCSTNode->addToken(previous());
+            attachTriviaFromToken(previous());
+            literalCSTNode->setSourceSpan(previous().start, previous().end);
+            addChildToCurrentContext(std::move(literalCSTNode));
         }
+        
+        return literalExpr;
     }
 
     // Handle interpolated strings that start with interpolation (no initial string part)
     if (match({TokenType::INTERPOLATION_START})) {
         // This is an interpolated string starting with interpolation
-        // We need to "back up" and call interpolatedString with an empty initial string
-        current--; // Back up to before INTERPOLATION_START
+        // Extract the string part from the INTERPOLATION_START token
+        std::string startPart = previous().lexeme;
+        // Remove quotes: "Hello, " -> Hello, 
+        if (startPart.size() >= 2 && startPart.front() == '"' && startPart.back() == '"') {
+            startPart = startPart.substr(1, startPart.length() - 2);
+        }
         
         auto interpolated = std::make_shared<AST::InterpolatedStringExpr>();
-        interpolated->line = peek().line;
+        interpolated->line = previous().line;
         
-        // Add empty initial string part
-        interpolated->addStringPart("");
+        // Add the string part from INTERPOLATION_START token
+        interpolated->addStringPart(startPart);
         
-        // Parse interpolation parts
+        // Parse the expression inside the interpolation  
+        auto expr = expression();
+        interpolated->addExpressionPart(expr);
+        
+        // Expect INTERPOLATION_END
+        consume(TokenType::INTERPOLATION_END, "Expected '}' after interpolation expression.");
+        
+        // Parse remaining interpolation parts (like interpolatedString() does)
         while (check(TokenType::INTERPOLATION_START)) {
             advance(); // consume INTERPOLATION_START
             
+            // Extract string part from INTERPOLATION_START token
+            std::string nextPart = previous().lexeme;
+            // Remove quotes: ", b=" -> , b=
+            if (nextPart.size() >= 2 && nextPart.front() == '"' && nextPart.back() == '"') {
+                nextPart = nextPart.substr(1, nextPart.length() - 2);
+            }
+            interpolated->addStringPart(nextPart);
+            
             // Parse the expression inside the interpolation
-            auto expr = expression();
-            interpolated->addExpressionPart(expr);
+            auto nextExpr = expression();
+            interpolated->addExpressionPart(nextExpr);
             
             // Expect INTERPOLATION_END
             consume(TokenType::INTERPOLATION_END, "Expected '}' after interpolation expression.");
-            
-            // Check if there's another string part after this interpolation
-            if (check(TokenType::STRING)) {
-                advance();
-                interpolated->addStringPart(parseStringLiteral(previous().lexeme));
-            }
+        }
+        
+        // Check if there's another string part after this interpolation
+        if (check(TokenType::STRING)) {
+            advance();
+            interpolated->addStringPart(parseStringLiteral(previous().lexeme));
         }
         
         return interpolated;

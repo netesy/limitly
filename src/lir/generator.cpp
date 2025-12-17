@@ -1,16 +1,20 @@
 #include "generator.hh"
 #include "../backend/value.hh"
 #include "../backend/types.hh"
+#include <algorithm>
 
 namespace LIR {
 
-Generator::Generator() : next_register_(0) {}
+Generator::Generator()
+    : next_register_(0) {}
 
 std::unique_ptr<LIR_Function> Generator::generate_program(AST::Program& program) {
     // Create a main function
     current_function_ = std::make_unique<LIR_Function>("main", 0);
-    variable_registers_.clear();
     next_register_ = 0;
+    scope_stack_.clear();
+    register_types_.clear();
+    enter_scope();
     
     // Process all statements
     for (const auto& stmt : program.statements) {
@@ -22,21 +26,28 @@ std::unique_ptr<LIR_Function> Generator::generate_program(AST::Program& program)
         current_function_->instructions.back().op != LIR_Op::Return) {
         emit_instruction(LIR_Inst(LIR_Op::Return));
     }
-    
+
+    exit_scope();
+
     auto result = std::move(current_function_);
     current_function_ = nullptr;
+    scope_stack_.clear();
+    register_types_.clear();
     return result;
 }
 
 std::unique_ptr<LIR_Function> Generator::generate_function(AST::FunctionDeclaration& fn) {
     // Create function with parameters
     current_function_ = std::make_unique<LIR_Function>(fn.name, fn.params.size());
-    variable_registers_.clear();
     next_register_ = fn.params.size();
+    scope_stack_.clear();
+    register_types_.clear();
+    enter_scope();
     
     // Register parameters
     for (size_t i = 0; i < fn.params.size(); ++i) {
-        set_variable_register(fn.params[i].first, static_cast<Reg>(i));
+        bind_variable(fn.params[i].first, static_cast<Reg>(i));
+        set_register_type(static_cast<Reg>(i), nullptr);
     }
     
     // Emit function body
@@ -60,18 +71,66 @@ Reg Generator::allocate_register() {
     return next_register_++;
 }
 
-void Generator::set_variable_register(const std::string& name, Reg reg) {
-    variable_registers_[name] = reg;
+void Generator::enter_scope() {
+    scope_stack_.push_back(Scope{});
 }
 
-Reg Generator::get_variable_register(const std::string& name) {
-    auto it = variable_registers_.find(name);
-    return (it != variable_registers_.end()) ? it->second : UINT32_MAX;
+void Generator::exit_scope() {
+    if (!scope_stack_.empty()) {
+        scope_stack_.pop_back();
+    }
+}
+
+void Generator::bind_variable(const std::string& name, Reg reg) {
+    if (scope_stack_.empty()) {
+        enter_scope();
+    }
+    scope_stack_.back().vars[name] = reg;
+}
+
+void Generator::update_variable_binding(const std::string& name, Reg reg) {
+    for (auto it = scope_stack_.rbegin(); it != scope_stack_.rend(); ++it) {
+        auto found = it->vars.find(name);
+        if (found != it->vars.end()) {
+            found->second = reg;
+            return;
+        }
+    }
+    bind_variable(name, reg);
+}
+
+Reg Generator::resolve_variable(const std::string& name) {
+    for (auto it = scope_stack_.rbegin(); it != scope_stack_.rend(); ++it) {
+        auto found = it->vars.find(name);
+        if (found != it->vars.end()) {
+            return found->second;
+        }
+    }
+    return UINT32_MAX;
+}
+
+void Generator::set_register_type(Reg reg, TypePtr type) {
+    register_types_[reg] = type;
+}
+
+TypePtr Generator::get_register_type(Reg reg) const {
+    auto it = register_types_.find(reg);
+    if (it != register_types_.end()) {
+        return it->second;
+    }
+    return nullptr;
 }
 
 void Generator::emit_instruction(const LIR_Inst& inst) {
     if (current_function_) {
         current_function_->instructions.push_back(inst);
+        current_function_->register_count = std::max(current_function_->register_count, next_register_);
+        if (inst.dst != UINT32_MAX) {
+            auto type = get_register_type(inst.dst);
+            if (type) {
+                current_function_->set_register_type(inst.dst, type);
+            }
+        }
     }
 }
 
@@ -138,6 +197,8 @@ Reg Generator::emit_expr(AST::Expression& expr) {
         return emit_literal_expr(*literal);
     } else if (auto variable = dynamic_cast<AST::VariableExpr*>(&expr)) {
         return emit_variable_expr(*variable);
+    } else if (auto interpolated = dynamic_cast<AST::InterpolatedStringExpr*>(&expr)) {
+        return emit_interpolated_string_expr(*interpolated);
     } else if (auto binary = dynamic_cast<AST::BinaryExpr*>(&expr)) {
         return emit_binary_expr(*binary);
     } else if (auto unary = dynamic_cast<AST::UnaryExpr*>(&expr)) {
@@ -198,6 +259,7 @@ Reg Generator::emit_literal_expr(AST::LiteralExpr& expr) {
                     // If parsing fails, treat as string
                     auto string_type = std::make_shared<Type>(TypeTag::String);
                     const_val = std::make_shared<Value>(string_type, stringValue);
+                    current_function_->instructions.back().const_val->type = string_type;
                 }
             } else {
                 // Create integer value
@@ -209,6 +271,7 @@ Reg Generator::emit_literal_expr(AST::LiteralExpr& expr) {
                     // If parsing fails, treat as string
                     auto string_type = std::make_shared<Type>(TypeTag::String);
                     const_val = std::make_shared<Value>(string_type, stringValue);
+                    current_function_->instructions.back().const_val->type = string_type;
                 }
             }
         } else {
@@ -224,19 +287,21 @@ Reg Generator::emit_literal_expr(AST::LiteralExpr& expr) {
     } else if (std::holds_alternative<std::nullptr_t>(expr.value)) {
         // Create nil value
         auto nil_type = std::make_shared<Type>(TypeTag::Nil);
-        const_val = std::make_shared<Value>(nil_type, "");
+        const_val = std::make_shared<Value>(nil_type, std::string("nil"));
     } else {
         // Default to nil
         auto nil_type = std::make_shared<Type>(TypeTag::Nil);
         const_val = std::make_shared<Value>(nil_type, "");
     }
     
+    // Set type BEFORE emitting so it's available during emit_instruction
+    set_register_type(dst, const_val ? const_val->type : nullptr);
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, dst, const_val));
     return dst;
 }
 
 Reg Generator::emit_variable_expr(AST::VariableExpr& expr) {
-    Reg reg = get_variable_register(expr.name);
+    Reg reg = resolve_variable(expr.name);
     if (reg == UINT32_MAX) {
         report_error("Undefined variable: " + expr.name);
         return 0;
@@ -244,7 +309,124 @@ Reg Generator::emit_variable_expr(AST::VariableExpr& expr) {
     return reg;
 }
 
+Reg Generator::emit_interpolated_string_expr(AST::InterpolatedStringExpr& expr) {
+    auto string_type = std::make_shared<Type>(TypeTag::String);
+
+    if (expr.parts.empty()) {
+        Reg result = allocate_register();
+        ValuePtr result_val = std::make_shared<Value>(string_type, std::string(""));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, result, result_val));
+        set_register_type(result, string_type);
+        return result;
+    }
+
+    Reg sb_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::SBCreate, sb_reg, 0, 0));
+
+    for (const auto& part : expr.parts) {
+        if (std::holds_alternative<std::string>(part)) {
+            std::string literal = std::get<std::string>(part);
+            ValuePtr literal_val = std::make_shared<Value>(string_type, literal);
+            Reg literal_reg = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, literal_reg, literal_val));
+            set_register_type(literal_reg, string_type);
+            emit_instruction(LIR_Inst(LIR_Op::SBAppend, sb_reg, literal_reg, 0));
+
+        } else if (std::holds_alternative<std::shared_ptr<AST::Expression>>(part)) {
+            auto expr_part = std::get<std::shared_ptr<AST::Expression>>(part);
+            Reg expr_reg = emit_expr(*expr_part);
+
+            Reg str_reg = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::ToString, str_reg, expr_reg, 0));
+            set_register_type(str_reg, string_type);
+            emit_instruction(LIR_Inst(LIR_Op::SBAppend, sb_reg, str_reg, 0));
+        }
+    }
+
+    Reg result_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::SBFinish, result_reg, sb_reg, 0));
+    set_register_type(result_reg, string_type);
+    return result_reg;
+}
+
 Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
+    // For string concatenation, handle at generation time
+    if (expr.op == TokenType::PLUS) {
+        // Check if this is string concatenation by examining operands
+        bool left_is_string = false;
+        bool right_is_string = false;
+        std::string left_str, right_str;
+        
+        // Check left operand
+        if (auto left_literal = dynamic_cast<AST::LiteralExpr*>(expr.left.get())) {
+            if (std::holds_alternative<std::string>(left_literal->value)) {
+                left_str = std::get<std::string>(left_literal->value);
+                // Check if it's actually a non-numeric string
+                bool is_numeric = false;
+                if (!left_str.empty()) {
+                    char first = left_str[0];
+                    if (std::isdigit(first) || first == '+' || first == '-' || first == '.') {
+                        is_numeric = true;
+                        if (left_str.find('.') != std::string::npos || 
+                            left_str.find('e') != std::string::npos || 
+                            left_str.find('E') != std::string::npos) {
+                            // Float - treat as numeric
+                        } else {
+                            // Integer - treat as numeric  
+                        }
+                    }
+                }
+                left_is_string = !is_numeric;
+            }
+        }
+        
+        // Check right operand
+        if (auto right_literal = dynamic_cast<AST::LiteralExpr*>(expr.right.get())) {
+            if (std::holds_alternative<std::string>(right_literal->value)) {
+                right_str = std::get<std::string>(right_literal->value);
+                // Check if it's actually a non-numeric string
+                bool is_numeric = false;
+                if (!right_str.empty()) {
+                    char first = right_str[0];
+                    if (std::isdigit(first) || first == '+' || first == '-' || first == '.') {
+                        is_numeric = true;
+                        if (right_str.find('.') != std::string::npos || 
+                            right_str.find('e') != std::string::npos || 
+                            right_str.find('E') != std::string::npos) {
+                            // Float - treat as numeric
+                        } else {
+                            // Integer - treat as numeric  
+                        }
+                    }
+                }
+                right_is_string = !is_numeric;
+            }
+        }
+        
+        // If either operand is a non-numeric string, treat as concatenation
+        if (left_is_string || right_is_string) {
+            // For string literals, concatenate at generation time
+            if (left_is_string && right_is_string) {
+                // Both are string literals - concatenate now
+                std::string result = left_str + right_str;
+                Reg dst = allocate_register();
+                auto string_type = std::make_shared<Type>(TypeTag::String);
+                ValuePtr result_val = std::make_shared<Value>(string_type, result);
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, dst, result_val));
+                return dst;
+            } else {
+                // Mixed types - for now, treat as arithmetic
+                // TODO: Better type analysis for mixed concatenation
+                Reg left = emit_expr(*expr.left);
+                Reg right = emit_expr(*expr.right);
+                Reg dst = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::Add, dst, left, right));
+                return dst;
+            }
+        }
+    }
+    
+    // Handle as arithmetic operation
     Reg left = emit_expr(*expr.left);
     Reg right = emit_expr(*expr.right);
     Reg dst = allocate_register();
@@ -256,6 +438,12 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
     else if (expr.op == TokenType::STAR) op = LIR_Op::Mul;
     else if (expr.op == TokenType::SLASH) op = LIR_Op::Div;
     else if (expr.op == TokenType::MODULUS) op = LIR_Op::Mod;
+    else if (expr.op == TokenType::POWER) {
+        // Power operation - for now, use multiplication (a * a for simple cases)
+        // TODO: Implement proper power operation or call to math library
+        emit_instruction(LIR_Inst(LIR_Op::Mul, dst, left, left));
+        return dst;
+    }
     else if (expr.op == TokenType::EQUAL_EQUAL) op = LIR_Op::CmpEQ;
     else if (expr.op == TokenType::BANG_EQUAL) op = LIR_Op::CmpNEQ;
     else if (expr.op == TokenType::LESS) op = LIR_Op::CmpLT;
@@ -264,23 +452,92 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
     else if (expr.op == TokenType::GREATER_EQUAL) op = LIR_Op::CmpGE;
     else if (expr.op == TokenType::AND) op = LIR_Op::And;
     else if (expr.op == TokenType::OR) op = LIR_Op::Or;
+    else if (expr.op == TokenType::CARET) op = LIR_Op::Xor;
     else {
         report_error("Unknown binary operator");
         return 0;
     }
     
+    // Infer result type based on operands and operation
+    TypePtr result_type = nullptr;
+    TypePtr left_type = get_register_type(left);
+    TypePtr right_type = get_register_type(right);
+    
+    // For arithmetic operations, determine result type
+    if (op == LIR_Op::Add || op == LIR_Op::Sub || op == LIR_Op::Mul || op == LIR_Op::Div || op == LIR_Op::Mod) {
+        // If either operand is float, result is float
+        if ((left_type && left_type->tag == TypeTag::Float64) || 
+            (right_type && right_type->tag == TypeTag::Float64)) {
+            result_type = std::make_shared<Type>(TypeTag::Float64);
+        } else if ((left_type && left_type->tag == TypeTag::Float32) || 
+                   (right_type && right_type->tag == TypeTag::Float32)) {
+            result_type = std::make_shared<Type>(TypeTag::Float32);
+        } else {
+            // Default to int for integer operations
+            result_type = std::make_shared<Type>(TypeTag::Int);
+        }
+    } else if (op == LIR_Op::CmpEQ || op == LIR_Op::CmpNEQ || op == LIR_Op::CmpLT || 
+               op == LIR_Op::CmpLE || op == LIR_Op::CmpGT || op == LIR_Op::CmpGE) {
+        // Comparison operations return bool
+        result_type = std::make_shared<Type>(TypeTag::Bool);
+    } else if (op == LIR_Op::And || op == LIR_Op::Or) {
+        // Logical operations return bool
+        result_type = std::make_shared<Type>(TypeTag::Bool);
+    } else if (op == LIR_Op::Xor) {
+        // Bitwise XOR returns int
+        result_type = std::make_shared<Type>(TypeTag::Int);
+    }
+    
+    // Set type BEFORE emitting so it's available during emit_instruction
+    if (result_type) {
+        set_register_type(dst, result_type);
+    }
+    
     emit_instruction(LIR_Inst(op, dst, left, right));
+    
     return dst;
 }
 
 Reg Generator::emit_unary_expr(AST::UnaryExpr& expr) {
     Reg operand = emit_expr(*expr.right);
     Reg dst = allocate_register();
+    TypePtr operand_type = get_register_type(operand);
+    TypePtr result_type = nullptr;
     
     if (expr.op == TokenType::MINUS) {
-        emit_instruction(LIR_Inst(LIR_Op::Sub, dst, 0, operand));
+        // Result type is same as operand type
+        result_type = operand_type;
+        set_register_type(dst, result_type);
+        // Use Neg operation for unary minus (more efficient than Sub from 0)
+        emit_instruction(LIR_Inst(LIR_Op::Neg, dst, operand, 0));
+    } else if (expr.op == TokenType::PLUS) {
+        // Result type is same as operand type
+        result_type = operand_type;
+        set_register_type(dst, result_type);
+        // Unary plus - just copy the value (no operation needed)
+        emit_instruction(LIR_Inst(LIR_Op::Mov, dst, operand, 0));
     } else if (expr.op == TokenType::BANG) {
-        emit_instruction(LIR_Inst(LIR_Op::CmpEQ, dst, operand, 0));
+        // Result type is bool
+        result_type = std::make_shared<Type>(TypeTag::Bool);
+        set_register_type(dst, result_type);
+        // Logical NOT - compare with true and negate (operand != true gives us !operand)
+        Reg true_reg = allocate_register();
+        auto bool_type = std::make_shared<Type>(TypeTag::Bool);
+        ValuePtr true_val = std::make_shared<Value>(bool_type, true);
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, true_reg, true_val));
+        set_register_type(true_reg, bool_type);
+        emit_instruction(LIR_Inst(LIR_Op::CmpNEQ, dst, operand, true_reg));
+    } else if (expr.op == TokenType::TILDE) {
+        // Result type is int
+        auto int_type = std::make_shared<Type>(TypeTag::Int);
+        result_type = int_type;
+        set_register_type(dst, result_type);
+        // Bitwise NOT - XOR with all bits set (for 64-bit: -1)
+        Reg all_bits = allocate_register();
+        ValuePtr neg_one_val = std::make_shared<Value>(int_type, static_cast<int64_t>(-1));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, all_bits, neg_one_val));
+        set_register_type(all_bits, int_type);
+        emit_instruction(LIR_Inst(LIR_Op::Xor, dst, operand, all_bits));
     } else {
         report_error("Unknown unary operator");
         return 0;
@@ -300,8 +557,11 @@ Reg Generator::emit_assign_expr(AST::AssignExpr& expr) {
     
     // For simple variable assignment
     if (!expr.name.empty()) {
-        set_variable_register(expr.name, value);
-        return value;
+        Reg dst = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::Mov, dst, value, 0));
+        set_register_type(dst, get_register_type(value));
+        update_variable_binding(expr.name, dst);
+        return dst;
     } else if (expr.object) {
         // For member or index assignment - not yet implemented
         report_error("Member/index assignment not yet implemented");
@@ -340,29 +600,144 @@ void Generator::emit_print_stmt(AST::PrintStatement& stmt) {
     // For now, just handle the first argument
     if (!stmt.arguments.empty()) {
         Reg value = emit_expr(*stmt.arguments[0]);
-        // Emit print instruction
-        emit_instruction(LIR_Inst(LIR_Op::Print, 0, value, 0));
+        
+        // First, check the register type that we tracked
+        TypePtr reg_type = get_register_type(value);
+        if (reg_type) {
+            switch (reg_type->tag) {
+                case TypeTag::Int:
+                case TypeTag::Int8:
+                case TypeTag::Int16:
+                case TypeTag::Int32:
+                case TypeTag::Int64:
+                case TypeTag::UInt:
+                case TypeTag::UInt8:
+                case TypeTag::UInt16:
+                case TypeTag::UInt32:
+                case TypeTag::UInt64:
+                    emit_instruction(LIR_Inst(LIR_Op::PrintInt, 0, value, 0));
+                    return;
+                case TypeTag::Float32:
+                case TypeTag::Float64:
+                    emit_instruction(LIR_Inst(LIR_Op::PrintFloat, 0, value, 0));
+                    return;
+                case TypeTag::Bool:
+                    emit_instruction(LIR_Inst(LIR_Op::PrintBool, 0, value, 0));
+                    return;
+                case TypeTag::String:
+                    emit_instruction(LIR_Inst(LIR_Op::PrintString, 0, value, 0));
+                    return;
+                default:
+                    break;
+            }
+        }
+        
+        // Fallback: Check what type of value we actually have in the register
+        // Look at the last instruction to determine the type
+        if (!current_function_->instructions.empty()) {
+            const auto& last_inst = current_function_->instructions.back();
+            if (last_inst.dst == value) {
+                if (last_inst.const_val) {
+                    // This is a LoadConst instruction - check the constant's type
+                    if (last_inst.const_val->type) {
+                        switch (last_inst.const_val->type->tag) {
+                            case TypeTag::Int:
+                            case TypeTag::Int8:
+                            case TypeTag::Int16:
+                            case TypeTag::Int32:
+                            case TypeTag::Int64:
+                                emit_instruction(LIR_Inst(LIR_Op::PrintInt, 0, value, 0));
+                                return;
+                            case TypeTag::Float32:
+                            case TypeTag::Float64:
+                                emit_instruction(LIR_Inst(LIR_Op::PrintFloat, 0, value, 0));
+                                return;
+                            case TypeTag::Bool:
+                                emit_instruction(LIR_Inst(LIR_Op::PrintBool, 0, value, 0));
+                                return;
+                            case TypeTag::String:
+                                emit_instruction(LIR_Inst(LIR_Op::PrintString, 0, value, 0));
+                                return;
+                            case TypeTag::Nil:
+                            default:
+                                // For nil and other types, convert to string and print
+                                auto string_type = std::make_shared<Type>(TypeTag::String);
+                                ValuePtr nil_str = std::make_shared<Value>(string_type, std::string("nil"));
+                                Reg nil_reg = allocate_register();
+                                emit_instruction(LIR_Inst(LIR_Op::LoadConst, nil_reg, nil_str));
+                                emit_instruction(LIR_Inst(LIR_Op::PrintString, 0, nil_reg, 0));
+                                return;
+                        }
+                    }
+                } else if (last_inst.op == LIR_Op::Concat || last_inst.op == LIR_Op::ToString) {
+                    // This is a string operation - treat as string
+                    emit_instruction(LIR_Inst(LIR_Op::PrintString, 0, value, 0));
+                    return;
+                }
+            }
+        }
+        
+        // Fallback: check if it's a literal primitive to determine print type
+        if (auto literal = dynamic_cast<AST::LiteralExpr*>(stmt.arguments[0].get())) {
+            if (std::holds_alternative<std::string>(literal->value)) {
+                std::string str_val = std::get<std::string>(literal->value);
+                // Check if it's a numeric string
+                if (!str_val.empty() && (std::isdigit(str_val[0]) || str_val[0] == '+' || str_val[0] == '-' || str_val[0] == '.')) {
+                    if (str_val.find('.') != std::string::npos || str_val.find('e') != std::string::npos || str_val.find('E') != std::string::npos) {
+                        emit_instruction(LIR_Inst(LIR_Op::PrintFloat, 0, value, 0));
+                    } else {
+                        emit_instruction(LIR_Inst(LIR_Op::PrintInt, 0, value, 0));
+                    }
+                } else {
+                    // String literal - print directly
+                    emit_instruction(LIR_Inst(LIR_Op::PrintString, 0, value, 0));
+                }
+            } else if (std::holds_alternative<bool>(literal->value)) {
+                emit_instruction(LIR_Inst(LIR_Op::PrintBool, 0, value, 0));
+            } else {
+                // nil - convert to string constant and print
+                auto string_type = std::make_shared<Type>(TypeTag::String);
+                ValuePtr nil_str = std::make_shared<Value>(string_type, std::string("nil"));
+                Reg nil_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, nil_reg, nil_str));
+                emit_instruction(LIR_Inst(LIR_Op::PrintString, 0, nil_reg, 0));
+            }
+        } else if (auto interpolated = dynamic_cast<AST::InterpolatedStringExpr*>(stmt.arguments[0].get())) {
+            // This is an interpolated string - treat as string
+            emit_instruction(LIR_Inst(LIR_Op::PrintString, 0, value, 0));
+        } else {
+            // For expressions, determine type at generation time and emit appropriate print
+            // For now, default to PrintInt for arithmetic expressions
+            // TODO: Better type inference for expressions
+            emit_instruction(LIR_Inst(LIR_Op::PrintInt, 0, value, 0));
+        }
     }
 }
 
 void Generator::emit_var_stmt(AST::VarDeclaration& stmt) {
+    Reg value_reg;
     if (stmt.initializer) {
         Reg value = emit_expr(*stmt.initializer);
-        set_variable_register(stmt.name, value);
+        value_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::Mov, value_reg, value, 0));
+        set_register_type(value_reg, get_register_type(value));
     } else {
         // Initialize with nil
-        Reg dst = allocate_register();
+        value_reg = allocate_register();
         auto nil_type = std::make_shared<Type>(TypeTag::Nil);
         ValuePtr nil_val = std::make_shared<Value>(nil_type, "");
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, dst, nil_val));
-        set_variable_register(stmt.name, dst);
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, value_reg, nil_val));
+        set_register_type(value_reg, nil_type);
     }
+    bind_variable(stmt.name, value_reg);
 }
 
 void Generator::emit_block_stmt(AST::BlockStatement& stmt) {
+    enter_scope();
     for (const auto& block_stmt : stmt.statements) {
         emit_stmt(*block_stmt);
     }
+    exit_scope();
 }
 
 void Generator::emit_if_stmt(AST::IfStatement& stmt) {

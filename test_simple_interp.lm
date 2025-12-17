@@ -1,2 +1,1 @@
-var message: str = "Hello World";
-print(message);
+print("{name}")
