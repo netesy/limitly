@@ -558,8 +558,9 @@ Reg Generator::emit_assign_expr(AST::AssignExpr& expr) {
     // For simple variable assignment
     if (!expr.name.empty()) {
         Reg dst = allocate_register();
-        emit_instruction(LIR_Inst(LIR_Op::Mov, dst, value, 0));
+        // Set type BEFORE emitting so it's available during emit_instruction
         set_register_type(dst, get_register_type(value));
+        emit_instruction(LIR_Inst(LIR_Op::Mov, dst, value, 0));
         update_variable_binding(expr.name, dst);
         return dst;
     } else if (expr.object) {

@@ -268,8 +268,9 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
     switch (inst.op) {
         // Data Movement
         case LIR::LIR_Op::Mov: {
-            gccjit::lvalue dst = get_jit_register(inst.dst);
             gccjit::rvalue src = get_jit_register(inst.a);
+            // Get or create destination register with the same type as source
+            gccjit::lvalue dst = get_jit_register(inst.dst, src.get_type());
             m_current_block.add_assignment(dst, src);
             return src;
         }
