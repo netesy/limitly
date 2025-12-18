@@ -56,6 +56,9 @@ std::string LIR_Inst::to_string() const {
                 oss << " r" << dst;
             }
             break;
+        case LIR_Op::Ret:
+            oss << " r" << dst;
+            break;
         case LIR_Op::Load:
         case LIR_Op::Store:
             oss << " r" << dst << ", r" << a;

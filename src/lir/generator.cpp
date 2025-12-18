@@ -17,7 +17,10 @@ std::unique_ptr<LIR_Function> Generator::generate_program(AST::Program& program)
     // PASS 0: Collect function signatures only
     collect_function_signatures(program);
     
-    // Create a main function
+    // PASS 1: Lower function bodies into separate LIR functions
+    lower_function_bodies(program);
+    
+    // PASS 2: Generate main function with top-level code only
     current_function_ = std::make_unique<LIR_Function>("main", 0);
     next_register_ = 0;
     next_label_ = 0;
@@ -27,11 +30,15 @@ std::unique_ptr<LIR_Function> Generator::generate_program(AST::Program& program)
     enter_scope();
     enter_memory_region();
     
-    // Start CFG building
+    // Start CFG building for main only
     start_cfg_build();
     
-    // PASS 1: Generate LIR with full function knowledge
+    // Generate top-level statements (excluding function definitions)
     for (const auto& stmt : program.statements) {
+        if (auto func_stmt = dynamic_cast<AST::FunctionDeclaration*>(stmt.get())) {
+            // Skip function definitions - they're already lowered
+            continue;
+        }
         emit_stmt(*stmt);
     }
     
@@ -40,7 +47,7 @@ std::unique_ptr<LIR_Function> Generator::generate_program(AST::Program& program)
         emit_instruction(LIR_Inst(LIR_Op::Return));
     }
 
-    // Finish CFG building
+    // Finish CFG building for main
     finish_cfg_build();
 
     exit_scope();
@@ -191,18 +198,14 @@ ValuePtr Generator::get_register_value(Reg reg) {
 
 void Generator::emit_instruction(const LIR_Inst& inst) {
     if (current_function_) {
-        // If CFG building is active, emit to current CFG block
         if (cfg_context_.building_cfg && cfg_context_.current_block) {
-            // Don't emit instructions to a terminated block
-            if (cfg_context_.current_block->terminated) {
-                std::cout << "[DEBUG] LIR Generator: Skipping instruction - block is terminated" << std::endl;
-                return;
+            if (cfg_context_.current_block->has_terminator()) {
+                // If the block is already terminated, create a new block for subsequent instructions
+                LIR_BasicBlock* new_block = create_basic_block("unreachable");
+                set_current_block(new_block);
             }
-            std::cout << "[DEBUG] LIR Generator: Adding instruction to current block, total now: " 
-                     << cfg_context_.current_block->instructions.size() + 1 << std::endl;
             cfg_context_.current_block->add_instruction(inst);
         } else {
-            // Fallback: emit to linear instruction stream for non-CFG mode
             current_function_->instructions.push_back(inst);
         }
         
@@ -1335,10 +1338,6 @@ void Generator::emit_if_stmt(AST::IfStatement& stmt) {
     
     // Conditional jump: if false, go to else (or end if no else)
     uint32_t false_target = else_block ? else_block->id : end_block->id;
-    emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, condition_bool, 0, false_target));
-    
-    // Jump to then branch
-    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, then_block->id));
     
     // Set up edges from current block
     add_block_edge(get_current_block(), then_block);
@@ -1391,7 +1390,9 @@ void Generator::emit_while_stmt(AST::WhileStatement& stmt) {
     set_loop_labels(header_block->id, exit_block->id, header_block->id);
     
     // Jump from current block to header
-    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
+    if (get_current_block() && !get_current_block()->has_terminator()) {
+        emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
+    }
     add_block_edge(get_current_block(), header_block);
     
     // === Header Block: condition check ===
@@ -1664,79 +1665,73 @@ void Generator::emit_worker_stmt(AST::WorkerStatement& stmt) {
 }
 
 void Generator::emit_iter_stmt(AST::IterStatement& stmt) {
-    // Generate labels for the loop
-    uint32_t start_label = generate_label();
-    uint32_t end_label = generate_label();
-    uint32_t continue_label = generate_label();
-    
-    // Enter loop context
-    enter_loop();
-    set_loop_labels(start_label, end_label, continue_label);
-    
-    // Create a new scope for the loop variables
-    enter_scope();
-    
-    // For now, implement a basic version that assumes the iterable is a range
-    // TODO: Implement proper iterator protocol
-    
-    // Get the iterable expression
-    Reg iterable_reg = emit_expr(*stmt.iterable);
-    
-    // Initialize loop variables (simplified - assumes range-like behavior)
-    for (const auto& var_name : stmt.loopVars) {
-        Reg var_reg = allocate_register();
-        bind_variable(var_name, var_reg);
-        
-        // Initialize with zero for now (proper implementation would get from iterator)
-        auto int_type = std::make_shared<Type>(TypeTag::Int);
-        ValuePtr zero_val = std::make_shared<Value>(int_type, (int64_t)0);
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, var_reg, zero_val));
-        set_register_type(var_reg, int_type);
+    auto range_expr = dynamic_cast<AST::RangeExpr*>(stmt.iterable.get());
+    if (!range_expr) {
+        report_error("iter statement only supports range expressions for now");
+        return;
     }
-    
-    // Emit condition check (simplified - assumes fixed iteration count)
-    // TODO: Proper iterator protocol with hasNext() check
-    Reg condition = allocate_register();
-    auto int_type = std::make_shared<Type>(TypeTag::Int);
-    ValuePtr condition_val = std::make_shared<Value>(int_type, (int64_t)1); // Always true for now
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, condition, condition_val));
-    set_register_type(condition, int_type);
-    
-    Reg condition_bool = allocate_register();
-    Reg zero_reg = allocate_register();
-    ValuePtr zero_val = std::make_shared<Value>(int_type, (int64_t)0);
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, zero_reg, zero_val));
-    set_register_type(zero_reg, int_type);
-    emit_instruction(LIR_Inst(LIR_Op::CmpNEQ, condition_bool, condition, zero_reg)); // condition != 0
-    
-    // Jump to end if condition is false
-    emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, condition_bool, 0, end_label));
-    
-    // Emit loop body
+
+    if (stmt.loopVars.size() != 1) {
+        report_error("iter statement currently supports only one loop variable");
+        return;
+    }
+    const std::string& loop_var_name = stmt.loopVars[0];
+
+    LIR_BasicBlock* header_block = create_basic_block("iter_header");
+    LIR_BasicBlock* body_block = create_basic_block("iter_body");
+    LIR_BasicBlock* increment_block = create_basic_block("iter_increment");
+    LIR_BasicBlock* exit_block = create_basic_block("iter_exit");
+
+    enter_scope();
+    enter_loop();
+    set_loop_labels(header_block->id, exit_block->id, increment_block->id);
+
+    Reg loop_var_reg = allocate_register();
+    bind_variable(loop_var_name, loop_var_reg);
+
+    Reg start_reg = emit_expr(*range_expr->start);
+    emit_instruction(LIR_Inst(LIR_Op::Mov, loop_var_reg, start_reg, 0));
+    set_register_type(loop_var_reg, get_register_type(start_reg));
+
+    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
+    add_block_edge(get_current_block(), header_block);
+
+    set_current_block(header_block);
+    Reg end_reg = emit_expr(*range_expr->end);
+    Reg cmp_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::CmpLT, cmp_reg, loop_var_reg, end_reg));
+    set_register_type(cmp_reg, std::make_shared<Type>(TypeTag::Bool));
+    emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp_reg, 0, exit_block->id));
+    add_block_edge(header_block, body_block);
+    add_block_edge(header_block, exit_block);
+
+    set_current_block(body_block);
     if (stmt.body) {
         emit_stmt(*stmt.body);
     }
-    
-    // Emit continue point
-    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, continue_label));
-    
-    // Increment loop variables (simplified)
-    for (const auto& var_name : stmt.loopVars) {
-        Reg var_reg = resolve_variable(var_name);
-        Reg one_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, increment_block->id));
+    add_block_edge(body_block, increment_block);
+
+    set_current_block(increment_block);
+    Reg step_reg;
+    if (range_expr->step) {
+        step_reg = emit_expr(*range_expr->step);
+    } else {
+        step_reg = allocate_register();
+        auto int_type = std::make_shared<Type>(TypeTag::Int64);
         ValuePtr one_val = std::make_shared<Value>(int_type, (int64_t)1);
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, one_reg, one_val));
-        emit_instruction(LIR_Inst(LIR_Op::Add, var_reg, var_reg, one_reg));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, step_reg, one_val));
+        set_register_type(step_reg, int_type);
     }
-    
-    // Jump back to start
-    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, start_label));
-    
-    // Exit loop scope (cleans up memory)
-    exit_scope();
-    
-    // Exit loop context
+    Reg new_val_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::Add, new_val_reg, loop_var_reg, step_reg));
+    emit_instruction(LIR_Inst(LIR_Op::Mov, loop_var_reg, new_val_reg, 0));
+    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
+    add_block_edge(increment_block, header_block);
+
+    set_current_block(exit_block);
     exit_loop();
+    exit_scope();
 }
 
 void Generator::emit_break_stmt(AST::BreakStatement& stmt) {
@@ -1834,7 +1829,9 @@ void Generator::exit_loop() {
 
 void Generator::set_loop_labels(uint32_t start_label, uint32_t end_label, uint32_t continue_label) {
     if (!loop_stack_.empty()) {
-        loop_stack_.back().start_label = start_label;
+        if (loop_stack_.back().start_label == 0) {
+            loop_stack_.back().start_label = start_label;
+        }
         loop_stack_.back().end_label = end_label;
         loop_stack_.back().continue_label = continue_label;
     }
@@ -2045,36 +2042,120 @@ void Generator::collect_function_signatures(AST::Program& program) {
 void Generator::collect_function_signature(AST::FunctionDeclaration& stmt) {
     std::cout << "[DEBUG] LIR Generator: Collecting signature for function '" << stmt.name << "'" << std::endl;
     
-    // Create parameter types
-    std::vector<LIRParameter> params;
-    for (const auto& param : stmt.params) {
-        LIRParameter lir_param;
-        lir_param.name = param.first;
-        auto param_type = convert_ast_type_to_lir_type(param.second);
-        lir_param.type = param_type ? param_type : std::make_shared<Type>(TypeTag::Any);
-        params.push_back(lir_param);
-    }
+    // Store function info in table - body will be lowered in Pass 1
+    FunctionInfo info;
+    info.name = stmt.name;
+    info.param_count = stmt.params.size();
+    info.optional_param_count = 0;
+    info.has_closure = false;
+    info.visibility = stmt.visibility;
+    info.lir_function = nullptr;  // Will be created in Pass 1
     
-    // Get return type
-    std::shared_ptr<Type> return_type = nullptr;
-    if (stmt.returnType.has_value()) {
-        return_type = convert_ast_type_to_lir_type(stmt.returnType.value());
-    }
-    if (!return_type) {
-        return_type = std::make_shared<Type>(TypeTag::Nil);
-    }
-    
-    // Create placeholder body - will be replaced in Pass 1
-    auto placeholder_body = [stmt](const std::vector<ValuePtr>& args) -> ValuePtr {
-        auto nil_type = std::make_shared<Type>(TypeTag::Nil);
-        return std::make_shared<Value>(nil_type);
-    };
-    
-    // Register the function signature immediately
-    auto lir_func = std::make_shared<LIRFunction>(stmt.name, params, return_type, placeholder_body);
-    LIRFunctionManager::getInstance().registerFunction(lir_func);
+    function_table_[stmt.name] = std::move(info);
     
     std::cout << "[DEBUG] LIR Generator: Registered signature for function '" << stmt.name << "'" << std::endl;
+}
+
+void Generator::lower_function_bodies(AST::Program& program) {
+    std::cout << "[DEBUG] LIR Generator: Pass 1 - Lowering function bodies..." << std::endl;
+    
+    for (const auto& stmt : program.statements) {
+        if (auto func_stmt = dynamic_cast<AST::FunctionDeclaration*>(stmt.get())) {
+            lower_function_body(*func_stmt);
+        }
+    }
+    
+    std::cout << "[DEBUG] LIR Generator: Pass 1 complete - All function bodies lowered" << std::endl;
+}
+
+void Generator::lower_function_body(AST::FunctionDeclaration& stmt) {
+    std::cout << "[DEBUG] LIR Generator: Lowering body for function '" << stmt.name << "'" << std::endl;
+    
+    // Create separate LIR function for this function body
+    auto func = std::make_unique<LIR_Function>(stmt.name, stmt.params.size());
+    
+    // Save current context
+    auto saved_function = std::move(current_function_);
+    auto saved_next_register = next_register_;
+    auto saved_scope_stack = scope_stack_;
+    auto saved_register_types = register_types_;
+    
+    // Set up function context
+    current_function_ = std::move(func);
+    next_register_ = stmt.params.size();  // Start after parameters
+    scope_stack_.clear();
+    register_types_.clear();
+    
+    // Enter function scope
+    enter_scope();
+    
+    // Bind parameters to registers (no explicit param instructions needed)
+    for (size_t i = 0; i < stmt.params.size(); ++i) {
+        bind_variable(stmt.params[i].first, static_cast<Reg>(i));
+        set_register_type(static_cast<Reg>(i), nullptr);
+    }
+    
+    // Emit function body from AST
+    if (stmt.body) {
+        emit_stmt(*stmt.body);
+    }
+    
+    // Ensure function has a return instruction
+    if (current_function_->instructions.empty() || 
+        !current_function_->instructions.back().isReturn()) {
+        // Implicit return of 0 if no explicit return
+        Reg return_reg = allocate_register();
+        auto int_type = std::make_shared<Type>(TypeTag::Int64);
+        ValuePtr zero_val = std::make_shared<Value>(int_type, int64_t(0));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, return_reg, zero_val));
+        emit_instruction(LIR_Inst(LIR_Op::Ret, return_reg, 0, 0));
+    }
+    
+    exit_scope();
+    
+    // Store the completed LIR function in the function table
+    auto& func_info = function_table_[stmt.name];
+    func_info.lir_function = std::move(current_function_);
+    
+    std::cout << "[DEBUG] Generated " << func_info.lir_function->instructions.size() 
+              << " LIR instructions for function '" << stmt.name << "'" << std::endl;
+    
+    // Print the LIR instructions for this function
+    std::cout << "=== LIR for function '" << stmt.name << "' ===" << std::endl;
+    
+    // Find the actual return register - look for the register being returned
+    Reg return_reg = 0;  // default
+    std::cout << "[DEBUG] Looking for return register in " << func_info.lir_function->instructions.size() << " instructions:" << std::endl;
+    for (const auto& inst : func_info.lir_function->instructions) {
+        std::cout << "[DEBUG] Instruction: " << inst.to_string() << " (op=" << static_cast<int>(inst.op) << ", dst=" << inst.dst << ")" << std::endl;
+        if (inst.op == LIR_Op::Return || inst.op == LIR_Op::Ret) {
+            return_reg = inst.dst;
+            std::cout << "[DEBUG] Found ret instruction with dst r" << return_reg << std::endl;
+            break;
+        }
+    }
+    std::cout << "[DEBUG] Final return_reg: r" << return_reg << std::endl;
+    
+    std::cout << "fn " << stmt.name << ", r" << return_reg << std::endl;
+    
+    // Print parameters
+    for (size_t i = 0; i < stmt.params.size(); ++i) {
+        std::cout << "param r" << i << "        ; " << stmt.params[i].first << std::endl;
+    }
+    std::cout << std::endl;
+    
+    // Print instructions with numbered indices
+    for (size_t i = 0; i < func_info.lir_function->instructions.size(); ++i) {
+        const auto& inst = func_info.lir_function->instructions[i];
+        std::cout << "[" << i << "] " << inst.to_string() << std::endl;
+    }
+    std::cout << "=== End LIR for function '" << stmt.name << "' ===" << std::endl;
+    
+    // Restore context
+    current_function_ = std::move(saved_function);
+    next_register_ = saved_next_register;
+    scope_stack_ = std::move(saved_scope_stack);
+    register_types_ = std::move(saved_register_types);
 }
 
 } // namespace LIR

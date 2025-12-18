@@ -418,29 +418,29 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
                 if (inst.const_val->type) {
                     switch (inst.const_val->type->tag) {
                         case TypeTag::Int:
-                            dst = get_jit_register(inst.dst, m_uint_type);
-                            // Explicitly cast to long to resolve ambiguity
+                            dst = get_jit_register(inst.dst, m_int_type);
+                            // Use int to resolve ambiguity
                             {
                                 long long val = std::stoll(inst.const_val->data);
-                                value = m_context.new_rvalue(m_uint_type, static_cast<long>(val));
+                                value = m_context.new_rvalue(m_int_type, static_cast<int>(val));
                             }
                             break;      
                         case TypeTag::UInt8:
                         case TypeTag::UInt16:
                         case TypeTag::UInt32:
                             dst = get_jit_register(inst.dst, m_uint_type);
-                            // Explicitly cast to long to resolve the ambiguity
+                            // Use int to resolve ambiguity
                             {
-
-                                long long val = std::stoll(inst.const_val->data);
-                                value = m_context.new_rvalue(m_uint_type, static_cast<long>(val));
+                                unsigned long long val = std::stoull(inst.const_val->data);
+                                value = m_context.new_rvalue(m_uint_type, static_cast<int>(val));
                             }
                             break;
                         case TypeTag::UInt64:
                             dst = get_jit_register(inst.dst, m_uint_type);
                             // Handle large unsigned values that don't fit in signed int
                             try {
-                                value = m_context.new_rvalue(m_uint_type, static_cast<long>(std::stoull(inst.const_val->data)));
+                                unsigned long long val = std::stoull(inst.const_val->data);
+                                value = m_context.new_rvalue(m_uint_type, static_cast<int>(val));
                             } catch (const std::out_of_range&) {
                                 // If value is too large, use 0 as fallback
                                 value = m_context.new_rvalue(m_uint_type, 0);
@@ -448,7 +448,7 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
                                 // If parsing fails, use 0 as fallback  
                                 value = m_context.new_rvalue(m_uint_type, 0);
                             }
-                            break; 
+                            break;
                             
                         case TypeTag::Int32: 
                             dst = get_jit_register(inst.dst, m_uint_type);
@@ -1171,13 +1171,14 @@ gccjit::type JITBackend::to_jit_type(TypePtr type) {
         case TypeTag::Int32:
         case TypeTag::Int64:
         case TypeTag::Int128:
+            return m_int_type;
         case TypeTag::UInt:
         case TypeTag::UInt8:
         case TypeTag::UInt16:
         case TypeTag::UInt32:
         case TypeTag::UInt64:
         case TypeTag::UInt128:
-            return m_int_type;
+            return m_uint_type;
         case TypeTag::Float32:
         case TypeTag::Float64:
             return m_double_type;
