@@ -32,6 +32,10 @@ private:
     void collect_function_signatures(AST::Program& program);
     void collect_function_signature(AST::FunctionDeclaration& stmt);
     
+    // Function body lowering (Pass 1)
+    void lower_function_bodies(AST::Program& program);
+    void lower_function_body(AST::FunctionDeclaration& stmt);
+    
     // Helper methods
     Reg allocate_register();
     void enter_scope();
@@ -168,7 +172,7 @@ private:
     // Function symbol table for visibility control
     struct FunctionInfo {
         std::string name;
-        std::unique_ptr<LIR_Function> function;
+        std::unique_ptr<LIR_Function> lir_function;  // Separate LIR function
         AST::VisibilityLevel visibility;
         size_t param_count;
         size_t optional_param_count;

@@ -7,6 +7,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include "lir.hh"
 #include "../backend/value.hh"
 #include "../backend/types.hh"
 
