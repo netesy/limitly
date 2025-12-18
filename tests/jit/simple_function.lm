@@ -1,0 +1,7 @@
+print("Starting function test");
+
+fn simple() {
+    print("Hello from simple function");
+}
+
+simple();

@@ -7,6 +7,7 @@
 #include "backend/bytecode_printer.hh"
 #include "backend/vm/vm.hh"
 #include "lir/generator.hh"
+#include "lir/functions.hh"
 #include "backend/jit/jit.hh"
 #include <iostream>
 #include <fstream>
@@ -126,8 +127,23 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 JIT::JITBackend jit;
                 jit.set_debug_mode(true); // Enable debug to see what's happening
                 
-                // Process the LIR function with JIT (now that CFG is fully built)
+                // Process the main LIR function with JIT (now that CFG is fully built)
                 jit.process_function(*lir_function);
+                
+                // Process all user-defined LIR functions that were registered
+                auto& lir_func_manager = LIR::LIRFunctionManager::getInstance();
+                auto function_names = lir_func_manager.getFunctionNames();
+                
+                std::cout << "Registering " << function_names.size() << " user-defined LIR functions with JIT..." << std::endl;
+                
+                for (const auto& func_name : function_names) {
+                    auto lir_func = lir_func_manager.getFunction(func_name);
+                    if (lir_func) {
+                        std::cout << "JIT registering function: " << func_name << std::endl;
+                        // TODO: Register function with JIT backend
+                        // For now, the JIT will resolve calls via function ID
+                    }
+                }
                 
                 if (jitDebug) {
                     std::cout << "=== JIT Debug Mode - Running Directly ===\n";

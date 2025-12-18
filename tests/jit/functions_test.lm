@@ -1,0 +1,39 @@
+// Test basic function declaration and call
+fn add(a: int, b: int) -> int {
+    return a + b;
+}
+
+// Test function with optional parameters
+fn greet(name: str, greeting: str = "Hello") -> str {
+    return greeting + ", " + name + "!";
+}
+
+// Test public function (should work at module level)
+public fn public_func() -> int {
+    return 42;
+}
+
+// Main test
+print("=== Function Tests ===");
+
+// Test basic function call
+var result = add(5, 3);
+// print("5 + 3 =", result);
+print("5 + 3 =");
+print( result);
+
+// Test function with default parameter
+var message = greet("World");
+print(message);
+
+// Test function with named parameter (if supported)
+var message2 = greet(name="Alice", greeting="Hi");
+print(message2);
+
+// Test public function
+var pub_result = public_func();
+// print("Public function result:", pub_result);
+print("Public function result:");
+print(pub_result);
+
+print("=== Function Tests Complete ===");
