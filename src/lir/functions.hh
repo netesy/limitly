@@ -42,6 +42,9 @@ private:
     std::optional<std::shared_ptr<Type>> returnType_;
     LIRFunctionBody body_;
     LIRFunctionSignature signature_;
+    
+    // Store the LIR instructions for this function
+    std::vector<LIR::LIR_Inst> instructions_;
 
 public:
     LIRFunction(const std::string& name, 
@@ -59,6 +62,10 @@ public:
     const std::vector<LIRParameter>& getParameters() const { return parameters_; }
     const std::optional<std::shared_ptr<Type>>& getReturnType() const { return returnType_; }
     bool hasBody() const { return static_cast<bool>(body_); }
+    
+    // LIR instruction access
+    const std::vector<LIR::LIR_Inst>& getInstructions() const { return instructions_; }
+    void setInstructions(const std::vector<LIR::LIR_Inst>& instructions) { instructions_ = instructions; }
 };
 
 // Manager for LIR-specific functions

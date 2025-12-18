@@ -49,6 +49,11 @@ enum class LIR_Op : uint8_t {
     Call,       // Function call (reg = call(func_id, params...))
     Return,     // Return (return from function)
     
+    // Function definition operations
+    FuncDef,    // Function definition (fn name, return_reg)
+    Param,      // Parameter definition (param reg)
+    Ret,        // Function return with register (ret reg)
+    
     // Typed print operations
     PrintInt,   // Print integer (print_int(reg))
     PrintUint,   // Print unsigned integer (print_uint(reg))
@@ -140,6 +145,11 @@ struct LIR_Inst {
     
     LIR_Inst(LIR_Op op, Reg dst, ValuePtr constant)
         : op(op), dst(dst), a(0), b(0), imm(0), const_val(constant) {}
+    
+    // Check if this instruction is a return instruction
+    bool isReturn() const {
+        return op == LIR_Op::Return || op == LIR_Op::Ret;
+    }
     
     std::string to_string() const;
 };
