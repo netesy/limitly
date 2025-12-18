@@ -2,13 +2,15 @@
 #define LIR_GENERATOR_H
 
 #include "lir.hh"
-#include "../frontend/ast.hh"
 #include "../backend/memory.hh"
-#include <unordered_map>
-#include <string>
+#include "../frontend/ast.hh"
 #include <memory>
-
-
+#include <vector>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
+#include <optional>
+#include <variant>
 
 //All semantic decisions about functions, classes, and variables are made in the generator. JIT only sees registers, memory offsets, and low-level types.
 namespace LIR {
@@ -26,6 +28,10 @@ public:
     std::vector<std::string> get_errors() const;
 
 private:
+    // Symbol collection (Pass 0)
+    void collect_function_signatures(AST::Program& program);
+    void collect_function_signature(AST::FunctionDeclaration& stmt);
+    
     // Helper methods
     Reg allocate_register();
     void enter_scope();
@@ -36,6 +42,10 @@ private:
     void set_register_type(Reg reg, TypePtr type);
     TypePtr get_register_type(Reg reg) const;
     void emit_instruction(const LIR_Inst& inst);
+    
+    // Register value management
+    void set_register_value(Reg reg, ValuePtr value);
+    ValuePtr get_register_value(Reg reg);
     
     // Type inference helpers
     TypePtr get_promoted_numeric_type(TypePtr left_type, TypePtr right_type);
@@ -88,12 +98,17 @@ private:
     Reg emit_call_expr(AST::CallExpr& expr);
     Reg emit_assign_expr(AST::AssignExpr& expr);
     Reg emit_list_expr(AST::ListExpr& expr);
+    Reg emit_call_closure_expr(AST::CallClosureExpr& expr);
     
     // Loop helper methods
     void emit_traditional_for_loop(AST::ForStatement& stmt);
     Reg emit_ternary_expr(AST::TernaryExpr& expr);
     Reg emit_index_expr(AST::IndexExpr& expr);
     Reg emit_member_expr(AST::MemberExpr& expr);
+    Reg emit_tuple_expr(AST::TupleExpr& expr);
+    Reg emit_dict_expr(AST::DictExpr& expr);
+    Reg emit_range_expr(AST::RangeExpr& expr);
+    Reg emit_lambda_expr(AST::LambdaExpr& expr);
     
     // Specific statement handlers
     void emit_expr_stmt(AST::ExprStatement& stmt);
@@ -147,11 +162,26 @@ private:
     uint32_t next_register_ = 0;
     uint32_t next_label_ = 0;
     std::unordered_map<Reg, TypePtr> register_types_;
+    std::unordered_map<Reg, ValuePtr> register_values_;
     std::vector<std::string> errors_;
+    
+    // Function symbol table for visibility control
+    struct FunctionInfo {
+        std::string name;
+        std::unique_ptr<LIR_Function> function;
+        AST::VisibilityLevel visibility;
+        size_t param_count;
+        size_t optional_param_count;
+        bool has_closure;
+    };
+    std::unordered_map<std::string, FunctionInfo> function_table_;
     
     // Memory management
     MemoryManager<> memory_manager_;
     MemoryManager<>::Region* current_memory_region_ = nullptr;
+    
+    // Helper methods
+    std::shared_ptr<Type> convert_ast_type_to_lir_type(const std::shared_ptr<AST::TypeAnnotation>& ast_type);
 };
 
 } // namespace LIR

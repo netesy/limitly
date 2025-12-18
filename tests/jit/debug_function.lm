@@ -1,0 +1,10 @@
+print("Before function");
+
+fn test() {
+    print("Inside function");
+}
+
+print("After function declaration");
+print("Before call");
+test();
+print("After call");
