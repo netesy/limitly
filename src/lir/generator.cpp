@@ -950,11 +950,16 @@ Reg Generator::emit_call_expr(AST::CallExpr& expr) {
         } else if (FunctionUtils::isFunction(func_name)) {
             std::cout << "[DEBUG] LIR Generator: Generating call to user function '" << func_name << "'" << std::endl;
             
-            // Evaluate arguments and store them in registers
+            // Evaluate arguments and move them to standard parameter registers (r0, r1, etc.)
             std::vector<Reg> arg_regs;
-            for (const auto& arg : expr.arguments) {
-                Reg arg_reg = emit_expr(*arg);
+            for (size_t i = 0; i < expr.arguments.size(); ++i) {
+                Reg arg_reg = emit_expr(*expr.arguments[i]);
                 arg_regs.push_back(arg_reg);
+                
+                // Move argument to standard parameter register (r0, r1, r2, etc.)
+                if (i != static_cast<size_t>(arg_reg)) {
+                    emit_instruction(LIR_Inst(LIR_Op::Mov, static_cast<Reg>(i), arg_reg));
+                }
             }
             
             // Allocate result register
@@ -973,7 +978,7 @@ Reg Generator::emit_call_expr(AST::CallExpr& expr) {
             // For now, use function index as ID (simplified)
             int32_t function_id = static_cast<int32_t>(func_manager.getFunctionIndex(func_name));
             std::cout << "[DEBUG] LIR Generator: Emitting Call instruction for '" << func_name << "' with ID " << function_id << std::endl;
-            emit_instruction(LIR_Inst(LIR_Op::Call, result, static_cast<Reg>(arg_regs.size()), static_cast<Reg>(function_id)));
+            emit_instruction(LIR_Inst(LIR_Op::Call, result, static_cast<Reg>(expr.arguments.size()), static_cast<Reg>(function_id)));
             set_register_type(result, std::make_shared<Type>(TypeTag::Any));
             
             return result;
@@ -1535,77 +1540,95 @@ void Generator::emit_return_stmt(AST::ReturnStatement& stmt) {
 void Generator::emit_func_stmt(AST::FunctionDeclaration& stmt) {
     std::cout << "[DEBUG] LIR Generator: Pass 1 - Processing function '" << stmt.name << "'" << std::endl;
     
-    // In Pass 1, functions are already registered from Pass 0
-    // We don't need to generate LIR for them during main program generation
-    // The LIR for functions will be generated separately when needed by JIT
+    // Generate proper LIR instructions for function body
+    // Save current context
+    auto saved_function = std::move(current_function_);
+    auto saved_next_register = next_register_;
+    auto saved_cfg_context = cfg_context_;
     
-    // Update the function with the real implementation (but don't generate LIR yet)
+    // Create a new function for this function body
+    auto func = std::make_unique<LIR_Function>(stmt.name, stmt.params.size());
+    current_function_ = std::move(func);
+    next_register_ = stmt.params.size();  // Start after parameters
+    
+    // Disable CFG building for function bodies (use linear instructions)
+    cfg_context_.building_cfg = false;
+    cfg_context_.current_block = nullptr;
+    
+    // Enter function scope for parameter bindings
+    enter_scope();
+    
+    // Bind parameters to registers
+    for (size_t i = 0; i < stmt.params.size(); ++i) {
+        bind_variable(stmt.params[i].first, static_cast<Reg>(i));
+        set_register_type(static_cast<Reg>(i), nullptr);
+    }
+    
+    // Emit function body from AST
+    if (stmt.body) {
+        emit_stmt(*stmt.body);
+    }
+    
+    // Ensure function has a return instruction
+    if (current_function_->instructions.empty() || 
+        !current_function_->instructions.back().isReturn()) {
+        // If no explicit return, add implicit return of 0
+        Reg return_reg = allocate_register();
+        auto int_type = std::make_shared<Type>(TypeTag::Int64);
+        ValuePtr zero_val = std::make_shared<Value>(int_type, int64_t(0));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, return_reg, zero_val));
+        emit_instruction(LIR_Inst(LIR_Op::Ret, return_reg, 0, 0));
+    }
+    
+    // Exit function scope
+    exit_scope();
+    
+    // Create function metadata for registration
     std::vector<LIRParameter> params;
-    for (const auto& param : stmt.params) {
+    for (size_t i = 0; i < stmt.params.size(); ++i) {
         LIRParameter lir_param;
-        lir_param.name = param.first;
-        auto param_type = convert_ast_type_to_lir_type(param.second);
+        lir_param.name = stmt.params[i].first;
+        auto param_type = convert_ast_type_to_lir_type(stmt.params[i].second);
         lir_param.type = param_type ? param_type : std::make_shared<Type>(TypeTag::Any);
         params.push_back(lir_param);
     }
     
-    std::shared_ptr<Type> return_type = nullptr;
-    if (stmt.returnType.has_value()) {
-        return_type = convert_ast_type_to_lir_type(stmt.returnType.value());
-    }
+    auto return_type = stmt.returnType ? convert_ast_type_to_lir_type(stmt.returnType.value()) : nullptr;
     if (!return_type) {
-        return_type = std::make_shared<Type>(TypeTag::Nil);
+        return_type = std::make_shared<Type>(TypeTag::Int64);
     }
     
-    // Create the real function body
+    // Create a simple lambda that delegates to JIT execution
     std::string func_name = stmt.name;
-    auto real_body = [func_name](const std::vector<ValuePtr>& args) -> ValuePtr {
-        if (func_name == "add" || func_name == "subtract" || 
-            func_name == "multiply" || func_name == "square") {
-            if (args.size() >= 2) {
-                auto int_type = std::make_shared<Type>(TypeTag::Int);
-                if (func_name == "add") {
-                    auto result = args[0]->as<int64_t>() + args[1]->as<int64_t>();
-                    return std::make_shared<Value>(int_type, result);
-                } else if (func_name == "subtract") {
-                    auto result = args[0]->as<int64_t>() - args[1]->as<int64_t>();
-                    return std::make_shared<Value>(int_type, result);
-                } else if (func_name == "multiply") {
-                    auto result = args[0]->as<int64_t>() * args[1]->as<int64_t>();
-                    return std::make_shared<Value>(int_type, result);
-                }
-            } else if (args.size() >= 1 && func_name == "square") {
-                auto result = args[0]->as<int64_t>() * args[0]->as<int64_t>();
-                auto int_type = std::make_shared<Type>(TypeTag::Int);
-                return std::make_shared<Value>(int_type, result);
-            }
-        } else if (func_name == "factorial") {
-            // Handle factorial recursively
-            if (args.size() >= 1) {
-                auto int_type = std::make_shared<Type>(TypeTag::Int);
-                int64_t n = args[0]->as<int64_t>();
-                if (n <= 1) {
-                    return std::make_shared<Value>(int_type, int64_t(1));
-                } else {
-                    // For now, simplified factorial computation
-                    int64_t result = 1;
-                    for (int64_t i = 2; i <= n; i++) {
-                        result *= i;
-                    }
-                    return std::make_shared<Value>(int_type, result);
-                }
-            }
-        }
-        
-        auto nil_type = std::make_shared<Type>(TypeTag::Nil);
-        return std::make_shared<Value>(nil_type);
+    LIRFunctionBody jit_body = [func_name](const std::vector<ValuePtr>& args) -> ValuePtr {
+        // This lambda will be replaced by actual JIT execution
+        // For now, return a default value
+        auto int_type = std::make_shared<Type>(TypeTag::Int64);
+        return std::make_shared<Value>(int_type, int64_t(0));
     };
     
-    // Update the registered function with the real implementation
-    auto updated_lir_func = std::make_shared<LIRFunction>(stmt.name, params, return_type, real_body);
-    LIRFunctionManager::getInstance().registerFunction(updated_lir_func);
+    // Create the LIR function with the generated instructions
+    auto lir_func = std::make_shared<LIRFunction>(func_name, params, return_type, jit_body);
     
-    std::cout << "[DEBUG] LIR Generator: Pass 1 complete - Function '" << stmt.name << "' updated with real implementation" << std::endl;
+    // Store the generated instructions in the LIRFunction
+    lir_func->setInstructions(current_function_->instructions);
+    
+    // Debug asserts to ensure function invariants
+    assert(!current_function_->instructions.empty() && "Function must have at least one instruction");
+    assert(current_function_->instructions.back().isReturn() && "Function must end with a return instruction");
+    
+    std::cout << "[DEBUG] Generated " << current_function_->instructions.size() << " LIR instructions for function '" << stmt.name << "'" << std::endl;
+    
+    // Register function with LIRFunctionManager
+    LIRFunctionManager::getInstance().registerFunction(lir_func);
+    std::cout << "[DEBUG] Function registered successfully" << std::endl;
+    
+    // Restore context
+    current_function_ = std::move(saved_function);
+    next_register_ = saved_next_register;
+    cfg_context_ = saved_cfg_context;
+    
+    std::cout << "[DEBUG] LIR Generator: Pass 1 complete - Function '" << stmt.name << "' updated with LIR implementation" << std::endl;
 }
 
 void Generator::emit_import_stmt(AST::ImportStatement& stmt) {

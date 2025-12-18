@@ -39,6 +39,7 @@ RSP_DIR := rsp
 # =============================
 FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp src/common/debugger.cpp src/frontend/cst.cpp src/frontend/cst_printer.cpp src/frontend/cst_utils.cpp src/frontend/ast_builder.cpp src/lir/generator.cpp
 BACK_SRCS := src/backend/vm/vm.cpp src/backend/jit/jit_backend.cpp src/backend/jit/jit.cpp src/lir/lir.cpp src/lir/lir_utils.cpp src/lir/functions.cpp src/lir/builtin_functions.cpp
+LIR_CORE_SRCS := src/lir/lir.cpp src/lir/lir_utils.cpp src/lir/functions.cpp    src/lir/builtin_functions.cpp
 COMMON_SRCS := src/common/builtin_functions.cpp
 BACKEND_COMMON_SRCS := src/backend/backend.cpp src/backend/symbol_table.cpp src/backend/value.cpp src/backend/ast_printer.cpp src/backend/bytecode_printer.cpp src/backend/functions.cpp src/backend/closure_impl.cpp src/backend/classes.cpp src/backend/type_checker.cpp src/backend/function_types.cpp 
 ERROR_SRCS := src/error/error_formatter.cpp src/error/error_code_generator.cpp src/error/contextual_hint_provider.cpp src/error/source_code_formatter.cpp src/error/console_formatter.cpp src/error/error_catalog.cpp
@@ -50,7 +51,7 @@ else
 endif
 
 MAIN_SRCS := src/main.cpp $(BACKEND_COMMON_SRCS) $(BACK_SRCS) $(COMMON_SRCS) $(CONCURRENCY_SRCS) $(ERROR_SRCS) $(FRONT_SRCS)
-TEST_SRCS := src/test_parser.cpp $(BACKEND_COMMON_SRCS) $(ERROR_SRCS) $(FRONT_SRCS) src/lir/function_registry.cpp
+TEST_SRCS := src/test_parser.cpp $(BACKEND_COMMON_SRCS) $(LIR_CORE_SRCS) $(ERROR_SRCS) $(FRONT_SRCS) src/lir/function_registry.cpp
 
 # =============================
 # Objects and response files
@@ -116,23 +117,16 @@ $(TEST_RSP): $(TEST_OBJS) | $(RSP_DIR)
 # =============================
 # Build targets
 # =============================
-windows: $(BIN_DIR) $(MAIN_RSP) $(TEST_RSP)
+windows: $(BIN_DIR) $(MAIN_RSP)
 	@echo "🔨 Linking limitly.exe ..."
 	$(CXX) $(CXXFLAGS) @$(MAIN_RSP) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS)
 	@echo "✅ limitly.exe built."
 
-	@echo "🔨 Linking test_parser.exe ..."
-	$(CXX) $(CXXFLAGS) @$(TEST_RSP) -o $(BIN_DIR)/test_parser$(EXE_EXT) $(LIBS)
-	@echo "✅ test_parser.exe built."
-
-linux: $(BIN_DIR) $(MAIN_RSP) $(TEST_RSP)
+linux: $(BIN_DIR) $(MAIN_RSP)
 	@echo "🔨 Linking limitly ..."
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) -o $(BIN_DIR)/limitly $(LIBS)
 	@echo "✅ limitly built."
 
-	@echo "🔨 Linking test_parser ..."
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(TEST_RSP) -o $(BIN_DIR)/test_parser $(LIBS)
-	@echo "✅ test_parser built."
 
 # =============================
 # Build modes
@@ -179,3 +173,8 @@ test-jit: $(BIN_DIR)
 	@echo "✅ JIT test built."
 	@echo "🧪 Running JIT test..."
 	$(BIN_DIR)/test_jit$(EXE_EXT)
+
+parser: $(BIN_DIR) $(TEST_RSP)
+	@echo "🔨 Building test_parser$(EXE_EXT)...."
+	$(CXX) $(CXXFLAGS) @$(TEST_RSP) -o $(BIN_DIR)/test_parser$(EXE_EXT) $(LIBS)
+	@echo "✅ $(BIN_DIR)/test_parser$(EXE_EXT) built."

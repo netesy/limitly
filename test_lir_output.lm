@@ -1,0 +1,10 @@
+fn square(x) {
+    return x * x
+}
+
+fn add(a, b) {
+    return a + b
+}
+
+print(square(5))
+print(add(3, 4))

@@ -125,6 +125,9 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::JumpIfFalse: return "jmp_if_false";
         case LIR_Op::Call: return "call";
         case LIR_Op::Return: return "ret";
+        case LIR_Op::FuncDef: return "fn";
+        case LIR_Op::Param: return "param";
+        case LIR_Op::Ret: return "ret";
         case LIR_Op::PrintInt: return "print_int";
         case LIR_Op::PrintUint: return "print_uint";
         case LIR_Op::PrintFloat: return "print_float";

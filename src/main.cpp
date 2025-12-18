@@ -112,6 +112,24 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                         const auto& inst = lir_function->instructions[i];
                         std::cout << "[" << i << "] " << inst.to_string() << "\n";
                     }
+                    
+                    // Display individual function LIR instructions
+                    auto& lir_func_manager = LIR::LIRFunctionManager::getInstance();
+                    auto function_names = lir_func_manager.getFunctionNames();
+                    
+                    std::cout << "\n=== Function LIR Instructions ===\n";
+                    for (const auto& func_name : function_names) {
+                        auto lir_func = lir_func_manager.getFunction(func_name);
+                        if (lir_func) {
+                            std::cout << "\n" << func_name << ":\n";
+                            const auto& instructions = lir_func->getInstructions();
+                            for (size_t i = 0; i < instructions.size(); ++i) {
+                                const auto& inst = instructions[i];
+                                std::cout << "[" << i << "] " << inst.to_string() << "\n";
+                            }
+                        }
+                    }
+                    
                     std::cout << "\n=== CFG Blocks ===\n";
                     for (size_t i = 0; i < lir_function->cfg->blocks.size(); ++i) {
                         const auto& block = lir_function->cfg->blocks[i];

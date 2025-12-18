@@ -597,6 +597,21 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
             compile_return(inst);
             break;
             
+        // Function definition operations
+        case LIR::LIR_Op::FuncDef:
+            // Function definition - no JIT action needed for now
+            // This is metadata for the function structure
+            break;
+            
+        case LIR::LIR_Op::Param:
+            // Parameter definition - no JIT action needed for now
+            // This is metadata for parameter registers
+            break;
+            
+        case LIR::LIR_Op::Ret:
+            compile_return(inst);
+            break;
+            
         // Memory Operations
         case LIR::LIR_Op::Load:
         case LIR::LIR_Op::Store:
@@ -811,7 +826,7 @@ void JITBackend::compile_call(const LIR::LIR_Inst& inst) {
         return;
     }
     
-    // Get the actual function implementation
+    // Get the actual LIR function with its instructions
     auto lir_func = func_manager.getFunction(func_name);
     if (!lir_func) {
         // Function not found, return 0
@@ -821,90 +836,21 @@ void JITBackend::compile_call(const LIR::LIR_Inst& inst) {
         return;
     }
     
-    // For now, implement simple hardcoded function logic for basic math operations
-    // This is a temporary solution until proper function registration is implemented
-    gccjit::rvalue result;
+    // For now, we need to implement a simple call mechanism
+    // In a full implementation, this would:
+    // 1. Save current register state
+    // 2. Set up arguments in parameter registers (already done by LIR generator)
+    // 3. Jump to the function's LIR code
+    // 4. Execute the function's instructions
+    // 5. Return result in the designated register
     
-    if (func_name == "add" && arg_count == 2) {
-        // Get argument values from registers (assuming they are in consecutive registers starting from 0)
-        gccjit::rvalue arg1 = get_jit_register(0);  // First argument
-        gccjit::rvalue arg2 = get_jit_register(1);  // Second argument
-        result = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_int_type, arg1, arg2);
-    } else if (func_name == "subtract" && arg_count == 2) {
-        gccjit::rvalue arg1 = get_jit_register(0);
-        gccjit::rvalue arg2 = get_jit_register(1);
-        result = m_context.new_binary_op(GCC_JIT_BINARY_OP_MINUS, m_int_type, arg1, arg2);
-    } else if (func_name == "multiply" && arg_count == 2) {
-        gccjit::rvalue arg1 = get_jit_register(0);
-        gccjit::rvalue arg2 = get_jit_register(1);
-        result = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_int_type, arg1, arg2);
-    } else if (func_name == "square" && arg_count == 1) {
-        gccjit::rvalue arg = get_jit_register(0);
-        result = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_int_type, arg, arg);
-    } else if (func_name == "factorial" && arg_count == 1) {
-        // Simple factorial implementation (for small numbers only)
-        gccjit::rvalue n = get_jit_register(0);
-        
-        // Create basic factorial loop
-        gccjit::block loop_block = m_current_func.new_block("factorial_loop");
-        gccjit::block after_block = m_current_func.new_block("factorial_after");
-        
-        // Initialize result = 1, i = n
-        gccjit::lvalue result_var = m_current_func.new_local(m_int_type, "factorial_result");
-        gccjit::lvalue i_var = m_current_func.new_local(m_int_type, "factorial_i");
-        
-        m_current_block.add_assignment(result_var, m_context.new_rvalue(m_int_type, 1));
-        m_current_block.add_assignment(i_var, n);
-        
-        // Loop condition: if i <= 0, jump to after
-        gccjit::rvalue zero = m_context.new_rvalue(m_int_type, 0);
-        gccjit::rvalue condition = m_context.new_comparison(GCC_JIT_COMPARISON_LE, i_var, zero);
-        m_current_block.end_with_conditional(condition, after_block, loop_block);
-        
-        // Loop body: result *= i; i--
-        m_current_block = loop_block;
-        m_current_block.add_assignment(result_var, 
-            m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_int_type, result_var, i_var));
-        m_current_block.add_assignment(i_var, 
-            m_context.new_binary_op(GCC_JIT_BINARY_OP_MINUS, m_int_type, i_var, m_context.new_rvalue(m_int_type, 1)));
-        
-        // Loop back
-        gccjit::rvalue loop_condition = m_context.new_comparison(GCC_JIT_COMPARISON_GT, i_var, zero);
-        m_current_block.end_with_conditional(loop_condition, loop_block, after_block);
-        
-        // Continue with after block
-        m_current_block = after_block;
-        result = result_var;
-    } else if (func_name == "isEven" && arg_count == 1) {
-        gccjit::rvalue arg = get_jit_register(0);
-        gccjit::rvalue two = m_context.new_rvalue(m_int_type, 2);
-        // Use (arg / 2) * 2 == arg to check if even (no modulo in libgccjit)
-        gccjit::rvalue div_result = m_context.new_binary_op(GCC_JIT_BINARY_OP_DIVIDE, m_int_type, arg, two);
-        gccjit::rvalue mult_result = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_int_type, div_result, two);
-        gccjit::rvalue zero = m_context.new_rvalue(m_int_type, 0);
-        result = m_context.new_comparison(GCC_JIT_COMPARISON_EQ, mult_result, arg);
-        // Convert bool to int for consistency
-        result = m_context.new_cast(result, m_int_type);
-    } else if (func_name == "sayHello" && arg_count == 0) {
-        // Print "Hello from function!" and return 0
-        const char* message = "Hello from function!\n";
-        gcc_jit_rvalue* c_message = gcc_jit_context_new_string_literal(m_context.get_inner_context(), message);
-        gccjit::rvalue msg_rval = gccjit::rvalue(c_message);
-        std::vector<gccjit::rvalue> args = {msg_rval};
-        gccjit::rvalue printf_call = m_context.new_call(m_printf_func, args);
-        m_current_block.add_eval(printf_call);
-        result = m_context.new_rvalue(m_int_type, 0);
-    } else if (func_name == "calculate" && arg_count == 2) {
-        // calculate(x, y) = (x + y) * (x * y)
-        gccjit::rvalue arg1 = get_jit_register(0);
-        gccjit::rvalue arg2 = get_jit_register(1);
-        gccjit::rvalue sum = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_int_type, arg1, arg2);
-        gccjit::rvalue product = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_int_type, arg1, arg2);
-        result = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_int_type, sum, product);
-    } else {
-        // Unknown function, return 0
-        result = m_context.new_rvalue(m_int_type, 0);
-    }
+    // Temporary solution: Create a simple function call that returns 0
+    // This will be replaced by proper LIR execution later
+    gccjit::rvalue result = m_context.new_rvalue(m_int_type, 0);
+    
+    // TODO: Implement proper LIR function execution
+    // The function body should be compiled as separate LIR instructions
+    // and called/jumped to appropriately
     
     gccjit::lvalue dst = get_jit_register(inst.dst);
     m_current_block.add_assignment(dst, result);
