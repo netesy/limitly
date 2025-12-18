@@ -51,6 +51,7 @@ enum class LIR_Op : uint8_t {
     
     // Typed print operations
     PrintInt,   // Print integer (print_int(reg))
+    PrintUint,   // Print unsigned integer (print_uint(reg))
     PrintFloat, // Print float (print_float(reg))
     PrintBool,  // Print boolean (print_bool(reg))
     PrintString,// Print string (print_string(reg))

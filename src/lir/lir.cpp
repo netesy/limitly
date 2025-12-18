@@ -45,6 +45,7 @@ std::string LIR_Inst::to_string() const {
             oss << " r" << dst << ", r" << a;
             break;
         case LIR_Op::PrintInt:
+        case LIR_Op::PrintUint:
         case LIR_Op::PrintFloat:
         case LIR_Op::PrintBool:
         case LIR_Op::PrintString:
@@ -125,6 +126,7 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::Call: return "call";
         case LIR_Op::Return: return "ret";
         case LIR_Op::PrintInt: return "print_int";
+        case LIR_Op::PrintUint: return "print_uint";
         case LIR_Op::PrintFloat: return "print_float";
         case LIR_Op::PrintBool: return "print_bool";
         case LIR_Op::PrintString: return "print_string";

@@ -37,6 +37,16 @@ private:
     TypePtr get_register_type(Reg reg) const;
     void emit_instruction(const LIR_Inst& inst);
     
+    // Type inference helpers
+    TypePtr get_promoted_numeric_type(TypePtr left_type, TypePtr right_type);
+    bool is_signed_integer_type(TypePtr type);
+    TypePtr get_wider_integer_type(TypePtr left_type, TypePtr right_type);
+    TypePtr get_unsigned_version(TypePtr type);
+    TypePtr get_best_integer_type(const std::string& value_str, bool prefer_signed = true);
+    bool is_numeric_string(const std::string& str);
+    bool types_match(TypePtr type1, TypePtr type2);
+    int get_type_rank(TypePtr type);
+    
     // CFG building methods
     void start_cfg_build();
     void finish_cfg_build();
@@ -69,7 +79,7 @@ private:
     Reg emit_expr(AST::Expression& expr);
     
     // Specific expression handlers
-    Reg emit_literal_expr(AST::LiteralExpr& expr);
+    Reg emit_literal_expr(AST::LiteralExpr& expr, TypePtr expected_type = nullptr);
     Reg emit_variable_expr(AST::VariableExpr& expr);
     Reg emit_interpolated_string_expr(AST::InterpolatedStringExpr& expr);
     Reg emit_binary_expr(AST::BinaryExpr& expr);

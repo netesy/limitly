@@ -130,6 +130,7 @@ JITBackend::JITBackend()
     // Initialize basic types
     m_void_type = m_context.get_type(GCC_JIT_TYPE_VOID);
     m_int_type = m_context.get_type(GCC_JIT_TYPE_LONG_LONG);
+    m_uint_type = m_context.get_type(GCC_JIT_TYPE_UINT64_T);
     m_double_type = m_context.get_type(GCC_JIT_TYPE_DOUBLE);
     m_bool_type = m_context.get_type(GCC_JIT_TYPE_BOOL);
     m_const_char_ptr_type = m_context.get_type(GCC_JIT_TYPE_CONST_CHAR_PTR);
@@ -415,17 +416,53 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
                 if (inst.const_val->type) {
                     switch (inst.const_val->type->tag) {
                         case TypeTag::Int:
-                        case TypeTag::Int8:
-                        case TypeTag::Int16:
-                        case TypeTag::Int32:
+                            dst = get_jit_register(inst.dst, m_uint_type);
+                            // Explicitly cast to long to resolve ambiguity
+                            {
+                                long long val = std::stoll(inst.const_val->data);
+                                value = m_context.new_rvalue(m_uint_type, static_cast<long>(val));
+                            }
+                            break;      
+                        case TypeTag::UInt8:
+                        case TypeTag::UInt16:
+                        case TypeTag::UInt32:
+                            dst = get_jit_register(inst.dst, m_uint_type);
+                            // Explicitly cast to long to resolve the ambiguity
+                            {
+
+                                long long val = std::stoll(inst.const_val->data);
+                                value = m_context.new_rvalue(m_uint_type, static_cast<long>(val));
+                            }
+                            break;
+                        case TypeTag::UInt64:
+                            dst = get_jit_register(inst.dst, m_uint_type);
+                            // Handle large unsigned values that don't fit in signed int
+                            try {
+                                value = m_context.new_rvalue(m_uint_type, static_cast<long>(std::stoull(inst.const_val->data)));
+                            } catch (const std::out_of_range&) {
+                                // If value is too large, use 0 as fallback
+                                value = m_context.new_rvalue(m_uint_type, 0);
+                            } catch (const std::invalid_argument&) {
+                                // If parsing fails, use 0 as fallback  
+                                value = m_context.new_rvalue(m_uint_type, 0);
+                            }
+                            break; 
+                            
+                        case TypeTag::Int32: 
+                            dst = get_jit_register(inst.dst, m_uint_type);
+                            value = m_context.new_rvalue(m_uint_type, static_cast<int>(std::stoll(inst.const_val->data)));
+                            break;
                         case TypeTag::Int64:
-                            dst = get_jit_register(inst.dst, m_int_type);
-                            value = m_context.new_rvalue(m_int_type, std::stoi(inst.const_val->data));
+                            dst = get_jit_register(inst.dst, m_uint_type);
+                            {
+                                long long val = std::stoll(inst.const_val->data);
+                                value = m_context.new_rvalue(m_uint_type, static_cast<long>(val));
+                            }
                             break;
                         case TypeTag::Float32:
                         case TypeTag::Float64:
                             dst = get_jit_register(inst.dst, m_double_type);
-                            value = m_context.new_rvalue(m_double_type, std::stod(inst.const_val->data));
+                            value = m_context.new_rvalue(m_double_type, static_cast<double>(std::stold(inst.const_val->data)));
                             break;
                         case TypeTag::Bool:
                             dst = get_jit_register(inst.dst, m_bool_type);
@@ -440,20 +477,27 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
                             }
                             break;
                         case TypeTag::Nil:
+                                                dst = get_jit_register(inst.dst, m_int_type);
+                            value = m_context.new_rvalue(m_int_type, 0);
+                            break;
                         default:
                             dst = get_jit_register(inst.dst, m_int_type);
                             value = m_context.new_rvalue(m_int_type, 0);
                             break;
                     }
                 } else {
-                    // Default to int type
-                    dst = get_jit_register(inst.dst, m_int_type);
-                    value = m_context.new_rvalue(m_int_type, 0);
+                    // Default to string type
+                    gcc_jit_rvalue* c_str = gcc_jit_context_new_string_literal(m_context.get_inner_context(), inst.const_val->data.c_str());
+                    value = gccjit::rvalue(c_str);
                 }
             } else {
-                // Default to int type
-                dst = get_jit_register(inst.dst, m_int_type);
-                value = m_context.new_rvalue(m_int_type, 0);
+                // // Default to int type
+                // dst = get_jit_register(inst.dst, m_int_type);
+                // value = m_context.new_rvalue(m_int_type, 0);
+
+                                    // Default to string type
+                    gcc_jit_rvalue* c_str = gcc_jit_context_new_string_literal(m_context.get_inner_context(), inst.const_val->data.c_str());
+                    value = gccjit::rvalue(c_str);
             }
             
             m_current_block.add_assignment(dst, value);
@@ -531,6 +575,10 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
             compile_print_int(inst);
             break;
             
+        case LIR::LIR_Op::PrintUint:
+            compile_print_uint(inst);
+            break;
+                    
         case LIR::LIR_Op::PrintFloat:
             compile_print_float(inst);
             break;
@@ -748,7 +796,18 @@ void JITBackend::compile_call(const LIR::LIR_Inst& inst) {
 void JITBackend::compile_print_int(const LIR::LIR_Inst& inst) {
     // Print integer using printf
     gccjit::rvalue value = get_jit_register(inst.a);
-    const char* format_str = "%d\n";
+    const char* format_str = "%lld\n";
+    gcc_jit_rvalue* c_format = gcc_jit_context_new_string_literal(m_context.get_inner_context(), format_str);
+    gccjit::rvalue format = gccjit::rvalue(c_format);
+    std::vector<gccjit::rvalue> args = {format, value};
+    gccjit::rvalue printf_call = m_context.new_call(m_printf_func, args);
+    m_current_block.add_eval(printf_call);
+}
+
+void JITBackend::compile_print_uint(const LIR::LIR_Inst& inst) {
+    // Print integer using printf
+    gccjit::rvalue value = get_jit_register(inst.a);
+    const char* format_str = "%llu\n";
     gcc_jit_rvalue* c_format = gcc_jit_context_new_string_literal(m_context.get_inner_context(), format_str);
     gccjit::rvalue format = gccjit::rvalue(c_format);
     std::vector<gccjit::rvalue> args = {format, value};

@@ -6,55 +6,55 @@ print(i8_val);
 i8_val = i8_val + 5;
 print(i8_val);
 
-print("--- Int16 ---");
+print("~~~ Int16 ~~~");
 var i16_val: i16 = 20;
 print(i16_val);
 i16_val = i16_val * 2;
 print(i16_val);
 
-print("--- Int32 ---");
+print("~~~ Int32 ~~~");
 var i32_val: i32 = 30;
 print(i32_val);
 i32_val = i32_val - 10;
 print(i32_val);
 
-print("--- Int64 ---");
-var i64_val: i64 = 40;
+print("~~~ Int64 ~~~");
+var i64_val: i64 = 400988768;
 print(i64_val);
 i64_val = i64_val / 4;
 print(i64_val);
 
-print("--- UInt8 ---");
+print("~~~ UInt8 ~~~");
 var u8_val: u8 = 250;
 print(u8_val);
 u8_val = u8_val + 5;
 print(u8_val);
 
-print("--- UInt16 ---");
+print("~~~ UInt16 ~~~");
 var u16_val: u16 = 65530;
 print(u16_val);
 u16_val = u16_val + 5;
 print(u16_val);
 
-print("--- UInt32 ---");
+print("~~~ UInt32 ~~~");
 var u32_val: u32 = 4294967290;
 print(u32_val);
 u32_val = u32_val + 5;
 print(u32_val);
 
-print("--- UInt64 ---");
-var u64_val: u64 = 18446744073709551610u;
+print("~~~ UInt64 ~~~");
+var u64_val: u64 = 1844674407370955161;
 print(u64_val);
 u64_val = u64_val + 5;
 print(u64_val);
 
-print("--- Float32 ---");
+print("~~~ Float32 ~~~");
 var f32_val: f32 = 1.23;
 print(f32_val);
 f32_val = f32_val * 2.0;
 print(f32_val);
 
-print("--- Float64 ---");
+print("~~~ Float64 ~~~");
 var f64_val: f64 = 4.56;
 print(f64_val);
 f64_val = f64_val + 1.0;

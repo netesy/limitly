@@ -1,28 +1,28 @@
 // tests/jit/basic.lm
 
-// --- Basic Arithmetic ---
-// print("--- Basic Arithmetic ---");
+// ~~~ Basic Arithmetic ~~~
+print("~~~ Basic Arithmetic ~~~");
 print(1 + 2);
 print(5 - 3);
 print(4 * 2);
 print(8 / 2);
 
-// // --- Floating Point Arithmetic ---
-// print("--- Floating Point Arithmetic ---");
+// // ~~~ Floating Point Arithmetic ~~~
+print("~~~ Floating Point Arithmetic ~~~");
 print(1.5 + 2.5);
 print(5.5 - 3.0);
 print(4.0 * 2.5);
 print(8.5 / 2.0);
 
-// // --- Boolean Logic ---
-// print("--- Boolean Logic ---");
+// // ~~~ Boolean Logic ~~~
+print("~~~ Boolean Logic ~~~");
 print(true and false);
 print(true or false);
 print(!true);
 print(!false);
 
-// --- Comparisons ---
-// print("--- Comparisons ---");
+// ~~~ Comparisons ~~~
+print("~~~ Comparisons ~~~");
 print(1 < 2);
 print(1 <= 1);
 print(2 > 1);
@@ -30,36 +30,36 @@ print(2 >= 2);
 print(1 == 1);
 print(1 != 2);
 
-// --- Control Flow: If/Else ---
-// print("--- Control Flow: If/Else ---");
-// if (true) {
-//   print("if(true) -> then");
-// } else {
-//   print("if(true) -> else");
-// }
+// ~~~ Control Flow: If/Else ~~~
+print("~~~ Control Flow: If/Else ~~~");
+if (true) {
+  print("if(true) -> then");
+} else {
+  print("if(true) -> else");
+}
 
-// if (false) {
-//   print("if(false) -> then");
-// } else {
-//   print("if(false) -> else");
-// }
+if (false) {
+  print("if(false) -> then");
+} else {
+  print("if(false) -> else");
+}
 
-// // --- Control Flow: While Loop ---
-// print("--- Control Flow: While Loop ---");
-// var i = 0;
-// while (i < 3) {
-//   print(i);
-//   i = i + 1;
-// }
+// ~~~ Control Flow: While Loop ~~~
+print("~~~ Control Flow: While Loop ~~~");
+var i = 0;
+while (i < 3) {
+  print(i);
+  i = i + 1;
+}
 
-// // --- Control Flow: For Loop ---
-// print("--- Control Flow: For Loop ---");
-// for (var j = 0; j < 3; j = j + 1) {
-//   print(j);
-// }
+// ~~~ Control Flow: For Loop ~~~
+print("~~~ Control Flow: For Loop ~~~");
+for (var j = 0; j < 3; j = j + 1) {
+  print(j);
+}
 
-// // --- Variables ---
-// print("--- Variables ---");
+// // ~~~ Variables ~~~
+print("~~~ Variables ~~~");
 var a = 10;
 var b = 20;
 print(a + b);
