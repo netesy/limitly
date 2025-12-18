@@ -3,6 +3,8 @@
 #include "../backend/types.hh"
 #include <algorithm>
 #include <unordered_set>
+#include <map>
+#include <limits>
 
 namespace LIR {
 
@@ -241,7 +243,7 @@ void Generator::emit_stmt(AST::Statement& stmt) {
 
 Reg Generator::emit_expr(AST::Expression& expr) {
     if (auto literal = dynamic_cast<AST::LiteralExpr*>(&expr)) {
-        return emit_literal_expr(*literal);
+        return emit_literal_expr(*literal, nullptr);
     } else if (auto variable = dynamic_cast<AST::VariableExpr*>(&expr)) {
         return emit_variable_expr(*variable);
     } else if (auto interpolated = dynamic_cast<AST::InterpolatedStringExpr*>(&expr)) {
@@ -250,18 +252,10 @@ Reg Generator::emit_expr(AST::Expression& expr) {
         return emit_binary_expr(*binary);
     } else if (auto unary = dynamic_cast<AST::UnaryExpr*>(&expr)) {
         return emit_unary_expr(*unary);
-    } else if (auto call = dynamic_cast<AST::CallExpr*>(&expr)) {
-        return emit_call_expr(*call);
     } else if (auto assign = dynamic_cast<AST::AssignExpr*>(&expr)) {
         return emit_assign_expr(*assign);
-    } else if (auto grouping = dynamic_cast<AST::GroupingExpr*>(&expr)) {
-        return emit_grouping_expr(*grouping);
-    } else if (auto ternary = dynamic_cast<AST::TernaryExpr*>(&expr)) {
-        return emit_ternary_expr(*ternary);
-    } else if (auto index = dynamic_cast<AST::IndexExpr*>(&expr)) {
-        return emit_index_expr(*index);
-    } else if (auto member = dynamic_cast<AST::MemberExpr*>(&expr)) {
-        return emit_member_expr(*member);
+    } else if (auto call = dynamic_cast<AST::CallExpr*>(&expr)) {
+        return emit_call_expr(*call);
     } else if (auto list = dynamic_cast<AST::ListExpr*>(&expr)) {
         return emit_list_expr(*list);
     } else {
@@ -270,8 +264,206 @@ Reg Generator::emit_expr(AST::Expression& expr) {
     }
 }
 
+TypePtr Generator::get_promoted_numeric_type(TypePtr left_type, TypePtr right_type) {
+    // If either type is null, default to Int64
+    if (!left_type || !right_type) {
+        return std::make_shared<Type>(TypeTag::Int64);
+    }
+    
+    // If either is string, result is string
+    if (left_type->tag == TypeTag::String || right_type->tag == TypeTag::String) {
+        return std::make_shared<Type>(TypeTag::String);
+    }
+    
+    // If either is float, promote to the larger float type
+    bool left_is_float = (left_type->tag == TypeTag::Float32 || left_type->tag == TypeTag::Float64);
+    bool right_is_float = (right_type->tag == TypeTag::Float32 || right_type->tag == TypeTag::Float64);
+    
+    if (left_is_float || right_is_float) {
+        if (left_type->tag == TypeTag::Float64 || right_type->tag == TypeTag::Float64) {
+            return std::make_shared<Type>(TypeTag::Float64);
+        }
+        return std::make_shared<Type>(TypeTag::Float32);
+    }
+    
+    // Both are integers - use the "smaller matches larger" strategy
+    int left_rank = get_type_rank(left_type);
+    int right_rank = get_type_rank(right_type);
+    
+    // If ranks are equal, prefer unsigned over signed to preserve unsigned semantics
+    if (left_rank == right_rank) {
+        bool left_is_unsigned = !is_signed_integer_type(left_type);
+        bool right_is_unsigned = !is_signed_integer_type(right_type);
+        
+        if (left_is_unsigned) return left_type;
+        if (right_is_unsigned) return right_type;
+        
+        // Both signed, return either
+        return left_type;
+    }
+    
+    // Return the type with higher rank (larger/more complex type)
+    // But if the higher rank type is signed and lower rank is unsigned, 
+    // and they're close in rank, prefer unsigned to avoid signed overflow
+    TypePtr higher_type = (left_rank > right_rank) ? left_type : right_type;
+    TypePtr lower_type = (left_rank > right_rank) ? right_type : left_type;
+    
+    bool higher_is_unsigned = !is_signed_integer_type(higher_type);
+    bool lower_is_unsigned = !is_signed_integer_type(lower_type);
+    
+    // If lower is unsigned and higher is signed, and ranks are close, use unsigned version of higher
+    if (lower_is_unsigned && !higher_is_unsigned && (left_rank - right_rank <= 2 || right_rank - left_rank <= 2)) {
+        return get_unsigned_version(higher_type);
+    }
+    
+    return higher_type;
+}
+
+int Generator::get_type_rank(TypePtr type) {
+    if (!type) return 0;
+    
+    switch (type->tag) {
+        case TypeTag::Int8: case TypeTag::UInt8: return 1;
+        case TypeTag::Int16: case TypeTag::UInt16: return 2;
+        case TypeTag::Int32: case TypeTag::UInt32: return 3;
+        case TypeTag::Int: case TypeTag::UInt: case TypeTag::Int64: case TypeTag::UInt64: return 4;
+        case TypeTag::Int128: case TypeTag::UInt128: return 5;
+        case TypeTag::Float32: return 6;
+        case TypeTag::Float64: return 7;
+        case TypeTag::String: return 8;
+        case TypeTag::Bool: return 0;
+        default: return 0;
+    }
+}
+
+bool Generator::is_signed_integer_type(TypePtr type) {
+    if (!type) return false;
+    return (type->tag == TypeTag::Int || type->tag == TypeTag::Int8 || 
+            type->tag == TypeTag::Int16 || type->tag == TypeTag::Int32 || 
+            type->tag == TypeTag::Int64 || type->tag == TypeTag::Int128);
+}
+
+TypePtr Generator::get_wider_integer_type(TypePtr left_type, TypePtr right_type) {
+    if (!left_type || !right_type) {
+        return std::make_shared<Type>(TypeTag::Int64);
+    }
+    
+    // Define type precedence (from narrowest to widest)
+    std::map<TypeTag, int> type_rank = {
+        {TypeTag::Int8, 1}, {TypeTag::UInt8, 1},
+        {TypeTag::Int16, 2}, {TypeTag::UInt16, 2},
+        {TypeTag::Int32, 3}, {TypeTag::UInt32, 3},
+        {TypeTag::Int, 4}, {TypeTag::UInt, 4},
+        {TypeTag::Int64, 5}, {TypeTag::UInt64, 5},
+        {TypeTag::Int128, 6}, {TypeTag::UInt128, 6}
+    };
+    
+    int left_rank = type_rank[left_type->tag];
+    int right_rank = type_rank[right_type->tag];
+    
+    if (left_rank >= right_rank) {
+        return left_type;
+    } else {
+        return right_type;
+    }
+}
+
+TypePtr Generator::get_unsigned_version(TypePtr type) {
+    if (!type) return std::make_shared<Type>(TypeTag::UInt64);
+    
+    switch (type->tag) {
+        case TypeTag::Int8: return std::make_shared<Type>(TypeTag::UInt8);
+        case TypeTag::Int16: return std::make_shared<Type>(TypeTag::UInt16);
+        case TypeTag::Int32: return std::make_shared<Type>(TypeTag::UInt32);
+        case TypeTag::Int: 
+        case TypeTag::Int64: return std::make_shared<Type>(TypeTag::UInt64);
+        case TypeTag::Int128: return std::make_shared<Type>(TypeTag::UInt128);
+        case TypeTag::UInt8: 
+        case TypeTag::UInt16: 
+        case TypeTag::UInt32: 
+        case TypeTag::UInt: 
+        case TypeTag::UInt64: 
+        case TypeTag::UInt128: return type; // Already unsigned
+        default: return std::make_shared<Type>(TypeTag::UInt64);
+    }
+}
+
+TypePtr Generator::get_best_integer_type(const std::string& value_str, bool prefer_signed) {
+    try {
+        // Try to parse as unsigned long long to check the magnitude
+        unsigned long long ull_val = std::stoull(value_str);
+        
+        // Check system support for 128-bit integers
+        bool has_int128 = false;
+#ifdef __SIZEOF_INT128__
+        has_int128 = true;
+#endif
+        
+        if (prefer_signed) {
+            // For signed integers, check if it fits in various ranges
+            if (ull_val <= static_cast<unsigned long long>(std::numeric_limits<int8_t>::max())) {
+                return std::make_shared<Type>(TypeTag::Int8);
+            } else if (ull_val <= static_cast<unsigned long long>(std::numeric_limits<int16_t>::max())) {
+                return std::make_shared<Type>(TypeTag::Int16);
+            } else if (ull_val <= static_cast<unsigned long long>(std::numeric_limits<int32_t>::max())) {
+                return std::make_shared<Type>(TypeTag::Int32);
+            } else if (ull_val <= static_cast<unsigned long long>(std::numeric_limits<int64_t>::max())) {
+                return std::make_shared<Type>(TypeTag::Int64);
+            } else if (has_int128) {
+                return std::make_shared<Type>(TypeTag::Int128);
+            } else {
+                // Fallback to unsigned if too large for signed
+                return get_best_integer_type(value_str, false);
+            }
+        } else {
+            // For unsigned integers
+            if (ull_val <= static_cast<unsigned long long>(std::numeric_limits<uint8_t>::max())) {
+                return std::make_shared<Type>(TypeTag::UInt8);
+            } else if (ull_val <= static_cast<unsigned long long>(std::numeric_limits<uint16_t>::max())) {
+                return std::make_shared<Type>(TypeTag::UInt16);
+            } else if (ull_val <= static_cast<unsigned long long>(std::numeric_limits<uint32_t>::max())) {
+                return std::make_shared<Type>(TypeTag::UInt32);
+            } else if (ull_val <= static_cast<unsigned long long>(std::numeric_limits<uint64_t>::max())) {
+                return std::make_shared<Type>(TypeTag::UInt64);
+            } else if (has_int128) {
+                return std::make_shared<Type>(TypeTag::UInt128);
+            } else {
+                // If no 128-bit support, this is an overflow situation
+                return std::make_shared<Type>(TypeTag::UInt64);
+            }
+        }
+    } catch (const std::exception&) {
+        // If parsing fails, default to Int64
+        return std::make_shared<Type>(TypeTag::Int64);
+    }
+}
+
+bool Generator::is_numeric_string(const std::string& str) {
+    if (str.empty()) return false;
+    
+    char first = str[0];
+    if (!(std::isdigit(first) || first == '+' || first == '-' || first == '.')) {
+        return false;
+    }
+    
+    // Check if all characters are valid for a number
+    for (char c : str) {
+        if (!std::isdigit(c) && c != '.' && c != '+' && c != '-' && 
+            c != 'e' && c != 'E' && c != 'u' && c != 'U' && 
+            c != 'l' && c != 'L' && c != 'f' && c != 'F') {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool Generator::types_match(TypePtr type1, TypePtr type2) {
+    if (!type1 || !type2) return false;
+    return type1->tag == type2->tag;
+}
+
 // Expression handlers
-Reg Generator::emit_literal_expr(AST::LiteralExpr& expr) {
+Reg Generator::emit_literal_expr(AST::LiteralExpr& expr, TypePtr expected_type) {
     Reg dst = allocate_register();
     
     // Create ValuePtr based on literal value
@@ -280,19 +472,32 @@ Reg Generator::emit_literal_expr(AST::LiteralExpr& expr) {
     if (std::holds_alternative<std::string>(expr.value)) {
         std::string stringValue = std::get<std::string>(expr.value);
         
-        // Try to determine if this string represents a number
+        // Try to determine if this string represents a pure number
         bool isNumeric = false;
         bool isFloat = false;
         
         if (!stringValue.empty()) {
             char first = stringValue[0];
             if (std::isdigit(first) || first == '+' || first == '-' || first == '.') {
-                isNumeric = true;
-                // Check if it's a float
-                if (stringValue.find('.') != std::string::npos || 
-                    stringValue.find('e') != std::string::npos || 
-                    stringValue.find('E') != std::string::npos) {
-                    isFloat = true;
+                // Check if the ENTIRE string is a valid number
+                bool hasInvalidChars = false;
+                for (char c : stringValue) {
+                    if (!std::isdigit(c) && c != '.' && c != '+' && c != '-' && 
+                        c != 'e' && c != 'E' && c != 'u' && c != 'U' && 
+                        c != 'l' && c != 'L' && c != 'f' && c != 'F') {
+                        hasInvalidChars = true;
+                        break;
+                    }
+                }
+                
+                if (!hasInvalidChars) {
+                    isNumeric = true;
+                    // Check if it's a float
+                    if (stringValue.find('.') != std::string::npos || 
+                        stringValue.find('e') != std::string::npos || 
+                        stringValue.find('E') != std::string::npos) {
+                        isFloat = true;
+                    }
                 }
             }
         }
@@ -300,7 +505,7 @@ Reg Generator::emit_literal_expr(AST::LiteralExpr& expr) {
         if (isNumeric) {
             if (isFloat) {
                 // Create float value
-                auto float_type = std::make_shared<Type>(TypeTag::Float64);
+                auto float_type = expected_type ? expected_type : std::make_shared<Type>(TypeTag::Float64);
                 try {
                     double floatVal = std::stod(stringValue);
                     const_val = std::make_shared<Value>(float_type, floatVal);
@@ -311,16 +516,41 @@ Reg Generator::emit_literal_expr(AST::LiteralExpr& expr) {
                     current_function_->instructions.back().const_val->type = string_type;
                 }
             } else {
-                // Create integer value
-                auto int_type = std::make_shared<Type>(TypeTag::Int);
+                // Create integer value - use expected type if provided
+                std::shared_ptr<Type> int_type = expected_type;
+                
+                if (!int_type) {
+                    // For simple small literals, default to Int64 to avoid type mismatches
+                    // This is a conservative approach that works well with mixed operations
+                    try {
+                        int64_t test_val = std::stoll(stringValue);
+                        // If it fits in int64 and is a small number, use Int64
+                        if (test_val >= 0 && test_val <= 1000000) {
+                            int_type = std::make_shared<Type>(TypeTag::Int64);
+                        } else {
+                            // For larger values, use automatic type selection
+                            int_type = get_best_integer_type(stringValue, true);
+                        }
+                    } catch (const std::exception&) {
+                        // If parsing as signed fails, use automatic selection
+                        int_type = get_best_integer_type(stringValue, true);
+                    }
+                }
+                
                 try {
                     int64_t intVal = std::stoll(stringValue);
                     const_val = std::make_shared<Value>(int_type, intVal);
                 } catch (const std::exception&) {
-                    // If parsing fails, treat as string
-                    auto string_type = std::make_shared<Type>(TypeTag::String);
-                    const_val = std::make_shared<Value>(string_type, stringValue);
-                    current_function_->instructions.back().const_val->type = string_type;
+                    // If parsing as signed fails, try unsigned
+                    try {
+                        uint64_t uintVal = std::stoull(stringValue);
+                        const_val = std::make_shared<Value>(int_type, uintVal);
+                    } catch (const std::exception&) {
+                        // If parsing fails, treat as string
+                        auto string_type = std::make_shared<Type>(TypeTag::String);
+                        const_val = std::make_shared<Value>(string_type, stringValue);
+                        current_function_->instructions.back().const_val->type = string_type;
+                    }
                 }
             }
         } else {
@@ -522,8 +752,47 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
                    (right_type && right_type->tag == TypeTag::Float32)) {
             result_type = std::make_shared<Type>(TypeTag::Float32);
         } else {
-            // Default to int for integer operations
-            result_type = std::make_shared<Type>(TypeTag::Int);
+            // For integer operations, preserve signedness and promote to wider type
+            result_type = get_promoted_numeric_type(left_type, right_type);
+        }
+        
+        // Check for type mismatches and re-emit if needed
+        if (left_type && right_type && result_type) {
+            // Implement "smaller matches larger" strategy
+            int left_rank = get_type_rank(left_type);
+            int right_rank = get_type_rank(right_type);
+            
+            // Re-emit the smaller/lower rank operand to match the larger one
+            if (left_rank < right_rank) {
+                if (auto left_literal = dynamic_cast<AST::LiteralExpr*>(expr.left.get())) {
+                    left = emit_literal_expr(*left_literal, right_type);
+                    left_type = right_type;
+                }
+            } else if (right_rank < left_rank) {
+                if (auto right_literal = dynamic_cast<AST::LiteralExpr*>(expr.right.get())) {
+                    right = emit_literal_expr(*right_literal, left_type);
+                    right_type = left_type;
+                }
+            }
+            // If ranks are equal but types differ, prefer signed to avoid unsigned promotion issues
+            else if (left_rank == right_rank && !types_match(left_type, right_type)) {
+                bool left_is_signed = is_signed_integer_type(left_type);
+                bool right_is_signed = is_signed_integer_type(right_type);
+                
+                if (!left_is_signed && right_is_signed) {
+                    auto left_literal = dynamic_cast<AST::LiteralExpr*>(expr.left.get());
+                    if (left_literal) {
+                        left = emit_literal_expr(*left_literal, right_type);
+                        left_type = right_type;
+                    }
+                } else if (left_is_signed && !right_is_signed) {
+                    auto right_literal = dynamic_cast<AST::LiteralExpr*>(expr.right.get());
+                    if (right_literal) {
+                        right = emit_literal_expr(*right_literal, left_type);
+                        right_type = left_type;
+                    }
+                }
+            }
         }
     } else if (op == LIR_Op::CmpEQ || op == LIR_Op::CmpNEQ || op == LIR_Op::CmpLT || 
                op == LIR_Op::CmpLE || op == LIR_Op::CmpGT || op == LIR_Op::CmpGE) {
@@ -533,8 +802,8 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
         // Logical operations return bool
         result_type = std::make_shared<Type>(TypeTag::Bool);
     } else if (op == LIR_Op::Xor) {
-        // Bitwise XOR returns int
-        result_type = std::make_shared<Type>(TypeTag::Int);
+        // Bitwise XOR should preserve integer types like arithmetic operations
+        result_type = get_promoted_numeric_type(left_type, right_type);
     }
     
     // Set type BEFORE emitting so it's available during emit_instruction
@@ -680,12 +949,14 @@ void Generator::emit_print_stmt(AST::PrintStatement& stmt) {
                 case TypeTag::Int16:
                 case TypeTag::Int32:
                 case TypeTag::Int64:
+                    emit_instruction(LIR_Inst(LIR_Op::PrintInt, 0, value, 0));
+                    return;
                 case TypeTag::UInt:
                 case TypeTag::UInt8:
                 case TypeTag::UInt16:
                 case TypeTag::UInt32:
                 case TypeTag::UInt64:
-                    emit_instruction(LIR_Inst(LIR_Op::PrintInt, 0, value, 0));
+                    emit_instruction(LIR_Inst(LIR_Op::PrintUint, 0, value, 0));
                     return;
                 case TypeTag::Float32:
                 case TypeTag::Float64:
@@ -718,6 +989,13 @@ void Generator::emit_print_stmt(AST::PrintStatement& stmt) {
                             case TypeTag::Int64:
                                 emit_instruction(LIR_Inst(LIR_Op::PrintInt, 0, value, 0));
                                 return;
+                            case TypeTag::UInt:
+                            case TypeTag::UInt8:
+                            case TypeTag::UInt16:
+                            case TypeTag::UInt32:
+                            case TypeTag::UInt64:
+                                emit_instruction(LIR_Inst(LIR_Op::PrintUint, 0, value, 0));
+                                return;                                
                             case TypeTag::Float32:
                             case TypeTag::Float64:
                                 emit_instruction(LIR_Inst(LIR_Op::PrintFloat, 0, value, 0));
@@ -790,7 +1068,50 @@ void Generator::emit_var_stmt(AST::VarDeclaration& stmt) {
         Reg value = emit_expr(*stmt.initializer);
         value_reg = allocate_register();
         emit_instruction(LIR_Inst(LIR_Op::Mov, value_reg, value, 0));
-        set_register_type(value_reg, get_register_type(value));
+        
+        // Use the declared type if available, otherwise use the initializer's type
+        TypePtr declared_type = nullptr;
+        if (stmt.type.has_value()) {
+            // Convert TypeAnnotation to Type - handle all basic types including 128-bit
+            auto type_annotation = *stmt.type.value();
+            if (type_annotation.typeName == "u32") {
+                declared_type = std::make_shared<Type>(TypeTag::UInt32);
+            } else if (type_annotation.typeName == "u16") {
+                declared_type = std::make_shared<Type>(TypeTag::UInt16);
+            } else if (type_annotation.typeName == "u8") {
+                declared_type = std::make_shared<Type>(TypeTag::UInt8);
+            } else if (type_annotation.typeName == "u64") {
+                declared_type = std::make_shared<Type>(TypeTag::UInt64);
+            } else if (type_annotation.typeName == "u128") {
+                declared_type = std::make_shared<Type>(TypeTag::UInt128);
+            } else if (type_annotation.typeName == "int") {
+                declared_type = std::make_shared<Type>(TypeTag::Int64);
+            } else if (type_annotation.typeName == "i64") {
+                declared_type = std::make_shared<Type>(TypeTag::Int64);
+            } else if (type_annotation.typeName == "i32") {
+                declared_type = std::make_shared<Type>(TypeTag::Int32);
+            } else if (type_annotation.typeName == "i16") {
+                declared_type = std::make_shared<Type>(TypeTag::Int16);
+            } else if (type_annotation.typeName == "i8") {
+                declared_type = std::make_shared<Type>(TypeTag::Int8);
+            } else if (type_annotation.typeName == "i128") {
+                declared_type = std::make_shared<Type>(TypeTag::Int128);
+            } else if (type_annotation.typeName == "f64") {
+                declared_type = std::make_shared<Type>(TypeTag::Float64);
+            } else if (type_annotation.typeName == "f32") {
+                declared_type = std::make_shared<Type>(TypeTag::Float32);
+            } else if (type_annotation.typeName == "bool") {
+                declared_type = std::make_shared<Type>(TypeTag::Bool);
+            } else if (type_annotation.typeName == "str" || type_annotation.typeName == "string") {
+                declared_type = std::make_shared<Type>(TypeTag::String);
+            }
+        }
+        
+        if (declared_type) {
+            set_register_type(value_reg, declared_type);
+        } else {
+            set_register_type(value_reg, get_register_type(value));
+        }
     } else {
         // Initialize with nil
         value_reg = allocate_register();

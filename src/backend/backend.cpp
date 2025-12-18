@@ -2184,9 +2184,9 @@ void BytecodeGenerator::findCapturedVariables(const std::shared_ptr<AST::Stateme
         if (forStmt->increment) {
             findCapturedVariables(forStmt->increment, localVars, capturedVars);
         }
-        if (forStmt->iterable) {
-            findCapturedVariables(forStmt->iterable, localVars, capturedVars);
-        }
+        // if (forStmt->iterable) {
+        //     findCapturedVariables(forStmt->iterable, localVars, capturedVars);
+        // }
         findCapturedVariables(forStmt->body, localVars, capturedVars);
     } else if (auto returnStmt = std::dynamic_pointer_cast<AST::ReturnStatement>(stmt)) {
         if (returnStmt->value) {

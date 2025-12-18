@@ -79,6 +79,7 @@ private:
     // Types
     gccjit::type m_void_type;
     gccjit::type m_int_type;
+    gccjit::type m_uint_type;
     gccjit::type m_double_type;
     gccjit::type m_bool_type;
     gccjit::type m_const_char_ptr_type;
@@ -132,6 +133,7 @@ private:
     void compile_conditional_jump(const LIR::LIR_Inst& inst, size_t current_instruction_pos);
     void compile_call(const LIR::LIR_Inst& inst);
     void compile_print_int(const LIR::LIR_Inst& inst);
+    void compile_print_uint(const LIR::LIR_Inst& inst);    
     void compile_print_float(const LIR::LIR_Inst& inst);
     void compile_print_bool(const LIR::LIR_Inst& inst);
     void compile_print_string(const LIR::LIR_Inst& inst);
