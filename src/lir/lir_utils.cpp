@@ -4,7 +4,7 @@
 
 namespace LIR {
 
-std::string LIR_Disassembler::disassemble() const {
+std::string Disassembler::disassemble() const {
     std::stringstream ss;
     
     // Function header
@@ -37,7 +37,7 @@ std::string LIR_Disassembler::disassemble() const {
     return ss.str();
 }
 
-std::string LIR_Disassembler::disassemble_instruction(const LIR_Inst& inst) const {
+std::string Disassembler::disassemble_instruction(const LIR_Inst& inst) const {
     std::string result = inst.to_string();
     
     // Add debug info if enabled
@@ -51,7 +51,7 @@ std::string LIR_Disassembler::disassemble_instruction(const LIR_Inst& inst) cons
     return result;
 }
 
-bool LIR_Optimizer::optimize() {
+bool Optimizer::optimize() {
     bool changed = false;
     
     if (func.optimizations.enable_peephole) {
@@ -69,7 +69,7 @@ bool LIR_Optimizer::optimize() {
     return changed;
 }
 
-bool LIR_Optimizer::peephole_optimize() {
+bool Optimizer::peephole_optimize() {
     // Simple peephole optimizations
     bool changed = false;
     
@@ -90,7 +90,7 @@ bool LIR_Optimizer::peephole_optimize() {
     return changed;
 }
 
-bool LIR_Optimizer::constant_folding() {
+bool Optimizer::constant_folding() {
     bool changed = false;
     
     for (auto& inst : func.instructions) {
@@ -106,7 +106,7 @@ bool LIR_Optimizer::constant_folding() {
     return changed;
 }
 
-bool LIR_Optimizer::dead_code_elimination() {
+bool Optimizer::dead_code_elimination() {
     // Simple dead code elimination
     std::vector<bool> used(func.register_count, false);
     

@@ -292,12 +292,12 @@ public:
 };
 
 // Optimization flags
-struct LIR_OptimizationFlags {
+struct OptimizationFlags {
     bool enable_peephole : 1;
     bool enable_const_fold : 1;
     bool enable_dead_code_elim : 1;
     
-    LIR_OptimizationFlags() : 
+    OptimizationFlags() : 
         enable_peephole(false), 
         enable_const_fold(false), 
         enable_dead_code_elim(false) {}
@@ -312,7 +312,7 @@ public:
     uint32_t param_count;
     uint32_t register_count;
     LIR_DebugInfo debug_info;
-    LIR_OptimizationFlags optimizations;
+    OptimizationFlags optimizations;
     
     // Variable to register mapping
     std::unordered_map<std::string, Reg> variable_to_reg;
@@ -401,12 +401,12 @@ public:
 };
 
 // Disassembler
-class LIR_Disassembler {
+class Disassembler {
     const LIR_Function& func;
     bool show_debug_info;
     
 public:
-    LIR_Disassembler(const LIR_Function& f, bool debug = false) 
+    Disassembler(const LIR_Function& f, bool debug = false) 
         : func(f), show_debug_info(debug) {}
         
     std::string disassemble() const;
@@ -414,7 +414,7 @@ public:
 };
 
 // Optimizer
-class LIR_Optimizer {
+class Optimizer {
     LIR_Function& func;
     
     bool peephole_optimize();
@@ -422,13 +422,13 @@ class LIR_Optimizer {
     bool dead_code_elimination();
     
 public:
-    LIR_Optimizer(LIR_Function& f) : func(f) {}
+    Optimizer(LIR_Function& f) : func(f) {}
     
     // Run all enabled optimizations
     bool optimize();
     
     // Enable/disable specific optimizations
-    void set_optimization_flags(const LIR_OptimizationFlags& flags) {
+    void set_optimization_flags(const OptimizationFlags& flags) {
         func.optimizations = flags;
     }
 };
