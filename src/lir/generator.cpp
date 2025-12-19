@@ -1426,8 +1426,66 @@ void Generator::emit_while_stmt(AST::WhileStatement& stmt) {
 }
 
 void Generator::emit_while_stmt_cfg(AST::WhileStatement& stmt) {
-    // CFG mode - for now, just emit linear version
-    emit_while_stmt_linear(stmt);
+    // CFG mode: create basic blocks for while loop
+    LIR_BasicBlock* header_block = create_basic_block("while_header");
+    LIR_BasicBlock* body_block = create_basic_block("while_body");
+    LIR_BasicBlock* end_block = create_basic_block("while_end");
+    
+    // Connect current block to header block
+    add_block_edge(get_current_block(), header_block);
+    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
+    
+    // Emit condition check in header block
+    set_current_block(header_block);
+    
+    // Emit loop condition
+    Reg condition = emit_expr(*stmt.condition);
+    Reg condition_bool = allocate_register();
+    
+    // For boolean conditions, use them directly
+    TypePtr condition_type = get_register_type(condition);
+    if (condition_type && condition_type->tag == TypeTag::Bool) {
+        condition_bool = condition;
+    } else {
+        // Convert non-boolean condition to boolean
+        Reg zero_reg = allocate_register();
+        auto int_type = std::make_shared<Type>(TypeTag::Int);
+        ValuePtr zero_val = std::make_shared<Value>(int_type, (int64_t)0);
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, zero_reg, zero_val));
+        set_register_type(zero_reg, int_type);
+        emit_instruction(LIR_Inst(LIR_Op::CmpNEQ, condition_bool, condition, zero_reg));
+        set_register_type(condition_bool, std::make_shared<Type>(TypeTag::Bool));
+    }
+    
+    // Conditional jump: if false, exit loop
+    emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, condition_bool, 0, end_block->id));
+    
+    // Set up edges from header block
+    add_block_edge(header_block, body_block);  // Continue if true
+    add_block_edge(header_block, end_block);   // Exit if false
+    
+    // === Body Block ===
+    set_current_block(body_block);
+    
+    // Emit loop body
+    if (stmt.body) {
+        emit_stmt(*stmt.body);
+    }
+    
+    // Jump back to header to continue loop
+    if (get_current_block() && !get_current_block()->has_terminator()) {
+        emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
+        add_block_edge(body_block, header_block);
+    }
+    
+    // === End Block: continuation ===
+    set_current_block(end_block);
+    
+    // Don't mark end_block as terminated - it's a continuation point for subsequent statements
+    // Only mark as terminated if it has explicit terminator instructions
+    if (end_block && end_block->has_terminator()) {
+        end_block->terminated = true;
+    }
 }
 
 void Generator::emit_while_stmt_linear(AST::WhileStatement& stmt) {
@@ -1451,8 +1509,104 @@ void Generator::emit_for_stmt(AST::ForStatement& stmt) {
 }
 
 void Generator::emit_for_stmt_cfg(AST::ForStatement& stmt) {
-    // CFG mode - for now, just emit linear version
-    emit_for_stmt_linear(stmt);
+    // CFG mode: create basic blocks for for loop
+    LIR_BasicBlock* init_block = create_basic_block("for_init");
+    LIR_BasicBlock* header_block = create_basic_block("for_header");
+    LIR_BasicBlock* body_block = create_basic_block("for_body");
+    LIR_BasicBlock* increment_block = create_basic_block("for_increment");
+    LIR_BasicBlock* end_block = create_basic_block("for_end");
+    
+    // Connect current block to init block
+    add_block_edge(get_current_block(), init_block);
+    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, init_block->id));
+    
+    // === Init Block (executed only once) ===
+    set_current_block(init_block);
+    
+    if (stmt.initializer) {
+        emit_stmt(*stmt.initializer);
+    }
+    
+    // Jump to header after initialization
+    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
+    add_block_edge(init_block, header_block);
+    
+    // === Header Block (executed each iteration) ===
+    set_current_block(header_block);
+    
+    // Emit condition check
+    Reg condition = allocate_register();
+    if (stmt.condition) {
+        Reg condition_expr = emit_expr(*stmt.condition);
+        
+        // For boolean conditions, use them directly
+        TypePtr condition_type = get_register_type(condition_expr);
+        if (condition_type && condition_type->tag == TypeTag::Bool) {
+            condition = condition_expr;
+        } else {
+            // Convert non-boolean condition to boolean
+            Reg zero_reg = allocate_register();
+            auto int_type = std::make_shared<Type>(TypeTag::Int);
+            ValuePtr zero_val = std::make_shared<Value>(int_type, (int64_t)0);
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, zero_reg, zero_val));
+            set_register_type(zero_reg, int_type);
+            emit_instruction(LIR_Inst(LIR_Op::CmpNEQ, condition, condition_expr, zero_reg));
+            set_register_type(condition, std::make_shared<Type>(TypeTag::Bool));
+        }
+    } else {
+        // No condition - always true
+        auto bool_type = std::make_shared<Type>(TypeTag::Bool);
+        ValuePtr true_val = std::make_shared<Value>(bool_type, true);
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, condition, true_val));
+        set_register_type(condition, bool_type);
+    }
+    
+    // Conditional jump: if false, exit loop
+    emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, condition, 0, end_block->id));
+    
+    // Set up edges from header block
+    add_block_edge(header_block, body_block);  // Continue if true
+    add_block_edge(header_block, end_block);   // Exit if false
+    
+    // === Body Block ===
+    set_current_block(body_block);
+    
+    // Emit loop body
+    if (stmt.body) {
+        emit_stmt(*stmt.body);
+    }
+    
+    // Jump to increment block
+    if (get_current_block() && !get_current_block()->has_terminator()) {
+        emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, increment_block->id));
+        add_block_edge(body_block, increment_block);
+    }
+    
+    // === Increment Block ===
+    set_current_block(increment_block);
+    
+    // Emit increment - for loop increment is typically an assignment expression
+    if (stmt.increment) {
+        // Create an expression statement from increment expression
+        AST::ExprStatement expr_stmt;
+        expr_stmt.expression = stmt.increment;
+        emit_stmt(expr_stmt);
+    }
+    
+    // Jump back to header to continue loop
+    if (get_current_block() && !get_current_block()->has_terminator()) {
+        emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
+        add_block_edge(increment_block, header_block);
+    }
+    
+    // === End Block: continuation ===
+    set_current_block(end_block);
+    
+    // Don't mark end_block as terminated - it's a continuation point for subsequent statements
+    // Only mark as terminated if it has explicit terminator instructions
+    if (end_block && end_block->has_terminator()) {
+        end_block->terminated = true;
+    }
 }
 
 void Generator::emit_for_stmt_linear(AST::ForStatement& stmt) {
