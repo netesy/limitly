@@ -39,6 +39,7 @@ RSP_DIR := rsp
 # =============================
 FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp src/common/debugger.cpp src/frontend/cst.cpp src/frontend/cst_printer.cpp src/frontend/cst_utils.cpp src/frontend/ast_builder.cpp src/lir/generator.cpp
 BACK_SRCS := src/backend/vm/vm.cpp src/backend/jit/jit_backend.cpp src/backend/jit/jit.cpp src/lir/lir.cpp src/lir/lir_utils.cpp src/lir/functions.cpp src/lir/builtin_functions.cpp
+REGISTER_SRCS := src/backend/register/register.cpp 
 LIR_CORE_SRCS := src/lir/lir.cpp src/lir/lir_utils.cpp src/lir/functions.cpp    src/lir/builtin_functions.cpp
 COMMON_SRCS := src/common/builtin_functions.cpp
 BACKEND_COMMON_SRCS := src/backend/backend.cpp src/backend/symbol_table.cpp src/backend/value.cpp src/backend/ast_printer.cpp src/backend/bytecode_printer.cpp src/backend/functions.cpp src/backend/closure_impl.cpp src/backend/classes.cpp src/backend/type_checker.cpp src/backend/function_types.cpp 
@@ -50,7 +51,7 @@ else
     CONCURRENCY_SRCS := src/backend/concurrency/scheduler.cpp src/backend/concurrency/thread_pool.cpp src/backend/concurrency/event_loop.cpp src/backend/concurrency/epoll_event_loop.cpp src/backend/concurrency/concurrency_runtime.cpp src/backend/concurrency/task_vm.cpp
 endif
 
-MAIN_SRCS := src/main.cpp $(BACKEND_COMMON_SRCS) $(BACK_SRCS) $(COMMON_SRCS) $(CONCURRENCY_SRCS) $(ERROR_SRCS) $(FRONT_SRCS)
+MAIN_SRCS := src/main.cpp $(BACKEND_COMMON_SRCS) $(BACK_SRCS) $(COMMON_SRCS) $(CONCURRENCY_SRCS) $(ERROR_SRCS)  $(FRONT_SRCS) $(REGISTER_SRCS)
 TEST_SRCS := src/test_parser.cpp $(BACKEND_COMMON_SRCS) $(LIR_CORE_SRCS) $(ERROR_SRCS) $(FRONT_SRCS) src/lir/function_registry.cpp
 
 # =============================

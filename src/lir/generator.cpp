@@ -1427,9 +1427,15 @@ void Generator::emit_while_stmt(AST::WhileStatement& stmt) {
 
 void Generator::emit_while_stmt_cfg(AST::WhileStatement& stmt) {
     // CFG mode: create basic blocks for while loop
+    enter_scope();
+    enter_loop();
+    
     LIR_BasicBlock* header_block = create_basic_block("while_header");
     LIR_BasicBlock* body_block = create_basic_block("while_body");
     LIR_BasicBlock* end_block = create_basic_block("while_end");
+    
+    // Set loop labels for break/continue
+    set_loop_labels(header_block->id, end_block->id, header_block->id);
     
     // Connect current block to header block
     add_block_edge(get_current_block(), header_block);
@@ -1481,6 +1487,9 @@ void Generator::emit_while_stmt_cfg(AST::WhileStatement& stmt) {
     // === End Block: continuation ===
     set_current_block(end_block);
     
+    exit_loop();
+    exit_scope();
+    
     // Don't mark end_block as terminated - it's a continuation point for subsequent statements
     // Only mark as terminated if it has explicit terminator instructions
     if (end_block && end_block->has_terminator()) {
@@ -1510,11 +1519,17 @@ void Generator::emit_for_stmt(AST::ForStatement& stmt) {
 
 void Generator::emit_for_stmt_cfg(AST::ForStatement& stmt) {
     // CFG mode: create basic blocks for for loop
+    enter_scope();
+    enter_loop();
+    
     LIR_BasicBlock* init_block = create_basic_block("for_init");
     LIR_BasicBlock* header_block = create_basic_block("for_header");
     LIR_BasicBlock* body_block = create_basic_block("for_body");
     LIR_BasicBlock* increment_block = create_basic_block("for_increment");
     LIR_BasicBlock* end_block = create_basic_block("for_end");
+    
+    // Set loop labels for break/continue
+    set_loop_labels(header_block->id, end_block->id, increment_block->id);
     
     // Connect current block to init block
     add_block_edge(get_current_block(), init_block);
@@ -1601,6 +1616,9 @@ void Generator::emit_for_stmt_cfg(AST::ForStatement& stmt) {
     
     // === End Block: continuation ===
     set_current_block(end_block);
+    
+    exit_loop();
+    exit_scope();
     
     // Don't mark end_block as terminated - it's a continuation point for subsequent statements
     // Only mark as terminated if it has explicit terminator instructions

@@ -1,0 +1,27 @@
+// Test file for function definitions and calls
+
+print("=== Testing Function Definitions and Calls ===");
+
+// Define a simple function
+fn add(a: int, b: int): int {
+    return a + b;
+}
+
+// Define another function
+fn multiply(x: int, y: int): int {
+    return x * y;
+}
+
+// Test function calls
+print("Calling add(2, 3):");
+var result1 = add(2, 3);
+print(result1);
+
+print("Calling multiply(4, 5):");
+var result2 = multiply(4, 5);
+print(result2);
+
+// Test nested function calls
+print("Calling add(multiply(2, 3), 4):");
+var result3 = add(multiply(2, 3), 4);
+print(result3);

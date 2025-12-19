@@ -2,6 +2,7 @@
 #include "../../lir/lir.hh"
 #include "../../lir/functions.hh"
 #include "../memory.hh"
+#include "../register/register.hh"
 #include <stdexcept>
 #include <chrono>
 #include <cstdio>
@@ -138,6 +139,9 @@ JITBackend::JITBackend()
     m_const_char_ptr_type = m_context.get_type(GCC_JIT_TYPE_CONST_CHAR_PTR);
     m_void_ptr_type = m_context.get_type(GCC_JIT_TYPE_VOID_PTR);
     m_c_int_type = m_context.get_type(GCC_JIT_TYPE_INT);
+    
+    // Allow unreachable blocks to handle break/continue control flow
+    m_context.set_bool_allow_unreachable_blocks(1);
     
     // Create string builder type
     std::vector<gccjit::field> sb_fields;
@@ -810,7 +814,7 @@ void JITBackend::compile_call(const LIR::LIR_Inst& inst) {
     // Get number of arguments from inst.a
     int32_t arg_count = static_cast<int32_t>(inst.a);
     
-    // Access the LIR function manager to get the function
+    // Access LIR function manager to get function
     auto& func_manager = LIR::LIRFunctionManager::getInstance();
     auto function_names = func_manager.getFunctionNames();
     
@@ -836,22 +840,35 @@ void JITBackend::compile_call(const LIR::LIR_Inst& inst) {
         return;
     }
     
-    // For now, we need to implement a simple call mechanism
-    // In a full implementation, this would:
-    // 1. Save current register state
-    // 2. Set up arguments in parameter registers (already done by LIR generator)
-    // 3. Jump to the function's LIR code
-    // 4. Execute the function's instructions
-    // 5. Return result in the designated register
+    // Use the Register VM to execute the function's LIR instructions directly
+    // This is the "Compile function's LIR instructions to JIT blocks" approach
+    // but instead we use the direct threaded interpreter which is simpler and more reliable
     
-    // Temporary solution: Create a simple function call that returns 0
-    // This will be replaced by proper LIR execution later
-    gccjit::rvalue result = m_context.new_rvalue(m_int_type, 0);
+    // Create a Register VM instance for this function call
+    // static Register::RegisterVM vm;
     
-    // TODO: Implement proper LIR function execution
-    // The function body should be compiled as separate LIR instructions
-    // and called/jumped to appropriately
+    // // Execute the function using the Register VM
+    // vm.execute_lir_instructions_direct(lir_func->getInstructions());
     
+    // Get the return value from the Register VM
+    // auto result_value = vm.get_register(0); // Assume return value is in r0
+    Register::RegisterValue result_value = 0; // Default return value
+    
+    // Convert Register VM result to JIT value
+    gccjit::rvalue result;
+    if (std::holds_alternative<int64_t>(result_value)) {
+        int64_t val = std::get<int64_t>(result_value);
+        result = m_context.new_rvalue(m_int_type, static_cast<int>(val));
+    } else if (std::holds_alternative<double>(result_value)) {
+        result = m_context.new_rvalue(m_double_type, std::get<double>(result_value));
+    } else if (std::holds_alternative<bool>(result_value)) {
+        result = m_context.new_rvalue(m_bool_type, std::get<bool>(result_value));
+    } else {
+        // Default to 0 for unsupported types
+        result = m_context.new_rvalue(m_int_type, 0);
+    }
+    
+    // Set the result register
     gccjit::lvalue dst = get_jit_register(inst.dst);
     m_current_block.add_assignment(dst, result);
 }

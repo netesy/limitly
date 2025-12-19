@@ -6,6 +6,7 @@
 #include "backend/ast_printer.hh"
 #include "backend/bytecode_printer.hh"
 #include "backend/vm/vm.hh"
+#include "backend/register/register.hh"
 #include "lir/generator.hh"
 #include "lir/functions.hh"
 #include "backend/jit/jit.hh"
@@ -41,7 +42,7 @@ std::string readFile(const std::string& filename) {
     return buffer.str();
 }
 
-int executeFile(const std::string& filename, bool printAst = false, bool printCst = false, bool printTokens = false, bool printBytecode = false, bool useJit = true, bool jitDebug = true, bool enableDebug = false) {
+int executeFile(const std::string& filename, bool printAst = false, bool printCst = false, bool printTokens = false, bool printBytecode = false, bool useJit = false, bool jitDebug = true, bool enableDebug = false) {
     try {
         // Read source file
         std::string source = readFile(filename);
@@ -89,9 +90,11 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 // Generate LIR from AST (this includes complete CFG building)
                 LIR::Generator lir_generator;
                 auto lir_function = lir_generator.generate_program(*ast);
-                // LIR::Disassembler disassemble(lir_function);
-
-                // disassemble.disassemble();
+                
+                // Initialize and run LIR disassembler
+                LIR::Disassembler disassemble(*lir_function, true);
+                std::cout << "\n=== LIR Disassembly ===\n";
+                std::cout << disassemble.disassemble() << std::endl;
                 
                 if (!lir_function) {
                     std::cerr << "Failed to generate LIR function\n";
@@ -200,34 +203,39 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             }
         } else {
 
-            // Backend: Generate bytecode
-            VM vm;
+            // Backend: Use register interpreter instead of VM
+            Register::RegisterVM register_vm;
             
             // Enable debug mode if requested
             if (enableDebug) {
-                vm.setDebug(true);
+                std::cout << "Debug mode enabled for register interpreter\n";
             }
             
-            BytecodeGenerator generator;
-            generator.setSourceContext(source, filename);
-            generator.process(ast);
-
-            // Print bytecode if requested
-            if (printBytecode) {
-                BytecodePrinter::print(generator.getBytecode());
+            // Generate LIR and execute with register interpreter
+            LIR::Generator lir_generator;
+            auto lir_function = lir_generator.generate_program(*ast);
+            
+            if (!lir_function) {
+                std::cerr << "Failed to generate LIR function\n";
+                return 1;
             }
-
-            // Execute bytecode using the virtual machine
-            try {
-                // Set source information for enhanced error reporting
-                vm.setSourceInfo(source, filename);
-                ValuePtr result = vm.execute(generator.getBytecode());
-                // Only print non-nil results
-                if (result && (!result->type || result->type->tag != TypeTag::Nil)) {
-                    std::cout << result->toString() << std::endl;
+            
+            if (lir_generator.has_errors()) {
+                std::cerr << "LIR generation errors:\n";
+                for (const auto& error : lir_generator.get_errors()) {
+                    std::cerr << "  " << error << std::endl;
                 }
-                if (vm.getThreadPool()) {
-                    vm.getThreadPool()->stop();
+                return 1;
+            }
+            
+            // Execute using register interpreter
+            try {
+                register_vm.execute_function(*lir_function);
+                
+                // Get result from register 0 (conventional return register)
+                auto result = register_vm.get_register(0);
+                if (!std::holds_alternative<std::nullptr_t>(result)) {
+                    std::cout << register_vm.to_string(result) << std::endl;
                 }
             } catch (const std::exception& e) {
                 std::cerr << "Error: " << e.what() << std::endl;
@@ -245,9 +253,9 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
 
 void startRepl() {
     std::cout << "Limit Programming Language REPL (Interactive Mode)" << std::endl;
-    std::cout << "Type 'exit' to quit, '.stack' to show stack, '.debug' to toggle debug mode" << std::endl;
+    std::cout << "Type 'exit' to quit, '.registers' to show register state, '.debug' to toggle debug mode" << std::endl;
     
-    VM vm;
+    Register::RegisterVM register_vm;
     bool debugMode = false;
     std::string line;
     
@@ -258,8 +266,17 @@ void startRepl() {
         // Handle special commands
         if (line == "exit") {
             break;
+        } else if (line == ".registers") {
+            std::cout << "Current register state:\n";
+            for (size_t i = 0; i < 10; ++i) {
+                auto reg_val = register_vm.get_register(i);
+                if (!std::holds_alternative<std::nullptr_t>(reg_val)) {
+                    std::cout << "  r" << i << ": " << register_vm.to_string(reg_val) << std::endl;
+                }
+            }
+            continue;
         } else if (line == ".stack") {
-            vm.printStack();
+            std::cout << ".stack command not supported with register interpreter. Use .registers to see register state.\n";
             continue;
         } else if (line == ".debug") {
             debugMode = !debugMode;
@@ -278,43 +295,46 @@ void startRepl() {
             Parser parser(scanner, false); // Use legacy mode for optimal REPL performance
             std::shared_ptr<AST::Program> ast = parser.parse();
             
-            // Backend: Generate bytecode
-            BytecodeGenerator generator;
-            generator.process(ast);
+            // Backend: Generate LIR and execute with register interpreter
+            LIR::Generator lir_generator;
+            auto lir_function = lir_generator.generate_program(*ast);
             
-            // Execute bytecode using the virtual machine
+            if (!lir_function) {
+                std::cerr << "Failed to generate LIR function\n";
+                continue;
+            }
+            
+            // Execute using register interpreter
             try {
-                // Set debug state based on debug mode
-                #ifdef DEBUG
-                bool oldDebug = Debugger::getInstance().isEnabled();
-                Debugger::getInstance().setEnabled(debugMode);
-                #endif
+                register_vm.execute_function(*lir_function);
                 
-                // Set source information for enhanced error reporting
-                vm.setSourceInfo(line, "<repl>");
+                // Get result from register 0 (conventional return register)
+                auto result = register_vm.get_register(0);
+                if (!std::holds_alternative<std::nullptr_t>(result)) {
+                    std::cout << "=> " << register_vm.to_string(result) << std::endl;
+                }
                 
-                // Execute the bytecode
-                ValuePtr result = vm.execute(generator.getBytecode());
-                
-                // Show stack after execution in debug mode
+                // Show registers after execution in debug mode
                 if (debugMode) {
-                    vm.printStack();
+                    std::cout << "Register state after execution:\n";
+                    for (size_t i = 0; i < 10; ++i) { // Show first 10 registers
+                        auto reg_val = register_vm.get_register(i);
+                        if (!std::holds_alternative<std::nullptr_t>(reg_val)) {
+                            std::cout << "  r" << i << ": " << register_vm.to_string(reg_val) << std::endl;
+                        }
+                    }
                 }
-                
-                // Only print non-nil results
-                if (result && (!result->type || result->type->tag != TypeTag::Nil)) {
-                    std::cout << "=> " << result->toString() << std::endl;
-                }
-                
-                #ifdef DEBUG
-                // Restore debug state
-                Debugger::getInstance().setEnabled(oldDebug);
-                #endif
                 
             } catch (const std::exception& e) {
                 std::cerr << "Runtime error: " << e.what() << std::endl;
                 if (debugMode) {
-                    vm.printStack();
+                    std::cout << "Register state after error:\n";
+                    for (size_t i = 0; i < 10; ++i) {
+                        auto reg_val = register_vm.get_register(i);
+                        if (!std::holds_alternative<std::nullptr_t>(reg_val)) {
+                            std::cout << "  r" << i << ": " << register_vm.to_string(reg_val) << std::endl;
+                        }
+                    }
                 }
             }
             
