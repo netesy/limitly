@@ -29,3 +29,10 @@ while (k < 5) {
 }
 
 print("Done with break/continue test");
+
+
+print("Basic range (1 to 5):");
+iter (var i in 1..8) {
+    print("i = ");
+    print(i);
+}

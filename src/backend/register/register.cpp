@@ -1,140 +1,19 @@
 #include "register.hh"
+#include "../../lir/lir.hh"
 #include <iostream>
-#include <stdexcept>
+#include <cstring>
 
 namespace Register {
 
-RegisterVM::RegisterVM() : ip(0) {
-    // Initialize registers with nil values
+RegisterVM::RegisterVM() {
     registers.resize(1024, nullptr);
-}
-
-void RegisterVM::execute_function(const LIR::LIR_Function& function) {
-    reset();
-    
-    // Execute instructions sequentially
-    while (ip < function.instructions.size()) {
-        const LIR_Inst& inst = function.instructions[ip];
-        
-        // Handle jumps by modifying ip
-        if (inst.op == LIR_Op::Jump) {
-            ip = inst.imm;
-            continue;
-        } else if (inst.op == LIR_Op::JumpIfFalse) {
-            bool condition = to_bool(get_register(inst.a));
-            if (!condition) {
-                ip = inst.imm;
-            } else {
-                ip++;
-            }
-            continue;
-        } else if (inst.op == LIR_Op::Return) {
-            break;
-        }
-        
-        execute_instruction(inst);
-        ip++;
-    }
-}
-
-Register::RegisterValue RegisterVM::execute_instruction(const LIR::LIR_Inst& inst) {
-    switch (inst.op) {
-        case LIR_Op::Mov:
-            set_register(inst.dst, get_register(inst.a));
-            break;
-            
-        case LIR_Op::LoadConst:
-            if (inst.const_val.kind == LIR_ValueKind::Int) {
-                set_register(inst.dst, inst.const_val.i);
-            } else if (inst.const_val.kind == LIR_ValueKind::Float) {
-                set_register(inst.dst, inst.const_val.f);
-            } else if (inst.const_val.kind == LIR_ValueKind::Bool) {
-                set_register(inst.dst, inst.const_val.b);
-            } else if (inst.const_val.kind == LIR_ValueKind::String) {
-                set_register(inst.dst, std::string(inst.const_val.s));
-            } else if (inst.const_val.kind == LIR_ValueKind::Nil) {
-                set_register(inst.dst, nullptr);
-            }
-            break;
-            
-        case LIR_Op::Add:
-        case LIR_Op::Sub:
-        case LIR_Op::Mul:
-        case LIR_Op::Div:
-        case LIR_Op::Mod:
-        case LIR_Op::And:
-        case LIR_Op::Or:
-        case LIR_Op::Xor:
-            set_register(inst.dst, perform_binary_op(inst.op, get_register(inst.a), get_register(inst.b)));
-            break;
-            
-        case LIR_Op::CmpEQ:
-        case LIR_Op::CmpNEQ:
-        case LIR_Op::CmpLT:
-        case LIR_Op::CmpLE:
-        case LIR_Op::CmpGT:
-        case LIR_Op::CmpGE: {
-            bool result = perform_comparison(inst.op, get_register(inst.a), get_register(inst.b));
-            set_register(inst.dst, result);
-            break;
-        }
-        
-        case LIR_Op::Call:
-            // Simplified call handling
-            std::cout << "Call to function in register r" << inst.a << std::endl;
-            set_register(inst.dst, nullptr);
-            break;
-            
-        case LIR_Op::Load:
-        case LIR_Op::Store:
-            // Placeholder for memory operations
-            break;
-            
-        case LIR_Op::Cast:
-            // Type casting (placeholder)
-            set_register(inst.dst, get_register(inst.a));
-            break;
-            
-        case LIR_Op::Concat: {
-            std::string a_str = to_string(get_register(inst.a));
-            std::string b_str = to_string(get_register(inst.b));
-            set_register(inst.dst, a_str + b_str);
-            break;
-        }
-        
-        case LIR_Op::Nop:
-            // No operation
-            break;
-            
-        default:
-            std::cerr << "Unsupported LIR operation: " << static_cast<int>(inst.op) << std::endl;
-            break;
-    }
-    
-    return get_register(inst.dst);
-}
-
-const Register::RegisterValue& RegisterVM::get_register(LIR::Reg reg) const {
-    if (reg >= registers.size()) {
-        static RegisterValue nil_value = nullptr;
-        return nil_value;
-    }
-    return registers[reg];
-}
-
-void RegisterVM::set_register(LIR::Reg reg, const RegisterValue& value) {
-    if (reg >= registers.size()) {
-        registers.resize(reg + 1, nullptr);
-    }
-    registers[reg] = value;
 }
 
 void RegisterVM::reset() {
     std::fill(registers.begin(), registers.end(), nullptr);
-    ip = 0;
 }
 
-std::string RegisterVM::register_value_to_string(const RegisterValue& value) const {
+std::string RegisterVM::to_string(const RegisterValue& value) const {
     if (std::holds_alternative<int64_t>(value)) {
         return std::to_string(std::get<int64_t>(value));
     } else if (std::holds_alternative<double>(value)) {
@@ -142,124 +21,344 @@ std::string RegisterVM::register_value_to_string(const RegisterValue& value) con
     } else if (std::holds_alternative<bool>(value)) {
         return std::get<bool>(value) ? "true" : "false";
     } else if (std::holds_alternative<std::string>(value)) {
-        return "\"" + std::get<std::string>(value) + "\"";
-    } else if (std::holds_alternative<std::nullptr_t>(value)) {
-        return "nil";
+        return std::get<std::string>(value);
     }
-    return "unknown";
+    return "nil";
 }
 
-Register::RegisterValue RegisterVM::perform_binary_op(LIR::LIR_Op op, const RegisterValue& a, const RegisterValue& b) {
-    if (is_numeric(a) && is_numeric(b)) {
-        double a_val = to_float(a);
-        double b_val = to_float(b);
-        
-        switch (op) {
-            case LIR_Op::Add: return a_val + b_val;
-            case LIR_Op::Sub: return a_val - b_val;
-            case LIR_Op::Mul: return a_val * b_val;
-            case LIR_Op::Div: return b_val != 0 ? a_val / b_val : 0.0;
-            case LIR_Op::Mod: {
-                int64_t a_int = to_int(a);
-                int64_t b_int = to_int(b);
-                return b_int != 0 ? a_int % b_int : 0;
-            }
-            case LIR_Op::And: return to_int(a) & to_int(b);
-            case LIR_Op::Or: return to_int(a) | to_int(b);
-            case LIR_Op::Xor: return to_int(a) ^ to_int(b);
-            default: break;
-        }
-    } else if (op == LIR_Op::And || op == LIR_Op::Or) {
-        // Logical operations
-        bool a_bool = to_bool(a);
-        bool b_bool = to_bool(b);
-        return (op == LIR_Op::And) ? a_bool && b_bool : a_bool || b_bool;
-    }
+void RegisterVM::execute_function(const LIR::LIR_Function& function) {
+    reset();
     
-    return nullptr;
-}
-
-Register::RegisterValue RegisterVM::perform_unary_op(LIR::LIR_Op op, const RegisterValue& a) {
-    if (op == LIR_Op::Sub && is_numeric(a)) {
-        return -to_float(a);
-    }
-    // Add other unary operations as needed
-    return a;
-}
-
-bool RegisterVM::perform_comparison(LIR::LIR_Op op, const RegisterValue& a, const RegisterValue& b) {
-    if (is_numeric(a) && is_numeric(b)) {
-        double a_val = to_float(a);
-        double b_val = to_float(b);
-        
-        switch (op) {
-            case LIR_Op::CmpEQ: return a_val == b_val;
-            case LIR_Op::CmpNEQ: return a_val != b_val;
-            case LIR_Op::CmpLT: return a_val < b_val;
-            case LIR_Op::CmpLE: return a_val <= b_val;
-            case LIR_Op::CmpGT: return a_val > b_val;
-            case LIR_Op::CmpGE: return a_val >= b_val;
-            default: return false;
-        }
-    } else if (std::holds_alternative<std::string>(a) && std::holds_alternative<std::string>(b)) {
-        const std::string& a_str = std::get<std::string>(a);
-        const std::string& b_str = std::get<std::string>(b);
-        
-        switch (op) {
-            case LIR_Op::CmpEQ: return a_str == b_str;
-            case LIR_Op::CmpNEQ: return a_str != b_str;
-            case LIR_Op::CmpLT: return a_str < b_str;
-            case LIR_Op::CmpLE: return a_str <= b_str;
-            case LIR_Op::CmpGT: return a_str > b_str;
-            case LIR_Op::CmpGE: return a_str >= b_str;
-            default: return false;
-        }
-    }
+    std::cout << "[DEBUG] Register VM: Executing function with " << function.instructions.size() << " instructions" << std::endl;
     
-    return false;
-}
+    const LIR::LIR_Inst* pc = function.instructions.data();
+    const LIR::LIR_Inst* end = pc + function.instructions.size();
+    
+    // Dispatch table for computed goto - using runtime initialization
+    void* dispatch_table[256] = {nullptr};
+    dispatch_table[static_cast<int>(LIR::LIR_Op::Nop)] = &&OP_NOP;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::Mov)] = &&OP_MOV;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::LoadConst)] = &&OP_LOADCONST;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::Add)] = &&OP_ADD;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::Sub)] = &&OP_SUB;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::Mul)] = &&OP_MUL;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::Div)] = &&OP_DIV;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::Mod)] = &&OP_MOD;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::And)] = &&OP_AND;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::Or)] = &&OP_OR;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::Xor)] = &&OP_XOR;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::CmpEQ)] = &&OP_CMPEQ;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::CmpNEQ)] = &&OP_CMPNEQ;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::CmpLT)] = &&OP_CMPLT;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::CmpLE)] = &&OP_CMPLE;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::CmpGT)] = &&OP_CMPGT;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::CmpGE)] = &&OP_CMPGE;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::Jump)] = &&OP_JUMP;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::JumpIfFalse)] = &&OP_JUMPIFFALSE;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::Return)] = &&OP_RETURN;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::Call)] = &&OP_CALL;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::PrintUint)] = &&OP_PRINTUINT;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::PrintFloat)] = &&OP_PRINTFLOAT;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::PrintBool)] = &&OP_PRINTBOOL;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::PrintString)] = &&OP_PRINTSTRING;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ToString)] = &&OP_TOSTRING;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::Concat)] = &&OP_CONCAT;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::SBCreate)] = &&OP_SBCREATE;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::SBAppend)] = &&OP_SBAPPEND;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::SBFinish)] = &&OP_SBFINISH;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::Cast)] = &&OP_CAST;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::Load)] = &&OP_LOAD;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::Store)] = &&OP_STORE;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ListCreate)] = &&OP_LISTCREATE;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ListAppend)] = &&OP_LISTAPPEND;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ListIndex)] = &&OP_LISTINDEX;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::NewObject)] = &&OP_NEWOBJECT;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::GetField)] = &&OP_GETFIELD;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::SetField)] = &&OP_SETFIELD;
+    
+    // Dispatch macro - jumps to next instruction handler
+    #define DISPATCH() \
+        do { \
+            pc++; \
+            if (pc >= end) { \
+                std::cout << "[DEBUG] Register VM: Reached end of instructions" << std::endl; \
+                return; \
+            } \
+            std::cout << "[DEBUG] Register VM: Dispatching to op " << static_cast<int>(pc->op) << std::endl; \
+            goto *dispatch_table[static_cast<int>(pc->op)]; \
+        } while (0)
+    
+    #define DISPATCH_JUMP(target) \
+        pc = function.instructions.data() + (target); \
+        if (pc >= end) return; \
+        goto *dispatch_table[static_cast<int>(pc->op)]
+    
+    // Temporary variables declared outside all handlers to avoid destructor issues
+    const RegisterValue* temp_a;
+    const RegisterValue* temp_b;
+    double double_result;
+    int64_t int_result;
+    bool bool_result;
+    ValuePtr cv;
+    
+    // Start execution
+    std::cout << "[DEBUG] Register VM: Starting threaded execution" << std::endl;
+    goto *dispatch_table[static_cast<int>(pc->op)];
+    
+    // ============ INSTRUCTION HANDLERS ============
+    
+OP_NOP:
+    DISPATCH();
 
-bool RegisterVM::is_numeric(const RegisterValue& value) const {
-    return std::holds_alternative<int64_t>(value) || std::holds_alternative<double>(value);
-}
+OP_MOV:
+    registers[pc->dst] = registers[pc->a];
+    DISPATCH();
 
-int64_t RegisterVM::to_int(const RegisterValue& value) const {
-    if (std::holds_alternative<int64_t>(value)) {
-        return std::get<int64_t>(value);
-    } else if (std::holds_alternative<double>(value)) {
-        return static_cast<int64_t>(std::get<double>(value));
-    } else if (std::holds_alternative<bool>(value)) {
-        return std::get<bool>(value) ? 1 : 0;
+OP_LOADCONST:
+    cv = pc->const_val;
+    if (!cv) {
+        registers[pc->dst] = nullptr;
+    } else if (cv->type->tag == TypeTag::Int) {
+        registers[pc->dst] = static_cast<int64_t>(std::stoi(cv->data));
+    } else if (cv->type->tag == TypeTag::Float64) {
+        memcpy(&double_result, &cv->data, sizeof(double));
+        registers[pc->dst] = double_result;
+    } else if (cv->type->tag == TypeTag::Bool) {
+        registers[pc->dst] = static_cast<bool>(cv->data == "true");
+    } else if (cv->type->tag == TypeTag::String) {
+        registers[pc->dst] = std::string(static_cast<const char*>(cv->data.c_str()));
+    } else {
+        registers[pc->dst] = nullptr;
     }
-    return 0;
-}
+    DISPATCH();
 
-double RegisterVM::to_float(const RegisterValue& value) const {
-    if (std::holds_alternative<double>(value)) {
-        return std::get<double>(value);
-    } else if (std::holds_alternative<int64_t>(value)) {
-        return static_cast<double>(std::get<int64_t>(value));
-    } else if (std::holds_alternative<bool>(value)) {
-        return std::get<bool>(value) ? 1.0 : 0.0;
+OP_ADD:
+    temp_a = &registers[pc->a];
+    temp_b = &registers[pc->b];
+    if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
+        registers[pc->dst] = to_float(*temp_a) + to_float(*temp_b);
+    } else {
+        registers[pc->dst] = nullptr;
     }
-    return 0.0;
-}
+    DISPATCH();
 
-bool RegisterVM::to_bool(const RegisterValue& value) const {
-    if (std::holds_alternative<bool>(value)) {
-        return std::get<bool>(value);
-    } else if (std::holds_alternative<int64_t>(value)) {
-        return std::get<int64_t>(value) != 0;
-    } else if (std::holds_alternative<double>(value)) {
-        return std::get<double>(value) != 0.0;
-    } else if (std::holds_alternative<std::string>(value)) {
-        return !std::get<std::string>(value).empty();
+OP_SUB:
+    temp_a = &registers[pc->a];
+    temp_b = &registers[pc->b];
+    if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
+        registers[pc->dst] = to_float(*temp_a) - to_float(*temp_b);
+    } else {
+        registers[pc->dst] = nullptr;
     }
-    return false;
-}
+    DISPATCH();
 
-std::string RegisterVM::to_string(const RegisterValue& value) const {
-    return register_value_to_string(value);
+OP_MUL:
+    temp_a = &registers[pc->a];
+    temp_b = &registers[pc->b];
+    if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
+        registers[pc->dst] = to_float(*temp_a) * to_float(*temp_b);
+    } else {
+        registers[pc->dst] = nullptr;
+    }
+    DISPATCH();
+
+OP_DIV:
+    temp_a = &registers[pc->a];
+    temp_b = &registers[pc->b];
+    if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
+        double_result = to_float(*temp_b);
+        registers[pc->dst] = (double_result != 0.0) ? to_float(*temp_a) / double_result : 0.0;
+    } else {
+        registers[pc->dst] = nullptr;
+    }
+    DISPATCH();
+
+OP_MOD:
+    temp_a = &registers[pc->a];
+    temp_b = &registers[pc->b];
+    if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
+        int_result = to_int(*temp_b);
+        registers[pc->dst] = (int_result != 0) ? to_int(*temp_a) % int_result : 0;
+    } else {
+        registers[pc->dst] = nullptr;
+    }
+    DISPATCH();
+
+OP_AND:
+    temp_a = &registers[pc->a];
+    temp_b = &registers[pc->b];
+    if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
+        registers[pc->dst] = to_int(*temp_a) & to_int(*temp_b);
+    } else {
+        registers[pc->dst] = to_bool(*temp_a) && to_bool(*temp_b);
+    }
+    DISPATCH();
+
+OP_OR:
+    temp_a = &registers[pc->a];
+    temp_b = &registers[pc->b];
+    if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
+        registers[pc->dst] = to_int(*temp_a) | to_int(*temp_b);
+    } else {
+        registers[pc->dst] = to_bool(*temp_a) || to_bool(*temp_b);
+    }
+    DISPATCH();
+
+OP_XOR:
+    temp_a = &registers[pc->a];
+    temp_b = &registers[pc->b];
+    if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
+        registers[pc->dst] = to_int(*temp_a) ^ to_int(*temp_b);
+    } else {
+        registers[pc->dst] = nullptr;
+    }
+    DISPATCH();
+
+OP_CMPEQ:
+    temp_a = &registers[pc->a];
+    temp_b = &registers[pc->b];
+    bool_result = false;
+    if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
+        bool_result = to_float(*temp_a) == to_float(*temp_b);
+    } else if (std::holds_alternative<std::string>(*temp_a) && std::holds_alternative<std::string>(*temp_b)) {
+        bool_result = std::get<std::string>(*temp_a) == std::get<std::string>(*temp_b);
+    }
+    registers[pc->dst] = bool_result;
+    DISPATCH();
+
+OP_CMPNEQ:
+    temp_a = &registers[pc->a];
+    temp_b = &registers[pc->b];
+    bool_result = false;
+    if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
+        bool_result = to_float(*temp_a) != to_float(*temp_b);
+    } else if (std::holds_alternative<std::string>(*temp_a) && std::holds_alternative<std::string>(*temp_b)) {
+        bool_result = std::get<std::string>(*temp_a) != std::get<std::string>(*temp_b);
+    }
+    registers[pc->dst] = bool_result;
+    DISPATCH();
+
+OP_CMPLT:
+    temp_a = &registers[pc->a];
+    temp_b = &registers[pc->b];
+    bool_result = false;
+    if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
+        bool_result = to_float(*temp_a) < to_float(*temp_b);
+    } else if (std::holds_alternative<std::string>(*temp_a) && std::holds_alternative<std::string>(*temp_b)) {
+        bool_result = std::get<std::string>(*temp_a) < std::get<std::string>(*temp_b);
+    }
+    registers[pc->dst] = bool_result;
+    DISPATCH();
+
+OP_CMPLE:
+    temp_a = &registers[pc->a];
+    temp_b = &registers[pc->b];
+    bool_result = false;
+    if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
+        bool_result = to_float(*temp_a) <= to_float(*temp_b);
+    } else if (std::holds_alternative<std::string>(*temp_a) && std::holds_alternative<std::string>(*temp_b)) {
+        bool_result = std::get<std::string>(*temp_a) <= std::get<std::string>(*temp_b);
+    }
+    registers[pc->dst] = bool_result;
+    DISPATCH();
+
+OP_CMPGT:
+    temp_a = &registers[pc->a];
+    temp_b = &registers[pc->b];
+    bool_result = false;
+    if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
+        bool_result = to_float(*temp_a) > to_float(*temp_b);
+    } else if (std::holds_alternative<std::string>(*temp_a) && std::holds_alternative<std::string>(*temp_b)) {
+        bool_result = std::get<std::string>(*temp_a) > std::get<std::string>(*temp_b);
+    }
+    registers[pc->dst] = bool_result;
+    DISPATCH();
+
+OP_CMPGE:
+    temp_a = &registers[pc->a];
+    temp_b = &registers[pc->b];
+    bool_result = false;
+    if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
+        bool_result = to_float(*temp_a) >= to_float(*temp_b);
+    } else if (std::holds_alternative<std::string>(*temp_a) && std::holds_alternative<std::string>(*temp_b)) {
+        bool_result = std::get<std::string>(*temp_a) >= std::get<std::string>(*temp_b);
+    }
+    registers[pc->dst] = bool_result;
+    DISPATCH();
+
+OP_JUMP:
+    DISPATCH_JUMP(pc->imm);
+
+OP_JUMPIFFALSE:
+    if (!to_bool(registers[pc->a])) {
+        DISPATCH_JUMP(pc->imm);
+    }
+    DISPATCH();
+
+OP_RETURN:
+    std::cout << "[DEBUG] Register VM: Execution completed, returning" << std::endl;
+    return;
+
+OP_CALL:
+    // Simplified - needs proper implementation
+    registers[pc->dst] = nullptr;
+    DISPATCH();
+
+OP_PRINTUINT:
+    std::cout << to_int(registers[pc->a]) << std::endl;
+    DISPATCH();
+
+OP_PRINTFLOAT:
+    std::cout << to_float(registers[pc->a]) << std::endl;
+    DISPATCH();
+
+OP_PRINTBOOL:
+    std::cout << (to_bool(registers[pc->a]) ? "true" : "false") << std::endl;
+    DISPATCH();
+
+OP_PRINTSTRING:
+    std::cout << to_string(registers[pc->a]) << std::endl;
+    DISPATCH();
+
+OP_TOSTRING:
+    registers[pc->dst] = to_string(registers[pc->a]);
+    DISPATCH();
+
+OP_CONCAT:
+    // String concatenation - store directly in register
+    registers[pc->dst] = to_string(registers[pc->a]) + to_string(registers[pc->b]);
+    DISPATCH();
+
+OP_SBCREATE:
+    registers[pc->dst] = std::string("");
+    DISPATCH();
+
+OP_SBAPPEND:
+    // Append to string builder
+    registers[pc->dst] = to_string(registers[pc->dst]) + to_string(registers[pc->a]);
+    DISPATCH();
+
+OP_SBFINISH:
+    registers[pc->dst] = registers[pc->a];
+    DISPATCH();
+
+OP_CAST:
+    registers[pc->dst] = registers[pc->a];
+    DISPATCH();
+
+OP_LOAD:
+OP_STORE:
+OP_LISTCREATE:
+OP_LISTAPPEND:
+OP_LISTINDEX:
+OP_NEWOBJECT:
+OP_GETFIELD:
+OP_SETFIELD:
+    registers[pc->dst] = nullptr;
+    DISPATCH();
+    
+    #undef DISPATCH
+    #undef DISPATCH_JUMP
 }
 
 } // namespace Register
