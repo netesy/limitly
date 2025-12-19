@@ -1,0 +1,40 @@
+// Test file focusing on control flow statements
+
+print("=== Testing If Statements ===");
+
+// Test if with true condition
+if (true) {
+    print("if(true) -> then branch executed");
+} else {
+    print("if(true) -> else branch executed");
+}
+
+// Test if with false condition  
+if (false) {
+    print("if(false) -> then branch executed");
+} else {
+    print("if(false) -> else branch executed");
+}
+
+print("\n=== Testing While Loop ===");
+
+// Simple while loop
+var i = 0;
+while (i < 3) {
+    print("while iteration:");
+    print(i);
+    i = i + 1;
+}
+
+print("\n=== Testing For Loop ===");
+
+// Simple for loop
+var j = 0;
+for (var k = 0; k < 3; k = k + 1) {
+    print("for iteration: ");
+    print(k);
+    j = j + 1;
+}
+
+print("for loop completed, j =");
+print(j);

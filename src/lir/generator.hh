@@ -120,8 +120,14 @@ private:
     void emit_var_stmt(AST::VarDeclaration& stmt);
     void emit_block_stmt(AST::BlockStatement& stmt);
     void emit_if_stmt(AST::IfStatement& stmt);
+    void emit_if_stmt_cfg(AST::IfStatement& stmt);
+    void emit_if_stmt_linear(AST::IfStatement& stmt);
     void emit_while_stmt(AST::WhileStatement& stmt);
+    void emit_while_stmt_cfg(AST::WhileStatement& stmt);
+    void emit_while_stmt_linear(AST::WhileStatement& stmt);
     void emit_for_stmt(AST::ForStatement& stmt);
+    void emit_for_stmt_cfg(AST::ForStatement& stmt);
+    void emit_for_stmt_linear(AST::ForStatement& stmt);
     void emit_return_stmt(AST::ReturnStatement& stmt);
     void emit_func_stmt(AST::FunctionDeclaration& stmt);
     void emit_import_stmt(AST::ImportStatement& stmt);

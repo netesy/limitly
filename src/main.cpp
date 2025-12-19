@@ -41,7 +41,7 @@ std::string readFile(const std::string& filename) {
     return buffer.str();
 }
 
-int executeFile(const std::string& filename, bool printAst = false, bool printCst = false, bool printTokens = false, bool printBytecode = false, bool useJit = false, bool jitDebug = false, bool enableDebug = false) {
+int executeFile(const std::string& filename, bool printAst = false, bool printCst = false, bool printTokens = false, bool printBytecode = false, bool useJit = true, bool jitDebug = true, bool enableDebug = false) {
     try {
         // Read source file
         std::string source = readFile(filename);
@@ -89,6 +89,9 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 // Generate LIR from AST (this includes complete CFG building)
                 LIR::Generator lir_generator;
                 auto lir_function = lir_generator.generate_program(*ast);
+                // LIR::Disassembler disassemble(lir_function);
+
+                // disassemble.disassemble();
                 
                 if (!lir_function) {
                     std::cerr << "Failed to generate LIR function\n";
