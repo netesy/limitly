@@ -27,9 +27,6 @@ To get started with Limit, you'll need to build the interpreter from source. Don
 *   **On macOS or Linux:**
     ```bash
     # Open your terminal
-    mkdir build
-    cd build
-    cmake ..
     make
     ```
 
@@ -440,7 +437,7 @@ Congratulations on completing this beginner's guide! You've learned the fundamen
 
 Here are some resources to help you continue your journey:
 
-*   **Full Language Guide:** For a more in-depth look at all of Limit's features, check out the [**Full Language Guide**](./doc/guide.md).
-*   **The Zen of Limit:** To understand the philosophy behind the language, read [**The Zen of Limit**](./doc/zen.md).
-*   **Limit vs. Python:** To see how Limit compares to a popular dynamic language, check out our [**Limit vs. Python Comparison**](./doc/limit_vs_python.md).
+*   **Full Language Guide:** For a more in-depth look at all of Limit's features, check out the [**Full Language Guide**](./guide.md).
+*   **The Zen of Limit:** To understand the philosophy behind the language, read [**The Zen of Limit**](./zen.md).
+*   **Limit vs. Python:** To see how Limit compares to a popular dynamic language, check out our [**Limit vs. Python Comparison**](./limit_vs_python.md).
 *   **Explore the Code:** The best way to learn is to read code! Check out the `tests/` directory in this project to see examples of every feature in action.

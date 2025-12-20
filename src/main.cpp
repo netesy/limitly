@@ -17,6 +17,19 @@
 #include <memory>
 #include "lembed.hh"
 
+// This file is the main entry point for the Limit programming language interpreter.
+// It handles command-line arguments, file execution, and the interactive REPL.
+//
+// The interpreter supports several flags for debugging and introspection:
+// - -ast: Print the Abstract Syntax Tree (AST) for a source file.
+// - -cst: Print the Concrete Syntax Tree (CST) for a source file.
+// - -tokens: Print the tokens for a source file.
+// - -bytecode: Print the bytecode for a source file.
+// - -jit: JIT compile a source file.
+// - -jit-debug: JIT compile and run directly in debug mode.
+// - -debug: Execute with debug output enabled.
+// - -repl: Start the REPL (interactive mode).
+
 void printUsage(const char* programName) {
     std::cout << "Limit Programming Language" << std::endl;
     std::cout << "Usage:" << std::endl;
