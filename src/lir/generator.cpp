@@ -662,44 +662,82 @@ Reg Generator::emit_interpolated_string_expr(AST::InterpolatedStringExpr& expr) 
         return result;
     }
 
-    Reg sb_reg = allocate_register();
-    emit_instruction(LIR_Inst(LIR_Op::SBCreate, sb_reg, 0, 0));
-
+    // Check for constant folding opportunity
+    bool all_parts_are_string_literals = true;
+    std::string folded_result = "";
+    
     for (const auto& part : expr.parts) {
         if (std::holds_alternative<std::string>(part)) {
-            std::string literal = std::get<std::string>(part);
-            ValuePtr literal_val = std::make_shared<Value>(string_type, literal);
-            Reg literal_reg = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::LoadConst, literal_reg, literal_val));
-            set_register_type(literal_reg, string_type);
-            emit_instruction(LIR_Inst(LIR_Op::SBAppend, sb_reg, literal_reg, 0));
-
-        } else if (std::holds_alternative<std::shared_ptr<AST::Expression>>(part)) {
-            auto expr_part = std::get<std::shared_ptr<AST::Expression>>(part);
-            Reg expr_reg = emit_expr(*expr_part);
-
-            Reg str_reg = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::ToString, str_reg, expr_reg, 0));
-            set_register_type(str_reg, string_type);
-            emit_instruction(LIR_Inst(LIR_Op::SBAppend, sb_reg, str_reg, 0));
+            folded_result += std::get<std::string>(part);
+        } else {
+            all_parts_are_string_literals = false;
+            break;
         }
     }
+    
+    // Constant folding: if all parts are string literals, fold them
+    if (all_parts_are_string_literals) {
+        Reg result = allocate_register();
+        ValuePtr result_val = std::make_shared<Value>(string_type, folded_result);
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, result, result_val));
+        set_register_type(result, string_type);
+        return result;
+    }
 
-    Reg result_reg = allocate_register();
-    emit_instruction(LIR_Inst(LIR_Op::SBFinish, result_reg, sb_reg, 0));
-    set_register_type(result_reg, string_type);
-    return result_reg;
+    // For complex interpolations, use STR_FORMAT
+    // Build format string and collect argument registers
+    std::string format_string = "";
+    std::vector<Reg> arg_regs;
+    
+    for (const auto& part : expr.parts) {
+        if (std::holds_alternative<std::string>(part)) {
+            format_string += std::get<std::string>(part);
+        } else if (std::holds_alternative<std::shared_ptr<AST::Expression>>(part)) {
+            format_string += "%s"; // Simple placeholder for now
+            auto expr_part = std::get<std::shared_ptr<AST::Expression>>(part);
+            Reg expr_reg = emit_expr(*expr_part);
+            arg_regs.push_back(expr_reg);
+        }
+    }
+    
+    // Emit STR_FORMAT instruction
+    Reg result = allocate_register();
+    Reg format_reg = allocate_register();
+    ValuePtr format_val = std::make_shared<Value>(string_type, format_string);
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, format_reg, format_val));
+    
+    // Handle multiple arguments by chaining STR_FORMAT calls
+    Reg current_result = format_reg;
+    for (size_t i = 0; i < arg_regs.size(); i++) {
+        if (i == 0) {
+            // First argument: format with first arg
+            emit_instruction(LIR_Inst(LIR_Op::STR_FORMAT, result, format_reg, arg_regs[i]));
+            current_result = result;
+        } else {
+            // Subsequent arguments: format previous result with next arg
+            Reg temp_result = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::STR_FORMAT, temp_result, current_result, arg_regs[i]));
+            current_result = temp_result;
+            if (i == arg_regs.size() - 1) {
+                // Final result is in temp_result, move to result register
+                emit_instruction(LIR_Inst(LIR_Op::Mov, result, temp_result, 0));
+            }
+        }
+    }
+    
+    set_register_type(result, string_type);
+    return result;
 }
 
 Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
-    // For string concatenation, handle at generation time
+    // Handle explicit string concatenation (+) with STR_CONCAT
     if (expr.op == TokenType::PLUS) {
-        // Check if this is string concatenation by examining operands
+        // Check if this is string concatenation by examining operand types
         bool left_is_string = false;
         bool right_is_string = false;
         std::string left_str, right_str;
         
-        // Check left operand
+        // Check left operand for string literal or variable
         if (auto left_literal = dynamic_cast<AST::LiteralExpr*>(expr.left.get())) {
             if (std::holds_alternative<std::string>(left_literal->value)) {
                 left_str = std::get<std::string>(left_literal->value);
@@ -720,9 +758,18 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
                 }
                 left_is_string = !is_numeric;
             }
+        } else if (auto left_var = dynamic_cast<AST::VariableExpr*>(expr.left.get())) {
+            // Check if variable is known to be a string type
+            Reg left_reg = resolve_variable(left_var->name);
+            if (left_reg != UINT32_MAX) {
+                TypePtr left_type = get_register_type(left_reg);
+                if (left_type && left_type->tag == TypeTag::String) {
+                    left_is_string = true;
+                }
+            }
         }
         
-        // Check right operand
+        // Check right operand for string literal or variable
         if (auto right_literal = dynamic_cast<AST::LiteralExpr*>(expr.right.get())) {
             if (std::holds_alternative<std::string>(right_literal->value)) {
                 right_str = std::get<std::string>(right_literal->value);
@@ -743,28 +790,30 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
                 }
                 right_is_string = !is_numeric;
             }
+        } else if (auto right_var = dynamic_cast<AST::VariableExpr*>(expr.right.get())) {
+            // Check if variable is known to be a string type
+            Reg right_reg = resolve_variable(right_var->name);
+            if (right_reg != UINT32_MAX) {
+                TypePtr right_type = get_register_type(right_reg);
+                if (right_type && right_type->tag == TypeTag::String) {
+                    right_is_string = true;
+                }
+            }
         }
         
-        // If either operand is a non-numeric string, treat as concatenation
+        // If either operand is a non-numeric string, use STR_CONCAT
         if (left_is_string || right_is_string) {
-            // For string literals, concatenate at generation time
-            if (left_is_string && right_is_string) {
-                // Both are string literals - concatenate now
-                std::string result = left_str + right_str;
-                Reg dst = allocate_register();
-                auto string_type = std::make_shared<Type>(TypeTag::String);
-                ValuePtr result_val = std::make_shared<Value>(string_type, result);
-                emit_instruction(LIR_Inst(LIR_Op::LoadConst, dst, result_val));
-                return dst;
-            } else {
-                // Mixed types - for now, treat as arithmetic
-                // TODO: Better type analysis for mixed concatenation
-                Reg left = emit_expr(*expr.left);
-                Reg right = emit_expr(*expr.right);
-                Reg dst = allocate_register();
-                emit_instruction(LIR_Inst(LIR_Op::Add, dst, left, right));
-                return dst;
-            }
+            Reg left = emit_expr(*expr.left);
+            Reg right = emit_expr(*expr.right);
+            Reg dst = allocate_register();
+            
+            // Use STR_CONCAT for explicit string addition
+            emit_instruction(LIR_Inst(LIR_Op::STR_CONCAT, dst, left, right));
+            
+            // Set result type as string
+            auto string_type = std::make_shared<Type>(TypeTag::String);
+            set_register_type(dst, string_type);
+            return dst;
         }
     }
     

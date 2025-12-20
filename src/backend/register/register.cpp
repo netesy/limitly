@@ -62,9 +62,8 @@ void RegisterVM::execute_function(const LIR::LIR_Function& function) {
     dispatch_table[static_cast<int>(LIR::LIR_Op::PrintString)] = &&OP_PRINTSTRING;
     dispatch_table[static_cast<int>(LIR::LIR_Op::ToString)] = &&OP_TOSTRING;
     dispatch_table[static_cast<int>(LIR::LIR_Op::Concat)] = &&OP_CONCAT;
-    dispatch_table[static_cast<int>(LIR::LIR_Op::SBCreate)] = &&OP_SBCREATE;
-    dispatch_table[static_cast<int>(LIR::LIR_Op::SBAppend)] = &&OP_SBAPPEND;
-    dispatch_table[static_cast<int>(LIR::LIR_Op::SBFinish)] = &&OP_SBFINISH;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::STR_CONCAT)] = &&OP_STR_CONCAT;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::STR_FORMAT)] = &&OP_STR_FORMAT;
     dispatch_table[static_cast<int>(LIR::LIR_Op::Cast)] = &&OP_CAST;
     dispatch_table[static_cast<int>(LIR::LIR_Op::Load)] = &&OP_LOAD;
     dispatch_table[static_cast<int>(LIR::LIR_Op::Store)] = &&OP_STORE;
@@ -334,17 +333,25 @@ OP_CONCAT:
     registers[pc->dst] = to_string(registers[pc->a]) + to_string(registers[pc->b]);
     DISPATCH();
 
-OP_SBCREATE:
-    registers[pc->dst] = std::string("");
+OP_STR_CONCAT:
+    // Explicit string concatenation - store directly in register
+    registers[pc->dst] = to_string(registers[pc->a]) + to_string(registers[pc->b]);
     DISPATCH();
 
-OP_SBAPPEND:
-    // Append to string builder
-    registers[pc->dst] = to_string(registers[pc->dst]) + to_string(registers[pc->a]);
-    DISPATCH();
-
-OP_SBFINISH:
-    registers[pc->dst] = registers[pc->a];
+OP_STR_FORMAT:
+    // String formatting - use snprintf-like behavior
+    {
+        std::string format = to_string(registers[pc->a]);
+        std::string arg = to_string(registers[pc->b]);
+        // Simple %s replacement for now
+        size_t pos = format.find("%s");
+        if (pos != std::string::npos) {
+            format.replace(pos, 2, arg);
+        } else {
+            format += arg; // Fallback: append
+        }
+        registers[pc->dst] = format;
+    }
     DISPATCH();
 
 OP_CAST:
