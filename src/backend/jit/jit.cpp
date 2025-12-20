@@ -15,21 +15,6 @@
 #include <cstdlib>
 #include "../value.hh"
 
-// String operation helpers for JIT bridge
-static const char* runtime_str_concat(const char* a, const char* b) {
-    if (!a) a = "";
-    if (!b) b = "";
-    std::string joined = std::string(a) + std::string(b);
-    return _strdup(joined.c_str()); // Use _strdup on Windows/MinGW
-}
-
-static const char* runtime_str_format(const char* fmt, const char* val) {
-    if (!fmt) return _strdup(val ? val : "");
-    char buffer[2048];
-    snprintf(buffer, sizeof(buffer), fmt, val ? val : "null");
-    return _strdup(buffer);
-}
-
 // C wrapper functions for JIT string building
 extern "C" {
     // Memory manager wrapper functions
@@ -51,10 +36,12 @@ JITBackend::JITBackend()
       m_jit_result(nullptr),
       current_memory_region_(nullptr) {
     
+#if defined(_WIN32) || defined(__CYGWIN__)
     // Export all symbols so JITed code can see runtime functions
     // Windows-specific options to export all symbols and disable static linking for JIT
     m_context.add_driver_option("-Wl,--export-all-symbols");
     m_context.add_driver_option("-Wl,--dynamicbase");
+#endif
     
     // Initialize memory manager with audit mode disabled for performance
     memory_manager_.setAuditMode(false);
@@ -170,7 +157,11 @@ JITBackend::~JITBackend() {
 // C wrapper implementations
 static MemoryManager<> g_jit_memory_manager;
 
-#define JIT_EXPORT __declspec(dllexport)
+#if defined(_WIN32) || defined(__CYGWIN__)
+    #define JIT_EXPORT __declspec(dllexport)
+#else
+    #define JIT_EXPORT __attribute__((visibility("default")))
+#endif
 
 // Runtime utility functions for JIT
 extern "C" {
@@ -949,43 +940,24 @@ void JITBackend::compile_memory_op(const LIR::LIR_Inst& inst) {
 }
 
 gccjit::rvalue JITBackend::compile_string_concat(gccjit::rvalue a, gccjit::rvalue b) {
-    // For string concatenation, create the result string literal directly
-    // This avoids runtime linking issues
+    // Ensure both operands are converted to C strings
+    gccjit::rvalue a_str = compile_to_cstring(a);
+    gccjit::rvalue b_str = compile_to_cstring(b);
     
-    // For now, create a simple concatenated result
-    // In a full implementation, we'd extract the actual string values from a and b
-    // and concatenate them using std::string during JIT compilation
-    std::string result = "HelloWorld";  // Placeholder - would be actual concatenation
-    
-    gcc_jit_rvalue* c_result = gcc_jit_context_new_string_literal(
-        m_context.get_inner_context(), 
-        result.c_str()
-    );
-    return gccjit::rvalue(c_result);
+    // Call the runtime concatenation function
+    std::vector<gccjit::rvalue> args = {a_str, b_str};
+    return m_context.new_call(m_runtime_concat_func, args);
 }
 
 
 gccjit::rvalue JITBackend::compile_string_format(gccjit::rvalue format, gccjit::rvalue arg) {
-    // For string formatting, we'll create a new string literal at compile time
-    // This works when at least one operand is a constant string literal
+    // Ensure both operands are converted to C strings
+    gccjit::rvalue format_str = compile_to_cstring(format);
+    gccjit::rvalue arg_str = compile_to_cstring(arg);
     
-    // Try to get the actual string values if they're constants
-    if (format.is_constant() && arg.is_constant()) {
-        // Both are constants - we can compute the result at compile time
-        gcc_jit_rvalue* c_result = gcc_jit_context_new_string_literal(
-            m_context.get_inner_context(), 
-            "[COMPILED_STRING_FORMAT]"  // Placeholder - in real implementation we'd extract and format
-        );
-        return gccjit::rvalue(c_result);
-    }
-    
-    // For now, fall back to creating a simple string literal
-    // In a full implementation, we'd handle the case where one or both operands are variables
-    gcc_jit_rvalue* c_result = gcc_jit_context_new_string_literal(
-        m_context.get_inner_context(), 
-        "HelloWorld"  // Placeholder result
-    );
-    return gccjit::rvalue(c_result);
+    // Call the runtime formatting function
+    std::vector<gccjit::rvalue> args = {format_str, arg_str};
+    return m_context.new_call(m_runtime_format_func, args);
 }
 
 

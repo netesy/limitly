@@ -14,7 +14,10 @@ else
     EXE_EXT :=
     CXX := g++
     LIBS := -lgccjit
-    LDFLAGS := -L$(shell dirname `find /usr -name libgccjit.so 2>/dev/null`)
+    LIBGCCJIT_PATH := $(shell find /usr -name libgccjit.so 2>/dev/null)
+    ifneq ($(LIBGCCJIT_PATH),)
+        LDFLAGS := -L$(shell dirname $(LIBGCCJIT_PATH))
+    endif
 endif
 
 # =============================
@@ -22,9 +25,12 @@ endif
 # =============================
 MODE ?= release
 ifeq ($(MODE),debug)
-    CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++) -Wl,--stack,16777216
+    CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 else
-    CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++) -Wl,--stack,16777216
+    CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+endif
+ifeq ($(PLATFORM),windows)
+    LDFLAGS += -Wl,--stack,16777216
 endif
 
 # =============================
@@ -71,7 +77,7 @@ TEST_RSP := $(RSP_DIR)/build_test.rsp
 # =============================
 # Default target
 # =============================
-all: check-deps windows
+all: check-deps $(PLATFORM)
 
 # =============================
 # Dependency check
@@ -120,12 +126,12 @@ $(TEST_RSP): $(TEST_OBJS) | $(RSP_DIR)
 # =============================
 windows: $(BIN_DIR) $(MAIN_RSP)
 	@echo "🔨 Linking limitly.exe ..."
-	$(CXX) $(CXXFLAGS) @$(MAIN_RSP) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS)
 	@echo "✅ limitly.exe built."
 
 linux: $(BIN_DIR) $(MAIN_RSP)
 	@echo "🔨 Linking limitly ..."
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) -o $(BIN_DIR)/limitly $(LIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS)
 	@echo "✅ limitly built."
 
 
