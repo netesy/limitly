@@ -6,7 +6,7 @@ Limit is a modern programming language designed with static typing, structured c
 
 To learn how to use the Limit language, check out our comprehensive, step-by-step guide:
 
-**[➡️ Read the Full Guide](./doc/guide.md)**
+**[➡️ Read the Full Guide](./docs/guide.md)**
 
 ## ✨ Features
 
@@ -16,6 +16,8 @@ To learn how to use the Limit language, check out our comprehensive, step-by-ste
 *   **Object-Oriented:** Support for classes, inheritance, and polymorphism.
 *   **First-Class Functions:** Higher-order functions and closures.
 *   **Pattern Matching:** Powerful `match` statements for expressive control flow.
+*   **Modules:** A flexible module system for organizing code.
+*   **AOT Compilation:** An AOT compiler for high-performance applications.
 
 ## 🛠️ Building and Running
 

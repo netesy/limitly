@@ -57,6 +57,8 @@ Welcome to the official guide for the Limit programming language. This document 
     *   [Channels](#channels)
     *   [Async/Await](#asyncawait)
     *   [Atomics](#atomics)
+10. [Modules](#modules)
+11. [AOT Compilation](#aot-compilation)
 
 ---
 
@@ -72,12 +74,10 @@ This section covers how to build the Limit compiler and run Limit programs.
 
 **Build Instructions:**
 
-You can build the project using CMake, a Windows batch script, or a Unix shell script.
+You can build the project using Make, a Windows batch script, or a Unix shell script.
 
-*   **Using CMake (recommended for cross-platform):**
+*   **Using Make (recommended for cross-platform):**
     ```bash
-    mkdir build && cd build
-    cmake ..
     make
     ```
 
@@ -989,3 +989,17 @@ concurrent {
 
 print("Final counter value: {shared_counter}"); // Output: 10
 ```
+
+## Modules
+
+The Limit language includes a powerful module system that allows developers to organize code into reusable units. A module is a separate file that can contain functions, classes, and variables. To use a module, you import it into your code using the `import` statement. This makes it easy to share code between different parts of a program or to create libraries that can be used in multiple projects.
+
+The module system is designed to be flexible and easy to use. You can import an entire module, or just specific parts of it. You can also use aliases to give modules a different name in your code, which can be useful for avoiding naming conflicts.
+
+For more information on how to use modules in Limit, see the [Modules and Imports](#modules) section of this guide.
+
+## AOT Compilation
+
+The Limit language supports Ahead-of-Time (AOT) compilation, which can significantly improve the performance of your programs. AOT compilation is the process of compiling a program to machine code before it is run. This is in contrast to Just-in-Time (JIT) compilation, which compiles code as it is being executed.
+
+The AOT compiler in Limit is built on top of the `libgccjit` library, which provides a powerful and flexible backend for compiling code to a variety of targets. To use the AOT compiler, you will need to have the `libgccjit` library installed on your system. Once you have the library installed, you can enable AOT compilation by passing the `-jit` flag to the `limitly` command-line tool.
