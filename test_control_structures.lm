@@ -1,0 +1,44 @@
+// Test control structures
+print("=== Testing if/elif/else ===");
+
+var x = 10;
+if (x > 5) {
+    print("x is greater than 5");
+} elif (x < 5) {
+    print("x is less than 5");
+} else {
+    print("x is equal to 5");
+}
+
+print("\n=== Testing for loop ===");
+for (var i = 0; i < 3; i = i + 1) {
+    print("Loop iteration:", i);
+}
+
+print("\n=== Testing while loop ===");
+var count = 0;
+while (count < 3) {
+    print("While count:", count);
+    count = count + 1;
+}
+
+print("\n=== Testing break/continue ===");
+for (var j = 0; j < 5; j = j + 1) {
+    if (j == 2) {
+        continue;
+    }
+    if (j == 4) {
+        break;
+    }
+    print("j =", j);
+}
+
+print("\n=== Testing nested loops ===");
+for (var outer = 0; outer < 2; outer = outer + 1) {
+    print("Outer:", outer);
+    for (var inner = 0; inner < 2; inner = inner + 1) {
+        print("  Inner:", inner);
+    }
+}
+
+print("\n=== All tests completed ===");

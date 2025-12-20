@@ -1,0 +1,35 @@
+// Comprehensive test of new string operations
+
+// Test 1: Explicit string concatenation with STR_CONCAT
+print("=== Test 1: STR_CONCAT ===")
+var a = "Hello"
+var b = " "
+var c = "World"
+var result = a + b + c
+print(result)  // Should output: "Hello World"
+
+// Test 2: String interpolation with STR_FORMAT
+print("=== Test 2: STR_FORMAT ===")
+var name = "Alice"
+var age = 30
+var interpolated = "Name: {name}, Age: {age}"
+print(interpolated)  // Should output: "Name: Alice, Age: 30"
+
+// Test 3: Constant folding
+print("=== Test 3: Constant Folding ===")
+var folded = "Result: " + (10 + 5)
+print(folded)  // Should output: "Result: 15"
+
+// Test 4: Mixed operations
+print("=== Test 4: Mixed Operations ===")
+var prefix = "Count: "
+var count = 42
+var mixed = prefix + "{count}"
+print(mixed)  // Should handle concatenation and interpolation
+
+// Test 5: Complex interpolation
+print("=== Test 5: Complex Interpolation ===")
+var first = "John"
+var last = "Doe"
+var complex = "User {first} {last} has logged in"
+print(complex)

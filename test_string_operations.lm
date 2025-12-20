@@ -1,0 +1,13 @@
+// Test string operations
+var name = "World"
+var greeting = "Hello " + name
+print(greeting)
+
+// Test string interpolation
+var age = 25
+var message = "My name is {name} and I am {age} years old"
+print(message)
+
+// Test constant folding
+var constant = "Total: " + (1 + 2)
+print(constant)

@@ -113,6 +113,13 @@ private:
     Reg emit_dict_expr(AST::DictExpr& expr);
     Reg emit_range_expr(AST::RangeExpr& expr);
     Reg emit_lambda_expr(AST::LambdaExpr& expr);
+    Reg emit_error_construct_expr(AST::ErrorConstructExpr& expr);
+    Reg emit_ok_construct_expr(AST::OkConstructExpr& expr);
+    Reg emit_fallible_expr(AST::FallibleExpr& expr);
+    
+    // Class system expression handlers
+    Reg emit_object_literal_expr(AST::ObjectLiteralExpr& expr);
+    Reg emit_this_expr(AST::ThisExpr& expr);
     
     // Specific statement handlers
     void emit_expr_stmt(AST::ExprStatement& stmt);
@@ -131,7 +138,6 @@ private:
     void emit_return_stmt(AST::ReturnStatement& stmt);
     void emit_func_stmt(AST::FunctionDeclaration& stmt);
     void emit_import_stmt(AST::ImportStatement& stmt);
-    void emit_match_stmt(AST::MatchStatement& stmt);
     void emit_contract_stmt(AST::ContractStatement& stmt);
     void emit_comptime_stmt(AST::ComptimeStatement& stmt);
     void emit_parallel_stmt(AST::ParallelStatement& stmt);
@@ -142,6 +148,9 @@ private:
     void emit_break_stmt(AST::BreakStatement& stmt);
     void emit_continue_stmt(AST::ContinueStatement& stmt);
     void emit_unsafe_stmt(AST::UnsafeStatement& stmt);
+    void emit_class_stmt(AST::ClassDeclaration& stmt);
+    void emit_match_stmt(AST::MatchStatement& stmt);
+    void emit_module_stmt(AST::ModuleDeclaration& stmt);
     
     // Error reporting
     void report_error(const std::string& message);
@@ -186,12 +195,56 @@ private:
     };
     std::unordered_map<std::string, FunctionInfo> function_table_;
     
+    // Smart module system with qualified symbol table
+    struct ModuleSymbolInfo {
+        std::string qualified_name;  // module::symbol
+        std::string module_name;
+        std::string symbol_name;
+        AST::VisibilityLevel visibility;
+        size_t param_count = 0;
+        bool is_function = false;
+        bool is_variable = false;
+    };
+    std::unordered_map<std::string, ModuleSymbolInfo> module_symbol_table_;
+    
+    // Import alias mapping for current scope
+    std::unordered_map<std::string, std::string> import_aliases_;
+    std::string current_module_ = "";  // Current module context
+    
+    // Class system support
+    struct ClassInfo {
+        std::string name;
+        std::vector<std::pair<std::string, TypePtr>> fields;  // field name -> type with offset
+        std::vector<std::string> method_names;               // ordered method names for V-Table
+        std::unordered_map<std::string, size_t> field_offsets; // field name -> offset
+        std::unordered_map<std::string, size_t> method_indices; // method name -> V-Table index
+        std::string super_class_name;
+        size_t total_field_size = 0;
+    };
+    std::unordered_map<std::string, ClassInfo> class_table_;
+    Reg this_register_ = UINT32_MAX;  // Register holding 'this' pointer in methods
+    
     // Memory management
     MemoryManager<> memory_manager_;
     MemoryManager<>::Region* current_memory_region_ = nullptr;
     
     // Helper methods
     std::shared_ptr<Type> convert_ast_type_to_lir_type(const std::shared_ptr<AST::TypeAnnotation>& ast_type);
+    
+    // Class system helper methods
+    void collect_class_signatures(AST::Program& program);
+    void collect_class_signature(AST::ClassDeclaration& class_decl);
+    void calculate_class_layout(ClassInfo& class_info);
+    size_t get_field_offset(const std::string& class_name, const std::string& field_name);
+    size_t get_method_index(const std::string& class_name, const std::string& method_name);
+    
+    // Smart module system helper methods
+    void collect_module_signatures(AST::Program& program);
+    void collect_module_declaration(AST::ModuleDeclaration& module_decl);
+    void register_module_symbol(const std::string& module_name, const std::string& symbol_name, 
+                                AST::VisibilityLevel visibility, bool is_function = false, size_t param_count = 0);
+    ModuleSymbolInfo* resolve_module_symbol(const std::string& qualified_name);
+    bool can_access_module_symbol(const ModuleSymbolInfo& symbol, const std::string& from_module = "");
 };
 
 } // namespace LIR

@@ -14,8 +14,10 @@ Generator::Generator() : current_function_(nullptr), next_register_(0), next_lab
 }
 
 std::unique_ptr<LIR_Function> Generator::generate_program(AST::Program& program) {
-    // PASS 0: Collect function signatures only
+    // PASS 0: Collect function, class, and module signatures only
     collect_function_signatures(program);
+    collect_class_signatures(program);
+    collect_module_signatures(program);
     
     // PASS 1: Lower function bodies into separate LIR functions
     lower_function_bodies(program);
@@ -281,6 +283,12 @@ void Generator::emit_stmt(AST::Statement& stmt) {
         emit_worker_stmt(*worker_stmt);
     } else if (auto unsafe_stmt = dynamic_cast<AST::UnsafeStatement*>(&stmt)) {
         emit_unsafe_stmt(*unsafe_stmt);
+    } else if (auto class_stmt = dynamic_cast<AST::ClassDeclaration*>(&stmt)) {
+        emit_class_stmt(*class_stmt);
+    } else if (auto match_stmt = dynamic_cast<AST::MatchStatement*>(&stmt)) {
+        emit_match_stmt(*match_stmt);
+    } else if (auto module_stmt = dynamic_cast<AST::ModuleDeclaration*>(&stmt)) {
+        emit_module_stmt(*module_stmt);
     } else {
         report_error("Unsupported statement type in LIR generator");
     }
@@ -321,6 +329,16 @@ Reg Generator::emit_expr(AST::Expression& expr) {
         return emit_range_expr(*range);
     } else if (auto lambda = dynamic_cast<AST::LambdaExpr*>(&expr)) {
         return emit_lambda_expr(*lambda);
+    } else if (auto error_construct = dynamic_cast<AST::ErrorConstructExpr*>(&expr)) {
+        return emit_error_construct_expr(*error_construct);
+    } else if (auto ok_construct = dynamic_cast<AST::OkConstructExpr*>(&expr)) {
+        return emit_ok_construct_expr(*ok_construct);
+    } else if (auto fallible = dynamic_cast<AST::FallibleExpr*>(&expr)) {
+        return emit_fallible_expr(*fallible);
+    } else if (auto object_literal = dynamic_cast<AST::ObjectLiteralExpr*>(&expr)) {
+        return emit_object_literal_expr(*object_literal);
+    } else if (auto this_expr = dynamic_cast<AST::ThisExpr*>(&expr)) {
+        return emit_this_expr(*this_expr);
     } else {
         report_error("Unknown expression type");
         return 0;
@@ -643,6 +661,37 @@ Reg Generator::emit_literal_expr(AST::LiteralExpr& expr, TypePtr expected_type) 
 }
 
 Reg Generator::emit_variable_expr(AST::VariableExpr& expr) {
+    // First check if this is a module variable access (e.g., "math.pi")
+    size_t dot_pos = expr.name.find("::");
+    if (dot_pos != std::string::npos) {
+        std::string module_name = expr.name.substr(0, dot_pos);
+        std::string symbol_name = expr.name.substr(dot_pos + 2);
+        
+        // Check for alias mapping
+        auto alias_it = import_aliases_.find(module_name);
+        if (alias_it != import_aliases_.end()) {
+            module_name = alias_it->second;
+        }
+        
+        // Resolve module symbol
+        std::string qualified_name = module_name + "::" + symbol_name;
+        ModuleSymbolInfo* symbol = resolve_module_symbol(qualified_name);
+        if (symbol && symbol->is_variable) {
+            if (!can_access_module_symbol(*symbol, current_module_)) {
+                report_error("Cannot access private/protected variable: " + qualified_name);
+                return 0;
+            }
+            
+            // For now, return a placeholder - in a full implementation,
+            // we'd need to load the actual module variable value
+            Reg result = allocate_register();
+            auto var_type = std::make_shared<Type>(TypeTag::Any);
+            set_register_type(result, var_type);
+            return result;
+        }
+    }
+    
+    // Check regular variable scope
     Reg reg = resolve_variable(expr.name);
     if (reg == UINT32_MAX) {
         report_error("Undefined variable: " + expr.name);
@@ -983,6 +1032,47 @@ Reg Generator::emit_call_expr(AST::CallExpr& expr) {
     if (auto var_expr = dynamic_cast<AST::VariableExpr*>(expr.callee.get())) {
         std::string func_name = var_expr->name;
         
+        // Check if this is a module function call (e.g., "math.add")
+        size_t dot_pos = func_name.find("::");
+        if (dot_pos != std::string::npos) {
+            std::string module_name = func_name.substr(0, dot_pos);
+            std::string symbol_name = func_name.substr(dot_pos + 2);
+            
+            // Check for alias mapping
+            auto alias_it = import_aliases_.find(module_name);
+            if (alias_it != import_aliases_.end()) {
+                module_name = alias_it->second;
+            }
+            
+            // Resolve module symbol
+            std::string qualified_name = module_name + "::" + symbol_name;
+            ModuleSymbolInfo* symbol = resolve_module_symbol(qualified_name);
+            if (symbol && symbol->is_function) {
+                if (!can_access_module_symbol(*symbol, current_module_)) {
+                    report_error("Cannot access private/protected function: " + qualified_name);
+                    return 0;
+                }
+                
+                std::cout << "[DEBUG] LIR Generator: Generating module function call to '" << qualified_name << "'" << std::endl;
+                
+                // Evaluate arguments and store them in registers
+                std::vector<Reg> arg_regs;
+                for (const auto& arg : expr.arguments) {
+                    Reg arg_reg = emit_expr(*arg);
+                    arg_regs.push_back(arg_reg);
+                }
+                
+                // Allocate result register
+                Reg result = allocate_register();
+                
+                // Generate module function call
+                emit_instruction(LIR_Inst(LIR_Op::Call, result, static_cast<Reg>(arg_regs.size()), static_cast<Reg>(0)));
+                set_register_type(result, std::make_shared<Type>(TypeTag::Any));
+                
+                return result;
+            }
+        }
+        
         if (BuiltinUtils::isBuiltinFunction(func_name)) {
             std::cout << "[DEBUG] LIR Generator: Generating builtin call to '" << func_name << "'" << std::endl;
             
@@ -1027,6 +1117,44 @@ Reg Generator::emit_call_expr(AST::CallExpr& expr) {
             report_error("Unknown function: " + func_name);
             return 0;
         }
+    } else if (auto member_expr = dynamic_cast<AST::MemberExpr*>(expr.callee.get())) {
+        // Method call: obj.method(args...)
+        std::string method_name = member_expr->name;
+        
+        // Evaluate the object (this will be the first argument)
+        Reg object_reg = emit_expr(*member_expr->object);
+        
+        // Try to find the method in any class
+        for (const auto& [class_name, class_info] : class_table_) {
+            auto method_it = class_info.method_indices.find(method_name);
+            if (method_it != class_info.method_indices.end()) {
+                // Found the method - generate method call
+                std::vector<Reg> arg_regs;
+                arg_regs.push_back(object_reg); // 'this' is first parameter
+                
+                // Evaluate other arguments
+                for (const auto& arg : expr.arguments) {
+                    Reg arg_reg = emit_expr(*arg);
+                    arg_regs.push_back(arg_reg);
+                }
+                
+                // Allocate result register
+                Reg result = allocate_register();
+                
+                // Generate method call using V-Table dispatch
+                // For now, we'll use a simple approach - in a full implementation,
+                // we'd load the V-Table and do dynamic dispatch
+                std::string full_method_name = class_name + "." + method_name;
+                if (function_table_.find(full_method_name) != function_table_.end()) {
+                    emit_instruction(LIR_Inst(LIR_Op::Call, result, static_cast<Reg>(arg_regs.size()), static_cast<Reg>(0)));
+                    set_register_type(result, std::make_shared<Type>(TypeTag::Any));
+                    return result;
+                }
+            }
+        }
+        
+        report_error("Unknown method: " + method_name);
+        return 0;
     } else {
         report_error("Complex function calls not yet supported in LIR");
         return 0;
@@ -1051,9 +1179,29 @@ Reg Generator::emit_assign_expr(AST::AssignExpr& expr) {
         // No need to update binding since we're using the existing register
         return dst;
     } else if (expr.object) {
-        // For member or index assignment - not yet implemented
-        report_error("Member/index assignment not yet implemented");
-        return 0;
+        // For member or index assignment
+        if (expr.member.has_value()) {
+            // Field assignment: obj.field = value
+            Reg object_reg = emit_expr(*expr.object);
+            std::string field_name = expr.member.value();
+            
+            // Find field offset
+            for (const auto& [class_name, class_info] : class_table_) {
+                auto offset_it = class_info.field_offsets.find(field_name);
+                if (offset_it != class_info.field_offsets.end()) {
+                    // Found the field - emit SetField
+                    emit_instruction(LIR_Inst(LIR_Op::SetField, object_reg, offset_it->second, value));
+                    return value;
+                }
+            }
+            
+            report_error("Unknown field for assignment: " + field_name);
+            return 0;
+        } else {
+            // Index assignment - not yet implemented
+            report_error("Index assignment not yet implemented");
+            return 0;
+        }
     } else {
         report_error("Invalid assignment target");
         return 0;
@@ -1123,7 +1271,33 @@ Reg Generator::emit_index_expr(AST::IndexExpr& expr) {
 }
 
 Reg Generator::emit_member_expr(AST::MemberExpr& expr) {
-    report_error("Member expressions not yet implemented");
+    // First evaluate the object expression
+    Reg object_reg = emit_expr(*expr.object);
+    
+    // For now, we'll handle simple field access
+    // In a full implementation, we'd need to determine if this is a field access or method call
+    
+    // Try to find field offset by checking all classes
+    // This is a simplified approach - a full implementation would need proper type tracking
+    for (const auto& [class_name, class_info] : class_table_) {
+        auto offset_it = class_info.field_offsets.find(expr.name);
+        if (offset_it != class_info.field_offsets.end()) {
+            // Found the field - emit GetField
+            Reg dst = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::GetField, dst, object_reg, offset_it->second));
+            
+            // Set the field type
+            if (offset_it->second < class_info.fields.size()) {
+                set_register_type(dst, class_info.fields[offset_it->second].second);
+            }
+            
+            return dst;
+        }
+    }
+    
+    // If we get here, it's either a method call or unknown field
+    // For now, we'll treat it as an error
+    report_error("Unknown field or method: " + expr.name);
     return 0;
 }
 
@@ -1800,11 +1974,11 @@ void Generator::emit_func_stmt(AST::FunctionDeclaration& stmt) {
 }
 
 void Generator::emit_import_stmt(AST::ImportStatement& stmt) {
-    report_error("Import statements not yet implemented");
-}
-
-void Generator::emit_match_stmt(AST::MatchStatement& stmt) {
-    report_error("Match statements not yet implemented");
+    // Smart import resolution - just update alias map, no LIR emission
+    std::string alias = stmt.alias.value_or(stmt.modulePath);
+    import_aliases_[alias] = stmt.modulePath;
+    
+    std::cout << "[DEBUG] Import registered: " << alias << " -> " << stmt.modulePath << std::endl;
 }
 
 void Generator::emit_contract_stmt(AST::ContractStatement& stmt) {
@@ -2274,6 +2448,350 @@ void Generator::lower_function_body(AST::FunctionDeclaration& stmt) {
     next_register_ = saved_next_register;
     scope_stack_ = std::move(saved_scope_stack);
     register_types_ = std::move(saved_register_types);
+}
+
+// Error and Result type expression handlers
+Reg Generator::emit_error_construct_expr(AST::ErrorConstructExpr& expr) {
+    Reg dst = allocate_register();
+    
+    // Create error value based on error type and arguments
+    auto result_type = std::make_shared<Type>(TypeTag::ErrorUnion); // Generic Result type
+    
+    // For now, create a simple error value - in a full implementation,
+    // this would use the errorType and arguments to create a proper error object
+    auto error_val = std::make_shared<Value>(result_type, std::string("error"));
+    
+    set_register_type(dst, result_type);
+    emit_instruction(LIR_Inst(LIR_Op::ConstructError, dst, error_val));
+    return dst;
+}
+
+Reg Generator::emit_ok_construct_expr(AST::OkConstructExpr& expr) {
+    Reg dst = allocate_register();
+    
+    // First evaluate the value to be wrapped
+    Reg value_reg = emit_expr(*expr.value);
+    
+    // Create Result type wrapping the value
+    auto result_type = std::make_shared<Type>(TypeTag::ErrorUnion);
+    
+    // For now, create a simple ok value - in a full implementation,
+    // this would properly wrap the value from value_reg
+    auto ok_val = std::make_shared<Value>(result_type, std::string("ok"));
+    
+    set_register_type(dst, result_type);
+    emit_instruction(LIR_Inst(LIR_Op::ConstructOk, dst, ok_val));
+    return dst;
+}
+
+Reg Generator::emit_fallible_expr(AST::FallibleExpr& expr) {
+    // Evaluate the expression that may return a Result
+    Reg result_reg = emit_expr(*expr.expression);
+    
+    // For the ? operator, we need to:
+    // 1. Check if the result is an error using IsError
+    // 2. If it's an error, jump to error handler or return early
+    // 3. If it's ok, unwrap the value using Unwrap
+    
+    // Create a register to hold the error check result
+    Reg is_error_reg = allocate_register();
+    auto bool_type = std::make_shared<Type>(TypeTag::Bool);
+    set_register_type(is_error_reg, bool_type);
+    
+    // Check if the result contains an error
+    emit_instruction(LIR_Inst(LIR_Op::IsError, is_error_reg, result_reg, 0));
+    
+    // Create labels for error handling
+    uint32_t error_label = generate_label();
+    uint32_t continue_label = generate_label();
+    
+    // If it's an error, jump to error handling
+    emit_instruction(LIR_Inst(LIR_Op::JumpIf, error_label, is_error_reg, 0));
+    
+    // If we get here, it's not an error, so unwrap the value
+    Reg unwrapped_reg = allocate_register();
+    set_register_type(unwrapped_reg, get_register_type(result_reg));
+    emit_instruction(LIR_Inst(LIR_Op::Unwrap, unwrapped_reg, result_reg, 0));
+    
+    // Jump to continue label
+    emit_instruction(LIR_Inst(LIR_Op::Jump, continue_label, 0, 0));
+    
+    // Error handling block
+    emit_instruction(LIR_Inst(LIR_Op::Label, error_label, 0, 0));
+    
+    // For now, we'll just return the error result
+    // In a full implementation, this would handle the elseHandler if present
+    // or propagate the error up the call stack
+    
+    // Jump to continue label
+    emit_instruction(LIR_Inst(LIR_Op::Jump, continue_label, 0, 0));
+    
+    // Continue label
+    emit_instruction(LIR_Inst(LIR_Op::Label, continue_label, 0, 0));
+    
+    // Return the unwrapped value (or the error if it was an error)
+    // For simplicity, we'll return the unwrapped_reg for now
+    return unwrapped_reg;
+}
+
+// Class system implementations
+void Generator::collect_class_signatures(AST::Program& program) {
+    for (const auto& stmt : program.statements) {
+        if (auto class_decl = dynamic_cast<AST::ClassDeclaration*>(stmt.get())) {
+            collect_class_signature(*class_decl);
+        }
+    }
+}
+
+void Generator::collect_class_signature(AST::ClassDeclaration& class_decl) {
+    ClassInfo class_info;
+    class_info.name = class_decl.name;
+    class_info.super_class_name = class_decl.superClassName;
+    
+    // Collect field information
+    for (const auto& field : class_decl.fields) {
+        TypePtr field_type = nullptr; // TODO: Convert from AST type annotation
+        class_info.fields.push_back({field->name, field_type});
+    }
+    
+    // Collect method information
+    for (const auto& method : class_decl.methods) {
+        class_info.method_names.push_back(method->name);
+        class_info.method_indices[method->name] = class_info.method_names.size() - 1;
+        
+        // Register method in function table
+        FunctionInfo func_info;
+        func_info.name = class_decl.name + "." + method->name;
+        func_info.param_count = method->params.size() + 1; // +1 for 'this'
+        func_info.visibility = AST::VisibilityLevel::Public; // TODO: Get from method
+        func_info.has_closure = false;
+        function_table_[func_info.name] = std::move(func_info);
+    }
+    
+    // Calculate field offsets and total size
+    calculate_class_layout(class_info);
+    
+    // Store class information
+    class_table_[class_decl.name] = class_info;
+}
+
+void Generator::calculate_class_layout(ClassInfo& class_info) {
+    size_t offset = 0;
+    
+    // First field is V-Table pointer for classes with methods
+    if (!class_info.method_names.empty()) {
+        offset++; // Reserve space for V-Table pointer
+    }
+    
+    // Calculate field offsets
+    for (auto& field : class_info.fields) {
+        class_info.field_offsets[field.first] = offset;
+        offset++; // Simple layout - each field is one register slot
+    }
+    
+    class_info.total_field_size = offset;
+}
+
+size_t Generator::get_field_offset(const std::string& class_name, const std::string& field_name) {
+    auto it = class_table_.find(class_name);
+    if (it == class_table_.end()) {
+        report_error("Unknown class: " + class_name);
+        return UINT32_MAX;
+    }
+    
+    auto offset_it = it->second.field_offsets.find(field_name);
+    if (offset_it == it->second.field_offsets.end()) {
+        report_error("Unknown field '" + field_name + "' in class '" + class_name + "'");
+        return UINT32_MAX;
+    }
+    
+    return offset_it->second;
+}
+
+size_t Generator::get_method_index(const std::string& class_name, const std::string& method_name) {
+    auto it = class_table_.find(class_name);
+    if (it == class_table_.end()) {
+        report_error("Unknown class: " + class_name);
+        return UINT32_MAX;
+    }
+    
+    auto index_it = it->second.method_indices.find(method_name);
+    if (index_it == it->second.method_indices.end()) {
+        report_error("Unknown method '" + method_name + "' in class '" + class_name + "'");
+        return UINT32_MAX;
+    }
+    
+    return index_it->second;
+}
+
+void Generator::emit_class_stmt(AST::ClassDeclaration& stmt) {
+    // Class declarations are handled in Pass 0 (signature collection)
+    // This function is called during Pass 2 but doesn't need to emit anything
+    // since the class layout and methods are already registered
+}
+
+Reg Generator::emit_object_literal_expr(AST::ObjectLiteralExpr& expr) {
+    Reg dst = allocate_register();
+    
+    // Create new object
+    emit_instruction(LIR_Inst(LIR_Op::NewObject, dst, 0, 0));
+    
+    // Set each property
+    size_t field_index = 0;
+    for (const auto& [prop_name, prop_value] : expr.properties) {
+        Reg value_reg = emit_expr(*prop_value);
+        emit_instruction(LIR_Inst(LIR_Op::SetField, dst, field_index, value_reg));
+        field_index++;
+    }
+    
+    // Set object type (could be enhanced to track actual class type)
+    auto obj_type = std::make_shared<Type>(TypeTag::UserDefined);
+    set_register_type(dst, obj_type);
+    
+    return dst;
+}
+
+Reg Generator::emit_this_expr(AST::ThisExpr& expr) {
+    if (this_register_ == UINT32_MAX) {
+        report_error("'this' used outside of method context");
+        return 0;
+    }
+    return this_register_;
+}
+
+// Smart module system implementations
+void Generator::collect_module_signatures(AST::Program& program) {
+    for (const auto& stmt : program.statements) {
+        if (auto module_decl = dynamic_cast<AST::ModuleDeclaration*>(stmt.get())) {
+            collect_module_declaration(*module_decl);
+        }
+    }
+}
+
+void Generator::collect_module_declaration(AST::ModuleDeclaration& module_decl) {
+    std::string saved_module = current_module_;
+    current_module_ = module_decl.name;
+    
+    // Process public members
+    for (const auto& member : module_decl.publicMembers) {
+        if (auto func_decl = dynamic_cast<AST::FunctionDeclaration*>(member.get())) {
+            register_module_symbol(module_decl.name, func_decl->name, AST::VisibilityLevel::Public, 
+                                true, func_decl->params.size());
+        } else if (auto var_decl = dynamic_cast<AST::VarDeclaration*>(member.get())) {
+            register_module_symbol(module_decl.name, var_decl->name, AST::VisibilityLevel::Public, false);
+        }
+    }
+    
+    // Process protected members
+    for (const auto& member : module_decl.protectedMembers) {
+        if (auto func_decl = dynamic_cast<AST::FunctionDeclaration*>(member.get())) {
+            register_module_symbol(module_decl.name, func_decl->name, AST::VisibilityLevel::Protected, 
+                                true, func_decl->params.size());
+        } else if (auto var_decl = dynamic_cast<AST::VarDeclaration*>(member.get())) {
+            register_module_symbol(module_decl.name, var_decl->name, AST::VisibilityLevel::Protected, false);
+        }
+    }
+    
+    // Process private members
+    for (const auto& member : module_decl.privateMembers) {
+        if (auto func_decl = dynamic_cast<AST::FunctionDeclaration*>(member.get())) {
+            register_module_symbol(module_decl.name, func_decl->name, AST::VisibilityLevel::Private, 
+                                true, func_decl->params.size());
+        } else if (auto var_decl = dynamic_cast<AST::VarDeclaration*>(member.get())) {
+            register_module_symbol(module_decl.name, var_decl->name, AST::VisibilityLevel::Private, false);
+        }
+    }
+    
+    current_module_ = saved_module;
+}
+
+void Generator::register_module_symbol(const std::string& module_name, const std::string& symbol_name, 
+                                       AST::VisibilityLevel visibility, bool is_function, size_t param_count) {
+    ModuleSymbolInfo symbol_info;
+    symbol_info.qualified_name = module_name + "::" + symbol_name;
+    symbol_info.module_name = module_name;
+    symbol_info.symbol_name = symbol_name;
+    symbol_info.visibility = visibility;
+    symbol_info.is_function = is_function;
+    symbol_info.is_variable = !is_function;
+    symbol_info.param_count = param_count;
+    
+    module_symbol_table_[symbol_info.qualified_name] = symbol_info;
+}
+
+Generator::ModuleSymbolInfo* Generator::resolve_module_symbol(const std::string& qualified_name) {
+    auto it = module_symbol_table_.find(qualified_name);
+    if (it != module_symbol_table_.end()) {
+        return &it->second;
+    }
+    return nullptr;
+}
+
+bool Generator::can_access_module_symbol(const ModuleSymbolInfo& symbol, const std::string& from_module) {
+    // Public symbols are always accessible
+    if (symbol.visibility == AST::VisibilityLevel::Public) {
+        return true;
+    }
+    
+    // Protected and private symbols are only accessible from the same module
+    return from_module == symbol.module_name;
+}
+
+void Generator::emit_match_stmt(AST::MatchStatement& stmt) {
+    // Evaluate the value to match
+    Reg value_reg = emit_expr(*stmt.value);
+    
+    // Generate labels for match cases
+    std::vector<uint32_t> case_labels;
+    uint32_t end_label = generate_label();
+    
+    // Create labels for each case
+    for (size_t i = 0; i < stmt.cases.size(); i++) {
+        case_labels.push_back(generate_label());
+    }
+    
+    // Generate match cases
+    for (size_t i = 0; i < stmt.cases.size(); i++) {
+        const auto& match_case = stmt.cases[i];
+        
+        // For simple literal patterns, emit comparison
+        if (auto literal = dynamic_cast<AST::LiteralExpr*>(match_case.pattern.get())) {
+            Reg pattern_reg = emit_expr(*literal);
+            Reg compare_reg = allocate_register();
+            
+            // Compare value with pattern
+            emit_instruction(LIR_Inst(LIR_Op::CmpEQ, compare_reg, value_reg, pattern_reg));
+            
+            // Jump to case if match, otherwise jump to next case
+            uint32_t next_label = (i + 1 < stmt.cases.size()) ? case_labels[i + 1] : end_label;
+            emit_instruction(LIR_Inst(LIR_Op::JumpIf, compare_reg, case_labels[i], 0));
+            emit_instruction(LIR_Inst(LIR_Op::Jump, next_label, 0, 0));
+        } else {
+            // For complex patterns, just jump to next case for now
+            uint32_t next_label = (i + 1 < stmt.cases.size()) ? case_labels[i + 1] : end_label;
+            emit_instruction(LIR_Inst(LIR_Op::Jump, next_label, 0, 0));
+        }
+        
+        // Emit case label
+        emit_instruction(LIR_Inst(LIR_Op::Label, case_labels[i], 0, 0));
+        
+        // Emit case body
+        if (match_case.body) {
+            emit_stmt(*match_case.body);
+        }
+        
+        // Jump to end after case body
+        emit_instruction(LIR_Inst(LIR_Op::Jump, end_label, 0, 0));
+    }
+    
+    // Emit end label
+    emit_instruction(LIR_Inst(LIR_Op::Label, end_label, 0, 0));
+}
+
+void Generator::emit_module_stmt(AST::ModuleDeclaration& stmt) {
+    // Module declarations are handled in Pass 0 (signature collection)
+    // This function is called during Pass 2 but doesn't emit LIR
+    // since modules are handled through the symbol resolution system
 }
 
 } // namespace LIR
