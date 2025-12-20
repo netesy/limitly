@@ -72,12 +72,9 @@ enum class LIR_Op : uint8_t {
     ToString,   // Convert value to string representation
     
     // String operations
-    Concat,     // String concatenation
-    
-    // String builder operations
-    SBCreate,   // Create string builder
-    SBAppend,   // Append string/value to builder
-    SBFinish,   // Finish building string
+    Concat,     // String concatenation (legacy)
+    STR_CONCAT, // Explicit string concatenation (+)
+    STR_FORMAT, // String formatting (interpolation)
     
     // Error handling
     ConstructError,
