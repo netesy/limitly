@@ -29,8 +29,6 @@ std::string RegisterVM::to_string(const RegisterValue& value) const {
 void RegisterVM::execute_function(const LIR::LIR_Function& function) {
     reset();
     
-    std::cout << "[DEBUG] Register VM: Executing function with " << function.instructions.size() << " instructions" << std::endl;
-    
     const LIR::LIR_Inst* pc = function.instructions.data();
     const LIR::LIR_Inst* end = pc + function.instructions.size();
     
@@ -57,6 +55,7 @@ void RegisterVM::execute_function(const LIR::LIR_Function& function) {
     dispatch_table[static_cast<int>(LIR::LIR_Op::JumpIfFalse)] = &&OP_JUMPIFFALSE;
     dispatch_table[static_cast<int>(LIR::LIR_Op::Return)] = &&OP_RETURN;
     dispatch_table[static_cast<int>(LIR::LIR_Op::Call)] = &&OP_CALL;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::PrintInt)] = &&OP_PRINTINT;
     dispatch_table[static_cast<int>(LIR::LIR_Op::PrintUint)] = &&OP_PRINTUINT;
     dispatch_table[static_cast<int>(LIR::LIR_Op::PrintFloat)] = &&OP_PRINTFLOAT;
     dispatch_table[static_cast<int>(LIR::LIR_Op::PrintBool)] = &&OP_PRINTBOOL;
@@ -81,10 +80,8 @@ void RegisterVM::execute_function(const LIR::LIR_Function& function) {
         do { \
             pc++; \
             if (pc >= end) { \
-                std::cout << "[DEBUG] Register VM: Reached end of instructions" << std::endl; \
                 return; \
             } \
-            std::cout << "[DEBUG] Register VM: Dispatching to op " << static_cast<int>(pc->op) << std::endl; \
             goto *dispatch_table[static_cast<int>(pc->op)]; \
         } while (0)
     
@@ -102,7 +99,6 @@ void RegisterVM::execute_function(const LIR::LIR_Function& function) {
     ValuePtr cv;
     
     // Start execution
-    std::cout << "[DEBUG] Register VM: Starting threaded execution" << std::endl;
     goto *dispatch_table[static_cast<int>(pc->op)];
     
     // ============ INSTRUCTION HANDLERS ============
@@ -118,17 +114,23 @@ OP_LOADCONST:
     cv = pc->const_val;
     if (!cv) {
         registers[pc->dst] = nullptr;
-    } else if (cv->type->tag == TypeTag::Int) {
-        registers[pc->dst] = static_cast<int64_t>(std::stoi(cv->data));
-    } else if (cv->type->tag == TypeTag::Float64) {
-        memcpy(&double_result, &cv->data, sizeof(double));
-        registers[pc->dst] = double_result;
-    } else if (cv->type->tag == TypeTag::Bool) {
-        registers[pc->dst] = static_cast<bool>(cv->data == "true");
-    } else if (cv->type->tag == TypeTag::String) {
-        registers[pc->dst] = std::string(static_cast<const char*>(cv->data.c_str()));
     } else {
-        registers[pc->dst] = nullptr;
+        if (cv->type->tag == TypeTag::Int || cv->type->tag == TypeTag::Int8 || 
+            cv->type->tag == TypeTag::Int16 || cv->type->tag == TypeTag::Int32 || 
+            cv->type->tag == TypeTag::Int64 || cv->type->tag == TypeTag::Int128 ||
+            cv->type->tag == TypeTag::UInt || cv->type->tag == TypeTag::UInt8 || 
+            cv->type->tag == TypeTag::UInt16 || cv->type->tag == TypeTag::UInt32 || 
+            cv->type->tag == TypeTag::UInt64 || cv->type->tag == TypeTag::UInt128) {
+            registers[pc->dst] = static_cast<int64_t>(std::stoll(cv->data));
+        } else if (cv->type->tag == TypeTag::Float32 || cv->type->tag == TypeTag::Float64) {
+            registers[pc->dst] = std::stod(cv->data);
+        } else if (cv->type->tag == TypeTag::Bool) {
+            registers[pc->dst] = static_cast<bool>(cv->data == "true");
+        } else if (cv->type->tag == TypeTag::String) {
+            registers[pc->dst] = std::string(static_cast<const char*>(cv->data.c_str()));
+        } else {
+            registers[pc->dst] = nullptr;
+        }
     }
     DISPATCH();
 
@@ -296,12 +298,15 @@ OP_JUMPIFFALSE:
     DISPATCH();
 
 OP_RETURN:
-    std::cout << "[DEBUG] Register VM: Execution completed, returning" << std::endl;
     return;
 
 OP_CALL:
     // Simplified - needs proper implementation
     registers[pc->dst] = nullptr;
+    DISPATCH();
+
+OP_PRINTINT:
+    std::cout << to_int(registers[pc->a]) << std::endl;
     DISPATCH();
 
 OP_PRINTUINT:
