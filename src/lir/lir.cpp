@@ -126,8 +126,10 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::CmpLE: return "cmple";
         case LIR_Op::CmpGT: return "cmpgt";
         case LIR_Op::CmpGE: return "cmpge";
-        case LIR_Op::Jump: return "jmp";
+        case LIR_Op::Jump: return "jump";
         case LIR_Op::JumpIfFalse: return "jmp_if_false";
+        case LIR_Op::JumpIf: return "jmp_if";
+        case LIR_Op::Label: return "label";
         case LIR_Op::Call: return "call";
         case LIR_Op::Return: return "ret";
         case LIR_Op::FuncDef: return "fn";
@@ -148,6 +150,9 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::STR_FORMAT: return "str_format";
         case LIR_Op::ConstructError: return "error";
         case LIR_Op::ConstructOk: return "ok";
+        case LIR_Op::IsError: return "is_error";
+        case LIR_Op::Unwrap: return "unwrap";
+        case LIR_Op::UnwrapOr: return "unwrap_or";
         case LIR_Op::AtomicLoad: return "atomic_load";
         case LIR_Op::AtomicStore: return "atomic_store";
         case LIR_Op::AtomicFetchAdd: return "atomic_fetch_add";

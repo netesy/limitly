@@ -46,6 +46,8 @@ enum class LIR_Op : uint8_t {
     // Control flow
     Jump,       // Unconditional jump (jump to label)
     JumpIfFalse,// Jump if condition is false
+    JumpIf,     // Jump if condition is true
+    Label,      // Label definition for jump targets
     Call,       // Function call (reg = call(func_id, params...))
     Return,     // Return (return from function)
     
@@ -79,6 +81,9 @@ enum class LIR_Op : uint8_t {
     // Error handling
     ConstructError,
     ConstructOk,
+    IsError,     // Check if Result contains an error
+    Unwrap,      // Unwrap Result value (panic if error)
+    UnwrapOr,    // Unwrap with default value
     
     // Atomic operations
     AtomicLoad,
