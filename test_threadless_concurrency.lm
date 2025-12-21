@@ -1,0 +1,21 @@
+// Threadless Concurrency Test
+// This test demonstrates the threadless concurrency design
+// No threads, just cooperative state machines!
+var shared_counter: atomic = 0;  // atomic for primitives, locked for objects
+counts = channel();
+
+concurrent(ch=counts, mode=batch) {
+    task(i in 1..7) {
+        print("Task {i} running");
+        sleep(2000);  // Sleep for 2 seconds
+        shared_counter += 1;
+        counts.send(shared_counter);
+    }
+}
+
+iter (count in counts) {
+    print("Updated counter: ");
+    print(count);
+}
+
+print("Threadless concurrent block finished (no threads used!)");

@@ -1,0 +1,31 @@
+// Comprehensive test for lock-free parallel execution
+print("=== Lock-Free Parallel Test ===");
+
+// Test 1: Basic parallel tasks
+parallel(cores=3) {
+    task(i in 0..2) {
+        print("Task {i}: Starting work");
+        // Simulate work with a simple computation
+        result = i * 2;
+        print("Task {i}: Result = {result}");
+    }
+}
+
+print("Test 1 completed");
+
+// Test 2: More tasks than cores
+parallel(cores=2) {
+    task(i in 0..4) {
+        print("Heavy task {i}: Processing");
+        // Simulate heavier work
+        sum = 0;
+        iter(j in 0..100) {
+            sum = sum + i;
+        }
+        print("Heavy task {i}: Sum = {sum}");
+    }
+}
+
+print("Test 2 completed");
+
+print("=== All parallel tests completed ===");

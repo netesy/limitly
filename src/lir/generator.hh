@@ -142,7 +142,10 @@ private:
     void emit_comptime_stmt(AST::ComptimeStatement& stmt);
     void emit_parallel_stmt(AST::ParallelStatement& stmt);
     void emit_concurrent_stmt(AST::ConcurrentStatement& stmt);
+    void emit_task_init_and_step(AST::TaskStatement& task, size_t task_id, Reg contexts_reg, Reg channel_reg, Reg counter_reg, int64_t loop_var_value = 0);
     void emit_task_stmt(AST::TaskStatement& stmt);
+    void emit_parallel_task_init(AST::TaskStatement& task, size_t task_id, Reg contexts_reg, Reg work_queue_reg, int64_t loop_var_value = 0);
+    void emit_parallel_worker_loop(Reg work_queue_reg, int worker_id);
     void emit_worker_stmt(AST::WorkerStatement& stmt);
     void emit_iter_stmt(AST::IterStatement& stmt);
     void emit_break_stmt(AST::BreakStatement& stmt);
@@ -151,6 +154,9 @@ private:
     void emit_class_stmt(AST::ClassDeclaration& stmt);
     void emit_match_stmt(AST::MatchStatement& stmt);
     void emit_module_stmt(AST::ModuleDeclaration& stmt);
+    
+    // Helper functions
+    std::optional<ValuePtr> evaluate_constant_expression(std::shared_ptr<AST::Expression> expr);
     
     // Error reporting
     void report_error(const std::string& message);

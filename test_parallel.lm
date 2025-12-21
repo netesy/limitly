@@ -1,0 +1,8 @@
+// Test lock-free parallel execution
+parallel(cores=3) {
+    task(i in 0..2) {
+        print("Parallel task {i} executing");
+    }
+}
+
+print("Parallel execution completed");

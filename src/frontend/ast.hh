@@ -491,6 +491,7 @@ namespace AST {
 
     struct ConcurrentStatement : public Statement {
         std::string channel;  // Channel name for communication
+        std::string channelParam; // Parameter name for channel (e.g., "ch" in "ch=counts")
         std::string mode;     // Execution mode (batch, stream, async)
         std::string cores;    // Number of cores to use (or "auto")
         std::string onError;  // Error handling strategy
