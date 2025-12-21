@@ -94,6 +94,39 @@ enum class LIR_Op : uint8_t {
     Await,
     AsyncCall,
     
+    // === THREADLESS CONCURRENCY ===
+    
+    // Task management (pure data structures)
+    TaskContextAlloc,    // Allocate task context array
+    TaskContextInit,     // Initialize a task context
+    TaskGetState,        // Get current state from context
+    TaskSetState,        // Set new state in context
+    TaskSetField,        // Set arbitrary field in context (sleep_until, counter, etc.)
+    TaskGetField,        // Get arbitrary field from context
+    
+    // Simple channel (no locks, single-threaded)
+    ChannelAlloc,        // Allocate channel buffer
+    ChannelPush,         // Push value (no blocking)
+    ChannelPop,          // Pop value (no blocking)
+    ChannelHasData,      // Check if channel has data
+    
+    // Scheduler control
+    SchedulerInit,       // Initialize scheduler
+    SchedulerRun,        // Run scheduler loop (returns when all done)
+    SchedulerTick,       // Single scheduler tick
+    
+    // Time (bare metal compatible)
+    GetTickCount,        // Get monotonic tick counter
+    DelayUntil,          // Check if delay expired (non-blocking)
+    
+    // === LOCK-FREE PARALLEL OPERATIONS ===
+    WorkQueueAlloc,      // Allocate lock-free work queue
+    WorkQueuePush,       // Push task to queue (atomic)
+    WorkQueuePop,        // Pop task from queue (atomic)
+    ParallelWaitComplete,// Wait for all workers to complete
+    WorkerSignal,        // Signal workers to start
+    WorkerJoin,          // Wait for workers to finish
+    
     // List/Collection operations
     ListCreate,
     ListAppend,

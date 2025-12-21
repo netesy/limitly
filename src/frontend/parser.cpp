@@ -2022,7 +2022,45 @@ void Parser::parseConcurrencyParams(
     std::string& grace,
     std::string& onTimeout
 ) {
-    if (match({TokenType::LEFT_PAREN})) {
+    // Handle both parenthesized and non-parenthesized parameter syntax
+    bool has_parens = match({TokenType::LEFT_PAREN});
+    
+    // Check for simple parameter assignment without parentheses: concurrent(ch=counts)
+    if (!has_parens && check(TokenType::IDENTIFIER)) {
+        std::string paramName = consume(TokenType::IDENTIFIER, "Expected parameter name").lexeme;
+        
+        if (match({TokenType::EQUAL})) {
+            // Assignment syntax: param = value
+            std::string paramValue;
+            if (check(TokenType::IDENTIFIER)) {
+                paramValue = consume(TokenType::IDENTIFIER, "Expected identifier").lexeme;
+                
+                // Assign parameter value to the appropriate field
+                if (paramName == "ch") {
+                    channel = paramValue;
+                    // Also store the parameter name for the AST
+                    // We'll handle this in the calling function
+                } else if (paramName == "mode") {
+                    mode = paramValue;
+                } else if (paramName == "cores") {
+                    cores = paramValue;
+                } else if (paramName == "on_error") {
+                    onError = paramValue;
+                } else if (paramName == "timeout") {
+                    timeout = paramValue;
+                } else if (paramName == "grace") {
+                    grace = paramValue;
+                } else if (paramName == "on_timeout") {
+                    onTimeout = paramValue;
+                } else {
+                    error("Unknown parameter: " + paramName);
+                }
+                return; // Done with single parameter
+            }
+        }
+    }
+    
+    if (has_parens) {
         while (!check(TokenType::RIGHT_PAREN) && !isAtEnd()) {
             // Parse parameter name
             std::string paramName = consume(TokenType::IDENTIFIER, "Expected parameter name").lexeme;
@@ -2143,6 +2181,7 @@ std::shared_ptr<AST::Statement> Parser::concurrentStatement() {
 
     // Set default values
     stmt->channel = "";
+    stmt->channelParam = "";
     stmt->mode = "batch";
     stmt->cores = "auto";
     stmt->onError = "stop";
@@ -2151,7 +2190,18 @@ std::shared_ptr<AST::Statement> Parser::concurrentStatement() {
     stmt->onTimeout = "partial";
 
     // Parse parameters
+    std::string paramName;
     parseConcurrencyParams(stmt->channel, stmt->mode, stmt->cores, stmt->onError, stmt->timeout, stmt->grace, stmt->onTimeout);
+    
+    // If we parsed a parameter assignment, extract the parameter name
+    // For the simple case concurrent(ch=counts), we need to set channelParam to "ch"
+    if (!stmt->channel.empty()) {
+        // Check if we have a simple assignment without parentheses
+        // In this case, the paramName was parsed but we need to capture it
+        // For now, we'll assume if channel is not empty and we're in this context,
+        // it was a ch=assignment, so set channelParam to "ch"
+        stmt->channelParam = "ch";
+    }
 
     // Parse the block
     consume(TokenType::LEFT_BRACE, "Expected '{' after 'concurrent'.");

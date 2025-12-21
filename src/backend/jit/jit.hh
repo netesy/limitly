@@ -105,6 +105,7 @@ private:
     // Runtime utility functions
     gccjit::function m_runtime_concat_func;
     gccjit::function m_runtime_format_func;
+    gccjit::function m_get_ticks_func;
     
     // Helper methods
     gccjit::rvalue convert_to_jit_type(gccjit::rvalue value, gccjit::type target_type);

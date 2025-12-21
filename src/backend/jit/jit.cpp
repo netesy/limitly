@@ -110,17 +110,21 @@ JITBackend::JITBackend()
     snprintf_params.push_back(m_context.new_param(m_size_t_type, "size"));
     snprintf_params.push_back(m_context.new_param(m_const_char_ptr_type, "format"));
     m_snprintf_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_int_type, "snprintf", snprintf_params, 1);
+    
+    // Set up platform time function (header-only, no runtime.c needed)
+    std::vector<gccjit::param> get_ticks_params;
+    m_get_ticks_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_uint_type, "get_ticks", get_ticks_params, 0);
 
     // Register runtime utility functions
     std::vector<gccjit::param> concat_params;
     concat_params.push_back(m_context.new_param(m_const_char_ptr_type, "a"));
     concat_params.push_back(m_context.new_param(m_const_char_ptr_type, "b"));
-    m_runtime_concat_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_const_char_ptr_type, "runtime_str_concat", concat_params, 0);
+    m_runtime_concat_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_const_char_ptr_type, "limitly_runtime_concat", concat_params, 0);
     
     std::vector<gccjit::param> format_params;
     format_params.push_back(m_context.new_param(m_const_char_ptr_type, "format"));
     format_params.push_back(m_context.new_param(m_const_char_ptr_type, "arg"));
-    m_runtime_format_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_const_char_ptr_type, "runtime_str_format", format_params, 0);
+    m_runtime_format_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_const_char_ptr_type, "limitly_runtime_format", format_params, 0);
 
     // Initialize stats
     m_stats = {0, 0, 0.0};
@@ -622,6 +626,307 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
             // No operation
             break;
             
+        // === THREADLESS CONCURRENCY OPERATIONS ===
+        // All generated inline - no external runtime functions needed!
+        
+        case LIR::LIR_Op::ChannelAlloc: {
+            // Generate: void* ch = malloc(sizeof(Channel) + capacity * sizeof(int));
+            // Initialize inline using raw memory operations
+            
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_void_ptr_type);
+            gccjit::rvalue capacity = get_jit_register(inst.a);
+            
+            // Calculate total size: sizeof(Channel) approx + buffer size
+            gccjit::rvalue size_of_int = m_context.new_rvalue(m_size_t_type, static_cast<long>(sizeof(int)));
+            gccjit::rvalue capacity_as_uintptr = m_context.new_cast(capacity, m_uint_type); // Use uint as intermediate
+            gccjit::rvalue capacity_as_size = m_context.new_cast(capacity_as_uintptr, m_size_t_type);
+            gccjit::rvalue buffer_size = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_size_t_type, capacity_as_size, size_of_int);
+            gccjit::rvalue header_size = m_context.new_rvalue(m_size_t_type, static_cast<long>(32)); // Approx header size
+            gccjit::rvalue total_size = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_size_t_type, buffer_size, header_size);
+            
+            // Allocate memory
+            std::vector<gccjit::rvalue> malloc_args = {total_size};
+            gccjit::rvalue channel_ptr = m_context.new_call(m_malloc_func, malloc_args);
+            
+            // Initialize using memset (zero everything)
+            std::vector<gccjit::rvalue> memset_args = {channel_ptr, m_context.new_rvalue(m_int_type, 0), total_size};
+            m_context.new_call(m_memset_func, memset_args);
+            
+            // Store capacity at offset 0 (approximate struct layout)
+            gccjit::lvalue capacity_ptr = m_context.new_cast(channel_ptr, m_int_type.get_pointer()).dereference();
+            m_current_block.add_assignment(capacity_ptr, capacity);
+            
+            m_current_block.add_assignment(dst, channel_ptr);
+            return channel_ptr;
+        }
+        
+        case LIR::LIR_Op::ChannelPush: {
+            // Generate simplified inline channel push using raw memory
+            
+            gccjit::rvalue channel_ptr = get_jit_register(inst.a);
+            gccjit::rvalue value = get_jit_register(inst.b);
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+            
+            // Simplified: assume always succeeds for now
+            // In real implementation, would track write_pos/read_pos
+            
+            // For now, just return success (1)
+            m_current_block.add_assignment(dst, m_context.new_rvalue(m_int_type, 1));
+            return dst;
+        }
+        
+        case LIR::LIR_Op::ChannelPop: {
+            // Generate simplified inline channel pop using raw memory
+            
+            gccjit::rvalue channel_ptr = get_jit_register(inst.a);
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+            
+            // Simplified: return 0 for now (no data)
+            // In real implementation, would track write_pos/read_pos
+            
+            m_current_block.add_assignment(dst, m_context.new_rvalue(m_int_type, 0));
+            return dst;
+        }
+        
+        case LIR::LIR_Op::ChannelHasData: {
+            // Generate simplified inline channel check
+            
+            gccjit::rvalue channel_ptr = get_jit_register(inst.a);
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_bool_type);
+            
+            // Simplified: return false for now
+            m_current_block.add_assignment(dst, m_context.new_rvalue(m_bool_type, 0));
+            return dst;
+        }
+        
+        case LIR::LIR_Op::TaskContextAlloc: {
+            // Generate: TaskContext* tasks = malloc(count * sizeof(TaskContext));
+            
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_void_ptr_type);
+            
+            // Get count - create a new temp register to avoid type conflicts
+            gccjit::rvalue count_src_raw = get_jit_register(inst.a);
+            gccjit::rvalue count_src = count_src_raw;
+            
+            // Cast count to int if needed
+            if (count_src.get_type().get_inner_type() != m_int_type.get_inner_type()) {
+                count_src = m_context.new_cast(count_src, m_int_type);
+            }
+            
+            // Approximate TaskContext size
+            gccjit::rvalue task_size = m_context.new_rvalue(m_size_t_type, static_cast<long>(128)); // Approx size
+            gccjit::rvalue count_as_uintptr = m_context.new_cast(count_src, m_uint_type); // Use uint as intermediate
+            gccjit::rvalue count_as_size = m_context.new_cast(count_as_uintptr, m_size_t_type);
+            gccjit::rvalue total_size = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_size_t_type, count_as_size, task_size);
+            
+            // Allocate array
+            std::vector<gccjit::rvalue> malloc_args = {total_size};
+            gccjit::rvalue tasks_ptr = m_context.new_call(m_malloc_func, malloc_args);
+            
+            // Initialize to zero
+            std::vector<gccjit::rvalue> memset_args = {tasks_ptr, m_context.new_rvalue(m_int_type, 0), total_size};
+            m_context.new_call(m_memset_func, memset_args);
+            
+            m_current_block.add_assignment(dst, tasks_ptr);
+            return tasks_ptr;
+        }
+        
+        case LIR::LIR_Op::TaskContextInit: {
+            // Generate: tasks[task_id].state = TASK_STATE_INIT;
+            // Generate: tasks[task_id].task_id = task_id;
+            
+            gccjit::rvalue tasks_ptr = get_jit_register(inst.dst);
+            gccjit::rvalue task_id = get_jit_register(inst.a);
+            
+            // Calculate task offset: task_id * task_size
+            gccjit::rvalue task_size = m_context.new_rvalue(m_size_t_type, static_cast<long>(128));
+            gccjit::rvalue task_id_as_uintptr = m_context.new_cast(task_id, m_uint_type); // Use uint as intermediate
+            gccjit::rvalue task_id_as_size = m_context.new_cast(task_id_as_uintptr, m_size_t_type);
+            gccjit::rvalue task_offset = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_size_t_type, task_id_as_size, task_size);
+            
+            // Get task pointer: tasks_ptr + task_offset
+            gccjit::rvalue task_ptr = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_void_ptr_type, tasks_ptr, task_offset);
+            
+            // Set state at offset 0
+            gccjit::lvalue state_ptr = m_context.new_cast(task_ptr, m_int_type.get_pointer()).dereference();
+            m_current_block.add_assignment(state_ptr, m_context.new_rvalue(m_int_type, 0)); // TASK_STATE_INIT
+            
+            // Set task_id at offset 4 (approximate)
+            gccjit::rvalue offset_4 = m_context.new_rvalue(m_size_t_type, static_cast<long>(4));
+            gccjit::rvalue task_id_ptr = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_void_ptr_type, 
+                task_ptr, offset_4);
+            gccjit::lvalue task_id_field = m_context.new_cast(task_id_ptr, m_int_type.get_pointer()).dereference();
+            m_current_block.add_assignment(task_id_field, task_id);
+            
+            return task_id;
+        }
+        
+        case LIR::LIR_Op::TaskSetField: {
+            // Generate: tasks[task_index].fields[field_index] = value;
+            
+            gccjit::rvalue tasks_ptr = get_jit_register(inst.dst);
+            gccjit::rvalue task_index = get_jit_register(inst.a);
+            gccjit::rvalue field_index = get_jit_register(inst.b);
+            gccjit::rvalue value = get_jit_register(inst.imm);
+            
+            // Calculate task offset
+            gccjit::rvalue task_size = m_context.new_rvalue(m_size_t_type, static_cast<long>(128));
+            gccjit::rvalue task_index_as_uintptr = m_context.new_cast(task_index, m_uint_type); // Use uint as intermediate
+            gccjit::rvalue task_index_as_size = m_context.new_cast(task_index_as_uintptr, m_size_t_type);
+            gccjit::rvalue task_offset = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_size_t_type, task_index_as_size, task_size);
+            
+            // Get task pointer
+            gccjit::rvalue task_ptr = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_void_ptr_type, tasks_ptr, task_offset);
+            
+            // Calculate field offset (approximate: base_offset + field_index * 4)
+            gccjit::rvalue base_field_offset = m_context.new_rvalue(m_size_t_type, static_cast<long>(16)); // Start after basic fields
+            gccjit::rvalue field_index_as_uintptr = m_context.new_cast(field_index, m_uint_type); // Use uint as intermediate
+            gccjit::rvalue field_index_as_size = m_context.new_cast(field_index_as_uintptr, m_size_t_type);
+            gccjit::rvalue field_offset = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_size_t_type, 
+                field_index_as_size, m_context.new_rvalue(m_size_t_type, static_cast<long>(4)));
+            gccjit::rvalue total_field_offset = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_size_t_type, base_field_offset, field_offset);
+            
+            // Get field pointer
+            gccjit::rvalue field_ptr = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_void_ptr_type, task_ptr, total_field_offset);
+            gccjit::lvalue field = m_context.new_cast(field_ptr, m_int_type.get_pointer()).dereference();
+            
+            m_current_block.add_assignment(field, value);
+            return value;
+        }
+        
+        case LIR::LIR_Op::SchedulerRun: {
+            // Generate simplified scheduler loop
+            
+            gccjit::rvalue tasks_ptr = get_jit_register(inst.dst);
+            gccjit::rvalue task_count = get_jit_register(inst.a);
+            
+            // For now, just return 0 (simplified)
+            // Real implementation would generate the full scheduler loop
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+            m_current_block.add_assignment(dst, m_context.new_rvalue(m_int_type, 0));
+            return dst;
+        }
+        
+        case LIR::LIR_Op::GetTickCount: {
+            // Generate: return get_ticks(); (imported from platform header)
+            
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_uint_type);
+            std::vector<gccjit::rvalue> get_ticks_args = {}; // No arguments
+            gccjit::rvalue ticks = m_context.new_call(m_get_ticks_func, get_ticks_args);
+            m_current_block.add_assignment(dst, ticks);
+            return ticks;
+        }
+        
+        case LIR::LIR_Op::DelayUntil: {
+            // Generate: return (current_ticks >= target_ticks);
+            
+            gccjit::rvalue target_ticks = get_jit_register(inst.a);
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_bool_type);
+            
+            // Get current ticks
+            std::vector<gccjit::rvalue> get_ticks_args = {};
+            gccjit::rvalue current_ticks = m_context.new_call(m_get_ticks_func, get_ticks_args);
+            
+            // Compare
+            gccjit::rvalue expired = m_context.new_comparison(GCC_JIT_COMPARISON_GE, current_ticks, target_ticks);
+            m_current_block.add_assignment(dst, expired);
+            return expired;
+        }
+        
+        case LIR::LIR_Op::TaskGetState: {
+            // Generate: return tasks[task_id].state;
+            
+            gccjit::rvalue tasks_ptr = get_jit_register(inst.a);
+            gccjit::rvalue task_id = get_jit_register(inst.b);
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+            
+            // Calculate task offset
+            gccjit::rvalue task_size = m_context.new_rvalue(m_size_t_type, static_cast<long>(128));
+            gccjit::rvalue task_id_as_uintptr = m_context.new_cast(task_id, m_uint_type);
+            gccjit::rvalue task_id_as_size = m_context.new_cast(task_id_as_uintptr, m_size_t_type);
+            gccjit::rvalue task_offset = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_size_t_type, task_id_as_size, task_size);
+            
+            // Get task pointer
+            gccjit::rvalue task_ptr = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_void_ptr_type, tasks_ptr, task_offset);
+            
+            // Get state at offset 0
+            gccjit::lvalue state_ptr = m_context.new_cast(task_ptr, m_int_type.get_pointer()).dereference();
+            gccjit::rvalue state = state_ptr;
+            m_current_block.add_assignment(dst, state);
+            return state;
+        }
+        
+        case LIR::LIR_Op::TaskSetState: {
+            // Generate: tasks[task_id].state = new_state;
+            
+            gccjit::rvalue tasks_ptr = get_jit_register(inst.dst);
+            gccjit::rvalue task_id = get_jit_register(inst.a);
+            gccjit::rvalue new_state = get_jit_register(inst.b);
+            
+            // Calculate task offset
+            gccjit::rvalue task_size = m_context.new_rvalue(m_size_t_type, static_cast<long>(128));
+            gccjit::rvalue task_id_as_uintptr = m_context.new_cast(task_id, m_uint_type);
+            gccjit::rvalue task_id_as_size = m_context.new_cast(task_id_as_uintptr, m_size_t_type);
+            gccjit::rvalue task_offset = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_size_t_type, task_id_as_size, task_size);
+            
+            // Get task pointer
+            gccjit::rvalue task_ptr = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_void_ptr_type, tasks_ptr, task_offset);
+            
+            // Set state at offset 0
+            gccjit::lvalue state_ptr = m_context.new_cast(task_ptr, m_int_type.get_pointer()).dereference();
+            m_current_block.add_assignment(state_ptr, new_state);
+            return new_state;
+        }
+        
+        case LIR::LIR_Op::TaskGetField: {
+            // Generate: return tasks[task_index].fields[field_index];
+            
+            gccjit::rvalue tasks_ptr = get_jit_register(inst.a);
+            gccjit::rvalue task_index = get_jit_register(inst.b);
+            gccjit::rvalue field_index = get_jit_register(inst.imm);
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+            
+            // Calculate task offset
+            gccjit::rvalue task_size = m_context.new_rvalue(m_size_t_type, static_cast<long>(128));
+            gccjit::rvalue task_index_as_uintptr = m_context.new_cast(task_index, m_uint_type);
+            gccjit::rvalue task_index_as_size = m_context.new_cast(task_index_as_uintptr, m_size_t_type);
+            gccjit::rvalue task_offset = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_size_t_type, task_index_as_size, task_size);
+            
+            // Get task pointer
+            gccjit::rvalue task_ptr = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_void_ptr_type, tasks_ptr, task_offset);
+            
+            // Calculate field offset (approximate: base_offset + field_index * 4)
+            gccjit::rvalue base_field_offset = m_context.new_rvalue(m_size_t_type, static_cast<long>(16));
+            gccjit::rvalue field_index_as_uintptr = m_context.new_cast(field_index, m_uint_type);
+            gccjit::rvalue field_index_as_size = m_context.new_cast(field_index_as_uintptr, m_size_t_type);
+            gccjit::rvalue field_offset = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_size_t_type, 
+                field_index_as_size, m_context.new_rvalue(m_size_t_type, static_cast<long>(4)));
+            gccjit::rvalue total_field_offset = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_size_t_type, base_field_offset, field_offset);
+            
+            // Get field pointer
+            gccjit::rvalue field_ptr = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_void_ptr_type, task_ptr, total_field_offset);
+            gccjit::lvalue field = m_context.new_cast(field_ptr, m_int_type.get_pointer()).dereference();
+            gccjit::rvalue value = field;
+            m_current_block.add_assignment(dst, value);
+            return value;
+        }
+        
+        case LIR::LIR_Op::SchedulerInit: {
+            // Generate: return 0; (simplified - no initialization needed)
+            
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+            m_current_block.add_assignment(dst, m_context.new_rvalue(m_int_type, 0));
+            return dst;
+        }
+        
+        case LIR::LIR_Op::SchedulerTick: {
+            // Generate: return 0; (simplified - single tick)
+            
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+            m_current_block.add_assignment(dst, m_context.new_rvalue(m_int_type, 0));
+            return dst;
+        }
+            
         default:
             report_error("Unsupported instruction: " + std::to_string(static_cast<int>(inst.op)));
             break;
@@ -769,7 +1074,7 @@ void JITBackend::compile_call(const LIR::LIR_Inst& inst) {
     } else {
         // Invalid function ID, return 0
         gccjit::rvalue result = m_context.new_rvalue(m_int_type, 0);
-        gccjit::lvalue dst = get_jit_register(inst.dst);
+        gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
         m_current_block.add_assignment(dst, result);
         return;
     }
@@ -779,7 +1084,7 @@ void JITBackend::compile_call(const LIR::LIR_Inst& inst) {
     if (!lir_func) {
         // Function not found, return 0
         gccjit::rvalue result = m_context.new_rvalue(m_int_type, 0);
-        gccjit::lvalue dst = get_jit_register(inst.dst);
+        gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
         m_current_block.add_assignment(dst, result);
         return;
     }
@@ -813,7 +1118,7 @@ void JITBackend::compile_call(const LIR::LIR_Inst& inst) {
     }
     
     // Set the result register
-    gccjit::lvalue dst = get_jit_register(inst.dst);
+    gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
     m_current_block.add_assignment(dst, result);
 }
 

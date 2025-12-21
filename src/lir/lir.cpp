@@ -153,11 +153,39 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::IsError: return "is_error";
         case LIR_Op::Unwrap: return "unwrap";
         case LIR_Op::UnwrapOr: return "unwrap_or";
+
+        //  === ATOMIC OPERATIONS ===
         case LIR_Op::AtomicLoad: return "atomic_load";
         case LIR_Op::AtomicStore: return "atomic_store";
         case LIR_Op::AtomicFetchAdd: return "atomic_fetch_add";
         case LIR_Op::Await: return "await";
         case LIR_Op::AsyncCall: return "async_call";
+        
+        // === THREADLESS CONCURRENCY ===
+        case LIR_Op::TaskContextAlloc: return "task_context_alloc";
+        case LIR_Op::TaskContextInit: return "task_context_init";
+        case LIR_Op::TaskGetState: return "task_get_state";
+        case LIR_Op::TaskSetState: return "task_set_state";
+        case LIR_Op::TaskSetField: return "task_set_field";
+        case LIR_Op::TaskGetField: return "task_get_field";
+        case LIR_Op::ChannelAlloc: return "channel_alloc";
+        case LIR_Op::ChannelPush: return "channel_push";
+        case LIR_Op::ChannelPop: return "channel_pop";
+        case LIR_Op::ChannelHasData: return "channel_has_data";
+        case LIR_Op::SchedulerInit: return "scheduler_init";
+        case LIR_Op::SchedulerRun: return "scheduler_run";
+        case LIR_Op::SchedulerTick: return "scheduler_tick";
+        case LIR_Op::GetTickCount: return "get_tick_count";
+        case LIR_Op::DelayUntil: return "delay_until";
+        
+        // === LOCK-FREE PARALLEL OPERATIONS ===
+        case LIR_Op::WorkQueueAlloc: return "work_queue_alloc";
+        case LIR_Op::WorkQueuePush: return "work_queue_push";
+        case LIR_Op::WorkQueuePop: return "work_queue_pop";
+        case LIR_Op::ParallelWaitComplete: return "parallel_wait_complete";
+        case LIR_Op::WorkerSignal: return "worker_signal";
+        case LIR_Op::WorkerJoin: return "worker_join";
+        
         case LIR_Op::ListCreate: return "list_create";
         case LIR_Op::ListAppend: return "list_append";
         case LIR_Op::ListIndex: return "list_index";

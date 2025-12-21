@@ -1153,6 +1153,23 @@ Reg Generator::emit_call_expr(AST::CallExpr& expr) {
             }
         }
         
+        // Check for special channel methods
+        if (method_name == "send") {
+            if (expr.arguments.size() != 1) {
+                report_error("channel.send() requires exactly one argument");
+                return 0;
+            }
+            
+            // Evaluate the value to send
+            Reg value_reg = emit_expr(*expr.arguments[0]);
+            
+            // Generate ChannelPush instruction
+            Reg result = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::ChannelPush, result, object_reg, value_reg));
+            set_register_type(result, std::make_shared<Type>(TypeTag::Int));
+            return result;
+        }
+        
         report_error("Unknown method: " + method_name);
         return 0;
     } else {
@@ -1296,6 +1313,18 @@ Reg Generator::emit_member_expr(AST::MemberExpr& expr) {
     }
     
     // If we get here, it's either a method call or unknown field
+    // Check for special channel methods
+    if (expr.name == "send") {
+        // For channel.send(value), we need to return a special marker that this is a method call
+        // The actual call will be handled in emit_call_expr
+        Reg method_marker = allocate_register();
+        auto int_type = std::make_shared<Type>(TypeTag::Int);
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, method_marker, 
+                                std::make_shared<Value>(int_type, int64_t(-1)))); // Special marker
+        set_register_type(method_marker, int_type);
+        return method_marker;
+    }
+    
     // For now, we'll treat it as an error
     report_error("Unknown field or method: " + expr.name);
     return 0;
@@ -1990,15 +2019,325 @@ void Generator::emit_comptime_stmt(AST::ComptimeStatement& stmt) {
 }
 
 void Generator::emit_parallel_stmt(AST::ParallelStatement& stmt) {
-    report_error("Parallel statements not yet implemented");
+    auto int_type = std::make_shared<Type>(TypeTag::Int64);
+    
+    // Parse cores parameter (default to 3 if not specified)
+    int num_cores = 3;
+    if (!stmt.cores.empty() && stmt.cores != "auto") {
+        try {
+            num_cores = std::stoi(stmt.cores);
+        } catch (...) {
+            // Default to 3 on parse error
+        }
+    }
+    
+    // Count tasks in the parallel block (similar to concurrent)
+    size_t task_count = 0;
+    for (auto& task_stmt : stmt.body->statements) {
+        if (auto task = dynamic_cast<AST::TaskStatement*>(task_stmt.get())) {
+            if (task->iterable) {
+                auto range_expr = dynamic_cast<AST::RangeExpr*>(task->iterable.get());
+                if (range_expr) {
+                    auto start_val = evaluate_constant_expression(range_expr->start);
+                    auto end_val = evaluate_constant_expression(range_expr->end);
+                    if (start_val && end_val) {
+                        int64_t start = std::stoll(start_val->get()->data);
+                        int64_t end = std::stoll(end_val->get()->data);
+                        task_count += (end - start + 1);
+                    } else {
+                        task_count++;
+                    }
+                } else {
+                    task_count++;
+                }
+            } else {
+                task_count++;
+            }
+        }
+    }
+    
+    // === LOCK-FREE PARALLEL EXECUTION ===
+    
+    // 1. Allocate lock-free work queue
+    Reg work_queue_reg = allocate_register();
+    Reg queue_size_reg = allocate_register();
+    ValuePtr queue_size_val = std::make_shared<Value>(int_type, int64_t(task_count));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, queue_size_reg, queue_size_val));
+    set_register_type(queue_size_reg, int_type);
+    
+    emit_instruction(LIR_Inst(LIR_Op::WorkQueueAlloc, work_queue_reg, queue_size_reg, 0));
+    set_register_type(work_queue_reg, int_type);
+    
+    // 2. Allocate task contexts (reuse existing mechanism)
+    Reg contexts_reg = allocate_register();
+    Reg task_count_reg = allocate_register();
+    ValuePtr task_count_val = std::make_shared<Value>(int_type, int64_t(task_count));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, task_count_reg, task_count_val));
+    set_register_type(task_count_reg, int_type);
+    
+    emit_instruction(LIR_Inst(LIR_Op::TaskContextAlloc, contexts_reg, task_count_reg, 0));
+    set_register_type(contexts_reg, int_type);
+    
+    // 3. Initialize each task and push to work queue
+    size_t task_id = 0;
+    for (auto& task_stmt : stmt.body->statements) {
+        if (auto task = dynamic_cast<AST::TaskStatement*>(task_stmt.get())) {
+            if (task->iterable) {
+                auto range_expr = dynamic_cast<AST::RangeExpr*>(task->iterable.get());
+                if (range_expr) {
+                    auto start_val = evaluate_constant_expression(range_expr->start);
+                    auto end_val = evaluate_constant_expression(range_expr->end);
+                    if (start_val && end_val) {
+                        int64_t start = std::stoll(start_val->get()->data);
+                        int64_t end = std::stoll(end_val->get()->data);
+                        
+                        for (int64_t i = start; i <= end; i++) {
+                            // Initialize task context
+                            emit_parallel_task_init(*task, task_id, contexts_reg, work_queue_reg, i);
+                            task_id++;
+                        }
+                    } else {
+                        emit_parallel_task_init(*task, task_id, contexts_reg, work_queue_reg, 0);
+                        task_id++;
+                    }
+                } else {
+                    emit_parallel_task_init(*task, task_id, contexts_reg, work_queue_reg, 0);
+                    task_id++;
+                }
+            } else {
+                emit_parallel_task_init(*task, task_id, contexts_reg, work_queue_reg, 0);
+                task_id++;
+            }
+        }
+    }
+    
+    // 4. Set up atomic variables
+    Reg active_workers_reg = allocate_register();
+    ValuePtr num_cores_val = std::make_shared<Value>(int_type, int64_t(num_cores));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, active_workers_reg, num_cores_val));
+    set_register_type(active_workers_reg, int_type);
+    
+    // 5. Signal workers to start (atomic store)
+    Reg work_available_reg = allocate_register();
+    ValuePtr work_available_val = std::make_shared<Value>(int_type, int64_t(1));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, work_available_reg, work_available_val));
+    set_register_type(work_available_reg, int_type);
+    
+    emit_instruction(LIR_Inst(LIR_Op::WorkerSignal, work_available_reg, active_workers_reg, 0));
+    
+    // 6. Main thread participates as worker 0
+    emit_parallel_worker_loop(work_queue_reg, 0);
+    
+    // 7. Wait for all workers to complete
+    Reg timeout_reg = allocate_register();
+    ValuePtr timeout_val = std::make_shared<Value>(int_type, int64_t(20000)); // 20 second timeout
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, timeout_reg, timeout_val));
+    set_register_type(timeout_reg, int_type);
+    
+    emit_instruction(LIR_Inst(LIR_Op::ParallelWaitComplete, work_queue_reg, timeout_reg, 0));
+    
+    // 8. Cleanup work queue
+    emit_instruction(LIR_Inst(LIR_Op::WorkQueuePush, work_queue_reg, 0, 0)); // Signal cleanup
+}
+
+// Helper function to evaluate constant expressions
+std::optional<ValuePtr> Generator::evaluate_constant_expression(std::shared_ptr<AST::Expression> expr) {
+    if (!expr) return std::nullopt;
+    
+    // Handle literal expressions
+    if (auto literal = dynamic_cast<AST::LiteralExpr*>(expr.get())) {
+        if (std::holds_alternative<std::string>(literal->value)) {
+            // Try to parse string as integer
+            std::string str_val = std::get<std::string>(literal->value);
+            try {
+                int64_t int_val = std::stoll(str_val);
+                auto int_type = std::make_shared<Type>(TypeTag::Int64);
+                return std::make_shared<Value>(int_type, int_val);
+            } catch (...) {
+                return std::nullopt;
+            }
+        } else if (std::holds_alternative<bool>(literal->value)) {
+            auto bool_type = std::make_shared<Type>(TypeTag::Bool);
+            return std::make_shared<Value>(bool_type, std::get<bool>(literal->value));
+        }
+    }
+    
+    // Handle variable expressions (for now, just return nullopt)
+    // In a full implementation, this would look up constant variables
+    
+    return std::nullopt;
 }
 
 void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
-    report_error("Concurrent statements not yet implemented");
+    enter_scope();
+    
+    auto int_type = std::make_shared<Type>(TypeTag::Int64);
+    
+    // Handle channel parameter assignment (e.g., "ch=counts")
+    Reg channel_reg;
+    if (!stmt.channelParam.empty()) {
+        // We have a parameter assignment: param_name = channel_name
+        std::string param_name = stmt.channelParam;
+        std::string channel_name = stmt.channel;
+        
+        // Resolve the existing channel variable
+        channel_reg = resolve_variable(channel_name);
+        if (channel_reg == UINT32_MAX) {
+            report_error("Undefined channel variable: " + channel_name);
+            exit_scope();
+            return;
+        }
+        
+        // Bind the parameter name to the existing channel
+        bind_variable(param_name, channel_reg);
+        set_register_type(channel_reg, int_type);
+    } else {
+        // Original behavior: allocate new channel
+        channel_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::ChannelAlloc, channel_reg, 32, 0));
+        bind_variable(stmt.channel, channel_reg);
+        set_register_type(channel_reg, int_type);
+    }
+    
+    // Allocate shared counter
+    Reg counter_reg = allocate_register();
+    ValuePtr zero = std::make_shared<Value>(int_type, int64_t(0));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, counter_reg, zero));
+    bind_variable("shared_counter", counter_reg);
+    set_register_type(counter_reg, int_type);
+    
+    // Count tasks (expand ranges)
+    size_t task_count = 0;
+    for (auto& task_stmt : stmt.body->statements) {
+        if (auto task = dynamic_cast<AST::TaskStatement*>(task_stmt.get())) {
+            // Check if the task has a range iterable
+            if (task->iterable) {
+                auto range_expr = dynamic_cast<AST::RangeExpr*>(task->iterable.get());
+                if (range_expr) {
+                    // Evaluate the range bounds
+                    auto start_val = evaluate_constant_expression(range_expr->start);
+                    auto end_val = evaluate_constant_expression(range_expr->end);
+                    
+                    if (start_val && end_val) {
+                        int64_t start = std::stoll(start_val->get()->data);
+                        int64_t end = std::stoll(end_val->get()->data);
+                        task_count += (end - start + 1); // Number of tasks in range
+                    } else {
+                        task_count++; // Fallback: one task
+                    }
+                } else {
+                    task_count++; // Not a range, one task
+                }
+            } else {
+                task_count++; // No iterable, one task
+            }
+        }
+    }
+    
+    // Allocate task context array (just malloc!)
+    Reg contexts_reg = allocate_register();
+    
+    // Load task_count into a register first
+    Reg task_count_reg = allocate_register();
+    ValuePtr task_count_val = std::make_shared<Value>(int_type, int64_t(task_count));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, task_count_reg, task_count_val));
+    set_register_type(task_count_reg, int_type);
+    
+    emit_instruction(LIR_Inst(LIR_Op::TaskContextAlloc, contexts_reg, task_count_reg, 0));
+    set_register_type(contexts_reg, int_type);
+    
+    // Initialize each task
+    size_t task_id = 0;
+    for (auto& task_stmt : stmt.body->statements) {
+        if (auto task = dynamic_cast<AST::TaskStatement*>(task_stmt.get())) {
+            // Check if the task has a range iterable (e.g., "i in 1..7")
+            if (task->iterable) {
+                auto range_expr = dynamic_cast<AST::RangeExpr*>(task->iterable.get());
+                if (range_expr) {
+                    // Evaluate the range bounds
+                    auto start_val = evaluate_constant_expression(range_expr->start);
+                    auto end_val = evaluate_constant_expression(range_expr->end);
+                    
+                    if (start_val && end_val) {
+                        int64_t start = std::stoll(start_val->get()->data);
+                        int64_t end = std::stoll(end_val->get()->data);
+                        
+                        // Create tasks for each value in the range
+                        for (int64_t i = start; i <= end; ++i) {
+                            emit_task_init_and_step(*task, task_id, contexts_reg, channel_reg, counter_reg, i);
+                            task_id++;
+                        }
+                    } else {
+                        // Fallback: create one task
+                        emit_task_init_and_step(*task, task_id, contexts_reg, channel_reg, counter_reg);
+                        task_id++;
+                    }
+                } else {
+                    // Not a range, create one task
+                    emit_task_init_and_step(*task, task_id, contexts_reg, channel_reg, counter_reg);
+                    task_id++;
+                }
+            } else {
+                // No iterable, create one task
+                emit_task_init_and_step(*task, task_id, contexts_reg, channel_reg, counter_reg);
+                task_id++;
+            }
+        }
+    }
+    
+    // Run scheduler (blocking call that returns when all done)
+    emit_instruction(LIR_Inst(LIR_Op::SchedulerRun, contexts_reg, task_count, 0));
+    
+    // Only exit scope if we didn't have parameter assignment
+    // This preserves the original channel variable binding for iteration
+    if (stmt.channelParam.empty()) {
+        exit_scope();
+    }
 }
 
 void Generator::emit_task_stmt(AST::TaskStatement& stmt) {
     report_error("Task statements not yet implemented");
+}
+
+void Generator::emit_task_init_and_step(AST::TaskStatement& task, size_t task_id, Reg contexts_reg, Reg channel_reg, Reg counter_reg, int64_t loop_var_value) {
+    auto int_type = std::make_shared<Type>(TypeTag::Int64);
+    
+    // Use task_id directly as the task context register value
+    Reg task_context_reg = allocate_register();
+    ValuePtr task_id_val = std::make_shared<Value>(int_type, int64_t(task_id));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, task_context_reg, task_id_val));
+    set_register_type(task_context_reg, int_type);
+    
+    // Initialize task context
+    emit_instruction(LIR_Inst(LIR_Op::TaskContextInit, task_context_reg, task_id, 0));
+    
+    // Set task ID in context
+    Reg task_id_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, task_id_reg, task_id_val));
+    set_register_type(task_id_reg, int_type);
+    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, 0, task_context_reg, task_id_reg, 0)); // field 0 = task_id
+    
+    // Set loop variable value in context (use the actual loop value, not task_id)
+    ValuePtr loop_var_val = std::make_shared<Value>(int_type, int64_t(loop_var_value));
+    Reg loop_var_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, loop_var_reg, loop_var_val));
+    set_register_type(loop_var_reg, int_type);
+    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, 0, task_context_reg, loop_var_reg, 1)); // field 1 = loop_var
+    
+    // Bind the loop variable in the current scope so it can be used in the task body
+    if (!task.loopVar.empty()) {
+        bind_variable(task.loopVar, loop_var_reg);
+    }
+    
+    // Set channel index in context
+    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, 0, task_context_reg, channel_reg, 2)); // field 2 = channel
+    
+    // Set shared counter index in context
+    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, 0, task_context_reg, counter_reg, 3)); // field 3 = shared_counter
+    
+    // NOTE: Task body should be executed by scheduler, not emitted inline
+    // In a full implementation, this would generate separate task functions
+    // For now, we'll let the scheduler simulation handle task execution
 }
 
 void Generator::emit_worker_stmt(AST::WorkerStatement& stmt) {
@@ -2007,72 +2346,135 @@ void Generator::emit_worker_stmt(AST::WorkerStatement& stmt) {
 
 void Generator::emit_iter_stmt(AST::IterStatement& stmt) {
     auto range_expr = dynamic_cast<AST::RangeExpr*>(stmt.iterable.get());
-    if (!range_expr) {
-        report_error("iter statement only supports range expressions for now");
-        return;
-    }
+    auto var_expr = dynamic_cast<AST::VariableExpr*>(stmt.iterable.get());
+    
+    if (range_expr) {
+        // Handle range iteration (existing logic)
+        if (stmt.loopVars.size() != 1) {
+            report_error("iter statement currently supports only one loop variable");
+            return;
+        }
+        const std::string& loop_var_name = stmt.loopVars[0];
 
-    if (stmt.loopVars.size() != 1) {
-        report_error("iter statement currently supports only one loop variable");
-        return;
-    }
-    const std::string& loop_var_name = stmt.loopVars[0];
+        LIR_BasicBlock* header_block = create_basic_block("iter_header");
+        LIR_BasicBlock* body_block = create_basic_block("iter_body");
+        LIR_BasicBlock* increment_block = create_basic_block("iter_increment");
+        LIR_BasicBlock* exit_block = create_basic_block("iter_exit");
 
-    LIR_BasicBlock* header_block = create_basic_block("iter_header");
-    LIR_BasicBlock* body_block = create_basic_block("iter_body");
-    LIR_BasicBlock* increment_block = create_basic_block("iter_increment");
-    LIR_BasicBlock* exit_block = create_basic_block("iter_exit");
+        enter_scope();
+        enter_loop();
+        set_loop_labels(header_block->id, exit_block->id, increment_block->id);
 
-    enter_scope();
-    enter_loop();
-    set_loop_labels(header_block->id, exit_block->id, increment_block->id);
+        Reg loop_var_reg = allocate_register();
+        bind_variable(loop_var_name, loop_var_reg);
 
-    Reg loop_var_reg = allocate_register();
-    bind_variable(loop_var_name, loop_var_reg);
+        Reg start_reg = emit_expr(*range_expr->start);
+        emit_instruction(LIR_Inst(LIR_Op::Mov, loop_var_reg, start_reg, 0));
+        set_register_type(loop_var_reg, get_register_type(start_reg));
 
-    Reg start_reg = emit_expr(*range_expr->start);
-    emit_instruction(LIR_Inst(LIR_Op::Mov, loop_var_reg, start_reg, 0));
-    set_register_type(loop_var_reg, get_register_type(start_reg));
+        emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
+        add_block_edge(get_current_block(), header_block);
 
-    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
-    add_block_edge(get_current_block(), header_block);
+        set_current_block(header_block);
+        Reg end_reg = emit_expr(*range_expr->end);
+        Reg cmp_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::CmpLT, cmp_reg, loop_var_reg, end_reg));
+        set_register_type(cmp_reg, std::make_shared<Type>(TypeTag::Bool));
+        emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp_reg, 0, exit_block->id));
+        add_block_edge(header_block, body_block);
+        add_block_edge(header_block, exit_block);
 
-    set_current_block(header_block);
-    Reg end_reg = emit_expr(*range_expr->end);
-    Reg cmp_reg = allocate_register();
-    emit_instruction(LIR_Inst(LIR_Op::CmpLT, cmp_reg, loop_var_reg, end_reg));
-    set_register_type(cmp_reg, std::make_shared<Type>(TypeTag::Bool));
-    emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp_reg, 0, exit_block->id));
-    add_block_edge(header_block, body_block);
-    add_block_edge(header_block, exit_block);
+        set_current_block(body_block);
+        if (stmt.body) {
+            emit_stmt(*stmt.body);
+        }
+        emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, increment_block->id));
+        add_block_edge(body_block, increment_block);
 
-    set_current_block(body_block);
-    if (stmt.body) {
-        emit_stmt(*stmt.body);
-    }
-    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, increment_block->id));
-    add_block_edge(body_block, increment_block);
+        set_current_block(increment_block);
+        Reg step_reg;
+        if (range_expr->step) {
+            step_reg = emit_expr(*range_expr->step);
+        } else {
+            step_reg = allocate_register();
+            auto int_type = std::make_shared<Type>(TypeTag::Int64);
+            ValuePtr one_val = std::make_shared<Value>(int_type, (int64_t)1);
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, step_reg, one_val));
+            set_register_type(step_reg, int_type);
+        }
+        Reg new_val_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::Add, new_val_reg, loop_var_reg, step_reg));
+        emit_instruction(LIR_Inst(LIR_Op::Mov, loop_var_reg, new_val_reg, 0));
+        emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
+        add_block_edge(increment_block, header_block);
 
-    set_current_block(increment_block);
-    Reg step_reg;
-    if (range_expr->step) {
-        step_reg = emit_expr(*range_expr->step);
+        set_current_block(exit_block);
+        exit_loop();
+        exit_scope();
+        
+    } else if (var_expr) {
+        // Handle channel iteration
+        if (stmt.loopVars.size() != 1) {
+            report_error("iter statement currently supports only one loop variable");
+            return;
+        }
+        const std::string& loop_var_name = stmt.loopVars[0];
+
+        LIR_BasicBlock* header_block = create_basic_block("channel_iter_header");
+        LIR_BasicBlock* body_block = create_basic_block("channel_iter_body");
+        LIR_BasicBlock* exit_block = create_basic_block("channel_iter_exit");
+
+        enter_scope();
+        enter_loop();
+        set_loop_labels(header_block->id, exit_block->id, 0);
+
+        // Get the channel variable
+        Reg channel_reg = resolve_variable(var_expr->name);
+        if (channel_reg == UINT32_MAX) {
+            report_error("Undefined variable: " + var_expr->name);
+            return;
+        }
+
+        // Bind loop variable
+        Reg loop_var_reg = allocate_register();
+        bind_variable(loop_var_name, loop_var_reg);
+
+        // Jump to header
+        emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
+        add_block_edge(get_current_block(), header_block);
+
+        set_current_block(header_block);
+        // Check if channel has data
+        Reg has_data_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::ChannelHasData, has_data_reg, channel_reg, 0));
+        set_register_type(has_data_reg, std::make_shared<Type>(TypeTag::Bool));
+        
+        // Jump to exit if no data
+        emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, has_data_reg, 0, exit_block->id));
+        add_block_edge(header_block, body_block);
+        add_block_edge(header_block, exit_block);
+
+        set_current_block(body_block);
+        // Pop value from channel
+        emit_instruction(LIR_Inst(LIR_Op::ChannelPop, loop_var_reg, channel_reg, 0));
+        set_register_type(loop_var_reg, std::make_shared<Type>(TypeTag::Int64));
+        
+        // Execute loop body
+        if (stmt.body) {
+            emit_stmt(*stmt.body);
+        }
+        
+        // Jump back to header
+        emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
+        add_block_edge(body_block, header_block);
+
+        set_current_block(exit_block);
+        exit_loop();
+        exit_scope();
+        
     } else {
-        step_reg = allocate_register();
-        auto int_type = std::make_shared<Type>(TypeTag::Int64);
-        ValuePtr one_val = std::make_shared<Value>(int_type, (int64_t)1);
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, step_reg, one_val));
-        set_register_type(step_reg, int_type);
+        report_error("iter statement only supports range expressions and channel variables for now");
     }
-    Reg new_val_reg = allocate_register();
-    emit_instruction(LIR_Inst(LIR_Op::Add, new_val_reg, loop_var_reg, step_reg));
-    emit_instruction(LIR_Inst(LIR_Op::Mov, loop_var_reg, new_val_reg, 0));
-    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
-    add_block_edge(increment_block, header_block);
-
-    set_current_block(exit_block);
-    exit_loop();
-    exit_scope();
 }
 
 void Generator::emit_break_stmt(AST::BreakStatement& stmt) {
@@ -2783,7 +3185,6 @@ void Generator::emit_match_stmt(AST::MatchStatement& stmt) {
         // Jump to end after case body
         emit_instruction(LIR_Inst(LIR_Op::Jump, end_label, 0, 0));
     }
-    
     // Emit end label
     emit_instruction(LIR_Inst(LIR_Op::Label, end_label, 0, 0));
 }
@@ -2792,6 +3193,135 @@ void Generator::emit_module_stmt(AST::ModuleDeclaration& stmt) {
     // Module declarations are handled in Pass 0 (signature collection)
     // This function is called during Pass 2 but doesn't emit LIR
     // since modules are handled through the symbol resolution system
+}
+
+// === LOCK-FREE PARALLEL HELPER FUNCTIONS ===
+
+void Generator::emit_parallel_task_init(AST::TaskStatement& task, size_t task_id, Reg contexts_reg, Reg work_queue_reg, int64_t loop_var_value) {
+    auto int_type = std::make_shared<Type>(TypeTag::Int64);
+    
+    // Initialize task context (reuse existing logic)
+    Reg task_context_reg = allocate_register();
+    ValuePtr task_id_val = std::make_shared<Value>(int_type, int64_t(task_id));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, task_context_reg, task_id_val));
+    set_register_type(task_context_reg, int_type);
+    
+    emit_instruction(LIR_Inst(LIR_Op::TaskContextInit, task_context_reg, task_id, 0));
+    
+    // Set task ID in context
+    Reg task_id_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, task_id_reg, task_id_val));
+    set_register_type(task_id_reg, int_type);
+    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, 0, task_context_reg, task_id_reg, 0)); // field 0 = task_id
+    
+    // Set loop variable value in context
+    ValuePtr loop_var_val = std::make_shared<Value>(int_type, int64_t(loop_var_value));
+    Reg loop_var_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, loop_var_reg, loop_var_val));
+    set_register_type(loop_var_reg, int_type);
+    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, 0, task_context_reg, loop_var_reg, 1)); // field 1 = loop_var
+    
+    // Bind the loop variable in the current scope
+    if (!task.loopVar.empty()) {
+        bind_variable(task.loopVar, loop_var_reg);
+    }
+    
+    // Push task context to work queue (atomic)
+    emit_instruction(LIR_Inst(LIR_Op::WorkQueuePush, work_queue_reg, task_context_reg, 0));
+}
+
+void Generator::emit_parallel_worker_loop(Reg work_queue_reg, int worker_id) {
+    auto int_type = std::make_shared<Type>(TypeTag::Int64);
+    
+    // Create labels for the worker loop
+    uint32_t work_loop_label = generate_label();
+    uint32_t spin_wait_label = generate_label();
+    uint32_t exit_label = generate_label();
+    
+    // === SPIN WAIT LOOP ===
+    emit_instruction(LIR_Inst(LIR_Op::Label, spin_wait_label, 0, 0));
+    
+    // Atomic load of work_available flag
+    Reg work_available_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::AtomicLoad, work_available_reg, 0, 0)); // Global flag address
+    set_register_type(work_available_reg, int_type);
+    
+    // Check if work is available
+    Reg zero_reg = allocate_register();
+    ValuePtr zero_val = std::make_shared<Value>(int_type, int64_t(0));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, zero_reg, zero_val));
+    set_register_type(zero_reg, int_type);
+    
+    Reg cmp_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::CmpEQ, cmp_reg, work_available_reg, zero_reg));
+    set_register_type(cmp_reg, int_type);
+    
+    // Jump to spin wait if no work available
+    emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, cmp_reg, spin_wait_label, 0));
+    
+    // === WORK LOOP ===
+    emit_instruction(LIR_Inst(LIR_Op::Label, work_loop_label, 0, 0));
+    
+    // Try to pop work from queue (atomic)
+    Reg task_context_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::WorkQueuePop, task_context_reg, work_queue_reg, 0));
+    set_register_type(task_context_reg, int_type);
+    
+    // Check if we got a task (NULL = no more work)
+    Reg null_reg = allocate_register();
+    ValuePtr null_val = std::make_shared<Value>(int_type, int64_t(0));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, null_reg, null_val));
+    set_register_type(null_reg, int_type);
+    
+    Reg task_check_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::CmpEQ, task_check_reg, task_context_reg, null_reg));
+    set_register_type(task_check_reg, int_type);
+    
+    // Jump to exit if no more work
+    emit_instruction(LIR_Inst(LIR_Op::JumpIf, task_check_reg, exit_label, 0));
+    
+    // Execute task (in a real implementation, this would call the task function)
+    // For now, we simulate task execution by incrementing a counter
+    Reg counter_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, counter_reg, int64_t(1)));
+    set_register_type(counter_reg, int_type);
+    
+    // Atomic fetch-add to global counter
+    emit_instruction(LIR_Inst(LIR_Op::AtomicFetchAdd, counter_reg, 0, counter_reg));
+    
+    // Continue work loop
+    emit_instruction(LIR_Inst(LIR_Op::Jump, work_loop_label, 0, 0));
+    
+    // === EXIT ===
+    emit_instruction(LIR_Inst(LIR_Op::Label, exit_label, 0, 0));
+    
+    // Atomic decrement active workers
+    Reg active_workers_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::AtomicLoad, active_workers_reg, 1, 0)); // Global active_workers
+    set_register_type(active_workers_reg, int_type);
+    
+    Reg dec_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, dec_reg, int64_t(-1)));
+    set_register_type(dec_reg, int_type);
+    
+    emit_instruction(LIR_Inst(LIR_Op::AtomicFetchAdd, active_workers_reg, 1, dec_reg));
+    
+    // Check if we're the last worker
+    Reg last_check_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::CmpEQ, last_check_reg, active_workers_reg, zero_reg));
+    set_register_type(last_check_reg, int_type);
+    
+    // Signal completion if last worker
+    uint32_t signal_label = generate_label();
+    emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, last_check_reg, signal_label, 0));
+    
+    // Set completion flag (atomic store)
+    Reg completion_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, completion_reg, int64_t(1)));
+    set_register_type(completion_reg, int_type);
+    emit_instruction(LIR_Inst(LIR_Op::AtomicStore, completion_reg, 2, 0)); // Global all_done flag
+    
+    emit_instruction(LIR_Inst(LIR_Op::Label, signal_label, 0, 0));
 }
 
 } // namespace LIR
