@@ -9,12 +9,31 @@
 #include <sstream>
 #include <iomanip>
 #include "../backend/value.hh"
+#include "../frontend/type_system.hh"
 
 namespace LIR {
 
 // Register and Immediate types
 using Reg = uint32_t;
 using Imm = uint32_t;
+
+// Single type system for both LIR and JIT (ABI-level types)
+enum class Type : uint8_t {
+    // Primitive types
+    I32,
+    I64, 
+    F64,
+    Bool,
+    
+    // Pointer types
+    Ptr,
+    
+    // Special types
+    Void
+};
+
+// Convert Type to string
+std::string type_to_string(Type type);
 
 // LIR Operations (following the register-based design)
 enum class LIR_Op : uint8_t {
@@ -162,24 +181,32 @@ struct LIR_SourceLoc {
     }
 };
 
-// LIR Instruction structure
+// LIR Instruction structure (typed)
 struct LIR_Inst {
-    LIR_Op op;     // Operation
-    Reg dst;       // Destination register
-    Reg a;         // Operand 1 (source register)
-    Reg b;         // Operand 2 (source register, optional)
-    Imm imm;       // Immediate value (optional, for constants or jump targets)
-    ValuePtr const_val; // Constant value (for LoadConst operations)
+    LIR_Op op;             // Operation
+    Type result_type;      // Type of the result register (ABI-level)
+    Reg dst;               // Destination register
+    Reg a;                 // Operand 1 (source register)
+    Reg b;                 // Operand 2 (source register, optional)
+    Imm imm;               // Immediate value (optional, for constants or jump targets)
+    ValuePtr const_val;    // Constant value (for LoadConst operations)
     
     // Debug information
     std::string comment;
     LIR_SourceLoc loc;
     
+    LIR_Inst(LIR_Op op, Type result_type, Reg dst = 0, Reg a = 0, Reg b = 0, Imm imm = 0)
+        : op(op), result_type(result_type), dst(dst), a(a), b(b), imm(imm) {}
+    
+    LIR_Inst(LIR_Op op, Type result_type, Reg dst, ValuePtr constant)
+        : op(op), result_type(result_type), dst(dst), a(0), b(0), imm(0), const_val(constant) {}
+    
+    // Legacy constructors for backward compatibility
     LIR_Inst(LIR_Op op, Reg dst = 0, Reg a = 0, Reg b = 0, Imm imm = 0)
-        : op(op), dst(dst), a(a), b(b), imm(imm) {}
+        : op(op), result_type(Type::Void), dst(dst), a(a), b(b), imm(imm) {}
     
     LIR_Inst(LIR_Op op, Reg dst, ValuePtr constant)
-        : op(op), dst(dst), a(0), b(0), imm(0), const_val(constant) {}
+        : op(op), result_type(Type::Void), dst(dst), a(0), b(0), imm(0), const_val(constant) {}
     
     // Check if this instruction is a return instruction
     bool isReturn() const {
@@ -287,7 +314,8 @@ struct LIR_DebugInfo {
 class LIR_FunctionContext {
 public:
     std::unordered_map<std::string, Reg> variable_to_reg;
-    std::unordered_map<Reg, TypePtr> register_types;
+    std::unordered_map<Reg, Type> register_types;  // ABI-level types for registers
+    std::unordered_map<Reg, LanguageType*> register_language_types; // Language types for reference
     std::vector<LIR_Inst> instructions;
     uint32_t next_reg = 0;
     
@@ -306,13 +334,33 @@ public:
         variable_to_reg[name] = reg;
     }
 
-    void set_register_type(Reg reg, TypePtr type) {
-        register_types[reg] = type;
+    void set_register_type(Reg reg, Type abi_type) {
+        register_types[reg] = abi_type;
     }
 
-    TypePtr get_register_type(Reg reg) const {
+    void set_register_language_type(Reg reg, LanguageType* lang_type) {
+        register_language_types[reg] = lang_type;
+    }
+
+    Type get_register_type(Reg reg) const {
         auto it = register_types.find(reg);
-        return (it != register_types.end()) ? it->second : nullptr;
+        return (it != register_types.end()) ? it->second : Type::Void;
+    }
+
+    LanguageType* get_register_language_type(Reg reg) const {
+        auto it = register_language_types.find(reg);
+        return (it != register_language_types.end()) ? it->second : nullptr;
+    }
+
+    // Legacy method for backward compatibility
+    void set_register_type_legacy(Reg reg, TypePtr type) {
+        // Convert legacy TypePtr to Type if needed
+        register_types[reg] = Type::I64; // Default
+    }
+
+    TypePtr get_register_type_legacy(Reg reg) const {
+        // Return nullptr since we're moving away from TypePtr
+        return nullptr;
     }
 
     // Instruction emission
@@ -351,7 +399,8 @@ public:
     
     // Variable to register mapping
     std::unordered_map<std::string, Reg> variable_to_reg;
-    std::unordered_map<Reg, TypePtr> register_types;
+    std::unordered_map<Reg, Type> register_types;    // ABI-level types for registers
+    std::unordered_map<Reg, LanguageType*> register_language_types; // Language types for reference
 
     LIR_Function(const std::string& name, uint32_t param_count = 0)
         : name(name), param_count(param_count), register_count(0), cfg(std::make_unique<LIR_CFG>()) {
@@ -369,7 +418,8 @@ public:
           debug_info(other.debug_info),
           optimizations(other.optimizations),
           variable_to_reg(other.variable_to_reg),
-          register_types(other.register_types) {
+          register_types(other.register_types),
+          register_language_types(other.register_language_types) {
         // Manually copy CFG blocks if needed
         if (other.cfg && cfg) {
             // Copy basic CFG structure but recreate blocks
@@ -391,6 +441,7 @@ public:
             optimizations = other.optimizations;
             variable_to_reg = other.variable_to_reg;
             register_types = other.register_types;
+            register_language_types = other.register_language_types;
             
             // Manually copy CFG structure if needed
             if (other.cfg && cfg) {
@@ -419,12 +470,32 @@ public:
     }
 
     void set_register_type(Reg reg, TypePtr type) {
-        register_types[reg] = type;
+        // Legacy method - convert to ABI type
+        register_types[reg] = Type::I64;
     }
 
     TypePtr get_register_type(Reg reg) const {
+        // Legacy method - return nullptr since we're moving away from TypePtr
+        return nullptr;
+    }
+
+    // New simplified methods
+    void set_register_abi_type(Reg reg, Type abi_type) {
+        register_types[reg] = abi_type;
+    }
+
+    void set_register_language_type(Reg reg, LanguageType* lang_type) {
+        register_language_types[reg] = lang_type;
+    }
+
+    Type get_register_abi_type(Reg reg) const {
         auto it = register_types.find(reg);
-        return (it != register_types.end()) ? it->second : nullptr;
+        return (it != register_types.end()) ? it->second : Type::Void;
+    }
+
+    LanguageType* get_register_language_type(Reg reg) const {
+        auto it = register_language_types.find(reg);
+        return (it != register_language_types.end()) ? it->second : nullptr;
     }
 
     // Instruction emission
@@ -470,6 +541,10 @@ public:
 
 // Utility functions
 std::string lir_op_to_string(LIR_Op op);
+std::string type_to_string(Type type);
+
+// Type conversion utilities (simplified)
+Type language_type_to_abi_type(LanguageType* lang_type);
 
 } // namespace LIR
 

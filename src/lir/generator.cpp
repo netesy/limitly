@@ -13,14 +13,17 @@ Generator::Generator() : current_function_(nullptr), next_register_(0), next_lab
     FunctionUtils::initializeFunctions();
 }
 
-std::unique_ptr<LIR_Function> Generator::generate_program(AST::Program& program) {
+std::unique_ptr<LIR_Function> Generator::generate_program(const TypeCheckResult& type_check_result) {
+    // Set type system reference
+    type_system = &type_check_result.type_system;
+    
     // PASS 0: Collect function, class, and module signatures only
-    collect_function_signatures(program);
-    collect_class_signatures(program);
-    collect_module_signatures(program);
+    collect_function_signatures(type_check_result);
+    collect_class_signatures(*type_check_result.program);
+    collect_module_signatures(*type_check_result.program);
     
     // PASS 1: Lower function bodies into separate LIR functions
-    lower_function_bodies(program);
+    lower_function_bodies(type_check_result);
     
     // PASS 2: Generate main function with top-level code only
     current_function_ = std::make_unique<LIR_Function>("main", 0);
@@ -29,6 +32,8 @@ std::unique_ptr<LIR_Function> Generator::generate_program(AST::Program& program)
     scope_stack_.clear();
     loop_stack_.clear();
     register_types_.clear();
+    register_abi_types_.clear();
+    register_language_types_.clear();
     enter_scope();
     enter_memory_region();
     
@@ -40,7 +45,7 @@ std::unique_ptr<LIR_Function> Generator::generate_program(AST::Program& program)
     start_cfg_build();
     
     // Generate top-level statements (excluding function definitions)
-    for (const auto& stmt : program.statements) {
+    for (const auto& stmt : type_check_result.program->statements) {
         if (auto func_stmt = dynamic_cast<AST::FunctionDeclaration*>(stmt.get())) {
             // Skip function definitions - they're already lowered
             continue;
@@ -167,6 +172,65 @@ TypePtr Generator::get_register_type(Reg reg) const {
         return it->second;
     }
     return nullptr;
+}
+
+// New simplified type methods
+void Generator::set_register_abi_type(Reg reg, Type abi_type) {
+    register_abi_types_[reg] = abi_type;
+    if (current_function_) {
+        current_function_->set_register_abi_type(reg, abi_type);
+    }
+}
+
+void Generator::set_register_language_type(Reg reg, LanguageType* lang_type) {
+    register_language_types_[reg] = lang_type;
+    if (current_function_) {
+        current_function_->set_register_language_type(reg, lang_type);
+    }
+    
+    // Also set the ABI type
+    if (lang_type && type_system) {
+        Type abi_type = language_type_to_abi_type(lang_type);
+        set_register_abi_type(reg, abi_type);
+    }
+}
+
+Type Generator::get_register_abi_type(Reg reg) const {
+    auto it = register_abi_types_.find(reg);
+    if (it != register_abi_types_.end()) {
+        return it->second;
+    }
+    return Type::Void;
+}
+
+LanguageType* Generator::get_register_language_type(Reg reg) const {
+    auto it = register_language_types_.find(reg);
+    if (it != register_language_types_.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
+Type Generator::language_type_to_abi_type(LanguageType* lang_type) {
+    if (!type_system || !lang_type) return Type::Void;
+    return LIR::language_type_to_abi_type(lang_type);
+}
+
+Type Generator::get_expression_abi_type(AST::Expression& expr) {
+    if (expr.inferred_type && type_system) {
+        return language_type_to_abi_type(expr.inferred_type);
+    }
+    return Type::Void;
+}
+
+void Generator::emit_typed_instruction(const LIR_Inst& inst) {
+    // Set the ABI type for the destination register if not already set
+    if (inst.dst != UINT32_MAX && inst.result_type != Type::Void) {
+        set_register_abi_type(inst.dst, inst.result_type);
+    }
+    
+    // Emit the instruction
+    emit_instruction(inst);
 }
 
 void Generator::set_register_value(Reg reg, ValuePtr value) {
@@ -656,126 +720,15 @@ Reg Generator::emit_literal_expr(AST::LiteralExpr& expr, TypePtr expected_type) 
     
     // Set type BEFORE emitting so it's available during emit_instruction
     set_register_type(dst, const_val ? const_val->type : nullptr);
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, dst, const_val));
+    
+    // Convert the TypePtr to ABI Type for the instruction
+    Type abi_type = Type::Void;
+    if (const_val && const_val->type) {
+        abi_type = language_type_to_abi_type(expr.inferred_type);
+    }
+    
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, abi_type, dst, const_val));
     return dst;
-}
-
-Reg Generator::emit_variable_expr(AST::VariableExpr& expr) {
-    // First check if this is a module variable access (e.g., "math.pi")
-    size_t dot_pos = expr.name.find("::");
-    if (dot_pos != std::string::npos) {
-        std::string module_name = expr.name.substr(0, dot_pos);
-        std::string symbol_name = expr.name.substr(dot_pos + 2);
-        
-        // Check for alias mapping
-        auto alias_it = import_aliases_.find(module_name);
-        if (alias_it != import_aliases_.end()) {
-            module_name = alias_it->second;
-        }
-        
-        // Resolve module symbol
-        std::string qualified_name = module_name + "::" + symbol_name;
-        ModuleSymbolInfo* symbol = resolve_module_symbol(qualified_name);
-        if (symbol && symbol->is_variable) {
-            if (!can_access_module_symbol(*symbol, current_module_)) {
-                report_error("Cannot access private/protected variable: " + qualified_name);
-                return 0;
-            }
-            
-            // For now, return a placeholder - in a full implementation,
-            // we'd need to load the actual module variable value
-            Reg result = allocate_register();
-            auto var_type = std::make_shared<Type>(TypeTag::Any);
-            set_register_type(result, var_type);
-            return result;
-        }
-    }
-    
-    // Check regular variable scope
-    Reg reg = resolve_variable(expr.name);
-    if (reg == UINT32_MAX) {
-        report_error("Undefined variable: " + expr.name);
-        return 0;
-    }
-    return reg;
-}
-
-Reg Generator::emit_interpolated_string_expr(AST::InterpolatedStringExpr& expr) {
-    auto string_type = std::make_shared<Type>(TypeTag::String);
-
-    if (expr.parts.empty()) {
-        Reg result = allocate_register();
-        ValuePtr result_val = std::make_shared<Value>(string_type, std::string(""));
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, result, result_val));
-        set_register_type(result, string_type);
-        return result;
-    }
-
-    // Check for constant folding opportunity
-    bool all_parts_are_string_literals = true;
-    std::string folded_result = "";
-    
-    for (const auto& part : expr.parts) {
-        if (std::holds_alternative<std::string>(part)) {
-            folded_result += std::get<std::string>(part);
-        } else {
-            all_parts_are_string_literals = false;
-            break;
-        }
-    }
-    
-    // Constant folding: if all parts are string literals, fold them
-    if (all_parts_are_string_literals) {
-        Reg result = allocate_register();
-        ValuePtr result_val = std::make_shared<Value>(string_type, folded_result);
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, result, result_val));
-        set_register_type(result, string_type);
-        return result;
-    }
-
-    // For complex interpolations, use STR_FORMAT
-    // Build format string and collect argument registers
-    std::string format_string = "";
-    std::vector<Reg> arg_regs;
-    
-    for (const auto& part : expr.parts) {
-        if (std::holds_alternative<std::string>(part)) {
-            format_string += std::get<std::string>(part);
-        } else if (std::holds_alternative<std::shared_ptr<AST::Expression>>(part)) {
-            format_string += "%s"; // Simple placeholder for now
-            auto expr_part = std::get<std::shared_ptr<AST::Expression>>(part);
-            Reg expr_reg = emit_expr(*expr_part);
-            arg_regs.push_back(expr_reg);
-        }
-    }
-    
-    // Emit STR_FORMAT instruction
-    Reg result = allocate_register();
-    Reg format_reg = allocate_register();
-    ValuePtr format_val = std::make_shared<Value>(string_type, format_string);
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, format_reg, format_val));
-    
-    // Handle multiple arguments by chaining STR_FORMAT calls
-    Reg current_result = format_reg;
-    for (size_t i = 0; i < arg_regs.size(); i++) {
-        if (i == 0) {
-            // First argument: format with first arg
-            emit_instruction(LIR_Inst(LIR_Op::STR_FORMAT, result, format_reg, arg_regs[i]));
-            current_result = result;
-        } else {
-            // Subsequent arguments: format previous result with next arg
-            Reg temp_result = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::STR_FORMAT, temp_result, current_result, arg_regs[i]));
-            current_result = temp_result;
-            if (i == arg_regs.size() - 1) {
-                // Final result is in temp_result, move to result register
-                emit_instruction(LIR_Inst(LIR_Op::Mov, result, temp_result, 0));
-            }
-        }
-    }
-    
-    set_register_type(result, string_type);
-    return result;
 }
 
 Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
@@ -857,7 +810,8 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
             Reg dst = allocate_register();
             
             // Use STR_CONCAT for explicit string addition
-            emit_instruction(LIR_Inst(LIR_Op::STR_CONCAT, dst, left, right));
+            Type abi_type = language_type_to_abi_type(expr.inferred_type);
+            emit_instruction(LIR_Inst(LIR_Op::STR_CONCAT, abi_type, dst, left, right));
             
             // Set result type as string
             auto string_type = std::make_shared<Type>(TypeTag::String);
@@ -972,210 +926,15 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
         set_register_type(dst, result_type);
     }
     
-    emit_instruction(LIR_Inst(op, dst, left, right));
-    
-    return dst;
-}
-
-Reg Generator::emit_unary_expr(AST::UnaryExpr& expr) {
-    Reg operand = emit_expr(*expr.right);
-    Reg dst = allocate_register();
-    TypePtr operand_type = get_register_type(operand);
-    TypePtr result_type = nullptr;
-    
-    if (expr.op == TokenType::MINUS) {
-        // Result type is same as operand type
-        result_type = operand_type;
-        set_register_type(dst, result_type);
-        // Use Neg operation for unary minus (more efficient than Sub from 0)
-        emit_instruction(LIR_Inst(LIR_Op::Neg, dst, operand, 0));
-    } else if (expr.op == TokenType::PLUS) {
-        // Result type is same as operand type
-        result_type = operand_type;
-        set_register_type(dst, result_type);
-        // Unary plus - just copy the value (no operation needed)
-        emit_instruction(LIR_Inst(LIR_Op::Mov, dst, operand, 0));
-    } else if (expr.op == TokenType::BANG) {
-        // Result type is bool
-        result_type = std::make_shared<Type>(TypeTag::Bool);
-        set_register_type(dst, result_type);
-        // Logical NOT - compare with true and negate (operand != true gives us !operand)
-        Reg true_reg = allocate_register();
-        auto bool_type = std::make_shared<Type>(TypeTag::Bool);
-        ValuePtr true_val = std::make_shared<Value>(bool_type, true);
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, true_reg, true_val));
-        set_register_type(true_reg, bool_type);
-        emit_instruction(LIR_Inst(LIR_Op::CmpNEQ, dst, operand, true_reg));
-    } else if (expr.op == TokenType::TILDE) {
-        // Result type is int
-        auto int_type = std::make_shared<Type>(TypeTag::Int);
-        result_type = int_type;
-        set_register_type(dst, result_type);
-        // Bitwise NOT - XOR with all bits set (for 64-bit: -1)
-        Reg all_bits = allocate_register();
-        ValuePtr neg_one_val = std::make_shared<Value>(int_type, static_cast<int64_t>(-1));
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, all_bits, neg_one_val));
-        set_register_type(all_bits, int_type);
-        emit_instruction(LIR_Inst(LIR_Op::Xor, dst, operand, all_bits));
-    } else {
-        report_error("Unknown unary operator");
-        return 0;
+    // Convert the TypePtr to ABI Type for the instruction
+    Type abi_type = Type::Void;
+    if (result_type) {
+        abi_type = language_type_to_abi_type(expr.inferred_type);
     }
     
-    return dst;
-}
-
-Reg Generator::emit_call_expr(AST::CallExpr& expr) {
-    // Generate proper Call instruction with function ID
-    // The JIT will resolve and call the function at runtime
+    emit_instruction(LIR_Inst(op, abi_type, dst, left, right));
     
-    if (auto var_expr = dynamic_cast<AST::VariableExpr*>(expr.callee.get())) {
-        std::string func_name = var_expr->name;
-        
-        // Check if this is a module function call (e.g., "math.add")
-        size_t dot_pos = func_name.find("::");
-        if (dot_pos != std::string::npos) {
-            std::string module_name = func_name.substr(0, dot_pos);
-            std::string symbol_name = func_name.substr(dot_pos + 2);
-            
-            // Check for alias mapping
-            auto alias_it = import_aliases_.find(module_name);
-            if (alias_it != import_aliases_.end()) {
-                module_name = alias_it->second;
-            }
-            
-            // Resolve module symbol
-            std::string qualified_name = module_name + "::" + symbol_name;
-            ModuleSymbolInfo* symbol = resolve_module_symbol(qualified_name);
-            if (symbol && symbol->is_function) {
-                if (!can_access_module_symbol(*symbol, current_module_)) {
-                    report_error("Cannot access private/protected function: " + qualified_name);
-                    return 0;
-                }
-                
-                std::cout << "[DEBUG] LIR Generator: Generating module function call to '" << qualified_name << "'" << std::endl;
-                
-                // Evaluate arguments and store them in registers
-                std::vector<Reg> arg_regs;
-                for (const auto& arg : expr.arguments) {
-                    Reg arg_reg = emit_expr(*arg);
-                    arg_regs.push_back(arg_reg);
-                }
-                
-                // Allocate result register
-                Reg result = allocate_register();
-                
-                // Generate module function call
-                emit_instruction(LIR_Inst(LIR_Op::Call, result, static_cast<Reg>(arg_regs.size()), static_cast<Reg>(0)));
-                set_register_type(result, std::make_shared<Type>(TypeTag::Any));
-                
-                return result;
-            }
-        }
-        
-        if (BuiltinUtils::isBuiltinFunction(func_name)) {
-            std::cout << "[DEBUG] LIR Generator: Generating builtin call to '" << func_name << "'" << std::endl;
-            
-            // Evaluate arguments and store them in registers
-            std::vector<Reg> arg_regs;
-            for (const auto& arg : expr.arguments) {
-                Reg arg_reg = emit_expr(*arg);
-                arg_regs.push_back(arg_reg);
-            }
-            
-            // Allocate result register
-            Reg result = allocate_register();
-            
-            // Generate builtin call instruction with function ID
-            // For now, use a special ID for builtins (negative numbers)
-            int32_t builtin_id = -1; // Will be resolved by function name
-            emit_instruction(LIR_Inst(LIR_Op::Call, result, static_cast<Reg>(arg_regs.size()), static_cast<Reg>(builtin_id)));
-            set_register_type(result, std::make_shared<Type>(TypeTag::Any));
-            
-            return result;
-            
-        } else if (function_table_.find(func_name) != function_table_.end()) {
-            std::cout << "[DEBUG] LIR Generator: Generating call to user function '" << func_name << "'" << std::endl;
-            
-            // Evaluate arguments and store them in registers
-            std::vector<Reg> arg_regs;
-            for (const auto& arg : expr.arguments) {
-                Reg arg_reg = emit_expr(*arg);
-                arg_regs.push_back(arg_reg);
-            }
-            
-            // Allocate result register
-            Reg result = allocate_register();
-            
-            // Generate call instruction - function will be resolved by JIT
-            emit_instruction(LIR_Inst(LIR_Op::Call, result, static_cast<Reg>(arg_regs.size()), static_cast<Reg>(0)));
-            set_register_type(result, std::make_shared<Type>(TypeTag::Any));
-            
-            return result;
-            
-        } else {
-            report_error("Unknown function: " + func_name);
-            return 0;
-        }
-    } else if (auto member_expr = dynamic_cast<AST::MemberExpr*>(expr.callee.get())) {
-        // Method call: obj.method(args...)
-        std::string method_name = member_expr->name;
-        
-        // Evaluate the object (this will be the first argument)
-        Reg object_reg = emit_expr(*member_expr->object);
-        
-        // Try to find the method in any class
-        for (const auto& [class_name, class_info] : class_table_) {
-            auto method_it = class_info.method_indices.find(method_name);
-            if (method_it != class_info.method_indices.end()) {
-                // Found the method - generate method call
-                std::vector<Reg> arg_regs;
-                arg_regs.push_back(object_reg); // 'this' is first parameter
-                
-                // Evaluate other arguments
-                for (const auto& arg : expr.arguments) {
-                    Reg arg_reg = emit_expr(*arg);
-                    arg_regs.push_back(arg_reg);
-                }
-                
-                // Allocate result register
-                Reg result = allocate_register();
-                
-                // Generate method call using V-Table dispatch
-                // For now, we'll use a simple approach - in a full implementation,
-                // we'd load the V-Table and do dynamic dispatch
-                std::string full_method_name = class_name + "." + method_name;
-                if (function_table_.find(full_method_name) != function_table_.end()) {
-                    emit_instruction(LIR_Inst(LIR_Op::Call, result, static_cast<Reg>(arg_regs.size()), static_cast<Reg>(0)));
-                    set_register_type(result, std::make_shared<Type>(TypeTag::Any));
-                    return result;
-                }
-            }
-        }
-        
-        // Check for special channel methods
-        if (method_name == "send") {
-            if (expr.arguments.size() != 1) {
-                report_error("channel.send() requires exactly one argument");
-                return 0;
-            }
-            
-            // Evaluate the value to send
-            Reg value_reg = emit_expr(*expr.arguments[0]);
-            
-            // Generate ChannelPush instruction
-            Reg result = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::ChannelPush, result, object_reg, value_reg));
-            set_register_type(result, std::make_shared<Type>(TypeTag::Int));
-            return result;
-        }
-        
-        report_error("Unknown method: " + method_name);
-        return 0;
-    } else {
-        report_error("Complex function calls not yet supported in LIR");
-        return 0;
-    }
+    return dst;
 }
 
 Reg Generator::emit_assign_expr(AST::AssignExpr& expr) {
@@ -1192,7 +951,11 @@ Reg Generator::emit_assign_expr(AST::AssignExpr& expr) {
         }
         // Set type BEFORE emitting so it's available during emit_instruction
         set_register_type(dst, get_register_type(value));
-        emit_instruction(LIR_Inst(LIR_Op::Mov, dst, value, 0));
+        
+        // Convert the TypePtr to ABI Type for the instruction
+        Type abi_type = language_type_to_abi_type(expr.inferred_type);
+        
+        emit_instruction(LIR_Inst(LIR_Op::Mov, abi_type, dst, value, 0));
         // No need to update binding since we're using the existing register
         return dst;
     } else if (expr.object) {
@@ -1225,6 +988,38 @@ Reg Generator::emit_assign_expr(AST::AssignExpr& expr) {
     }
 }
 
+Reg Generator::emit_call_expr(AST::CallExpr& expr) {
+    // Evaluate callee
+    Reg callee_reg = emit_expr(*expr.callee);
+    
+    // Evaluate arguments
+    std::vector<Reg> arg_regs;
+    for (const auto& arg : expr.arguments) {
+        arg_regs.push_back(emit_expr(*arg));
+    }
+    
+    // Create result register
+    Reg result = allocate_register();
+    
+    // For now, emit a generic call instruction
+    // TODO: Implement proper function resolution and calling
+    Type abi_type = Type::Void;
+    if (expr.inferred_type) {
+        abi_type = language_type_to_abi_type(expr.inferred_type);
+    }
+    
+    emit_instruction(LIR_Inst(LIR_Op::Call, abi_type, result, callee_reg, 0));
+    
+    // Set register type based on inference
+    if (expr.inferred_type) {
+        set_register_type(result, expr.inferred_type);
+    } else {
+        set_register_type(result, std::make_shared<Type>(TypeTag::Any));
+    }
+    
+    return result;
+}
+
 Reg Generator::emit_call_closure_expr(AST::CallClosureExpr& expr) {
     // Handle closure calls - calling a function stored in a variable
     // This enables first-order functions and closures
@@ -1251,10 +1046,19 @@ Reg Generator::emit_call_closure_expr(AST::CallClosureExpr& expr) {
     
     // Emit closure call instruction
     // TODO: Implement proper closure calling with captured environment
-    emit_instruction(LIR_Inst(LIR_Op::Call, result, closure_reg, 0));
+    Type abi_type = Type::Void;
+    if (expr.inferred_type) {
+        abi_type = language_type_to_abi_type(expr.inferred_type);
+    }
     
-    // Set default return type (for now)
-    set_register_type(result, std::make_shared<Type>(TypeTag::Int));
+    emit_instruction(LIR_Inst(LIR_Op::Call, abi_type, result, closure_reg, 0));
+    
+    // Set return type based on inference
+    if (expr.inferred_type) {
+        set_register_type(result, expr.inferred_type);
+    } else {
+        set_register_type(result, std::make_shared<Type>(TypeTag::Int));
+    }
     
     return result;
 }
@@ -1267,7 +1071,8 @@ Reg Generator::emit_list_expr(AST::ListExpr& expr) {
     // Create a nil/empty list for now
     auto nil_type = std::make_shared<Type>(TypeTag::Nil);
     ValuePtr nil_val = std::make_shared<Value>(nil_type, std::string(""));
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, list_reg, nil_val));
+    Type abi_type = language_type_to_abi_type(expr.inferred_type);
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, abi_type, list_reg, nil_val));
     set_register_type(list_reg, nil_type);
     
     return list_reg;
@@ -1487,7 +1292,8 @@ void Generator::emit_var_stmt(AST::VarDeclaration& stmt) {
     if (stmt.initializer) {
         Reg value = emit_expr(*stmt.initializer);
         value_reg = allocate_register();
-        emit_instruction(LIR_Inst(LIR_Op::Mov, value_reg, value, 0));
+        Type abi_type = language_type_to_abi_type(stmt.inferred_type);
+        emit_instruction(LIR_Inst(LIR_Op::Mov, abi_type, value_reg, value, 0));
         
         // Use the declared type if available, otherwise use the initializer's type
         TypePtr declared_type = nullptr;
@@ -1537,7 +1343,8 @@ void Generator::emit_var_stmt(AST::VarDeclaration& stmt) {
         value_reg = allocate_register();
         auto nil_type = std::make_shared<Type>(TypeTag::Nil);
         ValuePtr nil_val = std::make_shared<Value>(nil_type, "");
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, value_reg, nil_val));
+        Type abi_type = language_type_to_abi_type(stmt.inferred_type);
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, abi_type, value_reg, nil_val));
         set_register_type(value_reg, nil_type);
     }
     bind_variable(stmt.name, value_reg);
@@ -2769,8 +2576,8 @@ std::shared_ptr<Type> Generator::convert_ast_type_to_lir_type(const std::shared_
 }
 
 // Symbol collection methods (Pass 0)
-void Generator::collect_function_signatures(AST::Program& program) {
-    for (const auto& stmt : program.statements) {
+void Generator::collect_function_signatures(const TypeCheckResult& type_check_result) {
+    for (const auto& stmt : type_check_result.program->statements) {
         if (auto func_stmt = dynamic_cast<AST::FunctionDeclaration*>(stmt.get())) {
             collect_function_signature(*func_stmt);
         }
@@ -2790,8 +2597,8 @@ void Generator::collect_function_signature(AST::FunctionDeclaration& stmt) {
     function_table_[stmt.name] = std::move(info);
 }
 
-void Generator::lower_function_bodies(AST::Program& program) {
-    for (const auto& stmt : program.statements) {
+void Generator::lower_function_bodies(const TypeCheckResult& type_check_result) {
+    for (const auto& stmt : type_check_result.program->statements) {
         if (auto func_stmt = dynamic_cast<AST::FunctionDeclaration*>(stmt.get())) {
             lower_function_body(*func_stmt);
         }
