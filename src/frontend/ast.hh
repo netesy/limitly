@@ -12,9 +12,11 @@
 #include <sstream>
 #include <algorithm>
 #include "scanner.hh"
+#include "type_system.hh"
 // #include "../common/big_int.hh"
 
 // Forward declarations
+struct LanguageType;
 struct Type;
 using TypePtr = std::shared_ptr<Type>;
 
@@ -106,17 +108,29 @@ namespace AST {
     // Base node type
     struct Node {
         int line;
+        
+        // Inferred type after type checking (null before type checking)
+        // For strictly statically typed language, all nodes should have type info
+        mutable LanguageType* inferred_type = nullptr;
+        
         virtual ~Node() = default;
     };
 
     // Base expression type
     struct Expression : public Node {
+        // inferred_type is inherited from Node
+        
         virtual ~Expression() = default;
     };
 
     // Base statement type
     struct Statement : public Node {
         std::vector<Token> annotations;
+        
+        // inferred_type is inherited from Node
+        // For statements, this typically represents the type of value produced by the statement
+        // (e.g., return type for return statements, declaration type for var declarations)
+        
         virtual ~Statement() = default;
     };
 
