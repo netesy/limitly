@@ -3136,8 +3136,19 @@ void Generator::emit_parallel_worker_loop(Reg work_queue_reg, int worker_id) {
 
 // Missing emit function implementations
 Reg Generator::emit_variable_expr(AST::VariableExpr& expr) {
-    report_error("Variable expressions not yet implemented in LIR generator");
-    return 0;
+    // Look up the variable in the current scope
+    Reg var_reg = resolve_variable(expr.name);
+    if (var_reg == UINT32_MAX) {
+        report_error("Undefined variable: " + expr.name, expr.line);
+        return allocate_register();
+    }
+    
+    // Set the type information for the register
+    if (expr.inferred_type) {
+        set_register_language_type(var_reg, expr.inferred_type);
+    }
+    
+    return var_reg;
 }
 
 Reg Generator::emit_interpolated_string_expr(AST::InterpolatedStringExpr& expr) {
