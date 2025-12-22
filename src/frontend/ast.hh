@@ -12,15 +12,9 @@
 #include <sstream>
 #include <algorithm>
 #include "scanner.hh"
-#include "type_system.hh"
-// #include "../common/big_int.hh"
+#include "../backend/types.hh"
 
 // Forward declarations
-struct LanguageType;
-struct Type;
-using TypePtr = std::shared_ptr<Type>;
-
-// Forward declarations for AST node types
 namespace AST {
     struct Node;
     struct Expression;
@@ -111,7 +105,7 @@ namespace AST {
         
         // Inferred type after type checking (null before type checking)
         // For strictly statically typed language, all nodes should have type info
-        mutable LanguageType* inferred_type = nullptr;
+        mutable TypePtr inferred_type = nullptr;
         
         virtual ~Node() = default;
     };

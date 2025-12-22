@@ -29,7 +29,7 @@ bool TypeChecker::check_program(std::shared_ptr<AST::Program> program) {
     
     // Set the inferred type on the program node
     // For a program, we could use void type or the type of the last statement
-    program->inferred_type = type_system.get_nil_type(); // Programs don't return values
+    program->inferred_type = type_system.NIL_TYPE; // Programs don't return values
     
     return errors.empty();
 }
@@ -57,17 +57,17 @@ void TypeChecker::exit_scope() {
     }
 }
 
-void TypeChecker::declare_variable(const std::string& name, LanguageType* type) {
+void TypeChecker::declare_variable(const std::string& name, TypePtr type) {
     if (current_scope) {
         current_scope->declare(name, type);
     }
 }
 
-LanguageType* TypeChecker::lookup_variable(const std::string& name) {
+TypePtr TypeChecker::lookup_variable(const std::string& name) {
     return current_scope ? current_scope->lookup(name) : nullptr;
 }
 
-LanguageType* TypeChecker::check_statement(std::shared_ptr<AST::Statement> stmt) {
+TypePtr TypeChecker::check_statement(std::shared_ptr<AST::Statement> stmt) {
     if (!stmt) return nullptr;
     
     if (auto func_decl = std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt)) {
@@ -93,13 +93,13 @@ LanguageType* TypeChecker::check_statement(std::shared_ptr<AST::Statement> stmt)
     return nullptr;
 }
 
-LanguageType* TypeChecker::check_function_declaration(std::shared_ptr<AST::FunctionDeclaration> func) {
+TypePtr TypeChecker::check_function_declaration(std::shared_ptr<AST::FunctionDeclaration> func) {
     if (!func) return nullptr;
     
     // Resolve return type
-    LanguageType* return_type = type_system.get_string_type(); // Default
+    TypePtr return_type = type_system.STRING_TYPE; // Default
     if (func->returnType) {
-        return_type = resolve_type_annotation(func->returnType);
+        return_type = resolve_type_annotation(func->returnType.value());
     }
     
     // Create function signature
@@ -109,10 +109,10 @@ LanguageType* TypeChecker::check_function_declaration(std::shared_ptr<AST::Funct
     signature.declaration = func;
     
     // Check parameters
-    for (const auto& param : func->parameters) {
-        LanguageType* param_type = type_system.get_string_type(); // Default
-        if (param.type) {
-            param_type = resolve_type_annotation(param.type);
+    for (const auto& param : func->params) {
+        TypePtr param_type = type_system.STRING_TYPE; // Default
+        if (param.second) {
+            param_type = resolve_type_annotation(param.second);
         }
         signature.param_types.push_back(param_type);
     }
@@ -125,12 +125,12 @@ LanguageType* TypeChecker::check_function_declaration(std::shared_ptr<AST::Funct
     enter_scope();
     
     // Declare parameters
-    for (size_t i = 0; i < func->parameters.size(); ++i) {
-        declare_variable(func->parameters[i].name, signature.param_types[i]);
+    for (size_t i = 0; i < func->params.size(); ++i) {
+        declare_variable(func->params[i].first, signature.param_types[i]);
     }
     
     // Check body
-    LanguageType* body_type = check_statement(func->body);
+    TypePtr body_type = check_statement(func->body);
     
     exit_scope();
     current_function = nullptr;
@@ -142,27 +142,27 @@ LanguageType* TypeChecker::check_function_declaration(std::shared_ptr<AST::Funct
     return return_type;
 }
 
-LanguageType* TypeChecker::check_var_declaration(std::shared_ptr<AST::VarDeclaration> var_decl) {
+TypePtr TypeChecker::check_var_declaration(std::shared_ptr<AST::VarDeclaration> var_decl) {
     if (!var_decl) return nullptr;
     
-    LanguageType* declared_type = nullptr;
+    TypePtr declared_type = nullptr;
     if (var_decl->type) {
-        declared_type = resolve_type_annotation(var_decl->type);
+        declared_type = resolve_type_annotation(var_decl->type.value());
     }
     
-    LanguageType* init_type = nullptr;
+    TypePtr init_type = nullptr;
     if (var_decl->initializer) {
         init_type = check_expression(var_decl->initializer);
     }
     
-    LanguageType* final_type = nullptr;
+    TypePtr final_type = nullptr;
     
     if (declared_type && init_type) {
         // Both declared and initialized - check compatibility
         if (is_type_compatible(declared_type, init_type)) {
             final_type = declared_type;
         } else {
-            add_type_error(declared_type->to_string(), init_type->to_string(), var_decl->line);
+            add_type_error(declared_type->toString(), init_type->toString(), var_decl->line);
             final_type = declared_type; // Use declared type anyway
         }
     } else if (declared_type) {
@@ -174,7 +174,7 @@ LanguageType* TypeChecker::check_var_declaration(std::shared_ptr<AST::VarDeclara
     } else {
         // Neither - error
         add_error("Variable declaration without type or initializer", var_decl->line);
-        final_type = type_system.get_string_type(); // Default
+        final_type = type_system.STRING_TYPE; // Default
     }
     
     declare_variable(var_decl->name, final_type);
@@ -185,12 +185,12 @@ LanguageType* TypeChecker::check_var_declaration(std::shared_ptr<AST::VarDeclara
     return final_type;
 }
 
-LanguageType* TypeChecker::check_block_statement(std::shared_ptr<AST::BlockStatement> block) {
+TypePtr TypeChecker::check_block_statement(std::shared_ptr<AST::BlockStatement> block) {
     if (!block) return nullptr;
     
     enter_scope();
     
-    LanguageType* last_type = nullptr;
+    TypePtr last_type = nullptr;
     for (const auto& stmt : block->statements) {
         last_type = check_statement(stmt);
     }
@@ -203,13 +203,13 @@ LanguageType* TypeChecker::check_block_statement(std::shared_ptr<AST::BlockState
     return last_type;
 }
 
-LanguageType* TypeChecker::check_if_statement(std::shared_ptr<AST::IfStatement> if_stmt) {
+TypePtr TypeChecker::check_if_statement(std::shared_ptr<AST::IfStatement> if_stmt) {
     if (!if_stmt) return nullptr;
     
     // Check condition
-    LanguageType* condition_type = check_expression(if_stmt->condition);
+    TypePtr condition_type = check_expression(if_stmt->condition);
     if (!is_boolean_type(condition_type)) {
-        add_type_error("bool", condition_type->to_string(), if_stmt->condition->line);
+        add_type_error("bool", condition_type->toString(), if_stmt->condition->line);
     }
     
     // Check then branch
@@ -221,19 +221,19 @@ LanguageType* TypeChecker::check_if_statement(std::shared_ptr<AST::IfStatement> 
     }
     
     // Set the inferred type on the if statement
-    LanguageType* result_type = type_system.get_string_type(); // if statements don't produce a value
+    TypePtr result_type = type_system.STRING_TYPE; // if statements don't produce a value
     if_stmt->inferred_type = result_type;
     
     return result_type;
 }
 
-LanguageType* TypeChecker::check_while_statement(std::shared_ptr<AST::WhileStatement> while_stmt) {
+TypePtr TypeChecker::check_while_statement(std::shared_ptr<AST::WhileStatement> while_stmt) {
     if (!while_stmt) return nullptr;
     
     // Check condition
-    LanguageType* condition_type = check_expression(while_stmt->condition);
+    TypePtr condition_type = check_expression(while_stmt->condition);
     if (!is_boolean_type(condition_type)) {
-        add_type_error("bool", condition_type->to_string(), while_stmt->condition->line);
+        add_type_error("bool", condition_type->toString(), while_stmt->condition->line);
     }
     
     // Check body
@@ -243,13 +243,13 @@ LanguageType* TypeChecker::check_while_statement(std::shared_ptr<AST::WhileState
     in_loop = was_in_loop;
     
     // Set the inferred type on the while statement
-    LanguageType* result_type = type_system.get_string_type();
+    TypePtr result_type = type_system.STRING_TYPE;
     while_stmt->inferred_type = result_type;
     
     return result_type;
 }
 
-LanguageType* TypeChecker::check_for_statement(std::shared_ptr<AST::ForStatement> for_stmt) {
+TypePtr TypeChecker::check_for_statement(std::shared_ptr<AST::ForStatement> for_stmt) {
     if (!for_stmt) return nullptr;
     
     enter_scope();
@@ -261,9 +261,9 @@ LanguageType* TypeChecker::check_for_statement(std::shared_ptr<AST::ForStatement
     
     // Check condition
     if (for_stmt->condition) {
-        LanguageType* condition_type = check_expression(for_stmt->condition);
+        TypePtr condition_type = check_expression(for_stmt->condition);
         if (!is_boolean_type(condition_type)) {
-            add_type_error("bool", condition_type->to_string(), for_stmt->condition->line);
+            add_type_error("bool", condition_type->toString(), for_stmt->condition->line);
         }
     }
     
@@ -281,25 +281,25 @@ LanguageType* TypeChecker::check_for_statement(std::shared_ptr<AST::ForStatement
     exit_scope();
     
     // Set the inferred type on the for statement
-    LanguageType* result_type = type_system.get_string_type();
+    TypePtr result_type = type_system.STRING_TYPE;
     for_stmt->inferred_type = result_type;
     
     return result_type;
 }
 
-LanguageType* TypeChecker::check_return_statement(std::shared_ptr<AST::ReturnStatement> return_stmt) {
+TypePtr TypeChecker::check_return_statement(std::shared_ptr<AST::ReturnStatement> return_stmt) {
     if (!return_stmt) return nullptr;
     
-    LanguageType* return_type = nullptr;
+    TypePtr return_type = nullptr;
     if (return_stmt->value) {
         return_type = check_expression(return_stmt->value);
     } else {
-        return_type = type_system.get_nil_type();
+        return_type = type_system.NIL_TYPE;
     }
     
     // Check if return type matches function return type
     if (current_return_type && !is_type_compatible(current_return_type, return_type)) {
-        add_type_error(current_return_type->to_string(), return_type->to_string(), return_stmt->line);
+        add_type_error(current_return_type->toString(), return_type->toString(), return_stmt->line);
     }
     
     // Set the inferred type on the return statement
@@ -308,7 +308,7 @@ LanguageType* TypeChecker::check_return_statement(std::shared_ptr<AST::ReturnSta
     return return_type;
 }
 
-LanguageType* TypeChecker::check_print_statement(std::shared_ptr<AST::PrintStatement> print_stmt) {
+TypePtr TypeChecker::check_print_statement(std::shared_ptr<AST::PrintStatement> print_stmt) {
     if (!print_stmt) return nullptr;
     
     for (const auto& arg : print_stmt->arguments) {
@@ -316,16 +316,16 @@ LanguageType* TypeChecker::check_print_statement(std::shared_ptr<AST::PrintState
     }
     
     // Set the inferred type on the print statement
-    LanguageType* result_type = type_system.get_string_type();
+    TypePtr result_type = type_system.STRING_TYPE;
     print_stmt->inferred_type = result_type;
     
     return result_type;
 }
 
-LanguageType* TypeChecker::check_expression(std::shared_ptr<AST::Expression> expr) {
+TypePtr TypeChecker::check_expression(std::shared_ptr<AST::Expression> expr) {
     if (!expr) return nullptr;
     
-    LanguageType* type = nullptr;
+    TypePtr type = nullptr;
     
     if (auto literal = std::dynamic_pointer_cast<AST::LiteralExpr>(expr)) {
         type = check_literal_expr(literal);
@@ -363,52 +363,52 @@ LanguageType* TypeChecker::check_expression(std::shared_ptr<AST::Expression> exp
     return type;
 }
 
-LanguageType* TypeChecker::check_literal_expr(std::shared_ptr<AST::LiteralExpr> expr) {
+TypePtr TypeChecker::check_literal_expr(std::shared_ptr<AST::LiteralExpr> expr) {
     if (!expr) return nullptr;
     
     if (std::holds_alternative<bool>(expr->value)) {
-        return type_system.get_bool_type();
+        return type_system.BOOL_TYPE;
     } else if (std::holds_alternative<std::nullptr_t>(expr->value)) {
-        return type_system.get_nil_type();
+        return type_system.NIL_TYPE;
     } else if (std::holds_alternative<std::string>(expr->value)) {
-        return type_system.get_string_type();
+        return type_system.STRING_TYPE;
     }
     
-    return type_system.get_string_type(); // Default
+    return type_system.STRING_TYPE; // Default
 }
 
-LanguageType* TypeChecker::check_variable_expr(std::shared_ptr<AST::VariableExpr> expr) {
+TypePtr TypeChecker::check_variable_expr(std::shared_ptr<AST::VariableExpr> expr) {
     if (!expr) return nullptr;
     
-    LanguageType* type = lookup_variable(expr->name);
+    TypePtr type = lookup_variable(expr->name);
     if (!type) {
         add_error("Undefined variable: " + expr->name, expr->line);
-        return type_system.get_string_type(); // Default
+        return type_system.STRING_TYPE; // Default
     }
     
     return type;
 }
 
-LanguageType* TypeChecker::check_binary_expr(std::shared_ptr<AST::BinaryExpr> expr) {
+TypePtr TypeChecker::check_binary_expr(std::shared_ptr<AST::BinaryExpr> expr) {
     if (!expr) return nullptr;
     
-    LanguageType* left_type = check_expression(expr->left);
-    LanguageType* right_type = check_expression(expr->right);
+    TypePtr left_type = check_expression(expr->left);
+    TypePtr right_type = check_expression(expr->right);
     
     switch (expr->op) {
         case TokenType::PLUS:
         case TokenType::MINUS:
-        case TokenType::MULTIPLY:
-        case TokenType::DIVIDE:
+        case TokenType::STAR:
+        case TokenType::SLASH:
             // Arithmetic operations
             if (is_numeric_type(left_type) && is_numeric_type(right_type)) {
                 return promote_numeric_types(left_type, right_type);
             } else if (expr->op == TokenType::PLUS && 
                       (is_string_type(left_type) || is_string_type(right_type))) {
-                return type_system.get_string_type();
+                return type_system.STRING_TYPE;
             }
             add_error("Invalid operand types for arithmetic operation", expr->line);
-            return type_system.get_int_type();
+            return type_system.INT_TYPE;
             
         case TokenType::EQUAL_EQUAL:
         case TokenType::BANG_EQUAL:
@@ -417,40 +417,40 @@ LanguageType* TypeChecker::check_binary_expr(std::shared_ptr<AST::BinaryExpr> ex
         case TokenType::GREATER:
         case TokenType::GREATER_EQUAL:
             // Comparison operations
-            return type_system.get_bool_type();
+            return type_system.BOOL_TYPE;
             
         case TokenType::AND:
         case TokenType::OR:
             // Logical operations
             if (is_boolean_type(left_type) && is_boolean_type(right_type)) {
-                return type_system.get_bool_type();
+                return type_system.BOOL_TYPE;
             }
             add_error("Logical operations require boolean operands", expr->line);
-            return type_system.get_bool_type();
+            return type_system.BOOL_TYPE;
             
         default:
             add_error("Unsupported binary operator", expr->line);
-            return type_system.get_string_type();
+            return type_system.STRING_TYPE;
     }
 }
 
-LanguageType* TypeChecker::check_unary_expr(std::shared_ptr<AST::UnaryExpr> expr) {
+TypePtr TypeChecker::check_unary_expr(std::shared_ptr<AST::UnaryExpr> expr) {
     if (!expr) return nullptr;
     
-    LanguageType* right_type = check_expression(expr->right);
+    TypePtr right_type = check_expression(expr->right);
     
     switch (expr->op) {
         case TokenType::BANG:
             // Logical NOT
             if (!is_boolean_type(right_type)) {
-                add_type_error("bool", right_type->to_string(), expr->line);
+                add_type_error("bool", right_type->toString(), expr->line);
             }
-            return type_system.get_bool_type();
+            return type_system.BOOL_TYPE;
             
         case TokenType::MINUS:
             // Numeric negation
             if (!is_numeric_type(right_type)) {
-                add_type_error("numeric", right_type->to_string(), expr->line);
+                add_type_error("numeric", right_type->toString(), expr->line);
             }
             return right_type;
             
@@ -460,21 +460,21 @@ LanguageType* TypeChecker::check_unary_expr(std::shared_ptr<AST::UnaryExpr> expr
     }
 }
 
-LanguageType* TypeChecker::check_call_expr(std::shared_ptr<AST::CallExpr> expr) {
+TypePtr TypeChecker::check_call_expr(std::shared_ptr<AST::CallExpr> expr) {
     if (!expr) return nullptr;
     
     // Check callee
-    LanguageType* callee_type = check_expression(expr->callee);
+    TypePtr callee_type = check_expression(expr->callee);
     
     // Check arguments
-    std::vector<LanguageType*> arg_types;
+    std::vector<TypePtr> arg_types;
     for (const auto& arg : expr->arguments) {
         arg_types.push_back(check_expression(arg));
     }
     
     // Check if callee is a function
     if (auto var_expr = std::dynamic_pointer_cast<AST::VariableExpr>(expr->callee)) {
-        LanguageType* result_type = nullptr;
+        TypePtr result_type = nullptr;
         if (check_function_call(var_expr->name, arg_types, result_type)) {
             expr->inferred_type = result_type;
             return result_type;
@@ -482,20 +482,20 @@ LanguageType* TypeChecker::check_call_expr(std::shared_ptr<AST::CallExpr> expr) 
     }
     
     add_error("Cannot call non-function value", expr->line);
-    return type_system.get_string_type();
+    return type_system.STRING_TYPE;
 }
 
-LanguageType* TypeChecker::check_assign_expr(std::shared_ptr<AST::AssignExpr> expr) {
+TypePtr TypeChecker::check_assign_expr(std::shared_ptr<AST::AssignExpr> expr) {
     if (!expr) return nullptr;
     
-    LanguageType* value_type = check_expression(expr->value);
+    TypePtr value_type = check_expression(expr->value);
     
     // For simple variable assignment
     if (!expr->object && !expr->member && !expr->index) {
-        LanguageType* var_type = lookup_variable(expr->name);
+        TypePtr var_type = lookup_variable(expr->name);
         if (var_type) {
             if (!is_type_compatible(var_type, value_type)) {
-                add_type_error(var_type->to_string(), value_type->to_string(), expr->line);
+                add_type_error(var_type->toString(), value_type->toString(), expr->line);
             }
         } else {
             // Implicit variable declaration
@@ -506,38 +506,38 @@ LanguageType* TypeChecker::check_assign_expr(std::shared_ptr<AST::AssignExpr> ex
     return value_type;
 }
 
-LanguageType* TypeChecker::check_grouping_expr(std::shared_ptr<AST::GroupingExpr> expr) {
+TypePtr TypeChecker::check_grouping_expr(std::shared_ptr<AST::GroupingExpr> expr) {
     if (!expr) return nullptr;
     return check_expression(expr->expression);
 }
 
-LanguageType* TypeChecker::check_member_expr(std::shared_ptr<AST::MemberExpr> expr) {
+TypePtr TypeChecker::check_member_expr(std::shared_ptr<AST::MemberExpr> expr) {
     if (!expr) return nullptr;
     
-    LanguageType* object_type = check_expression(expr->object);
+    TypePtr object_type = check_expression(expr->object);
     
     // For now, assume all member access returns string
     // TODO: Implement proper class/struct type checking
-    return type_system.get_string_type();
+    return type_system.STRING_TYPE;
 }
 
-LanguageType* TypeChecker::check_index_expr(std::shared_ptr<AST::IndexExpr> expr) {
+TypePtr TypeChecker::check_index_expr(std::shared_ptr<AST::IndexExpr> expr) {
     if (!expr) return nullptr;
     
-    LanguageType* object_type = check_expression(expr->object);
-    LanguageType* index_type = check_expression(expr->index);
+    TypePtr object_type = check_expression(expr->object);
+    TypePtr index_type = check_expression(expr->index);
     
     // For now, assume all indexing returns string
     // TODO: Implement proper collection type checking
-    return type_system.get_string_type();
+    return type_system.STRING_TYPE;
 }
 
-LanguageType* TypeChecker::check_list_expr(std::shared_ptr<AST::ListExpr> expr) {
+TypePtr TypeChecker::check_list_expr(std::shared_ptr<AST::ListExpr> expr) {
     if (!expr) return nullptr;
     
-    LanguageType* element_type = nullptr;
+    TypePtr element_type = nullptr;
     for (const auto& elem : expr->elements) {
-        LanguageType* elem_type = check_expression(elem);
+        TypePtr elem_type = check_expression(elem);
         if (element_type) {
             element_type = get_common_type(element_type, elem_type);
         } else {
@@ -547,10 +547,10 @@ LanguageType* TypeChecker::check_list_expr(std::shared_ptr<AST::ListExpr> expr) 
     
     // Create list type
     // TODO: Implement proper list type creation
-    return type_system.get_string_type();
+    return type_system.STRING_TYPE;
 }
 
-LanguageType* TypeChecker::check_tuple_expr(std::shared_ptr<AST::TupleExpr> expr) {
+TypePtr TypeChecker::check_tuple_expr(std::shared_ptr<AST::TupleExpr> expr) {
     if (!expr) return nullptr;
     
     for (const auto& elem : expr->elements) {
@@ -558,10 +558,10 @@ LanguageType* TypeChecker::check_tuple_expr(std::shared_ptr<AST::TupleExpr> expr
     }
     
     // TODO: Implement proper tuple type creation
-    return type_system.get_string_type();
+    return type_system.STRING_TYPE;
 }
 
-LanguageType* TypeChecker::check_dict_expr(std::shared_ptr<AST::DictExpr> expr) {
+TypePtr TypeChecker::check_dict_expr(std::shared_ptr<AST::DictExpr> expr) {
     if (!expr) return nullptr;
     
     for (const auto& [key, value] : expr->entries) {
@@ -570,10 +570,10 @@ LanguageType* TypeChecker::check_dict_expr(std::shared_ptr<AST::DictExpr> expr) 
     }
     
     // TODO: Implement proper dict type creation
-    return type_system.get_string_type();
+    return type_system.STRING_TYPE;
 }
 
-LanguageType* TypeChecker::check_interpolated_string_expr(std::shared_ptr<AST::InterpolatedStringExpr> expr) {
+TypePtr TypeChecker::check_interpolated_string_expr(std::shared_ptr<AST::InterpolatedStringExpr> expr) {
     if (!expr) return nullptr;
     
     for (const auto& part : expr->parts) {
@@ -582,49 +582,71 @@ LanguageType* TypeChecker::check_interpolated_string_expr(std::shared_ptr<AST::I
         }
     }
     
-    return type_system.get_string_type();
+    return type_system.STRING_TYPE;
 }
 
-LanguageType* TypeChecker::check_lambda_expr(std::shared_ptr<AST::LambdaExpr> expr) {
+TypePtr TypeChecker::check_lambda_expr(std::shared_ptr<AST::LambdaExpr> expr) {
     if (!expr) return nullptr;
     
     // TODO: Implement proper lambda type checking
-    return type_system.get_string_type();
+    return type_system.STRING_TYPE;
 }
 
-LanguageType* TypeChecker::resolve_type_annotation(std::shared_ptr<AST::TypeAnnotation> annotation) {
+TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<AST::TypeAnnotation> annotation) {
     if (!annotation) return nullptr;
     
     // Simple type resolution based on type name
     if (annotation->typeName == "int") {
-        return type_system.get_int_type();
+        return type_system.INT_TYPE;
     } else if (annotation->typeName == "float") {
-        return type_system.get_float_type();
+        return type_system.FLOAT64_TYPE;
     } else if (annotation->typeName == "bool") {
-        return type_system.get_bool_type();
+        return type_system.BOOL_TYPE;
     } else if (annotation->typeName == "string") {
-        return type_system.get_string_type();
+        return type_system.STRING_TYPE;
     }
     
     // TODO: Implement more complex type resolution
-    return type_system.get_string_type();
+    return type_system.STRING_TYPE;
 }
 
-bool TypeChecker::is_type_compatible(LanguageType* expected, LanguageType* actual) {
-    return type_system.are_compatible(expected, actual);
+bool TypeChecker::is_type_compatible(TypePtr expected, TypePtr actual) {
+    return type_system.isCompatible(expected, actual);
 }
 
-LanguageType* TypeChecker::get_common_type(LanguageType* left, LanguageType* right) {
-    return type_system.get_common_type(left, right);
+TypePtr TypeChecker::get_common_type(TypePtr left, TypePtr right) {
+    return type_system.getCommonType(left, right);
 }
 
-bool TypeChecker::can_implicitly_convert(LanguageType* from, LanguageType* to) {
-    return TypeUtils::can_implicitly_convert(from, to);
+bool TypeChecker::can_implicitly_convert(TypePtr from, TypePtr to) {
+    // Simple conversion check - can be expanded later
+    if (!from || !to) return false;
+    if (from == to) return true;
+    if (to->tag == TypeTag::Any) return true;
+    
+    // Numeric conversions
+    bool from_is_numeric = (from->tag == TypeTag::Int || from->tag == TypeTag::Int8 || 
+                           from->tag == TypeTag::Int16 || from->tag == TypeTag::Int32 || 
+                           from->tag == TypeTag::Int64 || from->tag == TypeTag::Int128 ||
+                           from->tag == TypeTag::UInt || from->tag == TypeTag::UInt8 || 
+                           from->tag == TypeTag::UInt16 || from->tag == TypeTag::UInt32 || 
+                           from->tag == TypeTag::UInt64 || from->tag == TypeTag::UInt128 ||
+                           from->tag == TypeTag::Float32 || from->tag == TypeTag::Float64);
+    
+    bool to_is_numeric = (to->tag == TypeTag::Int || to->tag == TypeTag::Int8 || 
+                         to->tag == TypeTag::Int16 || to->tag == TypeTag::Int32 || 
+                         to->tag == TypeTag::Int64 || to->tag == TypeTag::Int128 ||
+                         to->tag == TypeTag::UInt || to->tag == TypeTag::UInt8 || 
+                         to->tag == TypeTag::UInt16 || to->tag == TypeTag::UInt32 || 
+                         to->tag == TypeTag::UInt64 || to->tag == TypeTag::UInt128 ||
+                         to->tag == TypeTag::Float32 || to->tag == TypeTag::Float64);
+    
+    return from_is_numeric && to_is_numeric;
 }
 
 bool TypeChecker::check_function_call(const std::string& func_name, 
-                                     const std::vector<LanguageType*>& arg_types,
-                                     LanguageType*& result_type) {
+                                     const std::vector<TypePtr>& arg_types,
+                                     TypePtr& result_type) {
     auto it = function_signatures.find(func_name);
     if (it == function_signatures.end()) {
         add_error("Undefined function: " + func_name);
@@ -641,8 +663,8 @@ bool TypeChecker::check_function_call(const std::string& func_name,
     return true;
 }
 
-bool TypeChecker::validate_argument_types(const std::vector<LanguageType*>& expected,
-                                         const std::vector<LanguageType*>& actual,
+bool TypeChecker::validate_argument_types(const std::vector<TypePtr>& expected,
+                                         const std::vector<TypePtr>& actual,
                                          const std::string& func_name) {
     if (expected.size() != actual.size()) {
         add_error("Function " + func_name + " expects " + 
@@ -654,8 +676,8 @@ bool TypeChecker::validate_argument_types(const std::vector<LanguageType*>& expe
     for (size_t i = 0; i < expected.size(); ++i) {
         if (!is_type_compatible(expected[i], actual[i])) {
             add_error("Argument " + std::to_string(i + 1) + " of function " + 
-                     func_name + " expects " + expected[i]->to_string() + 
-                     ", got " + actual[i]->to_string());
+                     func_name + " expects " + expected[i]->toString() +
+                     ", got " + actual[i]->toString());
             return false;
         }
     }
@@ -663,19 +685,25 @@ bool TypeChecker::validate_argument_types(const std::vector<LanguageType*>& expe
     return true;
 }
 
-bool TypeChecker::is_numeric_type(LanguageType* type) {
-    return TypeUtils::is_numeric(type);
+bool TypeChecker::is_numeric_type(TypePtr type) {
+    return type && (type->tag == TypeTag::Int || type->tag == TypeTag::Int8 || 
+                   type->tag == TypeTag::Int16 || type->tag == TypeTag::Int32 || 
+                   type->tag == TypeTag::Int64 || type->tag == TypeTag::Int128 ||
+                   type->tag == TypeTag::UInt || type->tag == TypeTag::UInt8 || 
+                   type->tag == TypeTag::UInt16 || type->tag == TypeTag::UInt32 || 
+                   type->tag == TypeTag::UInt64 || type->tag == TypeTag::UInt128 ||
+                   type->tag == TypeTag::Float32 || type->tag == TypeTag::Float64);
 }
 
-bool TypeChecker::is_boolean_type(LanguageType* type) {
-    return type && type->tag == LanguageTypeTag::Bool;
+bool TypeChecker::is_boolean_type(TypePtr type) {
+    return type && type->tag == TypeTag::Bool;
 }
 
-bool TypeChecker::is_string_type(LanguageType* type) {
-    return type && type->tag == LanguageTypeTag::String;
+bool TypeChecker::is_string_type(TypePtr type) {
+    return type && type->tag == TypeTag::String;
 }
 
-LanguageType* TypeChecker::promote_numeric_types(LanguageType* left, LanguageType* right) {
+TypePtr TypeChecker::promote_numeric_types(TypePtr left, TypePtr right) {
     return get_common_type(left, right);
 }
 
@@ -686,13 +714,15 @@ LanguageType* TypeChecker::promote_numeric_types(LanguageType* left, LanguageTyp
 namespace TypeCheckerFactory {
 
 TypeCheckResult check_program(std::shared_ptr<AST::Program> program) {
-    TypeSystem type_system;
-    type_system.initialize_builtin_types();
+    // Create memory manager and region for type system
+    static MemoryManager<> memoryManager;
+    static MemoryManager<>::Region memoryRegion(memoryManager);
+    static TypeSystem type_system(memoryManager, memoryRegion);
+    auto checker = create(type_system);
     
-    TypeChecker checker(type_system);
-    bool success = checker.check_program(program);
+    TypeCheckResult result(program, type_system, checker->check_program(program), checker->get_errors());
     
-    return TypeCheckResult(program, type_system, success, checker.get_errors());
+    return result;
 }
 
 std::unique_ptr<TypeChecker> create(TypeSystem& type_system) {

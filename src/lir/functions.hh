@@ -16,15 +16,18 @@ namespace LIR {
 // LIR-specific parameter and signature types (independent from backend)
 struct LIRParameter {
     std::string name;
-    std::shared_ptr<Type> type;
+    Type type;
 };
 
 struct LIRFunctionSignature {
     std::string name;
     std::vector<LIRParameter> parameters;
-    std::optional<std::shared_ptr<Type>> returnType;
+    std::optional<Type> returnType;
     bool isAsync = false;
 };
+
+// Helper function to convert TypeTag to LIR::Type
+Type typeTagToLIRType(TypeTag tag);
 
 // Forward declarations
 class LIRFunction;
@@ -40,7 +43,7 @@ class LIRFunction {
 private:
     std::string name_;
     std::vector<LIRParameter> parameters_;
-    std::optional<std::shared_ptr<Type>> returnType_;
+    std::optional<Type> returnType_;
     LIRFunctionBody body_;
     LIRFunctionSignature signature_;
     
@@ -50,7 +53,7 @@ private:
 public:
     LIRFunction(const std::string& name, 
                 const std::vector<LIRParameter>& params,
-                std::optional<std::shared_ptr<Type>> returnType,
+                std::optional<Type> returnType,
                 LIRFunctionBody body);
     
     // Function interface
@@ -61,7 +64,7 @@ public:
     // LIR-specific accessors
     const std::string& getName() const { return name_; }
     const std::vector<LIRParameter>& getParameters() const { return parameters_; }
-    const std::optional<std::shared_ptr<Type>>& getReturnType() const { return returnType_; }
+    const std::optional<Type>& getReturnType() const { return returnType_; }
     bool hasBody() const { return static_cast<bool>(body_); }
     
     // LIR instruction access
@@ -95,7 +98,7 @@ public:
     std::shared_ptr<LIRFunction> createFunction(
         const std::string& name,
         const std::vector<LIRParameter>& params,
-        std::optional<std::shared_ptr<Type>> returnType,
+        std::optional<Type> returnType,
         LIRFunctionBody body);
     
     std::shared_ptr<LIRFunction> createArithmeticFunction(

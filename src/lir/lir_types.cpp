@@ -15,59 +15,68 @@ std::string type_to_string(Type type) {
     }
 }
 
-Type language_type_to_abi_type(LanguageType* lang_type) {
+Type language_type_to_abi_type(TypePtr lang_type) {
     if (!lang_type) return Type::Void;
     
     switch (lang_type->tag) {
         // Integer types - map to appropriate ABI integer
-        case LanguageTypeTag::Int8:
-        case LanguageTypeTag::Int16:
-        case LanguageTypeTag::Int32:
-        case LanguageTypeTag::UInt8:
-        case LanguageTypeTag::UInt16:
-        case LanguageTypeTag::UInt32:
+        case TypeTag::Int8:
+        case TypeTag::Int16:
+        case TypeTag::Int32:
+        case TypeTag::UInt8:
+        case TypeTag::UInt16:
+        case TypeTag::UInt32:
             return Type::I32;
             
-        case LanguageTypeTag::Int64:
-        case LanguageTypeTag::Int128:
-        case LanguageTypeTag::UInt64:
-        case LanguageTypeTag::UInt128:
+        // 64-bit integers
+        case TypeTag::Int64:
+        case TypeTag::Int128:
+        case TypeTag::UInt64:
+        case TypeTag::UInt128:
             return Type::I64;
             
-        // Floating point types
-        case LanguageTypeTag::Float32:
-        case LanguageTypeTag::Float64:
+        // Other integer types
+        case TypeTag::Int:
+        case TypeTag::UInt:
+            return Type::I64;
+            
+        // Floating point
+        case TypeTag::Float32:
+        case TypeTag::Float64:
             return Type::F64;
             
         // Boolean
-        case LanguageTypeTag::Bool:
+        case TypeTag::Bool:
             return Type::Bool;
             
-        // String and complex types - all map to pointer
-        case LanguageTypeTag::String:
-        case LanguageTypeTag::List:
-        case LanguageTypeTag::Dict:
-        case LanguageTypeTag::Tuple:
-        case LanguageTypeTag::Function:
-        case LanguageTypeTag::Closure:
-        case LanguageTypeTag::Class:
-        case LanguageTypeTag::Struct:
-        case LanguageTypeTag::Ptr:
-        case LanguageTypeTag::Ref:
-        case LanguageTypeTag::Union:
-        case LanguageTypeTag::Intersection:
-        case LanguageTypeTag::Option:
-        case LanguageTypeTag::ErrorUnion:
-        case LanguageTypeTag::Error:
-        case LanguageTypeTag::Enum:
-        case LanguageTypeTag::Module:
-        case LanguageTypeTag::Any:
-        default:
+        // Reference types
+        case TypeTag::String:
+        case TypeTag::List:
+        case TypeTag::Dict:
+        case TypeTag::Tuple:
+        case TypeTag::Function:
+        case TypeTag::Closure:
+        case TypeTag::Class:
+        case TypeTag::Object:
             return Type::Ptr;
             
-        // Special types
-        case LanguageTypeTag::Nil:
-        case LanguageTypeTag::Void:
+        // Other types
+        case TypeTag::Union:
+        case TypeTag::Sum:
+        case TypeTag::Enum:
+        case TypeTag::Module:
+        case TypeTag::Any:
+        case TypeTag::Range:
+        case TypeTag::Channel:
+        case TypeTag::UserDefined:
+        case TypeTag::ErrorUnion:
+            return Type::Ptr;
+            
+        // Nil
+        case TypeTag::Nil:
+            return Type::Void;
+            
+        default:
             return Type::Void;
     }
 }

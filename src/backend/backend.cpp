@@ -20,7 +20,7 @@ BytecodeGenerator::BytecodeGenerator() {
     static MemoryManager<>::Region region(MemoryManager<>::getInstance()); 
     
     typeSystem = std::make_unique<TypeSystem>(memoryManager, region);
-    typeChecker = std::make_unique<TypeChecker>(*typeSystem);
+    typeChecker = std::make_unique<BackendTypeChecker>(*typeSystem);
 }
 
 void BytecodeGenerator::setSourceContext(const std::string& source, const std::string& filePath) {

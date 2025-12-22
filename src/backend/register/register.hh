@@ -2,6 +2,8 @@
 #define REGISTER_H
 
 #include "../../lir/lir.hh"
+#include "../types.hh"
+#include "../memory.hh"
 #include <vector>
 #include <string>
 #include <variant>
@@ -128,6 +130,16 @@ public:
 private:
     std::vector<RegisterValue> registers;
     
+    // Memory management for type system
+    MemoryManager<> memoryManager;
+    MemoryManager<>::Region memoryRegion;
+    
+    // Type system instance
+    std::unique_ptr<TypeSystem> type_system;
+    
+    // Reference to current function for type information
+    const LIR::LIR_Function* current_function;
+    
     // Concurrency management
     std::vector<std::unique_ptr<TaskContext>> task_contexts;
     std::vector<std::unique_ptr<Channel>> channels;
@@ -135,6 +147,12 @@ private:
     uint64_t current_time;
     
     // Helper methods - all inlined for performance
+    inline LIR::Type get_register_type(LIR::Reg reg) const {
+        if (!current_function) return LIR::Type::Void;
+        auto it = current_function->register_types.find(reg);
+        return (it != current_function->register_types.end()) ? it->second : LIR::Type::Void;
+    }
+    
     inline bool is_numeric(const RegisterValue& value) const {
         return std::holds_alternative<int64_t>(value) || 
                std::holds_alternative<double>(value);

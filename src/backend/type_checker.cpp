@@ -12,13 +12,13 @@
 #include <cmath>
 #include <limits>
 
-void TypeChecker::addError(const std::string& message, int line, int column, const std::string& context) {
+void BackendTypeChecker::addError(const std::string& message, int line, int column, const std::string& context) {
     errors.emplace_back(message, line, column, context);
     
     // Don't report immediately - let backend.cpp handle error display with proper context
 }
 
-void TypeChecker::addError(const std::string& message, int line, int column, const std::string& context, const std::string& lexeme, const std::string& expectedValue) {
+void BackendTypeChecker::addError(const std::string& message, int line, int column, const std::string& context, const std::string& lexeme, const std::string& expectedValue) {
     // Enhanced error with lexeme and expected value information
     std::string enhancedMessage = message;
     if (!lexeme.empty()) {
@@ -33,15 +33,15 @@ void TypeChecker::addError(const std::string& message, int line, int column, con
 }
 
 // No-op. The SymbolTable class now handles this.
-void TypeChecker::enterScope() {
+void BackendTypeChecker::enterScope() {
     symbolTable.enterScope();
 }
 
-void TypeChecker::exitScope() {
+void BackendTypeChecker::exitScope() {
     symbolTable.exitScope();
 }
 
-std::vector<TypeCheckError> TypeChecker::checkProgram(const std::shared_ptr<AST::Program>& program) {
+std::vector<TypeCheckError> BackendTypeChecker::checkProgram(const std::shared_ptr<AST::Program>& program) {
     errors.clear();
     
     // Extract visibility information from AST
@@ -127,7 +127,7 @@ std::vector<TypeCheckError> TypeChecker::checkProgram(const std::shared_ptr<AST:
     return errors;
 }
 
-TypePtr TypeChecker::resolveTypeAnnotation(const std::shared_ptr<AST::TypeAnnotation>& annotation) {
+TypePtr BackendTypeChecker::resolveTypeAnnotation(const std::shared_ptr<AST::TypeAnnotation>& annotation) {
     if (!annotation) {
         return typeSystem.NIL_TYPE;
     }
@@ -258,7 +258,7 @@ TypePtr TypeChecker::resolveTypeAnnotation(const std::shared_ptr<AST::TypeAnnota
     return baseType;
 }
 
-void TypeChecker::checkStatement(const std::shared_ptr<AST::Statement>& stmt) {
+void BackendTypeChecker::checkStatement(const std::shared_ptr<AST::Statement>& stmt) {
     if (auto varDecl = std::dynamic_pointer_cast<AST::VarDeclaration>(stmt)) {
         // Store top-level variable declaration for visibility checking
         topLevelVariables[varDecl->name] = varDecl;
@@ -553,11 +553,11 @@ void TypeChecker::checkStatement(const std::shared_ptr<AST::Statement>& stmt) {
     // Handle other statement types as needed
 }
 
-TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& expr) {
+TypePtr BackendTypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& expr) {
     return checkExpression(expr, nullptr);
 }
 
-TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& expr, TypePtr expectedType) {
+TypePtr BackendTypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& expr, TypePtr expectedType) {
     if (auto literalExpr = std::dynamic_pointer_cast<AST::LiteralExpr>(expr)) {
         // Handle string-based literal values
         if (std::holds_alternative<std::string>(literalExpr->value)) {
@@ -1013,7 +1013,7 @@ TypePtr TypeChecker::checkExpression(const std::shared_ptr<AST::Expression>& exp
     return typeSystem.ANY_TYPE;
 }
 
-TypePtr TypeChecker::inferLambdaReturnType(const std::shared_ptr<AST::Statement>& body) {
+TypePtr BackendTypeChecker::inferLambdaReturnType(const std::shared_ptr<AST::Statement>& body) {
     // Try to infer return type from lambda body
     if (!body) {
         return typeSystem.NIL_TYPE;
@@ -1061,7 +1061,7 @@ TypePtr TypeChecker::inferLambdaReturnType(const std::shared_ptr<AST::Statement>
     return typeSystem.NIL_TYPE;
 }
 
-void TypeChecker::checkFallibleExpression(const std::shared_ptr<AST::FallibleExpr>& expr) {
+void BackendTypeChecker::checkFallibleExpression(const std::shared_ptr<AST::FallibleExpr>& expr) {
     TypePtr exprType = checkExpression(expr->expression);
     
     // Check that the expression is actually fallible
@@ -1117,7 +1117,7 @@ void TypeChecker::checkFallibleExpression(const std::shared_ptr<AST::FallibleExp
     }
 }
 
-void TypeChecker::checkErrorConstructExpression(const std::shared_ptr<AST::ErrorConstructExpr>& expr) {
+void BackendTypeChecker::checkErrorConstructExpression(const std::shared_ptr<AST::ErrorConstructExpr>& expr) {
     // Enhanced error type validation
     if (!typeSystem.isErrorType(expr->errorType)) {
         addError("Unknown error type '" + expr->errorType + 
@@ -1144,12 +1144,12 @@ void TypeChecker::checkErrorConstructExpression(const std::shared_ptr<AST::Error
     }
 }
 
-void TypeChecker::checkOkConstructExpression(const std::shared_ptr<AST::OkConstructExpr>& expr) {
+void BackendTypeChecker::checkOkConstructExpression(const std::shared_ptr<AST::OkConstructExpr>& expr) {
     // Just check the wrapped value
     checkExpression(expr->value);
 }
 
-void TypeChecker::checkFunctionCall(const std::shared_ptr<AST::CallExpr>& expr) {
+void BackendTypeChecker::checkFunctionCall(const std::shared_ptr<AST::CallExpr>& expr) {
     // Check arguments
     std::vector<TypePtr> argTypes;
     for (const auto& arg : expr->arguments) {
@@ -1230,7 +1230,7 @@ void TypeChecker::checkFunctionCall(const std::shared_ptr<AST::CallExpr>& expr) 
     addError("Invalid function call expression", expr->line);
 }
 
-void TypeChecker::checkRegularFunctionCall(FunctionSignature* signature, const std::vector<TypePtr>& argTypes, const std::shared_ptr<AST::CallExpr>& expr) {
+void BackendTypeChecker::checkRegularFunctionCall(FunctionSignature* signature, const std::vector<TypePtr>& argTypes, const std::shared_ptr<AST::CallExpr>& expr) {
     // Check argument count with optional parameter support
     if (!signature->isValidArgCount(argTypes.size())) {
         size_t minArgs = signature->getMinRequiredArgs();
@@ -1274,7 +1274,7 @@ void TypeChecker::checkRegularFunctionCall(FunctionSignature* signature, const s
     }
 }
 
-void TypeChecker::checkHigherOrderFunctionCall(TypePtr functionType, const std::vector<TypePtr>& argTypes, const std::shared_ptr<AST::CallExpr>& expr) {
+void BackendTypeChecker::checkHigherOrderFunctionCall(TypePtr functionType, const std::vector<TypePtr>& argTypes, const std::shared_ptr<AST::CallExpr>& expr) {
     // Extract function type information
     if (std::holds_alternative<FunctionType>(functionType->extra)) {
         auto funcType = std::get<FunctionType>(functionType->extra);
@@ -1316,7 +1316,7 @@ void TypeChecker::checkHigherOrderFunctionCall(TypePtr functionType, const std::
 }
 
 // Helper method to join error types for error messages
-std::string TypeChecker::joinErrorTypes(const std::vector<std::string>& errorTypes) {
+std::string BackendTypeChecker::joinErrorTypes(const std::vector<std::string>& errorTypes) {
     if (errorTypes.empty()) {
         return "any error";
     }
@@ -1329,7 +1329,7 @@ std::string TypeChecker::joinErrorTypes(const std::vector<std::string>& errorTyp
     return result;
 }
 
-void TypeChecker::checkFunctionDeclaration(const std::shared_ptr<AST::FunctionDeclaration>& stmt) {
+void BackendTypeChecker::checkFunctionDeclaration(const std::shared_ptr<AST::FunctionDeclaration>& stmt) {
     // Set current function context
     FunctionSignature* signature = symbolTable.findFunction(stmt->name);
     FunctionSignature* prevFunction = currentFunction;
@@ -1382,7 +1382,7 @@ void TypeChecker::checkFunctionDeclaration(const std::shared_ptr<AST::FunctionDe
     currentFunction = prevFunction;
 }
 
-void TypeChecker::checkMatchStatement(const std::shared_ptr<AST::MatchStatement>& stmt) {
+void BackendTypeChecker::checkMatchStatement(const std::shared_ptr<AST::MatchStatement>& stmt) {
     // Check the matched expression
     TypePtr matchType = checkExpression(stmt->value);
     
@@ -1450,7 +1450,7 @@ void TypeChecker::checkMatchStatement(const std::shared_ptr<AST::MatchStatement>
     }
 }
 
-bool TypeChecker::isErrorUnionCompatible(TypePtr from, TypePtr to) {
+bool BackendTypeChecker::isErrorUnionCompatible(TypePtr from, TypePtr to) {
     if (from->tag != TypeTag::ErrorUnion || to->tag != TypeTag::ErrorUnion) {
         return false;
     }
@@ -1467,7 +1467,7 @@ bool TypeChecker::isErrorUnionCompatible(TypePtr from, TypePtr to) {
     return canPropagateError(fromErrorUnion.errorTypes, toErrorUnion.errorTypes);
 }
 
-bool TypeChecker::canPropagateError(const std::vector<std::string>& sourceErrors, 
+bool BackendTypeChecker::canPropagateError(const std::vector<std::string>& sourceErrors, 
                                   const std::vector<std::string>& targetErrors) {
     // If target allows generic errors, any source is compatible
     if (targetErrors.empty()) {
@@ -1485,7 +1485,7 @@ bool TypeChecker::canPropagateError(const std::vector<std::string>& sourceErrors
     return true;
 }
 
-std::vector<std::string> TypeChecker::getErrorTypesFromType(TypePtr type) {
+std::vector<std::string> BackendTypeChecker::getErrorTypesFromType(TypePtr type) {
     if (type->tag == TypeTag::ErrorUnion) {
         auto errorUnion = std::get<ErrorUnionType>(type->extra);
         return errorUnion.errorTypes;
@@ -1493,19 +1493,19 @@ std::vector<std::string> TypeChecker::getErrorTypesFromType(TypePtr type) {
     return {};
 }
 
-bool TypeChecker::isErrorUnionType(TypePtr type) {
+bool BackendTypeChecker::isErrorUnionType(TypePtr type) {
     return type && type->tag == TypeTag::ErrorUnion;
 }
 
-bool TypeChecker::isUnionType(TypePtr type) {
+bool BackendTypeChecker::isUnionType(TypePtr type) {
     return type && type->tag == TypeTag::Union;
 }
 
-bool TypeChecker::requiresErrorHandling(TypePtr type) {
+bool BackendTypeChecker::requiresErrorHandling(TypePtr type) {
     return isErrorUnionType(type);
 }
 
-bool TypeChecker::isExhaustiveErrorMatch(const std::vector<std::shared_ptr<AST::MatchCase>>& cases, TypePtr type) {
+bool BackendTypeChecker::isExhaustiveErrorMatch(const std::vector<std::shared_ptr<AST::MatchCase>>& cases, TypePtr type) {
     if (!isErrorUnionType(type)) {
         return true; // Non-error types don't need exhaustive error matching
     }
@@ -1568,14 +1568,14 @@ bool TypeChecker::isExhaustiveErrorMatch(const std::vector<std::shared_ptr<AST::
     return hasSuccessCase && allErrorsCovered;
 }
 
-std::vector<TypeCheckError> TypeChecker::checkFunction(const std::shared_ptr<AST::FunctionDeclaration>& func) {
+std::vector<TypeCheckError> BackendTypeChecker::checkFunction(const std::shared_ptr<AST::FunctionDeclaration>& func) {
     errors.clear();
     checkFunctionDeclaration(func);
     return errors;
 }
 // Function signature error type validation methods
 
-void TypeChecker::validateFunctionErrorTypes(const std::shared_ptr<AST::FunctionDeclaration>& stmt) {
+void BackendTypeChecker::validateFunctionErrorTypes(const std::shared_ptr<AST::FunctionDeclaration>& stmt) {
     // Validate consistency between return type and declared error types
     if (stmt->returnType && *stmt->returnType) {
         auto returnType = resolveTypeAnnotation(*stmt->returnType);
@@ -1613,7 +1613,7 @@ void TypeChecker::validateFunctionErrorTypes(const std::shared_ptr<AST::Function
     }
 }
 
-void TypeChecker::validateFunctionBodyErrorTypes(const std::shared_ptr<AST::FunctionDeclaration>& stmt) {
+void BackendTypeChecker::validateFunctionBodyErrorTypes(const std::shared_ptr<AST::FunctionDeclaration>& stmt) {
     if (!stmt->canFail) {
         return; // No error type validation needed for non-fallible functions
     }
@@ -1640,7 +1640,7 @@ void TypeChecker::validateFunctionBodyErrorTypes(const std::shared_ptr<AST::Func
     }
 }
 
-void TypeChecker::validateErrorTypeCompatibility(const std::shared_ptr<AST::FunctionDeclaration>& caller,
+void BackendTypeChecker::validateErrorTypeCompatibility(const std::shared_ptr<AST::FunctionDeclaration>& caller,
                                                const std::shared_ptr<AST::FunctionDeclaration>& callee) {
     if (!callee->canFail) {
         return; // Callee doesn't produce errors, no compatibility check needed
@@ -1666,7 +1666,7 @@ void TypeChecker::validateErrorTypeCompatibility(const std::shared_ptr<AST::Func
     }
 }
 
-bool TypeChecker::canFunctionProduceErrorType(const std::shared_ptr<AST::Statement>& body, 
+bool BackendTypeChecker::canFunctionProduceErrorType(const std::shared_ptr<AST::Statement>& body, 
                                              const std::string& errorType) {
     // Check if the function body can produce the specified error type
     
@@ -1694,7 +1694,7 @@ bool TypeChecker::canFunctionProduceErrorType(const std::shared_ptr<AST::Stateme
     return false;
 }
 
-std::vector<std::string> TypeChecker::inferFunctionErrorTypes(const std::shared_ptr<AST::Statement>& body) {
+std::vector<std::string> BackendTypeChecker::inferFunctionErrorTypes(const std::shared_ptr<AST::Statement>& body) {
     std::vector<std::string> errorTypes;
     
     if (auto blockStmt = std::dynamic_pointer_cast<AST::BlockStatement>(body)) {
@@ -1729,7 +1729,7 @@ std::vector<std::string> TypeChecker::inferFunctionErrorTypes(const std::shared_
 }
 
 
-std::vector<std::string> TypeChecker::inferExpressionErrorTypes(const std::shared_ptr<AST::Expression>& expr) {
+std::vector<std::string> BackendTypeChecker::inferExpressionErrorTypes(const std::shared_ptr<AST::Expression>& expr) {
     std::vector<std::string> errorTypes;
     
     if (auto errorConstruct = std::dynamic_pointer_cast<AST::ErrorConstructExpr>(expr)) {
@@ -1779,7 +1779,7 @@ std::vector<std::string> TypeChecker::inferExpressionErrorTypes(const std::share
     
     return errorTypes;
 }
-void TypeChecker::registerBuiltinFunctions() {
+void BackendTypeChecker::registerBuiltinFunctions() {
     // Register builtin functions so they're recognized during semantic analysis
     
     // Core utility functions
@@ -1861,7 +1861,7 @@ void TypeChecker::registerBuiltinFunctions() {
         "close", {typeSystem.ANY_TYPE}, typeSystem.NIL_TYPE, false, {}, 0));
 }
 
-void TypeChecker::checkContractStatement(const std::shared_ptr<AST::ContractStatement>& stmt) {
+void BackendTypeChecker::checkContractStatement(const std::shared_ptr<AST::ContractStatement>& stmt) {
     if (!stmt->condition) {
         addError("contract statement missing condition", stmt->line, 0, 
                 getCodeContext(stmt->line), "contract", "contract(condition, message)");
@@ -1889,7 +1889,7 @@ void TypeChecker::checkContractStatement(const std::shared_ptr<AST::ContractStat
     }
 }
 
-void TypeChecker::checkAssertCall(const std::shared_ptr<AST::CallExpr>& expr) {
+void BackendTypeChecker::checkAssertCall(const std::shared_ptr<AST::CallExpr>& expr) {
     if (expr->arguments.size() != 2) {
         addError("assert() expects exactly 2 arguments: condition (bool) and message (string), got " + 
                 std::to_string(expr->arguments.size()), expr->line, 0, 
@@ -1912,7 +1912,7 @@ void TypeChecker::checkAssertCall(const std::shared_ptr<AST::CallExpr>& expr) {
     }
 }
 
-std::string TypeChecker::getCodeContext(int line) {
+std::string BackendTypeChecker::getCodeContext(int line) {
     if (sourceCode.empty() || line <= 0) {
         return "";
     }
@@ -1934,7 +1934,7 @@ std::string TypeChecker::getCodeContext(int line) {
 }
 // Helper functions for type checking
 
-bool TypeChecker::isOptionalType(TypePtr type) {
+bool BackendTypeChecker::isOptionalType(TypePtr type) {
     if (!type || type->tag != TypeTag::ErrorUnion) {
         return false;
     }
@@ -1954,7 +1954,7 @@ bool TypeChecker::isOptionalType(TypePtr type) {
 
 // Union type pattern matching validation methods
 
-bool TypeChecker::isExhaustiveUnionMatch(TypePtr unionType, const std::vector<std::shared_ptr<AST::MatchCase>>& cases) {
+bool BackendTypeChecker::isExhaustiveUnionMatch(TypePtr unionType, const std::vector<std::shared_ptr<AST::MatchCase>>& cases) {
     if (!unionType || unionType->tag != TypeTag::Union) {
         return true; // Non-union types don't need union exhaustiveness checking
     }
@@ -2065,7 +2065,7 @@ bool TypeChecker::isExhaustiveUnionMatch(TypePtr unionType, const std::vector<st
     return true;
 }
 
-void TypeChecker::validateUnionVariantAccess(TypePtr unionType, const std::string& variantName, int line) {
+void BackendTypeChecker::validateUnionVariantAccess(TypePtr unionType, const std::string& variantName, int line) {
     if (!unionType || unionType->tag != TypeTag::Union) {
         addError("Attempted to access variant '" + variantName + "' on non-union type " + 
                 unionType->toString(), line);
@@ -2099,7 +2099,7 @@ void TypeChecker::validateUnionVariantAccess(TypePtr unionType, const std::strin
     }
 }
 
-void TypeChecker::validatePatternCompatibility(const std::shared_ptr<AST::Expression>& pattern, TypePtr matchType, int line) {
+void BackendTypeChecker::validatePatternCompatibility(const std::shared_ptr<AST::Expression>& pattern, TypePtr matchType, int line) {
     if (!pattern || !matchType) {
         return;
     }
@@ -2142,7 +2142,7 @@ void TypeChecker::validatePatternCompatibility(const std::shared_ptr<AST::Expres
     }
 }
 
-std::string TypeChecker::getMissingUnionVariants(TypePtr unionType, const std::vector<std::shared_ptr<AST::MatchCase>>& cases) {
+std::string BackendTypeChecker::getMissingUnionVariants(TypePtr unionType, const std::vector<std::shared_ptr<AST::MatchCase>>& cases) {
     if (!unionType || unionType->tag != TypeTag::Union) {
         return "";
     }
@@ -2242,7 +2242,7 @@ std::string TypeChecker::getMissingUnionVariants(TypePtr unionType, const std::v
     return result;
 }
 
-bool TypeChecker::isExhaustiveOptionMatch(const std::vector<std::shared_ptr<AST::MatchCase>>& cases) {
+bool BackendTypeChecker::isExhaustiveOptionMatch(const std::vector<std::shared_ptr<AST::MatchCase>>& cases) {
     bool hasSomeCase = false;
     bool hasNoneCase = false;
     bool hasWildcard = false;
@@ -2270,7 +2270,7 @@ bool TypeChecker::isExhaustiveOptionMatch(const std::vector<std::shared_ptr<AST:
 }
 
 
-void TypeChecker::checkClassDeclaration(const std::shared_ptr<AST::ClassDeclaration>& classDecl) {
+void BackendTypeChecker::checkClassDeclaration(const std::shared_ptr<AST::ClassDeclaration>& classDecl) {
     // Store the class declaration for visibility checking
     classDeclarations[classDecl->name] = classDecl;
     
@@ -2332,7 +2332,7 @@ void TypeChecker::checkClassDeclaration(const std::shared_ptr<AST::ClassDeclarat
     currentClassDecl = previousClassDecl;
 }
 
-void TypeChecker::checkModuleDeclaration(const std::shared_ptr<AST::ModuleDeclaration>& moduleDecl) {
+void BackendTypeChecker::checkModuleDeclaration(const std::shared_ptr<AST::ModuleDeclaration>& moduleDecl) {
     // Store the module declaration for visibility checking
     moduleDeclarations[moduleDecl->name] = moduleDecl;
     
@@ -2353,7 +2353,7 @@ void TypeChecker::checkModuleDeclaration(const std::shared_ptr<AST::ModuleDeclar
 }
 // Visibility enforcement methods
 
-TypePtr TypeChecker::checkMemberAccess(const std::shared_ptr<AST::MemberExpr>& expr) {
+TypePtr BackendTypeChecker::checkMemberAccess(const std::shared_ptr<AST::MemberExpr>& expr) {
     // First, check the object type
     TypePtr objectType = checkExpression(expr->object);
     
@@ -2434,7 +2434,7 @@ TypePtr TypeChecker::checkMemberAccess(const std::shared_ptr<AST::MemberExpr>& e
     return typeSystem.ANY_TYPE;
 }
 
-bool TypeChecker::canAccessMember(const std::string& className, const std::string& memberName, AST::VisibilityLevel memberVisibility) {
+bool BackendTypeChecker::canAccessMember(const std::string& className, const std::string& memberName, AST::VisibilityLevel memberVisibility) {
     switch (memberVisibility) {
         case AST::VisibilityLevel::Public:
         case AST::VisibilityLevel::Const:
@@ -2486,7 +2486,7 @@ bool TypeChecker::canAccessMember(const std::string& className, const std::strin
     }
 }
 
-bool TypeChecker::canAccessClassMember(const std::string& className, const std::string& memberName, AST::VisibilityLevel memberVisibility) {
+bool BackendTypeChecker::canAccessClassMember(const std::string& className, const std::string& memberName, AST::VisibilityLevel memberVisibility) {
     // Class-based access checking logic (independent from module rules)
     switch (memberVisibility) {
         case AST::VisibilityLevel::Public:
@@ -2523,7 +2523,7 @@ bool TypeChecker::canAccessClassMember(const std::string& className, const std::
     }
 }
 
-bool TypeChecker::canAccessModuleMember(AST::VisibilityLevel visibility, const std::string& declaringModule, const std::string& accessingModule) {
+bool BackendTypeChecker::canAccessModuleMember(AST::VisibilityLevel visibility, const std::string& declaringModule, const std::string& accessingModule) {
     // Module-based access checking logic (independent from class rules)
     switch (visibility) {
         case AST::VisibilityLevel::Public:
@@ -2541,11 +2541,11 @@ bool TypeChecker::canAccessModuleMember(AST::VisibilityLevel visibility, const s
     }
 }
 
-std::string TypeChecker::getCurrentClassName() {
+std::string BackendTypeChecker::getCurrentClassName() {
     return currentClassName;
 }
 
-AST::VisibilityLevel TypeChecker::getModuleMemberVisibility(const std::string& moduleName, const std::string& memberName) {
+AST::VisibilityLevel BackendTypeChecker::getModuleMemberVisibility(const std::string& moduleName, const std::string& memberName) {
     if (memberName.empty() || moduleName.empty()) {
         return AST::VisibilityLevel::Private;
     }
@@ -2649,7 +2649,7 @@ AST::VisibilityLevel TypeChecker::getModuleMemberVisibility(const std::string& m
     return AST::VisibilityLevel::Private;
 }
 
-bool TypeChecker::canAccessModuleMember(const std::string& moduleName, const std::string& memberName) {
+bool BackendTypeChecker::canAccessModuleMember(const std::string& moduleName, const std::string& memberName) {
     AST::VisibilityLevel memberVisibility = getModuleMemberVisibility(moduleName, memberName);
     
     switch (memberVisibility) {
@@ -2668,7 +2668,7 @@ bool TypeChecker::canAccessModuleMember(const std::string& moduleName, const std
     }
 }
 
-bool TypeChecker::isSubclassOf(const std::string& subclass, const std::string& superclass) {
+bool BackendTypeChecker::isSubclassOf(const std::string& subclass, const std::string& superclass) {
     if (subclass == superclass) {
         return true; // A class is considered a subclass of itself
     }
@@ -2695,7 +2695,7 @@ bool TypeChecker::isSubclassOf(const std::string& subclass, const std::string& s
     return isSubclassOf(subclassDecl->superClassName, superclass);
 }
 
-AST::VisibilityLevel TypeChecker::getTopLevelDeclarationVisibility(const std::string& name) {
+AST::VisibilityLevel BackendTypeChecker::getTopLevelDeclarationVisibility(const std::string& name) {
     // Check top-level variables
     auto varIt = topLevelVariables.find(name);
     if (varIt != topLevelVariables.end()) {
@@ -2720,7 +2720,7 @@ AST::VisibilityLevel TypeChecker::getTopLevelDeclarationVisibility(const std::st
     return AST::VisibilityLevel::Private;
 }
 
-bool TypeChecker::canAccessFromCurrentModule(AST::VisibilityLevel visibility, const std::string& declaringModule) {
+bool BackendTypeChecker::canAccessFromCurrentModule(AST::VisibilityLevel visibility, const std::string& declaringModule) {
     switch (visibility) {
         case AST::VisibilityLevel::Public:
         case AST::VisibilityLevel::Const:
@@ -2744,7 +2744,7 @@ bool TypeChecker::canAccessFromCurrentModule(AST::VisibilityLevel visibility, co
     }
 }
 
-bool TypeChecker::isValidModuleFunctionReference(const std::string& functionRef) {
+bool BackendTypeChecker::isValidModuleFunctionReference(const std::string& functionRef) {
     // Check if this is a module function reference (format: "module_function:functionName")
     if (functionRef.substr(0, 16) == "module_function:") {
         std::string functionName = functionRef.substr(16);
@@ -2771,7 +2771,7 @@ bool TypeChecker::isValidModuleFunctionReference(const std::string& functionRef)
     return false; // Not a module function reference
 }
 
-std::string TypeChecker::extractModuleFunctionName(const std::string& functionRef) {
+std::string BackendTypeChecker::extractModuleFunctionName(const std::string& functionRef) {
     // Extract function name from module function reference
     if (functionRef.substr(0, 16) == "module_function:") {
         return functionRef.substr(16);
@@ -2779,7 +2779,7 @@ std::string TypeChecker::extractModuleFunctionName(const std::string& functionRe
     return ""; // Not a module function reference
 }
 
-void TypeChecker::validateImportFilter(const AST::ImportFilter& filter, const std::string& modulePath) {
+void BackendTypeChecker::validateImportFilter(const AST::ImportFilter& filter, const std::string& modulePath) {
     // Get module visibility info
     auto moduleIt = moduleRegistry.find(modulePath);
     if (moduleIt == moduleRegistry.end()) {
@@ -2819,7 +2819,7 @@ void TypeChecker::validateImportFilter(const AST::ImportFilter& filter, const st
     }
 }
 
-void TypeChecker::checkModuleMemberFunctionCall(const std::shared_ptr<AST::MemberExpr>& memberExpr, 
+void BackendTypeChecker::checkModuleMemberFunctionCall(const std::shared_ptr<AST::MemberExpr>& memberExpr, 
                                                const std::vector<TypePtr>& argTypes, 
                                                const std::shared_ptr<AST::CallExpr>& callExpr) {
     // Get the object name from the member expression
@@ -2873,7 +2873,7 @@ void TypeChecker::checkModuleMemberFunctionCall(const std::shared_ptr<AST::Membe
     // For now, we'll just validate that the function is accessible
 }
 
-TypePtr TypeChecker::checkClassMethodCall(const std::shared_ptr<AST::MemberExpr>& memberExpr,
+TypePtr BackendTypeChecker::checkClassMethodCall(const std::shared_ptr<AST::MemberExpr>& memberExpr,
                                           const std::vector<TypePtr>& argTypes,
                                           const std::shared_ptr<AST::CallExpr>& callExpr) {
     // 1. Get object and class information
@@ -2960,7 +2960,7 @@ TypePtr TypeChecker::checkClassMethodCall(const std::shared_ptr<AST::MemberExpr>
     return typeSystem.NIL_TYPE;
 }
 
-void TypeChecker::checkImportStatement(const std::shared_ptr<AST::ImportStatement>& importStmt) {
+void BackendTypeChecker::checkImportStatement(const std::shared_ptr<AST::ImportStatement>& importStmt) {
     // Handle the import during type checking phase
     handleImportStatement(importStmt);
     
@@ -2983,7 +2983,7 @@ void TypeChecker::checkImportStatement(const std::shared_ptr<AST::ImportStatemen
     symbolTable.addVariable(aliasName, typeSystem.MODULE_TYPE, importStmt->line);
 }
 
-AST::VisibilityLevel TypeChecker::getMemberVisibility(const std::string& className, const std::string& memberName) {
+AST::VisibilityLevel BackendTypeChecker::getMemberVisibility(const std::string& className, const std::string& memberName) {
     if (memberName.empty() || className.empty()) {
         return AST::VisibilityLevel::Private;
     }
@@ -3044,7 +3044,7 @@ AST::VisibilityLevel TypeChecker::getMemberVisibility(const std::string& classNa
 
 // Visibility information extraction methods
 
-void TypeChecker::extractModuleVisibility(const std::shared_ptr<AST::Program>& program) {
+void BackendTypeChecker::extractModuleVisibility(const std::shared_ptr<AST::Program>& program) {
     // Create or get module visibility info for current module
     ModuleVisibilityInfo& moduleInfo = moduleRegistry[currentModulePath];
     moduleInfo.modulePath = currentModulePath;
@@ -3063,7 +3063,7 @@ void TypeChecker::extractModuleVisibility(const std::shared_ptr<AST::Program>& p
     }
 }
 
-void TypeChecker::extractClassVisibility(const std::shared_ptr<AST::ClassDeclaration>& classDecl) {
+void BackendTypeChecker::extractClassVisibility(const std::shared_ptr<AST::ClassDeclaration>& classDecl) {
     // Create class visibility info
     ClassVisibilityInfo classInfo(classDecl->name, currentModulePath, classDecl->superClassName);
     
@@ -3110,7 +3110,7 @@ void TypeChecker::extractClassVisibility(const std::shared_ptr<AST::ClassDeclara
     moduleInfo.classes[classDecl->name] = classInfo;
 }
 
-void TypeChecker::extractFunctionVisibility(const std::shared_ptr<AST::FunctionDeclaration>& funcDecl) {
+void BackendTypeChecker::extractFunctionVisibility(const std::shared_ptr<AST::FunctionDeclaration>& funcDecl) {
     // Handle default visibility rules (private for module members)
     AST::VisibilityLevel visibility = funcDecl->visibility;
     if (visibility == AST::VisibilityLevel::Private && funcDecl->visibility == AST::VisibilityLevel::Private) {
@@ -3126,7 +3126,7 @@ void TypeChecker::extractFunctionVisibility(const std::shared_ptr<AST::FunctionD
     moduleInfo.functions[funcDecl->name] = memberInfo;
 }
 
-void TypeChecker::extractVariableVisibility(const std::shared_ptr<AST::VarDeclaration>& varDecl) {
+void BackendTypeChecker::extractVariableVisibility(const std::shared_ptr<AST::VarDeclaration>& varDecl) {
     // Handle default visibility rules (private for module members)
     AST::VisibilityLevel visibility = varDecl->visibility;
     if (visibility == AST::VisibilityLevel::Private && varDecl->visibility == AST::VisibilityLevel::Private) {
@@ -3143,7 +3143,7 @@ void TypeChecker::extractVariableVisibility(const std::shared_ptr<AST::VarDeclar
 }
 // Import  handling methods
 
-void TypeChecker::handleImportStatement(const std::shared_ptr<AST::ImportStatement>& importStmt) {
+void BackendTypeChecker::handleImportStatement(const std::shared_ptr<AST::ImportStatement>& importStmt) {
     // Resolve the module path to actual file path
     std::string actualModulePath = resolveModulePath(importStmt->modulePath);
     
@@ -3173,7 +3173,7 @@ void TypeChecker::handleImportStatement(const std::shared_ptr<AST::ImportStateme
     }
 }
 
-std::string TypeChecker::resolveModulePath(const std::string& modulePath) {
+std::string BackendTypeChecker::resolveModulePath(const std::string& modulePath) {
     // Convert module path (e.g., "tests.modules.math_module") to file path
     std::string filePath = modulePath;
     
@@ -3190,7 +3190,7 @@ std::string TypeChecker::resolveModulePath(const std::string& modulePath) {
     return filePath;
 }
 
-std::string TypeChecker::resolveModuleAlias(const std::string& alias) {
+std::string BackendTypeChecker::resolveModuleAlias(const std::string& alias) {
     auto it = moduleAliases.find(alias);
     if (it != moduleAliases.end()) {
         return it->second;
@@ -3198,7 +3198,7 @@ std::string TypeChecker::resolveModuleAlias(const std::string& alias) {
     return ""; // Alias not found
 }
 
-void TypeChecker::loadModuleVisibilityInfo(const std::string& modulePath) {
+void BackendTypeChecker::loadModuleVisibilityInfo(const std::string& modulePath) {
     // Check if we already have visibility info for this module
     if (moduleRegistry.find(modulePath) != moduleRegistry.end()) {
         return; // Already loaded
@@ -3234,7 +3234,7 @@ void TypeChecker::loadModuleVisibilityInfo(const std::string& modulePath) {
 
 // Core access validation logic methods
 
-bool TypeChecker::validateClassMemberAccess(const std::shared_ptr<AST::MemberExpr>& expr) {
+bool BackendTypeChecker::validateClassMemberAccess(const std::shared_ptr<AST::MemberExpr>& expr) {
     // Check class member access against stored visibility rules using only class-based context
     // Validate access context (same class, subclass) without considering module boundaries
     // Return validation result with error details
@@ -3403,7 +3403,7 @@ bool TypeChecker::validateClassMemberAccess(const std::shared_ptr<AST::MemberExp
     return true;
 }
 
-bool TypeChecker::validateModuleFunctionCall(const std::shared_ptr<AST::CallExpr>& expr) {
+bool BackendTypeChecker::validateModuleFunctionCall(const std::shared_ptr<AST::CallExpr>& expr) {
     // Validate module-level function call access based on function visibility
     
     // Check if this is a direct function call (not a method call)
@@ -3477,7 +3477,7 @@ bool TypeChecker::validateModuleFunctionCall(const std::shared_ptr<AST::CallExpr
     return true;
 }
 
-bool TypeChecker::validateModuleVariableAccess(const std::shared_ptr<AST::VariableExpr>& expr) {
+bool BackendTypeChecker::validateModuleVariableAccess(const std::shared_ptr<AST::VariableExpr>& expr) {
     // Validate module-level variable access based on variable visibility
     
     // Check if this is a local variable (in current scope)

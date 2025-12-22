@@ -57,7 +57,7 @@ private:
     
     // Type checking components
     std::unique_ptr<TypeSystem> typeSystem;
-    std::unique_ptr<TypeChecker> typeChecker;
+    std::unique_ptr<BackendTypeChecker> typeChecker;
     
     // Current task body being processed
     std::shared_ptr<AST::BlockStatement> current_task_body;

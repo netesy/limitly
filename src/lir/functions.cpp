@@ -1,22 +1,40 @@
 #include "functions.hh"
-#include "builtin_functions.hh"
-#include "../backend/value.hh"
-#include <stdexcept>
+#include "lir.hh"
+#include "../backend/types.hh"
 #include <iostream>
 
 namespace LIR {
 
+// Helper function to convert TypeTag to LIR::Type
+Type typeTagToLIRType(TypeTag tag) {
+    switch (tag) {
+        case TypeTag::Int:
+        case TypeTag::Int32:
+            return Type::I32;
+        case TypeTag::Int64:
+            return Type::I64;
+        case TypeTag::Float64:
+            return Type::F64;
+        case TypeTag::Bool:
+            return Type::Bool;
+        case TypeTag::Nil:
+            return Type::Void;
+        default:
+            return Type::I32; // Default to I32 for unknown types
+    }
+}
+
 // LIRFunction implementation
 LIRFunction::LIRFunction(const std::string& name, 
                        const std::vector<LIRParameter>& params,
-                       std::optional<std::shared_ptr<Type>> returnType,
+                       std::optional<Type> returnType,
                        LIRFunctionBody body)
     : name_(name), parameters_(params), returnType_(returnType), body_(body) {
     
     // Create LIR-specific signature
     signature_.name = name_;
     signature_.parameters = params;
-    signature_.returnType = returnType ? returnType.value() : std::make_shared<Type>(TypeTag::Nil);
+    signature_.returnType = returnType;
     signature_.isAsync = false;
 }
 
@@ -111,7 +129,7 @@ size_t LIRFunctionManager::getFunctionIndex(const std::string& name) const {
 std::shared_ptr<LIRFunction> LIRFunctionManager::createFunction(
     const std::string& name,
     const std::vector<LIRParameter>& params,
-    std::optional<std::shared_ptr<Type>> returnType,
+    std::optional<Type> returnType,
     LIRFunctionBody body) {
     
     auto function = std::make_shared<LIRFunction>(name, params, returnType, body);
@@ -129,11 +147,11 @@ std::shared_ptr<LIRFunction> LIRFunctionManager::createArithmeticFunction(
     for (size_t i = 0; i < paramTypes.size(); i++) {
         LIRParameter param;
         param.name = "arg" + std::to_string(i);
-        param.type = std::make_shared<Type>(paramTypes[i]);
+        param.type = typeTagToLIRType(paramTypes[i]);
         params.push_back(param);
     }
     
-    auto return_type = std::make_shared<Type>(returnType);
+    auto return_type = typeTagToLIRType(returnType);
     auto body = [impl](const std::vector<ValuePtr>& args) -> ValuePtr {
         return impl(args);
     };

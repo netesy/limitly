@@ -68,7 +68,7 @@ struct TypeCheckError {
 };
 
 // Compile-time type checker for error handling validation
-class TypeChecker {
+class BackendTypeChecker {
 private:
     TypeSystem& typeSystem;
     SymbolTable symbolTable;
@@ -214,7 +214,7 @@ private:
     void checkNoneConstructor(const std::shared_ptr<AST::CallExpr>& expr);
     
 public:
-    TypeChecker(TypeSystem& ts) : typeSystem(ts), symbolTable() {
+    BackendTypeChecker(TypeSystem& ts) : typeSystem(ts), symbolTable() {
         registerBuiltinFunctions();
     }
     
