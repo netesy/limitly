@@ -67,28 +67,34 @@ This section covers how to build the Limit compiler and run Limit programs.
 ### Building and Running Limit
 
 **Prerequisites:**
-- CMake 3.10 or higher
-- A C++17 compatible compiler
+- A C++17 compatible compiler (like g++)
+- `make`
+- For Windows: MSYS2 with MinGW64 is required.
 
 **Build Instructions:**
 
-You can build the project using CMake, a Windows batch script, or a Unix shell script.
+You can build the project using `make`, a Windows batch script, or a Unix shell script. The recommended method is using `make`.
 
-*   **Using CMake (recommended for cross-platform):**
+*   **Using Make (recommended for cross-platform):**
+    By default, this builds the release version.
     ```bash
-    mkdir build && cd build
-    cmake ..
     make
+    ```
+    To build the debug version:
+    ```bash
+    make debug
     ```
 
 *   **Using Windows Batch (MSYS2/MinGW64):**
+    The script is located in the `docs` directory.
     ```bash
-    build.bat
+    docs\\build.bat
     ```
 
 *   **Using Unix Shell:**
+    The script is located in the `docs` directory.
     ```bash
-    ./build.sh
+    ./docs/build.sh
     ```
 
 **Running the Interpreter:**
@@ -113,6 +119,26 @@ The `limitly` executable is the interpreter for the Limit language. It can be us
 *   **Print the bytecode:**
     ```bash
     ./limitly -bytecode your_script.lm
+    ```
+
+*   **Print the Concrete Syntax Tree (CST):**
+    ```bash
+    ./limitly -cst your_script.lm
+    ```
+
+*   **JIT Compile a source file:**
+    ```bash
+    ./limitly -jit your_script.lm
+    ```
+
+*   **JIT compile and run directly (debug mode):**
+    ```bash
+    ./limitly -jit-debug your_script.lm
+    ```
+
+*   **Execute with debug output enabled:**
+    ```bash
+    ./limitly -debug your_script.lm
     ```
 
 *   **Start the REPL (interactive mode):**
