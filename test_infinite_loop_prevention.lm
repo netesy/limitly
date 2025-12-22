@@ -1,0 +1,12 @@
+// Test instruction count limit to prevent infinite loops
+
+var counter = 0;
+
+// This would normally be an infinite loop, but should be stopped by the instruction limit
+while (true) {
+    counter += 1;
+    print("Counter: " + counter);
+    // This loop will be terminated after MAX_INSTRUCTIONS (1,000,000)
+}
+
+print("This line should never be reached due to instruction limit");

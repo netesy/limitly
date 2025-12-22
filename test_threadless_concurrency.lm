@@ -5,10 +5,10 @@ var shared_counter = 0;  // atomic for primitives, locked for objects
 var counts = channel();
 
 concurrent(ch=counts, mode=batch) {
-    task(i in 1..7) {
+    task(i in 1..5) {
         print("Task {i} running");
         sleep(2000);  // Sleep for 2 seconds
-        shared_counter += 1;
+        shared_counter += 3;
         counts.send(shared_counter);
     }
 }
