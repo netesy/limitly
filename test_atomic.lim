@@ -1,0 +1,2 @@
+var x: atomic = 0;
+print(x);

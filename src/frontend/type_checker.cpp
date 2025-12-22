@@ -329,14 +329,14 @@ TypePtr TypeChecker::check_expression(std::shared_ptr<AST::Expression> expr) {
     
     if (auto literal = std::dynamic_pointer_cast<AST::LiteralExpr>(expr)) {
         type = check_literal_expr(literal);
+    } else if (auto call = std::dynamic_pointer_cast<AST::CallExpr>(expr)) {
+        type = check_call_expr(call);
     } else if (auto variable = std::dynamic_pointer_cast<AST::VariableExpr>(expr)) {
         type = check_variable_expr(variable);
     } else if (auto binary = std::dynamic_pointer_cast<AST::BinaryExpr>(expr)) {
         type = check_binary_expr(binary);
     } else if (auto unary = std::dynamic_pointer_cast<AST::UnaryExpr>(expr)) {
         type = check_unary_expr(unary);
-    } else if (auto call = std::dynamic_pointer_cast<AST::CallExpr>(expr)) {
-        type = check_call_expr(call);
     } else if (auto assign = std::dynamic_pointer_cast<AST::AssignExpr>(expr)) {
         type = check_assign_expr(assign);
     } else if (auto grouping = std::dynamic_pointer_cast<AST::GroupingExpr>(expr)) {
@@ -351,13 +351,16 @@ TypePtr TypeChecker::check_expression(std::shared_ptr<AST::Expression> expr) {
         type = check_tuple_expr(tuple);
     } else if (auto dict = std::dynamic_pointer_cast<AST::DictExpr>(expr)) {
         type = check_dict_expr(dict);
-    } else if (auto interp_string = std::dynamic_pointer_cast<AST::InterpolatedStringExpr>(expr)) {
-        type = check_interpolated_string_expr(interp_string);
+    } else if (auto interpolated = std::dynamic_pointer_cast<AST::InterpolatedStringExpr>(expr)) {
+        type = check_interpolated_string_expr(interpolated);
     } else if (auto lambda = std::dynamic_pointer_cast<AST::LambdaExpr>(expr)) {
         type = check_lambda_expr(lambda);
+    } else {
+        add_error("Unknown expression type", expr->line);
+        type = type_system.STRING_TYPE; // Default fallback
     }
     
-    // Set the inferred type on the expression
+    // Set the inferred type on the expression node
     expr->inferred_type = type;
     
     return type;
@@ -366,15 +369,35 @@ TypePtr TypeChecker::check_expression(std::shared_ptr<AST::Expression> expr) {
 TypePtr TypeChecker::check_literal_expr(std::shared_ptr<AST::LiteralExpr> expr) {
     if (!expr) return nullptr;
     
-    if (std::holds_alternative<bool>(expr->value)) {
+    // Set type based on the literal value
+    if (std::holds_alternative<std::string>(expr->value)) {
+        // Check if it's a numeric string
+        const std::string& str = std::get<std::string>(expr->value);
+        bool is_numeric = !str.empty() && (str[0] == '-' || str[0] == '+' || 
+                          (str[0] >= '0' && str[0] <= '9'));
+        for (size_t i = 1; i < str.size() && is_numeric; i++) {
+            if (str[i] != '.' && !(str[i] >= '0' && str[i] <= '9')) {
+                is_numeric = false;
+            }
+        }
+        
+        if (is_numeric) {
+            expr->inferred_type = type_system.INT64_TYPE;
+            return type_system.INT64_TYPE;
+        } else {
+            expr->inferred_type = type_system.STRING_TYPE;
+            return type_system.STRING_TYPE;
+        }
+    } else if (std::holds_alternative<bool>(expr->value)) {
+        expr->inferred_type = type_system.BOOL_TYPE;
         return type_system.BOOL_TYPE;
     } else if (std::holds_alternative<std::nullptr_t>(expr->value)) {
+        expr->inferred_type = type_system.NIL_TYPE;
         return type_system.NIL_TYPE;
-    } else if (std::holds_alternative<std::string>(expr->value)) {
-        return type_system.STRING_TYPE;
     }
     
-    return type_system.STRING_TYPE; // Default
+    expr->inferred_type = type_system.STRING_TYPE;
+    return type_system.STRING_TYPE;
 }
 
 TypePtr TypeChecker::check_variable_expr(std::shared_ptr<AST::VariableExpr> expr) {
@@ -463,16 +486,13 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<AST::UnaryExpr> expr) {
 TypePtr TypeChecker::check_call_expr(std::shared_ptr<AST::CallExpr> expr) {
     if (!expr) return nullptr;
     
-    // Check callee
-    TypePtr callee_type = check_expression(expr->callee);
-    
-    // Check arguments
+    // Check arguments first
     std::vector<TypePtr> arg_types;
     for (const auto& arg : expr->arguments) {
         arg_types.push_back(check_expression(arg));
     }
     
-    // Check if callee is a function
+    // Check if callee is a function (before checking the callee as an expression)
     if (auto var_expr = std::dynamic_pointer_cast<AST::VariableExpr>(expr->callee)) {
         TypePtr result_type = nullptr;
         if (check_function_call(var_expr->name, arg_types, result_type)) {
@@ -480,6 +500,9 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<AST::CallExpr> expr) {
             return result_type;
         }
     }
+    
+    // If not a known function, check the callee as an expression
+    TypePtr callee_type = check_expression(expr->callee);
     
     add_error("Cannot call non-function value", expr->line);
     return type_system.STRING_TYPE;
@@ -598,12 +621,20 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<AST::TypeAnnotation
     // Simple type resolution based on type name
     if (annotation->typeName == "int") {
         return type_system.INT_TYPE;
+    } else if (annotation->typeName == "i64") {
+        return type_system.INT64_TYPE;
     } else if (annotation->typeName == "float") {
         return type_system.FLOAT64_TYPE;
     } else if (annotation->typeName == "bool") {
         return type_system.BOOL_TYPE;
     } else if (annotation->typeName == "string") {
         return type_system.STRING_TYPE;
+    } else if (annotation->typeName == "atomic") {
+        // atomic is an alias for i64
+        return type_system.INT64_TYPE;
+    } else if (annotation->typeName == "channel") {
+        // channel type is represented as i64 (channel handle)
+        return type_system.INT64_TYPE;
     }
     
     // TODO: Implement more complex type resolution
@@ -707,6 +738,18 @@ TypePtr TypeChecker::promote_numeric_types(TypePtr left, TypePtr right) {
     return get_common_type(left, right);
 }
 
+void TypeChecker::register_builtin_function(const std::string& name, 
+                                            const std::vector<TypePtr>& param_types,
+                                            TypePtr return_type) {
+    FunctionSignature sig;
+    sig.name = name;
+    sig.param_types = param_types;
+    sig.return_type = return_type;
+    sig.declaration = nullptr; // Builtin functions have no declaration
+    
+    function_signatures[name] = sig;
+}
+
 // =============================================================================
 // TYPE CHECKER FACTORY IMPLEMENTATION
 // =============================================================================
@@ -726,7 +769,19 @@ TypeCheckResult check_program(std::shared_ptr<AST::Program> program) {
 }
 
 std::unique_ptr<TypeChecker> create(TypeSystem& type_system) {
-    return std::make_unique<TypeChecker>(type_system);
+    auto checker = std::make_unique<TypeChecker>(type_system);
+    
+    // Register builtin functions
+    register_builtin_functions(*checker);
+    
+    return checker;
+}
+
+void register_builtin_functions(TypeChecker& checker) {
+    // Register channel() function
+    checker.register_builtin_function("channel", {}, checker.get_type_system().INT_TYPE);
+    
+    // Add more builtin functions here as needed
 }
 
 } // namespace TypeCheckerFactory
