@@ -526,7 +526,8 @@ OP_TASK_CONTEXT_INIT:
             // Add a copy to the scheduler, don't move the original
             auto task_copy = std::make_unique<TaskContext>(*task_contexts[context_id]);
             scheduler->add_task(std::move(task_copy));
-            registers[pc->dst] = static_cast<int64_t>(1); // Success
+            // Return the scheduler task index (same as context_id for threadless concurrency)
+            registers[pc->dst] = static_cast<int64_t>(context_id);
         } else {
             registers[pc->dst] = static_cast<int64_t>(0); // Failure
         }
