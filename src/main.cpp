@@ -242,10 +242,25 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             try {
                 register_vm.execute_function(*lir_function);
                 
-                // Get result from register 0 (conventional return register)
-                auto result = register_vm.get_register(0);
-                if (!std::holds_alternative<std::nullptr_t>(result)) {
-                    std::cout << register_vm.to_string(result) << std::endl;
+                // Check if the function has an explicit return statement
+                // For scripts, we only print the return value if there's an explicit return
+                bool should_print_result = false;
+                if (!lir_function->instructions.empty()) {
+                    // Look for a Return instruction (explicit return)
+                    // Ret instruction is used for implicit returns
+                    for (const auto& inst : lir_function->instructions) {
+                        if (inst.op == LIR::LIR_Op::Return) {
+                            should_print_result = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if (should_print_result) {
+                    auto result = register_vm.get_register(0);
+                    if (!std::holds_alternative<std::nullptr_t>(result)) {
+                        std::cout << register_vm.to_string(result) << std::endl;
+                    }
                 }
             } catch (const std::exception& e) {
                 std::cerr << "Error: " << e.what() << std::endl;

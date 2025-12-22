@@ -682,13 +682,6 @@ OP_SCHEDULER_RUN:
         // Execute tasks based on their context setup from LIR
         for (auto& task : scheduler->tasks) {
             if (task->state == TaskState::INIT || task->state == TaskState::RUNNING) {
-                // Execute the task based on its context
-                // The LIR has set up the task context with:
-                // - field 0: task_id
-                // - field 1: loop_var  
-                // - field 2: channel
-                // - field 3: counter
-                
                 // Print task info
                 std::cout << "Task " << task->task_id << " running" << std::endl;
                 

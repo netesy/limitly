@@ -55,7 +55,7 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const TypeCheckResult&
     
     // Add implicit return if none exists
     if (cfg_context_.building_cfg && get_current_block() && !get_current_block()->has_terminator()) {
-        emit_instruction(LIR_Inst(LIR_Op::Return));
+        emit_instruction(LIR_Inst(LIR_Op::Ret));
     }
 
     // Finish CFG building for main (only if CFG was used)
@@ -251,19 +251,19 @@ ValuePtr Generator::get_register_value(Reg reg) {
     // If no stored value, try to create one from the type
     TypePtr type = get_register_type(reg);
     if (type) {
-        if (type->tag == TypeTag::Int) {
+        if (type->tag == ::TypeTag::Int) {
             return std::make_shared<Value>(type, static_cast<int64_t>(0));
-        } else if (type->tag == TypeTag::Float32) {
+        } else if (type->tag == ::TypeTag::Float32) {
             return std::make_shared<Value>(type, 0.0);
-        } else if (type->tag == TypeTag::Bool) {
+        } else if (type->tag == ::TypeTag::Bool) {
             return std::make_shared<Value>(type, false);
-        } else if (type->tag == TypeTag::String) {
+        } else if (type->tag == ::TypeTag::String) {
             return std::make_shared<Value>(type, std::string(""));
         }
     }
     
     // Fallback: return an int value
-    auto int_type = std::make_shared<::Type>(TypeTag::Int);
+    auto int_type = std::make_shared<::Type>(::TypeTag::Int);
     return std::make_shared<Value>(int_type, static_cast<int64_t>(0));
 }
 
@@ -412,23 +412,23 @@ Reg Generator::emit_expr(AST::Expression& expr) {
 TypePtr Generator::get_promoted_numeric_type(TypePtr left_type, TypePtr right_type) {
     // If either type is null, default to Int64
     if (!left_type || !right_type) {
-        return std::make_shared<::Type>(TypeTag::Int64);
+        return std::make_shared<::Type>(::TypeTag::Int64);
     }
     
     // If either is string, result is string
-    if (left_type->tag == TypeTag::String || right_type->tag == TypeTag::String) {
-        return std::make_shared<::Type>(TypeTag::String);
+    if (left_type->tag == ::TypeTag::String || right_type->tag == ::TypeTag::String) {
+        return std::make_shared<::Type>(::TypeTag::String);
     }
     
     // If either is float, promote to the larger float type
-    bool left_is_float = (left_type->tag == TypeTag::Float32 || left_type->tag == TypeTag::Float64);
-    bool right_is_float = (right_type->tag == TypeTag::Float32 || right_type->tag == TypeTag::Float64);
+    bool left_is_float = (left_type->tag == ::TypeTag::Float32 || left_type->tag == ::TypeTag::Float64);
+    bool right_is_float = (right_type->tag == ::TypeTag::Float32 || right_type->tag == ::TypeTag::Float64);
     
     if (left_is_float || right_is_float) {
-        if (left_type->tag == TypeTag::Float64 || right_type->tag == TypeTag::Float64) {
-            return std::make_shared<::Type>(TypeTag::Float64);
+        if (left_type->tag == ::TypeTag::Float64 || right_type->tag == ::TypeTag::Float64) {
+            return std::make_shared<::Type>(::TypeTag::Float64);
         }
-        return std::make_shared<::Type>(TypeTag::Float32);
+        return std::make_shared<::Type>(::TypeTag::Float32);
     }
     
     // Both are integers - use the "smaller matches larger" strategy
@@ -468,39 +468,39 @@ int Generator::get_type_rank(TypePtr type) {
     if (!type) return 0;
     
     switch (type->tag) {
-        case TypeTag::Int8: case TypeTag::UInt8: return 1;
-        case TypeTag::Int16: case TypeTag::UInt16: return 2;
-        case TypeTag::Int32: case TypeTag::UInt32: return 3;
-        case TypeTag::Int: case TypeTag::UInt: case TypeTag::Int64: case TypeTag::UInt64: return 4;
-        case TypeTag::Int128: case TypeTag::UInt128: return 5;
-        case TypeTag::Float32: return 6;
-        case TypeTag::Float64: return 7;
-        case TypeTag::String: return 8;
-        case TypeTag::Bool: return 0;
+        case ::TypeTag::Int8: case ::TypeTag::UInt8: return 1;
+        case ::TypeTag::Int16: case ::TypeTag::UInt16: return 2;
+        case ::TypeTag::Int32: case ::TypeTag::UInt32: return 3;
+        case ::TypeTag::Int: case ::TypeTag::UInt: case ::TypeTag::Int64: case ::TypeTag::UInt64: return 4;
+        case ::TypeTag::Int128: case ::TypeTag::UInt128: return 5;
+        case ::TypeTag::Float32: return 6;
+        case ::TypeTag::Float64: return 7;
+        case ::TypeTag::String: return 8;
+        case ::TypeTag::Bool: return 0;
         default: return 0;
     }
 }
 
 bool Generator::is_signed_integer_type(TypePtr type) {
     if (!type) return false;
-    return (type->tag == TypeTag::Int || type->tag == TypeTag::Int8 || 
-            type->tag == TypeTag::Int16 || type->tag == TypeTag::Int32 || 
-            type->tag == TypeTag::Int64 || type->tag == TypeTag::Int128);
+    return (type->tag == ::TypeTag::Int || type->tag == ::TypeTag::Int8 || 
+            type->tag == ::TypeTag::Int16 || type->tag == ::TypeTag::Int32 || 
+            type->tag == ::TypeTag::Int64 || type->tag == ::TypeTag::Int128);
 }
 
 TypePtr Generator::get_wider_integer_type(TypePtr left_type, TypePtr right_type) {
     if (!left_type || !right_type) {
-        return std::make_shared<::Type>(TypeTag::Int64);
+        return std::make_shared<::Type>(::TypeTag::Int64);
     }
     
     // Define type precedence (from narrowest to widest)
     std::map<TypeTag, int> type_rank = {
-        {TypeTag::Int8, 1}, {TypeTag::UInt8, 1},
-        {TypeTag::Int16, 2}, {TypeTag::UInt16, 2},
-        {TypeTag::Int32, 3}, {TypeTag::UInt32, 3},
-        {TypeTag::Int, 4}, {TypeTag::UInt, 4},
-        {TypeTag::Int64, 5}, {TypeTag::UInt64, 5},
-        {TypeTag::Int128, 6}, {TypeTag::UInt128, 6}
+        {::TypeTag::Int8, 1}, {::TypeTag::UInt8, 1},
+        {::TypeTag::Int16, 2}, {::TypeTag::UInt16, 2},
+        {::TypeTag::Int32, 3}, {::TypeTag::UInt32, 3},
+        {::TypeTag::Int, 4}, {::TypeTag::UInt, 4},
+        {::TypeTag::Int64, 5}, {::TypeTag::UInt64, 5},
+        {::TypeTag::Int128, 6}, {::TypeTag::UInt128, 6}
     };
     
     int left_rank = type_rank[left_type->tag];
@@ -514,22 +514,22 @@ TypePtr Generator::get_wider_integer_type(TypePtr left_type, TypePtr right_type)
 }
 
 TypePtr Generator::get_unsigned_version(TypePtr type) {
-    if (!type) return std::make_shared<::Type>(TypeTag::UInt64);
+    if (!type) return std::make_shared<::Type>(::TypeTag::UInt64);
     
     switch (type->tag) {
-        case TypeTag::Int8: return std::make_shared<::Type>(TypeTag::UInt8);
-        case TypeTag::Int16: return std::make_shared<::Type>(TypeTag::UInt16);
-        case TypeTag::Int32: return std::make_shared<::Type>(TypeTag::UInt32);
-        case TypeTag::Int: 
-        case TypeTag::Int64: return std::make_shared<::Type>(TypeTag::UInt64);
-        case TypeTag::Int128: return std::make_shared<::Type>(TypeTag::UInt128);
-        case TypeTag::UInt8: 
-        case TypeTag::UInt16: 
-        case TypeTag::UInt32: 
-        case TypeTag::UInt: 
-        case TypeTag::UInt64: 
-        case TypeTag::UInt128: return type; // Already unsigned
-        default: return std::make_shared<::Type>(TypeTag::UInt64);
+        case ::TypeTag::Int8: return std::make_shared<::Type>(::TypeTag::UInt8);
+        case ::TypeTag::Int16: return std::make_shared<::Type>(::TypeTag::UInt16);
+        case ::TypeTag::Int32: return std::make_shared<::Type>(::TypeTag::UInt32);
+        case ::TypeTag::Int: 
+        case ::TypeTag::Int64: return std::make_shared<::Type>(::TypeTag::UInt64);
+        case ::TypeTag::Int128: return std::make_shared<::Type>(::TypeTag::UInt128);
+        case ::TypeTag::UInt8: 
+        case ::TypeTag::UInt16: 
+        case ::TypeTag::UInt32: 
+        case ::TypeTag::UInt: 
+        case ::TypeTag::UInt64: 
+        case ::TypeTag::UInt128: return type; // Already unsigned
+        default: return std::make_shared<::Type>(::TypeTag::UInt64);
     }
 }
 
@@ -547,15 +547,15 @@ TypePtr Generator::get_best_integer_type(const std::string& value_str, bool pref
         if (prefer_signed) {
             // For signed integers, check if it fits in various ranges
             if (ull_val <= static_cast<unsigned long long>(std::numeric_limits<int8_t>::max())) {
-                return std::make_shared<::Type>(TypeTag::Int8);
+                return std::make_shared<::Type>(::TypeTag::Int8);
             } else if (ull_val <= static_cast<unsigned long long>(std::numeric_limits<int16_t>::max())) {
-                return std::make_shared<::Type>(TypeTag::Int16);
+                return std::make_shared<::Type>(::TypeTag::Int16);
             } else if (ull_val <= static_cast<unsigned long long>(std::numeric_limits<int32_t>::max())) {
-                return std::make_shared<::Type>(TypeTag::Int32);
+                return std::make_shared<::Type>(::TypeTag::Int32);
             } else if (ull_val <= static_cast<unsigned long long>(std::numeric_limits<int64_t>::max())) {
-                return std::make_shared<::Type>(TypeTag::Int64);
+                return std::make_shared<::Type>(::TypeTag::Int64);
             } else if (has_int128) {
-                return std::make_shared<::Type>(TypeTag::Int128);
+                return std::make_shared<::Type>(::TypeTag::Int128);
             } else {
                 // Fallback to unsigned if too large for signed
                 return get_best_integer_type(value_str, false);
@@ -563,23 +563,23 @@ TypePtr Generator::get_best_integer_type(const std::string& value_str, bool pref
         } else {
             // For unsigned integers
             if (ull_val <= static_cast<unsigned long long>(std::numeric_limits<uint8_t>::max())) {
-                return std::make_shared<::Type>(TypeTag::UInt8);
+                return std::make_shared<::Type>(::TypeTag::UInt8);
             } else if (ull_val <= static_cast<unsigned long long>(std::numeric_limits<uint16_t>::max())) {
-                return std::make_shared<::Type>(TypeTag::UInt16);
+                return std::make_shared<::Type>(::TypeTag::UInt16);
             } else if (ull_val <= static_cast<unsigned long long>(std::numeric_limits<uint32_t>::max())) {
-                return std::make_shared<::Type>(TypeTag::UInt32);
+                return std::make_shared<::Type>(::TypeTag::UInt32);
             } else if (ull_val <= static_cast<unsigned long long>(std::numeric_limits<uint64_t>::max())) {
-                return std::make_shared<::Type>(TypeTag::UInt64);
+                return std::make_shared<::Type>(::TypeTag::UInt64);
             } else if (has_int128) {
-                return std::make_shared<::Type>(TypeTag::UInt128);
+                return std::make_shared<::Type>(::TypeTag::UInt128);
             } else {
                 // If no 128-bit support, this is an overflow situation
-                return std::make_shared<::Type>(TypeTag::UInt64);
+                return std::make_shared<::Type>(::TypeTag::UInt64);
             }
         }
     } catch (const std::exception&) {
         // If parsing fails, default to Int64
-        return std::make_shared<::Type>(TypeTag::Int64);
+        return std::make_shared<::Type>(::TypeTag::Int64);
     }
 }
 
@@ -650,13 +650,13 @@ Reg Generator::emit_literal_expr(AST::LiteralExpr& expr, TypePtr expected_type) 
         if (isNumeric) {
             if (isFloat) {
                 // Create float value
-                auto float_type = expected_type ? expected_type : std::make_shared<::Type>(TypeTag::Float64);
+                auto float_type = expected_type ? expected_type : std::make_shared<::Type>(::TypeTag::Float64);
                 try {
                     double floatVal = std::stod(stringValue);
                     const_val = std::make_shared<Value>(float_type, floatVal);
                 } catch (const std::exception&) {
                     // If parsing fails, treat as string
-                    auto string_type = std::make_shared<::Type>(TypeTag::String);
+                    auto string_type = std::make_shared<::Type>(::TypeTag::String);
                     const_val = std::make_shared<Value>(string_type, stringValue);
                     current_function_->instructions.back().const_val->type = string_type;
                 }
@@ -671,7 +671,7 @@ Reg Generator::emit_literal_expr(AST::LiteralExpr& expr, TypePtr expected_type) 
                         int64_t test_val = std::stoll(stringValue);
                         // If it fits in int64 and is a small number, use Int64
                         if (test_val >= 0 && test_val <= 1000000) {
-                            int_type = std::make_shared<::Type>(TypeTag::Int64);
+                            int_type = std::make_shared<::Type>(::TypeTag::Int64);
                         } else {
                             // For larger values, use automatic type selection
                             int_type = get_best_integer_type(stringValue, true);
@@ -692,7 +692,7 @@ Reg Generator::emit_literal_expr(AST::LiteralExpr& expr, TypePtr expected_type) 
                         const_val = std::make_shared<Value>(int_type, uintVal);
                     } catch (const std::exception&) {
                         // If parsing fails, treat as string
-                        auto string_type = std::make_shared<::Type>(TypeTag::String);
+                        auto string_type = std::make_shared<::Type>(::TypeTag::String);
                         const_val = std::make_shared<Value>(string_type, stringValue);
                         current_function_->instructions.back().const_val->type = string_type;
                     }
@@ -700,35 +700,160 @@ Reg Generator::emit_literal_expr(AST::LiteralExpr& expr, TypePtr expected_type) 
             }
         } else {
             // String value (already parsed, quotes removed by parser)
-            auto string_type = std::make_shared<::Type>(TypeTag::String);
+            auto string_type = std::make_shared<::Type>(::TypeTag::String);
             const_val = std::make_shared<Value>(string_type, stringValue);
         }
     } else if (std::holds_alternative<bool>(expr.value)) {
         // Create boolean value
-        auto bool_type = std::make_shared<::Type>(TypeTag::Bool);
+        auto bool_type = std::make_shared<::Type>(::TypeTag::Bool);
         bool boolVal = std::get<bool>(expr.value);
         const_val = std::make_shared<Value>(bool_type, boolVal);
     } else if (std::holds_alternative<std::nullptr_t>(expr.value)) {
         // Create nil value
-        auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
+        auto nil_type = std::make_shared<::Type>(::TypeTag::Nil);
         const_val = std::make_shared<Value>(nil_type, std::string("nil"));
     } else {
         // Default to nil
-        auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
+        auto nil_type = std::make_shared<::Type>(::TypeTag::Nil);
         const_val = std::make_shared<Value>(nil_type, "");
     }
     
     // Set type BEFORE emitting so it's available during emit_instruction
     set_register_type(dst, const_val ? const_val->type : nullptr);
-    
-    // Convert the TypePtr to ABI Type for the instruction
-    Type abi_type = Type::Void;
-    if (const_val && const_val->type) {
-        abi_type = language_type_to_abi_type(expr.inferred_type);
-    }
-    
+    Type abi_type = const_val ? language_type_to_abi_type(const_val->type) : Type::Void;
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, abi_type, dst, const_val));
     return dst;
+}
+
+Reg Generator::emit_variable_expr(AST::VariableExpr& expr) {
+    // First check if this is a module variable access (e.g., "math.pi")
+    size_t dot_pos = expr.name.find("::");
+    if (dot_pos != std::string::npos) {
+        std::string module_name = expr.name.substr(0, dot_pos);
+        std::string symbol_name = expr.name.substr(dot_pos + 2);
+        
+        // Check for alias mapping
+        auto alias_it = import_aliases_.find(module_name);
+        if (alias_it != import_aliases_.end()) {
+            module_name = alias_it->second;
+        }
+        
+        // Resolve module symbol
+        std::string qualified_name = module_name + "::" + symbol_name;
+        ModuleSymbolInfo* symbol = resolve_module_symbol(qualified_name);
+        if (symbol && symbol->is_variable) {
+            if (!can_access_module_symbol(*symbol, current_module_)) {
+                report_error("Cannot access private/protected variable: " + qualified_name);
+                return 0;
+            }
+            
+            // For now, return a placeholder - in a full implementation,
+            // we'd need to load the actual module variable value
+            Reg result = allocate_register();
+            auto var_type = std::make_shared<::Type>(::TypeTag::Any);
+            set_register_language_type(result, var_type);
+            set_register_abi_type(result, language_type_to_abi_type(var_type));
+            return result;
+        }
+    }
+    
+    // Check regular variable scope
+    Reg reg = resolve_variable(expr.name);
+    if (reg == UINT32_MAX) {
+        report_error("Undefined variable: " + expr.name);
+        return 0;
+    }
+    
+    // Set the type information for the register if available
+    if (expr.inferred_type) {
+        set_register_type(reg, expr.inferred_type);
+        set_register_language_type(reg, expr.inferred_type);
+        set_register_abi_type(reg, language_type_to_abi_type(expr.inferred_type));
+    } else {
+        // Set a default type if no inference is available
+        auto any_type = std::make_shared<::Type>(::TypeTag::Any);
+        set_register_type(reg, any_type);
+    }
+    
+    return reg;
+}
+
+Reg Generator::emit_interpolated_string_expr(AST::InterpolatedStringExpr& expr) {
+    auto string_type = std::make_shared<::Type>(::TypeTag::String);
+
+    if (expr.parts.empty()) {
+        Reg result = allocate_register();
+        ValuePtr result_val = std::make_shared<Value>(string_type, std::string(""));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, result, result_val));
+        set_register_type(result, string_type);
+        return result;
+    }
+
+    // Check for constant folding opportunity
+    bool all_parts_are_string_literals = true;
+    std::string folded_result = "";
+    
+    for (const auto& part : expr.parts) {
+        if (std::holds_alternative<std::string>(part)) {
+            folded_result += std::get<std::string>(part);
+        } else {
+            all_parts_are_string_literals = false;
+            break;
+        }
+    }
+    
+    // Constant folding: if all parts are string literals, fold them
+    if (all_parts_are_string_literals) {
+        Reg result = allocate_register();
+        ValuePtr result_val = std::make_shared<Value>(string_type, folded_result);
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, result, result_val));
+        set_register_type(result, string_type);
+        return result;
+    }
+
+    // For complex interpolations, use STR_FORMAT
+    // Build format string and collect argument registers
+    std::string format_string = "";
+    std::vector<Reg> arg_regs;
+    
+    for (const auto& part : expr.parts) {
+        if (std::holds_alternative<std::string>(part)) {
+            format_string += std::get<std::string>(part);
+        } else if (std::holds_alternative<std::shared_ptr<AST::Expression>>(part)) {
+            format_string += "%s"; // Simple placeholder for now
+            auto expr_part = std::get<std::shared_ptr<AST::Expression>>(part);
+            Reg expr_reg = emit_expr(*expr_part);
+            arg_regs.push_back(expr_reg);
+        }
+    }
+    
+    // Emit STR_FORMAT instruction
+    Reg result = allocate_register();
+    Reg format_reg = allocate_register();
+    ValuePtr format_val = std::make_shared<Value>(string_type, format_string);
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, format_reg, format_val));
+    
+    // Handle multiple arguments by chaining STR_FORMAT calls
+    Reg current_result = format_reg;
+    for (size_t i = 0; i < arg_regs.size(); i++) {
+        if (i == 0) {
+            // First argument: format with first arg
+            emit_instruction(LIR_Inst(LIR_Op::STR_FORMAT, result, format_reg, arg_regs[i]));
+            current_result = result;
+        } else {
+            // Subsequent arguments: format previous result with next arg
+            Reg temp_result = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::STR_FORMAT, temp_result, current_result, arg_regs[i]));
+            current_result = temp_result;
+            if (i == arg_regs.size() - 1) {
+                // Final result is in temp_result, move to result register
+                emit_instruction(LIR_Inst(LIR_Op::Mov, result, temp_result, 0));
+            }
+        }
+    }
+    
+    set_register_type(result, string_type);
+    return result;
 }
 
 Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
@@ -765,7 +890,7 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
             Reg left_reg = resolve_variable(left_var->name);
             if (left_reg != UINT32_MAX) {
                 TypePtr left_type = get_register_type(left_reg);
-                if (left_type && left_type->tag == TypeTag::String) {
+                if (left_type && left_type->tag == ::TypeTag::String) {
                     left_is_string = true;
                 }
             }
@@ -797,7 +922,7 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
             Reg right_reg = resolve_variable(right_var->name);
             if (right_reg != UINT32_MAX) {
                 TypePtr right_type = get_register_type(right_reg);
-                if (right_type && right_type->tag == TypeTag::String) {
+                if (right_type && right_type->tag == ::TypeTag::String) {
                     right_is_string = true;
                 }
             }
@@ -814,7 +939,7 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
             emit_instruction(LIR_Inst(LIR_Op::STR_CONCAT, abi_type, dst, left, right));
             
             // Set result type as string
-            auto string_type = std::make_shared<::Type>(TypeTag::String);
+            auto string_type = std::make_shared<::Type>(::TypeTag::String);
             set_register_type(dst, string_type);
             return dst;
         }
@@ -860,12 +985,12 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
     // For arithmetic operations, determine result type
     if (op == LIR_Op::Add || op == LIR_Op::Sub || op == LIR_Op::Mul || op == LIR_Op::Div || op == LIR_Op::Mod) {
         // If either operand is float, result is float
-        if ((left_type && left_type->tag == TypeTag::Float64) || 
-            (right_type && right_type->tag == TypeTag::Float64)) {
-            result_type = std::make_shared<::Type>(TypeTag::Float64);
-        } else if ((left_type && left_type->tag == TypeTag::Float32) || 
-                   (right_type && right_type->tag == TypeTag::Float32)) {
-            result_type = std::make_shared<::Type>(TypeTag::Float32);
+        if ((left_type && left_type->tag == ::TypeTag::Float64) || 
+            (right_type && right_type->tag == ::TypeTag::Float64)) {
+            result_type = std::make_shared<::Type>(::TypeTag::Float64);
+        } else if ((left_type && left_type->tag == ::TypeTag::Float32) || 
+                   (right_type && right_type->tag == ::TypeTag::Float32)) {
+            result_type = std::make_shared<::Type>(::TypeTag::Float32);
         } else {
             // For integer operations, preserve signedness and promote to wider type
             result_type = get_promoted_numeric_type(left_type, right_type);
@@ -912,10 +1037,10 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
     } else if (op == LIR_Op::CmpEQ || op == LIR_Op::CmpNEQ || op == LIR_Op::CmpLT || 
                op == LIR_Op::CmpLE || op == LIR_Op::CmpGT || op == LIR_Op::CmpGE) {
         // Comparison operations return bool
-        result_type = std::make_shared<::Type>(TypeTag::Bool);
+        result_type = std::make_shared<::Type>(::TypeTag::Bool);
     } else if (op == LIR_Op::And || op == LIR_Op::Or) {
         // Logical operations return bool
-        result_type = std::make_shared<::Type>(TypeTag::Bool);
+        result_type = std::make_shared<::Type>(::TypeTag::Bool);
     } else if (op == LIR_Op::Xor) {
         // Bitwise XOR should preserve integer types like arithmetic operations
         result_type = get_promoted_numeric_type(left_type, right_type);
@@ -926,15 +1051,237 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
         set_register_type(dst, result_type);
     }
     
-    // Convert the TypePtr to ABI Type for the instruction
-    Type abi_type = Type::Void;
-    if (result_type) {
-        abi_type = language_type_to_abi_type(expr.inferred_type);
-    }
-    
-    emit_instruction(LIR_Inst(op, abi_type, dst, left, right));
+    emit_instruction(LIR_Inst(op, dst, left, right));
     
     return dst;
+}
+
+Reg Generator::emit_unary_expr(AST::UnaryExpr& expr) {
+    Reg operand = emit_expr(*expr.right);
+    Reg dst = allocate_register();
+    TypePtr operand_type = get_register_type(operand);
+    TypePtr result_type = nullptr;
+    
+    if (expr.op == TokenType::MINUS) {
+        // Result type is same as operand type
+        result_type = operand_type;
+        set_register_type(dst, result_type);
+        // Use Neg operation for unary minus (more efficient than Sub from 0)
+        emit_instruction(LIR_Inst(LIR_Op::Neg, dst, operand, 0));
+    } else if (expr.op == TokenType::PLUS) {
+        // Result type is same as operand type
+        result_type = operand_type;
+        set_register_type(dst, result_type);
+        // Unary plus - just copy the value (no operation needed)
+        emit_instruction(LIR_Inst(LIR_Op::Mov, dst, operand, 0));
+    } else if (expr.op == TokenType::BANG) {
+        // Result type is bool
+        result_type = std::make_shared<::Type>(::TypeTag::Bool);
+        set_register_type(dst, result_type);
+        // Logical NOT - compare with true and negate (operand != true gives us !operand)
+        Reg true_reg = allocate_register();
+        auto bool_type = std::make_shared<::Type>(::TypeTag::Bool);
+        ValuePtr true_val = std::make_shared<Value>(bool_type, true);
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Bool, true_reg, true_val));
+        set_register_type(true_reg, bool_type);
+        emit_instruction(LIR_Inst(LIR_Op::CmpNEQ, dst, operand, true_reg));
+    } else if (expr.op == TokenType::TILDE) {
+        // Result type is int
+        auto int_type = std::make_shared<::Type>(::TypeTag::Int);
+        result_type = int_type;
+        set_register_type(dst, result_type);
+        // Bitwise NOT - XOR with all bits set (for 64-bit: -1)
+        Reg all_bits = allocate_register();
+        ValuePtr neg_one_val = std::make_shared<Value>(int_type, static_cast<int64_t>(-1));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, all_bits, neg_one_val));
+        set_register_type(all_bits, int_type);
+        emit_instruction(LIR_Inst(LIR_Op::Xor, dst, operand, all_bits));
+    } else {
+        report_error("Unknown unary operator");
+        return 0;
+    }
+    
+    return dst;
+}
+
+Reg Generator::emit_call_expr(AST::CallExpr& expr) {
+    // Generate proper Call instruction with function ID
+    // The JIT will resolve and call the function at runtime
+    
+    if (auto var_expr = dynamic_cast<AST::VariableExpr*>(expr.callee.get())) {
+        std::string func_name = var_expr->name;
+        
+        // Check if this is a module function call (e.g., "math.add")
+        size_t dot_pos = func_name.find("::");
+        if (dot_pos != std::string::npos) {
+            std::string module_name = func_name.substr(0, dot_pos);
+            std::string symbol_name = func_name.substr(dot_pos + 2);
+            
+            // Check for alias mapping
+            auto alias_it = import_aliases_.find(module_name);
+            if (alias_it != import_aliases_.end()) {
+                module_name = alias_it->second;
+            }
+            
+            // Resolve module symbol
+            std::string qualified_name = module_name + "::" + symbol_name;
+            ModuleSymbolInfo* symbol = resolve_module_symbol(qualified_name);
+            if (symbol && symbol->is_function) {
+                if (!can_access_module_symbol(*symbol, current_module_)) {
+                    report_error("Cannot access private/protected function: " + qualified_name);
+                    return 0;
+                }
+                
+                std::cout << "[DEBUG] LIR Generator: Generating module function call to '" << qualified_name << "'" << std::endl;
+                
+                // Evaluate arguments and store them in registers
+                std::vector<Reg> arg_regs;
+                for (const auto& arg : expr.arguments) {
+                    Reg arg_reg = emit_expr(*arg);
+                    arg_regs.push_back(arg_reg);
+                }
+                
+                // Allocate result register
+                Reg result = allocate_register();
+                
+                // Set the result type if available from type checking
+                if (expr.inferred_type) {
+                    set_register_language_type(result, expr.inferred_type);
+                    set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
+                } else {
+                    auto any_type = std::make_shared<::Type>(::TypeTag::Any);
+                    set_register_language_type(result, any_type);
+                    set_register_abi_type(result, language_type_to_abi_type(any_type));
+                }
+                
+                // Generate module function call
+                emit_instruction(LIR_Inst(LIR_Op::Call, result, static_cast<Reg>(arg_regs.size()), static_cast<Reg>(0)));
+                
+                return result;
+            }
+        }
+        
+        if (BuiltinUtils::isBuiltinFunction(func_name)) {
+            std::cout << "[DEBUG] LIR Generator: Generating builtin call to '" << func_name << "'" << std::endl;
+            
+            // Evaluate arguments and store them in registers
+            std::vector<Reg> arg_regs;
+            for (const auto& arg : expr.arguments) {
+                Reg arg_reg = emit_expr(*arg);
+                arg_regs.push_back(arg_reg);
+            }
+            
+            // Allocate result register
+            Reg result = allocate_register();
+            
+            // Set the result type if available from type checking
+            if (expr.inferred_type) {
+                set_register_language_type(result, expr.inferred_type);
+                set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
+            } else {
+                auto any_type = std::make_shared<::Type>(::TypeTag::Any);
+                set_register_language_type(result, any_type);
+                set_register_abi_type(result, language_type_to_abi_type(any_type));
+            }
+            
+            // Generate builtin call instruction with function ID
+            // For now, use a special ID for builtins (negative numbers)
+            int32_t builtin_id = -1; // Will be resolved by function name
+            emit_instruction(LIR_Inst(LIR_Op::Call, result, static_cast<Reg>(arg_regs.size()), static_cast<Reg>(builtin_id)));
+            
+            return result;
+            
+        } else if (function_table_.find(func_name) != function_table_.end()) {
+            std::cout << "[DEBUG] LIR Generator: Generating call to user function '" << func_name << "'" << std::endl;
+            
+            // Evaluate arguments and store them in registers
+            std::vector<Reg> arg_regs;
+            for (const auto& arg : expr.arguments) {
+                Reg arg_reg = emit_expr(*arg);
+                arg_regs.push_back(arg_reg);
+            }
+            
+            // Allocate result register
+            Reg result = allocate_register();
+            
+            // Set the result type if available from type checking
+            if (expr.inferred_type) {
+                set_register_language_type(result, expr.inferred_type);
+                set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
+            } else {
+                auto any_type = std::make_shared<::Type>(::TypeTag::Any);
+                set_register_language_type(result, any_type);
+                set_register_abi_type(result, language_type_to_abi_type(any_type));
+            }
+            
+            // Generate call instruction - function will be resolved by JIT
+            emit_instruction(LIR_Inst(LIR_Op::Call, result, static_cast<Reg>(arg_regs.size()), static_cast<Reg>(0)));
+            
+            return result;
+            
+        } else {
+            report_error("Unknown function: " + func_name);
+            return 0;
+        }
+    } else if (auto member_expr = dynamic_cast<AST::MemberExpr*>(expr.callee.get())) {
+        // Method call: obj.method(args...)
+        std::string method_name = member_expr->name;
+        
+        // Evaluate the object (this will be the first argument)
+        Reg object_reg = emit_expr(*member_expr->object);
+        
+        // Try to find the method in any class
+        for (const auto& [class_name, class_info] : class_table_) {
+            auto method_it = class_info.method_indices.find(method_name);
+            if (method_it != class_info.method_indices.end()) {
+                // Found the method - generate method call
+                std::vector<Reg> arg_regs;
+                arg_regs.push_back(object_reg); // 'this' is first parameter
+                
+                // Evaluate other arguments
+                for (const auto& arg : expr.arguments) {
+                    Reg arg_reg = emit_expr(*arg);
+                    arg_regs.push_back(arg_reg);
+                }
+                
+                // Allocate result register
+                Reg result = allocate_register();
+                
+                // Generate method call using V-Table dispatch
+                // For now, we'll use a simple approach - in a full implementation,
+                // we'd load the V-Table and do dynamic dispatch
+                std::string full_method_name = class_name + "." + method_name;
+                if (function_table_.find(full_method_name) != function_table_.end()) {
+                    emit_instruction(LIR_Inst(LIR_Op::Call, result, static_cast<Reg>(arg_regs.size()), static_cast<Reg>(0)));
+                    set_register_type(result, std::make_shared<::Type>(::TypeTag::Any));
+                    return result;
+                }
+            }
+        }
+        
+        // Check for special channel methods
+        if (method_name == "send") {
+            if (expr.arguments.size() != 1) {
+                report_error("channel.send() requires exactly one argument");
+                return 0;
+            }
+            
+            // Evaluate the value to send
+            Reg value_reg = emit_expr(*expr.arguments[0]);
+            
+            // Generate ChannelPush instruction
+            Reg result = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::ChannelPush, result, object_reg, value_reg));
+            set_register_type(result, std::make_shared<::Type>(::TypeTag::Int));
+            return result;
+        }
+        
+        report_error("Unknown method: " + method_name);
+        return 0;
+    } else {
+        report_error("Complex function calls not yet supported in LIR");
+        return 0;
+    }
 }
 
 Reg Generator::emit_assign_expr(AST::AssignExpr& expr) {
@@ -988,38 +1335,6 @@ Reg Generator::emit_assign_expr(AST::AssignExpr& expr) {
     }
 }
 
-Reg Generator::emit_call_expr(AST::CallExpr& expr) {
-    // Evaluate callee
-    Reg callee_reg = emit_expr(*expr.callee);
-    
-    // Evaluate arguments
-    std::vector<Reg> arg_regs;
-    for (const auto& arg : expr.arguments) {
-        arg_regs.push_back(emit_expr(*arg));
-    }
-    
-    // Create result register
-    Reg result = allocate_register();
-    
-    // For now, emit a generic call instruction
-    // TODO: Implement proper function resolution and calling
-    Type abi_type = Type::Void;
-    if (expr.inferred_type) {
-        abi_type = language_type_to_abi_type(expr.inferred_type);
-    }
-    
-    emit_instruction(LIR_Inst(LIR_Op::Call, abi_type, result, callee_reg, 0));
-    
-    // Set register type based on inference
-    if (expr.inferred_type) {
-        set_register_type(result, expr.inferred_type);
-    } else {
-        set_register_type(result, std::make_shared<::Type>(TypeTag::Any));
-    }
-    
-    return result;
-}
-
 Reg Generator::emit_call_closure_expr(AST::CallClosureExpr& expr) {
     // Handle closure calls - calling a function stored in a variable
     // This enables first-order functions and closures
@@ -1057,7 +1372,7 @@ Reg Generator::emit_call_closure_expr(AST::CallClosureExpr& expr) {
     if (expr.inferred_type) {
         set_register_type(result, expr.inferred_type);
     } else {
-        set_register_type(result, std::make_shared<::Type>(TypeTag::Int));
+        set_register_type(result, std::make_shared<::Type>(::TypeTag::Int));
     }
     
     return result;
@@ -1069,7 +1384,7 @@ Reg Generator::emit_list_expr(AST::ListExpr& expr) {
     Reg list_reg = allocate_register();
     
     // Create a nil/empty list for now
-    auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
+    auto nil_type = std::make_shared<::Type>(::TypeTag::Nil);
     ValuePtr nil_val = std::make_shared<Value>(nil_type, std::string(""));
     Type abi_type = language_type_to_abi_type(expr.inferred_type);
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, abi_type, list_reg, nil_val));
@@ -1123,8 +1438,8 @@ Reg Generator::emit_member_expr(AST::MemberExpr& expr) {
         // For channel.send(value), we need to return a special marker that this is a method call
         // The actual call will be handled in emit_call_expr
         Reg method_marker = allocate_register();
-        auto int_type = std::make_shared<::Type>(TypeTag::Int);
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, method_marker, 
+        auto int_type = std::make_shared<::Type>(::TypeTag::Int);
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, method_marker, 
                                 std::make_shared<Value>(int_type, int64_t(-1)))); // Special marker
         set_register_type(method_marker, int_type);
         return method_marker;
@@ -1169,29 +1484,29 @@ void Generator::emit_print_stmt(AST::PrintStatement& stmt) {
         TypePtr reg_type = get_register_type(value);
         if (reg_type) {
             switch (reg_type->tag) {
-                case TypeTag::Int:
-                case TypeTag::Int8:
-                case TypeTag::Int16:
-                case TypeTag::Int32:
-                case TypeTag::Int64:
-                    emit_instruction(LIR_Inst(LIR_Op::PrintInt, 0, value, 0));
+                case ::TypeTag::Int:
+                case ::TypeTag::Int8:
+                case ::TypeTag::Int16:
+                case ::TypeTag::Int32:
+                case ::TypeTag::Int64:
+                    emit_instruction(LIR_Inst(LIR_Op::PrintInt, Type::Void, 0, value, 0));
                     return;
-                case TypeTag::UInt:
-                case TypeTag::UInt8:
-                case TypeTag::UInt16:
-                case TypeTag::UInt32:
-                case TypeTag::UInt64:
-                    emit_instruction(LIR_Inst(LIR_Op::PrintUint, 0, value, 0));
+                case ::TypeTag::UInt:
+                case ::TypeTag::UInt8:
+                case ::TypeTag::UInt16:
+                case ::TypeTag::UInt32:
+                case ::TypeTag::UInt64:
+                    emit_instruction(LIR_Inst(LIR_Op::PrintUint, Type::Void, 0, value, 0));
                     return;
-                case TypeTag::Float32:
-                case TypeTag::Float64:
-                    emit_instruction(LIR_Inst(LIR_Op::PrintFloat, 0, value, 0));
+                case ::TypeTag::Float32:
+                case ::TypeTag::Float64:
+                    emit_instruction(LIR_Inst(LIR_Op::PrintFloat, Type::Void, 0, value, 0));
                     return;
-                case TypeTag::Bool:
-                    emit_instruction(LIR_Inst(LIR_Op::PrintBool, 0, value, 0));
+                case ::TypeTag::Bool:
+                    emit_instruction(LIR_Inst(LIR_Op::PrintBool, Type::Void, 0, value, 0));
                     return;
-                case TypeTag::String:
-                    emit_instruction(LIR_Inst(LIR_Op::PrintString, 0, value, 0));
+                case ::TypeTag::String:
+                    emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
                     return;
                 default:
                     break;
@@ -1207,44 +1522,44 @@ void Generator::emit_print_stmt(AST::PrintStatement& stmt) {
                     // This is a LoadConst instruction - check the constant's type
                     if (last_inst.const_val->type) {
                         switch (last_inst.const_val->type->tag) {
-                            case TypeTag::Int:
-                            case TypeTag::Int8:
-                            case TypeTag::Int16:
-                            case TypeTag::Int32:
-                            case TypeTag::Int64:
-                                emit_instruction(LIR_Inst(LIR_Op::PrintInt, 0, value, 0));
+                            case ::TypeTag::Int:
+                            case ::TypeTag::Int8:
+                            case ::TypeTag::Int16:
+                            case ::TypeTag::Int32:
+                            case ::TypeTag::Int64:
+                                emit_instruction(LIR_Inst(LIR_Op::PrintInt, Type::Void, 0, value, 0));
                                 return;
-                            case TypeTag::UInt:
-                            case TypeTag::UInt8:
-                            case TypeTag::UInt16:
-                            case TypeTag::UInt32:
-                            case TypeTag::UInt64:
-                                emit_instruction(LIR_Inst(LIR_Op::PrintUint, 0, value, 0));
+                            case ::TypeTag::UInt:
+                            case ::TypeTag::UInt8:
+                            case ::TypeTag::UInt16:
+                            case ::TypeTag::UInt32:
+                            case ::TypeTag::UInt64:
+                                emit_instruction(LIR_Inst(LIR_Op::PrintUint, Type::Void, 0, value, 0));
                                 return;                                
-                            case TypeTag::Float32:
-                            case TypeTag::Float64:
-                                emit_instruction(LIR_Inst(LIR_Op::PrintFloat, 0, value, 0));
+                            case ::TypeTag::Float32:
+                            case ::TypeTag::Float64:
+                                emit_instruction(LIR_Inst(LIR_Op::PrintFloat, Type::Void, 0, value, 0));
                                 return;
-                            case TypeTag::Bool:
-                                emit_instruction(LIR_Inst(LIR_Op::PrintBool, 0, value, 0));
+                            case ::TypeTag::Bool:
+                                emit_instruction(LIR_Inst(LIR_Op::PrintBool, Type::Void, 0, value, 0));
                                 return;
-                            case TypeTag::String:
-                                emit_instruction(LIR_Inst(LIR_Op::PrintString, 0, value, 0));
+                            case ::TypeTag::String:
+                                emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
                                 return;
-                            case TypeTag::Nil:
+                            case ::TypeTag::Nil:
                             default:
                                 // For nil and other types, convert to string and print
-                                auto string_type = std::make_shared<::Type>(TypeTag::String);
+                                auto string_type = std::make_shared<::Type>(::TypeTag::String);
                                 ValuePtr nil_str = std::make_shared<Value>(string_type, std::string("nil"));
                                 Reg nil_reg = allocate_register();
-                                emit_instruction(LIR_Inst(LIR_Op::LoadConst, nil_reg, nil_str));
+                                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, nil_reg, nil_str));
                                 emit_instruction(LIR_Inst(LIR_Op::PrintString, 0, nil_reg, 0));
                                 return;
                         }
                     }
                 } else if (last_inst.op == LIR_Op::Concat || last_inst.op == LIR_Op::ToString) {
                     // This is a string operation - treat as string
-                    emit_instruction(LIR_Inst(LIR_Op::PrintString, 0, value, 0));
+                    emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
                     return;
                 }
             }
@@ -1257,32 +1572,32 @@ void Generator::emit_print_stmt(AST::PrintStatement& stmt) {
                 // Check if it's a numeric string
                 if (!str_val.empty() && (std::isdigit(str_val[0]) || str_val[0] == '+' || str_val[0] == '-' || str_val[0] == '.')) {
                     if (str_val.find('.') != std::string::npos || str_val.find('e') != std::string::npos || str_val.find('E') != std::string::npos) {
-                        emit_instruction(LIR_Inst(LIR_Op::PrintFloat, 0, value, 0));
+                        emit_instruction(LIR_Inst(LIR_Op::PrintFloat, Type::Void, 0, value, 0));
                     } else {
-                        emit_instruction(LIR_Inst(LIR_Op::PrintInt, 0, value, 0));
+                        emit_instruction(LIR_Inst(LIR_Op::PrintInt, Type::Void, 0, value, 0));
                     }
                 } else {
                     // String literal - print directly
-                    emit_instruction(LIR_Inst(LIR_Op::PrintString, 0, value, 0));
+                    emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
                 }
             } else if (std::holds_alternative<bool>(literal->value)) {
-                emit_instruction(LIR_Inst(LIR_Op::PrintBool, 0, value, 0));
+                emit_instruction(LIR_Inst(LIR_Op::PrintBool, Type::Void, 0, value, 0));
             } else {
                 // nil - convert to string constant and print
-                auto string_type = std::make_shared<::Type>(TypeTag::String);
+                auto string_type = std::make_shared<::Type>(::TypeTag::String);
                 ValuePtr nil_str = std::make_shared<Value>(string_type, std::string("nil"));
                 Reg nil_reg = allocate_register();
-                emit_instruction(LIR_Inst(LIR_Op::LoadConst, nil_reg, nil_str));
-                emit_instruction(LIR_Inst(LIR_Op::PrintString, 0, nil_reg, 0));
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, nil_reg, nil_str));
+                emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, nil_reg, 0));
             }
         } else if (auto interpolated = dynamic_cast<AST::InterpolatedStringExpr*>(stmt.arguments[0].get())) {
             // This is an interpolated string - treat as string
-            emit_instruction(LIR_Inst(LIR_Op::PrintString, 0, value, 0));
+            emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
         } else {
             // For expressions, determine type at generation time and emit appropriate print
             // For now, default to PrintInt for arithmetic expressions
             // TODO: Better type inference for expressions
-            emit_instruction(LIR_Inst(LIR_Op::PrintInt, 0, value, 0));
+            emit_instruction(LIR_Inst(LIR_Op::PrintInt, Type::Void, 0, value, 0));
         }
     }
 }
@@ -1301,35 +1616,35 @@ void Generator::emit_var_stmt(AST::VarDeclaration& stmt) {
             // Convert TypeAnnotation to Type - handle all basic types including 128-bit
             auto type_annotation = *stmt.type.value();
             if (type_annotation.typeName == "u32") {
-                declared_type = std::make_shared<::Type>(TypeTag::UInt32);
+                declared_type = std::make_shared<::Type>(::TypeTag::UInt32);
             } else if (type_annotation.typeName == "u16") {
-                declared_type = std::make_shared<::Type>(TypeTag::UInt16);
+                declared_type = std::make_shared<::Type>(::TypeTag::UInt16);
             } else if (type_annotation.typeName == "u8") {
-                declared_type = std::make_shared<::Type>(TypeTag::UInt8);
+                declared_type = std::make_shared<::Type>(::TypeTag::UInt8);
             } else if (type_annotation.typeName == "u64") {
-                declared_type = std::make_shared<::Type>(TypeTag::UInt64);
+                declared_type = std::make_shared<::Type>(::TypeTag::UInt64);
             } else if (type_annotation.typeName == "u128") {
-                declared_type = std::make_shared<::Type>(TypeTag::UInt128);
+                declared_type = std::make_shared<::Type>(::TypeTag::UInt128);
             } else if (type_annotation.typeName == "int") {
-                declared_type = std::make_shared<::Type>(TypeTag::Int64);
+                declared_type = std::make_shared<::Type>(::TypeTag::Int64);
             } else if (type_annotation.typeName == "i64") {
-                declared_type = std::make_shared<::Type>(TypeTag::Int64);
+                declared_type = std::make_shared<::Type>(::TypeTag::Int64);
             } else if (type_annotation.typeName == "i32") {
-                declared_type = std::make_shared<::Type>(TypeTag::Int32);
+                declared_type = std::make_shared<::Type>(::TypeTag::Int32);
             } else if (type_annotation.typeName == "i16") {
-                declared_type = std::make_shared<::Type>(TypeTag::Int16);
+                declared_type = std::make_shared<::Type>(::TypeTag::Int16);
             } else if (type_annotation.typeName == "i8") {
-                declared_type = std::make_shared<::Type>(TypeTag::Int8);
+                declared_type = std::make_shared<::Type>(::TypeTag::Int8);
             } else if (type_annotation.typeName == "i128") {
-                declared_type = std::make_shared<::Type>(TypeTag::Int128);
+                declared_type = std::make_shared<::Type>(::TypeTag::Int128);
             } else if (type_annotation.typeName == "f64") {
-                declared_type = std::make_shared<::Type>(TypeTag::Float64);
+                declared_type = std::make_shared<::Type>(::TypeTag::Float64);
             } else if (type_annotation.typeName == "f32") {
-                declared_type = std::make_shared<::Type>(TypeTag::Float32);
+                declared_type = std::make_shared<::Type>(::TypeTag::Float32);
             } else if (type_annotation.typeName == "bool") {
-                declared_type = std::make_shared<::Type>(TypeTag::Bool);
+                declared_type = std::make_shared<::Type>(::TypeTag::Bool);
             } else if (type_annotation.typeName == "str" || type_annotation.typeName == "string") {
-                declared_type = std::make_shared<::Type>(TypeTag::String);
+                declared_type = std::make_shared<::Type>(::TypeTag::String);
             }
         }
         
@@ -1341,7 +1656,7 @@ void Generator::emit_var_stmt(AST::VarDeclaration& stmt) {
     } else {
         // Initialize with nil
         value_reg = allocate_register();
-        auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
+        auto nil_type = std::make_shared<::Type>(::TypeTag::Nil);
         ValuePtr nil_val = std::make_shared<Value>(nil_type, "");
         Type abi_type = language_type_to_abi_type(stmt.inferred_type);
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, abi_type, value_reg, nil_val));
@@ -1380,17 +1695,17 @@ void Generator::emit_if_stmt_cfg(AST::IfStatement& stmt) {
     
     // For boolean conditions, use them directly
     TypePtr condition_type = get_register_type(condition);
-    if (condition_type && condition_type->tag == TypeTag::Bool) {
+    if (condition_type && condition_type->tag == ::TypeTag::Bool) {
         condition_bool = condition;
     } else {
         // Convert non-boolean condition to boolean
         Reg zero_reg = allocate_register();
-        auto int_type = std::make_shared<::Type>(TypeTag::Int);
+        auto int_type = std::make_shared<::Type>(::TypeTag::Int);
         ValuePtr zero_val = std::make_shared<Value>(int_type, (int64_t)0);
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, zero_reg, zero_val));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, zero_reg, zero_val));
         set_register_type(zero_reg, int_type);
         emit_instruction(LIR_Inst(LIR_Op::CmpNEQ, condition_bool, condition, zero_reg));
-        set_register_type(condition_bool, std::make_shared<::Type>(TypeTag::Bool));
+        set_register_type(condition_bool, std::make_shared<::Type>(::TypeTag::Bool));
     }
     
     // Conditional jump: if false, go to else (or end if no else)
@@ -1452,17 +1767,17 @@ void Generator::emit_if_stmt_linear(AST::IfStatement& stmt) {
     
     // Convert condition to boolean if needed
     TypePtr condition_type = get_register_type(condition);
-    if (condition_type && condition_type->tag == TypeTag::Bool) {
+    if (condition_type && condition_type->tag == ::TypeTag::Bool) {
         condition_bool = condition;
     } else {
         // Convert non-boolean condition to boolean
         Reg zero_reg = allocate_register();
-        auto int_type = std::make_shared<::Type>(TypeTag::Int);
+        auto int_type = std::make_shared<::Type>(::TypeTag::Int);
         ValuePtr zero_val = std::make_shared<Value>(int_type, (int64_t)0);
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, zero_reg, zero_val));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, zero_reg, zero_val));
         set_register_type(zero_reg, int_type);
         emit_instruction(LIR_Inst(LIR_Op::CmpNEQ, condition_bool, condition, zero_reg));
-        set_register_type(condition_bool, std::make_shared<::Type>(TypeTag::Bool));
+        set_register_type(condition_bool, std::make_shared<::Type>(::TypeTag::Bool));
     }
     
     // For linear mode, we'll simplify: just emit the then branch for now
@@ -1509,17 +1824,17 @@ void Generator::emit_while_stmt_cfg(AST::WhileStatement& stmt) {
     
     // For boolean conditions, use them directly
     TypePtr condition_type = get_register_type(condition);
-    if (condition_type && condition_type->tag == TypeTag::Bool) {
+    if (condition_type && condition_type->tag == ::TypeTag::Bool) {
         condition_bool = condition;
     } else {
         // Convert non-boolean condition to boolean
         Reg zero_reg = allocate_register();
-        auto int_type = std::make_shared<::Type>(TypeTag::Int);
+        auto int_type = std::make_shared<::Type>(::TypeTag::Int);
         ValuePtr zero_val = std::make_shared<Value>(int_type, (int64_t)0);
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, zero_reg, zero_val));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, zero_reg, zero_val));
         set_register_type(zero_reg, int_type);
         emit_instruction(LIR_Inst(LIR_Op::CmpNEQ, condition_bool, condition, zero_reg));
-        set_register_type(condition_bool, std::make_shared<::Type>(TypeTag::Bool));
+        set_register_type(condition_bool, std::make_shared<::Type>(::TypeTag::Bool));
     }
     
     // Conditional jump: if false, exit loop
@@ -1615,23 +1930,23 @@ void Generator::emit_for_stmt_cfg(AST::ForStatement& stmt) {
         
         // For boolean conditions, use them directly
         TypePtr condition_type = get_register_type(condition_expr);
-        if (condition_type && condition_type->tag == TypeTag::Bool) {
+        if (condition_type && condition_type->tag == ::TypeTag::Bool) {
             condition = condition_expr;
         } else {
             // Convert non-boolean condition to boolean
             Reg zero_reg = allocate_register();
-            auto int_type = std::make_shared<::Type>(TypeTag::Int);
+            auto int_type = std::make_shared<::Type>(::TypeTag::Int);
             ValuePtr zero_val = std::make_shared<Value>(int_type, (int64_t)0);
-            emit_instruction(LIR_Inst(LIR_Op::LoadConst, zero_reg, zero_val));
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, zero_reg, zero_val));
             set_register_type(zero_reg, int_type);
             emit_instruction(LIR_Inst(LIR_Op::CmpNEQ, condition, condition_expr, zero_reg));
-            set_register_type(condition, std::make_shared<::Type>(TypeTag::Bool));
+            set_register_type(condition, std::make_shared<::Type>(::TypeTag::Bool));
         }
     } else {
         // No condition - always true
-        auto bool_type = std::make_shared<::Type>(TypeTag::Bool);
+        auto bool_type = std::make_shared<::Type>(::TypeTag::Bool);
         ValuePtr true_val = std::make_shared<Value>(bool_type, true);
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, condition, true_val));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Bool, condition, true_val));
         set_register_type(condition, bool_type);
     }
     
@@ -1750,12 +2065,8 @@ void Generator::emit_func_stmt(AST::FunctionDeclaration& stmt) {
     // Ensure function has a return instruction
     if (current_function_->instructions.empty() || 
         !current_function_->instructions.back().isReturn()) {
-        // If no explicit return, add implicit return of 0
-        Reg return_reg = allocate_register();
-        auto int_type = std::make_shared<::Type>(TypeTag::Int64);
-        ValuePtr zero_val = std::make_shared<Value>(int_type, int64_t(0));
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, return_reg, zero_val));
-        emit_instruction(LIR_Inst(LIR_Op::Ret, return_reg, 0, 0));
+        // If no explicit return, add implicit void return
+        emit_instruction(LIR_Inst(LIR_Op::Ret, 0, 0, 0));
     }
     
     // Exit function scope
@@ -1784,7 +2095,7 @@ void Generator::emit_func_stmt(AST::FunctionDeclaration& stmt) {
     LIRFunctionBody jit_body = [func_name](const std::vector<ValuePtr>& args) -> ValuePtr {
         // This lambda will be replaced by actual JIT execution
         // For now, return a default value
-        auto int_type = std::make_shared<::Type>(TypeTag::Int64);
+        auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
         return std::make_shared<Value>(int_type, int64_t(0));
     };
     
@@ -1829,7 +2140,7 @@ void Generator::emit_comptime_stmt(AST::ComptimeStatement& stmt) {
 }
 
 void Generator::emit_parallel_stmt(AST::ParallelStatement& stmt) {
-    auto int_type = std::make_shared<::Type>(TypeTag::Int64);
+    auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
     
     // Parse cores parameter (default to 3 if not specified)
     int num_cores = 3;
@@ -1872,7 +2183,7 @@ void Generator::emit_parallel_stmt(AST::ParallelStatement& stmt) {
     Reg work_queue_reg = allocate_register();
     Reg queue_size_reg = allocate_register();
     ValuePtr queue_size_val = std::make_shared<Value>(int_type, int64_t(task_count));
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, queue_size_reg, queue_size_val));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, queue_size_reg, queue_size_val));
     set_register_type(queue_size_reg, int_type);
     
     emit_instruction(LIR_Inst(LIR_Op::WorkQueueAlloc, work_queue_reg, queue_size_reg, 0));
@@ -1882,7 +2193,7 @@ void Generator::emit_parallel_stmt(AST::ParallelStatement& stmt) {
     Reg contexts_reg = allocate_register();
     Reg task_count_reg = allocate_register();
     ValuePtr task_count_val = std::make_shared<Value>(int_type, int64_t(task_count));
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, task_count_reg, task_count_val));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, task_count_reg, task_count_val));
     set_register_type(task_count_reg, int_type);
     
     emit_instruction(LIR_Inst(LIR_Op::TaskContextAlloc, contexts_reg, task_count_reg, 0));
@@ -1924,13 +2235,13 @@ void Generator::emit_parallel_stmt(AST::ParallelStatement& stmt) {
     // 4. Set up atomic variables
     Reg active_workers_reg = allocate_register();
     ValuePtr num_cores_val = std::make_shared<Value>(int_type, int64_t(num_cores));
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, active_workers_reg, num_cores_val));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, active_workers_reg, num_cores_val));
     set_register_type(active_workers_reg, int_type);
     
     // 5. Signal workers to start (atomic store)
     Reg work_available_reg = allocate_register();
     ValuePtr work_available_val = std::make_shared<Value>(int_type, int64_t(1));
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, work_available_reg, work_available_val));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, work_available_reg, work_available_val));
     set_register_type(work_available_reg, int_type);
     
     emit_instruction(LIR_Inst(LIR_Op::WorkerSignal, work_available_reg, active_workers_reg, 0));
@@ -1941,7 +2252,7 @@ void Generator::emit_parallel_stmt(AST::ParallelStatement& stmt) {
     // 7. Wait for all workers to complete
     Reg timeout_reg = allocate_register();
     ValuePtr timeout_val = std::make_shared<Value>(int_type, int64_t(20000)); // 20 second timeout
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, timeout_reg, timeout_val));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, timeout_reg, timeout_val));
     set_register_type(timeout_reg, int_type);
     
     emit_instruction(LIR_Inst(LIR_Op::ParallelWaitComplete, work_queue_reg, timeout_reg, 0));
@@ -1961,13 +2272,13 @@ std::optional<ValuePtr> Generator::evaluate_constant_expression(std::shared_ptr<
             std::string str_val = std::get<std::string>(literal->value);
             try {
                 int64_t int_val = std::stoll(str_val);
-                auto int_type = std::make_shared<::Type>(TypeTag::Int64);
+                auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
                 return std::make_shared<Value>(int_type, int_val);
             } catch (...) {
                 return std::nullopt;
             }
         } else if (std::holds_alternative<bool>(literal->value)) {
-            auto bool_type = std::make_shared<::Type>(TypeTag::Bool);
+            auto bool_type = std::make_shared<::Type>(::TypeTag::Bool);
             return std::make_shared<Value>(bool_type, std::get<bool>(literal->value));
         }
     }
@@ -1981,7 +2292,7 @@ std::optional<ValuePtr> Generator::evaluate_constant_expression(std::shared_ptr<
 void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
     enter_scope();
     
-    auto int_type = std::make_shared<::Type>(TypeTag::Int64);
+    auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
     
     // Handle channel parameter assignment (e.g., "ch=counts")
     Reg channel_reg;
@@ -2012,7 +2323,7 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
     // Allocate shared counter
     Reg counter_reg = allocate_register();
     ValuePtr zero = std::make_shared<Value>(int_type, int64_t(0));
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, counter_reg, zero));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, counter_reg, zero));
     bind_variable("shared_counter", counter_reg);
     set_register_type(counter_reg, int_type);
     
@@ -2050,7 +2361,7 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
     // Load task_count into a register first
     Reg task_count_reg = allocate_register();
     ValuePtr task_count_val = std::make_shared<Value>(int_type, int64_t(task_count));
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, task_count_reg, task_count_val));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, task_count_reg, task_count_val));
     set_register_type(task_count_reg, int_type);
     
     emit_instruction(LIR_Inst(LIR_Op::TaskContextAlloc, contexts_reg, task_count_reg, 0));
@@ -2110,12 +2421,12 @@ void Generator::emit_task_stmt(AST::TaskStatement& stmt) {
 }
 
 void Generator::emit_task_init_and_step(AST::TaskStatement& task, size_t task_id, Reg contexts_reg, Reg channel_reg, Reg counter_reg, int64_t loop_var_value) {
-    auto int_type = std::make_shared<::Type>(TypeTag::Int64);
+    auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
     
     // Use task_id directly as the task context register value
     Reg task_context_reg = allocate_register();
     ValuePtr task_id_val = std::make_shared<Value>(int_type, int64_t(task_id));
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, task_context_reg, task_id_val));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, task_context_reg, task_id_val));
     set_register_type(task_context_reg, int_type);
     
     // Initialize task context
@@ -2123,14 +2434,14 @@ void Generator::emit_task_init_and_step(AST::TaskStatement& task, size_t task_id
     
     // Set task ID in context
     Reg task_id_reg = allocate_register();
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, task_id_reg, task_id_val));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, task_id_reg, task_id_val));
     set_register_type(task_id_reg, int_type);
     emit_instruction(LIR_Inst(LIR_Op::TaskSetField, 0, task_context_reg, task_id_reg, 0)); // field 0 = task_id
     
     // Set loop variable value in context (use the actual loop value, not task_id)
     ValuePtr loop_var_val = std::make_shared<Value>(int_type, int64_t(loop_var_value));
     Reg loop_var_reg = allocate_register();
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, loop_var_reg, loop_var_val));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, loop_var_reg, loop_var_val));
     set_register_type(loop_var_reg, int_type);
     emit_instruction(LIR_Inst(LIR_Op::TaskSetField, 0, task_context_reg, loop_var_reg, 1)); // field 1 = loop_var
     
@@ -2189,7 +2500,7 @@ void Generator::emit_iter_stmt(AST::IterStatement& stmt) {
         Reg end_reg = emit_expr(*range_expr->end);
         Reg cmp_reg = allocate_register();
         emit_instruction(LIR_Inst(LIR_Op::CmpLT, cmp_reg, loop_var_reg, end_reg));
-        set_register_type(cmp_reg, std::make_shared<::Type>(TypeTag::Bool));
+        set_register_type(cmp_reg, std::make_shared<::Type>(::TypeTag::Bool));
         emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp_reg, 0, exit_block->id));
         add_block_edge(header_block, body_block);
         add_block_edge(header_block, exit_block);
@@ -2207,9 +2518,9 @@ void Generator::emit_iter_stmt(AST::IterStatement& stmt) {
             step_reg = emit_expr(*range_expr->step);
         } else {
             step_reg = allocate_register();
-            auto int_type = std::make_shared<::Type>(TypeTag::Int64);
+            auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
             ValuePtr one_val = std::make_shared<Value>(int_type, (int64_t)1);
-            emit_instruction(LIR_Inst(LIR_Op::LoadConst, step_reg, one_val));
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, step_reg, one_val));
             set_register_type(step_reg, int_type);
         }
         Reg new_val_reg = allocate_register();
@@ -2257,7 +2568,7 @@ void Generator::emit_iter_stmt(AST::IterStatement& stmt) {
         // Check if channel has data
         Reg has_data_reg = allocate_register();
         emit_instruction(LIR_Inst(LIR_Op::ChannelHasData, has_data_reg, channel_reg, 0));
-        set_register_type(has_data_reg, std::make_shared<::Type>(TypeTag::Bool));
+        set_register_type(has_data_reg, std::make_shared<::Type>(::TypeTag::Bool));
         
         // Jump to exit if no data
         emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, has_data_reg, 0, exit_block->id));
@@ -2267,7 +2578,7 @@ void Generator::emit_iter_stmt(AST::IterStatement& stmt) {
         set_current_block(body_block);
         // Pop value from channel
         emit_instruction(LIR_Inst(LIR_Op::ChannelPop, loop_var_reg, channel_reg, 0));
-        set_register_type(loop_var_reg, std::make_shared<::Type>(TypeTag::Int64));
+        set_register_type(loop_var_reg, std::make_shared<::Type>(::TypeTag::Int64));
         
         // Execute loop body
         if (stmt.body) {
@@ -2562,20 +2873,20 @@ std::shared_ptr<::Type> Generator::convert_ast_type_to_lir_type(const std::share
     if (ast_type->isPrimitive || ast_type->typeName == "int" || ast_type->typeName == "float" || 
         ast_type->typeName == "bool" || ast_type->typeName == "string" || ast_type->typeName == "void") {
         if (ast_type->typeName == "int") {
-            return std::make_shared<::Type>(TypeTag::Int);
+            return std::make_shared<::Type>(::TypeTag::Int);
         } else if (ast_type->typeName == "float") {
-            return std::make_shared<::Type>(TypeTag::Float32);
+            return std::make_shared<::Type>(::TypeTag::Float32);
         } else if (ast_type->typeName == "bool") {
-            return std::make_shared<::Type>(TypeTag::Bool);
+            return std::make_shared<::Type>(::TypeTag::Bool);
         } else if (ast_type->typeName == "string") {
-            return std::make_shared<::Type>(TypeTag::String);
+            return std::make_shared<::Type>(::TypeTag::String);
         } else if (ast_type->typeName == "void") {
-            return std::make_shared<::Type>(TypeTag::Nil);
+            return std::make_shared<::Type>(::TypeTag::Nil);
         }
     }
     
     // Default to Any type for complex or unknown types
-    return std::make_shared<::Type>(TypeTag::Any);
+    return std::make_shared<::Type>(::TypeTag::Any);
 }
 
 // Symbol collection methods (Pass 0)
@@ -2643,9 +2954,9 @@ void Generator::lower_function_body(AST::FunctionDeclaration& stmt) {
         !current_function_->instructions.back().isReturn()) {
         // Implicit return of 0 if no explicit return
         Reg return_reg = allocate_register();
-        auto int_type = std::make_shared<::Type>(TypeTag::Int64);
+        auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
         ValuePtr zero_val = std::make_shared<Value>(int_type, int64_t(0));
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, return_reg, zero_val));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, return_reg, zero_val));
         emit_instruction(LIR_Inst(LIR_Op::Ret, return_reg, 0, 0));
     }
     
@@ -2667,7 +2978,7 @@ Reg Generator::emit_error_construct_expr(AST::ErrorConstructExpr& expr) {
     Reg dst = allocate_register();
     
     // Create error value based on error type and arguments
-    auto result_type = std::make_shared<::Type>(TypeTag::ErrorUnion); // Generic Result type
+    auto result_type = std::make_shared<::Type>(::TypeTag::ErrorUnion); // Generic Result type
     
     // For now, create a simple error value - in a full implementation,
     // this would use the errorType and arguments to create a proper error object
@@ -2685,7 +2996,7 @@ Reg Generator::emit_ok_construct_expr(AST::OkConstructExpr& expr) {
     Reg value_reg = emit_expr(*expr.value);
     
     // Create Result type wrapping the value
-    auto result_type = std::make_shared<::Type>(TypeTag::ErrorUnion);
+    auto result_type = std::make_shared<::Type>(::TypeTag::ErrorUnion);
     
     // For now, create a simple ok value - in a full implementation,
     // this would properly wrap the value from value_reg
@@ -2707,7 +3018,7 @@ Reg Generator::emit_fallible_expr(AST::FallibleExpr& expr) {
     
     // Create a register to hold the error check result
     Reg is_error_reg = allocate_register();
-    auto bool_type = std::make_shared<::Type>(TypeTag::Bool);
+    auto bool_type = std::make_shared<::Type>(::TypeTag::Bool);
     set_register_type(is_error_reg, bool_type);
     
     // Check if the result contains an error
@@ -2857,7 +3168,7 @@ Reg Generator::emit_object_literal_expr(AST::ObjectLiteralExpr& expr) {
     }
     
     // Set object type (could be enhanced to track actual class type)
-    auto obj_type = std::make_shared<::Type>(TypeTag::UserDefined);
+    auto obj_type = std::make_shared<::Type>(::TypeTag::UserDefined);
     set_register_type(dst, obj_type);
     
     return dst;
@@ -3008,26 +3319,26 @@ void Generator::emit_module_stmt(AST::ModuleDeclaration& stmt) {
 // === LOCK-FREE PARALLEL HELPER FUNCTIONS ===
 
 void Generator::emit_parallel_task_init(AST::TaskStatement& task, size_t task_id, Reg contexts_reg, Reg work_queue_reg, int64_t loop_var_value) {
-    auto int_type = std::make_shared<::Type>(TypeTag::Int64);
+    auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
     
     // Initialize task context (reuse existing logic)
     Reg task_context_reg = allocate_register();
     ValuePtr task_id_val = std::make_shared<Value>(int_type, int64_t(task_id));
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, task_context_reg, task_id_val));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, task_context_reg, task_id_val));
     set_register_type(task_context_reg, int_type);
     
     emit_instruction(LIR_Inst(LIR_Op::TaskContextInit, task_context_reg, task_id, 0));
     
     // Set task ID in context
     Reg task_id_reg = allocate_register();
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, task_id_reg, task_id_val));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, task_id_reg, task_id_val));
     set_register_type(task_id_reg, int_type);
     emit_instruction(LIR_Inst(LIR_Op::TaskSetField, 0, task_context_reg, task_id_reg, 0)); // field 0 = task_id
     
     // Set loop variable value in context
     ValuePtr loop_var_val = std::make_shared<Value>(int_type, int64_t(loop_var_value));
     Reg loop_var_reg = allocate_register();
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, loop_var_reg, loop_var_val));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, loop_var_reg, loop_var_val));
     set_register_type(loop_var_reg, int_type);
     emit_instruction(LIR_Inst(LIR_Op::TaskSetField, 0, task_context_reg, loop_var_reg, 1)); // field 1 = loop_var
     
@@ -3041,7 +3352,7 @@ void Generator::emit_parallel_task_init(AST::TaskStatement& task, size_t task_id
 }
 
 void Generator::emit_parallel_worker_loop(Reg work_queue_reg, int worker_id) {
-    auto int_type = std::make_shared<::Type>(TypeTag::Int64);
+    auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
     
     // Create labels for the worker loop
     uint32_t work_loop_label = generate_label();
@@ -3080,7 +3391,7 @@ void Generator::emit_parallel_worker_loop(Reg work_queue_reg, int worker_id) {
     // Check if we got a task (NULL = no more work)
     Reg null_reg = allocate_register();
     ValuePtr null_val = std::make_shared<Value>(int_type, int64_t(0));
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, null_reg, null_val));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, null_reg, null_val));
     set_register_type(null_reg, int_type);
     
     Reg task_check_reg = allocate_register();
@@ -3093,7 +3404,7 @@ void Generator::emit_parallel_worker_loop(Reg work_queue_reg, int worker_id) {
     // Execute task (in a real implementation, this would call the task function)
     // For now, we simulate task execution by incrementing a counter
     Reg counter_reg = allocate_register();
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, counter_reg, int64_t(1)));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, counter_reg, int64_t(1)));
     set_register_type(counter_reg, int_type);
     
     // Atomic fetch-add to global counter
@@ -3111,7 +3422,7 @@ void Generator::emit_parallel_worker_loop(Reg work_queue_reg, int worker_id) {
     set_register_type(active_workers_reg, int_type);
     
     Reg dec_reg = allocate_register();
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, dec_reg, int64_t(-1)));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, dec_reg, int64_t(-1)));
     set_register_type(dec_reg, int_type);
     
     emit_instruction(LIR_Inst(LIR_Op::AtomicFetchAdd, active_workers_reg, 1, dec_reg));
@@ -3127,38 +3438,11 @@ void Generator::emit_parallel_worker_loop(Reg work_queue_reg, int worker_id) {
     
     // Set completion flag (atomic store)
     Reg completion_reg = allocate_register();
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, completion_reg, int64_t(1)));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, completion_reg, int64_t(1)));
     set_register_type(completion_reg, int_type);
     emit_instruction(LIR_Inst(LIR_Op::AtomicStore, completion_reg, 2, 0)); // Global all_done flag
     
     emit_instruction(LIR_Inst(LIR_Op::Label, signal_label, 0, 0));
-}
-
-// Missing emit function implementations
-Reg Generator::emit_variable_expr(AST::VariableExpr& expr) {
-    // Look up the variable in the current scope
-    Reg var_reg = resolve_variable(expr.name);
-    if (var_reg == UINT32_MAX) {
-        report_error("Undefined variable: " + expr.name, expr.line);
-        return allocate_register();
-    }
-    
-    // Set the type information for the register
-    if (expr.inferred_type) {
-        set_register_language_type(var_reg, expr.inferred_type);
-    }
-    
-    return var_reg;
-}
-
-Reg Generator::emit_interpolated_string_expr(AST::InterpolatedStringExpr& expr) {
-    report_error("Interpolated string expressions not yet implemented in LIR generator");
-    return 0;
-}
-
-Reg Generator::emit_unary_expr(AST::UnaryExpr& expr) {
-    report_error("Unary expressions not yet implemented in LIR generator");
-    return 0;
 }
 
 } // namespace LIR

@@ -1,10 +1,10 @@
 // Debug simple concatenation
 print("=== Debug Simple Concat ===")
-var x = "Hello"
-var y = "World"
+var x = "Hello "
+var y = "World!"
 var z = x + y
 print(z)
 
 print("=== Debug Direct Concat ===")
-var direct = "Hello" + "World"
+var direct = "Hello " + "World"
 print(direct)

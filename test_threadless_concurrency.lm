@@ -1,8 +1,8 @@
 // Threadless Concurrency Test
 // This test demonstrates the threadless concurrency design
 // No threads, just cooperative state machines!
-var shared_counter: atomic = 0;  // atomic for primitives, locked for objects
-counts = channel();
+var shared_counter = 0;  // atomic for primitives, locked for objects
+var counts = channel();
 
 concurrent(ch=counts, mode=batch) {
     task(i in 1..7) {

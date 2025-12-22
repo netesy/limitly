@@ -48,6 +48,11 @@ public:
     // Get the type system (for LIR generator)
     TypeSystem& get_type_system() { return type_system; }
     
+    // Register a builtin function
+    void register_builtin_function(const std::string& name, 
+                                  const std::vector<TypePtr>& param_types,
+                                  TypePtr return_type);
+    
 private:
     // Error reporting
     void add_error(const std::string& message, int line = 0);
@@ -162,4 +167,7 @@ namespace TypeCheckerFactory {
     
     // Create type checker instance (for testing)
     std::unique_ptr<TypeChecker> create(TypeSystem& type_system);
+    
+    // Register builtin functions with the type checker
+    void register_builtin_functions(TypeChecker& checker);
 }
