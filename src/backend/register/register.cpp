@@ -1,14 +1,18 @@
 #include "register.hh"
 #include "../../lir/lir.hh"
+#include "../types.hh"
 #include <iostream>
 #include <cstring>
 
 namespace Register {
 
-RegisterVM::RegisterVM() {
+RegisterVM::RegisterVM() 
+    : memoryRegion(memoryManager), 
+      type_system(std::make_unique<TypeSystem>(memoryManager, memoryRegion)) {
     registers.resize(1024, nullptr);
     scheduler = std::make_unique<Scheduler>();
     current_time = 0;
+    current_function = nullptr;
 }
 
 void RegisterVM::reset() {
@@ -17,6 +21,7 @@ void RegisterVM::reset() {
     channels.clear();
     scheduler = std::make_unique<Scheduler>();
     current_time = 0;
+    current_function = nullptr;
 }
 
 std::string RegisterVM::to_string(const RegisterValue& value) const {
@@ -34,6 +39,9 @@ std::string RegisterVM::to_string(const RegisterValue& value) const {
 
 void RegisterVM::execute_function(const LIR::LIR_Function& function) {
     reset();
+    
+    // Store reference to function for type information access
+    current_function = &function;
     
     const LIR::LIR_Inst* pc = function.instructions.data();
     const LIR::LIR_Inst* end = pc + function.instructions.size();
@@ -166,18 +174,42 @@ OP_LOADCONST:
     if (!cv) {
         registers[pc->dst] = nullptr;
     } else {
-        if (cv->type->tag == TypeTag::Int || cv->type->tag == TypeTag::Int8 || 
-            cv->type->tag == TypeTag::Int16 || cv->type->tag == TypeTag::Int32 || 
-            cv->type->tag == TypeTag::Int64 || cv->type->tag == TypeTag::Int128 ||
-            cv->type->tag == TypeTag::UInt || cv->type->tag == TypeTag::UInt8 || 
-            cv->type->tag == TypeTag::UInt16 || cv->type->tag == TypeTag::UInt32 || 
-            cv->type->tag == TypeTag::UInt64 || cv->type->tag == TypeTag::UInt128) {
+        // Use the TypeSystem to handle type conversion properly
+        TypePtr target_type;
+        switch (pc->result_type) {
+            case LIR::Type::I32:
+                target_type = type_system->INT32_TYPE;
+                break;
+            case LIR::Type::I64:
+                target_type = type_system->INT64_TYPE;
+                break;
+            case LIR::Type::F64:
+                target_type = type_system->FLOAT64_TYPE;
+                break;
+            case LIR::Type::Bool:
+                target_type = type_system->BOOL_TYPE;
+                break;
+            case LIR::Type::Ptr:
+                // For pointer types, store as string (e.g., string literals)
+                target_type = type_system->STRING_TYPE;
+                break;
+            default:
+                target_type = type_system->NIL_TYPE;
+                break;
+        }
+        
+        // Create a typed value and convert to register representation
+        ValuePtr typed_value = type_system->createValue(target_type);
+        typed_value->data = cv->data;
+        
+        // Convert to register value representation
+        if (target_type->tag == TypeTag::Int32 || target_type->tag == TypeTag::Int64) {
             registers[pc->dst] = static_cast<int64_t>(std::stoll(cv->data));
-        } else if (cv->type->tag == TypeTag::Float32 || cv->type->tag == TypeTag::Float64) {
+        } else if (target_type->tag == TypeTag::Float64) {
             registers[pc->dst] = std::stod(cv->data);
-        } else if (cv->type->tag == TypeTag::Bool) {
+        } else if (target_type->tag == TypeTag::Bool) {
             registers[pc->dst] = static_cast<bool>(cv->data == "true");
-        } else if (cv->type->tag == TypeTag::String) {
+        } else if (target_type->tag == TypeTag::String) {
             registers[pc->dst] = std::string(static_cast<const char*>(cv->data.c_str()));
         } else {
             registers[pc->dst] = nullptr;
@@ -189,7 +221,17 @@ OP_ADD:
     temp_a = &registers[pc->a];
     temp_b = &registers[pc->b];
     if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
-        registers[pc->dst] = to_float(*temp_a) + to_float(*temp_b);
+        // Use TypeSystem to determine proper result type
+        TypePtr result_type = (pc->result_type == LIR::Type::F64) ? 
+                              type_system->FLOAT64_TYPE : type_system->INT64_TYPE;
+        
+        if (result_type->tag == TypeTag::Float64) {
+            registers[pc->dst] = to_float(*temp_a) + to_float(*temp_b);
+        } else {
+            // For integer types (I32, I64)
+            int64_t int_result = to_int(*temp_a) + to_int(*temp_b);
+            registers[pc->dst] = int_result;
+        }
     } else {
         registers[pc->dst] = nullptr;
     }
@@ -199,7 +241,14 @@ OP_SUB:
     temp_a = &registers[pc->a];
     temp_b = &registers[pc->b];
     if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
-        registers[pc->dst] = to_float(*temp_a) - to_float(*temp_b);
+        // Use result_type to determine if we should return int or float
+        if (pc->result_type == LIR::Type::F64) {
+            registers[pc->dst] = to_float(*temp_a) - to_float(*temp_b);
+        } else {
+            // For integer types (I32, I64)
+            int64_t int_result = to_int(*temp_a) - to_int(*temp_b);
+            registers[pc->dst] = int_result;
+        }
     } else {
         registers[pc->dst] = nullptr;
     }
@@ -209,7 +258,14 @@ OP_MUL:
     temp_a = &registers[pc->a];
     temp_b = &registers[pc->b];
     if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
-        registers[pc->dst] = to_float(*temp_a) * to_float(*temp_b);
+        // Use result_type to determine if we should return int or float
+        if (pc->result_type == LIR::Type::F64) {
+            registers[pc->dst] = to_float(*temp_a) * to_float(*temp_b);
+        } else {
+            // For integer types (I32, I64)
+            int64_t int_result = to_int(*temp_a) * to_int(*temp_b);
+            registers[pc->dst] = int_result;
+        }
     } else {
         registers[pc->dst] = nullptr;
     }
@@ -220,7 +276,18 @@ OP_DIV:
     temp_b = &registers[pc->b];
     if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
         double_result = to_float(*temp_b);
-        registers[pc->dst] = (double_result != 0.0) ? to_float(*temp_a) / double_result : 0.0;
+        if (double_result != 0.0) {
+            // Use result_type to determine if we should return int or float
+            if (pc->result_type == LIR::Type::F64) {
+                registers[pc->dst] = to_float(*temp_a) / double_result;
+            } else {
+                // For integer types (I32, I64), perform integer division
+                int_result = to_int(*temp_a) / to_int(*temp_b);
+                registers[pc->dst] = int_result;
+            }
+        } else {
+            registers[pc->dst] = 0; // Division by zero protection
+        }
     } else {
         registers[pc->dst] = nullptr;
     }

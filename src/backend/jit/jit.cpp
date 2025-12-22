@@ -220,6 +220,7 @@ void JITBackend::compile_function(const LIR::LIR_Function& function) {
     // Enter memory region for this compilation
     enter_memory_region();
 
+    // Populate register_types from function's register_types mapping
     for (const auto& entry : function.register_types) {
         register_types[entry.first] = to_jit_type(entry.second);
     }
@@ -227,6 +228,11 @@ void JITBackend::compile_function(const LIR::LIR_Function& function) {
     // Create function type and function
     std::vector<gccjit::param> param_types;
     for (uint32_t i = 0; i < function.param_count; ++i) {
+        gccjit::type param_type = register_types[i];
+        if (!param_type.get_inner_type()) {
+            param_type = m_int_type; // Default to int if no type specified
+        }
+        param_types.push_back(m_context.new_param(param_type, ("param" + std::to_string(i)).c_str()));
         param_types.push_back(m_context.new_param(m_int_type, ("param" + std::to_string(i)).c_str()));
     }
     
@@ -1362,6 +1368,25 @@ gccjit::rvalue JITBackend::compile_to_cstring(gccjit::rvalue value) {
     return compile_to_string(value);
 }
 
+
+gccjit::type JITBackend::to_jit_type(LIR::Type type) {
+    switch (type) {
+        case LIR::Type::I32:
+            return m_int_type;
+        case LIR::Type::I64:
+            return m_int_type;
+        case LIR::Type::F64:
+            return m_double_type;
+        case LIR::Type::Bool:
+            return m_bool_type;
+        case LIR::Type::Ptr:
+            return m_void_ptr_type;
+        case LIR::Type::Void:
+            return m_void_type;
+        default:
+            return m_int_type;
+    }
+}
 
 gccjit::type JITBackend::to_jit_type(TypePtr type) {
     if (!type) {

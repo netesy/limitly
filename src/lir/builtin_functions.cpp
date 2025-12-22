@@ -28,10 +28,10 @@ LIRBuiltinFunction::LIRBuiltinFunction(const std::string& name,
     for (size_t i = 0; i < paramTypes_.size(); i++) {
         LIRParameter param;
         param.name = "arg" + std::to_string(i);
-        param.type = std::make_shared<Type>(paramTypes_[i]);
+        param.type = typeTagToLIRType(paramTypes_[i]);
         signature_.parameters.push_back(param);
     }
-    signature_.returnType = std::make_shared<Type>(returnType_);
+    signature_.returnType = typeTagToLIRType(returnType_);
     signature_.isAsync = false;
 }
 
@@ -103,7 +103,7 @@ void LIRBuiltinFunctions::registerStringFunctions() {
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             std::string a = args[0]->as<std::string>();
             std::string b = args[1]->as<std::string>();
-            auto string_type = std::make_shared<Type>(TypeTag::String);
+            auto string_type = std::make_shared<::Type>(TypeTag::String);
             return std::make_shared<Value>(string_type, a + b);
         }
     ));
@@ -114,7 +114,7 @@ void LIRBuiltinFunctions::registerStringFunctions() {
         TypeTag::Int,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             std::string a = args[0]->as<std::string>();
-            auto int_type = std::make_shared<Type>(TypeTag::Int);
+            auto int_type = std::make_shared<::Type>(TypeTag::Int);
             return std::make_shared<Value>(int_type, static_cast<int64_t>(a.length()));
         }
     ));
@@ -130,7 +130,7 @@ void LIRBuiltinFunctions::registerStringFunctions() {
             
             if (start < 0) start = 0;
             if (start >= str.length()) {
-                auto string_type = std::make_shared<Type>(TypeTag::String);
+                auto string_type = std::make_shared<::Type>(TypeTag::String);
                 return std::make_shared<Value>(string_type, std::string(""));
             }
             
@@ -139,7 +139,7 @@ void LIRBuiltinFunctions::registerStringFunctions() {
                 length = str.length() - start;
             }
             
-            auto string_type = std::make_shared<Type>(TypeTag::String);
+            auto string_type = std::make_shared<::Type>(TypeTag::String);
             return std::make_shared<Value>(string_type, str.substr(start, length));
         }
     ));
@@ -173,7 +173,7 @@ void LIRBuiltinFunctions::registerIOFunctions() {
                 }
                 std::cout << std::endl;
             }
-            auto nil_type = std::make_shared<Type>(TypeTag::Nil);
+            auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
             return std::make_shared<Value>(nil_type);
         }
     ));
@@ -189,7 +189,7 @@ void LIRBuiltinFunctions::registerIOFunctions() {
             std::string line;
             std::getline(std::cin, line);
             
-            auto string_type = std::make_shared<Type>(TypeTag::String);
+            auto string_type = std::make_shared<::Type>(TypeTag::String);
             return std::make_shared<Value>(string_type, line);
         }
     ));
@@ -202,7 +202,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         TypeTag::Int,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             int64_t value = args[0]->as<int64_t>();
-            auto int_type = std::make_shared<Type>(TypeTag::Int);
+            auto int_type = std::make_shared<::Type>(TypeTag::Int);
             return std::make_shared<Value>(int_type, value < 0 ? -value : value);
         }
     ));
@@ -213,7 +213,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         TypeTag::Float32,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double value = args[0]->as<double>();
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::fabs(value));
         }
     ));
@@ -225,7 +225,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double base = args[0]->as<double>();
             double exp = args[1]->as<double>();
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::pow(base, exp));
         }
     ));
@@ -237,7 +237,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double value = args[0]->as<double>();
             if (value < 0) throw std::runtime_error("Square root of negative number");
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::sqrt(value));
         }
     ));
@@ -248,7 +248,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         TypeTag::Float32,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double value = args[0]->as<double>();
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::cbrt(value));
         }
     ));
@@ -260,7 +260,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double x = args[0]->as<double>();
             double y = args[1]->as<double>();
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::hypot(x, y));
         }
     ));
@@ -272,7 +272,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         TypeTag::Float32,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double value = args[0]->as<double>();
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::sin(value));
         }
     ));
@@ -283,7 +283,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         TypeTag::Float32,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double value = args[0]->as<double>();
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::cos(value));
         }
     ));
@@ -294,7 +294,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         TypeTag::Float32,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double value = args[0]->as<double>();
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::tan(value));
         }
     ));
@@ -307,7 +307,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double value = args[0]->as<double>();
             if (value < -1.0 || value > 1.0) throw std::runtime_error("asin: argument out of range [-1, 1]");
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::asin(value));
         }
     ));
@@ -319,7 +319,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double value = args[0]->as<double>();
             if (value < -1.0 || value > 1.0) throw std::runtime_error("acos: argument out of range [-1, 1]");
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::acos(value));
         }
     ));
@@ -330,7 +330,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         TypeTag::Float32,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double value = args[0]->as<double>();
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::atan(value));
         }
     ));
@@ -342,7 +342,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double y = args[0]->as<double>();
             double x = args[1]->as<double>();
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::atan2(y, x));
         }
     ));
@@ -354,7 +354,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         TypeTag::Float32,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double value = args[0]->as<double>();
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::sinh(value));
         }
     ));
@@ -365,7 +365,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         TypeTag::Float32,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double value = args[0]->as<double>();
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::cosh(value));
         }
     ));
@@ -376,7 +376,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         TypeTag::Float32,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double value = args[0]->as<double>();
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::tanh(value));
         }
     ));
@@ -388,7 +388,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         TypeTag::Float32,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double value = args[0]->as<double>();
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::asinh(value));
         }
     ));
@@ -400,7 +400,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double value = args[0]->as<double>();
             if (value < 1.0) throw std::runtime_error("acosh: argument must be >= 1");
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::acosh(value));
         }
     ));
@@ -412,7 +412,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double value = args[0]->as<double>();
             if (value <= -1.0 || value >= 1.0) throw std::runtime_error("atanh: argument must be in (-1, 1)");
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::atanh(value));
         }
     ));
@@ -424,7 +424,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         TypeTag::Float32,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double value = args[0]->as<double>();
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::exp(value));
         }
     ));
@@ -435,7 +435,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         TypeTag::Float32,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double value = args[0]->as<double>();
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::exp2(value));
         }
     ));
@@ -447,7 +447,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double value = args[0]->as<double>();
             if (value <= 0) throw std::runtime_error("log: argument must be positive");
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::log(value));
         }
     ));
@@ -459,7 +459,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double value = args[0]->as<double>();
             if (value <= 0) throw std::runtime_error("log10: argument must be positive");
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::log10(value));
         }
     ));
@@ -471,7 +471,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double value = args[0]->as<double>();
             if (value <= 0) throw std::runtime_error("log2: argument must be positive");
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::log2(value));
         }
     ));
@@ -483,7 +483,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         TypeTag::Float32,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double value = args[0]->as<double>();
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::ceil(value));
         }
     ));
@@ -494,7 +494,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         TypeTag::Float32,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double value = args[0]->as<double>();
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::floor(value));
         }
     ));
@@ -505,7 +505,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         TypeTag::Float32,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double value = args[0]->as<double>();
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::trunc(value));
         }
     ));
@@ -519,7 +519,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
             double x = args[0]->as<double>();
             double y = args[1]->as<double>();
             if (y == 0.0) throw std::runtime_error("fmod: division by zero");
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::fmod(x, y));
         }
     ));
@@ -532,7 +532,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
             double x = args[0]->as<double>();
             double y = args[1]->as<double>();
             if (y == 0.0) throw std::runtime_error("remainder: division by zero");
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::remainder(x, y));
         }
     ));
@@ -544,7 +544,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double x = args[0]->as<double>();
             double y = args[1]->as<double>();
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::fmax(x, y));
         }
     ));
@@ -556,7 +556,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double x = args[0]->as<double>();
             double y = args[1]->as<double>();
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::fmin(x, y));
         }
     ));
@@ -568,7 +568,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             double x = args[0]->as<double>();
             double y = args[1]->as<double>();
-            auto float_type = std::make_shared<Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
             return std::make_shared<Value>(float_type, std::fdim(x, y));
         }
     ));
@@ -579,7 +579,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         std::vector<TypeTag>{},
         TypeTag::Float64,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
-            auto float_type = std::make_shared<Type>(TypeTag::Float64);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float64);
             return std::make_shared<Value>(float_type, 3.14159265358979323846);
         }
     ));
@@ -589,7 +589,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         std::vector<TypeTag>{},
         TypeTag::Float64,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
-            auto float_type = std::make_shared<Type>(TypeTag::Float64);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float64);
             return std::make_shared<Value>(float_type, 2.71828182845904523536);
         }
     ));
@@ -599,7 +599,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         std::vector<TypeTag>{},
         TypeTag::Float64,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
-            auto float_type = std::make_shared<Type>(TypeTag::Float64);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float64);
             return std::make_shared<Value>(float_type, 0.69314718055994530942);
         }
     ));
@@ -609,7 +609,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         std::vector<TypeTag>{},
         TypeTag::Float64,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
-            auto float_type = std::make_shared<Type>(TypeTag::Float64);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float64);
             return std::make_shared<Value>(float_type, 2.30258509299404568402);
         }
     ));
@@ -619,7 +619,7 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         std::vector<TypeTag>{},
         TypeTag::Float64,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
-            auto float_type = std::make_shared<Type>(TypeTag::Float64);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float64);
             return std::make_shared<Value>(float_type, 1.41421356237309504880);
         }
     ));
@@ -641,7 +641,7 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
                 case TypeTag::Nil: type_name = "nil"; break;
                 default: type_name = "unknown"; break;
             }
-            auto string_type = std::make_shared<Type>(TypeTag::String);
+            auto string_type = std::make_shared<::Type>(TypeTag::String);
             return std::make_shared<Value>(string_type, type_name);
         }
     ));
@@ -652,7 +652,7 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
         TypeTag::Float64,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             long double cpuTime = static_cast<long double>(std::clock()) / CLOCKS_PER_SEC;
-            auto float64_type = std::make_shared<Type>(TypeTag::Float64);
+            auto float64_type = std::make_shared<::Type>(TypeTag::Float64);
             return std::make_shared<Value>(float64_type, cpuTime);
         }
     ));
@@ -665,7 +665,7 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
             double seconds = args[0]->as<double>();
             if (seconds < 0) throw std::runtime_error("sleep: cannot sleep for negative time");
             std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(seconds * 1000)));
-            auto nil_type = std::make_shared<Type>(TypeTag::Nil);
+            auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
             return std::make_shared<Value>(nil_type);
         }
     ));
@@ -676,7 +676,7 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
         TypeTag::Int, // Returns channel handle as int
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             // For LIR generation, return a placeholder channel handle
-            auto int_type = std::make_shared<Type>(TypeTag::Int);
+            auto int_type = std::make_shared<::Type>(TypeTag::Int);
             return std::make_shared<Value>(int_type, static_cast<int64_t>(0));
         }
     ));
@@ -710,7 +710,7 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
                     throw std::runtime_error("len: unsupported type " + value->type->toString());
             }
             
-            auto int_type = std::make_shared<Type>(TypeTag::Int);
+            auto int_type = std::make_shared<::Type>(TypeTag::Int);
             return std::make_shared<Value>(int_type, static_cast<int64_t>(length));
         }
     ));
@@ -722,7 +722,7 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(
                 std::chrono::system_clock::now().time_since_epoch()).count();
-            auto int64_type = std::make_shared<Type>(TypeTag::Int64);
+            auto int64_type = std::make_shared<::Type>(TypeTag::Int64);
             return std::make_shared<Value>(int64_type, static_cast<int64_t>(timestamp));
         }
     ));
@@ -738,7 +738,7 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
             std::stringstream ss;
             ss << std::put_time(std::gmtime(&time_t), "%Y-%m-%d");
             
-            auto string_type = std::make_shared<Type>(TypeTag::String);
+            auto string_type = std::make_shared<::Type>(TypeTag::String);
             return std::make_shared<Value>(string_type, ss.str());
         }
     ));
@@ -754,7 +754,7 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
             std::stringstream ss;
             ss << std::put_time(std::gmtime(&time_t), "%Y-%m-%dT%H:%M:%SZ");
             
-            auto string_type = std::make_shared<Type>(TypeTag::String);
+            auto string_type = std::make_shared<::Type>(TypeTag::String);
             return std::make_shared<Value>(string_type, ss.str());
         }
     ));
@@ -769,7 +769,7 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
             if (!condition) {
                 throw std::runtime_error("Assertion failed: " + message);
             }
-            auto nil_type = std::make_shared<Type>(TypeTag::Nil);
+            auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
             return std::make_shared<Value>(nil_type);
         }
     ));
@@ -785,7 +785,7 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
             double multiplier = std::pow(10.0, precision);
             double rounded = std::round(value * multiplier) / multiplier;
             
-            auto float64_type = std::make_shared<Type>(TypeTag::Float64);
+            auto float64_type = std::make_shared<::Type>(TypeTag::Float64);
             return std::make_shared<Value>(float64_type, rounded);
         }
     ));
@@ -818,12 +818,12 @@ void LIRBuiltinFunctions::registerCollectionFunctions() {
                     if (element && element->type) {
                         if (element->type->tag == TypeTag::Int || element->type->tag == TypeTag::Int32) {
                             int64_t value = element->as<int64_t>();
-                            auto int_type = std::make_shared<Type>(TypeTag::Int);
+                            auto int_type = std::make_shared<::Type>(TypeTag::Int);
                             auto transformedElement = std::make_shared<Value>(int_type, value * 2);
                             result.append(transformedElement);
                         } else if (element->type->tag == TypeTag::Float64) {
                             double value = element->as<double>();
-                            auto float_type = std::make_shared<Type>(TypeTag::Float64);
+                            auto float_type = std::make_shared<::Type>(TypeTag::Float64);
                             auto transformedElement = std::make_shared<Value>(float_type, value * 2.0);
                             result.append(transformedElement);
                         } else {
@@ -835,7 +835,7 @@ void LIRBuiltinFunctions::registerCollectionFunctions() {
                 }
             }
             
-            auto list_type = std::make_shared<Type>(TypeTag::List);
+            auto list_type = std::make_shared<::Type>(TypeTag::List);
             return std::make_shared<Value>(list_type, result);
         }
     ));
@@ -884,7 +884,7 @@ void LIRBuiltinFunctions::registerCollectionFunctions() {
                 }
             }
             
-            auto list_type = std::make_shared<Type>(TypeTag::List);
+            auto list_type = std::make_shared<::Type>(TypeTag::List);
             return std::make_shared<Value>(list_type, result);
         }
     ));
@@ -933,12 +933,12 @@ void LIRBuiltinFunctions::registerCollectionFunctions() {
                             (element->type->tag == TypeTag::Int || element->type->tag == TypeTag::Int32)) {
                             int64_t accValue = accumulator->as<int64_t>();
                             int64_t elemValue = element->as<int64_t>();
-                            auto int_type = std::make_shared<Type>(TypeTag::Int);
+                            auto int_type = std::make_shared<::Type>(TypeTag::Int);
                             accumulator = std::make_shared<Value>(int_type, accValue + elemValue);
                         } else if (accumulator->type->tag == TypeTag::Float64 && element->type->tag == TypeTag::Float64) {
                             double accValue = accumulator->as<double>();
                             double elemValue = element->as<double>();
-                            auto float_type = std::make_shared<Type>(TypeTag::Float64);
+                            auto float_type = std::make_shared<::Type>(TypeTag::Float64);
                             accumulator = std::make_shared<Value>(float_type, accValue + elemValue);
                         } else {
                             break;
@@ -993,7 +993,7 @@ void LIRBuiltinFunctions::registerCollectionFunctions() {
                 }
             }
             
-            auto nil_type = std::make_shared<Type>(TypeTag::Nil);
+            auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
             return std::make_shared<Value>(nil_type);
         }
     ));
@@ -1082,7 +1082,7 @@ void LIRBuiltinFunctions::registerSearchFunctions() {
                 }
             }
             
-            auto nil_type = std::make_shared<Type>(TypeTag::Nil);
+            auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
             return std::make_shared<Value>(nil_type);
         }
     ));
@@ -1141,7 +1141,7 @@ void LIRBuiltinFunctions::registerSearchFunctions() {
                             }
                             
                             if (matches) {
-                                auto bool_type = std::make_shared<Type>(TypeTag::Bool);
+                                auto bool_type = std::make_shared<::Type>(TypeTag::Bool);
                                 return std::make_shared<Value>(bool_type, true);
                             }
                         } else if (element->type->tag == TypeTag::Float64) {
@@ -1161,7 +1161,7 @@ void LIRBuiltinFunctions::registerSearchFunctions() {
                             }
                             
                             if (matches) {
-                                auto bool_type = std::make_shared<Type>(TypeTag::Bool);
+                                auto bool_type = std::make_shared<::Type>(TypeTag::Bool);
                                 return std::make_shared<Value>(bool_type, true);
                             }
                         }
@@ -1171,7 +1171,7 @@ void LIRBuiltinFunctions::registerSearchFunctions() {
                 }
             }
             
-            auto bool_type = std::make_shared<Type>(TypeTag::Bool);
+            auto bool_type = std::make_shared<::Type>(TypeTag::Bool);
             return std::make_shared<Value>(bool_type, false);
         }
     ));
@@ -1230,7 +1230,7 @@ void LIRBuiltinFunctions::registerSearchFunctions() {
                             }
                             
                             if (!matches) {
-                                auto bool_type = std::make_shared<Type>(TypeTag::Bool);
+                                auto bool_type = std::make_shared<::Type>(TypeTag::Bool);
                                 return std::make_shared<Value>(bool_type, false);
                             }
                         } else if (element->type->tag == TypeTag::Float64) {
@@ -1249,11 +1249,11 @@ void LIRBuiltinFunctions::registerSearchFunctions() {
                             }
                             
                             if (!matches) {
-                                auto bool_type = std::make_shared<Type>(TypeTag::Bool);
+                                auto bool_type = std::make_shared<::Type>(TypeTag::Bool);
                                 return std::make_shared<Value>(bool_type, false);
                             }
                         } else {
-                            auto bool_type = std::make_shared<Type>(TypeTag::Bool);
+                            auto bool_type = std::make_shared<::Type>(TypeTag::Bool);
                             return std::make_shared<Value>(bool_type, false);
                         }
                     }
@@ -1262,7 +1262,7 @@ void LIRBuiltinFunctions::registerSearchFunctions() {
                 }
             }
             
-            auto bool_type = std::make_shared<Type>(TypeTag::Bool);
+            auto bool_type = std::make_shared<::Type>(TypeTag::Bool);
             return std::make_shared<Value>(bool_type, true);
         }
     ));
@@ -1279,7 +1279,7 @@ void LIRBuiltinFunctions::registerCompositionFunctions() {
             
             // For now, return a nil value as a placeholder
             // This will be replaced with proper function composition when closures are implemented
-            auto nil_type = std::make_shared<Type>(TypeTag::Nil);
+            auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
             return std::make_shared<Value>(nil_type);
         }
     ));
@@ -1293,7 +1293,7 @@ void LIRBuiltinFunctions::registerCompositionFunctions() {
             
             // For now, return a nil value as a placeholder
             // This will be replaced with proper function currying when closures are implemented
-            auto nil_type = std::make_shared<Type>(TypeTag::Nil);
+            auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
             return std::make_shared<Value>(nil_type);
         }
     ));
@@ -1310,7 +1310,7 @@ void LIRBuiltinFunctions::registerCompositionFunctions() {
             
             // For now, return a nil value as a placeholder
             // This will be replaced with proper partial application when closures are implemented
-            auto nil_type = std::make_shared<Type>(TypeTag::Nil);
+            auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
             return std::make_shared<Value>(nil_type);
         }
     ));

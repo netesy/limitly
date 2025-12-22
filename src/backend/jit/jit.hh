@@ -110,6 +110,7 @@ private:
     // Helper methods
     gccjit::rvalue convert_to_jit_type(gccjit::rvalue value, gccjit::type target_type);
     gccjit::type to_jit_type(TypePtr type);
+    gccjit::type to_jit_type(LIR::Type type);
     
     // Basic operations implementation
     gccjit::rvalue compile_arithmetic_op(LIR::LIR_Op op, gccjit::rvalue a, gccjit::rvalue b);

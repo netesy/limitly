@@ -9,7 +9,7 @@
 #include <sstream>
 #include <iomanip>
 #include "../backend/value.hh"
-#include "../frontend/type_system.hh"
+#include "../backend/types.hh"
 
 namespace LIR {
 
@@ -315,7 +315,7 @@ class LIR_FunctionContext {
 public:
     std::unordered_map<std::string, Reg> variable_to_reg;
     std::unordered_map<Reg, Type> register_types;  // ABI-level types for registers
-    std::unordered_map<Reg, LanguageType*> register_language_types; // Language types for reference
+    std::unordered_map<Reg, TypePtr> register_language_types; // Language types for reference
     std::vector<LIR_Inst> instructions;
     uint32_t next_reg = 0;
     
@@ -338,7 +338,7 @@ public:
         register_types[reg] = abi_type;
     }
 
-    void set_register_language_type(Reg reg, LanguageType* lang_type) {
+    void set_register_language_type(Reg reg, TypePtr lang_type) {
         register_language_types[reg] = lang_type;
     }
 
@@ -347,7 +347,7 @@ public:
         return (it != register_types.end()) ? it->second : Type::Void;
     }
 
-    LanguageType* get_register_language_type(Reg reg) const {
+    TypePtr get_register_language_type(Reg reg) const {
         auto it = register_language_types.find(reg);
         return (it != register_language_types.end()) ? it->second : nullptr;
     }
@@ -400,7 +400,7 @@ public:
     // Variable to register mapping
     std::unordered_map<std::string, Reg> variable_to_reg;
     std::unordered_map<Reg, Type> register_types;    // ABI-level types for registers
-    std::unordered_map<Reg, LanguageType*> register_language_types; // Language types for reference
+    std::unordered_map<Reg, TypePtr> register_language_types; // Language types for reference
 
     LIR_Function(const std::string& name, uint32_t param_count = 0)
         : name(name), param_count(param_count), register_count(0), cfg(std::make_unique<LIR_CFG>()) {
@@ -484,7 +484,7 @@ public:
         register_types[reg] = abi_type;
     }
 
-    void set_register_language_type(Reg reg, LanguageType* lang_type) {
+    void set_register_language_type(Reg reg, TypePtr lang_type) {
         register_language_types[reg] = lang_type;
     }
 
@@ -493,7 +493,7 @@ public:
         return (it != register_types.end()) ? it->second : Type::Void;
     }
 
-    LanguageType* get_register_language_type(Reg reg) const {
+    TypePtr get_register_language_type(Reg reg) const {
         auto it = register_language_types.find(reg);
         return (it != register_language_types.end()) ? it->second : nullptr;
     }
@@ -544,7 +544,7 @@ std::string lir_op_to_string(LIR_Op op);
 std::string type_to_string(Type type);
 
 // Type conversion utilities (simplified)
-Type language_type_to_abi_type(LanguageType* lang_type);
+Type language_type_to_abi_type(TypePtr lang_type);
 
 } // namespace LIR
 

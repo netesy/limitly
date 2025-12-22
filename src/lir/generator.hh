@@ -22,7 +22,7 @@ public:
     
     // Main entry point - now takes TypeCheckResult instead of raw AST
     std::unique_ptr<LIR_Function> generate_program(const TypeCheckResult& type_check_result);
-    std::unique_ptr<LIR_Function> generate_function(AST::FunctionDeclaration& fn, TypeSystem& type_system);
+    std::unique_ptr<LIR_Function> generate_function(AST::FunctionDeclaration& fn);
     
     // Error handling
     bool has_errors() const;
@@ -52,12 +52,12 @@ private:
     
     // New simplified type methods
     void set_register_abi_type(Reg reg, Type abi_type);
-    void set_register_language_type(Reg reg, LanguageType* lang_type);
+    void set_register_language_type(Reg reg, TypePtr lang_type);
     Type get_register_abi_type(Reg reg) const;
-    LanguageType* get_register_language_type(Reg reg) const;
+    TypePtr get_register_language_type(Reg reg) const;
     
     // Type conversion helpers
-    Type language_type_to_abi_type(LanguageType* lang_type);
+    Type language_type_to_abi_type(TypePtr lang_type);
     Type get_expression_abi_type(AST::Expression& expr);
     
     void emit_instruction(const LIR_Inst& inst);
@@ -109,7 +109,7 @@ private:
     Reg emit_expr(AST::Expression& expr);
     
     // Specific expression handlers
-    Reg emit_literal_expr(AST::LiteralExpr& expr, LanguageType* expected_type = nullptr);
+    Reg emit_literal_expr(AST::LiteralExpr& expr, TypePtr expected_type = nullptr);
     Reg emit_variable_expr(AST::VariableExpr& expr);
     Reg emit_interpolated_string_expr(AST::InterpolatedStringExpr& expr);
     Reg emit_binary_expr(AST::BinaryExpr& expr);
@@ -204,7 +204,7 @@ private:
     uint32_t next_label_ = 0;
     std::unordered_map<Reg, TypePtr> register_types_;
     std::unordered_map<Reg, Type> register_abi_types_;
-    std::unordered_map<Reg, LanguageType*> register_language_types_;
+    std::unordered_map<Reg, TypePtr> register_language_types_;
     std::unordered_map<Reg, ValuePtr> register_values_;
     std::vector<std::string> errors_;
     
@@ -253,7 +253,7 @@ private:
     MemoryManager<>::Region* current_memory_region_ = nullptr;
     
     // Helper methods
-    std::shared_ptr<Type> convert_ast_type_to_lir_type(const std::shared_ptr<AST::TypeAnnotation>& ast_type);
+    std::shared_ptr<::Type> convert_ast_type_to_lir_type(const std::shared_ptr<AST::TypeAnnotation>& ast_type);
     
     // Class system helper methods
     void collect_class_signatures(AST::Program& program);

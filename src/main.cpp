@@ -2,6 +2,7 @@
 #include "frontend/scanner.hh"
 #include "frontend/parser.hh"
 #include "frontend/cst_printer.hh"
+#include "frontend/type_checker.hh"
 #include "common/backend.hh"
 #include "backend/ast_printer.hh"
 #include "backend/bytecode_printer.hh"
@@ -15,7 +16,6 @@
 #include <sstream>
 #include <string>
 #include <memory>
-#include "lembed.hh"
 
 void printUsage(const char* programName) {
     std::cout << "Limit Programming Language" << std::endl;
@@ -77,6 +77,16 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             }
         }
         
+        // Type checking
+        auto type_check_result = TypeCheckerFactory::check_program(ast);
+        if (!type_check_result.success) {
+            std::cerr << "Type checking errors:\n";
+            for (const auto& error : type_check_result.errors) {
+                std::cerr << "  " << error << std::endl;
+            }
+            return 1;
+        }
+        
         // Print AST if requested
         if (printAst) {
             std::cout << "=== AST ===\n";
@@ -89,7 +99,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             try {
                 // Generate LIR from AST (this includes complete CFG building)
                 LIR::Generator lir_generator;
-                auto lir_function = lir_generator.generate_program(*ast);
+                auto lir_function = lir_generator.generate_program(type_check_result);
                 
                 // Initialize and run LIR disassembler
                 LIR::Disassembler disassemble(*lir_function, true);
@@ -213,7 +223,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             
             // Generate LIR and execute with register interpreter
             LIR::Generator lir_generator;
-            auto lir_function = lir_generator.generate_program(*ast);
+            auto lir_function = lir_generator.generate_program(type_check_result);
             
             if (!lir_function) {
                 std::cerr << "Failed to generate LIR function\n";
@@ -295,9 +305,19 @@ void startRepl() {
             Parser parser(scanner, false); // Use legacy mode for optimal REPL performance
             std::shared_ptr<AST::Program> ast = parser.parse();
             
+            // Type checking
+            auto type_check_result = TypeCheckerFactory::check_program(ast);
+            if (!type_check_result.success) {
+                std::cerr << "Type checking errors:\n";
+                for (const auto& error : type_check_result.errors) {
+                    std::cerr << "  " << error << std::endl;
+                }
+                continue;
+            }
+            
             // Backend: Generate LIR and execute with register interpreter
             LIR::Generator lir_generator;
-            auto lir_function = lir_generator.generate_program(*ast);
+            auto lir_function = lir_generator.generate_program(type_check_result);
             
             if (!lir_function) {
                 std::cerr << "Failed to generate LIR function\n";
