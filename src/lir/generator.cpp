@@ -2430,7 +2430,7 @@ void Generator::emit_task_init_and_step(AST::TaskStatement& task, size_t task_id
     set_register_type(task_context_reg, int_type);
     
     // Initialize task context
-    emit_instruction(LIR_Inst(LIR_Op::TaskContextInit, task_context_reg, task_id, 0));
+    emit_instruction(LIR_Inst(LIR_Op::TaskContextInit, task_context_reg, task_context_reg, 0));
     
     // Set task ID in context
     Reg task_id_reg = allocate_register();
@@ -3327,7 +3327,7 @@ void Generator::emit_parallel_task_init(AST::TaskStatement& task, size_t task_id
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, task_context_reg, task_id_val));
     set_register_type(task_context_reg, int_type);
     
-    emit_instruction(LIR_Inst(LIR_Op::TaskContextInit, task_context_reg, task_id, 0));
+    emit_instruction(LIR_Inst(LIR_Op::TaskContextInit, task_context_reg, task_context_reg, 0));
     
     // Set task ID in context
     Reg task_id_reg = allocate_register();
