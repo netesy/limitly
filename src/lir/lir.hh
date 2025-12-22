@@ -145,6 +145,7 @@ enum class LIR_Op : uint8_t {
     ParallelWaitComplete,// Wait for all workers to complete
     WorkerSignal,        // Signal workers to start
     WorkerJoin,          // Wait for workers to finish
+    TaskSetCode,         // Store task body code in context
     
     // List/Collection operations
     ListCreate,

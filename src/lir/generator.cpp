@@ -3347,6 +3347,25 @@ void Generator::emit_parallel_task_init(AST::TaskStatement& task, size_t task_id
         bind_variable(task.loopVar, loop_var_reg);
     }
     
+    // NEW: Emit task body as instruction range
+    size_t body_start_pc = current_function_->instructions.size();
+    
+    // Emit task body statements
+    for (const auto& stmt : task.body->statements) {
+        emit_stmt(*stmt);
+    }
+    
+    size_t body_end_pc = current_function_->instructions.size();
+    
+    // Store the instruction range in the task context
+    Reg start_pc_reg = allocate_register();
+    ValuePtr start_pc_val = std::make_shared<Value>(int_type, int64_t(body_start_pc));
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, start_pc_reg, start_pc_val));
+    set_register_type(start_pc_reg, int_type);
+    
+    // Use immediate field to store end PC
+    emit_instruction(LIR_Inst(LIR_Op::TaskSetCode, task_context_reg, start_pc_reg, 0, static_cast<Imm>(body_end_pc)));
+    
     // Push task context to work queue (atomic)
     emit_instruction(LIR_Inst(LIR_Op::WorkQueuePush, work_queue_reg, task_context_reg, 0));
 }

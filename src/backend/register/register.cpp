@@ -12,7 +12,7 @@ RegisterVM::RegisterVM()
     registers.resize(1024, nullptr);
     scheduler = std::make_unique<Scheduler>();
     current_time = 0;
-    current_function = nullptr;
+    current_function_ = nullptr;
     
     // Initialize shared variables
     shared_variables.emplace(std::piecewise_construct, 
@@ -26,13 +26,133 @@ void RegisterVM::reset() {
     channels.clear();
     scheduler = std::make_unique<Scheduler>();
     current_time = 0;
-    current_function = nullptr;
+    current_function_ = nullptr;
     
     // Reset shared variables
     shared_variables.clear();
     shared_variables.emplace(std::piecewise_construct, 
         std::forward_as_tuple("shared_counter"), 
         std::forward_as_tuple(0));
+    
+    // Reset atomic variables and work queues
+    default_atomic.store(0);
+    work_queues.clear();
+    work_queue_counter.store(0);
+    instruction_count = 0;
+}
+
+void RegisterVM::execute_task_body(TaskContext* task, const LIR::LIR_Function& function) {
+    std::cout << "[DEBUG] Executing task body: PC " << task->body_start_pc 
+              << " to " << task->body_end_pc << std::endl;
+    
+    if (task->body_start_pc < 0 || task->body_end_pc < 0) {
+        std::cout << "[DEBUG] Task has no body to execute" << std::endl;
+        return;
+    }
+    
+    // Save task fields to registers so body can access them
+    // For example, field 0 is usually the loop variable 'i'
+    for (const auto& [field_idx, value] : task->fields) {
+        // Map field index to a register
+        // This depends on your LIR generator's register allocation
+        // For now, let's assume field 0 maps to a known register
+        if (field_idx == 0) {
+            // Store loop variable in register 5 (or wherever your LIR expects it)
+            registers[5] = value;
+            std::cout << "[DEBUG] Set loop variable r5 = " << to_int(value) << std::endl;
+        }
+    }
+    
+    // Execute instructions from body_start_pc to body_end_pc
+    const LIR::LIR_Inst* body_pc = function.instructions.data() + task->body_start_pc;
+    const LIR::LIR_Inst* body_end = function.instructions.data() + task->body_end_pc;
+    
+    // Simple execution: just run the instructions in sequence
+    while (body_pc < body_end) {
+        // Execute the instruction using the same dispatch logic
+        // For simplicity, we'll use a switch statement here
+        
+        switch (body_pc->op) {
+            case LIR::LIR_Op::LoadConst:
+                // Handle load_const
+                {
+                    ValuePtr cv = body_pc->const_val;
+                    if (cv) {
+                        if (body_pc->result_type == LIR::Type::I64) {
+                            registers[body_pc->dst] = static_cast<int64_t>(std::stoll(cv->data));
+                        } else if (body_pc->result_type == LIR::Type::F64) {
+                            registers[body_pc->dst] = std::stod(cv->data);
+                        } else if (body_pc->result_type == LIR::Type::Bool) {
+                            registers[body_pc->dst] = static_cast<bool>(cv->data == "true");
+                        } else if (body_pc->result_type == LIR::Type::Ptr) {
+                            registers[body_pc->dst] = std::string(cv->data);
+                        } else {
+                            registers[body_pc->dst] = nullptr;
+                        }
+                    }
+                }
+                break;
+                
+            case LIR::LIR_Op::PrintString:
+                std::cout << to_string(registers[body_pc->a]) << std::endl;
+                break;
+                
+            case LIR::LIR_Op::PrintInt:
+                std::cout << to_int(registers[body_pc->a]) << std::endl;
+                break;
+                
+            case LIR::LIR_Op::STR_FORMAT:
+                {
+                    std::string format = to_string(registers[body_pc->a]);
+                    std::string arg = to_string(registers[body_pc->b]);
+                    size_t pos = format.find("%s");
+                    if (pos != std::string::npos) {
+                        format.replace(pos, 2, arg);
+                    }
+                    registers[body_pc->dst] = format;
+                }
+                break;
+                
+            case LIR::LIR_Op::Mul:
+                {
+                    const auto& a = registers[body_pc->a];
+                    const auto& b = registers[body_pc->b];
+                    if (is_numeric(a) && is_numeric(b)) {
+                        if (body_pc->result_type == LIR::Type::F64) {
+                            registers[body_pc->dst] = to_float(a) * to_float(b);
+                        } else {
+                            registers[body_pc->dst] = to_int(a) * to_int(b);
+                        }
+                    }
+                }
+                break;
+                
+            case LIR::LIR_Op::Mov:
+                registers[body_pc->dst] = registers[body_pc->a];
+                break;
+                
+            case LIR::LIR_Op::Add:
+                {
+                    const auto& a = registers[body_pc->a];
+                    const auto& b = registers[body_pc->b];
+                    if (is_numeric(a) && is_numeric(b)) {
+                        if (body_pc->result_type == LIR::Type::F64) {
+                            registers[body_pc->dst] = to_float(a) + to_float(b);
+                        } else {
+                            registers[body_pc->dst] = to_int(a) + to_int(b);
+                        }
+                    }
+                }
+                break;
+                
+            default:
+                std::cout << "[DEBUG] Unhandled instruction in task body: " 
+                          << static_cast<int>(body_pc->op) << std::endl;
+                break;
+        }
+        
+        body_pc++;
+    }
 }
 
 std::string RegisterVM::to_string(const RegisterValue& value) const {
@@ -49,10 +169,14 @@ std::string RegisterVM::to_string(const RegisterValue& value) const {
 }
 
 void RegisterVM::execute_function(const LIR::LIR_Function& function) {
-    reset();
+    // Set current function for task execution
+    current_function_ = &function;
     
-    // Store reference to function for type information access
-    current_function = &function;
+    // Reset register file and initialize
+    registers.resize(1024);
+    for (auto& reg : registers) {
+        reg = nullptr;
+    }
     
     const LIR::LIR_Inst* pc = function.instructions.data();
     const LIR::LIR_Inst* end = pc + function.instructions.size();
@@ -144,6 +268,7 @@ void RegisterVM::execute_function(const LIR::LIR_Function& function) {
     dispatch_table[static_cast<int>(LIR::LIR_Op::WorkQueuePop)] = &&OP_WORK_QUEUE_POP;
     dispatch_table[static_cast<int>(LIR::LIR_Op::WorkerSignal)] = &&OP_WORKER_SIGNAL;
     dispatch_table[static_cast<int>(LIR::LIR_Op::ParallelWaitComplete)] = &&OP_PARALLEL_WAIT_COMPLETE;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::TaskSetCode)] = &&OP_TASK_SET_CODE;
     
     // Dispatch macro - jumps to next instruction handler
     #define DISPATCH() \
@@ -152,8 +277,13 @@ void RegisterVM::execute_function(const LIR::LIR_Function& function) {
             if (pc >= end) { \
                 return; \
             } \
+            instruction_count++; \
+            if (instruction_count > MAX_INSTRUCTIONS) { \
+                std::cerr << "Error: Instruction limit exceeded (" << MAX_INSTRUCTIONS << ") - possible infinite loop" << std::endl; \
+                return; \
+            } \
             goto *dispatch_table[static_cast<int>(pc->op)]; \
-        } while (0)
+        } while(0)
     
     #define DISPATCH_JUMP(target) \
         pc = function.instructions.data() + (target); \
@@ -825,23 +955,25 @@ OP_UNWRAPOR:
     DISPATCH();
 
 OP_ATOMICLOAD:
-    // Atomic load - placeholder
-    registers[pc->dst] = registers[pc->a];
+    // Atomic load from default_atomic
+    registers[pc->dst] = default_atomic.load();
     DISPATCH();
 
 OP_ATOMICSTORE:
-    // Atomic store - placeholder
-    registers[pc->dst] = registers[pc->a];
+    // Atomic store to default_atomic
+    {
+        int64_t value = to_int(registers[pc->a]);
+        default_atomic.store(value);
+        registers[pc->dst] = static_cast<int64_t>(1); // Success
+    }
     DISPATCH();
 
 OP_ATOMICFETCHADD:
-    // Atomic fetch and add - placeholder
-    temp_a = &registers[pc->a];
-    temp_b = &registers[pc->b];
-    if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
-        registers[pc->dst] = to_int(*temp_a) + to_int(*temp_b);
-    } else {
-        registers[pc->dst] = nullptr;
+    // Atomic fetch and add with proper atomic operations
+    {
+        int64_t addend = to_int(registers[pc->b]);
+        int64_t old_value = default_atomic.fetch_add(addend);
+        registers[pc->dst] = old_value; // Return the old value
     }
     DISPATCH();
 
@@ -879,56 +1011,85 @@ OP_WORK_QUEUE_ALLOC:
     // Allocate lock-free work queue
     {
         uint64_t size = static_cast<uint64_t>(to_int(registers[pc->a]));
-        // For now, just return a handle (simplified implementation)
-        static uint64_t queue_handle = 1000; // Simple handle allocation
-        registers[pc->dst] = static_cast<int64_t>(queue_handle++);
+        uint64_t queue_id = work_queue_counter.fetch_add(1);
+        
+        // Ensure work_queues vector is large enough
+        if (queue_id >= work_queues.size()) {
+            work_queues.resize(queue_id + 1);
+        }
+        
+        // Initialize empty queue
+        work_queues[queue_id] = std::queue<uint64_t>();
+        registers[pc->dst] = static_cast<int64_t>(queue_id);
     }
     DISPATCH();
 
 OP_WORK_QUEUE_PUSH:
     // Push task to work queue (atomic)
     {
-        uint64_t queue_handle = static_cast<uint64_t>(to_int(registers[pc->a]));
+        uint64_t queue_id = static_cast<uint64_t>(to_int(registers[pc->a]));
         uint64_t task_context = static_cast<uint64_t>(to_int(registers[pc->b]));
         
-        // Simplified: just store in a global vector (real implementation would use lock-free queue)
-        static std::vector<uint64_t> work_queue;
-        work_queue.push_back(task_context);
-        
-        registers[pc->dst] = static_cast<int64_t>(1); // Success
+        if (queue_id < work_queues.size()) {
+            work_queues[queue_id].push(task_context);
+            registers[pc->dst] = static_cast<int64_t>(1); // Success
+        } else {
+            registers[pc->dst] = static_cast<int64_t>(0); // Failure - invalid queue
+        }
     }
     DISPATCH();
 
 OP_WORK_QUEUE_POP:
     // Pop task from work queue (atomic)
     {
-        uint64_t queue_handle = static_cast<uint64_t>(to_int(registers[pc->a]));
+        uint64_t queue_id = static_cast<uint64_t>(to_int(registers[pc->a]));
         
-        // Simplified: pop from global vector
-        static std::vector<uint64_t> work_queue;
-        if (!work_queue.empty()) {
-            uint64_t task_context = work_queue.back();
-            work_queue.pop_back();
+        if (queue_id < work_queues.size() && !work_queues[queue_id].empty()) {
+            uint64_t task_context = work_queues[queue_id].front();
+            work_queues[queue_id].pop();
             registers[pc->dst] = static_cast<int64_t>(task_context);
         } else {
-            registers[pc->dst] = static_cast<int64_t>(0); // Empty
+            registers[pc->dst] = static_cast<int64_t>(0); // Empty or invalid queue
         }
     }
     DISPATCH();
 
 OP_WORKER_SIGNAL:
-    // Signal workers to start (atomic store)
+    // Process work queue and execute task bodies
     {
         uint64_t work_available = static_cast<uint64_t>(to_int(registers[pc->a]));
-        uint64_t active_workers = static_cast<uint64_t>(to_int(registers[pc->b]));
+        uint64_t num_workers = static_cast<uint64_t>(to_int(registers[pc->b]));
         
-        // Set global flag (simplified)
-        static uint64_t global_work_available = 0;
-        static uint64_t global_active_workers = 0;
+        std::cout << "[DEBUG] WorkerSignal: Processing work queue" << std::endl;
         
-        global_work_available = work_available;
-        global_active_workers = active_workers;
+        // CRITICAL: Set atomic to 0 to break wait loop
+        default_atomic.store(0);
         
+        // Process all work queues
+        for (auto& queue : work_queues) {
+            while (!queue.empty()) {
+                uint64_t task_context = queue.front();
+                queue.pop();
+                
+                // Execute the task with actual code
+                if (task_context < task_contexts.size()) {
+                    auto& task = task_contexts[task_context];
+                    if (task->state == TaskState::RUNNING || task->state == TaskState::INIT) {
+                        std::cout << "[DEBUG] Executing task " << task->task_id << std::endl;
+                        
+                        // Execute task body if it has one
+                        if (task->body_start_pc >= 0 && task->body_end_pc >= 0) {
+                            execute_task_body(task.get(), *current_function_);
+                        }
+                        
+                        // Mark task as completed
+                        task->state = TaskState::COMPLETED;
+                    }
+                }
+            }
+        }
+        
+        std::cout << "[DEBUG] All work complete" << std::endl;
         registers[pc->dst] = static_cast<int64_t>(1); // Success
     }
     DISPATCH();
@@ -941,6 +1102,27 @@ OP_PARALLEL_WAIT_COMPLETE:
         
         // Simplified: just return success (real implementation would wait with timeout)
         registers[pc->dst] = static_cast<int64_t>(1); // Success
+    }
+    DISPATCH();
+
+OP_TASK_SET_CODE:
+    // Store task body instruction range
+    {
+        uint64_t context_id = static_cast<uint64_t>(to_int(registers[pc->a]));
+        int64_t body_start = static_cast<int64_t>(to_int(registers[pc->b]));
+        int64_t body_end = pc->imm; // End PC stored in immediate field
+        
+        std::cout << "[DEBUG] task_set_code: context=" << context_id 
+                  << " body_start=" << body_start 
+                  << " body_end=" << body_end << std::endl;
+        
+        if (context_id < task_contexts.size()) {
+            task_contexts[context_id]->body_start_pc = body_start;
+            task_contexts[context_id]->body_end_pc = body_end;
+            registers[pc->dst] = static_cast<int64_t>(1); // Success
+        } else {
+            registers[pc->dst] = static_cast<int64_t>(0); // Failure
+        }
     }
     DISPATCH();
     

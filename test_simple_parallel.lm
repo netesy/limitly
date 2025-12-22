@@ -1,0 +1,14 @@
+// Simple parallel test to verify task execution
+
+print("Starting simple parallel test...");
+
+parallel(cores=2) {
+    task() {
+        print("Task 1 executed!");
+    }
+    task() {
+        print("Task 2 executed!");
+    }
+}
+
+print("Parallel test completed!");

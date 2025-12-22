@@ -35,12 +35,21 @@ struct TaskContext {
     RegisterValue channel_ptr;
     std::unordered_map<int, RegisterValue> fields;
     
-    TaskContext() : state(TaskState::INIT), task_id(0), sleep_until(0), counter(0), channel_ptr(nullptr) {}
+    // Store task body as instruction range
+    int64_t body_start_pc;  // Start instruction index
+    int64_t body_end_pc;    // End instruction index
     
-    // Copy constructor
+    TaskContext() 
+        : state(TaskState::INIT), task_id(0), sleep_until(0), 
+          counter(0), channel_ptr(nullptr),
+          body_start_pc(-1), body_end_pc(-1) {}
+    
     TaskContext(const TaskContext& other) 
-        : state(other.state), task_id(other.task_id), sleep_until(other.sleep_until), 
-          counter(other.counter), channel_ptr(other.channel_ptr), fields(other.fields) {}
+        : state(other.state), task_id(other.task_id), 
+          sleep_until(other.sleep_until), counter(other.counter), 
+          channel_ptr(other.channel_ptr), fields(other.fields),
+          body_start_pc(other.body_start_pc), 
+          body_end_pc(other.body_end_pc) {}
 };
 
 // Channel structure for threadless communication
@@ -127,9 +136,18 @@ public:
     
     void reset();
     std::string to_string(const RegisterValue& value) const;
+    
+    // Execute task body using instruction range
+    void execute_task_body(TaskContext* task, const LIR::LIR_Function& function);
+    
+    // Set current function for task execution
+    void set_current_function(const LIR::LIR_Function* func) { current_function_ = func; }
 
 private:
     std::vector<RegisterValue> registers;
+    
+    // Current function for task execution
+    const LIR::LIR_Function* current_function_ = nullptr;
     
     // Memory management for type system
     MemoryManager<> memoryManager;
@@ -137,9 +155,6 @@ private:
     
     // Type system instance
     std::unique_ptr<TypeSystem> type_system;
-    
-    // Reference to current function for type information
-    const LIR::LIR_Function* current_function;
     
     // Concurrency management
     std::vector<std::unique_ptr<TaskContext>> task_contexts;
@@ -150,11 +165,20 @@ private:
     // Shared atomic variables for true shared state across tasks
     std::unordered_map<std::string, std::atomic<int64_t>> shared_variables;
     
+    // Atomic variables and work queues for lock-free parallel operations
+    std::atomic<int64_t> default_atomic{0};
+    std::vector<std::queue<uint64_t>> work_queues;
+    std::atomic<uint64_t> work_queue_counter{0};
+    
+    // Instruction count limit to prevent infinite loops
+    static constexpr uint64_t MAX_INSTRUCTIONS = 1000000;
+    uint64_t instruction_count = 0;
+    
     // Helper methods - all inlined for performance
     inline LIR::Type get_register_type(LIR::Reg reg) const {
-        if (!current_function) return LIR::Type::Void;
-        auto it = current_function->register_types.find(reg);
-        return (it != current_function->register_types.end()) ? it->second : LIR::Type::Void;
+        if (!current_function_) return LIR::Type::Void;
+        auto it = current_function_->register_types.find(reg);
+        return (it != current_function_->register_types.end()) ? it->second : LIR::Type::Void;
     }
     
     inline bool is_numeric(const RegisterValue& value) const {

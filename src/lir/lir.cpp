@@ -184,6 +184,7 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::WorkQueuePop: return "work_queue_pop";
         case LIR_Op::ParallelWaitComplete: return "parallel_wait_complete";
         case LIR_Op::WorkerSignal: return "worker_signal";
+        case LIR_Op::TaskSetCode: return "task_set_code";
         case LIR_Op::WorkerJoin: return "worker_join";
         
         case LIR_Op::ListCreate: return "list_create";
