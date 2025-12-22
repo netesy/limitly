@@ -57,6 +57,7 @@ Welcome to the official guide for the Limit programming language. This document 
     *   [Channels](#channels)
     *   [Async/Await](#asyncawait)
     *   [Atomics](#atomics)
+- [Tasks](#tasks)
 
 ---
 
@@ -362,6 +363,80 @@ match (value) {
     x where x < 10 => { print("{x} is less than 10"); },
     _              => { print("It must be 10"); }
 }
+```
+
+### Advanced Pattern Matching
+
+Limit's `match` statement supports more than just literal and type matching. You can also destructure complex data types like enums, structs, lists, and tuples.
+
+#### Destructuring Structs and Enums
+
+You can match on the structure of an enum or a struct and bind its inner values to variables.
+
+```limit
+enum Option {
+    Some(any),
+    None
+}
+
+fn print_option(opt: Option) {
+    match (opt) {
+        Some(value) => { print("Value is {value}"); },
+        None => { print("No value"); }
+    }
+}
+
+print_option(Some(10)); // Output: Value is 10
+print_option(None);     // Output: No value
+```
+
+You can also destructure records or objects with a similar syntax:
+
+```limit
+type Person = {name: str, age: int};
+
+fn greet(p: Person) {
+    match (p) {
+        {name: n, age: a} => { print("{n} is {a} years old."); }
+    }
+}
+
+greet({name: "Alice", age: 30}); // Output: Alice is 30 years old.
+```
+
+#### Destructuring Lists
+
+You can destructure lists to bind elements to variables. The `...` syntax can be used to bind the rest of the list to a variable.
+
+```limit
+var my_list = [1, 2, 3, 4];
+
+match (my_list) {
+    [] => { print("Empty list"); },
+    [x] => { print("Single element: {x}"); },
+    [a, b, ...rest] => {
+        print("First: {a}, Second: {b}");
+        print("Rest: {rest}");
+    },
+    _ => { print("Some other list"); }
+}
+// Output:
+// First: 1, Second: 2
+// Rest: [3, 4]
+```
+
+#### Destructuring Tuples
+
+Tuples can be destructured in a similar way.
+
+```limit
+var my_tuple = ("Jules", 42);
+
+match (my_tuple) {
+    (name, age) => { print("{name} is {age} years old."); },
+    _ => { print("Not a person tuple."); }
+}
+// Output: Jules is 42 years old.
 ```
 
 ## Data Structures
@@ -694,6 +769,79 @@ greet(); // greet is imported
 // my_variable is not imported
 ```
 
+## Advanced Features
+
+### Lambda Expressions (Anonymous Functions)
+
+Limit supports lambda expressions, also known as anonymous functions. These are functions that do not have a name and can be defined on the fly.
+
+```limit
+// A lambda that adds two numbers
+var add = fn(a: int, b: int): int {
+    return a + b;
+};
+
+var result = add(5, 10);
+print(result); // Output: 15
+```
+
+Lambdas are particularly useful when working with higher-order functions.
+
+```limit
+fn apply(x: int, y: int, operation: fn(int, int): int): int {
+    return operation(x, y);
+}
+
+// Pass a lambda directly to the apply function
+var result = apply(10, 5, fn(a, b) { return a * b; });
+print(result); // Output: 50
+```
+
+### Destructuring Assignments
+
+You can unpack values from tuples and lists into separate variables.
+
+```limit
+// Destructuring a tuple
+var (name, age) = ("Alice", 30);
+print("{name} is {age} years old."); // Output: Alice is 30 years old.
+
+// Destructuring a list
+var [a, b, c] = [1, 2, 3];
+print(a); // Output: 1
+```
+
+### Unsafe Blocks
+
+Limit is a memory-safe language, but sometimes you may need to interface with low-level code or perform operations that the compiler cannot guarantee are safe. For these cases, you can use an `unsafe` block.
+
+```limit
+unsafe {
+    // Low-level operations
+}
+```
+
+### Contract Statements
+
+Contracts are used to enforce preconditions, postconditions, and invariants in your code. They are useful for debugging and ensuring correctness.
+
+```limit
+fn divide(a: int, b: int): int {
+    contract(b != 0, "Cannot divide by zero");
+    return a / b;
+}
+```
+
+### Compile-Time Execution
+
+The `comptime` keyword allows you to execute code at compile time. This is useful for metaprogramming, generating lookup tables, or performing other computations before the program runs.
+
+```limit
+comptime {
+    var my_compile_time_var = 123;
+}
+```
+
 ## The Type System
 
 Limit has a rich type system that allows for creating complex and expressive data structures while maintaining null-safety by design.
@@ -723,53 +871,145 @@ my_num = 3.14;                 // This is also valid
 
 Union types are especially powerful when combined with `match` statements to handle all possible types that a variable could be.
 
-### Optional Values and Error Handling
+### Structural Types
 
-**Key Design Principle**: Limit is null-free by design. There are no null pointers, null references, or null values. Instead, Limit uses a unified system where "absence of value" is treated as an error condition.
-
-### The Unified `Type?` System
-
-Limit uses a single, unified system for both optional values and error handling:
-
-- **`Type?`** - Represents a value that might be present or absent (absence is an error condition)
-- **`Type?ErrorType`** - Represents a value that might succeed or fail with specific error types
-- **`ok(value)`** - Creates a success/present value
-- **`err()`** - Creates an error/absent value (no nulls - absence is an error)
+A structural type allows you to define a type based on its structure or shape, rather than by a specific name. This is useful for working with data that has a consistent structure but may not be an instance of a named class.
 
 ```limit
-// Optional value (might be absent)
-fn find_user(id: int): str? {
-    if (id == 1) {
-        return ok("Alice");  // Present value
-    }
-    return err();  // Absent value (treated as error, not null)
+type Point = {x: float, y: float};
+
+fn print_point(p: Point) {
+    print("({p.x}, {p.y})");
 }
 
-// Specific error types
-fn divide(a: int, b: int): int?DivisionByZero {
-    if (b == 0) {
-        return err(DivisionByZero("Cannot divide by zero"));
+var my_point = {x: 10.5, y: 20.0};
+print_point(my_point); // Output: (10.5, 20.0)
+```
+
+### Tuple Types
+
+A tuple is a fixed-size, ordered collection of elements of different types. Tuple types are defined using parentheses.
+
+```limit
+type PersonInfo = (str, int, str);
+
+var person: PersonInfo = ("Alice", 30, "New York");
+```
+
+### Enum Declarations
+
+Enums (enumerations) allow you to define a type that can only be one of a specific set of values.
+
+```limit
+enum Status {
+    Pending,
+    Running,
+    Completed,
+    Failed
+}
+
+var current_status: Status = Status.Running;
+```
+
+### Traits and Interfaces
+
+Traits and interfaces are used to define a set of methods that a class must implement. This is a powerful tool for abstraction and polymorphism.
+
+```limit
+trait Speaker {
+    fn speak();
+}
+
+class Dog : Speaker {
+    fn speak() {
+        print("Woof!");
     }
-    return ok(a / b);
 }
 ```
 
-### Pattern Matching with Optional Values
+### Error Handling
 
-Use `match` statements to handle both present and absent cases:
+**Key Design Principle**: Limit is designed to be null-free. It does not have null pointers, references, or values. Instead, Limit uses a robust type-based system to handle optionality and errors.
+
+### The `Option` Type for Optional Values
+
+When a value can be present or absent, you should use the `Option` enum, which has two variants:
+- **`Some(value)`**: Represents the presence of a value.
+- **`None`**: Represents the absence of a value.
+
+```limit
+enum Option {
+    Some(any),
+    None
+}
+
+fn find_user(id: int): Option {
+    if (id == 1) {
+        return Some("Alice");
+    }
+    return None;
+}
+```
+
+You can then use a `match` statement to safely handle both cases:
 
 ```limit
 var user = find_user(1);
-match user {
-    Ok(name) => print("Found user: {name}"),
-    Err => print("User not found")  // No null - absence is an error
+match (user) {
+    Some(name) => { print("Found user: {name}"); },
+    None => { print("User not found"); }
+}
+```
+
+### The `Result` Type for Operations That Can Fail
+
+For operations that can either succeed or fail, Limit uses a `Result` type (often implemented as a `Type?` or a custom enum). The common convention is:
+- **`Ok(value)`**: Represents a successful result.
+- **`Err(error)`**: Represents a failure, containing an error value.
+
+```limit
+fn divide(a: int, b: int): int?DivisionByZero {
+    if (b == 0) {
+        return Err(DivisionByZero("Cannot divide by zero"));
+    }
+    return Ok(a / b);
 }
 
 var result = divide(10, 2);
-match result {
-    Ok(value) => print("Result: {value}"),
-    Err => print("Division failed")
+match (result) {
+    Ok(value) => { print("Result: {value}"); },
+    Err(e) => { print("Error: {e}"); }
 }
+```
+
+### The Unified `Type?` System
+
+For convenience, Limit provides the `Type?` syntax as a shorthand for fallible operations. The `Type?` syntax is syntactic sugar for `Result<Type, DefaultError>`, where `DefaultError` is a generic error type used when a specific one is not provided.
+- **`Type?`**: A type that can either hold a value of `Type` or an error.
+- **`ok(value)`**: Constructs a success value.
+- **`err()`**: Constructs an error value.
+
+### The `?` Operator for Propagating Errors
+
+The `?` operator is a convenient way to propagate errors up the call stack. If a function call returns an `Err`, the `?` operator will immediately return that `Err` from the current function.
+
+```limit
+fn get_number_from_string(s: str): int? {
+    var number: int = to_int(s)?; // If to_int returns Err, this function also returns Err
+    return ok(number * 2);
+}
+```
+
+### Inline Error Handling with `? else`
+
+You can use the `? else` construct to handle an error inline and provide a default value or an alternative code path.
+
+```limit
+var value: int = divide(10, 0)? else {
+    print("Division failed");
+    return 0; // Default value
+};
+// `value` will be 0.
 ```
 
 
@@ -1014,4 +1254,22 @@ concurrent {
 }
 
 print("Final counter value: {shared_counter}"); // Output: 10
+```
+
+### Tasks
+
+A `task` statement is used inside a `parallel` or `concurrent` block to define a unit of work that can be executed concurrently. A task can also iterate over a collection, creating a new concurrent task for each item.
+
+```limit
+concurrent {
+    // A simple task
+    task {
+        print("Task 1");
+    }
+
+    // A task that iterates over a range
+    task(i in 1..5) {
+        print("Task {i}");
+    }
+}
 ```
