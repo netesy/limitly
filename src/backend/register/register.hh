@@ -11,6 +11,7 @@
 #include <queue>
 #include <unordered_map>
 #include <memory>
+#include <atomic>
 
 namespace Register {
 
@@ -145,6 +146,9 @@ private:
     std::vector<std::unique_ptr<Channel>> channels;
     std::unique_ptr<Scheduler> scheduler;
     uint64_t current_time;
+    
+    // Shared atomic variables for true shared state across tasks
+    std::unordered_map<std::string, std::atomic<int64_t>> shared_variables;
     
     // Helper methods - all inlined for performance
     inline LIR::Type get_register_type(LIR::Reg reg) const {

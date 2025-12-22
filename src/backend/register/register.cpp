@@ -13,6 +13,11 @@ RegisterVM::RegisterVM()
     scheduler = std::make_unique<Scheduler>();
     current_time = 0;
     current_function = nullptr;
+    
+    // Initialize shared variables
+    shared_variables.emplace(std::piecewise_construct, 
+        std::forward_as_tuple("shared_counter"), 
+        std::forward_as_tuple(0));
 }
 
 void RegisterVM::reset() {
@@ -22,6 +27,12 @@ void RegisterVM::reset() {
     scheduler = std::make_unique<Scheduler>();
     current_time = 0;
     current_function = nullptr;
+    
+    // Reset shared variables
+    shared_variables.clear();
+    shared_variables.emplace(std::piecewise_construct, 
+        std::forward_as_tuple("shared_counter"), 
+        std::forward_as_tuple(0));
 }
 
 std::string RegisterVM::to_string(const RegisterValue& value) const {
@@ -526,7 +537,8 @@ OP_TASK_CONTEXT_INIT:
             // Add a copy to the scheduler, don't move the original
             auto task_copy = std::make_unique<TaskContext>(*task_contexts[context_id]);
             scheduler->add_task(std::move(task_copy));
-            registers[pc->dst] = static_cast<int64_t>(1); // Success
+            // Return the scheduler task index (same as context_id for threadless concurrency)
+            registers[pc->dst] = static_cast<int64_t>(context_id);
         } else {
             registers[pc->dst] = static_cast<int64_t>(0); // Failure
         }
@@ -685,8 +697,8 @@ OP_SCHEDULER_RUN:
                 // Print task info
                 std::cout << "Task " << task->task_id << " running" << std::endl;
                 
-                // Simulate task work - increment counter
-                task->counter++;
+                // Simulate task work - increment shared counter atomically
+                int64_t new_counter_value = shared_variables["shared_counter"].fetch_add(1) + 1;
                 
                 // Send counter to channel if channel is set
                 std::cout << "[DEBUG] Task channel_ptr type: ";
@@ -702,9 +714,9 @@ OP_SCHEDULER_RUN:
                 
                 if (!std::holds_alternative<std::nullptr_t>(task->channel_ptr)) {
                     uint64_t channel_id = static_cast<uint64_t>(to_int(task->channel_ptr));
-                    std::cout << "[DEBUG] Pushing to channel " << channel_id << " value " << task->counter << std::endl;
+                    std::cout << "[DEBUG] Pushing to channel " << channel_id << " value " << new_counter_value << std::endl;
                     if (channel_id < channels.size()) {
-                        channels[channel_id]->push(static_cast<int64_t>(task->counter));
+                        channels[channel_id]->push(new_counter_value);
                         std::cout << "[DEBUG] Push successful" << std::endl;
                     } else {
                         std::cout << "[DEBUG] Channel " << channel_id << " out of range (max " << channels.size() << ")" << std::endl;
