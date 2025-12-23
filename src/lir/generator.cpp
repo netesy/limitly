@@ -1296,13 +1296,50 @@ Reg Generator::emit_assign_expr(AST::AssignExpr& expr) {
             dst = allocate_register();
             bind_variable(expr.name, dst);
         }
-        // Set type BEFORE emitting so it's available during emit_instruction
-        set_register_type(dst, get_register_type(value));
         
-        // Convert the TypePtr to ABI Type for the instruction
-        Type abi_type = language_type_to_abi_type(expr.inferred_type);
-        
-        emit_instruction(LIR_Inst(LIR_Op::Mov, abi_type, dst, value, 0));
+        // Handle compound assignment operators
+        if (expr.op != TokenType::EQUAL) {
+            // For compound assignment (+=, -=, *=, /=, %=), we need to:
+            // 1. Load current value
+            // 2. Perform operation with new value
+            // 3. Store result back
+            
+            // Convert the TypePtr to ABI Type for the instruction
+            Type abi_type = language_type_to_abi_type(expr.inferred_type);
+            
+            std::cout << "[DEBUG] Compound assignment: op=" << static_cast<int>(expr.op) << " dst=" << dst << " value_reg=" << value << std::endl;
+            
+            switch (expr.op) {
+                case TokenType::PLUS_EQUAL:
+                    std::cout << "[DEBUG] Emitting PLUS_EQUAL Add instruction" << std::endl;
+                    emit_instruction(LIR_Inst(LIR_Op::Add, abi_type, dst, dst, value));
+                    break;
+                case TokenType::MINUS_EQUAL:
+                    emit_instruction(LIR_Inst(LIR_Op::Sub, abi_type, dst, dst, value));
+                    break;
+                case TokenType::STAR_EQUAL:
+                    emit_instruction(LIR_Inst(LIR_Op::Mul, abi_type, dst, dst, value));
+                    break;
+                case TokenType::SLASH_EQUAL:
+                    emit_instruction(LIR_Inst(LIR_Op::Div, abi_type, dst, dst, value));
+                    break;
+                case TokenType::MODULUS_EQUAL:
+                    emit_instruction(LIR_Inst(LIR_Op::Mod, abi_type, dst, dst, value));
+                    break;
+                default:
+                    report_error("Unsupported compound assignment operator");
+                    return 0;
+            }
+        } else {
+            // Simple assignment - just move the value
+            // Set type BEFORE emitting so it's available during emit_instruction
+            set_register_type(dst, get_register_type(value));
+            
+            // Convert the TypePtr to ABI Type for the instruction
+            Type abi_type = language_type_to_abi_type(expr.inferred_type);
+            
+            emit_instruction(LIR_Inst(LIR_Op::Mov, abi_type, dst, value, 0));
+        }
         // No need to update binding since we're using the existing register
         return dst;
     } else if (expr.object) {
@@ -2290,6 +2327,7 @@ std::optional<ValuePtr> Generator::evaluate_constant_expression(std::shared_ptr<
 }
 
 void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
+    std::cout << "[DEBUG] Processing concurrent statement" << std::endl;
     enter_scope();
     
     auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
@@ -2326,6 +2364,13 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, counter_reg, zero));
     bind_variable("shared_counter", counter_reg);
     set_register_type(counter_reg, int_type);
+    
+    // Capture variable mappings for task body lowering
+    task_variable_mappings_["shared_counter"] = counter_reg;
+    task_variable_mappings_["counts"] = channel_reg;
+    if (!stmt.channelParam.empty()) {
+        task_variable_mappings_[stmt.channelParam] = channel_reg;
+    }
     
     // Count tasks (expand ranges)
     size_t task_count = 0;
@@ -2414,6 +2459,9 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
     if (stmt.channelParam.empty()) {
         exit_scope();
     }
+    
+    // Clear task variable mappings to avoid contamination
+    task_variable_mappings_.clear();
 }
 
 void Generator::emit_task_stmt(AST::TaskStatement& stmt) {
@@ -2423,7 +2471,7 @@ void Generator::emit_task_stmt(AST::TaskStatement& stmt) {
 void Generator::emit_task_init_and_step(AST::TaskStatement& task, size_t task_id, Reg contexts_reg, Reg channel_reg, Reg counter_reg, int64_t loop_var_value) {
     auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
     
-    // Use task_id directly as the task context register value
+    // Load task_id as the context register value
     Reg task_context_reg = allocate_register();
     ValuePtr task_id_val = std::make_shared<Value>(int_type, int64_t(task_id));
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, task_context_reg, task_id_val));
@@ -2432,33 +2480,73 @@ void Generator::emit_task_init_and_step(AST::TaskStatement& task, size_t task_id
     // Initialize task context
     emit_instruction(LIR_Inst(LIR_Op::TaskContextInit, task_context_reg, task_context_reg, 0));
     
-    // Set task ID in context
+    // Set task ID in context (field 0)
     Reg task_id_reg = allocate_register();
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, task_id_reg, task_id_val));
     set_register_type(task_id_reg, int_type);
-    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, 0, task_context_reg, task_id_reg, 0)); // field 0 = task_id
+    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, 0, task_context_reg, task_id_reg, 0));
     
-    // Set loop variable value in context (use the actual loop value, not task_id)
+    // Set loop variable value in context (field 1)
     ValuePtr loop_var_val = std::make_shared<Value>(int_type, int64_t(loop_var_value));
     Reg loop_var_reg = allocate_register();
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, loop_var_reg, loop_var_val));
     set_register_type(loop_var_reg, int_type);
-    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, 0, task_context_reg, loop_var_reg, 1)); // field 1 = loop_var
+    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, 0, task_context_reg, loop_var_reg, 1));
     
-    // Bind the loop variable in the current scope so it can be used in the task body
+    // Bind the loop variable in the current scope
     if (!task.loopVar.empty()) {
         bind_variable(task.loopVar, loop_var_reg);
     }
     
-    // Set channel index in context
-    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, 0, task_context_reg, channel_reg, 2)); // field 2 = channel
+    // Set channel index in context (field 2)
+    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, 0, task_context_reg, channel_reg, 2));
     
-    // Set shared counter index in context
-    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, 0, task_context_reg, counter_reg, 3)); // field 3 = shared_counter
+    // Load current shared counter value and set it in context (field 3)
+    Reg current_counter_reg = allocate_register();
+    // Load current shared counter from global storage
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, current_counter_reg, 
+                              std::make_shared<Value>(int_type, int64_t(0))));
+    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, 0, task_context_reg, current_counter_reg, 3));
     
-    // NOTE: Task body should be executed by scheduler, not emitted inline
-    // In a full implementation, this would generate separate task functions
-    // For now, we'll let the scheduler simulation handle task execution
+    // CRITICAL FIX: Copy task function instructions into current function
+    if (!task.task_function_name.empty()) {
+        auto task_func_it = task_functions_.find(task.task_function_name);
+        if (task_func_it != task_functions_.end()) {
+            const auto& task_func = task_func_it->second;
+            
+            // Record the start PC BEFORE adding instructions
+            size_t body_start_pc = current_function_->instructions.size();
+            
+            std::cout << "[DEBUG] Copying task function '" << task.task_function_name 
+                      << "' (" << task_func->instructions.size() << " instructions) "
+                      << "at PC " << body_start_pc << std::endl;
+            
+            // Copy all task function instructions into current function
+            for (const auto& inst : task_func->instructions) {
+                current_function_->instructions.push_back(inst);
+            }
+            
+            // Record the end PC AFTER adding instructions
+            size_t body_end_pc = current_function_->instructions.size();
+            
+            std::cout << "[DEBUG] Task " << task_id 
+                      << " body: PC " << body_start_pc 
+                      << " to " << body_end_pc << std::endl;
+            
+            // Store the instruction range in the task context
+            Reg start_pc_reg = allocate_register();
+            ValuePtr start_pc_val = std::make_shared<Value>(int_type, int64_t(body_start_pc));
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, start_pc_reg, start_pc_val));
+            set_register_type(start_pc_reg, int_type);
+            
+            // Use TaskSetCode with end PC in immediate field
+            emit_instruction(LIR_Inst(LIR_Op::TaskSetCode, task_context_reg, start_pc_reg, 0, static_cast<Imm>(body_end_pc)));
+        } else {
+            std::cout << "[ERROR] Task function '" << task.task_function_name << "' not found" << std::endl;
+        }
+    } else {
+        std::cout << "[ERROR] No task function name for task " << task_id << std::endl;
+    }
 }
 
 void Generator::emit_worker_stmt(AST::WorkerStatement& stmt) {
@@ -2917,6 +3005,39 @@ void Generator::lower_function_bodies(const TypeCheckResult& type_check_result) 
             lower_function_body(*func_stmt);
         }
     }
+    
+    // Also lower task bodies by searching through all statements
+    lower_task_bodies_recursive(type_check_result.program->statements);
+}
+
+void Generator::lower_task_bodies_recursive(const std::vector<std::shared_ptr<AST::Statement>>& statements) {
+    for (const auto& stmt : statements) {
+        if (auto concurrent_stmt = dynamic_cast<AST::ConcurrentStatement*>(stmt.get())) {
+            // Capture variable mappings from this concurrent statement
+            task_variable_mappings_.clear();
+            
+            // Map shared_counter to register 3 (standard task parameter position)
+            task_variable_mappings_["shared_counter"] = static_cast<Reg>(3);
+            
+            // Map channel variable to register 2 (standard task parameter position)
+            if (!concurrent_stmt->channel.empty()) {
+                task_variable_mappings_[concurrent_stmt->channel] = static_cast<Reg>(2);
+            }
+            
+            // Map channel parameter to register 2 if specified
+            if (!concurrent_stmt->channelParam.empty()) {
+                task_variable_mappings_[concurrent_stmt->channelParam] = static_cast<Reg>(2);
+            }
+            
+            // Look for task statements inside concurrent blocks
+            lower_task_bodies_recursive(concurrent_stmt->body->statements);
+        } else if (auto task_stmt = dynamic_cast<AST::TaskStatement*>(stmt.get())) {
+            lower_task_body(*task_stmt);
+        } else if (auto block_stmt = dynamic_cast<AST::BlockStatement*>(stmt.get())) {
+            // Recursively search within block statements
+            lower_task_bodies_recursive(block_stmt->statements);
+        }
+    }
 }
 
 void Generator::lower_function_body(AST::FunctionDeclaration& stmt) {
@@ -2965,6 +3086,75 @@ void Generator::lower_function_body(AST::FunctionDeclaration& stmt) {
     // Store the completed LIR function in the function table
     auto& func_info = function_table_[stmt.name];
     func_info.lir_function = std::move(current_function_);
+    
+    // Restore context
+    current_function_ = std::move(saved_function);
+    next_register_ = saved_next_register;
+    scope_stack_ = std::move(saved_scope_stack);
+    register_types_ = std::move(saved_register_types);
+}
+
+void Generator::lower_task_body(AST::TaskStatement& stmt) {
+    // Create separate LIR function for this task body
+    std::string task_func_name = "_task_" + std::to_string(reinterpret_cast<uintptr_t>(&stmt));
+    auto func = std::make_unique<LIR_Function>(task_func_name, 4); // task_id, loop_var, channel, shared_counter
+    
+    // Save current context
+    auto saved_function = std::move(current_function_);
+    auto saved_next_register = next_register_;
+    auto saved_scope_stack = scope_stack_;
+    auto saved_register_types = register_types_;
+    
+    // Set up function context
+    current_function_ = std::move(func);
+    next_register_ = 4;  // Start after parameters
+    scope_stack_.clear();
+    register_types_.clear();
+    
+    // Enter function scope
+    enter_scope();
+    
+    // Bind task parameters to registers
+    bind_variable("_task_id", static_cast<Reg>(0));
+    bind_variable("_loop_var", static_cast<Reg>(1));
+    bind_variable("_channel", static_cast<Reg>(2));
+    bind_variable("_shared_counter", static_cast<Reg>(3));
+    
+    // Bind original variable names to their mapped parameter registers
+    for (const auto& mapping : task_variable_mappings_) {
+        bind_variable(mapping.first, mapping.second);
+    }
+    
+    // Bind loop variable name if specified
+    if (!stmt.loopVar.empty()) {
+        bind_variable(stmt.loopVar, static_cast<Reg>(1));
+    }
+    
+    // Emit task body from AST
+    if (stmt.body) {
+        std::cout << "[DEBUG] Emitting task body with " << stmt.body->statements.size() << " statements" << std::endl;
+        emit_stmt(*stmt.body);
+        std::cout << "[DEBUG] Task body emitted, function has " << current_function_->instructions.size() << " instructions" << std::endl;
+    }
+    
+    // Ensure function has a return instruction
+    if (current_function_->instructions.empty() || 
+        !current_function_->instructions.back().isReturn()) {
+        // Implicit return of 0 if no explicit return
+        Reg return_reg = allocate_register();
+        auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
+        ValuePtr zero_val = std::make_shared<Value>(int_type, int64_t(0));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, return_reg, zero_val));
+        emit_instruction(LIR_Inst(LIR_Op::Ret, return_reg, 0, 0));
+    }
+    
+    exit_scope();
+    
+    // Store the completed LIR function in the task function table
+    task_functions_[task_func_name] = std::move(current_function_);
+    
+    // Store the task function name for later reference
+    stmt.task_function_name = task_func_name;
     
     // Restore context
     current_function_ = std::move(saved_function);

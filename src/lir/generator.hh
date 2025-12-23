@@ -39,6 +39,8 @@ private:
     // Function body lowering (Pass 1)
     void lower_function_bodies(const TypeCheckResult& type_check_result);
     void lower_function_body(AST::FunctionDeclaration& stmt);
+    void lower_task_body(AST::TaskStatement& stmt);
+    void lower_task_bodies_recursive(const std::vector<std::shared_ptr<AST::Statement>>& statements);
     
     // Helper methods
     Reg allocate_register();
@@ -218,6 +220,7 @@ private:
         bool has_closure;
     };
     std::unordered_map<std::string, FunctionInfo> function_table_;
+    std::unordered_map<std::string, std::unique_ptr<LIR_Function>> task_functions_;
     
     // Smart module system with qualified symbol table
     struct ModuleSymbolInfo {
@@ -251,6 +254,9 @@ private:
     // Memory management
     MemoryManager<> memory_manager_;
     MemoryManager<>::Region* current_memory_region_ = nullptr;
+    
+    // Task body variable mapping - maps original variable names to task parameter registers
+    std::unordered_map<std::string, Reg> task_variable_mappings_;
     
     // Helper methods
     std::shared_ptr<::Type> convert_ast_type_to_lir_type(const std::shared_ptr<AST::TypeAnnotation>& ast_type);
