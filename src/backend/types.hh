@@ -415,6 +415,10 @@ public:
         case TypeTag::UInt128:
             value->data = std::to_string(0);
             break;
+        case TypeTag::Float32:
+        case TypeTag::Float64:
+            value->data = std::to_string(0.0);
+            break;
         case TypeTag::String:
             value->data = std::string("");
             break;

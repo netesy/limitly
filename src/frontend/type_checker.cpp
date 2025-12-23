@@ -382,8 +382,22 @@ TypePtr TypeChecker::check_literal_expr(std::shared_ptr<AST::LiteralExpr> expr) 
         }
         
         if (is_numeric) {
-            expr->inferred_type = type_system.INT64_TYPE;
-            return type_system.INT64_TYPE;
+            // Check if it contains a decimal point to determine if it's a float
+            bool is_float = false;
+            for (size_t i = 0; i < str.size(); i++) {
+                if (str[i] == '.') {
+                    is_float = true;
+                    break;
+                }
+            }
+            
+            if (is_float) {
+                expr->inferred_type = type_system.FLOAT64_TYPE;
+                return type_system.FLOAT64_TYPE;
+            } else {
+                expr->inferred_type = type_system.INT64_TYPE;
+                return type_system.INT64_TYPE;
+            }
         } else {
             expr->inferred_type = type_system.STRING_TYPE;
             return type_system.STRING_TYPE;

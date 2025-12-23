@@ -515,6 +515,7 @@ namespace AST {
         std::string loopVar;
         std::shared_ptr<Expression> iterable;
         std::shared_ptr<BlockStatement> body;
+        std::string task_function_name; // Name of the compiled task function
     };
 
     // Worker statement inside a concurrent/parallel block

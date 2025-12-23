@@ -1,0 +1,12 @@
+// Simple channel push test
+var ch = channel();
+
+// Test direct channel push
+ch.send(42);
+ch.send(84);
+ch.send(126);
+
+iter (value in ch) {
+    print("Channel value: ");
+    print(value);
+}

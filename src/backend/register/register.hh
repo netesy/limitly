@@ -122,6 +122,7 @@ class RegisterVM {
 public:
     RegisterVM();
     
+    void execute_instructions(const LIR::LIR_Function& function, size_t start_pc, size_t end_pc);
     // Main execution method
     void execute_function(const LIR::LIR_Function& function);
     
