@@ -439,6 +439,83 @@ match (my_tuple) {
 // Output: Jules is 42 years old.
 ```
 
+#### Advanced Destructuring
+
+Limit's pattern matching also supports more advanced destructuring patterns.
+
+##### Type Patterns
+
+You can match against a specific type.
+
+```limit
+match (my_value) {
+    int => { print("It's an integer."); },
+    str => { print("It's a string."); },
+    _   => { print("It's some other type."); }
+}
+```
+
+##### Binding Patterns
+
+You can bind the value of a match to a variable.
+
+```limit
+match (my_option) {
+    Some(value) => { print("The value is {value}"); },
+    None => { print("No value"); }
+}
+```
+
+##### Dictionary Patterns
+
+You can destructure dictionaries (or records) by matching against their keys.
+
+```limit
+var person = {name: "Jules", age: 28};
+
+match (person) {
+    {name: n, age: a} => { print("{n} is {a} years old."); },
+    _ => { print("Not a person."); }
+}
+```
+
+##### Destructuring `Result` Types
+
+You can easily destructure `Result` types using `val` and `err` patterns.
+
+```limit
+fn divide(a: int, b: int): int? {
+    if (b == 0) {
+        return err("Division by zero");
+    }
+    return ok(a / b);
+}
+
+var result = divide(10, 2);
+
+match (result) {
+    val(value) => { print("Result: {value}"); },
+    err(e) => { print("Error: {e}"); }
+}
+```
+
+You can also match against specific error types.
+
+```limit
+type MyError = {message: str};
+
+fn do_something(): int?MyError {
+    return err(MyError("Something went wrong"));
+}
+
+var result = do_something();
+
+match (result) {
+    val(value) => { print("Success!"); },
+    err(MyError(msg)) => { print("Error: {msg}"); }
+}
+```
+
 ## Data Structures
 
 Limit provides built-in support for common data structures.
@@ -589,6 +666,53 @@ print(counter()); // Output: 2
 print(counter()); // Output: 3
 ```
 
+### Function Modifiers
+
+Functions can also have modifiers that change their behavior, especially when they are methods within a class.
+
+- **`static`**: A static method belongs to the class rather than an instance of the class. It is called on the class itself and cannot access `self`.
+- **`abstract`**: An abstract method is a method that is declared, but contains no implementation. Abstract methods are only allowed in abstract classes and must be implemented by subclasses.
+- **`final`**: A final method cannot be overridden by subclasses.
+
+```limit
+abstract class Vehicle {
+    abstract fn startEngine(); // Abstract method
+
+    final fn stopEngine() { // Final method
+        print("Engine stopped.");
+    }
+}
+
+class Car : Vehicle {
+    // Implementing the abstract method
+    fn startEngine() {
+        print("Car engine started.");
+    }
+}
+```
+
+### Workers
+
+A `worker` is a concurrent task that is designed to process a stream of data from a channel. It will automatically stop when the channel is closed.
+
+```limit
+var my_channel = channel();
+
+// Start a worker that processes items from the channel
+concurrent {
+    worker(item in my_channel) {
+        print("Processing item: {item}");
+    }
+}
+
+// Send some data to the channel
+my_channel.send("A");
+my_channel.send("B");
+
+// Close the channel to stop the worker
+my_channel.close();
+```
+
 ## Classes
 
 Limit is an object-oriented language and supports classes for creating user-defined types.
@@ -640,6 +764,34 @@ person.introduce(); // Output: Hi, I'm Jules and I'm 28 years old.
 ### The `self` Keyword
 
 The `self` keyword refers to the current instance of the class. It is used to access the instance's fields and methods.
+
+### Modifiers and Visibility
+
+Limit provides several modifiers to control the behavior and visibility of classes, fields, and methods.
+
+#### Class Modifiers
+
+- **`abstract`**: An abstract class cannot be instantiated directly and may contain abstract methods (methods without a body).
+- **`final`**: A final class cannot be inherited from.
+- **`data`**: A data class automatically generates methods like `equals()`, `hashCode()`, and `toString()` based on its fields.
+
+#### Visibility Modifiers
+
+Visibility modifiers can be applied to fields and methods:
+
+- **`private`**: (Default) Accessible only within the class.
+- **`protected`**: Accessible within the class and its subclasses.
+- **`public`**: Accessible from anywhere.
+- **`const`**: A read-only public field.
+
+```limit
+public final class MyClass {
+    private var myPrivateField: int = 10;
+    protected var myProtectedField: int = 20;
+    public var myPublicField: int = 30;
+    const MY_CONST_FIELD: int = 40;
+}
+```
 
 ### Inheritance
 
@@ -769,6 +921,30 @@ greet(); // greet is imported
 // my_variable is not imported
 ```
 
+### Module Declarations
+
+In addition to file-based modules, Limit also supports `module` declarations. This allows you to define a module with explicit `public`, `protected`, and `private` members.
+
+```limit
+module MyModule {
+    public fn public_function() {
+        print("This function is public.");
+    }
+
+    protected fn protected_function() {
+        print("This function is protected.");
+    }
+
+    private fn private_function() {
+        print("This function is private.");
+    }
+}
+
+MyModule.public_function(); // This is a valid call.
+// MyModule.protected_function(); // This would cause a compile-time error.
+// MyModule.private_function(); // This would cause a compile-time error.
+```
+
 ## Advanced Features
 
 ### Lambda Expressions (Anonymous Functions)
@@ -799,7 +975,7 @@ print(result); // Output: 50
 
 ### Destructuring Assignments
 
-You can unpack values from tuples and lists into separate variables.
+You can unpack values from tuples and lists into separate variables. This is a powerful feature for writing concise and readable code.
 
 ```limit
 // Destructuring a tuple
@@ -811,19 +987,32 @@ var [a, b, c] = [1, 2, 3];
 print(a); // Output: 1
 ```
 
+You can also use destructuring in `for` loops.
+
+```limit
+var people = [("Alice", 30), ("Bob", 25)];
+
+for ((name, age) in people) {
+    print("{name} is {age} years old.");
+}
+```
+
 ### Unsafe Blocks
 
 Limit is a memory-safe language, but sometimes you may need to interface with low-level code or perform operations that the compiler cannot guarantee are safe. For these cases, you can use an `unsafe` block.
 
 ```limit
 unsafe {
-    // Low-level operations
+    // Example: Calling a C function
+    // var result = c.my_c_function();
 }
 ```
 
+**Note**: Use `unsafe` blocks with caution, as they can lead to undefined behavior if not used correctly.
+
 ### Contract Statements
 
-Contracts are used to enforce preconditions, postconditions, and invariants in your code. They are useful for debugging and ensuring correctness.
+Contracts are used to enforce preconditions, postconditions, and invariants in your code. They are useful for debugging and ensuring correctness. If a contract fails, the program will terminate.
 
 ```limit
 fn divide(a: int, b: int): int {
@@ -834,12 +1023,14 @@ fn divide(a: int, b: int): int {
 
 ### Compile-Time Execution
 
-The `comptime` keyword allows you to execute code at compile time. This is useful for metaprogramming, generating lookup tables, or performing other computations before the program runs.
+The `comptime` keyword allows you to execute code at compile time. This is useful for metaprogramming, generating lookup tables, or performing other computations before the program runs. The results of these computations can then be used as constants in your program.
 
 ```limit
 comptime {
     var my_compile_time_var = 123;
 }
+
+print(my_compile_time_var); // Output: 123
 ```
 
 ## The Type System
@@ -871,6 +1062,24 @@ my_num = 3.14;                 // This is also valid
 
 Union types are especially powerful when combined with `match` statements to handle all possible types that a variable could be.
 
+### Intersection Types
+
+An intersection type is a type that combines multiple types into one. A value of an intersection type has all the properties of all the types in the intersection. Intersection types are defined using the ampersand (`&`) character.
+
+```limit
+type HasName = {name: str};
+type HasAge = {age: int};
+
+type Person = HasName & HasAge;
+
+fn greet(p: Person) {
+    print("Hello, {p.name}! You are {p.age} years old.");
+}
+
+var person: Person = {name: "Jules", age: 28};
+greet(person); // Output: Hello, Jules! You are 28 years old.
+```
+
 ### Structural Types
 
 A structural type allows you to define a type based on its structure or shape, rather than by a specific name. This is useful for working with data that has a consistent structure but may not be an instance of a named class.
@@ -894,6 +1103,21 @@ A tuple is a fixed-size, ordered collection of elements of different types. Tupl
 type PersonInfo = (str, int, str);
 
 var person: PersonInfo = ("Alice", 30, "New York");
+```
+
+### Refined Types
+
+A refined type is a type that is constrained by a predicate. This allows you to create more specific types that can be checked at compile time.
+
+```limit
+type PositiveInt = int where value > 0;
+
+fn print_positive(n: PositiveInt) {
+    print("{n} is a positive integer.");
+}
+
+print_positive(10); // Output: 10 is a positive integer.
+// print_positive(-5); // This would cause a compile-time error.
 ```
 
 ### Enum Declarations
@@ -986,8 +1210,25 @@ match (result) {
 
 For convenience, Limit provides the `Type?` syntax as a shorthand for fallible operations. The `Type?` syntax is syntactic sugar for `Result<Type, DefaultError>`, where `DefaultError` is a generic error type used when a specific one is not provided.
 - **`Type?`**: A type that can either hold a value of `Type` or an error.
-- **`ok(value)`**: Constructs a success value.
-- **`err()`**: Constructs an error value.
+
+#### Constructing `Option` and `Result` Values
+
+Limit provides built-in functions to construct `Option` and `Result` values:
+
+- **`some(value)`**: Creates an `Option` with a value.
+- **`none()`**: Creates an `Option` with no value.
+- **`ok(value)`**: Creates a `Result` with a success value.
+- **`err(error)`**: Creates a `Result` with an error value.
+
+```limit
+fn get_user(id: int): User? {
+    if (id > 0) {
+        return ok(User(id));
+    } else {
+        return err(UserNotFound("Invalid ID"));
+    }
+}
+```
 
 ### The `?` Operator for Propagating Errors
 
