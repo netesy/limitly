@@ -14,6 +14,23 @@
 #include <cstring>
 #include <cstdlib>
 #include "../value.hh"
+#include "../../../runtime_string.h"
+
+// Global loop counter to prevent infinite loops
+static int loop_execution_counter = 0;
+static const int MAX_LOOP_ITERATIONS = 30;
+
+// Loop counter check function for JIT
+extern "C" {
+    __attribute__((dllexport)) int check_loop_counter() {
+        if (loop_execution_counter >= MAX_LOOP_ITERATIONS) {
+            printf("ERROR: Maximum loop iterations (%d) exceeded!\n", MAX_LOOP_ITERATIONS);
+            exit(1); // Exit the program to prevent infinite loop
+        }
+        loop_execution_counter++;
+        return 1;
+    }
+}
 
 // C wrapper functions for JIT string building
 extern "C" {
@@ -36,7 +53,6 @@ JITBackend::JITBackend()
     // Export all symbols so JITed code can see runtime functions
     // Windows-specific options to export all symbols and disable static linking for JIT
     m_context.add_driver_option("-Wl,--export-all-symbols");
-    m_context.add_driver_option("-Wl,--dynamicbase");
 #endif
     
     // Initialize memory manager with audit mode disabled for performance
@@ -115,17 +131,6 @@ JITBackend::JITBackend()
     std::vector<gccjit::param> get_ticks_params;
     m_get_ticks_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_uint_type, "get_ticks", get_ticks_params, 0);
 
-    // Register runtime utility functions
-    std::vector<gccjit::param> concat_params;
-    concat_params.push_back(m_context.new_param(m_const_char_ptr_type, "a"));
-    concat_params.push_back(m_context.new_param(m_const_char_ptr_type, "b"));
-    m_runtime_concat_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_const_char_ptr_type, "limitly_runtime_concat", concat_params, 0);
-    
-    std::vector<gccjit::param> format_params;
-    format_params.push_back(m_context.new_param(m_const_char_ptr_type, "format"));
-    format_params.push_back(m_context.new_param(m_const_char_ptr_type, "arg"));
-    m_runtime_format_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_const_char_ptr_type, "limitly_runtime_format", format_params, 0);
-
     // Initialize stats
     m_stats = {0, 0, 0.0};
 
@@ -140,6 +145,52 @@ JITBackend::JITBackend()
     strcat_params.push_back(m_context.new_param(m_void_ptr_type, "dest"));
     strcat_params.push_back(m_context.new_param(m_const_char_ptr_type, "src"));
     m_strcat_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "strcat", strcat_params, 0);
+    
+    // Create LmString struct type for runtime functions
+    std::vector<gccjit::field> lm_string_fields;
+    lm_string_fields.push_back(m_context.new_field(m_const_char_ptr_type, "data"));
+    lm_string_fields.push_back(m_context.new_field(m_context.get_type(GCC_JIT_TYPE_UINT64_T), "len"));
+    m_lm_string_type = m_context.new_struct_type("LmString", lm_string_fields);
+    
+    // Set up lm_string_concat function
+    std::vector<gccjit::param> concat_params;
+    concat_params.push_back(m_context.new_param(m_lm_string_type, "a"));
+    concat_params.push_back(m_context.new_param(m_lm_string_type, "b"));
+    m_lm_string_concat_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_lm_string_type, "lm_string_concat", concat_params, 0);
+    
+    // Set up lm_int_to_string function
+    std::vector<gccjit::param> int_to_string_params;
+    int_to_string_params.push_back(m_context.new_param(m_context.get_type(GCC_JIT_TYPE_INT64_T), "value"));
+    m_lm_int_to_string_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_lm_string_type, "lm_int_to_string", int_to_string_params, 0);
+    
+    // Set up lm_double_to_string function
+    std::vector<gccjit::param> double_to_string_params;
+    double_to_string_params.push_back(m_context.new_param(m_double_type, "value"));
+    m_lm_double_to_string_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_lm_string_type, "lm_double_to_string", double_to_string_params, 0);
+    
+    // Set up lm_bool_to_string function
+    std::vector<gccjit::param> bool_to_string_params;
+    bool_to_string_params.push_back(m_context.new_param(m_context.get_type(GCC_JIT_TYPE_UINT8_T), "value"));
+    m_lm_bool_to_string_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_lm_string_type, "lm_bool_to_string", bool_to_string_params, 0);
+    
+    // Set up lm_string_free function
+    std::vector<gccjit::param> string_free_params;
+    string_free_params.push_back(m_context.new_param(m_lm_string_type, "str"));
+    m_lm_string_free_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_void_type, "lm_string_free", string_free_params, 0);
+    
+    // Set up lm_string_from_cstr function
+    std::vector<gccjit::param> from_cstr_params;
+    from_cstr_params.push_back(m_context.new_param(m_const_char_ptr_type, "cstr"));
+    m_lm_string_from_cstr_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_lm_string_type, "lm_string_from_cstr", from_cstr_params, 0);
+    
+    // Register loop counter check function
+    std::vector<gccjit::param> loop_check_params;
+    m_loop_check_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_int_type, "check_loop_counter", loop_check_params, 0);
+    
+    // Set up jit_mem_allocate_permanent function
+    std::vector<gccjit::param> jit_mem_alloc_params;
+    jit_mem_alloc_params.push_back(m_context.new_param(m_size_t_type, "size"));
+    m_jit_mem_allocate_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "jit_mem_allocate_permanent", jit_mem_alloc_params, 0);
 }
 
 JITBackend::~JITBackend() {
@@ -165,29 +216,7 @@ static MemoryManager<> g_jit_memory_manager;
 
 // Runtime utility functions for JIT
 extern "C" {
-    JIT_EXPORT const char* limitly_runtime_concat(const char* a, const char* b) {
-        // Use a thread_local static string for thread safety
-        thread_local static std::string result;
-        result = std::string(a) + std::string(b);
-        return result.c_str();
-    }
-    
-    JIT_EXPORT const char* limitly_runtime_format(const char* format, const char* arg) {
-        // Use a thread_local static string for thread safety
-        thread_local static std::string result;
-        result = std::string(format);
-        
-        // Simple %s replacement
-        size_t pos = result.find("%s");
-        if (pos != std::string::npos) {
-            result.replace(pos, 2, arg);
-        } else {
-            result += arg; // Fallback: append
-        }
-        return result.c_str();
-    }
-    
-    void* jit_mem_allocate_permanent(size_t size) {
+    JIT_EXPORT void* jit_mem_allocate_permanent(size_t size) {
         return g_jit_memory_manager.allocate(size);
     }
     
@@ -245,6 +274,9 @@ void JITBackend::compile_function(const LIR::LIR_Function& function) {
     if (m_debug_mode) {
         std::cout << "Compiling JIT context..." << std::endl;
     }
+    
+    // Add current executable to library search path for JIT
+    m_context.set_str_option(GCC_JIT_STR_OPTION_PROGNAME, "limitly.exe");
     
     gcc_jit_result* jit_result = m_context.compile();
     if (!jit_result) {
@@ -362,8 +394,17 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
         // Data Movement
         case LIR::LIR_Op::Mov: {
             gccjit::rvalue src = get_jit_register(inst.a);
-            // Get or create destination register with the same type as source
-            gccjit::lvalue dst = get_jit_register(inst.dst, src.get_type());
+            
+            // Use the result type from the instruction
+            gccjit::type result_type = to_jit_type(inst.result_type);
+            
+            // Cast source to result type if needed
+            if (src.get_type().get_inner_type() != result_type.get_inner_type()) {
+                src = m_context.new_cast(src, result_type);
+            }
+            
+            // Get or create destination register with the result type
+            gccjit::lvalue dst = get_jit_register(inst.dst, result_type);
             m_current_block.add_assignment(dst, src);
             return src;
         }
@@ -473,10 +514,22 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
         case LIR::LIR_Op::Mod: {
             gccjit::rvalue a = get_jit_register(inst.a);
             gccjit::rvalue b = get_jit_register(inst.b);
+            
+            // Convert operands to the expected result type if needed
+            gccjit::type result_type = to_jit_type(inst.result_type);
+            
+            // Cast operands to the result type if needed
+            if (a.get_type().get_inner_type() != result_type.get_inner_type()) {
+                a = m_context.new_cast(a, result_type);
+            }
+            if (b.get_type().get_inner_type() != result_type.get_inner_type()) {
+                b = m_context.new_cast(b, result_type);
+            }
+            
             gccjit::rvalue result = compile_arithmetic_op(inst.op, a, b);
             
             // Get or create destination register with the correct type
-            gccjit::lvalue dst = get_jit_register(inst.dst, result.get_type());
+            gccjit::lvalue dst = get_jit_register(inst.dst, result_type);
             m_current_block.add_assignment(dst, result);
             return result;
         }
@@ -486,18 +539,27 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
         case LIR::LIR_Op::Or: {
             gccjit::rvalue a = get_jit_register(inst.a);
             gccjit::rvalue b = get_jit_register(inst.b);
+            
+            // Use the result type from the instruction
+            gccjit::type result_type = to_jit_type(inst.result_type);
+            
             gccjit::rvalue result = compile_bitwise_op(inst.op, a, b);
-            // Get or create destination register with bool type for logical operations
-            gccjit::lvalue dst = get_jit_register(inst.dst, m_bool_type);
+            
+            // Get or create destination register with the correct type
+            gccjit::lvalue dst = get_jit_register(inst.dst, result_type);
             m_current_block.add_assignment(dst, result);
             return result;
         }
         
         case LIR::LIR_Op::Xor: {
-            gccjit::lvalue dst = get_jit_register(inst.dst);
             gccjit::rvalue a = get_jit_register(inst.a);
             gccjit::rvalue b = get_jit_register(inst.b);
+            
+            // Use the result type from the instruction
+            gccjit::type result_type = to_jit_type(inst.result_type);
+            
             gccjit::rvalue result = compile_bitwise_op(inst.op, a, b);
+            gccjit::lvalue dst = get_jit_register(inst.dst, result_type);
             m_current_block.add_assignment(dst, result);
             return result;
         }
@@ -991,6 +1053,26 @@ gccjit::rvalue JITBackend::compile_comparison_op(LIR::LIR_Op op, gccjit::rvalue 
         default: comparison = GCC_JIT_COMPARISON_EQ; break;
     }
     
+    // Cast operands to the same type for comparison
+    gccjit::type compare_type = a.get_type();
+    if (a.get_type().get_inner_type() != b.get_type().get_inner_type()) {
+        // If types differ, cast both to the larger type
+        if (a.get_type().get_inner_type() == m_double_type.get_inner_type() ||
+            b.get_type().get_inner_type() == m_double_type.get_inner_type()) {
+            compare_type = m_double_type;
+        } else {
+            compare_type = m_int_type; // Default to int for integer comparisons
+        }
+        
+        // Cast operands to the comparison type
+        if (a.get_type().get_inner_type() != compare_type.get_inner_type()) {
+            a = m_context.new_cast(a, compare_type);
+        }
+        if (b.get_type().get_inner_type() != compare_type.get_inner_type()) {
+            b = m_context.new_cast(b, compare_type);
+        }
+    }
+    
     // Return bool result directly - don't cast to int
     return m_context.new_comparison(comparison, a, b);
 }
@@ -1095,6 +1177,10 @@ void JITBackend::compile_call(const LIR::LIR_Inst& inst) {
         return;
     }
     
+    // Register the addresses of our runtime helpers
+    // Note: gcc_jit_context_add_builtin_ptr might not be available in this version
+    // The JIT should be able to find the functions since they're imported
+
     // Use the Register VM to execute the function's LIR instructions directly
     // This is the "Compile function's LIR instructions to JIT blocks" approach
     // but instead we use the direct threaded interpreter which is simpler and more reliable
@@ -1247,115 +1333,65 @@ void JITBackend::compile_memory_op(const LIR::LIR_Inst& inst) {
 }
 
 gccjit::rvalue JITBackend::compile_string_concat(gccjit::rvalue a, gccjit::rvalue b) {
-    // Ensure both operands are converted to C strings
-    gccjit::rvalue a_str = compile_to_cstring(a);
-    gccjit::rvalue b_str = compile_to_cstring(b);
+    // Convert operands to LmString structures
+    gccjit::rvalue a_lm_string = convert_to_lm_string(a);
+    gccjit::rvalue b_lm_string = convert_to_lm_string(b);
     
-    // Call the runtime concatenation function
-    std::vector<gccjit::rvalue> args = {a_str, b_str};
-    return m_context.new_call(m_runtime_concat_func, args);
+    // Call runtime lm_string_concat function
+    std::vector<gccjit::rvalue> concat_args = {a_lm_string, b_lm_string};
+    gccjit::rvalue result_lm_string = m_context.new_call(m_lm_string_concat_func, concat_args);
+    
+    // Extract data pointer from LmString result
+    // Cast to void* first, then to char** to access the data field
+    gccjit::rvalue result_ptr = m_context.new_cast(result_lm_string, m_void_ptr_type);
+    gccjit::rvalue data_ptr_ptr = m_context.new_cast(result_ptr, m_const_char_ptr_type.get_pointer());
+    gccjit::lvalue data_field = data_ptr_ptr.dereference();
+    
+    return data_field.rvalue();
 }
 
 
 gccjit::rvalue JITBackend::compile_string_format(gccjit::rvalue format, gccjit::rvalue arg) {
-    // Ensure both operands are converted to C strings
-    gccjit::rvalue format_str = compile_to_cstring(format);
+    // Convert argument to C string since format uses %s
     gccjit::rvalue arg_str = compile_to_cstring(arg);
-    
-    // Call the runtime formatting function
-    std::vector<gccjit::rvalue> args = {format_str, arg_str};
-    return m_context.new_call(m_runtime_format_func, args);
+    return arg_str;
 }
 
-
-gccjit::rvalue JITBackend::compile_to_string(gccjit::rvalue value) {
-    // Get the C type for comparison
-    gcc_jit_type* c_type = value.get_type().get_inner_type();
-    gcc_jit_type* c_int_type = m_int_type.get_inner_type();
-    gcc_jit_type* c_double_type = m_double_type.get_inner_type();
-    gcc_jit_type* c_bool_type = m_bool_type.get_inner_type();
-    gcc_jit_type* c_const_char_ptr_type = m_const_char_ptr_type.get_inner_type();
-
-    // If already a string, return as-is
-    if (c_type == c_const_char_ptr_type) {
-        return value;
-    } else if (c_type == c_int_type) {
-        // Convert int to string using snprintf
-        // Allocate buffer for int string (max 12 digits + sign + null)
-        gccjit::rvalue buffer_size = m_context.new_rvalue(m_size_t_type, 13);
-
-        // Use permanent memory manager allocation
-        std::vector<gccjit::param> mem_alloc_params;
-        mem_alloc_params.push_back(m_context.new_param(m_size_t_type, "size"));
-        gccjit::function mem_alloc_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "jit_mem_allocate_permanent", mem_alloc_params, 0);
-
-        gccjit::rvalue buffer = m_context.new_call(mem_alloc_func, {buffer_size});
-
-        gcc_jit_rvalue* c_format = gcc_jit_context_new_string_literal(m_context.get_inner_context(), "%d");
-        gccjit::rvalue format_str = gccjit::rvalue(c_format);
-        std::vector<gccjit::rvalue> snprintf_args = {buffer, buffer_size, format_str, value};
-        m_context.new_call(m_snprintf_func, snprintf_args);
-
-        // Cast to const char* before returning
-        return m_context.new_cast(buffer, m_const_char_ptr_type);
-    } else if (c_type == c_double_type) {
-        // Convert double to string using snprintf
-        // Allocate buffer for double string (max 32 characters)
-        gccjit::rvalue buffer_size = m_context.new_rvalue(m_size_t_type, 33);
-
-        // Use permanent memory manager allocation
-        std::vector<gccjit::param> mem_alloc_params;
-        mem_alloc_params.push_back(m_context.new_param(m_size_t_type, "size"));
-        gccjit::function mem_alloc_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "jit_mem_allocate_permanent", mem_alloc_params, 0);
-
-        gccjit::rvalue buffer = m_context.new_call(mem_alloc_func, {buffer_size});
-
-        gcc_jit_rvalue* c_format = gcc_jit_context_new_string_literal(m_context.get_inner_context(), "%f");
-        gccjit::rvalue format_str = gccjit::rvalue(c_format);
-        std::vector<gccjit::rvalue> snprintf_args = {buffer, buffer_size, format_str, value};
-        m_context.new_call(m_snprintf_func, snprintf_args);
-
-        // Cast to const char* before returning
-        return m_context.new_cast(buffer, m_const_char_ptr_type);
-    } else if (c_type == c_bool_type) {
-        // Convert bool to string using a local variable and conditional assignment
-        // Create a local variable to hold the result
-        gccjit::lvalue result_var = m_current_func.new_local(m_const_char_ptr_type, "bool_str_result");
-        
-        // Create blocks for the conditional
-        gccjit::block true_block = m_current_func.new_block("bool_to_str_true");
-        gccjit::block false_block = m_current_func.new_block("bool_to_str_false");
-        gccjit::block merge_block = m_current_func.new_block("bool_to_str_merge");
-        
-        // Branch based on the boolean value
-        m_current_block.end_with_conditional(value, true_block, false_block);
-        
-        // True block: assign "true"
-        gcc_jit_rvalue* c_true_str = gcc_jit_context_new_string_literal(m_context.get_inner_context(), "true");
-        gccjit::rvalue true_str = gccjit::rvalue(c_true_str);
-        true_block.add_assignment(result_var, true_str);
-        true_block.end_with_jump(merge_block);
-        
-        // False block: assign "false"
-        gcc_jit_rvalue* c_false_str = gcc_jit_context_new_string_literal(m_context.get_inner_context(), "false");
-        gccjit::rvalue false_str = gccjit::rvalue(c_false_str);
-        false_block.add_assignment(result_var, false_str);
-        false_block.end_with_jump(merge_block);
-        
-        // Continue in merge block
-        m_current_block = merge_block;
-        
-        // Return the result variable as rvalue
-        return result_var;
-    } 
-    else {
-        // Default case: return empty string
-        gcc_jit_rvalue* c_empty_str = gcc_jit_context_new_string_literal(m_context.get_inner_context(), "");
-        return gccjit::rvalue(c_empty_str);
-    }
-}
 
 gccjit::rvalue JITBackend::compile_to_cstring(gccjit::rvalue value) {
+    // Check if the value is already a string
+    gcc_jit_type* c_type = value.get_type().get_inner_type();
+    gcc_jit_type* c_const_char_ptr = m_const_char_ptr_type.get_inner_type();
+    
+    if (c_type == c_const_char_ptr) {
+        return value;
+    }
+    
+    // For integer types (including uint64_t), convert to string using snprintf
+    // Allocate buffer for integer conversion (enough for 64-bit integer + null terminator)
+    gccjit::rvalue buffer_size = m_context.new_rvalue(m_size_t_type, 21);
+    std::vector<gccjit::rvalue> malloc_args = {buffer_size};
+    gccjit::rvalue buffer = m_context.new_call(m_malloc_func, malloc_args);
+    
+    // Convert integer to string using snprintf with %llu for unsigned long long
+    // Note: UINT64_T should use %llu format
+    gcc_jit_rvalue* c_format_str = gcc_jit_context_new_string_literal(m_context.get_inner_context(), "%llu");
+    
+    // Cast the value to unsigned long long for snprintf
+    gccjit::rvalue cast_value = m_context.new_cast(value, m_context.get_type(GCC_JIT_TYPE_LONG_LONG));
+    
+    std::vector<gccjit::rvalue> snprintf_args = {
+        buffer,
+        buffer_size,
+        gccjit::rvalue(c_format_str),
+        cast_value
+    };
+    m_current_block.add_eval(m_context.new_call(m_snprintf_func, snprintf_args));
+    
+    return m_context.new_cast(buffer, m_const_char_ptr_type);
+}
+
+gccjit::rvalue JITBackend::compile_to_string(gccjit::rvalue value) {
     // If already a string pointer, just return it
     gcc_jit_type* c_type = value.get_type().get_inner_type();
     gcc_jit_type* c_const_char_ptr = m_const_char_ptr_type.get_inner_type();
@@ -1366,6 +1402,21 @@ gccjit::rvalue JITBackend::compile_to_cstring(gccjit::rvalue value) {
     
     // Otherwise convert to string
     return compile_to_string(value);
+}
+
+gccjit::rvalue JITBackend::convert_to_lm_string(gccjit::rvalue value) {
+    // Check if the value is already a const char* (string literal)
+    // Compare types using the underlying gcc_jit_type pointers
+    if (value.get_type().get_inner_type() == m_const_char_ptr_type.get_inner_type()) {
+        // Convert C string to LmString using runtime function
+        std::vector<gccjit::rvalue> from_cstr_args = {value};
+        return m_context.new_call(m_lm_string_from_cstr_func, from_cstr_args);
+    }
+    
+    // For other types, convert to string first, then to LmString
+    gccjit::rvalue c_string = compile_to_cstring(value);
+    std::vector<gccjit::rvalue> from_cstr_args = {c_string};
+    return m_context.new_call(m_lm_string_from_cstr_func, from_cstr_args);
 }
 
 
@@ -1482,6 +1533,9 @@ CompileResult JITBackend::compile(CompileMode mode, const std::string& output_pa
             std::cout << "Compiling JIT context..." << std::endl;
         }
         
+        // Add current executable to library search path for JIT
+        m_context.set_str_option(GCC_JIT_STR_OPTION_PROGNAME, "limitly.exe");
+        
         gcc_jit_result* jit_result = m_context.compile();
         if (!jit_result) {
             result.success = false;
@@ -1535,6 +1589,9 @@ int JITBackend::execute_compiled_function(const std::vector<int>& args) {
         report_error("No compiled function available");
         return -1;
     }
+    
+    // Reset loop counter for this execution
+    loop_execution_counter = 0;
     
     // Cast to function pointer with no parameters since our generated functions take no args
     typedef int (*func_type)();

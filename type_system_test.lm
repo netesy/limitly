@@ -1,0 +1,21 @@
+// Test comprehensive type system fixes
+
+print("=== Type System Test ===");
+
+// Test 1: Integer division
+var a = 284;
+var b = 4;
+var int_result = a / b;
+print("284 / 4 =", int_result);
+
+// Test 2: Float division  
+var x = 10.0;
+var y = 2.847;
+var float_result = x / y;
+print("10.0 / 2.847 =", float_result);
+
+// Test 3: Mixed division (should promote to float)
+var mixed_result = 15.0 / 3;
+print("15.0 / 3 =", mixed_result);
+
+print("=== Test completed ===");

@@ -531,7 +531,7 @@ print("\n=== 18. PATTERN MATCHING - BASIC SYNTAX ===");
 // Match expression syntax (commented out - VM implementation pending)
 /*
 var testValue = 42;
-match testValue {
+match (testValue) {
     0 => print("Zero"),
     1..10 => print("Small number"),
     _ => print("Other number")

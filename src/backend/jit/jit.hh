@@ -87,7 +87,8 @@ private:
     gccjit::type m_void_ptr_type;
     gccjit::type m_string_builder_type;
     gccjit::type m_c_int_type;
-        gccjit::type m_size_t_type;
+    gccjit::type m_size_t_type;
+    gccjit::type m_lm_string_type;
     
     // Standard library functions
     gccjit::function m_printf_func;
@@ -106,6 +107,16 @@ private:
     gccjit::function m_runtime_concat_func;
     gccjit::function m_runtime_format_func;
     gccjit::function m_get_ticks_func;
+    gccjit::function m_jit_mem_allocate_func;
+    gccjit::function m_loop_check_func;
+    
+    // Runtime string functions
+    gccjit::function m_lm_string_concat_func;
+    gccjit::function m_lm_int_to_string_func;
+    gccjit::function m_lm_double_to_string_func;
+    gccjit::function m_lm_bool_to_string_func;
+    gccjit::function m_lm_string_free_func;
+    gccjit::function m_lm_string_from_cstr_func;
     
     // Helper methods
     gccjit::rvalue convert_to_jit_type(gccjit::rvalue value, gccjit::type target_type);
@@ -122,6 +133,7 @@ private:
     gccjit::rvalue compile_string_format(gccjit::rvalue format, gccjit::rvalue arg);
     gccjit::rvalue compile_to_string(gccjit::rvalue value);
     gccjit::rvalue compile_to_cstring(gccjit::rvalue value);
+    gccjit::rvalue convert_to_lm_string(gccjit::rvalue value);
     
     // Control flow
     void compile_jump(const LIR::LIR_Inst& inst);
