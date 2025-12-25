@@ -1,0 +1,10 @@
+// Simple JIT test without string formatting
+print("=== Simple JIT Test ===");
+
+var a = 10;
+var b = 20;
+var c = a + b;
+
+print(c);
+
+print("=== Test Completed ===");

@@ -857,90 +857,41 @@ Reg Generator::emit_interpolated_string_expr(AST::InterpolatedStringExpr& expr) 
 }
 
 Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
-    // Handle explicit string concatenation (+) with STR_CONCAT
+    // Handle PLUS operator - check for string concatenation first
     if (expr.op == TokenType::PLUS) {
-        // Check if this is string concatenation by examining operand types
-        bool left_is_string = false;
-        bool right_is_string = false;
-        std::string left_str, right_str;
+        // Emit left and right operands FIRST to get their types
+        Reg left = emit_expr(*expr.left);
+        Reg right = emit_expr(*expr.right);
         
-        // Check left operand for string literal or variable
-        if (auto left_literal = dynamic_cast<AST::LiteralExpr*>(expr.left.get())) {
-            if (std::holds_alternative<std::string>(left_literal->value)) {
-                left_str = std::get<std::string>(left_literal->value);
-                // Check if it's actually a non-numeric string
-                bool is_numeric = false;
-                if (!left_str.empty()) {
-                    char first = left_str[0];
-                    if (std::isdigit(first) || first == '+' || first == '-' || first == '.') {
-                        is_numeric = true;
-                        if (left_str.find('.') != std::string::npos || 
-                            left_str.find('e') != std::string::npos || 
-                            left_str.find('E') != std::string::npos) {
-                            // Float - treat as numeric
-                        } else {
-                            // Integer - treat as numeric  
-                        }
-                    }
-                }
-                left_is_string = !is_numeric;
-            }
-        } else if (auto left_var = dynamic_cast<AST::VariableExpr*>(expr.left.get())) {
-            // Check if variable is known to be a string type
-            Reg left_reg = resolve_variable(left_var->name);
-            if (left_reg != UINT32_MAX) {
-                TypePtr left_type = get_register_type(left_reg);
-                if (left_type && left_type->tag == ::TypeTag::String) {
-                    left_is_string = true;
-                }
-            }
-        }
+        TypePtr left_type = get_register_type(left);
+        TypePtr right_type = get_register_type(right);
         
-        // Check right operand for string literal or variable
-        if (auto right_literal = dynamic_cast<AST::LiteralExpr*>(expr.right.get())) {
-            if (std::holds_alternative<std::string>(right_literal->value)) {
-                right_str = std::get<std::string>(right_literal->value);
-                // Check if it's actually a non-numeric string
-                bool is_numeric = false;
-                if (!right_str.empty()) {
-                    char first = right_str[0];
-                    if (std::isdigit(first) || first == '+' || first == '-' || first == '.') {
-                        is_numeric = true;
-                        if (right_str.find('.') != std::string::npos || 
-                            right_str.find('e') != std::string::npos || 
-                            right_str.find('E') != std::string::npos) {
-                            // Float - treat as numeric
-                        } else {
-                            // Integer - treat as numeric  
-                        }
-                    }
-                }
-                right_is_string = !is_numeric;
-            }
-        } else if (auto right_var = dynamic_cast<AST::VariableExpr*>(expr.right.get())) {
-            // Check if variable is known to be a string type
-            Reg right_reg = resolve_variable(right_var->name);
-            if (right_reg != UINT32_MAX) {
-                TypePtr right_type = get_register_type(right_reg);
-                if (right_type && right_type->tag == ::TypeTag::String) {
-                    right_is_string = true;
-                }
-            }
-        }
+        // Check if EITHER operand is a string type
+        bool left_is_string = (left_type && left_type->tag == ::TypeTag::String);
+        bool right_is_string = (right_type && right_type->tag == ::TypeTag::String);
         
-        // If either operand is a non-numeric string, use STR_CONCAT
         if (left_is_string || right_is_string) {
-            Reg left = emit_expr(*expr.left);
-            Reg right = emit_expr(*expr.right);
+            // Convert non-string operand to string using ToString
+            if (!left_is_string) {
+                Reg str_left = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::ToString, Type::Ptr, str_left, left, 0));
+                auto string_type = std::make_shared<::Type>(::TypeTag::String);
+                set_register_type(str_left, string_type);
+                left = str_left;
+            }
+            if (!right_is_string) {
+                Reg str_right = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::ToString, Type::Ptr, str_right, right, 0));
+                auto string_type = std::make_shared<::Type>(::TypeTag::String);
+                set_register_type(str_right, string_type);
+                right = str_right;
+            }
+            
+            // Perform string concatenation
             Reg dst = allocate_register();
-            
-            // Use STR_CONCAT for explicit string addition
-            Type abi_type = language_type_to_abi_type(expr.inferred_type);
-            emit_instruction(LIR_Inst(LIR_Op::STR_CONCAT, abi_type, dst, left, right));
-            
-            // Set result type as string
             auto string_type = std::make_shared<::Type>(::TypeTag::String);
             set_register_type(dst, string_type);
+            emit_instruction(LIR_Inst(LIR_Op::STR_CONCAT, Type::Ptr, dst, left, right));
             return dst;
         }
     }
@@ -955,7 +906,45 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
     if (expr.op == TokenType::PLUS) op = LIR_Op::Add;
     else if (expr.op == TokenType::MINUS) op = LIR_Op::Sub;
     else if (expr.op == TokenType::STAR) op = LIR_Op::Mul;
-    else if (expr.op == TokenType::SLASH) op = LIR_Op::Div;
+    else if (expr.op == TokenType::SLASH) {
+        // Handle division with proper type checking
+        TypePtr left_type = get_register_type(left);
+        TypePtr right_type = get_register_type(right);
+        
+        bool left_is_int = left_type && 
+            (left_type->tag == ::TypeTag::Int || left_type->tag == ::TypeTag::Int64 ||
+             left_type->tag == ::TypeTag::Int32 || left_type->tag == ::TypeTag::Int16 ||
+             left_type->tag == ::TypeTag::Int8 || left_type->tag == ::TypeTag::UInt ||
+             left_type->tag == ::TypeTag::UInt64 || left_type->tag == ::TypeTag::UInt32 ||
+             left_type->tag == ::TypeTag::UInt16 || left_type->tag == ::TypeTag::UInt8);
+        
+        bool right_is_int = right_type && 
+            (right_type->tag == ::TypeTag::Int || right_type->tag == ::TypeTag::Int64 ||
+             right_type->tag == ::TypeTag::Int32 || right_type->tag == ::TypeTag::Int16 ||
+             right_type->tag == ::TypeTag::Int8 || right_type->tag == ::TypeTag::UInt ||
+             right_type->tag == ::TypeTag::UInt64 || right_type->tag == ::TypeTag::UInt32 ||
+             right_type->tag == ::TypeTag::UInt16 || right_type->tag == ::TypeTag::UInt8);
+        
+        if (left_is_int && right_is_int) {
+            // INTEGER DIVISION: 284/4 = 71 (no decimal)
+            op = LIR_Op::Div;
+        } else {
+            // FLOAT DIVISION: 10/2.847 = 3.512... (with decimal)
+            op = LIR_Op::Div;
+            
+            // Convert integer operands to float for division
+            if (left_is_int) {
+                Reg float_left = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::Cast, Type::F64, float_left, left, 0));
+                left = float_left;
+            }
+            if (right_is_int) {
+                Reg float_right = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::Cast, Type::F64, float_right, right, 0));
+                right = float_right;
+            }
+        }
+    }
     else if (expr.op == TokenType::MODULUS) op = LIR_Op::Mod;
     else if (expr.op == TokenType::POWER) {
         // Power operation - for now, use multiplication (a * a for simple cases)
@@ -1049,9 +1038,12 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
     // Set type BEFORE emitting so it's available during emit_instruction
     if (result_type) {
         set_register_type(dst, result_type);
+        Type abi_type = language_type_to_abi_type(result_type);
+        emit_instruction(LIR_Inst(op, abi_type, dst, left, right));
+    } else {
+        // Fallback for operations without result type
+        emit_instruction(LIR_Inst(op, dst, left, right));
     }
-    
-    emit_instruction(LIR_Inst(op, dst, left, right));
     
     return dst;
 }
@@ -1513,12 +1505,12 @@ void Generator::emit_expr_stmt(AST::ExprStatement& stmt) {
 }
 
 void Generator::emit_print_stmt(AST::PrintStatement& stmt) {
-    // For now, just handle the first argument
-    if (!stmt.arguments.empty()) {
-        Reg value = emit_expr(*stmt.arguments[0]);
+    // Handle all arguments
+    for (size_t i = 0; i < stmt.arguments.size(); ++i) {
+        Reg value = emit_expr(*stmt.arguments[i]);
         
         // First, check the register type that we tracked
-        TypePtr reg_type = get_register_type(value);
+        TypePtr reg_type = get_register_language_type(value);
         if (reg_type) {
             switch (reg_type->tag) {
                 case ::TypeTag::Int:
@@ -1527,114 +1519,113 @@ void Generator::emit_print_stmt(AST::PrintStatement& stmt) {
                 case ::TypeTag::Int32:
                 case ::TypeTag::Int64:
                     emit_instruction(LIR_Inst(LIR_Op::PrintInt, Type::Void, 0, value, 0));
-                    return;
+                    break;
                 case ::TypeTag::UInt:
                 case ::TypeTag::UInt8:
                 case ::TypeTag::UInt16:
                 case ::TypeTag::UInt32:
                 case ::TypeTag::UInt64:
                     emit_instruction(LIR_Inst(LIR_Op::PrintUint, Type::Void, 0, value, 0));
-                    return;
+                    break;
                 case ::TypeTag::Float32:
                 case ::TypeTag::Float64:
                     emit_instruction(LIR_Inst(LIR_Op::PrintFloat, Type::Void, 0, value, 0));
-                    return;
+                    break;
                 case ::TypeTag::Bool:
                     emit_instruction(LIR_Inst(LIR_Op::PrintBool, Type::Void, 0, value, 0));
-                    return;
+                    break;
                 case ::TypeTag::String:
                     emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
-                    return;
+                    break;
                 default:
                     break;
             }
-        }
-        
-        // Fallback: Check what type of value we actually have in the register
-        // Look at the last instruction to determine the type
-        if (!current_function_->instructions.empty()) {
-            const auto& last_inst = current_function_->instructions.back();
-            if (last_inst.dst == value) {
-                if (last_inst.const_val) {
-                    // This is a LoadConst instruction - check the constant's type
-                    if (last_inst.const_val->type) {
-                        switch (last_inst.const_val->type->tag) {
-                            case ::TypeTag::Int:
-                            case ::TypeTag::Int8:
-                            case ::TypeTag::Int16:
-                            case ::TypeTag::Int32:
-                            case ::TypeTag::Int64:
-                                emit_instruction(LIR_Inst(LIR_Op::PrintInt, Type::Void, 0, value, 0));
-                                return;
-                            case ::TypeTag::UInt:
-                            case ::TypeTag::UInt8:
-                            case ::TypeTag::UInt16:
-                            case ::TypeTag::UInt32:
-                            case ::TypeTag::UInt64:
-                                emit_instruction(LIR_Inst(LIR_Op::PrintUint, Type::Void, 0, value, 0));
-                                return;                                
-                            case ::TypeTag::Float32:
-                            case ::TypeTag::Float64:
-                                emit_instruction(LIR_Inst(LIR_Op::PrintFloat, Type::Void, 0, value, 0));
-                                return;
-                            case ::TypeTag::Bool:
-                                emit_instruction(LIR_Inst(LIR_Op::PrintBool, Type::Void, 0, value, 0));
-                                return;
-                            case ::TypeTag::String:
-                                emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
-                                return;
-                            case ::TypeTag::Nil:
-                            default:
-                                // For nil and other types, convert to string and print
-                                auto string_type = std::make_shared<::Type>(::TypeTag::String);
-                                ValuePtr nil_str = std::make_shared<Value>(string_type, std::string("nil"));
-                                Reg nil_reg = allocate_register();
-                                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, nil_reg, nil_str));
-                                emit_instruction(LIR_Inst(LIR_Op::PrintString, 0, nil_reg, 0));
-                                return;
-                        }
-                    }
-                } else if (last_inst.op == LIR_Op::Concat || last_inst.op == LIR_Op::ToString) {
-                    // This is a string operation - treat as string
-                    emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
-                    return;
-                }
-            }
-        }
-        
-        // Fallback: check if it's a literal primitive to determine print type
-        if (auto literal = dynamic_cast<AST::LiteralExpr*>(stmt.arguments[0].get())) {
-            if (std::holds_alternative<std::string>(literal->value)) {
-                std::string str_val = std::get<std::string>(literal->value);
-                // Check if it's a numeric string
-                if (!str_val.empty() && (std::isdigit(str_val[0]) || str_val[0] == '+' || str_val[0] == '-' || str_val[0] == '.')) {
-                    if (str_val.find('.') != std::string::npos || str_val.find('e') != std::string::npos || str_val.find('E') != std::string::npos) {
-                        emit_instruction(LIR_Inst(LIR_Op::PrintFloat, Type::Void, 0, value, 0));
-                    } else {
-                        emit_instruction(LIR_Inst(LIR_Op::PrintInt, Type::Void, 0, value, 0));
-                    }
-                } else {
-                    // String literal - print directly
-                    emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
-                }
-            } else if (std::holds_alternative<bool>(literal->value)) {
-                emit_instruction(LIR_Inst(LIR_Op::PrintBool, Type::Void, 0, value, 0));
-            } else {
-                // nil - convert to string constant and print
-                auto string_type = std::make_shared<::Type>(::TypeTag::String);
-                ValuePtr nil_str = std::make_shared<Value>(string_type, std::string("nil"));
-                Reg nil_reg = allocate_register();
-                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, nil_reg, nil_str));
-                emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, nil_reg, 0));
-            }
-        } else if (auto interpolated = dynamic_cast<AST::InterpolatedStringExpr*>(stmt.arguments[0].get())) {
-            // This is an interpolated string - treat as string
-            emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
         } else {
-            // For expressions, determine type at generation time and emit appropriate print
-            // For now, default to PrintInt for arithmetic expressions
-            // TODO: Better type inference for expressions
-            emit_instruction(LIR_Inst(LIR_Op::PrintInt, Type::Void, 0, value, 0));
+            // Fallback: Check what type of value we actually have in the register
+            // Look at the last instruction to determine the type
+            if (!current_function_->instructions.empty()) {
+                const auto& last_inst = current_function_->instructions.back();
+                if (last_inst.dst == value) {
+                    if (last_inst.const_val) {
+                        // This is a LoadConst instruction - check the constant's type
+                        if (last_inst.const_val->type) {
+                            switch (last_inst.const_val->type->tag) {
+                                case ::TypeTag::Int:
+                                case ::TypeTag::Int8:
+                                case ::TypeTag::Int16:
+                                case ::TypeTag::Int32:
+                                case ::TypeTag::Int64:
+                                    emit_instruction(LIR_Inst(LIR_Op::PrintInt, Type::Void, 0, value, 0));
+                                    break;
+                                case ::TypeTag::UInt:
+                                case ::TypeTag::UInt8:
+                                case ::TypeTag::UInt16:
+                                case ::TypeTag::UInt32:
+                                case ::TypeTag::UInt64:
+                                    emit_instruction(LIR_Inst(LIR_Op::PrintUint, Type::Void, 0, value, 0));
+                                    break;                                
+                                case ::TypeTag::Float32:
+                                case ::TypeTag::Float64:
+                                    emit_instruction(LIR_Inst(LIR_Op::PrintFloat, Type::Void, 0, value, 0));
+                                    break;
+                                case ::TypeTag::Bool:
+                                    emit_instruction(LIR_Inst(LIR_Op::PrintBool, Type::Void, 0, value, 0));
+                                    break;
+                                case ::TypeTag::String:
+                                    emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
+                                    break;
+                                case ::TypeTag::Nil:
+                                default:
+                                    // For nil and other types, convert to string and print
+                                    auto string_type = std::make_shared<::Type>(::TypeTag::String);
+                                    ValuePtr nil_str = std::make_shared<Value>(string_type, std::string("nil"));
+                                    Reg nil_reg = allocate_register();
+                                    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, nil_reg, nil_str));
+                                    emit_instruction(LIR_Inst(LIR_Op::PrintString, 0, nil_reg, 0));
+                                    break;
+                            }
+                        }
+                    } else if (last_inst.op == LIR_Op::Concat || last_inst.op == LIR_Op::ToString) {
+                        // This is a string operation - treat as string
+                        emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
+                    }
+                }
+            }
+            
+            // Fallback: check if it's a literal primitive to determine print type
+            if (auto literal = dynamic_cast<AST::LiteralExpr*>(stmt.arguments[i].get())) {
+                if (std::holds_alternative<std::string>(literal->value)) {
+                    std::string str_val = std::get<std::string>(literal->value);
+                    // Check if it's a numeric string
+                    if (!str_val.empty() && (std::isdigit(str_val[0]) || str_val[0] == '+' || str_val[0] == '-' || str_val[0] == '.')) {
+                        if (str_val.find('.') != std::string::npos || str_val.find('e') != std::string::npos || str_val.find('E') != std::string::npos) {
+                            emit_instruction(LIR_Inst(LIR_Op::PrintFloat, Type::Void, 0, value, 0));
+                        } else {
+                            emit_instruction(LIR_Inst(LIR_Op::PrintInt, Type::Void, 0, value, 0));
+                        }
+                    } else {
+                        // String literal - print directly
+                        emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
+                    }
+                } else if (std::holds_alternative<bool>(literal->value)) {
+                    emit_instruction(LIR_Inst(LIR_Op::PrintBool, Type::Void, 0, value, 0));
+                } else {
+                    // nil - convert to string constant and print
+                    auto string_type = std::make_shared<::Type>(::TypeTag::String);
+                    ValuePtr nil_str = std::make_shared<Value>(string_type, std::string("nil"));
+                    Reg nil_reg = allocate_register();
+                    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, nil_reg, nil_str));
+                    emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, nil_reg, 0));
+                }
+            } else if (auto interpolated = dynamic_cast<AST::InterpolatedStringExpr*>(stmt.arguments[i].get())) {
+                // This is an interpolated string - treat as string
+                emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
+            } else {
+                // For expressions, determine type at generation time and emit appropriate print
+                // For now, default to PrintInt for arithmetic expressions
+                // TODO: Better type inference for expressions
+                emit_instruction(LIR_Inst(LIR_Op::PrintInt, Type::Void, 0, value, 0));
+            }
         }
     }
 }

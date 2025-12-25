@@ -1,0 +1,48 @@
+// Test comprehensive type system fixes
+
+// Test 1: Integer vs Float division
+print("=== Division Tests ===");
+var int_div = 284 / 4;      // Should be 71 (integer division)
+var float_div = 10 / 2.847; // Should be ~3.512 (float division)
+var mixed_div = 15.0 / 3;   // Should be 5.0 (float division)
+print("284 / 4 =", int_div);
+print("10 / 2.847 =", float_div);
+print("15.0 / 3 =", mixed_div);
+
+// Test 2: String concatenation with type conversion
+print("\n=== String Concatenation Tests ===");
+var str1 = "hello";
+var num1 = 42;
+var concat1 = str1 + num1;        // Should convert 42 to string
+var concat2 = num1 + str1;        // Should convert 42 to string
+var concat3 = "value:" + 3.14;     // Should convert 3.14 to string
+print("hello + 42 =", concat1);
+print("42 + hello =", concat2);
+print("value: + 3.14 =", concat3);
+
+// Test 3: Enhanced float literal detection
+print("\n=== Float Literal Tests ===");
+var f1 = 3.14;        // Decimal point
+var f2 = 2e5;         // Exponent
+var f3 = 1.5e-3;      // Exponent with decimal
+var f4 = 6.022e23;    // Scientific notation
+print("3.14 =", f1);
+print("2e5 =", f2);
+print("1.5e-3 =", f3);
+print("6.022e23 =", f4);
+
+// Test 4: Type promotion rules
+print("\n=== Type Promotion Tests ===");
+var small_num = 127;         // int8 range
+var medium_num = 1000;       // int32 range
+var large_num = 1000000;     // int64 range
+var unsigned_num = 4000000000u; // uint32
+
+var result1 = small_num + medium_num;    // Should promote to int32
+var result2 = medium_num + large_num;   // Should promote to int64
+var result3 = large_num + unsigned_num;   // Should handle unsigned correctly
+print("127 + 1000 =", result1);
+print("1000 + 1000000 =", result2);
+print("1000000 + 4000000000u =", result3);
+
+print("\n=== All tests completed ===");

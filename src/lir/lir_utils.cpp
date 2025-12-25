@@ -46,6 +46,42 @@ std::string Disassembler::disassemble_instruction(const LIR_Inst& inst) const {
         if (it != func.debug_info.var_names.end()) {
             result += " ; " + it->second;
         }
+        
+        // Add register type information
+        std::vector<std::pair<Reg, std::string>> reg_types;
+        
+        // Get type for destination register
+        if (inst.dst != 0) {
+            LIR::Type dst_type = func.get_register_abi_type(inst.dst);
+            if (dst_type != LIR::Type::Void) {
+                reg_types.push_back({inst.dst, type_to_string(dst_type)});
+            }
+        }
+        
+        // Get types for source registers
+        if (inst.a != 0) {
+            LIR::Type a_type = func.get_register_abi_type(inst.a);
+            if (a_type != LIR::Type::Void) {
+                reg_types.push_back({inst.a, type_to_string(a_type)});
+            }
+        }
+        
+        if (inst.b != 0) {
+            LIR::Type b_type = func.get_register_abi_type(inst.b);
+            if (b_type != LIR::Type::Void) {
+                reg_types.push_back({inst.b, type_to_string(b_type)});
+            }
+        }
+        
+        // Add type information to output
+        if (!reg_types.empty()) {
+            result += " [types: ";
+            for (size_t i = 0; i < reg_types.size(); ++i) {
+                if (i > 0) result += ", ";
+                result += "r" + std::to_string(reg_types[i].first) + ":" + reg_types[i].second;
+            }
+            result += "]";
+        }
     }
     
     return result;

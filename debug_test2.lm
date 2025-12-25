@@ -1,0 +1,5 @@
+// Debug test
+var a = 284;
+var b = 4;
+var result = a / b;
+print("284 / 4 =", result);

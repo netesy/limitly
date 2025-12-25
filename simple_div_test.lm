@@ -1,0 +1,4 @@
+// Simple division test
+print("=== Simple Division Test ===");
+var int_div = 284 / 4;      // Should be 71 (integer division)
+print("284 / 4 =", int_div);

@@ -40,6 +40,9 @@ BIN_DIR := bin
 OBJ_DIR := obj/$(MODE)
 RSP_DIR := rsp
 
+# Runtime library
+RUNTIME_LIB := $(OBJ_DIR)/limitly_runtime.a
+
 # =============================
 # Sources
 # =============================
@@ -97,6 +100,14 @@ $(OBJ_DIR)/%.o: %.cpp | $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 # =============================
+# Runtime library compilation
+# =============================
+$(RUNTIME_LIB): runtime_string.c | $(OBJ_DIR)
+	@echo "Building runtime library..."
+	gcc -c runtime_string.c -o $(OBJ_DIR)/runtime_string.o
+	ar rcs $@ $(OBJ_DIR)/runtime_string.o
+
+# =============================
 # Directories
 # =============================
 $(OBJ_DIR):
@@ -124,14 +135,14 @@ $(TEST_RSP): $(TEST_OBJS) | $(RSP_DIR)
 # =============================
 # Build targets
 # =============================
-windows: $(BIN_DIR) $(MAIN_RSP)
+windows: $(BIN_DIR) $(MAIN_RSP) $(RUNTIME_LIB)
 	@echo "🔨 Linking limitly.exe ..."
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(RUNTIME_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS)
 	@echo "✅ limitly.exe built."
 
-linux: $(BIN_DIR) $(MAIN_RSP)
+linux: $(BIN_DIR) $(MAIN_RSP) $(RUNTIME_LIB)
 	@echo "🔨 Linking limitly ..."
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(RUNTIME_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS)
 	@echo "✅ limitly built."
 
 
@@ -176,12 +187,12 @@ endif
 # =============================
 test-jit: $(BIN_DIR)
 	@echo "🔨 Building JIT test..."
-	$(CXX) $(CXXFLAGS) -I. test_jit_operations.cpp src/backend/jit/jit.cpp src/lir/lir.cpp src/lir/lir_utils.cpp -o $(BIN_DIR)/test_jit$(EXE_EXT) $(LIBS)
+	$(CXX) $(CXXFLAGS) -I. test_jit_operations.cpp src/backend/jit/jit.cpp src/lir/lir.cpp src/lir/lir_utils.cpp $(RUNTIME_LIB) -o $(BIN_DIR)/test_jit$(EXE_EXT) $(LIBS)
 	@echo "✅ JIT test built."
 	@echo "🧪 Running JIT test..."
 	$(BIN_DIR)/test_jit$(EXE_EXT)
 
 parser: $(BIN_DIR) $(TEST_RSP)
 	@echo "🔨 Building test_parser$(EXE_EXT)...."
-	$(CXX) $(CXXFLAGS) @$(TEST_RSP) -o $(BIN_DIR)/test_parser$(EXE_EXT) $(LIBS)
+	$(CXX) $(CXXFLAGS) @$(TEST_RSP)  -o $(BIN_DIR)/test_parser$(EXE_EXT) $(LIBS)
 	@echo "✅ $(BIN_DIR)/test_parser$(EXE_EXT) built."

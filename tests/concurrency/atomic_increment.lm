@@ -1,7 +1,7 @@
 var counter: atomic = 0;
 var ch = channel();
 
-concurrent {
+concurrent(ch=ch) {
     task(i in 1..10) {
         counter += 1;
         ch.send(counter);
@@ -10,8 +10,9 @@ concurrent {
 
 // Drain channel
 var seen = 0;
+print("Value from channel: {ch}");
 iter (v in ch) {
-    print("Value from channel: {v}");
+    print("Value from channel loop: {v}");
     seen += 1;
     if (seen >= 10) break;
 }
