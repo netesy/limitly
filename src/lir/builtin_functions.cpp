@@ -143,6 +143,51 @@ void LIRBuiltinFunctions::registerStringFunctions() {
             return std::make_shared<Value>(string_type, str.substr(start, length));
         }
     ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "str_format",
+        std::vector<TypeTag>{TypeTag::String, TypeTag::Any},
+        TypeTag::String,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string format_str = args[0]->as<std::string>();
+            const auto& value = args[1];
+            std::string formatted_str;
+
+            // Simple formatting based on type
+            if (value && value->type) {
+                switch (value->type->tag) {
+                    case TypeTag::Int:
+                    case TypeTag::Int64:
+                        formatted_str = std::to_string(value->as<int64_t>());
+                        break;
+                    case TypeTag::Float32:
+                    case TypeTag::Float64:
+                        formatted_str = std::to_string(value->as<double>());
+                        break;
+                    case TypeTag::Bool:
+                        formatted_str = value->as<bool>() ? "true" : "false";
+                        break;
+                    case TypeTag::String:
+                        formatted_str = value->as<std::string>();
+                        break;
+                    default:
+                        formatted_str = "<unsupported>";
+                        break;
+                }
+            } else {
+                formatted_str = "<null>";
+            }
+
+            // Replace the first format specifier
+            size_t pos = format_str.find("%s");
+            if (pos != std::string::npos) {
+                format_str.replace(pos, 2, formatted_str);
+            }
+
+            auto string_type = std::make_shared<::Type>(TypeTag::String);
+            return std::make_shared<Value>(string_type, format_str);
+        }
+    ));
 }
 
 void LIRBuiltinFunctions::registerIOFunctions() {
