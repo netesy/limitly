@@ -17,6 +17,7 @@ Welcome to the official guide for the Limit programming language. This document 
     *   [For Loops](#for-loops)
     *   [While Loops](#while-loops)
     *   [Iter Loops](#iter-loops)
+    *   [Ternary Operator](#ternary-operator)
     *   [Match Statements](#match-statements)
 4.  [Data Structures](#data-structures)
     *   [Lists](#lists)
@@ -31,6 +32,7 @@ Welcome to the official guide for the Limit programming language. This document 
     *   [Closures](#closures)
 6.  [Classes](#classes)
     *   [Defining Classes](#defining-classes)
+    *   [Class Members and Modifiers](#class-members-and-modifiers)
     *   [Fields and Methods](#fields-and-methods)
     *   [The `init` Constructor](#the-init-constructor)
     *   [The `self` Keyword](#the-self-keyword)
@@ -44,6 +46,7 @@ Welcome to the official guide for the Limit programming language. This document 
     *   [Import with an Alias](#import-with-an-alias)
     *   [Importing Specific Symbols](#importing-specific-symbols)
     *   [Hiding Imported Symbols](#hiding-imported-symbols)
+    *   [Module Declarations](#module-declarations)
 8.  [The Type System](#the-type-system)
     *   [Type Aliases](#type-aliases)
     *   [Union Types](#union-types)
@@ -317,12 +320,33 @@ while (i < 10) {
 
 The `iter` loop is a modern way to iterate over ranges. The range `start..end` is inclusive of `start` and exclusive of `end`.
 
-```
+```limit
 // Iterate from 1 to 4
 iter (i in 1..5) {
     print("i = {i}");
 }
 ```
+
+You can also specify a step value for the range.
+
+```limit
+// Iterate from 0 to 9 with a step of 2
+iter (i in 0..10..2) {
+    print("i = {i}"); // Output: 0, 2, 4, 6, 8
+}
+```
+> **Note:** The step value feature is planned but not yet fully implemented in the parser.
+
+### Ternary Operator
+
+Limit supports the ternary operator (`? :`) for concise conditional expressions.
+
+```limit
+var x = 10;
+var result = x > 5 ? "Greater than 5" : "Not greater than 5";
+print(result); // Output: Greater than 5
+```
+> **Note:** The ternary operator is planned but not yet implemented in the parser.
 
 ### Match Statements
 
@@ -402,6 +426,29 @@ fn greet(p: Person) {
 }
 
 greet({name: "Alice", age: 30}); // Output: Alice is 30 years old.
+```
+
+#### Destructuring Dictionaries
+
+You can destructure dictionaries to bind values to variables based on their keys. You can also capture the remaining key-value pairs using the `...` syntax.
+
+```limit
+var person = {
+    "name": "Alice",
+    "age": 30,
+    "city": "New York"
+};
+
+match (person) {
+    {name: n, age: a, ...rest} => {
+        print("{n} is {a} years old.");
+        print("Other info: {rest}");
+    },
+    _ => { print("Not a person."); }
+}
+// Output:
+// Alice is 30 years old.
+// Other info: {city: "New York"}
 ```
 
 #### Destructuring Lists
@@ -597,7 +644,7 @@ Limit is an object-oriented language and supports classes for creating user-defi
 
 Classes are defined using the `class` keyword.
 
-```
+```limit
 class Greeter {
     var name: str = "World";
 
@@ -608,6 +655,92 @@ class Greeter {
 
 var greeter: Greeter = Greeter();
 greeter.say_hello(); // Output: Hello, World!
+```
+
+### Class Members and Modifiers
+
+Limit provides several modifiers to control the behavior and visibility of classes and their members.
+
+#### Visibility Modifiers
+
+You can control the visibility of class members (fields and methods) using `pub` (public) and `prot` (protected). By default, all members are `private`.
+
+*   **`private`** (default): The member can only be accessed from within the class.
+*   **`prot`** (protected): The member can be accessed from within the class and by its subclasses.
+*   **`pub`** (public): The member can be accessed from anywhere.
+
+```limit
+class MyClass {
+    var private_field = 1;      // private by default
+    pub var public_field = 2;
+    prot var protected_field = 3;
+
+    fn private_method() {}      // private by default
+    pub fn public_method() {}
+    prot fn protected_method() {}
+}
+```
+
+#### Static Members
+
+You can declare `static` fields and methods, which belong to the class itself rather than to an instance.
+
+```limit
+class Counter {
+    static var count = 0;
+
+    static fn increment() {
+        Counter.count += 1;
+    }
+}
+
+Counter.increment();
+print(Counter.count); // Output: 1
+```
+
+#### Abstract Classes and Methods
+
+An `abstract` class cannot be instantiated directly and is meant to be subclassed. It can contain `abstract` methods, which are declared without a body and must be implemented by subclasses.
+
+```limit
+abstract class Shape {
+    abstract fn area(): float;
+}
+
+class Circle : Shape {
+    var radius: float;
+
+    fn init(r: float) {
+        self.radius = r;
+    }
+
+    fn area(): float {
+        return 3.14 * self.radius * self.radius;
+    }
+}
+```
+
+#### Final Classes and Methods
+
+A `final` class cannot be subclassed. A `final` method cannot be overridden by a subclass.
+
+```limit
+final class Uninheritable {}
+
+class Parent {
+    final fn cannot_override() {}
+}
+```
+
+#### Data Classes
+
+A `data` class is a special kind of class that automatically generates useful methods, such as a constructor for all its fields. Data classes are implicitly `final`.
+
+```limit
+data class User(name: str, age: int);
+
+var user = User("Alice", 30);
+print(user.name); // Output: Alice
 ```
 
 ### Fields and Methods
@@ -768,6 +901,30 @@ import my_module hide my_variable;
 greet(); // greet is imported
 // my_variable is not imported
 ```
+
+### Module Declarations
+
+For more explicit control over what a module exposes, you can use a `module` block. This allows you to define `public`, `protected`, and `private` sections for your module's members.
+
+```limit
+// in file my_app/utils.lm
+module my_app.utils {
+    @public
+    fn format_user(user: User): str {
+        // ...
+    }
+
+    @protected
+    class StringHelper {
+        // ...
+    }
+
+    @private
+    var api_key = "secret";
+}
+```
+
+When another file imports this module, it will only have access to the `public` members. `protected` members would be available to other modules within the `my_app` namespace (not yet fully implemented), and `private` members are internal to the module.
 
 ## Advanced Features
 
