@@ -305,8 +305,7 @@ void JITBackend::compile_function(const LIR::LIR_Function& function) {
         }
         report_error("Failed to get compiled function: " + function.name);
         m_current_func = nullptr;
-      // ADD THIS:
-      m_jit_result = jit_result; // Hand over ownership to the class member
+        gcc_jit_result_release(jit_result);
         return;
     }
     
@@ -419,20 +418,18 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
                     switch (inst.const_val->type->tag) {
                         case TypeTag::Int:
                             dst = get_jit_register(inst.dst, m_int_type);
-                            // Use int to resolve ambiguity
                             {
                                 long long val = std::stoll(inst.const_val->data);
-                                value = m_context.new_rvalue(m_int_type, static_cast<int>(val));
+                                value = m_context.new_rvalue(m_int_type, static_cast<long>(val));
                             }
-                            break;      
+                            break;
                         case TypeTag::UInt8:
                         case TypeTag::UInt16:
                         case TypeTag::UInt32:
                             dst = get_jit_register(inst.dst, m_uint_type);
-                            // Use int to resolve ambiguity
                             {
                                 unsigned long long val = std::stoull(inst.const_val->data);
-                                value = m_context.new_rvalue(m_uint_type, static_cast<int>(val));
+                                value = m_context.new_rvalue(m_uint_type, static_cast<long>(val));
                             }
                             break;
                         case TypeTag::UInt64:
@@ -440,25 +437,25 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
                             // Handle large unsigned values that don't fit in signed int
                             try {
                                 unsigned long long val = std::stoull(inst.const_val->data);
-                                value = m_context.new_rvalue(m_uint_type, static_cast<int>(val));
+                                value = m_context.new_rvalue(m_uint_type, static_cast<long>(val));
                             } catch (const std::out_of_range&) {
                                 // If value is too large, use 0 as fallback
-                                value = m_context.new_rvalue(m_uint_type, 0);
+                                value = m_context.new_rvalue(m_uint_type, 0L);
                             } catch (const std::invalid_argument&) {
                                 // If parsing fails, use 0 as fallback  
-                                value = m_context.new_rvalue(m_uint_type, 0);
+                                value = m_context.new_rvalue(m_uint_type, 0L);
                             }
                             break;
                             
                         case TypeTag::Int32: 
-                            dst = get_jit_register(inst.dst, m_uint_type);
-                            value = m_context.new_rvalue(m_uint_type, static_cast<int>(std::stoll(inst.const_val->data)));
+                            dst = get_jit_register(inst.dst, m_int_type);
+                            value = m_context.new_rvalue(m_int_type, static_cast<long>(std::stoll(inst.const_val->data)));
                             break;
                         case TypeTag::Int64:
-                            dst = get_jit_register(inst.dst, m_uint_type);
+                            dst = get_jit_register(inst.dst, m_int_type);
                             {
                                 long long val = std::stoll(inst.const_val->data);
-                                value = m_context.new_rvalue(m_uint_type, static_cast<long>(val));
+                                value = m_context.new_rvalue(m_int_type, static_cast<long>(val));
                             }
                             break;
                         case TypeTag::Float32:
@@ -1004,21 +1001,10 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
 }
 
 gccjit::rvalue JITBackend::compile_arithmetic_op(LIR::LIR_Op op, gccjit::rvalue a, gccjit::rvalue b) {
-    // Determine the result type based on operand types
+    // The result type is determined by the type of the operands,
+    // which are expected to be cast to the correct result type
+    // before this function is called.
     gccjit::type result_type = a.get_type();
-    
-    // If either operand is double, use double
-    if (a.get_type().get_inner_type() == m_double_type.get_inner_type() ||
-        b.get_type().get_inner_type() == m_double_type.get_inner_type()) {
-        result_type = m_double_type;
-        // Cast both operands to double if needed
-        if (a.get_type().get_inner_type() != m_double_type.get_inner_type()) {
-            a = m_context.new_cast(a, m_double_type);
-        }
-        if (b.get_type().get_inner_type() != m_double_type.get_inner_type()) {
-            b = m_context.new_cast(b, m_double_type);
-        }
-    }
     
     switch (op) {
         case LIR::LIR_Op::Add:
@@ -1030,12 +1016,14 @@ gccjit::rvalue JITBackend::compile_arithmetic_op(LIR::LIR_Op op, gccjit::rvalue 
         case LIR::LIR_Op::Div:
             return m_context.new_binary_op(GCC_JIT_BINARY_OP_DIVIDE, result_type, a, b);
         case LIR::LIR_Op::Mod:
-            // Modulo only works on integers
+            // Modulo only works on integers. The type checker should prevent this on floats.
             if (result_type.get_inner_type() == m_double_type.get_inner_type()) {
-                return a; // Can't do modulo on floats
+                report_error("Modulo operation on float/double is not supported.");
+                return a; // Return something to avoid crashing, error will be reported.
             }
             return m_context.new_binary_op(GCC_JIT_BINARY_OP_MODULO, result_type, a, b);
         default:
+            report_error("Unsupported arithmetic operation in JIT.");
             return a;
     }
 }
@@ -1347,44 +1335,86 @@ gccjit::rvalue JITBackend::compile_string_concat(gccjit::rvalue a, gccjit::rvalu
     gccjit::rvalue data_ptr_ptr = m_context.new_cast(result_ptr, m_const_char_ptr_type.get_pointer());
     gccjit::lvalue data_field = data_ptr_ptr.dereference();
     
-    return data_field.rvalue();
+    return data_field;
 }
 
 
 gccjit::rvalue JITBackend::compile_string_format(gccjit::rvalue format, gccjit::rvalue arg) {
-    // Convert argument to C string since format uses %s
-    gccjit::rvalue arg_str = compile_to_cstring(arg);
-    return arg_str;
+    // This function should format the string using the provided format and argument.
+    // For simplicity, we'll assume the format string contains one '%s' and we'll replace it.
+    // A more robust implementation would parse the format string.
+
+    // Convert argument to a C string
+    gccjit::rvalue arg_as_cstring = compile_to_cstring(arg);
+
+    // Allocate a buffer for the formatted string.
+    // The size needed is format.length + arg.length + 1.
+    // We'll approximate this for now. A safer way would be to call snprintf with null to get the size.
+    gccjit::rvalue buffer_size = m_context.new_rvalue(m_size_t_type, 1024); // Fixed size buffer for simplicity
+    std::vector<gccjit::rvalue> malloc_args = {buffer_size};
+    gccjit::rvalue buffer = m_context.new_call(m_malloc_func, malloc_args);
+
+    // Call sprintf to format the string
+    std::vector<gccjit::rvalue> sprintf_args = {buffer, format, arg_as_cstring};
+    m_current_block.add_eval(m_context.new_call(m_sprintf_func, sprintf_args));
+
+    return m_context.new_cast(buffer, m_const_char_ptr_type);
 }
 
 
 gccjit::rvalue JITBackend::compile_to_cstring(gccjit::rvalue value) {
-    // Check if the value is already a string
     gcc_jit_type* c_type = value.get_type().get_inner_type();
-    gcc_jit_type* c_const_char_ptr = m_const_char_ptr_type.get_inner_type();
     
-    if (c_type == c_const_char_ptr) {
+    if (c_type == m_const_char_ptr_type.get_inner_type()) {
         return value;
     }
     
-    // For integer types (including uint64_t), convert to string using snprintf
-    // Allocate buffer for integer conversion (enough for 64-bit integer + null terminator)
-    gccjit::rvalue buffer_size = m_context.new_rvalue(m_size_t_type, 21);
+    // Allocate buffer for conversion. 128 bytes should be plenty for primitives.
+    gccjit::rvalue buffer_size = m_context.new_rvalue(m_size_t_type, 128);
     std::vector<gccjit::rvalue> malloc_args = {buffer_size};
     gccjit::rvalue buffer = m_context.new_call(m_malloc_func, malloc_args);
     
-    // Convert integer to string using snprintf with %llu for unsigned long long
-    // Note: UINT64_T should use %llu format
-    gcc_jit_rvalue* c_format_str = gcc_jit_context_new_string_literal(m_context.get_inner_context(), "%llu");
-    
-    // Cast the value to unsigned long long for snprintf
-    gccjit::rvalue cast_value = m_context.new_cast(value, m_context.get_type(GCC_JIT_TYPE_LONG_LONG));
+    const char* format_str_cstr;
+    gccjit::rvalue value_to_format = value;
+
+    if (c_type == m_int_type.get_inner_type()) {
+        format_str_cstr = "%lld";
+    } else if (c_type == m_uint_type.get_inner_type()) {
+        format_str_cstr = "%llu";
+    } else if (c_type == m_double_type.get_inner_type()) {
+        format_str_cstr = "%g";
+    } else if (c_type == m_bool_type.get_inner_type()) {
+        // Use conditional to produce "true" or "false" string
+        gccjit::block true_block = m_current_func.new_block("to_cstring_true");
+        gccjit::block false_block = m_current_func.new_block("to_cstring_false");
+        gccjit::block after_block = m_current_func.new_block("to_cstring_after");
+
+        m_current_block.end_with_conditional(value, true_block, false_block);
+
+        std::vector<gccjit::rvalue> true_args = {buffer, gccjit::rvalue(gcc_jit_context_new_string_literal(m_context.get_inner_context(), "true"))};
+        true_block.add_eval(m_context.new_call(m_strcpy_func, true_args));
+        true_block.end_with_jump(after_block);
+
+        std::vector<gccjit::rvalue> false_args = {buffer, gccjit::rvalue(gcc_jit_context_new_string_literal(m_context.get_inner_context(), "false"))};
+        false_block.add_eval(m_context.new_call(m_strcpy_func, false_args));
+        false_block.end_with_jump(after_block);
+
+        m_current_block = after_block;
+        return m_context.new_cast(buffer, m_const_char_ptr_type);
+    } else {
+        // Default for unknown types
+        std::vector<gccjit::rvalue> strcpy_args = {buffer, gccjit::rvalue(gcc_jit_context_new_string_literal(m_context.get_inner_context(), "<unknown_type>"))};
+        m_current_block.add_eval(m_context.new_call(m_strcpy_func, strcpy_args));
+        return m_context.new_cast(buffer, m_const_char_ptr_type);
+    }
+
+    gcc_jit_rvalue* c_format_str = gcc_jit_context_new_string_literal(m_context.get_inner_context(), format_str_cstr);
     
     std::vector<gccjit::rvalue> snprintf_args = {
         buffer,
         buffer_size,
         gccjit::rvalue(c_format_str),
-        cast_value
+        value_to_format
     };
     m_current_block.add_eval(m_context.new_call(m_snprintf_func, snprintf_args));
     
@@ -1394,14 +1424,13 @@ gccjit::rvalue JITBackend::compile_to_cstring(gccjit::rvalue value) {
 gccjit::rvalue JITBackend::compile_to_string(gccjit::rvalue value) {
     // If already a string pointer, just return it
     gcc_jit_type* c_type = value.get_type().get_inner_type();
-    gcc_jit_type* c_const_char_ptr = m_const_char_ptr_type.get_inner_type();
     
-    if (c_type == c_const_char_ptr) {
+    if (c_type == m_const_char_ptr_type.get_inner_type()) {
         return value;
     }
     
     // Otherwise convert to string
-    return compile_to_string(value);
+    return compile_to_cstring(value);
 }
 
 gccjit::rvalue JITBackend::convert_to_lm_string(gccjit::rvalue value) {

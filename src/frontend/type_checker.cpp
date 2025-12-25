@@ -465,6 +465,13 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<AST::BinaryExpr> expr) {
             add_error("Logical operations require boolean operands", expr->line);
             return type_system.BOOL_TYPE;
             
+        case TokenType::MODULUS:
+        case TokenType::POWER:
+            if (is_numeric_type(left_type) && is_numeric_type(right_type)) {
+                return promote_numeric_types(left_type, right_type);
+            }
+            add_error("Invalid operand types for arithmetic operation", expr->line);
+            return type_system.INT_TYPE;
         default:
             add_error("Unsupported binary operator", expr->line);
             return type_system.STRING_TYPE;
@@ -485,6 +492,7 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<AST::UnaryExpr> expr) {
             return type_system.BOOL_TYPE;
             
         case TokenType::MINUS:
+        case TokenType::PLUS:
             // Numeric negation
             if (!is_numeric_type(right_type)) {
                 add_type_error("numeric", right_type->toString(), expr->line);
