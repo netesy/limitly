@@ -112,11 +112,12 @@ private:
     
     // Runtime string functions
     gccjit::function m_lm_string_concat_func;
+    gccjit::function m_lm_string_from_cstr_func;
+    gccjit::function m_lm_string_get_data_func;
     gccjit::function m_lm_int_to_string_func;
     gccjit::function m_lm_double_to_string_func;
     gccjit::function m_lm_bool_to_string_func;
     gccjit::function m_lm_string_free_func;
-    gccjit::function m_lm_string_from_cstr_func;
     
     // Helper methods
     gccjit::rvalue convert_to_jit_type(gccjit::rvalue value, gccjit::type target_type);

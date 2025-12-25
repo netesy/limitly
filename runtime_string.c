@@ -1,15 +1,12 @@
+#define BUILDING_RUNTIME
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-
-typedef struct {
-    char* data;
-    uint64_t len;
-} LmString;
+#include "runtime_string.h"
 
 // String concatenation function
-LmString lm_string_concat(LmString a, LmString b) {
+RUNTIME_API LmString lm_string_concat(LmString a, LmString b) {
     char* buf = (char*)malloc(a.len + b.len + 1);
     if (!buf) {
         // Return empty string on allocation failure
@@ -31,7 +28,7 @@ LmString lm_string_concat(LmString a, LmString b) {
 }
 
 // Convert integer to string
-LmString lm_int_to_string(int64_t value) {
+RUNTIME_API LmString lm_int_to_string(int64_t value) {
     // Buffer large enough for 64-bit integer
     char temp[32];
     int len = snprintf(temp, sizeof(temp), "%lld", (long long)value);
@@ -51,7 +48,7 @@ LmString lm_int_to_string(int64_t value) {
 }
 
 // Convert double to string
-LmString lm_double_to_string(double value) {
+RUNTIME_API LmString lm_double_to_string(double value) {
     char temp[64];
     int len = snprintf(temp, sizeof(temp), "%g", value);
     if (len <= 0) {
@@ -70,7 +67,7 @@ LmString lm_double_to_string(double value) {
 }
 
 // Convert boolean to string
-LmString lm_bool_to_string(uint8_t value) {
+RUNTIME_API LmString lm_bool_to_string(uint8_t value) {
     const char* str = value ? "true" : "false";
     uint64_t len = value ? 4 : 5;
     
@@ -86,7 +83,7 @@ LmString lm_bool_to_string(uint8_t value) {
 }
 
 // String formatting function - simple version for variable arguments
-LmString lm_string_format(LmString format_str, LmString* args, uint64_t arg_count) {
+RUNTIME_API LmString lm_string_format(LmString format_str, LmString* args, uint64_t arg_count) {
     // Simple implementation - just concatenate all arguments
     // In a full implementation, this would handle format specifiers
     
@@ -120,26 +117,21 @@ LmString lm_string_format(LmString format_str, LmString* args, uint64_t arg_coun
 }
 
 // Free string memory
-void lm_string_free(LmString str) {
+RUNTIME_API void lm_string_free(LmString str) {
     if (str.data) {
         free(str.data);
     }
 }
 
-// Create string from C string literal
-LmString lm_string_from_cstr(const char* cstr) {
-    if (!cstr) {
-        return (LmString){ NULL, 0 };
-    }
-    
-    uint64_t len = strlen(cstr);
-    char* buf = (char*)malloc(len + 1);
-    if (!buf) {
-        return (LmString){ NULL, 0 };
-    }
-    
-    memcpy(buf, cstr, len);
-    buf[len] = 0;
-    
-    return (LmString){ buf, len };
+// Convert C string to LmString
+RUNTIME_API LmString lm_string_from_cstr(const char* str) {
+    LmString result;
+    result.data = (char*)str;
+    result.len = strlen(str);
+    return result;
+}
+
+// Helper: Extract data pointer from LmString (for JIT)
+RUNTIME_API const char* lm_string_get_data(LmString str) {
+    return str.data;
 }
