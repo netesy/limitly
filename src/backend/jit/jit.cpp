@@ -14,7 +14,10 @@
 #include <cstring>
 #include <cstdlib>
 #include "../value.hh"
+
+extern "C" {
 #include "../../../runtime_string.h"
+}
 
 // Global loop counter to prevent infinite loops
 static int loop_execution_counter = 0;
@@ -178,6 +181,11 @@ JITBackend::JITBackend()
     string_free_params.push_back(m_context.new_param(m_lm_string_type, "str"));
     m_lm_string_free_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_void_type, "lm_string_free", string_free_params, 0);
     
+    // Set up lm_string_get_data function
+    std::vector<gccjit::param> get_data_params;
+    get_data_params.push_back(m_context.new_param(m_lm_string_type, "str"));
+    m_lm_string_get_data_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_const_char_ptr_type, "lm_string_get_data", get_data_params, 0);
+    
     // Set up lm_string_from_cstr function
     std::vector<gccjit::param> from_cstr_params;
     from_cstr_params.push_back(m_context.new_param(m_const_char_ptr_type, "cstr"));
@@ -277,6 +285,9 @@ void JITBackend::compile_function(const LIR::LIR_Function& function) {
     
     // Add current executable to library search path for JIT
     m_context.set_str_option(GCC_JIT_STR_OPTION_PROGNAME, "limitly.exe");
+    
+    // Add runtime library directly to linker options
+    m_context.add_driver_option("obj/release/limitly_runtime.a");
     
     gcc_jit_result* jit_result = m_context.compile();
     if (!jit_result) {
@@ -1329,15 +1340,12 @@ gccjit::rvalue JITBackend::compile_string_concat(gccjit::rvalue a, gccjit::rvalu
     std::vector<gccjit::rvalue> concat_args = {a_lm_string, b_lm_string};
     gccjit::rvalue result_lm_string = m_context.new_call(m_lm_string_concat_func, concat_args);
     
-    // Extract data pointer from LmString result
-    // Cast to void* first, then to char** to access the data field
-    gccjit::rvalue result_ptr = m_context.new_cast(result_lm_string, m_void_ptr_type);
-    gccjit::rvalue data_ptr_ptr = m_context.new_cast(result_ptr, m_const_char_ptr_type.get_pointer());
-    gccjit::lvalue data_field = data_ptr_ptr.dereference();
+    // Extract data pointer from LmString result using helper function
+    std::vector<gccjit::rvalue> get_data_args = {result_lm_string};
+    gccjit::rvalue data_ptr = m_context.new_call(m_lm_string_get_data_func, get_data_args);
     
-    return data_field;
+    return data_ptr;
 }
-
 
 gccjit::rvalue JITBackend::compile_string_format(gccjit::rvalue format, gccjit::rvalue arg) {
     // This function should format the string using the provided format and argument.
@@ -1460,7 +1468,7 @@ gccjit::type JITBackend::to_jit_type(LIR::Type type) {
         case LIR::Type::Bool:
             return m_bool_type;
         case LIR::Type::Ptr:
-            return m_void_ptr_type;
+            return m_const_char_ptr_type;
         case LIR::Type::Void:
             return m_void_type;
         default:

@@ -719,7 +719,7 @@ Reg Generator::emit_literal_expr(AST::LiteralExpr& expr, TypePtr expected_type) 
     }
     
     // Set type BEFORE emitting so it's available during emit_instruction
-    set_register_type(dst, const_val ? const_val->type : nullptr);
+    set_register_language_type(dst, const_val ? const_val->type : nullptr);
     Type abi_type = const_val ? language_type_to_abi_type(const_val->type) : Type::Void;
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, abi_type, dst, const_val));
     return dst;
@@ -785,7 +785,7 @@ Reg Generator::emit_interpolated_string_expr(AST::InterpolatedStringExpr& expr) 
         Reg result = allocate_register();
         ValuePtr result_val = std::make_shared<Value>(string_type, std::string(""));
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, result, result_val));
-        set_register_type(result, string_type);
+        set_register_language_type(result, string_type);
         return result;
     }
 
@@ -807,7 +807,7 @@ Reg Generator::emit_interpolated_string_expr(AST::InterpolatedStringExpr& expr) 
         Reg result = allocate_register();
         ValuePtr result_val = std::make_shared<Value>(string_type, folded_result);
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, result, result_val));
-        set_register_type(result, string_type);
+        set_register_language_type(result, string_type);
         return result;
     }
 
@@ -852,7 +852,7 @@ Reg Generator::emit_interpolated_string_expr(AST::InterpolatedStringExpr& expr) 
         }
     }
     
-    set_register_type(result, string_type);
+    set_register_language_type(result, string_type);
     return result;
 }
 
@@ -876,21 +876,21 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
                 Reg str_left = allocate_register();
                 emit_instruction(LIR_Inst(LIR_Op::ToString, Type::Ptr, str_left, left, 0));
                 auto string_type = std::make_shared<::Type>(::TypeTag::String);
-                set_register_type(str_left, string_type);
+                set_register_language_type(str_left, string_type);
                 left = str_left;
             }
             if (!right_is_string) {
                 Reg str_right = allocate_register();
                 emit_instruction(LIR_Inst(LIR_Op::ToString, Type::Ptr, str_right, right, 0));
                 auto string_type = std::make_shared<::Type>(::TypeTag::String);
-                set_register_type(str_right, string_type);
+                set_register_language_type(str_right, string_type);
                 right = str_right;
             }
             
             // Perform string concatenation
             Reg dst = allocate_register();
             auto string_type = std::make_shared<::Type>(::TypeTag::String);
-            set_register_type(dst, string_type);
+            set_register_language_type(dst, string_type);
             emit_instruction(LIR_Inst(LIR_Op::STR_CONCAT, Type::Ptr, dst, left, right));
             return dst;
         }

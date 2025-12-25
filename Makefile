@@ -102,10 +102,13 @@ $(OBJ_DIR)/%.o: %.cpp | $(OBJ_DIR)
 # =============================
 # Runtime library compilation
 # =============================
+.PHONY: runtime
+runtime: $(RUNTIME_LIB)
 $(RUNTIME_LIB): runtime_string.c | $(OBJ_DIR)
 	@echo "Building runtime library..."
-	gcc -c runtime_string.c -o $(OBJ_DIR)/runtime_string.o
-	ar rcs $@ $(OBJ_DIR)/runtime_string.o
+	@rm -f $(OBJ_DIR)/runtime_string.o $(RUNTIME_LIB)
+	gcc -c $< -o $(OBJ_DIR)/runtime_string.o
+	ar rcs $(RUNTIME_LIB) $(OBJ_DIR)/runtime_string.o
 
 # =============================
 # Directories
@@ -137,7 +140,7 @@ $(TEST_RSP): $(TEST_OBJS) | $(RSP_DIR)
 # =============================
 windows: $(BIN_DIR) $(MAIN_RSP) $(RUNTIME_LIB)
 	@echo "🔨 Linking limitly.exe ..."
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(RUNTIME_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) -Wl,--whole-archive $(RUNTIME_LIB) -Wl,--no-whole-archive -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS) -Wl,-rpath,$(PWD)/obj/release
 	@echo "✅ limitly.exe built."
 
 linux: $(BIN_DIR) $(MAIN_RSP) $(RUNTIME_LIB)
