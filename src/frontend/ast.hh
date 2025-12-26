@@ -822,11 +822,12 @@ namespace AST {
         virtual std::shared_ptr<Statement> optimizeStatement(std::shared_ptr<Statement> stmt);
         
         // Specific expression optimizations
-        virtual std::shared_ptr<BinaryExpr> optimizeBinaryExpr(std::shared_ptr<BinaryExpr> expr);
+        virtual std::shared_ptr<Expression> optimizeBinaryExpr(std::shared_ptr<BinaryExpr> expr);
         virtual std::shared_ptr<UnaryExpr> optimizeUnaryExpr(std::shared_ptr<UnaryExpr> expr);
         virtual std::shared_ptr<InterpolatedStringExpr> optimizeInterpolatedStringExpr(std::shared_ptr<InterpolatedStringExpr> expr);
         virtual std::shared_ptr<LiteralExpr> optimizeLiteralExpr(std::shared_ptr<LiteralExpr> expr);
         virtual std::shared_ptr<VariableExpr> optimizeVariableExpr(std::shared_ptr<VariableExpr> expr);
+        virtual std::shared_ptr<Expression> optimizeGroupingExpr(std::shared_ptr<GroupingExpr> expr);
         virtual std::shared_ptr<CallExpr> optimizeCallExpr(std::shared_ptr<CallExpr> expr);
         virtual std::shared_ptr<TernaryExpr> optimizeTernaryExpr(std::shared_ptr<TernaryExpr> expr);
         

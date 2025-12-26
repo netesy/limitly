@@ -4,7 +4,46 @@
 
 namespace AST {
 
-// Helper function to create boolean literals
+// Helper function to infer type of a literal value (similar to type checker)
+TypePtr inferLiteralType(const std::variant<std::string, bool, std::nullptr_t>& value) {
+    if (std::holds_alternative<std::string>(value)) {
+        const std::string& str = std::get<std::string>(value);
+        
+        // Check if it's a numeric string
+        bool is_numeric = !str.empty() && (str[0] == '-' || str[0] == '+' || 
+                          (str[0] >= '0' && str[0] <= '9'));
+        for (size_t i = 1; i < str.size() && is_numeric; i++) {
+            if (str[i] != '.' && !(str[i] >= '0' && str[i] <= '9')) {
+                is_numeric = false;
+            }
+        }
+        
+        if (is_numeric) {
+            // Check if it contains a decimal point to determine if it's a float
+            bool is_float = false;
+            for (size_t i = 0; i < str.size(); i++) {
+                if (str[i] == '.') {
+                    is_float = true;
+                    break;
+                }
+            }
+            
+            if (is_float) {
+                return std::make_shared<::Type>(::TypeTag::Float64);
+            } else {
+                return std::make_shared<::Type>(::TypeTag::Int64);
+            }
+        } else {
+            return std::make_shared<::Type>(::TypeTag::String);
+        }
+    } else if (std::holds_alternative<bool>(value)) {
+        return std::make_shared<::Type>(::TypeTag::Bool);
+    } else if (std::holds_alternative<std::nullptr_t>(value)) {
+        return std::make_shared<::Type>(::TypeTag::Nil);
+    }
+    
+    return std::make_shared<::Type>(::TypeTag::Any);
+}
 std::shared_ptr<LiteralExpr> createBoolLiteral(bool value, int line) {
     auto result = std::make_shared<LiteralExpr>();
     result->value = value;
@@ -19,8 +58,8 @@ std::shared_ptr<LiteralExpr> createStringLiteral(const std::string& value, int l
     auto result = std::make_shared<LiteralExpr>();
     result->value = value;
     result->line = line;
-    // Set inferred type for string
-    result->inferred_type = std::make_shared<::Type>(::TypeTag::String);
+    // Use type inference to set the correct type
+    result->inferred_type = inferLiteralType(result->value);
     return result;
 }
 
@@ -29,8 +68,8 @@ std::shared_ptr<LiteralExpr> createNumericLiteral(const std::string& value, int 
     auto result = std::make_shared<LiteralExpr>();
     result->value = value;
     result->line = line;
-    // Set inferred type for numeric (Int64)
-    result->inferred_type = std::make_shared<::Type>(::TypeTag::Int64);
+    // Use type inference to set the correct type
+    result->inferred_type = inferLiteralType(result->value);
     return result;
 }
 
@@ -44,7 +83,7 @@ std::shared_ptr<Program> ASTOptimizer::optimizeProgram(std::shared_ptr<Program> 
     // Run optimizations in a loop until stable
     bool changed = true;
     int iterations = 0;
-    const int max_iterations = 10; // Prevent infinite loops
+    const int max_iterations = 3; // Run at least 3 times to allow propagation + folding
     
     while (changed && iterations < max_iterations) {
         changed = false;
@@ -54,7 +93,9 @@ std::shared_ptr<Program> ASTOptimizer::optimizeProgram(std::shared_ptr<Program> 
         for (auto& stmt : program->statements) {
             auto old_stmt = stmt;
             stmt = optimizeStatement(stmt);
-            if (stmt != old_stmt) changed = true;
+            if (stmt != old_stmt) {
+                changed = true;
+            }
         }
     }
     
@@ -66,17 +107,36 @@ std::shared_ptr<Expression> ASTOptimizer::optimizeExpression(std::shared_ptr<Exp
     
     // Apply optimizations based on expression type
     if (auto binary = std::dynamic_pointer_cast<BinaryExpr>(expr)) {
-        return optimizeBinaryExpr(binary);
+        auto result = optimizeBinaryExpr(binary);
+        // If optimization resulted in a different type (like literal), return it directly
+        if (result != binary) {
+            return std::dynamic_pointer_cast<Expression>(result);
+        }
+        return binary;
     } else if (auto unary = std::dynamic_pointer_cast<UnaryExpr>(expr)) {
-        return optimizeUnaryExpr(unary);
-    } else if (auto interp = std::dynamic_pointer_cast<InterpolatedStringExpr>(expr)) {
-        return optimizeInterpolatedStringExpr(interp);
+        auto result = optimizeUnaryExpr(unary);
+        if (result != unary) {
+            return std::dynamic_pointer_cast<Expression>(result);
+        }
+        return unary;
+    } else if (auto interpolated = std::dynamic_pointer_cast<InterpolatedStringExpr>(expr)) {
+        auto result = optimizeInterpolatedStringExpr(interpolated);
+        if (result != interpolated) {
+            return std::dynamic_pointer_cast<Expression>(result);
+        }
+        return interpolated;
     } else if (auto literal = std::dynamic_pointer_cast<LiteralExpr>(expr)) {
         return optimizeLiteralExpr(literal);
     } else if (auto variable = std::dynamic_pointer_cast<VariableExpr>(expr)) {
-        return optimizeVariableExpr(variable);
-    } else if (auto call = std::dynamic_pointer_cast<CallExpr>(expr)) {
-        return optimizeCallExpr(call);
+        auto result = optimizeVariableExpr(variable);
+        // Check if constant propagation happened
+        auto propagated = propagateConstants(variable);
+        if (propagated != variable) {
+            return propagated;  // Return the literal from constant propagation
+        }
+        return variable;
+    } else if (auto grouping = std::dynamic_pointer_cast<GroupingExpr>(expr)) {
+        return optimizeGroupingExpr(grouping);
     } else if (auto ternary = std::dynamic_pointer_cast<TernaryExpr>(expr)) {
         return optimizeTernaryExpr(ternary);
     }
@@ -109,23 +169,38 @@ std::shared_ptr<Statement> ASTOptimizer::optimizeStatement(std::shared_ptr<State
 // EXPRESSION OPTIMIZATIONS
 // ============================================================================
 
-std::shared_ptr<BinaryExpr> ASTOptimizer::optimizeBinaryExpr(std::shared_ptr<BinaryExpr> expr) {
+std::shared_ptr<Expression> ASTOptimizer::optimizeBinaryExpr(std::shared_ptr<BinaryExpr> expr) {
     if (!expr) return nullptr;
     
-    // Optimize left and right operands first
+    // Optimize operands first
+    std::cout << "DEBUG: Before optimizing operands" << std::endl;
     expr->left = optimizeExpression(expr->left);
     expr->right = optimizeExpression(expr->right);
+    std::cout << "DEBUG: After optimizing operands" << std::endl;
+    std::cout << "DEBUG: Left is " << (expr->left ? "not null" : "null") << std::endl;
+    std::cout << "DEBUG: Right is " << (expr->right ? "not null" : "null") << std::endl;
     
-    // Apply constant folding
-    auto folded = foldConstants(expr);
-    if (folded != expr) {
-        return std::dynamic_pointer_cast<BinaryExpr>(folded);
+    // Apply string canonicalization FIRST (only for actual strings)
+    auto canonicalized = canonicalizeStrings(expr);
+    if (canonicalized != expr) {
+        return canonicalized;
+    }
+    
+    // Apply constant folding (for numeric operations)
+    auto folded = evaluateBinaryOp(expr->op, expr->left, expr->right);
+    if (folded) {
+        context.stats.constant_folds++;
+        std::cout << "DEBUG: Folded operation" << std::endl;
+        // Return the folded literal directly
+        return folded;
+    } else {
+        std::cout << "DEBUG: Failed to fold operation" << std::endl;
     }
     
     // Apply algebraic simplification
     auto simplified = simplifyAlgebraic(expr);
     if (simplified != expr) {
-        return std::dynamic_pointer_cast<BinaryExpr>(simplified);
+        return simplified;
     }
     
     return expr;
@@ -166,17 +241,40 @@ std::shared_ptr<InterpolatedStringExpr> ASTOptimizer::optimizeInterpolatedString
 }
 
 std::shared_ptr<LiteralExpr> ASTOptimizer::optimizeLiteralExpr(std::shared_ptr<LiteralExpr> expr) {
-    // Literals are already optimal, just return as-is
+    if (!expr) return nullptr;
+    
+    // CRITICAL: Set inferred type using type inference if not already set
+    if (!expr->inferred_type) {
+        expr->inferred_type = inferLiteralType(expr->value);
+        std::cout << "DEBUG: Set inferred type for literal: " << static_cast<int>(expr->inferred_type->tag) << std::endl;
+    }
+    
+    // Apply constant propagation to literal expressions
+    auto propagated = propagateConstants(expr);
+    if (propagated != expr) {
+        return std::dynamic_pointer_cast<LiteralExpr>(propagated);
+    }
+    
     return expr;
 }
 
 std::shared_ptr<VariableExpr> ASTOptimizer::optimizeVariableExpr(std::shared_ptr<VariableExpr> expr) {
     if (!expr) return nullptr;
     
-    // Apply constant propagation
-    auto propagated = propagateConstants(expr);
-    if (propagated != expr) {
-        return std::dynamic_pointer_cast<VariableExpr>(propagated);
+    // Variable expressions don't need optimization themselves
+    // Constant propagation is handled in the main optimizeExpression dispatcher
+    return expr;
+}
+
+std::shared_ptr<Expression> ASTOptimizer::optimizeGroupingExpr(std::shared_ptr<GroupingExpr> expr) {
+    if (!expr) return nullptr;
+    
+    // Optimize the grouped expression
+    expr->expression = optimizeExpression(expr->expression);
+    
+    // If the grouped expression is a literal, remove the grouping
+    if (auto literal = std::dynamic_pointer_cast<LiteralExpr>(expr->expression)) {
+        return literal;
     }
     
     return expr;
@@ -224,6 +322,11 @@ std::shared_ptr<VarDeclaration> ASTOptimizer::optimizeVarDeclaration(std::shared
     // Optimize initializer if present
     if (stmt->initializer) {
         stmt->initializer = optimizeExpression(stmt->initializer);
+        
+        // If optimization resulted in nullptr, create an empty string literal to preserve the initializer
+        if (!stmt->initializer) {
+            stmt->initializer = createStringLiteral("", stmt->line);
+        }
         
         // If this is a constant variable, track it for propagation
         if (stmt->initializer && isLiteralConstant(stmt->initializer)) {
@@ -381,10 +484,14 @@ std::shared_ptr<Expression> ASTOptimizer::propagateConstants(std::shared_ptr<Exp
             auto constant = context.getConstant(variable->name);
             if (constant) {
                 // Create a copy of the constant to avoid modifying the original
-                auto copy = std::make_shared<LiteralExpr>(*std::dynamic_pointer_cast<LiteralExpr>(constant));
-                if (copy) {
-                    // Preserve the variable's inferred type
-                    copy->inferred_type = variable->inferred_type;
+                if (auto literal = std::dynamic_pointer_cast<LiteralExpr>(constant)) {
+                    auto copy = std::make_shared<LiteralExpr>(*literal);
+                    // CRITICAL: Preserve the constant's inferred type, not the variable's
+                    copy->inferred_type = literal->inferred_type;
+                    // If the constant doesn't have a type, infer it
+                    if (!copy->inferred_type) {
+                        copy->inferred_type = inferLiteralType(copy->value);
+                    }
                     context.stats.constant_propagations++;
                     return copy;
                 }
@@ -461,25 +568,48 @@ std::shared_ptr<Expression> ASTOptimizer::simplifyAlgebraic(std::shared_ptr<Expr
 std::shared_ptr<Expression> ASTOptimizer::lowerInterpolation(std::shared_ptr<InterpolatedStringExpr> expr) {
     if (!expr) return nullptr;
     
-    // Check if all parts are string literals
+    // Check if all parts are string literals (either direct strings or literal expressions)
     bool allStringParts = true;
+    std::string concatenated_result;
+    
     for (const auto& part : expr->parts) {
-        if (!std::holds_alternative<std::string>(part)) {
+        if (auto strPart = std::get_if<std::string>(&part)) {
+            // Direct string literal part
+            concatenated_result += *strPart;
+        } else if (auto exprPart = std::get_if<std::shared_ptr<Expression>>(&part)) {
+            // Check if this expression part is now a literal after optimization
+            if (auto literal = std::dynamic_pointer_cast<LiteralExpr>(*exprPart)) {
+                if (std::holds_alternative<std::string>(literal->value)) {
+                    // It's a string literal - add it to the result
+                    concatenated_result += std::get<std::string>(literal->value);
+                } else {
+                    // It's a non-string literal (number, bool) - convert to string
+                    if (std::holds_alternative<bool>(literal->value)) {
+                        concatenated_result += std::get<bool>(literal->value) ? "true" : "false";
+                    } else if (std::holds_alternative<std::nullptr_t>(literal->value)) {
+                        concatenated_result += "nil";
+                    } else if (std::holds_alternative<std::string>(literal->value)) {
+                        concatenated_result += std::get<std::string>(literal->value);
+                    } else {
+                        // For any other type, try to convert to string representation
+                        concatenated_result += std::get<std::string>(literal->value);
+                    }
+                }
+            } else {
+                // Not a literal - can't fold completely
+                allStringParts = false;
+                break;
+            }
+        } else {
+            // Unknown part type
             allStringParts = false;
             break;
         }
     }
     
-    // If all parts are string literals, concatenate them
+    // If all parts can be concatenated into a constant string, return a literal
     if (allStringParts) {
-        std::string result;
-        for (const auto& part : expr->parts) {
-            if (auto strPart = std::get_if<std::string>(&part)) {
-                result += *strPart;
-            }
-        }
-        
-        auto literal = createStringLiteral(result, expr->line);
+        auto literal = createStringLiteral(concatenated_result, expr->line);
         context.stats.interpolations_lowered++;
         return literal;
     }
@@ -538,14 +668,22 @@ std::shared_ptr<Expression> ASTOptimizer::canonicalizeStrings(std::shared_ptr<Ex
             auto rightLiteral = std::dynamic_pointer_cast<LiteralExpr>(binary->right);
             
             if (leftLiteral && rightLiteral) {
-                auto leftStr = std::get_if<std::string>(&leftLiteral->value);
-                auto rightStr = std::get_if<std::string>(&rightLiteral->value);
+                // Concatenate if either is a string (string + anything)
+                bool leftIsString = leftLiteral->inferred_type && 
+                                   leftLiteral->inferred_type->tag == TypeTag::String;
+                bool rightIsString = rightLiteral->inferred_type && 
+                                    rightLiteral->inferred_type->tag == TypeTag::String;
                 
-                if (leftStr && rightStr) {
-                    // Merge adjacent string literals
-                    auto merged = createStringLiteral(*leftStr + *rightStr, expr->line);
-                    context.stats.strings_canonicalized++;
-                    return merged;
+                if (leftIsString || rightIsString) {
+                    auto leftStr = std::get_if<std::string>(&leftLiteral->value);
+                    auto rightStr = std::get_if<std::string>(&rightLiteral->value);
+                    
+                    if (leftStr && rightStr) {
+                        // Merge string literals
+                        auto merged = createStringLiteral(*leftStr + *rightStr, expr->line);
+                        context.stats.strings_canonicalized++;
+                        return merged;
+                    }
                 }
             }
         }
@@ -568,8 +706,89 @@ std::shared_ptr<Expression> ASTOptimizer::evaluateBinaryOp(TokenType op, std::sh
     
     if (!leftLiteral || !rightLiteral) return nullptr;
     
-    // Handle string concatenation
-    if (op == TokenType::PLUS) {
+    // Check if both operands are numeric (int or float)
+    bool leftIsNumeric = leftLiteral->inferred_type && 
+                        (leftLiteral->inferred_type->tag == TypeTag::Int64 ||
+                         leftLiteral->inferred_type->tag == TypeTag::Int32 ||
+                         leftLiteral->inferred_type->tag == TypeTag::Float64 ||
+                         leftLiteral->inferred_type->tag == TypeTag::Float32);
+                         
+    bool rightIsNumeric = rightLiteral->inferred_type && 
+                         (rightLiteral->inferred_type->tag == TypeTag::Int64 ||
+                          rightLiteral->inferred_type->tag == TypeTag::Int32 ||
+                          rightLiteral->inferred_type->tag == TypeTag::Float64 ||
+                          rightLiteral->inferred_type->tag == TypeTag::Float32);
+    
+    std::cout << "DEBUG: leftIsNumeric=" << leftIsNumeric << " rightIsNumeric=" << rightIsNumeric << std::endl;
+    if (leftLiteral->inferred_type) {
+        std::cout << "DEBUG: left type=" << static_cast<int>(leftLiteral->inferred_type->tag) << " (Int64=" << static_cast<int>(TypeTag::Int64) << ")" << std::endl;
+    }
+    if (rightLiteral->inferred_type) {
+        std::cout << "DEBUG: right type=" << static_cast<int>(rightLiteral->inferred_type->tag) << " (Int64=" << static_cast<int>(TypeTag::Int64) << ")" << std::endl;
+    }
+    
+    // If both are numeric, do numeric operations
+    if (leftIsNumeric && rightIsNumeric) {
+        auto leftStr = std::get_if<std::string>(&leftLiteral->value);
+        auto rightStr = std::get_if<std::string>(&rightLiteral->value);
+        
+        if (leftStr && rightStr) {
+            try {
+                double leftNum = std::stod(*leftStr);
+                double rightNum = std::stod(*rightStr);
+                double result = 0.0;
+                
+                switch (op) {
+                    case TokenType::PLUS:
+                        result = leftNum + rightNum;
+                        break;
+                    case TokenType::MINUS:
+                        result = leftNum - rightNum;
+                        break;
+                    case TokenType::STAR:
+                        result = leftNum * rightNum;
+                        break;
+                    case TokenType::SLASH:
+                        if (rightNum == 0.0) return nullptr;  // Division by zero
+                        result = leftNum / rightNum;
+                        break;
+                    case TokenType::MODULUS:
+                        if (rightNum == 0.0) return nullptr;  // Modulus by zero
+                        result = std::fmod(leftNum, rightNum);
+                        break;
+                    default:
+                        return nullptr;
+                }
+                
+                // Determine result type (prefer float if either operand is float)
+                TypePtr resultType = leftLiteral->inferred_type;
+                if (leftLiteral->inferred_type->tag == TypeTag::Float64 || 
+                    leftLiteral->inferred_type->tag == TypeTag::Float32 ||
+                    rightLiteral->inferred_type->tag == TypeTag::Float64 || 
+                    rightLiteral->inferred_type->tag == TypeTag::Float32) {
+                    resultType = std::make_shared<::Type>(::TypeTag::Float64);
+                }
+                
+                // Create result literal with proper type
+                auto resultLiteral = std::make_shared<LiteralExpr>();
+                resultLiteral->value = std::to_string(result);
+                resultLiteral->line = left->line;
+                resultLiteral->inferred_type = resultType;
+                return resultLiteral;
+                
+            } catch (const std::exception&) {
+                return nullptr;  // Failed to parse numbers
+            }
+        }
+    }
+    
+    // Handle string concatenation if both are strings
+    bool leftIsString = leftLiteral->inferred_type && 
+                       leftLiteral->inferred_type->tag == TypeTag::String;
+    bool rightIsString = rightLiteral->inferred_type && 
+                        rightLiteral->inferred_type->tag == TypeTag::String;
+    
+    if (leftIsString && rightIsString && op == TokenType::PLUS) {
         auto leftStr = std::get_if<std::string>(&leftLiteral->value);
         auto rightStr = std::get_if<std::string>(&rightLiteral->value);
         
@@ -577,80 +796,6 @@ std::shared_ptr<Expression> ASTOptimizer::evaluateBinaryOp(TokenType op, std::sh
             return createStringLiteral(*leftStr + *rightStr, left->line);
         }
     }
-    
-    // Handle numeric operations
-    auto leftStr = std::get_if<std::string>(&leftLiteral->value);
-    auto rightStr = std::get_if<std::string>(&rightLiteral->value);
-    
-    if (leftStr && rightStr) {
-        try {
-            double leftNum = std::stod(*leftStr);
-            double rightNum = std::stod(*rightStr);
-            double result = 0.0;
-            
-            switch (op) {
-                case TokenType::PLUS:
-                    result = leftNum + rightNum;
-                    break;
-                case TokenType::MINUS:
-                    result = leftNum - rightNum;
-                    break;
-                case TokenType::STAR:
-                    result = leftNum * rightNum;
-                    break;
-                case TokenType::SLASH:
-                    if (rightNum == 0.0) return nullptr; // Division by zero
-                    result = leftNum / rightNum;
-                    break;
-                case TokenType::MODULUS:
-                    if (rightNum == 0.0) return nullptr; // Modulo by zero
-                    result = std::fmod(leftNum, rightNum);
-                    break;
-                case TokenType::LESS:
-                    return createBoolLiteral(leftNum < rightNum, left->line);
-                case TokenType::LESS_EQUAL:
-                    return createBoolLiteral(leftNum <= rightNum, left->line);
-                case TokenType::GREATER:
-                    return createBoolLiteral(leftNum > rightNum, left->line);
-                case TokenType::GREATER_EQUAL:
-                    return createBoolLiteral(leftNum >= rightNum, left->line);
-                case TokenType::EQUAL_EQUAL:
-                    return createBoolLiteral(std::abs(leftNum - rightNum) < 1e-10, left->line);
-                case TokenType::BANG_EQUAL:
-                    return createBoolLiteral(std::abs(leftNum - rightNum) >= 1e-10, left->line);
-                default:
-                    return nullptr;
-            }
-            
-            auto resultLiteral = createNumericLiteral(std::to_string(result), left->line);
-            return resultLiteral;
-            
-        } catch (const std::invalid_argument&) {
-            // Not numeric, fall through
-        } catch (const std::out_of_range&) {
-            // Numeric overflow, fall through
-        }
-    }
-    
-    // Handle boolean operations
-    auto leftBool = std::get_if<bool>(&leftLiteral->value);
-    auto rightBool = std::get_if<bool>(&rightLiteral->value);
-    
-    if (leftBool && rightBool) {
-        switch (op) {
-            case TokenType::EQUAL_EQUAL:
-                return createBoolLiteral(*leftBool == *rightBool, left->line);
-            case TokenType::BANG_EQUAL:
-                return createBoolLiteral(*leftBool != *rightBool, left->line);
-            case TokenType::AND:
-                return createBoolLiteral(*leftBool && *rightBool, left->line);
-            case TokenType::OR:
-                return createBoolLiteral(*leftBool || *rightBool, left->line);
-            default:
-                return nullptr;
-        }
-    }
-    // This would require proper numeric type support in LiteralExpr
     
     return nullptr;
 }
