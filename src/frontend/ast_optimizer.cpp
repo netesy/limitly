@@ -221,7 +221,7 @@ std::shared_ptr<UnaryExpr> ASTOptimizer::optimizeUnaryExpr(std::shared_ptr<Unary
     return expr;
 }
 
-std::shared_ptr<InterpolatedStringExpr> ASTOptimizer::optimizeInterpolatedStringExpr(std::shared_ptr<InterpolatedStringExpr> expr) {
+std::shared_ptr<Expression> ASTOptimizer::optimizeInterpolatedStringExpr(std::shared_ptr<InterpolatedStringExpr> expr) {
     if (!expr) return nullptr;
     
     // Optimize all expression parts
@@ -234,7 +234,7 @@ std::shared_ptr<InterpolatedStringExpr> ASTOptimizer::optimizeInterpolatedString
     // Apply interpolation lowering
     auto lowered = lowerInterpolation(expr);
     if (lowered != expr) {
-        return std::dynamic_pointer_cast<InterpolatedStringExpr>(lowered);
+        return lowered;  // Return the lowered expression (could be a literal)
     }
     
     return expr;
