@@ -104,7 +104,7 @@ std::shared_ptr<Program> ASTOptimizer::optimizeProgram(std::shared_ptr<Program> 
 
 std::shared_ptr<Expression> ASTOptimizer::optimizeExpression(std::shared_ptr<Expression> expr) {
     if (!expr) return nullptr;
-    
+
     // Apply optimizations based on expression type
     if (auto binary = std::dynamic_pointer_cast<BinaryExpr>(expr)) {
         auto result = optimizeBinaryExpr(binary);
@@ -160,6 +160,19 @@ std::shared_ptr<Statement> ASTOptimizer::optimizeStatement(std::shared_ptr<State
         return optimizeForStatement(forStmt);
     } else if (auto returnStmt = std::dynamic_pointer_cast<ReturnStatement>(stmt)) {
         return optimizeReturnStatement(returnStmt);
+    } else if (auto printStmt = std::dynamic_pointer_cast<PrintStatement>(stmt)) {
+        return optimizePrintStatement(printStmt);
+    }
+    
+    return stmt;
+}
+
+std::shared_ptr<PrintStatement> ASTOptimizer::optimizePrintStatement(std::shared_ptr<PrintStatement> stmt) {
+    if (!stmt) return nullptr;
+    
+    // Optimize all arguments
+    for (auto& arg : stmt->arguments) {
+        arg = optimizeExpression(arg);
     }
     
     return stmt;
@@ -173,12 +186,8 @@ std::shared_ptr<Expression> ASTOptimizer::optimizeBinaryExpr(std::shared_ptr<Bin
     if (!expr) return nullptr;
     
     // Optimize operands first
-    std::cout << "DEBUG: Before optimizing operands" << std::endl;
     expr->left = optimizeExpression(expr->left);
     expr->right = optimizeExpression(expr->right);
-    std::cout << "DEBUG: After optimizing operands" << std::endl;
-    std::cout << "DEBUG: Left is " << (expr->left ? "not null" : "null") << std::endl;
-    std::cout << "DEBUG: Right is " << (expr->right ? "not null" : "null") << std::endl;
     
     // Apply string canonicalization FIRST (only for actual strings)
     auto canonicalized = canonicalizeStrings(expr);
@@ -190,11 +199,9 @@ std::shared_ptr<Expression> ASTOptimizer::optimizeBinaryExpr(std::shared_ptr<Bin
     auto folded = evaluateBinaryOp(expr->op, expr->left, expr->right);
     if (folded) {
         context.stats.constant_folds++;
-        std::cout << "DEBUG: Folded operation" << std::endl;
         // Return the folded literal directly
         return folded;
     } else {
-        std::cout << "DEBUG: Failed to fold operation" << std::endl;
     }
     
     // Apply algebraic simplification
@@ -223,20 +230,20 @@ std::shared_ptr<UnaryExpr> ASTOptimizer::optimizeUnaryExpr(std::shared_ptr<Unary
 
 std::shared_ptr<Expression> ASTOptimizer::optimizeInterpolatedStringExpr(std::shared_ptr<InterpolatedStringExpr> expr) {
     if (!expr) return nullptr;
-    
+
     // Optimize all expression parts
     for (auto& part : expr->parts) {
         if (auto exprPart = std::get_if<std::shared_ptr<Expression>>(&part)) {
             *exprPart = optimizeExpression(*exprPart);
         }
     }
-    
+
     // Apply interpolation lowering
     auto lowered = lowerInterpolation(expr);
     if (lowered != expr) {
         return lowered;  // Return the lowered expression (could be a literal)
     }
-    
+
     return expr;
 }
 
@@ -246,7 +253,6 @@ std::shared_ptr<LiteralExpr> ASTOptimizer::optimizeLiteralExpr(std::shared_ptr<L
     // CRITICAL: Set inferred type using type inference if not already set
     if (!expr->inferred_type) {
         expr->inferred_type = inferLiteralType(expr->value);
-        std::cout << "DEBUG: Set inferred type for literal: " << static_cast<int>(expr->inferred_type->tag) << std::endl;
     }
     
     // Apply constant propagation to literal expressions
@@ -567,11 +573,11 @@ std::shared_ptr<Expression> ASTOptimizer::simplifyAlgebraic(std::shared_ptr<Expr
 
 std::shared_ptr<Expression> ASTOptimizer::lowerInterpolation(std::shared_ptr<InterpolatedStringExpr> expr) {
     if (!expr) return nullptr;
-    
+
     // Check if all parts are string literals (either direct strings or literal expressions)
     bool allStringParts = true;
     std::string concatenated_result;
-    
+
     for (const auto& part : expr->parts) {
         if (auto strPart = std::get_if<std::string>(&part)) {
             // Direct string literal part
@@ -606,7 +612,7 @@ std::shared_ptr<Expression> ASTOptimizer::lowerInterpolation(std::shared_ptr<Int
             break;
         }
     }
-    
+
     // If all parts can be concatenated into a constant string, return a literal
     if (allStringParts) {
         auto literal = createStringLiteral(concatenated_result, expr->line);
@@ -719,14 +725,6 @@ std::shared_ptr<Expression> ASTOptimizer::evaluateBinaryOp(TokenType op, std::sh
                           rightLiteral->inferred_type->tag == TypeTag::Float64 ||
                           rightLiteral->inferred_type->tag == TypeTag::Float32);
     
-    std::cout << "DEBUG: leftIsNumeric=" << leftIsNumeric << " rightIsNumeric=" << rightIsNumeric << std::endl;
-    if (leftLiteral->inferred_type) {
-        std::cout << "DEBUG: left type=" << static_cast<int>(leftLiteral->inferred_type->tag) << " (Int64=" << static_cast<int>(TypeTag::Int64) << ")" << std::endl;
-    }
-    if (rightLiteral->inferred_type) {
-        std::cout << "DEBUG: right type=" << static_cast<int>(rightLiteral->inferred_type->tag) << " (Int64=" << static_cast<int>(TypeTag::Int64) << ")" << std::endl;
-    }
-    
     // If both are numeric, do numeric operations
     if (leftIsNumeric && rightIsNumeric) {
         auto leftStr = std::get_if<std::string>(&leftLiteral->value);
@@ -769,12 +767,12 @@ std::shared_ptr<Expression> ASTOptimizer::evaluateBinaryOp(TokenType op, std::sh
                     resultType = std::make_shared<::Type>(::TypeTag::Float64);
                 }
                 
-                // Create result literal with proper type
-                auto resultLiteral = std::make_shared<LiteralExpr>();
-                resultLiteral->value = std::to_string(result);
-                resultLiteral->line = left->line;
-                resultLiteral->inferred_type = resultType;
-                return resultLiteral;
+                // Create the folded literal
+            auto foldedLiteral = std::make_shared<LiteralExpr>();
+            foldedLiteral->value = std::to_string(result);
+            foldedLiteral->line = left->line;
+            foldedLiteral->inferred_type = inferLiteralType(foldedLiteral->value);
+            return foldedLiteral;
                 
             } catch (const std::exception&) {
                 return nullptr;  // Failed to parse numbers

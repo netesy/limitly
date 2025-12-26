@@ -68,7 +68,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         std::shared_ptr<AST::Program> ast = parser.parse();
         
         // Print AST before optimization if debug mode is enabled
-        if (enableDebug) {
+        if (enableDebug || jitDebug) {
             std::cout << "=== AST Before Optimization ===\n";
             ASTPrinter printer;
             printer.process(ast);
@@ -80,7 +80,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         ast = optimizer.optimize(ast);
         
         // Print AST after optimization if debug mode is enabled
-        if (enableDebug) {
+        if (enableDebug || jitDebug) {
             std::cout << "=== AST After Optimization ===\n";
             ASTPrinter printer_after;
             printer_after.process(ast);
@@ -88,7 +88,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         }
         
         // Print optimization statistics if debug mode is enabled
-        if (enableDebug) {
+        if (enableDebug || jitDebug) {
             const auto& stats = optimizer.getStats();
             std::cout << "=== AST Optimization Statistics ===\n";
             std::cout << "Constant folds: " << stats.constant_folds << "\n";
@@ -120,12 +120,6 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             }
             return 1;
         }
-                LIR::Generator lir_generator;
-                auto lir_function = lir_generator.generate_program(type_check_result);
-                        // Initialize and run LIR disassembler
-                LIR::Disassembler disassemble(*lir_function, true);
-                std::cout << "\n=== LIR Disassembly ===\n";
-                std::cout << disassemble.disassemble() << std::endl;
 
         // Print AST if requested
         if (printAst) {
@@ -137,6 +131,14 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
 
         if (useJit) {
             try {
+                // Generate LIR from optimized AST
+                LIR::Generator lir_generator;
+                auto lir_function = lir_generator.generate_program(type_check_result);
+                
+                // Initialize and run LIR disassembler
+                LIR::Disassembler disassemble(*lir_function, true);
+                std::cout << "\n=== LIR Disassembly ===\n";
+                std::cout << disassemble.disassemble() << std::endl;
                 
                 if (!lir_function) {
                     std::cerr << "Failed to generate LIR function\n";
