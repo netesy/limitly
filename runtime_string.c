@@ -135,3 +135,56 @@ RUNTIME_API LmString lm_string_from_cstr(const char* str) {
 RUNTIME_API const char* lm_string_get_data(LmString str) {
     return str.data;
 }
+
+// String interpolation function for JIT - replaces {placeholder} with values
+RUNTIME_API LmString lm_string_interpolate(LmString format_str, LmString* args, uint64_t arg_count) {
+    if (arg_count == 0) {
+        return format_str;
+    }
+    
+    // Convert format to C string for easier processing
+    const char* format = format_str.data;
+    uint64_t format_len = format_str.len;
+    
+    // Calculate maximum possible result size
+    uint64_t max_size = format_len + 256 * arg_count; // Conservative estimate
+    char* result = (char*)malloc(max_size);
+    if (!result) {
+        return (LmString){ NULL, 0 };
+    }
+    
+    uint64_t pos = 0;
+    uint64_t arg_index = 0;
+    
+    // Simple interpolation: replace {placeholder} with argument
+    for (uint64_t i = 0; i < format_len && arg_index < arg_count; i++) {
+        if (format[i] == '{' && i + 1 < format_len && format[i + 1] == '}') {
+            // Found placeholder, insert argument
+            if (arg_index < arg_count) {
+                LmString arg = args[arg_index];
+                for (uint64_t j = 0; j < arg.len && pos < max_size - 1; j++) {
+                    result[pos++] = arg.data[j];
+                }
+            }
+            i += 1; // Skip the '}'
+            arg_index++;
+        } else {
+            // Copy character as-is
+            if (pos < max_size - 1) {
+                result[pos++] = format[i];
+            }
+        }
+    }
+    
+    // Copy remaining format characters
+    for (uint64_t i = 0; i < format_len && pos < max_size - 1; i++) {
+        if (format[i] != '{' && (i + 1 >= format_len || format[i + 1] != '}')) {
+            if (pos < max_size - 1) {
+                result[pos++] = format[i];
+            }
+        }
+    }
+    
+    result[pos] = '\0';
+    return (LmString){ result, strlen(result) };
+}

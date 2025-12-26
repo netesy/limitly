@@ -31,6 +31,9 @@ RUNTIME_API LmString lm_string_from_cstr(const char* str);
 // Get data pointer from LmString (for JIT)
 RUNTIME_API const char* lm_string_get_data(LmString str);
 
+// String interpolation function for JIT - replaces {placeholder} with values
+RUNTIME_API LmString lm_string_interpolate(LmString format_str, LmString* args, uint64_t arg_count);
+
 // Convert integer to string
 RUNTIME_API LmString lm_int_to_string(int64_t value);
 

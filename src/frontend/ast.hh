@@ -11,6 +11,8 @@
 #include <set>
 #include <sstream>
 #include <algorithm>
+#include <stack>
+#include <queue>
 #include "scanner.hh"
 #include "../backend/types.hh"
 
@@ -711,6 +713,149 @@ namespace AST {
         
         // Captured variables (determined during analysis)
         std::vector<std::string> capturedVars;
+    };
+
+    // ============================================================================
+    // AST OPTIMIZATION FRAMEWORK
+    // ============================================================================
+
+    // Optimization context for tracking constants and variable states
+    struct OptimizationContext {
+        // Variable to constant mapping for constant propagation
+        std::unordered_map<std::string, std::shared_ptr<Expression>> constants;
+        
+        // Set of variables that have been reassigned (not constant)
+        std::set<std::string> reassigned_vars;
+        
+        // Variables that escape current scope (cannot propagate)
+        std::set<std::string> escaping_vars;
+        
+        // Current scope depth for tracking variable lifetimes
+        int scope_depth = 0;
+        
+        // Stack of scope changes for rollback
+        std::vector<std::pair<std::string, std::shared_ptr<Expression>>> constant_stack;
+        std::vector<std::string> reassigned_stack;
+        
+        // Optimization statistics
+        struct Stats {
+            int constant_folds = 0;
+            int constant_propagations = 0;
+            int dead_code_eliminated = 0;
+            int branches_simplified = 0;
+            int interpolations_lowered = 0;
+            int algebraic_simplifications = 0;
+            int strings_canonicalized = 0;
+        } stats;
+        
+        // Push a new scope
+        void pushScope() {
+            scope_depth++;
+        }
+        
+        // Pop current scope and restore previous state
+        void popScope() {
+            scope_depth--;
+            // Restore constants that were added in this scope
+            while (!constant_stack.empty() && constant_stack.back().second != nullptr) {
+                constants.erase(constant_stack.back().first);
+                constant_stack.pop_back();
+            }
+            // Restore reassigned variables
+            while (!reassigned_stack.empty()) {
+                reassigned_vars.erase(reassigned_stack.back());
+                reassigned_stack.pop_back();
+            }
+        }
+        
+        // Check if a variable is a known constant
+        bool isConstant(const std::string& name) const {
+            return constants.find(name) != constants.end() && 
+                   reassigned_vars.find(name) == reassigned_vars.end() &&
+                   escaping_vars.find(name) == escaping_vars.end();
+        }
+        
+        // Get constant value for a variable
+        std::shared_ptr<Expression> getConstant(const std::string& name) const {
+            auto it = constants.find(name);
+            return (it != constants.end()) ? it->second : nullptr;
+        }
+        
+        // Set a variable to a constant value
+        void setConstant(const std::string& name, std::shared_ptr<Expression> value) {
+            constants[name] = value;
+            constant_stack.emplace_back(name, value);
+        }
+        
+        // Mark variable as reassigned (no longer constant)
+        void markReassigned(const std::string& name) {
+            reassigned_vars.insert(name);
+            reassigned_stack.push_back(name);
+        }
+        
+        // Mark variable as escaping (cannot propagate)
+        void markEscaping(const std::string& name) {
+            escaping_vars.insert(name);
+        }
+    };
+
+    // Base optimizer class
+    class ASTOptimizer {
+    protected:
+        OptimizationContext context;
+        
+    public:
+        virtual ~ASTOptimizer() = default;
+        
+        // Main optimization entry point
+        virtual std::shared_ptr<Program> optimize(std::shared_ptr<Program> program) {
+            return optimizeProgram(program);
+        }
+        
+        // Get optimization statistics
+        const OptimizationContext::Stats& getStats() const { return context.stats; }
+        
+    protected:
+        // Optimization methods for each node type
+        virtual std::shared_ptr<Program> optimizeProgram(std::shared_ptr<Program> program);
+        virtual std::shared_ptr<Expression> optimizeExpression(std::shared_ptr<Expression> expr);
+        virtual std::shared_ptr<Statement> optimizeStatement(std::shared_ptr<Statement> stmt);
+        
+        // Specific expression optimizations
+        virtual std::shared_ptr<BinaryExpr> optimizeBinaryExpr(std::shared_ptr<BinaryExpr> expr);
+        virtual std::shared_ptr<UnaryExpr> optimizeUnaryExpr(std::shared_ptr<UnaryExpr> expr);
+        virtual std::shared_ptr<InterpolatedStringExpr> optimizeInterpolatedStringExpr(std::shared_ptr<InterpolatedStringExpr> expr);
+        virtual std::shared_ptr<LiteralExpr> optimizeLiteralExpr(std::shared_ptr<LiteralExpr> expr);
+        virtual std::shared_ptr<VariableExpr> optimizeVariableExpr(std::shared_ptr<VariableExpr> expr);
+        virtual std::shared_ptr<CallExpr> optimizeCallExpr(std::shared_ptr<CallExpr> expr);
+        virtual std::shared_ptr<TernaryExpr> optimizeTernaryExpr(std::shared_ptr<TernaryExpr> expr);
+        
+        // Specific statement optimizations
+        virtual std::shared_ptr<VarDeclaration> optimizeVarDeclaration(std::shared_ptr<VarDeclaration> stmt);
+        virtual std::shared_ptr<BlockStatement> optimizeBlockStatement(std::shared_ptr<BlockStatement> stmt);
+        virtual std::shared_ptr<IfStatement> optimizeIfStatement(std::shared_ptr<IfStatement> stmt);
+        virtual std::shared_ptr<WhileStatement> optimizeWhileStatement(std::shared_ptr<WhileStatement> stmt);
+        virtual std::shared_ptr<ForStatement> optimizeForStatement(std::shared_ptr<ForStatement> stmt);
+        virtual std::shared_ptr<ReturnStatement> optimizeReturnStatement(std::shared_ptr<ReturnStatement> stmt);
+        
+        // Core optimization utilities
+        std::shared_ptr<Expression> foldConstants(std::shared_ptr<Expression> expr);
+        std::shared_ptr<Expression> propagateConstants(std::shared_ptr<Expression> expr);
+        std::shared_ptr<Expression> simplifyBranches(std::shared_ptr<Expression> expr);
+        std::shared_ptr<Expression> simplifyAlgebraic(std::shared_ptr<Expression> expr);
+        std::shared_ptr<Expression> lowerInterpolation(std::shared_ptr<InterpolatedStringExpr> expr);
+        std::shared_ptr<Expression> canonicalizeStrings(std::shared_ptr<Expression> expr);
+        
+        // Utility methods
+        bool isLiteralConstant(std::shared_ptr<Expression> expr);
+        std::shared_ptr<Expression> evaluateBinaryOp(TokenType op, std::shared_ptr<Expression> left, std::shared_ptr<Expression> right);
+        std::shared_ptr<Expression> evaluateUnaryOp(TokenType op, std::shared_ptr<Expression> right);
+        bool isCompileTimeFalse(std::shared_ptr<Expression> expr);
+        bool isCompileTimeTrue(std::shared_ptr<Expression> expr);
+        
+        // Dead code detection
+        bool isUnreachableCode(std::shared_ptr<Statement> stmt);
+        std::shared_ptr<Statement> eliminateDeadCode(std::shared_ptr<Statement> stmt);
     };
 }
 

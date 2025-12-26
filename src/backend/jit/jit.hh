@@ -114,6 +114,8 @@ private:
     gccjit::function m_lm_string_concat_func;
     gccjit::function m_lm_string_from_cstr_func;
     gccjit::function m_lm_string_get_data_func;
+    gccjit::function m_lm_string_format_func;
+    gccjit::function m_lm_string_interpolate_func;
     gccjit::function m_lm_int_to_string_func;
     gccjit::function m_lm_double_to_string_func;
     gccjit::function m_lm_bool_to_string_func;

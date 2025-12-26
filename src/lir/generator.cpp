@@ -720,6 +720,7 @@ Reg Generator::emit_literal_expr(AST::LiteralExpr& expr, TypePtr expected_type) 
     
     // Set type BEFORE emitting so it's available during emit_instruction
     set_register_language_type(dst, const_val ? const_val->type : nullptr);
+    set_register_type(dst, const_val ? const_val->type : nullptr);
     Type abi_type = const_val ? language_type_to_abi_type(const_val->type) : Type::Void;
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, abi_type, dst, const_val));
     return dst;
@@ -901,6 +902,8 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
     Reg right = emit_expr(*expr.right);
     Reg dst = allocate_register();
     
+    std::cout << "[DEBUG] Binary expr: left=" << left << " right=" << right << " op=" << static_cast<int>(expr.op) << std::endl;
+    
     // Map operator to LIR operation
     LIR_Op op;
     if (expr.op == TokenType::PLUS) op = LIR_Op::Add;
@@ -1042,6 +1045,7 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
         emit_instruction(LIR_Inst(op, abi_type, dst, left, right));
     } else {
         // Fallback for operations without result type
+        std::cout << "[DEBUG] Emitting instruction: op=" << static_cast<int>(op) << " dst=" << dst << " left=" << left << " right=" << right << std::endl;
         emit_instruction(LIR_Inst(op, dst, left, right));
     }
     
@@ -1300,6 +1304,20 @@ Reg Generator::emit_assign_expr(AST::AssignExpr& expr) {
             Type abi_type = language_type_to_abi_type(expr.inferred_type);
             
             std::cout << "[DEBUG] Compound assignment: op=" << static_cast<int>(expr.op) << " dst=" << dst << " value_reg=" << value << std::endl;
+            
+            // Check if this should be string concatenation instead of arithmetic
+            if (expr.op == TokenType::PLUS_EQUAL) {
+                // Get the type of the left operand (current variable value)
+                TypePtr dst_type = get_register_type(dst);
+                if (dst_type && dst_type->tag == TypeTag::String) {
+                    // String += something -> use string concatenation
+                    std::cout << "[DEBUG] PLUS_EQUAL with string variable, using STR_CONCAT" << std::endl;
+                    auto string_type = std::make_shared<::Type>(::TypeTag::String);
+                    emit_instruction(LIR_Inst(LIR_Op::STR_CONCAT, Type::Ptr, dst, dst, value));
+                    set_register_type(dst, string_type);
+                    return dst;
+                }
+            }
             
             switch (expr.op) {
                 case TokenType::PLUS_EQUAL:

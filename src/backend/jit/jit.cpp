@@ -191,6 +191,20 @@ JITBackend::JITBackend()
     from_cstr_params.push_back(m_context.new_param(m_const_char_ptr_type, "cstr"));
     m_lm_string_from_cstr_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_lm_string_type, "lm_string_from_cstr", from_cstr_params, 0);
     
+    // Set up lm_string_format function
+    std::vector<gccjit::param> format_params;
+    format_params.push_back(m_context.new_param(m_lm_string_type, "format_str"));
+    format_params.push_back(m_context.new_param(m_lm_string_type, "args"));
+    format_params.push_back(m_context.new_param(m_context.get_type(GCC_JIT_TYPE_UINT64_T), "arg_count"));
+    m_lm_string_format_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_lm_string_type, "lm_string_format", format_params, 0);
+    
+    // Set up lm_string_interpolate function
+    std::vector<gccjit::param> interpolate_params;
+    interpolate_params.push_back(m_context.new_param(m_lm_string_type, "format_str"));
+    interpolate_params.push_back(m_context.new_param(m_lm_string_type.get_pointer(), "args"));
+    interpolate_params.push_back(m_context.new_param(m_context.get_type(GCC_JIT_TYPE_UINT64_T), "arg_count"));
+    m_lm_string_interpolate_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_lm_string_type, "lm_string_interpolate", interpolate_params, 0);
+    
     // Register loop counter check function
     std::vector<gccjit::param> loop_check_params;
     m_loop_check_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_int_type, "check_loop_counter", loop_check_params, 0);
@@ -273,7 +287,7 @@ void JITBackend::compile_function(const LIR::LIR_Function& function) {
         param_types.push_back(m_context.new_param(m_int_type, ("param" + std::to_string(i)).c_str()));
     }
     
-    m_current_func = m_context.new_function(GCC_JIT_FUNCTION_EXPORTED, m_int_type, function.name.c_str(), param_types, 0);
+    m_current_func = m_context.new_function(GCC_JIT_FUNCTION_EXPORTED, m_const_char_ptr_type, function.name.c_str(), param_types, 0);
     
     // === SINGLE PASS: Process instructions and create blocks on the fly ===
     compile_function_single_pass(function);
@@ -653,10 +667,9 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
             gccjit::rvalue a = get_jit_register(inst.a);
             gccjit::rvalue b = get_jit_register(inst.b);
             gccjit::rvalue result = compile_string_concat(a, b);
-            // Cast void* to const char* for assignment
-            gccjit::rvalue cast_result = m_context.new_cast(result, m_const_char_ptr_type);
-            m_current_block.add_assignment(dst, cast_result);
-            return cast_result;
+            // compile_string_concat already returns const char*
+            m_current_block.add_assignment(dst, result);
+            return result;
         }
         
         case LIR::LIR_Op::STR_CONCAT: {
@@ -664,21 +677,22 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
             gccjit::rvalue a = get_jit_register(inst.a);
             gccjit::rvalue b = get_jit_register(inst.b);
             gccjit::rvalue result = compile_string_concat(a, b);
-            // Cast void* to const char* for assignment
-            gccjit::rvalue cast_result = m_context.new_cast(result, m_const_char_ptr_type);
-            m_current_block.add_assignment(dst, cast_result);
-            return cast_result;
+            // compile_string_concat already returns const char*
+            m_current_block.add_assignment(dst, result);
+            return result;
         }
         
         case LIR::LIR_Op::STR_FORMAT: {
             gccjit::lvalue dst = get_jit_register(inst.dst, m_const_char_ptr_type);
             gccjit::rvalue format = get_jit_register(inst.a);
             gccjit::rvalue arg = get_jit_register(inst.b);
+            
+            // Use compile_string_format which should return const char*
             gccjit::rvalue result = compile_string_format(format, arg);
-            // Cast void* to const char* for assignment
-            gccjit::rvalue cast_result = m_context.new_cast(result, m_const_char_ptr_type);
-            m_current_block.add_assignment(dst, cast_result);
-            return cast_result;
+            
+            // compile_string_format should return const char*
+            m_current_block.add_assignment(dst, result);
+            return result;
         }
         
         // Type Operations
@@ -1299,11 +1313,21 @@ void JITBackend::compile_print_string(const LIR::LIR_Inst& inst) {
 void JITBackend::compile_return(const LIR::LIR_Inst& inst) {
     if (inst.a != 0) {
         gccjit::rvalue value = get_jit_register(inst.a);
+        
+        // Check if the value type matches the function return type (const char*)
+        gcc_jit_type* value_type = value.get_type().get_inner_type();
+        gcc_jit_type* return_type = m_const_char_ptr_type.get_inner_type();
+        
+        if (value_type != return_type) {
+            // Cast the return value to the expected function return type
+            value = m_context.new_cast(value, m_const_char_ptr_type);
+        }
+        
         m_current_block.end_with_return(value);
     } else {
-        // Return zero for void/nil returns
-        gccjit::rvalue zero = m_context.new_rvalue(m_int_type, 0);
-        m_current_block.end_with_return(zero);
+        // Return empty string for void/nil returns
+        gccjit::rvalue empty_str = m_context.new_rvalue(m_const_char_ptr_type, (void*)"");
+        m_current_block.end_with_return(empty_str);
     }
 }
 
@@ -1348,25 +1372,37 @@ gccjit::rvalue JITBackend::compile_string_concat(gccjit::rvalue a, gccjit::rvalu
 }
 
 gccjit::rvalue JITBackend::compile_string_format(gccjit::rvalue format, gccjit::rvalue arg) {
-    // This function should format the string using the provided format and argument.
-    // For simplicity, we'll assume the format string contains one '%s' and we'll replace it.
-    // A more robust implementation would parse the format string.
-
-    // Convert argument to a C string
-    gccjit::rvalue arg_as_cstring = compile_to_cstring(arg);
-
-    // Allocate a buffer for the formatted string.
-    // The size needed is format.length + arg.length + 1.
-    // We'll approximate this for now. A safer way would be to call snprintf with null to get the size.
-    gccjit::rvalue buffer_size = m_context.new_rvalue(m_size_t_type, 1024); // Fixed size buffer for simplicity
-    std::vector<gccjit::rvalue> malloc_args = {buffer_size};
-    gccjit::rvalue buffer = m_context.new_call(m_malloc_func, malloc_args);
-
-    // Call sprintf to format the string
-    std::vector<gccjit::rvalue> sprintf_args = {buffer, format, arg_as_cstring};
-    m_current_block.add_eval(m_context.new_call(m_sprintf_func, sprintf_args));
-
-    return m_context.new_cast(buffer, m_const_char_ptr_type);
+    // Simple implementation: just concatenate format string and argument
+    // This works for basic cases like "a = %s" with integer 10 -> "a = 10"
+    
+    // Convert argument to string using appropriate runtime function
+    gccjit::rvalue arg_as_string;
+    if (arg.get_type().get_inner_type() == m_int_type.get_inner_type() || 
+        arg.get_type().get_inner_type() == m_context.get_type(GCC_JIT_TYPE_UINT64_T).get_inner_type()) {
+        // Integer argument - convert to string
+        arg_as_string = m_context.new_call(m_lm_int_to_string_func, {arg});
+        // Extract data pointer from the result
+        std::vector<gccjit::rvalue> get_data_args = {arg_as_string};
+        arg_as_string = m_context.new_call(m_lm_string_get_data_func, get_data_args);
+    } else {
+        // Already a string
+        arg_as_string = arg;
+    }
+    
+    // Simply concatenate format string and argument
+    // This handles cases like "a = %s" + "10" -> "a = 10"
+    gccjit::rvalue format_lm_string = convert_to_lm_string(format);
+    gccjit::rvalue arg_lm_string = convert_to_lm_string(arg_as_string);
+    
+    // Call runtime lm_string_concat function
+    std::vector<gccjit::rvalue> concat_args = {format_lm_string, arg_lm_string};
+    gccjit::rvalue result_lm_string = m_context.new_call(m_lm_string_concat_func, concat_args);
+    
+    // Extract data pointer from LmString result
+    std::vector<gccjit::rvalue> get_data_args = {result_lm_string};
+    gccjit::rvalue data_ptr = m_context.new_call(m_lm_string_get_data_func, get_data_args);
+    
+    return data_ptr;
 }
 
 
