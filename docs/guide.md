@@ -1088,60 +1088,9 @@ class Dog : Speaker {
 
 **Key Design Principle**: Limit is designed to be null-free. It does not have null pointers, references, or values. Instead, Limit uses a robust type-based system to handle optionality and errors.
 
-### The `Option` Type for Optional Values
-
-When a value can be present or absent, you should use the `Option` enum, which has two variants:
-- **`Some(value)`**: Represents the presence of a value.
-- **`None`**: Represents the absence of a value.
-
-```limit
-enum Option {
-    Some(any),
-    None
-}
-
-fn find_user(id: int): Option {
-    if (id == 1) {
-        return Some("Alice");
-    }
-    return None;
-}
-```
-
-You can then use a `match` statement to safely handle both cases:
-
-```limit
-var user = find_user(1);
-match (user) {
-    Some(name) => { print("Found user: {name}"); },
-    None => { print("User not found"); }
-}
-```
-
-### The `Result` Type for Operations That Can Fail
-
-For operations that can either succeed or fail, Limit uses a `Result` type (often implemented as a `Type?` or a custom enum). The common convention is:
-- **`Ok(value)`**: Represents a successful result.
-- **`Err(error)`**: Represents a failure, containing an error value.
-
-```limit
-fn divide(a: int, b: int): int?DivisionByZero {
-    if (b == 0) {
-        return Err(DivisionByZero("Cannot divide by zero"));
-    }
-    return Ok(a / b);
-}
-
-var result = divide(10, 2);
-match (result) {
-    Ok(value) => { print("Result: {value}"); },
-    Err(e) => { print("Error: {e}"); }
-}
-```
-
 ### The Unified `Type?` System
 
-For convenience, Limit provides the `Type?` syntax as a shorthand for fallible operations. The `Type?` syntax is syntactic sugar for `Result<Type, DefaultError>`, where `DefaultError` is a generic error type used when a specific one is not provided.
+Limit provides the `Type?` syntax for fallible operations.
 - **`Type?`**: A type that can either hold a value of `Type` or an error.
 - **`ok(value)`**: Constructs a success value.
 - **`err()`**: Constructs an error value.
