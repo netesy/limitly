@@ -838,6 +838,7 @@ namespace AST {
         virtual std::shared_ptr<WhileStatement> optimizeWhileStatement(std::shared_ptr<WhileStatement> stmt);
         virtual std::shared_ptr<ForStatement> optimizeForStatement(std::shared_ptr<ForStatement> stmt);
         virtual std::shared_ptr<ReturnStatement> optimizeReturnStatement(std::shared_ptr<ReturnStatement> stmt);
+        virtual std::shared_ptr<PrintStatement> optimizePrintStatement(std::shared_ptr<PrintStatement> stmt);
         
         // Core optimization utilities
         std::shared_ptr<Expression> foldConstants(std::shared_ptr<Expression> expr);

@@ -284,7 +284,9 @@ void Generator::emit_instruction(const LIR_Inst& inst) {
         if (inst.dst != UINT32_MAX) {
             auto type = get_register_type(inst.dst);
             if (type) {
-                current_function_->set_register_type(inst.dst, type);
+                // Use the ABI type conversion instead of legacy method
+                Type abi_type = language_type_to_abi_type(type);
+                current_function_->set_register_abi_type(inst.dst, abi_type);
             }
         }
     }
@@ -700,6 +702,7 @@ Reg Generator::emit_literal_expr(AST::LiteralExpr& expr, TypePtr expected_type) 
             }
         } else {
             // String value (already parsed, quotes removed by parser)
+            // For quoted string literals from the parser, always treat as string type
             auto string_type = std::make_shared<::Type>(::TypeTag::String);
             const_val = std::make_shared<Value>(string_type, stringValue);
         }
@@ -719,10 +722,14 @@ Reg Generator::emit_literal_expr(AST::LiteralExpr& expr, TypePtr expected_type) 
     }
     
     // Set type BEFORE emitting so it's available during emit_instruction
-    set_register_language_type(dst, const_val ? const_val->type : nullptr);
-    set_register_type(dst, const_val ? const_val->type : nullptr);
-    Type abi_type = const_val ? language_type_to_abi_type(const_val->type) : Type::Void;
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, abi_type, dst, const_val));
+    if (const_val) {
+        Type abi_type = language_type_to_abi_type(const_val->type);
+        set_register_language_type(dst, const_val->type);
+        set_register_type(dst, const_val->type);
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, abi_type, dst, const_val));
+    } else {
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, dst, const_val));
+    }
     return dst;
 }
 
@@ -1651,10 +1658,17 @@ void Generator::emit_print_stmt(AST::PrintStatement& stmt) {
 void Generator::emit_var_stmt(AST::VarDeclaration& stmt) {
     Reg value_reg;
     if (stmt.initializer) {
-        Reg value = emit_expr(*stmt.initializer);
-        value_reg = allocate_register();
-        Type abi_type = language_type_to_abi_type(stmt.inferred_type);
-        emit_instruction(LIR_Inst(LIR_Op::Mov, abi_type, value_reg, value, 0));
+        // Check if the initializer is a literal - if so, optimize by directly using it
+        if (auto literal = dynamic_cast<AST::LiteralExpr*>(stmt.initializer.get())) {
+            // For literal initializers, emit the literal and use it directly
+            value_reg = emit_literal_expr(*literal);
+        } else {
+            // For non-literal initializers, evaluate and move
+            Reg value = emit_expr(*stmt.initializer);
+            value_reg = allocate_register();
+            Type abi_type = language_type_to_abi_type(stmt.inferred_type);
+            emit_instruction(LIR_Inst(LIR_Op::Mov, abi_type, value_reg, value, 0));
+        }
         
         // Use the declared type if available, otherwise use the initializer's type
         TypePtr declared_type = nullptr;
@@ -1689,15 +1703,17 @@ void Generator::emit_var_stmt(AST::VarDeclaration& stmt) {
                 declared_type = std::make_shared<::Type>(::TypeTag::Float32);
             } else if (type_annotation.typeName == "bool") {
                 declared_type = std::make_shared<::Type>(::TypeTag::Bool);
-            } else if (type_annotation.typeName == "str" || type_annotation.typeName == "string") {
+            } else if (type_annotation.typeName == "string") {
                 declared_type = std::make_shared<::Type>(::TypeTag::String);
+            } else if (type_annotation.typeName == "any") {
+                declared_type = std::make_shared<::Type>(::TypeTag::Any);
             }
         }
         
         if (declared_type) {
             set_register_type(value_reg, declared_type);
         } else {
-            set_register_type(value_reg, get_register_type(value));
+            set_register_type(value_reg, stmt.initializer->inferred_type);
         }
     } else {
         // Initialize with nil
