@@ -213,23 +213,32 @@ std::shared_ptr<Expression> ASTOptimizer::optimizeBinaryExpr(std::shared_ptr<Bin
     return expr;
 }
 
-std::shared_ptr<UnaryExpr> ASTOptimizer::optimizeUnaryExpr(std::shared_ptr<UnaryExpr> expr) {
+std::shared_ptr<Expression> ASTOptimizer::optimizeUnaryExpr(std::shared_ptr<UnaryExpr> expr) {
     if (!expr) return nullptr;
+    
+    std::cout << "DEBUG: optimizeUnaryExpr called with op: " << static_cast<int>(expr->op) << std::endl;
     
     // Optimize the operand first
     expr->right = optimizeExpression(expr->right);
     
+    std::cout << "DEBUG: After optimizing operand" << std::endl;
+    
     // Apply constant folding
     auto folded = foldConstants(expr);
     if (folded != expr) {
-        return std::dynamic_pointer_cast<UnaryExpr>(folded);
+        std::cout << "DEBUG: Unary expression was folded" << std::endl;
+        // folded is now a LiteralExpr, return it directly
+        return folded;
     }
     
+    std::cout << "DEBUG: Unary expression was not folded" << std::endl;
     return expr;
 }
 
 std::shared_ptr<Expression> ASTOptimizer::optimizeInterpolatedStringExpr(std::shared_ptr<InterpolatedStringExpr> expr) {
     if (!expr) return nullptr;
+
+    std::cout << "DEBUG: optimizeInterpolatedStringExpr called with " << expr->parts.size() << " parts" << std::endl;
 
     // Optimize all expression parts
     for (auto& part : expr->parts) {
@@ -241,9 +250,11 @@ std::shared_ptr<Expression> ASTOptimizer::optimizeInterpolatedStringExpr(std::sh
     // Apply interpolation lowering
     auto lowered = lowerInterpolation(expr);
     if (lowered != expr) {
+        std::cout << "DEBUG: Interpolation was lowered to literal" << std::endl;
         return lowered;  // Return the lowered expression (could be a literal)
     }
 
+    std::cout << "DEBUG: Interpolation was not lowered, returning original" << std::endl;
     return expr;
 }
 
@@ -574,39 +585,61 @@ std::shared_ptr<Expression> ASTOptimizer::simplifyAlgebraic(std::shared_ptr<Expr
 std::shared_ptr<Expression> ASTOptimizer::lowerInterpolation(std::shared_ptr<InterpolatedStringExpr> expr) {
     if (!expr) return nullptr;
 
+    std::cout << "DEBUG: lowerInterpolation called with " << expr->parts.size() << " parts" << std::endl;
+
     // Check if all parts are string literals (either direct strings or literal expressions)
     bool allStringParts = true;
     std::string concatenated_result;
 
-    for (const auto& part : expr->parts) {
+    for (size_t i = 0; i < expr->parts.size(); ++i) {
+        const auto& part = expr->parts[i];
+        std::cout << "DEBUG: Processing part " << i << std::endl;
+        
         if (auto strPart = std::get_if<std::string>(&part)) {
             // Direct string literal part
+            std::cout << "DEBUG: Direct string part: '" << *strPart << "'" << std::endl;
             concatenated_result += *strPart;
         } else if (auto exprPart = std::get_if<std::shared_ptr<Expression>>(&part)) {
+            std::cout << "DEBUG: Expression part found";
+            if (*exprPart) {
+                std::cout << ", type: " << typeid(*(*exprPart)).name() << std::endl;
+            } else {
+                std::cout << ", but it's null!" << std::endl;
+                allStringParts = false;
+                break;
+            }
             // Check if this expression part is now a literal after optimization
             if (auto literal = std::dynamic_pointer_cast<LiteralExpr>(*exprPart)) {
+                std::cout << "DEBUG: Expression part is a literal" << std::endl;
                 if (std::holds_alternative<std::string>(literal->value)) {
                     // It's a string literal - add it to the result
                     concatenated_result += std::get<std::string>(literal->value);
+                    std::cout << "DEBUG: Added string literal: '" << std::get<std::string>(literal->value) << "'" << std::endl;
                 } else {
                     // It's a non-string literal (number, bool) - convert to string
                     if (std::holds_alternative<bool>(literal->value)) {
                         concatenated_result += std::get<bool>(literal->value) ? "true" : "false";
+                        std::cout << "DEBUG: Added bool literal" << std::endl;
                     } else if (std::holds_alternative<std::nullptr_t>(literal->value)) {
                         concatenated_result += "nil";
-                    } else if (std::holds_alternative<std::string>(literal->value)) {
-                        concatenated_result += std::get<std::string>(literal->value);
+                        std::cout << "DEBUG: Added nil literal" << std::endl;
                     } else {
                         // For any other type, try to convert to string representation
-                        concatenated_result += std::get<std::string>(literal->value);
+                        // This should handle numeric literals stored as strings
+                        if (auto strVal = std::get_if<std::string>(&literal->value)) {
+                            concatenated_result += *strVal;
+                            std::cout << "DEBUG: Added string literal value: '" << *strVal << "'" << std::endl;
+                        }
                     }
                 }
             } else {
+                std::cout << "DEBUG: Expression part is not a literal, can't fold" << std::endl;
                 // Not a literal - can't fold completely
                 allStringParts = false;
                 break;
             }
         } else {
+            std::cout << "DEBUG: Unknown part type" << std::endl;
             // Unknown part type
             allStringParts = false;
             break;
@@ -615,9 +648,12 @@ std::shared_ptr<Expression> ASTOptimizer::lowerInterpolation(std::shared_ptr<Int
 
     // If all parts can be concatenated into a constant string, return a literal
     if (allStringParts) {
+        std::cout << "DEBUG: All parts are literals, creating string: '" << concatenated_result << "'" << std::endl;
         auto literal = createStringLiteral(concatenated_result, expr->line);
         context.stats.interpolations_lowered++;
         return literal;
+    } else {
+        std::cout << "DEBUG: Not all parts are literals, can't fold" << std::endl;
     }
     
     // Convert interpolation to concatenation of string literals and expressions
@@ -823,6 +859,12 @@ std::shared_ptr<Expression> ASTOptimizer::evaluateUnaryOp(TokenType op, std::sha
                 // Numeric overflow, fall through
             }
         }
+    }
+    
+    // Handle numeric positive (no-op, but ensure it's a literal)
+    if (op == TokenType::PLUS) {
+        // For positive, just return the operand as-is if it's already a literal
+        return rightLiteral;
     }
     
     return nullptr;
