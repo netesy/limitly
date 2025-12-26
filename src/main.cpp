@@ -3,6 +3,7 @@
 #include "frontend/parser.hh"
 #include "frontend/cst_printer.hh"
 #include "frontend/type_checker.hh"
+#include "frontend/ast.hh"
 #include "common/backend.hh"
 #include "backend/ast_printer.hh"
 #include "backend/bytecode_printer.hh"
@@ -66,6 +67,23 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         Parser parser(scanner, useCSTMode);
         std::shared_ptr<AST::Program> ast = parser.parse();
         
+        // AST Optimization (before type checking)
+        AST::ASTOptimizer optimizer;
+        ast = optimizer.optimize(ast);
+        
+        // Print optimization statistics if debug mode is enabled
+        if (enableDebug) {
+            const auto& stats = optimizer.getStats();
+            std::cout << "=== AST Optimization Statistics ===\n";
+            std::cout << "Constant folds: " << stats.constant_folds << "\n";
+            std::cout << "Constant propagations: " << stats.constant_propagations << "\n";
+            std::cout << "Dead code eliminated: " << stats.dead_code_eliminated << "\n";
+            std::cout << "Branches simplified: " << stats.branches_simplified << "\n";
+            std::cout << "Interpolations lowered: " << stats.interpolations_lowered << "\n";
+            std::cout << "Algebraic simplifications: " << stats.algebraic_simplifications << "\n";
+            std::cout << "Strings canonicalized: " << stats.strings_canonicalized << "\n";
+        }
+        
         // Print CST if requested
         if (printCst) {
             std::cout << "=== CST ===\n";
@@ -86,7 +104,13 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             }
             return 1;
         }
-        
+                LIR::Generator lir_generator;
+                auto lir_function = lir_generator.generate_program(type_check_result);
+                        // Initialize and run LIR disassembler
+                LIR::Disassembler disassemble(*lir_function, true);
+                std::cout << "\n=== LIR Disassembly ===\n";
+                std::cout << disassemble.disassemble() << std::endl;
+
         // Print AST if requested
         if (printAst) {
             std::cout << "=== AST ===\n";
@@ -97,14 +121,6 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
 
         if (useJit) {
             try {
-                // Generate LIR from AST (this includes complete CFG building)
-                LIR::Generator lir_generator;
-                auto lir_function = lir_generator.generate_program(type_check_result);
-                
-                // Initialize and run LIR disassembler
-                LIR::Disassembler disassemble(*lir_function, true);
-                std::cout << "\n=== LIR Disassembly ===\n";
-                std::cout << disassemble.disassemble() << std::endl;
                 
                 if (!lir_function) {
                     std::cerr << "Failed to generate LIR function\n";
@@ -122,7 +138,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 std::cout << "Generated LIR function with " << lir_function->instructions.size() << " instructions\n";
                 std::cout << "CFG generation completed with " << lir_function->cfg->blocks.size() << " blocks\n";
                 
-                if (jitDebug) {
+                if (jitDebug || enableDebug) {
                     std::cout << "\n=== LIR Instructions ===\n";
                     for (size_t i = 0; i < lir_function->instructions.size(); ++i) {
                         const auto& inst = lir_function->instructions[i];
@@ -221,7 +237,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 std::cout << "Debug mode enabled for register interpreter\n";
             }
             
-            // Generate LIR and execute with register interpreter
+            // Generate LIR from optimized AST and execute with register interpreter
             LIR::Generator lir_generator;
             auto lir_function = lir_generator.generate_program(type_check_result);
             
@@ -320,6 +336,10 @@ void startRepl() {
             Parser parser(scanner, false); // Use legacy mode for optimal REPL performance
             std::shared_ptr<AST::Program> ast = parser.parse();
             
+            // AST Optimization (always run, before type checking)
+            AST::ASTOptimizer optimizer;
+            ast = optimizer.optimize(ast);
+            
             // Type checking
             auto type_check_result = TypeCheckerFactory::check_program(ast);
             if (!type_check_result.success) {
@@ -328,6 +348,20 @@ void startRepl() {
                     std::cerr << "  " << error << std::endl;
                 }
                 continue;
+            }
+            
+            // Print optimization statistics in debug mode
+            if (debugMode) {
+                const auto& stats = optimizer.getStats();
+                if (stats.constant_folds > 0 || stats.constant_propagations > 0 || 
+                    stats.dead_code_eliminated > 0 || stats.branches_simplified > 0) {
+                    std::cout << "AST Optimizations: ";
+                    if (stats.constant_folds > 0) std::cout << stats.constant_folds << " folds ";
+                    if (stats.constant_propagations > 0) std::cout << stats.constant_propagations << " props ";
+                    if (stats.dead_code_eliminated > 0) std::cout << stats.dead_code_eliminated << " dead ";
+                    if (stats.branches_simplified > 0) std::cout << stats.branches_simplified << " branches ";
+                    std::cout << "\n";
+                }
             }
             
             // Backend: Generate LIR and execute with register interpreter
