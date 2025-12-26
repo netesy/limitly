@@ -526,7 +526,11 @@ void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
         printNode(unaryExpr->right, indent + 2);
     }
     else if (auto literalExpr = std::dynamic_pointer_cast<AST::LiteralExpr>(node)) {
-        std::cout << indentation << "Literal: " << valueToString(literalExpr->value) << std::endl;
+        std::string typeInfo = "";
+        if (literalExpr->inferred_type) {
+            typeInfo = " [type: " + typePtrToString(literalExpr->inferred_type) + "]";
+        }
+        std::cout << indentation << "Literal: " << valueToString(literalExpr->value) << typeInfo << std::endl;
     }
     else if (auto interpolatedExpr = std::dynamic_pointer_cast<AST::InterpolatedStringExpr>(node)) {
         std::cout << indentation << "InterpolatedString:" << std::endl;
@@ -1071,4 +1075,42 @@ std::string ASTPrinter::typeToString(const std::shared_ptr<AST::TypeAnnotation>&
     }
     
     return result;
+}
+
+std::string ASTPrinter::typePtrToString(const TypePtr& type) const {
+    if (!type) return "<null>";
+    
+    switch (type->tag) {
+        case TypeTag::Nil: return "nil";
+        case TypeTag::Bool: return "bool";
+        case TypeTag::Int: return "int";
+        case TypeTag::Int8: return "int8";
+        case TypeTag::Int16: return "int16";
+        case TypeTag::Int32: return "int32";
+        case TypeTag::Int64: return "int64";
+        case TypeTag::Int128: return "int128";
+        case TypeTag::UInt: return "uint";
+        case TypeTag::UInt8: return "uint8";
+        case TypeTag::UInt16: return "uint16";
+        case TypeTag::UInt32: return "uint32";
+        case TypeTag::UInt64: return "uint64";
+        case TypeTag::UInt128: return "uint128";
+        case TypeTag::Float32: return "float32";
+        case TypeTag::Float64: return "float64";
+        case TypeTag::String: return "string";
+        case TypeTag::List: return "list";
+        case TypeTag::Dict: return "dict";
+        case TypeTag::Tuple: return "tuple";
+        case TypeTag::Enum: return "enum";
+        case TypeTag::Sum: return "sum";
+        case TypeTag::Union: return "union";
+        case TypeTag::ErrorUnion: return "error_union";
+        case TypeTag::Function: return "function";
+        case TypeTag::Closure: return "closure";
+        case TypeTag::Object: return "object";
+        case TypeTag::Module: return "module";
+        case TypeTag::Any: return "any";
+        case TypeTag::UserDefined: return "user_defined";
+        default: return "unknown";
+    }
 }

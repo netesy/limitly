@@ -23,6 +23,7 @@ private:
     std::string tokenTypeToString(TokenType type) const;
     std::string valueToString(const std::variant<std::string, bool, std::nullptr_t>& value) const;
     std::string typeToString(const std::shared_ptr<AST::TypeAnnotation>& type) const;
+    std::string typePtrToString(const TypePtr& type) const;
 };
 
 #endif // AST_PRINTER_HH

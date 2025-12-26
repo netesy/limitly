@@ -67,9 +67,25 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         Parser parser(scanner, useCSTMode);
         std::shared_ptr<AST::Program> ast = parser.parse();
         
+        // Print AST before optimization if debug mode is enabled
+        if (enableDebug) {
+            std::cout << "=== AST Before Optimization ===\n";
+            ASTPrinter printer;
+            printer.process(ast);
+            std::cout << std::endl;
+        }
+        
         // AST Optimization (before type checking)
         AST::ASTOptimizer optimizer;
         ast = optimizer.optimize(ast);
+        
+        // Print AST after optimization if debug mode is enabled
+        if (enableDebug) {
+            std::cout << "=== AST After Optimization ===\n";
+            ASTPrinter printer_after;
+            printer_after.process(ast);
+            std::cout << std::endl;
+        }
         
         // Print optimization statistics if debug mode is enabled
         if (enableDebug) {
