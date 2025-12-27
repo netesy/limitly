@@ -830,6 +830,7 @@ namespace AST {
         virtual std::shared_ptr<Expression> optimizeGroupingExpr(std::shared_ptr<GroupingExpr> expr);
         virtual std::shared_ptr<CallExpr> optimizeCallExpr(std::shared_ptr<CallExpr> expr);
         virtual std::shared_ptr<TernaryExpr> optimizeTernaryExpr(std::shared_ptr<TernaryExpr> expr);
+        virtual std::shared_ptr<AssignExpr> optimizeAssignExpr(std::shared_ptr<AssignExpr> expr);
         
         // Specific statement optimizations
         virtual std::shared_ptr<VarDeclaration> optimizeVarDeclaration(std::shared_ptr<VarDeclaration> stmt);
