@@ -1202,6 +1202,11 @@ Reg Generator::emit_call_expr(AST::CallExpr& expr) {
                 Reg arg_reg = emit_expr(*arg);
                 arg_regs.push_back(arg_reg);
             }
+
+            // Move arguments to parameter registers
+            for (size_t i = 0; i < arg_regs.size(); ++i) {
+                emit_instruction(LIR_Inst(LIR_Op::Mov, static_cast<Reg>(i), arg_regs[i], 0));
+            }
             
             // Allocate result register
             Reg result = allocate_register();
@@ -1274,7 +1279,7 @@ Reg Generator::emit_call_expr(AST::CallExpr& expr) {
             }
             
             // Generate call instruction with function index
-            emit_instruction(LIR_Inst(LIR_Op::Call, result, static_cast<Reg>(arg_regs.size()), static_cast<Reg>(func_index)));
+            emit_instruction(LIR_Inst(LIR_Op::Call, result, static_cast<Reg>(func_index), static_cast<Reg>(arg_regs.size())));
             
             return result;
             
