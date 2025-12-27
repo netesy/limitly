@@ -1,0 +1,100 @@
+// Test file with potential memory bugs to verify type checker catches them
+
+fn test_use_after_move() {
+    var x = 42
+    var y = x  // Move semantics - x becomes invalid
+    print("y = {y}")
+    print("x = {x}")  // ERROR: Use after move
+}
+
+fn test_double_drop() {
+    var x = 100
+    // Simulate explicit drop (if language had drop keyword)
+    // drop x  // First drop
+    // drop x  // ERROR: Double drop
+    print("x = {x}")
+}
+
+fn test_drop_after_move() {
+    var x = 200
+    var y = x  // Move x to y
+    // Simulate drop of moved value
+    // drop x  // ERROR: Drop after move
+    print("y = {y}")
+}
+
+fn test_escape_analysis() {
+    var local_var = 300
+    // If we had return by reference, this would be an error:
+    // return &local_var  // ERROR: Escaping local reference
+    return local_var  // This is OK - returns by value
+}
+
+fn test_borrow_moved_value() {
+    var x = 400
+    var y = x  // Move x to y
+    // If we had borrowing, this would be an error:
+    // var ref = &x  // ERROR: Borrowing moved value
+    print("y = {y}")
+}
+
+fn test_undefined_variable() {
+    print("value = {undefined_var}")  // ERROR: Undefined variable
+}
+
+fn test_scope_errors() {
+    {
+        var inner_var = 500
+        print("Inner: {inner_var}")
+    }
+    // ERROR: inner_var is out of scope here
+    print("Outer: {inner_var}")
+}
+
+fn test_double_allocation() {
+    var ptr = 600  // Simulate pointer allocation
+    ptr = 700  // ERROR: Memory leak - previous allocation lost
+    print("ptr = {ptr}")
+}
+
+fn test_null_dereference() {
+    var ptr = 0  // Simulate null pointer
+    // ERROR: Dereferencing null pointer
+    print("ptr value = {ptr}")
+}
+
+fn test_buffer_overflow() {
+    var array = [1, 2, 3]
+    // ERROR: Buffer overflow - accessing index 10
+    // var value = array[10]
+    print("array = {array}")
+}
+
+fn test_use_before_init() {
+    var uninit_var  // ERROR: Use before initialization
+    print("uninit = {uninit_var}")
+}
+
+fn test_memory_leak() {
+    var leaked = 800  // Allocated but never used/freed
+    var normal = 900
+    print("normal = {normal}")
+    // leaked goes out of scope without being freed - ERROR: Memory leak
+}
+
+fn main() {
+    print("=== Testing Memory Bug Detection ===")
+    test_use_after_move()
+    test_double_drop()
+    test_drop_after_move()
+    test_escape_analysis()
+    test_borrow_moved_value()
+    test_undefined_variable()
+    test_scope_errors()
+    test_double_allocation()
+    test_null_dereference()
+    test_buffer_overflow()
+    test_use_before_init()
+    test_memory_leak()
+    print("=== Memory Bug Tests Complete ===")
+}

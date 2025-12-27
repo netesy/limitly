@@ -3,6 +3,7 @@
 #include "../backend/types.hh"
 #include "../frontend/ast.hh"
 #include "../lir/lir.hh"
+#include "../memory/model.hh"
 #include <memory>
 #include <vector>
 #include <unordered_map>
@@ -10,7 +11,7 @@
 
 // =============================================================================
 // TYPE CHECKER - Runs BEFORE LIR generation
-// Implements the mental model: AST -> Typed AST -> LIR (typed) -> JIT
+// Implements the mental model: AST -> Typed AST (with memory safety) -> LIR (typed) -> JIT
 // =============================================================================
 
 class TypeChecker {
@@ -20,6 +21,21 @@ private:
     
     // Symbol table for variable types
     std::unordered_map<std::string, TypePtr> variable_types;
+    
+    // Memory safety tracking
+    struct VariableInfo {
+        TypePtr type;
+        std::string memory_state;  // "owned", "moved", "dropped", "borrowed"
+        std::size_t region_id;
+        std::size_t alloc_id;
+    };
+    std::unordered_map<std::string, VariableInfo> variable_memory_info;
+    
+    // Region and generation tracking for compile-time memory model
+    std::size_t current_region_id = 0;
+    std::size_t current_generation = 0;
+    std::size_t next_alloc_id = 0;
+    std::vector<std::size_t> region_stack;
     
     // Function signatures
     struct FunctionSignature {
@@ -35,6 +51,35 @@ private:
     TypePtr current_return_type = nullptr;
     bool in_loop = false;
     
+    // Source context for error reporting
+    std::string current_source;
+    std::string current_file_path;
+    
+    // Linear type reference system
+    struct LinearTypeInfo {
+        bool is_moved = false;
+        int move_line = 0;
+        int access_count = 0;
+        std::size_t current_generation = 0;
+        std::set<std::string> references;
+        std::set<std::string> mutable_references;  // Track mutable aliases separately
+    };
+    
+    struct ReferenceInfo {
+        std::string target_linear_var;
+        int creation_line = 0;
+        bool is_valid = true;
+        std::size_t created_generation = 0;
+        bool is_mutable = false;
+        int creation_scope = 0;  // Track scope level where reference was created
+    };
+    
+    std::unordered_map<std::string, LinearTypeInfo> linear_types;
+    std::unordered_map<std::string, ReferenceInfo> references;
+    
+    // Scope tracking for lifetime analysis
+    int current_scope_level = 0;
+    
 public:
     explicit TypeChecker(TypeSystem& ts) : type_system(ts) {}
     
@@ -48,6 +93,12 @@ public:
     // Get the type system (for LIR generator)
     TypeSystem& get_type_system() { return type_system; }
     
+    // Set source context for error reporting
+    void set_source_context(const std::string& source, const std::string& file_path) {
+        current_source = source;
+        current_file_path = file_path;
+    }
+    
     // Register a builtin function
     void register_builtin_function(const std::string& name, 
                                   const std::vector<TypePtr>& param_types,
@@ -58,11 +109,48 @@ private:
     void add_error(const std::string& message, int line = 0);
     void add_type_error(const std::string& expected, const std::string& found, int line = 0);
     
+    // Linear type reference methods
+    void check_linear_type_access(const std::string& var_name, int line);
+    void create_reference(const std::string& linear_var, const std::string& ref_var, int line, bool is_mutable = false);
+    void move_linear_type(const std::string& var_name, int line);
+    void check_reference_validity(const std::string& ref_name, int line);
+    
+    // Mutable aliasing detection
+    void check_mutable_aliasing(const std::string& linear_var, const std::string& ref_var, bool is_mutable, int line);
+    
+    // Lifetime analysis
+    void check_scope_escape(const std::string& ref_name, int target_scope, int line);
+    
     // Symbol table management
     void enter_scope();
     void exit_scope();
     void declare_variable(const std::string& name, TypePtr type);
     TypePtr lookup_variable(const std::string& name);
+    
+    // Memory safety methods
+    void enter_memory_region();
+    void exit_memory_region();
+    void declare_variable_memory(const std::string& name, TypePtr type);
+    void check_variable_use(const std::string& name, int line);
+    void check_variable_move(const std::string& name);
+    void check_variable_drop(const std::string& name);
+    void check_borrow_safety(const std::string& var_name);
+    void check_escape_analysis(const std::string& var_name, const std::string& target_context);
+    void check_memory_leaks(int line);
+    void check_use_after_free(const std::string& name, int line);
+    void check_dangling_pointer(const std::string& name, int line);
+    void check_double_free(const std::string& name, int line);
+    void check_multiple_owners(const std::string& name, int line);
+    void check_buffer_overflow(const std::string& array_name, const std::string& index_expr, int line);
+    void check_uninitialized_use(const std::string& name, int line);
+    void check_invalid_type(const std::string& var_name, TypePtr expected_type, TypePtr actual_type, int line);
+    void check_misalignment(const std::string& ptr_name, int line);
+    void check_heap_corruption(const std::string& operation, int line);
+    void check_race_condition(const std::string& shared_var, int line);
+    bool is_variable_alive(const std::string& name);
+    void mark_variable_moved(const std::string& name);
+    void mark_variable_dropped(const std::string& name);
+    void mark_variable_initialized(const std::string& name);
     
     // Type checking methods
     TypePtr check_expression(std::shared_ptr<AST::Expression> expr);
@@ -163,7 +251,7 @@ struct TypeCheckResult {
 
 namespace TypeCheckerFactory {
     // Create and run type checker
-    TypeCheckResult check_program(std::shared_ptr<AST::Program> program);
+    TypeCheckResult check_program(std::shared_ptr<AST::Program> program, const std::string& source = "", const std::string& file_path = "");
     
     // Create type checker instance (for testing)
     std::unique_ptr<TypeChecker> create(TypeSystem& type_system);

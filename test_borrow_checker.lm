@@ -1,0 +1,57 @@
+// Test file for borrow checker without borrow checker
+// Demonstrates compile-time memory safety
+
+fn test_borrow_rules() {
+    var data = 42
+    
+    // Immutable borrow (allowed)
+    var ref1 = data
+    var ref2 = data  // Multiple immutable borrows allowed
+    
+    print("data = {data}, ref1 = {ref1}, ref2 = {ref2}")
+    
+    // Mutable borrow (should be exclusive)
+    var mutable_ref = data  // This would conflict with existing borrows in real borrow checker
+    print("mutable_ref = {mutable_ref}")
+}
+
+fn test_move_semantics() {
+    var source = "hello"
+    var target = source  // Move operation
+    
+    // Using source after move should be an error
+    // print("source = {source}")  // This would be use-after-move
+    print("target = {target}")
+}
+
+fn test_lifetime_safety() {
+    var outer = 100
+    
+    {
+        var inner = outer  // Borrow from outer scope
+        print("inner = {inner}")
+    } // inner goes out of scope
+    
+    print("outer = {outer}")  // outer should still be valid
+}
+
+fn test_shared_references() {
+    var shared_data = [1, 2, 3]
+    
+    // Multiple shared references should be allowed
+    var share1 = shared_data
+    var share2 = shared_data
+    var share3 = shared_data
+    
+    print("shared_data = {shared_data}")
+    print("share1 = {share1}, share2 = {share2}, share3 = {share3}")
+}
+
+fn main() {
+    print("=== Borrow Checker Tests ===")
+    test_borrow_rules()
+    test_move_semantics()
+    test_lifetime_safety()
+    test_shared_references()
+    print("=== All Tests Complete ===")
+}

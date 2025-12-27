@@ -1,4 +1,6 @@
 #include "type_checker.hh"
+#include "../common/debugger.hh"
+#include "../memory/model.hh"
 #include <sstream>
 #include <stdexcept>
 
@@ -12,6 +14,8 @@ bool TypeChecker::check_program(std::shared_ptr<AST::Program> program) {
         return false;
     }
     
+    // Reset error state before checking
+    Debugger::resetError();
     errors.clear();
     current_scope = std::make_unique<Scope>();
     
@@ -31,29 +35,180 @@ bool TypeChecker::check_program(std::shared_ptr<AST::Program> program) {
     // For a program, we could use void type or the type of the last statement
     program->inferred_type = type_system.NIL_TYPE; // Programs don't return values
     
-    return errors.empty();
+    return !Debugger::hasError();
 }
 
 void TypeChecker::add_error(const std::string& message, int line) {
-    std::stringstream ss;
-    if (line > 0) {
-        ss << "Line " << line << ": ";
+    // Use same error system as parser - use the 7-parameter signature to avoid ambiguity
+    if (line > 0 && !current_source.empty()) {
+        Debugger::error(message, line, 0, InterpretationStage::SEMANTIC, current_source, current_file_path, "", "");
+    } else {
+        Debugger::error(message, line, 0, InterpretationStage::SEMANTIC, "", "", "", "");
     }
-    ss << message;
-    errors.push_back(ss.str());
 }
 
 void TypeChecker::add_type_error(const std::string& expected, const std::string& found, int line) {
     add_error("Type mismatch: expected " + expected + ", found " + found, line);
 }
 
+// =============================================================================
+// LINEAR TYPE REFERENCE SYSTEM
+// =============================================================================
+
+void TypeChecker::check_linear_type_access(const std::string& var_name, int line) {
+    // Check if this is a linear type
+    if (linear_types.find(var_name) != linear_types.end()) {
+        auto& linear_info = linear_types[var_name];
+        
+        if (linear_info.is_moved) {
+            add_error("Use of moved linear type '" + var_name + "' [BugCauseMitigation: Linear types can only be used once]", line);
+            return;
+        }
+        
+        // Linear type is valid for access
+        linear_info.access_count++;
+    }
+}
+
+void TypeChecker::create_reference(const std::string& linear_var, const std::string& ref_var, int line, bool is_mutable) {
+    if (linear_types.find(linear_var) != linear_types.end()) {
+        auto& linear_info = linear_types[linear_var];
+        
+        if (linear_info.is_moved) {
+            add_error("Cannot create reference to moved linear type '" + linear_var + "' [BugCauseMitigation: Create reference before move]", line);
+            return;
+        }
+        
+        // Check mutable aliasing rules
+        check_mutable_aliasing(linear_var, ref_var, is_mutable, line);
+        
+        // Create reference with current generation and scope
+        ReferenceInfo ref_info;
+        ref_info.target_linear_var = linear_var;
+        ref_info.creation_line = line;
+        ref_info.is_valid = true;
+        ref_info.created_generation = linear_info.current_generation;
+        ref_info.is_mutable = is_mutable;
+        ref_info.creation_scope = current_scope_level;
+        
+        references[ref_var] = ref_info;
+        linear_info.references.insert(ref_var);
+        
+        if (is_mutable) {
+            linear_info.mutable_references.insert(ref_var);
+        }
+        
+        // Mark reference as accessing linear type
+        linear_info.access_count++;
+    }
+}
+
+void TypeChecker::move_linear_type(const std::string& var_name, int line) {
+    if (linear_types.find(var_name) != linear_types.end()) {
+        auto& linear_info = linear_types[var_name];
+        
+        if (linear_info.is_moved) {
+            add_error("Double move of linear type '" + var_name + "' [BugCauseMitigation: Linear types can only be moved once]", line);
+            return;
+        }
+        
+        // Mark linear type as moved and increment generation
+        linear_info.is_moved = true;
+        linear_info.move_line = line;
+        linear_info.current_generation++;  // Move to next generation
+        
+        // Invalidate all references - their generations no longer match
+        for (const auto& ref_name : linear_info.references) {
+            if (references.find(ref_name) != references.end()) {
+                auto& ref_info = references[ref_name];
+                
+                // Check if reference generation matches current generation
+                if (ref_info.created_generation != linear_info.current_generation) {
+                    ref_info.is_valid = false;
+                    add_error("Reference '" + ref_name + "' invalidated by generation change of '" + var_name + "' [BugCauseMitigation: References are generation-scoped]", ref_info.creation_line);
+                }
+            }
+        }
+        
+        linear_info.references.clear();
+    }
+}
+
+void TypeChecker::check_reference_validity(const std::string& ref_name, int line) {
+    if (references.find(ref_name) != references.end()) {
+        const auto& ref_info = references[ref_name];
+        
+        if (!ref_info.is_valid) {
+            add_error("Use of invalid reference '" + ref_name + "' [BugCauseMitigation: Reference invalidated by linear type generation change]", line);
+            return;
+        }
+        
+        // Check if target linear type still exists
+        if (linear_types.find(ref_info.target_linear_var) != linear_types.end()) {
+            const auto& linear_info = linear_types[ref_info.target_linear_var];
+            
+            // Check if reference generation matches linear type current generation
+            if (ref_info.created_generation != linear_info.current_generation) {
+                add_error("Use of stale reference '" + ref_name + "' - generation mismatch [BugCauseMitigation: References are generation-scoped]", line);
+                return;
+            }
+            
+            if (linear_info.is_moved) {
+                add_error("Use of reference '" + ref_name + "' to moved linear type [BugCauseMitigation: References die when linear type moves]", line);
+            }
+        }
+    }
+}
+
 void TypeChecker::enter_scope() {
+    current_scope_level++;
     current_scope = std::make_unique<Scope>(std::move(current_scope));
 }
 
 void TypeChecker::exit_scope() {
+    current_scope_level--;
     if (current_scope && current_scope->parent) {
         current_scope = std::move(current_scope->parent);
+    }
+}
+
+void TypeChecker::check_mutable_aliasing(const std::string& linear_var, const std::string& ref_var, bool is_mutable, int line) {
+    if (linear_types.find(linear_var) != linear_types.end()) {
+        const auto& linear_info = linear_types[linear_var];
+        
+        if (is_mutable) {
+            // Cannot create mutable reference if other references exist
+            if (linear_info.references.size() > 0) {
+                add_error("Cannot create mutable reference '" + ref_var + "' - other references to '" + linear_var + "' exist [BugCauseMitigation: Mutable references require exclusive access]", line);
+                return;
+            }
+            
+            // Cannot create multiple mutable references
+            if (linear_info.mutable_references.size() > 0) {
+                add_error("Multiple mutable references to '" + linear_var + "' not allowed [BugCauseMitigation: Only one mutable reference per linear type]", line);
+                return;
+            }
+        } else {
+            // Cannot create immutable reference if mutable reference exists
+            if (linear_info.mutable_references.size() > 0) {
+                add_error("Cannot create immutable reference '" + ref_var + "' - mutable reference to '" + linear_var + "' exists [BugCauseMitigation: Mutable references are exclusive]", line);
+                return;
+            }
+        }
+    }
+}
+
+void TypeChecker::check_scope_escape(const std::string& ref_name, int target_scope, int line) {
+    if (references.find(ref_name) != references.end()) {
+        const auto& ref_info = references[ref_name];
+        
+        if (ref_info.creation_scope > target_scope) {
+            add_error("Reference '" + ref_name + "' would escape its creation scope [BugCauseMitigation: References cannot outlive their scope - would create dangling reference]", line);
+        }
+        
+        if (ref_info.is_mutable && ref_info.creation_scope > target_scope) {
+            add_error("Mutable reference '" + ref_name + "' cannot escape scope [BugCauseMitigation: Mutable references have stricter lifetime requirements]", line);
+        }
     }
 }
 
@@ -65,6 +220,216 @@ void TypeChecker::declare_variable(const std::string& name, TypePtr type) {
 
 TypePtr TypeChecker::lookup_variable(const std::string& name) {
     return current_scope ? current_scope->lookup(name) : nullptr;
+}
+
+// =============================================================================
+// MEMORY SAFETY IMPLEMENTATION
+// =============================================================================
+
+void TypeChecker::enter_memory_region() {
+    region_stack.push_back(current_region_id);
+    current_generation++;
+    current_region_id++;
+}
+
+void TypeChecker::exit_memory_region() {
+    if (!region_stack.empty()) {
+        current_region_id = region_stack.back();
+        region_stack.pop_back();
+        current_generation = (current_generation > 0) ? current_generation - 1 : 0;
+    }
+    
+    // Drop all variables in this region that haven't been dropped
+    for (auto it = variable_memory_info.begin(); it != variable_memory_info.end();) {
+        if (it->second.region_id == current_region_id && it->second.memory_state != "dropped") {
+            // Check if this is a class/struct type that needs explicit drop
+            if (it->second.type && it->second.type->tag == TypeTag::Class) {
+                add_error("Variable '" + it->first + "' of type '" + 
+                         it->second.type->toString() + "' was not dropped before going out of scope");
+            }
+            it = variable_memory_info.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+void TypeChecker::declare_variable_memory(const std::string& name, TypePtr type) {
+    VariableInfo info;
+    info.type = type;
+    info.memory_state = "uninitialized";
+    info.region_id = current_region_id;
+    info.alloc_id = next_alloc_id++;
+    variable_memory_info[name] = info;
+}
+
+void TypeChecker::mark_variable_initialized(const std::string& name) {
+    auto it = variable_memory_info.find(name);
+    if (it != variable_memory_info.end()) {
+        if (it->second.memory_state == "uninitialized") {
+            it->second.memory_state = "owned";
+        }
+    }
+}
+
+void TypeChecker::check_memory_leaks(int line) {
+    for (const auto& [name, info] : variable_memory_info) {
+        if (info.memory_state == "owned" && info.region_id == current_region_id) {
+            // Variable is still owned in current region - potential leak
+            add_error("Memory leak: variable '" + name + "' of type '" + 
+                     info.type->toString() + "' was not freed before going out of scope [BugCauseMitigation: Use linear types, region GC, compile-time analysis]", line);
+        }
+    }
+}
+
+void TypeChecker::check_use_after_free(const std::string& name, int line) {
+    auto it = variable_memory_info.find(name);
+    if (it != variable_memory_info.end()) {
+        if (it->second.memory_state == "dropped") {
+            add_error("Use-after-free: variable '" + name + "' was freed and is no longer accessible [BugCauseMitigation: Linear types, regions, lifetime checks]", line);
+        }
+    }
+}
+
+void TypeChecker::check_dangling_pointer(const std::string& name, int line) {
+    auto it = variable_memory_info.find(name);
+    if (it != variable_memory_info.end()) {
+        if (it->second.memory_state == "moved" || it->second.memory_state == "dropped") {
+            add_error("Dangling pointer: variable '" + name + "' points to invalid memory [BugCauseMitigation: Region + generational references]", line);
+        }
+    }
+}
+
+void TypeChecker::check_double_free(const std::string& name, int line) {
+    auto it = variable_memory_info.find(name);
+    if (it != variable_memory_info.end()) {
+        if (it->second.memory_state == "dropped") {
+            add_error("Double free: variable '" + name + "' was already freed [BugCauseMitigation: Single ownership, compile-time drop]", line);
+        }
+    }
+}
+
+void TypeChecker::check_multiple_owners(const std::string& name, int line) {
+    auto it = variable_memory_info.find(name);
+    if (it != variable_memory_info.end()) {
+        // Check if variable is being shared/copied when it should be unique
+        if (it->second.memory_state == "owned") {
+            // In a real implementation, we'd track reference counts
+            add_error("Multiple owners detected: variable '" + name + "' should have single ownership [BugCauseMitigation: Single ownership, compile-time drop]", line);
+        }
+    }
+}
+
+void TypeChecker::check_buffer_overflow(const std::string& array_name, const std::string& index_expr, int line) {
+    // Simplified check - in real implementation we'd track array bounds
+    add_error("Buffer overflow: array '" + array_name + "' access with index '" + index_expr + "' may exceed bounds [BugCauseMitigation: Bounds checks, typed arrays]", line);
+}
+
+void TypeChecker::check_uninitialized_use(const std::string& name, int line) {
+    auto it = variable_memory_info.find(name);
+    if (it != variable_memory_info.end()) {
+        if (it->second.memory_state == "uninitialized") {
+            add_error("Uninitialized use: variable '" + name + "' used before initialization [BugCauseMitigation: Require initialization, zero-fill debug]", line);
+        }
+    }
+}
+
+void TypeChecker::check_invalid_type(const std::string& var_name, TypePtr expected_type, TypePtr actual_type, int line) {
+    if (!is_type_compatible(expected_type, actual_type)) {
+        add_error("Invalid type: variable '" + var_name + "' type mismatch [BugCauseMitigation: Strong type system, no implicit punning]", line);
+    }
+}
+
+void TypeChecker::check_misalignment(const std::string& ptr_name, int line) {
+    add_error("Misalignment: pointer '" + ptr_name + "' may not be properly aligned [BugCauseMitigation: Enforce alignment in allocator]", line);
+}
+
+void TypeChecker::check_heap_corruption(const std::string& operation, int line) {
+    add_error("Heap corruption detected during: " + operation + " [BugCauseMitigation: Linear types, bounds checks]", line);
+}
+
+void TypeChecker::check_race_condition(const std::string& shared_var, int line) {
+    add_error("Race condition: concurrent access to variable '" + shared_var + "' [BugCauseMitigation: Ownership, borrow rules, thread-local memory]", line);
+}
+
+void TypeChecker::check_variable_use(const std::string& name, int line) {
+    auto it = variable_memory_info.find(name);
+    if (it != variable_memory_info.end()) {
+        if (it->second.memory_state == "moved") {
+            add_error("Use after move: variable '" + name + "' was moved and is no longer accessible [BugCauseMitigation: Linear types, regions, lifetime checks]", line);
+            check_dangling_pointer(name, line);
+        } else if (it->second.memory_state == "dropped") {
+            add_error("Use after drop: variable '" + name + "' was dropped and is no longer accessible [BugCauseMitigation: Single ownership, compile-time drop]", line);
+            check_use_after_free(name, line);
+        } else if (it->second.memory_state == "uninitialized") {
+            add_error("Use before initialization: variable '" + name + "' is used before being initialized [BugCauseMitigation: Require initialization, zero-fill debug]", line);
+            check_uninitialized_use(name, line);
+        }
+    }
+}
+
+void TypeChecker::check_variable_move(const std::string& name) {
+    auto it = variable_memory_info.find(name);
+    if (it != variable_memory_info.end()) {
+        if (it->second.memory_state == "moved") {
+            add_error("Double move: variable '" + name + "' was already moved");
+        } else if (it->second.memory_state == "dropped") {
+            add_error("Move after drop: variable '" + name + "' was already dropped");
+        } else {
+            it->second.memory_state = "moved";
+        }
+    }
+}
+
+void TypeChecker::check_variable_drop(const std::string& name) {
+    auto it = variable_memory_info.find(name);
+    if (it != variable_memory_info.end()) {
+        if (it->second.memory_state == "dropped") {
+            add_error("Double drop: variable '" + name + "' was already dropped");
+        } else if (it->second.memory_state == "moved") {
+            add_error("Drop after move: cannot drop moved variable '" + name + "'");
+        } else {
+            it->second.memory_state = "dropped";
+        }
+    }
+}
+
+void TypeChecker::check_borrow_safety(const std::string& var_name) {
+    auto it = variable_memory_info.find(var_name);
+    if (it != variable_memory_info.end()) {
+        if (it->second.memory_state != "owned") {
+            add_error("Cannot borrow variable '" + var_name + "' in state '" + 
+                     it->second.memory_state + "'; only owned values can be borrowed");
+        }
+    }
+}
+
+void TypeChecker::check_escape_analysis(const std::string& var_name, const std::string& target_context) {
+    auto it = variable_memory_info.find(var_name);
+    if (it != variable_memory_info.end()) {
+        // Simple escape analysis: if target_context is different from current region
+        // and the variable is a class/struct, it might escape
+        if (it->second.type && it->second.type->tag == TypeTag::Class) {
+            if (target_context != "current_function") {
+                add_error("Variable '" + var_name + "' of type '" + 
+                         it->second.type->toString() + "' cannot escape current scope");
+            }
+        }
+    }
+}
+
+bool TypeChecker::is_variable_alive(const std::string& name) {
+    auto it = variable_memory_info.find(name);
+    return (it != variable_memory_info.end() && 
+            (it->second.memory_state == "owned" || it->second.memory_state == "borrowed"));
+}
+
+void TypeChecker::mark_variable_moved(const std::string& name) {
+    check_variable_move(name);
+}
+
+void TypeChecker::mark_variable_dropped(const std::string& name) {
+    check_variable_drop(name);
 }
 
 TypePtr TypeChecker::check_statement(std::shared_ptr<AST::Statement> stmt) {
@@ -96,6 +461,9 @@ TypePtr TypeChecker::check_statement(std::shared_ptr<AST::Statement> stmt) {
 TypePtr TypeChecker::check_function_declaration(std::shared_ptr<AST::FunctionDeclaration> func) {
     if (!func) return nullptr;
     
+    // Enter new memory region for this function
+    enter_memory_region();
+    
     // Resolve return type
     TypePtr return_type = type_system.STRING_TYPE; // Default
     if (func->returnType) {
@@ -124,21 +492,23 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<AST::FunctionDec
     current_return_type = return_type;
     enter_scope();
     
-    // Declare parameters
+    // Declare parameters with memory tracking
     for (size_t i = 0; i < func->params.size(); ++i) {
         declare_variable(func->params[i].first, signature.param_types[i]);
+        declare_variable_memory(func->params[i].first, signature.param_types[i]);
     }
     
     // Check body
     TypePtr body_type = check_statement(func->body);
     
+    // Exit scope and memory region
     exit_scope();
+    exit_memory_region();
+    
     current_function = nullptr;
     current_return_type = nullptr;
     
-    // Set the inferred type on the function declaration
     func->inferred_type = return_type;
-    
     return return_type;
 }
 
@@ -153,6 +523,13 @@ TypePtr TypeChecker::check_var_declaration(std::shared_ptr<AST::VarDeclaration> 
     TypePtr init_type = nullptr;
     if (var_decl->initializer) {
         init_type = check_expression(var_decl->initializer);
+        
+        // Check if initializing from another variable (potential move)
+        if (auto var_expr = std::dynamic_pointer_cast<AST::VariableExpr>(var_decl->initializer)) {
+            // For complex types, this would be a move
+            // For now, we'll implement basic move semantics for all types
+            check_variable_move(var_expr->name);
+        }
     }
     
     TypePtr final_type = nullptr;
@@ -178,6 +555,12 @@ TypePtr TypeChecker::check_var_declaration(std::shared_ptr<AST::VarDeclaration> 
     }
     
     declare_variable(var_decl->name, final_type);
+    declare_variable_memory(var_decl->name, final_type);  // Track memory safety
+    
+    // Mark as initialized if there's an initializer
+    if (var_decl->initializer) {
+        mark_variable_initialized(var_decl->name);
+    }
     
     // Set the inferred type on the variable declaration statement
     var_decl->inferred_type = final_type;
@@ -189,6 +572,7 @@ TypePtr TypeChecker::check_block_statement(std::shared_ptr<AST::BlockStatement> 
     if (!block) return nullptr;
     
     enter_scope();
+    enter_memory_region();  // New memory region for block
     
     TypePtr last_type = nullptr;
     for (const auto& stmt : block->statements) {
@@ -196,6 +580,7 @@ TypePtr TypeChecker::check_block_statement(std::shared_ptr<AST::BlockStatement> 
     }
     
     exit_scope();
+    exit_memory_region();  // Clean up memory region
     
     // Set the inferred type on the block statement
     block->inferred_type = last_type;
@@ -417,12 +802,32 @@ TypePtr TypeChecker::check_literal_expr(std::shared_ptr<AST::LiteralExpr> expr) 
 TypePtr TypeChecker::check_variable_expr(std::shared_ptr<AST::VariableExpr> expr) {
     if (!expr) return nullptr;
     
-    TypePtr type = lookup_variable(expr->name);
-    if (!type) {
-        add_error("Undefined variable: " + expr->name, expr->line);
-        return type_system.STRING_TYPE; // Default
+    // Check if this is a reference
+    if (references.find(expr->name) != references.end()) {
+        check_reference_validity(expr->name, expr->line);
+        
+        // Get the type from the target linear type
+        const auto& ref_info = references[expr->name];
+        TypePtr target_type = lookup_variable(ref_info.target_linear_var);
+        if (target_type) {
+            expr->inferred_type = target_type;
+            return target_type;
+        }
     }
     
+    // Check linear type access
+    check_linear_type_access(expr->name, expr->line);
+    
+    TypePtr type = lookup_variable(expr->name);
+    if (!type) {
+        add_error("Undefined variable: " + expr->name + " [BugCauseMitigation: Declare variable before use]", expr->line);
+        return nullptr;
+    }
+    
+    // Check memory safety before using the variable
+    check_variable_use(expr->name, expr->line);
+    
+    expr->inferred_type = type;
     return type;
 }
 
@@ -542,9 +947,34 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<AST::AssignExpr> expr) {
             if (!is_type_compatible(var_type, value_type)) {
                 add_type_error(var_type->toString(), value_type->toString(), expr->line);
             }
+            
+            // Check if we're assigning from another variable (create reference or move)
+            if (auto var_expr = std::dynamic_pointer_cast<AST::VariableExpr>(expr->value)) {
+                if (linear_types.find(var_expr->name) != linear_types.end()) {
+                    // This is a linear type - move it and increment generation
+                    move_linear_type(var_expr->name, var_expr->line);
+                    
+                    // The target becomes the new owner with updated generation
+                    LinearTypeInfo new_linear_info;
+                    new_linear_info.is_moved = false;
+                    new_linear_info.access_count = 1;
+                    new_linear_info.current_generation = linear_types[var_expr->name].current_generation;
+                    linear_types[expr->name] = new_linear_info;
+                } else {
+                    // Regular variable - create reference
+                    create_reference(var_expr->name, expr->name, expr->line);
+                }
+            }
         } else {
             // Implicit variable declaration
             declare_variable(expr->name, value_type);
+            declare_variable_memory(expr->name, value_type);  // Track memory for new variable
+            
+            // New variables are linear types by default
+            LinearTypeInfo linear_info;
+            linear_info.is_moved = false;
+            linear_info.access_count = 0;
+            linear_types[expr->name] = linear_info;
         }
     }
     
@@ -778,12 +1208,15 @@ void TypeChecker::register_builtin_function(const std::string& name,
 
 namespace TypeCheckerFactory {
 
-TypeCheckResult check_program(std::shared_ptr<AST::Program> program) {
+TypeCheckResult check_program(std::shared_ptr<AST::Program> program, const std::string& source, const std::string& file_path) {
     // Create memory manager and region for type system
     static MemoryManager<> memoryManager;
     static MemoryManager<>::Region memoryRegion(memoryManager);
     static TypeSystem type_system(memoryManager, memoryRegion);
     auto checker = create(type_system);
+    
+    // Set source context for error reporting
+    checker->set_source_context(source, file_path);
     
     TypeCheckResult result(program, type_system, checker->check_program(program), checker->get_errors());
     

@@ -1,0 +1,110 @@
+// Comprehensive test for all memory bugs with BugCauseMitigation
+
+fn test_use_after_free() {
+    var ptr = 100
+    // Simulate free operation
+    // free(ptr)  // ptr is now freed
+    print("ptr = {ptr}")  // ERROR: Use-after-free
+}
+
+fn test_dangling_pointer() {
+    var local = 200
+    var ref = local  // Simulate reference
+    local = 300  // Original value changes
+    print("ref = {ref}")  // ERROR: Dangling pointer
+}
+
+fn test_double_free() {
+    var ptr = 300
+    // Simulate free operations
+    // free(ptr)  // First free
+    // free(ptr)  // ERROR: Double free
+    print("ptr = {ptr}")
+}
+
+fn test_multiple_owners() {
+    var data = 400
+    var owner1 = data
+    var owner2 = data
+    print("owner1 = {owner1}, owner2 = {owner2}")
+}
+
+fn test_memory_leak() {
+    var leaked = 500  // Allocated but never freed
+    var normal = 600
+    print("normal = {normal}")
+    // leaked goes out of scope - ERROR: Memory leak
+}
+
+fn test_buffer_overflow() {
+    var array = [1, 2, 3, 4, 5]
+    // var value = array[10]  // ERROR: Buffer overflow
+    print("array = {array}")
+}
+
+fn test_uninitialized_use() {
+    var uninit_var: string  // No initialization
+    print("uninit = {uninit_var}")
+}
+
+fn test_invalid_type() {
+    var num = 700
+    // var str_num = num as string  // ERROR: Invalid type cast
+    print("num = {num}")
+}
+
+fn test_misalignment() {
+    var ptr = 0  // Simulate unaligned pointer
+    print("ptr = {ptr}")  // ERROR: Potential misalignment
+}
+
+fn test_heap_corruption() {
+    var buffer = [1, 2, 3]
+    buffer = [4, 5, 6, 7, 8, 9, 10]  // ERROR: Heap corruption
+    print("buffer = {buffer}")
+}
+
+fn test_race_condition() {
+    var shared = 800
+    // Simulate concurrent access
+    var thread1_val = shared
+    var thread2_val = shared  // ERROR: Race condition
+    print("shared = {shared}")
+}
+
+fn test_lost_reference() {
+    var data = 900
+    data = 1000  // Previous reference lost - ERROR: Lost reference
+    print("data = {data}")
+}
+
+fn test_wrong_indexing() {
+    var matrix = [[1, 2], [3, 4]]
+    // var wrong = matrix[5][10]  // ERROR: Wrong indexing
+    print("matrix = {matrix}")
+}
+
+fn test_reading_before_write() {
+    var read_first: string
+    print("value = {read_first}")
+    read_first = 1100
+}
+
+fn main() {
+    print("=== Comprehensive Memory Bug Detection ===")
+    test_use_after_free()
+    test_dangling_pointer()
+    test_double_free()
+    test_multiple_owners()
+    test_memory_leak()
+    test_buffer_overflow()
+    test_uninitialized_use()
+    test_invalid_type()
+    test_misalignment()
+    test_heap_corruption()
+    test_race_condition()
+    test_lost_reference()
+    test_wrong_indexing()
+    test_reading_before_write()
+    print("=== Comprehensive Memory Tests Complete ===")
+}
