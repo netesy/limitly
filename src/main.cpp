@@ -67,14 +67,6 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         Parser parser(scanner, useCSTMode);
         std::shared_ptr<AST::Program> ast = parser.parse();
         
-        // Print AST before optimization if debug mode is enabled
-        if (enableDebug || jitDebug) {
-            std::cout << "=== AST Before Optimization ===\n";
-            ASTPrinter printer;
-            printer.process(ast);
-            std::cout << std::endl;
-        }
-        
         // AST Optimization (before type checking)
         AST::ASTOptimizer optimizer;
         ast = optimizer.optimize(ast);
@@ -112,12 +104,8 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         }
         
         // Type checking
-        auto type_check_result = TypeCheckerFactory::check_program(ast);
+        auto type_check_result = TypeCheckerFactory::check_program(ast, source, filename);
         if (!type_check_result.success) {
-            std::cerr << "Type checking errors:\n";
-            for (const auto& error : type_check_result.errors) {
-                std::cerr << "  " << error << std::endl;
-            }
             return 1;
         }
 
