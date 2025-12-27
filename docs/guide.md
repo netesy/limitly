@@ -60,7 +60,8 @@ Welcome to the official guide for the Limit programming language. This document 
     *   [Channels](#channels)
     *   [Async/Await](#asyncawait)
     *   [Atomics](#atomics)
-- [Tasks](#tasks)
+    *   [Tasks](#tasks)
+    *   [Workers](#workers)
 
 ---
 
@@ -428,6 +429,23 @@ fn greet(p: Person) {
 greet({name: "Alice", age: 30}); // Output: Alice is 30 years old.
 ```
 
+You can also create object literals with a constructor name, which is particularly useful for enums with associated data.
+
+```limit
+enum Option {
+    Some(any),
+    None
+}
+
+var my_option = Some { value: 42 };
+
+match (my_option) {
+    Some { value: v } => { print("The value is {v}"); },
+    None => { print("No value"); }
+}
+// Output: The value is 42
+```
+
 #### Destructuring Dictionaries
 
 You can destructure dictionaries to bind values to variables based on their keys. You can also capture the remaining key-value pairs using the `...` syntax.
@@ -717,6 +735,35 @@ class Circle : Shape {
     fn area(): float {
         return 3.14 * self.radius * self.radius;
     }
+}
+```
+
+### Workers
+
+A `worker` is a long-running task that continuously processes data from a channel until the channel is closed. Workers are useful for creating data processing pipelines.
+
+```limit
+var data_stream = channel();
+var results = channel();
+
+concurrent {
+    // This worker will process data from the `data_stream` channel
+    worker(data in data_stream) {
+        var processed_data = data * 2;
+        results.send(processed_data);
+    }
+
+    // This task sends data to the worker
+    task {
+        for (var i = 0; i < 5; i += 1) {
+            data_stream.send(i);
+        }
+        data_stream.close(); // Close the channel to signal the worker to stop
+    }
+}
+
+iter (result in results) {
+    print("Result: {result}");
 }
 ```
 
