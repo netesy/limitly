@@ -272,17 +272,33 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 return 1;
             }
             
-            // Execute using register interpreter
+            // Execute using register interpreter with the new LIRFunctionManager
             try {
-                register_vm.execute_function(*lir_function);
+                // Register the main function in LIRFunctionManager if it exists
+                std::shared_ptr<LIR::LIRFunction> main_lir_func;
+                if (lir_function) {
+                    auto& func_manager = LIR::LIRFunctionManager::getInstance();
+                    
+                    // Convert the old LIR function to new LIRFunction format
+                    std::vector<LIR::LIRParameter> main_params;
+                    main_lir_func = func_manager.createFunction("main", main_params, LIR::Type::I64, nullptr);
+                    main_lir_func->setInstructions(lir_function->instructions);
+                    
+                    std::cout << "[DEBUG] Registered main function in LIRFunctionManager\n";
+                    
+                    register_vm.execute_lir_function(*main_lir_func);
+                } else {
+                    std::cerr << "No LIR function generated\n";
+                    return 1;
+                }
                 
                 // Check if the function has an explicit return statement
                 // For scripts, we only print the return value if there's an explicit return
                 bool should_print_result = false;
-                if (!lir_function->instructions.empty()) {
+                if (main_lir_func && !main_lir_func->getInstructions().empty()) {
                     // Look for a Return instruction (explicit return)
                     // Ret instruction is used for implicit returns
-                    for (const auto& inst : lir_function->instructions) {
+                    for (const auto& inst : main_lir_func->getInstructions()) {
                         if (inst.op == LIR::LIR_Op::Return) {
                             should_print_result = true;
                             break;

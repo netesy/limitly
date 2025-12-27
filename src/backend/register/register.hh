@@ -2,6 +2,7 @@
 #define REGISTER_H
 
 #include "../../lir/lir.hh"
+#include "../../lir/functions.hh"
 #include "../types.hh"
 #include "../memory.hh"
 #include <vector>
@@ -125,6 +126,9 @@ public:
     void execute_instructions(const LIR::LIR_Function& function, size_t start_pc, size_t end_pc);
     // Main execution method
     void execute_function(const LIR::LIR_Function& function);
+    
+    // Execute LIRFunction (new method)
+    void execute_lir_function(const LIR::LIRFunction& function);
     
     // Register access
     inline const RegisterValue& get_register(LIR::Reg reg) const {

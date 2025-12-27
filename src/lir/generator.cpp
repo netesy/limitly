@@ -73,7 +73,18 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const TypeCheckResult&
     return result;
 }
 
-std::unique_ptr<LIR_Function> Generator::generate_function(AST::FunctionDeclaration& fn) {
+void Generator::generate_function(AST::FunctionDeclaration& fn) {
+    std::cout << "[DEBUG] generate_function called for: " << fn.name << std::endl;
+    
+    auto& func_manager = LIRFunctionManager::getInstance();
+    
+    // Pre-register a placeholder for recursive calls
+    if (!func_manager.hasFunction(fn.name)) {
+        std::vector<LIRParameter> empty_params;
+        auto placeholder = func_manager.createFunction(fn.name, empty_params, Type::I64, nullptr);
+        std::cout << "[DEBUG] Pre-registered placeholder for: " << fn.name << std::endl;
+    }
+    
     // Create function with parameters
     current_function_ = std::make_unique<LIR_Function>(fn.name, fn.params.size());
     next_register_ = fn.params.size();
@@ -109,9 +120,27 @@ std::unique_ptr<LIR_Function> Generator::generate_function(AST::FunctionDeclarat
     exit_scope();
     exit_memory_region();
     
+    // Convert LIR_Function to LIRFunction and update the registration
     auto result = std::move(current_function_);
     current_function_ = nullptr;
-    return result;
+    
+    // Create proper LIRFunction from our LIR_Function
+    std::vector<LIRParameter> params;
+    for (const auto& param : fn.params) {
+        LIRParameter lir_param;
+        lir_param.name = param.first;
+        // Convert type - for now use I64 as default
+        lir_param.type = Type::I64;
+        params.push_back(lir_param);
+    }
+    
+    // Create function with I64 return type for now
+    auto lir_func = func_manager.createFunction(fn.name, params, Type::I64, nullptr);
+    
+    // Copy the instructions from our LIR_Function
+    lir_func->setInstructions(result->instructions);
+    
+    std::cout << "[DEBUG] Function registered with LIRFunctionManager: " << fn.name << std::endl;
 }
 
 Reg Generator::allocate_register() {
@@ -1187,15 +1216,42 @@ Reg Generator::emit_call_expr(AST::CallExpr& expr) {
                 set_register_abi_type(result, language_type_to_abi_type(any_type));
             }
             
-            // Generate builtin call instruction with function ID
-            // For now, use a special ID for builtins (negative numbers)
-            int32_t builtin_id = -1; // Will be resolved by function name
+            // Generate builtin call instruction with negative ID
+            // Use negative IDs to distinguish from user functions
+            int32_t builtin_id = -1; // Will be resolved by function name in JIT
             emit_instruction(LIR_Inst(LIR_Op::Call, result, static_cast<Reg>(arg_regs.size()), static_cast<Reg>(builtin_id)));
             
             return result;
             
         } else if (function_table_.find(func_name) != function_table_.end()) {
             std::cout << "[DEBUG] LIR Generator: Generating call to user function '" << func_name << "'" << std::endl;
+            
+            // Get function index from LIRFunctionManager
+            auto& func_manager = LIRFunctionManager::getInstance();
+            auto function_names = func_manager.getFunctionNames();
+            
+            // Debug: Print all registered functions
+            std::cout << "[DEBUG] Registered functions: ";
+            for (size_t i = 0; i < function_names.size(); ++i) {
+                std::cout << "[" << i << "]:" << function_names[i] << " ";
+            }
+            std::cout << std::endl;
+            
+            // Find the index of this function
+            int32_t func_index = -1;
+            for (size_t i = 0; i < function_names.size(); ++i) {
+                if (function_names[i] == func_name) {
+                    func_index = static_cast<int32_t>(i);
+                    break;
+                }
+            }
+            
+            if (func_index == -1) {
+                report_error("Function not found in LIRFunctionManager: " + func_name);
+                return 0;
+            }
+            
+            std::cout << "[DEBUG] Calling function '" << func_name << "' with index " << func_index << std::endl;
             
             // Evaluate arguments and store them in registers
             std::vector<Reg> arg_regs;
@@ -1217,8 +1273,8 @@ Reg Generator::emit_call_expr(AST::CallExpr& expr) {
                 set_register_abi_type(result, language_type_to_abi_type(any_type));
             }
             
-            // Generate call instruction - function will be resolved by JIT
-            emit_instruction(LIR_Inst(LIR_Op::Call, result, static_cast<Reg>(arg_regs.size()), static_cast<Reg>(0)));
+            // Generate call instruction with function index
+            emit_instruction(LIR_Inst(LIR_Op::Call, result, static_cast<Reg>(arg_regs.size()), static_cast<Reg>(func_index)));
             
             return result;
             
@@ -3025,14 +3081,17 @@ void Generator::collect_function_signature(AST::FunctionDeclaration& stmt) {
 }
 
 void Generator::lower_function_bodies(const TypeCheckResult& type_check_result) {
+    std::cout << "[DEBUG] Starting lower_function_bodies" << std::endl;
     for (const auto& stmt : type_check_result.program->statements) {
         if (auto func_stmt = dynamic_cast<AST::FunctionDeclaration*>(stmt.get())) {
+            std::cout << "[DEBUG] Lowering function body: " << func_stmt->name << std::endl;
             lower_function_body(*func_stmt);
         }
     }
     
     // Also lower task bodies by searching through all statements
     lower_task_bodies_recursive(type_check_result.program->statements);
+    std::cout << "[DEBUG] Finished lower_function_bodies" << std::endl;
 }
 
 void Generator::lower_task_bodies_recursive(const std::vector<std::shared_ptr<AST::Statement>>& statements) {
@@ -3066,57 +3125,15 @@ void Generator::lower_task_bodies_recursive(const std::vector<std::shared_ptr<AS
 }
 
 void Generator::lower_function_body(AST::FunctionDeclaration& stmt) {
-    // Create separate LIR function for this function body
-    auto func = std::make_unique<LIR_Function>(stmt.name, stmt.params.size());
+    // Use generate_function to create and register the function properly
+    std::cout << "[DEBUG] Lowering and registering function: " << stmt.name << std::endl;
+    generate_function(stmt);
     
-    // Save current context
-    auto saved_function = std::move(current_function_);
-    auto saved_next_register = next_register_;
-    auto saved_scope_stack = scope_stack_;
-    auto saved_register_types = register_types_;
-    
-    // Set up function context
-    current_function_ = std::move(func);
-    next_register_ = stmt.params.size();  // Start after parameters
-    scope_stack_.clear();
-    register_types_.clear();
-    
-    // Enter function scope
-    enter_scope();
-    
-    // Bind parameters to registers (no explicit param instructions needed)
-    for (size_t i = 0; i < stmt.params.size(); ++i) {
-        bind_variable(stmt.params[i].first, static_cast<Reg>(i));
-        set_register_type(static_cast<Reg>(i), nullptr);
-    }
-    
-    // Emit function body from AST
-    if (stmt.body) {
-        emit_stmt(*stmt.body);
-    }
-    
-    // Ensure function has a return instruction
-    if (current_function_->instructions.empty() || 
-        !current_function_->instructions.back().isReturn()) {
-        // Implicit return of 0 if no explicit return
-        Reg return_reg = allocate_register();
-        auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
-        ValuePtr zero_val = std::make_shared<Value>(int_type, int64_t(0));
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, return_reg, zero_val));
-        emit_instruction(LIR_Inst(LIR_Op::Ret, return_reg, 0, 0));
-    }
-    
-    exit_scope();
-    
-    // Store the completed LIR function in the function table
+    // The function is now registered with FunctionRegistry
+    // Store a reference in the function table for later use
     auto& func_info = function_table_[stmt.name];
-    func_info.lir_function = std::move(current_function_);
-    
-    // Restore context
-    current_function_ = std::move(saved_function);
-    next_register_ = saved_next_register;
-    scope_stack_ = std::move(saved_scope_stack);
-    register_types_ = std::move(saved_register_types);
+    func_info.lir_function = nullptr; // Not needed since FunctionRegistry manages it
+    std::cout << "[DEBUG] Function lowered and registered: " << stmt.name << std::endl;
 }
 
 void Generator::lower_task_body(AST::TaskStatement& stmt) {
