@@ -462,23 +462,57 @@ OP_JUMPIFFALSE:
     if (!to_bool(registers[pc->a])) {
         DISPATCH_JUMP(pc->imm);
     }
-    DISPATCH();
-
 OP_RETURN:
     return;
 
 OP_CALL:
-    // Handle builtin function calls
+    // Handle user function calls
     {
-        auto int_type = std::make_shared<Type>(TypeTag::Int64);
+        // Get function index from register a
+        auto func_index_value = registers[pc->a];
+        if (!std::holds_alternative<int64_t>(func_index_value)) {
+            registers[pc->dst] = nullptr;
+            DISPATCH();
+        }
         
-        // Create a channel and return its ID
-        auto channel = std::make_unique<Channel>(32); // Default capacity 32
-        uint64_t channel_id = channels.size();
-        channels.push_back(std::move(channel));
-        registers[pc->dst] = static_cast<int64_t>(channel_id);
+        int64_t func_index = std::get<int64_t>(func_index_value);
+        
+        // Get function from LIRFunctionManager
+        auto& func_manager = LIR::LIRFunctionManager::getInstance();
+        auto function_names = func_manager.getFunctionNames();
+        
+        if (func_index >= 0 && func_index < function_names.size()) {
+            auto func_name = function_names[func_index];
+            auto func = func_manager.getFunction(func_name);
+            
+            if (func) {
+                // Save current context
+                auto saved_registers = registers;
+                auto saved_pc = pc;
+                
+                // Set up parameters (move from caller's parameter registers to callee's parameter registers)
+                // For now, assume parameters are already in the right registers
+                
+                // Execute function
+                execute_lir_function(*func);
+                
+                // Get return value from register 0 (standard return register)
+                auto return_value = registers[0];
+                
+                // Restore caller's registers
+                registers = saved_registers;
+                
+                // Set return value in destination register
+                registers[pc->dst] = return_value;
+                
+                DISPATCH();
+            }
+        }
+        
+        // Function not found
+        registers[pc->dst] = nullptr;
+        DISPATCH();
     }
-    DISPATCH();
 
 OP_PRINTINT:
     std::cout << to_int(registers[pc->a]) << std::endl;
@@ -1025,6 +1059,18 @@ void RegisterVM::execute_function(const LIR::LIR_Function& function) {
     
     // Execute from start to end of function
     execute_instructions(function, 0, function.instructions.size());
+}
+
+void RegisterVM::execute_lir_function(const LIR::LIRFunction& function) {
+    // Get the instructions from the LIRFunction
+    const auto& instructions = function.getInstructions();
+    
+    // Create a temporary LIR_Function wrapper to reuse existing execution logic
+    LIR::LIR_Function temp_wrapper(function.getName(), function.getSignature().parameters.size());
+    temp_wrapper.instructions = instructions;
+    
+    // Execute using the existing method
+    execute_function(temp_wrapper);
 }
 
 std::string RegisterVM::to_string(const RegisterValue& value) const {

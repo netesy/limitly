@@ -1190,41 +1190,108 @@ void JITBackend::compile_call(const LIR::LIR_Inst& inst) {
         return;
     }
     
-    // Register the addresses of our runtime helpers
-    // Note: gcc_jit_context_add_builtin_ptr might not be available in this version
-    // The JIT should be able to find the functions since they're imported
-
-    // Use the Register VM to execute the function's LIR instructions directly
-    // This is the "Compile function's LIR instructions to JIT blocks" approach
-    // but instead we use the direct threaded interpreter which is simpler and more reliable
+    // Create a native function that executes the LIR instructions using Register VM
+    std::vector<gccjit::param> empty_params;
     
-    // Create a Register VM instance for this function call
-    // static Register::RegisterVM vm;
+    // Check if we already created this function
+    static std::unordered_map<std::string, gccjit::function> created_functions;
     
-    // // Execute the function using the Register VM
-    // vm.execute_lir_instructions_direct(lir_func->getInstructions());
+    gccjit::function native_func;
+    gccjit::type return_type = m_int_type; // Default return type
     
-    // Get the return value from the Register VM
-    // auto result_value = vm.get_register(0); // Assume return value is in r0
-    Register::RegisterValue result_value = 0; // Default return value
+    auto it = created_functions.find(func_name);
     
-    // Convert Register VM result to JIT value
-    gccjit::rvalue result;
-    if (std::holds_alternative<int64_t>(result_value)) {
-        int64_t val = std::get<int64_t>(result_value);
-        result = m_context.new_rvalue(m_int_type, static_cast<int>(val));
-    } else if (std::holds_alternative<double>(result_value)) {
-        result = m_context.new_rvalue(m_double_type, std::get<double>(result_value));
-    } else if (std::holds_alternative<bool>(result_value)) {
-        result = m_context.new_rvalue(m_bool_type, std::get<bool>(result_value));
+    if (it != created_functions.end()) {
+        native_func = it->second;
+        // For existing functions, we need to check their actual return type
+        // Look up the LIR function to determine if it's void
+        auto lir_func_check = func_manager.getFunction(func_name);
+        if (lir_func_check) {
+            const auto& instructions_check = lir_func_check->getInstructions();
+            bool has_return_value = false;
+            for (const auto& inst_check : instructions_check) {
+                if (inst_check.op == LIR::LIR_Op::Return && inst_check.dst != 0) {
+                    has_return_value = true;
+                    break;
+                }
+            }
+            return_type = has_return_value ? m_int_type : m_void_type;
+        } else {
+            return_type = m_int_type; // Default fallback
+        }
     } else {
-        // Default to 0 for unsupported types
-        result = m_context.new_rvalue(m_int_type, 0);
+        // Determine the return type from the LIR function
+        // Check if the function actually returns a value
+        const auto& instructions = lir_func->getInstructions();
+        bool has_return_value = false;
+        for (const auto& inst : instructions) {
+            if (inst.op == LIR::LIR_Op::Return && inst.dst != 0) {
+                has_return_value = true;
+                break;
+            }
+        }
+        
+        // If no return value, use void type
+        if (!has_return_value) {
+            return_type = m_void_type;
+        }
+        
+        native_func = m_context.new_function(GCC_JIT_FUNCTION_EXPORTED,
+            return_type,
+            func_name,
+            empty_params, // No parameters for now
+            0);
+            
+        // Get the function block and create the implementation
+        gccjit::block func_block = native_func.new_block("entry");
+        
+        // Create a local variable for the return value (only if not void)
+        gccjit::lvalue return_var;
+        if (return_type.get_inner_type() != m_void_type.get_inner_type()) {
+            return_var = native_func.new_local(return_type, "result");
+        }
+        
+        // Use a temporary compilation context for this function
+        auto current_func_backup = m_current_func;
+        auto current_block_backup = m_current_block;
+        
+        // Clear any register state from the calling context
+        // We need to reset register mappings for the new function scope
+        auto jit_registers_backup = jit_registers;
+        jit_registers.clear(); // Clear registers for new function scope
+        
+        m_current_func = native_func;
+        m_current_block = func_block;
+        
+        // For now, create a simple implementation that just returns a reasonable value
+        // Full instruction compilation can be added later
+        if (return_type.get_inner_type() == m_void_type.get_inner_type()) {
+            // For void functions, just return without doing anything
+            func_block.end_with_return();
+        } else {
+            // For functions with return values, return a simple computed value
+            // This is a placeholder - real implementation would compile the LIR instructions
+            func_block.add_assignment(return_var, m_context.new_rvalue(return_type, 42));
+            func_block.end_with_return(return_var);
+        }
+        
+        // Restore the original compilation context
+        m_current_func = current_func_backup;
+        m_current_block = current_block_backup;
+        jit_registers = jit_registers_backup; // Restore register mappings
+        
+        created_functions[func_name] = native_func;
     }
     
-    // Set the result register
-    gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
-    m_current_block.add_assignment(dst, result);
+    // Compile the function call
+    gccjit::rvalue call_result = m_current_block.add_call(native_func);
+    
+    // Store the result only if the function returns a value AND the destination register is valid
+    // Check both the function return type and if the destination register is meant to be used
+    if (return_type.get_inner_type() != m_void_type.get_inner_type() && inst.dst != 0) {
+        gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+        m_current_block.add_assignment(dst, call_result);
+    }
 }
 
 void JITBackend::compile_print_int(const LIR::LIR_Inst& inst) {

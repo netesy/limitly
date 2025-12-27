@@ -22,7 +22,7 @@ public:
     
     // Main entry point - now takes TypeCheckResult instead of raw AST
     std::unique_ptr<LIR_Function> generate_program(const TypeCheckResult& type_check_result);
-    std::unique_ptr<LIR_Function> generate_function(AST::FunctionDeclaration& fn);
+    void generate_function(AST::FunctionDeclaration& fn);
     
     // Error handling
     bool has_errors() const;
