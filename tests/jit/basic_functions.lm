@@ -23,9 +23,8 @@ fn add(a: int, b: int): int {
 
 
 var sum = add(5, 3);
-// print("add(5, 3) = {sum}");
-print("add(5, 3) = ");
-print(sum);
+print("add(5, 3) = {sum}");
+
 
 
 // Test 3: Function with string parameters
@@ -48,15 +47,8 @@ fn square(x: int): int {
 
 var result1 = square(4);
 var result2 = square(7);
-// print("square(4) = {result1}");
-// print("square(7) = {result2}");
-
-print("square(4) =");
-print(result1);
-print("square(7) = ");
-
-print(result2);
-
+print("square(4) = {result1}");
+print("square(7) = {result2}");
 
 // Test 5: Function with local variables
 print("\n--- Test 5: Local Variables ---");
@@ -69,10 +61,7 @@ fn calculate(x: int, y: int): int {
 
 
 var calcResult = calculate(3, 4);
-// print("calculate(3, 4) = {calcResult}");
-print("calculate(3, 4) = ");
-print(calcResult);
-
+print("calculate(3, 4) = {calcResult}");
 
 // Test 6: Recursive function
 print("\n--- Test 6: Recursion ---");
@@ -86,10 +75,7 @@ fn factorial(n: int): int {
 
 
 var fact5 = factorial(5);
-// print("factorial(5) = {fact5}");
-print("factorial(5) = ");
-print(fact5);
-
+print("factorial(5) = {fact5}");
 
 // Test 7: Multiple functions
 print("\n--- Test 7: Multiple Functions ---");
@@ -114,10 +100,10 @@ var evenCheck = isEven(8);
 var oddCheck = isEven(9);
 
 
-// print("subtract(10, 3) = {subResult}");
-// print("multiply(6, 7) = {multResult}");
-// print("isEven(8) = {evenCheck}");
-// print("isEven(9) = {oddCheck}");
+print("subtract(10, 3) = {subResult}");
+print("multiply(6, 7) = {multResult}");
+print("isEven(8) = {evenCheck}");
+print("isEven(9) = {oddCheck}");
 
 
 print("\n=== Basic Function Tests Complete ===");

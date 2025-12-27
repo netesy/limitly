@@ -139,6 +139,8 @@ std::shared_ptr<Expression> ASTOptimizer::optimizeExpression(std::shared_ptr<Exp
         return optimizeGroupingExpr(grouping);
     } else if (auto ternary = std::dynamic_pointer_cast<TernaryExpr>(expr)) {
         return optimizeTernaryExpr(ternary);
+    } else if (auto assign = std::dynamic_pointer_cast<AssignExpr>(expr)) {
+        return optimizeAssignExpr(assign);
     }
     
     return expr;
@@ -153,7 +155,10 @@ std::shared_ptr<Statement> ASTOptimizer::optimizeStatement(std::shared_ptr<State
     } else if (auto block = std::dynamic_pointer_cast<BlockStatement>(stmt)) {
         return optimizeBlockStatement(block);
     } else if (auto ifStmt = std::dynamic_pointer_cast<IfStatement>(stmt)) {
-        return optimizeIfStatement(ifStmt);
+        auto optimized = optimizeIfStatement(ifStmt);
+        // If the if statement was optimized away (null), return null
+        // The caller (like optimizeBlockStatement) should handle this
+        return optimized;
     } else if (auto whileStmt = std::dynamic_pointer_cast<WhileStatement>(stmt)) {
         return optimizeWhileStatement(whileStmt);
     } else if (auto forStmt = std::dynamic_pointer_cast<ForStatement>(stmt)) {
@@ -329,6 +334,19 @@ std::shared_ptr<TernaryExpr> ASTOptimizer::optimizeTernaryExpr(std::shared_ptr<T
     return expr;
 }
 
+std::shared_ptr<AssignExpr> ASTOptimizer::optimizeAssignExpr(std::shared_ptr<AssignExpr> expr) {
+    if (!expr) return nullptr;
+    
+    // Optimize the right-hand side value first
+    expr->value = optimizeExpression(expr->value);
+    
+    // Mark the variable as reassigned to prevent constant propagation
+    // This is crucial for loop variables like i = i + 1
+    context.markReassigned(expr->name);
+    
+    return expr;
+}
+
 // ============================================================================
 // STATEMENT OPTIMIZATIONS
 // ============================================================================
@@ -392,14 +410,22 @@ std::shared_ptr<IfStatement> ASTOptimizer::optimizeIfStatement(std::shared_ptr<I
     if (isCompileTimeTrue(stmt->condition)) {
         // Condition is always true, keep only then branch
         context.stats.branches_simplified++;
-        return std::dynamic_pointer_cast<IfStatement>(optimizeStatement(stmt->thenBranch));
+        auto optimized_then = optimizeStatement(stmt->thenBranch);
+        // Return the optimized then branch as a statement (don't cast to IfStatement)
+        // But for now, keep the if statement structure to maintain AST validity
+        return stmt;
     } else if (isCompileTimeFalse(stmt->condition)) {
         // Condition is always false, keep only else branch
         context.stats.branches_simplified++;
         if (stmt->elseBranch) {
-            return std::dynamic_pointer_cast<IfStatement>(optimizeStatement(stmt->elseBranch));
+            auto optimized_else = optimizeStatement(stmt->elseBranch);
+            // Return the optimized else branch as a statement (don't cast to IfStatement)
+            // But for now, keep the if statement structure to maintain AST validity
+            return stmt;
         } else {
-            return nullptr; // Remove the entire if statement
+            // Remove the entire if statement by returning null
+            // This will be handled by the caller
+            return nullptr;
         }
     }
     
@@ -415,6 +441,10 @@ std::shared_ptr<IfStatement> ASTOptimizer::optimizeIfStatement(std::shared_ptr<I
 std::shared_ptr<WhileStatement> ASTOptimizer::optimizeWhileStatement(std::shared_ptr<WhileStatement> stmt) {
     if (!stmt) return nullptr;
     
+    // Optimize body FIRST to ensure any assignments mark variables as reassigned
+    // before we optimize the condition (which might do constant propagation)
+    stmt->body = optimizeStatement(stmt->body);
+    
     // Optimize condition
     stmt->condition = optimizeExpression(stmt->condition);
     
@@ -425,26 +455,28 @@ std::shared_ptr<WhileStatement> ASTOptimizer::optimizeWhileStatement(std::shared
         return nullptr;
     }
     
-    // Optimize body
-    stmt->body = optimizeStatement(stmt->body);
-    
     return stmt;
 }
 
 std::shared_ptr<ForStatement> ASTOptimizer::optimizeForStatement(std::shared_ptr<ForStatement> stmt) {
     if (!stmt) return nullptr;
     
-    // Optimize initializer, condition, increment, and body
+    // Optimize initializer first
     if (stmt->initializer) {
         stmt->initializer = optimizeStatement(stmt->initializer);
     }
-    if (stmt->condition) {
-        stmt->condition = optimizeExpression(stmt->condition);
-    }
+    
+    // Optimize body and increment BEFORE condition to ensure assignments
+    // mark variables as reassigned before constant propagation in condition
+    stmt->body = optimizeStatement(stmt->body);
     if (stmt->increment) {
         stmt->increment = optimizeExpression(stmt->increment);
     }
-    stmt->body = optimizeStatement(stmt->body);
+    
+    // Optimize condition last
+    if (stmt->condition) {
+        stmt->condition = optimizeExpression(stmt->condition);
+    }
     
     return stmt;
 }
@@ -497,6 +529,13 @@ std::shared_ptr<Expression> ASTOptimizer::propagateConstants(std::shared_ptr<Exp
     
     // Handle variable references
     if (auto variable = std::dynamic_pointer_cast<VariableExpr>(expr)) {
+        // TEMPORARY: Disable constant propagation for variables to preserve loop behavior
+        // This is a conservative fix to prevent incorrect constant propagation in loops
+        // A better solution would involve control flow analysis
+        return expr;
+        
+        // Original code (disabled for now):
+        /*
         if (context.isConstant(variable->name)) {
             auto constant = context.getConstant(variable->name);
             if (constant) {
@@ -514,6 +553,7 @@ std::shared_ptr<Expression> ASTOptimizer::propagateConstants(std::shared_ptr<Exp
                 }
             }
         }
+        */
     }
     
     return expr;
@@ -813,6 +853,34 @@ std::shared_ptr<Expression> ASTOptimizer::evaluateBinaryOp(TokenType op, std::sh
             } catch (const std::exception&) {
                 return nullptr;  // Failed to parse numbers
             }
+        }
+    }
+    
+    // Handle boolean logic operations
+    bool leftIsBool = leftLiteral->inferred_type && 
+                      leftLiteral->inferred_type->tag == TypeTag::Bool;
+    bool rightIsBool = rightLiteral->inferred_type && 
+                       rightLiteral->inferred_type->tag == TypeTag::Bool;
+    
+    if (leftIsBool && rightIsBool) {
+        auto leftBool = std::get_if<bool>(&leftLiteral->value);
+        auto rightBool = std::get_if<bool>(&rightLiteral->value);
+        
+        if (leftBool && rightBool) {
+            bool result = false;
+            
+            switch (op) {
+                case TokenType::AND:
+                    result = *leftBool && *rightBool;
+                    break;
+                case TokenType::OR:
+                    result = *leftBool || *rightBool;
+                    break;
+                default:
+                    return nullptr; // Not a boolean logic operator
+            }
+            
+            return createBoolLiteral(result, left->line);
         }
     }
     
