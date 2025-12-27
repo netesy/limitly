@@ -468,48 +468,46 @@ OP_RETURN:
 OP_CALL:
     // Handle user function calls
     {
-        // Get function index from register a
-        auto func_index_value = registers[pc->a];
-        if (!std::holds_alternative<int64_t>(func_index_value)) {
-            registers[pc->dst] = nullptr;
-            DISPATCH();
-        }
-        
-        int64_t func_index = std::get<int64_t>(func_index_value);
-        
-        // Get function from LIRFunctionManager
+        int64_t func_index = pc->a;
+        size_t arg_count = pc->b;
+
+        std::cout << "[DEBUG] OP_CALL: func_index=" << func_index << ", arg_count=" << arg_count << std::endl;
+
         auto& func_manager = LIR::LIRFunctionManager::getInstance();
         auto function_names = func_manager.getFunctionNames();
-        
-        if (func_index >= 0 && func_index < function_names.size()) {
+
+        if (func_index >= 0 && func_index < static_cast<int64_t>(function_names.size())) {
             auto func_name = function_names[func_index];
             auto func = func_manager.getFunction(func_name);
-            
+
             if (func) {
-                // Save current context
-                auto saved_registers = registers;
-                auto saved_pc = pc;
-                
-                // Set up parameters (move from caller's parameter registers to callee's parameter registers)
-                // For now, assume parameters are already in the right registers
-                
-                // Execute function
+                // Save caller's registers
+                std::vector<RegisterValue> saved_registers = registers;
+
+                // Prepare registers for the callee
+                std::vector<RegisterValue> callee_registers(1024, nullptr);
+                for (size_t i = 0; i < arg_count; ++i) {
+                    callee_registers[i] = registers[i];
+                }
+                registers = callee_registers;
+
+                // Execute the function
                 execute_lir_function(*func);
                 
-                // Get return value from register 0 (standard return register)
-                auto return_value = registers[0];
-                
+                // Get return value from the callee's r0
+                RegisterValue return_value = registers[0];
+
                 // Restore caller's registers
                 registers = saved_registers;
-                
-                // Set return value in destination register
+
+                // Set the return value in the caller's destination register
                 registers[pc->dst] = return_value;
-                
+
                 DISPATCH();
             }
         }
-        
-        // Function not found
+
+        // Function not found or other error
         registers[pc->dst] = nullptr;
         DISPATCH();
     }
@@ -1048,17 +1046,19 @@ void RegisterVM::execute_task_body(TaskContext* task, const LIR::LIR_Function& f
 }
 
 void RegisterVM::execute_function(const LIR::LIR_Function& function) {
-    // Set current function for task execution
+    // Set current function for task execution, saving the old one.
+    auto saved_current_function = current_function_;
     current_function_ = &function;
     
-    // Reset register file and initialize
-    registers.resize(1024);
-    for (auto& reg : registers) {
-        reg = nullptr;
-    }
+    // The caller is responsible for setting up the register file.
+    // For the main function, `reset()` should be called.
+    // For OP_CALL, the handler sets up arguments in a fresh register file.
     
     // Execute from start to end of function
     execute_instructions(function, 0, function.instructions.size());
+
+    // Restore the previous function context.
+    current_function_ = saved_current_function;
 }
 
 void RegisterVM::execute_lir_function(const LIR::LIRFunction& function) {
