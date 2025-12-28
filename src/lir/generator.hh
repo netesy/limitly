@@ -81,6 +81,7 @@ private:
     
     // CFG building methods
     void start_cfg_build();
+    void ensure_all_blocks_terminated();
     void finish_cfg_build();
     void remove_unreachable_blocks();
     void flatten_cfg_to_instructions();

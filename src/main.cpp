@@ -43,7 +43,7 @@ std::string readFile(const std::string& filename) {
     return buffer.str();
 }
 
-int executeFile(const std::string& filename, bool printAst = false, bool printCst = false, bool printTokens = false, bool printBytecode = false, bool useJit = false, bool jitDebug = true, bool enableDebug = false) {
+int executeFile(const std::string& filename, bool printAst = false, bool printCst = false, bool printTokens = false, bool printBytecode = false, bool useJit = false, bool jitDebug = false, bool enableDebug = false) {
     try {
         // Read source file
         std::string source = readFile(filename);
@@ -70,6 +70,18 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         // AST Optimization (before type checking)
         AST::ASTOptimizer optimizer;
         ast = optimizer.optimize(ast);
+        
+        // Print optimization statistics
+        const auto& stats = optimizer.getStats();
+        std::cout << "=== AST Optimization Statistics ===\n";
+        std::cout << "Constant folds: " << stats.constant_folds << "\n";
+        std::cout << "Constant propagations: " << stats.constant_propagations << "\n";
+        std::cout << "Dead code eliminated: " << stats.dead_code_eliminated << "\n";
+        std::cout << "Branches simplified: " << stats.branches_simplified << "\n";
+        std::cout << "Interpolations lowered: " << stats.interpolations_lowered << "\n";
+        std::cout << "Algebraic simplifications: " << stats.algebraic_simplifications << "\n";
+        std::cout << "Strings canonicalized: " << stats.strings_canonicalized << "\n";
+        std::cout << std::endl;
         
         // Print AST after optimization if debug mode is enabled
         if (enableDebug || jitDebug) {
@@ -260,6 +272,11 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 return 1;
             }
             
+            // Show LIR disassembly
+            std::cout << "\n=== LIR Disassembly ===\n";
+            LIR::Disassembler disassemble(*lir_function, true);
+            std::cout << disassemble.disassemble() << std::endl;
+            
             // Execute using register interpreter with the new LIRFunctionManager
             try {
                 // Register the main function in LIRFunctionManager if it exists
@@ -271,8 +288,6 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                     std::vector<LIR::LIRParameter> main_params;
                     main_lir_func = func_manager.createFunction("main", main_params, LIR::Type::I64, nullptr);
                     main_lir_func->setInstructions(lir_function->instructions);
-                    
-                    std::cout << "[DEBUG] Registered main function in LIRFunctionManager\n";
                     
                     register_vm.execute_lir_function(*main_lir_func);
                 } else {

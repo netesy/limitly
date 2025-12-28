@@ -37,11 +37,11 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const TypeCheckResult&
     enter_scope();
     enter_memory_region();
     
-    // Use linear mode for main/top-level code (not CFG)
+    // Use CFG mode for proper JIT compatibility
     cfg_context_.building_cfg = false;
     cfg_context_.current_block = nullptr;
     
-    // But create minimal CFG for JIT compatibility
+    // Create CFG for JIT compatibility
     start_cfg_build();
     
     // Generate top-level statements (excluding function definitions)
@@ -56,10 +56,18 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const TypeCheckResult&
     // Add implicit return if none exists
     if (cfg_context_.building_cfg && get_current_block() && !get_current_block()->has_terminator()) {
         emit_instruction(LIR_Inst(LIR_Op::Ret));
+    } else if (!cfg_context_.building_cfg) {
+        // Linear mode - add implicit return if function doesn't end with return
+        if (current_function_->instructions.empty() || 
+            !current_function_->instructions.back().isReturn()) {
+            emit_instruction(LIR_Inst(LIR_Op::Ret, 0, 0, 0));
+        }
     }
 
     // Finish CFG building for main (only if CFG was used)
     if (cfg_context_.building_cfg) {
+        // Don't force terminators - let the natural CFG structure handle it
+        // ensure_all_blocks_terminated();
         finish_cfg_build();
     }
 
@@ -74,7 +82,6 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const TypeCheckResult&
 }
 
 void Generator::generate_function(AST::FunctionDeclaration& fn) {
-    std::cout << "[DEBUG] generate_function called for: " << fn.name << std::endl;
     
     auto& func_manager = LIRFunctionManager::getInstance();
     
@@ -82,7 +89,6 @@ void Generator::generate_function(AST::FunctionDeclaration& fn) {
     if (!func_manager.hasFunction(fn.name)) {
         std::vector<LIRParameter> empty_params;
         auto placeholder = func_manager.createFunction(fn.name, empty_params, Type::I64, nullptr);
-        std::cout << "[DEBUG] Pre-registered placeholder for: " << fn.name << std::endl;
     }
     
     // Create function with parameters
@@ -139,8 +145,6 @@ void Generator::generate_function(AST::FunctionDeclaration& fn) {
     
     // Copy the instructions from our LIR_Function
     lir_func->setInstructions(result->instructions);
-    
-    std::cout << "[DEBUG] Function registered with LIRFunctionManager: " << fn.name << std::endl;
 }
 
 Reg Generator::allocate_register() {
@@ -937,8 +941,6 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
     Reg left = emit_expr(*expr.left);
     Reg right = emit_expr(*expr.right);
     Reg dst = allocate_register();
-    
-    std::cout << "[DEBUG] Binary expr: left=" << left << " right=" << right << " op=" << static_cast<int>(expr.op) << std::endl;
     
     // Map operator to LIR operation
     LIR_Op op;
@@ -1898,12 +1900,33 @@ void Generator::emit_if_stmt_linear(AST::IfStatement& stmt) {
         set_register_type(condition_bool, std::make_shared<::Type>(::TypeTag::Bool));
     }
     
-    // For linear mode, we'll simplify: just emit the then branch for now
-    // TODO: Implement proper conditional jumps for linear mode
+    // Reserve space for jump instructions
+    size_t false_jump_pc = current_function_->instructions.size();
+    emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, condition_bool, 0)); // Placeholder target
+    
+    // Emit then branch
     emit_stmt(*stmt.thenBranch);
     
     if (stmt.elseBranch) {
+        // Reserve space for jump to end
+        size_t end_jump_pc = current_function_->instructions.size();
+        emit_instruction(LIR_Inst(LIR_Op::Jump, 0)); // Placeholder target
+        
+        // Update false jump to point to else branch
+        size_t else_start_pc = current_function_->instructions.size();
+        current_function_->instructions[false_jump_pc].imm = else_start_pc;
+        
+        // Emit else branch
         emit_stmt(*stmt.elseBranch);
+        
+        // Update end jump to point after else branch
+        size_t end_pc = current_function_->instructions.size();
+        current_function_->instructions[end_jump_pc].imm = end_pc;
+    } else {
+        // No else branch - the false jump should skip the then branch
+        // The target should be the next instruction after the then branch
+        size_t end_pc = current_function_->instructions.size();
+        current_function_->instructions[false_jump_pc].imm = end_pc;
     }
 }
 
@@ -2905,6 +2928,42 @@ void Generator::start_cfg_build() {
     cfg_context_.exit_block->is_exit = true;
 }
 
+void Generator::ensure_all_blocks_terminated() {
+    if (!current_function_ || !current_function_->cfg) {
+        return;
+    }
+    
+    // Ensure all blocks have proper terminators
+    for (const auto& block : current_function_->cfg->blocks) {
+        if (!block) continue;
+        
+        // Check if block has a terminator
+        if (!block->has_terminator()) {
+            // Only add terminator if the block is not the exit block
+            if (cfg_context_.exit_block && block.get() != cfg_context_.exit_block) {
+                // Temporarily set this block as current to emit instruction
+                auto saved_current = cfg_context_.current_block;
+                cfg_context_.current_block = block.get();
+                
+                emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, cfg_context_.exit_block->id));
+                add_block_edge(block.get(), cfg_context_.exit_block);
+                
+                // Restore current block
+                cfg_context_.current_block = saved_current;
+            } else if (block.get() == cfg_context_.exit_block) {
+                // Exit block should have a return statement
+                auto saved_current = cfg_context_.current_block;
+                cfg_context_.current_block = block.get();
+                
+                emit_instruction(LIR_Inst(LIR_Op::Ret, 0, 0, 0));
+                
+                // Restore current block
+                cfg_context_.current_block = saved_current;
+            }
+        }
+    }
+}
+
 void Generator::finish_cfg_build() {
     cfg_context_.building_cfg = false;
     
@@ -2982,9 +3041,12 @@ void Generator::flatten_cfg_to_instructions() {
     // First pass: calculate positions for each block
     size_t current_pos = 0;
     for (const auto& block : current_function_->cfg->blocks) {
-        if (block) {
+        if (block && !block->instructions.empty()) {
             block_positions[block->id] = current_pos;
             current_pos += block->instructions.size();
+        } else if (block) {
+            // Empty block - still needs a position for jumps
+            block_positions[block->id] = current_pos;
         }
     }
     
@@ -3001,6 +3063,10 @@ void Generator::flatten_cfg_to_instructions() {
                 auto it = block_positions.find(inst.imm);
                 if (it != block_positions.end()) {
                     modified_inst.imm = it->second; // Use instruction position as label
+                } else {
+                    // Block not found - this might be an error
+                    // For now, keep the original target
+                    std::cerr << "Warning: Jump target block " << inst.imm << " not found in block_positions" << std::endl;
                 }
             }
             
@@ -3081,7 +3147,6 @@ void Generator::collect_function_signature(AST::FunctionDeclaration& stmt) {
 }
 
 void Generator::lower_function_bodies(const TypeCheckResult& type_check_result) {
-    std::cout << "[DEBUG] Starting lower_function_bodies" << std::endl;
     for (const auto& stmt : type_check_result.program->statements) {
         if (auto func_stmt = dynamic_cast<AST::FunctionDeclaration*>(stmt.get())) {
             std::cout << "[DEBUG] Lowering function body: " << func_stmt->name << std::endl;
@@ -3091,7 +3156,6 @@ void Generator::lower_function_bodies(const TypeCheckResult& type_check_result) 
     
     // Also lower task bodies by searching through all statements
     lower_task_bodies_recursive(type_check_result.program->statements);
-    std::cout << "[DEBUG] Finished lower_function_bodies" << std::endl;
 }
 
 void Generator::lower_task_bodies_recursive(const std::vector<std::shared_ptr<AST::Statement>>& statements) {

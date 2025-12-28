@@ -966,6 +966,7 @@ std::string ASTPrinter::tokenTypeToString(TokenType type) const {
         
         // Keywords
         case TokenType::AND: return "and";
+        case TokenType::OR: return "or";
         case TokenType::CLASS: return "class";
         case TokenType::FALSE: return "false";
         case TokenType::FN: return "fn";
