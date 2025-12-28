@@ -1,4 +1,0 @@
-var f32_val: f32 = 1.23;
-print(f32_val);
-print(f32_val * 2.0);
-print(f32_val * 2);

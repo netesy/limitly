@@ -1,2 +1,0 @@
-var flag = true;
-print("{flag}");

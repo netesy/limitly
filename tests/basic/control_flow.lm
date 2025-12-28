@@ -1,11 +1,11 @@
 // Test control flow statements
-print("=== Control Flow Tests ===");
+print(" === Control Flow Tests === ");
 
 // If statements
 var x = 10;
 var y = 5;
 
-print("If statement tests:");
+print("If statement tests: ");
 if (x > y) {
     print("x is greater than y");
 }
@@ -17,8 +17,8 @@ if (x < y) {
 }
 
 // If-elif-else chain
-var score = 95;
-print("Grade calculation:");
+var score = 75;
+print("Grade calculation: ");
 if (score >= 90) {
     print("Grade: A");
 } elif (score >= 80) {
@@ -30,25 +30,25 @@ if (score >= 90) {
 }
 
 // Nested if statements
-print("Nested if test:");
-var a = 25;
+print("Nested if test: ");
+var a = 15;
 if (a > 10) {
     print("a is greater than 10");
     if (a > 20) {
         print("a is also greater than 20");
-    } else {
-        print("but a is not greater than 20");
-    }
-}
+        } else {
+            print("but a is not greater than 20");
+            }
+            }
 
-// Boolean conditions
-var isActive = true;
-var isValid = false;
+            // Boolean conditions
+            var isActive = true;
+            var isValid = false;
 
-if (isActive and !isValid) {
-    print("Active but not valid");
-}
+            if (isActive and ! isValid) {
+                print("Active but not valid");
+                }
 
-if (isActive or isValid) {
-    print("At least one is true");
-}
+                if (isActive or isValid) {
+                    print("At least one is true");
+                    }

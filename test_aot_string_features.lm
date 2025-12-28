@@ -1,3 +1,0 @@
-print("Hello World");
-print("Value: {true}");
-print("Name: {name}");

@@ -1,3 +1,0 @@
-// Simple float test
-var x = 10.0;
-print("x =", x);

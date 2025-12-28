@@ -1,4 +1,0 @@
-var str = "The answer is ";
-var num = 42;
-var result = str + num;
-print(result);

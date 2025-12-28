@@ -75,7 +75,7 @@ TEST_RSP := $(RSP_DIR)/build_test.rsp
 # =============================
 # Phony targets
 # =============================
-.PHONY: all clean clear check-deps windows linux release debug
+.PHONY: all clean clear clean-lm check-deps windows linux release debug
 
 # =============================
 # Default target
@@ -184,6 +184,17 @@ else
 	@find . -name "*.tokens.txt" -type f -delete 2>/dev/null || true
 endif
 	@echo "✅ Generated files cleaned."
+
+# Clean .lm files from root folder only (preserve std/ and tests/)
+clean-lm:
+ifeq ($(PLATFORM),windows)
+	@echo "🧹 Cleaning .lm files from root folder..."
+	@powershell -Command "Get-ChildItem -Path . -Filter *.lm -File | Remove-Item -Force -ErrorAction SilentlyContinue"
+else
+	@echo "🧹 Cleaning .lm files from root folder..."
+	@find . -maxdepth 1 -name "*.lm" -type f -delete 2>/dev/null || true
+endif
+	@echo "✅ Root .lm files cleaned (std/ and tests/ preserved)."
 
 # =============================
 # JIT Test Target

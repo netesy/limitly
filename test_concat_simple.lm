@@ -1,3 +1,0 @@
-// Test simple string concatenation
-var greeting = "Hello " + "World";
-print(greeting);
