@@ -73,7 +73,6 @@ void LIRFunctionManager::initialize() {
     BuiltinUtils::initializeBuiltins();
     
     initialized_ = true;
-    std::cout << "[DEBUG] LIR Function Manager: Initialization complete" << std::endl;
 }
 
 void LIRFunctionManager::registerFunction(std::shared_ptr<LIRFunction> function) {
@@ -87,8 +86,6 @@ void LIRFunctionManager::registerFunction(std::shared_ptr<LIRFunction> function)
     // Also register with the LIR function registry for JIT compilation
     // Note: We don't use the backend UserDefinedFunction system since LIR functions are independent
     // The registry will handle the function lookup for JIT compilation
-    
-    std::cout << "[DEBUG] LIR Function Manager: Registered function '" << name << "'" << std::endl;
 }
 
 std::shared_ptr<LIRFunction> LIRFunctionManager::getFunction(const std::string& name) {

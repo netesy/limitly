@@ -77,8 +77,6 @@ void LIRBuiltinFunctions::initialize() {
         return;
     }
     
-    std::cout << "[DEBUG] LIR Builtin Functions: Initializing LIR-specific builtin functions" << std::endl;
-    
     // Register all LIR-specific builtin functions
     registerStringFunctions();
     registerIOFunctions();
@@ -89,7 +87,6 @@ void LIRBuiltinFunctions::initialize() {
     registerCompositionFunctions();
     
     initialized_ = true;
-    std::cout << "[DEBUG] LIR Builtin Functions: Initialized " << builtinFunctions_.size() << " functions" << std::endl;
 }
 
 

@@ -42,15 +42,6 @@ void RegisterVM::reset() {
 }
 
 void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t start_pc, size_t end_pc) {
-    std::cout << "[DEBUG] execute_instructions: range " << start_pc << " to " << end_pc 
-              << " (total instructions: " << function.instructions.size() << ")" << std::endl;
-    
-    // Debug: Print all instructions in the function
-    for (size_t i = 0; i < function.instructions.size(); i++) {
-        const auto& inst = function.instructions[i];
-        std::cout << "[DEBUG] Instruction " << i << ": op=" << static_cast<int>(inst.op) 
-                  << " dst=" << inst.dst << " a=" << inst.a << " b=" << inst.b << std::endl;
-    }
     
     const LIR::LIR_Inst* pc = function.instructions.data() + start_pc;
     const LIR::LIR_Inst* end = function.instructions.data() + end_pc;
@@ -263,7 +254,6 @@ OP_ADD:
             int64_t right = to_int(*temp_b);
             int64_t int_result = left + right;
             registers[pc->dst] = int_result;
-            std::cout << "[DEBUG] ADD: " << left << " + " << right << " = " << int_result << std::endl;
         }
     } else {
         registers[pc->dst] = nullptr;
@@ -462,6 +452,8 @@ OP_JUMPIFFALSE:
     if (!to_bool(registers[pc->a])) {
         DISPATCH_JUMP(pc->imm);
     }
+    DISPATCH();
+
 OP_RETURN:
     return;
 
@@ -640,17 +632,12 @@ OP_TASK_SET_FIELD:
             field_value = registers[pc->b];
         }
 
-        std::cout << "[DEBUG] task_set_field: context=" << context_id
-                  << " field=" << field_index
-                  << " value=" << to_int(field_value) << std::endl;
-
         if (context_id < task_contexts.size()) {
             auto& ctx = task_contexts[context_id];
             ctx->fields[field_index] = field_value;
 
             if (field_index == 2) {
                 ctx->channel_ptr = field_value;
-                std::cout << "[DEBUG] Set channel_ptr to " << to_int(field_value) << std::endl;
             } else if (field_index == 3) {
                 ctx->counter = to_int(field_value);
             }
@@ -760,18 +747,12 @@ OP_SCHEDULER_RUN:
                 auto shared_counter_reg = registers[3];
                 if (!std::holds_alternative<std::nullptr_t>(shared_counter_reg)) {
                     int64_t updated_counter = to_int(shared_counter_reg);
-                    std::cout << "[DEBUG] Task " << task->task_id << " register 3 = " << updated_counter << std::endl;
                     shared_variables["shared_counter"].store(updated_counter);
-                    
-                    std::cout << "[DEBUG] Updated shared_counter to " << updated_counter << std::endl;
                 }
 
                 if (!std::holds_alternative<std::nullptr_t>(task->channel_ptr)) {
                     uint64_t channel_id = static_cast<uint64_t>(to_int(task->channel_ptr));
                     int64_t new_counter_value = shared_variables["shared_counter"].load();
-
-                    std::cout << "[DEBUG] Pushing to channel " << channel_id 
-                              << " value " << new_counter_value << std::endl;
 
                     if (channel_id < channels.size()) {
                         channels[channel_id]->push(new_counter_value);
@@ -951,8 +932,6 @@ OP_WORKER_SIGNAL:
         uint64_t work_available = static_cast<uint64_t>(to_int(registers[pc->a]));
         uint64_t num_workers = static_cast<uint64_t>(to_int(registers[pc->b]));
         
-        std::cout << "[DEBUG] WorkerSignal: Processing work queue" << std::endl;
-        
         default_atomic.store(0);
         
         for (auto& queue : work_queues) {
@@ -963,8 +942,6 @@ OP_WORKER_SIGNAL:
                 if (task_context < task_contexts.size()) {
                     auto& task = task_contexts[task_context];
                     if (task->state == TaskState::RUNNING || task->state == TaskState::INIT) {
-                        std::cout << "[DEBUG] Executing task " << task->task_id << std::endl;
-                        
                         if (task->body_start_pc >= 0 && task->body_end_pc >= 0) {
                             execute_task_body(task.get(), *current_function_);
                         }
@@ -975,7 +952,6 @@ OP_WORKER_SIGNAL:
             }
         }
         
-        std::cout << "[DEBUG] All work complete" << std::endl;
         registers[pc->dst] = static_cast<int64_t>(1);
     }
     DISPATCH();
@@ -995,10 +971,6 @@ OP_TASK_SET_CODE:
         int64_t body_start = static_cast<int64_t>(to_int(registers[pc->b]));
         int64_t body_end = pc->imm;
         
-        std::cout << "[DEBUG] task_set_code: context=" << context_id 
-                  << " body_start=" << body_start 
-                  << " body_end=" << body_end << std::endl;
-        
         if (context_id < task_contexts.size()) {
             task_contexts[context_id]->body_start_pc = body_start;
             task_contexts[context_id]->body_end_pc = body_end;
@@ -1014,16 +986,12 @@ OP_TASK_SET_CODE:
 }
 
 void RegisterVM::execute_task_body(TaskContext* task, const LIR::LIR_Function& function) {
-    std::cout << "[DEBUG] Executing task body: PC " << task->body_start_pc 
-              << " to " << task->body_end_pc << std::endl;
-    
     // Set up task context parameters
     if (task) {
         // Set loop variable value from task context field 1
         auto loop_var_it = task->fields.find(1);
         if (loop_var_it != task->fields.end()) {
             registers[1] = loop_var_it->second;
-            std::cout << "[DEBUG] Set loop variable r1 = " << to_int(loop_var_it->second) << std::endl;
         }
         
         // Set up other task context fields in registers
@@ -1040,7 +1008,6 @@ void RegisterVM::execute_task_body(TaskContext* task, const LIR::LIR_Function& f
         // Initialize shared counter with current global value (override task field)
         int64_t current_shared_counter = shared_variables["shared_counter"].load();
         registers[3] = current_shared_counter;
-        std::cout << "[DEBUG] Task " << task->task_id << " starting with shared_counter = " << current_shared_counter << " (overriding task field)" << std::endl;
     }
     
     // Execute the task body using the shared instruction executor

@@ -737,6 +737,9 @@ namespace AST {
         std::vector<std::pair<std::string, std::shared_ptr<Expression>>> constant_stack;
         std::vector<std::string> reassigned_stack;
         
+        // Flag to track if we are inside a loop
+        bool in_loop = false;
+        
         // Optimization statistics
         struct Stats {
             int constant_folds = 0;
@@ -835,7 +838,7 @@ namespace AST {
         // Specific statement optimizations
         virtual std::shared_ptr<VarDeclaration> optimizeVarDeclaration(std::shared_ptr<VarDeclaration> stmt);
         virtual std::shared_ptr<BlockStatement> optimizeBlockStatement(std::shared_ptr<BlockStatement> stmt);
-        virtual std::shared_ptr<IfStatement> optimizeIfStatement(std::shared_ptr<IfStatement> stmt);
+        virtual std::shared_ptr<Statement> optimizeIfStatement(std::shared_ptr<IfStatement> stmt);
         virtual std::shared_ptr<WhileStatement> optimizeWhileStatement(std::shared_ptr<WhileStatement> stmt);
         virtual std::shared_ptr<ForStatement> optimizeForStatement(std::shared_ptr<ForStatement> stmt);
         virtual std::shared_ptr<ReturnStatement> optimizeReturnStatement(std::shared_ptr<ReturnStatement> stmt);

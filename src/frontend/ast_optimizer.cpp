@@ -221,22 +221,16 @@ std::shared_ptr<Expression> ASTOptimizer::optimizeBinaryExpr(std::shared_ptr<Bin
 std::shared_ptr<Expression> ASTOptimizer::optimizeUnaryExpr(std::shared_ptr<UnaryExpr> expr) {
     if (!expr) return nullptr;
     
-    std::cout << "DEBUG: optimizeUnaryExpr called with op: " << static_cast<int>(expr->op) << std::endl;
-    
     // Optimize the operand first
     expr->right = optimizeExpression(expr->right);
-    
-    std::cout << "DEBUG: After optimizing operand" << std::endl;
     
     // Apply constant folding
     auto folded = foldConstants(expr);
     if (folded != expr) {
-        std::cout << "DEBUG: Unary expression was folded" << std::endl;
         // folded is now a LiteralExpr, return it directly
         return folded;
     }
     
-    std::cout << "DEBUG: Unary expression was not folded" << std::endl;
     return expr;
 }
 
@@ -400,39 +394,32 @@ std::shared_ptr<BlockStatement> ASTOptimizer::optimizeBlockStatement(std::shared
     return stmt;
 }
 
-std::shared_ptr<IfStatement> ASTOptimizer::optimizeIfStatement(std::shared_ptr<IfStatement> stmt) {
+std::shared_ptr<Statement> ASTOptimizer::optimizeIfStatement(std::shared_ptr<IfStatement> stmt) {
     if (!stmt) return nullptr;
     
-    // Optimize condition
+    // Optimize condition first
     stmt->condition = optimizeExpression(stmt->condition);
-    
-    // Apply branch simplification
-    if (isCompileTimeTrue(stmt->condition)) {
-        // Condition is always true, keep only then branch
-        context.stats.branches_simplified++;
-        auto optimized_then = optimizeStatement(stmt->thenBranch);
-        // Return the optimized then branch as a statement (don't cast to IfStatement)
-        // But for now, keep the if statement structure to maintain AST validity
-        return stmt;
-    } else if (isCompileTimeFalse(stmt->condition)) {
-        // Condition is always false, keep only else branch
-        context.stats.branches_simplified++;
-        if (stmt->elseBranch) {
-            auto optimized_else = optimizeStatement(stmt->elseBranch);
-            // Return the optimized else branch as a statement (don't cast to IfStatement)
-            // But for now, keep the if statement structure to maintain AST validity
-            return stmt;
-        } else {
-            // Remove the entire if statement by returning null
-            // This will be handled by the caller
-            return nullptr;
-        }
-    }
     
     // Optimize branches
     stmt->thenBranch = optimizeStatement(stmt->thenBranch);
     if (stmt->elseBranch) {
         stmt->elseBranch = optimizeStatement(stmt->elseBranch);
+    }
+    
+    // Apply branch simplification for compile-time constant conditions
+    if (isCompileTimeTrue(stmt->condition)) {
+        // Condition is always true, keep only then branch
+        context.stats.branches_simplified++;
+        return stmt->thenBranch;
+    } else if (isCompileTimeFalse(stmt->condition)) {
+        // Condition is always false, keep only else branch
+        context.stats.branches_simplified++;
+        if (stmt->elseBranch) {
+            return stmt->elseBranch;
+        } else {
+            // No else branch, remove entire if statement
+            return nullptr;
+        }
     }
     
     return stmt;
@@ -441,12 +428,11 @@ std::shared_ptr<IfStatement> ASTOptimizer::optimizeIfStatement(std::shared_ptr<I
 std::shared_ptr<WhileStatement> ASTOptimizer::optimizeWhileStatement(std::shared_ptr<WhileStatement> stmt) {
     if (!stmt) return nullptr;
     
-    // Optimize body FIRST to ensure any assignments mark variables as reassigned
-    // before we optimize the condition (which might do constant propagation)
+    // Set in_loop flag and optimize body and condition
+    context.in_loop = true;
     stmt->body = optimizeStatement(stmt->body);
-    
-    // Optimize condition
     stmt->condition = optimizeExpression(stmt->condition);
+    context.in_loop = false;
     
     // Apply branch simplification
     if (isCompileTimeFalse(stmt->condition)) {
@@ -461,22 +447,21 @@ std::shared_ptr<WhileStatement> ASTOptimizer::optimizeWhileStatement(std::shared
 std::shared_ptr<ForStatement> ASTOptimizer::optimizeForStatement(std::shared_ptr<ForStatement> stmt) {
     if (!stmt) return nullptr;
     
-    // Optimize initializer first
+    // Optimize initializer first (outside loop)
     if (stmt->initializer) {
         stmt->initializer = optimizeStatement(stmt->initializer);
     }
     
-    // Optimize body and increment BEFORE condition to ensure assignments
-    // mark variables as reassigned before constant propagation in condition
+    // Then set in_loop=true and optimize rest
+    context.in_loop = true;
     stmt->body = optimizeStatement(stmt->body);
     if (stmt->increment) {
         stmt->increment = optimizeExpression(stmt->increment);
     }
-    
-    // Optimize condition last
     if (stmt->condition) {
         stmt->condition = optimizeExpression(stmt->condition);
     }
+    context.in_loop = false;
     
     return stmt;
 }
@@ -527,15 +512,18 @@ std::shared_ptr<Expression> ASTOptimizer::foldConstants(std::shared_ptr<Expressi
 std::shared_ptr<Expression> ASTOptimizer::propagateConstants(std::shared_ptr<Expression> expr) {
     if (!expr) return nullptr;
     
+    // Don't propagate inside loops
+    if (context.in_loop) {
+        return expr;
+    }
+    
     // Handle variable references
     if (auto variable = std::dynamic_pointer_cast<VariableExpr>(expr)) {
-        // TEMPORARY: Disable constant propagation for variables to preserve loop behavior
-        // This is a conservative fix to prevent incorrect constant propagation in loops
-        // A better solution would involve control flow analysis
-        return expr;
+        // Don't propagate reassigned variables (like loop counters)
+        if (context.reassigned_vars.find(variable->name) != context.reassigned_vars.end()) {
+            return expr;
+        }
         
-        // Original code (disabled for now):
-        /*
         if (context.isConstant(variable->name)) {
             auto constant = context.getConstant(variable->name);
             if (constant) {
@@ -553,7 +541,6 @@ std::shared_ptr<Expression> ASTOptimizer::propagateConstants(std::shared_ptr<Exp
                 }
             }
         }
-        */
     }
     
     return expr;
@@ -811,6 +798,9 @@ std::shared_ptr<Expression> ASTOptimizer::evaluateBinaryOp(TokenType op, std::sh
                 double leftNum = std::stod(*leftStr);
                 double rightNum = std::stod(*rightStr);
                 double result = 0.0;
+                bool isArithmetic = (op == TokenType::PLUS || op == TokenType::MINUS || 
+                                   op == TokenType::STAR || op == TokenType::SLASH || 
+                                   op == TokenType::MODULUS);
                 
                 switch (op) {
                     case TokenType::PLUS:
@@ -830,8 +820,26 @@ std::shared_ptr<Expression> ASTOptimizer::evaluateBinaryOp(TokenType op, std::sh
                         if (rightNum == 0.0) return nullptr;  // Modulus by zero
                         result = std::fmod(leftNum, rightNum);
                         break;
+                    // Comparison operations - return boolean results
+                    case TokenType::GREATER:
+                        return createBoolLiteral(leftNum > rightNum, left->line);
+                    case TokenType::GREATER_EQUAL:
+                        return createBoolLiteral(leftNum >= rightNum, left->line);
+                    case TokenType::LESS:
+                        return createBoolLiteral(leftNum < rightNum, left->line);
+                    case TokenType::LESS_EQUAL:
+                        return createBoolLiteral(leftNum <= rightNum, left->line);
+                    case TokenType::EQUAL_EQUAL:
+                        return createBoolLiteral(leftNum == rightNum, left->line);
+                    case TokenType::BANG_EQUAL:
+                        return createBoolLiteral(leftNum != rightNum, left->line);
                     default:
                         return nullptr;
+                }
+                
+                // Only create arithmetic result for arithmetic operations
+                if (!isArithmetic) {
+                    return nullptr;
                 }
                 
                 // Determine result type (prefer float if either operand is float)
