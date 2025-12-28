@@ -1,2 +1,0 @@
-var ch = channel();
-print(ch);

@@ -1,3 +1,0 @@
-print("Hello");
-var name = "Limit";
-print(name);

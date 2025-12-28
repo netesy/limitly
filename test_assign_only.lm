@@ -1,3 +1,0 @@
-// Test assignment without interpolation
-var x = 5;
-print("Variable assigned");

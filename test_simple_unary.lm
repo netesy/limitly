@@ -1,3 +1,0 @@
-// Simple test of unary operations
-var x = -5;
-print("Result: {x}");

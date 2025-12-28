@@ -1,7 +1,0 @@
-var f32_val: f32 = 1.23;
-print("Immediately after initialization:");
-print(f32_val);
-
-f32_val = f32_val + 1.0;
-print("After addition:");
-print(f32_val);

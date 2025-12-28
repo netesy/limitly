@@ -1,4 +1,0 @@
-var x = 42;
-print("The answer is ");
-print(x);
-print(".");

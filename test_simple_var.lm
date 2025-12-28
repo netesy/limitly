@@ -1,3 +1,0 @@
-// Test direct variable printing
-var x = 5;
-print("Variable: {x}");
