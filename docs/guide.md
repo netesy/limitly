@@ -956,17 +956,13 @@ print(result); // Output: 50
 
 ### Destructuring Assignments
 
-You can unpack values from tuples and lists into separate variables.
+You can unpack values from tuples into separate variables.
 
 ```limit
-// Destructuring a tuple
 var (name, age) = ("Alice", 30);
 print("{name} is {age} years old."); // Output: Alice is 30 years old.
-
-// Destructuring a list
-var [a, b, c] = [1, 2, 3];
-print(a); // Output: 1
 ```
+> **Note:** Currently, only tuple destructuring is supported. List destructuring is not yet implemented.
 
 ### Unsafe Blocks
 
