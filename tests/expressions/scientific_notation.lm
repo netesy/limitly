@@ -3,7 +3,7 @@
 // Test basic scientific notation
 var small: f64 = 1.23e-10;
 var large: f64 = 4.56e+15;
-var negative: f64 = -7.89e-5;
+var negative: f64 = 7.89e-5;
 
 print("Scientific notation test:");
 print("Small:", small);

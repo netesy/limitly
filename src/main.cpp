@@ -45,6 +45,9 @@ std::string readFile(const std::string& filename) {
 
 int executeFile(const std::string& filename, bool printAst = false, bool printCst = false, bool printTokens = false, bool printBytecode = false, bool useJit = false, bool jitDebug = false, bool enableDebug = false) {
     try {
+        // Initialize LIR function systems
+        LIR::FunctionUtils::initializeFunctions();
+        
         // Read source file
         std::string source = readFile(filename);
         
@@ -332,6 +335,9 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
 void startRepl() {
     std::cout << "Limit Programming Language REPL (Interactive Mode)" << std::endl;
     std::cout << "Type 'exit' to quit, '.registers' to show register state, '.debug' to toggle debug mode" << std::endl;
+    
+    // Initialize LIR function systems
+    LIR::FunctionUtils::initializeFunctions();
     
     Register::RegisterVM register_vm;
     bool debugMode = false;

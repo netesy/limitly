@@ -1233,10 +1233,91 @@ std::unique_ptr<TypeChecker> create(TypeSystem& type_system) {
 }
 
 void register_builtin_functions(TypeChecker& checker) {
-    // Register channel() function
-    checker.register_builtin_function("channel", {}, checker.get_type_system().INT_TYPE);
+    auto& ts = checker.get_type_system();
     
-    // Add more builtin functions here as needed
+    // Math functions
+    checker.register_builtin_function("abs", {ts.INT_TYPE}, ts.INT_TYPE);
+    checker.register_builtin_function("fabs", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("sqrt", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("cbrt", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("pow", {ts.FLOAT32_TYPE, ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("exp", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("exp2", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("log", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("log10", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("log2", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    
+    // Trigonometric functions
+    checker.register_builtin_function("sin", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("cos", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("tan", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("asin", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("acos", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("atan", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("atan2", {ts.FLOAT32_TYPE, ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    
+    // Hyperbolic functions
+    checker.register_builtin_function("sinh", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("cosh", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("tanh", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("asinh", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("acosh", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("atanh", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    
+    // Rounding functions
+    checker.register_builtin_function("ceil", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("floor", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("trunc", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("round", {ts.FLOAT64_TYPE, ts.INT_TYPE}, ts.FLOAT64_TYPE);
+    
+    // Other math functions
+    checker.register_builtin_function("fmod", {ts.FLOAT32_TYPE, ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("remainder", {ts.FLOAT32_TYPE, ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("fmax", {ts.FLOAT32_TYPE, ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("fmin", {ts.FLOAT32_TYPE, ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("fdim", {ts.FLOAT32_TYPE, ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    checker.register_builtin_function("hypot", {ts.FLOAT32_TYPE, ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    
+    // String functions
+    checker.register_builtin_function("concat", {ts.STRING_TYPE, ts.STRING_TYPE}, ts.STRING_TYPE);
+    checker.register_builtin_function("length", {ts.STRING_TYPE}, ts.INT_TYPE);
+    checker.register_builtin_function("substring", {ts.STRING_TYPE, ts.INT_TYPE, ts.INT_TYPE}, ts.STRING_TYPE);
+    checker.register_builtin_function("str_format", {ts.STRING_TYPE, ts.ANY_TYPE}, ts.STRING_TYPE);
+    
+    // Utility functions
+    checker.register_builtin_function("typeof", {ts.ANY_TYPE}, ts.STRING_TYPE);
+    checker.register_builtin_function("clock", {}, ts.FLOAT64_TYPE);
+    checker.register_builtin_function("sleep", {ts.FLOAT64_TYPE}, ts.NIL_TYPE);
+    checker.register_builtin_function("len", {ts.ANY_TYPE}, ts.INT_TYPE);
+    checker.register_builtin_function("time", {}, ts.INT64_TYPE);
+    checker.register_builtin_function("date", {}, ts.STRING_TYPE);
+    checker.register_builtin_function("now", {}, ts.STRING_TYPE);
+    checker.register_builtin_function("assert", {ts.BOOL_TYPE, ts.STRING_TYPE}, ts.NIL_TYPE);
+    
+    // Math constants (as functions)
+    checker.register_builtin_function("pi", {}, ts.FLOAT64_TYPE);
+    checker.register_builtin_function("e", {}, ts.FLOAT64_TYPE);
+    checker.register_builtin_function("ln2", {}, ts.FLOAT64_TYPE);
+    checker.register_builtin_function("ln10", {}, ts.FLOAT64_TYPE);
+    checker.register_builtin_function("sqrt2", {}, ts.FLOAT64_TYPE);
+    
+    // Collection functions (simplified for now)
+    auto function_type = ts.createFunctionType({}, ts.ANY_TYPE); // Simple function type
+    checker.register_builtin_function("map", {function_type, ts.LIST_TYPE}, ts.LIST_TYPE);
+    checker.register_builtin_function("filter", {function_type, ts.LIST_TYPE}, ts.LIST_TYPE);
+    checker.register_builtin_function("reduce", {function_type, ts.LIST_TYPE, ts.ANY_TYPE}, ts.ANY_TYPE);
+    checker.register_builtin_function("forEach", {function_type, ts.LIST_TYPE}, ts.NIL_TYPE);
+    checker.register_builtin_function("find", {function_type, ts.LIST_TYPE}, ts.ANY_TYPE);
+    checker.register_builtin_function("some", {function_type, ts.LIST_TYPE}, ts.BOOL_TYPE);
+    checker.register_builtin_function("every", {function_type, ts.LIST_TYPE}, ts.BOOL_TYPE);
+    
+    // Function composition
+    checker.register_builtin_function("compose", {function_type, function_type}, function_type);
+    checker.register_builtin_function("curry", {function_type}, function_type);
+    checker.register_builtin_function("partial", {function_type, ts.ANY_TYPE}, function_type);
+    
+    // Channel function
+    checker.register_builtin_function("channel", {}, ts.INT_TYPE);
 }
 
 } // namespace TypeCheckerFactory

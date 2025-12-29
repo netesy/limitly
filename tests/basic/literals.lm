@@ -27,6 +27,6 @@ print("Booleans:");
 print(true);
 print(false);
 
-// Null literal
-print("Null:");
+// Nil literal
+print("Nil:");
 print(nil);

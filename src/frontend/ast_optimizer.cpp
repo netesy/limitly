@@ -80,6 +80,10 @@ std::shared_ptr<LiteralExpr> createNumericLiteral(const std::string& value, int 
 std::shared_ptr<Program> ASTOptimizer::optimizeProgram(std::shared_ptr<Program> program) {
     if (!program) return nullptr;
     
+    // CRITICAL FIX: Pre-analysis pass to identify all reassigned variables
+    // This prevents constant propagation of variables that will be reassigned later
+    preAnalyzeReassignments(program);
+    
     // Run optimizations in a loop until stable
     bool changed = true;
     int iterations = 0;
@@ -524,6 +528,8 @@ std::shared_ptr<Expression> ASTOptimizer::propagateConstants(std::shared_ptr<Exp
             return expr;
         }
         
+        // CRITICAL FIX: Only propagate if the variable is truly constant (never reassigned)
+        // This prevents propagating initial values when variables are later reassigned
         if (context.isConstant(variable->name)) {
             auto constant = context.getConstant(variable->name);
             if (constant) {
@@ -1097,6 +1103,100 @@ std::shared_ptr<Statement> ASTOptimizer::eliminateDeadCode(std::shared_ptr<State
     }
     
     return stmt;
+}
+
+// ============================================================================
+// PRE-ANALYSIS FOR REASSIGNMENT DETECTION
+// ============================================================================
+
+void ASTOptimizer::preAnalyzeReassignments(std::shared_ptr<Program> program) {
+    if (!program) return;
+    
+    // Walk through all statements and identify variables that get reassigned
+    for (auto& stmt : program->statements) {
+        preAnalyzeStatement(stmt);
+    }
+}
+
+void ASTOptimizer::preAnalyzeStatement(std::shared_ptr<Statement> stmt) {
+    if (!stmt) return;
+    
+    if (auto varDecl = std::dynamic_pointer_cast<VarDeclaration>(stmt)) {
+        // Variable declarations don't count as reassignments
+        if (varDecl->initializer) {
+            preAnalyzeExpression(varDecl->initializer);
+        }
+    } else if (auto block = std::dynamic_pointer_cast<BlockStatement>(stmt)) {
+        for (auto& s : block->statements) {
+            preAnalyzeStatement(s);
+        }
+    } else if (auto ifStmt = std::dynamic_pointer_cast<IfStatement>(stmt)) {
+        preAnalyzeExpression(ifStmt->condition);
+        preAnalyzeStatement(ifStmt->thenBranch);
+        if (ifStmt->elseBranch) {
+            preAnalyzeStatement(ifStmt->elseBranch);
+        }
+    } else if (auto whileStmt = std::dynamic_pointer_cast<WhileStatement>(stmt)) {
+        preAnalyzeExpression(whileStmt->condition);
+        preAnalyzeStatement(whileStmt->body);
+    } else if (auto forStmt = std::dynamic_pointer_cast<ForStatement>(stmt)) {
+        if (forStmt->initializer) {
+            preAnalyzeStatement(forStmt->initializer);
+        }
+        if (forStmt->condition) {
+            preAnalyzeExpression(forStmt->condition);
+        }
+        if (forStmt->increment) {
+            preAnalyzeExpression(forStmt->increment);
+        }
+        preAnalyzeStatement(forStmt->body);
+    } else if (auto returnStmt = std::dynamic_pointer_cast<ReturnStatement>(stmt)) {
+        if (returnStmt->value) {
+            preAnalyzeExpression(returnStmt->value);
+        }
+    } else if (auto printStmt = std::dynamic_pointer_cast<PrintStatement>(stmt)) {
+        for (auto& arg : printStmt->arguments) {
+            preAnalyzeExpression(arg);
+        }
+    } else if (auto exprStmt = std::dynamic_pointer_cast<ExprStatement>(stmt)) {
+        preAnalyzeExpression(exprStmt->expression);
+    }
+}
+
+void ASTOptimizer::preAnalyzeExpression(std::shared_ptr<Expression> expr) {
+    if (!expr) return;
+    
+    if (auto assign = std::dynamic_pointer_cast<AssignExpr>(expr)) {
+        // This is a reassignment - mark the variable as reassigned
+        context.markReassigned(assign->name);
+        preAnalyzeExpression(assign->value);
+    } else if (auto binary = std::dynamic_pointer_cast<BinaryExpr>(expr)) {
+        preAnalyzeExpression(binary->left);
+        preAnalyzeExpression(binary->right);
+    } else if (auto unary = std::dynamic_pointer_cast<UnaryExpr>(expr)) {
+        preAnalyzeExpression(unary->right);
+    } else if (auto interpolated = std::dynamic_pointer_cast<InterpolatedStringExpr>(expr)) {
+        for (const auto& part : interpolated->parts) {
+            if (auto exprPart = std::get_if<std::shared_ptr<Expression>>(&part)) {
+                preAnalyzeExpression(*exprPart);
+            }
+        }
+    } else if (auto grouping = std::dynamic_pointer_cast<GroupingExpr>(expr)) {
+        preAnalyzeExpression(grouping->expression);
+    } else if (auto ternary = std::dynamic_pointer_cast<TernaryExpr>(expr)) {
+        preAnalyzeExpression(ternary->condition);
+        preAnalyzeExpression(ternary->thenBranch);
+        preAnalyzeExpression(ternary->elseBranch);
+    } else if (auto call = std::dynamic_pointer_cast<CallExpr>(expr)) {
+        preAnalyzeExpression(call->callee);
+        for (auto& arg : call->arguments) {
+            preAnalyzeExpression(arg);
+        }
+        for (auto& [name, arg] : call->namedArgs) {
+            preAnalyzeExpression(arg);
+        }
+    }
+    // Other expression types (literals, variables) don't need pre-analysis
 }
 
 } // namespace AST
