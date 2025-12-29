@@ -668,12 +668,14 @@ You can control the visibility of class members (fields and methods) using `pub`
 *   **`private`** (default): The member can only be accessed from within the class.
 *   **`prot`** (protected): The member can be accessed from within the class and by its subclasses.
 *   **`pub`** (public): The member can be accessed from anywhere.
+*   **`const`**: The member is read-only and publicly accessible.
 
 ```limit
 class MyClass {
     var private_field = 1;      // private by default
     pub var public_field = 2;
     prot var protected_field = 3;
+    const PI = 3.14;
 
     fn private_method() {}      // private by default
     pub fn public_method() {}
@@ -956,16 +958,12 @@ print(result); // Output: 50
 
 ### Destructuring Assignments
 
-You can unpack values from tuples and lists into separate variables.
+You can unpack values from tuples into separate variables. List destructuring is not yet supported.
 
 ```limit
 // Destructuring a tuple
 var (name, age) = ("Alice", 30);
 print("{name} is {age} years old."); // Output: Alice is 30 years old.
-
-// Destructuring a list
-var [a, b, c] = [1, 2, 3];
-print(a); // Output: 1
 ```
 
 ### Unsafe Blocks
@@ -1072,6 +1070,10 @@ var current_status: Status = Status.Running;
 
 Traits and interfaces are used to define a set of methods that a class must implement. This is a powerful tool for abstraction and polymorphism.
 
+#### Traits
+
+Traits define a set of methods that a type must implement. They are similar to interfaces in other languages but can also contain implemented methods.
+
 ```limit
 trait Speaker {
     fn speak();
@@ -1080,6 +1082,23 @@ trait Speaker {
 class Dog : Speaker {
     fn speak() {
         print("Woof!");
+    }
+}
+```
+
+#### Interfaces
+
+Interfaces are similar to traits but can only contain method signatures, not implementations. They define a contract that a class must adhere to.
+
+```limit
+interface Serializable {
+    fn serialize(): str;
+}
+
+class User : Serializable {
+    var name: str;
+    fn serialize(): str {
+        return "{'name': '{self.name}'}";
     }
 }
 ```
