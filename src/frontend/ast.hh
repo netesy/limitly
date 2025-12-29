@@ -862,6 +862,11 @@ namespace AST {
         // Dead code detection
         bool isUnreachableCode(std::shared_ptr<Statement> stmt);
         std::shared_ptr<Statement> eliminateDeadCode(std::shared_ptr<Statement> stmt);
+        
+        // Pre-analysis for reassignment detection
+        void preAnalyzeReassignments(std::shared_ptr<Program> program);
+        void preAnalyzeStatement(std::shared_ptr<Statement> stmt);
+        void preAnalyzeExpression(std::shared_ptr<Expression> expr);
     };
 }
 

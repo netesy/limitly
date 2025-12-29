@@ -60,7 +60,7 @@ else
     CONCURRENCY_SRCS := src/backend/concurrency/scheduler.cpp src/backend/concurrency/thread_pool.cpp src/backend/concurrency/event_loop.cpp src/backend/concurrency/epoll_event_loop.cpp src/backend/concurrency/concurrency_runtime.cpp src/backend/concurrency/task_vm.cpp
 endif
 
-MAIN_SRCS := src/main.cpp $(BACKEND_COMMON_SRCS) $(BACK_SRCS) $(COMMON_SRCS) $(CONCURRENCY_SRCS) $(ERROR_SRCS)  $(FRONT_SRCS) $(REGISTER_SRCS) $(LIR_CORE_SRCS)
+MAIN_SRCS := src/main.cpp $(BACKEND_COMMON_SRCS) $(BACK_SRCS) $(COMMON_SRCS) $(CONCURRENCY_SRCS) $(ERROR_SRCS)  $(FRONT_SRCS) $(REGISTER_SRCS) $(LIR_CORE_SRCS) src/lir/function_registry.cpp
 TEST_SRCS := src/test_parser.cpp $(BACKEND_COMMON_SRCS) $(LIR_CORE_SRCS) $(ERROR_SRCS) $(FRONT_SRCS) src/lir/function_registry.cpp
 
 # =============================

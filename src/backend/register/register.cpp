@@ -1,5 +1,7 @@
 #include "register.hh"
 #include "../../lir/lir.hh"
+#include "../../lir/functions.hh"
+#include "../../lir/builtin_functions.hh"
 #include "../types.hh"
 #include <iostream>
 #include <cstring>
@@ -458,23 +460,110 @@ OP_RETURN:
     return;
 
 OP_CALL:
-    // Handle user function calls
+    // Handle both builtin and user function calls
     {
-        // Get function index from register a
-        auto func_index_value = registers[pc->a];
-        if (!std::holds_alternative<int64_t>(func_index_value)) {
-            registers[pc->dst] = nullptr;
+        // Get function index from operand b (immediate value)
+        int64_t func_index = static_cast<int64_t>(pc->b);
+        
+        // Get argument count from operand a (immediate value)
+        int arg_count = static_cast<int>(pc->a);
+        
+        // First try builtin functions
+        auto builtin_names = LIR::BuiltinUtils::getBuiltinFunctionNames();
+        if (func_index >= 0 && func_index < builtin_names.size()) {
+            auto func_name = builtin_names[func_index];
+            
+            // Collect arguments from registers (they should be in consecutive registers before the result register)
+            std::vector<ValuePtr> args;
+            
+            for (int i = 0; i < arg_count; ++i) {
+                // Arguments are in registers immediately before the result register
+                // The LIR generator allocates arguments in consecutive registers before the result
+                auto reg_index = pc->dst - arg_count + i;
+                auto reg_value = registers[reg_index];
+                
+                std::cout << "[DEBUG] Arg " << i << " register " << reg_index << " contains: ";
+                if (std::holds_alternative<int64_t>(reg_value)) {
+                    std::cout << "int64_t(" << std::get<int64_t>(reg_value) << ")" << std::endl;
+                } else if (std::holds_alternative<double>(reg_value)) {
+                    std::cout << "double(" << std::get<double>(reg_value) << ")" << std::endl;
+                } else if (std::holds_alternative<bool>(reg_value)) {
+                    std::cout << "bool(" << std::get<bool>(reg_value) << ")" << std::endl;
+                } else if (std::holds_alternative<std::string>(reg_value)) {
+                    std::cout << "string(" << std::get<std::string>(reg_value) << ")" << std::endl;
+                } else {
+                    std::cout << "nullptr" << std::endl;
+                }
+                
+                // Convert register value to ValuePtr
+                ValuePtr arg_value;
+                if (std::holds_alternative<int64_t>(reg_value)) {
+                    auto int_type = std::make_shared<::Type>(TypeTag::Int);
+                    arg_value = std::make_shared<Value>(int_type, std::get<int64_t>(reg_value));
+                    std::cout << "[DEBUG] Created Value with TypeTag::Int (" << static_cast<int>(TypeTag::Int) << ")" << std::endl;
+                } else if (std::holds_alternative<double>(reg_value)) {
+                    auto float_type = std::make_shared<::Type>(TypeTag::Float64);
+                    arg_value = std::make_shared<Value>(float_type, std::get<double>(reg_value));
+                    std::cout << "[DEBUG] Created Value with TypeTag::Float64 (" << static_cast<int>(TypeTag::Float64) << ")" << std::endl;
+                } else if (std::holds_alternative<bool>(reg_value)) {
+                    auto bool_type = std::make_shared<::Type>(TypeTag::Bool);
+                    arg_value = std::make_shared<Value>(bool_type, std::get<bool>(reg_value));
+                    std::cout << "[DEBUG] Created Value with TypeTag::Bool (" << static_cast<int>(TypeTag::Bool) << ")" << std::endl;
+                } else if (std::holds_alternative<std::string>(reg_value)) {
+                    auto string_type = std::make_shared<::Type>(TypeTag::String);
+                    arg_value = std::make_shared<Value>(string_type, std::get<std::string>(reg_value));
+                    std::cout << "[DEBUG] Created Value with TypeTag::String (" << static_cast<int>(TypeTag::String) << ")" << std::endl;
+                } else {
+                    auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
+                    arg_value = std::make_shared<Value>(nil_type);
+                }
+                args.push_back(arg_value);
+            }
+            
+            try {
+                // Call builtin function
+                ValuePtr result = LIR::BuiltinUtils::callBuiltinFunction(func_name, args);
+                
+                // Convert result back to register value
+                if (result && result->type) {
+                    switch (result->type->tag) {
+                        case TypeTag::Int:
+                        case TypeTag::Int64:
+                            registers[pc->dst] = result->as<int64_t>();
+                            break;
+                        case TypeTag::Float64:
+                            registers[pc->dst] = result->as<double>();
+                            break;
+                        case TypeTag::Bool:
+                            registers[pc->dst] = result->as<bool>();
+                            break;
+                        case TypeTag::String:
+                            registers[pc->dst] = result->as<std::string>();
+                            break;
+                        default:
+                            registers[pc->dst] = nullptr;
+                            break;
+                    }
+                } else {
+                    registers[pc->dst] = nullptr;
+                }
+            } catch (const std::exception& e) {
+                std::cerr << "Error calling builtin function " << func_name << ": " << e.what() << std::endl;
+                registers[pc->dst] = nullptr;
+            }
+            
             DISPATCH();
         }
         
-        int64_t func_index = std::get<int64_t>(func_index_value);
-        
-        // Get function from LIRFunctionManager
+        // Then try user-defined functions
         auto& func_manager = LIR::LIRFunctionManager::getInstance();
         auto function_names = func_manager.getFunctionNames();
         
-        if (func_index >= 0 && func_index < function_names.size()) {
-            auto func_name = function_names[func_index];
+        // Adjust index for user functions (subtract builtin count)
+        int64_t user_func_index = func_index - builtin_names.size();
+        
+        if (user_func_index >= 0 && user_func_index < function_names.size()) {
+            auto func_name = function_names[user_func_index];
             auto func = func_manager.getFunction(func_name);
             
             if (func) {
@@ -483,7 +572,10 @@ OP_CALL:
                 auto saved_pc = pc;
                 
                 // Set up parameters (move from caller's parameter registers to callee's parameter registers)
-                // For now, assume parameters are already in the right registers
+                int arg_count = static_cast<int>(pc->b);
+                for (int i = 0; i < arg_count && i < func->getParameters().size(); ++i) {
+                    registers[i] = registers[pc->b + i + 1]; // Copy arguments to parameter registers
+                }
                 
                 // Execute function
                 execute_lir_function(*func);

@@ -47,11 +47,38 @@ ValuePtr LIRBuiltinFunction::execute(const std::vector<ValuePtr>& args) {
                               ", got " + std::to_string(args.size()) + ")");
     }
     
-    // Validate argument types
+    // Validate argument types (with some flexibility for numeric types)
     for (size_t i = 0; i < args.size(); i++) {
-        if (!args[i] || args[i]->type->tag != paramTypes_[i]) {
+        if (!args[i]) {
             throw std::runtime_error("Argument type mismatch for LIR builtin function: " + name_ + 
-                                  " at position " + std::to_string(i));
+                                  " at position " + std::to_string(i) + " (null argument)");
+        }
+        
+        TypeTag expected = paramTypes_[i];
+        TypeTag actual = args[i]->type->tag;
+        
+        // Allow some flexibility for numeric types
+        bool type_compatible = (expected == actual);
+        
+        // Allow int variants to be compatible
+        if (!type_compatible && 
+            (expected == TypeTag::Int || expected == TypeTag::Int32 || expected == TypeTag::Int64) &&
+            (actual == TypeTag::Int || actual == TypeTag::Int32 || actual == TypeTag::Int64)) {
+            type_compatible = true;
+        }
+        
+        // Allow float variants to be compatible  
+        if (!type_compatible &&
+            (expected == TypeTag::Float32 || expected == TypeTag::Float64) &&
+            (actual == TypeTag::Float32 || actual == TypeTag::Float64)) {
+            type_compatible = true;
+        }
+        
+        if (!type_compatible) {
+            throw std::runtime_error("Argument type mismatch for LIR builtin function: " + name_ + 
+                                  " at position " + std::to_string(i) + 
+                                  " (expected " + std::to_string(static_cast<int>(expected)) + 
+                                  ", got " + std::to_string(static_cast<int>(actual)) + ")");
         }
     }
     
@@ -238,14 +265,34 @@ void LIRBuiltinFunctions::registerIOFunctions() {
 }
 
 void LIRBuiltinFunctions::registerMathFunctions() {
+    // Polymorphic abs function that handles both integers and floats
     registerFunction(std::make_shared<LIRBuiltinFunction>(
         "abs",
         std::vector<TypeTag>{TypeTag::Int},
         TypeTag::Int,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
-            int64_t value = args[0]->as<int64_t>();
-            auto int_type = std::make_shared<::Type>(TypeTag::Int);
-            return std::make_shared<Value>(int_type, value < 0 ? -value : value);
+            if (!args[0] || !args[0]->type) {
+                throw std::runtime_error("Invalid argument to abs function");
+            }
+            
+            TypeTag argType = args[0]->type->tag;
+            
+            // Handle integer types
+            if (argType == TypeTag::Int || argType == TypeTag::Int32 || argType == TypeTag::Int64) {
+                int64_t value = args[0]->as<int64_t>();
+                auto int_type = std::make_shared<::Type>(TypeTag::Int);
+                return std::make_shared<Value>(int_type, value < 0 ? -value : value);
+            }
+            // Handle float types
+            else if (argType == TypeTag::Float32 || argType == TypeTag::Float64) {
+                double value = args[0]->as<double>();
+                auto float_type = std::make_shared<::Type>(TypeTag::Float64);
+                return std::make_shared<Value>(float_type, std::fabs(value));
+            }
+            else {
+                throw std::runtime_error("abs function requires numeric argument (got type " + 
+                                       std::to_string(static_cast<int>(argType)) + ")");
+            }
         }
     ));
     
@@ -272,14 +319,34 @@ void LIRBuiltinFunctions::registerMathFunctions() {
         }
     ));
     
+    // Polymorphic sqrt function that handles both integers and floats
     registerFunction(std::make_shared<LIRBuiltinFunction>(
         "sqrt",
         std::vector<TypeTag>{TypeTag::Float32},
-        TypeTag::Float32,
+        TypeTag::Float64,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
-            double value = args[0]->as<double>();
+            if (!args[0] || !args[0]->type) {
+                throw std::runtime_error("Invalid argument to sqrt function");
+            }
+            
+            double value;
+            TypeTag argType = args[0]->type->tag;
+            
+            // Handle integer types - convert to double
+            if (argType == TypeTag::Int || argType == TypeTag::Int32 || argType == TypeTag::Int64) {
+                value = static_cast<double>(args[0]->as<int64_t>());
+            }
+            // Handle float types
+            else if (argType == TypeTag::Float32 || argType == TypeTag::Float64) {
+                value = args[0]->as<double>();
+            }
+            else {
+                throw std::runtime_error("sqrt function requires numeric argument (got type " + 
+                                       std::to_string(static_cast<int>(argType)) + ")");
+            }
+            
             if (value < 0) throw std::runtime_error("Square root of negative number");
-            auto float_type = std::make_shared<::Type>(TypeTag::Float32);
+            auto float_type = std::make_shared<::Type>(TypeTag::Float64);
             return std::make_shared<Value>(float_type, std::sqrt(value));
         }
     ));

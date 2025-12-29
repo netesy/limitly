@@ -1218,10 +1218,44 @@ Reg Generator::emit_call_expr(AST::CallExpr& expr) {
                 set_register_abi_type(result, language_type_to_abi_type(any_type));
             }
             
-            // Generate builtin call instruction with negative ID
-            // Use negative IDs to distinguish from user functions
-            int32_t builtin_id = -1; // Will be resolved by function name in JIT
-            emit_instruction(LIR_Inst(LIR_Op::Call, result, static_cast<Reg>(arg_regs.size()), static_cast<Reg>(builtin_id)));
+            // Get builtin function index
+            auto builtin_names = BuiltinUtils::getBuiltinFunctionNames();
+            int32_t builtin_id = -1;
+            for (size_t i = 0; i < builtin_names.size(); ++i) {
+                if (builtin_names[i] == func_name) {
+                    builtin_id = static_cast<int32_t>(i);
+                    break;
+                }
+            }
+            
+            if (builtin_id == -1) {
+                std::cerr << "[ERROR] Builtin function '" << func_name << "' not found in registry" << std::endl;
+                builtin_id = 0; // Fallback to first function
+            }
+            
+            std::cout << "[DEBUG] Builtin function '" << func_name << "' has index " << builtin_id << std::endl;
+            
+            // Generate builtin call instruction with correct function ID and argument registers
+            // For now, we'll use a convention where arguments are in consecutive registers before the result
+            // This is a limitation of the current LIR instruction format that only has 2 operand slots
+            
+            // Add assertion to catch register mismatches at codegen time
+            if (arg_regs.size() > 2) {
+                std::cerr << "[ERROR] Function '" << func_name << "' has " << arg_regs.size() 
+                         << " arguments, but LIR instruction format only supports 2 operands" << std::endl;
+                return 0;
+            }
+            
+            // For single argument functions, put the argument register in 'a' field
+            // For two argument functions, put them in 'a' and 'b' fields
+            Reg arg1_reg = (arg_regs.size() >= 1) ? arg_regs[0] : 0;
+            Reg arg2_reg = (arg_regs.size() >= 2) ? arg_regs[1] : 0;
+            
+            // Store function index in the immediate field instead
+            emit_instruction(LIR_Inst(LIR_Op::Call, result, arg1_reg, arg2_reg, static_cast<Imm>(builtin_id)));
+            
+            std::cout << "[DEBUG] Generated call with arg1_reg=" << arg1_reg << ", arg2_reg=" << arg2_reg 
+                     << ", func_id=" << builtin_id << std::endl;
             
             return result;
             

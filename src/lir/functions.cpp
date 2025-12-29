@@ -1,4 +1,5 @@
 #include "functions.hh"
+#include "function_registry.hh"
 #include "lir.hh"
 #include "../backend/types.hh"
 #include <iostream>
@@ -69,8 +70,37 @@ LIRFunctionManager& LIRFunctionManager::getInstance() {
 }
 
 void LIRFunctionManager::initialize() {
+    if (initialized_) {
+        return;
+    }
+    
     // Initialize builtins first
     BuiltinUtils::initializeBuiltins();
+    
+    // Register builtin functions with the function registry for JIT compilation
+    auto& registry = FunctionRegistry::getInstance();
+    auto builtin_names = BuiltinUtils::getBuiltinFunctionNames();
+    
+    for (const auto& name : builtin_names) {
+        // Create a simple LIR function wrapper for builtins
+        auto lir_func = std::make_unique<LIR_Function>("builtin_" + name, 0);
+        lir_func->name = name;
+        lir_func->param_count = 0; // Will be determined at call time
+        
+        // Add a simple call instruction to the builtin
+        LIR_Inst call_inst(LIR_Op::Call, 0, 0, 0, 0);
+        call_inst.dst = 0; // Return value in register 0
+        call_inst.a = 0;   // Function index (will be resolved)
+        call_inst.b = 0;   // Argument count (will be resolved)
+        lir_func->instructions.push_back(call_inst);
+        
+        // Add return instruction
+        LIR_Inst ret_inst(LIR_Op::Return, 0, 0, 0, 0);
+        ret_inst.a = 0; // Return register 0
+        lir_func->instructions.push_back(ret_inst);
+        
+        registry.registerFunction(name, std::move(lir_func));
+    }
     
     initialized_ = true;
 }
@@ -84,8 +114,27 @@ void LIRFunctionManager::registerFunction(std::shared_ptr<LIRFunction> function)
     functions_[name] = function;
     
     // Also register with the LIR function registry for JIT compilation
-    // Note: We don't use the backend UserDefinedFunction system since LIR functions are independent
-    // The registry will handle the function lookup for JIT compilation
+    auto& registry = FunctionRegistry::getInstance();
+    
+    // Convert LIRFunction to LIR_Function for registry
+    auto lir_func = std::make_unique<LIR_Function>(name, function->getParameters().size());
+    lir_func->name = name;
+    lir_func->param_count = function->getParameters().size();
+    
+    // Set up register types for parameters
+    for (size_t i = 0; i < function->getParameters().size(); ++i) {
+        lir_func->register_types[i] = function->getParameters()[i].type;
+    }
+    
+    // Set return type if available
+    if (function->getReturnType()) {
+        lir_func->register_types[0] = *function->getReturnType(); // Return value in register 0
+    }
+    
+    // Copy instructions if available
+    lir_func->instructions = function->getInstructions();
+    
+    registry.registerFunction(name, std::move(lir_func));
 }
 
 std::shared_ptr<LIRFunction> LIRFunctionManager::getFunction(const std::string& name) {

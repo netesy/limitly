@@ -1,6 +1,7 @@
 #include "jit.hh"
 #include "../../lir/lir.hh"
 #include "../../lir/functions.hh"
+#include "../../lir/builtin_functions.hh"
 #include "../memory.hh"
 #include "../register/register.hh"
 #include <libgccjit++.h>
@@ -1164,19 +1165,66 @@ void JITBackend::compile_call(const LIR::LIR_Inst& inst) {
     // Get number of arguments from inst.a
     int32_t arg_count = static_cast<int32_t>(inst.a);
     
-    // Access LIR function manager to get function
+    // First check if this is a builtin function call
+    auto builtin_names = LIR::BuiltinUtils::getBuiltinFunctionNames();
+    if (function_id >= 0 && function_id < static_cast<int32_t>(builtin_names.size())) {
+        // This is a builtin function call
+        std::string func_name = builtin_names[function_id];
+        
+        // For JIT compilation of builtin functions, we need to create inline implementations
+        // For now, let's handle some common builtins
+        if (func_name == "print") {
+            // Inline print implementation
+            if (arg_count > 0) {
+                gccjit::rvalue arg = get_jit_register(inst.a + 1); // First argument
+                
+                // Determine type and call appropriate print function
+                gcc_jit_type* arg_type = arg.get_type().get_inner_type();
+                if (arg_type == m_int_type.get_inner_type()) {
+                    compile_print_int(LIR::LIR_Inst{LIR::LIR_Op::PrintInt, 0, static_cast<LIR::Reg>(inst.a + 1), 0, 0});
+                } else if (arg_type == m_double_type.get_inner_type()) {
+                    compile_print_float(LIR::LIR_Inst{LIR::LIR_Op::PrintFloat, 0, static_cast<LIR::Reg>(inst.a + 1), 0, 0});
+                } else if (arg_type == m_bool_type.get_inner_type()) {
+                    compile_print_bool(LIR::LIR_Inst{LIR::LIR_Op::PrintBool, 0, static_cast<LIR::Reg>(inst.a + 1), 0, 0});
+                } else if (arg_type == m_const_char_ptr_type.get_inner_type()) {
+                    compile_print_string(LIR::LIR_Inst{LIR::LIR_Op::PrintString, 0, static_cast<LIR::Reg>(inst.a + 1), 0, 0});
+                }
+            }
+            
+            // Set return value to nil/0
+            if (inst.dst != 0) {
+                gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+                m_current_block.add_assignment(dst, m_context.new_rvalue(m_int_type, 0));
+            }
+            return;
+        }
+        
+        // For other builtins, create a simple placeholder implementation
+        if (inst.dst != 0) {
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+            m_current_block.add_assignment(dst, m_context.new_rvalue(m_int_type, 0));
+        }
+        return;
+    }
+    
+    // Handle user-defined functions
     auto& func_manager = LIR::LIRFunctionManager::getInstance();
     auto function_names = func_manager.getFunctionNames();
     
+    // Adjust function ID for user functions (subtract builtin count)
+    int32_t user_func_id = function_id - static_cast<int32_t>(builtin_names.size());
+    
     // Find function by ID/index
     std::string func_name;
-    if (function_id >= 0 && function_id < static_cast<int32_t>(function_names.size())) {
-        func_name = function_names[function_id];
+    if (user_func_id >= 0 && user_func_id < static_cast<int32_t>(function_names.size())) {
+        func_name = function_names[user_func_id];
     } else {
         // Invalid function ID, return 0
-        gccjit::rvalue result = m_context.new_rvalue(m_int_type, 0);
-        gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
-        m_current_block.add_assignment(dst, result);
+        if (inst.dst != 0) {
+            gccjit::rvalue result = m_context.new_rvalue(m_int_type, 0);
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+            m_current_block.add_assignment(dst, result);
+        }
         return;
     }
     
@@ -1184,9 +1232,11 @@ void JITBackend::compile_call(const LIR::LIR_Inst& inst) {
     auto lir_func = func_manager.getFunction(func_name);
     if (!lir_func) {
         // Function not found, return 0
-        gccjit::rvalue result = m_context.new_rvalue(m_int_type, 0);
-        gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
-        m_current_block.add_assignment(dst, result);
+        if (inst.dst != 0) {
+            gccjit::rvalue result = m_context.new_rvalue(m_int_type, 0);
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+            m_current_block.add_assignment(dst, result);
+        }
         return;
     }
     
