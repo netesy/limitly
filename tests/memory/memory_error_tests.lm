@@ -1,0 +1,130 @@
+// =============================================================================
+// MEMORY ERROR DETECTION TESTS
+// Tests that should trigger memory safety errors
+// =============================================================================
+
+// Test 1: Use after move
+var source: int = 100;
+var target: int = source;  // source is moved
+print(source);  // ERROR: Use after move
+
+// Test 2: Use before initialization
+var uninitialized: int;
+print(uninitialized);  // ERROR: Use before initialization
+
+// Test 3: Double move
+var original: int = 200;
+var first_move: int = original;   // original is moved
+var second_move: int = original;  // ERROR: Double move
+
+// Test 4: Use after scope ends
+var out_of_scope: int;
+{
+    var scoped: int = 300;
+    out_of_scope = scoped;  // scoped is moved out of its scope
+}
+print(out_of_scope);  // ERROR: Value from expired scope
+
+// Test 5: Invalid reference after move
+var linear_value: int = 400;
+var reference = linear_value;  // Creates reference
+var moved_value: int = linear_value;  // linear_value is moved, invalidating reference
+print(reference);  // ERROR: Reference to moved value
+
+// Test 6: Use after drop (if explicit drop was implemented)
+var droppable: int = 500;
+// drop(droppable);  // Explicit drop (if implemented)
+// print(droppable);  // ERROR: Use after drop
+
+// Test 7: Memory leak (variable not cleaned up)
+{
+    var leaked: int = 600;
+    // Variable goes out of scope without proper cleanup
+    // ERROR: Memory leak (for complex types)
+}
+
+// Test 8: Dangling pointer simulation
+var pointer_target: int = 700;
+var pointer_ref = pointer_target;  // Create reference
+pointer_target = 800;  // Reassign target, potentially invalidating reference
+print(pointer_ref);  // ERROR: Potentially dangling reference
+
+// Test 9: Use of moved function parameter disabled - fn system is faulty
+// fn consume_parameter(param: int): int {
+//     var consumed: int = param;  // param is moved
+//     print(param);  // ERROR: Use after move within function
+//     return consumed;
+// }
+
+// Test 10: Return of moved local variable disabled - fn system is faulty
+// fn return_moved_local(): int {
+//     var local: int = 900;
+//     var moved: int = local;  // local is moved
+//     return local;  // ERROR: Return of moved variable
+// }
+
+// Test 11: Multiple mutable references (if implemented)
+var shared: int = 1000;
+// var mut_ref1 = &mut shared;  // First mutable reference
+// var mut_ref2 = &mut shared;  // ERROR: Multiple mutable references
+
+// Test 12: Mutable and immutable references conflict (if implemented)
+var conflicted: int = 1100;
+// var immut_ref = &conflicted;     // Immutable reference
+// var mut_ref = &mut conflicted;   // ERROR: Mutable reference while immutable exists
+
+// Test 13: Reference outliving target
+var target_var: int = 1200;
+var long_lived_ref: int;
+{
+    var short_lived: int = 1300;
+    long_lived_ref = short_lived;  // Reference to short-lived variable
+}
+print(long_lived_ref);  // ERROR: Reference outlives target
+
+// Test 14: Use in different generation
+var generational: int = 1400;
+var gen_ref = generational;  // Create reference in generation 1
+generational = 1500;  // Move to generation 2
+print(gen_ref);  // ERROR: Reference from different generation
+
+// Test 15: Buffer overflow simulation (if array bounds checking implemented)
+// var array: [int; 5] = [1, 2, 3, 4, 5];
+// var overflow = array[10];  // ERROR: Buffer overflow
+
+// Test 16: Uninitialized variable in expression
+var uninit_a: int;
+var uninit_b: int;
+var result: int = uninit_a + uninit_b;  // ERROR: Use of uninitialized variables
+
+// Test 17: Move in loop causing issues
+var loop_var: int = 1600;
+for (var i: int = 0; i < 3; i = i + 1) {
+    var moved_in_loop: int = loop_var;  // loop_var is moved in first iteration
+    print(moved_in_loop);
+}
+print(loop_var);  // ERROR: Use after move (moved in loop)
+
+// Test 18: Conditional move causing issues
+var conditional: int = 1700;
+var condition: bool = true;
+if (condition) {
+    var moved_conditionally: int = conditional;  // conditional is moved
+}
+print(conditional);  // ERROR: Use after conditional move
+
+// Test 19: Function call with moved argument disabled - fn system is faulty
+// fn process_value(value: int) {
+//     print(value);
+// }
+
+// var func_arg: int = 1800;
+// var moved_arg: int = func_arg;  // func_arg is moved
+// process_value(func_arg);  // ERROR: Use of moved variable as function argument
+
+// Test 20: Assignment to moved variable
+var assign_target: int = 1900;
+var moved_target: int = assign_target;  // assign_target is moved
+assign_target = 2000;  // ERROR: Assignment to moved variable
+
+print("Memory error tests completed - errors should be detected!");

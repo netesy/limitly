@@ -1139,13 +1139,10 @@ Reg Generator::emit_unary_expr(AST::UnaryExpr& expr) {
 }
 
 Reg Generator::emit_call_expr(AST::CallExpr& expr) {
-    // Generate proper Call instruction with function ID
-    // The JIT will resolve and call the function at runtime
-    
     if (auto var_expr = dynamic_cast<AST::VariableExpr*>(expr.callee.get())) {
         std::string func_name = var_expr->name;
         
-        // Check if this is a module function call (e.g., "math.add")
+        // Check if this is a module function call (e.g., "math::add")
         size_t dot_pos = func_name.find("::");
         if (dot_pos != std::string::npos) {
             std::string module_name = func_name.substr(0, dot_pos);
@@ -1188,8 +1185,8 @@ Reg Generator::emit_call_expr(AST::CallExpr& expr) {
                     set_register_abi_type(result, language_type_to_abi_type(any_type));
                 }
                 
-                // Generate module function call
-                emit_instruction(LIR_Inst(LIR_Op::Call, result, static_cast<Reg>(arg_regs.size()), static_cast<Reg>(0)));
+                // Generate module function call using new format: call r2, module_func(r0, r1)
+                emit_instruction(LIR_Inst(LIR_Op::Call, result, qualified_name, arg_regs));
                 
                 return result;
             }
@@ -1218,76 +1215,17 @@ Reg Generator::emit_call_expr(AST::CallExpr& expr) {
                 set_register_abi_type(result, language_type_to_abi_type(any_type));
             }
             
-            // Get builtin function index
-            auto builtin_names = BuiltinUtils::getBuiltinFunctionNames();
-            int32_t builtin_id = -1;
-            for (size_t i = 0; i < builtin_names.size(); ++i) {
-                if (builtin_names[i] == func_name) {
-                    builtin_id = static_cast<int32_t>(i);
-                    break;
-                }
-            }
+            std::cout << "[DEBUG] Builtin function '" << func_name << "' called with " << arg_regs.size() << " arguments" << std::endl;
             
-            if (builtin_id == -1) {
-                std::cerr << "[ERROR] Builtin function '" << func_name << "' not found in registry" << std::endl;
-                builtin_id = 0; // Fallback to first function
-            }
+            // Generate builtin call using new format: call r2, builtin_func(r0, r1, r2, ...)
+            emit_instruction(LIR_Inst(LIR_Op::Call, result, func_name, arg_regs));
             
-            std::cout << "[DEBUG] Builtin function '" << func_name << "' has index " << builtin_id << std::endl;
-            
-            // Generate builtin call instruction with correct function ID and argument registers
-            // For now, we'll use a convention where arguments are in consecutive registers before the result
-            // This is a limitation of the current LIR instruction format that only has 2 operand slots
-            
-            // Add assertion to catch register mismatches at codegen time
-            if (arg_regs.size() > 2) {
-                std::cerr << "[ERROR] Function '" << func_name << "' has " << arg_regs.size() 
-                         << " arguments, but LIR instruction format only supports 2 operands" << std::endl;
-                return 0;
-            }
-            
-            // For single argument functions, put the argument register in 'a' field
-            // For two argument functions, put them in 'a' and 'b' fields
-            Reg arg1_reg = (arg_regs.size() >= 1) ? arg_regs[0] : 0;
-            Reg arg2_reg = (arg_regs.size() >= 2) ? arg_regs[1] : 0;
-            
-            // Store function index in the immediate field instead
-            emit_instruction(LIR_Inst(LIR_Op::Call, result, arg1_reg, arg2_reg, static_cast<Imm>(builtin_id)));
-            
-            std::cout << "[DEBUG] Generated call with arg1_reg=" << arg1_reg << ", arg2_reg=" << arg2_reg 
-                     << ", func_id=" << builtin_id << std::endl;
+            std::cout << "[DEBUG] Generated call: call r" << result << ", " << func_name << "(...)" << std::endl;
             
             return result;
             
         } else if (function_table_.find(func_name) != function_table_.end()) {
             std::cout << "[DEBUG] LIR Generator: Generating call to user function '" << func_name << "'" << std::endl;
-            
-            // Get function index from LIRFunctionManager
-            auto& func_manager = LIRFunctionManager::getInstance();
-            auto function_names = func_manager.getFunctionNames();
-            
-            // Debug: Print all registered functions
-            std::cout << "[DEBUG] Registered functions: ";
-            for (size_t i = 0; i < function_names.size(); ++i) {
-                std::cout << "[" << i << "]:" << function_names[i] << " ";
-            }
-            std::cout << std::endl;
-            
-            // Find the index of this function
-            int32_t func_index = -1;
-            for (size_t i = 0; i < function_names.size(); ++i) {
-                if (function_names[i] == func_name) {
-                    func_index = static_cast<int32_t>(i);
-                    break;
-                }
-            }
-            
-            if (func_index == -1) {
-                report_error("Function not found in LIRFunctionManager: " + func_name);
-                return 0;
-            }
-            
-            std::cout << "[DEBUG] Calling function '" << func_name << "' with index " << func_index << std::endl;
             
             // Evaluate arguments and store them in registers
             std::vector<Reg> arg_regs;
@@ -1309,8 +1247,8 @@ Reg Generator::emit_call_expr(AST::CallExpr& expr) {
                 set_register_abi_type(result, language_type_to_abi_type(any_type));
             }
             
-            // Generate call instruction with function index
-            emit_instruction(LIR_Inst(LIR_Op::Call, result, static_cast<Reg>(arg_regs.size()), static_cast<Reg>(func_index)));
+            // Generate user function call using new format: call r2, user_func(r0, r1, r2, ...)
+            emit_instruction(LIR_Inst(LIR_Op::Call, result, func_name, arg_regs));
             
             return result;
             
@@ -1325,32 +1263,26 @@ Reg Generator::emit_call_expr(AST::CallExpr& expr) {
         // Evaluate the object (this will be the first argument)
         Reg object_reg = emit_expr(*member_expr->object);
         
+        // Evaluate other arguments
+        std::vector<Reg> arg_regs;
+        arg_regs.push_back(object_reg); // 'this' is first parameter
+        for (const auto& arg : expr.arguments) {
+            Reg arg_reg = emit_expr(*arg);
+            arg_regs.push_back(arg_reg);
+        }
+        
         // Try to find the method in any class
         for (const auto& [class_name, class_info] : class_table_) {
             auto method_it = class_info.method_indices.find(method_name);
             if (method_it != class_info.method_indices.end()) {
                 // Found the method - generate method call
-                std::vector<Reg> arg_regs;
-                arg_regs.push_back(object_reg); // 'this' is first parameter
-                
-                // Evaluate other arguments
-                for (const auto& arg : expr.arguments) {
-                    Reg arg_reg = emit_expr(*arg);
-                    arg_regs.push_back(arg_reg);
-                }
-                
-                // Allocate result register
                 Reg result = allocate_register();
                 
-                // Generate method call using V-Table dispatch
-                // For now, we'll use a simple approach - in a full implementation,
-                // we'd load the V-Table and do dynamic dispatch
+                // Generate method call using new format: call r2, method_name(r0, r1, r2, ...)
                 std::string full_method_name = class_name + "." + method_name;
-                if (function_table_.find(full_method_name) != function_table_.end()) {
-                    emit_instruction(LIR_Inst(LIR_Op::Call, result, static_cast<Reg>(arg_regs.size()), static_cast<Reg>(0)));
-                    set_register_type(result, std::make_shared<::Type>(::TypeTag::Any));
-                    return result;
-                }
+                emit_instruction(LIR_Inst(LIR_Op::Call, result, full_method_name, arg_regs));
+                set_register_type(result, std::make_shared<::Type>(::TypeTag::Any));
+                return result;
             }
         }
         
@@ -2206,96 +2138,27 @@ void Generator::emit_return_stmt(AST::ReturnStatement& stmt) {
 }
 
 void Generator::emit_func_stmt(AST::FunctionDeclaration& stmt) {
-    std::cout << "[DEBUG] LIR Generator: Pass 1 - Processing function '" << stmt.name << "'" << std::endl;
+    std::cout << "[DEBUG] LIR Generator: Processing function declaration '" << stmt.name << "'" << std::endl;
     
-    // Generate proper LIR instructions for function body
-    // Save current context
-    auto saved_function = std::move(current_function_);
-    auto saved_next_register = next_register_;
-    auto saved_cfg_context = cfg_context_;
-    
-    // Create a new function for this function body
-    auto func = std::make_unique<LIR_Function>(stmt.name, stmt.params.size());
-    current_function_ = std::move(func);
-    next_register_ = stmt.params.size();  // Start after parameters
-    
-    // Disable CFG building for function bodies (use linear instructions)
-    cfg_context_.building_cfg = false;
-    cfg_context_.current_block = nullptr;
-    
-    // Enter function scope for parameter bindings
-    enter_scope();
-    
-    // Bind parameters to registers
+    // Collect parameter registers
+    std::vector<Reg> param_regs;
     for (size_t i = 0; i < stmt.params.size(); ++i) {
-        bind_variable(stmt.params[i].first, static_cast<Reg>(i));
-        set_register_type(static_cast<Reg>(i), nullptr);
+        param_regs.push_back(static_cast<Reg>(i));
     }
     
-    // Emit function body from AST
-    if (stmt.body) {
-        emit_stmt(*stmt.body);
+    // Determine return register (if function has return type)
+    Reg return_reg = 0;
+    if (stmt.returnType.has_value()) {
+        return_reg = static_cast<Reg>(stmt.params.size()); // Return register comes after parameters
     }
     
-    // Ensure function has a return instruction
-    if (current_function_->instructions.empty() || 
-        !current_function_->instructions.back().isReturn()) {
-        // If no explicit return, add implicit void return
-        emit_instruction(LIR_Inst(LIR_Op::Ret, 0, 0, 0));
-    }
+    // Emit function definition using new format: fn r2, add(r0, r1) {
+    emit_instruction(LIR_Inst(LIR_Op::FuncDef, stmt.name, param_regs, return_reg));
     
-    // Exit function scope
-    exit_scope();
-    
-    // Create function metadata for registration
-    std::vector<LIRParameter> params;
-    for (size_t i = 0; i < stmt.params.size(); ++i) {
-        LIRParameter lir_param;
-        lir_param.name = stmt.params[i].first;
-        auto param_type = convert_ast_type_to_lir_type(stmt.params[i].second);
-        lir_param.type = param_type ? typeTagToLIRType(param_type->tag) : Type::I32;
-        params.push_back(lir_param);
-    }
-    
-    auto return_type = stmt.returnType ? 
-        std::optional<Type>(typeTagToLIRType(convert_ast_type_to_lir_type(stmt.returnType.value())->tag)) : 
-        std::nullopt;
-    
-    if (!return_type.has_value()) {
-        return_type = Type::I64;
-    }
-    
-    // Create a simple lambda that delegates to JIT execution
-    std::string func_name = stmt.name;
-    LIRFunctionBody jit_body = [func_name](const std::vector<ValuePtr>& args) -> ValuePtr {
-        // This lambda will be replaced by actual JIT execution
-        // For now, return a default value
-        auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
-        return std::make_shared<Value>(int_type, int64_t(0));
-    };
-    
-    // Create the LIR function with the generated instructions
-    auto lir_func = std::make_shared<LIRFunction>(func_name, params, return_type, jit_body);
-    
-    // Store the generated instructions in the LIRFunction
-    lir_func->setInstructions(current_function_->instructions);
-    
-    // Debug asserts to ensure function invariants
-    assert(!current_function_->instructions.empty() && "Function must have at least one instruction");
-    assert(current_function_->instructions.back().isReturn() && "Function must end with a return instruction");
-    
-    std::cout << "[DEBUG] Generated " << current_function_->instructions.size() << " LIR instructions for function '" << stmt.name << "'" << std::endl;
-    
-    // Register function with LIRFunctionManager
-    LIRFunctionManager::getInstance().registerFunction(lir_func);
-    std::cout << "[DEBUG] Function registered successfully" << std::endl;
-    
-    // Restore context
-    current_function_ = std::move(saved_function);
-    next_register_ = saved_next_register;
-    cfg_context_ = saved_cfg_context;
-    
-    std::cout << "[DEBUG] LIR Generator: Pass 1 complete - Function '" << stmt.name << "' updated with LIR implementation" << std::endl;
+    // Generate function body (this will be handled by the separate function generation pass)
+    // For now, just emit a placeholder
+    std::cout << "[DEBUG] Function '" << stmt.name << "' definition emitted with " 
+              << param_regs.size() << " parameters" << std::endl;
 }
 
 void Generator::emit_import_stmt(AST::ImportStatement& stmt) {

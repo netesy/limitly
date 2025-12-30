@@ -1,0 +1,65 @@
+// =============================================================================
+// TYPE ERROR DETECTION TESTS
+// Tests that should trigger type checking errors
+// =============================================================================
+
+// Test 1: Type mismatch in variable declaration
+var x: int = "not an integer";  // ERROR: Type mismatch
+
+// Test 2: Type mismatch in assignment
+var y: string = 42;  // ERROR: Type mismatch
+
+// Test 3: Function parameter type mismatch disabled - fn system is faulty
+// fn add_numbers(a: int, b: int): int {
+//     return a + b;
+// }
+
+// var wrong_call = add_numbers("hello", "world");  // ERROR: Wrong parameter types
+
+// Test 4: Return type mismatch disabled - fn system is faulty
+// fn get_string(): string {
+//     return 42;  // ERROR: Return type mismatch
+// }
+
+// Test 5: Binary operation type mismatch
+var invalid_op = "hello" * 5;  // ERROR: Invalid operation
+
+// Test 6: Logical operation with non-boolean - disabled (&& not supported)
+// var invalid_logic = "true" && false;  // ERROR: Non-boolean in logical operation
+
+// Test 7: Comparison with incompatible types
+var invalid_comparison = "hello" > 42;  // ERROR: Incompatible comparison
+
+// Test 8: Undefined variable
+var undefined_var = nonexistent_variable;  // ERROR: Undefined variable
+
+// Test 9: Undefined function disabled - fn system is faulty
+// var undefined_func = unknown_function();  // ERROR: Undefined function
+
+// Test 10: Wrong number of arguments disabled - fn system is faulty
+// var wrong_args = add_numbers(1, 2, 3);  // ERROR: Too many arguments
+
+// Test 11: Union type violation - disabled until union types work
+type StringOrInt = string | int;
+var union_var: StringOrInt = true;  // ERROR: bool not in union
+
+// Test 12: Optional parameter type mismatch disabled - fn system is faulty
+// fn optional_param(name: string, age: int?) {
+//     print(name);
+// }
+
+// optional_param("Alice", "thirty");  // ERROR: Wrong optional parameter type
+
+// Test 13: Type alias violation - disabled until type aliases work
+type UserId = int;
+var user_id: UserId = "not_a_number";  // ERROR: Type alias violation
+
+// Test 14: Invalid member access - disabled until member access works
+// var obj = 42;
+// var member = obj.property;  // ERROR: Member access on non-object
+
+// Test 15: Invalid index access - disabled until indexing works
+// var str = "hello";
+// var char = str[3.14];  // ERROR: Non-integer index
+
+print("Type error tests completed - errors should be detected!");

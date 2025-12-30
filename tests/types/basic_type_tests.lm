@@ -1,0 +1,43 @@
+// =============================================================================
+// BASIC TYPE CHECKING TESTS
+// Tests basic type checking that should work with current system
+// =============================================================================
+
+// Test 1: Basic variable declarations with explicit types
+var x: int = 42;
+var y: string = "hello";
+var z: bool = true;
+
+// Test 2: Type inference from literals
+var inferred_int = 100;
+var inferred_string = "world";
+var inferred_bool = false;
+
+// Test 3: Basic expressions
+var sum = x + inferred_int;
+var concat = y + inferred_string;
+
+// Test 4: Print statements
+print(x);
+print(y);
+print(z);
+print(sum);
+print(concat);
+
+// Test 5: Control flow
+if (z) {
+    var if_var: string = "in if block";
+    print(if_var);
+}
+
+// Test 6: Loops
+for (var i = 0; i < 5; i = i + 1) {
+    print(i);
+}
+
+// Test 7: String interpolation
+var name: string = "Alice";
+var message: string = "Hello {name}!";
+print(message);
+
+print("Basic type tests completed successfully!");

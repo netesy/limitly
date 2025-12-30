@@ -1,0 +1,21 @@
+// Test the new function call format
+
+fn add(a: int, b: int): int {
+    return a + b;
+}
+
+fn printResult(value: int) {
+    print(value);
+}
+
+// Top-level code (no main function needed)
+var x = 5;
+var y = 3;
+var result = add(x, y);
+printResult(result);
+
+// Test builtin function calls
+var sum = add(10, 20);
+print(sum);
+
+print("Function call tests complete ! ");

@@ -42,7 +42,32 @@ std::string LIR_Inst::to_string() const {
             oss << " r" << a << ", " << imm;
             break;
         case LIR_Op::Call:
-            oss << " r" << dst << ", r" << a;
+            // Clear and rebuild to avoid "callcall" issue
+            oss.str("");
+            oss.clear();
+            oss << "call ";
+            if (dst != 0) {
+                oss << "r" << dst << ", ";
+            }
+            oss << func_name << "(";
+            for (size_t i = 0; i < call_args.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << "r" << call_args[i];
+            }
+            oss << ")";
+            break;
+        case LIR_Op::FuncDef:
+            // Follow clean format: fn r2, add(r0, r1) or fn print(r0)
+            oss << "fn ";
+            if (dst != 0) {
+                oss << "r" << dst << ", ";
+            }
+            oss << func_name << "(";
+            for (size_t i = 0; i < call_args.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << "r" << call_args[i];
+            }
+            oss << ") {";
             break;
         case LIR_Op::PrintInt:
         case LIR_Op::PrintUint:
@@ -131,10 +156,18 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::JumpIf: return "jmp_if";
         case LIR_Op::Label: return "label";
         case LIR_Op::Call: return "call";
-        case LIR_Op::Return: return "ret";
+        case LIR_Op::CallVoid: return "call_void";
+        case LIR_Op::CallIndirect: return "call_indirect";
+        case LIR_Op::CallBuiltin: return "call_builtin";
+        case LIR_Op::CallVariadic: return "call_variadic";
         case LIR_Op::FuncDef: return "fn";
         case LIR_Op::Param: return "param";
         case LIR_Op::Ret: return "ret";
+        case LIR_Op::Return: return "return";
+        case LIR_Op::VaStart: return "vastart";
+        case LIR_Op::VaArg: return "vaarg";
+        case LIR_Op::VaEnd: return "vaend";
+        case LIR_Op::Copy: return "copy";
         case LIR_Op::PrintInt: return "print_int";
         case LIR_Op::PrintUint: return "print_uint";
         case LIR_Op::PrintFloat: return "print_float";

@@ -288,7 +288,7 @@ void JITBackend::compile_function(const LIR::LIR_Function& function) {
         param_types.push_back(m_context.new_param(m_int_type, ("param" + std::to_string(i)).c_str()));
     }
     
-    m_current_func = m_context.new_function(GCC_JIT_FUNCTION_EXPORTED, m_const_char_ptr_type, function.name.c_str(), param_types, 0);
+    m_current_func = m_context.new_function(GCC_JIT_FUNCTION_EXPORTED, m_int_type, function.name.c_str(), param_types, 0);
     
     // === SINGLE PASS: Process instructions and create blocks on the fly ===
     compile_function_single_pass(function);
@@ -638,6 +638,7 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
             break;
             
         case LIR::LIR_Op::Return:
+        case LIR::LIR_Op::Ret:
             compile_return(inst);
             break;
             
@@ -652,10 +653,7 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
             // This is metadata for parameter registers
             break;
             
-        case LIR::LIR_Op::Ret:
-            compile_return(inst);
-            break;
-            
+         
         // Memory Operations
         case LIR::LIR_Op::Load:
         case LIR::LIR_Op::Store:
@@ -1159,6 +1157,202 @@ void JITBackend::compile_conditional_jump(const LIR::LIR_Inst& inst, size_t curr
 }
 
 void JITBackend::compile_call(const LIR::LIR_Inst& inst) {
+    // Check if this instruction uses the new format (has func_name and call_args)
+    if (!inst.func_name.empty()) {
+        // New format: call r2, add(r0, r1)
+        std::string func_name = inst.func_name;
+        const auto& arg_regs = inst.call_args;
+        
+        if (m_debug_mode) {
+            std::cout << "[JIT DEBUG] New format call to '" << func_name << "' with " << arg_regs.size() << " arguments" << std::endl;
+        }
+        
+        // First try builtin functions
+        if (LIR::BuiltinUtils::isBuiltinFunction(func_name)) {
+            // Handle builtin functions by calling them directly using the same approach as register VM
+            
+            // Collect arguments from the specified registers
+            std::vector<gccjit::rvalue> args;
+            for (size_t i = 0; i < arg_regs.size(); ++i) {
+                args.push_back(get_jit_register(arg_regs[i]));
+            }
+            
+            // For JIT, we'll create inline implementations of common builtins
+            if (func_name == "add" && args.size() == 2) {
+                // Inline add implementation
+                gccjit::rvalue result = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_int_type, args[0], args[1]);
+                if (inst.dst != 0) {
+                    gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+                    m_current_block.add_assignment(dst, result);
+                }
+                return;
+            } else if (func_name == "sub" && args.size() == 2) {
+                // Inline sub implementation
+                gccjit::rvalue result = m_context.new_binary_op(GCC_JIT_BINARY_OP_MINUS, m_int_type, args[0], args[1]);
+                if (inst.dst != 0) {
+                    gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+                    m_current_block.add_assignment(dst, result);
+                }
+                return;
+            } else if (func_name == "mul" && args.size() == 2) {
+                // Inline mul implementation
+                gccjit::rvalue result = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_int_type, args[0], args[1]);
+                if (inst.dst != 0) {
+                    gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+                    m_current_block.add_assignment(dst, result);
+                }
+                return;
+            } else if (func_name == "div" && args.size() == 2) {
+                // Inline div implementation
+                gccjit::rvalue result = m_context.new_binary_op(GCC_JIT_BINARY_OP_DIVIDE, m_int_type, args[0], args[1]);
+                if (inst.dst != 0) {
+                    gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+                    m_current_block.add_assignment(dst, result);
+                }
+                return;
+            } else if (func_name == "print" && !args.empty()) {
+                // Inline print implementation
+                gccjit::rvalue arg = args[0];
+                
+                // Determine type and call appropriate print function
+                gcc_jit_type* arg_type = arg.get_type().get_inner_type();
+                if (arg_type == m_int_type.get_inner_type()) {
+                    compile_print_int(LIR::LIR_Inst{LIR::LIR_Op::PrintInt, 0, arg_regs[0], 0, 0});
+                } else if (arg_type == m_double_type.get_inner_type()) {
+                    compile_print_float(LIR::LIR_Inst{LIR::LIR_Op::PrintFloat, 0, arg_regs[0], 0, 0});
+                } else if (arg_type == m_bool_type.get_inner_type()) {
+                    compile_print_bool(LIR::LIR_Inst{LIR::LIR_Op::PrintBool, 0, arg_regs[0], 0, 0});
+                } else if (arg_type == m_const_char_ptr_type.get_inner_type()) {
+                    compile_print_string(LIR::LIR_Inst{LIR::LIR_Op::PrintString, 0, arg_regs[0], 0, 0});
+                }
+                
+                // Set return value to nil/0
+                if (inst.dst != 0) {
+                    gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+                    m_current_block.add_assignment(dst, m_context.new_rvalue(m_int_type, 0));
+                }
+                return;
+            }
+            
+            // For other builtins, create a simple placeholder implementation
+            if (inst.dst != 0) {
+                gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+                m_current_block.add_assignment(dst, m_context.new_rvalue(m_int_type, 0));
+            }
+            return;
+        }
+        
+        // Then try user-defined functions
+        auto& func_manager = LIR::LIRFunctionManager::getInstance();
+        if (func_manager.hasFunction(func_name)) {
+            auto func = func_manager.getFunction(func_name);
+            
+            if (func) {
+                if (m_debug_mode) {
+                    std::cout << "[JIT DEBUG] Calling user function '" << func_name << "' with " << arg_regs.size() << " arguments" << std::endl;
+                }
+                
+                // Create or get the compiled native function
+                gccjit::function native_func = get_or_create_native_function(func_name, func, arg_regs.size());
+                
+                if (native_func.get_inner_function()) {
+                    // Prepare arguments for the function call
+                    std::vector<gccjit::rvalue> call_args;
+                    for (size_t i = 0; i < arg_regs.size(); ++i) {
+                        call_args.push_back(get_jit_register(arg_regs[i]));
+                    }
+                    
+                    // Check if the function returns void
+                    gccjit::type return_type = determine_function_return_type(func->getInstructions());
+                    bool is_void_function = (return_type.get_inner_type() == m_void_type.get_inner_type());
+                    
+                    // Make the function call
+                    if (call_args.empty()) {
+                        if (is_void_function) {
+                            m_current_block.add_eval(m_current_block.add_call(native_func));
+                        } else {
+                            gccjit::rvalue call_result = m_current_block.add_call(native_func);
+                            if (inst.dst != 0) {
+                                gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+                                m_current_block.add_assignment(dst, call_result);
+                            }
+                        }
+                    } else if (call_args.size() == 1) {
+                        if (is_void_function) {
+                            m_current_block.add_eval(m_current_block.add_call(native_func, call_args[0]));
+                        } else {
+                            gccjit::rvalue call_result = m_current_block.add_call(native_func, call_args[0]);
+                            if (inst.dst != 0) {
+                                gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+                                m_current_block.add_assignment(dst, call_result);
+                            }
+                        }
+                    } else if (call_args.size() == 2) {
+                        if (is_void_function) {
+                            m_current_block.add_eval(m_current_block.add_call(native_func, call_args[0], call_args[1]));
+                        } else {
+                            gccjit::rvalue call_result = m_current_block.add_call(native_func, call_args[0], call_args[1]);
+                            if (inst.dst != 0) {
+                                gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+                                m_current_block.add_assignment(dst, call_result);
+                            }
+                        }
+                    } else if (call_args.size() == 3) {
+                        if (is_void_function) {
+                            m_current_block.add_eval(m_current_block.add_call(native_func, call_args[0], call_args[1], call_args[2]));
+                        } else {
+                            gccjit::rvalue call_result = m_current_block.add_call(native_func, call_args[0], call_args[1], call_args[2]);
+                            if (inst.dst != 0) {
+                                gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+                                m_current_block.add_assignment(dst, call_result);
+                            }
+                        }
+                    } else if (call_args.size() == 4) {
+                        if (is_void_function) {
+                            m_current_block.add_eval(m_current_block.add_call(native_func, call_args[0], call_args[1], call_args[2], call_args[3]));
+                        } else {
+                            gccjit::rvalue call_result = m_current_block.add_call(native_func, call_args[0], call_args[1], call_args[2], call_args[3]);
+                            if (inst.dst != 0) {
+                                gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+                                m_current_block.add_assignment(dst, call_result);
+                            }
+                        }
+                    } else {
+                        // For more arguments, use vector-based call
+                        if (is_void_function) {
+                            m_current_block.add_eval(m_context.new_call(native_func, call_args));
+                        } else {
+                            gccjit::rvalue call_result = m_context.new_call(native_func, call_args);
+                            if (inst.dst != 0) {
+                                gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+                                m_current_block.add_assignment(dst, call_result);
+                            }
+                        }
+                    }
+                } else {
+                    // Fallback: return 0 if function creation failed
+                    if (inst.dst != 0) {
+                        gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+                        m_current_block.add_assignment(dst, m_context.new_rvalue(m_int_type, 0));
+                    }
+                }
+                
+                return;
+            }
+        }
+        
+        // Function not found
+        if (m_debug_mode) {
+            std::cerr << "[JIT DEBUG] Function '" << func_name << "' not found" << std::endl;
+        }
+        if (inst.dst != 0) {
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+            m_current_block.add_assignment(dst, m_context.new_rvalue(m_int_type, 0));
+        }
+        return;
+    }
+    
+    // Legacy format fallback (for backward compatibility)
     // Get function ID from inst.b (function ID is stored in operand b)
     int32_t function_id = static_cast<int32_t>(inst.b);
     
@@ -1171,24 +1365,58 @@ void JITBackend::compile_call(const LIR::LIR_Inst& inst) {
         // This is a builtin function call
         std::string func_name = builtin_names[function_id];
         
-        // For JIT compilation of builtin functions, we need to create inline implementations
-        // For now, let's handle some common builtins
-        if (func_name == "print") {
+        // Handle common builtin functions with inline implementations
+        if (func_name == "add" && arg_count == 2) {
+            // Arguments are in registers immediately before the result register
+            gccjit::rvalue a = get_jit_register(inst.dst - 2);
+            gccjit::rvalue b = get_jit_register(inst.dst - 1);
+            gccjit::rvalue result = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_int_type, a, b);
+            if (inst.dst != 0) {
+                gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+                m_current_block.add_assignment(dst, result);
+            }
+            return;
+        } else if (func_name == "sub" && arg_count == 2) {
+            gccjit::rvalue a = get_jit_register(inst.dst - 2);
+            gccjit::rvalue b = get_jit_register(inst.dst - 1);
+            gccjit::rvalue result = m_context.new_binary_op(GCC_JIT_BINARY_OP_MINUS, m_int_type, a, b);
+            if (inst.dst != 0) {
+                gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+                m_current_block.add_assignment(dst, result);
+            }
+            return;
+        } else if (func_name == "mul" && arg_count == 2) {
+            gccjit::rvalue a = get_jit_register(inst.dst - 2);
+            gccjit::rvalue b = get_jit_register(inst.dst - 1);
+            gccjit::rvalue result = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_int_type, a, b);
+            if (inst.dst != 0) {
+                gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+                m_current_block.add_assignment(dst, result);
+            }
+            return;
+        } else if (func_name == "div" && arg_count == 2) {
+            gccjit::rvalue a = get_jit_register(inst.dst - 2);
+            gccjit::rvalue b = get_jit_register(inst.dst - 1);
+            gccjit::rvalue result = m_context.new_binary_op(GCC_JIT_BINARY_OP_DIVIDE, m_int_type, a, b);
+            if (inst.dst != 0) {
+                gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+                m_current_block.add_assignment(dst, result);
+            }
+            return;
+        } else if (func_name == "print" && arg_count > 0) {
             // Inline print implementation
-            if (arg_count > 0) {
-                gccjit::rvalue arg = get_jit_register(inst.a + 1); // First argument
-                
-                // Determine type and call appropriate print function
-                gcc_jit_type* arg_type = arg.get_type().get_inner_type();
-                if (arg_type == m_int_type.get_inner_type()) {
-                    compile_print_int(LIR::LIR_Inst{LIR::LIR_Op::PrintInt, 0, static_cast<LIR::Reg>(inst.a + 1), 0, 0});
-                } else if (arg_type == m_double_type.get_inner_type()) {
-                    compile_print_float(LIR::LIR_Inst{LIR::LIR_Op::PrintFloat, 0, static_cast<LIR::Reg>(inst.a + 1), 0, 0});
-                } else if (arg_type == m_bool_type.get_inner_type()) {
-                    compile_print_bool(LIR::LIR_Inst{LIR::LIR_Op::PrintBool, 0, static_cast<LIR::Reg>(inst.a + 1), 0, 0});
-                } else if (arg_type == m_const_char_ptr_type.get_inner_type()) {
-                    compile_print_string(LIR::LIR_Inst{LIR::LIR_Op::PrintString, 0, static_cast<LIR::Reg>(inst.a + 1), 0, 0});
-                }
+            gccjit::rvalue arg = get_jit_register(inst.dst - arg_count); // First argument
+            
+            // Determine type and call appropriate print function
+            gcc_jit_type* arg_type = arg.get_type().get_inner_type();
+            if (arg_type == m_int_type.get_inner_type()) {
+                compile_print_int(LIR::LIR_Inst{LIR::LIR_Op::PrintInt, 0, static_cast<LIR::Reg>(inst.dst - arg_count), 0, 0});
+            } else if (arg_type == m_double_type.get_inner_type()) {
+                compile_print_float(LIR::LIR_Inst{LIR::LIR_Op::PrintFloat, 0, static_cast<LIR::Reg>(inst.dst - arg_count), 0, 0});
+            } else if (arg_type == m_bool_type.get_inner_type()) {
+                compile_print_bool(LIR::LIR_Inst{LIR::LIR_Op::PrintBool, 0, static_cast<LIR::Reg>(inst.dst - arg_count), 0, 0});
+            } else if (arg_type == m_const_char_ptr_type.get_inner_type()) {
+                compile_print_string(LIR::LIR_Inst{LIR::LIR_Op::PrintString, 0, static_cast<LIR::Reg>(inst.dst - arg_count), 0, 0});
             }
             
             // Set return value to nil/0
@@ -1215,132 +1443,63 @@ void JITBackend::compile_call(const LIR::LIR_Inst& inst) {
     int32_t user_func_id = function_id - static_cast<int32_t>(builtin_names.size());
     
     // Find function by ID/index
-    std::string func_name;
     if (user_func_id >= 0 && user_func_id < static_cast<int32_t>(function_names.size())) {
-        func_name = function_names[user_func_id];
-    } else {
-        // Invalid function ID, return 0
-        if (inst.dst != 0) {
-            gccjit::rvalue result = m_context.new_rvalue(m_int_type, 0);
-            gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
-            m_current_block.add_assignment(dst, result);
-        }
-        return;
-    }
-    
-    // Get the actual LIR function with its instructions
-    auto lir_func = func_manager.getFunction(func_name);
-    if (!lir_func) {
-        // Function not found, return 0
-        if (inst.dst != 0) {
-            gccjit::rvalue result = m_context.new_rvalue(m_int_type, 0);
-            gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
-            m_current_block.add_assignment(dst, result);
-        }
-        return;
-    }
-    
-    // Create a native function that executes the LIR instructions using Register VM
-    std::vector<gccjit::param> empty_params;
-    
-    // Check if we already created this function
-    static std::unordered_map<std::string, gccjit::function> created_functions;
-    
-    gccjit::function native_func;
-    gccjit::type return_type = m_int_type; // Default return type
-    
-    auto it = created_functions.find(func_name);
-    
-    if (it != created_functions.end()) {
-        native_func = it->second;
-        // For existing functions, we need to check their actual return type
-        // Look up the LIR function to determine if it's void
-        auto lir_func_check = func_manager.getFunction(func_name);
-        if (lir_func_check) {
-            const auto& instructions_check = lir_func_check->getInstructions();
-            bool has_return_value = false;
-            for (const auto& inst_check : instructions_check) {
-                if (inst_check.op == LIR::LIR_Op::Return && inst_check.dst != 0) {
-                    has_return_value = true;
-                    break;
+        std::string func_name = function_names[user_func_id];
+        auto lir_func = func_manager.getFunction(func_name);
+        
+        if (lir_func) {
+            if (m_debug_mode) {
+                std::cout << "[JIT DEBUG] Calling user function '" << func_name << "' (legacy format)" << std::endl;
+            }
+            
+            // Create or get the compiled native function
+            gccjit::function native_func = get_or_create_native_function(func_name, lir_func, arg_count);
+            
+            if (native_func.get_inner_function()) {
+                // Prepare arguments for the function call (arguments are in registers before the result register)
+                std::vector<gccjit::rvalue> call_args;
+                for (int i = 0; i < arg_count; ++i) {
+                    call_args.push_back(get_jit_register(inst.dst - arg_count + i));
+                }
+                
+                // Make the function call
+                gccjit::rvalue call_result;
+                if (call_args.empty()) {
+                    call_result = m_current_block.add_call(native_func);
+                } else if (call_args.size() == 1) {
+                    call_result = m_current_block.add_call(native_func, call_args[0]);
+                } else if (call_args.size() == 2) {
+                    call_result = m_current_block.add_call(native_func, call_args[0], call_args[1]);
+                } else if (call_args.size() == 3) {
+                    call_result = m_current_block.add_call(native_func, call_args[0], call_args[1], call_args[2]);
+                } else if (call_args.size() == 4) {
+                    call_result = m_current_block.add_call(native_func, call_args[0], call_args[1], call_args[2], call_args[3]);
+                } else {
+                    // For more arguments, use vector-based call
+                    call_result = m_context.new_call(native_func, call_args);
+                }
+                
+                // Store the result if needed
+                if (inst.dst != 0) {
+                    gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+                    m_current_block.add_assignment(dst, call_result);
+                }
+            } else {
+                // Fallback: return 0 if function creation failed
+                if (inst.dst != 0) {
+                    gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+                    m_current_block.add_assignment(dst, m_context.new_rvalue(m_int_type, 0));
                 }
             }
-            return_type = has_return_value ? m_int_type : m_void_type;
-        } else {
-            return_type = m_int_type; // Default fallback
+            return;
         }
-    } else {
-        // Determine the return type from the LIR function
-        // Check if the function actually returns a value
-        const auto& instructions = lir_func->getInstructions();
-        bool has_return_value = false;
-        for (const auto& inst : instructions) {
-            if (inst.op == LIR::LIR_Op::Return && inst.dst != 0) {
-                has_return_value = true;
-                break;
-            }
-        }
-        
-        // If no return value, use void type
-        if (!has_return_value) {
-            return_type = m_void_type;
-        }
-        
-        native_func = m_context.new_function(GCC_JIT_FUNCTION_EXPORTED,
-            return_type,
-            func_name,
-            empty_params, // No parameters for now
-            0);
-            
-        // Get the function block and create the implementation
-        gccjit::block func_block = native_func.new_block("entry");
-        
-        // Create a local variable for the return value (only if not void)
-        gccjit::lvalue return_var;
-        if (return_type.get_inner_type() != m_void_type.get_inner_type()) {
-            return_var = native_func.new_local(return_type, "result");
-        }
-        
-        // Use a temporary compilation context for this function
-        auto current_func_backup = m_current_func;
-        auto current_block_backup = m_current_block;
-        
-        // Clear any register state from the calling context
-        // We need to reset register mappings for the new function scope
-        auto jit_registers_backup = jit_registers;
-        jit_registers.clear(); // Clear registers for new function scope
-        
-        m_current_func = native_func;
-        m_current_block = func_block;
-        
-        // For now, create a simple implementation that just returns a reasonable value
-        // Full instruction compilation can be added later
-        if (return_type.get_inner_type() == m_void_type.get_inner_type()) {
-            // For void functions, just return without doing anything
-            func_block.end_with_return();
-        } else {
-            // For functions with return values, return a simple computed value
-            // This is a placeholder - real implementation would compile the LIR instructions
-            func_block.add_assignment(return_var, m_context.new_rvalue(return_type, 42));
-            func_block.end_with_return(return_var);
-        }
-        
-        // Restore the original compilation context
-        m_current_func = current_func_backup;
-        m_current_block = current_block_backup;
-        jit_registers = jit_registers_backup; // Restore register mappings
-        
-        created_functions[func_name] = native_func;
     }
     
-    // Compile the function call
-    gccjit::rvalue call_result = m_current_block.add_call(native_func);
-    
-    // Store the result only if the function returns a value AND the destination register is valid
-    // Check both the function return type and if the destination register is meant to be used
-    if (return_type.get_inner_type() != m_void_type.get_inner_type() && inst.dst != 0) {
+    // Function not found, return 0
+    if (inst.dst != 0) {
+        gccjit::rvalue result = m_context.new_rvalue(m_int_type, 0);
         gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
-        m_current_block.add_assignment(dst, call_result);
+        m_current_block.add_assignment(dst, result);
     }
 }
 
@@ -1428,23 +1587,41 @@ void JITBackend::compile_print_string(const LIR::LIR_Inst& inst) {
 }
 
 void JITBackend::compile_return(const LIR::LIR_Inst& inst) {
-    if (inst.a != 0) {
-        gccjit::rvalue value = get_jit_register(inst.a);
-        
-        // Check if the value type matches the function return type (const char*)
-        gcc_jit_type* value_type = value.get_type().get_inner_type();
-        gcc_jit_type* return_type = m_const_char_ptr_type.get_inner_type();
-        
-        if (value_type != return_type) {
-            // Cast the return value to the expected function return type
-            value = m_context.new_cast(value, m_const_char_ptr_type);
+    if (inst.op == LIR::LIR_Op::Return) {
+        // User function return - value is in dst field
+        if (inst.dst != 0) {
+            gccjit::rvalue value = get_jit_register(inst.dst);
+            
+            if (m_debug_mode) {
+                std::cout << "[JIT DEBUG] User function returning value from register " << inst.dst << std::endl;
+            }
+            
+            m_current_block.end_with_return(value);
+        } else {
+            // Void return - don't return any value
+            if (m_debug_mode) {
+                std::cout << "[JIT DEBUG] User function void return (no value)" << std::endl;
+            }
+            m_current_block.end_with_return();
         }
-        
-        m_current_block.end_with_return(value);
-    } else {
-        // Return empty string for void/nil returns
-        gccjit::rvalue empty_str = m_context.new_rvalue(m_const_char_ptr_type, (void*)"");
-        m_current_block.end_with_return(empty_str);
+    } else if (inst.op == LIR::LIR_Op::Ret) {
+        // Main function return - value is in a field
+        if (inst.a != 0) {
+            gccjit::rvalue value = get_jit_register(inst.a);
+            
+            if (m_debug_mode) {
+                std::cout << "[JIT DEBUG] Main function returning value from register " << inst.a << std::endl;
+            }
+            
+            m_current_block.end_with_return(value);
+        } else {
+            // Return 0 for main function if no specific value
+            if (m_debug_mode) {
+                std::cout << "[JIT DEBUG] Main function returning 0" << std::endl;
+            }
+            gccjit::rvalue zero = m_context.new_rvalue(m_int_type, 0);
+            m_current_block.end_with_return(zero);
+        }
     }
 }
 
@@ -1863,6 +2040,205 @@ T* JITBackend::create_object(Args&&... args) {
 void JITBackend::cleanup_memory() {
     exit_memory_region();
    // memory_manager_.analyzeMemoryUsage();
+}
+
+// Function compilation methods
+gccjit::function JITBackend::get_or_create_native_function(const std::string& func_name, 
+                                                          std::shared_ptr<LIR::LIRFunction> lir_func, 
+                                                          size_t arg_count) {
+    // Check if we already compiled this function
+    auto it = compiled_functions.find(func_name);
+    if (it != compiled_functions.end()) {
+        return it->second;
+    }
+    
+    if (m_debug_mode) {
+        std::cout << "[JIT DEBUG] Creating native function for '" << func_name << "'" << std::endl;
+    }
+    
+    // Get the LIR instructions
+    const auto& instructions = lir_func->getInstructions();
+    
+    // Determine return type by analyzing the instructions
+    gccjit::type return_type = determine_function_return_type(instructions);
+    
+    // Create function parameters
+    std::vector<gccjit::param> params;
+    for (size_t i = 0; i < arg_count; ++i) {
+        std::string param_name = "param_" + std::to_string(i);
+        params.push_back(m_context.new_param(m_int_type, param_name)); // Default to int type
+    }
+    
+    // Create the native function
+    gccjit::function native_func = m_context.new_function(
+        GCC_JIT_FUNCTION_EXPORTED,
+        return_type,
+        func_name,
+        params,
+        0
+    );
+    
+    // Compile the function body
+    compile_function_body(native_func, instructions, arg_count);
+    
+    // Cache the compiled function
+    compiled_functions[func_name] = native_func;
+    
+    if (m_debug_mode) {
+        std::cout << "[JIT DEBUG] Successfully created native function '" << func_name << "'" << std::endl;
+    }
+    
+    return native_func;
+}
+
+gccjit::type JITBackend::determine_function_return_type(const std::vector<LIR::LIR_Inst>& instructions) {
+    // Analyze instructions to determine return type
+    for (const auto& inst : instructions) {
+        if (inst.op == LIR::LIR_Op::Return) {
+            if (m_debug_mode) {
+                std::cout << "[JIT DEBUG] Found return instruction with dst register: " << inst.dst << std::endl;
+            }
+            if (inst.dst != 0) {
+                // Function returns a value - check the register type or default to int
+                // For now, assume int for any non-void return
+                if (m_debug_mode) {
+                    std::cout << "[JIT DEBUG] Function returns int (register " << inst.dst << ")" << std::endl;
+                }
+                return m_int_type;
+            } else {
+                // Function returns void (return with no value)
+                if (m_debug_mode) {
+                    std::cout << "[JIT DEBUG] Function returns void" << std::endl;
+                }
+                return m_void_type;
+            }
+        }
+    }
+    
+    // If no explicit return found, check if there are any operations that suggest a return value
+    // Look for arithmetic operations or other value-producing operations
+    for (const auto& inst : instructions) {
+        if (inst.op == LIR::LIR_Op::Add || inst.op == LIR::LIR_Op::Sub || 
+            inst.op == LIR::LIR_Op::Mul || inst.op == LIR::LIR_Op::Div ||
+            inst.op == LIR::LIR_Op::LoadConst) {
+            // Function likely produces a value, assume int return type
+            if (m_debug_mode) {
+                std::cout << "[JIT DEBUG] Function has value-producing operations, assuming int return" << std::endl;
+            }
+            return m_int_type;
+        }
+    }
+    
+    // Default to void if no clear indication of return type
+    if (m_debug_mode) {
+        std::cout << "[JIT DEBUG] No clear return type indication, defaulting to void" << std::endl;
+    }
+    return m_void_type;
+}
+
+void JITBackend::compile_function_body(gccjit::function& native_func, 
+                                      const std::vector<LIR::LIR_Inst>& instructions,
+                                      size_t param_count) {
+    // Save current compilation context
+    auto saved_func = m_current_func;
+    auto saved_block = m_current_block;
+    auto saved_registers = jit_registers;
+    auto saved_label_blocks = label_blocks;
+    
+    // Set up new compilation context
+    m_current_func = native_func;
+    m_current_block = native_func.new_block("entry");
+    jit_registers.clear();
+    label_blocks.clear();
+    
+    try {
+        // Set up parameter registers (r0, r1, r2, ...)
+        for (size_t i = 0; i < param_count; ++i) {
+            gccjit::param param = native_func.get_param(i);
+            gccjit::lvalue param_reg = native_func.new_local(m_int_type, "r" + std::to_string(i));
+            m_current_block.add_assignment(param_reg, param);
+            jit_registers[i] = param_reg;
+        }
+        
+        // Pre-create blocks for jump targets
+        for (size_t i = 0; i < instructions.size(); ++i) {
+            const auto& inst = instructions[i];
+            if (inst.op == LIR::LIR_Op::Jump || inst.op == LIR::LIR_Op::JumpIfFalse) {
+                uint32_t target_label = inst.imm;
+                if (label_blocks.find(target_label) == label_blocks.end()) {
+                    std::string block_name = "label_" + std::to_string(target_label);
+                    gccjit::block target_block = native_func.new_block(block_name);
+                    label_blocks[target_label] = target_block;
+                }
+            }
+        }
+        
+        // Compile instructions
+        bool current_block_terminated = false;
+        for (size_t i = 0; i < instructions.size(); ++i) {
+            const auto& inst = instructions[i];
+            
+            // Check if this instruction position is a jump target
+            auto it = label_blocks.find(i);
+            if (it != label_blocks.end()) {
+                m_current_block = it->second;
+                current_block_terminated = false;
+            } else if (current_block_terminated) {
+                // Previous instruction terminated the block, create a new one
+                std::string new_block_name = "inst_" + std::to_string(i);
+                m_current_block = native_func.new_block(new_block_name);
+                current_block_terminated = false;
+            }
+            
+            // Compile the instruction
+            if (inst.op == LIR::LIR_Op::Jump) {
+                compile_jump(inst);
+                current_block_terminated = true;
+            } else if (inst.op == LIR::LIR_Op::JumpIfFalse) {
+                compile_conditional_jump(inst, i);
+                current_block_terminated = true;
+            } else if (inst.op == LIR::LIR_Op::Return) {
+                compile_return(inst);
+                current_block_terminated = true;
+            } else {
+                compile_instruction(inst);
+            }
+        }
+        
+        // If we reach the end without a return, add a default return
+        if (!current_block_terminated) {
+            gccjit::type return_type = determine_function_return_type(instructions);
+            if (return_type.get_inner_type() == m_void_type.get_inner_type()) {
+                m_current_block.end_with_return();
+            } else {
+                // Return the value from register 0 (standard return register)
+                if (jit_registers.find(0) != jit_registers.end()) {
+                    m_current_block.end_with_return(jit_registers[0]);
+                } else {
+                    m_current_block.end_with_return(m_context.new_rvalue(return_type, 0));
+                }
+            }
+        }
+        
+    } catch (const std::exception& e) {
+        if (m_debug_mode) {
+            std::cerr << "[JIT DEBUG] Error compiling function body: " << e.what() << std::endl;
+        }
+        
+        // Fallback: create a simple function that returns 0
+        gccjit::type return_type = determine_function_return_type(instructions);
+        if (return_type.get_inner_type() == m_void_type.get_inner_type()) {
+            m_current_block.end_with_return();
+        } else {
+            m_current_block.end_with_return(m_context.new_rvalue(return_type, 0));
+        }
+    }
+    
+    // Restore previous compilation context
+    m_current_func = saved_func;
+    m_current_block = saved_block;
+    jit_registers = saved_registers;
+    label_blocks = saved_label_blocks;
 }
 
 } // namespace JIT
