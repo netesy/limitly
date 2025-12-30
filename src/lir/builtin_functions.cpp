@@ -1086,15 +1086,15 @@ void LIRBuiltinFunctions::registerCollectionFunctions() {
                     if (element && element->type) {
                         if (element->type->tag == TypeTag::Int || element->type->tag == TypeTag::Int32) {
                             int64_t value = element->as<int64_t>();
-                            std::cout << "forEach element: " << value << std::endl;
+                            // Process element (no output for forEach)
                         } else if (element->type->tag == TypeTag::Float64) {
                             double value = element->as<double>();
-                            std::cout << "forEach element: " << value << std::endl;
+                            // Process element (no output for forEach)
                         } else if (element->type->tag == TypeTag::String) {
                             std::string value = element->as<std::string>();
-                            std::cout << "forEach element: " << value << std::endl;
+                            // Process element (no output for forEach)
                         } else {
-                            std::cout << "forEach element: <unknown type>" << std::endl;
+                            // Process element (no output for forEach)
                         }
                     }
                 } catch (const std::exception& e) {

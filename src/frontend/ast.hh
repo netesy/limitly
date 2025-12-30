@@ -89,6 +89,12 @@ namespace AST {
     struct UnsafeStatement;
     struct ContractStatement;
     struct ComptimeStatement;
+    
+    // Memory operation nodes (inserted by type checker)
+    struct MakeLinearExpr;
+    struct MakeRefExpr;
+    struct MoveExpr;
+    struct DropExpr;
 }
 
 // AST Node definitions
@@ -101,6 +107,22 @@ namespace AST {
         Const       // const (read-only public)
     };
 
+    // Memory ownership and lifetime information
+    struct MemoryInfo {
+        std::size_t region_id = 0;           // Which memory region owns this value
+        std::size_t generation = 0;          // Generation for reference validity
+        bool is_linear = false;              // Is this a linear (move-only) type
+        bool is_moved = false;               // Has this linear value been moved
+        bool is_reference = false;           // Is this a reference to a linear type
+        std::string target_linear_var;       // For references: which linear var do we reference
+        int creation_scope = 0;              // Scope level where this was created
+        bool needs_drop = false;             // Does this need explicit cleanup
+        
+        MemoryInfo() = default;
+        MemoryInfo(std::size_t rid, std::size_t gen, bool linear = false) 
+            : region_id(rid), generation(gen), is_linear(linear) {}
+    };
+
     // Base node type
     struct Node {
         int line;
@@ -108,6 +130,9 @@ namespace AST {
         // Inferred type after type checking (null before type checking)
         // For strictly statically typed language, all nodes should have type info
         mutable TypePtr inferred_type = nullptr;
+        
+        // Memory safety information (set by type checker)
+        mutable MemoryInfo memory_info;
         
         virtual ~Node() = default;
     };
@@ -713,6 +738,46 @@ namespace AST {
         
         // Captured variables (determined during analysis)
         std::vector<std::string> capturedVars;
+    };
+    
+    // Memory operation expressions (inserted by type checker)
+    
+    // Create a linear (move-only) value
+    struct MakeLinearExpr : public Expression {
+        std::shared_ptr<Expression> value;      // The value to make linear
+        std::size_t region_id;                  // Target memory region
+        std::size_t generation;                 // Initial generation
+        
+        MakeLinearExpr(std::shared_ptr<Expression> val, std::size_t rid, std::size_t gen)
+            : value(val), region_id(rid), generation(gen) {}
+    };
+    
+    // Create a reference to a linear value
+    struct MakeRefExpr : public Expression {
+        std::string target_var;                 // Name of linear variable to reference
+        bool is_mutable;                        // Is this a mutable reference
+        std::size_t creation_scope;             // Scope level where reference is created
+        
+        MakeRefExpr(const std::string& target, bool mutable_ref, std::size_t scope)
+            : target_var(target), is_mutable(mutable_ref), creation_scope(scope) {}
+    };
+    
+    // Move a linear value (invalidates original)
+    struct MoveExpr : public Expression {
+        std::shared_ptr<Expression> value;      // The linear value to move
+        std::string source_var;                 // Name of source variable (for tracking)
+        
+        MoveExpr(std::shared_ptr<Expression> val, const std::string& src)
+            : value(val), source_var(src) {}
+    };
+    
+    // Explicitly drop a linear value
+    struct DropExpr : public Expression {
+        std::shared_ptr<Expression> value;      // The linear value to drop
+        std::string target_var;                 // Name of variable being dropped
+        
+        DropExpr(std::shared_ptr<Expression> val, const std::string& target)
+            : value(val), target_var(target) {}
     };
 
     // ============================================================================

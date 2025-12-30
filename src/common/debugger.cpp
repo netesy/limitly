@@ -15,6 +15,7 @@
 std::vector<std::string> Debugger::sourceCodez;
 bool Debugger::hadError = false;
 bool Debugger::useEnhancedFormatting = true;
+std::set<std::string> Debugger::reportedErrors;
 
 void Debugger::error(const std::string &errorMessage,
                      int line,
@@ -24,6 +25,17 @@ void Debugger::error(const std::string &errorMessage,
                      const std::string &lexeme,
                      const std::string &expectedValue)
 {
+    // Create a unique key for this error to prevent duplicates
+    std::string errorKey = errorMessage + ":" + std::to_string(line) + ":" + std::to_string(column);
+    
+    // Check if we've already reported this error
+    if (reportedErrors.find(errorKey) != reportedErrors.end()) {
+        return; // Skip duplicate error
+    }
+    
+    // Add to reported errors set
+    reportedErrors.insert(errorKey);
+    
     hadError = true;
     
     if (useEnhancedFormatting) {
@@ -50,6 +62,17 @@ void Debugger::error(const std::string &errorMessage,
                      const std::string &lexeme,
                      const std::string &expectedValue)
 {
+    // Create a unique key for this error to prevent duplicates
+    std::string errorKey = errorMessage + ":" + std::to_string(line) + ":" + std::to_string(column) + ":" + filePath;
+    
+    // Check if we've already reported this error
+    if (reportedErrors.find(errorKey) != reportedErrors.end()) {
+        return; // Skip duplicate error
+    }
+    
+    // Add to reported errors set
+    reportedErrors.insert(errorKey);
+    
     hadError = true;
     
     if (useEnhancedFormatting) {
@@ -381,6 +404,8 @@ std::string Debugger::stageToString(InterpretationStage stage)
         return "Syntax Parsing";
     case InterpretationStage::SEMANTIC:
         return "Semantic Parsing";
+    case InterpretationStage::MEMORY:
+        return "Memory Safety";
     case InterpretationStage::BYTECODE:
         return "Bytecode Generation";
     case InterpretationStage::INTERPRETING:

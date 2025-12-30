@@ -17,7 +17,7 @@ void FunctionRegistry::registerFunction(const std::string& name, std::unique_ptr
     }
     
     lir_functions_[name] = std::move(function);
-    std::cout << "[DEBUG] LIR Registry: Registered LIR function '" << name << "'" << std::endl;
+    // Debug output removed for cleaner execution
 }
 
 // Function lookup

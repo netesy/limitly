@@ -5,7 +5,7 @@
 #include <optional>
 
 // Forward declaration to avoid circular dependency
-enum class InterpretationStage { SCANNING, PARSING, SYNTAX, SEMANTIC, BYTECODE, INTERPRETING, COMPILING };
+enum class InterpretationStage { SCANNING, PARSING, SYNTAX, SEMANTIC, MEMORY, BYTECODE, INTERPRETING, COMPILING };
 
 namespace ErrorHandling {
 
