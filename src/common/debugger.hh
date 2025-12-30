@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include <set>
 
 // Include error handling structures
 #include "../error/error_message.hh"
@@ -50,12 +51,16 @@ public:
     static bool hasError() { return hadError; }
 
     // Method to reset error state
-    static void resetError() { hadError = false; }
+    static void resetError() { 
+        hadError = false; 
+        reportedErrors.clear(); // Clear reported errors to allow fresh error reporting
+    }
 
 private:
     static std::vector<std::string> sourceCodez;
     static bool hadError;
     static bool useEnhancedFormatting;
+    static std::set<std::string> reportedErrors; // Track reported errors to prevent duplicates
 
     // Enhanced console and log methods using new formatters
     static void debugConsole(const ErrorHandling::ErrorMessage &errorMessage);

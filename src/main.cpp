@@ -3,6 +3,7 @@
 #include "frontend/parser.hh"
 #include "frontend/cst_printer.hh"
 #include "frontend/type_checker.hh"
+#include "frontend/memory_checker.hh"
 #include "frontend/ast.hh"
 #include "common/backend.hh"
 #include "backend/ast_printer.hh"
@@ -70,9 +71,51 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         Parser parser(scanner, useCSTMode);
         std::shared_ptr<AST::Program> ast = parser.parse();
         
-        // AST Optimization (before type checking)
+        // Phase 1: Type checking (sets inferred types on AST nodes)
+        std::cout << "=== Phase 1: Type Checking ===\n";
+        auto type_check_result = TypeCheckerFactory::check_program(ast, source, filename);
+        if (!type_check_result.success) {
+            std::cerr << "Type checking errors:\n";
+            for (const auto& error : type_check_result.errors) {
+                std::cerr << "  " << error << std::endl;
+            }
+            return 1;
+        }
+        std::cout << "✅ Type checking passed\n\n";
+        
+        // Phase 2: Memory safety analysis (after types are set)
+        std::cout << "=== Phase 2: Memory Safety Analysis ===\n";
+        auto memory_check_result = MemoryCheckerFactory::check_program(type_check_result.program, source, filename);
+        if (!memory_check_result.success) {
+            std::cerr << "Memory safety errors detected:\n";
+            // Memory errors are now reported through Debugger, so they'll show with proper formatting
+            return 1;
+        }
+        
+        // Show warnings if any
+        if (!memory_check_result.warnings.empty()) {
+            std::cout << "Memory safety warnings:\n";
+            for (const auto& warning : memory_check_result.warnings) {
+                std::cout << "  " << warning << std::endl;
+            }
+        }
+        std::cout << "✅ Memory safety analysis passed\n\n";
+        
+        // AST Optimization (after type checking and memory analysis)
         AST::ASTOptimizer optimizer;
-        ast = optimizer.optimize(ast);
+        ast = optimizer.optimize(memory_check_result.program);
+        
+        // Phase 3: Post-optimization verification
+        std::cout << "=== Phase 3: Post-Optimization Verification ===\n";
+        auto post_opt_type_check = TypeCheckerFactory::check_program(ast, source, filename);
+        if (!post_opt_type_check.success) {
+            std::cerr << "Post-optimization type errors:\n";
+            for (const auto& error : post_opt_type_check.errors) {
+                std::cerr << "  " << error << std::endl;
+            }
+            return 1;
+        }
+        std::cout << "✅ Post-optimization verification passed\n\n";
         
         // Print optimization statistics
         const auto& stats = optimizer.getStats();
@@ -117,12 +160,6 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 std::cout << "No CST available (parser not in CST mode)" << std::endl;
             }
         }
-        
-        // Type checking
-        auto type_check_result = TypeCheckerFactory::check_program(ast, source, filename);
-        if (!type_check_result.success) {
-            return 1;
-        }
 
         // Print AST if requested
         if (printAst) {
@@ -136,7 +173,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             try {
                 // Generate LIR from optimized AST
                 LIR::Generator lir_generator;
-                auto lir_function = lir_generator.generate_program(type_check_result);
+                auto lir_function = lir_generator.generate_program(post_opt_type_check);
                 
                 // Initialize and run LIR disassembler
                 LIR::Disassembler disassemble(*lir_function, true);
@@ -260,7 +297,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             
             // Generate LIR from optimized AST and execute with register interpreter
             LIR::Generator lir_generator;
-            auto lir_function = lir_generator.generate_program(type_check_result);
+            auto lir_function = lir_generator.generate_program(post_opt_type_check);
             
             if (!lir_function) {
                 std::cerr << "Failed to generate LIR function\n";
@@ -379,15 +416,32 @@ void startRepl() {
             Parser parser(scanner, false); // Use legacy mode for optimal REPL performance
             std::shared_ptr<AST::Program> ast = parser.parse();
             
-            // AST Optimization (always run, before type checking)
-            AST::ASTOptimizer optimizer;
-            ast = optimizer.optimize(ast);
-            
-            // Type checking
+            // Phase 1: Type checking (sets inferred types on AST nodes)
             auto type_check_result = TypeCheckerFactory::check_program(ast);
             if (!type_check_result.success) {
                 std::cerr << "Type checking errors:\n";
                 for (const auto& error : type_check_result.errors) {
+                    std::cerr << "  " << error << std::endl;
+                }
+                continue;
+            }
+            
+            // Phase 2: Memory safety analysis (after types are set)
+            auto memory_check_result = MemoryCheckerFactory::check_program(type_check_result.program);
+            if (!memory_check_result.success) {
+                // Memory errors are now reported through Debugger, so they'll show with proper formatting
+                continue;
+            }
+            
+            // AST Optimization (after type checking and memory analysis)
+            AST::ASTOptimizer optimizer;
+            ast = optimizer.optimize(memory_check_result.program);
+            
+            // Phase 3: Post-optimization verification
+            auto post_opt_type_check = TypeCheckerFactory::check_program(ast);
+            if (!post_opt_type_check.success) {
+                std::cerr << "Post-optimization type errors:\n";
+                for (const auto& error : post_opt_type_check.errors) {
                     std::cerr << "  " << error << std::endl;
                 }
                 continue;
@@ -409,7 +463,7 @@ void startRepl() {
             
             // Backend: Generate LIR and execute with register interpreter
             LIR::Generator lir_generator;
-            auto lir_function = lir_generator.generate_program(type_check_result);
+            auto lir_function = lir_generator.generate_program(post_opt_type_check);
             
             if (!lir_function) {
                 std::cerr << "Failed to generate LIR function\n";

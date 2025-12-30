@@ -46,7 +46,7 @@ RUNTIME_LIB := $(OBJ_DIR)/limitly_runtime.a
 # =============================
 # Sources
 # =============================
-FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp src/common/debugger.cpp src/frontend/cst.cpp src/frontend/cst_printer.cpp src/frontend/cst_utils.cpp src/frontend/ast_builder.cpp src/frontend/type_checker.cpp src/frontend/ast_optimizer.cpp src/lir/generator.cpp
+FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp src/common/debugger.cpp src/frontend/cst.cpp src/frontend/cst_printer.cpp src/frontend/cst_utils.cpp src/frontend/ast_builder.cpp src/frontend/type_checker.cpp src/frontend/memory_checker.cpp src/frontend/ast_optimizer.cpp src/lir/generator.cpp
 BACK_SRCS := src/backend/vm/vm.cpp src/backend/jit/jit_backend.cpp src/backend/jit/jit.cpp
 REGISTER_SRCS := src/backend/register/register.cpp 
 LIR_CORE_SRCS := src/lir/lir.cpp src/lir/lir_utils.cpp src/lir/functions.cpp src/lir/builtin_functions.cpp src/lir/lir_types.cpp
