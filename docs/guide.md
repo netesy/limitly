@@ -22,6 +22,8 @@ Welcome to the official guide for the Limit programming language. This document 
 4.  [Data Structures](#data-structures)
     *   [Lists](#lists)
     *   [Dictionaries](#dictionaries)
+    *   [Tuples](#tuples)
+    *   [Object Literals](#object-literals)
 5.  [Functions](#functions)
     *   [Defining Functions](#defining-functions)
     *   [Parameters](#parameters)
@@ -526,6 +528,35 @@ print(person["name"]); // Output: Alice
 print(person["age"]);  // Output: 30
 ```
 
+### Tuples
+
+A tuple is a fixed-size, ordered collection of elements that can be of different types. Tuples are created using parentheses `()`.
+
+```limit
+var my_tuple = (1, "hello", true);
+```
+
+You can access elements in a tuple using zero-based indexing with dot notation.
+
+```limit
+var person = ("Alice", 30);
+print(person.0); // Output: Alice
+print(person.1); // Output: 30
+```
+
+### Object Literals
+
+Object literals provide a way to create instances of user-defined types, like classes or enums, with a specific structure. This is especially useful for enums with associated data.
+
+```limit
+enum Option {
+    Some(any),
+    None
+}
+
+var my_option = Some { value: 42 };
+```
+
 ## Functions
 
 Functions are fundamental building blocks in Limit. They allow you to group code into reusable blocks.
@@ -1028,6 +1059,30 @@ my_num = 3.14;                 // This is also valid
 
 Union types are especially powerful when combined with `match` statements to handle all possible types that a variable could be.
 
+### Intersection Types
+
+An intersection type is a type that combines multiple types into one. A value of an intersection type has all the properties of all the types in the intersection. Intersection types are defined using the ampersand (`&`) character.
+
+```limit
+type HasName = { name: str };
+type HasAge = { age: int };
+
+type Person = HasName & HasAge;
+
+var p: Person = { name: "Alice", age: 30 };
+```
+
+### Refined Types
+
+Refined types allow you to add constraints to existing types. A refined type is a type with a predicate that must be true for all values of that type.
+
+```limit
+type PositiveInt = int where value > 0;
+
+var x: PositiveInt = 10; // Valid
+var y: PositiveInt = -5; // Invalid
+```
+
 ### Structural Types
 
 A structural type allows you to define a type based on its structure or shape, rather than by a specific name. This is useful for working with data that has a consistent structure but may not be an instance of a named class.
@@ -1055,7 +1110,7 @@ var person: PersonInfo = ("Alice", 30, "New York");
 
 ### Enum Declarations
 
-Enums (enumerations) allow you to define a type that can only be one of a specific set of values.
+Enums (enumerations) allow you to define a type that can only be one of a specific set of values. You can also define enums with variants that hold associated data.
 
 ```limit
 enum Status {
@@ -1066,20 +1121,55 @@ enum Status {
 }
 
 var current_status: Status = Status.Running;
+
+// Enum with associated data
+enum WebEvent {
+    PageLoad,
+    PageUnload,
+    KeyPress(str),
+    Paste(str),
+    Click({ x: int, y: int })
+}
+
+var key_press = WebEvent.KeyPress("a");
+var click = WebEvent.Click({ x: 10, y: 20 });
 ```
 
 ### Traits and Interfaces
 
-Traits and interfaces are used to define a set of methods that a class must implement. This is a powerful tool for abstraction and polymorphism.
+Traits and interfaces are used to define a set of methods that a class must implement. This is a powerful tool for abstraction and polymorphism. In Limit, `trait` and `interface` are very similar, with the main difference being their intended use. An `interface` defines a contract that a class *must* adhere to, while a `trait` provides a set of methods that a class *can* use.
 
 ```limit
-trait Speaker {
-    fn speak();
+// A trait for objects that can be serialized to JSON
+trait JsonSerializable {
+    fn to_json(): str;
 }
 
-class Dog : Speaker {
-    fn speak() {
-        print("Woof!");
+// An interface for a data repository
+interface Repository {
+    fn get(id: int): any;
+    fn save(item: any): bool;
+}
+
+class User {
+    var name: str;
+    var age: int;
+}
+
+// User implements the JsonSerializable trait
+impl User for JsonSerializable {
+    fn to_json(): str {
+        return '{"name": "{self.name}", "age": {self.age}}';
+    }
+}
+
+class UserRepository : Repository {
+    fn get(id: int): any {
+        // ...
+    }
+
+    fn save(item: any): bool {
+        // ...
     }
 }
 ```
