@@ -157,6 +157,7 @@ private:
     TypePtr check_statement(std::shared_ptr<AST::Statement> stmt);
     TypePtr check_function_declaration(std::shared_ptr<AST::FunctionDeclaration> func);
     TypePtr check_var_declaration(std::shared_ptr<AST::VarDeclaration> var_decl);
+    TypePtr check_type_declaration(std::shared_ptr<AST::TypeDeclaration> type_decl);
     TypePtr check_block_statement(std::shared_ptr<AST::BlockStatement> block);
     TypePtr check_if_statement(std::shared_ptr<AST::IfStatement> if_stmt);
     TypePtr check_while_statement(std::shared_ptr<AST::WhileStatement> while_stmt);
