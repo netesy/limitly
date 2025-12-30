@@ -1,0 +1,31 @@
+// =============================================================================
+// UNION TYPE ERROR TESTS
+// Tests that should trigger union type errors
+// =============================================================================
+
+// Test 1: Invalid union member assignment
+type IntOrStr = int | str;
+var invalid1: IntOrStr = true;  // ERROR: bool not in union
+
+// Test 2: Invalid union member assignment (float)
+type BoolOrStr = bool | str;
+var invalid2: BoolOrStr = 3.14;  // ERROR: float not in union
+
+// Test 3: Invalid union member assignment (complex type)
+type SimpleUnion = int | str;
+var invalid3: SimpleUnion = 42.5;  // ERROR: float not in union
+
+// Test 4: Assignment to wrong union type
+type NumberUnion = int | float;
+type StringUnion = str | bool;
+
+var numUnion: NumberUnion = 42;
+var strUnion: StringUnion = numUnion;  // ERROR: NumberUnion not compatible with StringUnion
+
+// Test 5: Invalid nested union assignment
+type InnerUnion = int | str;
+type OuterUnion = InnerUnion | bool;
+
+var outer: OuterUnion = 3.14;  // ERROR: float not in any part of union
+
+print("Union error tests completed - errors should be detected!");

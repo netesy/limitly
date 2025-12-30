@@ -498,6 +498,8 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<AST::FunctionDec
     for (size_t i = 0; i < func->params.size(); ++i) {
         declare_variable(func->params[i].first, signature.param_types[i]);
         declare_variable_memory(func->params[i].first, signature.param_types[i]);
+        // Function parameters are initialized when the function is called
+        mark_variable_initialized(func->params[i].first);
     }
     
     // Check body

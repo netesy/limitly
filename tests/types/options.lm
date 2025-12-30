@@ -5,20 +5,20 @@ print("=== Option Type Tests ===");
 
 // Test 1: Basic Option type definition
 print("\n--- Test 1: Basic Option Types ---");
-type IntOption = Some | None;
-type StringOption = Some | None;
+type IntOption = Some |nil;
+type StringOption = Some |nil;
 
 // Note: Option types are conceptual - actual implementation may vary
 // These tests focus on the union type foundation for Option types
 
 // Test 2: Option-like union types
 print("\n--- Test 2: Option-like Union Types ---");
-type MaybeInt = int | None;
-type MaybeString = str | None;
+type MaybeInt = int |nil;
+type MaybeString = str |nil;
 
-// Using a placeholder for None (since None isn't fully implemented)
-type NoneType = str;
-var noneValue: NoneType = "None";
+// Using a placeholder fornil (sincenil isn't fully implemented)
+typenilType = str;
+var noneValue:nilType = "None";
 
 var maybeInt1: int = 42;
 var maybeString1: str = "hello";

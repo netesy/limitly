@@ -2,6 +2,7 @@
 #define JIT_H
 
 #include "../../lir/lir.hh"
+#include "../../lir/functions.hh"
 #include "../memory.hh"
 #include <libgccjit++.h>
 #include <memory>
@@ -149,6 +150,15 @@ private:
     void compile_print_string(const LIR::LIR_Inst& inst);
     void compile_return(const LIR::LIR_Inst& inst);
     
+    // Function compilation
+    gccjit::function get_or_create_native_function(const std::string& func_name, 
+                                                   std::shared_ptr<LIR::LIRFunction> lir_func, 
+                                                   size_t arg_count);
+    gccjit::type determine_function_return_type(const std::vector<LIR::LIR_Inst>& instructions);
+    void compile_function_body(gccjit::function& native_func, 
+                              const std::vector<LIR::LIR_Inst>& instructions,
+                              size_t param_count);
+    
     // Memory operations
     void compile_memory_op(const LIR::LIR_Inst& inst);
     
@@ -178,6 +188,9 @@ private:
     std::vector<LIR::LIR_Function> processed_functions;
     void* m_compiled_function;
     gcc_jit_result* m_jit_result; // Keep the result alive
+    
+    // Function compilation cache
+    std::unordered_map<std::string, gccjit::function> compiled_functions;
     
     // Label to block mapping for jump resolution
     std::unordered_map<uint32_t, gccjit::block> label_blocks;

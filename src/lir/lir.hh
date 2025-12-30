@@ -35,7 +35,7 @@ enum class Type : uint8_t {
 // Convert Type to string
 std::string type_to_string(Type type);
 
-// LIR Operations (following the register-based design)
+// Add new call-related operations following Fyra IL best practices
 enum class LIR_Op : uint8_t {
     // Move and constants
     Mov,        // Move (reg = reg)
@@ -67,13 +67,27 @@ enum class LIR_Op : uint8_t {
     JumpIfFalse,// Jump if condition is false
     JumpIf,     // Jump if condition is true
     Label,      // Label definition for jump targets
-    Call,       // Function call (reg = call(func_id, params...))
-    Return,     // Return (return from function)
     
-    // Function definition operations
+    // Function calls (following Fyra IL best practices)
+    Call,       // Function call with return value: %r = call $f(...) : T
+    CallVoid,   // Function call without return value: call $f(...) : void
+    CallIndirect, // Indirect call through function pointer
+    CallBuiltin,  // Call to builtin function
+    CallVariadic, // Variadic function call
+    
+    // Function definition and control
+    Return,     // Return (return from function)
     FuncDef,    // Function definition (fn name, return_reg)
     Param,      // Parameter definition (param reg)
     Ret,        // Function return with register (ret reg)
+    
+    // Variadic function support (following Fyra IL)
+    VaStart,    // Start variadic argument list: vastart %ap
+    VaArg,      // Get next variadic argument: %r = vaarg %ap : T
+    VaEnd,      // End variadic argument processing
+    
+    // Enhanced function operations
+    Copy,       // Copy value: %r = copy %a : T
     
     // Typed print operations
     PrintInt,   // Print integer (print_int(reg))
@@ -192,6 +206,10 @@ struct LIR_Inst {
     Imm imm;               // Immediate value (optional, for constants or jump targets)
     ValuePtr const_val;    // Constant value (for LoadConst operations)
     
+    // Enhanced function call support
+    std::string func_name;          // Function name (for calls and function definitions)
+    std::vector<Reg> call_args;     // Arguments for calls, parameters for declarations
+    
     // Debug information
     std::string comment;
     LIR_SourceLoc loc;
@@ -208,6 +226,19 @@ struct LIR_Inst {
     
     LIR_Inst(LIR_Op op, Reg dst, ValuePtr constant)
         : op(op), result_type(Type::Void), dst(dst), a(0), b(0), imm(0), const_val(constant) {}
+    
+    // Enhanced constructors for function calls and declarations
+    // Function call with return value: call r2, add(r0, r1)
+    LIR_Inst(LIR_Op op, Reg dst, const std::string& func, const std::vector<Reg>& args)
+        : op(op), result_type(Type::Void), dst(dst), a(0), b(0), imm(0), func_name(func), call_args(args) {}
+    
+    // Void function call: call print(r0)
+    LIR_Inst(LIR_Op op, const std::string& func, const std::vector<Reg>& args)
+        : op(op), result_type(Type::Void), dst(0), a(0), b(0), imm(0), func_name(func), call_args(args) {}
+    
+    // Function definition: fn r2, add(r0, r1)
+    LIR_Inst(LIR_Op op, const std::string& func, const std::vector<Reg>& params, Reg return_reg)
+        : op(op), result_type(Type::Void), dst(return_reg), a(0), b(0), imm(0), func_name(func), call_args(params) {}
     
     // Check if this instruction is a return instruction
     bool isReturn() const {

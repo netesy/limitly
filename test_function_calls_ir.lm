@@ -1,0 +1,19 @@
+// Test file for new function call IR format
+// This should generate clean IR with unlimited function arguments
+
+fn add(a: int, b: int): int {
+    return a + b;
+}
+
+fn printResult(result: int) {
+    print(result);
+}
+
+// Test basic function calls
+var x = 5;
+var y = 3;
+var result = add(x, y);
+printResult(result);
+
+// Test direct calls
+print(add(10, 20));

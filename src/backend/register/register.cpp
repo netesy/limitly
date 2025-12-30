@@ -457,11 +457,161 @@ OP_JUMPIFFALSE:
     DISPATCH();
 
 OP_RETURN:
+    // Copy return value from specified register to register 0 (standard return register)
+    if (pc->dst != 0) {
+        registers[0] = registers[pc->dst];
+    }
     return;
 
 OP_CALL:
-    // Handle both builtin and user function calls
+    // Handle both builtin and user function calls using new LIR format
     {
+        // Check if this instruction uses the new format (has func_name and call_args)
+        if (!pc->func_name.empty()) {
+            // New format: call r2, add(r0, r1)
+            std::string func_name = pc->func_name;
+            const auto& arg_regs = pc->call_args;
+            
+            std::cout << "[DEBUG] New format call to '" << func_name << "' with " << arg_regs.size() << " arguments" << std::endl;
+            
+            // First try builtin functions
+            if (LIR::BuiltinUtils::isBuiltinFunction(func_name)) {
+                // Collect arguments from the specified registers
+                std::vector<ValuePtr> args;
+                
+                for (size_t i = 0; i < arg_regs.size(); ++i) {
+                    auto reg_value = registers[arg_regs[i]];
+                    
+                    std::cout << "[DEBUG] Arg " << i << " from register r" << arg_regs[i] << " contains: ";
+                    if (std::holds_alternative<int64_t>(reg_value)) {
+                        std::cout << "int64_t(" << std::get<int64_t>(reg_value) << ")" << std::endl;
+                    } else if (std::holds_alternative<double>(reg_value)) {
+                        std::cout << "double(" << std::get<double>(reg_value) << ")" << std::endl;
+                    } else if (std::holds_alternative<bool>(reg_value)) {
+                        std::cout << "bool(" << std::get<bool>(reg_value) << ")" << std::endl;
+                    } else if (std::holds_alternative<std::string>(reg_value)) {
+                        std::cout << "string('" << std::get<std::string>(reg_value) << "')" << std::endl;
+                    } else {
+                        std::cout << "nullptr" << std::endl;
+                    }
+                    
+                    // Convert register value to ValuePtr
+                    ValuePtr arg_value;
+                    if (std::holds_alternative<int64_t>(reg_value)) {
+                        auto int_type = std::make_shared<::Type>(TypeTag::Int);
+                        arg_value = std::make_shared<Value>(int_type, std::get<int64_t>(reg_value));
+                    } else if (std::holds_alternative<double>(reg_value)) {
+                        auto float_type = std::make_shared<::Type>(TypeTag::Float64);
+                        arg_value = std::make_shared<Value>(float_type, std::get<double>(reg_value));
+                    } else if (std::holds_alternative<bool>(reg_value)) {
+                        auto bool_type = std::make_shared<::Type>(TypeTag::Bool);
+                        arg_value = std::make_shared<Value>(bool_type, std::get<bool>(reg_value));
+                    } else if (std::holds_alternative<std::string>(reg_value)) {
+                        auto string_type = std::make_shared<::Type>(TypeTag::String);
+                        arg_value = std::make_shared<Value>(string_type, std::get<std::string>(reg_value));
+                    } else {
+                        auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
+                        arg_value = std::make_shared<Value>(nil_type);
+                    }
+                    args.push_back(arg_value);
+                }
+                
+                try {
+                    // Call builtin function
+                    ValuePtr result = LIR::BuiltinUtils::callBuiltinFunction(func_name, args);
+                    
+                    std::cout << "[DEBUG] Builtin function '" << func_name << "' returned: ";
+                    if (result && result->type) {
+                        std::cout << "type=" << static_cast<int>(result->type->tag) << std::endl;
+                    } else {
+                        std::cout << "nullptr" << std::endl;
+                    }
+                    
+                    // Convert result back to register value
+                    if (result && result->type) {
+                        switch (result->type->tag) {
+                            case TypeTag::Int:
+                            case TypeTag::Int64:
+                                registers[pc->dst] = result->as<int64_t>();
+                                break;
+                            case TypeTag::Float64:
+                                registers[pc->dst] = result->as<double>();
+                                break;
+                            case TypeTag::Bool:
+                                registers[pc->dst] = result->as<bool>();
+                                break;
+                            case TypeTag::String:
+                                registers[pc->dst] = result->as<std::string>();
+                                break;
+                            default:
+                                registers[pc->dst] = nullptr;
+                                break;
+                        }
+                    } else {
+                        registers[pc->dst] = nullptr;
+                    }
+                } catch (const std::exception& e) {
+                    std::cerr << "Error calling builtin function " << func_name << ": " << e.what() << std::endl;
+                    registers[pc->dst] = nullptr;
+                }
+                
+                DISPATCH();
+            }
+            
+            // Then try user-defined functions
+            auto& func_manager = LIR::LIRFunctionManager::getInstance();
+            if (func_manager.hasFunction(func_name)) {
+                auto func = func_manager.getFunction(func_name);
+                
+                if (func) {
+                    std::cout << "[DEBUG] Calling user function '" << func_name << "' with " << arg_regs.size() << " arguments" << std::endl;
+                    
+                    // Save current context
+                    auto saved_registers = registers;
+                    
+                    // Set up parameters (copy arguments to parameter registers r0, r1, r2, ...)
+                    for (size_t i = 0; i < arg_regs.size() && i < func->getParameters().size(); ++i) {
+                        registers[i] = registers[arg_regs[i]];
+                        std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = register r" << arg_regs[i] << std::endl;
+                    }
+                    
+                    // Execute function directly without resetting registers
+                    // Create a temporary LIR_Function wrapper to reuse existing execution logic
+                    LIR::LIR_Function temp_wrapper(func->getName(), func->getParameters().size());
+                    temp_wrapper.instructions = func->getInstructions();
+                    execute_instructions(temp_wrapper, 0, temp_wrapper.instructions.size());
+                    
+                    // Get return value from register 0 (standard return register)
+                    auto return_value = registers[0];
+                    
+                    std::cout << "[DEBUG] Function '" << func_name << "' returned: ";
+                    if (std::holds_alternative<int64_t>(return_value)) {
+                        std::cout << "int64_t(" << std::get<int64_t>(return_value) << ")" << std::endl;
+                    } else if (std::holds_alternative<double>(return_value)) {
+                        std::cout << "double(" << std::get<double>(return_value) << ")" << std::endl;
+                    } else if (std::holds_alternative<std::string>(return_value)) {
+                        std::cout << "string('" << std::get<std::string>(return_value) << "')" << std::endl;
+                    } else {
+                        std::cout << "nullptr" << std::endl;
+                    }
+                    
+                    // Restore caller's registers
+                    registers = saved_registers;
+                    
+                    // Set return value in destination register
+                    registers[pc->dst] = return_value;
+                    
+                    DISPATCH();
+                }
+            }
+            
+            // Function not found
+            std::cerr << "Error: Function '" << func_name << "' not found" << std::endl;
+            registers[pc->dst] = nullptr;
+            DISPATCH();
+        }
+        
+        // Legacy format fallback (for backward compatibility)
         // Get function index from operand b (immediate value)
         int64_t func_index = static_cast<int64_t>(pc->b);
         

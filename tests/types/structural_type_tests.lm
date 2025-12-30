@@ -1,0 +1,55 @@
+// =============================================================================
+// STRUCTURAL TYPE TESTS
+// Tests structural type parsing and current limitations
+// =============================================================================
+
+print("=== Structural Type Tests ===");
+
+// Test 1: Basic structural type declarations
+print("\n--- Test 1: Basic Structural Types ---");
+type Person = { name: str, age: int };
+type Address = { street: str, city: str, zipCode: int };
+
+// Test 2: Complex structural types
+print("\n--- Test 2: Complex Structural Types ---");
+type Employee = { 
+    id: int, 
+    name: str, 
+    email: str, 
+    active: bool,
+    salary: float
+};
+
+// Test 3: Nested structural type references
+print("\n--- Test 3: Nested Structural Types ---");
+type Contact = {
+    person: Person,
+    address: Address,
+    phone: str
+};
+
+// Test 4: Mixed primitive types
+print("\n--- Test 4: Mixed Primitive Types ---");
+type Product = {
+    id: int,
+    name: str,
+    price: float,
+    inStock: bool,
+    description: str
+};
+
+// Test 5: Structural types with different field counts
+print("\n--- Test 5: Various Field Counts ---");
+type Simple = { value: int };
+type Pair = { first: str, second: str };
+type Triple = { x: int, y: int, z: int };
+type Complex = { 
+    a: int, 
+    b: str, 
+    c: bool, 
+    d: float, 
+    e: str 
+};
+
+print("Structural type declarations completed!");
+print("Note: Structural types are parsed correctly but not yet fully implemented in the type system.");
