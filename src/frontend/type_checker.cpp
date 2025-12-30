@@ -439,6 +439,8 @@ TypePtr TypeChecker::check_statement(std::shared_ptr<AST::Statement> stmt) {
         return check_function_declaration(func_decl);
     } else if (auto var_decl = std::dynamic_pointer_cast<AST::VarDeclaration>(stmt)) {
         return check_var_declaration(var_decl);
+    } else if (auto type_decl = std::dynamic_pointer_cast<AST::TypeDeclaration>(stmt)) {
+        return check_type_declaration(type_decl);
     } else if (auto block = std::dynamic_pointer_cast<AST::BlockStatement>(stmt)) {
         return check_block_statement(block);
     } else if (auto if_stmt = std::dynamic_pointer_cast<AST::IfStatement>(stmt)) {
@@ -566,6 +568,25 @@ TypePtr TypeChecker::check_var_declaration(std::shared_ptr<AST::VarDeclaration> 
     var_decl->inferred_type = final_type;
     
     return final_type;
+}
+
+TypePtr TypeChecker::check_type_declaration(std::shared_ptr<AST::TypeDeclaration> type_decl) {
+    if (!type_decl) return nullptr;
+    
+    // Resolve the underlying type
+    TypePtr underlying_type = resolve_type_annotation(type_decl->type);
+    if (!underlying_type) {
+        add_error("Failed to resolve type for alias: " + type_decl->name, type_decl->line);
+        return nullptr;
+    }
+    
+    // Register the type alias in the type system
+    type_system.registerTypeAlias(type_decl->name, underlying_type);
+    
+    // Set the inferred type on the type declaration statement
+    type_decl->inferred_type = underlying_type;
+    
+    return underlying_type;
 }
 
 TypePtr TypeChecker::check_block_statement(std::shared_ptr<AST::BlockStatement> block) {
@@ -1070,26 +1091,59 @@ TypePtr TypeChecker::check_lambda_expr(std::shared_ptr<AST::LambdaExpr> expr) {
 TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<AST::TypeAnnotation> annotation) {
     if (!annotation) return nullptr;
     
-    // Simple type resolution based on type name
-    if (annotation->typeName == "int") {
-        return type_system.INT_TYPE;
-    } else if (annotation->typeName == "i64") {
-        return type_system.INT64_TYPE;
-    } else if (annotation->typeName == "float") {
-        return type_system.FLOAT64_TYPE;
-    } else if (annotation->typeName == "bool") {
-        return type_system.BOOL_TYPE;
-    } else if (annotation->typeName == "string") {
-        return type_system.STRING_TYPE;
-    } else if (annotation->typeName == "atomic") {
+    // Handle structural types (basic support - just return a placeholder for now)
+    if (annotation->isStructural && !annotation->structuralFields.empty()) {
+        // For now, structural types are not fully implemented in the type system
+        // We'll return a placeholder type to indicate the parsing worked
+        add_error("Structural types are parsed but not yet fully implemented in the type system");
+        return type_system.STRING_TYPE; // Placeholder
+    }
+    
+    // Handle union types
+    if (annotation->isUnion && !annotation->unionTypes.empty()) {
+        std::vector<TypePtr> union_member_types;
+        
+        // Resolve each type in the union
+        for (const auto& union_member : annotation->unionTypes) {
+            TypePtr member_type = resolve_type_annotation(union_member);
+            if (member_type) {
+                union_member_types.push_back(member_type);
+            }
+        }
+        
+        if (!union_member_types.empty()) {
+            // Create a union type using the type system
+            return type_system.createUnionType(union_member_types);
+        }
+    }
+    
+    // First try to get the type from the type system (handles built-in types and aliases)
+    TypePtr type = type_system.getType(annotation->typeName);
+    if (type) {
+        return type;
+    }
+    
+    // Check if it's a registered type alias
+    TypePtr alias_type = type_system.getTypeAlias(annotation->typeName);
+    if (alias_type) {
+        return alias_type;
+    }
+    
+    // Handle special cases that might not be in the type system yet
+    if (annotation->typeName == "atomic") {
         // atomic is an alias for i64
         return type_system.INT64_TYPE;
     } else if (annotation->typeName == "channel") {
         // channel type is represented as i64 (channel handle)
         return type_system.INT64_TYPE;
+    } else if (annotation->typeName == "nil") {
+        return type_system.NIL_TYPE;
     }
     
-    // TODO: Implement more complex type resolution
+    // If it's not a built-in type, it might be a user-defined type alias
+    // For now, we'll return STRING_TYPE as fallback, but this should be improved
+    // to properly handle type aliases and union types
+    add_error("Unknown type: " + annotation->typeName);
     return type_system.STRING_TYPE;
 }
 
