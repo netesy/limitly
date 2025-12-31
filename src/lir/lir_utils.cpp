@@ -1,7 +1,9 @@
 #include "lir.hh"
 #include "function_registry.hh"
+#include "functions.hh"
 #include <iomanip>
 #include <sstream>
+#include <set>
 
 namespace LIR {
 
@@ -15,6 +17,16 @@ std::string Disassembler::disassemble() const {
         ss << "r" << i;
     }
     ss << ") {\n";
+    
+    // Collect function names that are actually called in the main function
+    std::set<std::string> called_functions;
+    for (const auto& inst : func.instructions) {
+        if (inst.op == LIR_Op::Call || inst.op == LIR_Op::CallVoid) {
+            if (!inst.func_name.empty()) {
+                called_functions.insert(inst.func_name);
+            }
+        }
+    }
     
     // Main function instructions
     for (size_t i = 0; i < func.instructions.size(); ++i) {
@@ -36,45 +48,109 @@ std::string Disassembler::disassemble() const {
     
     ss << "}\n";
     
-    // Also disassemble all registered functions from the function registry
+    // Only show user-defined functions that are actually called
     auto& function_registry = FunctionRegistry::getInstance();
-    auto function_names = function_registry.getFunctionNames();
     
-    if (!function_names.empty()) {
+    if (!called_functions.empty()) {
         ss << "\n=== User-Defined Functions ===\n";
-        for (const auto& func_name : function_names) {
+        for (const auto& func_name : called_functions) {
             auto lir_func = function_registry.getFunction(func_name);
-            if (lir_func) {
-                // Create a temporary disassembler for this function
-                Disassembler func_disassemble(*lir_func, show_debug_info);
-                
-                // Get the disassembly but remove the recursive call to avoid infinite loop
-                ss << "\nfunction " << lir_func->name << "(";
-                for (uint32_t i = 0; i < lir_func->param_count; ++i) {
-                    if (i > 0) ss << ", ";
-                    ss << "r" << i;
+            if (lir_func && !lir_func->instructions.empty()) {
+                // Only show functions that have actual instructions (not just builtin stubs)
+                bool has_real_instructions = false;
+                for (const auto& inst : lir_func->instructions) {
+                    // Builtin functions typically have just a call and return instruction
+                    if (inst.op != LIR_Op::Call && inst.op != LIR_Op::Return) {
+                        has_real_instructions = true;
+                        break;
+                    }
                 }
-                ss << ") {\n";
                 
-                // Function instructions
-                for (size_t i = 0; i < lir_func->instructions.size(); ++i) {
-                    const auto& inst = lir_func->instructions[i];
+                // Show functions that either have real instructions or more than just call+return
+                if (has_real_instructions || lir_func->instructions.size() > 2) {
+                    // Create a temporary disassembler for this function
+                    Disassembler func_disassemble(*lir_func, show_debug_info);
                     
-                    // Add label if this is a jump target
-                    for (size_t j = 0; j < lir_func->instructions.size(); ++j) {
-                        const auto& other = lir_func->instructions[j];
-                        if ((other.op == LIR_Op::Jump || other.op == LIR_Op::JumpIfFalse) && 
-                            static_cast<size_t>(other.imm) == i) {
-                            ss << "L" << i << ":\n";
-                            break;
+                    // Get the disassembly but remove the recursive call to avoid infinite loop
+                    ss << "\nfunction " << lir_func->name << "(";
+                    for (uint32_t i = 0; i < lir_func->param_count; ++i) {
+                        if (i > 0) ss << ", ";
+                        ss << "r" << i;
+                    }
+                    ss << ") {\n";
+                    
+                    // Function instructions
+                    for (size_t i = 0; i < lir_func->instructions.size(); ++i) {
+                        const auto& inst = lir_func->instructions[i];
+                        
+                        // Add label if this is a jump target
+                        for (size_t j = 0; j < lir_func->instructions.size(); ++j) {
+                            const auto& other = lir_func->instructions[j];
+                            if ((other.op == LIR_Op::Jump || other.op == LIR_Op::JumpIfFalse) && 
+                                static_cast<size_t>(other.imm) == i) {
+                                ss << "L" << i << ":\n";
+                                break;
+                            }
                         }
+                        
+                        // Add instruction
+                        ss << "  " << i << ": " << func_disassemble.disassemble_instruction(inst) << "\n";
                     }
                     
-                    // Add instruction
-                    ss << "  " << i << ": " << func_disassemble.disassemble_instruction(inst) << "\n";
+                    ss << "}\n";
                 }
-                
-                ss << "}\n";
+            }
+        }
+    }
+    
+    // Add the actual function implementations from LIRFunctionManager (like in main.cpp)
+    auto& lir_func_manager = LIRFunctionManager::getInstance();
+    auto function_names = lir_func_manager.getFunctionNames();
+    
+    if (!function_names.empty()) {
+        ss << "\n=== Function LIR Instructions ===\n";
+        for (const auto& func_name : function_names) {
+            auto lir_func = lir_func_manager.getFunction(func_name);
+            if (lir_func) {
+                const auto& instructions = lir_func->getInstructions();
+                if (!instructions.empty()) {
+                    // Function header in proper disassembly style
+                    ss << "\nfunction " << func_name << "(";
+                    for (size_t p = 0; p < lir_func->getParameters().size(); ++p) {
+                        if (p > 0) ss << ", ";
+                        ss << "r" << p;
+                    }
+                    ss << ") {\n";
+                    
+                    // Function instructions with proper formatting
+                    for (size_t i = 0; i < instructions.size(); ++i) {
+                        const auto& inst = instructions[i];
+                        
+                        // Add label if this is a jump target
+                        for (size_t j = 0; j < instructions.size(); ++j) {
+                            const auto& other = instructions[j];
+                            if ((other.op == LIR_Op::Jump || other.op == LIR_Op::JumpIfFalse) && 
+                                static_cast<size_t>(other.imm) == i) {
+                                ss << "L" << i << ":\n";
+                                break;
+                            }
+                        }
+                        
+                        // Add instruction with proper indentation and formatting
+                        ss << "  " << i << ": " << inst.to_string();
+                        
+                        // Add debug info if enabled (similar to main function)
+                        if (show_debug_info) {
+                            // Note: LIRFunction doesn't have debug_info like LIR_Function,
+                            // so we'll just add basic type information if available
+                            ss << " ; user function";
+                        }
+                        
+                        ss << "\n";
+                    }
+                    
+                    ss << "}\n";
+                }
             }
         }
     }
