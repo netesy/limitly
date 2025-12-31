@@ -1,4 +1,5 @@
 #include "lir.hh"
+#include "function_registry.hh"
 #include <iomanip>
 #include <sstream>
 
@@ -7,7 +8,7 @@ namespace LIR {
 std::string Disassembler::disassemble() const {
     std::stringstream ss;
     
-    // Function header
+    // Main function header
     ss << "function " << func.name << "(";
     for (uint32_t i = 0; i < func.param_count; ++i) {
         if (i > 0) ss << ", ";
@@ -15,7 +16,7 @@ std::string Disassembler::disassemble() const {
     }
     ss << ") {\n";
     
-    // Instructions
+    // Main function instructions
     for (size_t i = 0; i < func.instructions.size(); ++i) {
         const auto& inst = func.instructions[i];
         
@@ -33,7 +34,51 @@ std::string Disassembler::disassemble() const {
         ss << "  " << i << ": " << disassemble_instruction(inst) << "\n";
     }
     
-    ss << "}";
+    ss << "}\n";
+    
+    // Also disassemble all registered functions from the function registry
+    auto& function_registry = FunctionRegistry::getInstance();
+    auto function_names = function_registry.getFunctionNames();
+    
+    if (!function_names.empty()) {
+        ss << "\n=== User-Defined Functions ===\n";
+        for (const auto& func_name : function_names) {
+            auto lir_func = function_registry.getFunction(func_name);
+            if (lir_func) {
+                // Create a temporary disassembler for this function
+                Disassembler func_disassemble(*lir_func, show_debug_info);
+                
+                // Get the disassembly but remove the recursive call to avoid infinite loop
+                ss << "\nfunction " << lir_func->name << "(";
+                for (uint32_t i = 0; i < lir_func->param_count; ++i) {
+                    if (i > 0) ss << ", ";
+                    ss << "r" << i;
+                }
+                ss << ") {\n";
+                
+                // Function instructions
+                for (size_t i = 0; i < lir_func->instructions.size(); ++i) {
+                    const auto& inst = lir_func->instructions[i];
+                    
+                    // Add label if this is a jump target
+                    for (size_t j = 0; j < lir_func->instructions.size(); ++j) {
+                        const auto& other = lir_func->instructions[j];
+                        if ((other.op == LIR_Op::Jump || other.op == LIR_Op::JumpIfFalse) && 
+                            static_cast<size_t>(other.imm) == i) {
+                            ss << "L" << i << ":\n";
+                            break;
+                        }
+                    }
+                    
+                    // Add instruction
+                    ss << "  " << i << ": " << func_disassemble.disassemble_instruction(inst) << "\n";
+                }
+                
+                ss << "}\n";
+            }
+        }
+    }
+    
     return ss.str();
 }
 

@@ -5,10 +5,7 @@
 #include "frontend/type_checker.hh"
 #include "frontend/memory_checker.hh"
 #include "frontend/ast.hh"
-#include "common/backend.hh"
 #include "backend/ast_printer.hh"
-#include "backend/bytecode_printer.hh"
-#include "backend/vm/vm.hh"
 #include "backend/register/register.hh"
 #include "lir/generator.hh"
 #include "lir/functions.hh"
@@ -26,7 +23,6 @@ void printUsage(const char* programName) {
     std::cout << "  " << programName << " -ast <source_file> - Print the AST for a source file" << std::endl;
     std::cout << "  " << programName << " -cst <source_file> - Print the CST for a source file" << std::endl;
     std::cout << "  " << programName << " -tokens <source_file> - Print the tokens for a source file" << std::endl;
-    std::cout << "  " << programName << " -bytecode <source_file> - Print the bytecode for a source file" << std::endl;
     std::cout << "  " << programName << " -jit <source_file>    - JIT compile a source file" << std::endl;
     std::cout << "  " << programName << " -jit-debug <source_file> - JIT compile and run directly (debug mode)" << std::endl;
     std::cout << "  " << programName << " -debug <source_file> - Execute with debug output enabled" << std::endl;
@@ -44,7 +40,7 @@ std::string readFile(const std::string& filename) {
     return buffer.str();
 }
 
-int executeFile(const std::string& filename, bool printAst = false, bool printCst = false, bool printTokens = false, bool printBytecode = false, bool useJit = false, bool jitDebug = false, bool enableDebug = false) {
+int executeFile(const std::string& filename, bool printAst = false, bool printCst = false, bool printTokens = false, bool useJit = false, bool jitDebug = false, bool enableDebug = false) {
     try {
         // Initialize LIR function systems
         LIR::FunctionUtils::initializeFunctions();
@@ -175,7 +171,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 LIR::Generator lir_generator;
                 auto lir_function = lir_generator.generate_program(post_opt_type_check);
                 
-                // Initialize and run LIR disassembler
+                // Initialize and run LIR disassembler (includes all functions)
                 LIR::Disassembler disassemble(*lir_function, true);
                 std::cout << "\n=== LIR Disassembly ===\n";
                 std::cout << disassemble.disassemble() << std::endl;
@@ -545,14 +541,12 @@ int main(int argc, char* argv[]) {
         return executeFile(argv[2], false, true, false, false);
     } else if (arg == "-tokens" && argc >= 3) {
         return executeFile(argv[2], false, false, true, false);
-    } else if (arg == "-bytecode" && argc >= 3) {
-        return executeFile(argv[2], false, false, false, true);
     } else if (arg == "-jit" && argc >= 3) {
-        return executeFile(argv[2], false, false, false, false, true, false);
+        return executeFile(argv[2], false, false, false, true, false);
     } else if (arg == "-jit-debug" && argc >= 3) {
-        return executeFile(argv[2], false, false, false, false, true, true);
+        return executeFile(argv[2], false, false, false, true, true);
     } else if (arg == "-debug" && argc >= 3) {
-        return executeFile(argv[2], false, false, false, false, false, false, true);
+        return executeFile(argv[2], false, false, false, false, false, true);
     } else if (arg[0] == '-') {
         std::cerr << "Unknown option: " << arg << std::endl;
         printUsage(argv[0]);
