@@ -720,6 +720,34 @@ class Circle : Shape {
 }
 ```
 
+### Workers
+
+A `worker` is a long-running task that processes data from a channel. It's useful for creating pipelines where data flows from one stage to the next.
+
+```limit
+var messages = channel();
+var results = channel();
+
+concurrent(ch=messages) {
+    // A producer task
+    task {
+        iter(i in 1..5) {
+            messages.send("Message {i}");
+        }
+    }
+
+    // A worker that processes messages
+    worker(message) {
+        print("Worker received: {message}");
+        results.send("Processed: {message}");
+    }
+}
+
+iter(result in results) {
+    print("Final result: {result}");
+}
+```
+
 #### Final Classes and Methods
 
 A `final` class cannot be subclassed. A `final` method cannot be overridden by a subclass.
@@ -967,6 +995,7 @@ print("{name} is {age} years old."); // Output: Alice is 30 years old.
 var [a, b, c] = [1, 2, 3];
 print(a); // Output: 1
 ```
+> **Note:** List destructuring is planned but not yet implemented in the parser.
 
 ### Unsafe Blocks
 
@@ -1028,6 +1057,41 @@ my_num = 3.14;                 // This is also valid
 
 Union types are especially powerful when combined with `match` statements to handle all possible types that a variable could be.
 
+### Intersection Types
+
+An intersection type is a type that combines multiple types into one. A value of an intersection type must satisfy the requirements of all the types in the intersection. Intersection types are defined using the ampersand (`&`) character.
+
+```limit
+trait HasName {
+    fn get_name(): str;
+}
+
+trait HasAge {
+    fn get_age(): int;
+}
+
+type Person = HasName & HasAge;
+
+fn print_person_details(p: Person) {
+    print("{p.get_name()} is {p.get_age()} years old.");
+}
+```
+
+### Refined Types
+
+A refined type allows you to add constraints to an existing type. This is useful for enforcing invariants at the type level. Refined types are defined using the `where` keyword.
+
+```limit
+type PositiveInt = int where value > 0;
+
+fn set_age(age: PositiveInt) {
+    // ...
+}
+
+set_age(10); // Valid
+set_age(-5); // This would be a runtime error
+```
+
 ### Structural Types
 
 A structural type allows you to define a type based on its structure or shape, rather than by a specific name. This is useful for working with data that has a consistent structure but may not be an instance of a named class.
@@ -1066,6 +1130,18 @@ enum Status {
 }
 
 var current_status: Status = Status.Running;
+```
+
+Enums can also have associated data, allowing you to create more complex data structures.
+
+```limit
+enum WebEvent {
+    PageLoad,
+    KeyPress(char),
+    Click({x: int, y: int})
+}
+
+var event = WebEvent.KeyPress('a');
 ```
 
 ### Traits and Interfaces
@@ -1136,6 +1212,18 @@ var result = divide(10, 2);
 match (result) {
     Ok(value) => { print("Result: {value}"); },
     Err(e) => { print("Error: {e}"); }
+}
+```
+
+You can also use `val` and `err` for more concise success/error matching, and even match on specific error types.
+
+```limit
+fn process_result(result: int?DivisionByZero) {
+    match (result) {
+        val v => { print("Success with value: {v}"); },
+        err DivisionByZero(msg) => { print("Division by zero: {msg}"); },
+        err => { print("An unknown error occurred."); }
+    }
 }
 ```
 
