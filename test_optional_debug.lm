@@ -1,0 +1,15 @@
+fn testOptional(name: str?) {
+    print("Parameter received:");
+    if (name) {
+        print("Name is not null");
+        print(name);
+    } else {
+        print("Name is null");
+    }
+}
+
+print("=== Testing with argument ===");
+testOptional("Alice");
+
+print("=== Testing without argument ===");
+testOptional();

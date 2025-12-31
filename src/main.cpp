@@ -316,6 +316,24 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             std::cout << "\n=== LIR Disassembly ===\n";
             LIR::Disassembler disassemble(*lir_function, true);
             std::cout << disassemble.disassemble() << std::endl;
+
+
+                                // Display individual function LIR instructions
+                    auto& lir_func_manager = LIR::LIRFunctionManager::getInstance();
+                    auto function_names = lir_func_manager.getFunctionNames();
+                    
+                    std::cout << "\n=== Function LIR Instructions ===\n";
+                    for (const auto& func_name : function_names) {
+                        auto lir_func = lir_func_manager.getFunction(func_name);
+                        if (lir_func) {
+                            std::cout << "\n" << func_name << ":\n";
+                            const auto& instructions = lir_func->getInstructions();
+                            for (size_t i = 0; i < instructions.size(); ++i) {
+                                const auto& inst = instructions[i];
+                                std::cout << "[" << i << "] " << inst.to_string() << "\n";
+                            }
+                        }
+                    }
             
             // Execute using register interpreter with the new LIRFunctionManager
             try {

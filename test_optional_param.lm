@@ -1,0 +1,5 @@
+fn test(name: str?) {
+    print("Testing optional parameter");
+}
+
+test("hello");

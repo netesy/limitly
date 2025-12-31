@@ -1,0 +1,6 @@
+fn test(x: int = 42): int {
+    return x;
+}
+
+var result = test();
+print(result);

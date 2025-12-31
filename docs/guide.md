@@ -526,6 +526,35 @@ print(person["name"]); // Output: Alice
 print(person["age"]);  // Output: 30
 ```
 
+### Tuples
+
+A tuple is a fixed-size, ordered collection of elements that can be of different types. Tuples are created using parentheses `()`.
+
+```limit
+var my_tuple = (1, "hello", true);
+```
+
+You can access elements in a tuple using zero-based indexing with dot notation.
+
+```limit
+var person = ("Alice", 30);
+print(person.0); // Output: Alice
+print(person.1); // Output: 30
+```
+
+### Object Literals
+
+Object literals provide a way to create instances of user-defined types, like classes or enums, with a specific structure. This is especially useful for enums with associated data.
+
+```limit
+enum Option {
+    Some(any),
+    None
+}
+
+var my_option = Some { value: 42 };
+```
+
 ## Functions
 
 Functions are fundamental building blocks in Limit. They allow you to group code into reusable blocks.
@@ -1027,6 +1056,41 @@ my_num = 3.14;                 // This is also valid
 ```
 
 Union types are especially powerful when combined with `match` statements to handle all possible types that a variable could be.
+
+### Intersection Types
+
+An intersection type is a type that combines multiple types into one. A value of an intersection type must satisfy the requirements of all the types in the intersection. Intersection types are defined using the ampersand (`&`) character.
+
+```limit
+trait HasName {
+    fn get_name(): str;
+}
+
+trait HasAge {
+    fn get_age(): int;
+}
+
+type Person = HasName & HasAge;
+
+fn print_person_details(p: Person) {
+    print("{p.get_name()} is {p.get_age()} years old.");
+}
+```
+
+### Refined Types
+
+A refined type allows you to add constraints to an existing type. This is useful for enforcing invariants at the type level. Refined types are defined using the `where` keyword.
+
+```limit
+type PositiveInt = int where value > 0;
+
+fn set_age(age: PositiveInt) {
+    // ...
+}
+
+set_age(10); // Valid
+set_age(-5); // This would be a runtime error
+```
 
 ### Structural Types
 
