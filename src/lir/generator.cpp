@@ -91,9 +91,10 @@ void Generator::generate_function(AST::FunctionDeclaration& fn) {
         auto placeholder = func_manager.createFunction(fn.name, empty_params, Type::I64, nullptr);
     }
     
-    // Create function with parameters
-    current_function_ = std::make_unique<LIR_Function>(fn.name, fn.params.size());
-    next_register_ = fn.params.size();
+    // Create function with parameters (including optional parameters)
+    size_t total_params = fn.params.size() + fn.optionalParams.size();
+    current_function_ = std::make_unique<LIR_Function>(fn.name, total_params);
+    next_register_ = total_params;
     next_label_ = 0;
     scope_stack_.clear();
     loop_stack_.clear();
@@ -104,11 +105,21 @@ void Generator::generate_function(AST::FunctionDeclaration& fn) {
     // Start CFG building
     start_cfg_build();
     
-    // Register parameters
+    // Register regular parameters
     for (size_t i = 0; i < fn.params.size(); ++i) {
         bind_variable(fn.params[i].first, static_cast<Reg>(i));
         set_register_type(static_cast<Reg>(i), nullptr);
     }
+    
+    // Register optional parameters
+    for (size_t i = 0; i < fn.optionalParams.size(); ++i) {
+        size_t reg_index = fn.params.size() + i;
+        bind_variable(fn.optionalParams[i].first, static_cast<Reg>(reg_index));
+        set_register_type(static_cast<Reg>(reg_index), nullptr);
+    }
+    
+    // Default parameter handling is done at runtime in the register VM
+    // No need to generate LIR code for default parameters
     
     // Emit function body
     if (fn.body) {
@@ -132,9 +143,20 @@ void Generator::generate_function(AST::FunctionDeclaration& fn) {
     
     // Create proper LIRFunction from our LIR_Function
     std::vector<LIRParameter> params;
+    
+    // Add regular parameters
     for (const auto& param : fn.params) {
         LIRParameter lir_param;
         lir_param.name = param.first;
+        // Convert type - for now use I64 as default
+        lir_param.type = Type::I64;
+        params.push_back(lir_param);
+    }
+    
+    // Add optional parameters
+    for (const auto& optional_param : fn.optionalParams) {
+        LIRParameter lir_param;
+        lir_param.name = optional_param.first;
         // Convert type - for now use I64 as default
         lir_param.type = Type::I64;
         params.push_back(lir_param);

@@ -3,46 +3,6 @@
 ## Project Overview
 The Limit Programming Language is a modern programming language with features like static typing, optional parameters, concurrency primitives, and error handling. This document tracks the development activities and progress of the language implementation.
 
-## Project Structure
-The project is organized into frontend and backend components:
-
-- **Frontend**: Responsible for lexical analysis (scanning) and syntax analysis (parsing)
-  - `frontend/scanner.hh/cpp`: Tokenizes source code into a stream of tokens
-  - `frontend/parser.hh/cpp`: Parses tokens into an Abstract Syntax Tree (AST)
-
-- **Backend**: Responsible for semantic analysis, optimization, and code generation
-  - `backend/backend.cpp`: Defines backend interfaces and implementations for bytecode generation
-  - `backend/vm.hh/cpp`: Implements a virtual machine for executing bytecode
-  - Includes bytecode generation and AST visualization
-
-- **Shared**:
-  - `ast.hh`: Defines the Abstract Syntax Tree structure
-  - `opcodes.hh`: Defines bytecode operation codes
-  - `debugger.hh`: Provides error reporting functionality
-  - `memory.hh`: Provides memory management functionality
-  - `value.hh`: Defines the value system for runtime values
-  - `types.hh`: Defines the type system for static typing
-
-## Current Status
-
-### Major Achievements ✅
-- **Complete Frontend**: Scanner, parser, and AST generation for all language features
-- **Complete VM**: Stack-based virtual machine with all core operations
-- **Control Flow**: All control structures (if/else, while, for, nested) working perfectly
-- **Loop Control**: break/continue statements for loops (complete)
-- **Functions**: Complete function system with parameters, return values, recursion, optional parameters, default parameters
-- **OOP System**: Complete object-oriented programming with classes, objects, constructors, methods, field declarations, property access
-- **Collections**: Lists and dictionaries with indexing, creation, and value operations
-- **Memory Management**: Integrated memory manager with region-based allocation and clean object lifecycle
-- **String Features**: Full string interpolation with expression embedding and comprehensive escape sequences
-- **Test Suite**: 20+ comprehensive test files with automated runners (100% pass rate)
-
-### Current Work 🔄
-- **Pattern Matching**: Destructuring patterns for match statements (parser complete, VM implementation in progress)
-- **Advanced Language Features**: Exception handling 
-- **Concurrency**: parallel/concurrent blocks implementation
-- **Standard Library**: Core library functions and modules
-
 ## Development Activities
 
 ### Phase 1: Frontend Development ✅
@@ -142,36 +102,3 @@ The project is organized into frontend and backend components:
   - [ ] Extract from code comments  
   - [ ] Generate HTML / Markdown  
 
-## Recent Achievements ✅
-- **Fixed Nested Iteration**: Resolved critical issue with nested `iter` statements by implementing indexed temporary variable system
-- **String Interpolation Fix**: Fixed parser to handle interpolated strings that start with expressions (e.g., `"{var}, {var2}"`)
-- **Comprehensive Test Suite**: Created organized test suite with 20+ test files covering all implemented features
-- **Test Infrastructure**: Built test runners and documentation for systematic testing
-- **Fixed Control Flow Jump Offsets**: Resolved critical jump offset calculation issues in all control statements (if/else, while, for, match)
-- **Fixed Iterator Stack Cleanup**: Eliminated spurious `<iterator>` output by fixing STORE_TEMP stack management
-- **Complete Control Flow Support**: All control flow statements now work correctly including nested structures
-- **Implemented Collection Operations**: Added full support for lists and dictionaries with proper indexing, value comparison, and append operations
-
-## Recent Achievements ✅ (Latest Updates)
-- **Complete OOP System**: Full object-oriented programming implementation with classes, objects, constructors, methods, field declarations, property access, and dynamic field support
-- **Complete Function System**: Full implementation of function declarations, calls, parameters, return values, recursion, optional parameters, and default parameters
-- **Enhanced Collections**: Lists and dictionaries with proper indexing, value comparison, and append operations
-- **Fixed Float Arithmetic**: Resolved type mismatch causing `std::get: wrong index for variant` errors in float operations
-- **Enhanced Escape Sequences**: Comprehensive escape sequence handling in scanner (`\n`, `\t`, `\r`, `\\`, `\'`, `\"`, `\{`, `\}`, `\0`, `\a`, `\b`, `\f`, `\v`)
-- **Comprehensive Test Suite**: 20+ test files with 100% pass rate and automated test runners
-- **Memory Safety**: Clean memory management with no leaks across all language features
-
-## Current Focus
-- **Pattern Matching**: Completing destructuring patterns for match statements (dict, list, tuple patterns)
-- Adding indexed assignment operations (myList[0] = value, myDict["key"] = value)
-- Implementing exception handling
-- Implementing concurrency primitives (parallel/concurrent blocks)
-- Adding advanced type features
-- Expanding standard library functions
-- Implementing modules and import system
-
-## Future Work
-- Implement a JIT compiler for improved performance
-- Add support for interoperability with C/C++
-- Create IDE integration with syntax highlighting and code completion
-- Implement a debugger
