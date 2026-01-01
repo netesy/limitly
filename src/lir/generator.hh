@@ -212,6 +212,13 @@ private:
     std::unordered_map<Reg, ValuePtr> register_values_;
     std::vector<std::string> errors_;
     
+    // Else block context for handling return statements in ? else {} blocks
+    struct ElseBlockContext {
+        bool in_else_block = false;
+        Reg result_register = UINT32_MAX;  // Register to store the result value
+    };
+    ElseBlockContext else_context_;
+    
     // Function symbol table for visibility control
     struct FunctionInfo {
         std::string name;

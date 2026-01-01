@@ -3,6 +3,7 @@
 #include "../../lir/functions.hh"
 #include "../../lir/builtin_functions.hh"
 #include "../types.hh"
+#include "../value.hh"
 #include <iostream>
 #include <cstring>
 
@@ -509,7 +510,7 @@ OP_CALL:
             std::string func_name = pc->func_name;
             const auto& arg_regs = pc->call_args;
             
-            std::cout << "[DEBUG] New format call to '" << func_name << "' with " << arg_regs.size() << " arguments" << std::endl;
+            //std::cout << "[DEBUG] New format call to '" << func_name << "' with " << arg_regs.size() << " arguments" << std::endl;
             
             // First try builtin functions
             if (LIR::BuiltinUtils::isBuiltinFunction(func_name)) {
@@ -519,7 +520,7 @@ OP_CALL:
                 for (size_t i = 0; i < arg_regs.size(); ++i) {
                     auto reg_value = registers[arg_regs[i]];
                     
-                    std::cout << "[DEBUG] Arg " << i << " from register r" << arg_regs[i] << " contains: ";
+                    //std::cout << "[DEBUG] Arg " << i << " from register r" << arg_regs[i] << " contains: ";
                     if (std::holds_alternative<int64_t>(reg_value)) {
                         std::cout << "int64_t(" << std::get<int64_t>(reg_value) << ")" << std::endl;
                     } else if (std::holds_alternative<double>(reg_value)) {
@@ -557,7 +558,7 @@ OP_CALL:
                     // Call builtin function
                     ValuePtr result = LIR::BuiltinUtils::callBuiltinFunction(func_name, args);
                     
-                    std::cout << "[DEBUG] Builtin function '" << func_name << "' returned: ";
+                    //std::cout << "[DEBUG] Builtin function '" << func_name << "' returned: ";
                     if (result && result->type) {
                         std::cout << "type=" << static_cast<int>(result->type->tag) << std::endl;
                     } else {
@@ -601,20 +602,20 @@ OP_CALL:
                 auto func = func_manager.getFunction(func_name);
                 
                 if (func) {
-                    std::cout << "[DEBUG] Calling user function '" << func_name << "' with " << arg_regs.size() << " arguments" << std::endl;
+                    //std::cout << "[DEBUG] Calling user function '" << func_name << "' with " << arg_regs.size() << " arguments" << std::endl;
                     
                     // Save current context
                     auto saved_registers = registers;
                     
                     // Set up parameters (copy arguments to parameter registers r0, r1, r2, ...)
-                    std::cout << "[DEBUG] Setting up " << func->getParameters().size() << " parameters for function '" << func_name << "'" << std::endl;
-                    std::cout << "[DEBUG] Provided arguments: " << arg_regs.size() << std::endl;
+                   // std::cout << "[DEBUG] Setting up " << func->getParameters().size() << " parameters for function '" << func_name << "'" << std::endl;
+                   // std::cout << "[DEBUG] Provided arguments: " << arg_regs.size() << std::endl;
                     
                     for (size_t i = 0; i < func->getParameters().size(); ++i) {
                         if (i < arg_regs.size()) {
                             // Copy provided argument
                             registers[i] = registers[arg_regs[i]];
-                            std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = register r" << arg_regs[i];
+                           // std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = register r" << arg_regs[i];
                             
                             // Debug: show the actual value
                             auto& val = registers[i];
@@ -632,39 +633,39 @@ OP_CALL:
                             if (func_name == "greet" || func_name == "greetWithDefault") {
                                 // Default name parameter to "World"
                                 registers[i] = std::string("World");
-                                std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = default value 'World'" << std::endl;
+                               // std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = default value 'World'" << std::endl;
                             } else if (func_name == "power") {
                                 // Default exponent parameter to 2
                                 registers[i] = static_cast<int64_t>(2);
-                                std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = default value 2" << std::endl;
+                              //  std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = default value 2" << std::endl;
                             } else if (func_name == "createUser") {
                                 // Default age to 18, active to true
                                 if (i == 1) { // age parameter
                                     registers[i] = static_cast<int64_t>(18);
-                                    std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = default age 18" << std::endl;
+                                 //   std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = default age 18" << std::endl;
                                 } else if (i == 2) { // active parameter
                                     registers[i] = true;
-                                    std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = default active true" << std::endl;
+                                  //  std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = default active true" << std::endl;
                                 } else {
                                     registers[i] = nullptr;
-                                    std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = nullptr (no default)" << std::endl;
+                                 //   std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = nullptr (no default)" << std::endl;
                                 }
                             } else if (func_name == "processData") {
                                 // Default transform to false, multiplier to 1
                                 if (i == 1) { // transform parameter
                                     registers[i] = false;
-                                    std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = default transform false" << std::endl;
+                                 //   std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = default transform false" << std::endl;
                                 } else if (i == 2) { // multiplier parameter
                                     registers[i] = static_cast<int64_t>(1);
-                                    std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = default multiplier 1" << std::endl;
+                                 //   std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = default multiplier 1" << std::endl;
                                 } else {
                                     registers[i] = nullptr;
-                                    std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = nullptr (no default)" << std::endl;
+                                 //   std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = nullptr (no default)" << std::endl;
                                 }
                             } else {
                                 // Generic default: nullptr for optional parameters
                                 registers[i] = nullptr;
-                                std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = nullptr (optional parameter not provided)" << std::endl;
+                              //  std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = nullptr (optional parameter not provided)" << std::endl;
                             }
                         }
                     }
@@ -678,7 +679,7 @@ OP_CALL:
                     // Get return value from register 0 (standard return register)
                     auto return_value = registers[0];
                     
-                    std::cout << "[DEBUG] Function '" << func_name << "' returned: ";
+                   // std::cout << "[DEBUG] Function '" << func_name << "' returned: ";
                     if (std::holds_alternative<int64_t>(return_value)) {
                         std::cout << "int64_t(" << std::get<int64_t>(return_value) << ")" << std::endl;
                     } else if (std::holds_alternative<double>(return_value)) {
@@ -726,7 +727,7 @@ OP_CALL:
                 auto reg_index = pc->dst - arg_count + i;
                 auto reg_value = registers[reg_index];
                 
-                std::cout << "[DEBUG] Arg " << i << " register " << reg_index << " contains: ";
+               // std::cout << "[DEBUG] Arg " << i << " register " << reg_index << " contains: ";
                 if (std::holds_alternative<int64_t>(reg_value)) {
                     std::cout << "int64_t(" << std::get<int64_t>(reg_value) << ")" << std::endl;
                 } else if (std::holds_alternative<double>(reg_value)) {
@@ -744,19 +745,19 @@ OP_CALL:
                 if (std::holds_alternative<int64_t>(reg_value)) {
                     auto int_type = std::make_shared<::Type>(TypeTag::Int);
                     arg_value = std::make_shared<Value>(int_type, std::get<int64_t>(reg_value));
-                    std::cout << "[DEBUG] Created Value with TypeTag::Int (" << static_cast<int>(TypeTag::Int) << ")" << std::endl;
+                  //  std::cout << "[DEBUG] Created Value with TypeTag::Int (" << static_cast<int>(TypeTag::Int) << ")" << std::endl;
                 } else if (std::holds_alternative<double>(reg_value)) {
                     auto float_type = std::make_shared<::Type>(TypeTag::Float64);
                     arg_value = std::make_shared<Value>(float_type, std::get<double>(reg_value));
-                    std::cout << "[DEBUG] Created Value with TypeTag::Float64 (" << static_cast<int>(TypeTag::Float64) << ")" << std::endl;
+                  //  std::cout << "[DEBUG] Created Value with TypeTag::Float64 (" << static_cast<int>(TypeTag::Float64) << ")" << std::endl;
                 } else if (std::holds_alternative<bool>(reg_value)) {
                     auto bool_type = std::make_shared<::Type>(TypeTag::Bool);
                     arg_value = std::make_shared<Value>(bool_type, std::get<bool>(reg_value));
-                    std::cout << "[DEBUG] Created Value with TypeTag::Bool (" << static_cast<int>(TypeTag::Bool) << ")" << std::endl;
+                 //   std::cout << "[DEBUG] Created Value with TypeTag::Bool (" << static_cast<int>(TypeTag::Bool) << ")" << std::endl;
                 } else if (std::holds_alternative<std::string>(reg_value)) {
                     auto string_type = std::make_shared<::Type>(TypeTag::String);
                     arg_value = std::make_shared<Value>(string_type, std::get<std::string>(reg_value));
-                    std::cout << "[DEBUG] Created Value with TypeTag::String (" << static_cast<int>(TypeTag::String) << ")" << std::endl;
+                  //  std::cout << "[DEBUG] Created Value with TypeTag::String (" << static_cast<int>(TypeTag::String) << ")" << std::endl;
                 } else {
                     auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
                     arg_value = std::make_shared<Value>(nil_type);
@@ -1157,38 +1158,45 @@ OP_RET:
 
 OP_CONSTRUCTERROR:
     {
-        // Create a proper error value instead of nullptr
-        // For now, we'll use a special tagged value to represent errors
-        // In a full implementation, this would be a proper Result<T, E> type
+        // Create an error ID using a tagged integer approach
+        // Error IDs are negative numbers starting from -1000000 to avoid conflicts
+        static int64_t next_error_id = -1000000;
+        int64_t error_id = next_error_id--;
         
-        // Use a negative integer to represent error state
-        // This allows is_error to distinguish between success and error values
-        registers[pc->dst] = static_cast<int64_t>(-1); // Error marker
+        // Store error information in our error table
+        ErrorInfo error_info;
+        error_info.errorType = "DefaultError";
+        error_info.message = "Operation failed";
+        error_info.isError = true;
+        error_table[error_id] = error_info;
+        
+        // Store the error ID in the register (primitive int64_t)
+        registers[pc->dst] = error_id;
     }
     DISPATCH();
 
 OP_CONSTRUCTOK:
     {
-        // Wrap the value in an Ok variant
-        // For now, we'll just pass through the value since we're using simple tagging
-        // In a full implementation, this would create a proper Result<T, E> with Ok variant
+        // For success values, just pass through the original value
+        // The type system at the LIR level knows this is wrapped in ErrorUnion
         registers[pc->dst] = registers[pc->a];
+        
+        // Clear any error information for this register
+        // (in case it was previously an error)
+        auto reg_value = registers[pc->a];
+        if (std::holds_alternative<int64_t>(reg_value)) {
+            int64_t value = std::get<int64_t>(reg_value);
+            if (value <= -1000000) {
+                error_table.erase(value);
+            }
+        }
     }
     DISPATCH();
 
 OP_ISERROR:
     {
-        // Check if the value is our error marker (-1) or nullptr
-        auto& value = registers[pc->a];
-        bool is_error = false;
-        
-        if (std::holds_alternative<std::nullptr_t>(value)) {
-            is_error = true; // nullptr is considered an error
-        } else if (std::holds_alternative<int64_t>(value)) {
-            // Check for our error marker
-            is_error = (std::get<int64_t>(value) == -1);
-        }
-        
+        // Check if the value is an error using our proper error detection
+        bool is_error = isErrorValue(pc->a);
         registers[pc->dst] = is_error;
     }
     DISPATCH();
@@ -1197,15 +1205,29 @@ OP_UNWRAP:
     {
         auto& value = registers[pc->a];
         
-        // Check if it's an error value
-        if (std::holds_alternative<std::nullptr_t>(value)) {
-            // Error case - this should not happen in well-formed code
-            registers[pc->dst] = nullptr;
-        } else if (std::holds_alternative<int64_t>(value) && std::get<int64_t>(value) == -1) {
-            // Error marker - this should not happen in well-formed code
+        // Check if it's an error value using proper error detection
+        if (isErrorValue(pc->a)) {
+            // Error case - this should panic in a real implementation
+            std::cerr << "Runtime Error: Attempted to unwrap an error value" << std::endl;
+            
+            // Get the actual error message from error table
+            if (std::holds_alternative<int64_t>(value)) {
+                int64_t error_id = std::get<int64_t>(value);
+                auto it = error_table.find(error_id);
+                if (it != error_table.end()) {
+                    std::cerr << "Error details: " << it->second.errorType << " - " << it->second.message << std::endl;
+                }
+            }
+            
+            // Legacy error storage check
+            auto legacy_it = error_storage.find(pc->a);
+            if (legacy_it != error_storage.end()) {
+                std::cerr << "Error details: " << legacy_it->second->errorType << " - " << legacy_it->second->message << std::endl;
+            }
+            
             registers[pc->dst] = nullptr;
         } else {
-            // Success case - unwrap the value (just pass it through for now)
+            // Success case - unwrap the value (just pass it through)
             registers[pc->dst] = value;
         }
     }
@@ -1420,7 +1442,17 @@ void RegisterVM::execute_lir_function(const LIR::LIRFunction& function) {
 
 std::string RegisterVM::to_string(const RegisterValue& value) const {
     if (std::holds_alternative<int64_t>(value)) {
-        return std::to_string(std::get<int64_t>(value));
+        int64_t intValue = std::get<int64_t>(value);
+        
+        // Check if it's an error ID
+        if (intValue <= -1000000) {
+            auto it = error_table.find(intValue);
+            if (it != error_table.end() && it->second.isError) {
+                return "Error(" + it->second.errorType + ": " + it->second.message + ")";
+            }
+        }
+        
+        return std::to_string(intValue);
     } else if (std::holds_alternative<double>(value)) {
         return std::to_string(std::get<double>(value));
     } else if (std::holds_alternative<bool>(value)) {
@@ -1429,6 +1461,83 @@ std::string RegisterVM::to_string(const RegisterValue& value) const {
         return std::get<std::string>(value);
     }
     return "nil";
+}
+
+// Error handling methods implementation
+ValuePtr RegisterVM::createErrorValue(const std::string& errorType, const std::string& message) {
+    // Create error value using the same approach as the old VM
+    ErrorValue errorVal(errorType, message, {}, 0); // No source location for now
+    
+    // Create error union type
+    ErrorUnionType errorUnionDetails;
+    errorUnionDetails.successType = type_system->NIL_TYPE;
+    errorUnionDetails.errorTypes = {errorType};
+    errorUnionDetails.isGenericError = (errorType == "DefaultError");
+    
+    auto errorUnionType = std::make_shared<Type>(TypeTag::ErrorUnion, errorUnionDetails);
+    
+    // Create the final value with the error union type
+    ValuePtr result = type_system->createValue(errorUnionType);
+    result->complexData = errorVal;
+    
+    return result;
+}
+
+ValuePtr RegisterVM::createSuccessValue(const RegisterValue& value) {
+    // Convert RegisterValue to ValuePtr
+    ValuePtr successValue;
+    
+    if (std::holds_alternative<int64_t>(value)) {
+        successValue = type_system->createValue(type_system->INT64_TYPE);
+        successValue->data = std::get<int64_t>(value);
+    } else if (std::holds_alternative<double>(value)) {
+        successValue = type_system->createValue(type_system->FLOAT64_TYPE);
+        successValue->data = std::get<double>(value);
+    } else if (std::holds_alternative<bool>(value)) {
+        successValue = type_system->createValue(type_system->BOOL_TYPE);
+        successValue->data = std::get<bool>(value) ? 1 : 0;
+    } else if (std::holds_alternative<std::string>(value)) {
+        successValue = type_system->createValue(type_system->STRING_TYPE);
+        successValue->data = std::get<std::string>(value);
+    } else {
+        successValue = type_system->createValue(type_system->NIL_TYPE);
+    }
+    
+    // Create error union type for the success value
+    ErrorUnionType errorUnionDetails;
+    errorUnionDetails.successType = successValue->type;
+    errorUnionDetails.isGenericError = true; // Generic for Type? syntax
+    
+    auto errorUnionType = std::make_shared<Type>(TypeTag::ErrorUnion, errorUnionDetails);
+    
+    // Create the union value containing the success value
+    ValuePtr result = type_system->createValue(errorUnionType);
+    result->data = successValue->data;
+    result->complexData = successValue->complexData;
+    
+    return result;
+}
+
+bool RegisterVM::isErrorValue(LIR::Reg reg) const {
+    const auto& regValue = registers[reg];
+    
+    // Check if it's an error ID (negative number in error range)
+    if (std::holds_alternative<int64_t>(regValue)) {
+        int64_t value = std::get<int64_t>(regValue);
+        if (value <= -1000000) {
+            // Check if this error ID exists in our error table
+            auto it = error_table.find(value);
+            return it != error_table.end() && it->second.isError;
+        }
+    }
+    
+    // Legacy: Check if this register contains an error value in error storage
+    auto it = error_storage.find(reg);
+    if (it != error_storage.end()) {
+        return true; // Has stored error
+    }
+    
+    return false;
 }
 
 } // namespace Register

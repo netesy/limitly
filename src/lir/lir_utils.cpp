@@ -72,7 +72,7 @@ std::string Disassembler::disassemble() const {
                     Disassembler func_disassemble(*lir_func, show_debug_info);
                     
                     // Get the disassembly but remove the recursive call to avoid infinite loop
-                    ss << "\nfunction " << lir_func->name << "(";
+                    ss << "\nfn " << lir_func->name << "(";
                     for (uint32_t i = 0; i < lir_func->param_count; ++i) {
                         if (i > 0) ss << ", ";
                         ss << "r" << i;
@@ -115,7 +115,7 @@ std::string Disassembler::disassemble() const {
                 const auto& instructions = lir_func->getInstructions();
                 if (!instructions.empty()) {
                     // Function header in proper disassembly style
-                    ss << "\nfunction " << func_name << "(";
+                    ss << "\nfn " << func_name << "(";
                     for (size_t p = 0; p < lir_func->getParameters().size(); ++p) {
                         if (p > 0) ss << ", ";
                         ss << "r" << p;

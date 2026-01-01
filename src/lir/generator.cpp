@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <map>
 #include <limits>
+using namespace LIR;
 
 namespace LIR {
 
@@ -2260,11 +2261,25 @@ void Generator::emit_for_stmt_linear(AST::ForStatement& stmt) {
 }
 
 void Generator::emit_return_stmt(AST::ReturnStatement& stmt) {
-    if (stmt.value) {
-        Reg value = emit_expr(*stmt.value);
-        emit_instruction(LIR_Inst(LIR_Op::Return, value));
+    if (else_context_.in_else_block) {
+        // Inside an else block - store the value in the result register instead of returning
+        if (stmt.value) {
+            Reg value = emit_expr(*stmt.value);
+            // Move the value to the result register
+            emit_instruction(LIR_Inst(LIR_Op::Mov, Type::I64, else_context_.result_register, value, 0));
+        } else {
+            // No value - store a default value (0)
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, else_context_.result_register, 0, 0));
+        }
+        // Don't emit a return instruction - let the else block continue
     } else {
-        emit_instruction(LIR_Inst(LIR_Op::Return));
+        // Normal return statement
+        if (stmt.value) {
+            Reg value = emit_expr(*stmt.value);
+            emit_instruction(LIR_Inst(LIR_Op::Return, value));
+        } else {
+            emit_instruction(LIR_Inst(LIR_Op::Return));
+        }
     }
 }
 
@@ -3163,11 +3178,15 @@ bool Generator::validate_cfg() {
         // A block must either have a terminator (return/jump) or successors
         // Exception: success_unwrap blocks in error propagation can continue without terminators
         // Exception: entry blocks in simple functions can fall through without explicit terminators
+        // Exception: continuation blocks (fallible_continue, if_end, etc.) can continue without terminators
         if (!has_terminator && !has_successors && !block->is_exit) {
             // Allow success_unwrap blocks to not have terminators (they continue execution)
             if (block->label.find("success_unwrap") == std::string::npos &&
                 // Allow entry blocks in simple functions to fall through
-                !(block->is_entry && current_function_->cfg->blocks.size() <= 2)) {
+                !(block->is_entry && current_function_->cfg->blocks.size() <= 2) &&
+                // Allow continuation blocks to not have terminators
+                block->label.find("_continue") == std::string::npos &&
+                block->label.find("_end") == std::string::npos) {
                 report_error("CFG validation: Block " + std::to_string(block->id) + 
                             " (" + block->label + ") has no terminator and no successors");
                 is_valid = false;
@@ -3443,18 +3462,11 @@ Reg Generator::emit_error_construct_expr(AST::ErrorConstructExpr& expr) {
     Reg dst = allocate_register();
     
     // For the unified Type? system, err() creates a generic error
-    // The success type will be inferred from context or explicitly provided
-    TypePtr success_type = type_system->STRING_TYPE; // Default, should be inferred from context
-    
-    // Create error value using the unified system
     auto result_type = std::make_shared<::Type>(::TypeTag::ErrorUnion);
-    
-    // For now, create a simple error value - in a full implementation,
-    // this would use the errorType and arguments to create a proper error object
-    auto error_val = std::make_shared<Value>(result_type, std::string("error"));
-    
     set_register_type(dst, result_type);
-    emit_instruction(LIR_Inst(LIR_Op::ConstructError, dst, error_val));
+    
+    // Generate ConstructError instruction - the VM will handle creating the error value
+    emit_instruction(LIR_Inst(LIR_Op::ConstructError, Type::Ptr, dst, 0, 0));
     return dst;
 }
 
@@ -3465,26 +3477,17 @@ Reg Generator::emit_ok_construct_expr(AST::OkConstructExpr& expr) {
     Reg value_reg = emit_expr(*expr.value);
     
     // Create ok value using the unified system
-    // ok(value) creates a success value in the Type? system
     auto result_type = std::make_shared<::Type>(::TypeTag::ErrorUnion);
-    
-    // For now, create a simple ok value - in a full implementation,
-    // this would properly wrap the value from value_reg
-    auto ok_val = std::make_shared<Value>(result_type, std::string("ok"));
-    
     set_register_type(dst, result_type);
-    emit_instruction(LIR_Inst(LIR_Op::ConstructOk, dst, ok_val));
+    
+    // Generate ConstructOk instruction with the actual value
+    emit_instruction(LIR_Inst(LIR_Op::ConstructOk, Type::Ptr, dst, value_reg, 0));
     return dst;
 }
 
 Reg Generator::emit_fallible_expr(AST::FallibleExpr& expr) {
     // Evaluate the expression that may return a Result (Type?)
     Reg result_reg = emit_expr(*expr.expression);
-    
-    // For the ? operator in the unified Type? system, we need to:
-    // 1. Check if the result is an error using IsError
-    // 2. If it's an error, return immediately from the function (proper propagation)
-    // 3. If it's ok, unwrap the value and continue
     
     // Create a register to hold the error check result
     Reg is_error_reg = allocate_register();
@@ -3496,13 +3499,17 @@ Reg Generator::emit_fallible_expr(AST::FallibleExpr& expr) {
     
     if (cfg_context_.building_cfg) {
         // CFG mode: create blocks for error handling
-        LIR_BasicBlock* error_block = create_basic_block("error_propagation");
+        LIR_BasicBlock* error_block = create_basic_block("error_handling");
         LIR_BasicBlock* success_block = create_basic_block("success_unwrap");
+        LIR_BasicBlock* continue_block = create_basic_block("fallible_continue");
         
-        // If it's an error, jump to error propagation block
+        // Create a register to hold the final result (either unwrapped value or else block result)
+        Reg final_result_reg = allocate_register();
+        
+        // If it's an error, jump to error handling block
         emit_instruction(LIR_Inst(LIR_Op::JumpIf, Type::Void, 0, is_error_reg, 0, error_block->id));
         
-        // Add unconditional jump to success block (fall-through case)
+        // Explicit jump to success block to ensure correct control flow
         emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, success_block->id));
         
         // Set up CFG edges
@@ -3513,65 +3520,102 @@ Reg Generator::emit_fallible_expr(AST::FallibleExpr& expr) {
         set_current_block(success_block);
         
         Reg unwrapped_reg = allocate_register();
-        
-        // Get the success type from the fallible type
         TypePtr fallible_type = get_register_type(result_reg);
         TypePtr success_type = type_system->STRING_TYPE; // Should extract from ErrorUnion type
         set_register_type(unwrapped_reg, success_type);
         
         emit_instruction(LIR_Inst(LIR_Op::Unwrap, Type::I64, unwrapped_reg, result_reg, 0));
         
-        // Continue execution after unwrap - don't add terminator here
-        // The caller will handle subsequent instructions
+        // Move unwrapped value to final result register
+        emit_instruction(LIR_Inst(LIR_Op::Mov, Type::I64, final_result_reg, unwrapped_reg, 0));
         
-        // === Error Block: propagate error by returning ===
+        // Jump to continue block
+        emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, continue_block->id));
+        add_block_edge(success_block, continue_block);
+        
+        // === Error Block: handle error ===
         set_current_block(error_block);
         
-        // For the ? operator, we propagate the error by returning it from the current function
-        // This implements the "If the value is Err, the ? operator will immediately return that Err"
-        emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, result_reg, 0, 0));
+        if (expr.elseHandler) {
+            // ? else {} construct - execute the else block instead of propagating
+            std::cout << "[DEBUG] Generating ? else {} block" << std::endl;
+            
+            // Allocate register for the else block result
+            Reg default_reg = allocate_register();
+            
+            // Set up else block context
+            else_context_.in_else_block = true;
+            else_context_.result_register = default_reg;
+            
+            // Execute the else block statements
+            emit_stmt(*expr.elseHandler);
+            
+            // Clear else block context
+            else_context_.in_else_block = false;
+            else_context_.result_register = UINT32_MAX;
+            
+            // Move default value to final result register
+            emit_instruction(LIR_Inst(LIR_Op::Mov, Type::I64, final_result_reg, default_reg, 0));
+            
+            // Jump to continue block
+            emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, continue_block->id));
+            add_block_edge(error_block, continue_block);
+            
+        } else {
+            // Simple ? operator - propagate error by returning
+            emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, result_reg, 0, 0));
+            // No edge to continue block since we return
+        }
         
-        // Mark error block as terminated since it has a return
-        error_block->terminated = true;
+        // === Continue Block: merge point for both paths ===
+        set_current_block(continue_block);
         
-        // Switch back to success block for continuation
-        set_current_block(success_block);
-        
-        // Return the unwrapped value
-        return unwrapped_reg;
+        return final_result_reg; // Return the final result register
         
     } else {
-        // Linear mode: use labels and jumps
+        // Non-CFG mode: use labels and jumps
         uint32_t error_label = generate_label();
         uint32_t continue_label = generate_label();
         
-        // If it's an error, jump to error propagation
+        // If it's an error, jump to error handling
         emit_instruction(LIR_Inst(LIR_Op::JumpIf, Type::Void, 0, is_error_reg, 0, error_label));
         
         // Success path: unwrap the value
         Reg unwrapped_reg = allocate_register();
-        
-        // Get the success type from the fallible type
-        TypePtr fallible_type = get_register_type(result_reg);
-        TypePtr success_type = type_system->STRING_TYPE; // Should extract from ErrorUnion type
+        TypePtr success_type = type_system->STRING_TYPE;
         set_register_type(unwrapped_reg, success_type);
         
         emit_instruction(LIR_Inst(LIR_Op::Unwrap, Type::I64, unwrapped_reg, result_reg, 0));
         
-        // Jump to continue execution after error handling
+        // Jump to continue execution
         emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, continue_label));
         
-        // Error propagation block
+        // Error handling block
         emit_instruction(LIR_Inst(LIR_Op::Label, Type::Void, error_label, 0, 0));
         
-        // For the ? operator, we propagate the error by returning it from the current function
-        // This implements the "If the value is Err, the ? operator will immediately return that Err"
-        emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, result_reg, 0, 0));
+        if (expr.elseHandler) {
+            // ? else {} construct - execute the else block
+            std::cout << "[DEBUG] Generating ? else {} block (non-CFG)" << std::endl;
+            
+            // Set up else block context
+            else_context_.in_else_block = true;
+            else_context_.result_register = unwrapped_reg;
+            
+            // Execute the else block statements
+            emit_stmt(*expr.elseHandler);
+            
+            // Clear else block context
+            else_context_.in_else_block = false;
+            else_context_.result_register = UINT32_MAX;
+            
+        } else {
+            // Simple ? operator - propagate error by returning
+            emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, result_reg, 0, 0));
+        }
         
-        // Continue execution label
+        // Continue label
         emit_instruction(LIR_Inst(LIR_Op::Label, Type::Void, continue_label, 0, 0));
         
-        // Return the unwrapped value
         return unwrapped_reg;
     }
 }

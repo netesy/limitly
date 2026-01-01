@@ -1,0 +1,59 @@
+// Comprehensive test of the new primitive-based error handling system
+
+fn divide(a: int, b: int): int? {
+    if (b == 0) {
+        return err();// Should create error ID
+        }
+        return a / b;// Should return success value
+    }
+
+    fn chain_operations(a: int, b: int, c: int): int? {
+        var step1 = divide(a, b)?;// Error propagation
+        var step2 = divide(step1, c)?;// Chain operations
+        return step2 * 2;
+    }
+
+    print(" === Comprehensive Error System Test === ");
+
+    // Test 1: Basic error creation and detection
+    print("\n1. Basic error creation: ");
+    var error_result = divide(10, 0);
+    print("Error result: {error_result}");
+
+    // Test 2: Basic success value
+    print("\n2. Basic success value: ");
+    var success_result = divide(10, 2);
+    print("Success result: {success_result}");
+
+    // Test 3: Error propagation in chain
+    print("\n3. Error propagation (should fail at first step): ");
+    var chain_error = chain_operations(10, 0, 2);
+    print("Chain error result: {chain_error}");
+
+    // Test 4: Success propagation in chain
+    print("\n4. Success propagation (should succeed): ");
+    var chain_success = chain_operations(20, 4, 2);
+    print("Chain success result: {chain_success}");
+
+    // Test 5: Error propagation at second step
+    print("\n5. Error propagation (should fail at second step): ");
+    var chain_error2 = chain_operations(20, 4, 0);
+    print("Chain error2 result: {chain_error2}");
+
+    // Test 6: ? else {} error handling
+    print("\n6. ? else {} error handling: ");
+    var handled_result = divide(10, 0)? else {
+        print("Caught error in else block ! ");
+        return 42;
+        };
+        print("Handled result: {handled_result}");
+
+        // Test 7: ? else {} success case
+        print("\n7. ? else {} success case: ");
+        var handled_success = divide(10, 2)? else {
+            print("This should not execute");
+            return - 1;
+            };
+            print("Handled success: {handled_success}");
+
+            print("\n === Test Complete === ");

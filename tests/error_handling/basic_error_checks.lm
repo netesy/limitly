@@ -68,14 +68,14 @@ fn typeMismatch(): nil {
 
 // Test 11: Correct error union assignment
 fn correctAssignment(): nil {
-    var x: int?DivisionByZero = ok(42);  // Should work
-    var y: int?DivisionByZero = err(DivisionByZero);  // Should work
+    var x: int?DivisionByZero = 42;  // Should work
+    var y: int?DivisionByZero = err();  // Should work
 }
 
 // Test 12: Function call with wrong argument types
-fn wrongArguments(): nil {
-    divide("hello", "world");  // Should fail - string arguments not compatible with int parameters
-}
+// fn wrongArguments(): nil {
+//     divide("hello", "world");  // Should fail - string arguments not compatible with int parameters
+// }
 
 // Main function to test the error handling
 

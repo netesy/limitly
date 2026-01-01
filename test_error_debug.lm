@@ -1,0 +1,16 @@
+// Debug test for error handling
+fn testErr(): int? {
+    return err();
+}
+
+fn testOk(): int? {
+    return ok(42);
+}
+
+print("Testing err(): ");
+var result1 = testErr();
+print("Result1: ", result1);
+
+print("Testing ok(): ");
+var result2 = testOk();
+print("Result2: ", result2);

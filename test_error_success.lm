@@ -1,0 +1,16 @@
+// Test error propagation success case
+fn divide(a: int, b: int): int? {
+    if (b == 0) {
+        return err();
+    }
+    return ok(a / b);
+}
+
+fn testSuccess(): int? {
+    var result = divide(10, 2)?; // This should succeed and unwrap to 5
+    return ok(result * 2);       // This should execute and return 10
+}
+
+print("Testing success case:");
+var result = testSuccess();
+print("Result:", result);
