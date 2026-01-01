@@ -1,0 +1,22 @@
+// Test simple error propagation with ? operator
+fn divide(a: int, b: int): int? {
+    if (b == 0) {
+        return err();
+    }
+    return ok(a / b);
+}
+
+fn calculate(x: int, y: int): int? {
+    var result = divide(x, y)?;  // Should propagate error if divide fails
+    return ok(result * 2);
+}
+
+print("Testing error propagation:");
+
+// Test error case - should propagate
+var result1 = calculate(10, 0);
+print("Result1 (should be error): {result1}");
+
+// Test success case - should work
+var result2 = calculate(10, 2);
+print("Result2 (should be 10): {result2}");

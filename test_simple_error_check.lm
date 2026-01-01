@@ -1,0 +1,7 @@
+// Simple test to check what error handling features work
+fn mayFail(): int? {
+    return 42; // Just return a simple value for now
+}
+
+var result = mayFail();
+print("Result:", result);

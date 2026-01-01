@@ -40,7 +40,7 @@ fn get_number_from_string(s: str): int? {
 }
 
 // Test function to demonstrate the unified system
-fn test_unified_system(): nil {
+fn test_unified_system() {
     print("Testing unified Type? error system");
     
     // Test successful operations
@@ -72,6 +72,5 @@ fn test_unified_system(): nil {
 }
 
 // Main function
-fn main(): nil {
+
     test_unified_system();
-}

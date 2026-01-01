@@ -5,6 +5,7 @@
 #include "../../lir/functions.hh"
 #include "../types.hh"
 #include "../memory.hh"
+#include "../value.hh"
 #include <vector>
 #include <string>
 #include <variant>
@@ -151,6 +152,23 @@ public:
 private:
     std::vector<RegisterValue> registers;
     
+    // Error information structure for primitive error handling
+    struct ErrorInfo {
+        std::string errorType;
+        std::string message;
+        bool isError;
+        
+        ErrorInfo() : isError(false) {}
+        ErrorInfo(const std::string& type, const std::string& msg, bool error = true)
+            : errorType(type), message(msg), isError(error) {}
+    };
+    
+    // Error table mapping error IDs to error information
+    std::unordered_map<int64_t, ErrorInfo> error_table;
+    
+    // Error storage for proper error handling (legacy compatibility)
+    std::unordered_map<LIR::Reg, std::shared_ptr<ErrorValue>> error_storage;
+    
     // Current function for task execution
     const LIR::LIR_Function* current_function_ = nullptr;
     
@@ -212,6 +230,11 @@ private:
         if (std::holds_alternative<std::string>(value)) return !std::get<std::string>(value).empty();
         return false;
     }
+    
+    // Error handling methods
+    ValuePtr createErrorValue(const std::string& errorType, const std::string& message = "");
+    ValuePtr createSuccessValue(const RegisterValue& value);
+    bool isErrorValue(LIR::Reg reg) const;
     
 
 };

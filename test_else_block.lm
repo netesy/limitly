@@ -1,0 +1,23 @@
+// Test ? else {} construct
+fn divide(a: int, b: int): int? {
+    if (b == 0) {
+        return err();
+        }
+        return ok(a / b);
+        }
+
+        print("Testing ? else {} construct: ");
+
+        // Test error case with else block
+        var result1 = divide(10, 0)? else {
+            print("Caught error in else block");
+            return 0;
+            };
+            print("Result1: ", result1);
+
+            // Test success case with else block
+            var result2 = divide(10, 2)? else {
+                print("This should not execute");
+                return - 1;
+                };
+                print("Result2: ", result2);

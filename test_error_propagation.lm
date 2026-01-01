@@ -1,0 +1,16 @@
+// Test error propagation with ? operator
+fn divide(a: int, b: int): int? {
+    if (b == 0) {
+        return err();
+    }
+    return ok(a / b);
+}
+
+fn testPropagation(): int? {
+    var result = divide(10, 0)?; // This should propagate the error
+    return result * 2;       // This should not execute
+}
+
+print("Testing error propagation:");
+var result = testPropagation();
+print("Result:", result);
