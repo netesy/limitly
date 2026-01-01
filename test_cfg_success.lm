@@ -1,0 +1,16 @@
+// Test CFG validation and error propagation - success case
+fn divide(a: int, b: int): int? {
+    if (b == 0) {
+        return err(); // Generic error
+    }
+    return a / b; // Success value
+}
+
+print("Testing successful operation...");
+
+// This should succeed and continue execution
+var result = divide(10, 2)?;
+
+// This line should be reached if error propagation works correctly
+print("Result: ", result);
+print("Success case completed");

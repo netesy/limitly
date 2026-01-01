@@ -748,6 +748,7 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
                 case TypeTag::Bool: type_name = "bool"; break;
                 case TypeTag::String: type_name = "string"; break;
                 case TypeTag::Nil: type_name = "nil"; break;
+                case TypeTag::ErrorUnion: type_name = "Type?"; break;
                 default: type_name = "unknown"; break;
             }
             auto string_type = std::make_shared<::Type>(TypeTag::String);

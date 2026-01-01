@@ -3465,14 +3465,22 @@ std::shared_ptr<AST::Expression> Parser::primary() {
         return varExpr;
     }
 
-    // Handle error construction: err(ErrorType) or err(ErrorType(args))
+    // Handle error construction: err(ErrorType) or err(ErrorType(args)) or err() for unified system
     if (match({TokenType::ERR})) {
         auto errorExpr = std::make_shared<AST::ErrorConstructExpr>();
         errorExpr->line = previous().line;
         
         consume(TokenType::LEFT_PAREN, "Expected '(' after 'err'.");
         
-        // Parse error type
+        // Check if this is the unified err() syntax (no error type)
+        if (check(TokenType::RIGHT_PAREN)) {
+            // err() - unified system with generic error
+            errorExpr->errorType = "DefaultError"; // Generic error type
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after 'err()'.");
+            return errorExpr;
+        }
+        
+        // Parse error type for specific error: err(ErrorType)
         errorExpr->errorType = consume(TokenType::IDENTIFIER, "Expected error type name.").lexeme;
         
         // Check if there are constructor arguments

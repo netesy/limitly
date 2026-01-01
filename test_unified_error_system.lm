@@ -1,0 +1,85 @@
+// Comprehensive test for the unified Type? error system
+// This tests the new error handling approach with ok() and err()
+
+// Test basic Type? syntax
+fn simple_divide(a: int, b: int): int? {
+    if (b == 0) {
+        return err(); // Generic error
+    }
+    return a / b; // Success value
+}
+
+// Test error propagation with ?
+fn chain_operations(x: int, y: int, z: int): int? {
+    var step1: int = simple_divide(x, y)?; // Propagate error if any
+    var step2: int = simple_divide(step1, z)?; // Chain operations
+    return step2 * 2; // Final result
+}
+
+// Test ? else construct
+fn safe_operation(a: int, b: int): int {
+    var result: int = simple_divide(a, b)? else {
+        print("Operation failed, using default");
+        return -1; // Default value
+    };
+    return result;
+}
+
+// Test with string operations
+fn parse_and_double(s: str): int? {
+    // Simulate string parsing (would normally use actual parsing)
+    if (s == "invalid") {
+        return err();
+    }
+    return 42; // Simulate successful parsing
+}
+
+fn process_string(input: str): int? {
+    var number: int = parse_and_double(input)?; // Propagate parse errors
+    return number * 2; // Double the result
+}
+
+// Main test function
+    print("Testing unified Type? error system");
+    
+    // Test 1: Successful operation
+    print("Test 1: Successful division");
+    var result1 = simple_divide(10, 2);
+    print("Result:", result1);
+    
+    // Test 2: Error case
+    print("Test 2: Division by zero");
+    var result2 = simple_divide(10, 0);
+    print("Result:", result2);
+    
+    // Test 3: Error propagation - success case
+    print("Test 3: Chain operations (success)");
+    var result3 = chain_operations(20, 4, 2);
+    print("Result:", result3);
+    
+    // Test 4: Error propagation - error case
+    print("Test 4: Chain operations (error)");
+    var result4 = chain_operations(20, 0, 2);
+    print("Result:", result4);
+    
+    // Test 5: ? else construct - success
+    print("Test 5: Safe operation (success)");
+    var safe1 = safe_operation(15, 3);
+    print("Result:", safe1);
+    
+    // Test 6: ? else construct - error
+    print("Test 6: Safe operation (error)");
+    var safe2 = safe_operation(15, 0);
+    print("Result:", safe2);
+    
+    // Test 7: String processing - success
+    print("Test 7: String processing (success)");
+    var str_result1 = process_string("valid");
+    print("Result:", str_result1);
+    
+    // Test 8: String processing - error
+    print("Test 8: String processing (error)");
+    var str_result2 = process_string("invalid");
+    print("Result:", str_result2);
+    
+    print("All tests completed");

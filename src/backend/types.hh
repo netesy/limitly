@@ -140,8 +140,16 @@ private:
         // Target is union type - source can convert if it matches any member
         if (to->tag == TypeTag::Union) {
             auto unionTypes = std::get<UnionType>(to->extra).types;
+            // For optional types (T?), allow T to be passed directly
             return std::any_of(unionTypes.begin(), unionTypes.end(),
                                [&](TypePtr type) { return canConvert(from, type); });
+        }
+        
+        // Source is union type - can convert if any member can convert to target
+        if (from->tag == TypeTag::Union) {
+            auto unionTypes = std::get<UnionType>(from->extra).types;
+            return std::any_of(unionTypes.begin(), unionTypes.end(),
+                               [&](TypePtr type) { return canConvert(type, to); });
         }
 
         // Error union type compatibility
@@ -612,14 +620,136 @@ public:
         return errorTypes.find(name) != errorTypes.end();
     }
 
-    // Create error union type
-    TypePtr createErrorUnionType(TypePtr successType, const std::vector<std::string>& errorTypeNames = {}, bool isGeneric = false) {
+    // Create error union type (Type? syntax - unified system)
+    TypePtr createErrorUnionType(TypePtr successType, const std::vector<std::string>& errorTypeNames = {}, bool isGeneric = true) {
         ErrorUnionType errorUnion;
         errorUnion.successType = successType;
         errorUnion.errorTypes = errorTypeNames;
-        errorUnion.isGenericError = isGeneric;
+        errorUnion.isGenericError = isGeneric; // Default to generic for Type? syntax
         
         return std::make_shared<Type>(TypeTag::ErrorUnion, errorUnion);
+    }
+    
+    // Create Type? (unified error system) - syntactic sugar for Result<Type, DefaultError>
+    TypePtr createFallibleType(TypePtr successType) {
+        return createErrorUnionType(successType, {}, true); // Generic error union
+    }
+    
+    // Check if a type is a fallible type (Type?)
+    bool isFallibleType(TypePtr type) {
+        return type && type->tag == TypeTag::ErrorUnion;
+    }
+    
+    // Create ok(value) - success value construction
+    ValuePtr createOkValue(TypePtr successType, ValuePtr value) {
+        if (!value) {
+            throw std::runtime_error("Cannot create ok() with null value");
+        }
+        
+        // Validate that the value type is compatible with the expected type
+        if (!isCompatible(value->type, successType)) {
+            throw std::runtime_error("Value type incompatible with success type");
+        }
+        
+        TypePtr fallibleType = createFallibleType(successType);
+        
+        // Create a value that represents the success case
+        ValuePtr okValue = memoryManager.makeRef<Value>(region);
+        okValue->type = fallibleType;
+        okValue->data = value->data;
+        okValue->complexData = value->complexData;
+        
+        return okValue;
+    }
+    
+    // Create err() - error value construction (generic error)
+    ValuePtr createErrValue(TypePtr successType, const std::string& errorMessage = "") {
+        TypePtr fallibleType = createFallibleType(successType);
+        
+        // Create error value
+        ErrorValue errorValue("DefaultError", errorMessage);
+        
+        ValuePtr errValue = memoryManager.makeRef<Value>(region);
+        errValue->type = fallibleType;
+        errValue->complexData = errorValue;
+        
+        return errValue;
+    }
+    
+    // Check if a value is Ok (success)
+    bool isOk(ValuePtr value) {
+        if (!value || !isFallibleType(value->type)) {
+            return false;
+        }
+        
+        // Check if it's not an error
+        return !std::holds_alternative<ErrorValue>(value->complexData);
+    }
+    
+    // Check if a value is Err (error)
+    bool isErr(ValuePtr value) {
+        if (!value || !isFallibleType(value->type)) {
+            return false;
+        }
+        
+        // Check if it contains an error
+        return std::holds_alternative<ErrorValue>(value->complexData);
+    }
+    
+    // Unwrap Ok value (throws if Err)
+    ValuePtr unwrapOk(ValuePtr fallibleValue) {
+        if (!isOk(fallibleValue)) {
+            throw std::runtime_error("Attempted to unwrap Err as Ok");
+        }
+        
+        // Get the success type from the fallible type
+        TypePtr successType = getFallibleSuccessType(fallibleValue->type);
+        if (!successType) {
+            throw std::runtime_error("Invalid fallible type structure");
+        }
+        
+        // Create a new value with the extracted data and correct type
+        ValuePtr extractedValue = memoryManager.makeRef<Value>(region);
+        extractedValue->type = successType;
+        extractedValue->data = fallibleValue->data;
+        extractedValue->complexData = fallibleValue->complexData;
+        
+        return extractedValue;
+    }
+    
+    // Unwrap Ok value safely (returns nullptr if Err)
+    ValuePtr unwrapOkSafe(ValuePtr fallibleValue) {
+        if (!isOk(fallibleValue)) {
+            return nullptr;
+        }
+        
+        // Get the success type from the fallible type
+        TypePtr successType = getFallibleSuccessType(fallibleValue->type);
+        if (!successType) {
+            return nullptr;
+        }
+        
+        // Create a new value with the extracted data and correct type
+        ValuePtr extractedValue = memoryManager.makeRef<Value>(region);
+        extractedValue->type = successType;
+        extractedValue->data = fallibleValue->data;
+        extractedValue->complexData = fallibleValue->complexData;
+        
+        return extractedValue;
+    }
+    
+    // Get success type from fallible type (the T in T?)
+    TypePtr getFallibleSuccessType(TypePtr fallibleType) {
+        if (!isFallibleType(fallibleType)) {
+            return nullptr;
+        }
+        
+        const auto* errorUnionType = std::get_if<ErrorUnionType>(&fallibleType->extra);
+        if (!errorUnionType) {
+            return nullptr;
+        }
+        
+        return errorUnionType->successType;
     }
     
     // Create union type

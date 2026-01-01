@@ -1,0 +1,6 @@
+// Test optional parameters without boolean checks
+fn greetOptional(name: str?) {
+    print("Greeting function called");
+}
+
+greetOptional("Charlie");

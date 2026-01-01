@@ -1156,22 +1156,58 @@ OP_RET:
     return;
 
 OP_CONSTRUCTERROR:
-    registers[pc->dst] = nullptr;
+    {
+        // Create a proper error value instead of nullptr
+        // For now, we'll use a special tagged value to represent errors
+        // In a full implementation, this would be a proper Result<T, E> type
+        
+        // Use a negative integer to represent error state
+        // This allows is_error to distinguish between success and error values
+        registers[pc->dst] = static_cast<int64_t>(-1); // Error marker
+    }
     DISPATCH();
 
 OP_CONSTRUCTOK:
-    registers[pc->dst] = registers[pc->a];
+    {
+        // Wrap the value in an Ok variant
+        // For now, we'll just pass through the value since we're using simple tagging
+        // In a full implementation, this would create a proper Result<T, E> with Ok variant
+        registers[pc->dst] = registers[pc->a];
+    }
     DISPATCH();
 
 OP_ISERROR:
-    registers[pc->dst] = static_cast<bool>(std::holds_alternative<std::nullptr_t>(registers[pc->a]));
+    {
+        // Check if the value is our error marker (-1) or nullptr
+        auto& value = registers[pc->a];
+        bool is_error = false;
+        
+        if (std::holds_alternative<std::nullptr_t>(value)) {
+            is_error = true; // nullptr is considered an error
+        } else if (std::holds_alternative<int64_t>(value)) {
+            // Check for our error marker
+            is_error = (std::get<int64_t>(value) == -1);
+        }
+        
+        registers[pc->dst] = is_error;
+    }
     DISPATCH();
 
 OP_UNWRAP:
-    if (std::holds_alternative<std::nullptr_t>(registers[pc->a])) {
-        registers[pc->dst] = nullptr;
-    } else {
-        registers[pc->dst] = registers[pc->a];
+    {
+        auto& value = registers[pc->a];
+        
+        // Check if it's an error value
+        if (std::holds_alternative<std::nullptr_t>(value)) {
+            // Error case - this should not happen in well-formed code
+            registers[pc->dst] = nullptr;
+        } else if (std::holds_alternative<int64_t>(value) && std::get<int64_t>(value) == -1) {
+            // Error marker - this should not happen in well-formed code
+            registers[pc->dst] = nullptr;
+        } else {
+            // Success case - unwrap the value (just pass it through for now)
+            registers[pc->dst] = value;
+        }
     }
     DISPATCH();
 
