@@ -85,6 +85,7 @@ private:
     void finish_cfg_build();
     void remove_unreachable_blocks();
     void flatten_cfg_to_instructions();
+    bool validate_cfg(); // CFG validator
     LIR_BasicBlock* create_basic_block(const std::string& label = "");
     void set_current_block(LIR_BasicBlock* block);
     void add_block_edge(LIR_BasicBlock* from, LIR_BasicBlock* to);

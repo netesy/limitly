@@ -1,0 +1,77 @@
+// Test file for the unified Type? error system
+// This demonstrates the new unified error handling approach
+
+// Basic fallible function using Type? syntax
+fn divide(a: int, b: int): int? {
+    if (b == 0) {
+        return err(); // Generic error for division by zero
+    }
+    return ok(a / b); // Success value
+}
+
+// Function that uses the ? operator for error propagation
+fn calculate(x: int, y: int, z: int): int? {
+    var step1: int = divide(x, y)?; // If divide returns err(), this function returns err()
+    var step2: int = divide(step1, z)?; // Chain operations with error propagation
+    return ok(step2); // Return success value
+}
+
+// Function demonstrating ? else construct for inline error handling
+fn safe_calculate(a: int, b: int): int {
+    var result: int = divide(a, b)? else {
+        print("Division failed, using default value");
+        return 0; // Default value on error
+    };
+    return result;
+}
+
+// Function that converts string to int (fallible operation)
+fn to_int(s: str): int? {
+    // This would normally parse the string and return err() on failure
+    // For now, we'll simulate success
+    return ok(42);
+}
+
+// Chained operations with error propagation
+fn get_number_from_string(s: str): int? {
+    var number: int = to_int(s)?; // If to_int returns err(), this function returns err()
+    print("Parsing was successful!");
+    return ok(number * 2); // Any value that fits the correct type becomes ok()
+}
+
+// Test function to demonstrate the unified system
+fn test_unified_system(): nil {
+    print("Testing unified Type? error system");
+    
+    // Test successful operations
+    var result1 = divide(10, 2);
+    print("divide(10, 2) result:", result1);
+    
+    // Test error case
+    var result2 = divide(10, 0);
+    print("divide(10, 0) result:", result2);
+    
+    // Test chained operations
+    var result3 = calculate(20, 4, 2);
+    print("calculate(20, 4, 2) result:", result3);
+    
+    // Test error propagation
+    var result4 = calculate(20, 0, 2);
+    print("calculate(20, 0, 2) result:", result4);
+    
+    // Test ? else construct
+    var safe_result1 = safe_calculate(10, 2);
+    print("safe_calculate(10, 2) result:", safe_result1);
+    
+    var safe_result2 = safe_calculate(10, 0);
+    print("safe_calculate(10, 0) result:", safe_result2);
+    
+    // Test string parsing
+    var parsed1 = get_number_from_string("123");
+    print("get_number_from_string('123') result:", parsed1);
+}
+
+// Main function
+fn main(): nil {
+    test_unified_system();
+}

@@ -180,6 +180,9 @@ private:
     TypePtr check_dict_expr(std::shared_ptr<AST::DictExpr> expr);
     TypePtr check_interpolated_string_expr(std::shared_ptr<AST::InterpolatedStringExpr> expr);
     TypePtr check_lambda_expr(std::shared_ptr<AST::LambdaExpr> expr);
+    TypePtr check_error_construct_expr(std::shared_ptr<AST::ErrorConstructExpr> expr);
+    TypePtr check_ok_construct_expr(std::shared_ptr<AST::OkConstructExpr> expr);
+    TypePtr check_fallible_expr(std::shared_ptr<AST::FallibleExpr> expr);
     
     // Type annotation resolution
     TypePtr resolve_type_annotation(std::shared_ptr<AST::TypeAnnotation> annotation);

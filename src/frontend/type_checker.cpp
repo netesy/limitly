@@ -498,6 +498,12 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<AST::FunctionDec
     
     function_signatures[func->name] = signature;
     
+    // Declare the function name as a variable in the current scope
+    // This allows the function to be called by name
+    TypePtr function_type = type_system.FUNCTION_TYPE;
+    declare_variable(func->name, function_type);
+    mark_variable_initialized(func->name);
+    
     // Check function body
     current_function = func;
     current_return_type = return_type;
@@ -719,6 +725,37 @@ TypePtr TypeChecker::check_return_statement(std::shared_ptr<AST::ReturnStatement
     TypePtr return_type = nullptr;
     if (return_stmt->value) {
         return_type = check_expression(return_stmt->value);
+        
+        // Auto-wrap in ok() if function returns error union type and value is not already wrapped
+        if (current_return_type && type_system.isFallibleType(current_return_type)) {
+            // Check if the return value is already an error construct or ok construct
+            bool is_already_wrapped = false;
+            if (auto error_construct = std::dynamic_pointer_cast<AST::ErrorConstructExpr>(return_stmt->value)) {
+                is_already_wrapped = true;
+            } else if (auto ok_construct = std::dynamic_pointer_cast<AST::OkConstructExpr>(return_stmt->value)) {
+                is_already_wrapped = true;
+            }
+            
+            if (!is_already_wrapped) {
+                // Get the expected success type from the function's return type
+                TypePtr expected_success_type = type_system.getFallibleSuccessType(current_return_type);
+                
+                if (expected_success_type && is_type_compatible(expected_success_type, return_type)) {
+                    // Automatically wrap the return value in ok()
+                    auto ok_construct = std::make_shared<AST::OkConstructExpr>();
+                    ok_construct->value = return_stmt->value;
+                    ok_construct->line = return_stmt->line;
+                    ok_construct->inferred_type = current_return_type;
+                    
+                    // Replace the return statement's value with the ok construct
+                    return_stmt->value = ok_construct;
+                    return_type = current_return_type;
+                } else {
+                    add_type_error(expected_success_type ? expected_success_type->toString() : "unknown", 
+                                 return_type->toString(), return_stmt->line);
+                }
+            }
+        }
     } else {
         return_type = type_system.NIL_TYPE;
     }
@@ -781,6 +818,12 @@ TypePtr TypeChecker::check_expression(std::shared_ptr<AST::Expression> expr) {
         type = check_interpolated_string_expr(interpolated);
     } else if (auto lambda = std::dynamic_pointer_cast<AST::LambdaExpr>(expr)) {
         type = check_lambda_expr(lambda);
+    } else if (auto error_construct = std::dynamic_pointer_cast<AST::ErrorConstructExpr>(expr)) {
+        type = check_error_construct_expr(error_construct);
+    } else if (auto ok_construct = std::dynamic_pointer_cast<AST::OkConstructExpr>(expr)) {
+        type = check_ok_construct_expr(ok_construct);
+    } else if (auto fallible = std::dynamic_pointer_cast<AST::FallibleExpr>(expr)) {
+        type = check_fallible_expr(fallible);
     } else {
         add_error("Unknown expression type", expr->line);
         type = type_system.STRING_TYPE; // Default fallback
@@ -1108,6 +1151,90 @@ TypePtr TypeChecker::check_lambda_expr(std::shared_ptr<AST::LambdaExpr> expr) {
     return type_system.STRING_TYPE;
 }
 
+TypePtr TypeChecker::check_error_construct_expr(std::shared_ptr<AST::ErrorConstructExpr> expr) {
+    if (!expr) return nullptr;
+    
+    // For err() constructs, we need to infer the Type? from the function's return type context
+    // If we're in a function that returns Type?, then err() should return that same Type?
+    
+    TypePtr error_union_type = nullptr;
+    
+    if (current_return_type && current_return_type->tag == TypeTag::ErrorUnion) {
+        // We're in a function that returns a fallible type, use that type
+        error_union_type = current_return_type;
+    } else if (current_return_type && type_system.isFallibleType(current_return_type)) {
+        // We're in a function that returns a fallible type, use that type
+        error_union_type = current_return_type;
+    } else {
+        // Fallback: create a generic error union type
+        // This should ideally be inferred from context in a full implementation
+        error_union_type = type_system.createFallibleType(type_system.STRING_TYPE);
+    }
+    
+    expr->inferred_type = error_union_type;
+    return error_union_type;
+}
+
+TypePtr TypeChecker::check_ok_construct_expr(std::shared_ptr<AST::OkConstructExpr> expr) {
+    if (!expr) return nullptr;
+    
+    // Check the value expression first
+    TypePtr value_type = check_expression(expr->value);
+    if (!value_type) {
+        add_error("Failed to determine type of ok() value", expr->line);
+        return nullptr;
+    }
+    
+    // Create a fallible type (Type?) with the value type as the success type
+    // If we're in a function context, try to match the return type
+    TypePtr ok_type = nullptr;
+    
+    if (current_return_type && current_return_type->tag == TypeTag::ErrorUnion) {
+        // We're in a function that returns a fallible type
+        // Check if the value type is compatible with the expected success type
+        TypePtr expected_success_type = type_system.getFallibleSuccessType(current_return_type);
+        if (expected_success_type && is_type_compatible(expected_success_type, value_type)) {
+            ok_type = current_return_type;
+        } else {
+            add_error("ok() value type doesn't match function return type", expr->line);
+            ok_type = type_system.createFallibleType(value_type);
+        }
+    } else {
+        // Create a new fallible type with the value type
+        ok_type = type_system.createFallibleType(value_type);
+    }
+    
+    expr->inferred_type = ok_type;
+    return ok_type;
+}
+
+TypePtr TypeChecker::check_fallible_expr(std::shared_ptr<AST::FallibleExpr> expr) {
+    if (!expr) return nullptr;
+    
+    // Check the expression that might be fallible
+    TypePtr expr_type = check_expression(expr->expression);
+    if (!expr_type) {
+        add_error("Failed to determine type of fallible expression", expr->line);
+        return nullptr;
+    }
+    
+    // The expression should be a fallible type (Type?)
+    if (!type_system.isFallibleType(expr_type)) {
+        add_error("? operator can only be used on fallible types (Type?)", expr->line);
+        return nullptr;
+    }
+    
+    // The ? operator unwraps the fallible type, returning the success type
+    TypePtr success_type = type_system.getFallibleSuccessType(expr_type);
+    if (!success_type) {
+        add_error("Failed to extract success type from fallible type", expr->line);
+        return type_system.STRING_TYPE;
+    }
+    
+    expr->inferred_type = success_type;
+    return success_type;
+}
+
 TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<AST::TypeAnnotation> annotation) {
     if (!annotation) return nullptr;
     
@@ -1163,18 +1290,18 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<AST::TypeAnnotation
         }
     }
     
-    // Handle optional types (e.g., str?, int?)
+    // Handle optional types (e.g., str?, int?) - unified Type? system
     if (annotation->isOptional) {
-        // Create an optional type by creating a union with the base type and nil
-        std::vector<TypePtr> optional_types = {base_type, type_system.NIL_TYPE};
-        return type_system.createUnionType(optional_types);
+        // Create a fallible type (Type?) using the unified error system
+        // Type? is syntactic sugar for Result<Type, DefaultError>
+        return type_system.createFallibleType(base_type);
     }
     
     return base_type;
 }
 
 bool TypeChecker::is_type_compatible(TypePtr expected, TypePtr actual) {
-    return type_system.isCompatible(expected, actual);
+    return type_system.isCompatible(actual, expected);
 }
 
 TypePtr TypeChecker::get_common_type(TypePtr left, TypePtr right) {
@@ -1299,6 +1426,11 @@ bool TypeChecker::is_boolean_type(TypePtr type) {
     // Union types (including optional types) can be used in boolean contexts
     if (type->tag == TypeTag::Union) {
         return true; // Optional types like str? can be used in if conditions
+    }
+    
+    // ErrorUnion types (fallible types like str?) can be used in boolean contexts
+    if (type->tag == TypeTag::ErrorUnion) {
+        return true; // Fallible types like str? can be used in if conditions
     }
     
     return false;

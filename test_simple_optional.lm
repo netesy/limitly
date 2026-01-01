@@ -1,0 +1,7 @@
+// Simple optional parameter test
+fn greet(name: str = "World") {
+    print("Hello, ", name, "!");
+}
+
+greet();
+greet("Alice");

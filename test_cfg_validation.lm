@@ -1,0 +1,16 @@
+// Test CFG validation and error propagation
+fn divide(a: int, b: int): int? {
+    if (b == 0) {
+        return err();// Generic error
+        }
+        return a / b;// Success value
+        }
+
+        print("Testing error propagation...");
+
+        // This should trigger error propagation and proper termination
+        var result = divide(10, 0)?;
+
+        // This line should not be reached if error propagation works correctly
+        print("Result: ", result);
+        print("This should not print if error propagation works");

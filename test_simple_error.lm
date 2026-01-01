@@ -1,0 +1,22 @@
+fn simple_divide(a: int, b: int): int? {
+    if (b == 0) {
+        return err();
+        }
+        return a / b;
+    }
+
+    print("Testing simple error handling");
+
+    // Test successful case
+    var result1 = simple_divide(10, 2);
+    print("Result 1: ", result1);
+
+    // Test error case
+    var result2 = simple_divide(10, 0);
+    print("Result 2: ", result2);
+
+    // Test error propagation
+    var result3 = simple_divide(20, 4)?;
+    print("Result 3: ", result3);
+
+    print("Done");

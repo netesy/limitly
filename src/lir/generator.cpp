@@ -55,19 +55,30 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const TypeCheckResult&
     
     // Add implicit return if none exists
     if (cfg_context_.building_cfg && get_current_block() && !get_current_block()->has_terminator()) {
-        emit_instruction(LIR_Inst(LIR_Op::Ret));
+        // For main function, use halt instead of return for proper termination
+        if (current_function_->name == "main") {
+            emit_instruction(LIR_Inst(LIR_Op::Ret, Type::Void, 0, 0, 0)); // Use Ret for main termination
+        } else {
+            emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, 0, 0));
+        }
     } else if (!cfg_context_.building_cfg) {
         // Linear mode - add implicit return if function doesn't end with return
         if (current_function_->instructions.empty() || 
             !current_function_->instructions.back().isReturn()) {
-            emit_instruction(LIR_Inst(LIR_Op::Ret, 0, 0, 0));
+            if (current_function_->name == "main") {
+                emit_instruction(LIR_Inst(LIR_Op::Ret, Type::Void, 0, 0, 0)); // Use Ret for main termination
+            } else {
+                emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, 0, 0));
+            }
         }
     }
 
     // Finish CFG building for main (only if CFG was used)
     if (cfg_context_.building_cfg) {
-        // Don't force terminators - let the natural CFG structure handle it
-        // ensure_all_blocks_terminated();
+        // Validate CFG before finishing
+        if (!validate_cfg()) {
+            report_error("CFG validation failed for main function");
+        }
         finish_cfg_build();
     }
 
@@ -132,6 +143,9 @@ void Generator::generate_function(AST::FunctionDeclaration& fn) {
     }
     
     // Finish CFG building
+    if (!validate_cfg()) {
+        report_error("CFG validation failed for function: " + fn.name);
+    }
     finish_cfg_build();
 
     exit_scope();
@@ -1152,6 +1166,101 @@ Reg Generator::emit_unary_expr(AST::UnaryExpr& expr) {
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, all_bits, neg_one_val));
         set_register_type(all_bits, int_type);
         emit_instruction(LIR_Inst(LIR_Op::Xor, dst, operand, all_bits));
+    } else if (expr.op == TokenType::QUESTION) {
+        // Error propagation operator (?)
+        // This should check if operand is an error, and if so, return early from the function
+        // Pattern: if (is_error(operand)) return operand; else return unwrap(operand);
+        
+        // Check if operand is an error
+        Reg is_error_reg = allocate_register();
+        auto bool_type = std::make_shared<::Type>(::TypeTag::Bool);
+        set_register_type(is_error_reg, bool_type);
+        emit_instruction(LIR_Inst(LIR_Op::IsError, Type::Bool, is_error_reg, operand, 0));
+        
+        if (cfg_context_.building_cfg) {
+            // CFG mode: create blocks for error handling
+            LIR_BasicBlock* error_block = create_basic_block("error_propagation");
+            LIR_BasicBlock* success_block = create_basic_block("success_unwrap");
+            
+            // If it's an error, jump to error propagation block
+            emit_instruction(LIR_Inst(LIR_Op::JumpIf, Type::Void, 0, is_error_reg, 0, error_block->id));
+            
+            // Add unconditional jump to success block (fall-through case)
+            emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, success_block->id));
+            
+            // Set up CFG edges
+            add_block_edge(get_current_block(), error_block);
+            add_block_edge(get_current_block(), success_block);
+            
+            // === Success Block: unwrap the value ===
+            set_current_block(success_block);
+            
+            // Create a register for the unwrapped value
+            Reg unwrapped_reg = allocate_register();
+            
+            // Try to determine the inner type from the Result type
+            result_type = operand_type;
+            set_register_type(unwrapped_reg, result_type);
+            set_register_type(dst, result_type);
+            
+            // Unwrap the value (this will be the success case)
+            emit_instruction(LIR_Inst(LIR_Op::Unwrap, Type::I64, unwrapped_reg, operand, 0));
+            
+            // Move unwrapped value to destination
+            emit_instruction(LIR_Inst(LIR_Op::Mov, Type::I64, dst, unwrapped_reg, 0));
+            
+            // === Error Block: propagate error by returning ===
+            set_current_block(error_block);
+            
+            // For proper error propagation, return the error value directly
+            emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, operand, 0, 0));
+            
+            // Mark error block as terminated since it has a return
+            error_block->terminated = true;
+            
+            // Switch back to success block for continuation
+            set_current_block(success_block);
+            
+            // Note: The success block intentionally doesn't have a terminator
+            // because it continues with the next statement in the calling context
+            
+        } else {
+            // Linear mode: use labels and jumps
+            uint32_t error_label = generate_label();
+            uint32_t continue_label = generate_label();
+            
+            // If it's an error, jump to error propagation
+            emit_instruction(LIR_Inst(LIR_Op::JumpIf, Type::Void, 0, is_error_reg, 0, error_label));
+            
+            // Success path: unwrap the value
+            Reg unwrapped_reg = allocate_register();
+            
+            // Try to determine the inner type from the Result type
+            result_type = operand_type;
+            set_register_type(unwrapped_reg, result_type);
+            set_register_type(dst, result_type);
+            
+            // Unwrap the value (this will be the success case)
+            emit_instruction(LIR_Inst(LIR_Op::Unwrap, Type::I64, unwrapped_reg, operand, 0));
+            
+            // Move unwrapped value to destination
+            emit_instruction(LIR_Inst(LIR_Op::Mov, Type::I64, dst, unwrapped_reg, 0));
+            
+            // Jump to continue execution
+            emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, continue_label));
+            
+            // Error propagation block
+            emit_instruction(LIR_Inst(LIR_Op::Label, Type::Void, error_label, 0, 0));
+            
+            // For proper error propagation, return the error value directly
+            emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, operand, 0, 0));
+            
+            // Continue execution label
+            emit_instruction(LIR_Inst(LIR_Op::Label, Type::Void, continue_label, 0, 0));
+        }
+        
+        std::cout << "[DEBUG] Generated error propagation (?) for register " << operand 
+                  << " -> " << dst << std::endl;
     } else {
         report_error("Unknown unary operator");
         return 0;
@@ -2957,34 +3066,40 @@ void Generator::flatten_cfg_to_instructions() {
     // Create a map from block ID to instruction position (label)
     std::unordered_map<uint32_t, size_t> block_positions;
     
-    // First pass: calculate positions for each block
+    // First pass: calculate positions for each block in order
     size_t current_pos = 0;
+    
+    // Sort blocks by ID to ensure consistent ordering
+    std::vector<LIR_BasicBlock*> sorted_blocks;
     for (const auto& block : current_function_->cfg->blocks) {
-        if (block && !block->instructions.empty()) {
-            block_positions[block->id] = current_pos;
-            current_pos += block->instructions.size();
-        } else if (block) {
-            // Empty block - still needs a position for jumps
-            block_positions[block->id] = current_pos;
+        if (block) {
+            sorted_blocks.push_back(block.get());
         }
+    }
+    std::sort(sorted_blocks.begin(), sorted_blocks.end(), 
+              [](const LIR_BasicBlock* a, const LIR_BasicBlock* b) {
+                  return a->id < b->id;
+              });
+    
+    // Calculate positions for each block
+    for (const auto* block : sorted_blocks) {
+        block_positions[block->id] = current_pos;
+        current_pos += block->instructions.size();
     }
     
     // Second pass: emit instructions with proper label targets
-    for (const auto& block : current_function_->cfg->blocks) {
-        if (!block) continue;
-        
+    for (const auto* block : sorted_blocks) {
         // Emit all instructions in this block
         for (const auto& inst : block->instructions) {
             LIR_Inst modified_inst = inst;
             
             // Update jump targets to use instruction positions as labels
-            if (inst.op == LIR_Op::Jump || inst.op == LIR_Op::JumpIfFalse) {
+            if (inst.op == LIR_Op::Jump || inst.op == LIR_Op::JumpIf || inst.op == LIR_Op::JumpIfFalse) {
                 auto it = block_positions.find(inst.imm);
                 if (it != block_positions.end()) {
                     modified_inst.imm = it->second; // Use instruction position as label
                 } else {
                     // Block not found - this might be an error
-                    // For now, keep the original target
                     std::cerr << "Warning: Jump target block " << inst.imm << " not found in block_positions" << std::endl;
                 }
             }
@@ -3016,6 +3131,141 @@ void Generator::add_block_edge(LIR_BasicBlock* from, LIR_BasicBlock* to) {
 
 LIR_BasicBlock* Generator::get_current_block() const {
     return cfg_context_.current_block;
+}
+
+bool Generator::validate_cfg() {
+    if (!current_function_ || !current_function_->cfg) {
+        report_error("CFG validation: No CFG to validate");
+        return false;
+    }
+    
+    bool is_valid = true;
+    
+    // Check 1: Entry block exists and is reachable
+    if (current_function_->cfg->entry_block_id == UINT32_MAX) {
+        report_error("CFG validation: No entry block defined");
+        is_valid = false;
+    } else {
+        auto entry_block = current_function_->cfg->get_block(current_function_->cfg->entry_block_id);
+        if (!entry_block) {
+            report_error("CFG validation: Entry block not found");
+            is_valid = false;
+        }
+    }
+    
+    // Check 2: All blocks have proper terminators or valid successors
+    for (const auto& block : current_function_->cfg->blocks) {
+        if (!block) continue;
+        
+        bool has_terminator = block->has_terminator();
+        bool has_successors = !block->successors.empty();
+        
+        // A block must either have a terminator (return/jump) or successors
+        // Exception: success_unwrap blocks in error propagation can continue without terminators
+        // Exception: entry blocks in simple functions can fall through without explicit terminators
+        if (!has_terminator && !has_successors && !block->is_exit) {
+            // Allow success_unwrap blocks to not have terminators (they continue execution)
+            if (block->label.find("success_unwrap") == std::string::npos &&
+                // Allow entry blocks in simple functions to fall through
+                !(block->is_entry && current_function_->cfg->blocks.size() <= 2)) {
+                report_error("CFG validation: Block " + std::to_string(block->id) + 
+                            " (" + block->label + ") has no terminator and no successors");
+                is_valid = false;
+            }
+        }
+        
+        // Check that all successor blocks exist
+        for (uint32_t successor_id : block->successors) {
+            auto successor_block = current_function_->cfg->get_block(successor_id);
+            if (!successor_block) {
+                report_error("CFG validation: Block " + std::to_string(block->id) + 
+                            " references non-existent successor " + std::to_string(successor_id));
+                is_valid = false;
+            }
+        }
+        
+        // Check that predecessor/successor relationships are symmetric
+        for (uint32_t successor_id : block->successors) {
+            auto successor_block = current_function_->cfg->get_block(successor_id);
+            if (successor_block) {
+                bool found_back_edge = false;
+                for (uint32_t pred_id : successor_block->predecessors) {
+                    if (pred_id == block->id) {
+                        found_back_edge = true;
+                        break;
+                    }
+                }
+                if (!found_back_edge) {
+                    report_error("CFG validation: Asymmetric edge from block " + 
+                                std::to_string(block->id) + " to " + std::to_string(successor_id));
+                    is_valid = false;
+                }
+            }
+        }
+    }
+    
+    // Check 3: Error propagation blocks must terminate with return
+    for (const auto& block : current_function_->cfg->blocks) {
+        if (!block) continue;
+        
+        if (block->label.find("error_propagation") != std::string::npos) {
+            if (!block->has_terminator()) {
+                report_error("CFG validation: Error propagation block " + std::to_string(block->id) + 
+                            " must terminate with return");
+                is_valid = false;
+            } else {
+                // Check that the last instruction is a return
+                if (!block->instructions.empty()) {
+                    const auto& last_inst = block->instructions.back();
+                    if (last_inst.op != LIR_Op::Return && last_inst.op != LIR_Op::Ret) {
+                        report_error("CFG validation: Error propagation block " + std::to_string(block->id) + 
+                                    " must end with return instruction");
+                        is_valid = false;
+                    }
+                }
+            }
+        }
+    }
+    
+    // Check 4: Main function must have proper termination after unwrap
+    if (current_function_->name == "main") {
+        // Look for unwrap instructions followed by proper termination
+        for (const auto& block : current_function_->cfg->blocks) {
+            if (!block) continue;
+            
+            for (size_t i = 0; i < block->instructions.size(); ++i) {
+                const auto& inst = block->instructions[i];
+                if (inst.op == LIR_Op::Unwrap) {
+                    // After unwrap, we should either:
+                    // 1. Have a return/halt in the same block
+                    // 2. Have successors that lead to proper termination
+                    bool has_proper_termination = false;
+                    
+                    // Check remaining instructions in this block
+                    for (size_t j = i + 1; j < block->instructions.size(); ++j) {
+                        const auto& next_inst = block->instructions[j];
+                        if (next_inst.op == LIR_Op::Return || next_inst.op == LIR_Op::Ret) {
+                            has_proper_termination = true;
+                            break;
+                        }
+                    }
+                    
+                    // If no termination in this block, check if block has terminator
+                    if (!has_proper_termination && block->has_terminator()) {
+                        has_proper_termination = true;
+                    }
+                    
+                    if (!has_proper_termination) {
+                        report_error("CFG validation: Main function unwrap at block " + 
+                                    std::to_string(block->id) + " must be followed by proper termination");
+                        is_valid = false;
+                    }
+                }
+            }
+        }
+    }
+    
+    return is_valid;
 }
 
 std::shared_ptr<::Type> Generator::convert_ast_type_to_lir_type(const std::shared_ptr<AST::TypeAnnotation>& ast_type) {
@@ -3188,12 +3438,16 @@ void Generator::lower_task_body(AST::TaskStatement& stmt) {
     register_types_ = std::move(saved_register_types);
 }
 
-// Error and Result type expression handlers
+// Error and Result type expression handlers - Unified Type? system
 Reg Generator::emit_error_construct_expr(AST::ErrorConstructExpr& expr) {
     Reg dst = allocate_register();
     
-    // Create error value based on error type and arguments
-    auto result_type = std::make_shared<::Type>(::TypeTag::ErrorUnion); // Generic Result type
+    // For the unified Type? system, err() creates a generic error
+    // The success type will be inferred from context or explicitly provided
+    TypePtr success_type = type_system->STRING_TYPE; // Default, should be inferred from context
+    
+    // Create error value using the unified system
+    auto result_type = std::make_shared<::Type>(::TypeTag::ErrorUnion);
     
     // For now, create a simple error value - in a full implementation,
     // this would use the errorType and arguments to create a proper error object
@@ -3210,7 +3464,8 @@ Reg Generator::emit_ok_construct_expr(AST::OkConstructExpr& expr) {
     // First evaluate the value to be wrapped
     Reg value_reg = emit_expr(*expr.value);
     
-    // Create Result type wrapping the value
+    // Create ok value using the unified system
+    // ok(value) creates a success value in the Type? system
     auto result_type = std::make_shared<::Type>(::TypeTag::ErrorUnion);
     
     // For now, create a simple ok value - in a full implementation,
@@ -3223,13 +3478,13 @@ Reg Generator::emit_ok_construct_expr(AST::OkConstructExpr& expr) {
 }
 
 Reg Generator::emit_fallible_expr(AST::FallibleExpr& expr) {
-    // Evaluate the expression that may return a Result
+    // Evaluate the expression that may return a Result (Type?)
     Reg result_reg = emit_expr(*expr.expression);
     
-    // For the ? operator, we need to:
+    // For the ? operator in the unified Type? system, we need to:
     // 1. Check if the result is an error using IsError
-    // 2. If it's an error, jump to error handler or return early
-    // 3. If it's ok, unwrap the value using Unwrap
+    // 2. If it's an error, return immediately from the function (proper propagation)
+    // 3. If it's ok, unwrap the value and continue
     
     // Create a register to hold the error check result
     Reg is_error_reg = allocate_register();
@@ -3237,39 +3492,88 @@ Reg Generator::emit_fallible_expr(AST::FallibleExpr& expr) {
     set_register_type(is_error_reg, bool_type);
     
     // Check if the result contains an error
-    emit_instruction(LIR_Inst(LIR_Op::IsError, is_error_reg, result_reg, 0));
+    emit_instruction(LIR_Inst(LIR_Op::IsError, Type::Bool, is_error_reg, result_reg, 0));
     
-    // Create labels for error handling
-    uint32_t error_label = generate_label();
-    uint32_t continue_label = generate_label();
-    
-    // If it's an error, jump to error handling
-    emit_instruction(LIR_Inst(LIR_Op::JumpIf, error_label, is_error_reg, 0));
-    
-    // If we get here, it's not an error, so unwrap the value
-    Reg unwrapped_reg = allocate_register();
-    set_register_type(unwrapped_reg, get_register_type(result_reg));
-    emit_instruction(LIR_Inst(LIR_Op::Unwrap, unwrapped_reg, result_reg, 0));
-    
-    // Jump to continue label
-    emit_instruction(LIR_Inst(LIR_Op::Jump, continue_label, 0, 0));
-    
-    // Error handling block
-    emit_instruction(LIR_Inst(LIR_Op::Label, error_label, 0, 0));
-    
-    // For now, we'll just return the error result
-    // In a full implementation, this would handle the elseHandler if present
-    // or propagate the error up the call stack
-    
-    // Jump to continue label
-    emit_instruction(LIR_Inst(LIR_Op::Jump, continue_label, 0, 0));
-    
-    // Continue label
-    emit_instruction(LIR_Inst(LIR_Op::Label, continue_label, 0, 0));
-    
-    // Return the unwrapped value (or the error if it was an error)
-    // For simplicity, we'll return the unwrapped_reg for now
-    return unwrapped_reg;
+    if (cfg_context_.building_cfg) {
+        // CFG mode: create blocks for error handling
+        LIR_BasicBlock* error_block = create_basic_block("error_propagation");
+        LIR_BasicBlock* success_block = create_basic_block("success_unwrap");
+        
+        // If it's an error, jump to error propagation block
+        emit_instruction(LIR_Inst(LIR_Op::JumpIf, Type::Void, 0, is_error_reg, 0, error_block->id));
+        
+        // Add unconditional jump to success block (fall-through case)
+        emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, success_block->id));
+        
+        // Set up CFG edges
+        add_block_edge(get_current_block(), error_block);
+        add_block_edge(get_current_block(), success_block);
+        
+        // === Success Block: unwrap the value ===
+        set_current_block(success_block);
+        
+        Reg unwrapped_reg = allocate_register();
+        
+        // Get the success type from the fallible type
+        TypePtr fallible_type = get_register_type(result_reg);
+        TypePtr success_type = type_system->STRING_TYPE; // Should extract from ErrorUnion type
+        set_register_type(unwrapped_reg, success_type);
+        
+        emit_instruction(LIR_Inst(LIR_Op::Unwrap, Type::I64, unwrapped_reg, result_reg, 0));
+        
+        // Continue execution after unwrap - don't add terminator here
+        // The caller will handle subsequent instructions
+        
+        // === Error Block: propagate error by returning ===
+        set_current_block(error_block);
+        
+        // For the ? operator, we propagate the error by returning it from the current function
+        // This implements the "If the value is Err, the ? operator will immediately return that Err"
+        emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, result_reg, 0, 0));
+        
+        // Mark error block as terminated since it has a return
+        error_block->terminated = true;
+        
+        // Switch back to success block for continuation
+        set_current_block(success_block);
+        
+        // Return the unwrapped value
+        return unwrapped_reg;
+        
+    } else {
+        // Linear mode: use labels and jumps
+        uint32_t error_label = generate_label();
+        uint32_t continue_label = generate_label();
+        
+        // If it's an error, jump to error propagation
+        emit_instruction(LIR_Inst(LIR_Op::JumpIf, Type::Void, 0, is_error_reg, 0, error_label));
+        
+        // Success path: unwrap the value
+        Reg unwrapped_reg = allocate_register();
+        
+        // Get the success type from the fallible type
+        TypePtr fallible_type = get_register_type(result_reg);
+        TypePtr success_type = type_system->STRING_TYPE; // Should extract from ErrorUnion type
+        set_register_type(unwrapped_reg, success_type);
+        
+        emit_instruction(LIR_Inst(LIR_Op::Unwrap, Type::I64, unwrapped_reg, result_reg, 0));
+        
+        // Jump to continue execution after error handling
+        emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, continue_label));
+        
+        // Error propagation block
+        emit_instruction(LIR_Inst(LIR_Op::Label, Type::Void, error_label, 0, 0));
+        
+        // For the ? operator, we propagate the error by returning it from the current function
+        // This implements the "If the value is Err, the ? operator will immediately return that Err"
+        emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, result_reg, 0, 0));
+        
+        // Continue execution label
+        emit_instruction(LIR_Inst(LIR_Op::Label, Type::Void, continue_label, 0, 0));
+        
+        // Return the unwrapped value
+        return unwrapped_reg;
+    }
 }
 
 // Class system implementations
