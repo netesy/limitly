@@ -749,6 +749,27 @@ class Circle : Shape {
 }
 ```
 
+### Workers
+
+A `worker` statement is used within a `concurrent` or `parallel` block to process data from a channel. Workers are long-running tasks that continuously receive and handle messages, making them ideal for stream processing or event handling.
+
+```limit
+var messages = channel();
+
+concurrent(ch=messages) {
+    // A worker that processes messages from the channel
+    worker(msg in messages) {
+        print("Received message: {msg}");
+    }
+
+    // A task that sends messages to the channel
+    task {
+        messages.send("Hello from a task!");
+        messages.send("Another message.");
+    }
+}
+```
+
 #### Final Classes and Methods
 
 A `final` class cannot be subclassed. A `final` method cannot be overridden by a subclass.
@@ -985,16 +1006,12 @@ print(result); // Output: 50
 
 ### Destructuring Assignments
 
-You can unpack values from tuples and lists into separate variables.
+You can unpack values from tuples into separate variables. List destructuring is not yet supported.
 
 ```limit
 // Destructuring a tuple
 var (name, age) = ("Alice", 30);
 print("{name} is {age} years old."); // Output: Alice is 30 years old.
-
-// Destructuring a list
-var [a, b, c] = [1, 2, 3];
-print(a); // Output: 1
 ```
 
 ### Unsafe Blocks
