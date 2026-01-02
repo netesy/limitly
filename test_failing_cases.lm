@@ -1,0 +1,8 @@
+// Test the specific failing cases
+    // Test the scientific notation expression that was failing
+    var result: f64 = 1.5e3 + 2.5e2;
+    print("Expression result: {result}");
+    
+    // Test large negative integer
+    var negLarge: i64 = -123456789;
+    print("Large negative: {negLarge}");

@@ -550,7 +550,8 @@ TypePtr TypeChecker::check_var_declaration(std::shared_ptr<AST::VarDeclaration> 
     
     TypePtr init_type = nullptr;
     if (var_decl->initializer) {
-        init_type = check_expression(var_decl->initializer);
+        // Pass the declared type as expected type for better type inference
+        init_type = check_expression_with_expected_type(var_decl->initializer, declared_type);
         
         // Check if initializing from another variable (potential move)
         if (auto var_expr = std::dynamic_pointer_cast<AST::VariableExpr>(var_decl->initializer)) {
@@ -835,41 +836,132 @@ TypePtr TypeChecker::check_expression(std::shared_ptr<AST::Expression> expr) {
     return type;
 }
 
+TypePtr TypeChecker::check_expression_with_expected_type(std::shared_ptr<AST::Expression> expr, TypePtr expected_type) {
+    if (!expr) return nullptr;
+    
+    TypePtr type = nullptr;
+    
+    if (auto literal = std::dynamic_pointer_cast<AST::LiteralExpr>(expr)) {
+        type = check_literal_expr_with_expected_type(literal, expected_type);
+    } else if (auto call = std::dynamic_pointer_cast<AST::CallExpr>(expr)) {
+        type = check_call_expr(call);
+    } else if (auto variable = std::dynamic_pointer_cast<AST::VariableExpr>(expr)) {
+        type = check_variable_expr(variable);
+    } else if (auto binary = std::dynamic_pointer_cast<AST::BinaryExpr>(expr)) {
+        type = check_binary_expr(binary);
+    } else if (auto unary = std::dynamic_pointer_cast<AST::UnaryExpr>(expr)) {
+        type = check_unary_expr(unary);
+    } else if (auto assign = std::dynamic_pointer_cast<AST::AssignExpr>(expr)) {
+        type = check_assign_expr(assign);
+    } else if (auto grouping = std::dynamic_pointer_cast<AST::GroupingExpr>(expr)) {
+        type = check_grouping_expr(grouping);
+    } else if (auto member = std::dynamic_pointer_cast<AST::MemberExpr>(expr)) {
+        type = check_member_expr(member);
+    } else if (auto index = std::dynamic_pointer_cast<AST::IndexExpr>(expr)) {
+        type = check_index_expr(index);
+    } else if (auto list = std::dynamic_pointer_cast<AST::ListExpr>(expr)) {
+        type = check_list_expr(list);
+    } else if (auto tuple = std::dynamic_pointer_cast<AST::TupleExpr>(expr)) {
+        type = check_tuple_expr(tuple);
+    } else if (auto dict = std::dynamic_pointer_cast<AST::DictExpr>(expr)) {
+        type = check_dict_expr(dict);
+    } else if (auto interpolated = std::dynamic_pointer_cast<AST::InterpolatedStringExpr>(expr)) {
+        type = check_interpolated_string_expr(interpolated);
+    } else if (auto lambda = std::dynamic_pointer_cast<AST::LambdaExpr>(expr)) {
+        type = check_lambda_expr(lambda);
+    } else if (auto error_construct = std::dynamic_pointer_cast<AST::ErrorConstructExpr>(expr)) {
+        type = check_error_construct_expr(error_construct);
+    } else if (auto ok_construct = std::dynamic_pointer_cast<AST::OkConstructExpr>(expr)) {
+        type = check_ok_construct_expr(ok_construct);
+    } else if (auto fallible = std::dynamic_pointer_cast<AST::FallibleExpr>(expr)) {
+        type = check_fallible_expr(fallible);
+    } else {
+        add_error("Unknown expression type", expr->line);
+        type = type_system.STRING_TYPE; // Default fallback
+    }
+    
+    // Set the inferred type on the expression node
+    expr->inferred_type = type;
+    
+    return type;
+}
+
 TypePtr TypeChecker::check_literal_expr(std::shared_ptr<AST::LiteralExpr> expr) {
     if (!expr) return nullptr;
     
-    // Set type based on the literal value
+    // CRITICAL FIX: If the literal already has a type (from constant propagation), preserve it
+    if (expr->inferred_type) {
+        return expr->inferred_type;
+    }
+    
+    // Set type based on the literal value and token type
     if (std::holds_alternative<std::string>(expr->value)) {
-        // Check if it's a numeric string
         const std::string& str = std::get<std::string>(expr->value);
-        bool is_numeric = !str.empty() && (str[0] == '-' || str[0] == '+' || 
-                          (str[0] >= '0' && str[0] <= '9'));
-        for (size_t i = 1; i < str.size() && is_numeric; i++) {
-            if (str[i] != '.' && !(str[i] >= '0' && str[i] <= '9')) {
-                is_numeric = false;
-            }
-        }
         
-        if (is_numeric) {
-            // Check if it contains a decimal point to determine if it's a float
-            bool is_float = false;
-            for (size_t i = 0; i < str.size(); i++) {
-                if (str[i] == '.') {
-                    is_float = true;
-                    break;
-                }
-            }
-            
-            if (is_float) {
+        // Use the token type to determine the correct type
+        switch (expr->literalType) {
+            case TokenType::INT_LITERAL:
+                expr->inferred_type = type_system.INT64_TYPE;
+                return type_system.INT64_TYPE;
+                
+            case TokenType::FLOAT_LITERAL:
+            case TokenType::SCIENTIFIC_LITERAL:
                 expr->inferred_type = type_system.FLOAT64_TYPE;
                 return type_system.FLOAT64_TYPE;
-            } else {
+                
+            default:
+                // Non-numeric string literal
+                expr->inferred_type = type_system.STRING_TYPE;
+                return type_system.STRING_TYPE;
+        }
+    } else if (std::holds_alternative<bool>(expr->value)) {
+        expr->inferred_type = type_system.BOOL_TYPE;
+        return type_system.BOOL_TYPE;
+    } else if (std::holds_alternative<std::nullptr_t>(expr->value)) {
+        expr->inferred_type = type_system.NIL_TYPE;
+        return type_system.NIL_TYPE;
+    }
+    
+    expr->inferred_type = type_system.STRING_TYPE;
+    return type_system.STRING_TYPE;
+}
+
+TypePtr TypeChecker::check_literal_expr_with_expected_type(std::shared_ptr<AST::LiteralExpr> expr, TypePtr expected_type) {
+    if (!expr) return nullptr;
+    
+    // Set type based on the literal value and token type, considering expected type
+    if (std::holds_alternative<std::string>(expr->value)) {
+        const std::string& str = std::get<std::string>(expr->value);
+        
+        // Use the token type to determine the correct type
+        switch (expr->literalType) {
+            case TokenType::INT_LITERAL: {
+                // If we have an expected type and it's an integer type, use it
+                if (expected_type && is_integer_type(expected_type)) {
+                    expr->inferred_type = expected_type;
+                    return expected_type;
+                }
+                // Otherwise, default to INT64_TYPE
                 expr->inferred_type = type_system.INT64_TYPE;
                 return type_system.INT64_TYPE;
             }
-        } else {
-            expr->inferred_type = type_system.STRING_TYPE;
-            return type_system.STRING_TYPE;
+                
+            case TokenType::FLOAT_LITERAL:
+            case TokenType::SCIENTIFIC_LITERAL: {
+                // If we have an expected type and it's a float type, use it
+                if (expected_type && is_float_type(expected_type)) {
+                    expr->inferred_type = expected_type;
+                    return expected_type;
+                }
+                // Otherwise, default to FLOAT64_TYPE
+                expr->inferred_type = type_system.FLOAT64_TYPE;
+                return type_system.FLOAT64_TYPE;
+            }
+                
+            default:
+                // Non-numeric string literal
+                expr->inferred_type = type_system.STRING_TYPE;
+                return type_system.STRING_TYPE;
         }
     } else if (std::holds_alternative<bool>(expr->value)) {
         expr->inferred_type = type_system.BOOL_TYPE;
@@ -982,10 +1074,57 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<AST::UnaryExpr> expr) {
             
         case TokenType::MINUS:
         case TokenType::PLUS:
-            // Numeric negation
+            // Numeric negation/affirmation
             if (!is_numeric_type(right_type)) {
                 add_type_error("numeric", right_type->toString(), expr->line);
             }
+            
+            // Special case: Handle large integers that were parsed as float due to overflow
+            // but should be integers when negated (e.g., -9223372036854775808 = INT64_MIN)
+            if (expr->op == TokenType::MINUS && right_type->tag == TypeTag::Float64) {
+                if (auto literal = std::dynamic_pointer_cast<AST::LiteralExpr>(expr->right)) {
+                    if (std::holds_alternative<std::string>(literal->value)) {
+                        const std::string& str = std::get<std::string>(literal->value);
+                        
+                        // Only apply this fix to pure integers (no decimal point or scientific notation)
+                        bool hasDecimal = str.find('.') != std::string::npos;
+                        bool hasScientific = str.find('e') != std::string::npos || str.find('E') != std::string::npos;
+                        
+                        if (!hasDecimal && !hasScientific) {
+                            // Try to parse as unsigned long long to check the range
+                            try {
+                                unsigned long long value = std::stoull(str);
+                                
+                                // Check if this value, when negated, fits in int64 range
+                                // INT64_MAX = 9223372036854775807
+                                // INT64_MIN = -9223372036854775808 (which is INT64_MAX + 1)
+                                const unsigned long long INT64_MAX_PLUS_1 = 9223372036854775808ULL;
+                                
+                                if (value <= INT64_MAX_PLUS_1) {
+                                    // This negative value fits in int64
+                                    // Update both the type and mark this as an integer literal
+                                    literal->inferred_type = type_system.INT64_TYPE;
+                                    expr->inferred_type = type_system.INT64_TYPE;
+                                    
+                                    // Also update the literal's value to ensure it's treated as integer
+                                    // Store the negative value as a string to preserve the integer nature
+                                    literal->value = "-" + str;
+                                    
+                                    return type_system.INT64_TYPE;
+                                }
+                                
+                                // Check if it fits in int128 range (for very large numbers)
+                                // For now, we'll be conservative and only handle int64 range
+                                // Future: could extend to int128 if needed
+                                
+                            } catch (const std::exception&) {
+                                // If parsing fails, keep as float
+                            }
+                        }
+                    }
+                }
+            }
+            expr->inferred_type = right_type;
             return right_type;
             
         default:
@@ -1413,6 +1552,19 @@ bool TypeChecker::is_numeric_type(TypePtr type) {
                    type->tag == TypeTag::UInt16 || type->tag == TypeTag::UInt32 || 
                    type->tag == TypeTag::UInt64 || type->tag == TypeTag::UInt128 ||
                    type->tag == TypeTag::Float32 || type->tag == TypeTag::Float64);
+}
+
+bool TypeChecker::is_integer_type(TypePtr type) {
+    return type && (type->tag == TypeTag::Int || type->tag == TypeTag::Int8 || 
+                   type->tag == TypeTag::Int16 || type->tag == TypeTag::Int32 || 
+                   type->tag == TypeTag::Int64 || type->tag == TypeTag::Int128 ||
+                   type->tag == TypeTag::UInt || type->tag == TypeTag::UInt8 || 
+                   type->tag == TypeTag::UInt16 || type->tag == TypeTag::UInt32 || 
+                   type->tag == TypeTag::UInt64 || type->tag == TypeTag::UInt128);
+}
+
+bool TypeChecker::is_float_type(TypePtr type) {
+    return type && (type->tag == TypeTag::Float32 || type->tag == TypeTag::Float64);
 }
 
 bool TypeChecker::is_boolean_type(TypePtr type) {

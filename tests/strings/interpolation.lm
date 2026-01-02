@@ -12,6 +12,7 @@ print("Pi: {pi}");
 
 // Expression interpolation
 print("Next year: {age + 1}");
+
 //!fix here
 print("Area of circle: {pi * 2 * 2}");
 

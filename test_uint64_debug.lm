@@ -1,0 +1,8 @@
+// Debug test for uint64 parsing
+var test1: u64 = 18446744073709551615;
+var test2: i64 = 9223372036854775807;
+var test3: u64 = 123;
+
+print("Test1 (max u64):", test1);
+print("Test2 (max i64):", test2);
+print("Test3 (small u64):", test3);

@@ -1,0 +1,12 @@
+fn divide(a: int, b: int): int? {
+    if (b == 0) return err("Division by zero");
+    return ok(a / b);
+}
+
+
+    print("Quick error test:");
+    var result1 = divide(10, 0);
+    print("Error result: {result1}");
+    
+    var result2 = divide(10, 2);
+    print("Success result: {result2}");

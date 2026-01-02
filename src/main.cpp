@@ -23,9 +23,14 @@ void printUsage(const char* programName) {
     std::cout << "  " << programName << " -ast <source_file> - Print the AST for a source file" << std::endl;
     std::cout << "  " << programName << " -cst <source_file> - Print the CST for a source file" << std::endl;
     std::cout << "  " << programName << " -tokens <source_file> - Print the tokens for a source file" << std::endl;
+<<<<<<< Updated upstream
     std::cout << "  " << programName << " -jit <source_file>    - JIT compile a source file" << std::endl;
     std::cout << "  " << programName << " -jit-debug <source_file> - JIT compile and run directly (debug mode)" << std::endl;
     std::cout << "  " << programName << " -debug <source_file> - Execute with debug output enabled" << std::endl;
+=======
+    std::cout << "  " << programName << " -bytecode <source_file> - Print the bytecode for a source file" << std::endl;
+    std::cout << "  " << programName << " -debug <source_file> - Execute with debug output" << std::endl;
+>>>>>>> Stashed changes
     std::cout << "  " << programName << " -repl           - Start the REPL (interactive mode)" << std::endl;
 }
 
@@ -40,7 +45,11 @@ std::string readFile(const std::string& filename) {
     return buffer.str();
 }
 
+<<<<<<< Updated upstream
 int executeFile(const std::string& filename, bool printAst = false, bool printCst = false, bool printTokens = false, bool useJit = false, bool jitDebug = false, bool enableDebug = false) {
+=======
+void executeFile(const std::string& filename, bool printAst = false, bool printTokens = false, bool printBytecode = false, bool useJit = false, bool debugMode = false) {
+>>>>>>> Stashed changes
     try {
         // Initialize LIR function systems
         LIR::FunctionUtils::initializeFunctions();
@@ -165,7 +174,36 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             std::cout << std::endl;
         }
 
+<<<<<<< Updated upstream
         if (useJit) {
+=======
+        // if (useJit) {
+        //     std::cout << "=== JIT Backend ===\n";
+        //     JitBackend jit;
+        //     jit.process(ast);
+        //     const char* output_filename = "jit_output";
+        //     jit.compile(output_filename);
+        //     std::cout << "Compiled to " << output_filename << ". Run ./" << output_filename << " to see the result.\n";
+        // } else {
+
+            // Backend: Generate bytecode
+            VM vm;
+            if (debugMode) {
+                vm.setDebug(true);
+            }
+            BytecodeGenerator generator;
+            generator.process(ast);
+
+            // Print bytecode if requested
+            if (printBytecode) {
+                std::cout << "=== Bytecode ===\n";
+                std::cout << "Generated " << generator.getBytecode().size() << " instructions\n";
+                // TODO: Implement bytecode disassembler and print instructions
+                std::cout << std::endl;
+            }
+
+            // Execute bytecode using the virtual machine
+>>>>>>> Stashed changes
             try {
                 // Generate LIR from optimized AST
                 LIR::Generator lir_generator;
@@ -540,6 +578,7 @@ int main(int argc, char* argv[]) {
     } else if (arg == "-cst" && argc >= 3) {
         return executeFile(argv[2], false, true, false, false);
     } else if (arg == "-tokens" && argc >= 3) {
+<<<<<<< Updated upstream
         return executeFile(argv[2], false, false, true, false);
     } else if (arg == "-jit" && argc >= 3) {
         return executeFile(argv[2], false, false, false, true, false);
@@ -547,6 +586,15 @@ int main(int argc, char* argv[]) {
         return executeFile(argv[2], false, false, false, true, true);
     } else if (arg == "-debug" && argc >= 3) {
         return executeFile(argv[2], false, false, false, false, false, true);
+=======
+        executeFile(argv[2], false, true, false);
+    } else if (arg == "-bytecode" && argc >= 3) {
+        executeFile(argv[2], false, false, true);
+    } else if (arg == "-debug" && argc >= 3) {
+        executeFile(argv[2], false, false, false, false, true);
+    // } else if (arg == "-jit" && argc >= 3) {
+    //     executeFile(argv[2], false, false, false, true);
+>>>>>>> Stashed changes
     } else if (arg[0] == '-') {
         std::cerr << "Unknown option: " << arg << std::endl;
         printUsage(argv[0]);

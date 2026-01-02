@@ -154,6 +154,7 @@ private:
     
     // Type checking methods
     TypePtr check_expression(std::shared_ptr<AST::Expression> expr);
+    TypePtr check_expression_with_expected_type(std::shared_ptr<AST::Expression> expr, TypePtr expected_type);
     TypePtr check_statement(std::shared_ptr<AST::Statement> stmt);
     TypePtr check_function_declaration(std::shared_ptr<AST::FunctionDeclaration> func);
     TypePtr check_var_declaration(std::shared_ptr<AST::VarDeclaration> var_decl);
@@ -167,6 +168,7 @@ private:
     
     // Expression type checking
     TypePtr check_literal_expr(std::shared_ptr<AST::LiteralExpr> expr);
+    TypePtr check_literal_expr_with_expected_type(std::shared_ptr<AST::LiteralExpr> expr, TypePtr expected_type);
     TypePtr check_variable_expr(std::shared_ptr<AST::VariableExpr> expr);
     TypePtr check_binary_expr(std::shared_ptr<AST::BinaryExpr> expr);
     TypePtr check_unary_expr(std::shared_ptr<AST::UnaryExpr> expr);
@@ -207,6 +209,8 @@ private:
     
     // Helper methods
     bool is_numeric_type(TypePtr type);
+    bool is_integer_type(TypePtr type);
+    bool is_float_type(TypePtr type);
     bool is_boolean_type(TypePtr type);
     bool is_string_type(TypePtr type);
     TypePtr promote_numeric_types(TypePtr left, TypePtr right);

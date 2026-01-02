@@ -2097,9 +2097,10 @@ void Parser::parseConcurrencyParams(
                 if (paramValue.size() >= 2) {
                     paramValue = paramValue.substr(1, paramValue.size() - 2);
                 }
-            } else if (check(TokenType::NUMBER)) {
+            } else if (check(TokenType::INT_LITERAL) || check(TokenType::FLOAT_LITERAL) || 
+                       check(TokenType::SCIENTIFIC_LITERAL)) {
                 // Get the number value
-                paramValue = consume(TokenType::NUMBER, "Expected number value").lexeme;
+                 paramValue = advance().lexeme;
                 
                 // Check for time unit (s, ms, etc.)
                 if (check(TokenType::IDENTIFIER)) {
@@ -2402,7 +2403,8 @@ std::shared_ptr<AST::Expression> Parser::parsePattern() {
 
     // Literal pattern
     if (check(TokenType::IDENTIFIER) ||
-               check(TokenType::NUMBER) || check(TokenType::STRING) ||
+               check(TokenType::INT_LITERAL) || check(TokenType::FLOAT_LITERAL) || 
+               check(TokenType::SCIENTIFIC_LITERAL) || check(TokenType::STRING) ||
                check(TokenType::TRUE) || check(TokenType::FALSE) ||
                check(TokenType::NIL)) {
         return primary();
@@ -2975,7 +2977,8 @@ std::shared_ptr<AST::Expression> Parser::call() {
             auto dotToken = previous();
             
             // Check for tuple indexing (e.g., tuple.0, tuple.1)
-            if (check(TokenType::NUMBER)) {
+            if (check(TokenType::INT_LITERAL) || check(TokenType::FLOAT_LITERAL) || 
+                check(TokenType::SCIENTIFIC_LITERAL)) {
                 auto numberToken = advance();
                 
                 // Create an index expression for tuple access
@@ -3235,76 +3238,13 @@ std::shared_ptr<AST::Expression> Parser::primary() {
         return literalExpr;
     }
 
-    if (match({TokenType::NUMBER})) {
+    if (match({TokenType::INT_LITERAL, TokenType::FLOAT_LITERAL, TokenType::SCIENTIFIC_LITERAL})) {
         auto token = previous();
         auto literalExpr = createNodeWithContext<AST::LiteralExpr>();
         literalExpr->line = token.line;
         
-        // Enhanced numeric literal parsing with string-based values
-        bool hasDecimal = token.lexeme.find('.') != std::string::npos;
-        bool hasScientific = token.lexeme.find('e') != std::string::npos || token.lexeme.find('E') != std::string::npos;
-        
-        if (hasDecimal || hasScientific) {
-            // Parse as floating-point number and store as string
-            try {
-                long double doubleValue = std::stold(token.lexeme);
-                
-                // Check for special values
-                if (std::isnan(doubleValue)) {
-                    error("Invalid floating-point number (NaN): " + token.lexeme);
-                    literalExpr->value = std::string("0.0");
-                } else if (std::isinf(doubleValue)) {
-                    // Allow infinity for very large scientific notation
-                    literalExpr->value = token.lexeme; // Store original string
-                } else {
-                    // Store as string for all floats
-                    literalExpr->value = token.lexeme;
-                }
-            } catch (const std::out_of_range& e) {
-                error("Floating-point number out of range: " + token.lexeme);
-                literalExpr->value = std::string("0.0");
-            } catch (const std::invalid_argument& e) {
-                error("Invalid floating-point number format: " + token.lexeme);
-                literalExpr->value = std::string("0.0");
-            } catch (const std::exception& e) {
-                error("Invalid floating-point number: " + token.lexeme);
-                literalExpr->value = std::string("0.0");
-            }
-        } else {
-            // Parse as integer and store as string
-            try {
-                // Validate integer format
-                size_t pos;
-                unsigned long long uintValue = std::stoull(token.lexeme, &pos);
-                if (pos != token.lexeme.length()) {
-                    throw std::invalid_argument("Invalid characters in integer");
-                }
-                
-                // Check if the value fits in 64-bit unsigned range
-                const unsigned long long MAX_UINT64_VALUE = 0xFFFFFFFFFFFFFFFFULL;
-                if (uintValue > MAX_UINT64_VALUE) {
-                    throw std::out_of_range("Integer value exceeds uint64 range");
-                }
-                
-                literalExpr->value = token.lexeme; // Store as string
-            } catch (const std::out_of_range&) {
-                // If stoull fails with out_of_range, try stoll for very large negative numbers
-                try {
-                    size_t pos;
-                    long long intValue = std::stoll(token.lexeme, &pos);
-                    if (pos != token.lexeme.length()) {
-                        throw std::invalid_argument("Invalid characters in integer");
-                    }
-                    literalExpr->value = token.lexeme; // Store as string
-                } catch (const std::exception& e) {
-                    error("Invalid integer format: " + token.lexeme + " - " + e.what());
-                    literalExpr->value = std::string("0");
-                }
-            } catch (const std::exception& e) {
-                error("Invalid integer format: " + token.lexeme + " - " + e.what());
-                literalExpr->value = std::string("0");
-            }
-        }
+        literalExpr->value = token.lexeme;
+        literalExpr->literalType = token.type;
         
         // Create detailed CST node if enabled
         if (cstMode && config.detailedExpressionNodes) {

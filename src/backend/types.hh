@@ -96,6 +96,11 @@ private:
         if (fromIsFloat && toIsFloat) {
             return true;
         }
+        
+        // Integer to float conversions (promotion)
+        if (fromIsInt && toIsFloat) {
+            return true;
+        }
 
         // Handle list and dict type compatibility
         if (from->tag == TypeTag::List && to->tag == TypeTag::List) {

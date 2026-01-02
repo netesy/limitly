@@ -27,6 +27,13 @@ public:
     // Error handling
     bool has_errors() const;
     std::vector<std::string> get_errors() const;
+    
+    // Enhanced error handling - access error information
+    struct ErrorInfo {
+        std::string errorType;
+        std::string message;
+    };
+    const std::unordered_map<Reg, ErrorInfo>& get_error_info_table() const { return error_info_table_; }
 
 private:
     // Type system reference from type checker
@@ -144,6 +151,7 @@ private:
     // Specific statement handlers
     void emit_expr_stmt(AST::ExprStatement& stmt);
     void emit_print_stmt(AST::PrintStatement& stmt);
+    void emit_print_value(Reg value);  // Helper for printing single values
     void emit_var_stmt(AST::VarDeclaration& stmt);
     void emit_block_stmt(AST::BlockStatement& stmt);
     void emit_if_stmt(AST::IfStatement& stmt);
@@ -211,6 +219,9 @@ private:
     std::unordered_map<Reg, TypePtr> register_language_types_;
     std::unordered_map<Reg, ValuePtr> register_values_;
     std::vector<std::string> errors_;
+    
+    // Error information table for enhanced error handling
+    std::unordered_map<Reg, ErrorInfo> error_info_table_;
     
     // Else block context for handling return statements in ? else {} blocks
     struct ElseBlockContext {

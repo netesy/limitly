@@ -1,0 +1,16 @@
+// Test literal type preservation
+    // Test integer literal
+    var x: i64 = 123;
+    print("Integer: {x}");
+    
+    // Test float literal  
+    var y: f64 = 3.14;
+    print("Float: {y}");
+    
+    // Test scientific literal
+    var z: f64 = 1.5e3;
+    print("Scientific: {z}");
+    
+    // Test negative integer (the problematic case)
+    var neg: i64 = -456;
+    print("Negative: {neg}");

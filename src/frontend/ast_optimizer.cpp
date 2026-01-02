@@ -1,6 +1,8 @@
 #include "ast.hh"
 #include <stdexcept>
 #include <cmath>
+#include <iomanip>
+#include <sstream>
 
 namespace AST {
 
@@ -58,18 +60,42 @@ std::shared_ptr<LiteralExpr> createStringLiteral(const std::string& value, int l
     auto result = std::make_shared<LiteralExpr>();
     result->value = value;
     result->line = line;
-    // Use type inference to set the correct type
-    result->inferred_type = inferLiteralType(result->value);
+    result->literalType = TokenType::STRING;
+    result->inferred_type = std::make_shared<::Type>(::TypeTag::String);
     return result;
 }
 
 // Helper function to create numeric literals
 std::shared_ptr<LiteralExpr> createNumericLiteral(const std::string& value, int line) {
     auto result = std::make_shared<LiteralExpr>();
-    result->value = value;
+    result->value = value;  // Preserve the original string representation
     result->line = line;
-    // Use type inference to set the correct type
-    result->inferred_type = inferLiteralType(result->value);
+    
+    // Set the appropriate literal type and inferred type based on content
+    bool hasDecimal = value.find('.') != std::string::npos;
+    bool hasScientific = value.find('e') != std::string::npos || value.find('E') != std::string::npos;
+    
+    if (hasDecimal || hasScientific) {
+        result->literalType = hasScientific ? TokenType::SCIENTIFIC_LITERAL : TokenType::FLOAT_LITERAL;
+        result->inferred_type = std::make_shared<::Type>(::TypeTag::Float64);
+    } else {
+        // For integers, try to determine if it should be unsigned based on size
+        try {
+            unsigned long long uval = std::stoull(value);
+            if (uval > 9223372036854775807ULL) {  // Larger than INT64_MAX
+                result->literalType = TokenType::INT_LITERAL;
+                result->inferred_type = std::make_shared<::Type>(::TypeTag::UInt64);
+            } else {
+                result->literalType = TokenType::INT_LITERAL;
+                result->inferred_type = std::make_shared<::Type>(::TypeTag::Int64);
+            }
+        } catch (const std::exception&) {
+            // If parsing fails, default to int64
+            result->literalType = TokenType::INT_LITERAL;
+            result->inferred_type = std::make_shared<::Type>(::TypeTag::Int64);
+        }
+    }
+    
     return result;
 }
 
@@ -269,12 +295,7 @@ std::shared_ptr<LiteralExpr> ASTOptimizer::optimizeLiteralExpr(std::shared_ptr<L
         expr->inferred_type = inferLiteralType(expr->value);
     }
     
-    // Apply constant propagation to literal expressions
-    auto propagated = propagateConstants(expr);
-    if (propagated != expr) {
-        return std::dynamic_pointer_cast<LiteralExpr>(propagated);
-    }
-    
+    // Literals are already constants - no need for constant propagation
     return expr;
 }
 
@@ -536,10 +557,31 @@ std::shared_ptr<Expression> ASTOptimizer::propagateConstants(std::shared_ptr<Exp
                 // Create a copy of the constant to avoid modifying the original
                 if (auto literal = std::dynamic_pointer_cast<LiteralExpr>(constant)) {
                     auto copy = std::make_shared<LiteralExpr>(*literal);
-                    // CRITICAL: Preserve the constant's inferred type, not the variable's
-                    copy->inferred_type = literal->inferred_type;
-                    // If the constant doesn't have a type, infer it
-                    if (!copy->inferred_type) {
+                    
+                    std::cout << "[DEBUG] Constant propagation for variable '" << variable->name << "':" << std::endl;
+                    std::cout << "  - Variable has inferred_type: " << (variable->inferred_type ? "YES" : "NO") << std::endl;
+                    std::cout << "  - Literal has inferred_type: " << (literal->inferred_type ? "YES" : "NO") << std::endl;
+                    if (variable->inferred_type) {
+                        std::cout << "  - Variable type tag: " << static_cast<int>(variable->inferred_type->tag) << std::endl;
+                    }
+                    if (literal->inferred_type) {
+                        std::cout << "  - Literal type tag: " << static_cast<int>(literal->inferred_type->tag) << std::endl;
+                    }
+                    
+                    // CRITICAL FIX: Preserve the variable's declared type instead of the literal's inferred type
+                    // This ensures that u64 variables keep their u64 type during constant propagation
+                    if (variable->inferred_type) {
+                        std::cout << "[DEBUG] Constant propagation: variable '" << variable->name 
+                                  << "' has inferred_type tag: " << static_cast<int>(variable->inferred_type->tag) << std::endl;
+                        copy->inferred_type = variable->inferred_type;
+                    } else if (literal->inferred_type) {
+                        std::cout << "[DEBUG] Constant propagation: variable '" << variable->name 
+                                  << "' has no inferred_type, using literal's type tag: " << static_cast<int>(literal->inferred_type->tag) << std::endl;
+                        copy->inferred_type = literal->inferred_type;
+                    } else {
+                        std::cout << "[DEBUG] Constant propagation: variable '" << variable->name 
+                                  << "' has no type info, inferring from value" << std::endl;
+                        // If neither has a type, infer it
                         copy->inferred_type = inferLiteralType(copy->value);
                     }
                     context.stats.constant_propagations++;
@@ -801,9 +843,9 @@ std::shared_ptr<Expression> ASTOptimizer::evaluateBinaryOp(TokenType op, std::sh
         
         if (leftStr && rightStr) {
             try {
-                double leftNum = std::stod(*leftStr);
-                double rightNum = std::stod(*rightStr);
-                double result = 0.0;
+                long double leftNum = std::stold(*leftStr);
+                long double rightNum = std::stold(*rightStr);
+                long double result = 0.0;
                 bool isArithmetic = (op == TokenType::PLUS || op == TokenType::MINUS || 
                                    op == TokenType::STAR || op == TokenType::SLASH || 
                                    op == TokenType::MODULUS);
@@ -857,12 +899,25 @@ std::shared_ptr<Expression> ASTOptimizer::evaluateBinaryOp(TokenType op, std::sh
                     resultType = std::make_shared<::Type>(::TypeTag::Float64);
                 }
                 
-                // Create the folded literal
-            auto foldedLiteral = std::make_shared<LiteralExpr>();
-            foldedLiteral->value = std::to_string(result);
-            foldedLiteral->line = left->line;
-            foldedLiteral->inferred_type = inferLiteralType(foldedLiteral->value);
-            return foldedLiteral;
+                // Create the folded literal with higher precision
+                auto foldedLiteral = std::make_shared<LiteralExpr>();
+                
+                // Use higher precision formatting
+                std::ostringstream oss;
+                oss << std::setprecision(17) << result;
+                foldedLiteral->value = oss.str();
+                
+                foldedLiteral->line = left->line;
+                foldedLiteral->inferred_type = resultType;
+                
+                // Set the appropriate literal type based on the result type
+                if (resultType->tag == TypeTag::Float64 || resultType->tag == TypeTag::Float32) {
+                    foldedLiteral->literalType = TokenType::FLOAT_LITERAL;
+                } else {
+                    foldedLiteral->literalType = TokenType::INT_LITERAL;
+                }
+                
+                return foldedLiteral;
                 
             } catch (const std::exception&) {
                 return nullptr;  // Failed to parse numbers
@@ -933,8 +988,35 @@ std::shared_ptr<Expression> ASTOptimizer::evaluateUnaryOp(TokenType op, std::sha
         auto strVal = std::get_if<std::string>(&rightLiteral->value);
         if (strVal) {
             try {
-                double num = std::stod(*strVal);
-                return createNumericLiteral(std::to_string(-num), right->line);
+                // Check if the original literal was an integer or float
+                bool shouldBeFloat = (rightLiteral->literalType == TokenType::FLOAT_LITERAL || 
+                                    rightLiteral->literalType == TokenType::SCIENTIFIC_LITERAL ||
+                                    rightLiteral->inferred_type->tag == TypeTag::Float64 ||
+                                    rightLiteral->inferred_type->tag == TypeTag::Float32);
+                
+                if (shouldBeFloat) {
+                    long double num = std::stold(*strVal);
+                    // Use higher precision formatting for long double
+                    std::ostringstream oss;
+                    oss << std::setprecision(17) << (num * -1.0L);
+                    return createNumericLiteral(oss.str(), right->line);
+                } else {
+                    // Handle as integer - check if it's unsigned
+                    if (rightLiteral->inferred_type->tag == TypeTag::UInt64 || 
+                        rightLiteral->inferred_type->tag == TypeTag::UInt32 ||
+                        rightLiteral->inferred_type->tag == TypeTag::UInt16 ||
+                        rightLiteral->inferred_type->tag == TypeTag::UInt8) {
+                        // For unsigned, we need to be careful with negation
+                        unsigned long long num = std::stoull(*strVal);
+                        // Convert to signed for negation
+                        long long signedResult = -static_cast<long long>(num);
+                        return createNumericLiteral(std::to_string(signedResult), right->line);
+                    } else {
+                        // Handle as signed integer
+                        long long num = std::stoll(*strVal);
+                        return createNumericLiteral(std::to_string(-num), right->line);
+                    }
+                }
             } catch (const std::invalid_argument&) {
                 // Not numeric, fall through
             } catch (const std::out_of_range&) {

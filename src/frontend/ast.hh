@@ -281,6 +281,7 @@ namespace AST {
     // Literal values (numbers, strings, booleans, nil)
     struct LiteralExpr : public Expression {
         std::variant<std::string, bool, std::nullptr_t> value;
+        TokenType literalType = TokenType::STRING; // Store the original token type for type inference
     };
 
     // Variable reference

@@ -1,0 +1,16 @@
+// Test refinement types implementation
+    print("Testing refinement types...");
+    
+    // Basic refinement type syntax
+    var positive: int{x > 0} = 42;
+    print("Positive integer: {positive}");
+    
+    // String refinement type
+    var name: string{len > 0} = "Alice";
+    print("Non-empty string: {name}");
+    
+    // Range refinement type
+    var percentage: int{x >= 0 && x <= 100} = 85;
+    print("Percentage: {percentage}");
+    
+    print("Refinement types test complete!");

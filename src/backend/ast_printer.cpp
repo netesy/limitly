@@ -931,7 +931,9 @@ std::string ASTPrinter::tokenTypeToString(TokenType type) const {
         // Literals
         case TokenType::IDENTIFIER: return "identifier";
         case TokenType::STRING: return "string";
-        case TokenType::NUMBER: return "number";
+        case TokenType::INT_LITERAL: return "int literal";
+        case TokenType::FLOAT_LITERAL: return "float literal";
+        case TokenType::SCIENTIFIC_LITERAL: return "scientific literal";
         
         // Types
         case TokenType::INT_TYPE: return "int";

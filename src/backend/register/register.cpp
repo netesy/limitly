@@ -226,6 +226,8 @@ OP_LOADCONST:
         // Convert to register value representation
         if (target_type->tag == TypeTag::Int32 || target_type->tag == TypeTag::Int64) {
             registers[pc->dst] = static_cast<int64_t>(std::stoll(cv->data));
+        } else if (target_type->tag == TypeTag::UInt32 || target_type->tag == TypeTag::UInt64) {
+            registers[pc->dst] = static_cast<uint64_t>(std::stoull(cv->data));
         } else if (target_type->tag == TypeTag::Float32) {
             registers[pc->dst] = std::stof(cv->data);
         } else if (target_type->tag == TypeTag::Float64) {
@@ -854,7 +856,7 @@ OP_PRINTINT:
     DISPATCH();
 
 OP_PRINTUINT:
-    std::cout << to_int(registers[pc->a]) << std::endl;
+    std::cout << to_uint(registers[pc->a]) << std::endl;
     DISPATCH();
 
 OP_PRINTFLOAT:
@@ -1158,6 +1160,21 @@ OP_RET:
 
 OP_CONSTRUCTERROR:
     {
+        // Parse error information from instruction comment
+        std::string errorType = "DefaultError";
+        std::string errorMessage = "Operation failed";
+        
+        // Check if the current instruction has error info in the comment
+        if (!pc->comment.empty() && pc->comment.find("ERROR_INFO:") == 0) {
+            // Parse format: "ERROR_INFO:ErrorType:Error message"
+            std::string info = pc->comment.substr(11); // Skip "ERROR_INFO:"
+            size_t colon_pos = info.find(':');
+            if (colon_pos != std::string::npos) {
+                errorType = info.substr(0, colon_pos);
+                errorMessage = info.substr(colon_pos + 1);
+            }
+        }
+        
         // Create an error ID using a tagged integer approach
         // Error IDs are negative numbers starting from -1000000 to avoid conflicts
         static int64_t next_error_id = -1000000;
@@ -1165,8 +1182,8 @@ OP_CONSTRUCTERROR:
         
         // Store error information in our error table
         ErrorInfo error_info;
-        error_info.errorType = "DefaultError";
-        error_info.message = "Operation failed";
+        error_info.errorType = errorType;
+        error_info.message = errorMessage;
         error_info.isError = true;
         error_table[error_id] = error_info;
         
@@ -1453,6 +1470,8 @@ std::string RegisterVM::to_string(const RegisterValue& value) const {
         }
         
         return std::to_string(intValue);
+    } else if (std::holds_alternative<uint64_t>(value)) {
+        return std::to_string(std::get<uint64_t>(value));
     } else if (std::holds_alternative<double>(value)) {
         return std::to_string(std::get<double>(value));
     } else if (std::holds_alternative<bool>(value)) {

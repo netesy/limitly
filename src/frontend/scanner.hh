@@ -58,7 +58,9 @@ enum class TokenType {
     INTERPOLATION,      // interpolation expression within strings (legacy)
     INTERPOLATION_START,// { for starting interpolation
     INTERPOLATION_END,  // } for ending interpolation
-    NUMBER,             // numeric literals
+    INT_LITERAL,        // integer literals (123, -456)
+    FLOAT_LITERAL,      // floating-point literals (1.23, 3.14159)
+    SCIENTIFIC_LITERAL, // scientific notation literals (1e9, 2.5e-3)
 
     // Group: Types
     INT_TYPE,      // int

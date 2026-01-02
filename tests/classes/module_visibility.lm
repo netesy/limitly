@@ -70,7 +70,7 @@ class TestClass {
                                 const value: int = 42;
                                 }
 
-                                data class DataClass {
+                                data DataClass {
                                     x: int;
                                     y: int;
                                     }
