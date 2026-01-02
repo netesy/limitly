@@ -3,43 +3,53 @@ print("=== Range Expression Tests ===");
 
 // Basic ranges
 print("Range 1..5:");
+var sum1 = 0;
 iter (i in 1..5) {
-    print(i);
+    sum1 += i;
 }
+assert(sum1 == 15, "Range 1..5 failed");
 
 print("Range 0..3:");
+var sum2 = 0;
 iter (j in 0..3) {
-    print(j);
+    sum2 += j;
 }
+assert(sum2 == 6, "Range 0..3 failed");
 
 // Range with variables
 var start = 5;
 var end = 8;
 print("Variable range {start}..{end}:");
+var sum3 = 0;
 iter (k in start..end) {
-    print(k);
+    sum3 += k;
 }
+assert(sum3 == 26, "Variable range failed");
 
 // Range with expressions
 var base = 2;
 print("Expression range {base}..{base + 3}:");
+var sum4 = 0;
 iter (x in base..(base + 3)) {
-    print(x);
+    sum4 += x;
 }
+assert(sum4 == 14, "Expression range failed");
 
 // Nested ranges
 print("Nested ranges:");
+var nested_sum = 0;
 iter (i in 1..3) {
-    print("Outer: {i}");
-    //!fix here
     iter (j in (i * 10)..(i * 10 + 2)) {
-        print("  Inner: {j}");
+        nested_sum += j;
     }
 }
+assert(nested_sum == 189, "Nested ranges failed");
 
 // Empty range
 print("Empty range (5..5):");
+var empty_sum = 0;
 iter (empty in 5..5) {
-    print("This should not print: {empty}");
+    empty_sum += 1;
 }
+assert(empty_sum == 0, "Empty range failed");
 print("Empty range test complete");

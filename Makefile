@@ -14,9 +14,9 @@ else
     EXE_EXT :=
     CXX := g++
     LIBS := -lgccjit
-    LIBGCCJIT_PATH := $(shell find /usr -name libgccjit.so 2>/dev/null)
+    LIBGCCJIT_PATH := $(shell find /usr -name libgccjit.so* 2>/dev/null | head -n 1)
     ifneq ($(LIBGCCJIT_PATH),)
-        LDFLAGS := -L$(shell dirname $(LIBGCCJIT_PATH))
+        LDFLAGS += -L$(shell dirname $(LIBGCCJIT_PATH))
     endif
 endif
 

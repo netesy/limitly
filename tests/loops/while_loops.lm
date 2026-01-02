@@ -4,34 +4,40 @@ print("=== While Loop Tests ===");
 // Basic while loop
 print("Basic while loop:");
 var i = 0;
+var sum1 = 0;
 while (i < 5) {
-    print("i = {i}");
+    sum1 += i;
     i += 1;
 }
+assert(sum1 == 10, "Basic while loop failed");
 
 // While loop with complex condition
 print("While with complex condition:");
 var x = 1;
 while (x * x < 100) {
-    print("x = {x}, x² = {x * x}");
     x += 1;
 }
+assert(x == 10, "While with complex condition failed");
 
 // Nested while loops
 print("Nested while loops:");
 var outer = 0;
+var nested_count = 0;
 while (outer < 2) {
     var inner = 0;
     while (inner < 3) {
-        print("({outer}, {inner})");
+        nested_count += 1;
         inner += 1;
     }
     outer += 1;
 }
+assert(nested_count == 6, "Nested while loops failed");
+
 
 // While loop with break/continue (if implemented)
 print("While with early termination:");
 var count = 0;
+var loop_sum = 0;
 while (count < 10) {
     if (count == 3) {
         count += 1;
@@ -40,6 +46,8 @@ while (count < 10) {
     if (count == 7) {
         break;
     }
-    print("count = {count}");
+    loop_sum += count;
     count += 1;
 }
+assert(count == 7, "While loop with break failed");
+assert(loop_sum == 18, "While loop with continue failed");

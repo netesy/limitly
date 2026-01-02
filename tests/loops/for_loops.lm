@@ -3,40 +3,52 @@ print("=== For Loop Tests ===");
 
 // Basic for loop
 print("Basic for loop (0 to 4):");
+var sum1 = 0;
 for (var i = 0; i < 5; i += 1) {
-    print("i = {i}");
+    sum1 += i;
 }
+assert(sum1 == 10, "Basic for loop failed");
 
 // For loop with different increment
 print("For loop with increment 2:");
+var sum2 = 0;
 for (var j = 0; j < 10; j += 2) {
-    print("j = {j}");
+    sum2 += j;
 }
+assert(sum2 == 20, "For loop with increment 2 failed");
 
 // Countdown loop
 print("Countdown loop:");
+var sum3 = 0;
 for (var k = 5; k > 0; k -= 1) {
-    print("k = {k}");
+    sum3 += k;
 }
+assert(sum3 == 15, "Countdown loop failed");
 
 // For loop with complex condition
 print("Complex condition:");
+var sum4 = 0;
 for (var x = 1; x * x < 20; x += 1) {
-    print("x = {x}, x² = {x * x}");
+    sum4 += x;
 }
+assert(sum4 == 10, "For loop with complex condition failed");
 
 // Nested for loops
-// print("Nested for loops (2x3 grid):");
-// for (var row = 0; row <= 2; row += 1) {
-//     for (var col = 0; col < 3; col += 1) {
-//         print("({row}, {col})");
-//     }
-// }
+print("Nested for loops (2x3 grid):");
+var nested_sum = 0;
+for (var row = 0; row <= 2; row += 1) {
+    for (var col = 0; col < 3; col += 1) {
+        nested_sum += 1;
+    }
+}
+assert(nested_sum == 9, "Nested for loops failed");
 
 // For loop with variable scope
 print("Variable scope test: new Issue");
 var outer:int = 100;
+var inner_sum = 0;
 for (var i = 0; i < 4; i += 1) {
     var inner = i * 10;
-    print("outer: {outer}, inner: {inner}");
+    inner_sum += inner;
 }
+assert(inner_sum == 60, "For loop with variable scope failed");

@@ -1035,27 +1035,29 @@ ValuePtr BuiltinFunctions::now(const std::vector<ValuePtr>& args) {
 }
 
 ValuePtr BuiltinFunctions::assertCondition(const std::vector<ValuePtr>& args) {
-    if (args.size() != 2) {
-        throw std::runtime_error("assert expects exactly 2 arguments, got " + std::to_string(args.size()));
+    if (args.size() < 1 || args.size() > 2) {
+        throw std::runtime_error("assert expects 1 or 2 arguments, got " + std::to_string(args.size()));
     }
-    
+
     const auto& condition = args[0];
-    const auto& message = args[1];
-    
+
     if (!condition || !condition->type || condition->type->tag != TypeTag::Bool) {
         throw std::runtime_error("assert: first argument must be a boolean");
     }
-    
-    if (!message || !message->type || message->type->tag != TypeTag::String) {
-        throw std::runtime_error("assert: second argument must be a string");
-    }
-    
-    bool conditionValue = (condition->data == "true");
+
+    bool conditionValue = condition->as<bool>();
     if (!conditionValue) {
-        std::string messageValue = message->data;
-        throw std::runtime_error("Assertion failed: " + messageValue);
+        std::string messageValue = "Assertion failed";
+        if (args.size() == 2) {
+            const auto& message = args[1];
+            if (!message || !message->type || message->type->tag != TypeTag::String) {
+                throw std::runtime_error("assert: second argument must be a string");
+            }
+            messageValue += ": " + message->data;
+        }
+        throw std::runtime_error(messageValue);
     }
-    
+
     auto nilType = std::make_shared<Type>(TypeTag::Nil);
     return std::make_shared<::Value>(nilType);
 }

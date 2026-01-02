@@ -6,31 +6,31 @@ var f = false;
 
 // Basic logical operations
 print("AND operations:");
-print("{t} and {t}: {t and t}");
-print("{t} and {f}: {t and f}");
-print("{f} and {t}: {f and t}");
-print("{f} and {f}: {f and f}");
+assert(t and t, "t and t should be true");
+assert(!(t and f), "t and f should be false");
+assert(!(f and t), "f and t should be false");
+assert(!(f and f), "f and f should be false");
 
 print("OR operations:");
-print("{t} or {t}: {t or t}");
-print("{t} or {f}: {t or f}");
-print("{f} or {t}: {f or t}");
-print("{f} or {f}: {f or f}");
+assert(t or t, "t or t should be true");
+assert(t or f, "t or f should be true");
+assert(f or t, "f or t should be true");
+assert(!(f or f), "f or f should be false");
 
 print("NOT operations:");
-print("!{t}: {!t}");
-print("!{f}: {!f}");
+assert(!t == f, "!t should be false");
+assert(!f == t, "!f should be true");
 
 // Complex logical expressions
 var a = 5;
 var b = 10;
 var result1 = (a < b) and (b > 0);
 var result2 = (a > b) or (a == 5);
-print("Complex: ({a} < {b}) and ({b} > 0) = {result1}");
-print("Complex: ({a} > {b}) or ({a} == 5) = {result2}");
+assert(result1, "Complex logical expression 1 failed");
+assert(result2, "Complex logical expression 2 failed");
 
 // Short-circuit evaluation
 print("Short-circuit tests:");
 var x = 0;
 var result3 = (x != 0) and (10 / x > 1);
-print("Safe division with and: {result3}");
+assert(!result3, "Short-circuit evaluation with and failed");

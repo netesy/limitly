@@ -6,33 +6,31 @@ var age = 25;
 var pi = 3.14159;
 
 // Basic interpolation
-print("Hello, {name}!");
-print("Age: {age}");
-print("Pi: {pi}");
+assert("Hello, {name}!" == "Hello, World!", "Basic interpolation failed");
+assert("Age: {age}" == "Age: 25", "Age interpolation failed");
+assert("Pi: {pi}" == "Pi: 3.14159", "Pi interpolation failed");
 
 // Expression interpolation
-print("Next year: {age + 1}");
-
-//!fix here
-print("Area of circle: {pi * 2 * 2}");
+assert("Next year: {age + 1}" == "Next year: 26", "Expression interpolation failed");
+assert("Area of circle: {pi * 2 * 2}" == "Area of circle: 12.56636", "Area of circle interpolation failed");
 
 // Multiple interpolations
-print("Name: {name}, Age: {age}");
-print("{name} is {age} years old");
+assert("Name: {name}, Age: {age}" == "Name: World, Age: 25", "Multiple interpolations failed");
+assert("{name} is {age} years old" == "World is 25 years old", "Multiple interpolations failed");
 
 // Interpolation at start
-print("{name} says hello");
-print("{age} is the age");
+assert("{name} says hello" == "World says hello", "Interpolation at start failed");
+assert("{age} is the age" == "25 is the age", "Interpolation at start failed");
 
 // Complex expressions
 var x = 10;
 var y = 5;
-print("Math: {x} + {y} = {x + y}");
-print("Comparison: {x} > {y} is {x > y}");
+assert("Math: {x} + {y} = {x + y}" == "Math: 10 + 5 = 15", "Complex expression interpolation failed");
+assert("Comparison: {x} > {y} is {x > y}" == "Comparison: 10 > 5 is true", "Complex expression interpolation failed");
 
 // Nested expressions
-print("Complex: {(x + y) * 2 - 1}");
+assert("Complex: {(x + y) * 2 - 1}" == "Complex: 29", "Nested expression interpolation failed");
 
 // String concatenation with interpolation
 var greeting = "Hello, {name}! You are {age}.";
-print(greeting);
+assert(greeting == "Hello, World! You are 25.", "String concatenation with interpolation failed");
