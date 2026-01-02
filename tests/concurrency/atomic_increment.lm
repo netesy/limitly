@@ -1,6 +1,8 @@
 var counter: atomic = 0;
 var ch = channel();
 
+assert(counter == 0, "Initial atomic counter should be 0");
+
 concurrent(ch=ch) {
     task(i in 1..10) {
         counter += 1;
@@ -17,4 +19,6 @@ iter (v in ch) {
     if (seen >= 10) break;
 }
 
+assert(seen == 10, "Should receive 10 values from channel");
+assert(counter == 10, "Final counter should be 10");
 print("Final counter: {counter}");

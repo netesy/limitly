@@ -197,8 +197,14 @@ print("Inheritance test:")
 var dog = Dog("Buddy", "Golden Retriever");
 print("Cat class constructor:");
 var cat = Cat("Whiskers");
-print("Smart Dog class constructor:");
+print("Smart Dog class constructor:")
 var smartDog = SmartDog("Einstein", "Border Collie", 150);
+
+assert(dog.name == "Buddy", "Dog name should be 'Buddy'");
+assert(dog.breed == "Golden Retriever", "Dog breed should be 'Golden Retriever'");
+assert(cat.name == "Whiskers", "Cat name should be 'Whiskers'");
+assert(smartDog.name == "Einstein", "SmartDog name should be 'Einstein'");
+assert(smartDog.iq == 150, "SmartDog IQ should be 150");
 
 // Test new inline constructor classes
 var eagle = Bird("Sky", "Bald Eagle", true);
@@ -206,6 +212,15 @@ var penguin = Bird("Waddles", "Emperor Penguin", false);
 var goldfish = Fish("Bubbles", "fresh");
 var shark = Fish("Bruce", "salt");
 var hybrid = HybridPet("Unique", "Cat", "Dog", 3);
+
+assert(eagle.name == "Sky", "Eagle name should be 'Sky'");
+assert(eagle.canFly == true, "Eagle should be able to fly");
+assert(penguin.canFly == false, "Penguin should not be able to fly");
+assert(goldfish.waterType == "fresh", "Goldfish should live in fresh water");
+assert(shark.waterType == "salt", "Shark should live in salt water");
+assert(hybrid.species1 == "Cat", "Hybrid species1 should be 'Cat'");
+assert(hybrid.species2 == "Dog", "Hybrid species2 should be 'Dog'");
+assert(hybrid.age == 3, "Hybrid age should be 3");
 
 print("Dog methods:")
 dog.info();
@@ -217,11 +232,13 @@ cat.info();
 cat.speak();
 cat.purr();
 
-print("Smart dog methods:");
+print("Smart dog methods:")
 smartDog.info();
 smartDog.speak();
 smartDog.solve("fetch puzzle");
-print("Einstein's IQ: {smartDog.getIQ()}");
+var iq = smartDog.getIQ();
+assert(iq == 150, "SmartDog getIQ() should return 150");
+print("Einstein's IQ: {iq}");
 
 print("Bird methods:")
 eagle.info();

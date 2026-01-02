@@ -41,6 +41,11 @@ var y = 3.14;
 var name = "Limit";
 var isActive = true;
 
+assert(x == 42, "Variable x should be 42");
+assert(y == 3.14, "Variable y should be 3.14");
+assert(name == "Limit", "Variable name should be 'Limit'");
+assert(isActive == true, "Variable isActive should be true");
+
 print("Variables:");
 print("Integer: {x}");
 print("Float: {y}");
@@ -270,6 +275,7 @@ fn add(a: int, b: int): int {
 
 print("Function with parameters:");
 var addResult: int = add(5, 3);
+assert(addResult == 8, "add(5, 3) should return 8");
 print("add(5, 3) = {addResult}");
 
 // Function with return value
@@ -278,8 +284,12 @@ fn square(x: int): int {
 }
 
 print("Square function:");
-print("square(4) = {square(4)}");
-print("square(7) = {square(7)}");
+var square4 = square(4);
+var square7 = square(7);
+assert(square4 == 16, "square(4) should return 16");
+assert(square7 == 49, "square(7) should return 49");
+print("square(4) = {square4}");
+print("square(7) = {square7}");
 
 // Function with string parameter
 fn greet(name: str): str {
@@ -300,6 +310,7 @@ fn calculate(x: int, y: int): int {
 
 print("Function with locals:");
 var calcResult: int = calculate(3, 4);
+assert(calcResult == (3 + 4) * (3 * 4), "calculate(3, 4) should return 84");
 print("Result: {calcResult}");
 
 // Recursive function

@@ -79,10 +79,15 @@ fn correctAssignment(): nil {
 
 // Main function to test the error handling
 
-    print("Testing basic compile-time error checking");
+print("Testing basic compile-time error checking");
     
-    // These should work
-    var result1 = safeDivide(10, 2);
-    var result2 = propagateGeneric(false);
-    
-    print("Basic error checking test completed");
+// These should work
+var result1 = safeDivide(10, 2);
+var result2 = propagateGeneric(false);
+
+assert(result1.isOk(), "safeDivide(10, 2) should succeed");
+assert(result1.unwrap() == 5, "safeDivide(10, 2) should return 5");
+assert(result2.isOk(), "propagateGeneric(false) should succeed");
+assert(result2.unwrap() == 42, "propagateGeneric(false) should return 42");
+
+print("Basic error checking test completed");

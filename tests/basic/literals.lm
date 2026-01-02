@@ -3,30 +3,70 @@ print("=== Literal Value Tests ===");
 
 // Integer literals
 print("Integers:");
-print(0);
-print(42);
-print(-17);
-print(999999);
+var int1 = 0;
+var int2 = 42;
+var int3 = -17;
+var int4 = 999999;
+
+assert(int1 == 0, "Integer literal 0 should be 0");
+assert(int2 == 42, "Integer literal 42 should be 42");
+assert(int3 == -17, "Integer literal -17 should be -17");
+assert(int4 == 999999, "Integer literal 999999 should be 999999");
+
+print(int1);
+print(int2);
+print(int3);
+print(int4);
 
 // Float literals
 print("Floats:");
-print(0.0);
-print(3.14159);
-print(-2.71828); 
-print(1.23e-14); 
-print("");
+var float1 = 0.0;
+var float2 = 3.14159;
+var float3 = -2.71828;
+var float4 = 1.23e-14;
+var emptyStr = "";
+
+assert(float1 == 0.0, "Float literal 0.0 should be 0.0");
+assert(float2 == 3.14159, "Float literal 3.14159 should be 3.14159");
+assert(float3 == -2.71828, "Float literal -2.71828 should be -2.71828");
+assert(float4 == 1.23e-14, "Float literal 1.23e-14 should be 1.23e-14");
+assert(emptyStr == "", "Empty string should be empty");
+
+print(float1);
+print(float2);
+print(float3);
+print(float4);
+print(emptyStr);
 
 // String literals
 print("Strings:");
-print("Hello, World!");
-print("");
-print("Special chars: \n\t\\\"");
+var str1 = "Hello, World!";
+var str2 = "";
+var str3 = "Special chars: \n\t\\\"";
+
+assert(str1 == "Hello, World!", "String literal should match");
+assert(str2 == "", "Empty string should be empty");
+assert(str3 == "Special chars: \n\t\\\"", "Special chars string should match");
+
+print(str1);
+print(str2);
+print(str3);
 
 // Boolean literals
 print("Booleans:");
-print(true);
-print(false);
+var bool1 = true;
+var bool2 = false;
+
+assert(bool1 == true, "Boolean literal true should be true");
+assert(bool2 == false, "Boolean literal false should be false");
+
+print(bool1);
+print(bool2);
 
 // Nil literal
 print("Nil:");
-print(nil);
+var nilValue = nil;
+
+assert(nilValue == nil, "Nil literal should be nil");
+
+print(nilValue);

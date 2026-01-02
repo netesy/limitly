@@ -5,50 +5,77 @@ print(" === Control Flow Tests === ");
 var x = 10;
 var y = 5;
 
+assert(x == 10, "Variable x should be 10");
+assert(y == 5, "Variable y should be 5");
+
 print("If statement tests: ");
 if (x > y) {
     print("x is greater than y");
+    assert(x > y, "x should be greater than y");
 }
 
 if (x < y) {
     print("This should not print");
+    assert(false, "This branch should not execute");
 } else {
     print("x is not less than y");
+    assert(!(x < y), "x should not be less than y");
 }
 
 // If-elif-else chain
 var score = 75;
+assert(score == 75, "Score should be 75");
+
 print("Grade calculation: ");
+var grade = "";
 if (score >= 90) {
-    print("Grade: A");
+    grade = "A";
+    assert(false, "Score 75 should not get grade A");
 } elif (score >= 80) {
-    print("Grade: B");
+    grade = "B";
+    assert(false, "Score 75 should not get grade B");
 } elif (score >= 70) {
-    print("Grade: C");
+    grade = "C";
+    assert(score >= 70, "Score 75 should get grade C");
 } else {
-    print("Grade: F");
+    grade = "F";
+    assert(false, "Score 75 should not get grade F");
 }
+
+assert(grade == "C", "Score 75 should result in grade C");
+print("Grade: {grade}");
 
 // Nested if statements
 print("Nested if test: ");
 var a = 15;
+assert(a == 15, "Variable a should be 15");
+
 if (a > 10) {
     print("a is greater than 10");
+    assert(a > 10, "a should be greater than 10");
+    
     if (a > 20) {
         print("a is also greater than 20");
-        } else {
-            print("but a is not greater than 20");
-            }
-            }
+        assert(false, "a should not be greater than 20");
+    } else {
+        print("but a is not greater than 20");
+        assert(!(a > 20), "a should not be greater than 20");
+    }
+}
 
-            // Boolean conditions
-            var isActive = true;
-            var isValid = false;
+// Boolean conditions
+var isActive = true;
+var isValid = false;
 
-            if (isActive and ! isValid) {
-                print("Active but not valid");
-                }
+assert(isActive == true, "isActive should be true");
+assert(isValid == false, "isValid should be false");
 
-                if (isActive or isValid) {
-                    print("At least one is true");
-                    }
+if (isActive and ! isValid) {
+    print("Active but not valid");
+    assert(isActive and ! isValid, "Should be active but not valid");
+}
+
+if (isActive or isValid) {
+    print("At least one is true");
+    assert(isActive or isValid, "At least one should be true");
+}
