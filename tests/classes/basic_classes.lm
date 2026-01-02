@@ -26,12 +26,19 @@ print("Creating Person objects:");
 var person1 = Person("Alice", 25);
 var person2 = Person("Bob", 30);
 
+assert(person1.name == "Alice", "person1.name should be 'Alice'");
+assert(person1.age == 25, "person1.age should be 25");
+assert(person2.name == "Bob", "person2.name should be 'Bob'");
+assert(person2.age == 30, "person2.age should be 30");
+
 print("Calling methods:");
 person1.greet();
 person2.greet();
 
 print("Birthday test:");
+var originalAge = person1.age;
 person1.birthday();
+assert(person1.age == originalAge + 1, "Age should increase by 1 after birthday");
 person1.greet();
 
 // Class with properties
@@ -55,8 +62,14 @@ class Rectangle {
 
 print("Rectangle class:");
 var rect = Rectangle(5, 3);
-print("Area: {rect.area()}");
-print("Perimeter: {rect.perimeter()}");
+var rectArea = rect.area();
+var rectPerimeter = rect.perimeter();
+
+assert(rectArea == 15, "Rectangle area should be 15 (5 * 3)");
+assert(rectPerimeter == 16, "Rectangle perimeter should be 16 (2 * (5 + 3))");
+
+print("Area: {rectArea}");
+print("Perimeter: {rectPerimeter}");
 
 
 // Test file for this keyword and member access
@@ -84,17 +97,26 @@ class BankAccount {
 fn test_bank_account() {
     var account = BankAccount()
     
+    assert(account.balance == 0.0, "Initial balance should be 0.0");
+    
     // Test deposit
-    account.deposit(100.0)
+    var newBalance = account.deposit(100.0)
+    assert(newBalance == 100.0, "Balance after deposit should be 100.0");
+    assert(account.balance == 100.0, "Account balance should be 100.0 after deposit");
     print("Balance after deposit: {account.balance}")  // Should be 100.0
     
     // Test withdraw
     var withdrawn = account.withdraw(30.0)
+    assert(withdrawn == 30.0, "Withdrawn amount should be 30.0");
+    assert(account.balance == 70.0, "Balance after withdrawal should be 70.0");
     print("Withdrawn: {withdrawn}")  // Should be 30.0
     print("Balance after withdrawal: {account.balance}")  // Should be 70.0
     
     // Test insufficient funds
+    var balanceBefore = account.balance
     var failed_withdraw = account.withdraw(100.0)  // Should print "Insufficient funds!"
+    assert(failed_withdraw == balanceBefore, "Failed withdrawal should return unchanged balance");
+    assert(account.balance == 70.0, "Balance should remain 70.0 after failed withdrawal");
     print("Failed withdrawal: {failed_withdraw}")  // Should be 70.0 (unchanged)
 }
 

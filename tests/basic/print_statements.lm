@@ -7,38 +7,83 @@ print("Hello, World!");
 // Print variables
 var name = "Limit";
 var version = 1.0;
+
+assert(name == "Limit", "Variable name should be 'Limit'");
+assert(version == 1.0, "Variable version should be 1.0");
+
 print(name);
 print(version);
 
 // Print expressions
-print(2 + 3);
-print(10 > 5);
-print("Result: " + "Success");
+var sumResult = 2 + 3;
+var boolResult = 10 > 5;
+var concatResult = "Result: " + "Success";
+
+assert(sumResult == 5, "2 + 3 should equal 5");
+assert(boolResult == true, "10 > 5 should be true");
+assert(concatResult == "Result: Success", "String concatenation should work");
+
+print(sumResult);
+print(boolResult);
+print(concatResult);
 
 // Print with interpolation
 var x = 42;
+assert(x == 42, "Variable x should be 42");
 print("The answer is {x}");
 
 // Print multiple types
-print(true);
-print(false);
-print(nil);
-print(0);
-print("");
+var boolTrue = true;
+var boolFalse = false;
+var nilValue = nil;
+var zero = 0;
+var emptyStr = "";
+
+assert(boolTrue == true, "Boolean true should be true");
+assert(boolFalse == false, "Boolean false should be false");
+assert(nilValue == nil, "Nil value should be nil");
+assert(zero == 0, "Zero should be 0");
+assert(emptyStr == "", "Empty string should be empty");
+
+print(boolTrue);
+print(boolFalse);
+print(nilValue);
+print(zero);
+print(emptyStr);
 
 // Print complex expressions
 var a = 5;
 var b = 3;
-print("Math: {a} + {b} = {a + b}");
-print("Logic: {a} > {b} is {a > b}");
+var mathResult = a + b;
+var logicResult = a > b;
+
+assert(a == 5, "Variable a should be 5");
+assert(b == 3, "Variable b should be 3");
+assert(mathResult == 8, "5 + 3 should equal 8");
+assert(logicResult == true, "5 > 3 should be true");
+
+print("Math: {a} + {b} = {mathResult}");
+print("Logic: {a} > {b} is {logicResult}");
 
 // Print in loops
 print("Numbers 1-3:");
+var loopCount = 0;
 for (var i = 1; i <= 3; i += 1) {
+    loopCount += 1;
     print("Number: {i}");
+    assert(i >= 1 and i <= 3, "Loop variable i should be between 1 and 3");
 }
+assert(loopCount == 3, "Loop should execute 3 times");
 
 // Print with special characters
-print("Line 1\nLine 2");
-print("Tab\tSeparated");
-print("Quote: \"Hello\"");
+var lineStr = "Line 1\nLine 2";
+var tabStr = "Tab\tSeparated";
+var quoteStr = "Quote: \"Hello\"";
+
+assert(lineStr == "Line 1\nLine 2", "Line string should contain newline");
+assert(tabStr == "Tab\tSeparated", "Tab string should contain tab");
+assert(quoteStr == "Quote: \"Hello\"", "Quote string should contain quotes");
+
+print(lineStr);
+print(tabStr);
+print(quoteStr);

@@ -3,6 +3,7 @@ print("=== Concurrency Smoke Test ===");
 
 // Atomic counter
 var counter: int = 0;
+assert(counter == 0, "Initial counter should be 0");
 
 print("Tasks Iteration Tests");
 
@@ -14,6 +15,7 @@ concurrent(mode=batch, cores=2, on_error=Stop) {
     }
 }
 
+assert(counter == 4, "Counter should be 4 after running 4 tasks");
 print("end Task tests");
 print("Final counter value: {counter}");
 print("Smoke test finished");

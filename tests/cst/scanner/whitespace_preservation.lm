@@ -5,6 +5,9 @@
 var x    =    42;     // Multiple spaces
 var y	=	24;       // Tabs
 
+assert(x == 42, "Variable x should be 42");
+assert(y == 24, "Variable y should be 24");
+
 // Test newlines and indentation
 print("Testing whitespace preservation");
 
@@ -13,6 +16,7 @@ print("Testing whitespace preservation");
 
 var z = x + y;   
 
+assert(z == 66, "x + y should be 66 (42 + 24)");
 print("Result: " + str(z));
 
 // Test comment preservation

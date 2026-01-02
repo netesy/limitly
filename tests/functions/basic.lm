@@ -14,7 +14,7 @@ fn sayHello(): bool {
 }
 
 var helloCalled = sayHello();
-assert(helloCalled == true, "sayHello() did not execute correctly");
+assert(helloCalled, "sayHello() did not execute correctly");
 
 
 //
@@ -124,8 +124,8 @@ fn isEven(n: int): bool {
 
 assert(subtract(10, 3) == 7,  "subtract(10, 3) should be 7");
 assert(multiply(6, 7) == 42,  "multiply(6, 7) should be 42");
-assert(isEven(8) == true,    "isEven(8) should be true");
-assert(isEven(9) == false,   "isEven(9) should be false");
+assert(isEven(8),    "isEven(8) should be true");
+assert(!isEven(9),   "isEven(9) should be false");
 
 print("subtract(10, 3) = {subtract(10, 3)}");
 print("multiply(6, 7) = {multiply(6, 7)}");

@@ -187,12 +187,27 @@ var dog = Dog("Buddy", "Golden Retriever");
 var cat = Cat("Whiskers");
 var smartDog = SmartDog("Einstein", "Border Collie", 150);
 
+assert(dog.name == "Buddy", "Dog name should be 'Buddy'");
+assert(dog.breed == "Golden Retriever", "Dog breed should be 'Golden Retriever'");
+assert(cat.name == "Whiskers", "Cat name should be 'Whiskers'");
+assert(smartDog.name == "Einstein", "SmartDog name should be 'Einstein'");
+assert(smartDog.iq == 150, "SmartDog IQ should be 150");
+
 // Test new inline constructor classes
 var eagle = Bird("Sky", "Bald Eagle", true);
 var penguin = Bird("Waddles", "Emperor Penguin", false);
 var goldfish = Fish("Bubbles", "fresh");
 var shark = Fish("Bruce", "salt");
 var hybrid = HybridPet("Unique", "Cat", "Dog", 3);
+
+assert(eagle.name == "Sky", "Eagle name should be 'Sky'");
+assert(eagle.canFly == true, "Eagle should be able to fly");
+assert(penguin.canFly == false, "Penguin should not be able to fly");
+assert(goldfish.waterType == "fresh", "Goldfish should live in fresh water");
+assert(shark.waterType == "salt", "Shark should live in salt water");
+assert(hybrid.species1 == "Cat", "Hybrid species1 should be 'Cat'");
+assert(hybrid.species2 == "Dog", "Hybrid species2 should be 'Dog'");
+assert(hybrid.age == 3, "Hybrid age should be 3");
 
 print("Dog methods:")
 dog.info();
@@ -204,11 +219,13 @@ cat.info();
 cat.speak();
 cat.purr();
 
-print("Smart dog methods:");
+print("Smart dog methods:")
 smartDog.info();
 smartDog.speak();
 smartDog.solve("fetch puzzle");
-print("Einstein's IQ: {smartDog.getIQ()}");
+var iq = smartDog.getIQ();
+assert(iq == 150, "SmartDog getIQ() should return 150");
+print("Einstein's IQ: {iq}");
 
 print("Bird methods:")
 eagle.info();
@@ -234,13 +251,13 @@ hybrid.speak();
 hybrid.getHybridInfo();
 
 // Polymorphism test with expanded animal collection
-print("Polymorphism test:");
+print("Polymorphism test:")
 var animals = [dog, cat, smartDog, eagle, penguin, goldfish, shark, hybrid];
 iter (animal in animals) {
     animal.speak();
 }
 
-print("Info polymorphism test:");
+print("Info polymorphism test:")
 iter (animal in animals) {
     animal.info();
 }
@@ -331,13 +348,17 @@ var shapes = [
     Ellipse(4.0, 3.0)
 ];
 
+assert(shapes.length == 5, "Should have 5 shapes");
+
 iter( shape in shapes) {
     shape.describe();
 }
 
 print("Extended shape testing:")
 var ellipse = Ellipse(8.0, 6.0);
-print("Ellipse axes ratio: {ellipse.getAxesRatio()}");
+var ratio = ellipse.getAxesRatio();
+assert(ratio == 8.0 / 6.0, "Ellipse axes ratio should be 8.0/6.0");
+print("Ellipse axes ratio: {ratio}");
 
 // Test complex inheritance chain with inline constructors
 class ColoredShape(color: str) : Shape {
@@ -364,9 +385,14 @@ class ColoredCircle(radius: float, color: str) : ColoredShape(color) {
     }
 }
 
-print("Complex inheritance with inline constructors:");
+print("Complex inheritance with inline constructors:")
 var redCircle = ColoredCircle(3.0, "red");
 var blueCircle = ColoredCircle(7.0, "blue");
+
+assert(redCircle.getColor() == "red", "Red circle color should be 'red'");
+assert(blueCircle.getColor() == "blue", "Blue circle color should be 'blue'");
+assert(redCircle.getRadius() == 3.0, "Red circle radius should be 3.0");
+assert(blueCircle.getRadius() == 7.0, "Blue circle radius should be 7.0");
 
 redCircle.describe();
 blueCircle.describe();
@@ -375,7 +401,7 @@ print("Red circle radius: {redCircle.getRadius()}");
 print("Blue circle color: {blueCircle.getColor()}");
 
 // Final polymorphism test with all types
-print("Final comprehensive polymorphism test:");
+print("Final comprehensive polymorphism test:")
 var allShapes = [
     Circle(2.0),
     Rectangle(3.0, 4.0),

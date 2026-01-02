@@ -7,6 +7,11 @@ var y = 3.14;
 var name = "Limit";
 var isActive = true;
 
+assert(x == 42, "Variable x should be 42");
+assert(y == 3.14, "Variable y should be 3.14");
+assert(name == "Limit", "Variable name should be 'Limit'");
+assert(isActive == true, "Variable isActive should be true");
+
 print("Integer: {x}");
 print("Float: {y}");
 print("String: {name}");
@@ -18,6 +23,11 @@ y = 2.71;
 name = "Language";
 isActive = false;
 
+assert(x == 100, "Reassigned x should be 100");
+assert(y == 2.71, "Reassigned y should be 2.71");
+assert(name == "Language", "Reassigned name should be 'Language'");
+assert(isActive == false, "Reassigned isActive should be false");
+
 print("After reassignment:");
 print("Integer: {x}");
 print("Float: {y}");
@@ -28,4 +38,9 @@ print("Boolean: {isActive}");
 var a = 1;
 var b = 2;
 var c = 3;
+
+assert(a == 1, "Variable a should be 1");
+assert(b == 2, "Variable b should be 2");
+assert(c == 3, "Variable c should be 3");
+
 print("Multiple declarations: a={a}, b={b}, c={c}");
