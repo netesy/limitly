@@ -3,70 +3,113 @@
 
 print("=== Basic Function Tests ===");
 
+//
 // Test 1: Simple function declaration and call
+//
 print("\n--- Test 1: Simple Functions ---");
-fn sayHello() {
+
+fn sayHello(): bool {
     print("Hello from function!");
+    return true;
 }
 
-sayHello();
+var helloCalled = sayHello();
+assert(helloCalled == true, "sayHello() did not execute correctly");
 
+
+//
 // Test 2: Function with parameters
+//
 print("\n--- Test 2: Functions with Parameters ---");
+
 fn add(a: int, b: int): int {
     return a + b;
 }
 
 var sum = add(5, 3);
+assert(sum == 8, "add(5, 3) should return 8");
+
 print("add(5, 3) = {sum}");
 
+
+//
 // Test 3: Function with string parameters
+//
 print("\n--- Test 3: String Parameters ---");
-fn greet(name: str) {
-    print("Hello, {name}!");
+
+fn greet(name: str): str {
+    return "Hello, {name}!";
 }
 
-greet("Alice");
-greet("Bob");
+var greetAlice = greet("Alice");
+var greetBob   = greet("Bob");
 
+assert(greetAlice == "Hello, Alice!", "Greeting Alice failed");
+assert(greetBob   == "Hello, Bob!",   "Greeting Bob failed");
+
+print(greetAlice);
+print(greetBob);
+
+
+//
 // Test 4: Function with return values
+//
 print("\n--- Test 4: Return Values ---");
+
 fn square(x: int): int {
     return x * x;
 }
 
 var result1 = square(4);
 var result2 = square(7);
+
+assert(result1 == 16, "square(4) should be 16");
+assert(result2 == 49, "square(7) should be 49");
+
 print("square(4) = {result1}");
 print("square(7) = {result2}");
 
+
+//
 // Test 5: Function with local variables
+//
 print("\n--- Test 5: Local Variables ---");
+
 fn calculate(x: int, y: int): int {
     var sum = x + y;
     var product = x * y;
-    var result = sum * product;
-    return result;
+    return sum * product;
 }
 
 var calcResult = calculate(3, 4);
+assert(calcResult == (3 + 4) * (3 * 4), "calculate(3, 4) returned wrong value");
+
 print("calculate(3, 4) = {calcResult}");
 
+
+//
 // Test 6: Recursive function
+//
 print("\n--- Test 6: Recursion ---");
+
 fn factorial(n: int): int {
     if (n <= 1) {
         return 1;
-    } else {
-        return n * factorial(n - 1);
     }
+    return n * factorial(n - 1);
 }
 
 var fact5 = factorial(5);
+assert(fact5 == 120, "factorial(5) should be 120");
+
 print("factorial(5) = {fact5}");
 
+
+//
 // Test 7: Multiple functions
+//
 print("\n--- Test 7: Multiple Functions ---");
+
 fn subtract(a: int, b: int): int {
     return a - b;
 }
@@ -79,14 +122,14 @@ fn isEven(n: int): bool {
     return (n % 2) == 0;
 }
 
-var subResult = subtract(10, 3);
-var multResult = multiply(6, 7);
-var evenCheck = isEven(8);
-var oddCheck = isEven(9);
+assert(subtract(10, 3) == 7,  "subtract(10, 3) should be 7");
+assert(multiply(6, 7) == 42,  "multiply(6, 7) should be 42");
+assert(isEven(8) == true,    "isEven(8) should be true");
+assert(isEven(9) == false,   "isEven(9) should be false");
 
-print("subtract(10, 3) = {subResult}");
-print("multiply(6, 7) = {multResult}");
-print("isEven(8) = {evenCheck}");
-print("isEven(9) = {oddCheck}");
+print("subtract(10, 3) = {subtract(10, 3)}");
+print("multiply(6, 7) = {multiply(6, 7)}");
+print("isEven(8) = {isEven(8)}");
+print("isEven(9) = {isEven(9)}");
 
 print("\n=== Basic Function Tests Complete ===");

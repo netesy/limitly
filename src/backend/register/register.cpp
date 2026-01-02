@@ -522,19 +522,7 @@ OP_CALL:
                 for (size_t i = 0; i < arg_regs.size(); ++i) {
                     auto reg_value = registers[arg_regs[i]];
                     
-                    //std::cout << "[DEBUG] Arg " << i << " from register r" << arg_regs[i] << " contains: ";
-                    if (std::holds_alternative<int64_t>(reg_value)) {
-                        std::cout << "int64_t(" << std::get<int64_t>(reg_value) << ")" << std::endl;
-                    } else if (std::holds_alternative<double>(reg_value)) {
-                        std::cout << "double(" << std::get<double>(reg_value) << ")" << std::endl;
-                    } else if (std::holds_alternative<bool>(reg_value)) {
-                        std::cout << "bool(" << std::get<bool>(reg_value) << ")" << std::endl;
-                    } else if (std::holds_alternative<std::string>(reg_value)) {
-                        std::cout << "string('" << std::get<std::string>(reg_value) << "')" << std::endl;
-                    } else {
-                        std::cout << "nullptr" << std::endl;
-                    }
-                    
+                  
                     // Convert register value to ValuePtr
                     ValuePtr arg_value;
                     if (std::holds_alternative<int64_t>(reg_value)) {
@@ -562,9 +550,9 @@ OP_CALL:
                     
                     //std::cout << "[DEBUG] Builtin function '" << func_name << "' returned: ";
                     if (result && result->type) {
-                        std::cout << "type=" << static_cast<int>(result->type->tag) << std::endl;
+                        //std::cout << "type=" << static_cast<int>(result->type->tag) << std::endl;
                     } else {
-                        std::cout << "nullptr" << std::endl;
+                        //std::cout << "nullptr" << std::endl;
                     }
                     
                     // Convert result back to register value
@@ -574,6 +562,7 @@ OP_CALL:
                             case TypeTag::Int64:
                                 registers[pc->dst] = result->as<int64_t>();
                                 break;
+                            case TypeTag::Float32:
                             case TypeTag::Float64:
                                 registers[pc->dst] = result->as<double>();
                                 break;
@@ -617,58 +606,21 @@ OP_CALL:
                         if (i < arg_regs.size()) {
                             // Copy provided argument
                             registers[i] = registers[arg_regs[i]];
-                           // std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = register r" << arg_regs[i];
+                        //    // std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = register r" << arg_regs[i];
                             
-                            // Debug: show the actual value
-                            auto& val = registers[i];
-                            if (std::holds_alternative<std::string>(val)) {
-                                std::cout << " (string: '" << std::get<std::string>(val) << "')";
-                            } else if (std::holds_alternative<std::nullptr_t>(val)) {
-                                std::cout << " (nullptr)";
-                            } else if (std::holds_alternative<int64_t>(val)) {
-                                std::cout << " (int: " << std::get<int64_t>(val) << ")";
-                            }
-                            std::cout << std::endl;
+                        //     // Debug: show the actual value
+                        //     auto& val = registers[i];
+                        //     if (std::holds_alternative<std::string>(val)) {
+                        //         std::cout << " (string: '" << std::get<std::string>(val) << "')";
+                        //     } else if (std::holds_alternative<std::nullptr_t>(val)) {
+                        //         std::cout << " (nullptr)";
+                        //     } else if (std::holds_alternative<int64_t>(val)) {
+                        //         std::cout << " (int: " << std::get<int64_t>(val) << ")";
+                        //     }
+                        //     std::cout << std::endl;
                         } else {
-                            // Initialize missing optional parameter with default value
-                            // For now, use simple hardcoded defaults based on common patterns
-                            if (func_name == "greet" || func_name == "greetWithDefault") {
-                                // Default name parameter to "World"
-                                registers[i] = std::string("World");
-                               // std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = default value 'World'" << std::endl;
-                            } else if (func_name == "power") {
-                                // Default exponent parameter to 2
-                                registers[i] = static_cast<int64_t>(2);
-                              //  std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = default value 2" << std::endl;
-                            } else if (func_name == "createUser") {
-                                // Default age to 18, active to true
-                                if (i == 1) { // age parameter
-                                    registers[i] = static_cast<int64_t>(18);
-                                 //   std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = default age 18" << std::endl;
-                                } else if (i == 2) { // active parameter
-                                    registers[i] = true;
-                                  //  std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = default active true" << std::endl;
-                                } else {
-                                    registers[i] = nullptr;
-                                 //   std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = nullptr (no default)" << std::endl;
-                                }
-                            } else if (func_name == "processData") {
-                                // Default transform to false, multiplier to 1
-                                if (i == 1) { // transform parameter
-                                    registers[i] = false;
-                                 //   std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = default transform false" << std::endl;
-                                } else if (i == 2) { // multiplier parameter
-                                    registers[i] = static_cast<int64_t>(1);
-                                 //   std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = default multiplier 1" << std::endl;
-                                } else {
-                                    registers[i] = nullptr;
-                                 //   std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = nullptr (no default)" << std::endl;
-                                }
-                            } else {
-                                // Generic default: nullptr for optional parameters
                                 registers[i] = nullptr;
-                              //  std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = nullptr (optional parameter not provided)" << std::endl;
-                            }
+
                         }
                     }
                     
@@ -680,18 +632,8 @@ OP_CALL:
                     
                     // Get return value from register 0 (standard return register)
                     auto return_value = registers[0];
-                    
-                   // std::cout << "[DEBUG] Function '" << func_name << "' returned: ";
-                    if (std::holds_alternative<int64_t>(return_value)) {
-                        std::cout << "int64_t(" << std::get<int64_t>(return_value) << ")" << std::endl;
-                    } else if (std::holds_alternative<double>(return_value)) {
-                        std::cout << "double(" << std::get<double>(return_value) << ")" << std::endl;
-                    } else if (std::holds_alternative<std::string>(return_value)) {
-                        std::cout << "string('" << std::get<std::string>(return_value) << "')" << std::endl;
-                    } else {
-                        std::cout << "nullptr" << std::endl;
-                    }
-                    
+                  
+                  
                     // Restore caller's registers
                     registers = saved_registers;
                     
@@ -717,90 +659,7 @@ OP_CALL:
         
         // First try builtin functions
         auto builtin_names = LIR::BuiltinUtils::getBuiltinFunctionNames();
-        if (func_index >= 0 && func_index < builtin_names.size()) {
-            auto func_name = builtin_names[func_index];
-            
-            // Collect arguments from registers (they should be in consecutive registers before the result register)
-            std::vector<ValuePtr> args;
-            
-            for (int i = 0; i < arg_count; ++i) {
-                // Arguments are in registers immediately before the result register
-                // The LIR generator allocates arguments in consecutive registers before the result
-                auto reg_index = pc->dst - arg_count + i;
-                auto reg_value = registers[reg_index];
-                
-               // std::cout << "[DEBUG] Arg " << i << " register " << reg_index << " contains: ";
-                if (std::holds_alternative<int64_t>(reg_value)) {
-                    std::cout << "int64_t(" << std::get<int64_t>(reg_value) << ")" << std::endl;
-                } else if (std::holds_alternative<double>(reg_value)) {
-                    std::cout << "double(" << std::get<double>(reg_value) << ")" << std::endl;
-                } else if (std::holds_alternative<bool>(reg_value)) {
-                    std::cout << "bool(" << std::get<bool>(reg_value) << ")" << std::endl;
-                } else if (std::holds_alternative<std::string>(reg_value)) {
-                    std::cout << "string(" << std::get<std::string>(reg_value) << ")" << std::endl;
-                } else {
-                    std::cout << "nullptr" << std::endl;
-                }
-                
-                // Convert register value to ValuePtr
-                ValuePtr arg_value;
-                if (std::holds_alternative<int64_t>(reg_value)) {
-                    auto int_type = std::make_shared<::Type>(TypeTag::Int);
-                    arg_value = std::make_shared<Value>(int_type, std::get<int64_t>(reg_value));
-                  //  std::cout << "[DEBUG] Created Value with TypeTag::Int (" << static_cast<int>(TypeTag::Int) << ")" << std::endl;
-                } else if (std::holds_alternative<double>(reg_value)) {
-                    auto float_type = std::make_shared<::Type>(TypeTag::Float64);
-                    arg_value = std::make_shared<Value>(float_type, std::get<double>(reg_value));
-                  //  std::cout << "[DEBUG] Created Value with TypeTag::Float64 (" << static_cast<int>(TypeTag::Float64) << ")" << std::endl;
-                } else if (std::holds_alternative<bool>(reg_value)) {
-                    auto bool_type = std::make_shared<::Type>(TypeTag::Bool);
-                    arg_value = std::make_shared<Value>(bool_type, std::get<bool>(reg_value));
-                 //   std::cout << "[DEBUG] Created Value with TypeTag::Bool (" << static_cast<int>(TypeTag::Bool) << ")" << std::endl;
-                } else if (std::holds_alternative<std::string>(reg_value)) {
-                    auto string_type = std::make_shared<::Type>(TypeTag::String);
-                    arg_value = std::make_shared<Value>(string_type, std::get<std::string>(reg_value));
-                  //  std::cout << "[DEBUG] Created Value with TypeTag::String (" << static_cast<int>(TypeTag::String) << ")" << std::endl;
-                } else {
-                    auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
-                    arg_value = std::make_shared<Value>(nil_type);
-                }
-                args.push_back(arg_value);
-            }
-            
-            try {
-                // Call builtin function
-                ValuePtr result = LIR::BuiltinUtils::callBuiltinFunction(func_name, args);
-                
-                // Convert result back to register value
-                if (result && result->type) {
-                    switch (result->type->tag) {
-                        case TypeTag::Int:
-                        case TypeTag::Int64:
-                            registers[pc->dst] = result->as<int64_t>();
-                            break;
-                        case TypeTag::Float64:
-                            registers[pc->dst] = result->as<double>();
-                            break;
-                        case TypeTag::Bool:
-                            registers[pc->dst] = result->as<bool>();
-                            break;
-                        case TypeTag::String:
-                            registers[pc->dst] = result->as<std::string>();
-                            break;
-                        default:
-                            registers[pc->dst] = nullptr;
-                            break;
-                    }
-                } else {
-                    registers[pc->dst] = nullptr;
-                }
-            } catch (const std::exception& e) {
-                std::cerr << "Error calling builtin function " << func_name << ": " << e.what() << std::endl;
-                registers[pc->dst] = nullptr;
-            }
-            
-            DISPATCH();
-        }
+       
         
         // Then try user-defined functions
         auto& func_manager = LIR::LIRFunctionManager::getInstance();
