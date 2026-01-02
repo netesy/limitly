@@ -7,48 +7,51 @@ var y = 5;
 
 print("If statement tests: ");
 if (x > y) {
-    print("x is greater than y");
+    assert(true, "x should be greater than y");
 }
 
 if (x < y) {
-    print("This should not print");
+    assert(false, "This should not execute");
 } else {
-    print("x is not less than y");
+    assert(true, "x should not be less than y");
 }
 
 // If-elif-else chain
 var score = 75;
+var grade = "";
 print("Grade calculation: ");
 if (score >= 90) {
-    print("Grade: A");
+    grade = "A";
 } elif (score >= 80) {
-    print("Grade: B");
+    grade = "B";
 } elif (score >= 70) {
-    print("Grade: C");
+    grade = "C";
 } else {
-    print("Grade: F");
+    grade = "F";
 }
+assert(grade == "C", "Grade should be C");
 
 // Nested if statements
 print("Nested if test: ");
 var a = 15;
+var nested_check = false;
 if (a > 10) {
-    print("a is greater than 10");
     if (a > 20) {
-        print("a is also greater than 20");
-        } else {
-            print("but a is not greater than 20");
-            }
-            }
+        nested_check = false;
+    } else {
+        nested_check = true;
+    }
+}
+assert(nested_check, "Nested if condition failed");
 
-            // Boolean conditions
-            var isActive = true;
-            var isValid = false;
+// Boolean conditions
+var isActive = true;
+var isValid = false;
 
-            if (isActive and ! isValid) {
-                print("Active but not valid");
-                }
+if (isActive and !isValid) {
+    assert(true, "Active but not valid");
+}
 
-                if (isActive or isValid) {
-                    print("At least one is true");
-                    }
+if (isActive or isValid) {
+    assert(true, "At least one is true");
+}

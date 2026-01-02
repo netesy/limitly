@@ -1144,6 +1144,19 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<AST::CallExpr> expr) {
     
     // Check if callee is a function (before checking the callee as an expression)
     if (auto var_expr = std::dynamic_pointer_cast<AST::VariableExpr>(expr->callee)) {
+        if (var_expr->name == "assert") {
+            if (arg_types.size() < 1 || arg_types.size() > 2) {
+                add_error("assert expects 1 or 2 arguments", expr->line);
+                return type_system.NIL_TYPE;
+            }
+            if (!is_boolean_type(arg_types[0])) {
+                add_type_error("bool", arg_types[0]->toString(), expr->line);
+            }
+            if (arg_types.size() == 2 && !is_string_type(arg_types[1])) {
+                add_type_error("string", arg_types[1]->toString(), expr->line);
+            }
+            return type_system.NIL_TYPE;
+        }
         TypePtr result_type = nullptr;
         if (check_function_call(var_expr->name, arg_types, result_type)) {
             expr->inferred_type = result_type;
@@ -1598,11 +1611,12 @@ TypePtr TypeChecker::promote_numeric_types(TypePtr left, TypePtr right) {
 
 void TypeChecker::register_builtin_function(const std::string& name, 
                                             const std::vector<TypePtr>& param_types,
-                                            TypePtr return_type) {
+                                            TypePtr return_type, bool is_variadic) {
     FunctionSignature sig;
     sig.name = name;
     sig.param_types = param_types;
     sig.return_type = return_type;
+    sig.is_variadic = is_variadic;
     sig.declaration = nullptr; // Builtin functions have no declaration
     
     function_signatures[name] = sig;
@@ -1698,7 +1712,7 @@ void register_builtin_functions(TypeChecker& checker) {
     checker.register_builtin_function("time", {}, ts.INT64_TYPE);
     checker.register_builtin_function("date", {}, ts.STRING_TYPE);
     checker.register_builtin_function("now", {}, ts.STRING_TYPE);
-    checker.register_builtin_function("assert", {ts.BOOL_TYPE, ts.STRING_TYPE}, ts.NIL_TYPE);
+    checker.register_builtin_function("assert", {ts.BOOL_TYPE}, ts.NIL_TYPE, true);
     
     // Math constants (as functions)
     checker.register_builtin_function("pi", {}, ts.FLOAT64_TYPE);

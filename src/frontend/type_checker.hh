@@ -42,6 +42,7 @@ private:
         std::string name;
         std::vector<TypePtr> param_types;
         TypePtr return_type;
+        bool is_variadic = false;
         std::shared_ptr<AST::FunctionDeclaration> declaration;
     };
     std::unordered_map<std::string, FunctionSignature> function_signatures;
@@ -102,7 +103,7 @@ public:
     // Register a builtin function
     void register_builtin_function(const std::string& name, 
                                   const std::vector<TypePtr>& param_types,
-                                  TypePtr return_type);
+                                 TypePtr return_type, bool is_variadic = false);
     
 private:
     // Error reporting

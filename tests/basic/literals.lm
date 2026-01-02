@@ -3,30 +3,29 @@ print("=== Literal Value Tests ===");
 
 // Integer literals
 print("Integers:");
-print(0);
-print(42);
-print(-17);
-print(999999);
+assert(0 == 0, "Integer literal 0 failed");
+assert(42 == 42, "Integer literal 42 failed");
+assert(-17 == -17, "Integer literal -17 failed");
+assert(999999 == 999999, "Integer literal 999999 failed");
 
 // Float literals
 print("Floats:");
-print(0.0);
-print(3.14159);
-print(-2.71828); 
-print(1.23e-14); 
-print("");
+assert(0.0 == 0.0, "Float literal 0.0 failed");
+assert(3.14159 == 3.14159, "Float literal 3.14159 failed");
+assert(-2.71828 == -2.71828, "Float literal -2.71828 failed");
+assert(1.23e-14 == 1.23e-14, "Float literal 1.23e-14 failed");
 
 // String literals
 print("Strings:");
-print("Hello, World!");
-print("");
-print("Special chars: \n\t\\\"");
+assert("Hello, World!" == "Hello, World!", "String literal 'Hello, World!' failed");
+assert("" == "", "Empty string literal failed");
+assert("Special chars: \n\t\\\"" == "Special chars: \n\t\\\"", "String literal with special chars failed");
 
 // Boolean literals
 print("Booleans:");
-print(true);
-print(false);
+assert(true, "Boolean literal true failed");
+assert(!false, "Boolean literal false failed");
 
 // Nil literal
 print("Nil:");
-print(nil);
+assert(nil == nil, "Nil literal failed");

@@ -5,27 +5,26 @@ var a = 10;
 var b = 3;
 
 // Basic arithmetic
-print("Addition: {a} + {b} = {a + b}");
-print("Subtraction: {a} - {b} = {a - b}");
-print("Multiplication: {a} * {b} = {a * b}");
-print("Division: {a} / {b} = {a / b}");
-print("Modulo: {a} % {b} = {a % b}");
+assert(a + b == 13, "Addition failed");
+assert(a - b == 7, "Subtraction failed");
+assert(a * b == 30, "Multiplication failed");
+assert(a / b == 3, "Integer division failed");
+assert(a % b == 1, "Modulo failed");
 
 // Unary operations
-print("Negation: -{a} = {-a}");
-print("Positive: +{a} = {+a}");
+assert(-a == -10, "Negation failed");
+assert(+a == 10, "Positive failed");
 
 // Complex expressions
 var result = (a + b) * 2 - a / b;
-print("Complex: ({a} + {b}) * 2 - {a} / {b} = {result}");
+assert(result == 23, "Complex expression failed");
 
 // Operator precedence
 var precedence = a + b * 2;
-print("Precedence: {a} + {b} * 2 = {precedence}");
+assert(precedence == 16, "Operator precedence failed");
 
-// Float arithmetic 
-//!fix here
+// Float arithmetic
 var x = 3.14;
 var y = 2.0;
-print("Float arithmetic: {x} + {y} = {x + y}");
-print("Float division: {x} / {y} = {x / y}");
+assert(x + y == 5.14, "Float addition failed");
+assert(x / y == 1.57, "Float division failed");

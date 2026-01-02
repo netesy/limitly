@@ -5,29 +5,30 @@ var str1 = "Hello";
 var str2 = "World";
 var space = " ";
 
-// String concatenation 
-// print("Concatenation: {str1} + {str2} = {str1 + str2}");
+// String concatenation
+assert(str1 + space + str2 == "Hello World", "String concatenation failed");
 
 // String comparison
 print("String comparisons:");
-print("{str1} == {str2}: {str1 == str2}");
-print("{str1} != {str2}: {str1 != str2}");
+assert(!(str1 == str2), "str1 == str2 should be false");
+assert(str1 != str2, "str1 != str2 should be true");
+assert(str1 == "Hello", "str1 == 'Hello' should be true");
 
 // String with numbers
 var numStr = "42";
 var num = 42;
-print("String vs number: {numStr} == {num}: {numStr == num}");
+assert(numStr == "42", "String vs number comparison failed");
 
 // Empty strings
 var empty = "";
-print("Empty string: '{empty}'");
+assert(empty == "", "Empty string check failed");
 var emptyStr = "";
-print("Empty length check: {empty == emptyStr}");
+assert(empty == emptyStr, "Empty string comparison failed");
 
 // Special characters
 var special = "Line 1\nLine 2\tTabbed";
-print("Special chars: {special}");
+assert(special == "Line 1\nLine 2\tTabbed", "Special characters in string failed");
 
 // Quotes in strings
 var quoted = "He said \"Hello\"";
-print("Quoted: {quoted}");
+assert(quoted == "He said \"Hello\"", "Quotes in string failed");

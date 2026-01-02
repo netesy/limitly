@@ -7,10 +7,10 @@ var y = 3.14;
 var name = "Limit";
 var isActive = true;
 
-print("Integer: {x}");
-print("Float: {y}");
-print("String: {name}");
-print("Boolean: {isActive}");
+assert(x == 42, "Integer variable declaration failed");
+assert(y == 3.14, "Float variable declaration failed");
+assert(name == "Limit", "String variable declaration failed");
+assert(isActive, "Boolean variable declaration failed");
 
 // Variable reassignment
 x = 100;
@@ -19,13 +19,13 @@ name = "Language";
 isActive = false;
 
 print("After reassignment:");
-print("Integer: {x}");
-print("Float: {y}");
-print("String: {name}");
-print("Boolean: {isActive}");
+assert(x == 100, "Integer variable reassignment failed");
+assert(y == 2.71, "Float variable reassignment failed");
+assert(name == "Language", "String variable reassignment failed");
+assert(!isActive, "Boolean variable reassignment failed");
 
 // Multiple declarations
 var a = 1;
 var b = 2;
 var c = 3;
-print("Multiple declarations: a={a}, b={b}, c={c}");
+assert(a == 1 and b == 2 and c == 3, "Multiple declarations failed");

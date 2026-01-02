@@ -1814,7 +1814,7 @@ void BackendTypeChecker::registerBuiltinFunctions() {
         "input", {typeSystem.STRING_TYPE}, typeSystem.STRING_TYPE, false, {}, 0));
     
     symbolTable.addFunction("assert", FunctionSignature(
-        "assert", {typeSystem.BOOL_TYPE, typeSystem.STRING_TYPE}, typeSystem.NIL_TYPE, false, {}, 0));
+        "assert", {typeSystem.BOOL_TYPE}, typeSystem.NIL_TYPE, false, {}, 0, {true, true}));
     
     // Higher-order functions
     symbolTable.addFunction("map", FunctionSignature(
@@ -1890,10 +1890,10 @@ void BackendTypeChecker::checkContractStatement(const std::shared_ptr<AST::Contr
 }
 
 void BackendTypeChecker::checkAssertCall(const std::shared_ptr<AST::CallExpr>& expr) {
-    if (expr->arguments.size() != 2) {
-        addError("assert() expects exactly 2 arguments: condition (bool) and message (string), got " + 
+    if (expr->arguments.size() < 1 || expr->arguments.size() > 2) {
+        addError("assert() expects 1 or 2 arguments, got " +
                 std::to_string(expr->arguments.size()), expr->line, 0, 
-                getCodeContext(expr->line), "assert(...)", "assert(condition, message)");
+                getCodeContext(expr->line), "assert(...)", "assert(condition, [message])");
         return;
     }
     
@@ -1904,11 +1904,13 @@ void BackendTypeChecker::checkAssertCall(const std::shared_ptr<AST::CallExpr>& e
                 expr->line, 0, getCodeContext(expr->line), "condition", "boolean expression");
     }
     
-    // Check second argument (message) is string
-    TypePtr messageType = checkExpression(expr->arguments[1]);
-    if (messageType != typeSystem.STRING_TYPE && messageType != typeSystem.ANY_TYPE) {
-        addError("assert() second argument must be string, got " + messageType->toString(), 
-                expr->line, 0, getCodeContext(expr->line), "message", "string literal or expression");
+    // Check second argument (message) is string if it exists
+    if (expr->arguments.size() == 2) {
+        TypePtr messageType = checkExpression(expr->arguments[1]);
+        if (messageType != typeSystem.STRING_TYPE && messageType != typeSystem.ANY_TYPE) {
+            addError("assert() second argument must be a string, got " + messageType->toString(),
+                    expr->line, 0, getCodeContext(expr->line), "message", "string literal or expression");
+        }
     }
 }
 
