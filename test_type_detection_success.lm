@@ -1,0 +1,9 @@
+// Test to verify type detection is working correctly
+var maxUint64: u64 = 18446744073709551615;
+var maxInt64: i64 = 9223372036854775807;
+var smallUint64: u64 = 123;
+
+// These should show correct types in AST and LIR
+print("Max uint64:", maxUint64);
+print("Max int64:", maxInt64);  
+print("Small uint64:", smallUint64);

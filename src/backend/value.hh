@@ -10,6 +10,7 @@
 #include <vector>
 #include <stdexcept>
 #include <sstream>
+#include <iomanip>
 #include <optional>
 #include <charconv>
 #include "../common/opcodes.hh"
@@ -563,6 +564,16 @@ namespace ValueConverters {
         return std::nullopt;
     }
     
+    // Fast unsigned integer conversion using std::from_chars
+    inline std::optional<uint64_t> toUInt64(const std::string& str) {
+        uint64_t result = 0;
+        auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), result);
+        if (ec == std::errc()) {
+            return result;
+        }
+        return std::nullopt;
+    }
+    
     // Fast double conversion using std::from_chars
     inline std::optional<double> toDouble(const std::string& str) {
         double result = 0.0;
@@ -583,6 +594,8 @@ namespace ValueConverters {
     inline T safeConvert(const std::string& str, T defaultValue = T{}) {
         if constexpr (std::is_same_v<T, int64_t>) {
             if (auto val = toInt64(str)) return *val;
+        } else if constexpr (std::is_same_v<T, uint64_t>) {
+            if (auto val = toUInt64(str)) return *val;
         } else if constexpr (std::is_same_v<T, double>) {
             if (auto val = toDouble(str)) return *val;
         } else if constexpr (std::is_same_v<T, bool>) {
@@ -916,7 +929,12 @@ struct Value {
     // Float constructors
     Value(TypePtr t, float val) : type(std::move(t)), data(std::to_string(val)) {}
     Value(TypePtr t, double val) : type(std::move(t)), data(std::to_string(val)) {}
-    Value(TypePtr t, long double val) : type(std::move(t)), data(std::to_string(val)) {}
+    Value(TypePtr t, long double val) : type(std::move(t)) {
+        // Use higher precision formatting for long double to preserve very small/large numbers
+        std::ostringstream oss;
+        oss << std::setprecision(17) << std::scientific << val;
+        data = oss.str();
+    }
 
     // Template constructor for integer types
     template<typename T>
@@ -998,6 +1016,8 @@ struct Value {
     T as() const {
         if constexpr (std::is_same_v<T, int64_t>) {
             return ValueConverters::safeConvert<int64_t>(data, 0);
+        } else if constexpr (std::is_same_v<T, uint64_t>) {
+            return ValueConverters::safeConvert<uint64_t>(data, 0);
         } else if constexpr (std::is_same_v<T, double>) {
             return ValueConverters::safeConvert<double>(data, 0.0);
         } else if constexpr (std::is_same_v<T, bool>) {

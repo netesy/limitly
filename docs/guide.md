@@ -766,7 +766,10 @@ class Parent {
 A `data` class is a special kind of class that automatically generates useful methods, such as a constructor for all its fields. Data classes are implicitly `final`.
 
 ```limit
-data class User(name: str, age: int);
+data User {
+    name: str,
+    age: int
+}
 
 var user = User("Alice", 30);
 print(user.name); // Output: Alice

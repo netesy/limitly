@@ -369,7 +369,9 @@ namespace frontend {
             const auto& token = tokens[0];
             
             switch (token.type) {
-                case TokenType::NUMBER:
+                case TokenType::INT_LITERAL:
+                case TokenType::FLOAT_LITERAL:
+                case TokenType::SCIENTIFIC_LITERAL:
                     // Parse all numbers as string for consistent handling
                     try {
                         // Store as string - the runtime will handle conversion

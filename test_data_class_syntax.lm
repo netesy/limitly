@@ -1,0 +1,20 @@
+// Test the new data ClassName syntax (without 'class' keyword)
+
+data Person {
+    name: str,
+    age: int
+}
+
+var person = Person("Alice", 30);
+print("Name: {person.name}");
+print("Age: {person.age}");
+
+// Test with visibility modifiers
+pub data User {
+    id: int,
+    email: str
+}
+
+var user = User(123, "user@example.com");
+print("User ID: {user.id}");
+print("Email: {user.email}");

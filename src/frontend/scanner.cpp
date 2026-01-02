@@ -567,10 +567,14 @@ void Scanner::string() {
 }
 
 void Scanner::number() {
+    bool hasDecimal = false;
+    bool hasScientific = false;
+    
     while (isDigit(peek())) advance();
 
     // Look for a fractional part.
     if (peek() == '.' && isDigit(peekNext())) {
+        hasDecimal = true;
         // Consume the ".".
         advance();
 
@@ -595,6 +599,7 @@ void Scanner::number() {
             current = savedCurrent;
         } else {
             // Valid scientific notation - consume the exponent digits
+            hasScientific = true;
             while (isDigit(peek())) advance();
         }
     }
@@ -615,7 +620,17 @@ void Scanner::number() {
         }
     }
 
-    addToken(TokenType::NUMBER);
+    // Determine the appropriate token type based on the literal format
+    TokenType tokenType;
+    if (hasScientific) {
+        tokenType = TokenType::SCIENTIFIC_LITERAL;
+    } else if (hasDecimal) {
+        tokenType = TokenType::FLOAT_LITERAL;
+    } else {
+        tokenType = TokenType::INT_LITERAL;
+    }
+
+    addToken(tokenType);
 }
 
 void Scanner::identifier() {
@@ -820,8 +835,12 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "POWER";
     case TokenType::STRING:
         return "STRING";
-    case TokenType::NUMBER:
-        return "NUMBER";
+    case TokenType::INT_LITERAL:
+        return "INT LITERAL";
+    case TokenType::FLOAT_LITERAL:
+        return "FLOAT LITERAL";                
+    case TokenType::SCIENTIFIC_LITERAL:
+        return "SCIENTIFIC LITERAL";
     case TokenType::IDENTIFIER:
         return "IDENTIFIER";
     case TokenType::INT_TYPE:

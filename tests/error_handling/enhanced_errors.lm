@@ -1,0 +1,75 @@
+// Enhanced Error Handling Test - Custom error types and messages
+
+// Test custom error types and messages
+fn validate_input(value: int): int? {
+    if (value < 0) {
+        return err("ValidationError", "Value cannot be negative");
+    }
+    if (value > 100) {
+        return err("RangeError", "Value exceeds maximum limit of 100");
+    }
+    return ok(value);
+}
+
+// Test simple error messages without custom types
+fn check_even(value: int): int? {
+    if (value % 2 != 0) {
+        return err("Value must be even");
+    }
+    return ok(value);
+}
+
+// Test error propagation with custom errors
+fn process_value(value: int): int? {
+    var validated = validate_input(value)?;
+    var checked = check_even(validated)?;
+    return ok(checked * 2);
+}
+
+
+    print("=== Enhanced Error Handling Test ===");
+    
+    // Test 1: Custom error type and message
+    print("\n1. Custom error type and message:");
+    var result1 = validate_input(-5);
+    print("Result1: {result1}");
+    
+    // Test 2: Range error
+    print("\n2. Range error:");
+    var result2 = validate_input(150);
+    print("Result2: {result2}");
+    
+    // Test 3: Success case
+    print("\n3. Success case:");
+    var result3 = validate_input(50);
+    print("Result3: {result3}");
+    
+    // Test 4: Simple error message
+    print("\n4. Simple error message:");
+    var result4 = check_even(7);
+    print("Result4: {result4}");
+    
+    // Test 5: Error propagation with custom errors
+    print("\n5. Error propagation (negative value):");
+    var result5 = process_value(-10);
+    print("Result5: {result5}");
+    
+    // Test 6: Error propagation (odd value)
+    print("\n6. Error propagation (odd value):");
+    var result6 = process_value(15);
+    print("Result6: {result6}");
+    
+    // Test 7: Success propagation
+    print("\n7. Success propagation:");
+    var result7 = process_value(20);
+    print("Result7: {result7}");
+    
+    // Test 8: Error handling with ? else {}
+    print("\n8. Error handling with ? else {}:");
+    var handled_result = validate_input(-5)? else {
+        print("Caught validation error!");
+        return 0;
+    };
+    print("Handled result: {handled_result}");
+    
+    print("\n=== Enhanced Error Test Complete ===");

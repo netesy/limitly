@@ -8,3 +8,9 @@ import tests.functions.basic_functions as math hide greet, greet_name;
 //math.greet();
 print("adding 4 and 8 is: {math.add(4,8)}");
 
+<<<<<<< Updated upstream
+=======
+my_module.greet();
+
+
+>>>>>>> Stashed changes

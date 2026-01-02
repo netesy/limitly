@@ -683,6 +683,10 @@ bool Generator::types_match(TypePtr type1, TypePtr type2) {
 Reg Generator::emit_literal_expr(AST::LiteralExpr& expr, TypePtr expected_type) {
     Reg dst = allocate_register();
     
+    // CRITICAL FIX: Use AST's inferred type first, then expected type, then default inference
+    // This ensures that types preserved from constant propagation are respected
+    TypePtr target_type = expr.inferred_type ? expr.inferred_type : expected_type;
+    
     // Create ValuePtr based on literal value
     ValuePtr const_val;
     
@@ -722,52 +726,97 @@ Reg Generator::emit_literal_expr(AST::LiteralExpr& expr, TypePtr expected_type) 
         if (isNumeric) {
             if (isFloat) {
                 // Create float value
-                auto float_type = expected_type ? expected_type : std::make_shared<::Type>(::TypeTag::Float64);
+                auto float_type = target_type ? target_type : std::make_shared<::Type>(::TypeTag::Float64);
                 try {
-                    double floatVal = std::stod(stringValue);
-                    const_val = std::make_shared<Value>(float_type, floatVal);
-                } catch (const std::exception&) {
+                    // For very small or very large numbers, preserve the original string representation
+                    // to avoid precision loss during double conversion
+                    bool isVerySmallOrLarge = (stringValue.find("e-") != std::string::npos || 
+                                             stringValue.find("E-") != std::string::npos ||
+                                             stringValue.find("e+") != std::string::npos ||
+                                             stringValue.find("E+") != std::string::npos);
+                    
+                    if (isVerySmallOrLarge) {
+                        // Preserve original string representation for scientific notation
+                        const_val = std::make_shared<Value>(float_type, stringValue);
+                    } else {
+                        // For normal numbers, parse and convert
+                        long double floatVal = std::stold(stringValue);
+                        const_val = std::make_shared<Value>(float_type, floatVal);
+                    }
+                } catch (const std::exception& e) {
                     // If parsing fails, treat as string
                     auto string_type = std::make_shared<::Type>(::TypeTag::String);
                     const_val = std::make_shared<Value>(string_type, stringValue);
                     current_function_->instructions.back().const_val->type = string_type;
                 }
             } else {
-                // Create integer value - use expected type if provided
-                TypePtr int_type = expected_type;
+                // Create integer value - use target type if provided
+                TypePtr int_type = target_type;
                 
                 if (!int_type) {
-                    // For simple small literals, default to Int64 to avoid type mismatches
-                    // This is a conservative approach that works well with mixed operations
-                    try {
-                        int64_t test_val = std::stoll(stringValue);
-                        // If it fits in int64 and is a small number, use Int64
-                        if (test_val >= 0 && test_val <= 1000000) {
-                            int_type = std::make_shared<::Type>(::TypeTag::Int64);
-                        } else {
-                            // For larger values, use automatic type selection
+                    // Use expected type if available, otherwise infer from the literal value
+                    if (expected_type) {
+                        int_type = expected_type;
+                    } else {
+                        // For simple small literals, default to Int64 to avoid type mismatches
+                        // This is a conservative approach that works well with mixed operations
+                        try {
+                            int64_t test_val = std::stoll(stringValue);
+                            // If it fits in int64 and is a small number, use Int64
+                            if (test_val >= 0 && test_val <= 1000000) {
+                                int_type = std::make_shared<::Type>(::TypeTag::Int64);
+                            } else {
+                                // For larger values, use automatic type selection
+                                int_type = get_best_integer_type(stringValue, true);
+                            }
+                        } catch (const std::exception&) {
+                            // If parsing as signed fails, use automatic selection
                             int_type = get_best_integer_type(stringValue, true);
                         }
-                    } catch (const std::exception&) {
-                        // If parsing as signed fails, use automatic selection
-                        int_type = get_best_integer_type(stringValue, true);
                     }
                 }
                 
                 try {
-                    int64_t intVal = std::stoll(stringValue);
-                    const_val = std::make_shared<Value>(int_type, intVal);
-                } catch (const std::exception&) {
-                    // If parsing as signed fails, try unsigned
-                    try {
-                        uint64_t uintVal = std::stoull(stringValue);
-                        const_val = std::make_shared<Value>(int_type, uintVal);
-                    } catch (const std::exception&) {
-                        // If parsing fails, treat as string
-                        auto string_type = std::make_shared<::Type>(::TypeTag::String);
-                        const_val = std::make_shared<Value>(string_type, stringValue);
-                        current_function_->instructions.back().const_val->type = string_type;
+                    // Check if it's a negative number
+                    if (stringValue[0] == '-') {
+                        // Parse as signed integer
+                        int64_t intVal = std::stoll(stringValue);
+                        const_val = std::make_shared<Value>(int_type, intVal);
+                    } else {
+                        // Check if the expected type is unsigned
+                        bool expectUnsigned = (int_type && 
+                                             (int_type->tag == TypeTag::UInt || int_type->tag == TypeTag::UInt8 ||
+                                              int_type->tag == TypeTag::UInt16 || int_type->tag == TypeTag::UInt32 ||
+                                              int_type->tag == TypeTag::UInt64 || int_type->tag == TypeTag::UInt128));
+                        
+                        if (expectUnsigned) {
+                            // Expected type is unsigned, parse as unsigned
+                            uint64_t uintVal = std::stoull(stringValue);
+                            std::cout << "[DEBUG] Parsing unsigned literal '" << stringValue 
+                                      << "' as uint64_t: " << uintVal << std::endl;
+                            const_val = std::make_shared<Value>(int_type, uintVal);
+                            std::cout << "[DEBUG] Created Value with data: '" << const_val->data 
+                                      << "' and type tag: " << static_cast<int>(const_val->type->tag) << std::endl;
+                        } else {
+                            // Expected type is signed or no specific expectation
+                            uint64_t uintVal = std::stoull(stringValue);
+                            
+                            // Check if it fits in signed int64 range
+                            if (uintVal <= 9223372036854775807ULL) {
+                                // Fits in signed range, use as signed
+                                int64_t intVal = static_cast<int64_t>(uintVal);
+                                const_val = std::make_shared<Value>(int_type, intVal);
+                            } else {
+                                // Too large for signed, use as unsigned
+                                const_val = std::make_shared<Value>(int_type, uintVal);
+                            }
+                        }
                     }
+                } catch (const std::exception& e) {
+                    // If parsing fails, treat as string
+                    auto string_type = std::make_shared<::Type>(::TypeTag::String);
+                    const_val = std::make_shared<Value>(string_type, stringValue);
+                    current_function_->instructions.back().const_val->type = string_type;
                 }
             }
         } else {
@@ -793,9 +842,18 @@ Reg Generator::emit_literal_expr(AST::LiteralExpr& expr, TypePtr expected_type) 
     
     // Set type BEFORE emitting so it's available during emit_instruction
     if (const_val) {
-        Type abi_type = language_type_to_abi_type(const_val->type);
-        set_register_language_type(dst, const_val->type);
-        set_register_type(dst, const_val->type);
+        // Use the target type (AST inferred type takes priority)
+        TypePtr final_type = target_type ? target_type : const_val->type;
+        
+        Type abi_type = language_type_to_abi_type(final_type);
+        set_register_language_type(dst, final_type);
+        set_register_type(dst, final_type);
+        
+        // Update the const_val type to match the target type
+        if (target_type && target_type != const_val->type) {
+            const_val->type = target_type;
+        }
+        
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, abi_type, dst, const_val));
     } else {
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, dst, const_val));
@@ -1686,184 +1744,221 @@ void Generator::emit_expr_stmt(AST::ExprStatement& stmt) {
 }
 
 void Generator::emit_print_stmt(AST::PrintStatement& stmt) {
-    // Handle all arguments
-    for (size_t i = 0; i < stmt.arguments.size(); ++i) {
-        Reg value = emit_expr(*stmt.arguments[i]);
+    if (stmt.arguments.empty()) {
+        // Empty print statement - just print a newline
+        Reg newline_reg = allocate_register();
+        auto string_type = std::make_shared<::Type>(::TypeTag::String);
+        ValuePtr newline_val = std::make_shared<Value>(string_type, std::string("\n"));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, newline_reg, newline_val));
+        emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, newline_reg, 0));
+        return;
+    }
+    
+    if (stmt.arguments.size() == 1) {
+        // Single argument - print it directly
+        Reg value = emit_expr(*stmt.arguments[0]);
+        emit_print_value(value);
+        return;
+    }
+    
+    // Multiple arguments - concatenate them into a single string
+    Reg result_reg = emit_expr(*stmt.arguments[0]);
+    
+    // Convert first argument to string if it's not already
+    TypePtr first_type = get_register_language_type(result_reg);
+    if (!first_type || first_type->tag != ::TypeTag::String) {
+        Reg str_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::ToString, Type::Ptr, str_reg, result_reg, 0));
+        auto string_type = std::make_shared<::Type>(::TypeTag::String);
+        set_register_language_type(str_reg, string_type);
+        result_reg = str_reg;
+    }
+    
+    // Concatenate remaining arguments
+    for (size_t i = 1; i < stmt.arguments.size(); ++i) {
+        Reg arg_reg = emit_expr(*stmt.arguments[i]);
         
-        // First, check the register type that we tracked
-        TypePtr reg_type = get_register_language_type(value);
-        if (reg_type) {
-            switch (reg_type->tag) {
-                case ::TypeTag::Int:
-                case ::TypeTag::Int8:
-                case ::TypeTag::Int16:
-                case ::TypeTag::Int32:
-                case ::TypeTag::Int64:
-                    emit_instruction(LIR_Inst(LIR_Op::PrintInt, Type::Void, 0, value, 0));
-                    break;
-                case ::TypeTag::UInt:
-                case ::TypeTag::UInt8:
-                case ::TypeTag::UInt16:
-                case ::TypeTag::UInt32:
-                case ::TypeTag::UInt64:
-                    emit_instruction(LIR_Inst(LIR_Op::PrintUint, Type::Void, 0, value, 0));
-                    break;
-                case ::TypeTag::Float32:
-                case ::TypeTag::Float64:
-                    emit_instruction(LIR_Inst(LIR_Op::PrintFloat, Type::Void, 0, value, 0));
-                    break;
-                case ::TypeTag::Bool:
-                    emit_instruction(LIR_Inst(LIR_Op::PrintBool, Type::Void, 0, value, 0));
-                    break;
-                case ::TypeTag::String:
-                    emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
-                    break;
-                default:
-                    break;
-            }
-        } else {
-            // Fallback: Check what type of value we actually have in the register
-            // Look at the last instruction to determine the type
-            if (!current_function_->instructions.empty()) {
-                const auto& last_inst = current_function_->instructions.back();
-                if (last_inst.dst == value) {
-                    if (last_inst.const_val) {
-                        // This is a LoadConst instruction - check the constant's type
-                        if (last_inst.const_val->type) {
-                            switch (last_inst.const_val->type->tag) {
-                                case ::TypeTag::Int:
-                                case ::TypeTag::Int8:
-                                case ::TypeTag::Int16:
-                                case ::TypeTag::Int32:
-                                case ::TypeTag::Int64:
-                                    emit_instruction(LIR_Inst(LIR_Op::PrintInt, Type::Void, 0, value, 0));
-                                    break;
-                                case ::TypeTag::UInt:
-                                case ::TypeTag::UInt8:
-                                case ::TypeTag::UInt16:
-                                case ::TypeTag::UInt32:
-                                case ::TypeTag::UInt64:
-                                    emit_instruction(LIR_Inst(LIR_Op::PrintUint, Type::Void, 0, value, 0));
-                                    break;                                
-                                case ::TypeTag::Float32:
-                                case ::TypeTag::Float64:
-                                    emit_instruction(LIR_Inst(LIR_Op::PrintFloat, Type::Void, 0, value, 0));
-                                    break;
-                                case ::TypeTag::Bool:
-                                    emit_instruction(LIR_Inst(LIR_Op::PrintBool, Type::Void, 0, value, 0));
-                                    break;
-                                case ::TypeTag::String:
-                                    emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
-                                    break;
-                                case ::TypeTag::Nil:
-                                default:
-                                    // For nil and other types, convert to string and print
-                                    auto string_type = std::make_shared<::Type>(::TypeTag::String);
-                                    ValuePtr nil_str = std::make_shared<Value>(string_type, std::string("nil"));
-                                    Reg nil_reg = allocate_register();
-                                    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, nil_reg, nil_str));
-                                    emit_instruction(LIR_Inst(LIR_Op::PrintString, 0, nil_reg, 0));
-                                    break;
-                            }
-                        }
-                    } else if (last_inst.op == LIR_Op::Concat || last_inst.op == LIR_Op::ToString) {
-                        // This is a string operation - treat as string
-                        emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
-                    }
-                }
-            }
+        // Convert argument to string if it's not already
+        TypePtr arg_type = get_register_language_type(arg_reg);
+        if (!arg_type || arg_type->tag != ::TypeTag::String) {
+            Reg str_arg = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::ToString, Type::Ptr, str_arg, arg_reg, 0));
+            auto string_type = std::make_shared<::Type>(::TypeTag::String);
+            set_register_language_type(str_arg, string_type);
+            arg_reg = str_arg;
+        }
+        
+        // Add a space between arguments
+        if (i > 1 || (first_type && first_type->tag == ::TypeTag::String)) {
+            Reg space_reg = allocate_register();
+            auto string_type = std::make_shared<::Type>(::TypeTag::String);
+            ValuePtr space_val = std::make_shared<Value>(string_type, std::string(" "));
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, space_reg, space_val));
+            set_register_language_type(space_reg, string_type);
             
-            // Fallback: check if it's a literal primitive to determine print type
-            if (auto literal = dynamic_cast<AST::LiteralExpr*>(stmt.arguments[i].get())) {
-                if (std::holds_alternative<std::string>(literal->value)) {
-                    std::string str_val = std::get<std::string>(literal->value);
-                    // Check if it's a numeric string
-                    if (!str_val.empty() && (std::isdigit(str_val[0]) || str_val[0] == '+' || str_val[0] == '-' || str_val[0] == '.')) {
-                        if (str_val.find('.') != std::string::npos || str_val.find('e') != std::string::npos || str_val.find('E') != std::string::npos) {
-                            emit_instruction(LIR_Inst(LIR_Op::PrintFloat, Type::Void, 0, value, 0));
-                        } else {
-                            emit_instruction(LIR_Inst(LIR_Op::PrintInt, Type::Void, 0, value, 0));
-                        }
-                    } else {
-                        // String literal - print directly
-                        emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
-                    }
-                } else if (std::holds_alternative<bool>(literal->value)) {
-                    emit_instruction(LIR_Inst(LIR_Op::PrintBool, Type::Void, 0, value, 0));
-                } else {
-                    // nil - convert to string constant and print
-                    auto string_type = std::make_shared<::Type>(::TypeTag::String);
-                    ValuePtr nil_str = std::make_shared<Value>(string_type, std::string("nil"));
-                    Reg nil_reg = allocate_register();
-                    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, nil_reg, nil_str));
-                    emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, nil_reg, 0));
-                }
-            } else if (auto interpolated = dynamic_cast<AST::InterpolatedStringExpr*>(stmt.arguments[i].get())) {
-                // This is an interpolated string - treat as string
-                emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
-            } else {
-                // For expressions, determine type at generation time and emit appropriate print
-                // For now, default to PrintInt for arithmetic expressions
-                // TODO: Better type inference for expressions
+            Reg temp_reg = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::STR_CONCAT, Type::Ptr, temp_reg, result_reg, space_reg));
+            set_register_language_type(temp_reg, string_type);
+            result_reg = temp_reg;
+        }
+        
+        // Concatenate the argument
+        Reg concat_reg = allocate_register();
+        auto string_type = std::make_shared<::Type>(::TypeTag::String);
+        emit_instruction(LIR_Inst(LIR_Op::STR_CONCAT, Type::Ptr, concat_reg, result_reg, arg_reg));
+        set_register_language_type(concat_reg, string_type);
+        result_reg = concat_reg;
+    }
+    
+    // Print the final concatenated string
+    emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, result_reg, 0));
+}
+
+void Generator::emit_print_value(Reg value) {
+    // Helper function to print a single value based on its type
+    TypePtr reg_type = get_register_language_type(value);
+    if (reg_type) {
+        switch (reg_type->tag) {
+            case ::TypeTag::Int:
+            case ::TypeTag::Int8:
+            case ::TypeTag::Int16:
+            case ::TypeTag::Int32:
+            case ::TypeTag::Int64:
                 emit_instruction(LIR_Inst(LIR_Op::PrintInt, Type::Void, 0, value, 0));
+                break;
+            case ::TypeTag::UInt:
+            case ::TypeTag::UInt8:
+            case ::TypeTag::UInt16:
+            case ::TypeTag::UInt32:
+            case ::TypeTag::UInt64:
+                emit_instruction(LIR_Inst(LIR_Op::PrintUint, Type::Void, 0, value, 0));
+                break;
+            case ::TypeTag::Float32:
+            case ::TypeTag::Float64:
+                emit_instruction(LIR_Inst(LIR_Op::PrintFloat, Type::Void, 0, value, 0));
+                break;
+            case ::TypeTag::Bool:
+                emit_instruction(LIR_Inst(LIR_Op::PrintBool, Type::Void, 0, value, 0));
+                break;
+            case ::TypeTag::String:
+                emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
+                break;
+            default:
+                // Convert to string and print
+                Reg str_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::ToString, Type::Ptr, str_reg, value, 0));
+                auto string_type = std::make_shared<::Type>(::TypeTag::String);
+                set_register_language_type(str_reg, string_type);
+                emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, str_reg, 0));
+                break;
+        }
+    } else {
+        // Fallback: Check what type of value we actually have in the register
+        // Look at the last instruction to determine the type
+        if (!current_function_->instructions.empty()) {
+            const auto& last_inst = current_function_->instructions.back();
+            if (last_inst.dst == value) {
+                if (last_inst.const_val) {
+                    // This is a LoadConst instruction - check the constant's type
+                    if (last_inst.const_val->type) {
+                        switch (last_inst.const_val->type->tag) {
+                            case ::TypeTag::Int:
+                            case ::TypeTag::Int8:
+                            case ::TypeTag::Int16:
+                            case ::TypeTag::Int32:
+                            case ::TypeTag::Int64:
+                                emit_instruction(LIR_Inst(LIR_Op::PrintInt, Type::Void, 0, value, 0));
+                                break;
+                            case ::TypeTag::UInt:
+                            case ::TypeTag::UInt8:
+                            case ::TypeTag::UInt16:
+                            case ::TypeTag::UInt32:
+                            case ::TypeTag::UInt64:
+                                emit_instruction(LIR_Inst(LIR_Op::PrintUint, Type::Void, 0, value, 0));
+                                break;
+                            case ::TypeTag::Float32:
+                            case ::TypeTag::Float64:
+                                emit_instruction(LIR_Inst(LIR_Op::PrintFloat, Type::Void, 0, value, 0));
+                                break;
+                            case ::TypeTag::Bool:
+                                emit_instruction(LIR_Inst(LIR_Op::PrintBool, Type::Void, 0, value, 0));
+                                break;
+                            case ::TypeTag::String:
+                                emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
+                                break;
+                            default:
+                                // Convert to string and print
+                                Reg str_reg = allocate_register();
+                                emit_instruction(LIR_Inst(LIR_Op::ToString, Type::Ptr, str_reg, value, 0));
+                                auto string_type = std::make_shared<::Type>(::TypeTag::String);
+                                set_register_language_type(str_reg, string_type);
+                                emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, str_reg, 0));
+                                break;
+                        }
+                    }
+                }
             }
         }
+        
+        // Final fallback - assume it's a string
+        emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
     }
 }
 
 void Generator::emit_var_stmt(AST::VarDeclaration& stmt) {
     Reg value_reg;
+    
+    // Determine the declared type first, before processing the initializer
+    TypePtr declared_type = nullptr;
+    if (stmt.type.has_value()) {
+        // Convert TypeAnnotation to Type - handle all basic types including 128-bit
+        auto type_annotation = *stmt.type.value();
+        if (type_annotation.typeName == "u32") {
+            declared_type = std::make_shared<::Type>(::TypeTag::UInt32);
+        } else if (type_annotation.typeName == "u16") {
+            declared_type = std::make_shared<::Type>(::TypeTag::UInt16);
+        } else if (type_annotation.typeName == "u8") {
+            declared_type = std::make_shared<::Type>(::TypeTag::UInt8);
+        } else if (type_annotation.typeName == "u64") {
+            declared_type = std::make_shared<::Type>(::TypeTag::UInt64);
+        } else if (type_annotation.typeName == "u128") {
+            declared_type = std::make_shared<::Type>(::TypeTag::UInt128);
+        } else if (type_annotation.typeName == "int") {
+            declared_type = std::make_shared<::Type>(::TypeTag::Int64);
+        } else if (type_annotation.typeName == "i64") {
+            declared_type = std::make_shared<::Type>(::TypeTag::Int64);
+        } else if (type_annotation.typeName == "i32") {
+            declared_type = std::make_shared<::Type>(::TypeTag::Int32);
+        } else if (type_annotation.typeName == "i16") {
+            declared_type = std::make_shared<::Type>(::TypeTag::Int16);
+        } else if (type_annotation.typeName == "i8") {
+            declared_type = std::make_shared<::Type>(::TypeTag::Int8);
+        } else if (type_annotation.typeName == "i128") {
+            declared_type = std::make_shared<::Type>(::TypeTag::Int128);
+        } else if (type_annotation.typeName == "f64") {
+            declared_type = std::make_shared<::Type>(::TypeTag::Float64);
+        } else if (type_annotation.typeName == "f32") {
+            declared_type = std::make_shared<::Type>(::TypeTag::Float32);
+        } else if (type_annotation.typeName == "bool") {
+            declared_type = std::make_shared<::Type>(::TypeTag::Bool);
+        } else if (type_annotation.typeName == "string") {
+            declared_type = std::make_shared<::Type>(::TypeTag::String);
+        } else if (type_annotation.typeName == "any") {
+            declared_type = std::make_shared<::Type>(::TypeTag::Any);
+        }
+    }
+    
     if (stmt.initializer) {
         // Check if the initializer is a literal - if so, optimize by directly using it
         if (auto literal = dynamic_cast<AST::LiteralExpr*>(stmt.initializer.get())) {
-            // For literal initializers, emit the literal and use it directly
-            value_reg = emit_literal_expr(*literal);
+            // For literal initializers, emit the literal with the expected type
+            value_reg = emit_literal_expr(*literal, declared_type);
         } else {
             // For non-literal initializers, evaluate and move
             Reg value = emit_expr(*stmt.initializer);
             value_reg = allocate_register();
             Type abi_type = language_type_to_abi_type(stmt.inferred_type);
             emit_instruction(LIR_Inst(LIR_Op::Mov, abi_type, value_reg, value, 0));
-        }
-        
-        // Use the declared type if available, otherwise use the initializer's type
-        TypePtr declared_type = nullptr;
-        if (stmt.type.has_value()) {
-            // Convert TypeAnnotation to Type - handle all basic types including 128-bit
-            auto type_annotation = *stmt.type.value();
-            if (type_annotation.typeName == "u32") {
-                declared_type = std::make_shared<::Type>(::TypeTag::UInt32);
-            } else if (type_annotation.typeName == "u16") {
-                declared_type = std::make_shared<::Type>(::TypeTag::UInt16);
-            } else if (type_annotation.typeName == "u8") {
-                declared_type = std::make_shared<::Type>(::TypeTag::UInt8);
-            } else if (type_annotation.typeName == "u64") {
-                declared_type = std::make_shared<::Type>(::TypeTag::UInt64);
-            } else if (type_annotation.typeName == "u128") {
-                declared_type = std::make_shared<::Type>(::TypeTag::UInt128);
-            } else if (type_annotation.typeName == "int") {
-                declared_type = std::make_shared<::Type>(::TypeTag::Int64);
-            } else if (type_annotation.typeName == "i64") {
-                declared_type = std::make_shared<::Type>(::TypeTag::Int64);
-            } else if (type_annotation.typeName == "i32") {
-                declared_type = std::make_shared<::Type>(::TypeTag::Int32);
-            } else if (type_annotation.typeName == "i16") {
-                declared_type = std::make_shared<::Type>(::TypeTag::Int16);
-            } else if (type_annotation.typeName == "i8") {
-                declared_type = std::make_shared<::Type>(::TypeTag::Int8);
-            } else if (type_annotation.typeName == "i128") {
-                declared_type = std::make_shared<::Type>(::TypeTag::Int128);
-            } else if (type_annotation.typeName == "f64") {
-                declared_type = std::make_shared<::Type>(::TypeTag::Float64);
-            } else if (type_annotation.typeName == "f32") {
-                declared_type = std::make_shared<::Type>(::TypeTag::Float32);
-            } else if (type_annotation.typeName == "bool") {
-                declared_type = std::make_shared<::Type>(::TypeTag::Bool);
-            } else if (type_annotation.typeName == "string") {
-                declared_type = std::make_shared<::Type>(::TypeTag::String);
-            } else if (type_annotation.typeName == "any") {
-                declared_type = std::make_shared<::Type>(::TypeTag::Any);
-            }
         }
         
         if (declared_type) {
@@ -3465,8 +3560,26 @@ Reg Generator::emit_error_construct_expr(AST::ErrorConstructExpr& expr) {
     auto result_type = std::make_shared<::Type>(::TypeTag::ErrorUnion);
     set_register_type(dst, result_type);
     
-    // Generate ConstructError instruction - the VM will handle creating the error value
-    emit_instruction(LIR_Inst(LIR_Op::ConstructError, Type::Ptr, dst, 0, 0));
+    // Enhanced error construction with custom type and message
+    std::string errorType = expr.errorType.empty() ? "DefaultError" : expr.errorType;
+    std::string errorMessage = "Operation failed";
+    
+    // If there are arguments, the first one should be the error message
+    if (!expr.arguments.empty()) {
+        // Handle string literal messages
+        if (auto literalExpr = std::dynamic_pointer_cast<AST::LiteralExpr>(expr.arguments[0])) {
+            if (std::holds_alternative<std::string>(literalExpr->value)) {
+                errorMessage = std::get<std::string>(literalExpr->value);
+            }
+        }
+        // TODO: Support dynamic error messages from expressions
+    }
+    
+    // Create the instruction with error information in the comment
+    LIR_Inst error_inst(LIR_Op::ConstructError, Type::Ptr, dst, 0, 0);
+    error_inst.comment = "ERROR_INFO:" + errorType + ":" + errorMessage;
+    emit_instruction(error_inst);
+    
     return dst;
 }
 

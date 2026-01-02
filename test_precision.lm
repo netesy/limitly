@@ -1,0 +1,12 @@
+// Test number precision issues
+    // Test very large integer
+    var big: u64 = 18446744073709551615;
+    print("Big integer: {big}");
+    
+    // Test very small float
+    var tiny: f64 = 1e-100;
+    print("Tiny float: {tiny}");
+    
+    // Test scientific notation
+    var sci: f64 = 2.2250738585072014e-308;
+    print("Scientific: {sci}");
