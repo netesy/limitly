@@ -335,7 +335,6 @@ iter (i in 0..10..2) {
     print("i = {i}"); // Output: 0, 2, 4, 6, 8
 }
 ```
-> **Note:** The step value feature is planned but not yet fully implemented in the parser.
 
 ### Ternary Operator
 
@@ -346,7 +345,6 @@ var x = 10;
 var result = x > 5 ? "Greater than 5" : "Not greater than 5";
 print(result); // Output: Greater than 5
 ```
-> **Note:** The ternary operator is planned but not yet implemented in the parser.
 
 ### Match Statements
 
@@ -749,6 +747,36 @@ class Circle : Shape {
 }
 ```
 
+### Worker Statements
+
+A `worker` is a special kind of task that is designed to process a stream of data from a channel. It simplifies the common pattern of pulling items from a channel, processing them, and then sending a result to another channel.
+
+Workers are defined inside `parallel` or `concurrent` blocks and are automatically managed by the runtime.
+
+```limit
+var data_stream = channel();
+var results = channel();
+
+// Producer task to feed the data stream
+task {
+    for (var i = 0; i < 10; i += 1) {
+        data_stream.send(i);
+    }
+    data_stream.close(); // Close the channel when done
+}
+
+// A worker that processes items from 'data_stream'
+worker(item in data_stream) {
+    var squared = item * item;
+    results.send(squared);
+}
+
+// After the block, the results channel will contain the processed data
+iter (result in results) {
+    print(result);
+}
+```
+
 #### Final Classes and Methods
 
 A `final` class cannot be subclassed. A `final` method cannot be overridden by a subclass.
@@ -988,16 +1016,14 @@ print(result); // Output: 50
 
 ### Destructuring Assignments
 
-You can unpack values from tuples and lists into separate variables.
+You can unpack values from tuples into separate variables.
+
+> **Note:** The language currently only supports tuple destructuring. List destructuring is not yet implemented.
 
 ```limit
 // Destructuring a tuple
 var (name, age) = ("Alice", 30);
 print("{name} is {age} years old."); // Output: Alice is 30 years old.
-
-// Destructuring a list
-var [a, b, c] = [1, 2, 3];
-print(a); // Output: 1
 ```
 
 ### Unsafe Blocks
