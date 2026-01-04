@@ -550,7 +550,9 @@ namespace AST {
     struct WorkerStatement : public Statement {
         bool isAsync = false;
         std::string param;
+        std::string paramName; // Name of the parameter variable
         std::shared_ptr<BlockStatement> body;
+        std::string worker_function_name; // Generated function name for LIR
     };
 
     // Await expression

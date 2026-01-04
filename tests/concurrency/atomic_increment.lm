@@ -1,7 +1,7 @@
-var counter: atomic = 0;
+var counter: int = 0;
 var ch = channel();
 
-assert(counter == 0, "Initial atomic counter should be 0");
+assert(counter == 0, "Initial int counter should be 0");
 
 concurrent(ch=ch) {
     task(i in 1..10) {

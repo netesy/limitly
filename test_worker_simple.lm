@@ -1,0 +1,13 @@
+print("=== Simple Worker Test ===");
+
+var shared_counter: int = 0;
+
+parallel(mode=batch, cores=2, on_error=Stop) {
+    worker(item) {
+        print("Worker processing item: {item}");
+        shared_counter = shared_counter + 1;
+        print("Worker done, counter = {shared_counter}");
+    }
+}
+
+print("Final worker counter: {shared_counter}");

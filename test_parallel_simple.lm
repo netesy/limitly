@@ -1,0 +1,13 @@
+print("=== Simple Parallel Test ===");
+
+var shared_counter: int = 0;
+
+parallel(mode=batch, cores=2, on_error=Stop) {
+    task (i in 1..4) {
+        print("Parallel task {i} running");
+        shared_counter = shared_counter + 1;
+        print("Parallel task {i} done, counter = {shared_counter}");
+    }
+}
+
+print("Final parallel counter: {shared_counter}");

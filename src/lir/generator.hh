@@ -47,6 +47,7 @@ private:
     void lower_function_bodies(const TypeCheckResult& type_check_result);
     void lower_function_body(AST::FunctionDeclaration& stmt);
     void lower_task_body(AST::TaskStatement& stmt);
+    void lower_worker_body(AST::WorkerStatement& stmt);
     void lower_task_bodies_recursive(const std::vector<std::shared_ptr<AST::Statement>>& statements);
     
     // Helper methods
@@ -173,6 +174,7 @@ private:
     void emit_task_init_and_step(AST::TaskStatement& task, size_t task_id, Reg contexts_reg, Reg channel_reg, Reg counter_reg, int64_t loop_var_value = 0);
     void emit_task_stmt(AST::TaskStatement& stmt);
     void emit_parallel_task_init(AST::TaskStatement& task, size_t task_id, Reg contexts_reg, Reg work_queue_reg, int64_t loop_var_value = 0);
+    void emit_parallel_worker_init(AST::WorkerStatement& worker, size_t worker_id, Reg contexts_reg, Reg work_queue_reg, int64_t param_value = 0);
     void emit_parallel_worker_loop(Reg work_queue_reg, int worker_id);
     void emit_worker_stmt(AST::WorkerStatement& stmt);
     void emit_iter_stmt(AST::IterStatement& stmt);
@@ -277,6 +279,11 @@ private:
     
     // Task body variable mapping - maps original variable names to task parameter registers
     std::unordered_map<std::string, Reg> task_variable_mappings_;
+    
+    // Variable capture analysis for concurrent statements
+    void find_accessed_variables_in_concurrent(AST::ConcurrentStatement& stmt, std::set<std::string>& accessed_variables);
+    void find_accessed_variables_recursive(const std::vector<std::shared_ptr<AST::Statement>>& statements, std::set<std::string>& accessed_variables);
+    void find_accessed_variables_in_expr(const AST::Expression& expr, std::set<std::string>& accessed_variables);
     
     // Helper methods
     std::shared_ptr<::Type> convert_ast_type_to_lir_type(const std::shared_ptr<AST::TypeAnnotation>& ast_type);

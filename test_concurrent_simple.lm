@@ -1,0 +1,13 @@
+print("=== Simple Concurrent Test ===");
+
+var shared_counter: int = 0;
+
+concurrent() {
+    task (i in 1..4) {
+        print("Task {i} running");
+        shared_counter = shared_counter + 1;
+        print("Task {i} done, counter = {shared_counter}");
+    }
+}
+
+print("Final counter: {shared_counter}");
