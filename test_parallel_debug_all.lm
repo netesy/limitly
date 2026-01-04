@@ -1,0 +1,19 @@
+print("=== Debug All Parallel Tasks ===");
+
+var shared_counter: int = 0;
+
+print("Initial counter:");
+print(shared_counter);
+
+parallel(mode=batch, cores=4, on_error=Stop) {
+    task(i in 1..5) {
+        print("Task starting with i =");
+        print(i);
+        shared_counter = shared_counter + 1;
+        print("Task done with i =");
+        print(i);
+    }
+}
+
+print("Final counter:");
+print(shared_counter);

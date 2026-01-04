@@ -206,9 +206,9 @@ void Generator::exit_scope() {
 }
 
 void Generator::bind_variable(const std::string& name, Reg reg) {
-    std::cout << "[DEBUG] Binding variable '" << name << "' to register " << reg << std::endl;
+    // std::cout << "[DEBUG] Binding variable '" << name << "' to register " << reg << std::endl;
     if (scope_stack_.empty()) {
-        std::cout << "[DEBUG] Creating new scope for variable binding" << std::endl;
+        // std::cout << "[DEBUG] Creating new scope for variable binding" << std::endl;
         enter_scope();
     }
     scope_stack_.back().vars[name] = reg;
@@ -226,15 +226,15 @@ void Generator::update_variable_binding(const std::string& name, Reg reg) {
 }
 
 Reg Generator::resolve_variable(const std::string& name) {
-    std::cout << "[DEBUG] Resolving variable '" << name << "' in " << scope_stack_.size() << " scopes" << std::endl;
+    // std::cout << "[DEBUG] Resolving variable '" << name << "' in " << scope_stack_.size() << " scopes" << std::endl;
     for (auto it = scope_stack_.rbegin(); it != scope_stack_.rend(); ++it) {
         auto found = it->vars.find(name);
         if (found != it->vars.end()) {
-            std::cout << "[DEBUG] Found variable '" << name << "' -> register " << found->second << std::endl;
+            // std::cout << "[DEBUG] Found variable '" << name << "' -> register " << found->second << std::endl;
             return found->second;
         }
     }
-    std::cout << "[DEBUG] Variable '" << name << "' not found" << std::endl;
+    // std::cout << "[DEBUG] Variable '" << name << "' not found" << std::endl;
     return UINT32_MAX;
 }
 
@@ -2460,8 +2460,8 @@ void Generator::emit_parallel_stmt(AST::ParallelStatement& stmt) {
                 task_count++;
             }
         } else if (auto worker = dynamic_cast<AST::WorkerStatement*>(stmt_ptr.get())) {
-            // Workers are typically stream-based, count as 1 for now
-            task_count++;
+            // Skip workers for now - focus on tasks first
+            std::cout << "[DEBUG] Skipping worker statement in parallel block (not implemented yet)" << std::endl;
         }
     }
     
@@ -2474,7 +2474,7 @@ void Generator::emit_parallel_stmt(AST::ParallelStatement& stmt) {
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, queue_size_reg, queue_size_val));
     set_register_type(queue_size_reg, int_type);
     
-    emit_instruction(LIR_Inst(LIR_Op::WorkQueueAlloc, work_queue_reg, queue_size_reg, 0));
+    emit_instruction(LIR_Inst(LIR_Op::WorkQueueAlloc, work_queue_reg, queue_size_reg, 0, 0));
     set_register_type(work_queue_reg, int_type);
     
     // 2. Allocate task contexts (reuse existing mechanism)
@@ -2518,9 +2518,8 @@ void Generator::emit_parallel_stmt(AST::ParallelStatement& stmt) {
                 task_id++;
             }
         } else if (auto worker = dynamic_cast<AST::WorkerStatement*>(stmt_ptr.get())) {
-            // Initialize worker context
-            emit_parallel_worker_init(*worker, task_id, contexts_reg, work_queue_reg, 0);
-            task_id++;
+            // Skip workers for now - focus on tasks first
+            std::cout << "[DEBUG] Skipping worker initialization in parallel block (not implemented yet)" << std::endl;
         }
     }
     
@@ -2530,16 +2529,19 @@ void Generator::emit_parallel_stmt(AST::ParallelStatement& stmt) {
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, active_workers_reg, num_cores_val));
     set_register_type(active_workers_reg, int_type);
     
-    // 5. Signal workers to start (atomic store)
+    // 5. Signal workers to start - signal as many workers as we have tasks
     Reg work_available_reg = allocate_register();
-    ValuePtr work_available_val = std::make_shared<Value>(int_type, int64_t(1));
+    ValuePtr work_available_val = std::make_shared<Value>(int_type, int64_t(task_count));
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, work_available_reg, work_available_val));
     set_register_type(work_available_reg, int_type);
     
-    emit_instruction(LIR_Inst(LIR_Op::WorkerSignal, work_available_reg, active_workers_reg, 0));
+    emit_instruction(LIR_Inst(LIR_Op::WorkerSignal, active_workers_reg, work_available_reg, 0));
     
-    // 6. Main thread participates as worker 0
-    emit_parallel_worker_loop(work_queue_reg, 0);
+    // 6. Parallel execution uses work queue system, not scheduler
+    // The WorkerSignal above will process all tasks in the work queue
+    // No need for SchedulerRun - that's only for concurrent blocks
+    
+    std::cout << "[DEBUG] Using work queue system to execute parallel tasks" << std::endl;
     
     // 7. Wait for all workers to complete
     Reg timeout_reg = allocate_register();
@@ -2550,7 +2552,7 @@ void Generator::emit_parallel_stmt(AST::ParallelStatement& stmt) {
     emit_instruction(LIR_Inst(LIR_Op::ParallelWaitComplete, work_queue_reg, timeout_reg, 0));
     
     // 8. Cleanup work queue
-    emit_instruction(LIR_Inst(LIR_Op::WorkQueuePush, work_queue_reg, 0, 0)); // Signal cleanup
+    emit_instruction(LIR_Inst(LIR_Op::WorkQueueFree, 0, work_queue_reg, 0, 0));
 }
 
 // Helper function to evaluate constant expressions
@@ -3582,9 +3584,9 @@ void Generator::lower_task_body(AST::TaskStatement& stmt) {
     
     // Emit task body from AST
     if (stmt.body) {
-        std::cout << "[DEBUG] Emitting task body with " << stmt.body->statements.size() << " statements" << std::endl;
+        // std::cout << "[DEBUG] Emitting task body with " << stmt.body->statements.size() << " statements" << std::endl;
         emit_stmt(*stmt.body);
-        std::cout << "[DEBUG] Task body emitted, function has " << current_function_->instructions.size() << " instructions" << std::endl;
+        // std::cout << "[DEBUG] Task body emitted, function has " << current_function_->instructions.size() << " instructions" << std::endl;
     }
     
     // Ensure function has a return instruction
@@ -4186,7 +4188,7 @@ void Generator::emit_parallel_task_init(AST::TaskStatement& task, size_t task_id
     }
     
     // Push task context to work queue (atomic)
-    emit_instruction(LIR_Inst(LIR_Op::WorkQueuePush, work_queue_reg, task_context_reg, 0));
+    emit_instruction(LIR_Inst(LIR_Op::WorkQueuePush, 0, work_queue_reg, task_context_reg, 0));
 }
 
 void Generator::emit_parallel_worker_init(AST::WorkerStatement& worker, size_t worker_id, Reg contexts_reg, Reg work_queue_reg, int64_t param_value) {
@@ -4245,7 +4247,7 @@ void Generator::emit_parallel_worker_init(AST::WorkerStatement& worker, size_t w
     }
     
     // Push worker context to work queue (atomic)
-    emit_instruction(LIR_Inst(LIR_Op::WorkQueuePush, work_queue_reg, worker_context_reg, 0));
+    emit_instruction(LIR_Inst(LIR_Op::WorkQueuePush, 0, work_queue_reg, worker_context_reg, 0));
 }
 
 void Generator::emit_parallel_worker_loop(Reg work_queue_reg, int worker_id) {
@@ -4282,7 +4284,7 @@ void Generator::emit_parallel_worker_loop(Reg work_queue_reg, int worker_id) {
     
     // Try to pop work from queue (atomic)
     Reg task_context_reg = allocate_register();
-    emit_instruction(LIR_Inst(LIR_Op::WorkQueuePop, task_context_reg, work_queue_reg, 0));
+    emit_instruction(LIR_Inst(LIR_Op::WorkQueuePop, task_context_reg, work_queue_reg, 0, 0));
     set_register_type(task_context_reg, int_type);
     
     // Check if we got a task (NULL = no more work)
