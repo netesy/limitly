@@ -96,7 +96,7 @@ struct Scheduler {
     Scheduler() : current_time(0), next_task_id(1) {}
     
     void add_task(std::unique_ptr<TaskContext> task) {
-        task->task_id = next_task_id++;
+        // Don't reassign task_id - it's already set correctly during initialization
         tasks.push_back(std::move(task));
     }
     

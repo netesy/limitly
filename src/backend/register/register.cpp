@@ -1,6 +1,7 @@
 #include "register.hh"
 #include "../../lir/lir.hh"
 #include "../../lir/functions.hh"
+#include "../../lir/function_registry.hh"
 #include "../../lir/builtin_functions.hh"
 #include "../types.hh"
 #include "../value.hh"
@@ -935,24 +936,28 @@ OP_SCHEDULER_RUN:
 
             if (ctx->state == TaskState::INIT) {
                 ctx->state = TaskState::RUNNING;
+                // Copy the context instead of moving it, so task_set_code can still access it
                 scheduler->add_task(std::make_unique<TaskContext>(*ctx));
             }
         }
 
         for (auto& task : scheduler->tasks) {
             if (task->state == TaskState::RUNNING) {
-                std::cout << "Task " << task->task_id << " running" << std::endl;
+                std::cout << "Task " << (task->task_id + 1) << " running" << std::endl;
+                std::cout << "  body_start_pc: " << task->body_start_pc << ", body_end_pc: " << task->body_end_pc << std::endl;
 
-                if (task->body_start_pc >= 0 && task->body_end_pc >= 0 && current_function_) {
+                // Store the initial shared counter value before task execution
+                int64_t initial_shared_counter = shared_variables["shared_counter"].load();
+
+                // Execute the task using the new function-based approach
+                if (current_function_) {
                     execute_task_body(task.get(), *current_function_);
+                } else {
+                    std::cout << "  Skipping task execution: current_function_ is null" << std::endl;
                 }
 
-                // Update shared counter from task's local register (register 3)
-                auto shared_counter_reg = registers[3];
-                if (!std::holds_alternative<std::nullptr_t>(shared_counter_reg)) {
-                    int64_t updated_counter = to_int(shared_counter_reg);
-                    shared_variables["shared_counter"].store(updated_counter);
-                }
+                // The task execution should have updated the shared counter directly
+                // No need for additional increment calculation since execute_task_body handles it
 
                 if (!std::holds_alternative<std::nullptr_t>(task->channel_ptr)) {
                     uint64_t channel_id = static_cast<uint64_t>(to_int(task->channel_ptr));
@@ -967,7 +972,9 @@ OP_SCHEDULER_RUN:
             }
         }
 
-        registers[pc->dst] = static_cast<int64_t>(1);
+        // Return the final shared counter value instead of just 1
+        int64_t final_counter = shared_variables["shared_counter"].load();
+        registers[pc->dst] = final_counter;
     }
     DISPATCH();
 
@@ -1262,32 +1269,87 @@ OP_TASK_SET_CODE:
 }
 
 void RegisterVM::execute_task_body(TaskContext* task, const LIR::LIR_Function& function) {
-    // Set up task context parameters
+    // Get the task function name from task context field 4
+    auto func_name_it = task->fields.find(4);
+    if (func_name_it == task->fields.end()) {
+        std::cerr << "Error: Task function name not found in task context" << std::endl;
+        return;
+    }
+    
+    // Extract function name from register value
+    std::string task_func_name;
+    if (std::holds_alternative<std::string>(func_name_it->second)) {
+        task_func_name = std::get<std::string>(func_name_it->second);
+    } else {
+        std::cerr << "Error: Task function name is not a string" << std::endl;
+        return;
+    }
+    
+    // Get the task function from the registry
+    auto& func_registry = LIR::FunctionRegistry::getInstance();
+    LIR::LIR_Function* task_func = func_registry.getFunction(task_func_name);
+    if (!task_func) {
+        std::cerr << "Error: Task function '" << task_func_name << "' not found in registry" << std::endl;
+        return;
+    }
+    
+    std::cout << "Task " << (task->task_id + 1) << " calling function: " << task_func_name << std::endl;
+    
+    // Save current register state
+    auto saved_registers = registers;
+    
+    // Initialize a fresh register context for this task
+    registers.clear();
+    registers.resize(1024);
+    for (auto& reg : registers) {
+        reg = nullptr;
+    }
+    
+    // Set up task context parameters in the fresh register space
     if (task) {
+        // Set task ID from task context field 0
+        auto task_id_it = task->fields.find(0);
+        if (task_id_it != task->fields.end()) {
+            registers[0] = task_id_it->second;
+        }
+        
         // Set loop variable value from task context field 1
         auto loop_var_it = task->fields.find(1);
         if (loop_var_it != task->fields.end()) {
             registers[1] = loop_var_it->second;
         }
         
-        // Set up other task context fields in registers
-        auto task_id_it = task->fields.find(0);
-        if (task_id_it != task->fields.end()) {
-            registers[0] = task_id_it->second;
-        }
-        
+        // Set channel from task context field 2
         auto channel_it = task->fields.find(2);
         if (channel_it != task->fields.end()) {
             registers[2] = channel_it->second;
         }
         
-        // Initialize shared counter with current global value (override task field)
+        // Initialize shared counter with current global value
         int64_t current_shared_counter = shared_variables["shared_counter"].load();
         registers[3] = current_shared_counter;
+        
+        std::cout << "Task " << (task->task_id + 1) << " starting with shared counter = " << current_shared_counter << std::endl;
     }
     
-    // Execute the task body using the shared instruction executor
-    execute_instructions(function, task->body_start_pc, task->body_end_pc);
+    // Execute the task function using the shared instruction executor
+    execute_instructions(*task_func, 0, task_func->instructions.size());
+    
+    // Update the shared counter with the task's result
+    if (std::holds_alternative<int64_t>(registers[3])) {
+        int64_t new_counter_value = std::get<int64_t>(registers[3]);
+        shared_variables["shared_counter"].store(new_counter_value);
+        std::cout << "Task " << (task->task_id + 1) << " updated shared counter to " << new_counter_value << std::endl;
+    }
+    
+    // Preserve the task result (register 3 contains the updated counter)
+    auto task_result = registers[3];
+    
+    // Restore the original register state
+    registers = saved_registers;
+    
+    // Store the task result back in register 3 for the scheduler to read
+    registers[3] = task_result;
 }
 
 void RegisterVM::execute_function(const LIR::LIR_Function& function) {
