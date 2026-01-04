@@ -1188,23 +1188,23 @@ OP_WORK_QUEUE_PUSH:
         uint64_t queue_id = static_cast<uint64_t>(to_int(registers[pc->a]));
         uint64_t task_context = static_cast<uint64_t>(to_int(registers[pc->b]));
         
-        std::cout << "[DEBUG] work_queue_push: pc->a=" << pc->a << " (queue_id=" << queue_id << "), pc->b=" << pc->b << " (task_context=" << task_context << ")" << std::endl;
-        std::cout << "[DEBUG] Pushing task context " << task_context << " to work queue " << queue_id << std::endl;
+        // std::cout << "[DEBUG] work_queue_push: pc->a=" << pc->a << " (queue_id=" << queue_id << "), pc->b=" << pc->b << " (task_context=" << task_context << ")" << std::endl;
+        // std::cout << "[DEBUG] Pushing task context " << task_context << " to work queue " << queue_id << std::endl;
         
         if (queue_id < work_queues.size()) {
             work_queues[queue_id].push(task_context);
-            std::cout << "[DEBUG] Work queue " << queue_id << " now has " << work_queues[queue_id].size() << " tasks" << std::endl;
+            // std::cout << "[DEBUG] Work queue " << queue_id << " now has " << work_queues[queue_id].size() << " tasks" << std::endl;
             
             // Show task details
             if (task_context < task_contexts.size() && task_contexts[task_context]) {
                 auto& task = task_contexts[task_context];
-                std::cout << "[DEBUG] Task " << task_context << " details: task_id=" << task->task_id 
-                          << ", state=" << static_cast<int>(task->state) << std::endl;
+                // std::cout << "[DEBUG] Task " << task_context << " details: task_id=" << task->task_id 
+                        //   << ", state=" << static_cast<int>(task->state) << std::endl;
             }
             
             registers[pc->dst] = static_cast<int64_t>(1);
         } else {
-            std::cout << "[DEBUG] Invalid queue_id " << queue_id << " - out of range" << std::endl;
+            // std::cout << "[DEBUG] Invalid queue_id " << queue_id << " - out of range" << std::endl;
             registers[pc->dst] = static_cast<int64_t>(0);
         }
     }
@@ -1229,13 +1229,13 @@ OP_WORKER_SIGNAL:
         uint64_t task_count = static_cast<uint64_t>(to_int(registers[pc->a]));    // Number of tasks to process
         uint64_t num_cores = static_cast<uint64_t>(to_int(registers[pc->b]));     // Number of cores available
         
-        std::cout << "[DEBUG] Worker signal: processing " << task_count << " tasks on " << num_cores << " cores" << std::endl;
+        // std::cout << "[DEBUG] Worker signal: processing " << task_count << " tasks on " << num_cores << " cores" << std::endl;
         
         // Show all tasks in all work queues before execution
-        std::cout << "[DEBUG] === Work Queue Contents Before Execution ===" << std::endl;
+        // std::cout << "[DEBUG] === Work Queue Contents Before Execution ===" << std::endl;
         for (size_t queue_idx = 0; queue_idx < work_queues.size(); queue_idx++) {
             auto& queue = work_queues[queue_idx];
-            std::cout << "[DEBUG] Work queue " << queue_idx << " has " << queue.size() << " tasks:" << std::endl;
+            // std::cout << "[DEBUG] Work queue " << queue_idx << " has " << queue.size() << " tasks:" << std::endl;
             
             // Create a temporary copy to inspect contents without modifying the queue
             std::queue<uint64_t> temp_queue = queue;
@@ -1244,7 +1244,7 @@ OP_WORKER_SIGNAL:
                 uint64_t task_context = temp_queue.front();
                 temp_queue.pop();
                 
-                std::cout << "[DEBUG]   Task " << task_idx << ": context_id=" << task_context;
+                // std::cout << "[DEBUG]   Task " << task_idx << ": context_id=" << task_context;
                 if (task_context < task_contexts.size() && task_contexts[task_context]) {
                     auto& task = task_contexts[task_context];
                     std::cout << ", task_id=" << task->task_id 
@@ -1254,7 +1254,7 @@ OP_WORKER_SIGNAL:
                 task_idx++;
             }
         }
-        std::cout << "[DEBUG] === Starting Task Execution ===" << std::endl;
+        // std::cout << "[DEBUG] === Starting Task Execution ===" << std::endl;
         
         default_atomic.store(0);
         
@@ -1265,11 +1265,11 @@ OP_WORKER_SIGNAL:
                 uint64_t task_context = queue.front();
                 queue.pop();
                 
-                std::cout << "[DEBUG] Processing task context " << task_context << std::endl;
+                // std::cout << "[DEBUG] Processing task context " << task_context << std::endl;
                 
                 if (task_context < task_contexts.size()) {
                     auto& task = task_contexts[task_context];
-                    std::cout << "[DEBUG] Task context " << task_context << " state: " << static_cast<int>(task->state) << std::endl;
+                    // std::cout << "[DEBUG] Task context " << task_context << " state: " << static_cast<int>(task->state) << std::endl;
                     
                     // Process task regardless of state for debugging
                     if (task) {
@@ -1279,17 +1279,17 @@ OP_WORKER_SIGNAL:
                         task->state = TaskState::COMPLETED;
                         tasks_processed++;
                         
-                        std::cout << "[DEBUG] Completed task context " << task_context << ", total processed: " << tasks_processed << std::endl;
+                        // std::cout << "[DEBUG] Completed task context " << task_context << ", total processed: " << tasks_processed << std::endl;
                     } else {
-                        std::cout << "[DEBUG] Task context " << task_context << " is null" << std::endl;
+                        // std::cout << "[DEBUG] Task context " << task_context << " is null" << std::endl;
                     }
                 } else {
-                    std::cout << "[DEBUG] Invalid task context " << task_context << " - out of range" << std::endl;
+                    // std::cout << "[DEBUG] Invalid task context " << task_context << " - out of range" << std::endl;
                 }
             }
         }
         
-        std::cout << "[DEBUG] Worker signal completed: " << tasks_processed << " tasks processed" << std::endl;
+        // std::cout << "[DEBUG] Worker signal completed: " << tasks_processed << " tasks processed" << std::endl;
         registers[pc->dst] = static_cast<int64_t>(tasks_processed);
     }
     DISPATCH();
@@ -1308,8 +1308,8 @@ OP_PARALLEL_WAIT_COMPLETE:
             // Based on the debug output, it should be register 1
             registers[1] = final_counter_value;
             
-            std::cout << "[DEBUG] Synchronized shared_counter = " << final_counter_value 
-                      << " back to main thread register 1" << std::endl;
+            // std::cout << "[DEBUG] Synchronized shared_counter = " << final_counter_value 
+                    //   << " back to main thread register 1" << std::endl;
         }
         
         registers[pc->dst] = static_cast<int64_t>(1);
@@ -1320,17 +1320,17 @@ OP_WORK_QUEUE_FREE:
     {
         uint64_t queue_id = static_cast<uint64_t>(to_int(registers[pc->a]));
         
-        std::cout << "[DEBUG] work_queue_free: freeing queue_id=" << queue_id << std::endl;
+        // std::cout << "[DEBUG] work_queue_free: freeing queue_id=" << queue_id << std::endl;
         
         if (queue_id < work_queues.size()) {
             // Clear the queue contents
             while (!work_queues[queue_id].empty()) {
                 work_queues[queue_id].pop();
             }
-            std::cout << "[DEBUG] Work queue " << queue_id << " freed successfully" << std::endl;
+            // std::cout << "[DEBUG] Work queue " << queue_id << " freed successfully" << std::endl;
             registers[pc->dst] = static_cast<int64_t>(1);
         } else {
-            std::cout << "[DEBUG] Invalid queue_id " << queue_id << " for free operation" << std::endl;
+            // std::cout << "[DEBUG] Invalid queue_id " << queue_id << " for free operation" << std::endl;
             registers[pc->dst] = static_cast<int64_t>(0);
         }
     }
