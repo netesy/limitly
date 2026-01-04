@@ -156,6 +156,7 @@ enum class LIR_Op : uint8_t {
     WorkQueueAlloc,      // Allocate lock-free work queue
     WorkQueuePush,       // Push task to queue (atomic)
     WorkQueuePop,        // Pop task from queue (atomic)
+    WorkQueueFree,       // Free work queue resources
     ParallelWaitComplete,// Wait for all workers to complete
     WorkerSignal,        // Signal workers to start
     WorkerJoin,          // Wait for workers to finish

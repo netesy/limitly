@@ -1,0 +1,17 @@
+print("=== Parallel Tasks Debug Test ===");
+
+var shared_counter: int = 0;
+
+print("Initial counter:");
+print(shared_counter);
+
+parallel(mode=batch, cores=2, on_error=Stop) {
+    task(i in 1..3) {
+        print("Task starting");
+        shared_counter = shared_counter + 1;
+        print("Task done");
+    }
+}
+
+print("Final counter:");
+print(shared_counter);

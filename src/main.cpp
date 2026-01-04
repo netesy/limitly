@@ -97,9 +97,10 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         }
         std::cout << "✅ Memory safety analysis passed\n\n";
         
-        // AST Optimization (after type checking and memory analysis)
-        AST::ASTOptimizer optimizer;
-        ast = optimizer.optimize(memory_check_result.program);
+        // AST Optimization (DISABLED FOR DEBUGGING)
+        // AST::ASTOptimizer optimizer;
+        // ast = optimizer.optimize(memory_check_result.program);
+        ast = memory_check_result.program; // Use unoptimized AST
         
         // Phase 3: Post-optimization verification
         std::cout << "=== Phase 3: Post-Optimization Verification ===\n";
@@ -113,16 +114,10 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         }
         std::cout << "✅ Post-optimization verification passed\n\n";
         
-        // Print optimization statistics
-        const auto& stats = optimizer.getStats();
-        std::cout << "=== AST Optimization Statistics ===\n";
-        std::cout << "Constant folds: " << stats.constant_folds << "\n";
-        std::cout << "Constant propagations: " << stats.constant_propagations << "\n";
-        std::cout << "Dead code eliminated: " << stats.dead_code_eliminated << "\n";
-        std::cout << "Branches simplified: " << stats.branches_simplified << "\n";
-        std::cout << "Interpolations lowered: " << stats.interpolations_lowered << "\n";
-        std::cout << "Algebraic simplifications: " << stats.algebraic_simplifications << "\n";
-        std::cout << "Strings canonicalized: " << stats.strings_canonicalized << "\n";
+        // Print optimization statistics (DISABLED)
+        // const auto& stats = optimizer.getStats();
+        std::cout << "=== AST Optimization Statistics (DISABLED) ===\n";
+        std::cout << "AST optimization temporarily disabled for debugging\n";
         std::cout << std::endl;
         
         // Print AST after optimization if debug mode is enabled
@@ -133,17 +128,11 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             std::cout << std::endl;
         }
         
-        // Print optimization statistics if debug mode is enabled
+        // Print optimization statistics if debug mode is enabled (DISABLED)
         if (enableDebug || jitDebug) {
-            const auto& stats = optimizer.getStats();
-            std::cout << "=== AST Optimization Statistics ===\n";
-            std::cout << "Constant folds: " << stats.constant_folds << "\n";
-            std::cout << "Constant propagations: " << stats.constant_propagations << "\n";
-            std::cout << "Dead code eliminated: " << stats.dead_code_eliminated << "\n";
-            std::cout << "Branches simplified: " << stats.branches_simplified << "\n";
-            std::cout << "Interpolations lowered: " << stats.interpolations_lowered << "\n";
-            std::cout << "Algebraic simplifications: " << stats.algebraic_simplifications << "\n";
-            std::cout << "Strings canonicalized: " << stats.strings_canonicalized << "\n";
+            // const auto& stats = optimizer.getStats();
+            std::cout << "=== AST Optimization Statistics (DISABLED) ===\n";
+            std::cout << "AST optimization temporarily disabled for debugging\n";
         }
         
         // Print CST if requested
@@ -447,9 +436,10 @@ void startRepl() {
                 continue;
             }
             
-            // AST Optimization (after type checking and memory analysis)
-            AST::ASTOptimizer optimizer;
-            ast = optimizer.optimize(memory_check_result.program);
+            // AST Optimization (DISABLED FOR DEBUGGING)
+            // AST::ASTOptimizer optimizer;
+            // ast = optimizer.optimize(memory_check_result.program);
+            ast = memory_check_result.program; // Use unoptimized AST
             
             // Phase 3: Post-optimization verification
             auto post_opt_type_check = TypeCheckerFactory::check_program(ast);
@@ -461,18 +451,9 @@ void startRepl() {
                 continue;
             }
             
-            // Print optimization statistics in debug mode
+            // Print optimization statistics in debug mode (DISABLED)
             if (debugMode) {
-                const auto& stats = optimizer.getStats();
-                if (stats.constant_folds > 0 || stats.constant_propagations > 0 || 
-                    stats.dead_code_eliminated > 0 || stats.branches_simplified > 0) {
-                    std::cout << "AST Optimizations: ";
-                    if (stats.constant_folds > 0) std::cout << stats.constant_folds << " folds ";
-                    if (stats.constant_propagations > 0) std::cout << stats.constant_propagations << " props ";
-                    if (stats.dead_code_eliminated > 0) std::cout << stats.dead_code_eliminated << " dead ";
-                    if (stats.branches_simplified > 0) std::cout << stats.branches_simplified << " branches ";
-                    std::cout << "\n";
-                }
+                std::cout << "AST Optimization: disabled for debugging\n";
             }
             
             // Backend: Generate LIR and execute with register interpreter
