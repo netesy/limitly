@@ -2465,6 +2465,30 @@ void Generator::emit_parallel_stmt(AST::ParallelStatement& stmt) {
         }
     }
     
+    // Find variables accessed in task/worker bodies that need to be shared
+    std::set<std::string> accessed_variables;
+    find_accessed_variables_recursive(stmt.body->statements, accessed_variables);
+    
+    // Allocate shared counter registers for each accessed variable
+    std::map<std::string, Reg> shared_counter_regs;
+    for (const auto& var_name : accessed_variables) {
+        Reg counter_reg = resolve_variable(var_name);
+        if (counter_reg == UINT32_MAX) {
+            // Variable doesn't exist, allocate a new one
+            counter_reg = allocate_register();
+            ValuePtr zero = std::make_shared<Value>(int_type, int64_t(0));
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, counter_reg, zero));
+            bind_variable(var_name, counter_reg);
+            set_register_type(counter_reg, int_type);
+        } else {
+            // Variable exists, ensure it's initialized to 0 for the parallel block
+            ValuePtr zero = std::make_shared<Value>(int_type, int64_t(0));
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, counter_reg, zero));
+            set_register_type(counter_reg, int_type);
+        }
+        shared_counter_regs[var_name] = counter_reg;
+    }
+    
     // === LOCK-FREE PARALLEL EXECUTION ===
     
     // 1. Allocate lock-free work queue
@@ -2502,19 +2526,19 @@ void Generator::emit_parallel_stmt(AST::ParallelStatement& stmt) {
                         
                         for (int64_t i = start; i <= end; i++) {
                             // Initialize task context
-                            emit_parallel_task_init(*task, task_id, contexts_reg, work_queue_reg, i);
+                            emit_parallel_task_init(*task, task_id, contexts_reg, work_queue_reg, i, shared_counter_regs);
                             task_id++;
                         }
                     } else {
-                        emit_parallel_task_init(*task, task_id, contexts_reg, work_queue_reg, 0);
+                        emit_parallel_task_init(*task, task_id, contexts_reg, work_queue_reg, 0, shared_counter_regs);
                         task_id++;
                     }
                 } else {
-                    emit_parallel_task_init(*task, task_id, contexts_reg, work_queue_reg, 0);
+                    emit_parallel_task_init(*task, task_id, contexts_reg, work_queue_reg, 0, shared_counter_regs);
                     task_id++;
                 }
             } else {
-                emit_parallel_task_init(*task, task_id, contexts_reg, work_queue_reg, 0);
+                emit_parallel_task_init(*task, task_id, contexts_reg, work_queue_reg, 0, shared_counter_regs);
                 task_id++;
             }
         } else if (auto worker = dynamic_cast<AST::WorkerStatement*>(stmt_ptr.get())) {
@@ -2620,11 +2644,20 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
     }
     
     // Allocate shared counter and map accessed variables
-    Reg counter_reg = allocate_register();
-    ValuePtr zero = std::make_shared<Value>(int_type, int64_t(0));
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, counter_reg, zero));
-    bind_variable("shared_counter", counter_reg);
-    set_register_type(counter_reg, int_type);
+    Reg counter_reg = resolve_variable("shared_counter");
+    if (counter_reg == UINT32_MAX) {
+        // Variable doesn't exist, allocate a new one
+        counter_reg = allocate_register();
+        ValuePtr zero = std::make_shared<Value>(int_type, int64_t(0));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, counter_reg, zero));
+        bind_variable("shared_counter", counter_reg);
+        set_register_type(counter_reg, int_type);
+    } else {
+        // Variable exists, initialize it to 0 for the concurrent block
+        ValuePtr zero = std::make_shared<Value>(int_type, int64_t(0));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, counter_reg, zero));
+        set_register_type(counter_reg, int_type);
+    }
     
     // Capture variable mappings for task body lowering
     task_variable_mappings_["shared_counter"] = counter_reg;
@@ -4132,7 +4165,7 @@ void Generator::emit_module_stmt(AST::ModuleDeclaration& stmt) {
 
 // === LOCK-FREE PARALLEL HELPER FUNCTIONS ===
 
-void Generator::emit_parallel_task_init(AST::TaskStatement& task, size_t task_id, Reg contexts_reg, Reg work_queue_reg, int64_t loop_var_value) {
+void Generator::emit_parallel_task_init(AST::TaskStatement& task, size_t task_id, Reg contexts_reg, Reg work_queue_reg, int64_t loop_var_value, const std::map<std::string, Reg>& shared_counter_regs) {
     auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
     
     // Initialize task context (reuse existing logic)
@@ -4159,6 +4192,17 @@ void Generator::emit_parallel_task_init(AST::TaskStatement& task, size_t task_id
     // Bind the loop variable in the current scope
     if (!task.loopVar.empty()) {
         bind_variable(task.loopVar, loop_var_reg);
+    }
+    
+    // Set shared counter values in context (field 3) - use the first shared counter for now
+    // TODO: Support multiple shared counters per task
+    if (!shared_counter_regs.empty()) {
+        auto first_counter = shared_counter_regs.begin();
+        Reg current_counter_reg = allocate_register();
+        // Load current shared counter value
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, current_counter_reg, 
+                                  std::make_shared<Value>(int_type, int64_t(0))));
+        emit_instruction(LIR_Inst(LIR_Op::TaskSetField, 0, task_context_reg, current_counter_reg, 3));
     }
     
     // Use function-based approach instead of inline PC ranges

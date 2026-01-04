@@ -173,7 +173,7 @@ private:
     void emit_concurrent_stmt(AST::ConcurrentStatement& stmt);
     void emit_task_init_and_step(AST::TaskStatement& task, size_t task_id, Reg contexts_reg, Reg channel_reg, Reg counter_reg, int64_t loop_var_value = 0);
     void emit_task_stmt(AST::TaskStatement& stmt);
-    void emit_parallel_task_init(AST::TaskStatement& task, size_t task_id, Reg contexts_reg, Reg work_queue_reg, int64_t loop_var_value = 0);
+    void emit_parallel_task_init(AST::TaskStatement& task, size_t task_id, Reg contexts_reg, Reg work_queue_reg, int64_t loop_var_value = 0, const std::map<std::string, Reg>& shared_counter_regs = {});
     void emit_parallel_worker_init(AST::WorkerStatement& worker, size_t worker_id, Reg contexts_reg, Reg work_queue_reg, int64_t param_value = 0);
     void emit_parallel_worker_loop(Reg work_queue_reg, int worker_id);
     void emit_worker_stmt(AST::WorkerStatement& stmt);
