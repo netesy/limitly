@@ -701,7 +701,7 @@ void BytecodeGenerator::visitParallelStatement(const std::shared_ptr<AST::Parall
     }
 
     // Start parallel block with mode and cores
-    emit(Opcode::BEGIN_PARALLEL, stmt->line, cores, 0.0f, false, stmt->mode);
+    //emit(Opcode::BEGIN_PARALLEL, stmt->line, cores, 0.0f, false, stmt->mode);
     
     // Process parallel block body (which may contain task and worker statements)
     visitBlockStatement(stmt->body);

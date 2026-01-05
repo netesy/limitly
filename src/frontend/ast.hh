@@ -515,13 +515,10 @@ namespace AST {
 
     // Concurrency constructs
     struct ParallelStatement : public Statement {
-        std::string channel;  // Channel name for communication
-        std::string mode;     // Execution mode (fork-join, etc.)
-        std::string cores;    // Number of cores to use (or "auto")
-        std::string onError;  // Error handling strategy
-        std::string timeout;  // Timeout duration
-        std::string grace;    // Grace period for cleanup
-        std::string onTimeout; // Action on timeout
+        std::string cores;     // Number of cores to use (or "auto")
+        std::string timeout;   // Timeout duration
+        std::string grace;     // Grace period for cleanup
+        std::string on_error;  // Error handling strategy (Stop, Continue, Partial)
         std::shared_ptr<BlockStatement> body;
     };
 
@@ -532,21 +529,25 @@ namespace AST {
         std::string cores;    // Number of cores to use (or "auto")
         std::string onError;  // Error handling strategy
         std::string timeout;  // Timeout duration
+        std::string on_error;  // Error handling strategy (Stop, Continue, Partial)
         std::string grace;    // Grace period for cleanup
         std::string onTimeout; // Action on timeout
         std::shared_ptr<BlockStatement> body;
     };
 
-    // Task statement inside a concurrent/parallel block
+    // Concurrent task statement - for I/O-bound event processing with channels
     struct TaskStatement : public Statement {
         bool isAsync = false;
         std::string loopVar;
         std::shared_ptr<Expression> iterable;
         std::shared_ptr<BlockStatement> body;
         std::string task_function_name; // Name of the compiled task function
+        
+        // Channel information for this task (concurrent only)
+        std::string channel_param; // Channel parameter name (e.g., "ch")
     };
 
-    // Worker statement inside a concurrent/parallel block
+    // Worker statement inside a concurrent block
     struct WorkerStatement : public Statement {
         bool isAsync = false;
         std::string param;

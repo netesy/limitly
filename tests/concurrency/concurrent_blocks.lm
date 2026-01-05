@@ -1,56 +1,49 @@
 print("=== Concurrent Block Tests ===");
 
 // ==========================================
-//  Basic concurrent execution (batch mode)
+//  Basic concurrent execution (stream mode)
 // ==========================================
-// concurrent = I/O-bound, default mode=batch
-var shared_counter: int = 0;  // atomic for primitives, locked for objects
+// concurrent = I/O-bound, uses channels only (no SharedCell)
+var input_events = channel();
+var output_results = channel();
 
-counts = channel();
-concurrent(ch=counts, mode=batch, cores=Auto, on_error=Stop,
-           timeout=20s, grace=500ms, on_timeout=partial) {
+concurrent(ch=input_events, cores=Auto, on_error=Stop,
+           timeout=20s, grace=500ms) {
     task(i in 1..3) {
         print("Concurrent task {i} running");
         sleep(randint(1, 3));
-        shared_counter += 1;  // atomic add
-        counts.send(shared_counter);
+        output_results.send("Task {i} completed");  // Channel communication only
     }
-} // auto-close counts when done or timeout+grace reached
+} // auto-close input_events when done
 
-iter (count in counts) {
-    print("Updated counter: {count}");
+// Feed events to concurrent block
+input_events.send("event1");
+input_events.send("event2");
+input_events.send("event3");
+
+iter (result in output_results) {
+    print("Received result: {result}");
 }
 print("Concurrent block finished");
 
 
 // ==========================================
-//  Async/await pattern (batch mode)
+//  Stream processing with workers
 // ==========================================
-results = channel();
-concurrent(ch=results, mode=batch, cores=Auto, on_error=Auto,
-           timeout=20s, grace=500ms, on_timeout=partial) {
-    task() {
-        var datas = await fetchData();
-        results.send(datas);
-    }
-} // auto-close results
+var stream_in = channel();
+var stream_out = channel();
 
-iter (result in results) {
-    print("Got async result: {result}");
-}
-
-
-// ==========================================
-//  Stream processing (I/O bound)
-// ==========================================
-stream_out = channel();
-concurrent(events: StreamEvent, ch=stream_out, mode=stream, cores=Auto,
-           on_error=Stop, timeout=15s, grace=500ms, on_timeout=partial) {
+concurrent(ch=stream_in, cores=4, timeout=15s, grace=500ms) {
     worker(event) {
         print("Processing event: {event}");
-        stream_out.send("Handled {event.id}");
+        stream_out.send("Handled {event}");  // Channel communication only
     }
-} // auto-close stream_out
+} // auto-close stream_in
+
+// Feed events to stream
+stream_in.send("data1");
+stream_in.send("data2");
+stream_in.send("data3");
 
 iter (msg in stream_out) {
     print("Result: {msg}");
@@ -58,74 +51,39 @@ iter (msg in stream_out) {
 
 
 // ==========================================
-//  Async stream pipeline (I/O bound)
+//  Concurrent block with channel parameter assignment
 // ==========================================
-async_out = channel();
-concurrent(events: StreamEvent, ch=async_out, mode=async, timeout=20s, grace=500ms,
-           on_timeout=partial, on_error=Stop) {
-    worker(event) {
-        var datas = await fetchData(event.id);
-        async_out.send("Processed {event.id} -> {datas}");
-    }
-} // auto-close async_out
+var main_channel = channel();
 
-iter (msg in async_out) {
-    print("Result: {msg}");
+concurrent(ch=main_channel, cores=2, timeout=10s) {
+    worker(item) {
+        processed = "Processed: {item}";
+        main_channel.send(processed);  // Channel communication only
+    }
+}
+
+// Feed items to workers
+main_channel.send("item1");
+main_channel.send("item2");
+
+iter (result in main_channel) {
+    print("Final result: {result}");
 }
 
 
-// Test parallel blocks 
-print("=== Parallel Block Tests ===");
+// ==========================================
+//  Simple concurrent block with no parameters
+// ==========================================
+var simple_channel = channel();
 
-// // ==========================================
-// //  Batch parallel block (CPU bound)
-// // ==========================================
-// messages = channel();
-// parallel(ch=messages, mode=batch, cores=Auto, on_error=Auto,
-//          timeout=20s, grace=500ms, on_timeout=partial) {
-//     task(i in 1..3) {
-//         print("Task {i} running");
-//         sleep(randint(1, 3));
-//         messages.send("Task {i} done");
-//     }
-// } // auto-close messages
+concurrent {
+    worker(data) {
+        simple_channel.send("Worker processed: {data}");  // Channel communication only
+    }
+}
 
-// iter (message in messages) {
-//     print("Received: {message}");
-// }
+simple_channel.send("test_data");
 
-// // ==========================================
-// //  Stream processing (CPU bound, retries)
-// // ==========================================
-// files_out = channel();
-// parallel(events: FileChunks, ch=files_out, mode=stream, cores=Auto,
-//          on_error=Retry, timeout=60s,
-//          grace=500ms, on_timeout=partial) {
-//     worker(chunk) {
-//         process_chunk(chunk);
-//         files_out.send("Chunk {chunk.id} processed");
-//     }
-// } // auto-close files_out
-
-// iter (msg in files_out) {
-//     print(msg);
-// }
-
-// // ==========================================
-// //  Concurrent block with no parameters
-// // ==========================================
-// concurrent {
-//     task(i in 1..2) {
-//         print("Task {i} with default parameters");
-//     }
-// }
-
-// // ==========================================
-// //  Parallel block with invalid parameter
-// // ==========================================
-// // This should be handled gracefully by the parser
-// // parallel(invalid_param="test") {
-// //     task(i in 1..2) {
-// //         print("This should not be executed");
-// //     }
-// // }
+iter (result in simple_channel) {
+    print("Simple result: {result}");
+}

@@ -147,20 +147,15 @@ enum class LIR_Op : uint8_t {
     SchedulerInit,       // Initialize scheduler
     SchedulerRun,        // Run scheduler loop (returns when all done)
     SchedulerTick,       // Single scheduler tick
+    SchedulerAddTask,    // Add task to scheduler
     
     // Time (bare metal compatible)
     GetTickCount,        // Get monotonic tick counter
     DelayUntil,          // Check if delay expired (non-blocking)
     
-    // === LOCK-FREE PARALLEL OPERATIONS ===
-    WorkQueueAlloc,      // Allocate lock-free work queue
-    WorkQueuePush,       // Push task to queue (atomic)
-    WorkQueuePop,        // Pop task from queue (atomic)
-    WorkQueueFree,       // Free work queue resources
-    ParallelWaitComplete,// Wait for all workers to complete
-    WorkerSignal,        // Signal workers to start
-    WorkerJoin,          // Wait for workers to finish
-    TaskSetCode,         // Store task body code in context
+    // === NEW SIMPLIFIED PARALLEL OPERATIONS ===
+    ParallelInit,        // Initialize parallel execution context
+    ParallelSync,        // Synchronize and complete parallel execution
     
     // List/Collection operations
     ListCreate,
@@ -176,7 +171,14 @@ enum class LIR_Op : uint8_t {
     ImportModule,
     ExportSymbol,
     BeginModule,
-    EndModule
+    EndModule,
+    
+    // SharedCell operations for parallel execution
+    SharedCellAlloc,    // Allocate SharedCell, returns cell_id (reg = cell_id)
+    SharedCellLoad,     // Load value from SharedCell (reg = shared_cells[cell_id].value)
+    SharedCellStore,    // Store value to SharedCell (shared_cells[cell_id].value = reg)
+    SharedCellAdd,      // Atomic add to SharedCell (shared_cells[cell_id].value += reg)
+    SharedCellSub       // Atomic sub from SharedCell (shared_cells[cell_id].value -= reg)
 };
 
 // Source location for debugging

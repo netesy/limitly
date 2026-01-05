@@ -1015,6 +1015,71 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
             m_current_block.add_assignment(dst, m_context.new_rvalue(m_int_type, 0));
             return dst;
         }
+        
+        // === SHARED CELL OPERATIONS ===
+        case LIR::LIR_Op::SharedCellAlloc: {
+            // Allocate a new SharedCell ID
+            // For now, just return a simple incrementing ID
+            // In a real implementation, this would allocate from the global shared_cells table
+            
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+            
+            // Simple implementation: use a static counter
+            // TODO: Make this thread-safe with atomic operations
+            static uint32_t next_cell_id = 0;
+            uint32_t cell_id = next_cell_id++;
+            
+            gccjit::rvalue cell_id_rvalue = m_context.new_rvalue(m_int_type, static_cast<int>(cell_id));
+            m_current_block.add_assignment(dst, cell_id_rvalue);
+            
+            return dst;
+        }
+        
+        case LIR::LIR_Op::SharedCellLoad: {
+            // Load value from SharedCell: dst = shared_cells[cell_id].value
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+            gccjit::rvalue cell_id = get_jit_register(inst.a);
+            
+            // For now, implement as a simple array lookup
+            // TODO: Implement proper SharedCell table access
+            gccjit::rvalue zero = m_context.new_rvalue(m_int_type, 0);
+            m_current_block.add_assignment(dst, zero);
+            
+            return dst;
+        }
+        
+        case LIR::LIR_Op::SharedCellStore: {
+            // Store value to SharedCell: shared_cells[cell_id].value = src
+            gccjit::rvalue cell_id = get_jit_register(inst.a);
+            gccjit::rvalue src = get_jit_register(inst.b);
+            
+            // For now, just a no-op
+            // TODO: Implement proper SharedCell table store with atomic operations
+            
+            return src;
+        }
+        
+        case LIR::LIR_Op::SharedCellAdd: {
+            // Atomic add to SharedCell: shared_cells[cell_id].value += src
+            gccjit::rvalue cell_id = get_jit_register(inst.a);
+            gccjit::rvalue src = get_jit_register(inst.b);
+            
+            // For now, just a no-op
+            // TODO: Implement proper atomic SharedCell add operation
+            
+            return src;
+        }
+        
+        case LIR::LIR_Op::SharedCellSub: {
+            // Atomic sub from SharedCell: shared_cells[cell_id].value -= src
+            gccjit::rvalue cell_id = get_jit_register(inst.a);
+            gccjit::rvalue src = get_jit_register(inst.b);
+            
+            // For now, just a no-op
+            // TODO: Implement proper atomic SharedCell sub operation
+            
+            return src;
+        }
             
         default:
             report_error("Unsupported instruction: " + std::to_string(static_cast<int>(inst.op)));

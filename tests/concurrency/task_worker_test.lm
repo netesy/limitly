@@ -1,110 +1,126 @@
-// Test task and worker statements in Limit Language
+// Test task and worker statements in concurrent blocks
 print("=== Task and Worker Tests ===");
 
 // ==========================================
-//  Simple task statement
+//  Simple task statement in concurrent block
 // ==========================================
-print("\nTesting simple task statement...");
+print("\nTesting simple task statement in concurrent block...");
 
-// Create a channel for task communication
-//ch = channel();
+var task_results = channel();
 
-// Run tasks in parallel
-task(i in 1..3) {
-    result = i * i;print("Task ${i} result: ${result}");
-   // ch.send("Task ${i} result: ${result}");
+concurrent(ch=task_results, cores=2) {
+    task(i in 1..3) {
+        result = i * i;
+        print("Task {i} result: {result}");
+        task_results.send("Task {i} result: {result}");
+    }
 }
-
-// Close the channel after all tasks complete
-//ch.close();
 
 // Print results
-// iter (msg in ch) {
-//     print(msg);
-// }
-
-// ==========================================
-//  Task with custom iterable
-// ==========================================
-print("\nTesting task with custom iterable...");
-
-items = ["apple", "banana", "cherry"];
-results = [];
-
-// Run tasks with custom iterable
-task(item in items) {
-    results.push(item.to_upper());
+iter (msg in task_results) {
+    print(msg);
 }
 
-// Results should be collected in parallel
-print("Uppercased items:", results);
+// ==========================================
+//  Task with custom iterable in concurrent block
+// ==========================================
+print("\nTesting task with custom iterable in concurrent block...");
+
+var items = ["apple", "banana", "cherry"];
+var uppercase_results = channel();
+
+concurrent(ch=uppercase_results, cores=3) {
+    task(item in items) {
+        processed = item.to_upper();
+        uppercase_results.send(processed);
+    }
+}
+
+// Collect results
+var processed_items = [];
+iter (result in uppercase_results) {
+    processed_items.push(result);
+}
+
+print("Uppercased items: {processed_items}");
 
 // ==========================================
-//  Worker with channel communication
+//  Worker with channel communication in concurrent block
 // ==========================================
 print("\nTesting worker with channel communication...");
 
-// Create input and output channels
-input_ch = channel();
-output_ch = channel();
+var input_ch = channel();
+var output_ch = channel();
 
-// Start worker
-worker(item) {
-    // Process item (e.g., make it uppercase and add index)
-    processed = "${item.to_upper()}_processed";
-    output_ch.send(processed);
+concurrent(ch=input_ch, cores=2) {
+    worker(item) {
+        // Process item (e.g., make it uppercase and add index)
+        processed = "{item.to_upper()}_processed";
+        output_ch.send(processed);
+    }
 }
 
-// Send data to worker
+// Send data to workers
 input_ch.send("first");
 input_ch.send("second");
 input_ch.send("third");
-input_ch.close();
 
 // Process results
 iter (result in output_ch) {
-    print("Processed:", result);
+    print("Processed: {result}");
 }
 
 // ==========================================
-//  Nested tasks and workers
+//  Mixed task and worker in concurrent block
 // ==========================================
-print("\nTesting nested tasks and workers...");
+print("\nTesting mixed task and worker in concurrent block...");
 
-// Outer task
-task(i in 1..2) {
-    print("Outer task", i);
-    
-    // Inner worker
-    worker(x) {
-        return x * 10;
+var mixed_results = channel();
+
+concurrent(ch=mixed_results, cores=3) {
+    // Task for processing numbers
+    task(i in 1..3) {
+        print("Task processing number: {i}");
+        mixed_results.send("Task result: {i * 10}");
     }
     
-    // Use the worker
-    result = worker(i);
-    print("Worker result:", result);
-    
-    // Nested task
-    task(j in 1..2) {
-        print("  Nested task", i, j);
-        return i * 100 + j;
+    // Worker for processing strings
+    worker(text) {
+        print("Worker processing text: {text}");
+        mixed_results.send("Worker result: {text.to_upper()}");
     }
 }
 
-// ==========================================
-//  Error handling in tasks
-// ==========================================
-print("\nTesting error handling in tasks...");
+// Send data to worker
+mixed_results.send("hello");
+mixed_results.send("world");
 
-// try {
-//     task(i in 1..3) {
-//         if (i == 2) {
-//             throw "Error in task ${i}";
-//         }
-//         print("Task", i, "completed successfully");
-//     }
-// } catch (e) {
-//     print("Caught error:", e);
-// }
+// Collect all results
+var all_results = [];
+iter (result in mixed_results) {
+    all_results.push(result);
+}
+
+print("All results: {all_results}");
+
+// ==========================================
+//  Simple concurrent block with only workers
+// ==========================================
+print("\nTesting concurrent block with only workers...");
+
+var worker_only_results = channel();
+
+concurrent(ch=worker_only_results) {
+    worker(data) {
+        worker_only_results.send("Worker processed: {data}");
+    }
+}
+
+worker_only_results.send("test1");
+worker_only_results.send("test2");
+
+iter (result in worker_only_results) {
+    print(result);
+}
 
 print("\n=== Task and Worker Tests Complete ===");
