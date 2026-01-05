@@ -38,6 +38,9 @@ void RegisterVM::reset() {
         std::forward_as_tuple("shared_counter"), 
         std::forward_as_tuple(0));
     
+    // Reset SharedCell operations
+    shared_cells.clear();
+    
     // Reset atomic variables and work queues
     default_atomic.store(0);
     work_queues.clear();
@@ -108,6 +111,17 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
     dispatch_table[static_cast<int>(LIR::LIR_Op::SchedulerTick)] = &&OP_SCHEDULER_TICK;
     dispatch_table[static_cast<int>(LIR::LIR_Op::GetTickCount)] = &&OP_GET_TICK_COUNT;
     dispatch_table[static_cast<int>(LIR::LIR_Op::DelayUntil)] = &&OP_DELAY_UNTIL;
+    
+    // Parallel execution operations
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ParallelInit)] = &&OP_PARALLEL_INIT;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ParallelSync)] = &&OP_PARALLEL_SYNC;
+    
+    // SharedCell operations
+    dispatch_table[static_cast<int>(LIR::LIR_Op::SharedCellAlloc)] = &&OP_SHARED_CELL_ALLOC;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::SharedCellLoad)] = &&OP_SHARED_CELL_LOAD;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::SharedCellStore)] = &&OP_SHARED_CELL_STORE;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::SharedCellAdd)] = &&OP_SHARED_CELL_ADD;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::SharedCellSub)] = &&OP_SHARED_CELL_SUB;
     
     // Additional missing operations
     dispatch_table[static_cast<int>(LIR::LIR_Op::Neg)] = &&OP_NEG;
@@ -985,6 +999,116 @@ OP_DELAY_UNTIL:
     {
         uint64_t target_time = static_cast<uint64_t>(to_int(registers[pc->a]));
         registers[pc->dst] = static_cast<bool>(current_time >= target_time);
+    }
+    DISPATCH();
+
+// ============ PARALLEL EXECUTION OPERATIONS ============
+
+OP_PARALLEL_INIT:
+    {
+        // Initialize parallel execution context
+        // For now, just return success (1)
+        // In a real implementation, this would set up worker threads
+        std::cout << "[DEBUG] Parallel execution initialized" << std::endl;
+        registers[pc->dst] = static_cast<int64_t>(1);
+    }
+    DISPATCH();
+
+OP_PARALLEL_SYNC:
+    {
+        // Synchronize and complete parallel execution
+        // For now, just return success (1)
+        // In a real implementation, this would wait for all workers to complete
+        std::cout << "[DEBUG] Parallel execution synchronized" << std::endl;
+        registers[pc->dst] = static_cast<int64_t>(1);
+    }
+    DISPATCH();
+
+// ============ SHARED CELL OPERATIONS ============
+
+OP_SHARED_CELL_ALLOC:
+    {
+        // Allocate a new SharedCell ID
+        // For now, use a simple incrementing ID
+        static uint32_t next_cell_id = 1;
+        uint32_t cell_id = next_cell_id++;
+        
+        // Initialize SharedCell with value 0
+        shared_cells[cell_id] = std::make_unique<SharedCell>(cell_id, 0);
+        
+        std::cout << "[DEBUG] Allocated SharedCell ID " << cell_id << std::endl;
+        registers[pc->dst] = static_cast<int64_t>(cell_id);
+    }
+    DISPATCH();
+
+OP_SHARED_CELL_LOAD:
+    {
+        // Load value from SharedCell: dst = shared_cells[cell_id].value
+        uint32_t cell_id = static_cast<uint32_t>(to_int(registers[pc->a]));
+        
+        if (shared_cells.find(cell_id) != shared_cells.end()) {
+            int64_t value = shared_cells[cell_id]->value.load();
+            registers[pc->dst] = value;
+            std::cout << "[DEBUG] Loaded " << value << " from SharedCell " << cell_id << std::endl;
+        } else {
+            std::cerr << "[ERROR] SharedCell ID " << cell_id << " not found" << std::endl;
+            registers[pc->dst] = static_cast<int64_t>(0);
+        }
+    }
+    DISPATCH();
+
+OP_SHARED_CELL_STORE:
+    {
+        // Store value to SharedCell: shared_cells[cell_id].value = src
+        uint32_t cell_id = static_cast<uint32_t>(to_int(registers[pc->a]));
+        int64_t value = to_int(registers[pc->b]);
+        
+        if (shared_cells.find(cell_id) != shared_cells.end()) {
+            shared_cells[cell_id]->value.store(value);
+            std::cout << "[DEBUG] Stored " << value << " to SharedCell " << cell_id << std::endl;
+            registers[pc->dst] = value;
+        } else {
+            std::cerr << "[ERROR] SharedCell ID " << cell_id << " not found" << std::endl;
+            registers[pc->dst] = static_cast<int64_t>(0);
+        }
+    }
+    DISPATCH();
+
+OP_SHARED_CELL_ADD:
+    {
+        // Atomic add to SharedCell: shared_cells[cell_id].value += src
+        uint32_t cell_id = static_cast<uint32_t>(to_int(registers[pc->a]));
+        int64_t value = to_int(registers[pc->b]);
+        
+        if (shared_cells.find(cell_id) != shared_cells.end()) {
+            int64_t old_value = shared_cells[cell_id]->value.fetch_add(value);
+            int64_t new_value = old_value + value;
+            std::cout << "[DEBUG] Added " << value << " to SharedCell " << cell_id 
+                      << " (old: " << old_value << ", new: " << new_value << ")" << std::endl;
+            registers[pc->dst] = new_value;
+        } else {
+            std::cerr << "[ERROR] SharedCell ID " << cell_id << " not found" << std::endl;
+            registers[pc->dst] = static_cast<int64_t>(0);
+        }
+    }
+    DISPATCH();
+
+OP_SHARED_CELL_SUB:
+    {
+        // Atomic sub from SharedCell: shared_cells[cell_id].value -= src
+        uint32_t cell_id = static_cast<uint32_t>(to_int(registers[pc->a]));
+        int64_t value = to_int(registers[pc->b]);
+        
+        if (shared_cells.find(cell_id) != shared_cells.end()) {
+            int64_t old_value = shared_cells[cell_id]->value.fetch_sub(value);
+            int64_t new_value = old_value - value;
+            std::cout << "[DEBUG] Subtracted " << value << " from SharedCell " << cell_id 
+                      << " (old: " << old_value << ", new: " << new_value << ")" << std::endl;
+            registers[pc->dst] = new_value;
+        } else {
+            std::cerr << "[ERROR] SharedCell ID " << cell_id << " not found" << std::endl;
+            registers[pc->dst] = static_cast<int64_t>(0);
+        }
     }
     DISPATCH();
 
