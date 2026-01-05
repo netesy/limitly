@@ -87,6 +87,15 @@ struct Channel {
     }
 };
 
+// SharedCell structure for parallel execution
+struct SharedCell {
+    uint32_t id;
+    std::atomic<int64_t> value;
+    
+    SharedCell(uint32_t cell_id, int64_t initial_value) 
+        : id(cell_id), value(initial_value) {}
+};
+
 // Scheduler for threadless concurrency
 struct Scheduler {
     std::vector<std::unique_ptr<TaskContext>> tasks;
@@ -187,6 +196,9 @@ private:
     
     // Shared atomic variables for true shared state across tasks
     std::unordered_map<std::string, std::atomic<int64_t>> shared_variables;
+    
+    // SharedCell operations for parallel execution
+    std::unordered_map<uint32_t, std::unique_ptr<SharedCell>> shared_cells;
     
     // Atomic variables and work queues for lock-free parallel operations
     std::atomic<int64_t> default_atomic{0};
