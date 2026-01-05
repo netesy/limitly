@@ -174,6 +174,9 @@ private:
     void emit_task_init_and_step(AST::TaskStatement& task, size_t task_id, Reg contexts_reg, Reg channel_reg, Reg counter_reg, int64_t loop_var_value = 0);
     void emit_task_stmt(AST::TaskStatement& stmt);
     void create_and_register_task_function(const std::string& task_name, AST::TaskStatement* task_stmt, int64_t loop_value);
+    void create_parallel_work_item(const std::string& work_item_name, std::shared_ptr<AST::Statement> stmt);
+    void collect_variables_from_statement(AST::Statement& stmt, std::set<std::string>& variables);
+    void collect_variables_from_expression(AST::Expression& expr, std::set<std::string>& variables);
     void emit_concurrent_worker_init(AST::WorkerStatement& worker, size_t worker_id, Reg scheduler_reg, Reg channel_reg);
     void emit_worker_stmt(AST::WorkerStatement& stmt);
     void emit_iter_stmt(AST::IterStatement& stmt);

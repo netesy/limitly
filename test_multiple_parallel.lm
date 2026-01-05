@@ -10,7 +10,7 @@ print("Counter2:", counter2);
 
 // First parallel block
 parallel {
-    task (i in 1..3) {
+    iter (i in 1..3) {
         print("Block 1 - Task", i, "starting");
         counter1 = counter1 + 1;
         print("Block 1 - Task", i, "done, counter1 =", counter1);
@@ -22,7 +22,7 @@ print("Counter1:", counter1);
 
 // Second parallel block
 parallel {
-    task (i in 1..2) {
+    iter (i in 1..2) {
         print("Block 2 - Task", i, "starting");
         counter2 = counter2 + 1;
         print("Block 2 - Task", i, "done, counter2 =", counter2);
@@ -39,7 +39,7 @@ print("=== Simple Concurrent Test ===");
 var shared_counter: int = 0;
 
 concurrent() {
-    task (i in 1..4) {
+    iter (i in 1..4) {
         print("Task {i} running");
         shared_counter = shared_counter + 1;
         print("Task {i} done, counter = {shared_counter}");
