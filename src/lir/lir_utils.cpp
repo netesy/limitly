@@ -48,9 +48,14 @@ std::string Disassembler::disassemble() const {
     
     ss << "}\n";
     
-    // Only show user-defined functions that are actually called
+    // Show user-defined functions that are actually called AND task functions
     auto& function_registry = FunctionRegistry::getInstance();
     
+    // Get all registered function names
+    auto all_function_names = function_registry.getFunctionNames();
+    bool has_user_functions = false;
+    
+    // First show called functions (original behavior)
     if (!called_functions.empty()) {
         ss << "\n=== User-Defined Functions ===\n";
         for (const auto& func_name : called_functions) {
@@ -68,10 +73,11 @@ std::string Disassembler::disassemble() const {
                 
                 // Show functions that either have real instructions or more than just call+return
                 if (has_real_instructions || lir_func->instructions.size() > 2) {
+                    has_user_functions = true;
                     // Create a temporary disassembler for this function
                     Disassembler func_disassemble(*lir_func, show_debug_info);
                     
-                    // Get the disassembly but remove the recursive call to avoid infinite loop
+                    // Get the disassembly but remove recursive call to avoid infinite loop
                     ss << "\nfn " << lir_func->name << "(";
                     for (uint32_t i = 0; i < lir_func->param_count; ++i) {
                         if (i > 0) ss << ", ";
@@ -94,6 +100,37 @@ std::string Disassembler::disassemble() const {
                         }
                         
                         // Add instruction
+                        ss << "  " << i << ": " << func_disassemble.disassemble_instruction(inst) << "\n";
+                    }
+                    
+                    ss << "}\n";
+                }
+            }
+        }
+    }
+    
+    // Also show task functions (even if not called directly)
+    if (!all_function_names.empty()) {
+        bool has_task_functions = false;
+        for (const auto& func_name : all_function_names) {
+            // Check if this is a task function (starts with "task_")
+            if (func_name.find("task_") == 0) {
+                auto lir_func = function_registry.getFunction(func_name);
+                if (lir_func && !lir_func->instructions.empty()) {
+                    if (!has_task_functions) {
+                        ss << "\n=== Task Functions ===\n";
+                        has_task_functions = true;
+                    }
+                    
+                    // Create a temporary disassembler for this task function
+                    Disassembler func_disassemble(*lir_func, show_debug_info);
+                    
+                    // Task function header
+                    ss << "\nfn " << lir_func->name << "() {\n";
+                    
+                    // Task function instructions
+                    for (size_t i = 0; i < lir_func->instructions.size(); ++i) {
+                        const auto& inst = lir_func->instructions[i];
                         ss << "  " << i << ": " << func_disassemble.disassemble_instruction(inst) << "\n";
                     }
                     

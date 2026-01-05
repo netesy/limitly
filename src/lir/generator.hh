@@ -173,9 +173,8 @@ private:
     void emit_concurrent_stmt(AST::ConcurrentStatement& stmt);
     void emit_task_init_and_step(AST::TaskStatement& task, size_t task_id, Reg contexts_reg, Reg channel_reg, Reg counter_reg, int64_t loop_var_value = 0);
     void emit_task_stmt(AST::TaskStatement& stmt);
-    void emit_parallel_task_init(AST::TaskStatement& task, size_t task_id, Reg contexts_reg, Reg work_queue_reg, int64_t loop_var_value = 0, const std::map<std::string, Reg>& shared_counter_regs = {});
-    void emit_parallel_worker_init(AST::WorkerStatement& worker, size_t worker_id, Reg contexts_reg, Reg work_queue_reg, int64_t param_value = 0);
-    void emit_parallel_worker_loop(Reg work_queue_reg, int worker_id);
+    void create_and_register_task_function(const std::string& task_name, AST::TaskStatement* task_stmt, int64_t loop_value);
+    void emit_concurrent_worker_init(AST::WorkerStatement& worker, size_t worker_id, Reg scheduler_reg, Reg channel_reg);
     void emit_worker_stmt(AST::WorkerStatement& stmt);
     void emit_iter_stmt(AST::IterStatement& stmt);
     void emit_break_stmt(AST::BreakStatement& stmt);
@@ -187,6 +186,8 @@ private:
     
     // Helper functions
     std::optional<ValuePtr> evaluate_constant_expression(std::shared_ptr<AST::Expression> expr);
+    uint64_t parse_timeout(const std::string& timeout_str);
+    uint64_t parse_grace_period(const std::string& grace_str);
     
     // Error reporting
     void report_error(const std::string& message);
@@ -214,6 +215,9 @@ private:
     std::vector<Scope> scope_stack_;
     std::vector<LoopContext> loop_stack_;
     CFGContext cfg_context_;
+    
+    // Task counter for generating unique task function names
+    size_t task_counter_ = 0;
     uint32_t next_register_ = 0;
     uint32_t next_label_ = 0;
     std::unordered_map<Reg, TypePtr> register_types_;
@@ -277,8 +281,12 @@ private:
     MemoryManager<> memory_manager_;
     MemoryManager<>::Region* current_memory_region_ = nullptr;
     
-    // Task body variable mapping - maps original variable names to task parameter registers
-    std::unordered_map<std::string, Reg> task_variable_mappings_;
+    // SharedCell tracking for parallel blocks - maps variable names to cell IDs
+    // This ensures proper shared variable identity and isolation
+    std::unordered_map<std::string, uint32_t> parallel_block_cell_ids_;
+    
+    // Channel context for concurrent blocks
+    Reg channel_context_ = UINT32_MAX;
     
     // Variable capture analysis for concurrent statements
     void find_accessed_variables_in_concurrent(AST::ConcurrentStatement& stmt, std::set<std::string>& accessed_variables);

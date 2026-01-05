@@ -157,8 +157,14 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         if (useJit) {
             try {
                 // Generate LIR from optimized AST
+                if (enableDebug || jitDebug) {
+                    std::cout << "[DEBUG] Starting LIR generation..." << std::endl;
+                }
                 LIR::Generator lir_generator;
                 auto lir_function = lir_generator.generate_program(post_opt_type_check);
+                if (enableDebug || jitDebug) {
+                    std::cout << "[DEBUG] LIR generation completed." << std::endl;
+                }
                 
                 // Initialize and run LIR disassembler (includes all functions)
                 LIR::Disassembler disassemble(*lir_function, true);
@@ -280,9 +286,14 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 std::cout << "Debug mode enabled for register interpreter\n";
             }
             
-            // Generate LIR from optimized AST and execute with register interpreter
+            if (enableDebug) {
+                std::cout << "[DEBUG] Starting LIR generation for register interpreter..." << std::endl;
+            }
             LIR::Generator lir_generator;
             auto lir_function = lir_generator.generate_program(post_opt_type_check);
+            if (enableDebug) {
+                std::cout << "[DEBUG] LIR generation completed for register interpreter." << std::endl;
+            }
             
             if (!lir_function) {
                 std::cerr << "Failed to generate LIR function\n";

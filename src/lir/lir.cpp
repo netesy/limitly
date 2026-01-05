@@ -208,19 +208,13 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::SchedulerInit: return "scheduler_init";
         case LIR_Op::SchedulerRun: return "scheduler_run";
         case LIR_Op::SchedulerTick: return "scheduler_tick";
+        case LIR_Op::SchedulerAddTask: return "scheduler_add_task";
         case LIR_Op::GetTickCount: return "get_tick_count";
         case LIR_Op::DelayUntil: return "delay_until";
+        case LIR_Op::ParallelInit: return "parallel_init";
+        case LIR_Op::ParallelSync: return "parallel_sync";
         
         // === LOCK-FREE PARALLEL OPERATIONS ===
-        case LIR_Op::WorkQueueAlloc: return "work_queue_alloc";
-        case LIR_Op::WorkQueuePush: return "work_queue_push";
-        case LIR_Op::WorkQueuePop: return "work_queue_pop";
-        case LIR_Op::WorkQueueFree: return "work_queue_free";
-        case LIR_Op::ParallelWaitComplete: return "parallel_wait_complete";
-        case LIR_Op::WorkerSignal: return "worker_signal";
-        case LIR_Op::TaskSetCode: return "task_set_code";
-        case LIR_Op::WorkerJoin: return "worker_join";
-        
         case LIR_Op::ListCreate: return "list_create";
         case LIR_Op::ListAppend: return "list_append";
         case LIR_Op::ListIndex: return "list_index";
@@ -231,6 +225,13 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::ExportSymbol: return "export_symbol";
         case LIR_Op::BeginModule: return "begin_module";
         case LIR_Op::EndModule: return "end_module";
+        
+        // === SHARED CELL OPERATIONS ===
+        case LIR_Op::SharedCellAlloc: return "shared_cell_alloc";
+        case LIR_Op::SharedCellLoad: return "shared_cell_load";
+        case LIR_Op::SharedCellStore: return "shared_cell_store";
+        case LIR_Op::SharedCellAdd: return "shared_cell_add";
+        case LIR_Op::SharedCellSub: return "shared_cell_sub";
     }
     return "unknown";
 }

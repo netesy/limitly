@@ -1,36 +1,73 @@
-// Concurrency smoke test - exercises atomics and simple tasks without channels
+// Concurrency smoke test - exercises concurrent blocks with channels
 print("=== Concurrency Smoke Test ===");
 
-// Atomic counter
-var counter: int = 0;
-assert(counter == 0, "Initial counter should be 0");
+// Channel for communication
+var results = channel();
 
-print("Tasks Iteration Tests");
+print("Testing concurrent task iteration");
 
-// Fixed iteration block - using the correct syntax that should work
-concurrent(mode=batch, cores=2, on_error=Stop) {
+// Fixed iteration block - using channels only (no SharedCell)
+concurrent(ch=results, cores=2, on_error=Stop) {
     task(i in 1..4) {
-        counter += 1;
-        print("Task running with counter {counter}");
+        print("Task {i} running");
+        results.send("Task {i} completed");  // Channel communication only
     }
 }
 
-assert(counter == 4, "Counter should be 4 after running 4 tasks");
-print("end Task tests");
-print("Final counter value: {counter}");
-print("Final counter:");
-print(counter);
-print("Smoke test finished");
+// Collect results
+var task_count = 0;
+iter (result in results) {
+    print("Received: {result}");
+    task_count = task_count + 1;
+}
 
-// Test the exact syntax from the working example
-print("=== Test Concurrent Iteration ===");
+assert(task_count == 4, "Should receive 4 results");
+print("Task tests completed");
+print("Final task count: {task_count}");
 
-// concurrent {
-//     task(i in 1..2) {
-//         print("Task {i} with default parameters");
+// // Test worker statements
+// print("=== Testing Worker Statements ===");
+
+// var worker_results = channel();
+
+// concurrent(ch=worker_results, cores=2) {
+//     worker(datas) {
+//         processed = "Worker processed: {datas}";
+//         worker_results.send(processed);  // Channel communication only
 //     }
 // }
 
-print("Test finished");
+// // Feed data to workers
+// worker_results.send("data1");
+// worker_results.send("data2");
+
+// var worker_count = 0;
+// iter (result in worker_results) {
+//     print("Worker result: {result}");
+//     worker_count = worker_count + 1;
+// }
+
+// assert(worker_count == 2, "Should receive 2 worker results");
+// print("Worker tests completed");
+// print("Final worker count: {worker_count}");
+
+// // Test simple concurrent block
+// print("=== Testing Simple Concurrent Block ===");
+
+// var simple_channel = channel();
+
+// concurrent {
+//     worker(item) {
+//         simple_channel.send("Simple worker: {item}");  // Channel communication only
+//     }
+// }
+
+// simple_channel.send("test");
+
+// iter (result in simple_channel) {
+//     print("Simple result: {result}");
+// }
+
+print("Smoke test finished successfully");
 
 

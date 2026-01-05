@@ -2151,16 +2151,16 @@ std::shared_ptr<AST::Statement> Parser::parallelStatement() {
     stmt->line = previous().line;
 
     // Set default values
-    stmt->channel = "";
-    stmt->mode = "fork-join";  // Default mode for parallel blocks
     stmt->cores = "auto";
-    stmt->onError = "stop";
     stmt->timeout = "0";
     stmt->grace = "0";
-    stmt->onTimeout = "partial";
+    stmt->on_error = "stop";
 
     // Parse parameters
-    parseConcurrencyParams(stmt->channel, stmt->mode, stmt->cores, stmt->onError, stmt->timeout, stmt->grace, stmt->onTimeout);
+    // For parallel statements, we only have cores, timeout, grace, and on_error
+    // We'll use dummy variables for the other parameters that parseConcurrencyParams expects
+    std::string dummy_channel, dummy_mode, dummy_onError, dummy_onTimeout;
+    parseConcurrencyParams(dummy_channel, dummy_mode, stmt->cores, stmt->on_error, stmt->timeout, stmt->grace, dummy_onTimeout);
 
     // Parse the block
     consume(TokenType::LEFT_BRACE, "Expected '{' after 'parallel'.");

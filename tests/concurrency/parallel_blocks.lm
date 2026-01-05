@@ -2,42 +2,53 @@
 print("=== Parallel Block Tests ===");
 
 // ==========================================
-//  Batch parallel block (CPU bound)
+//  Simple parallel block (CPU bound)
 // ==========================================
-var messages = channel();
-parallel(ch=messages, mode=batch, cores=Auto, on_error=Auto,
-         timeout=20s, grace=500ms, on_timeout=partial) {
-    
-    // Task statement for parallel execution
-    task(i in 1..3) {
-        print("Task {i} running");
-        sleep(randint(1, 3)); // these are assumed to be system functions
-        messages.send("Task {i} done");
-    }
-} // auto-close messages
+var counter = 0;
+var results: array[1000] = 0;
 
-// Process messages from parallel tasks
-iter (message in messages) {
-    print("Received: {message}");
+parallel {
+    // Direct SharedCell operations - no task statements
+    iter(i in 0..999) {
+        results[i] = i * 2;  // SharedCell access to results array
+        counter = counter + 1;  // SharedCell access to counter
+    }
 }
 
-// ==========================================
-//  Stream processing (CPU bound, retries)
-// ==========================================
-var files_out = channel();
-parallel(events: FileChunks, ch=files_out, mode=stream, cores=Auto,
-         on_error=Retry, timeout=60s,
-         grace=500ms, on_timeout=partial) {
-    
-    // Worker definition for processing chunks
-    worker(chunk) {
-        // Process the chunk and send result
-        process_chunk(chunk);
-        files_out.send("Chunk {chunk.id} processed");
-    }
-} // auto-close files_out
+print("Parallel processing complete");
+print("Counter: {counter}");
+print("First result: {results[0]}");
+print("Last result: {results[999]}");
 
-// Process output from workers
-iter (msg in files_out) {
-    print(msg);
+// ==========================================
+//  Parallel block with parameters
+// ==========================================
+var matrix: array[100][100] = 0;
+
+parallel(cores=4, timeout=30s, on_error=Stop) {
+    // Direct SharedCell operations - no task statements
+    iter(i in 0..99) {
+        iter(j in 0..99) {
+            matrix[i][j] = i * 100 + j;  // SharedCell access to matrix
+        }
+    }
 }
+
+print("Matrix processing complete");
+print("Matrix[0][0]: {matrix[0][0]}");
+print("Matrix[99][99]: {matrix[99][99]}");
+
+// ==========================================
+//  Parallel block with SharedCell operations
+// ==========================================
+var shared_sum = 0;
+
+parallel(cores=Auto, timeout=60s, grace=1s, on_error=Continue) {
+    // Direct SharedCell operations
+    iter(i in 1..1000) {
+        shared_sum = shared_sum + i;  // Atomic SharedCell add
+    }
+}
+
+print("Sum calculation complete");
+print("Shared sum: {shared_sum}");
