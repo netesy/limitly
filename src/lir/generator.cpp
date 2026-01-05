@@ -2519,9 +2519,11 @@ void Generator::emit_comptime_stmt(AST::ComptimeStatement& stmt) {
 }
 
 void Generator::emit_parallel_stmt(AST::ParallelStatement& stmt) {
+    std::cout << "[DEBUG] Emitting ParallelStatement" << std::endl;
+    
     auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
     
-    // Parse cores parameter (default to 3 if not specified)
+    // Parse cores parameter
     int num_cores = 3;  // default
     if (!stmt.cores.empty() && stmt.cores != "auto") {
         try {
@@ -2553,79 +2555,66 @@ void Generator::emit_parallel_stmt(AST::ParallelStatement& stmt) {
               << " timeout=" << timeout_ms << "ms grace=" << grace_ms 
               << "ms on_error=" << error_strategy << std::endl;
     
-    // Find variables accessed in the parallel block body that need to be shared
-    std::cout << "[DEBUG] About to call find_accessed_variables_recursive for parallel statement" << std::endl;
+    // According to spec: Parallel blocks should NOT use task statements
+    // They should use direct code with SharedCell operations and work queue system
+    
+    // 1. Find variables accessed in the parallel block body that need to be shared
     std::set<std::string> accessed_variables;
+    collect_variables_from_statement(*stmt.body, accessed_variables);
     
-    // For parallel blocks, manually collect accessed variables since we skip recursive analysis
-    if (auto block_stmt = dynamic_cast<AST::BlockStatement*>(stmt.body.get())) {
-        for (const auto& body_stmt : block_stmt->statements) {
-            if (auto task_stmt = dynamic_cast<AST::TaskStatement*>(body_stmt.get())) {
-                // Collect loop variable
-                if (!task_stmt->loopVar.empty()) {
-                    accessed_variables.insert(task_stmt->loopVar);
-                }
-                
-                // Collect variables from task body
-                if (task_stmt->body) {
-                    collect_variables_from_statement(*task_stmt->body, accessed_variables);
-                }
-            } else if (auto expr_stmt = dynamic_cast<AST::ExprStatement*>(body_stmt.get())) {
-                collect_variables_from_expression(*expr_stmt->expression, accessed_variables);
-            }
-        }
-    }
+    std::cout << "[DEBUG] Found " << accessed_variables.size() << " variables to share via SharedCell" << std::endl;
     
-    // find_accessed_variables_recursive(stmt.body->statements, accessed_variables);
-    std::cout << "[DEBUG] find_accessed_variables_recursive SKIPPED for parallel statement to prevent infinite recursion" << std::endl;
-    
-    // Allocate SharedCell IDs for each accessed variable - one per variable per parallel block
+    // 2. Allocate SharedCell IDs for each accessed variable
     parallel_block_cell_ids_.clear();
     for (const auto& var_name : accessed_variables) {
-        // Emit SharedCell allocation LIR instruction - let the VM handle the actual allocation
         Reg cell_id_reg = allocate_register();
         emit_instruction(LIR_Inst(LIR_Op::SharedCellAlloc, Type::I64, cell_id_reg, 0, 0));
-        
-        // Store the allocated cell_id for this variable (will be determined at runtime)
         parallel_block_cell_ids_[var_name] = cell_id_reg;
         
-        std::cout << "[DEBUG] Requested SharedCell allocation for variable '" << var_name 
-                  << "' (will be stored in register r" << cell_id_reg << ")" << std::endl;
+        std::cout << "[DEBUG] Allocated SharedCell for variable '" << var_name 
+                  << "' in register r" << cell_id_reg << std::endl;
     }
     
-    // NEW SIMPLIFIED APPROACH: Direct parallel execution without work queues
-    // 1. Initialize parallel execution
+    // 3. Initialize parallel execution system (using available operations)
     Reg parallel_context_reg = allocate_register();
     emit_instruction(LIR_Inst(LIR_Op::ParallelInit, parallel_context_reg, num_cores, 0));
     
-    // 2. Set up SharedCell context for the parallel block body
+    std::cout << "[DEBUG] Initialized parallel execution for " << num_cores << " cores" << std::endl;
+    
+    // 4. Set up SharedCell context for the parallel block body
     auto saved_parallel_block_cell_ids = parallel_block_cell_ids_;
     
-    // 3. Emit the parallel block body directly with SharedCell context
-    if (stmt.body) {
-        std::cout << "[DEBUG] Emitting parallel block body" << std::endl;
-        emit_stmt(*stmt.body);
-        std::cout << "[DEBUG] Parallel block body emitted" << std::endl;
+    // 5. Process parallel block body - execute directly with SharedCell context
+    if (auto block_stmt = dynamic_cast<AST::BlockStatement*>(stmt.body.get())) {
+        for (auto& body_stmt : block_stmt->statements) {
+            // According to spec: NO task statements in parallel blocks
+            if (auto task_stmt = dynamic_cast<AST::TaskStatement*>(body_stmt.get())) {
+                report_error("Task statements are not allowed in parallel blocks. Use concurrent blocks for task-based parallelism.");
+                return;
+            }
+            
+            // For parallel blocks, execute statements directly with SharedCell context
+            std::cout << "[DEBUG] Executing parallel statement directly" << std::endl;
+            emit_stmt(*body_stmt);
+        }
     }
     
-    // 4. Synchronize and cleanup
+    // 6. Synchronize and complete parallel execution (using available operations)
     emit_instruction(LIR_Inst(LIR_Op::ParallelSync, parallel_context_reg, 0, 0));
     
-    // 5. Synchronize SharedCell values back to main thread registers
+    // 7. Synchronize SharedCell values back to main thread registers
     for (const auto& var_mapping : parallel_block_cell_ids_) {
         const std::string& var_name = var_mapping.first;
         Reg cell_id_reg = var_mapping.second;
         
-        // Load the current value from SharedCell
+        // Load the final value from SharedCell
         Reg current_value_reg = allocate_register();
         emit_instruction(LIR_Inst(LIR_Op::SharedCellLoad, current_value_reg, cell_id_reg, 0));
-        set_register_type(current_value_reg, int_type);
         
         // Store it back to the original variable
         Reg var_reg = resolve_variable(var_name);
         if (var_reg != UINT32_MAX) {
             emit_instruction(LIR_Inst(LIR_Op::Store, var_reg, current_value_reg, 0));
-            set_register_type(var_reg, int_type);
             
             std::cout << "[DEBUG] Synchronized SharedCell for variable '" << var_name 
                       << "' back to register r" << var_reg << std::endl;
@@ -2635,7 +2624,7 @@ void Generator::emit_parallel_stmt(AST::ParallelStatement& stmt) {
     // Restore SharedCell context
     parallel_block_cell_ids_ = saved_parallel_block_cell_ids;
     
-    std::cout << "[DEBUG] Parallel block completed" << std::endl;
+    std::cout << "[DEBUG] Parallel block completed using SharedCell + direct execution" << std::endl;
 }
 
 // Helper functions for parsing timeout and grace period strings
@@ -2800,6 +2789,70 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
     emit_instruction(LIR_Inst(LIR_Op::SchedulerRun, scheduler_reg, 0, 0));
     
     std::cout << "[DEBUG] Concurrent statement processing completed" << std::endl;
+}
+
+void Generator::create_parallel_work_item(const std::string& work_item_name, std::shared_ptr<AST::Statement> stmt) {
+    std::cout << "[DEBUG] Creating parallel work item: " << work_item_name << std::endl;
+    
+    // Save current context
+    auto saved_function = std::move(current_function_);
+    auto saved_cfg_context = cfg_context_;
+    auto saved_current_block = cfg_context_.current_block;
+    
+    // Create new work item function
+    current_function_ = std::make_unique<LIR_Function>(work_item_name, 0);
+    cfg_context_.building_cfg = false;
+    cfg_context_.current_block = nullptr;
+    
+    // Initialize work item function
+    enter_scope();
+    
+    // Emit the statement directly (no task wrapper)
+    emit_stmt(*stmt);
+    
+    // Add return to work item function
+    emit_instruction(LIR_Inst(LIR_Op::Ret, Type::Void, 0, 0, 0));
+    
+    // Restore context
+    exit_scope();
+    
+    // Register work item function
+    auto& func_registry = LIR::FunctionRegistry::getInstance();
+    func_registry.registerFunction(work_item_name, std::move(current_function_));
+    
+    // Restore previous context
+    current_function_ = std::move(saved_function);
+    cfg_context_ = saved_cfg_context;
+    cfg_context_.current_block = saved_current_block;
+    
+    std::cout << "[DEBUG] Work item function " << work_item_name << " registered" << std::endl;
+}
+
+void Generator::collect_variables_from_statement(AST::Statement& stmt, std::set<std::string>& variables) {
+    if (auto block_stmt = dynamic_cast<AST::BlockStatement*>(&stmt)) {
+        for (const auto& body_stmt : block_stmt->statements) {
+            collect_variables_from_statement(*body_stmt, variables);
+        }
+    } else if (auto expr_stmt = dynamic_cast<AST::ExprStatement*>(&stmt)) {
+        collect_variables_from_expression(*expr_stmt->expression, variables);
+    } else if (auto print_stmt = dynamic_cast<AST::PrintStatement*>(&stmt)) {
+        for (const auto& arg : print_stmt->arguments) {
+            collect_variables_from_expression(*arg, variables);
+        }
+    }
+    // Add other statement types as needed
+}
+
+void Generator::collect_variables_from_expression(AST::Expression& expr, std::set<std::string>& variables) {
+    if (auto var_expr = dynamic_cast<AST::VariableExpr*>(&expr)) {
+        variables.insert(var_expr->name);
+    } else if (auto binary_expr = dynamic_cast<AST::BinaryExpr*>(&expr)) {
+        collect_variables_from_expression(*binary_expr->left, variables);
+        collect_variables_from_expression(*binary_expr->right, variables);
+    } else if (auto unary_expr = dynamic_cast<AST::UnaryExpr*>(&expr)) {
+        collect_variables_from_expression(*unary_expr->right, variables);
+    }
+    // Add other expression types as needed
 }
 
 void Generator::create_and_register_task_function(const std::string& task_name, AST::TaskStatement* task_stmt, int64_t loop_value) {
