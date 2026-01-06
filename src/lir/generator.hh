@@ -223,6 +223,19 @@ private:
     size_t task_counter_ = 0;
     uint32_t next_register_ = 0;
     uint32_t next_label_ = 0;
+    std::map<std::string, TypePtr> variable_types_;
+    std::shared_ptr<TypeSystem> type_system_;
+    std::string current_function_name_;
+    std::set<std::string> function_names_;
+    std::map<std::string, std::shared_ptr<AST::Expression>> constant_expressions_;
+    std::map<std::string, int64_t> constant_values_;
+    std::map<std::string, Reg> variable_registers_;
+    std::map<std::string, Reg> channel_registers_;
+    std::map<std::string, uint32_t> parallel_block_cell_ids_;
+    std::map<std::string, Reg> shared_cell_registers_;
+    std::string current_concurrent_block_id_;
+    std::map<std::string, uint64_t> task_counters_;
+    bool scheduler_initialized_ = false;
     std::unordered_map<Reg, TypePtr> register_types_;
     std::unordered_map<Reg, Type> register_abi_types_;
     std::unordered_map<Reg, TypePtr> register_language_types_;
@@ -284,16 +297,11 @@ private:
     MemoryManager<> memory_manager_;
     MemoryManager<>::Region* current_memory_region_ = nullptr;
     
-    // SharedCell tracking for parallel blocks - maps variable names to cell IDs
-    // This ensures proper shared variable identity and isolation
-    std::unordered_map<std::string, uint32_t> parallel_block_cell_ids_;
     
     // Channel context for concurrent blocks
     Reg channel_context_ = UINT32_MAX;
     
-    // Current concurrent block tracking
-    std::string current_concurrent_block_id_;
-    
+   
     // Variable capture analysis for concurrent statements
     void find_accessed_variables_in_concurrent(AST::ConcurrentStatement& stmt, std::set<std::string>& accessed_variables);
     void find_accessed_variables_recursive(const std::vector<std::shared_ptr<AST::Statement>>& statements, std::set<std::string>& accessed_variables);

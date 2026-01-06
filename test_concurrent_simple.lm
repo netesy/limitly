@@ -1,4 +1,4 @@
-print("=== Simple Concurrent Test ===");
+// print("=== Simple Concurrent Test ===");
 
 var shared_counter: int = 0;
 
