@@ -383,16 +383,13 @@ std::string Value::toString() const {
                 type->tag == TypeTag::UInt64 || type->tag == TypeTag::UInt128) {
                 // For unsigned types, use uint64_t conversion
                 uint64_t val = as<uint64_t>();
-                std::cout << "[DEBUG] Value::toString() unsigned: data='" << data << "' val=" << val << std::endl;
                 oss << val;
             } else {
                 // For signed types, use int64_t conversion
                 int64_t val = as<int64_t>();
-                std::cout << "[DEBUG] Value::toString() signed: data='" << data << "' val=" << val << std::endl;
                 oss << val;
             }
         } catch (const std::exception& e) {
-            std::cout << "[DEBUG] Value::toString() exception: " << e.what() << " data='" << data << "'" << std::endl;
             oss << "<error>";
         }
     } else if (type->tag == TypeTag::Float32 || type->tag == TypeTag::Float64) {

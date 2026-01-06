@@ -2756,17 +2756,26 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
                                     
                                     // Add task to scheduler
                                     Reg task_context_reg = allocate_register();
-                                    emit_instruction(LIR_Inst(LIR_Op::TaskContextAlloc, task_context_reg, 0, 0));
+                                    emit_instruction(LIR_Inst(LIR_Op::TaskContextAlloc, task_context_reg, 1, 0));
                                     
                                     // Set task ID
                                     Reg task_id_reg = allocate_register();
                                     auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
                                     ValuePtr task_id_val = std::make_shared<Value>(int_type, i);
+                                    std::cout << "[DEBUG] Creating task ID value: " << i << " for task " << task_name << std::endl;
                                     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, task_id_reg, task_id_val));
-                                    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, 0, task_context_reg, task_id_reg, 0));
+                                    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, task_id_reg, task_context_reg, 0, 0));
                                     
                                     // Set channel register
-                                    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, 0, task_context_reg, channel_reg, 2));
+                                    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, channel_reg, task_context_reg, 0, 2));
+                                    
+                                    // Set task function name in field 4
+                                    Reg task_name_reg = allocate_register();
+                                    auto string_type = std::make_shared<::Type>(::TypeTag::String);
+                                    ValuePtr task_name_val = std::make_shared<Value>(string_type, task_name);
+                                    std::cout << "[DEBUG] Setting task function name: '" << task_name << "' in field 4" << std::endl;
+                                    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, task_name_reg, task_name_val));
+                                    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, task_name_reg, task_context_reg, 0, 4));
                                     
                                     // Add task to scheduler
                                     emit_instruction(LIR_Inst(LIR_Op::SchedulerAddTask, Type::Void, scheduler_reg, task_context_reg, 0));
@@ -2873,11 +2882,11 @@ void Generator::create_and_register_task_function(const std::string& task_name, 
     
     // Bind loop variable if specified
     if (!task_stmt->loopVar.empty()) {
-        auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
-        Reg loop_var_reg = allocate_register();
-        ValuePtr loop_val = std::make_shared<Value>(int_type, loop_value);
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, loop_var_reg, loop_val));
+        // For concurrent tasks, the loop variable should come from register 0 (task context field 0)
+        // not from a hardcoded constant. Register 0 will be set up by the scheduler.
+        Reg loop_var_reg = 0;  // Use register 0 directly
         bind_variable(task_stmt->loopVar, loop_var_reg);
+        auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
         set_register_type(loop_var_reg, int_type);
     }
     
@@ -2907,6 +2916,21 @@ void Generator::create_and_register_task_function(const std::string& task_name, 
 void Generator::emit_task_stmt(AST::TaskStatement& stmt) {
     std::cout << "[DEBUG] Processing TaskStatement" << std::endl;
     
+    // Check if we're in a concurrent block - if so, convert to iter for direct execution
+    if (!current_concurrent_block_id_.empty()) {
+        std::cout << "[DEBUG] Converting task to iter in concurrent block" << std::endl;
+        
+        // Create a temporary IterStatement to reuse existing iter logic
+        auto temp_iter_stmt = std::make_unique<AST::IterStatement>();
+        temp_iter_stmt->loopVars = {stmt.loopVar};
+        temp_iter_stmt->iterable = stmt.iterable;
+        temp_iter_stmt->body = stmt.body;
+        
+        // Emit as iter statement (direct execution)
+        emit_iter_stmt(*temp_iter_stmt);
+        return;
+    }
+
     // Check if we're in a parallel block (SharedCell context) or concurrent block
     if (!parallel_block_cell_ids_.empty()) {
         std::cout << "[DEBUG] TaskStatement within parallel block - using SharedCell approach" << std::endl;

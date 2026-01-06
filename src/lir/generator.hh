@@ -291,6 +291,9 @@ private:
     // Channel context for concurrent blocks
     Reg channel_context_ = UINT32_MAX;
     
+    // Current concurrent block tracking
+    std::string current_concurrent_block_id_;
+    
     // Variable capture analysis for concurrent statements
     void find_accessed_variables_in_concurrent(AST::ConcurrentStatement& stmt, std::set<std::string>& accessed_variables);
     void find_accessed_variables_recursive(const std::vector<std::shared_ptr<AST::Statement>>& statements, std::set<std::string>& accessed_variables);
