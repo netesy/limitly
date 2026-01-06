@@ -951,12 +951,12 @@ module my_app.utils {
         // ...
     }
 
-    @private
+    // Members are private by default
     var api_key = "secret";
 }
 ```
 
-When another file imports this module, it will only have access to the `public` members. `protected` members would be available to other modules within the `my_app` namespace (not yet fully implemented), and `private` members are internal to the module.
+When another file imports this module, it will only have access to the `public` members. `protected` members would be available to other modules within the `my_app` namespace (not yet fully implemented), and members without a visibility annotation are `private` and internal to the module.
 
 ## Advanced Features
 
@@ -1418,7 +1418,7 @@ Limit's concurrency model is "structured," which means that the lifetime of conc
 var messages = channel();
 
 // This block will run tasks on multiple cores
-parallel(ch=messages, mode=batch, cores="auto", timeout=10s, onError="stop") {
+parallel(ch=messages, mode=batch, cores="auto", timeout=10s, on_error="stop") {
     task(i in 1..4) {
         print("Running task {i}...");
         // Perform some CPU-intensive work here
@@ -1440,13 +1440,13 @@ iter (message in messages) {
 *   `ch`: The channel to be used for communication between tasks.
 *   `mode`: The execution mode. `"batch"` (default for `concurrent`) waits for all tasks to be submitted before execution, while `"fork-join"` (default for `parallel`) executes tasks as they are submitted.
 *   `cores`: (parallel only) The number of CPU cores to use. Can be an integer or `"auto"` (default) to use all available cores.
-*   `onError`: Behavior upon task failure.
+*   `on_error`: Behavior upon task failure.
     *   `"stop"` (default): Stop all tasks immediately.
     *   `"continue"`: Allow other tasks to continue.
     *   A function reference to a custom error handler.
 *   `timeout`: A duration for the entire block (e.g., `5s`, `100ms`).
 *   `grace`: A grace period for tasks to complete after a timeout is reached.
-*   `onTimeout`: Behavior upon timeout.
+*   `on_timeout`: Behavior upon timeout.
     *   `"partial"` (default): Return results from completed tasks.
     *   `"stop"`: Stop all tasks.
     *   A function reference to a custom timeout handler.
