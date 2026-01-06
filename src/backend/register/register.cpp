@@ -855,7 +855,6 @@ OP_TASK_SET_FIELD:
 
         if (pc->imm != 0) {
             field_index = static_cast<int>(pc->imm);
-            field_value = registers[pc->b];
         }
 
         std::cout << "[DEBUG] TaskSetField: context_id=" << context_id << " field_index=" << field_index << " imm=" << pc->imm << " value_reg=" << pc->dst << std::endl;
