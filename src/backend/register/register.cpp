@@ -1004,11 +1004,10 @@ OP_SCHEDULER_RUN:
                 std::string task_func_name;
                 if (std::holds_alternative<std::string>(func_name_it->second)) {
                     task_func_name = std::get<std::string>(func_name_it->second);
-                    std::cout << "[DEBUG] Found task function name: '" << task_func_name << "'" << std::endl;
+                    std::cout << "[DEBUG] VM retrieved task function name: '" << task_func_name << "'" << std::endl;
                 } else {
                     std::cerr << "[ERROR] Task function name is not a string, value type: " << func_name_it->second.index() << std::endl;
-                    task->state = TaskState::COMPLETED;
-                    continue;
+                    task_func_name = "<corrupted>";
                 }
                 
                 // Get task function from registry

@@ -15,6 +15,7 @@ Generator::Generator() : current_function_(nullptr), next_register_(0), next_lab
     FunctionUtils::initializeFunctions();
 }
 
+
 std::unique_ptr<LIR_Function> Generator::generate_program(const TypeCheckResult& type_check_result) {
     std::cout << "[DEBUG] generate_program started" << std::endl;
     
@@ -2686,9 +2687,8 @@ std::optional<ValuePtr> Generator::evaluate_constant_expression(std::shared_ptr<
 
 void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
     std::cout << "[DEBUG] Processing concurrent statement" << std::endl;
-    
     auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
-    
+    scheduler_initialized_ = true;
     // Handle channel parameter assignment (e.g., "ch=counts")
     std::cout << "[DEBUG] Handling channel parameter assignment" << std::endl;
     Reg channel_reg;
@@ -2699,7 +2699,7 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
         std::string channel_name = stmt.channel;
         
         std::cout << "[DEBUG] Resolving existing channel variable: " << channel_name << std::endl;
-        // Resolve the existing channel variable
+        // Resolve to existing channel variable
         channel_reg = resolve_variable(channel_name);
         if (channel_reg == UINT32_MAX) {
             std::cout << "[DEBUG] Channel variable not found: " << channel_name << std::endl;
@@ -2719,14 +2719,14 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
         bind_variable(stmt.channel, channel_reg);
         set_register_type(channel_reg, int_type);
     }
+    // Set current concurrent block ID for this statement
+    current_concurrent_block_id_ = std::to_string(reinterpret_cast<uintptr_t>(&stmt));
     
     // Initialize scheduler for concurrent execution
-    std::cout << "[DEBUG] Initializing scheduler" << std::endl;
+    std::cout << "[DEBUG] Initializing scheduler for concurrent block: " << current_concurrent_block_id_ << std::endl;
     Reg scheduler_reg = allocate_register();
     emit_instruction(LIR_Inst(LIR_Op::SchedulerInit, scheduler_reg, 0, 0));
-    
-    // Process the concurrent task body - expand task iterations
-    std::cout << "[DEBUG] Processing concurrent task body" << std::endl;
+    scheduler_initialized_ = true;
     if (stmt.body) {
         // Look for TaskStatement in the body
         if (auto block_stmt = dynamic_cast<AST::BlockStatement*>(stmt.body.get())) {
@@ -2794,7 +2794,7 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
     }
     
     // Run scheduler to execute all tasks
-    std::cout << "[DEBUG] Running scheduler" << std::endl;
+    std::cout << "[DEBUG] Running scheduler for concurrent block: " << current_concurrent_block_id_ << std::endl;
     emit_instruction(LIR_Inst(LIR_Op::SchedulerRun, scheduler_reg, 0, 0));
     
     std::cout << "[DEBUG] Concurrent statement processing completed" << std::endl;
