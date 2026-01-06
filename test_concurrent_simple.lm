@@ -2,7 +2,7 @@ print("=== Simple Concurrent Test ===");
 
 var shared_counter: int = 0;
 
-concurrent() {
+concurrent {
     task (i in 1..4) {
         print("Task {i} running");
         shared_counter = shared_counter + 1;
@@ -11,3 +11,30 @@ concurrent() {
 }
 
 print("Final counter: {shared_counter}");
+
+
+print("=== Concurrency Smoke Test ===");
+
+// Channel for communication
+var results = channel();
+
+print("Testing concurrent task iteration");
+
+// Fixed iteration block - using channels only (no SharedCell)
+concurrent(ch=results, cores=2, on_error=Stop) {
+    task(i in 1..4) {
+        print("Task {i} running");
+        results.send("Task {i} completed");  // Channel communication only
+    }
+}
+
+// Collect results
+var task_count = 0;
+iter (result in results) {
+    print("Received: {result}");
+    task_count = task_count + 1;
+}
+
+assert(task_count == 4, "Should receive 4 results");
+print("Task tests completed");
+print("Final task count: {task_count}");

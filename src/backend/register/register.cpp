@@ -109,6 +109,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
     dispatch_table[static_cast<int>(LIR::LIR_Op::SchedulerInit)] = &&OP_SCHEDULER_INIT;
     dispatch_table[static_cast<int>(LIR::LIR_Op::SchedulerRun)] = &&OP_SCHEDULER_RUN;
     dispatch_table[static_cast<int>(LIR::LIR_Op::SchedulerTick)] = &&OP_SCHEDULER_TICK;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::SchedulerAddTask)] = &&OP_SCHEDULER_ADD_TASK;
     dispatch_table[static_cast<int>(LIR::LIR_Op::GetTickCount)] = &&OP_GET_TICK_COUNT;
     dispatch_table[static_cast<int>(LIR::LIR_Op::DelayUntil)] = &&OP_DELAY_UNTIL;
     
@@ -124,6 +125,14 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
     dispatch_table[static_cast<int>(LIR::LIR_Op::SharedCellSub)] = &&OP_SHARED_CELL_SUB;
     
     // Additional missing operations
+    // dispatch_table[static_cast<int>(LIR::LIR_Op::CallVoid)] = &&OP_CALLVOID;
+    // dispatch_table[static_cast<int>(LIR::LIR_Op::CallIndirect)] = &&OP_CALLINDIRECT;
+    // dispatch_table[static_cast<int>(LIR::LIR_Op::CallBuiltin)] = &&OP_CALLBUILTIN;
+    // dispatch_table[static_cast<int>(LIR::LIR_Op::CallVariadic)] = &&OP_CALLVARIADIC;
+    // dispatch_table[static_cast<int>(LIR::LIR_Op::VaStart)] = &&OP_VASTART;
+    // dispatch_table[static_cast<int>(LIR::LIR_Op::VaArg)] = &&OP_VAARG;
+    // dispatch_table[static_cast<int>(LIR::LIR_Op::VaEnd)] = &&OP_VAEND;
+    // dispatch_table[static_cast<int>(LIR::LIR_Op::Copy)] = &&OP_COPY;
     dispatch_table[static_cast<int>(LIR::LIR_Op::Neg)] = &&OP_NEG;
     dispatch_table[static_cast<int>(LIR::LIR_Op::JumpIf)] = &&OP_JUMPIF;
     dispatch_table[static_cast<int>(LIR::LIR_Op::Label)] = &&OP_LABEL;
@@ -783,14 +792,19 @@ OP_SETFIELD:
 
 OP_TASK_CONTEXT_ALLOC:
     {
-        uint64_t count = static_cast<uint64_t>(to_int(registers[pc->a]));
+        uint64_t count = static_cast<uint64_t>(pc->a);  // Read count from immediate value in 'a' field
         uint64_t start_context_id = task_contexts.size();
+        
+        std::cout << "[DEBUG] OP_TASK_CONTEXT_ALLOC called with count: " << count << std::endl;
+        std::cout << "[DEBUG] Starting context ID: " << start_context_id << std::endl;
         
         for (uint64_t i = 0; i < count; i++) {
             auto task_context = std::make_unique<TaskContext>();
             task_contexts.push_back(std::move(task_context));
+            std::cout << "[DEBUG] Created task context " << (start_context_id + i) << std::endl;
         }
         
+        std::cout << "[DEBUG] Total task_contexts.size(): " << task_contexts.size() << std::endl;
         registers[pc->dst] = static_cast<int64_t>(start_context_id);
     }
     DISPATCH();
@@ -843,6 +857,8 @@ OP_TASK_SET_FIELD:
             field_index = static_cast<int>(pc->imm);
             field_value = registers[pc->b];
         }
+
+        std::cout << "[DEBUG] TaskSetField: context_id=" << context_id << " field_index=" << field_index << " imm=" << pc->imm << " value_reg=" << pc->dst << std::endl;
 
         if (context_id < task_contexts.size()) {
             auto& ctx = task_contexts[context_id];
@@ -932,56 +948,123 @@ OP_CHANNEL_HAS_DATA:
 
 OP_SCHEDULER_INIT:
     scheduler = std::make_unique<Scheduler>();
-    current_time = 0;
+    std::cout << "[DEBUG] Scheduler initialized" << std::endl;
     registers[pc->dst] = static_cast<int64_t>(1);
+    DISPATCH();
+
+OP_SCHEDULER_ADD_TASK:
+    {
+        uint64_t context_id = static_cast<uint64_t>(to_int(registers[pc->a]));
+        std::cout << "[DEBUG] OP_SCHEDULER_ADD_TASK called with context_id: " << context_id << std::endl;
+        std::cout << "[DEBUG] task_contexts.size(): " << task_contexts.size() << std::endl;
+        
+        if (context_id < task_contexts.size()) {
+            auto& ctx = task_contexts[context_id];
+            if (ctx) {
+                // Copy task context to the scheduler
+                scheduler->add_task(std::make_unique<TaskContext>(*ctx));
+                std::cout << "[DEBUG] Added task " << context_id << " to scheduler" << std::endl;
+                std::cout << "[DEBUG] Scheduler now has " << scheduler->tasks.size() << " tasks" << std::endl;
+                registers[pc->dst] = static_cast<int64_t>(1);
+            } else {
+                std::cout << "[DEBUG] Task context " << context_id << " is null" << std::endl;
+                registers[pc->dst] = static_cast<int64_t>(0);
+            }
+        } else {
+            std::cout << "[DEBUG] Context ID " << context_id << " out of range (max: " << task_contexts.size() - 1 << ")" << std::endl;
+            registers[pc->dst] = static_cast<int64_t>(0);
+        }
+    }
     DISPATCH();
 
 OP_SCHEDULER_RUN:
     {
-        for (auto& ctx : task_contexts) {
-            if (!ctx) continue;
-
-            if (ctx->state == TaskState::INIT) {
-                ctx->state = TaskState::RUNNING;
-                // Copy the context instead of moving it, so task_set_code can still access it
-                scheduler->add_task(std::make_unique<TaskContext>(*ctx));
+        std::cout << "[DEBUG] Scheduler running with " << scheduler->tasks.size() << " tasks" << std::endl;
+        
+        // Execute all running tasks (they should already be in scheduler via OP_SCHEDULER_ADD_TASK)
+        for (size_t i = 0; i < scheduler->tasks.size(); ++i) {
+            auto& task = scheduler->tasks[i];
+            
+            if (task->state == TaskState::INIT) {
+                task->state = TaskState::RUNNING;
             }
-        }
-
-        for (auto& task : scheduler->tasks) {
+            
             if (task->state == TaskState::RUNNING) {
-                std::cout << "Task " << (task->task_id + 1) << " running" << std::endl;
-                std::cout << "  body_start_pc: " << task->body_start_pc << ", body_end_pc: " << task->body_end_pc << std::endl;
-
-                // Store the initial shared counter value before task execution
-                int64_t initial_shared_counter = shared_variables["shared_counter"].load();
-
-                // Execute the task using the new function-based approach
-                if (current_function_) {
-                    execute_task_body(task.get(), *current_function_);
+                std::cout << "[DEBUG] Executing task " << (task->task_id + 1) << std::endl;
+                
+                // Get task function name from task context field 4 (set during task creation)
+                auto func_name_it = task->fields.find(4);
+                if (func_name_it == task->fields.end()) {
+                    std::cerr << "[ERROR] Task function name not found in task context field 4" << std::endl;
+                    task->state = TaskState::COMPLETED;
+                    continue;
+                }
+                
+                // Extract function name from register value
+                std::string task_func_name;
+                if (std::holds_alternative<std::string>(func_name_it->second)) {
+                    task_func_name = std::get<std::string>(func_name_it->second);
+                    std::cout << "[DEBUG] Found task function name: '" << task_func_name << "'" << std::endl;
                 } else {
-                    std::cout << "  Skipping task execution: current_function_ is null" << std::endl;
+                    std::cerr << "[ERROR] Task function name is not a string, value type: " << func_name_it->second.index() << std::endl;
+                    task->state = TaskState::COMPLETED;
+                    continue;
                 }
-
-                // The task execution should have updated the shared counter directly
-                // No need for additional increment calculation since execute_task_body handles it
-
-                if (!std::holds_alternative<std::nullptr_t>(task->channel_ptr)) {
-                    uint64_t channel_id = static_cast<uint64_t>(to_int(task->channel_ptr));
-                    int64_t new_counter_value = shared_variables["shared_counter"].load();
-
-                    if (channel_id < channels.size()) {
-                        channels[channel_id]->push(new_counter_value);
-                    }
+                
+                // Get task function from registry
+                auto& func_registry = LIR::FunctionRegistry::getInstance();
+                LIR::LIR_Function* task_func = func_registry.getFunction(task_func_name);
+                if (!task_func) {
+                    std::cerr << "[ERROR] Task function '" << task_func_name << "' not found in registry" << std::endl;
+                    task->state = TaskState::COMPLETED;
+                    continue;
                 }
-
+                
+                // Save current register state and current function
+                auto saved_registers = registers;
+                auto saved_function = current_function_;
+                
+                // Initialize a fresh register context for this task
+                registers.clear();
+                registers.resize(1024, nullptr);
+                
+                // Set up task context parameters in fresh register space
+                // Enforce fixed task context ABI: Always set task argument (field 0)
+                auto task_id_it = task->fields.find(0);
+                if (task_id_it == task->fields.end()) {
+                    std::cerr << "[ASSERTION FAILED] Task context missing field 0 (task ID)" << std::endl;
+                    task->state = TaskState::COMPLETED;
+                    continue;
+                }
+                registers[0] = task_id_it->second;
+                std::cout << "[DEBUG] Set register[0] to task ID from field 0" << std::endl;
+                
+                // Set loop variable value from task context field 1
+                auto loop_var_it = task->fields.find(1);
+                if (loop_var_it != task->fields.end()) {
+                    registers[1] = loop_var_it->second;
+                }
+                
+                // Set channel from task context field 2
+                auto channel_it = task->fields.find(2);
+                if (channel_it != task->fields.end()) {
+                    registers[2] = channel_it->second;
+                }
+                
+                // Execute task function
+                current_function_ = task_func;
+                execute_instructions(*task_func, 0, task_func->instructions.size());
+                
+                // Restore register state and current function
+                registers = saved_registers;
+                current_function_ = saved_function;
+                
                 task->state = TaskState::COMPLETED;
+                std::cout << "[DEBUG] Task " << (task->task_id + 1) << " completed" << std::endl;
             }
         }
-
-        // Return the final shared counter value instead of just 1
-        int64_t final_counter = shared_variables["shared_counter"].load();
-        registers[pc->dst] = final_counter;
+        
+        registers[pc->dst] = static_cast<int64_t>(1);
     }
     DISPATCH();
 
