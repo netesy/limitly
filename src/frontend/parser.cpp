@@ -3450,6 +3450,73 @@ std::shared_ptr<AST::Expression> Parser::primary() {
         return okExpr;
     }
 
+    // Handle channel operations
+    if (match({TokenType::OFFER})) {
+        auto offerExpr = std::make_shared<AST::ChannelOfferExpr>();
+        offerExpr->line = previous().line;
+        
+        consume(TokenType::LEFT_PAREN, "Expected '(' after 'offer'.");
+        
+        // Parse value to send
+        offerExpr->value = expression();
+        
+        consume(TokenType::COMMA, "Expected ',' after value in offer expression.");
+        
+        // Parse channel
+        offerExpr->channel = expression();
+        
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after offer expression.");
+        
+        return offerExpr;
+    }
+
+    if (match({TokenType::POLL})) {
+        auto pollExpr = std::make_shared<AST::ChannelPollExpr>();
+        pollExpr->line = previous().line;
+        
+        consume(TokenType::LEFT_PAREN, "Expected '(' after 'poll'.");
+        
+        // Parse channel
+        pollExpr->channel = expression();
+        
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after poll expression.");
+        
+        return pollExpr;
+    }
+
+    if (match({TokenType::SEND})) {
+        auto sendExpr = std::make_shared<AST::ChannelSendExpr>();
+        sendExpr->line = previous().line;
+        
+        consume(TokenType::LEFT_PAREN, "Expected '(' after 'send'.");
+        
+        // Parse value to send
+        sendExpr->value = expression();
+        
+        consume(TokenType::COMMA, "Expected ',' after value in send expression.");
+        
+        // Parse channel
+        sendExpr->channel = expression();
+        
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after send expression.");
+        
+        return sendExpr;
+    }
+
+    if (match({TokenType::RECV})) {
+        auto recvExpr = std::make_shared<AST::ChannelRecvExpr>();
+        recvExpr->line = previous().line;
+        
+        consume(TokenType::LEFT_PAREN, "Expected '(' after 'recv'.");
+        
+        // Parse channel
+        recvExpr->channel = expression();
+        
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after recv expression.");
+        
+        return recvExpr;
+    }
+
     // Check for lambda expression: fn(param1, param2): returnType {body}
     if (check(TokenType::FN)) {
         return lambdaExpression();

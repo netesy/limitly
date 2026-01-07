@@ -1,0 +1,13 @@
+
+    var ch = channel();
+    
+    // Test non-blocking operations
+    var result:any = offer(42, ch);
+    var value:any = poll(ch);
+    
+    // Test blocking operations  
+    send(42, ch);
+    var received:any = recv(ch);
+    
+    print("Channel operations test completed");
+

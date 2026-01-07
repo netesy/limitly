@@ -121,8 +121,6 @@ enum class TokenType {
     SELF,       // self
     TRUE,       // true
     VAR,        // var
-    // ATTEMPT,    // attempt
-    // HANDLE,     // handle
     PARALLEL,   // parallel
     CONCURRENT, // concurrent
     // ASYNC,      // async
@@ -130,8 +128,6 @@ enum class TokenType {
     BREAK,      // break
     CONTINUE,   // continue
     IMPORT,     // import
-    // NONE,       // None
-    // THROWS,     // throws
     TYPE,       // type
     TRAIT,      // trait
     INTERFACE,  // interface
@@ -142,6 +138,10 @@ enum class TokenType {
     PRIVATE,    // private
     PROTECTED,  // protected
     OPEN,       // open
+    OFFER,      // offer
+    POLL,       // poll
+    SEND,        // send
+    RECV,        // recv
     CONTRACT,   // contract
     COMPTIME,   // comptime
     UNSAFE,     // unsafe
