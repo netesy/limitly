@@ -53,6 +53,219 @@ void RegisterVM::reset() {
     instruction_count = 0;
 }
 
+// RegisterVM member functions continue here
+
+void RegisterVM::execute_task_body(TaskContext* task, const LIR::LIR_Function& function) {
+    // Get the task function name from task context field 4
+    auto func_name_it = task->fields.find(4);
+    if (func_name_it == task->fields.end()) {
+        std::cerr << "Error: Task function name not found in task context" << std::endl;
+        return;
+    }
+    
+    // Extract function name from register value
+    std::string task_func_name;
+    if (std::holds_alternative<std::string>(func_name_it->second)) {
+        task_func_name = std::get<std::string>(func_name_it->second);
+    } else {
+        std::cerr << "Error: Task function name is not a string" << std::endl;
+        return;
+    }
+    
+    // Get the task function from the registry
+    auto& func_registry = LIR::FunctionRegistry::getInstance();
+    LIR::LIR_Function* task_func = func_registry.getFunction(task_func_name);
+    if (!task_func) {
+        std::cerr << "Error: Task function '" << task_func_name << "' not found in registry" << std::endl;
+        return;
+    }
+    
+    std::cout << "Task " << (task->task_id + 1) << " calling function: " << task_func_name << std::endl;
+    
+    // Save current register state
+    auto saved_registers = registers;
+    
+    // Initialize a fresh register context for this task
+    registers.clear();
+    registers.resize(1024);
+    for (auto& reg : registers) {
+        reg = nullptr;
+    }
+    
+    // Set up task context parameters in the fresh register space
+    if (task) {
+        // Set task ID from task context field 0
+        auto task_id_it = task->fields.find(0);
+        if (task_id_it != task->fields.end()) {
+            registers[0] = task_id_it->second;
+        }
+        
+        // Set loop variable value from task context field 1
+        auto loop_var_it = task->fields.find(1);
+        if (loop_var_it != task->fields.end()) {
+            registers[1] = loop_var_it->second;
+        }
+        
+        // Set channel from task context field 2
+        auto channel_it = task->fields.find(2);
+        if (channel_it != task->fields.end()) {
+            registers[2] = channel_it->second;
+        }
+        
+        // Initialize shared counter with current global value
+        int64_t current_shared_counter = shared_variables["shared_counter"].load();
+        registers[3] = current_shared_counter;
+        
+        std::cout << "Task " << (task->task_id + 1) << " starting with shared counter = " << current_shared_counter << std::endl;
+    }
+    
+    // Execute the task function using the shared instruction executor
+    execute_instructions(*task_func, 0, task_func->instructions.size());
+    
+    // Update the shared counter with the task's result
+    if (std::holds_alternative<int64_t>(registers[3])) {
+        int64_t new_counter_value = std::get<int64_t>(registers[3]);
+        shared_variables["shared_counter"].store(new_counter_value);
+        std::cout << "Task " << (task->task_id + 1) << " updated shared counter to " << new_counter_value << std::endl;
+    }
+    
+    // Preserve the task result (register 3 contains the updated counter)
+    auto task_result = registers[3];
+    
+    // Restore the original register state
+    registers = saved_registers;
+    
+    // Store the task result back in register 3 for the scheduler to read
+    registers[3] = task_result;
+}
+
+void RegisterVM::execute_function(const LIR::LIR_Function& function) {
+    // Set current function for task execution
+    current_function_ = &function;
+    
+    // Reset register file and initialize
+    registers.resize(1024);
+    for (auto& reg : registers) {
+        reg = nullptr;
+    }
+    
+    // Execute from start to end of function
+    execute_instructions(function, 0, function.instructions.size());
+}
+
+void RegisterVM::execute_lir_function(const LIR::LIRFunction& function) {
+    // Get the instructions from the LIRFunction
+    const auto& instructions = function.getInstructions();
+    
+    // Create a temporary LIR_Function wrapper to reuse existing execution logic
+    LIR::LIR_Function temp_wrapper(function.getName(), function.getSignature().parameters.size());
+    temp_wrapper.instructions = instructions;
+    
+    // Execute using the existing method
+    execute_function(temp_wrapper);
+}
+
+std::string RegisterVM::to_string(const RegisterValue& value) const {
+    if (std::holds_alternative<int64_t>(value)) {
+        int64_t intValue = std::get<int64_t>(value);
+        
+        // Check if it's an error ID
+        if (intValue <= -1000000) {
+            auto it = error_table.find(intValue);
+            if (it != error_table.end() && it->second.isError) {
+                return "Error(" + it->second.errorType + ": " + it->second.message + ")";
+            }
+        }
+        
+        return std::to_string(intValue);
+    } else if (std::holds_alternative<uint64_t>(value)) {
+        return std::to_string(std::get<uint64_t>(value));
+    } else if (std::holds_alternative<double>(value)) {
+        return std::to_string(std::get<double>(value));
+    } else if (std::holds_alternative<bool>(value)) {
+        return std::get<bool>(value) ? "true" : "false";
+    } else if (std::holds_alternative<std::string>(value)) {
+        return std::get<std::string>(value);
+    }
+    return "nil";
+}
+
+ValuePtr RegisterVM::createErrorValue(const std::string& errorType, const std::string& message) {
+    // Create error value using the same approach as the old VM
+    ErrorValue errorVal(errorType, message, {}, 0); // No source location for now
+    
+    // Create error union type
+    ErrorUnionType errorUnionDetails;
+    errorUnionDetails.successType = type_system->NIL_TYPE;
+    errorUnionDetails.errorTypes = {errorType};
+    errorUnionDetails.isGenericError = (errorType == "DefaultError");
+    
+    auto errorUnionType = std::make_shared<Type>(TypeTag::ErrorUnion, errorUnionDetails);
+    
+    // Create the final value with the error union type
+    ValuePtr result = type_system->createValue(errorUnionType);
+    result->complexData = errorVal;
+    
+    return result;
+}
+
+ValuePtr RegisterVM::createSuccessValue(const RegisterValue& value) {
+    // Convert RegisterValue to ValuePtr
+    ValuePtr successValue;
+    
+    if (std::holds_alternative<int64_t>(value)) {
+        successValue = type_system->createValue(type_system->INT64_TYPE);
+        successValue->data = std::get<int64_t>(value);
+    } else if (std::holds_alternative<double>(value)) {
+        successValue = type_system->createValue(type_system->FLOAT64_TYPE);
+        successValue->data = std::get<double>(value);
+    } else if (std::holds_alternative<bool>(value)) {
+        successValue = type_system->createValue(type_system->BOOL_TYPE);
+        successValue->data = std::get<bool>(value) ? 1 : 0;
+    } else if (std::holds_alternative<std::string>(value)) {
+        successValue = type_system->createValue(type_system->STRING_TYPE);
+        successValue->data = std::get<std::string>(value);
+    } else {
+        successValue = type_system->createValue(type_system->NIL_TYPE);
+    }
+    
+    // Create error union type for the success value
+    ErrorUnionType errorUnionDetails;
+    errorUnionDetails.successType = successValue->type;
+    errorUnionDetails.isGenericError = true; // Generic for Type? syntax
+    
+    auto errorUnionType = std::make_shared<Type>(TypeTag::ErrorUnion, errorUnionDetails);
+    
+    // Create the union value containing the success value
+    ValuePtr result = type_system->createValue(errorUnionType);
+    result->data = successValue->data;
+    result->complexData = successValue->complexData;
+    
+    return result;
+}
+
+bool RegisterVM::isErrorValue(LIR::Reg reg) const {
+    const auto& regValue = registers[reg];
+    
+    // Check if it's an error ID (negative number in error range)
+    if (std::holds_alternative<int64_t>(regValue)) {
+        int64_t value = std::get<int64_t>(regValue);
+        if (value <= -1000000) {
+            // Check if this error ID exists in our error table
+            auto it = error_table.find(value);
+            return it != error_table.end() && it->second.isError;
+        }
+    }
+    
+    // Legacy: Check if this register contains an error value in error storage
+    auto it = error_storage.find(reg);
+    if (it != error_storage.end()) {
+        return true; // Has stored error
+    }
+    
+    return false;
+}
+
 void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t start_pc, size_t end_pc) {
     
     const LIR::LIR_Inst* pc = function.instructions.data() + start_pc;
@@ -1586,215 +1799,6 @@ OP_CHAN_POLL:
     #undef DISPATCH_JUMP
 }
 
-void RegisterVM::execute_task_body(TaskContext* task, const LIR::LIR_Function& function) {
-    // Get the task function name from task context field 4
-    auto func_name_it = task->fields.find(4);
-    if (func_name_it == task->fields.end()) {
-        std::cerr << "Error: Task function name not found in task context" << std::endl;
-        return;
-    }
-    
-    // Extract function name from register value
-    std::string task_func_name;
-    if (std::holds_alternative<std::string>(func_name_it->second)) {
-        task_func_name = std::get<std::string>(func_name_it->second);
-    } else {
-        std::cerr << "Error: Task function name is not a string" << std::endl;
-        return;
-    }
-    
-    // Get the task function from the registry
-    auto& func_registry = LIR::FunctionRegistry::getInstance();
-    LIR::LIR_Function* task_func = func_registry.getFunction(task_func_name);
-    if (!task_func) {
-        std::cerr << "Error: Task function '" << task_func_name << "' not found in registry" << std::endl;
-        return;
-    }
-    
-    std::cout << "Task " << (task->task_id + 1) << " calling function: " << task_func_name << std::endl;
-    
-    // Save current register state
-    auto saved_registers = registers;
-    
-    // Initialize a fresh register context for this task
-    registers.clear();
-    registers.resize(1024);
-    for (auto& reg : registers) {
-        reg = nullptr;
-    }
-    
-    // Set up task context parameters in the fresh register space
-    if (task) {
-        // Set task ID from task context field 0
-        auto task_id_it = task->fields.find(0);
-        if (task_id_it != task->fields.end()) {
-            registers[0] = task_id_it->second;
-        }
-        
-        // Set loop variable value from task context field 1
-        auto loop_var_it = task->fields.find(1);
-        if (loop_var_it != task->fields.end()) {
-            registers[1] = loop_var_it->second;
-        }
-        
-        // Set channel from task context field 2
-        auto channel_it = task->fields.find(2);
-        if (channel_it != task->fields.end()) {
-            registers[2] = channel_it->second;
-        }
-        
-        // Initialize shared counter with current global value
-        int64_t current_shared_counter = shared_variables["shared_counter"].load();
-        registers[3] = current_shared_counter;
-        
-        std::cout << "Task " << (task->task_id + 1) << " starting with shared counter = " << current_shared_counter << std::endl;
-    }
-    
-    // Execute the task function using the shared instruction executor
-    execute_instructions(*task_func, 0, task_func->instructions.size());
-    
-    // Update the shared counter with the task's result
-    if (std::holds_alternative<int64_t>(registers[3])) {
-        int64_t new_counter_value = std::get<int64_t>(registers[3]);
-        shared_variables["shared_counter"].store(new_counter_value);
-        std::cout << "Task " << (task->task_id + 1) << " updated shared counter to " << new_counter_value << std::endl;
-    }
-    
-    // Preserve the task result (register 3 contains the updated counter)
-    auto task_result = registers[3];
-    
-    // Restore the original register state
-    registers = saved_registers;
-    
-    // Store the task result back in register 3 for the scheduler to read
-    registers[3] = task_result;
-}
 
-void RegisterVM::execute_function(const LIR::LIR_Function& function) {
-    // Set current function for task execution
-    current_function_ = &function;
-    
-    // Reset register file and initialize
-    registers.resize(1024);
-    for (auto& reg : registers) {
-        reg = nullptr;
-    }
-    
-    // Execute from start to end of function
-    execute_instructions(function, 0, function.instructions.size());
-}
-
-void RegisterVM::execute_lir_function(const LIR::LIRFunction& function) {
-    // Get the instructions from the LIRFunction
-    const auto& instructions = function.getInstructions();
-    
-    // Create a temporary LIR_Function wrapper to reuse existing execution logic
-    LIR::LIR_Function temp_wrapper(function.getName(), function.getSignature().parameters.size());
-    temp_wrapper.instructions = instructions;
-    
-    // Execute using the existing method
-    execute_function(temp_wrapper);
-}
-
-std::string RegisterVM::to_string(const RegisterValue& value) const {
-    if (std::holds_alternative<int64_t>(value)) {
-        int64_t intValue = std::get<int64_t>(value);
-        
-        // Check if it's an error ID
-        if (intValue <= -1000000) {
-            auto it = error_table.find(intValue);
-            if (it != error_table.end() && it->second.isError) {
-                return "Error(" + it->second.errorType + ": " + it->second.message + ")";
-            }
-        }
-        
-        return std::to_string(intValue);
-    } else if (std::holds_alternative<uint64_t>(value)) {
-        return std::to_string(std::get<uint64_t>(value));
-    } else if (std::holds_alternative<double>(value)) {
-        return std::to_string(std::get<double>(value));
-    } else if (std::holds_alternative<bool>(value)) {
-        return std::get<bool>(value) ? "true" : "false";
-    } else if (std::holds_alternative<std::string>(value)) {
-        return std::get<std::string>(value);
-    }
-    return "nil";
-}
-
-ValuePtr RegisterVM::createErrorValue(const std::string& errorType, const std::string& message) {
-    // Create error value using the same approach as the old VM
-    ErrorValue errorVal(errorType, message, {}, 0); // No source location for now
-    
-    // Create error union type
-    ErrorUnionType errorUnionDetails;
-    errorUnionDetails.successType = type_system->NIL_TYPE;
-    errorUnionDetails.errorTypes = {errorType};
-    errorUnionDetails.isGenericError = (errorType == "DefaultError");
-    
-    auto errorUnionType = std::make_shared<Type>(TypeTag::ErrorUnion, errorUnionDetails);
-    
-    // Create the final value with the error union type
-    ValuePtr result = type_system->createValue(errorUnionType);
-    result->complexData = errorVal;
-    
-    return result;
-}
-
-ValuePtr RegisterVM::createSuccessValue(const RegisterValue& value) {
-    // Convert RegisterValue to ValuePtr
-    ValuePtr successValue;
-    
-    if (std::holds_alternative<int64_t>(value)) {
-        successValue = type_system->createValue(type_system->INT64_TYPE);
-        successValue->data = std::get<int64_t>(value);
-    } else if (std::holds_alternative<double>(value)) {
-        successValue = type_system->createValue(type_system->FLOAT64_TYPE);
-        successValue->data = std::get<double>(value);
-    } else if (std::holds_alternative<bool>(value)) {
-        successValue = type_system->createValue(type_system->BOOL_TYPE);
-        successValue->data = std::get<bool>(value) ? 1 : 0;
-    } else if (std::holds_alternative<std::string>(value)) {
-        successValue = type_system->createValue(type_system->STRING_TYPE);
-        successValue->data = std::get<std::string>(value);
-    } else {
-        successValue = type_system->createValue(type_system->NIL_TYPE);
-    }
-    
-    // Create error union type for the success value
-    ErrorUnionType errorUnionDetails;
-    errorUnionDetails.successType = successValue->type;
-    errorUnionDetails.isGenericError = true; // Generic for Type? syntax
-    
-    auto errorUnionType = std::make_shared<Type>(TypeTag::ErrorUnion, errorUnionDetails);
-    
-    // Create the union value containing the success value
-    ValuePtr result = type_system->createValue(errorUnionType);
-    result->data = successValue->data;
-    result->complexData = successValue->complexData;
-    
-    return result;
-}
-
-bool RegisterVM::isErrorValue(LIR::Reg reg) const {
-    const auto& regValue = registers[reg];
-    
-    // Check if it's an error ID (negative number in error range)
-    if (std::holds_alternative<int64_t>(regValue)) {
-        int64_t value = std::get<int64_t>(regValue);
-        if (value <= -1000000) {
-            // Check if this error ID exists in our error table
-            auto it = error_table.find(value);
-            return it != error_table.end() && it->second.isError;
-        }
-    }
-    
-    // Legacy: Check if this register contains an error value in error storage
-    auto it = error_storage.find(reg);
-    if (it != error_storage.end()) {
-        return true; // Has stored error
-    }
-    
-    return false;
-}
-
+} 
 } // namespace Register
