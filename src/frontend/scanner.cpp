@@ -665,8 +665,6 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "true") return TokenType::TRUE;
     if (rest == "var") return TokenType::VAR;
     if (rest == "while") return TokenType::WHILE;
-    // if (rest == "attempt") return TokenType::ATTEMPT;
-    // if (rest == "handle") return TokenType::HANDLE;
     if (rest == "parallel") return TokenType::PARALLEL;
     if (rest == "concurrent") return TokenType::CONCURRENT;
     // if (rest == "async") return TokenType::ASYNC;
@@ -674,7 +672,6 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "break") return TokenType::BREAK;
     if (rest == "continue") return TokenType::CONTINUE;
     if (rest == "import") return TokenType::IMPORT;
-    // if (rest == "throws") return TokenType::THROWS;
     if (rest == "match") return TokenType::MATCH;
     if (rest == "in") return TokenType::IN;
     if (rest == "type") return TokenType::TYPE;
@@ -740,6 +737,10 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "events") return TokenType::IDENTIFIER;
     if (rest == "sleep") return TokenType::IDENTIFIER;
     if (rest == "assert") return TokenType::IDENTIFIER;
+    if (rest == "offer") return TokenType::OFFER;
+    if (rest == "poll") return TokenType::POLL;
+    if (rest == "send") return TokenType::SEND;
+    if (rest == "recv") return TokenType::RECV;
 
     return TokenType::IDENTIFIER;
 }
@@ -971,6 +972,14 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "PROTECTED";
     case TokenType::OPEN:
         return "OPEN";
+    case TokenType::OFFER:
+        return "OFFER";
+    case TokenType::POLL:
+        return "POLL";
+    case TokenType::SEND:
+        return "SEND";
+    case TokenType::RECV:
+        return "RECV";
     case TokenType::CONTRACT:
         return "CONTRACT";
     case TokenType::COMPTIME:

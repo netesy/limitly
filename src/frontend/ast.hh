@@ -90,6 +90,12 @@ namespace AST {
     struct ContractStatement;
     struct ComptimeStatement;
     
+    // Channel operation nodes
+    struct ChannelOfferExpr;
+    struct ChannelPollExpr;
+    struct ChannelSendExpr;
+    struct ChannelRecvExpr;
+    
     // Memory operation nodes (inserted by type checker)
     struct MakeLinearExpr;
     struct MakeRefExpr;
@@ -559,6 +565,30 @@ namespace AST {
     // Await expression
     struct AwaitExpr : public Expression {
         std::shared_ptr<Expression> expression;
+    };
+
+    // Channel offer expression - non-blocking send
+    struct ChannelOfferExpr : public Expression {
+        std::shared_ptr<Expression> value;          // value being sent
+        std::shared_ptr<Expression> channel;        // channel expression
+    };
+
+    // Channel poll expression - non-blocking receive
+    struct ChannelPollExpr : public Expression {
+        std::shared_ptr<Expression> channel;        // channel expression
+        std::string target;                       // variable to assign
+    };
+
+    // Channel send expression - blocking send
+    struct ChannelSendExpr : public Expression {
+        std::shared_ptr<Expression> value;          // value being sent
+        std::shared_ptr<Expression> channel;        // channel expression
+    };
+
+    // Channel receive expression - blocking receive
+    struct ChannelRecvExpr : public Expression {
+        std::shared_ptr<Expression> channel;        // channel expression
+        std::string target;                       // variable to assign
     };
 
     // Import statement filter type
