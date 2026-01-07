@@ -1,0 +1,23 @@
+print("Hello");
+
+// Create a typed channel of strings, bounded capacity 2
+var ch : channel:str = channel(capacity=2);
+
+// Producer: send messages
+for (i in 0..3) {
+    ch.send("hello {i}");       // blocking send, suspends if full
+    ch.send("netesy- {i}");     // moves ownership
+}
+
+// Close the channel so consumers know no more messages are coming
+ch.close();
+
+// Consumer: receive messages until channel is closed
+while (true) {
+    var msg = ch.recv();        // blocking receive, suspends if empty
+    if (!msg) {                  // channel closed
+        break;
+    }
+    print("Count: ");
+    print(msg);
+}

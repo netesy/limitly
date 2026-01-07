@@ -497,6 +497,18 @@ Reg Generator::emit_expr(AST::Expression& expr) {
         return emit_object_literal_expr(*object_literal);
     } else if (auto this_expr = dynamic_cast<AST::ThisExpr*>(&expr)) {
         return emit_this_expr(*this_expr);
+    } else if (auto channel_create = dynamic_cast<AST::ChannelCreateExpr*>(&expr)) {
+        return emit_channel_create_expr(*channel_create);
+    } else if (auto channel_send = dynamic_cast<AST::ChannelSendExpr*>(&expr)) {
+        return emit_channel_send_expr(*channel_send);
+    } else if (auto channel_recv = dynamic_cast<AST::ChannelRecvExpr*>(&expr)) {
+        return emit_channel_recv_expr(*channel_recv);
+    } else if (auto channel_close = dynamic_cast<AST::ChannelCloseExpr*>(&expr)) {
+        return emit_channel_close_expr(*channel_close);
+    } else if (auto channel_offer = dynamic_cast<AST::ChannelOfferExpr*>(&expr)) {
+        return emit_channel_offer_expr(*channel_offer);
+    } else if (auto channel_poll = dynamic_cast<AST::ChannelPollExpr*>(&expr)) {
+        return emit_channel_poll_expr(*channel_poll);
     } else {
         report_error("Unknown expression type");
         return 0;
@@ -4469,6 +4481,148 @@ void Generator::emit_concurrent_worker_init(AST::WorkerStatement& worker, size_t
     
     std::cout << "[DEBUG] Created worker " << worker_id 
               << " with param '" << worker.paramName << "'" << std::endl;
+}
+
+// Channel expression emission methods
+Reg Generator::emit_channel_create_expr(AST::ChannelCreateExpr& expr) {
+    Reg dst = allocate_register();
+    
+    // Get capacity (default to 0 if not specified)
+    Reg capacity_reg = 0;
+    if (expr.capacity) {
+        capacity_reg = emit_expr(*expr.capacity);
+    } else {
+        // Default capacity of 0 (unbuffered)
+        capacity_reg = allocate_register();
+        emit_typed_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, capacity_reg, 
+            std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), static_cast<int64_t>(0))));
+    }
+    
+    // Get element type from type annotation or inferred type
+    TypePtr element_type = nullptr;
+    if (expr.element_type) {
+        // Convert AST type annotation to TypePtr
+        // For now, we'll use a simple mapping
+        if (expr.element_type->typeName == "str") {
+            element_type = std::make_shared<::Type>(::TypeTag::String);
+        } else if (expr.element_type->typeName == "int") {
+            element_type = std::make_shared<::Type>(::TypeTag::Int64);
+        } else {
+            element_type = std::make_shared<::Type>(::TypeTag::Int64); // Default
+        }
+    } else if (expr.inferred_type) {
+        element_type = expr.inferred_type;
+    } else {
+        element_type = std::make_shared<::Type>(::TypeTag::Int64); // Default
+    }
+    
+    // Emit channel allocation instruction - channels are pointers (Type::Ptr)
+    emit_typed_instruction(LIR_Inst(LIR_Op::ChanAlloc, Type::Ptr, dst, capacity_reg));
+    
+    // Set the type information for the channel register
+    set_register_language_type(dst, element_type);
+    
+    return dst;
+}
+
+Reg Generator::emit_channel_send_expr(AST::ChannelSendExpr& expr) {
+    // Get channel register
+    Reg channel_reg = emit_expr(*expr.channel);
+    
+    // Get value register
+    Reg value_reg = emit_expr(*expr.value);
+    
+    // Emit blocking send instruction - no return value
+    emit_typed_instruction(LIR_Inst(LIR_Op::ChanSend, Type::Void, 0, channel_reg, value_reg));
+    
+    // Send doesn't return a value, return 0 as placeholder
+    return 0;
+}
+
+Reg Generator::emit_channel_recv_expr(AST::ChannelRecvExpr& expr) {
+    Reg dst = allocate_register();
+    
+    // Get channel register
+    Reg channel_reg = emit_expr(*expr.channel);
+    
+    // Get the element type from the channel
+    TypePtr element_type = get_register_language_type(channel_reg);
+    Type abi_type = Type::I64; // Default
+    
+    if (element_type) {
+        // Convert language type to ABI type
+        if (element_type->tag == ::TypeTag::String) {
+            abi_type = Type::Ptr; // Strings are pointers
+        } else if (element_type->tag == ::TypeTag::Int64) {
+            abi_type = Type::I64;
+        } else if (element_type->tag == ::TypeTag::Bool) {
+            abi_type = Type::Bool;
+        }
+    }
+    
+    // Emit blocking receive instruction
+    emit_typed_instruction(LIR_Inst(LIR_Op::ChanRecv, abi_type, dst, channel_reg, 0));
+    
+    // Set the type information based on the channel's element type
+    set_register_language_type(dst, element_type);
+    
+    return dst;
+}
+
+Reg Generator::emit_channel_close_expr(AST::ChannelCloseExpr& expr) {
+    // Get channel register
+    Reg channel_reg = emit_expr(*expr.channel);
+    
+    // Emit close channel instruction - no return value
+    emit_typed_instruction(LIR_Inst(LIR_Op::ChanClose, Type::Void, 0, channel_reg, 0));
+    
+    // Close doesn't return a value, return 0 as placeholder
+    return 0;
+}
+
+Reg Generator::emit_channel_offer_expr(AST::ChannelOfferExpr& expr) {
+    Reg dst = allocate_register();
+    
+    // Get channel register
+    Reg channel_reg = emit_expr(*expr.channel);
+    
+    // Get value register
+    Reg value_reg = emit_expr(*expr.value);
+    
+    // Emit non-blocking send instruction - returns boolean success
+    emit_typed_instruction(LIR_Inst(LIR_Op::ChanOffer, Type::Bool, dst, channel_reg, value_reg));
+    
+    return dst;
+}
+
+Reg Generator::emit_channel_poll_expr(AST::ChannelPollExpr& expr) {
+    Reg dst = allocate_register();
+    
+    // Get channel register
+    Reg channel_reg = emit_expr(*expr.channel);
+    
+    // Get the element type from the channel
+    TypePtr element_type = get_register_language_type(channel_reg);
+    Type abi_type = Type::I64; // Default
+    
+    if (element_type) {
+        // Convert language type to ABI type
+        if (element_type->tag == ::TypeTag::String) {
+            abi_type = Type::Ptr; // Strings are pointers
+        } else if (element_type->tag == ::TypeTag::Int64) {
+            abi_type = Type::I64;
+        } else if (element_type->tag == ::TypeTag::Bool) {
+            abi_type = Type::Bool;
+        }
+    }
+    
+    // Emit non-blocking receive instruction - returns value or special value
+    emit_typed_instruction(LIR_Inst(LIR_Op::ChanPoll, abi_type, dst, channel_reg, 0));
+    
+    // Set the type information based on the channel's element type
+    set_register_language_type(dst, element_type);
+    
+    return dst;
 }
 
 } // namespace LIR

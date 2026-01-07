@@ -149,6 +149,14 @@ private:
     Reg emit_object_literal_expr(AST::ObjectLiteralExpr& expr);
     Reg emit_this_expr(AST::ThisExpr& expr);
     
+    // Channel expression handlers
+    Reg emit_channel_create_expr(AST::ChannelCreateExpr& expr);
+    Reg emit_channel_send_expr(AST::ChannelSendExpr& expr);
+    Reg emit_channel_recv_expr(AST::ChannelRecvExpr& expr);
+    Reg emit_channel_close_expr(AST::ChannelCloseExpr& expr);
+    Reg emit_channel_offer_expr(AST::ChannelOfferExpr& expr);
+    Reg emit_channel_poll_expr(AST::ChannelPollExpr& expr);
+    
     // Specific statement handlers
     void emit_expr_stmt(AST::ExprStatement& stmt);
     void emit_print_stmt(AST::PrintStatement& stmt);

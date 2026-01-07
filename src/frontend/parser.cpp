@@ -3343,57 +3343,120 @@ std::shared_ptr<AST::Expression> Parser::primary() {
 
     if (match({TokenType::IDENTIFIER})) {
         auto token = previous();
+        
         // Check if this is 'self' keyword
         if (token.lexeme == "self" || token.lexeme == "this" ) {
             auto thisExpr = std::make_shared<AST::ThisExpr>();
             thisExpr->line = token.line;
             return thisExpr;
-        } else {
-            // Check if this is an object literal: Identifier { ... }
-            if (check(TokenType::LEFT_BRACE)) {
-                // This is an object literal with constructor name
-                auto objExpr = std::make_shared<AST::ObjectLiteralExpr>();
-                objExpr->line = token.line;
-                objExpr->constructorName = token.lexeme;
-                
-                advance(); // consume LEFT_BRACE
-                
-                // Parse key-value pairs
-                if (!check(TokenType::RIGHT_BRACE)) {
-                    do {
-                        // Parse key
-                        Token keyToken = consume(TokenType::IDENTIFIER, "Expected property name in object literal.");
-                        consume(TokenType::COLON, "Expected ':' after property name.");
-                        
-                        // Parse value
-                        auto value = expression();
-                        
-                        objExpr->properties[keyToken.lexeme] = value;
-                    } while (match({TokenType::COMMA}));
-                }
-                
-                consume(TokenType::RIGHT_BRACE, "Expected '}' after object literal properties.");
-                return objExpr;
-            } else {
-                auto varExpr = createNodeWithContext<AST::VariableExpr>();
-                varExpr->line = token.line;
-                varExpr->name = token.lexeme;
-                
-                // Create detailed CST node if enabled
-                if (cstMode && config.detailedExpressionNodes) {
-                    auto varCSTNode = std::make_unique<CST::Node>(CST::NodeKind::VARIABLE_EXPR);
-                    varCSTNode->setDescription("variable reference");
-                    varCSTNode->addToken(token);
-                    attachTriviaFromToken(token);
-                    varCSTNode->setSourceSpan(token.start, token.end);
-                    addChildToCurrentContext(std::move(varCSTNode));
-                } else {
-                    attachTriviaFromToken(token);
-                }
-                
-                return varExpr;
-            }
         }
+        
+        // Check for channel operations: send, recv, close, offer, poll
+        if (token.lexeme == "send") {
+            auto sendExpr = std::make_shared<AST::ChannelSendExpr>();
+            sendExpr->line = token.line;
+            
+            // Parse send(channel, value) syntax
+            consume(TokenType::LEFT_PAREN, "Expected '(' after send");
+            sendExpr->channel = expression();
+            consume(TokenType::COMMA, "Expected ',' after channel in send()");
+            sendExpr->value = expression();
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after send() arguments.");
+            
+            return sendExpr;
+        }
+        
+        if (token.lexeme == "recv") {
+            auto recvExpr = std::make_shared<AST::ChannelRecvExpr>();
+            recvExpr->line = token.line;
+            
+            // Parse recv(channel) syntax
+            consume(TokenType::LEFT_PAREN, "Expected '(' after recv");
+            recvExpr->channel = expression();
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after recv() argument.");
+            
+            return recvExpr;
+        }
+        
+        if (token.lexeme == "close") {
+            auto closeExpr = std::make_shared<AST::ChannelCloseExpr>();
+            closeExpr->line = token.line;
+            
+            // Parse close(channel) syntax
+            consume(TokenType::LEFT_PAREN, "Expected '(' after close");
+            closeExpr->channel = expression();
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after close() argument.");
+            
+            return closeExpr;
+        }
+        
+        if (token.lexeme == "offer") {
+            auto offerExpr = std::make_shared<AST::ChannelOfferExpr>();
+            offerExpr->line = token.line;
+            
+            // Parse offer(channel, value) syntax
+            consume(TokenType::LEFT_PAREN, "Expected '(' after offer");
+            offerExpr->channel = expression();
+            consume(TokenType::COMMA, "Expected ',' after channel in offer()");
+            offerExpr->value = expression();
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after offer() arguments.");
+            
+            return offerExpr;
+        }
+        
+        if (token.lexeme == "poll") {
+            auto pollExpr = std::make_shared<AST::ChannelPollExpr>();
+            pollExpr->line = token.line;
+            
+            // Parse poll(channel) syntax
+            consume(TokenType::LEFT_PAREN, "Expected '(' after poll");
+            pollExpr->channel = expression();
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after poll() argument.");
+            
+            return pollExpr;
+        }
+        
+        // Check if this is 'channel' keyword for channel creation
+        if (token.lexeme == "channel") {
+            auto channelExpr = std::make_shared<AST::ChannelCreateExpr>();
+            channelExpr->line = token.line;
+            
+            // Parse channel(capacity=N) syntax
+            consume(TokenType::LEFT_PAREN, "Expected '(' after channel");
+            
+            // Parse capacity parameter
+            bool hasCapacity = false;
+            if (check(TokenType::IDENTIFIER)) {
+                auto paramToken = consume(TokenType::IDENTIFIER, "Expected parameter name");
+                if (paramToken.lexeme == "capacity") {
+                    consume(TokenType::EQUAL, "Expected '=' after capacity parameter");
+                    channelExpr->capacity = expression();
+                    hasCapacity = true;
+                }
+            }
+            
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after channel() arguments.");
+            // Note: element_type will be determined by type inference from context
+            return channelExpr;
+        }
+        
+        auto varExpr = createNodeWithContext<AST::VariableExpr>();
+        varExpr->line = token.line;
+        varExpr->name = token.lexeme;
+        
+        // Create detailed CST node if enabled
+        if (cstMode && config.detailedExpressionNodes) {
+            auto varCSTNode = std::make_unique<CST::Node>(CST::NodeKind::VARIABLE_EXPR);
+            varCSTNode->setDescription("variable reference");
+            varCSTNode->addToken(token);
+            attachTriviaFromToken(token);
+            varCSTNode->setSourceSpan(token.start, token.end);
+            addChildToCurrentContext(std::move(varCSTNode));
+        } else {
+            attachTriviaFromToken(token);
+        }
+        
+        return varExpr;
     }
 
     if (match({TokenType::SLEEP})) {
@@ -4097,7 +4160,20 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseBasicType() {
     } else if (match({TokenType::RESULT_TYPE})) {
         type->typeName = "result";
     } else if (match({TokenType::CHANNEL_TYPE})) {
+        // Parse channel type with element type: channel:element_type
         type->typeName = "channel";
+        
+        // Check for element type annotation after colon
+        if (match({TokenType::COLON})) {
+            // Parse the element type (e.g., str in channel:str)
+            type->elementType = parseBasicType();
+        } else {
+            // Default to any if no element type is specified
+            auto anyType = std::make_shared<AST::TypeAnnotation>();
+            anyType->typeName = "any";
+            anyType->isPrimitive = true;
+            type->elementType = anyType;
+        }
     } else if (match({TokenType::ATOMIC_TYPE})) {
         type->typeName = "atomic";
     } else if (match({TokenType::FN})) {

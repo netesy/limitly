@@ -143,6 +143,17 @@ enum class LIR_Op : uint8_t {
     ChannelPop,          // Pop value (no blocking)
     ChannelHasData,      // Check if channel has data
     
+    // New blocking channel operations
+    ChanAlloc,           // Allocate typed channel with capacity
+    ChanSend,            // Blocking send (suspend if full)
+    ChanRecv,            // Blocking receive (suspend if empty)
+    ChanClose,           // Close channel
+    ChanTestEmpty,       // Test if channel is empty/closed
+    
+    // Non-blocking channel operations
+    ChanOffer,           // Non-blocking send (returns success/failure)
+    ChanPoll,            // Non-blocking receive (returns value or empty)
+    
     // Scheduler control
     SchedulerInit,       // Initialize scheduler
     SchedulerRun,        // Run scheduler loop (returns when all done)

@@ -7,7 +7,6 @@
 #include "../../common/debugger.hh"
 #include "../../frontend/parser.hh"
 #include "../../common/builtin_functions.hh"  // For builtin functions
-#include "../concurrency/task_vm.hh"
 #include "../bytecode_printer.hh"  // For opcodeToString function
 #include "../classes.hh"  // For VMMethodImplementation
 

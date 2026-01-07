@@ -699,6 +699,13 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "ok") return TokenType::OK;
     if (rest == "val") return TokenType::VAL;
     
+    // Channel operation keywords
+    if (rest == "send") return TokenType::SEND;
+    if (rest == "recv") return TokenType::RECV;
+    if (rest == "close") return TokenType::CLOSE;
+    if (rest == "offer") return TokenType::OFFER;
+    if (rest == "poll") return TokenType::POLL;
+    
     // Visibility keywords
     if (rest == "pub") return TokenType::PUB;
     if (rest == "prot") return TokenType::PROT;
@@ -734,8 +741,8 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "option") return TokenType::OPTION_TYPE;
     // Always treat "result" as an identifier to avoid conflicts with variable names
     if (rest == "result") return TokenType::IDENTIFIER;
-    if (rest == "channel") return TokenType::IDENTIFIER;
-    if (rest == "atomic") return TokenType::IDENTIFIER;
+    if (rest == "channel") return TokenType::CHANNEL_TYPE;
+    if (rest == "atomic") return TokenType::ATOMIC_TYPE;
     if (rest == "function") return TokenType::FUNCTION_TYPE;
     if (rest == "events") return TokenType::IDENTIFIER;
     if (rest == "sleep") return TokenType::IDENTIFIER;
@@ -1045,6 +1052,16 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "OK";
     case TokenType::VAL:
         return "VAL";
+    case TokenType::SEND:
+        return "SEND";
+    case TokenType::RECV:
+        return "RECV";
+    case TokenType::CLOSE:
+        return "CLOSE";
+    case TokenType::OFFER:
+        return "OFFER";
+    case TokenType::POLL:
+        return "POLL";
     case TokenType::PUB:
         return "PUB";
     case TokenType::PROT:

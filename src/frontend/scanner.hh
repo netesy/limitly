@@ -154,6 +154,13 @@ enum class TokenType {
     OK,         // ok
     VAL,        // val
     
+    // Channel operation keywords
+    SEND,       // send
+    RECV,       // recv
+    CLOSE,      // close
+    OFFER,      // offer (non-blocking send)
+    POLL,       // poll (non-blocking receive)
+    
     // Visibility keywords
     PUB,        // pub
     PROT,       // prot

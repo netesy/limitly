@@ -12,10 +12,6 @@
 #include "../types.hh"
 #include "../functions.hh"
 #include "../classes.hh"
-#include "../concurrency/scheduler.hh"
-#include "../concurrency/thread_pool.hh"
-#include "../concurrency/event_loop.hh"
-#include "../concurrency/concurrency_state.hh"
 #include <vector>
 #include <stack>
 #include <unordered_map>
@@ -26,15 +22,12 @@
 #include <string>
 #include <iostream>
 #include <functional>
-#include <thread>
-#include <mutex>
 
 #include "../env.hh"
 
 // Forward declarations
 struct CallFrame;
 class VM;
-class TaskVM;
 
 namespace backend {
     class VMMethodImplementation;
@@ -321,14 +314,15 @@ private:
         }
     };
     ClosureTracker closureTracker;
-
-    // Concurrency runtime - replaced with integrated state
-    std::unique_ptr<ConcurrencyState> concurrency_state;
     
     // Helper methods
     ValuePtr pop();
     void push(const ValuePtr& value);
     ValuePtr peek(int distance = 0) const;
+    ValuePtr peekOrThrow(int distance = 0) const {
+        ValuePtr value = peek(distance);
+        if (!value) {
+            throw std::runtime_error("Stack underflow");
     std::string valueToString(const ValuePtr& value);
     
     // Error handling helper methods

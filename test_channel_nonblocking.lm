@@ -1,0 +1,65 @@
+print("Testing non-blocking channel operations");
+
+// Create a typed channel of strings, bounded capacity 2
+var ch : channel:str = channel(capacity=2);
+
+// Non-blocking operations demonstration
+print("=== Non-blocking operations ===");
+
+// Try to send using offer (non-blocking)
+var success = ch.offer("message 1");
+if (success) {
+    print("Successfully sent: message 1");
+} else {
+    print("Channel full, could not send: message 1");
+}
+
+// Try to receive using poll (non-blocking)
+var msg = ch.poll();
+if (msg) {
+    print("Received: " + msg);
+} else {
+    print("Channel empty, no message received");
+}
+
+// Fill the channel
+ch.send("message 2");
+ch.send("message 3");
+
+// Try to send to full channel using offer
+success = ch.offer("message 4");
+if (success) {
+    print("Successfully sent: message 4");
+} else {
+    print("Channel full, could not send: message 4");
+}
+
+// Drain the channel using poll
+while (true) {
+    msg = ch.poll();
+    if (!msg) {
+        print("Channel empty, stopping poll");
+        break;
+    }
+    print("Polled: " + msg);
+}
+
+// Close the channel
+ch.close();
+
+print("=== Blocking operations ===");
+
+// Create another channel for blocking demo
+var ch2 : channel:int = channel(capacity=1);
+
+// Blocking send (will succeed since channel is empty)
+ch2.send(42);
+
+// Blocking receive (will succeed since channel has data)
+var value = ch2.recv();
+print("Blocking receive got: " + value);
+
+// Close the second channel
+ch2.close();
+
+print("Channel test completed");

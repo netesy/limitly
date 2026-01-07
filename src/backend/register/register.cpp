@@ -1,4 +1,9 @@
 #include "register.hh"
+#include "../src/fiber.hh"
+#include "../src/channel.hh"
+#include "../src/scheduler.hh"
+#include "../src/shared_cell.hh"
+#include "../src/task.hh"
 #include "../../lir/lir.hh"
 #include "../../lir/functions.hh"
 #include "../../lir/function_registry.hh"
@@ -102,19 +107,18 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
     dispatch_table[static_cast<int>(LIR::LIR_Op::TaskSetState)] = &&OP_TASK_SET_STATE;
     dispatch_table[static_cast<int>(LIR::LIR_Op::TaskSetField)] = &&OP_TASK_SET_FIELD;
     dispatch_table[static_cast<int>(LIR::LIR_Op::TaskGetField)] = &&OP_TASK_GET_FIELD;
-    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelAlloc)] = &&OP_CHANNEL_ALLOC;
-    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelPush)] = &&OP_CHANNEL_PUSH;
-    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelPop)] = &&OP_CHANNEL_POP;
-    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelHasData)] = &&OP_CHANNEL_HAS_DATA;
+                    
+    // New blocking channel operations
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ChanAlloc)] = &&OP_CHAN_ALLOC;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ChanSend)] = &&OP_CHAN_SEND;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ChanRecv)] = &&OP_CHAN_RECV;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ChanClose)] = &&OP_CHAN_CLOSE;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ChanTestEmpty)] = &&OP_CHAN_TEST_EMPTY;
     
-    // Enhanced channel operations
-    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelSend)] = &&OP_CHANNEL_SEND;
-    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelRecv)] = &&OP_CHANNEL_RECV;
-    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelTrySend)] = &&OP_CHANNEL_TRY_SEND;
-    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelTryRecv)] = &&OP_CHANNEL_TRY_RECV;
-    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelClose)] = &&OP_CHANNEL_CLOSE;
-    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelLen)] = &&OP_CHANNEL_LEN;
-    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelSelect)] = &&OP_CHANNEL_SELECT;
+    // Non-blocking channel operations
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ChanOffer)] = &&OP_CHAN_OFFER;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ChanPoll)] = &&OP_CHAN_POLL;
+    
     dispatch_table[static_cast<int>(LIR::LIR_Op::SchedulerInit)] = &&OP_SCHEDULER_INIT;
     dispatch_table[static_cast<int>(LIR::LIR_Op::SchedulerRun)] = &&OP_SCHEDULER_RUN;
     dispatch_table[static_cast<int>(LIR::LIR_Op::SchedulerTick)] = &&OP_SCHEDULER_TICK;
@@ -895,30 +899,10 @@ OP_TASK_GET_FIELD:
                 registers[pc->dst] = it->second;
             } else {
                 registers[pc->dst] = static_cast<int64_t>(0);
-            }
-        } else {
-            registers[pc->dst] = static_cast<int64_t>(0);
-        }
-    }
-    DISPATCH();
-
-OP_CHANNEL_ALLOC:
-    {
-        size_t capacity = static_cast<size_t>(to_int(registers[pc->a]));
-        if (capacity == 0) capacity = 32;
-        auto channel = std::make_unique<Channel>(capacity);
-        uint64_t channel_id = channels.size();
-        channels.push_back(std::move(channel));
-        registers[pc->dst] = static_cast<int64_t>(channel_id);
-    }
-    DISPATCH();
-
-OP_CHANNEL_PUSH:
-    {
         uint64_t channel_id = static_cast<uint64_t>(to_int(registers[pc->a]));
         RegisterValue value = registers[pc->b];
         if (channel_id < channels.size()) {
-            bool success = channels[channel_id]->push(value);
+            bool success = channels[channel_id]->offer(value);
             registers[pc->dst] = static_cast<int64_t>(success ? 1 : 0);
         } else {
             registers[pc->dst] = static_cast<int64_t>(0);
@@ -931,7 +915,7 @@ OP_CHANNEL_POP:
         uint64_t channel_id = static_cast<uint64_t>(to_int(registers[pc->a]));
         if (channel_id < channels.size()) {
             RegisterValue value;
-            bool success = channels[channel_id]->pop(value);
+            bool success = channels[channel_id]->poll(value);
             if (success) {
                 registers[pc->dst] = value;
             } else {
@@ -959,7 +943,7 @@ OP_CHANNEL_SEND:
         uint64_t channel_id = static_cast<uint64_t>(to_int(registers[pc->a]));
         RegisterValue value = registers[pc->b];
         if (channel_id < channels.size()) {
-            bool success = channels[channel_id]->push(value);
+            bool success = channels[channel_id]->offer(value);
             registers[pc->dst] = static_cast<int64_t>(success ? 1 : 0);
         } else {
             registers[pc->dst] = static_cast<int64_t>(0);
@@ -972,7 +956,7 @@ OP_CHANNEL_RECV:
         uint64_t channel_id = static_cast<uint64_t>(to_int(registers[pc->a]));
         if (channel_id < channels.size()) {
             RegisterValue value;
-            bool success = channels[channel_id]->pop(value);
+            bool success = channels[channel_id]->poll(value);
             if (success) {
                 registers[pc->dst] = value;
             } else {
@@ -989,7 +973,7 @@ OP_CHANNEL_TRY_SEND:
         uint64_t channel_id = static_cast<uint64_t>(to_int(registers[pc->a]));
         RegisterValue value = registers[pc->b];
         if (channel_id < channels.size()) {
-            bool success = channels[channel_id]->push(value);
+            bool success = channels[channel_id]->offer(value);
             registers[pc->dst] = static_cast<int64_t>(success ? 1 : 0);
         } else {
             registers[pc->dst] = static_cast<int64_t>(0);
@@ -1002,7 +986,7 @@ OP_CHANNEL_TRY_RECV:
         uint64_t channel_id = static_cast<uint64_t>(to_int(registers[pc->a]));
         if (channel_id < channels.size()) {
             RegisterValue value;
-            bool success = channels[channel_id]->pop(value);
+            bool success = channels[channel_id]->poll(value);
             if (success) {
                 registers[pc->dst] = value;
                 registers[pc->b] = static_cast<int64_t>(1); // status register
@@ -1498,7 +1482,106 @@ OP_BEGINMODULE:
 
 OP_ENDMODULE:
     DISPATCH();
-  
+
+// New blocking channel operations
+OP_CHAN_ALLOC:
+    {
+        size_t capacity = static_cast<size_t>(to_int(registers[pc->a]));
+        if (capacity == 0) capacity = 1; // Default to unbuffered
+        
+        // Create a new channel and return its ID
+        auto channel = std::make_unique<Channel>(capacity);
+        uint64_t channel_id = channels.size();
+        channels.push_back(std::move(channel));
+        registers[pc->dst] = static_cast<int64_t>(channel_id);
+    }
+    DISPATCH();
+
+OP_CHAN_SEND:
+    {
+        uint64_t channel_id = static_cast<uint64_t>(to_int(registers[pc->a]));
+        RegisterValue value = registers[pc->b];
+        
+        if (channel_id < channels.size()) {
+            // Blocking send - suspend fiber if full
+            // TODO: Get current fiber and pass to send()
+            channels[channel_id]->send(value, nullptr);
+        }
+    }
+    DISPATCH();
+
+OP_CHAN_RECV:
+    {
+        uint64_t channel_id = static_cast<uint64_t>(to_int(registers[pc->a]));
+        
+        if (channel_id < channels.size()) {
+            // Blocking receive - suspend fiber if empty
+            // TODO: Get current fiber and pass to recv()
+            RegisterValue value = channels[channel_id]->recv(nullptr);
+            registers[pc->dst] = value;
+        } else {
+            registers[pc->dst] = nullptr;
+        }
+    }
+    DISPATCH();
+
+OP_CHAN_CLOSE:
+    {
+        uint64_t channel_id = static_cast<uint64_t>(to_int(registers[pc->a]));
+        
+        if (channel_id < channels.size()) {
+            channels[channel_id]->close();
+        }
+    }
+    DISPATCH();
+
+OP_CHAN_TEST_EMPTY:
+    {
+        uint64_t channel_id = static_cast<uint64_t>(to_int(registers[pc->a]));
+        
+        if (channel_id < channels.size()) {
+            bool is_empty = !channels[channel_id]->has_data();
+            registers[pc->dst] = is_empty;
+        } else {
+            registers[pc->dst] = true; // Invalid channel ID, treat as empty
+        }
+    }
+    DISPATCH();
+
+// Non-blocking channel operations
+OP_CHAN_OFFER:
+    {
+        uint64_t channel_id = static_cast<uint64_t>(to_int(registers[pc->a]));
+        RegisterValue value = registers[pc->b];
+        
+        if (channel_id < channels.size()) {
+            bool sent = channels[channel_id]->offer(value);
+            registers[pc->dst] = sent;
+        } else {
+            registers[pc->dst] = false; // Invalid channel ID
+        }
+    }
+    DISPATCH();
+
+OP_CHAN_POLL:
+    {
+        uint64_t channel_id = static_cast<uint64_t>(to_int(registers[pc->a]));
+        
+        if (channel_id < channels.size()) {
+            RegisterValue value;
+            bool received = channels[channel_id]->poll(value);
+            if (received) {
+                registers[pc->dst] = value;
+            } else {
+                // Channel was empty, return nil
+                registers[pc->dst] = nullptr;
+            }
+        } else {
+            registers[pc->dst] = nullptr; // Invalid channel ID
+        }
+    }
+    DISPATCH();
+
     #undef DISPATCH
     #undef DISPATCH_JUMP
 }
@@ -1638,7 +1721,6 @@ std::string RegisterVM::to_string(const RegisterValue& value) const {
     return "nil";
 }
 
-// Error handling methods implementation
 ValuePtr RegisterVM::createErrorValue(const std::string& errorType, const std::string& message) {
     // Create error value using the same approach as the old VM
     ErrorValue errorVal(errorType, message, {}, 0); // No source location for now

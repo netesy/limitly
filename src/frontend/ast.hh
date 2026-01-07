@@ -89,7 +89,13 @@ namespace AST {
     struct UnsafeStatement;
     struct ContractStatement;
     struct ComptimeStatement;
-    
+    struct ChannelTypeExpr;
+    struct ChannelCreateExpr;
+    struct ChannelSendExpr;
+    struct ChannelRecvExpr;
+    struct ChannelCloseExpr;
+    struct ChannelOfferExpr;
+    struct ChannelPollExpr;
     // Memory operation nodes (inserted by type checker)
     struct MakeLinearExpr;
     struct MakeRefExpr;
@@ -782,6 +788,38 @@ namespace AST {
         
         DropExpr(std::shared_ptr<Expression> val, const std::string& target)
             : value(val), target_var(target) {}
+    };
+
+    // Channel-related expression nodes
+    struct ChannelTypeExpr : public Expression {
+        std::shared_ptr<TypeAnnotation> element_type;  // Type of elements in the channel (e.g., str in channel:str)
+    };
+    
+    struct ChannelCreateExpr : public Expression {
+        std::shared_ptr<TypeAnnotation> element_type;  // Type of elements the channel will hold
+        std::shared_ptr<Expression> capacity;          // Channel capacity (optional, defaults to 0 for unbuffered)
+    };
+    
+    struct ChannelSendExpr : public Expression {
+        std::shared_ptr<Expression> channel;          // Channel expression
+        std::shared_ptr<Expression> value;             // Value to send
+    };
+    
+    struct ChannelRecvExpr : public Expression {
+        std::shared_ptr<Expression> channel;          // Channel expression
+    };
+    
+    struct ChannelCloseExpr : public Expression {
+        std::shared_ptr<Expression> channel;          // Channel expression
+    };
+
+    struct ChannelOfferExpr : public Expression {
+        std::shared_ptr<Expression> channel;          // Channel expression
+        std::shared_ptr<Expression> value;             // Value to send
+    };
+
+    struct ChannelPollExpr : public Expression {
+        std::shared_ptr<Expression> channel;          // Channel expression
     };
 
     // ============================================================================
