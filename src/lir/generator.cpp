@@ -1433,6 +1433,26 @@ Reg Generator::emit_call_expr(AST::CallExpr& expr) {
         if (BuiltinUtils::isBuiltinFunction(func_name)) {
             std::cout << "[DEBUG] LIR Generator: Generating builtin call to '" << func_name << "'" << std::endl;
             
+            // Special handling for channel() builtin
+            if (func_name == "channel") {
+                std::cout << "[DEBUG] LIR Generator: Special handling for channel() builtin" << std::endl;
+                
+                // Allocate result register
+                Reg result = allocate_register();
+                
+                // Set the result type to int (channel handle)
+                auto int_type = std::make_shared<::Type>(::TypeTag::Int);
+                set_register_language_type(result, int_type);
+                set_register_abi_type(result, language_type_to_abi_type(int_type));
+                
+                // Generate ChannelAlloc instruction with default capacity (32)
+                emit_instruction(LIR_Inst(LIR_Op::ChannelAlloc, result, 32, 0));
+                
+                std::cout << "[DEBUG] Generated ChannelAlloc instruction for channel()" << std::endl;
+                
+                return result;
+            }
+            
             // Evaluate arguments and store them in registers
             std::vector<Reg> arg_regs;
             for (const auto& arg : expr.arguments) {
@@ -3683,43 +3703,9 @@ void Generator::lower_task_bodies_recursive(const std::vector<std::shared_ptr<AS
         std::cout << "[DEBUG] Processing statement in lower_task_bodies_recursive: " << typeid(*stmt.get()).name() << std::endl;
         if (auto concurrent_stmt = dynamic_cast<AST::ConcurrentStatement*>(stmt.get())) {
             std::cout << "[DEBUG] Found ConcurrentStatement in lower_task_bodies_recursive" << std::endl;
-            // === SHARED CELL CONCURRENT HANDLING ===
-            // Use SharedCell system instead of old task_variable_mappings_
-            
-            // Find variables accessed in task bodies that need to be shared
-            std::cout << "[DEBUG] About to call find_accessed_variables_in_concurrent" << std::endl;
-            std::set<std::string> accessed_variables;
-            // TEMPORARILY DISABLED TO DEBUG HANGING
-            // find_accessed_variables_in_concurrent(*concurrent_stmt, accessed_variables);
-            std::cout << "[DEBUG] find_accessed_variables_in_concurrent SKIPPED" << std::endl;
-            
-            // Allocate SharedCell IDs for each accessed variable
-            std::cout << "[DEBUG] About to allocate SharedCell IDs" << std::endl;
-            parallel_block_cell_ids_.clear();
-            for (const auto& var_name : accessed_variables) {
-                // Emit SharedCell allocation LIR instruction
-                Reg cell_id_reg = allocate_register();
-                emit_instruction(LIR_Inst(LIR_Op::SharedCellAlloc, Type::I64, cell_id_reg, 0, 0));
-                
-                // Store the SharedCell ID register for this variable
-                parallel_block_cell_ids_[var_name] = cell_id_reg;
-                
-                std::cout << "[DEBUG] Concurrent: Allocated SharedCell for variable '" << var_name 
-                          << "' (register r" << cell_id_reg << ")" << std::endl;
-            }
-            std::cout << "[DEBUG] SharedCell allocation completed" << std::endl;
-            
-            // Store SharedCell information in tasks
-            for (const auto& stmt_ptr : concurrent_stmt->body->statements) {
-                if (auto task = dynamic_cast<AST::TaskStatement*>(stmt_ptr.get())) {
-                    // TaskStatement no longer uses shared_cell_registers - removed in new model
-                }
-            }
-            
-            // Look for task statements inside concurrent blocks
-            std::cout << "[DEBUG] About to make recursive call to lower_task_bodies_recursive - THIS WILL CAUSE INFINITE RECURSION!" << std::endl;
-            // lower_task_bodies_recursive(concurrent_stmt->body->statements);
-            std::cout << "[DEBUG] Recursive call SKIPPED to prevent infinite recursion" << std::endl;
+            // === CHANNELS ONLY CONCURRENT HANDLING ===
+            // Concurrent blocks use channels for communication, not shared variables
+            // No SharedCell allocation needed for concurrent blocks
         } else if (auto parallel_stmt = dynamic_cast<AST::ParallelStatement*>(stmt.get())) {
             // === SHARED CELL PARALLEL HANDLING ===
             // Use SharedCell system instead of old task_variable_mappings_

@@ -106,6 +106,15 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
     dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelPush)] = &&OP_CHANNEL_PUSH;
     dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelPop)] = &&OP_CHANNEL_POP;
     dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelHasData)] = &&OP_CHANNEL_HAS_DATA;
+    
+    // Enhanced channel operations
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelSend)] = &&OP_CHANNEL_SEND;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelRecv)] = &&OP_CHANNEL_RECV;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelTrySend)] = &&OP_CHANNEL_TRY_SEND;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelTryRecv)] = &&OP_CHANNEL_TRY_RECV;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelClose)] = &&OP_CHANNEL_CLOSE;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelLen)] = &&OP_CHANNEL_LEN;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelSelect)] = &&OP_CHANNEL_SELECT;
     dispatch_table[static_cast<int>(LIR::LIR_Op::SchedulerInit)] = &&OP_SCHEDULER_INIT;
     dispatch_table[static_cast<int>(LIR::LIR_Op::SchedulerRun)] = &&OP_SCHEDULER_RUN;
     dispatch_table[static_cast<int>(LIR::LIR_Op::SchedulerTick)] = &&OP_SCHEDULER_TICK;
@@ -854,8 +863,7 @@ OP_TASK_SET_FIELD:
         RegisterValue field_value = registers[pc->dst];
 
         if (pc->imm != 0) {
-            field_index = static_cast<int>(pc->imm);
-            field_value = registers[pc->b];
+            field_index = static_cast<int>(pc->imm);           
         }
 
         std::cout << "[DEBUG] TaskSetField: context_id=" << context_id << " field_index=" << field_index << " imm=" << pc->imm << " value_reg=" << pc->dst << std::endl;
@@ -942,6 +950,108 @@ OP_CHANNEL_HAS_DATA:
             registers[pc->dst] = static_cast<bool>(channels[channel_id]->has_data());
         } else {
             registers[pc->dst] = static_cast<bool>(false);
+        }
+    }
+    DISPATCH();
+
+OP_CHANNEL_SEND:
+    {
+        uint64_t channel_id = static_cast<uint64_t>(to_int(registers[pc->a]));
+        RegisterValue value = registers[pc->b];
+        if (channel_id < channels.size()) {
+            bool success = channels[channel_id]->push(value);
+            registers[pc->dst] = static_cast<int64_t>(success ? 1 : 0);
+        } else {
+            registers[pc->dst] = static_cast<int64_t>(0);
+        }
+    }
+    DISPATCH();
+
+OP_CHANNEL_RECV:
+    {
+        uint64_t channel_id = static_cast<uint64_t>(to_int(registers[pc->a]));
+        if (channel_id < channels.size()) {
+            RegisterValue value;
+            bool success = channels[channel_id]->pop(value);
+            if (success) {
+                registers[pc->dst] = value;
+            } else {
+                registers[pc->dst] = nullptr;
+            }
+        } else {
+            registers[pc->dst] = nullptr;
+        }
+    }
+    DISPATCH();
+
+OP_CHANNEL_TRY_SEND:
+    {
+        uint64_t channel_id = static_cast<uint64_t>(to_int(registers[pc->a]));
+        RegisterValue value = registers[pc->b];
+        if (channel_id < channels.size()) {
+            bool success = channels[channel_id]->push(value);
+            registers[pc->dst] = static_cast<int64_t>(success ? 1 : 0);
+        } else {
+            registers[pc->dst] = static_cast<int64_t>(0);
+        }
+    }
+    DISPATCH();
+
+OP_CHANNEL_TRY_RECV:
+    {
+        uint64_t channel_id = static_cast<uint64_t>(to_int(registers[pc->a]));
+        if (channel_id < channels.size()) {
+            RegisterValue value;
+            bool success = channels[channel_id]->pop(value);
+            if (success) {
+                registers[pc->dst] = value;
+                registers[pc->b] = static_cast<int64_t>(1); // status register
+            } else {
+                registers[pc->dst] = nullptr;
+                registers[pc->b] = static_cast<int64_t>(0); // status register
+            }
+        } else {
+            registers[pc->dst] = nullptr;
+            registers[pc->b] = static_cast<int64_t>(0); // status register
+        }
+    }
+    DISPATCH();
+
+OP_CHANNEL_CLOSE:
+    {
+        uint64_t channel_id = static_cast<uint64_t>(to_int(registers[pc->a]));
+        if (channel_id < channels.size()) {
+            channels[channel_id]->close();
+            registers[pc->dst] = static_cast<int64_t>(1);
+        } else {
+            registers[pc->dst] = static_cast<int64_t>(0);
+        }
+    }
+    DISPATCH();
+
+OP_CHANNEL_LEN:
+    {
+        uint64_t channel_id = static_cast<uint64_t>(to_int(registers[pc->a]));
+        if (channel_id < channels.size()) {
+            registers[pc->dst] = static_cast<int64_t>(channels[channel_id]->size());
+        } else {
+            registers[pc->dst] = static_cast<int64_t>(0);
+        }
+    }
+    DISPATCH();
+
+OP_CHANNEL_SELECT:
+    {
+        // For now, implement simple select on first ready channel
+        // In a full implementation, this would wait on multiple channels
+        uint64_t channel_count = static_cast<uint64_t>(to_int(registers[pc->a]));
+        registers[pc->dst] = static_cast<int64_t>(-1); // default: no channel ready
+        
+        for (uint64_t i = 0; i < channel_count && i < channels.size(); ++i) {
+            if (channels[i]->has_data()) {
+                registers[pc->dst] = static_cast<int64_t>(i);
+                break;
+            }
         }
     }
     DISPATCH();
@@ -1048,6 +1158,30 @@ OP_SCHEDULER_RUN:
                 auto channel_it = task->fields.find(2);
                 if (channel_it != task->fields.end()) {
                     registers[2] = channel_it->second;
+                    std::cout << "[DEBUG] Set register[2] to channel ID from field 2: ";
+                    auto& channel_val = registers[2];
+                    if (std::holds_alternative<int64_t>(channel_val)) {
+                        std::cout << std::get<int64_t>(channel_val);
+                    } else if (std::holds_alternative<uint64_t>(channel_val)) {
+                        std::cout << std::get<uint64_t>(channel_val);
+                    } else {
+                        std::cout << "unknown type";
+                    }
+                    std::cout << std::endl;
+                    
+                    // Debug: also show what was stored in task context
+                    std::cout << "[DEBUG] Task context field 2 actually contains: ";
+                    auto& stored_val = channel_it->second;
+                    if (std::holds_alternative<int64_t>(stored_val)) {
+                        std::cout << std::get<int64_t>(stored_val);
+                    } else if (std::holds_alternative<uint64_t>(stored_val)) {
+                        std::cout << std::get<uint64_t>(stored_val);
+                    } else {
+                        std::cout << "unknown type " << stored_val.index();
+                    }
+                    std::cout << std::endl;
+                } else {
+                    std::cout << "[DEBUG] No channel found in task context field 2" << std::endl;
                 }
                 
                 // Execute task function
