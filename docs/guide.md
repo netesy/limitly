@@ -335,7 +335,6 @@ iter (i in 0..10..2) {
     print("i = {i}"); // Output: 0, 2, 4, 6, 8
 }
 ```
-> **Note:** The step value feature is planned but not yet fully implemented in the parser.
 
 ### Ternary Operator
 
@@ -346,7 +345,6 @@ var x = 10;
 var result = x > 5 ? "Greater than 5" : "Not greater than 5";
 print(result); // Output: Greater than 5
 ```
-> **Note:** The ternary operator is planned but not yet implemented in the parser.
 
 ### Match Statements
 
@@ -748,6 +746,31 @@ class Circle : Shape {
     }
 }
 ```
+
+### Worker Statements for Channel Processing
+
+A `worker` statement provides a convenient way to process items from a channel within a `concurrent` block. It automatically receives items from the channel specified in the `concurrent` block's parameters and executes its body for each item.
+
+This simplifies the common pattern of looping and receiving from a channel manually.
+
+```limit
+// Create a channel with a buffer of 5
+var messages = channel(capacity=5);
+
+concurrent(ch=messages) {
+    // Tasks send data to the channel
+    task(i in 1..5) {
+        messages.send("Message {i}");
+    }
+
+    // A worker processes the data
+    worker(msg) {
+        print("Worker received: {msg}");
+    }
+}
+```
+
+In this example, the `worker` will be repeatedly executed for each message sent to the `messages` channel, until the channel is closed.
 
 #### Final Classes and Methods
 
@@ -1414,8 +1437,8 @@ Limit's concurrency model is "structured," which means that the lifetime of conc
 `parallel` blocks are designed for CPU-bound workloads, where you want to take full advantage of multiple CPU cores.
 
 ```
-// Create a channel to receive messages from the tasks
-var messages = channel();
+// Create a channel with a buffer of 10 to receive messages from the tasks
+var messages = channel(capacity=10);
 
 // This block will run tasks on multiple cores
 parallel(ch=messages, mode=batch, cores="auto", timeout=10s, onError="stop") {
@@ -1456,7 +1479,8 @@ iter (message in messages) {
 `concurrent` blocks are designed for I/O-bound workloads, such as waiting for network requests or reading from files. These tasks can be run efficiently on a smaller number of threads because they spend most of their time waiting.
 
 ```
-var results = channel();
+// Create a channel with a buffer of 2
+var results = channel(capacity=2);
 
 concurrent(ch=results, mode=batch) {
     task() {
