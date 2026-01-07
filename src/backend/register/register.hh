@@ -6,6 +6,11 @@
 #include "../types.hh"
 #include "../memory.hh"
 #include "../value.hh"
+#include "../task.hh"
+#include "../channel.hh"
+#include "../shared_cell.hh"
+#include "../scheduler.hh"
+#include "../fiber.hh"
 #include <vector>
 #include <string>
 #include <variant>
@@ -17,119 +22,7 @@
 
 namespace Register {
 
-// Register value type
-using RegisterValue = std::variant<int64_t, uint64_t, double, bool, std::string, std::nullptr_t>;
-
-// Task states for threadless concurrency
-enum class TaskState {
-    INIT,
-    RUNNING,
-    SLEEPING,
-    COMPLETED
-};
-
-// Task context structure
-struct TaskContext {
-    TaskState state;
-    uint64_t task_id;
-    uint64_t sleep_until;
-    int64_t counter;
-    RegisterValue channel_ptr;
-    std::unordered_map<int, RegisterValue> fields;
-    
-    // Store task body as instruction range
-    int64_t body_start_pc;  // Start instruction index
-    int64_t body_end_pc;    // End instruction index
-    
-    TaskContext() 
-        : state(TaskState::INIT), task_id(0), sleep_until(0), 
-          counter(0), channel_ptr(nullptr),
-          body_start_pc(-1), body_end_pc(-1) {}
-    
-    TaskContext(const TaskContext& other) 
-        : state(other.state), task_id(other.task_id), 
-          sleep_until(other.sleep_until), counter(other.counter), 
-          channel_ptr(other.channel_ptr), fields(other.fields),
-          body_start_pc(other.body_start_pc), 
-          body_end_pc(other.body_end_pc) {}
-};
-
-// Channel structure for threadless communication
-struct Channel {
-    std::queue<RegisterValue> buffer;
-    size_t capacity;
-    
-    Channel(size_t cap) : capacity(cap) {}
-    
-    bool push(const RegisterValue& value) {
-        if (buffer.size() < capacity) {
-            buffer.push(value);
-            return true;
-        }
-        return false;
-    }
-    
-    bool pop(RegisterValue& value) {
-        if (!buffer.empty()) {
-            value = buffer.front();
-            buffer.pop();
-            return true;
-        }
-        return false;
-    }
-    
-    bool has_data() const {
-        return !buffer.empty();
-    }
-    
-    size_t size() const {
-        return buffer.size();
-    }
-};
-
-// SharedCell structure for parallel execution
-struct SharedCell {
-    uint32_t id;
-    std::atomic<int64_t> value;
-    
-    SharedCell(uint32_t cell_id, int64_t initial_value) 
-        : id(cell_id), value(initial_value) {}
-};
-
-// Scheduler for threadless concurrency
-struct Scheduler {
-    std::vector<std::unique_ptr<TaskContext>> tasks;
-    uint64_t current_time;
-    uint64_t next_task_id;
-    
-    Scheduler() : current_time(0), next_task_id(1) {}
-    
-    void add_task(std::unique_ptr<TaskContext> task) {
-        // Don't reassign task_id - it's already set correctly during initialization
-        tasks.push_back(std::move(task));
-    }
-    
-    void tick() {
-        current_time++;
-        // Simple round-robin scheduling
-        for (auto& task : tasks) {
-            if (task->state == TaskState::SLEEPING && current_time >= task->sleep_until) {
-                task->state = TaskState::RUNNING;
-            }
-        }
-    }
-    
-    bool has_running_tasks() const {
-        for (const auto& task : tasks) {
-            if (task->state != TaskState::COMPLETED) {
-                return true;
-            }
-        }
-        return false;
-    }
-};
-
-class RegisterVM {
+    class RegisterVM {
 public:
     RegisterVM();
     
@@ -154,6 +47,14 @@ public:
     
     // Execute task body using instruction range
     void execute_task_body(TaskContext* task, const LIR::LIR_Function& function);
+    
+    // Fiber management methods
+    uint64_t create_fiber(std::unique_ptr<TaskContext> task);
+    void suspend_fiber(uint64_t fiber_id);
+    void resume_fiber(uint64_t fiber_id);
+    void execute_fiber_step();
+    bool has_active_fibers() const;
+    Fiber* get_current_fiber();
     
     // Set current function for task execution
     void set_current_function(const LIR::LIR_Function* func) { current_function_ = func; }

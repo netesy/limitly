@@ -1,53 +1,125 @@
 #ifndef CHANNEL_H
 #define CHANNEL_H
 
+#include "task.hh"
+#include "fiber.hh"
+#include "scheduler.hh"
 #include <queue>
-#include <mutex>
-#include <condition_variable>
-#include <stdexcept>
+#include <deque>
+#include <cstddef>
 
-template<typename T>
-class Channel {
-public:
-    Channel() = default;
+namespace Register {
 
-    // Deleted copy constructor and assignment operator
-    Channel(const Channel&) = delete;
-    Channel& operator=(const Channel&) = delete;
+// Modern Channel for Limitly concurrency
+struct Channel {
+    std::queue<RegisterValue> buffer;
+    size_t capacity;
+    bool closed = false;            // channel closed flag
+    std::deque<Fiber*> waiting_senders;   // fibers waiting to send
+    std::deque<Fiber*> waiting_receivers; // fibers waiting to receive
 
-    void send(T value) {
-        std::lock_guard<std::mutex> lock(mtx_);
-        if (closed_) {
-            throw std::runtime_error("send on closed channel");
+    // Constructor
+    Channel(size_t cap) : capacity(cap) {}
+
+    // Blocking send: suspend fiber if full
+    void send(const RegisterValue& value, Fiber* current_fiber) {
+        while (buffer.size() >= capacity) {
+            // suspend this fiber until there is space
+            waiting_senders.push_back(current_fiber);
+            // Note: This would need to be called from the scheduler context
+            // For now, we'll mark the fiber as suspended
+            if (current_fiber) {
+                current_fiber->suspend();
+            }
+            return; // Return early, actual suspension handled by scheduler
         }
-        queue_.push(std::move(value));
-        cv_.notify_one();
+        buffer.push(value);
+
+        // wake up one waiting receiver if exists
+        if (!waiting_receivers.empty()) {
+            Fiber* f = waiting_receivers.front();
+            waiting_receivers.pop_front();
+            f->resume();
+        }
     }
 
-    bool receive(T& value) {
-        std::unique_lock<std::mutex> lock(mtx_);
-        cv_.wait(lock, [this] { return !queue_.empty() || closed_; });
-
-        if (queue_.empty() && closed_) {
-            return false;
+    // Blocking receive: suspend fiber if empty
+    RegisterValue recv(Fiber* current_fiber) {
+        while (buffer.empty()) {
+            if (closed) {
+                // return an invalid marker if channel closed
+                return RegisterValue(); 
+            }
+            // suspend this fiber until data arrives
+            waiting_receivers.push_back(current_fiber);
+            // Note: This would need to be called from the scheduler context
+            // For now, we'll mark the fiber as suspended
+            if (current_fiber) {
+                current_fiber->suspend();
+            }
+            return RegisterValue(); // Return early, actual suspension handled by scheduler
         }
+        RegisterValue val = buffer.front();
+        buffer.pop();
 
-        value = std::move(queue_.front());
-        queue_.pop();
+        // wake up one waiting sender if exists
+        if (!waiting_senders.empty()) {
+            Fiber* f = waiting_senders.front();
+            waiting_senders.pop_front();
+            f->resume();
+        }
+        return val;
+    }
+
+    // Non-blocking send (offer)
+    bool offer(const RegisterValue& value) {
+        if (closed) return false;
+        if (buffer.size() >= capacity) return false;
+        buffer.push(value);
+
+        if (!waiting_receivers.empty()) {
+            Fiber* f = waiting_receivers.front();
+            waiting_receivers.pop_front();
+            f->resume();
+        }
         return true;
     }
 
-    void close() {
-        std::lock_guard<std::mutex> lock(mtx_);
-        closed_ = true;
-        cv_.notify_all();
+    // Non-blocking receive (poll)
+    bool poll(RegisterValue& out_value) {
+        if (buffer.empty()) return false;
+        out_value = buffer.front();
+        buffer.pop();
+
+        if (!waiting_senders.empty()) {
+            Fiber* f = waiting_senders.front();
+            waiting_senders.pop_front();
+            f->resume();
+        }
+        return true;
     }
 
-private:
-    std::mutex mtx_;
-    std::condition_variable cv_;
-    std::queue<T> queue_;
-    bool closed_ = false;
+    // Close channel
+    void close() {
+        closed = true;
+
+        // resume all waiting receivers so they can detect closure
+        while (!waiting_receivers.empty()) {
+            Fiber* f = waiting_receivers.front();
+            waiting_receivers.pop_front();
+            f->resume();
+        }
+    }
+
+    bool has_data() const {
+        return !buffer.empty();
+    }
+
+    size_t size() const {
+        return buffer.size();
+    }
 };
+
+} // namespace Register
 
 #endif // CHANNEL_H
