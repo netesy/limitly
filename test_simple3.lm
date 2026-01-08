@@ -1,0 +1,2 @@
+var ch = channel();
+ch.offer(42);

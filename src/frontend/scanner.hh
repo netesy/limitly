@@ -138,10 +138,7 @@ enum class TokenType {
     PRIVATE,    // private
     PROTECTED,  // protected
     OPEN,       // open
-    OFFER,      // offer
-    POLL,       // poll
-    SEND,        // send
-    RECV,        // recv
+
     CONTRACT,   // contract
     COMPTIME,   // comptime
     UNSAFE,     // unsafe

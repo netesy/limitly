@@ -497,6 +497,14 @@ Reg Generator::emit_expr(AST::Expression& expr) {
         return emit_object_literal_expr(*object_literal);
     } else if (auto this_expr = dynamic_cast<AST::ThisExpr*>(&expr)) {
         return emit_this_expr(*this_expr);
+    } else if (auto channel_offer = dynamic_cast<AST::ChannelOfferExpr*>(&expr)) {
+        return emit_channel_offer_expr(*channel_offer);
+    } else if (auto channel_poll = dynamic_cast<AST::ChannelPollExpr*>(&expr)) {
+        return emit_channel_poll_expr(*channel_poll);
+    } else if (auto channel_send = dynamic_cast<AST::ChannelSendExpr*>(&expr)) {
+        return emit_channel_send_expr(*channel_send);
+    } else if (auto channel_recv = dynamic_cast<AST::ChannelRecvExpr*>(&expr)) {
+        return emit_channel_recv_expr(*channel_recv);
     } else {
         report_error("Unknown expression type");
         return 0;
@@ -1531,16 +1539,71 @@ Reg Generator::emit_call_expr(AST::CallExpr& expr) {
                 return 0;
             }
             
-            // Evaluate the value to send
+            // Evaluate value to send
             Reg value_reg = emit_expr(*expr.arguments[0]);
             
-            // Generate ChannelPush instruction
+            // Generate ChannelSend instruction (blocking)
             Reg result = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::ChannelPush, result, object_reg, value_reg));
-            set_register_type(result, std::make_shared<::Type>(::TypeTag::Int));
+            emit_instruction(LIR_Inst(LIR_Op::ChannelSend, result, object_reg, value_reg));
+            set_register_type(result, std::make_shared<::Type>(::TypeTag::Nil)); // Void return
             return result;
         }
-        
+
+        if (method_name == "recv") {
+            if (expr.arguments.size() != 0) {
+                report_error("channel.recv() requires no arguments");
+                return 0;
+            }
+            
+            // Generate ChannelRecv instruction (blocking)
+            Reg result = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::ChannelRecv, result, object_reg));
+            set_register_type(result, std::make_shared<::Type>(::TypeTag::Any)); // Returns T
+            return result;
+        }        
+
+        if (method_name == "offer") {
+            if (expr.arguments.size() != 1) {
+                report_error("channel.offer() requires exactly one argument");
+                return 0;
+            }
+            
+            // Evaluate value to offer
+            Reg value_reg = emit_expr(*expr.arguments[0]);
+            
+            // Generate ChannelOffer instruction (non-blocking)
+            Reg result = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::ChannelOffer, result, object_reg, value_reg));
+            set_register_type(result, std::make_shared<::Type>(::TypeTag::Bool)); // Returns success/failure
+            return result;
+        } 
+
+        if (method_name == "poll") {
+            if (expr.arguments.size() != 0) {
+                report_error("channel.poll() requires no arguments");
+                return 0;
+            }
+            
+            // Generate ChannelPoll instruction (non-blocking)
+            Reg result = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::ChannelPoll, result, object_reg));
+            set_register_type(result, std::make_shared<::Type>(::TypeTag::Any)); // Returns Option<T>
+            return result;
+        } 
+
+        if (method_name == "close") {
+            if (expr.arguments.size() != 0) {
+                report_error("channel.close() requires no arguments");
+                return 0;
+            }
+            
+            // Generate ChannelClose instruction (assuming it exists or use ChannelPush with special value)
+            Reg result = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::ChannelPush, result, object_reg, 0)); // Use 0 as close marker
+            set_register_type(result, std::make_shared<::Type>(::TypeTag::Nil)); // Void return
+            return result;
+        }         
+
         report_error("Unknown method: " + method_name);
         return 0;
     } else {
@@ -4447,6 +4510,69 @@ void Generator::emit_concurrent_worker_init(AST::WorkerStatement& worker, size_t
     
     std::cout << "[DEBUG] Created worker " << worker_id 
               << " with param '" << worker.paramName << "'" << std::endl;
+}
+
+// Channel operation implementations
+Reg Generator::emit_channel_offer_expr(AST::ChannelOfferExpr& expr) {
+    std::cout << "[DEBUG] Generating channel offer expression" << std::endl;
+    
+    // Evaluate value to offer
+    Reg value_reg = emit_expr(*expr.value);
+    
+    // Evaluate channel
+    Reg channel_reg = emit_expr(*expr.channel);
+    
+    // Generate ChannelOffer instruction
+    Reg result = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::ChannelOffer, result, channel_reg, value_reg));
+    set_register_type(result, std::make_shared<::Type>(::TypeTag::Bool));
+    
+    return result;
+}
+
+Reg Generator::emit_channel_poll_expr(AST::ChannelPollExpr& expr) {
+    std::cout << "[DEBUG] Generating channel poll expression" << std::endl;
+    
+    // Evaluate channel
+    Reg channel_reg = emit_expr(*expr.channel);
+    
+    // Generate ChannelPoll instruction
+    Reg result = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::ChannelPoll, result, channel_reg));
+    set_register_type(result, std::make_shared<::Type>(::TypeTag::Any)); // Returns Option<T>
+    
+    return result;
+}
+
+Reg Generator::emit_channel_send_expr(AST::ChannelSendExpr& expr) {
+    std::cout << "[DEBUG] Generating channel send expression" << std::endl;
+    
+    // Evaluate value to send
+    Reg value_reg = emit_expr(*expr.value);
+    
+    // Evaluate channel
+    Reg channel_reg = emit_expr(*expr.channel);
+    
+    // Generate ChannelSend instruction (blocking)
+    Reg result = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::ChannelSend, result, channel_reg, value_reg));
+    set_register_type(result, std::make_shared<::Type>(::TypeTag::Nil)); // Void return
+    
+    return result;
+}
+
+Reg Generator::emit_channel_recv_expr(AST::ChannelRecvExpr& expr) {
+    std::cout << "[DEBUG] Generating channel recv expression" << std::endl;
+    
+    // Evaluate channel
+    Reg channel_reg = emit_expr(*expr.channel);
+    
+    // Generate ChannelRecv instruction (blocking)
+    Reg result = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::ChannelRecv, result, channel_reg));
+    set_register_type(result, std::make_shared<::Type>(::TypeTag::Any)); // Returns T
+    
+    return result;
 }
 
 } // namespace LIR

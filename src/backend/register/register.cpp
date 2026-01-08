@@ -103,8 +103,11 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
     dispatch_table[static_cast<int>(LIR::LIR_Op::TaskSetField)] = &&OP_TASK_SET_FIELD;
     dispatch_table[static_cast<int>(LIR::LIR_Op::TaskGetField)] = &&OP_TASK_GET_FIELD;
     dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelAlloc)] = &&OP_CHANNEL_ALLOC;
-    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelPush)] = &&OP_CHANNEL_PUSH;
-    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelPop)] = &&OP_CHANNEL_POP;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelSend)] = &&OP_CHANNEL_SEND;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelOffer)] = &&OP_CHANNEL_OFFER;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelRecv)] = &&OP_CHANNEL_RECV;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelPoll)] = &&OP_CHANNEL_POLL;
+    dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelClose)] = &&OP_CHANNEL_CLOSE;
     dispatch_table[static_cast<int>(LIR::LIR_Op::ChannelHasData)] = &&OP_CHANNEL_HAS_DATA;
     dispatch_table[static_cast<int>(LIR::LIR_Op::SchedulerInit)] = &&OP_SCHEDULER_INIT;
     dispatch_table[static_cast<int>(LIR::LIR_Op::SchedulerRun)] = &&OP_SCHEDULER_RUN;
@@ -182,6 +185,48 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
     int64_t int_result;
     bool bool_result;
     ValuePtr cv;
+    
+    std::string func_name;
+    std::vector<ValuePtr> args;
+    int64_t func_index;
+    int arg_count;
+    auto saved_registers = registers;
+    auto saved_pc = pc;
+    RegisterValue return_value;
+    LIR::LIRFunction temp_wrapper(function.getName(), function.getParameters(), std::nullopt, LIR::LIRFunctionBody(function.getInstructions())); // Fix LIRFunction constructor call
+    std::vector<std::string> builtin_names;
+    std::vector<std::string> function_names;
+    std::shared_ptr<LIR::LIRFunction> func;
+    
+    TaskContext* ctx = nullptr; // Add missing ctx variable
+    uint64_t count;
+    uint64_t start_context_id;
+    uint64_t context_id;
+    uint64_t channel_id;
+    int field_index;
+    RegisterValue field_value;
+    size_t capacity;
+    bool success;
+    RegisterValue value;
+    TaskState new_state;
+    uint64_t target_time;
+    std::string format;
+    std::string arg;
+    size_t pos;
+    std::shared_ptr<LIR::LIRFunction> task_func;
+    std::string task_func_name;
+    std::unordered_map<int, RegisterValue>::iterator func_name_it;
+    std::unordered_map<int, RegisterValue>::iterator loop_var_it;
+    std::unordered_map<int, RegisterValue>::iterator channel_it;
+    auto& func_manager = LIR::LIRFunctionManager::getInstance();
+    auto& func_registry = LIR::FunctionRegistry::getInstance();
+    auto& scheduler_ref = scheduler;
+    std::vector<RegisterValue> saved_registers_task;
+    const LIR::LIR_Function* saved_function_task = nullptr;
+    std::shared_ptr<TaskContext> ctx_task;
+    std::unordered_map<int, RegisterValue>::iterator it;
+    std::unique_ptr<Channel> channel;
+    std::unique_ptr<Scheduler> scheduler_ptr;
     
     // Start execution
     goto *dispatch_table[static_cast<int>(pc->op)];
@@ -526,192 +571,131 @@ OP_CALL:
         // Check if this instruction uses the new format (has func_name and call_args)
         if (!pc->func_name.empty()) {
             // New format: call r2, add(r0, r1)
-            std::string func_name = pc->func_name;
+            func_name = pc->func_name;
             const auto& arg_regs = pc->call_args;
+        
+        //std::cout << "[DEBUG] New format call to '" << func_name << "' with " << arg_regs.size() << " arguments" << std::endl;
+        
+        // First try builtin functions
+        if (LIR::BuiltinUtils::isBuiltinFunction(func_name)) {
+            // Collect arguments from the specified registers
+            args.clear();
             
-            //std::cout << "[DEBUG] New format call to '" << func_name << "' with " << arg_regs.size() << " arguments" << std::endl;
-            
-            // First try builtin functions
-            if (LIR::BuiltinUtils::isBuiltinFunction(func_name)) {
-                // Collect arguments from the specified registers
-                std::vector<ValuePtr> args;
+            for (size_t i = 0; i < arg_regs.size(); ++i) {
+                auto reg_value = registers[arg_regs[i]];
                 
-                for (size_t i = 0; i < arg_regs.size(); ++i) {
-                    auto reg_value = registers[arg_regs[i]];
-                    
-                  
-                    // Convert register value to ValuePtr
-                    ValuePtr arg_value;
-                    if (std::holds_alternative<int64_t>(reg_value)) {
-                        auto int_type = std::make_shared<::Type>(TypeTag::Int);
-                        arg_value = std::make_shared<Value>(int_type, std::get<int64_t>(reg_value));
-                    } else if (std::holds_alternative<double>(reg_value)) {
-                        auto float_type = std::make_shared<::Type>(TypeTag::Float64);
-                        arg_value = std::make_shared<Value>(float_type, std::get<double>(reg_value));
-                    } else if (std::holds_alternative<bool>(reg_value)) {
-                        auto bool_type = std::make_shared<::Type>(TypeTag::Bool);
-                        arg_value = std::make_shared<Value>(bool_type, std::get<bool>(reg_value));
-                    } else if (std::holds_alternative<std::string>(reg_value)) {
-                        auto string_type = std::make_shared<::Type>(TypeTag::String);
-                        arg_value = std::make_shared<Value>(string_type, std::get<std::string>(reg_value));
-                    } else {
-                        auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
-                        arg_value = std::make_shared<Value>(nil_type);
-                    }
-                    args.push_back(arg_value);
+              
+                // Convert register value to ValuePtr
+                ValuePtr arg_value;
+                if (std::holds_alternative<int64_t>(reg_value)) {
+                    auto int_type = std::make_shared<::Type>(TypeTag::Int);
+                    arg_value = std::make_shared<Value>(int_type, std::get<int64_t>(reg_value));
+                } else if (std::holds_alternative<double>(reg_value)) {
+                    auto float_type = std::make_shared<::Type>(TypeTag::Float64);
+                    arg_value = std::make_shared<Value>(float_type, std::get<double>(reg_value));
+                } else if (std::holds_alternative<bool>(reg_value)) {
+                    auto bool_type = std::make_shared<::Type>(TypeTag::Bool);
+                    arg_value = std::make_shared<Value>(bool_type, std::get<bool>(reg_value));
+                } else if (std::holds_alternative<std::string>(reg_value)) {
+                    auto string_type = std::make_shared<::Type>(TypeTag::String);
+                    arg_value = std::make_shared<Value>(string_type, std::get<std::string>(reg_value));
+                } else {
+                    auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
+                    arg_value = std::make_shared<Value>(nil_type);
+                }
+                args.push_back(arg_value);
+            }
+            
+            try {
+                // Call builtin function
+                ValuePtr result = LIR::BuiltinUtils::callBuiltinFunction(func_name, args);
+                
+                //std::cout << "[DEBUG] Builtin function '" << func_name << "' returned: ";
+                if (result && result->type) {
+                    //std::cout << "type=" << static_cast<int>(result->type->tag) << std::endl;
+                } else {
+                    //std::cout << "nullptr" << std::endl;
                 }
                 
-                try {
-                    // Call builtin function
-                    ValuePtr result = LIR::BuiltinUtils::callBuiltinFunction(func_name, args);
-                    
-                    //std::cout << "[DEBUG] Builtin function '" << func_name << "' returned: ";
-                    if (result && result->type) {
-                        //std::cout << "type=" << static_cast<int>(result->type->tag) << std::endl;
-                    } else {
-                        //std::cout << "nullptr" << std::endl;
+                // Convert result back to register value
+                if (result && result->type) {
+                    switch (result->type->tag) {
+                        case TypeTag::Int:
+                        case TypeTag::Int64:
+                            registers[pc->dst] = result->as<int64_t>();
+                            break;
+                        case TypeTag::Float32:
+                        case TypeTag::Float64:
+                            registers[pc->dst] = result->as<double>();
+                            break;
+                        case TypeTag::Bool:
+                            registers[pc->dst] = result->as<bool>();
+                            break;
+                        case TypeTag::String:
+                            registers[pc->dst] = result->as<std::string>();
+                            break;
+                        default:
+                            registers[pc->dst] = nullptr;
+                            break;
                     }
-                    
-                    // Convert result back to register value
-                    if (result && result->type) {
-                        switch (result->type->tag) {
-                            case TypeTag::Int:
-                            case TypeTag::Int64:
-                                registers[pc->dst] = result->as<int64_t>();
-                                break;
-                            case TypeTag::Float32:
-                            case TypeTag::Float64:
-                                registers[pc->dst] = result->as<double>();
-                                break;
-                            case TypeTag::Bool:
-                                registers[pc->dst] = result->as<bool>();
-                                break;
-                            case TypeTag::String:
-                                registers[pc->dst] = result->as<std::string>();
-                                break;
-                            default:
-                                registers[pc->dst] = nullptr;
-                                break;
-                        }
-                    } else {
-                        registers[pc->dst] = nullptr;
-                    }
-                } catch (const std::exception& e) {
-                    std::cerr << "Error calling builtin function " << func_name << ": " << e.what() << std::endl;
+                } else {
                     registers[pc->dst] = nullptr;
                 }
-                
-                DISPATCH();
+            } catch (const std::exception& e) {
+                std::cerr << "Error calling builtin function " << func_name << ": " << e.what() << std::endl;
+                registers[pc->dst] = nullptr;
             }
             
-            // Then try user-defined functions
-            auto& func_manager = LIR::LIRFunctionManager::getInstance();
-            if (func_manager.hasFunction(func_name)) {
-                auto func = func_manager.getFunction(func_name);
-                
-                if (func) {
-                    //std::cout << "[DEBUG] Calling user function '" << func_name << "' with " << arg_regs.size() << " arguments" << std::endl;
-                    
-                    // Save current context
-                    auto saved_registers = registers;
-                    
-                    // Set up parameters (copy arguments to parameter registers r0, r1, r2, ...)
-                   // std::cout << "[DEBUG] Setting up " << func->getParameters().size() << " parameters for function '" << func_name << "'" << std::endl;
-                   // std::cout << "[DEBUG] Provided arguments: " << arg_regs.size() << std::endl;
-                    
-                    for (size_t i = 0; i < func->getParameters().size(); ++i) {
-                        if (i < arg_regs.size()) {
-                            // Copy provided argument
-                            registers[i] = registers[arg_regs[i]];
-                        //    // std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = register r" << arg_regs[i];
-                            
-                        //     // Debug: show the actual value
-                        //     auto& val = registers[i];
-                        //     if (std::holds_alternative<std::string>(val)) {
-                        //         std::cout << " (string: '" << std::get<std::string>(val) << "')";
-                        //     } else if (std::holds_alternative<std::nullptr_t>(val)) {
-                        //         std::cout << " (nullptr)";
-                        //     } else if (std::holds_alternative<int64_t>(val)) {
-                        //         std::cout << " (int: " << std::get<int64_t>(val) << ")";
-                        //     }
-                        //     std::cout << std::endl;
-                        } else {
-                                registers[i] = nullptr;
-
-                        }
-                    }
-                    
-                    // Execute function directly without resetting registers
-                    // Create a temporary LIR_Function wrapper to reuse existing execution logic
-                    LIR::LIR_Function temp_wrapper(func->getName(), func->getParameters().size());
-                    temp_wrapper.instructions = func->getInstructions();
-                    execute_instructions(temp_wrapper, 0, temp_wrapper.instructions.size());
-                    
-                    // Get return value from register 0 (standard return register)
-                    auto return_value = registers[0];
-                  
-                  
-                    // Restore caller's registers
-                    registers = saved_registers;
-                    
-                    // Set return value in destination register
-                    registers[pc->dst] = return_value;
-                    
-                    DISPATCH();
-                }
-            }
-            
-            // Function not found
-            std::cerr << "Error: Function '" << func_name << "' not found" << std::endl;
-            registers[pc->dst] = nullptr;
             DISPATCH();
         }
         
-        // Legacy format fallback (for backward compatibility)
-        // Get function index from operand b (immediate value)
-        int64_t func_index = static_cast<int64_t>(pc->b);
-        
-        // Get argument count from operand a (immediate value)
-        int arg_count = static_cast<int>(pc->a);
-        
-        // First try builtin functions
-        auto builtin_names = LIR::BuiltinUtils::getBuiltinFunctionNames();
-       
-        
         // Then try user-defined functions
         auto& func_manager = LIR::LIRFunctionManager::getInstance();
-        auto function_names = func_manager.getFunctionNames();
-        
-        // Adjust index for user functions (subtract builtin count)
-        int64_t user_func_index = func_index - builtin_names.size();
-        
-        if (user_func_index >= 0 && user_func_index < function_names.size()) {
-            auto func_name = function_names[user_func_index];
-            auto func = func_manager.getFunction(func_name);
+        if (func_manager.hasFunction(func_name)) {
+            func = func_manager.getFunction(func_name);
             
             if (func) {
-                // Save current context
-                auto saved_registers = registers;
-                auto saved_pc = pc;
+                //std::cout << "[DEBUG] Calling user function '" << func_name << "' with " << arg_regs.size() << " arguments" << std::endl;
                 
-                // Set up parameters (move from caller's parameter registers to callee's parameter registers)
-                int arg_count = static_cast<int>(pc->b);
-                for (int i = 0; i < func->getParameters().size(); ++i) {
-                    if (i < arg_count) {
+                // Save current context
+                saved_registers = registers;
+                
+                // Set up parameters (copy arguments to parameter registers r0, r1, r2, ...)
+               // std::cout << "[DEBUG] Setting up " << func->getParameters().size() << " parameters for function '" << func_name << "'" << std::endl;
+               // std::cout << "[DEBUG] Provided arguments: " << arg_regs.size() << std::endl;
+                
+                for (size_t i = 0; i < func->getParameters().size(); ++i) {
+                    if (i < arg_regs.size()) {
                         // Copy provided argument
-                        registers[i] = registers[pc->b + i + 1];
+                        registers[i] = registers[arg_regs[i]];
+                    //    // std::cout << "[DEBUG] Parameter " << i << " (r" << i << ") = register r" << arg_regs[i];
+                        
+                    //     // Debug: show the actual value
+                    //     auto& val = registers[i];
+                    //     if (std::holds_alternative<std::string>(val)) {
+                    //         std::cout << " (string: '" << std::get<std::string>(val) << "')";
+                    //     } else if (std::holds_alternative<std::nullptr_t>(val)) {
+                    //         std::cout << " (nullptr)";
+                    //     } else if (std::holds_alternative<int64_t>(val)) {
+                    //         std::cout << " (int: " << std::get<int64_t>(val) << ")";
+                    //     }
+                    //     std::cout << std::endl;
                     } else {
-                        // Initialize missing optional parameter to nullptr (nil)
-                        registers[i] = nullptr;
+                            registers[i] = nullptr;
+
                     }
                 }
                 
-                // Execute function
-                execute_lir_function(*func);
+                // Execute function directly without resetting registers
+                // Create a temporary LIR_Function wrapper to reuse existing execution logic
+                LIR::LIRFunction temp_wrapper(func->getName(), func->getParameters().size());
+                temp_wrapper.instructions = func->getInstructions();
+                execute_instructions(temp_wrapper, 0, func->getInstructions().size());
                 
                 // Get return value from register 0 (standard return register)
-                auto return_value = registers[0];
-                
+                return_value = registers[0];
+              
+              
                 // Restore caller's registers
                 registers = saved_registers;
                 
@@ -723,59 +707,67 @@ OP_CALL:
         }
         
         // Function not found
+        std::cerr << "Error: Function '" << func_name << "' not found" << std::endl;
         registers[pc->dst] = nullptr;
         DISPATCH();
     }
+    
+      
+    // Function not found
+    std::cerr << "Error: Function '" << func_name << "' not found" << std::endl;
+    registers[pc->dst] = nullptr;
+    DISPATCH();
+}
 
 OP_PRINTINT:
-    std::cout << to_int(registers[pc->a]) << std::endl;
-    DISPATCH();
+std::cout << to_int(registers[pc->a]) << std::endl;
+DISPATCH();
 
 OP_PRINTUINT:
-    std::cout << to_uint(registers[pc->a]) << std::endl;
-    DISPATCH();
+std::cout << to_uint(registers[pc->a]) << std::endl;
+DISPATCH();
 
 OP_PRINTFLOAT:
-    std::cout << to_float(registers[pc->a]) << std::endl;
-    DISPATCH();
+std::cout << to_float(registers[pc->a]) << std::endl;
+DISPATCH();
 
 OP_PRINTBOOL:
-    std::cout << (to_bool(registers[pc->a]) ? "true" : "false") << std::endl;
-    DISPATCH();
+std::cout << (to_bool(registers[pc->a]) ? "true" : "false") << std::endl;
+DISPATCH();
 
 OP_PRINTSTRING:
-    std::cout << to_string(registers[pc->a]) << std::endl;
-    DISPATCH();
+std::cout << to_string(registers[pc->a]) << std::endl;
+DISPATCH();
 
 OP_TOSTRING:
-    registers[pc->dst] = to_string(registers[pc->a]);
-    DISPATCH();
+registers[pc->dst] = to_string(registers[pc->a]);
+DISPATCH();
 
 OP_CONCAT:
-    registers[pc->dst] = to_string(registers[pc->a]) + to_string(registers[pc->b]);
-    DISPATCH();
+registers[pc->dst] = to_string(registers[pc->a]) + to_string(registers[pc->b]);
+DISPATCH();
 
 OP_STR_CONCAT:
-    registers[pc->dst] = to_string(registers[pc->a]) + to_string(registers[pc->b]);
-    DISPATCH();
+registers[pc->dst] = to_string(registers[pc->a]) + to_string(registers[pc->b]);
+DISPATCH();
 
 OP_STR_FORMAT:
-    {
-        std::string format = to_string(registers[pc->a]);
-        std::string arg = to_string(registers[pc->b]);
-        size_t pos = format.find("%s");
-        if (pos != std::string::npos) {
-            format.replace(pos, 2, arg);
-        } else {
-            format += arg;
-        }
-        registers[pc->dst] = format;
+{
+    std::string format = to_string(registers[pc->a]);
+    std::string arg = to_string(registers[pc->b]);
+    size_t pos = format.find("%s");
+    if (pos != std::string::npos) {
+        format.replace(pos, 2, arg);
+    } else {
+        format += arg;
     }
-    DISPATCH();
+    registers[pc->dst] = format;
+}
+DISPATCH();
 
 OP_CAST:
-    registers[pc->dst] = registers[pc->a];
-    DISPATCH();
+registers[pc->dst] = registers[pc->a];
+DISPATCH();
 
 OP_LOAD:
 OP_STORE:
@@ -785,131 +777,139 @@ OP_LISTINDEX:
 OP_NEWOBJECT:
 OP_GETFIELD:
 OP_SETFIELD:
-    registers[pc->dst] = nullptr;
-    DISPATCH();
+registers[pc->dst] = nullptr;
+DISPATCH();
 
 // ============ THREADLESS CONCURRENCY OPERATIONS ============
 
 OP_TASK_CONTEXT_ALLOC:
-    {
-        uint64_t count = static_cast<uint64_t>(pc->a);  // Read count from immediate value in 'a' field
-        uint64_t start_context_id = task_contexts.size();
-        
-        std::cout << "[DEBUG] OP_TASK_CONTEXT_ALLOC called with count: " << count << std::endl;
-        std::cout << "[DEBUG] Starting context ID: " << start_context_id << std::endl;
-        
-        for (uint64_t i = 0; i < count; i++) {
-            auto task_context = std::make_unique<TaskContext>();
-            task_contexts.push_back(std::move(task_context));
-            std::cout << "[DEBUG] Created task context " << (start_context_id + i) << std::endl;
-        }
-        
-        std::cout << "[DEBUG] Total task_contexts.size(): " << task_contexts.size() << std::endl;
-        registers[pc->dst] = static_cast<int64_t>(start_context_id);
+{
+    count = static_cast<uint64_t>(pc->a);  // Read count from immediate value in 'a' field
+    start_context_id = task_contexts.size();
+    
+    std::cout << "[DEBUG] OP_TASK_CONTEXT_ALLOC called with count: " << count << std::endl;
+    std::cout << "[DEBUG] Starting context ID: " << start_context_id << std::endl;
+    
+    for (uint64_t i = 0; i < count; i++) {
+        auto task_ctx = std::make_unique<TaskContext>();
+        task_contexts.push_back(std::move(task_ctx));
+        std::cout << "[DEBUG] Created task context " << (start_context_id + i) << std::endl;
     }
-    DISPATCH();
+    
+    std::cout << "[DEBUG] Total task_contexts.size(): " << task_contexts.size() << std::endl;
+    registers[pc->dst] = static_cast<int64_t>(start_context_id);
+}
+DISPATCH();
 
 OP_TASK_CONTEXT_INIT:
-    {
-        uint64_t context_id = static_cast<uint64_t>(to_int(registers[pc->a]));
-        if (context_id < task_contexts.size()) {
-            auto& ctx = task_contexts[context_id];
-            ctx->state = TaskState::INIT;
-            ctx->task_id = context_id;
-            registers[pc->dst] = static_cast<int64_t>(context_id);
-        } else {
-            registers[pc->dst] = static_cast<int64_t>(0);
-        }
+{
+    uint64_t context_id = static_cast<uint64_t>(to_int(registers[pc->a]));
+    if (context_id < task_contexts.size()) {
+        ctx = task_contexts[context_id].get();
+        ctx->state = TaskState::INIT;
+        ctx->task_id = context_id;
+        registers[pc->dst] = static_cast<int64_t>(context_id);
+    } else {
+        registers[pc->dst] = static_cast<int64_t>(0);
     }
-    DISPATCH();
+}
+DISPATCH();
 
 OP_TASK_GET_STATE:
-    {
-        uint64_t context_id = static_cast<uint64_t>(to_int(registers[pc->a]));
-        if (context_id < scheduler->tasks.size()) {
-            registers[pc->dst] = static_cast<int64_t>(scheduler->tasks[context_id]->state);
-        } else {
-            registers[pc->dst] = static_cast<int64_t>(TaskState::INIT);
-        }
+{
+    uint64_t context_id = static_cast<uint64_t>(to_int(registers[pc->a]));
+    if (context_id < scheduler->fibers.size()) {
+        registers[pc->dst] = static_cast<int64_t>(scheduler->fibers[context_id]->state);
+    } else {
+        registers[pc->dst] = static_cast<int64_t>(TaskState::INIT);
     }
-    DISPATCH();
+}
+DISPATCH();
 
 OP_TASK_SET_STATE:
-    {
-        uint64_t context_id = static_cast<uint64_t>(to_int(registers[pc->a]));
-        TaskState new_state = static_cast<TaskState>(to_int(registers[pc->b]));
-        if (context_id < scheduler->tasks.size()) {
-            scheduler->tasks[context_id]->state = new_state;
-            registers[pc->dst] = static_cast<int64_t>(1);
-        } else {
-            registers[pc->dst] = static_cast<int64_t>(0);
-        }
+{
+    uint64_t context_id = static_cast<uint64_t>(to_int(registers[pc->a]));
+    TaskState new_state = static_cast<TaskState>(to_int(registers[pc->b]));
+    if (context_id < scheduler->fibers.size()) {
+        scheduler->fibers[context_id]->state = static_cast<FiberState>(new_state);
+        registers[pc->dst] = static_cast<int64_t>(1);
+    } else {
+        registers[pc->dst] = static_cast<int64_t>(0);
     }
-    DISPATCH();
+}
+DISPATCH();
 
 OP_TASK_SET_FIELD:
-    {
-        uint64_t context_id = static_cast<uint64_t>(to_int(registers[pc->a]));
-        int field_index = static_cast<int>(to_int(registers[pc->b]));
-        RegisterValue field_value = registers[pc->dst];
+{
+    uint64_t context_id = static_cast<uint64_t>(to_int(registers[pc->a]));
+    int field_index = static_cast<int>(to_int(registers[pc->b]));
+    RegisterValue field_value = registers[pc->dst];
 
-        if (pc->imm != 0) {
-            field_index = static_cast<int>(pc->imm);
-           }
-
-        std::cout << "[DEBUG] TaskSetField: context_id=" << context_id << " field_index=" << field_index << " imm=" << pc->imm << " value_reg=" << pc->dst << std::endl;
-
-        if (context_id < task_contexts.size()) {
-            auto& ctx = task_contexts[context_id];
-            ctx->fields[field_index] = field_value;
-
-            if (field_index == 2) {
-                ctx->channel_ptr = field_value;
-            } else if (field_index == 3) {
-                ctx->counter = to_int(field_value);
-            }
-
-            registers[pc->dst] = static_cast<int64_t>(1);
-        } else {
-            registers[pc->dst] = static_cast<int64_t>(0);
-        }
+    if (pc->imm != 0) {
+        field_index = static_cast<int>(pc->imm);
     }
-    DISPATCH();
+
+    std::cout << "[DEBUG] TaskSetField: context_id=" << context_id << " field_index=" << field_index << " imm=" << pc->imm << " value_reg=" << pc->dst << std::endl;
+
+    if (context_id < scheduler->fibers.size()) {
+        auto& fiber = scheduler->fibers[context_id];
+        fiber->task_context->fields[field_index] = field_value;
+
+        // Note: Fiber doesn't have channel_ptr or counter members
+        // These would need to be added to Fiber struct if needed
+        registers[pc->dst] = static_cast<int64_t>(1);
+    } else {
+        registers[pc->dst] = static_cast<int64_t>(0);
+    }
+}
+DISPATCH();
 
 OP_TASK_GET_FIELD:
-    {
-        uint64_t context_id = static_cast<uint64_t>(to_int(registers[pc->a]));
-        int field_index = static_cast<int>(to_int(registers[pc->b]));
-        if (context_id < scheduler->tasks.size()) {
-            auto it = scheduler->tasks[context_id]->fields.find(field_index);
-            if (it != scheduler->tasks[context_id]->fields.end()) {
-                registers[pc->dst] = it->second;
-            } else {
-                registers[pc->dst] = static_cast<int64_t>(0);
-            }
+{
+    uint64_t context_id = static_cast<uint64_t>(to_int(registers[pc->a]));
+    int field_index = static_cast<int>(to_int(registers[pc->b]));
+    if (context_id < scheduler->fibers.size()) {
+        auto it = scheduler->fibers[context_id]->task_context->fields.find(field_index);
+        if (it != scheduler->fibers[context_id]->task_context->fields.end()) {
+            registers[pc->dst] = it->second;
         } else {
             registers[pc->dst] = static_cast<int64_t>(0);
         }
     }
+}  
     DISPATCH();
 
 OP_CHANNEL_ALLOC:
     {
         size_t capacity = static_cast<size_t>(to_int(registers[pc->a]));
         if (capacity == 0) capacity = 32;
-        auto channel = std::make_unique<Channel>(capacity);
+        channel = std::make_unique<Channel>(capacity);
         uint64_t channel_id = channels.size();
         channels.push_back(std::move(channel));
         registers[pc->dst] = static_cast<int64_t>(channel_id);
     }
     DISPATCH();
 
-OP_CHANNEL_PUSH:
+OP_CHANNEL_SEND:
     {
         uint64_t channel_id = static_cast<uint64_t>(to_int(registers[pc->a]));
         RegisterValue value = registers[pc->b];
         if (channel_id < channels.size()) {
-            bool success = channels[channel_id]->push(value);
+            // For now, use non-blocking offer. TODO: Implement proper blocking send with fiber suspension
+            bool success = channels[channel_id]->offer(value);
+            registers[pc->dst] = static_cast<int64_t>(success ? 1 : 0);
+    } else {
+        registers[pc->dst] = static_cast<int64_t>(0);
+    }
+}
+DISPATCH();
+
+OP_CHANNEL_OFFER:
+    {
+        uint64_t channel_id = static_cast<uint64_t>(to_int(registers[pc->a]));
+        RegisterValue value = registers[pc->b];
+        if (channel_id < channels.size()) {
+            bool success = channels[channel_id]->offer(value);
             registers[pc->dst] = static_cast<int64_t>(success ? 1 : 0);
         } else {
             registers[pc->dst] = static_cast<int64_t>(0);
@@ -917,12 +917,13 @@ OP_CHANNEL_PUSH:
     }
     DISPATCH();
 
-OP_CHANNEL_POP:
+OP_CHANNEL_RECV:
     {
         uint64_t channel_id = static_cast<uint64_t>(to_int(registers[pc->a]));
         if (channel_id < channels.size()) {
+            // For now, use non-blocking poll. TODO: Implement proper blocking recv with fiber suspension
             RegisterValue value;
-            bool success = channels[channel_id]->pop(value);
+            bool success = channels[channel_id]->poll(value);
             if (success) {
                 registers[pc->dst] = value;
             } else {
@@ -930,6 +931,35 @@ OP_CHANNEL_POP:
             }
         } else {
             registers[pc->dst] = nullptr;
+        }
+    }
+    DISPATCH();
+
+OP_CHANNEL_POLL:
+    {
+        uint64_t channel_id = static_cast<uint64_t>(to_int(registers[pc->a]));
+        if (channel_id < channels.size()) {
+            RegisterValue value;
+            bool success = channels[channel_id]->poll(value);
+            if (success) {
+                registers[pc->dst] = value;
+            } else {
+                registers[pc->dst] = nullptr;
+            }
+        } else {
+            registers[pc->dst] = nullptr;
+        }
+    }
+    DISPATCH();
+
+OP_CHANNEL_CLOSE:
+    {
+        uint64_t channel_id = static_cast<uint64_t>(to_int(registers[pc->a]));
+        if (channel_id < channels.size()) {
+            channels[channel_id]->close();
+            registers[pc->dst] = static_cast<int64_t>(1);
+        } else {
+            registers[pc->dst] = static_cast<int64_t>(0);
         }
     }
     DISPATCH();
@@ -952,118 +982,121 @@ OP_SCHEDULER_INIT:
     DISPATCH();
 
 OP_SCHEDULER_ADD_TASK:
-    {
-        uint64_t context_id = static_cast<uint64_t>(to_int(registers[pc->a]));
-        std::cout << "[DEBUG] OP_SCHEDULER_ADD_TASK called with context_id: " << context_id << std::endl;
-        std::cout << "[DEBUG] task_contexts.size(): " << task_contexts.size() << std::endl;
-        
-        if (context_id < task_contexts.size()) {
-            auto& ctx = task_contexts[context_id];
-            if (ctx) {
-                // Copy task context to the scheduler
-                scheduler->add_task(std::make_unique<TaskContext>(*ctx));
-                std::cout << "[DEBUG] Added task " << context_id << " to scheduler" << std::endl;
-                std::cout << "[DEBUG] Scheduler now has " << scheduler->tasks.size() << " tasks" << std::endl;
-                registers[pc->dst] = static_cast<int64_t>(1);
-            } else {
-                std::cout << "[DEBUG] Task context " << context_id << " is null" << std::endl;
-                registers[pc->dst] = static_cast<int64_t>(0);
-            }
+{
+    uint64_t context_id = static_cast<uint64_t>(to_int(registers[pc->a]));
+    std::cout << "[DEBUG] OP_SCHEDULER_ADD_TASK called with context_id: " << context_id << std::endl;
+    std::cout << "[DEBUG] task_contexts.size(): " << task_contexts.size() << std::endl;
+
+    if (context_id < task_contexts.size()) {
+        ctx = task_contexts[context_id].get();
+        if (ctx) {
+            // Copy task context to the scheduler
+            scheduler->add_fiber(std::make_unique<TaskContext>(*ctx));
+            std::cout << "[DEBUG] Added task " << context_id << " to scheduler" << std::endl;
+            std::cout << "[DEBUG] Scheduler now has " << scheduler->fibers.size() << " tasks" << std::endl;
+            registers[pc->dst] = static_cast<int64_t>(1);
         } else {
-            std::cout << "[DEBUG] Context ID " << context_id << " out of range (max: " << task_contexts.size() - 1 << ")" << std::endl;
+            std::cout << "[DEBUG] Task context " << context_id << " is null" << std::endl;
             registers[pc->dst] = static_cast<int64_t>(0);
         }
+    } else {
+        std::cout << "[DEBUG] Context ID " << context_id << " out of range (max: " << task_contexts.size() - 1 << ")" << std::endl;
+        registers[pc->dst] = static_cast<int64_t>(0);
     }
-    DISPATCH();
+}
+DISPATCH();
 
 OP_SCHEDULER_RUN:
-    {
-        std::cout << "[DEBUG] Scheduler running with " << scheduler->tasks.size() << " tasks" << std::endl;
-        
-        // Execute all running tasks (they should already be in scheduler via OP_SCHEDULER_ADD_TASK)
-        for (size_t i = 0; i < scheduler->tasks.size(); ++i) {
-            auto& task = scheduler->tasks[i];
-            
-            if (task->state == TaskState::INIT) {
-                task->state = TaskState::RUNNING;
+{
+    std::cout << "[DEBUG] Scheduler running with " << scheduler->fibers.size() << " tasks" << std::endl;
+
+    // Execute all running tasks (they should already be in scheduler via OP_SCHEDULER_ADD_TASK)
+    for (size_t i = 0; i < scheduler->fibers.size(); ++i) {
+        auto& fiber = scheduler->fibers[i];
+
+        if (fiber->state == FiberState::CREATED) {
+            fiber->state = FiberState::RUNNING;
+        }
+
+        if (fiber->state == FiberState::RUNNING) {
+            std::cout << "[DEBUG] Executing task " << (fiber->fiber_id + 1) << std::endl;
+
+            // Get task function name from task context field 4
+            auto func_name_it = fiber->task_context->fields.find(4);
+            if (func_name_it == fiber->task_context->fields.end()) {
+                std::cerr << "[ERROR] Task function name not found in task context" << std::endl;
+                fiber->state = FiberState::COMPLETED;
+                continue;
             }
-            
-            if (task->state == TaskState::RUNNING) {
-                std::cout << "[DEBUG] Executing task " << (task->task_id + 1) << std::endl;
-                
-                // Get task function name from task context field 4 (set during task creation)
-                auto func_name_it = task->fields.find(4);
-                if (func_name_it == task->fields.end()) {
-                    std::cerr << "[ERROR] Task function name not found in task context field 4" << std::endl;
-                    task->state = TaskState::COMPLETED;
-                    continue;
+
+            // Extract function name from register value
+            std::string task_func_name;
+            if (std::holds_alternative<std::string>(func_name_it->second)) {
+                task_func_name = std::get<std::string>(func_name_it->second);
+            } else {
+                std::cerr << "[ERROR] Task function name is not a string" << std::endl;
+                fiber->state = FiberState::COMPLETED;
+                continue;
+            }
+
+            // Get task function from registry
+            auto& func_registry = LIR::FunctionRegistry::getInstance();
+            LIR::LIR_Function* task_func = func_registry.getFunction(task_func_name);
+            if (!task_func) {
+                std::cerr << "[ERROR] Task function '" << task_func_name << "' not found in registry" << std::endl;
+                fiber->state = FiberState::COMPLETED;
+                continue;
+            }
+
+            std::cout << "Task " << (fiber->fiber_id + 1) << " calling function: " << task_func_name << std::endl;
+
+            // Save current register state
+            auto saved_registers = registers;
+
+            // Initialize a fresh register context for this task
+            registers.clear();
+            registers.resize(1024);
+            for (auto& reg : registers) {
+                reg = nullptr;
+            }
+
+            // Set up task context parameters in fresh register space
+            if (fiber) {
+                // Set task ID from task context field 0
+                auto task_id_it = fiber->task_context->fields.find(0);
+                if (task_id_it != fiber->task_context->fields.end()) {
+                    registers[0] = task_id_it->second;
                 }
-                
-                // Extract function name from register value
-                std::string task_func_name;
-                if (std::holds_alternative<std::string>(func_name_it->second)) {
-                    task_func_name = std::get<std::string>(func_name_it->second);
-                    std::cout << "[DEBUG] VM retrieved task function name: '" << task_func_name << "'" << std::endl;
-                } else {
-                    std::cerr << "[ERROR] Task function name is not a string, value type: " << func_name_it->second.index() << std::endl;
-                    task_func_name = "<corrupted>";
-                }
-                
-                // Get task function from registry
-                auto& func_registry = LIR::FunctionRegistry::getInstance();
-                LIR::LIR_Function* task_func = func_registry.getFunction(task_func_name);
-                if (!task_func) {
-                    std::cerr << "[ERROR] Task function '" << task_func_name << "' not found in registry" << std::endl;
-                    task->state = TaskState::COMPLETED;
-                    continue;
-                }
-                
-                // Save current register state and current function
-                auto saved_registers = registers;
-                auto saved_function = current_function_;
-                
-                // Initialize a fresh register context for this task
-                registers.clear();
-                registers.resize(1024, nullptr);
-                
-                // Set up task context parameters in fresh register space
-                // Enforce fixed task context ABI: Always set task argument (field 0)
-                auto task_id_it = task->fields.find(0);
-                if (task_id_it == task->fields.end()) {
-                    std::cerr << "[ASSERTION FAILED] Task context missing field 0 (task ID)" << std::endl;
-                    task->state = TaskState::COMPLETED;
-                    continue;
-                }
-                registers[0] = task_id_it->second;
-                std::cout << "[DEBUG] Set register[0] to task ID from field 0" << std::endl;
-                
+
                 // Set loop variable value from task context field 1
-                auto loop_var_it = task->fields.find(1);
-                if (loop_var_it != task->fields.end()) {
+                auto loop_var_it = fiber->task_context->fields.find(1);
+                if (loop_var_it != fiber->task_context->fields.end()) {
                     registers[1] = loop_var_it->second;
                 }
-                
+
                 // Set channel from task context field 2
-                auto channel_it = task->fields.find(2);
-                if (channel_it != task->fields.end()) {
+                auto channel_it = fiber->task_context->fields.find(2);
+                if (channel_it != fiber->task_context->fields.end()) {
                     registers[2] = channel_it->second;
                 }
-                
-                // Execute task function
-                current_function_ = task_func;
-                execute_instructions(*task_func, 0, task_func->instructions.size());
+            }
+
+            // Execute task function
+            current_function_ = task_func;
+            execute_instructions(*task_func, 0, task_func->instructions.size());
                 
                 // Restore register state and current function
                 registers = saved_registers;
-                current_function_ = saved_function;
+                current_function_ = nullptr;
                 
-                task->state = TaskState::COMPLETED;
-                std::cout << "[DEBUG] Task " << (task->task_id + 1) << " completed" << std::endl;
+                fiber->state = FiberState::COMPLETED;
+                std::cout << "[DEBUG] Task " << (fiber->fiber_id + 1) << " completed" << std::endl;
             }
         }
         
         registers[pc->dst] = static_cast<int64_t>(1);
-    }
+}
+
     DISPATCH();
 
 OP_SCHEDULER_TICK:

@@ -14,8 +14,13 @@
 #include <optional>
 #include <charconv>
 #include "../common/opcodes.hh"
-#include "concurrency/channel.hh"
+#include "channel.hh"
 #include <atomic>
+
+// Forward declaration for Register::Channel
+namespace Register {
+    struct Channel;
+}
 
 // Forward declarations for AST types
 namespace AST {
@@ -893,7 +898,7 @@ struct Value {
                  IteratorValuePtr,
                  ObjectInstancePtr,
                  std::shared_ptr<backend::ClassDefinition>,
-                 std::shared_ptr<Channel<ValuePtr>>,
+                 std::shared_ptr<Register::Channel>,
                  AtomicValue,
                  ModuleValue,
                  std::shared_ptr<backend::UserDefinedFunction>,
@@ -980,7 +985,7 @@ struct Value {
 
     Value(TypePtr t, const IteratorValuePtr& iter) : type(std::move(t)), data(""), complexData(iter) {}
 
-    Value(TypePtr t, const std::shared_ptr<Channel<ValuePtr>>& ch) : type(std::move(t)), data(""), complexData(ch) {}
+    Value(TypePtr t, const std::shared_ptr<Register::Channel>& ch) : type(std::move(t)), data(""), complexData(ch) {}
 
     Value(TypePtr t, const AtomicValue& av) : type(std::move(t)), data(""), complexData(av) {}
 

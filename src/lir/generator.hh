@@ -145,6 +145,12 @@ private:
     Reg emit_ok_construct_expr(AST::OkConstructExpr& expr);
     Reg emit_fallible_expr(AST::FallibleExpr& expr);
     
+    // Channel operation handlers
+    Reg emit_channel_offer_expr(AST::ChannelOfferExpr& expr);
+    Reg emit_channel_poll_expr(AST::ChannelPollExpr& expr);
+    Reg emit_channel_send_expr(AST::ChannelSendExpr& expr);
+    Reg emit_channel_recv_expr(AST::ChannelRecvExpr& expr);
+    
     // Class system expression handlers
     Reg emit_object_literal_expr(AST::ObjectLiteralExpr& expr);
     Reg emit_this_expr(AST::ThisExpr& expr);

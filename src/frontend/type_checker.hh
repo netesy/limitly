@@ -43,6 +43,18 @@ private:
         std::vector<TypePtr> param_types;
         TypePtr return_type;
         std::shared_ptr<AST::FunctionDeclaration> declaration;
+        bool can_fail = false;
+        std::vector<std::string> error_types;
+        std::vector<bool> optional_params;
+        std::vector<bool> has_default_values;
+        
+        FunctionSignature() = default;
+        FunctionSignature(const std::string& n, const std::vector<TypePtr>& params, TypePtr ret, 
+                       bool fail = false, const std::vector<std::string>& errors = {}, 
+                       int line = 0, const std::vector<bool>& opt = {}, 
+                       const std::vector<bool>& defaults = {})
+            : name(n), param_types(params), return_type(ret), can_fail(fail), 
+              error_types(errors), optional_params(opt), has_default_values(defaults) {}
     };
     std::unordered_map<std::string, FunctionSignature> function_signatures;
     
@@ -105,9 +117,13 @@ public:
                                   TypePtr return_type);
     
 private:
-    // Error reporting
+    // Enhanced error reporting
     void add_error(const std::string& message, int line = 0);
+    void add_error(const std::string& message, int line, int column, const std::string& context, 
+                 const std::string& lexeme = "", const std::string& expected_value = "");
     void add_type_error(const std::string& expected, const std::string& found, int line = 0);
+    std::string get_code_context(int line);
+    void check_assert_call(const std::shared_ptr<AST::CallExpr>& expr);
     
     // Linear type reference methods
     void check_linear_type_access(const std::string& var_name, int line);
@@ -165,6 +181,8 @@ private:
     TypePtr check_for_statement(std::shared_ptr<AST::ForStatement> for_stmt);
     TypePtr check_return_statement(std::shared_ptr<AST::ReturnStatement> return_stmt);
     TypePtr check_print_statement(std::shared_ptr<AST::PrintStatement> print_stmt);
+    TypePtr check_match_statement(std::shared_ptr<AST::MatchStatement> match_stmt);
+    TypePtr check_contract_statement(std::shared_ptr<AST::ContractStatement> contract_stmt);
     
     // Expression type checking
     TypePtr check_literal_expr(std::shared_ptr<AST::LiteralExpr> expr);
@@ -213,7 +231,32 @@ private:
     bool is_float_type(TypePtr type);
     bool is_boolean_type(TypePtr type);
     bool is_string_type(TypePtr type);
+    bool is_optional_type(TypePtr type);
+    bool is_error_union_type(TypePtr type);
+    bool is_union_type(TypePtr type);
+    bool requires_error_handling(TypePtr type);
     TypePtr promote_numeric_types(TypePtr left, TypePtr right);
+    
+    // Advanced error handling methods
+    void validate_function_error_types(const std::shared_ptr<AST::FunctionDeclaration>& stmt);
+    void validate_function_body_error_types(const std::shared_ptr<AST::FunctionDeclaration>& stmt);
+    std::vector<std::string> infer_function_error_types(const std::shared_ptr<AST::Statement>& body);
+    std::vector<std::string> infer_expression_error_types(const std::shared_ptr<AST::Expression>& expr);
+    bool can_function_produce_error_type(const std::shared_ptr<AST::Statement>& body, const std::string& error_type);
+    bool can_propagate_error(const std::vector<std::string>& source_errors, const std::vector<std::string>& target_errors);
+    bool is_error_union_compatible(TypePtr from, TypePtr to);
+    std::string join_error_types(const std::vector<std::string>& error_types);
+    
+    // Pattern matching methods
+    bool is_exhaustive_error_match(const std::vector<std::shared_ptr<AST::MatchCase>>& cases, TypePtr type);
+    bool is_exhaustive_union_match(TypePtr union_type, const std::vector<std::shared_ptr<AST::MatchCase>>& cases);
+    bool is_exhaustive_option_match(const std::vector<std::shared_ptr<AST::MatchCase>>& cases);
+    std::string get_missing_union_variants(TypePtr union_type, const std::vector<std::shared_ptr<AST::MatchCase>>& cases);
+    void validate_pattern_compatibility(std::shared_ptr<AST::Expression> pattern_node, TypePtr match_type, int line);
+    
+    // Enhanced type inference
+    TypePtr infer_lambda_return_type(const std::shared_ptr<AST::Statement>& body);
+    TypePtr infer_literal_type(const std::shared_ptr<AST::LiteralExpr>& expr, TypePtr expected_type = nullptr);
     
     // Scope management
     struct Scope {

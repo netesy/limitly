@@ -212,11 +212,30 @@ bool IteratorValue::hasNext() const {
 
             // Attempt to receive from the channel (this will block until value or closed)
             try {
-                if (auto chPtr = std::get_if<std::shared_ptr<Channel<ValuePtr>>>(&iterable->complexData)) {
-                    ValuePtr v;
-                    bool ok = (*chPtr)->receive(v);
+                if (auto chPtr = std::get_if<std::shared_ptr<Register::Channel>>(&iterable->complexData)) {
+                    Register::RegisterValue rv;
+                    bool ok = (*chPtr)->poll(rv);
                     if (ok) {
-                        bufferedValue = v;
+                        // Convert Register::RegisterValue to ValuePtr with proper types
+                        if (auto valPtr = std::get_if<std::string>(&rv)) {
+                            auto stringType = std::make_shared<Type>(TypeTag::String);
+                            bufferedValue = std::make_shared<Value>(stringType, *valPtr);
+                        } else if (auto valPtr = std::get_if<int64_t>(&rv)) {
+                            auto intType = std::make_shared<Type>(TypeTag::Int64);
+                            bufferedValue = std::make_shared<Value>(intType, *valPtr);
+                        } else if (auto valPtr = std::get_if<uint64_t>(&rv)) {
+                            auto uintType = std::make_shared<Type>(TypeTag::UInt64);
+                            bufferedValue = std::make_shared<Value>(uintType, *valPtr);
+                        } else if (auto valPtr = std::get_if<double>(&rv)) {
+                            auto floatType = std::make_shared<Type>(TypeTag::Float64);
+                            bufferedValue = std::make_shared<Value>(floatType, *valPtr);
+                        } else if (auto valPtr = std::get_if<bool>(&rv)) {
+                            auto boolType = std::make_shared<Type>(TypeTag::Bool);
+                            bufferedValue = std::make_shared<Value>(boolType, *valPtr);
+                        } else {
+                            auto nullType = std::make_shared<Type>(TypeTag::Nil);
+                            bufferedValue = std::make_shared<Value>(nullType);
+                        }
                         hasBuffered = true;
                         return true;
                     }
@@ -278,10 +297,31 @@ ValuePtr IteratorValue::next() {
             return res;
         }
         // As a fallback, try to receive directly
-        if (auto chPtr = std::get_if<std::shared_ptr<Channel<ValuePtr>>>(&iterable->complexData)) {
-            ValuePtr v;
-            bool ok = (*chPtr)->receive(v);
-            if (ok) return v;
+        if (auto chPtr = std::get_if<std::shared_ptr<Register::Channel>>(&iterable->complexData)) {
+            Register::RegisterValue rv;
+            bool ok = (*chPtr)->poll(rv);
+            if (ok) {
+                // Convert Register::RegisterValue to ValuePtr with proper types
+                if (auto valPtr = std::get_if<std::string>(&rv)) {
+                    auto stringType = std::make_shared<Type>(TypeTag::String);
+                    return std::make_shared<Value>(stringType, *valPtr);
+                } else if (auto valPtr = std::get_if<int64_t>(&rv)) {
+                    auto intType = std::make_shared<Type>(TypeTag::Int64);
+                    return std::make_shared<Value>(intType, *valPtr);
+                } else if (auto valPtr = std::get_if<uint64_t>(&rv)) {
+                    auto uintType = std::make_shared<Type>(TypeTag::UInt64);
+                    return std::make_shared<Value>(uintType, *valPtr);
+                } else if (auto valPtr = std::get_if<double>(&rv)) {
+                    auto floatType = std::make_shared<Type>(TypeTag::Float64);
+                    return std::make_shared<Value>(floatType, *valPtr);
+                } else if (auto valPtr = std::get_if<bool>(&rv)) {
+                    auto boolType = std::make_shared<Type>(TypeTag::Bool);
+                    return std::make_shared<Value>(boolType, *valPtr);
+                } else {
+                    auto nullType = std::make_shared<Type>(TypeTag::Nil);
+                    return std::make_shared<Value>(nullType);
+                }
+            }
             throw std::runtime_error("No more elements in iterator");
         }
         throw std::runtime_error("Invalid channel iterator state");
@@ -445,7 +485,7 @@ std::string Value::toString() const {
                            oss << "<null iterator>";
                        }
                    },
-                   [&](const std::shared_ptr<Channel<ValuePtr>>&){
+                   [&](const std::shared_ptr<Register::Channel>&){
                        oss << "<channel>";
                    },
                    [&](const AtomicValue& av) {
@@ -552,7 +592,7 @@ std::string Value::getRawString() const {
                            oss << "<null iterator>";
                        }
                    },
-                   [&](const std::shared_ptr<Channel<ValuePtr>>&){
+                   [&](const std::shared_ptr<Register::Channel>&){
                        oss << "<channel>";
                    },
                    [&](const AtomicValue& av) {
