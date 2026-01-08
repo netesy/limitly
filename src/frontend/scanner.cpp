@@ -737,10 +737,10 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "events") return TokenType::IDENTIFIER;
     if (rest == "sleep") return TokenType::IDENTIFIER;
     if (rest == "assert") return TokenType::IDENTIFIER;
-    if (rest == "offer") return TokenType::OFFER;
-    if (rest == "poll") return TokenType::POLL;
-    if (rest == "send") return TokenType::SEND;
-    if (rest == "recv") return TokenType::RECV;
+    if (rest == "offer") return TokenType::IDENTIFIER;
+    if (rest == "poll") return TokenType::IDENTIFIER;
+    if (rest == "send") return TokenType::IDENTIFIER;
+    if (rest == "recv") return TokenType::IDENTIFIER;
 
     return TokenType::IDENTIFIER;
 }
@@ -932,6 +932,8 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "PARALLEL";
     case TokenType::CONCURRENT:
         return "CONCURRENT";
+    case TokenType::CONTRACT:
+        return "CONTRACT";        
     // case TokenType::ASYNC:
     //     return "ASYNC";
     // case TokenType::AWAIT:
@@ -970,18 +972,6 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "PRIVATE";
     case TokenType::PROTECTED:
         return "PROTECTED";
-    case TokenType::OPEN:
-        return "OPEN";
-    case TokenType::OFFER:
-        return "OFFER";
-    case TokenType::POLL:
-        return "POLL";
-    case TokenType::SEND:
-        return "SEND";
-    case TokenType::RECV:
-        return "RECV";
-    case TokenType::CONTRACT:
-        return "CONTRACT";
     case TokenType::COMPTIME:
         return "COMPTIME";
     case TokenType::UNSAFE:

@@ -11,6 +11,7 @@
 #include "../shared_cell.hh"
 #include "../scheduler.hh"
 #include "../fiber.hh"
+#include "../register_value.hh"
 #include <vector>
 #include <string>
 #include <variant>
@@ -91,7 +92,7 @@ private:
     
     // Concurrency management
     std::vector<std::unique_ptr<TaskContext>> task_contexts;
-    std::vector<std::unique_ptr<Channel>> channels;
+    std::vector<std::unique_ptr<Register::Channel>> channels;
     std::unique_ptr<Scheduler> scheduler;
     uint64_t current_time;
     

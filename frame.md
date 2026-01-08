@@ -125,7 +125,7 @@ parallel(
 
 ```limit
 concurrent(
-    ch = channel_handle,      // output channel (required)
+    ch = ch,      // output channel (required)
     mode = batch,             // batch processing mode
     cores = Auto | Int,       // worker threads (default: Auto)
     timeout = Duration?,      // max execution time (default: 20s)
@@ -185,7 +185,7 @@ frame BatchProcessor : Processor {
 ```limit
 concurrent(
     events: <EventType>,      // event source/stream
-    ch = channel_handle,      // output channel (required)
+    ch = ch,      // output channel (required)
     mode = stream,            // stream processing mode
     cores = Auto | Int,       // worker threads (default: Auto)
     timeout = Duration?,      // max execution time (default: 15s)

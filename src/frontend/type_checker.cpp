@@ -1,8 +1,15 @@
 #include "type_checker.hh"
 #include "../common/debugger.hh"
 #include "../memory/model.hh"
-#include <sstream>
-#include <stdexcept>
+#include <memory>
+#include <vector>
+#include <unordered_map>
+#include <string>
+#include <set>
+#include <cmath>
+#include <limits>
+#include <algorithm>
+#include <unordered_set>
 
 // =============================================================================
 // TYPE CHECKER IMPLEMENTATION
@@ -47,8 +54,70 @@ void TypeChecker::add_error(const std::string& message, int line) {
     }
 }
 
+void TypeChecker::add_error(const std::string& message, int line, int column, const std::string& context, 
+                         const std::string& lexeme, const std::string& expected_value) {
+    // Enhanced error with lexeme and expected value information
+    std::string enhancedMessage = message;
+    if (!lexeme.empty()) {
+        enhancedMessage += " (at '" + lexeme + "')";
+    }
+    if (!expected_value.empty()) {
+        enhancedMessage += " - expected: " + expected_value;
+    }
+    
+    if (line > 0 && !current_source.empty()) {
+        Debugger::error(enhancedMessage, line, column, InterpretationStage::SEMANTIC, current_source, current_file_path, context, "");
+    } else {
+        Debugger::error(enhancedMessage, line, column, InterpretationStage::SEMANTIC, "repl", "repl", context, "");
+    }
+}
+
 void TypeChecker::add_type_error(const std::string& expected, const std::string& found, int line) {
     add_error("Type mismatch: expected " + expected + ", found " + found, line);
+}
+
+std::string TypeChecker::get_code_context(int line) {
+    if (current_source.empty() || line <= 0) {
+        return "";
+    }
+    
+    std::istringstream stream(current_source);
+    std::string currentLine;
+    int currentLineNumber = 1;
+    
+    // Find the target line
+    while (std::getline(stream, currentLine) && currentLineNumber < line) {
+        currentLineNumber++;
+    }
+    
+    if (currentLineNumber == line) {
+        return currentLine;
+    }
+    
+    return "";
+}
+
+void TypeChecker::check_assert_call(const std::shared_ptr<AST::CallExpr>& expr) {
+    if (expr->arguments.size() != 2) {
+        add_error("assert() expects exactly 2 arguments: condition (bool) and message (string), got " + 
+                std::to_string(expr->arguments.size()), expr->line, 0, 
+                get_code_context(expr->line), "assert(...)", "assert(condition, message)");
+        return;
+    }
+    
+    // Check first argument (condition) is boolean
+    TypePtr conditionType = check_expression(expr->arguments[0]);
+    if (!is_boolean_type(conditionType) && conditionType->tag != TypeTag::Any) {
+        add_error("assert() first argument must be boolean, got " + conditionType->toString(), 
+                expr->line, 0, get_code_context(expr->line), "condition", "boolean expression");
+    }
+    
+    // Check second argument (message) is string
+    TypePtr messageType = check_expression(expr->arguments[1]);
+    if (!is_string_type(messageType) && messageType->tag != TypeTag::Any) {
+        add_error("assert() second argument must be string, got " + messageType->toString(), 
+                expr->line, 0, get_code_context(expr->line), "message", "string literal or expression");
+    }
 }
 
 // =============================================================================
@@ -453,6 +522,10 @@ TypePtr TypeChecker::check_statement(std::shared_ptr<AST::Statement> stmt) {
         return check_return_statement(return_stmt);
     } else if (auto print_stmt = std::dynamic_pointer_cast<AST::PrintStatement>(stmt)) {
         return check_print_statement(print_stmt);
+    } else if (auto match_stmt = std::dynamic_pointer_cast<AST::MatchStatement>(stmt)) {
+        return check_match_statement(match_stmt);
+    } else if (auto contract_stmt = std::dynamic_pointer_cast<AST::ContractStatement>(stmt)) {
+        return check_contract_statement(contract_stmt);
     } else if (auto expr_stmt = std::dynamic_pointer_cast<AST::ExprStatement>(stmt)) {
         return check_expression(expr_stmt->expression);
     }
@@ -472,11 +545,13 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<AST::FunctionDec
         return_type = resolve_type_annotation(func->returnType.value());
     }
     
-    // Create function signature
+    // Create function signature with enhanced features
     FunctionSignature signature;
     signature.name = func->name;
     signature.return_type = return_type;
     signature.declaration = func;
+    signature.can_fail = func->canFail || func->throws;
+    signature.error_types = func->declaredErrorTypes;
     
     // Check parameters
     for (const auto& param : func->params) {
@@ -485,6 +560,8 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<AST::FunctionDec
             param_type = resolve_type_annotation(param.second);
         }
         signature.param_types.push_back(param_type);
+        signature.optional_params.push_back(false); // Required parameters are not optional
+        signature.has_default_values.push_back(false); // Required parameters don't have defaults
     }
     
     // Check optional parameters
@@ -494,9 +571,14 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<AST::FunctionDec
             param_type = resolve_type_annotation(optional_param.second.first);
         }
         signature.param_types.push_back(param_type);
+        signature.optional_params.push_back(true); // These are optional parameters
+        signature.has_default_values.push_back(optional_param.second.second != nullptr); // Has default if expression exists
     }
     
     function_signatures[func->name] = signature;
+    
+    // Validate error type annotations
+    validate_function_error_types(func);
     
     // Declare the function name as a variable in the current scope
     // This allows the function to be called by name
@@ -528,6 +610,9 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<AST::FunctionDec
     
     // Check body
     TypePtr body_type = check_statement(func->body);
+    
+    // Validate function body error types
+    validate_function_body_error_types(func);
     
     // Exit scope and memory region
     exit_scope();
@@ -1233,42 +1318,100 @@ TypePtr TypeChecker::check_index_expr(std::shared_ptr<AST::IndexExpr> expr) {
 TypePtr TypeChecker::check_list_expr(std::shared_ptr<AST::ListExpr> expr) {
     if (!expr) return nullptr;
     
-    TypePtr element_type = nullptr;
+    if (expr->elements.empty()) {
+        // Empty list - return generic list type
+        return type_system.createTypedListType(type_system.ANY_TYPE);
+    }
+    
+    // Check all elements and infer common element type
+    std::vector<TypePtr> elementTypes;
     for (const auto& elem : expr->elements) {
-        TypePtr elem_type = check_expression(elem);
-        if (element_type) {
-            element_type = get_common_type(element_type, elem_type);
-        } else {
-            element_type = elem_type;
+        TypePtr elemType = check_expression(elem);
+        elementTypes.push_back(elemType);
+    }
+    
+    // Find common type for all elements
+    TypePtr commonElementType = elementTypes[0];
+    for (size_t i = 1; i < elementTypes.size(); ++i) {
+        try {
+            commonElementType = get_common_type(commonElementType, elementTypes[i]);
+        } catch (const std::exception& e) {
+            add_error("Inconsistent element types in list literal: cannot mix " + 
+                    commonElementType->toString() + " and " + elementTypes[i]->toString() + 
+                    ": " + e.what(), expr->line);
+            return type_system.createTypedListType(type_system.ANY_TYPE);
         }
     }
     
-    // Create list type
-    // TODO: Implement proper list type creation
-    return type_system.STRING_TYPE;
+    TypePtr listType = type_system.createTypedListType(commonElementType);
+    expr->inferred_type = listType;
+    return listType;
 }
 
 TypePtr TypeChecker::check_tuple_expr(std::shared_ptr<AST::TupleExpr> expr) {
     if (!expr) return nullptr;
     
+    // Check all elements and collect their types
+    std::vector<TypePtr> elementTypes;
     for (const auto& elem : expr->elements) {
-        check_expression(elem);
+        TypePtr elemType = check_expression(elem);
+        elementTypes.push_back(elemType);
     }
     
-    // TODO: Implement proper tuple type creation
-    return type_system.STRING_TYPE;
+    // Create tuple type with the element types
+    TypePtr tupleType = type_system.createTupleType(elementTypes);
+    expr->inferred_type = tupleType;
+    return tupleType;
 }
 
 TypePtr TypeChecker::check_dict_expr(std::shared_ptr<AST::DictExpr> expr) {
     if (!expr) return nullptr;
     
-    for (const auto& [key, value] : expr->entries) {
-        check_expression(key);
-        check_expression(value);
+    if (expr->entries.empty()) {
+        // Empty dictionary - return generic dict type
+        return type_system.createTypedDictType(type_system.STRING_TYPE, type_system.ANY_TYPE);
     }
     
-    // TODO: Implement proper dict type creation
-    return type_system.STRING_TYPE;
+    // Check all entries and infer common key and value types
+    std::vector<TypePtr> keyTypes;
+    std::vector<TypePtr> valueTypes;
+    
+    for (const auto& [keyExpr, valueExpr] : expr->entries) {
+        TypePtr keyType = check_expression(keyExpr);
+        TypePtr valueType = check_expression(valueExpr);
+        keyTypes.push_back(keyType);
+        valueTypes.push_back(valueType);
+    }
+    
+    // Find common types for keys and values
+    TypePtr commonKeyType = keyTypes[0];
+    TypePtr commonValueType = valueTypes[0];
+    
+    for (size_t i = 1; i < keyTypes.size(); ++i) {
+        try {
+            commonKeyType = get_common_type(commonKeyType, keyTypes[i]);
+        } catch (const std::exception& e) {
+            add_error("Inconsistent key types in dictionary literal: cannot mix " + 
+                    commonKeyType->toString() + " and " + keyTypes[i]->toString() + 
+                    ": " + e.what(), expr->line);
+            return type_system.createTypedDictType(type_system.STRING_TYPE, type_system.ANY_TYPE);
+        }
+    }
+    
+    for (size_t i = 1; i < valueTypes.size(); ++i) {
+        try {
+            commonValueType = get_common_type(commonValueType, valueTypes[i]);
+        } catch (const std::exception& e) {
+            add_error("Inconsistent value types in dictionary literal: cannot mix " + 
+                    commonValueType->toString() + " and " + valueTypes[i]->toString() + 
+                    ": " + e.what(), expr->line);
+            return type_system.createTypedDictType(commonKeyType, type_system.ANY_TYPE);
+        }
+    }
+    
+    TypePtr dictType = type_system.createTypedDictType(commonKeyType, commonValueType);
+    expr->inferred_type = dictType;
+    return dictType;
 }
 
 TypePtr TypeChecker::check_interpolated_string_expr(std::shared_ptr<AST::InterpolatedStringExpr> expr) {
@@ -1286,8 +1429,57 @@ TypePtr TypeChecker::check_interpolated_string_expr(std::shared_ptr<AST::Interpo
 TypePtr TypeChecker::check_lambda_expr(std::shared_ptr<AST::LambdaExpr> expr) {
     if (!expr) return nullptr;
     
-    // TODO: Implement proper lambda type checking
-    return type_system.STRING_TYPE;
+    // Create new scope for lambda parameters
+    enter_scope();
+    
+    // Process parameters and add them to scope
+    std::vector<TypePtr> paramTypes;
+    for (const auto& param : expr->params) {
+        TypePtr paramType = type_system.ANY_TYPE;
+        if (param.second) {
+            paramType = resolve_type_annotation(param.second);
+        }
+        paramTypes.push_back(paramType);
+        declare_variable(param.first, paramType);
+    }
+    
+    // Determine return type
+    TypePtr returnType = type_system.ANY_TYPE;
+    if (expr->returnType.has_value()) {
+        returnType = resolve_type_annotation(expr->returnType.value());
+    } else {
+        // Enhanced return type inference from lambda body
+        returnType = infer_lambda_return_type(expr->body);
+    }
+    
+    // Set up function context for lambda
+    auto prevFunction = current_function;
+    auto prevReturnType = current_return_type;
+    
+    // Create a temporary function signature for the lambda
+    FunctionSignature lambdaSignature;
+    lambdaSignature.name = "<lambda>";
+    lambdaSignature.param_types = paramTypes;
+    lambdaSignature.return_type = returnType;
+    lambdaSignature.can_fail = false;
+    lambdaSignature.error_types = {};
+    
+    current_function = nullptr; // Lambdas don't have function declarations
+    current_return_type = returnType;
+    
+    // Check lambda body
+    TypePtr bodyType = check_statement(expr->body);
+    
+    // Restore previous context
+    current_function = prevFunction;
+    current_return_type = prevReturnType;
+    
+    exit_scope(); // Exit lambda scope
+    
+    // Create and return function type
+    TypePtr functionType = type_system.createFunctionType(paramTypes, returnType);
+    expr->inferred_type = functionType;
+    return functionType;
 }
 
 TypePtr TypeChecker::check_error_construct_expr(std::shared_ptr<AST::ErrorConstructExpr> expr) {
@@ -1416,8 +1608,8 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<AST::TypeAnnotation
             // atomic is an alias for i64
             base_type = type_system.INT64_TYPE;
         } else if (annotation->typeName == "channel") {
-            // channel type is represented as i64 (channel handle)
-            base_type = type_system.INT64_TYPE;
+            // channel type is represented as any (channel handle)
+            base_type = type_system.ANY_TYPE;
         } else if (annotation->typeName == "nil") {
             base_type = type_system.NIL_TYPE;
         } else {
@@ -1490,12 +1682,13 @@ bool TypeChecker::check_function_call(const std::string& func_name,
     
     result_type = sig.return_type;
     return true;
-}
+
+     }
 
 bool TypeChecker::validate_argument_types(const std::vector<TypePtr>& expected,
                                          const std::vector<TypePtr>& actual,
                                          const std::string& func_name) {
-    // For now, we need to get the function declaration to check optional parameters
+    // Get function signature to check optional parameters
     auto func_it = function_signatures.find(func_name);
     if (func_it == function_signatures.end()) {
         return false;
@@ -1505,7 +1698,7 @@ bool TypeChecker::validate_argument_types(const std::vector<TypePtr>& expected,
     auto func_decl = sig.declaration;
     
     if (!func_decl) {
-        // Fallback to strict checking if we don't have the declaration
+        // Fallback to strict checking if we don't have declaration
         if (expected.size() != actual.size()) {
             add_error("Function " + func_name + " expects " + 
                      std::to_string(expected.size()) + " arguments, got " + 
@@ -1514,8 +1707,15 @@ bool TypeChecker::validate_argument_types(const std::vector<TypePtr>& expected,
         }
     } else {
         // Check argument count considering optional parameters
-        size_t min_args = func_decl->params.size(); // Required parameters
-        size_t max_args = func_decl->params.size() + func_decl->optionalParams.size(); // All parameters
+        size_t min_args = 0; // Count required parameters
+        size_t max_args = expected.size(); // All parameters
+        
+        // Count required vs optional parameters
+        for (size_t i = 0; i < sig.optional_params.size() && i < expected.size(); ++i) {
+            if (!sig.optional_params[i]) {
+                min_args++; // This is a required parameter
+            }
+        }
         
         if (actual.size() < min_args || actual.size() > max_args) {
             if (min_args == max_args) {
@@ -1592,8 +1792,792 @@ bool TypeChecker::is_string_type(TypePtr type) {
     return type && type->tag == TypeTag::String;
 }
 
+bool TypeChecker::is_optional_type(TypePtr type) {
+    if (!type || type->tag != TypeTag::ErrorUnion) {
+        return false;
+    }
+    
+    // Both optional types (str?) and fallible types (int?DivisionByZero) 
+    // should be allowed in if conditions for null/error checking
+    auto errorUnion = std::get<ErrorUnionType>(type->extra);
+    
+    // Optional types: empty error types and marked as generic (str?)
+    bool isOptional = errorUnion.errorTypes.empty() && errorUnion.isGenericError;
+    
+    // Fallible types: have specific error types (int?DivisionByZero)
+    bool isFallible = !errorUnion.errorTypes.empty();
+    
+    return isOptional || isFallible;
+}
+
+bool TypeChecker::is_error_union_type(TypePtr type) {
+    return type && type->tag == TypeTag::ErrorUnion;
+}
+
+bool TypeChecker::is_union_type(TypePtr type) {
+    return type && type->tag == TypeTag::Union;
+}
+
+bool TypeChecker::requires_error_handling(TypePtr type) {
+    return is_error_union_type(type);
+}
+
 TypePtr TypeChecker::promote_numeric_types(TypePtr left, TypePtr right) {
     return get_common_type(left, right);
+}
+
+// =============================================================================
+// ADVANCED ERROR HANDLING METHODS
+// =============================================================================
+
+void TypeChecker::validate_function_error_types(const std::shared_ptr<AST::FunctionDeclaration>& stmt) {
+    // Validate consistency between return type and declared error types
+    if (stmt->returnType && *stmt->returnType) {
+        auto returnType = resolve_type_annotation(*stmt->returnType);
+        
+        if (is_error_union_type(returnType)) {
+            auto errorUnion = std::get<ErrorUnionType>(returnType->extra);
+            
+            // If function declares specific error types, they should match return type
+            if (stmt->canFail && !stmt->declaredErrorTypes.empty()) {
+                // Check that declared error types match return type error types
+                if (!errorUnion.isGenericError) {
+                    for (const auto& declaredError : stmt->declaredErrorTypes) {
+                        if (std::find(errorUnion.errorTypes.begin(), errorUnion.errorTypes.end(), declaredError) == errorUnion.errorTypes.end()) {
+                            add_error("Function '" + stmt->name + "' declares error type '" + declaredError + 
+                                    "' but return type does not include this error type", stmt->line);
+                        }
+                    }
+                    
+                    for (const auto& returnError : errorUnion.errorTypes) {
+                        if (std::find(stmt->declaredErrorTypes.begin(), stmt->declaredErrorTypes.end(), returnError) == stmt->declaredErrorTypes.end()) {
+                            add_error("Function '" + stmt->name + "' return type includes error type '" + returnError + 
+                                    "' but it is not declared in function signature", stmt->line);
+                        }
+                    }
+                }
+            }
+        } else if (stmt->canFail) {
+            // Function declares it can fail but return type is not an error union
+            add_error("Function '" + stmt->name + "' declares 'throws' but return type is not an error union type", stmt->line);
+        }
+    } else if (stmt->canFail) {
+        // Function declares it can fail but has no return type annotation
+        add_error("Function '" + stmt->name + "' declares 'throws' but has no return type annotation. " +
+                "Use 'Type?' for generic errors or 'Type?ErrorType1,ErrorType2' for specific error types", stmt->line);
+    }
+}
+
+void TypeChecker::validate_function_body_error_types(const std::shared_ptr<AST::FunctionDeclaration>& stmt) {
+    if (!stmt->canFail) {
+        return; // No error type validation needed for non-fallible functions
+    }
+    
+    // Infer error types that function body can actually produce
+    std::vector<std::string> inferredErrorTypes = infer_function_error_types(stmt->body);
+    
+    // If function declares specific error types, validate they can be produced
+    if (!stmt->declaredErrorTypes.empty()) {
+        for (const auto& declaredError : stmt->declaredErrorTypes) {
+            if (!can_function_produce_error_type(stmt->body, declaredError)) {
+                add_error("Function '" + stmt->name + "' declares error type '" + declaredError + 
+                        "' but function body cannot produce this error type", stmt->line);
+            }
+        }
+        
+        // Check for undeclared error types that body might produce
+        for (const auto& inferredError : inferredErrorTypes) {
+            if (std::find(stmt->declaredErrorTypes.begin(), stmt->declaredErrorTypes.end(), inferredError) == stmt->declaredErrorTypes.end()) {
+                add_error("Function '" + stmt->name + "' body can produce error type '" + inferredError + 
+                        "' but it is not declared in function signature", stmt->line);
+            }
+        }
+    }
+}
+
+std::vector<std::string> TypeChecker::infer_function_error_types(const std::shared_ptr<AST::Statement>& body) {
+    std::vector<std::string> errorTypes;
+    
+    if (auto blockStmt = std::dynamic_pointer_cast<AST::BlockStatement>(body)) {
+        for (const auto& stmt : blockStmt->statements) {
+            auto stmtErrors = infer_function_error_types(stmt);
+            errorTypes.insert(errorTypes.end(), stmtErrors.begin(), stmtErrors.end());
+        }
+    } else if (auto returnStmt = std::dynamic_pointer_cast<AST::ReturnStatement>(body)) {
+        if (returnStmt->value) {
+            auto returnErrors = infer_expression_error_types(returnStmt->value);
+            errorTypes.insert(errorTypes.end(), returnErrors.begin(), returnErrors.end());
+        }
+    } else if (auto ifStmt = std::dynamic_pointer_cast<AST::IfStatement>(body)) {
+        auto thenErrors = infer_function_error_types(ifStmt->thenBranch);
+        errorTypes.insert(errorTypes.end(), thenErrors.begin(), thenErrors.end());
+        
+        if (ifStmt->elseBranch) {
+            auto elseErrors = infer_function_error_types(ifStmt->elseBranch);
+            errorTypes.insert(errorTypes.end(), elseErrors.begin(), elseErrors.end());
+        }
+    } else if (auto exprStmt = std::dynamic_pointer_cast<AST::ExprStatement>(body)) {
+        // Check for fallible expressions that might propagate errors
+        auto exprErrors = infer_expression_error_types(exprStmt->expression);
+        errorTypes.insert(errorTypes.end(), exprErrors.begin(), exprErrors.end());
+    }
+    
+    // Remove duplicates
+    std::sort(errorTypes.begin(), errorTypes.end());
+    errorTypes.erase(std::unique(errorTypes.begin(), errorTypes.end()), errorTypes.end());
+    
+    return errorTypes;
+}
+
+std::vector<std::string> TypeChecker::infer_expression_error_types(const std::shared_ptr<AST::Expression>& expr) {
+    std::vector<std::string> errorTypes;
+    
+    if (auto errorConstruct = std::dynamic_pointer_cast<AST::ErrorConstructExpr>(expr)) {
+        // Direct error construction
+        errorTypes.push_back(errorConstruct->errorType);
+        
+    } else if (auto fallibleExpr = std::dynamic_pointer_cast<AST::FallibleExpr>(expr)) {
+        // Fallible expression with ? operator - propagates errors from inner expression
+        auto innerErrors = infer_expression_error_types(fallibleExpr->expression);
+        errorTypes.insert(errorTypes.end(), innerErrors.begin(), innerErrors.end());
+        
+    } else if (auto callExpr = std::dynamic_pointer_cast<AST::CallExpr>(expr)) {
+        // Function call - check if called function can produce errors
+        if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(callExpr->callee)) {
+            auto it = function_signatures.find(varExpr->name);
+            if (it != function_signatures.end() && it->second.can_fail) {
+                errorTypes.insert(errorTypes.end(), it->second.error_types.begin(), it->second.error_types.end());
+            }
+        }
+        
+    } else if (auto binaryExpr = std::dynamic_pointer_cast<AST::BinaryExpr>(expr)) {
+        // Binary expressions might produce built-in errors (e.g., division by zero)
+        if (binaryExpr->op == TokenType::SLASH) {
+            errorTypes.push_back("DivisionByZero");
+        }
+        
+        // Also check operands for error propagation
+        auto leftErrors = infer_expression_error_types(binaryExpr->left);
+        auto rightErrors = infer_expression_error_types(binaryExpr->right);
+        errorTypes.insert(errorTypes.end(), leftErrors.begin(), leftErrors.end());
+        errorTypes.insert(errorTypes.end(), rightErrors.begin(), rightErrors.end());
+        
+    } else if (auto indexExpr = std::dynamic_pointer_cast<AST::IndexExpr>(expr)) {
+        // Array/dict indexing can produce IndexOutOfBounds errors
+        errorTypes.push_back("IndexOutOfBounds");
+        
+        // Also check object and index expressions
+        auto objectErrors = infer_expression_error_types(indexExpr->object);
+        auto indexErrors = infer_expression_error_types(indexExpr->index);
+        errorTypes.insert(errorTypes.end(), objectErrors.begin(), objectErrors.end());
+        errorTypes.insert(errorTypes.end(), indexErrors.begin(), indexErrors.end());
+    }
+    
+    // Remove duplicates
+    std::sort(errorTypes.begin(), errorTypes.end());
+    errorTypes.erase(std::unique(errorTypes.begin(), errorTypes.end()), errorTypes.end());
+    
+    return errorTypes;
+}
+
+bool TypeChecker::can_function_produce_error_type(const std::shared_ptr<AST::Statement>& body, 
+                                             const std::string& errorType) {
+    // Check if function body can produce specified error type
+    
+    if (auto blockStmt = std::dynamic_pointer_cast<AST::BlockStatement>(body)) {
+        for (const auto& stmt : blockStmt->statements) {
+            if (can_function_produce_error_type(stmt, errorType)) {
+                return true;
+            }
+        }
+    } else if (auto returnStmt = std::dynamic_pointer_cast<AST::ReturnStatement>(body)) {
+        if (returnStmt->value) {
+            // Check if return expression can produce error type
+            auto returnErrors = infer_expression_error_types(returnStmt->value);
+            return std::find(returnErrors.begin(), returnErrors.end(), errorType) != returnErrors.end();
+        }
+    } else if (auto ifStmt = std::dynamic_pointer_cast<AST::IfStatement>(body)) {
+        return can_function_produce_error_type(ifStmt->thenBranch, errorType) ||
+               (ifStmt->elseBranch && can_function_produce_error_type(ifStmt->elseBranch, errorType));
+    } else if (auto exprStmt = std::dynamic_pointer_cast<AST::ExprStatement>(body)) {
+        // Check for fallible expressions that might propagate errors
+        auto exprErrors = infer_expression_error_types(exprStmt->expression);
+        return std::find(exprErrors.begin(), exprErrors.end(), errorType) != exprErrors.end();
+    }
+    
+    return false;
+}
+
+bool TypeChecker::can_propagate_error(const std::vector<std::string>& source_errors, 
+                                  const std::vector<std::string>& target_errors) {
+    // If target allows generic errors, any source is compatible
+    if (target_errors.empty()) {
+        return true;
+    }
+    
+    // Check that all source errors are in target errors
+    for (const auto& sourceError : source_errors) {
+        bool found = std::find(target_errors.begin(), target_errors.end(), sourceError) != target_errors.end();
+        if (!found) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+bool TypeChecker::is_error_union_compatible(TypePtr from, TypePtr to) {
+    if (!is_error_union_type(from) || !is_error_union_type(to)) {
+        return false;
+    }
+    
+    auto fromErrorUnion = std::get<ErrorUnionType>(from->extra);
+    auto toErrorUnion = std::get<ErrorUnionType>(to->extra);
+    
+    // Success types must be compatible
+    if (!is_type_compatible(fromErrorUnion.successType, toErrorUnion.successType)) {
+        return false;
+    }
+    
+    // Check error type compatibility
+    return can_propagate_error(fromErrorUnion.errorTypes, toErrorUnion.errorTypes);
+}
+
+std::string TypeChecker::join_error_types(const std::vector<std::string>& errorTypes) {
+    if (errorTypes.empty()) {
+        return "any error";
+    }
+    
+    std::string result;
+    for (size_t i = 0; i < errorTypes.size(); ++i) {
+        if (i > 0) result += ", ";
+        result += errorTypes[i];
+    }
+    return result;
+}
+
+// =============================================================================
+// PATTERN MATCHING METHODS
+// =============================================================================
+
+bool TypeChecker::is_exhaustive_error_match(const std::vector<std::shared_ptr<AST::MatchCase>>& cases, TypePtr type) {
+    if (!is_error_union_type(type)) {
+        return true; // Non-error types don't need exhaustive error matching
+    }
+    
+    auto errorUnion = std::get<ErrorUnionType>(type->extra);
+    
+    bool hasSuccessCase = false;
+    bool hasGenericErrorCase = false;
+    std::unordered_set<std::string> coveredErrors;
+    
+    for (const auto& matchCase : cases) {
+        // Enhanced pattern analysis for error matching
+        if (auto valPattern = std::dynamic_pointer_cast<AST::ValPatternExpr>(matchCase->pattern)) {
+            hasSuccessCase = true;
+        } else if (auto errPattern = std::dynamic_pointer_cast<AST::ErrPatternExpr>(matchCase->pattern)) {
+            if (errPattern->errorType.has_value()) {
+                // Specific error type in err pattern
+                coveredErrors.insert(errPattern->errorType.value());
+            } else {
+                // Generic error pattern
+                hasGenericErrorCase = true;
+            }
+        } else if (auto bindingPattern = std::dynamic_pointer_cast<AST::BindingPatternExpr>(matchCase->pattern)) {
+            if (bindingPattern->typeName == "val") {
+                hasSuccessCase = true;
+            } else if (bindingPattern->typeName == "err") {
+                hasGenericErrorCase = true;
+            } else {
+                // Specific error type pattern
+                coveredErrors.insert(bindingPattern->typeName);
+            }
+        } else {
+            // Wildcard or other patterns - assume they cover everything
+            hasSuccessCase = true;
+            hasGenericErrorCase = true;
+        }
+    }
+    
+    // For generic error unions, we need at least success and error cases
+    if (errorUnion.isGenericError) {
+        return hasSuccessCase && hasGenericErrorCase;
+    }
+    
+    // For specific error unions, all error types must be covered plus success case
+    bool allErrorsCovered = hasGenericErrorCase || 
+                           (coveredErrors.size() >= errorUnion.errorTypes.size() &&
+                            std::all_of(errorUnion.errorTypes.begin(), errorUnion.errorTypes.end(),
+                                       [&coveredErrors](const std::string& errorType) {
+                                           return coveredErrors.find(errorType) != coveredErrors.end();
+                                       }));
+    
+    return hasSuccessCase && allErrorsCovered;
+}
+
+bool TypeChecker::is_exhaustive_union_match(TypePtr union_type, const std::vector<std::shared_ptr<AST::MatchCase>>& cases) {
+    if (!is_union_type(union_type)) {
+        return true; // Non-union types don't need union exhaustiveness checking
+    }
+    
+    const auto* unionTypeInfo = std::get_if<UnionType>(&union_type->extra);
+    if (!unionTypeInfo) {
+        return true;
+    }
+    
+    std::set<TypeTag> coveredTypeTags;
+    std::set<std::string> coveredTypeNames;
+    bool hasWildcard = false;
+    
+    for (const auto& matchCase : cases) {
+        if (auto bindingPattern = std::dynamic_pointer_cast<AST::BindingPatternExpr>(matchCase->pattern)) {
+            // Pattern like Some(x), None, etc.
+            coveredTypeNames.insert(bindingPattern->typeName);
+        } else if (auto typePattern = std::dynamic_pointer_cast<AST::TypePatternExpr>(matchCase->pattern)) {
+            // Pattern matching specific types
+            if (typePattern->type) {
+                coveredTypeNames.insert(typePattern->type->typeName);
+                // Also resolve type to get its tag
+                TypePtr resolvedType = resolve_type_annotation(typePattern->type);
+                if (resolvedType) {
+                    coveredTypeTags.insert(resolvedType->tag);
+                }
+            }
+        } else if (auto literalExpr = std::dynamic_pointer_cast<AST::LiteralExpr>(matchCase->pattern)) {
+            // Literal patterns - check if they match union variant types
+            if (std::holds_alternative<std::string>(literalExpr->value)) {
+                std::string literalValue = std::get<std::string>(literalExpr->value);
+                coveredTypeNames.insert(literalValue);
+            } else if (std::holds_alternative<std::nullptr_t>(literalExpr->value)) {
+                // This is a wildcard pattern represented as nil literal
+                hasWildcard = true;
+            }
+        } else if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(matchCase->pattern)) {
+            // Variable patterns - check for wildcard or specific variant names
+            if (varExpr->name == "_") {
+                hasWildcard = true;
+            } else {
+                // This is a type pattern like 'int', 'str', 'bool', 'f64'
+                coveredTypeNames.insert(varExpr->name);
+                
+                // Map type names to type tags for better matching
+                if (varExpr->name == "int") coveredTypeTags.insert(TypeTag::Int);
+                else if (varExpr->name == "str") coveredTypeTags.insert(TypeTag::String);
+                else if (varExpr->name == "bool") coveredTypeTags.insert(TypeTag::Bool);
+                else if (varExpr->name == "f64") coveredTypeTags.insert(TypeTag::Float64);
+                else if (varExpr->name == "float") coveredTypeTags.insert(TypeTag::Float64);
+                else if (varExpr->name == "i64") coveredTypeTags.insert(TypeTag::Int64);
+                else if (varExpr->name == "u64") coveredTypeTags.insert(TypeTag::UInt64);
+            }
+        }
+    }
+    
+    // If we have a wildcard, match is exhaustive
+    if (hasWildcard) {
+        return true;
+    }
+    
+    // Check if all union variants are covered
+    for (const auto& variantType : unionTypeInfo->types) {
+        bool variantCovered = false;
+        
+        // Check by type tag (most reliable for primitive types)
+        if (coveredTypeTags.find(variantType->tag) != coveredTypeTags.end()) {
+            variantCovered = true;
+        }
+        
+        // Check by type name
+        std::string variantName = variantType->toString();
+        if (coveredTypeNames.find(variantName) != coveredTypeNames.end()) {
+            variantCovered = true;
+        }
+        
+        // Additional checks for common type name variations
+        if (variantType->tag == TypeTag::Int && 
+            (coveredTypeNames.find("int") != coveredTypeNames.end() || 
+             coveredTypeNames.find("Int") != coveredTypeNames.end())) {
+            variantCovered = true;
+        }
+        
+        if (variantType->tag == TypeTag::String && 
+            (coveredTypeNames.find("str") != coveredTypeNames.end() || 
+             coveredTypeNames.find("String") != coveredTypeNames.end())) {
+            variantCovered = true;
+        }
+        
+        if (variantType->tag == TypeTag::Bool && 
+            (coveredTypeNames.find("bool") != coveredTypeNames.end() || 
+             coveredTypeNames.find("Bool") != coveredTypeNames.end())) {
+            variantCovered = true;
+        }
+        
+        if (!variantCovered) {
+            return false; // Found uncovered variant
+        }
+    }
+    
+    return true;
+}
+
+bool TypeChecker::is_exhaustive_option_match(const std::vector<std::shared_ptr<AST::MatchCase>>& cases) {
+    bool hasSomeCase = false;
+    bool hasNoneCase = false;
+    bool hasWildcard = false;
+    
+    for (const auto& matchCase : cases) {
+        if (auto bindingPattern = std::dynamic_pointer_cast<AST::BindingPatternExpr>(matchCase->pattern)) {
+            if (bindingPattern->typeName == "Some" || bindingPattern->typeName == "some") {
+                hasSomeCase = true;
+            } else if (bindingPattern->typeName == "None" || bindingPattern->typeName == "none") {
+                hasNoneCase = true;
+            } else if (bindingPattern->typeName == "_" || bindingPattern->typeName == "any") {
+                hasWildcard = true;
+            }
+        } else if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(matchCase->pattern)) {
+            if (varExpr->name == "_" || varExpr->name == "any") {
+                hasWildcard = true;
+            }
+        }
+    }
+    
+    // If we have a wildcard, it's exhaustive
+    if (hasWildcard) {
+        return true;
+    }
+    
+    // Otherwise, need both Some and None cases
+    return hasSomeCase && hasNoneCase;
+}
+
+std::string TypeChecker::get_missing_union_variants(TypePtr union_type, const std::vector<std::shared_ptr<AST::MatchCase>>& cases) {
+    if (!is_union_type(union_type)) {
+        return "";
+    }
+    
+    const auto* unionTypeInfo = std::get_if<UnionType>(&union_type->extra);
+    if (!unionTypeInfo) {
+        return "";
+    }
+    
+    std::set<std::string> coveredTypeNames;
+    bool hasWildcard = false;
+    
+    // Collect covered types
+    for (const auto& matchCase : cases) {
+        if (auto bindingPattern = std::dynamic_pointer_cast<AST::BindingPatternExpr>(matchCase->pattern)) {
+            coveredTypeNames.insert(bindingPattern->typeName);
+        } else if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(matchCase->pattern)) {
+            if (varExpr->name == "_") {
+                hasWildcard = true;
+            } else {
+                coveredTypeNames.insert(varExpr->name);
+            }
+        }
+    }
+    
+    // If wildcard, no missing variants
+    if (hasWildcard) {
+        return "";
+    }
+    
+    // Find missing variants
+    std::vector<std::string> missing;
+    for (const auto& variantType : unionTypeInfo->types) {
+        std::string variantName = variantType->toString();
+        if (coveredTypeNames.find(variantName) == coveredTypeNames.end()) {
+            missing.push_back(variantName);
+        }
+    }
+    
+    if (missing.empty()) {
+        return "";
+    }
+    
+    std::string result = "Missing patterns for: ";
+    for (size_t i = 0; i < missing.size(); ++i) {
+        if (i > 0) result += ", ";
+        result += missing[i];
+    }
+    return result;
+}
+
+void TypeChecker::validate_pattern_compatibility(std::shared_ptr<AST::Expression> pattern_node, TypePtr match_type, int line) {
+    // Basic pattern compatibility validation
+    if (!pattern_node || !match_type) {
+        return;
+    }
+    
+    if (auto bindingPattern = std::dynamic_pointer_cast<AST::BindingPatternExpr>(pattern_node)) {
+        // Check if binding pattern is compatible with match type
+        if (bindingPattern->typeName == "val") {
+            // val pattern expects success type
+            if (is_error_union_type(match_type)) {
+                auto errorUnion = std::get<ErrorUnionType>(match_type->extra);
+                // val pattern should match the success type
+                // This is a simplified check - in practice, we'd need more sophisticated matching
+            } else {
+                add_error("val pattern can only be used with error union types", line);
+            }
+        } else if (bindingPattern->typeName == "err") {
+            // err pattern expects error type
+            if (!is_error_union_type(match_type)) {
+                add_error("err pattern can only be used with error union types", line);
+            }
+        }
+    } else if (auto typePattern = std::dynamic_pointer_cast<AST::TypePatternExpr>(pattern_node)) {
+        // Type pattern - check compatibility
+        if (typePattern->type) {
+            TypePtr patternType = resolve_type_annotation(typePattern->type);
+            if (!is_type_compatible(patternType, match_type)) {
+                add_error("Type pattern type " + patternType->toString() + " does not match match type " + match_type->toString(), line);
+            }
+        }
+    } else if (auto literalPattern = std::dynamic_pointer_cast<AST::LiteralExpr>(pattern_node)) {
+        // Literal pattern - check compatibility
+        TypePtr literalType = check_literal_expr(literalPattern);
+        if (!is_type_compatible(literalType, match_type)) {
+            add_error("Literal pattern type " + literalType->toString() + " does not match match type " + match_type->toString(), line);
+        }
+    }
+    // Add more pattern type checks as needed
+}
+
+// =============================================================================
+// ENHANCED TYPE INFERENCE METHODS
+// =============================================================================
+
+TypePtr TypeChecker::infer_lambda_return_type(const std::shared_ptr<AST::Statement>& body) {
+    // Try to infer return type from lambda body
+    if (!body) {
+        return type_system.NIL_TYPE;
+    }
+    
+    // If body is a block statement, look for return statements
+    if (auto blockStmt = std::dynamic_pointer_cast<AST::BlockStatement>(body)) {
+        std::vector<TypePtr> returnTypes;
+        
+        for (const auto& stmt : blockStmt->statements) {
+            if (auto returnStmt = std::dynamic_pointer_cast<AST::ReturnStatement>(stmt)) {
+                if (returnStmt->value) {
+                    TypePtr returnType = check_expression(returnStmt->value);
+                    returnTypes.push_back(returnType);
+                } else {
+                    returnTypes.push_back(type_system.NIL_TYPE);
+                }
+            }
+        }
+        
+        // If we found return statements, try to find common type
+        if (!returnTypes.empty()) {
+            TypePtr commonType = returnTypes[0];
+            for (size_t i = 1; i < returnTypes.size(); ++i) {
+                try {
+                    commonType = get_common_type(commonType, returnTypes[i]);
+                } catch (const std::exception&) {
+                    // If types are incompatible, fall back to ANY_TYPE
+                    return type_system.ANY_TYPE;
+                }
+            }
+            return commonType;
+        }
+        
+        // No explicit return statements found, assume NIL return
+        return type_system.NIL_TYPE;
+    }
+    
+    // If body is an expression statement, infer from expression
+    if (auto exprStmt = std::dynamic_pointer_cast<AST::ExprStatement>(body)) {
+        return check_expression(exprStmt->expression);
+    }
+    
+    // For other statement types, assume NIL return
+    return type_system.NIL_TYPE;
+}
+
+TypePtr TypeChecker::infer_literal_type(const std::shared_ptr<AST::LiteralExpr>& expr, TypePtr expected_type) {
+    if (!expr) return nullptr;
+    
+    // Handle string-based literal values with enhanced type inference
+    if (std::holds_alternative<std::string>(expr->value)) {
+        std::string stringValue = std::get<std::string>(expr->value);
+        
+        // Try to determine if this string represents a number
+        bool isNumeric = false;
+        bool isFloat = false;
+        
+        if (!stringValue.empty()) {
+            char first = stringValue[0];
+            if (std::isdigit(first) || first == '+' || first == '-' || first == '.') {
+                isNumeric = true;
+                // Check if it's a float
+                if (stringValue.find('.') != std::string::npos || 
+                    stringValue.find('e') != std::string::npos || 
+                    stringValue.find('E') != std::string::npos) {
+                    isFloat = true;
+                }
+            }
+        }
+        
+        // If we have an expected type context and it's compatible, use it
+        if (expected_type && (
+            expected_type->tag == TypeTag::Int || expected_type->tag == TypeTag::Int8 ||
+            expected_type->tag == TypeTag::Int16 || expected_type->tag == TypeTag::Int32 ||
+            expected_type->tag == TypeTag::Int64 || expected_type->tag == TypeTag::Int128 ||
+            expected_type->tag == TypeTag::UInt || expected_type->tag == TypeTag::UInt8 ||
+            expected_type->tag == TypeTag::UInt16 || expected_type->tag == TypeTag::UInt32 ||
+            expected_type->tag == TypeTag::UInt64 || expected_type->tag == TypeTag::UInt128 ||
+            expected_type->tag == TypeTag::Float32 || expected_type->tag == TypeTag::Float64)) {
+            return expected_type;
+        }
+        
+        if (isNumeric) {
+            if (isFloat) {
+                // Float values - determine appropriate float type
+                try {
+                    double floatVal = std::stod(stringValue);
+                    if (std::abs(floatVal) <= std::numeric_limits<float>::max()) {
+                        float floatVal32 = static_cast<float>(floatVal);
+                        if (static_cast<double>(floatVal32) == floatVal) {
+                            return type_system.FLOAT32_TYPE;
+                        }
+                    }
+                    return type_system.FLOAT64_TYPE;
+                } catch (const std::exception&) {
+                    // If parsing fails, treat as string
+                    return type_system.STRING_TYPE;
+                }
+            } else {
+                // Integer values - determine appropriate integer type
+                try {
+                    // Try to fit into the smallest appropriate integer type
+                    int64_t intVal = std::stoll(stringValue);
+                    
+                    if (intVal >= std::numeric_limits<int8_t>::min() && intVal <= std::numeric_limits<int8_t>::max()) {
+                        return type_system.INT8_TYPE;
+                    } else if (intVal >= std::numeric_limits<int16_t>::min() && intVal <= std::numeric_limits<int16_t>::max()) {
+                        return type_system.INT16_TYPE;
+                    } else if (intVal >= std::numeric_limits<int32_t>::min() && intVal <= std::numeric_limits<int32_t>::max()) {
+                        return type_system.INT32_TYPE;
+                    } else {
+                        return type_system.INT64_TYPE;
+                    }
+                } catch (const std::exception&) {
+                    // If too large for int64, use Int128
+                    return type_system.INT128_TYPE;
+                }
+            }
+        } else {
+            // String literal
+            return type_system.STRING_TYPE;
+        }
+    } else if (std::holds_alternative<bool>(expr->value)) {
+        return type_system.BOOL_TYPE;
+    } else if (std::holds_alternative<std::nullptr_t>(expr->value)) {
+        return type_system.NIL_TYPE;
+    }
+    
+    return type_system.STRING_TYPE; // Default fallback
+}
+
+// =============================================================================
+// CONTRACT STATEMENT CHECKING
+// =============================================================================
+
+TypePtr TypeChecker::check_contract_statement(std::shared_ptr<AST::ContractStatement> contract_stmt) {
+    if (!contract_stmt) return nullptr;
+    
+    if (!contract_stmt->condition) {
+        add_error("contract statement missing condition", contract_stmt->line, 0, 
+                get_code_context(contract_stmt->line), "contract", "contract(condition, message)");
+        return type_system.NIL_TYPE;
+    }
+    
+    if (!contract_stmt->message) {
+        add_error("contract statement missing message", contract_stmt->line, 0, 
+                get_code_context(contract_stmt->line), "contract", "contract(condition, message)");
+        return type_system.NIL_TYPE;
+    }
+    
+    // Check condition is boolean
+    TypePtr conditionType = check_expression(contract_stmt->condition);
+    if (!is_boolean_type(conditionType) && conditionType->tag != TypeTag::Any) {
+        add_error("contract condition must be boolean, got " + conditionType->toString(), 
+                contract_stmt->line, 0, get_code_context(contract_stmt->line), "condition", "boolean expression");
+    }
+    
+    // Check message is string
+    TypePtr messageType = check_expression(contract_stmt->message);
+    if (!is_string_type(messageType) && messageType->tag != TypeTag::Any) {
+        add_error("contract message must be string, got " + messageType->toString(), 
+                contract_stmt->line, 0, get_code_context(contract_stmt->line), "message", "string literal or expression");
+    }
+    
+    contract_stmt->inferred_type = type_system.NIL_TYPE;
+    return type_system.NIL_TYPE;
+}
+
+TypePtr TypeChecker::check_match_statement(std::shared_ptr<AST::MatchStatement> match_stmt) {
+    if (!match_stmt) return nullptr;
+    
+    // Check the matched expression
+    TypePtr matchType = check_expression(match_stmt->value);
+    
+    // Check each case
+    for (const auto& matchCase : match_stmt->cases) {
+        // Check guard if present
+        if (matchCase.guard) {
+            TypePtr guardType = check_expression(matchCase.guard);
+            if (!is_boolean_type(guardType) && guardType->tag != TypeTag::Any) {
+                add_error("Match guard must be a boolean expression", match_stmt->line);
+            }
+        }
+        
+        // Check case body
+        check_statement(matchCase.body);
+        
+        // Validate pattern compatibility with matched type
+        validate_pattern_compatibility(matchCase.pattern, matchType, match_stmt->line);
+    }
+    
+    // Convert cases to shared_ptr vector for function calls
+    std::vector<std::shared_ptr<AST::MatchCase>> case_ptrs;
+    case_ptrs.reserve(match_stmt->cases.size());
+    for (const auto& case_item : match_stmt->cases) {
+        case_ptrs.push_back(std::make_shared<AST::MatchCase>(case_item));
+    }
+    
+    // Enhanced exhaustiveness checking for different type categories
+    if (is_error_union_type(matchType)) {
+        if (!is_exhaustive_error_match(case_ptrs, matchType)) {
+            auto errorUnion = std::get<ErrorUnionType>(matchType->extra);
+            
+            if (errorUnion.isGenericError) {
+                add_error("Match statement is not exhaustive for error union type. Must handle both success case (val pattern) and error case (err pattern)", 
+                        match_stmt->line);
+            } else {
+                std::string missingPatterns = "Must handle success case (val pattern) and all error types: [" + 
+                                            join_error_types(errorUnion.errorTypes) + "]";
+                add_error("Match statement is not exhaustive for error union type. " + missingPatterns, 
+                        match_stmt->line);
+            }
+        }
+    } else if (is_union_type(matchType)) {
+        // Union type exhaustiveness checking
+        if (!is_exhaustive_union_match(matchType, case_ptrs)) {
+            std::string missingVariants = get_missing_union_variants(matchType, case_ptrs);
+            add_error("Match statement is not exhaustive for union type " + matchType->toString() + 
+                    ". Missing patterns for: " + missingVariants, match_stmt->line);
+        }
+    } else if (type_system.isOptionType(matchType)) {
+        // Option type exhaustiveness checking
+        if (!is_exhaustive_option_match(case_ptrs)) {
+            add_error("Match statement is not exhaustive for Option type. Must handle both Some and None cases", 
+                        match_stmt->line);
+        }
+    }
+    
+    match_stmt->inferred_type = matchType;
+    return matchType;
 }
 
 void TypeChecker::register_builtin_function(const std::string& name, 
@@ -1707,15 +2691,15 @@ void register_builtin_functions(TypeChecker& checker) {
     checker.register_builtin_function("ln10", {}, ts.FLOAT64_TYPE);
     checker.register_builtin_function("sqrt2", {}, ts.FLOAT64_TYPE);
     
-    // Collection functions (simplified for now)
+    // Collection functions (enhanced)
     auto function_type = ts.createFunctionType({}, ts.ANY_TYPE); // Simple function type
-    checker.register_builtin_function("map", {function_type, ts.LIST_TYPE}, ts.LIST_TYPE);
-    checker.register_builtin_function("filter", {function_type, ts.LIST_TYPE}, ts.LIST_TYPE);
-    checker.register_builtin_function("reduce", {function_type, ts.LIST_TYPE, ts.ANY_TYPE}, ts.ANY_TYPE);
-    checker.register_builtin_function("forEach", {function_type, ts.LIST_TYPE}, ts.NIL_TYPE);
-    checker.register_builtin_function("find", {function_type, ts.LIST_TYPE}, ts.ANY_TYPE);
-    checker.register_builtin_function("some", {function_type, ts.LIST_TYPE}, ts.BOOL_TYPE);
-    checker.register_builtin_function("every", {function_type, ts.LIST_TYPE}, ts.BOOL_TYPE);
+    checker.register_builtin_function("map", {function_type, ts.createTypedListType(ts.ANY_TYPE)}, ts.createTypedListType(ts.ANY_TYPE));
+    checker.register_builtin_function("filter", {function_type, ts.createTypedListType(ts.ANY_TYPE)}, ts.createTypedListType(ts.ANY_TYPE));
+    checker.register_builtin_function("reduce", {function_type, ts.createTypedListType(ts.ANY_TYPE), ts.ANY_TYPE}, ts.ANY_TYPE);
+    checker.register_builtin_function("forEach", {function_type, ts.createTypedListType(ts.ANY_TYPE)}, ts.NIL_TYPE);
+    checker.register_builtin_function("find", {function_type, ts.createTypedListType(ts.ANY_TYPE)}, ts.ANY_TYPE);
+    checker.register_builtin_function("some", {function_type, ts.createTypedListType(ts.ANY_TYPE)}, ts.BOOL_TYPE);
+    checker.register_builtin_function("every", {function_type, ts.createTypedListType(ts.ANY_TYPE)}, ts.BOOL_TYPE);
     
     // Function composition
     checker.register_builtin_function("compose", {function_type, function_type}, function_type);
@@ -1724,6 +2708,11 @@ void register_builtin_functions(TypeChecker& checker) {
     
     // Channel function
     checker.register_builtin_function("channel", {}, ts.INT_TYPE);
+    
+    // Additional utility functions from backend
+    checker.register_builtin_function("typeOf", {ts.ANY_TYPE}, ts.STRING_TYPE);
+    checker.register_builtin_function("debug", {ts.ANY_TYPE}, ts.NIL_TYPE);
+    checker.register_builtin_function("input", {ts.STRING_TYPE}, ts.STRING_TYPE);
 }
 
 } // namespace TypeCheckerFactory

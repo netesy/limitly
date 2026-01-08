@@ -1,15 +1,11 @@
 #ifndef TASK_H
 #define TASK_H
 
-#include <variant>
-#include <string>
+#include "register_value.hh"
 #include <unordered_map>
 #include <cstdint>
 
 namespace Register {
-
-// Register value type
-using RegisterValue = std::variant<int64_t, uint64_t, double, bool, std::string, std::nullptr_t>;
 
 // Task states for threadless concurrency
 enum class TaskState {

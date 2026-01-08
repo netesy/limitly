@@ -2868,16 +2868,64 @@ void BackendTypeChecker::checkModuleMemberFunctionCall(const std::shared_ptr<AST
                 "' from module '" + objectName + "'", callExpr->line);
         return;
     }
-    
-    // TODO: Add parameter count and type validation here
-    // For now, we'll just validate that the function is accessible
-}
+} // Added missing closing brace
 
 TypePtr BackendTypeChecker::checkClassMethodCall(const std::shared_ptr<AST::MemberExpr>& memberExpr,
                                           const std::vector<TypePtr>& argTypes,
                                           const std::shared_ptr<AST::CallExpr>& callExpr) {
     // 1. Get object and class information
     TypePtr objectType = checkExpression(memberExpr->object);
+    
+    // Handle channel method calls
+    if (objectType && objectType->tag == TypeTag::Channel) {
+        std::string methodName = memberExpr->name;
+        
+        if (methodName == "send") {
+            if (argTypes.size() != 1) {
+                addError("channel.send() requires exactly one argument", callExpr->line);
+                return typeSystem.ANY_TYPE;
+            }
+            // send(value) returns nil (void)
+            return typeSystem.NIL_TYPE;
+            
+        } else if (methodName == "recv") {
+            if (argTypes.size() != 0) {
+                addError("channel.recv() requires no arguments", callExpr->line);
+                return typeSystem.ANY_TYPE;
+            }
+            // recv() returns the channel element type (any for now)
+            return typeSystem.ANY_TYPE;
+            
+        } else if (methodName == "offer") {
+            if (argTypes.size() != 1) {
+                addError("channel.offer() requires exactly one argument", callExpr->line);
+                return typeSystem.ANY_TYPE;
+            }
+            // offer(value) returns bool (success/failure)
+            return typeSystem.BOOL_TYPE;
+            
+        } else if (methodName == "poll") {
+            if (argTypes.size() != 0) {
+                addError("channel.poll() requires no arguments", callExpr->line);
+                return typeSystem.ANY_TYPE;
+            }
+            // poll() returns Option<T> (represented as any for now)
+            return typeSystem.ANY_TYPE;
+            
+        } else if (methodName == "close") {
+            if (argTypes.size() != 0) {
+                addError("channel.close() requires no arguments", callExpr->line);
+                return typeSystem.ANY_TYPE;
+            }
+            // close() returns nil (void)
+            return typeSystem.NIL_TYPE;
+            
+        } else {
+            addError("Unknown channel method: " + methodName, callExpr->line);
+            return typeSystem.ANY_TYPE;
+        }
+    }
+    
     if (!objectType || (objectType->tag != TypeTag::Object && objectType->tag != TypeTag::UserDefined)) {
         // This isn't a class instance, so it can't be a method call.
         // Let other parts of the type checker handle it (e.g., function-typed fields).
