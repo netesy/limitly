@@ -335,7 +335,6 @@ iter (i in 0..10..2) {
     print("i = {i}"); // Output: 0, 2, 4, 6, 8
 }
 ```
-> **Note:** The step value feature is planned but not yet fully implemented in the parser.
 
 ### Ternary Operator
 
@@ -346,7 +345,6 @@ var x = 10;
 var result = x > 5 ? "Greater than 5" : "Not greater than 5";
 print(result); // Output: Greater than 5
 ```
-> **Note:** The ternary operator is planned but not yet implemented in the parser.
 
 ### Match Statements
 
@@ -678,7 +676,7 @@ class Greeter {
     var name: str = "World";
 
     fn say_hello() {
-        print("Hello, {self.name}!");
+        print("Hello, {this.name}!");
     }
 }
 
@@ -740,11 +738,11 @@ class Circle : Shape {
     var radius: float;
 
     fn init(r: float) {
-        self.radius = r;
+        this.radius = r;
     }
 
     fn area(): float {
-        return 3.14 * self.radius * self.radius;
+        return 3.14 * this.radius * this.radius;
     }
 }
 ```
@@ -789,12 +787,12 @@ class Person {
     var age: int;
 
     fn init(name_param: str, age_param: int) {
-        self.name = name_param;
-        self.age = age_param;
+        this.name = name_param;
+        this.age = age_param;
     }
 
     fn introduce() {
-        print("Hi, I'm {self.name} and I'm {self.age} years old.");
+        print("Hi, I'm {this.name} and I'm {this.age} years old.");
     }
 }
 
@@ -802,9 +800,9 @@ var person: Person = Person("Jules", 28);
 person.introduce(); // Output: Hi, I'm Jules and I'm 28 years old.
 ```
 
-### The `self` Keyword
+### The `this` Keyword
 
-The `self` keyword refers to the current instance of the class. It is used to access the instance's fields and methods.
+The `this` keyword refers to the current instance of the class. It is used to access the instance's fields and methods.
 
 ### Inheritance
 
@@ -936,27 +934,30 @@ greet(); // greet is imported
 
 ### Module Declarations
 
-For more explicit control over what a module exposes, you can use a `module` block. This allows you to define `public`, `protected`, and `private` sections for your module's members.
+For more explicit control over what a module exposes, you can use a `module` block. This allows you to define `public`, `protected`, and `private` sections for your module's members. By default, all members of a module are private.
 
 ```limit
 // in file my_app/utils.lm
 module my_app.utils {
-    @public
-    fn format_user(user: User): str {
-        // ...
+    public {
+        fn format_user(user: User): str {
+            // ...
+        }
     }
 
-    @protected
-    class StringHelper {
-        // ...
+    protected {
+        class StringHelper {
+            // ...
+        }
     }
 
-    @private
-    var api_key = "secret";
+    private {
+        var api_key = "secret";
+    }
 }
 ```
 
-When another file imports this module, it will only have access to the `public` members. `protected` members would be available to other modules within the `my_app` namespace (not yet fully implemented), and `private` members are internal to the module.
+When another file imports this module, it will only have access to the `public` members. `protected` members would be available to other modules within the `my_app` namespace, and `private` members are internal to the module.
 
 ## Advanced Features
 
@@ -1137,16 +1138,51 @@ var current_status: Status = Status.Running;
 
 ### Traits and Interfaces
 
-Traits and interfaces are used to define a set of methods that a class must implement. This is a powerful tool for abstraction and polymorphism.
+Traits and interfaces are used to define a set of methods that a type must implement. This allows you to write code that works with any type that satisfies a certain contract, which is a powerful tool for abstraction and polymorphism.
+
+A `trait` defines a contract that a class can implement.
 
 ```limit
 trait Speaker {
-    fn speak();
+    fn speak(): str;
 }
 
 class Dog : Speaker {
-    fn speak() {
-        print("Woof!");
+    fn speak(): str {
+        return "Woof!";
+    }
+}
+
+class Cat : Speaker {
+    fn speak(): str {
+        return "Meow!";
+    }
+}
+
+fn make_speak(s: Speaker) {
+    print(s.speak());
+}
+
+var my_dog = Dog();
+var my_cat = Cat();
+
+make_speak(my_dog); // Output: Woof!
+make_speak(my_cat); // Output: Meow!
+```
+
+Interfaces are similar to traits but are typically used to define the public API of an object.
+
+```limit
+interface Serializable {
+    fn serialize(): str;
+}
+
+class User : Serializable {
+    var name: str;
+    var age: int;
+
+    fn serialize(): str {
+        return "{'name': '{this.name}', 'age': {this.age}}";
     }
 }
 ```
@@ -1185,55 +1221,89 @@ match (user) {
 }
 ```
 
-### The `Result` Type for Operations That Can Fail
+### Fallible Operations with `Type?`
 
-For operations that can either succeed or fail, Limit uses a `Result` type (often implemented as a `Type?` or a custom enum). The common convention is:
-- **`Ok(value)`**: Represents a successful result.
-- **`Err(error)`**: Represents a failure, containing an error value.
+For operations that can either succeed or fail, Limit uses a unified `Type?` system. This provides a clear and concise way to handle results without resorting to exceptions or `nil` values.
+
+- **`Type?`**: A fallible type. It can either hold a success value of `Type` or an error.
+- **`ok(value)`**: Constructs a success value. The type of `value` must match `Type`.
+- **`err(error_value)`**: Constructs an error value. The `error_value` can be a string, a custom error object, or omitted for a generic error.
+
+Here is an example of a function that returns a fallible integer:
 
 ```limit
-fn divide(a: int, b: int): int?DivisionByZero {
+fn divide(a: int, b: int): int? {
     if (b == 0) {
-        return Err(DivisionByZero("Cannot divide by zero"));
+        return err("Division by zero");
     }
-    return Ok(a / b);
-}
-
-var result = divide(10, 2);
-match (result) {
-    Ok(value) => { print("Result: {value}"); },
-    Err(e) => { print("Error: {e}"); }
+    return ok(a / b);
 }
 ```
 
-### The Unified `Type?` System
+### Handling Fallible Values with `match`
 
-For convenience, Limit provides the `Type?` syntax as a shorthand for fallible operations. The `Type?` syntax is syntactic sugar for `Result<Type, DefaultError>`, where `DefaultError` is a generic error type used when a specific one is not provided.
-- **`Type?`**: A type that can either hold a value of `Type` or an error.
-- **`ok(value)`**: Constructs a success value.
-- **`err()`**: Constructs an error value.
-
-### The `?` Operator for Propagating Errors
-
-The `?` operator is a convenient way to propagate errors up the call stack. If a function call returns an `Err`, the `?` operator will immediately return that `Err` from the current function.
+The most robust way to handle a `Type?` value is with a `match` statement, which can destructure the success (`val`) or error (`err`) cases.
 
 ```limit
-fn get_number_from_string(s: str): int? {
-    var number: int = to_int(s)?; // If to_int returns Err, this function also returns Err
+var result = divide(10, 2);
+
+match (result) {
+    val(value) => { print("Result: {value}"); },
+    err(e) => { print("Error: {e}"); }
+}
+// Output: Result: 5
+
+var result_fail = divide(10, 0);
+
+match (result_fail) {
+    val(value) => { print("Result: {value}"); },
+    err(e) => { print("Error: {e}"); }
+}
+// Output: Error: Division by zero
+```
+
+### Propagating Errors with `?`
+
+When you call a function that returns a `Type?` inside another function that also returns a `Type?`, you often just want to pass the error up to the caller. The `?` operator is a convenient shorthand for this.
+
+If the result is `ok(value)`, the `?` operator unwraps it and returns `value`. If the result is `err(e)`, the `?` operator immediately returns `err(e)` from the current function.
+
+```limit
+fn to_int(s: str): int? {
+    // A built-in or library function that might fail
+    // ...
+}
+
+// This function uses '?' to propagate an error from to_int
+fn get_and_double(s: str): int? {
+    var number = to_int(s)?; // If to_int fails, get_and_double also fails
+
+    // This code only runs if to_int was successful
     return ok(number * 2);
 }
+
+var result = get_and_double("10"); // result will be ok(20)
+var failed_result = get_and_double("abc"); // failed_result will be an err
 ```
 
 ### Inline Error Handling with `? else`
 
-You can use the `? else` construct to handle an error inline and provide a default value or an alternative code path.
+Sometimes, you want to handle an error immediately and provide a default value or run some alternative code. The `? else` construct is perfect for this.
 
 ```limit
+// Provide a default value if the operation fails
 var value: int = divide(10, 0)? else {
-    print("Division failed");
-    return 0; // Default value
+    print("Division failed, using default value 0.");
+    return 0;
 };
-// `value` will be 0.
+// value will be 0
+
+// You can also handle the error in the else block
+var result: int? = divide(10, 0)? else err_val {
+    print("An error occurred: {err_val}");
+    // The current function can continue, or return its own error
+    return err("Could not perform division.");
+};
 ```
 
 
@@ -1440,7 +1510,7 @@ iter (message in messages) {
 *   `ch`: The channel to be used for communication between tasks.
 *   `mode`: The execution mode. `"batch"` (default for `concurrent`) waits for all tasks to be submitted before execution, while `"fork-join"` (default for `parallel`) executes tasks as they are submitted.
 *   `cores`: (parallel only) The number of CPU cores to use. Can be an integer or `"auto"` (default) to use all available cores.
-*   `onError`: Behavior upon task failure.
+*   `on_error`: Behavior upon task failure.
     *   `"stop"` (default): Stop all tasks immediately.
     *   `"continue"`: Allow other tasks to continue.
     *   A function reference to a custom error handler.
@@ -1474,7 +1544,63 @@ print("All concurrent tasks have completed.");
 
 ### Channels
 
-Channels are the primary way for concurrent tasks to communicate. One or more tasks can send messages to a channel, and another task can receive them.
+Channels are the primary way for concurrent tasks to communicate. You can think of a channel as a thread-safe queue that allows you to send messages between tasks.
+
+#### Creating a Channel
+
+You can create a channel using the `channel()` function.
+
+```limit
+var messages = channel();
+```
+
+#### Sending and Receiving Messages
+
+You can send a message to a channel using the `send()` method and receive messages by iterating over the channel with an `iter` loop.
+
+```limit
+var messages = channel();
+
+concurrent {
+    task {
+        messages.send("Hello from task 1");
+    }
+    task {
+        messages.send("Hello from task 2");
+    }
+}
+
+// This loop will receive the messages as they are sent
+iter (message in messages) {
+    print(message);
+}
+```
+
+### Worker Statement
+
+The `worker` statement provides a convenient way to process items from a channel concurrently. A `worker` block automatically receives items from the channel specified in the `concurrent` block and executes its body for each item.
+
+```limit
+var tasks = channel();
+var results = channel();
+
+// Send some tasks to the channel
+tasks.send("task 1");
+tasks.send("task 2");
+tasks.send("task 3");
+
+concurrent(ch=tasks) {
+    worker(item) {
+        // The 'item' variable will receive "task 1", "task 2", and "task 3"
+        var processed_item = item + " processed";
+        results.send(processed_item);
+    }
+}
+
+iter (result in results) {
+    print(result);
+}
+```
 
 ### Async/Await
 
