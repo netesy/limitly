@@ -193,6 +193,15 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::AtomicFetchAdd: return "atomic_fetch_add";
         case LIR_Op::Await: return "await";
         case LIR_Op::AsyncCall: return "async_call";
+
+        //  === CHANNEL OPERATIONS ===
+        case LIR_Op::ChannelOffer: return "channel_offer";
+        case LIR_Op::ChannelRecv: return "channel_recv";
+        case LIR_Op::ChannelPoll: return "channel_poll";
+        case LIR_Op::ChannelClose: return "channel_close";
+        case LIR_Op::ChannelAlloc: return "channel_alloc";
+        case LIR_Op::ChannelSend: return "channel_send";
+        case LIR_Op::ChannelHasData: return "channel_has_data";
         
         // === THREADLESS CONCURRENCY ===
         case LIR_Op::TaskContextAlloc: return "task_context_alloc";
@@ -201,10 +210,6 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::TaskSetState: return "task_set_state";
         case LIR_Op::TaskSetField: return "task_set_field";
         case LIR_Op::TaskGetField: return "task_get_field";
-        case LIR_Op::ChannelAlloc: return "channel_alloc";
-        case LIR_Op::ChannelPush: return "channel_push";
-        case LIR_Op::ChannelPop: return "channel_pop";
-        case LIR_Op::ChannelHasData: return "channel_has_data";
         case LIR_Op::SchedulerInit: return "scheduler_init";
         case LIR_Op::SchedulerRun: return "scheduler_run";
         case LIR_Op::SchedulerTick: return "scheduler_tick";
