@@ -342,6 +342,7 @@ public:
     const TypePtr CLOSURE_TYPE = std::make_shared<Type>(TypeTag::Closure);
     const TypePtr OBJECT_TYPE = std::make_shared<Type>(TypeTag::Object);
     const TypePtr MODULE_TYPE = std::make_shared<Type>(TypeTag::Module);
+    const TypePtr CHANNEL_TYPE = std::make_shared<Type>(TypeTag::Channel);
     const TypePtr ERROR_UNION_TYPE = std::make_shared<Type>(TypeTag::ErrorUnion);
 
     // Built-in error types

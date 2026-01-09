@@ -1236,6 +1236,15 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<AST::CallExpr> expr) {
         }
     }
     
+    // Check if callee is a member expression (method call)
+    if (auto member_expr = std::dynamic_pointer_cast<AST::MemberExpr>(expr->callee)) {
+        TypePtr result_type = check_expression(expr->callee);
+        if (result_type) {
+            expr->inferred_type = result_type;
+            return result_type;
+        }
+    }
+    
     // If not a known function, check the callee as an expression
     TypePtr callee_type = check_expression(expr->callee);
     
@@ -1299,7 +1308,28 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<AST::MemberExpr> expr) {
     
     TypePtr object_type = check_expression(expr->object);
     
-    // For now, assume all member access returns string
+    // Handle channel method access
+    if (object_type && object_type->tag == TypeTag::Channel) {
+        std::string method_name = expr->name;
+        
+        // Return appropriate types for channel methods
+        if (method_name == "offer") {
+            return type_system.BOOL_TYPE; // offer() returns bool
+        } else if (method_name == "poll") {
+            return type_system.ANY_TYPE; // poll() returns Option<T> (represented as any for now)
+        } else if (method_name == "send") {
+            return type_system.NIL_TYPE; // send() returns nil
+        } else if (method_name == "recv") {
+            return type_system.ANY_TYPE; // recv() returns T
+        } else if (method_name == "close") {
+            return type_system.NIL_TYPE; // close() returns nil
+        } else {
+            add_error("Unknown channel method: " + method_name, expr->line);
+            return type_system.ANY_TYPE;
+        }
+    }
+    
+    // For now, assume all other member access returns string
     // TODO: Implement proper class/struct type checking
     return type_system.STRING_TYPE;
 }
@@ -2707,7 +2737,7 @@ void register_builtin_functions(TypeChecker& checker) {
     checker.register_builtin_function("partial", {function_type, ts.ANY_TYPE}, function_type);
     
     // Channel function
-    checker.register_builtin_function("channel", {}, ts.INT_TYPE);
+    checker.register_builtin_function("channel", {}, ts.CHANNEL_TYPE);
     
     // Additional utility functions from backend
     checker.register_builtin_function("typeOf", {ts.ANY_TYPE}, ts.STRING_TYPE);

@@ -1849,13 +1849,13 @@ void BackendTypeChecker::registerBuiltinFunctions() {
     
     // Channel functions (VM-implemented)
     symbolTable.addFunction("channel", FunctionSignature(
-        "channel", {}, typeSystem.ANY_TYPE, false, {}, 0));
+        "channel", {}, typeSystem.CHANNEL_TYPE, false, {}, 0));
     
     symbolTable.addFunction("send", FunctionSignature(
-        "send", {typeSystem.ANY_TYPE, typeSystem.ANY_TYPE}, typeSystem.NIL_TYPE, false, {}, 0));
+        "send", {typeSystem.ANY_TYPE, typeSystem.CHANNEL_TYPE}, typeSystem.NIL_TYPE, false, {}, 0));
     
     symbolTable.addFunction("receive", FunctionSignature(
-        "receive", {typeSystem.ANY_TYPE}, typeSystem.ANY_TYPE, false, {}, 0));
+        "receive", {typeSystem.CHANNEL_TYPE}, typeSystem.ANY_TYPE, false, {}, 0));
     
     symbolTable.addFunction("close", FunctionSignature(
         "close", {typeSystem.ANY_TYPE}, typeSystem.NIL_TYPE, false, {}, 0));
@@ -2428,6 +2428,27 @@ TypePtr BackendTypeChecker::checkMemberAccess(const std::shared_ptr<AST::MemberE
     if (objectType->tag == TypeTag::Dict) {
         // Dict access is always allowed
         return typeSystem.ANY_TYPE;
+    }
+    
+    // Handle channel method access
+    if (objectType->tag == TypeTag::Channel) {
+        std::string methodName = expr->name;
+        
+        // Return appropriate types for channel methods
+        if (methodName == "offer") {
+            return typeSystem.BOOL_TYPE; // offer() returns bool
+        } else if (methodName == "poll") {
+            return typeSystem.ANY_TYPE; // poll() returns Option<T> (represented as any for now)
+        } else if (methodName == "send") {
+            return typeSystem.NIL_TYPE; // send() returns nil
+        } else if (methodName == "recv") {
+            return typeSystem.ANY_TYPE; // recv() returns T
+        } else if (methodName == "close") {
+            return typeSystem.NIL_TYPE; // close() returns nil
+        } else {
+            addError("Unknown channel method: " + methodName, expr->line);
+            return typeSystem.ANY_TYPE;
+        }
     }
     
     // For other types, allow access but warn if it doesn't make sense

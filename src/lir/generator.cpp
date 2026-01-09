@@ -1441,6 +1441,33 @@ Reg Generator::emit_call_expr(AST::CallExpr& expr) {
         if (BuiltinUtils::isBuiltinFunction(func_name)) {
             std::cout << "[DEBUG] LIR Generator: Generating builtin call to '" << func_name << "'" << std::endl;
             
+            // Special handling for channel() function
+            if (func_name == "channel") {
+                std::cout << "[DEBUG] Processing channel() builtin function" << std::endl;
+                if (!expr.arguments.empty()) {
+                    std::cout << "[DEBUG] channel() has arguments, reporting error" << std::endl;
+                    report_error("channel() function takes no arguments");
+                    return 0;
+                }
+                
+                std::cout << "[DEBUG] Allocating result register for channel" << std::endl;
+                // Allocate result register
+                Reg result = allocate_register();
+                
+                std::cout << "[DEBUG] Setting channel type for register " << result << std::endl;
+                
+                // Set the result type to Channel
+                auto channel_type = std::make_shared<::Type>(::TypeTag::Channel);
+                set_register_language_type(result, channel_type);
+                set_register_abi_type(result, Type::I64); // Channel handles are int64
+                
+                // Generate ChannelAlloc instruction with default capacity
+                emit_instruction(LIR_Inst(LIR_Op::ChannelAlloc, result, 32, 0));
+                
+                std::cout << "[DEBUG] Generated ChannelAlloc: channel_alloc r" << result << std::endl;
+                return result;
+            }
+            
             // Evaluate arguments and store them in registers
             std::vector<Reg> arg_regs;
             for (const auto& arg : expr.arguments) {
@@ -2070,11 +2097,13 @@ void Generator::emit_print_value(Reg value) {
 }
 
 void Generator::emit_var_stmt(AST::VarDeclaration& stmt) {
+    std::cout << "[DEBUG] emit_var_stmt called for variable: " << stmt.name << std::endl;
     Reg value_reg;
     
     // Determine the declared type first, before processing the initializer
     TypePtr declared_type = nullptr;
     if (stmt.type.has_value()) {
+        std::cout << "[DEBUG] Variable has explicit type" << std::endl;
         // Convert TypeAnnotation to Type - handle all basic types including 128-bit
         auto type_annotation = *stmt.type.value();
         if (type_annotation.typeName == "u32") {
@@ -2112,14 +2141,18 @@ void Generator::emit_var_stmt(AST::VarDeclaration& stmt) {
         }
     }
     
+    std::cout << "[DEBUG] Checking if variable has initializer" << std::endl;
     if (stmt.initializer) {
+        std::cout << "[DEBUG] Variable has initializer, processing..." << std::endl;
         // Check if the initializer is a literal - if so, optimize by directly using it
         if (auto literal = dynamic_cast<AST::LiteralExpr*>(stmt.initializer.get())) {
             // For literal initializers, emit the literal with the expected type
             value_reg = emit_literal_expr(*literal, declared_type);
         } else {
             // For non-literal initializers, evaluate and move
+            std::cout << "[DEBUG] Processing non-literal initializer" << std::endl;
             Reg value = emit_expr(*stmt.initializer);
+            std::cout << "[DEBUG] emit_expr completed, value=" << value << std::endl;
             value_reg = allocate_register();
             Type abi_type = language_type_to_abi_type(stmt.inferred_type);
             emit_instruction(LIR_Inst(LIR_Op::Mov, abi_type, value_reg, value, 0));
@@ -2139,7 +2172,9 @@ void Generator::emit_var_stmt(AST::VarDeclaration& stmt) {
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, abi_type, value_reg, nil_val));
         set_register_type(value_reg, nil_type);
     }
+    std::cout << "[DEBUG] Binding variable: " << stmt.name << " to register " << value_reg << std::endl;
     bind_variable(stmt.name, value_reg);
+    std::cout << "[DEBUG] emit_var_stmt completed for: " << stmt.name << std::endl;
 }
 
 void Generator::emit_block_stmt(AST::BlockStatement& stmt) {
@@ -2752,8 +2787,11 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
     std::cout << "[DEBUG] Processing concurrent statement" << std::endl;
     auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
     scheduler_initialized_ = true;
+    std::cout << "[DEBUG] About to handle channel parameter assignment" << std::endl;
     // Handle channel parameter assignment (e.g., "ch=counts")
     std::cout << "[DEBUG] Handling channel parameter assignment" << std::endl;
+    std::cout << "[DEBUG] Channel param: '" << stmt.channelParam << "'" << std::endl;
+    std::cout << "[DEBUG] Channel name: '" << stmt.channel << "'" << std::endl;
     Reg channel_reg;
     if (!stmt.channelParam.empty()) {
         std::cout << "[DEBUG] Channel param is not empty: " << stmt.channelParam << std::endl;
@@ -2795,6 +2833,10 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
         if (auto block_stmt = dynamic_cast<AST::BlockStatement*>(stmt.body.get())) {
             for (auto& body_stmt : block_stmt->statements) {
                 if (auto task_stmt = dynamic_cast<AST::TaskStatement*>(body_stmt.get())) {
+                    // Set the channel parameter for this task
+                    task_stmt->channel_param = stmt.channel;
+                    std::cout << "[DEBUG] Set channel_param '" << stmt.channel << "' for task" << std::endl;
+                    
                     // Handle range iteration: task(i in 1..4)
                     if (task_stmt->iterable) {
                         if (auto range_expr = dynamic_cast<AST::RangeExpr*>(task_stmt->iterable.get())) {
@@ -2819,18 +2861,28 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
                                     
                                     // Add task to scheduler
                                     Reg task_context_reg = allocate_register();
+                                    Reg context_id_reg = allocate_register();
                                     emit_instruction(LIR_Inst(LIR_Op::TaskContextAlloc, task_context_reg, 1, 0));
                                     
-                                    // Set task ID
+                                    // Store context_id for later use in TaskSetField calls
+                                    emit_instruction(LIR_Inst(LIR_Op::Mov, context_id_reg, task_context_reg, 0));
+                                    
+                                    // Set task ID in field 0
                                     Reg task_id_reg = allocate_register();
                                     auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
                                     ValuePtr task_id_val = std::make_shared<Value>(int_type, i);
                                     std::cout << "[DEBUG] Creating task ID value: " << i << " for task " << task_name << std::endl;
                                     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, task_id_reg, task_id_val));
-                                    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, task_id_reg, task_context_reg, 0, 0));
+                                    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, task_id_reg, context_id_reg, 0, 0));
+                                    
+                                    // Set loop variable value in field 1
+                                    Reg loop_var_reg = allocate_register();
+                                    ValuePtr loop_var_val = std::make_shared<Value>(int_type, i);
+                                    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, loop_var_reg, loop_var_val));
+                                    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, loop_var_reg, context_id_reg, 0, 1));
                                     
                                     // Set channel register
-                                    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, channel_reg, task_context_reg, 0, 2));
+                                    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, channel_reg, context_id_reg, 0, 2));
                                     
                                     // Set task function name in field 4
                                     Reg task_name_reg = allocate_register();
@@ -2838,10 +2890,10 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
                                     ValuePtr task_name_val = std::make_shared<Value>(string_type, task_name);
                                     std::cout << "[DEBUG] Setting task function name: '" << task_name << "' in field 4" << std::endl;
                                     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, task_name_reg, task_name_val));
-                                    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, task_name_reg, task_context_reg, 0, 4));
+                                    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, task_name_reg, context_id_reg, 0, 4));
                                     
                                     // Add task to scheduler
-                                    emit_instruction(LIR_Inst(LIR_Op::SchedulerAddTask, Type::Void, scheduler_reg, task_context_reg, 0));
+                                    emit_instruction(LIR_Inst(LIR_Op::SchedulerAddTask, Type::Void, context_id_reg, task_context_reg, 0));
                                     
                                     std::cout << "[DEBUG] Created task " << task_name << " for value " << i << std::endl;
                                 }
@@ -2945,12 +2997,23 @@ void Generator::create_and_register_task_function(const std::string& task_name, 
     
     // Bind loop variable if specified
     if (!task_stmt->loopVar.empty()) {
-        // For concurrent tasks, the loop variable should come from register 0 (task context field 0)
-        // not from a hardcoded constant. Register 0 will be set up by the scheduler.
-        Reg loop_var_reg = 0;  // Use register 0 directly
+        // For concurrent tasks, the loop variable should come from register 1 (task context field 1)
+        // not from a hardcoded constant. Register 1 will be set up by the scheduler.
+        Reg loop_var_reg = 1;  // Use register 1 directly
         bind_variable(task_stmt->loopVar, loop_var_reg);
         auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
         set_register_type(loop_var_reg, int_type);
+    }
+    
+    // Bind channel variable if specified
+    if (!task_stmt->channel_param.empty()) {
+        // For concurrent tasks, the channel should come from register 2 (task context field 2)
+        // Register 2 will be set up by the scheduler.
+        Reg channel_reg = 2;  // Use register 2 directly
+        bind_variable(task_stmt->channel_param, channel_reg);
+        auto channel_type = std::make_shared<::Type>(::TypeTag::Channel);
+        set_register_type(channel_reg, channel_type);
+        std::cout << "[DEBUG] Bound channel variable '" << task_stmt->channel_param << "' to register " << channel_reg << std::endl;
     }
     
     // Emit task body
@@ -3029,14 +3092,14 @@ void Generator::emit_task_init_and_step(AST::TaskStatement& task, size_t task_id
     Reg task_id_reg = allocate_register();
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, task_id_reg, task_id_val));
     set_register_type(task_id_reg, int_type);
-    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, 0, task_context_reg, task_id_reg, 0));
+    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, task_id_reg, task_context_reg, 0, 0));
     
     // Set loop variable value in context (field 1)
     ValuePtr loop_var_val = std::make_shared<Value>(int_type, int64_t(loop_var_value));
     Reg loop_var_reg = allocate_register();
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, loop_var_reg, loop_var_val));
     set_register_type(loop_var_reg, int_type);
-    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, 0, task_context_reg, loop_var_reg, 1));
+    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, loop_var_reg, task_context_reg, 0, 1));
     
     // Bind the loop variable in the current scope
     if (!task.loopVar.empty()) {
@@ -3044,14 +3107,14 @@ void Generator::emit_task_init_and_step(AST::TaskStatement& task, size_t task_id
     }
     
     // Set channel index in context (field 2)
-    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, 0, task_context_reg, channel_reg, 2));
+    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, channel_reg, task_context_reg, 0, 2));
     
     // Load current shared counter value and set it in context (field 3)
     Reg current_counter_reg = allocate_register();
     // Load current shared counter from global storage
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, current_counter_reg, 
                               std::make_shared<Value>(int_type, int64_t(0))));
-    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, 0, task_context_reg, current_counter_reg, 3));
+    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, current_counter_reg, task_context_reg, 0, 3));
     
     // Instead of copying task function instructions, store the task function name
     // The scheduler will call the task function directly from the FunctionRegistry

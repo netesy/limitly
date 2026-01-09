@@ -589,11 +589,30 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
 
                 std::cout << "[DEBUG] TaskSetField: context_id=" << context_id << " field_index=" << field_index << " imm=" << pc->imm << " value_reg=" << pc->dst << std::endl;
 
+                // Check if context exists in scheduler first, then in task_contexts
                 if (context_id < scheduler->fibers.size()) {
                     auto& fiber = scheduler->fibers[context_id];
-                    fiber->task_context->fields[field_index] = field_value;
-                    registers[pc->dst] = static_cast<int64_t>(1);
+                    if (fiber->task_context) {
+                        fiber->task_context->fields[field_index] = field_value;
+                        std::cout << "[DEBUG] Set field " << field_index << " in task context " << context_id << " (scheduler fiber)" << std::endl;
+                        registers[pc->dst] = static_cast<int64_t>(1);
+                    } else {
+                        std::cout << "[DEBUG] Task context " << context_id << " is null (scheduler fiber)" << std::endl;
+                        registers[pc->dst] = static_cast<int64_t>(0);
+                    }
+                } else if (context_id < task_contexts.size()) {
+                    // Task context exists but not yet in scheduler
+                    auto& ctx = task_contexts[context_id];
+                    if (ctx) {
+                        ctx->fields[field_index] = field_value;
+                        std::cout << "[DEBUG] Set field " << field_index << " in task context " << context_id << " (pre-scheduler)" << std::endl;
+                        registers[pc->dst] = static_cast<int64_t>(1);
+                    } else {
+                        std::cout << "[DEBUG] Task context " << context_id << " is null (pre-scheduler)" << std::endl;
+                        registers[pc->dst] = static_cast<int64_t>(0);
+                    }
                 } else {
+                    std::cout << "[DEBUG] Context ID " << context_id << " out of range, max: " << task_contexts.size() << std::endl;
                     registers[pc->dst] = static_cast<int64_t>(0);
                 }
                 break;
@@ -660,6 +679,10 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                         auto func_name_it = fiber->task_context->fields.find(4);
                         if (func_name_it == fiber->task_context->fields.end()) {
                             std::cerr << "[ERROR] Task function name not found in task context" << std::endl;
+                            std::cerr << "[DEBUG] Task context has " << fiber->task_context->fields.size() << " fields:" << std::endl;
+                            for (const auto& field : fiber->task_context->fields) {
+                                std::cerr << "[DEBUG] Field " << field.first << " type: " << field.second.index() << std::endl;
+                            }
                             fiber->state = FiberState::COMPLETED;
                             continue;
                         }
@@ -668,8 +691,9 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                         std::string task_func_name;
                         if (std::holds_alternative<std::string>(func_name_it->second)) {
                             task_func_name = std::get<std::string>(func_name_it->second);
+                            std::cout << "[DEBUG] Found task function name: '" << task_func_name << "'" << std::endl;
                         } else {
-                            std::cerr << "[ERROR] Task function name is not a string" << std::endl;
+                            std::cerr << "[ERROR] Task function name is not a string, type index: " << func_name_it->second.index() << std::endl;
                             fiber->state = FiberState::COMPLETED;
                             continue;
                         }
