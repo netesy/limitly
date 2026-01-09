@@ -368,6 +368,90 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 }
                 break;
             }
+            case LIR::LIR_Op::CmpLT: {
+                const RegisterValue* temp_a = &registers[pc->a];
+                const RegisterValue* temp_b = &registers[pc->b];
+                if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
+                    if (std::holds_alternative<double>(*temp_a) || std::holds_alternative<double>(*temp_b)) {
+                        registers[pc->dst] = to_float(*temp_a) < to_float(*temp_b);
+                    } else {
+                        registers[pc->dst] = to_int(*temp_a) < to_int(*temp_b);
+                    }
+                } else {
+                    registers[pc->dst] = to_string(*temp_a) < to_string(*temp_b);
+                }
+                break;
+            }
+            case LIR::LIR_Op::CmpLE: {
+                const RegisterValue* temp_a = &registers[pc->a];
+                const RegisterValue* temp_b = &registers[pc->b];
+                if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
+                    if (std::holds_alternative<double>(*temp_a) || std::holds_alternative<double>(*temp_b)) {
+                        registers[pc->dst] = to_float(*temp_a) <= to_float(*temp_b);
+                    } else {
+                        registers[pc->dst] = to_int(*temp_a) <= to_int(*temp_b);
+                    }
+                } else {
+                    registers[pc->dst] = to_string(*temp_a) <= to_string(*temp_b);
+                }
+                break;
+            }
+            case LIR::LIR_Op::CmpGT: {
+                const RegisterValue* temp_a = &registers[pc->a];
+                const RegisterValue* temp_b = &registers[pc->b];
+                if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
+                    if (std::holds_alternative<double>(*temp_a) || std::holds_alternative<double>(*temp_b)) {
+                        registers[pc->dst] = to_float(*temp_a) > to_float(*temp_b);
+                    } else {
+                        registers[pc->dst] = to_int(*temp_a) > to_int(*temp_b);
+                    }
+                } else {
+                    registers[pc->dst] = to_string(*temp_a) > to_string(*temp_b);
+                }
+                break;
+            }
+            case LIR::LIR_Op::CmpGE: {
+                const RegisterValue* temp_a = &registers[pc->a];
+                const RegisterValue* temp_b = &registers[pc->b];
+                if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
+                    if (std::holds_alternative<double>(*temp_a) || std::holds_alternative<double>(*temp_b)) {
+                        registers[pc->dst] = to_float(*temp_a) >= to_float(*temp_b);
+                    } else {
+                        registers[pc->dst] = to_int(*temp_a) >= to_int(*temp_b);
+                    }
+                } else {
+                    registers[pc->dst] = to_string(*temp_a) >= to_string(*temp_b);
+                }
+                break;
+            }
+            case LIR::LIR_Op::CmpEQ: {
+                const RegisterValue* temp_a = &registers[pc->a];
+                const RegisterValue* temp_b = &registers[pc->b];
+                if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
+                    if (std::holds_alternative<double>(*temp_a) || std::holds_alternative<double>(*temp_b)) {
+                        registers[pc->dst] = to_float(*temp_a) == to_float(*temp_b);
+                    } else {
+                        registers[pc->dst] = to_int(*temp_a) == to_int(*temp_b);
+                    }
+                } else {
+                    registers[pc->dst] = to_string(*temp_a) == to_string(*temp_b);
+                }
+                break;
+            }
+            case LIR::LIR_Op::CmpNEQ: {
+                const RegisterValue* temp_a = &registers[pc->a];
+                const RegisterValue* temp_b = &registers[pc->b];
+                if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
+                    if (std::holds_alternative<double>(*temp_a) || std::holds_alternative<double>(*temp_b)) {
+                        registers[pc->dst] = to_float(*temp_a) != to_float(*temp_b);
+                    } else {
+                        registers[pc->dst] = to_int(*temp_a) != to_int(*temp_b);
+                    }
+                } else {
+                    registers[pc->dst] = to_string(*temp_a) != to_string(*temp_b);
+                }
+                break;
+            }
             case LIR::LIR_Op::Jump: {
                 pc = function.instructions.data() + (pc->imm);
                 if (pc >= end) return;
