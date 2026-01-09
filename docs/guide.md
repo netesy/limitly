@@ -35,7 +35,7 @@ Welcome to the official guide for the Limit programming language. This document 
     *   [Class Members and Modifiers](#class-members-and-modifiers)
     *   [Fields and Methods](#fields-and-methods)
     *   [The `init` Constructor](#the-init-constructor)
-    *   [The `self` Keyword](#the-self-keyword)
+    *   [The `this` Keyword](#the-this-keyword)
     *   [Inheritance](#inheritance)
     *   [Method Overriding](#method-overriding)
     *   [The `super` Keyword](#the-super-keyword)
@@ -189,6 +189,7 @@ Limit has several built-in primitive types:
 
 ```
 var my_integer: int = 42;
+var my_uint: uint = 100;
 var my_float: float = 3.14;
 var my_boolean: bool = true;
 var my_string: str = "Hello, Limit!";
@@ -335,7 +336,6 @@ iter (i in 0..10..2) {
     print("i = {i}"); // Output: 0, 2, 4, 6, 8
 }
 ```
-> **Note:** The step value feature is planned but not yet fully implemented in the parser.
 
 ### Ternary Operator
 
@@ -346,7 +346,6 @@ var x = 10;
 var result = x > 5 ? "Greater than 5" : "Not greater than 5";
 print(result); // Output: Greater than 5
 ```
-> **Note:** The ternary operator is planned but not yet implemented in the parser.
 
 ### Match Statements
 
@@ -678,7 +677,7 @@ class Greeter {
     var name: str = "World";
 
     fn say_hello() {
-        print("Hello, {self.name}!");
+        print("Hello, {this.name}!");
     }
 }
 
@@ -740,11 +739,11 @@ class Circle : Shape {
     var radius: float;
 
     fn init(r: float) {
-        self.radius = r;
+        this.radius = r;
     }
 
     fn area(): float {
-        return 3.14 * self.radius * self.radius;
+        return 3.14 * this.radius * this.radius;
     }
 }
 ```
@@ -789,12 +788,12 @@ class Person {
     var age: int;
 
     fn init(name_param: str, age_param: int) {
-        self.name = name_param;
-        self.age = age_param;
+        this.name = name_param;
+        this.age = age_param;
     }
 
     fn introduce() {
-        print("Hi, I'm {self.name} and I'm {self.age} years old.");
+        print("Hi, I'm {this.name} and I'm {this.age} years old.");
     }
 }
 
@@ -802,9 +801,9 @@ var person: Person = Person("Jules", 28);
 person.introduce(); // Output: Hi, I'm Jules and I'm 28 years old.
 ```
 
-### The `self` Keyword
+### The `this` Keyword
 
-The `self` keyword refers to the current instance of the class. It is used to access the instance's fields and methods.
+The `this` keyword refers to the current instance of the class. It is used to access the instance's fields and methods.
 
 ### Inheritance
 
