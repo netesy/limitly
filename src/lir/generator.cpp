@@ -2893,6 +2893,103 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
                             }
                         }
                     }
+                } else if (auto worker_stmt = dynamic_cast<AST::WorkerStatement*>(body_stmt.get())) {
+                    // Handle worker statement: worker(item from jobs) or worker(item in jobs)
+                    std::cout << "[DEBUG] Processing worker statement with param '" << worker_stmt->paramName << "'" << std::endl;
+                    
+                    // Set channel parameter for this worker to use main channel
+                    worker_stmt->channel_param = stmt.channel;
+                    std::cout << "[DEBUG] Set worker channel_param to: " << worker_stmt->channel_param << std::endl;
+                    
+                    // Handle worker iteration
+                    if (worker_stmt->iterable) {
+                        std::cout << "[DEBUG] Worker has iterable, processing..." << std::endl;
+                        std::cout << "[DEBUG] About to evaluate iterable expression" << std::endl;
+                        
+                        // For now, create a single worker task that will handle iteration
+                        // In a full implementation, this would create multiple workers based on cores
+                        std::string worker_name = "worker_" + std::to_string(worker_counter_++);
+                        std::cout << "[DEBUG] Generated worker name: " << worker_name << std::endl;
+                        
+                        // Create worker function
+                        std::cout << "[DEBUG] About to create worker function" << std::endl;
+                        create_and_register_worker_function(worker_name, worker_stmt);
+                        std::cout << "[DEBUG] Worker function created and registered" << std::endl;
+                        
+                        // Add worker to scheduler
+                        std::cout << "[DEBUG] About to add worker to scheduler" << std::endl;
+                        Reg worker_context_reg = allocate_register();
+                        Reg context_id_reg = allocate_register();
+                        emit_instruction(LIR_Inst(LIR_Op::TaskContextAlloc, worker_context_reg, 1, 0));
+                        std::cout << "[DEBUG] Task context allocated" << std::endl;
+                        
+                        // Store context_id for later use in TaskSetField calls
+                        emit_instruction(LIR_Inst(LIR_Op::Mov, context_id_reg, worker_context_reg, 0));
+                        
+                        // Set worker ID in field 0
+                        Reg worker_id_reg = allocate_register();
+                        auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
+                        ValuePtr worker_id_val = std::make_shared<Value>(int_type, static_cast<int64_t>(0));
+                        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, worker_id_reg, worker_id_val));
+                        emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, worker_id_reg, context_id_reg, 0, 0));
+                        std::cout << "[DEBUG] Worker ID set" << std::endl;
+                        
+                        // Set iterable (channel/array) in field 1 - evaluate iterable expression
+                        std::cout << "[DEBUG] About to evaluate iterable expression" << std::endl;
+                        Reg iterable_reg = emit_expr(*worker_stmt->iterable);
+                        std::cout << "[DEBUG] Iterable expression evaluated to register: " << iterable_reg << std::endl;
+                        emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, iterable_reg, context_id_reg, 0, 1));
+                        std::cout << "[DEBUG] Iterable field set" << std::endl;
+                        
+                        // Set channel register (use a fresh register to avoid overwriting channel_reg)
+                        Reg channel_copy_reg = allocate_register();
+                        emit_instruction(LIR_Inst(LIR_Op::Mov, channel_copy_reg, channel_reg, 0));
+                        emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, channel_copy_reg, context_id_reg, 0, 2));
+                        std::cout << "[DEBUG] Channel field set" << std::endl;
+                        
+                        // Set worker function name in field 4
+                        Reg worker_name_reg = allocate_register();
+                        auto string_type = std::make_shared<::Type>(::TypeTag::String);
+                        ValuePtr worker_name_val = std::make_shared<Value>(string_type, worker_name);
+                        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, worker_name_reg, worker_name_val));
+                        emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, worker_name_reg, context_id_reg, 0, 4));
+                        std::cout << "[DEBUG] Worker function name field set" << std::endl;
+                        
+                        // Add worker to scheduler
+                        emit_instruction(LIR_Inst(LIR_Op::SchedulerAddTask, Type::Void, context_id_reg, worker_context_reg, 0));
+                        std::cout << "[DEBUG] Worker added to scheduler" << std::endl;
+                    } else {
+                        std::cout << "[DEBUG] Worker has no iterable, creating single worker" << std::endl;
+                        // Handle worker without iterable (single execution)
+                        std::string worker_name = "worker_" + std::to_string(worker_counter_++);
+                        create_and_register_worker_function(worker_name, worker_stmt);
+                        
+                        // Add to scheduler similar to above but without iterable
+                        Reg worker_context_reg = allocate_register();
+                        Reg context_id_reg = allocate_register();
+                        emit_instruction(LIR_Inst(LIR_Op::TaskContextAlloc, worker_context_reg, 0, 0));
+                        emit_instruction(LIR_Inst(LIR_Op::Mov, context_id_reg, worker_context_reg, 0));
+                        
+                        Reg worker_id_reg = allocate_register();
+                        auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
+                        ValuePtr worker_id_val = std::make_shared<Value>(int_type, static_cast<int64_t>(0));
+                        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, worker_id_reg, worker_id_val));
+                        emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, worker_id_reg, context_id_reg, 0, 0));
+                        
+                        Reg channel_copy_reg = allocate_register();
+                        emit_instruction(LIR_Inst(LIR_Op::Mov, channel_copy_reg, channel_reg, 0));
+                        emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, channel_copy_reg, context_id_reg, 0, 2));
+                        
+                        Reg worker_name_reg = allocate_register();
+                        auto string_type = std::make_shared<::Type>(::TypeTag::String);
+                        ValuePtr worker_name_val = std::make_shared<Value>(string_type, worker_name);
+                        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, worker_name_reg, worker_name_val));
+                        emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, worker_name_reg, context_id_reg, 0, 4));
+                        
+                        emit_instruction(LIR_Inst(LIR_Op::SchedulerAddTask, Type::Void, context_id_reg, worker_context_reg, 0));
+                        std::cout << "[DEBUG] Single worker added to scheduler" << std::endl;
+                    }
+                    std::cout << "[DEBUG] Worker processing completed" << std::endl;
                 } else {
                     // For non-task statements, emit directly
                     emit_stmt(*body_stmt);
@@ -3030,6 +3127,81 @@ void Generator::create_and_register_task_function(const std::string& task_name, 
     cfg_context_.current_block = saved_current_block;
     
     std::cout << "[DEBUG] Task function " << task_name << " registered" << std::endl;
+}
+
+void Generator::create_and_register_worker_function(const std::string& worker_name, AST::WorkerStatement* worker_stmt) {
+    std::cout << "[DEBUG] Creating worker function: " << worker_name << std::endl;
+    std::cout << "[DEBUG] Worker param name: '" << worker_stmt->paramName << "'" << std::endl;
+    std::cout << "[DEBUG] Worker has iterable: " << (worker_stmt->iterable ? "YES" : "NO") << std::endl;
+    std::cout << "[DEBUG] Worker channel_param: '" << worker_stmt->channel_param << "'" << std::endl;
+    
+    // Save current context
+    auto saved_function = std::move(current_function_);
+    auto saved_cfg_context = cfg_context_;
+    auto saved_current_block = cfg_context_.current_block;
+    
+    // Create new worker function
+    current_function_ = std::make_unique<LIR_Function>(worker_name, 0);
+    cfg_context_.building_cfg = false;
+    cfg_context_.current_block = nullptr;
+    
+    // Initialize worker function
+    enter_scope();
+    
+    // Bind worker parameter name if specified
+    if (!worker_stmt->paramName.empty()) {
+        // For concurrent workers, parameter should come from register 1 (task context field 1)
+        // which will contain the current item from iteration
+        Reg param_reg = 1;  // Use register 1 directly
+        bind_variable(worker_stmt->paramName, param_reg);
+        auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
+        set_register_type(param_reg, int_type);
+        std::cout << "[DEBUG] Bound worker parameter '" << worker_stmt->paramName << "' to register " << param_reg << std::endl;
+    }
+    
+    // Bind channel variable if specified
+    if (!worker_stmt->channel_param.empty()) {
+        // For concurrent workers, channel should come from register 2 (task context field 2)
+        Reg channel_reg = 2;  // Use register 2 directly
+        bind_variable(worker_stmt->channel_param, channel_reg);
+        auto channel_type = std::make_shared<::Type>(::TypeTag::Channel);
+        set_register_type(channel_reg, channel_type);
+        std::cout << "[DEBUG] Bound channel variable '" << worker_stmt->channel_param << "' to register " << channel_reg << std::endl;
+    }
+    
+    // Bind iterable if available (for worker iteration logic)
+    if (worker_stmt->iterable) {
+        // Iterable should be available in register 1 (same as parameter for iteration)
+        // This allows the worker to access the source iterable for iteration
+        Reg iterable_reg = 1;  // Use register 1 for iterable access
+        auto iterable_type = std::make_shared<::Type>(::TypeTag::Channel); // Default to channel type
+        set_register_type(iterable_reg, iterable_type);
+        std::cout << "[DEBUG] Bound iterable to register " << iterable_reg << std::endl;
+    }
+    
+    // Emit worker body
+    if (worker_stmt->body) {
+        std::cout << "[DEBUG] About to emit worker body with " << worker_stmt->body->statements.size() << " statements" << std::endl;
+        emit_stmt(*worker_stmt->body);
+        std::cout << "[DEBUG] Worker body emitted successfully" << std::endl;
+    }
+    
+    // Add return to worker function
+    emit_instruction(LIR_Inst(LIR_Op::Ret, Type::Void, 0, 0, 0));
+    
+    // Restore context
+    exit_scope();
+    
+    // Register worker function
+    auto& func_registry = LIR::FunctionRegistry::getInstance();
+    func_registry.registerFunction(worker_name, std::move(current_function_));
+    
+    // Restore previous context
+    current_function_ = std::move(saved_function);
+    cfg_context_ = saved_cfg_context;
+    cfg_context_.current_block = saved_current_block;
+    
+    std::cout << "[DEBUG] Worker function " << worker_name << " registered" << std::endl;
 }
 
 void Generator::emit_task_stmt(AST::TaskStatement& stmt) {
@@ -3985,6 +4157,17 @@ void Generator::lower_worker_body(AST::WorkerStatement& stmt) {
     // Bind worker parameter name if specified
     if (!stmt.paramName.empty()) {
         bind_variable(stmt.paramName, static_cast<Reg>(1)); // Use loop_var register for worker parameter
+    }
+    
+    // Bind iterable if available for iteration
+    if (stmt.iterable) {
+        // For workers with iterables, we need to set up iteration logic
+        // The iterable will be passed in register 1, and we'll need to iterate over it
+        std::cout << "[DEBUG] Worker has iterable, setting up iteration" << std::endl;
+        
+        // For now, bind the iterable to a special variable that the worker can access
+        // In a full implementation, this would involve proper iteration setup
+        bind_variable("_iterable", static_cast<Reg>(1));
     }
     
     // Emit worker body from AST

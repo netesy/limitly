@@ -180,6 +180,7 @@ private:
     void emit_task_init_and_step(AST::TaskStatement& task, size_t task_id, Reg contexts_reg, Reg channel_reg, Reg counter_reg, int64_t loop_var_value = 0);
     void emit_task_stmt(AST::TaskStatement& stmt);
     void create_and_register_task_function(const std::string& task_name, AST::TaskStatement* task_stmt, int64_t loop_value);
+    void create_and_register_worker_function(const std::string& worker_name, AST::WorkerStatement* worker_stmt);
     void create_parallel_work_item(const std::string& work_item_name, std::shared_ptr<AST::Statement> stmt);
     void collect_variables_from_statement(AST::Statement& stmt, std::set<std::string>& variables);
     void collect_variables_from_expression(AST::Expression& expr, std::set<std::string>& variables);
@@ -227,6 +228,8 @@ private:
     
     // Task counter for generating unique task function names
     size_t task_counter_ = 0;
+    // Worker counter for generating unique worker function names
+    size_t worker_counter_ = 0;
     uint32_t next_register_ = 0;
     uint32_t next_label_ = 0;
     std::map<std::string, TypePtr> variable_types_;

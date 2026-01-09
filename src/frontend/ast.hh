@@ -561,6 +561,7 @@ namespace AST {
         std::shared_ptr<Expression> iterable; // Source iterable (array, channel, etc.)
         std::shared_ptr<BlockStatement> body;
         std::string worker_function_name; // Generated function name for LIR
+        std::string channel_param; // Channel parameter name (e.g., "ch" in "ch=counts")
     };
 
     // Await expression
