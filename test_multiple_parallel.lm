@@ -1,8 +1,8 @@
 // Test multiple parallel blocks to ensure proper cleanup
 print("=== Multiple Parallel Blocks Test ===");
 
-var counter1: int = 0;
-var counter2: int = 0;
+var counter1: int = 1;
+var counter2: int = 1;
 
 print("Initial counters:");
 print("Counter1:", counter1);
@@ -22,7 +22,7 @@ print("Counter1:", counter1);
 
 // Second parallel block
 parallel {
-    iter (i in 1..2) {
+    iter (i in 1..4) {
         print("Block 2 - Task", i, "starting");
         counter2 = counter2 + 1;
         print("Block 2 - Task", i, "done, counter2 =", counter2);

@@ -2833,15 +2833,12 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
         if (auto block_stmt = dynamic_cast<AST::BlockStatement*>(stmt.body.get())) {
             for (auto& body_stmt : block_stmt->statements) {
                 if (auto task_stmt = dynamic_cast<AST::TaskStatement*>(body_stmt.get())) {
-                    // Set the channel parameter for this task
+                    // Set the channel parameter for this task to use main channel
                     task_stmt->channel_param = stmt.channel;
-                    std::cout << "[DEBUG] Set channel_param '" << stmt.channel << "' for task" << std::endl;
                     
                     // Handle range iteration: task(i in 1..4)
                     if (task_stmt->iterable) {
                         if (auto range_expr = dynamic_cast<AST::RangeExpr*>(task_stmt->iterable.get())) {
-                            std::cout << "[DEBUG] Found range iteration" << std::endl;
-                            
                             // Evaluate range bounds
                             auto start_val = evaluate_constant_expression(range_expr->start);
                             auto end_val = evaluate_constant_expression(range_expr->end);
@@ -2849,8 +2846,6 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
                             if (start_val && end_val) {
                                 int64_t start = std::stoll((*start_val)->data);
                                 int64_t end = std::stoll((*end_val)->data);
-                                
-                                std::cout << "[DEBUG] Range: " << start << " to " << end << std::endl;
                                 
                                 // Create task for each value in range
                                 for (int64_t i = start; i <= end; ++i) {
@@ -2871,7 +2866,6 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
                                     Reg task_id_reg = allocate_register();
                                     auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
                                     ValuePtr task_id_val = std::make_shared<Value>(int_type, i);
-                                    std::cout << "[DEBUG] Creating task ID value: " << i << " for task " << task_name << std::endl;
                                     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, task_id_reg, task_id_val));
                                     emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, task_id_reg, context_id_reg, 0, 0));
                                     
@@ -2881,21 +2875,20 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
                                     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, loop_var_reg, loop_var_val));
                                     emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, loop_var_reg, context_id_reg, 0, 1));
                                     
-                                    // Set channel register
-                                    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, channel_reg, context_id_reg, 0, 2));
+                                    // Set channel register (use a fresh register to avoid overwriting channel_reg)
+                                    Reg channel_copy_reg = allocate_register();
+                                    emit_instruction(LIR_Inst(LIR_Op::Mov, channel_copy_reg, channel_reg, 0));
+                                    emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, channel_copy_reg, context_id_reg, 0, 2));
                                     
                                     // Set task function name in field 4
                                     Reg task_name_reg = allocate_register();
                                     auto string_type = std::make_shared<::Type>(::TypeTag::String);
                                     ValuePtr task_name_val = std::make_shared<Value>(string_type, task_name);
-                                    std::cout << "[DEBUG] Setting task function name: '" << task_name << "' in field 4" << std::endl;
                                     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, task_name_reg, task_name_val));
                                     emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, task_name_reg, context_id_reg, 0, 4));
                                     
                                     // Add task to scheduler
                                     emit_instruction(LIR_Inst(LIR_Op::SchedulerAddTask, Type::Void, context_id_reg, task_context_reg, 0));
-                                    
-                                    std::cout << "[DEBUG] Created task " << task_name << " for value " << i << std::endl;
                                 }
                             }
                         }
@@ -3234,7 +3227,7 @@ void Generator::emit_iter_stmt(AST::IterStatement& stmt) {
         enter_loop();
         set_loop_labels(header_block->id, exit_block->id, 0);
 
-        // Get the channel variable
+        // Get channel variable
         Reg channel_reg = resolve_variable(var_expr->name);
         if (channel_reg == UINT32_MAX) {
             report_error("Undefined variable: " + var_expr->name);
@@ -3250,20 +3243,32 @@ void Generator::emit_iter_stmt(AST::IterStatement& stmt) {
         add_block_edge(get_current_block(), header_block);
 
         set_current_block(header_block);
-        // Check if channel has data
-        Reg has_data_reg = allocate_register();
-        emit_instruction(LIR_Inst(LIR_Op::ChannelHasData, has_data_reg, channel_reg, 0));
-        set_register_type(has_data_reg, std::make_shared<::Type>(::TypeTag::Bool));
+        // Non-blocking channel poll
+        Reg poll_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::ChannelPoll, poll_reg, channel_reg, 0));
+        set_register_type(poll_reg, std::make_shared<::Type>(::TypeTag::Any));
         
-        // Jump to exit if no data
-        emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, has_data_reg, 0, exit_block->id));
+        // Create nil constant for comparison
+        Reg nil_reg = allocate_register();
+        auto nil_type = std::make_shared<::Type>(::TypeTag::Nil);
+        ValuePtr nil_val = std::make_shared<Value>(nil_type, std::string("nil"));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, nil_reg, nil_val));
+        set_register_type(nil_reg, nil_type);
+        
+        // Compare poll result with nil
+        Reg is_nil_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::CmpEQ, is_nil_reg, poll_reg, nil_reg));
+        set_register_type(is_nil_reg, std::make_shared<::Type>(::TypeTag::Bool));
+        
+        // Jump to exit if poll result is nil (channel empty/closed)
+        emit_instruction(LIR_Inst(LIR_Op::JumpIf, 0, is_nil_reg, 0, exit_block->id));
         add_block_edge(header_block, body_block);
         add_block_edge(header_block, exit_block);
 
         set_current_block(body_block);
-        // Pop value from channel
-        emit_instruction(LIR_Inst(LIR_Op::ChannelPop, loop_var_reg, channel_reg, 0));
-        set_register_type(loop_var_reg, std::make_shared<::Type>(::TypeTag::Int64));
+        // Use the polled value
+        emit_instruction(LIR_Inst(LIR_Op::Mov, loop_var_reg, poll_reg, 0));
+        set_register_type(loop_var_reg, std::make_shared<::Type>(::TypeTag::Any));
         
         // Execute loop body
         if (stmt.body) {

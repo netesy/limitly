@@ -617,16 +617,14 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 uint64_t count = static_cast<uint64_t>(pc->a);
                 uint64_t start_context_id = task_contexts.size();
                 
-                std::cout << "[DEBUG] OP_TASK_CONTEXT_ALLOC called with count: " << count << std::endl;
-                std::cout << "[DEBUG] Starting context ID: " << start_context_id << std::endl;
+
                 
                 for (uint64_t i = 0; i < count; i++) {
                     auto task_ctx = std::make_unique<TaskContext>();
                     task_contexts.push_back(std::move(task_ctx));
-                    std::cout << "[DEBUG] Created task context " << (start_context_id + i) << std::endl;
+
                 }
                 
-                std::cout << "[DEBUG] Total task_contexts.size(): " << task_contexts.size() << std::endl;
                 registers[pc->dst] = static_cast<int64_t>(start_context_id);
                 break;
             }
@@ -671,17 +669,16 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                     field_index = static_cast<int>(pc->imm);
                 }
 
-                std::cout << "[DEBUG] TaskSetField: context_id=" << context_id << " field_index=" << field_index << " imm=" << pc->imm << " value_reg=" << pc->dst << std::endl;
 
                 // Check if context exists in scheduler first, then in task_contexts
                 if (context_id < scheduler->fibers.size()) {
                     auto& fiber = scheduler->fibers[context_id];
                     if (fiber->task_context) {
                         fiber->task_context->fields[field_index] = field_value;
-                        std::cout << "[DEBUG] Set field " << field_index << " in task context " << context_id << " (scheduler fiber)" << std::endl;
+
                         registers[pc->dst] = static_cast<int64_t>(1);
                     } else {
-                        std::cout << "[DEBUG] Task context " << context_id << " is null (scheduler fiber)" << std::endl;
+
                         registers[pc->dst] = static_cast<int64_t>(0);
                     }
                 } else if (context_id < task_contexts.size()) {
@@ -689,14 +686,14 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                     auto& ctx = task_contexts[context_id];
                     if (ctx) {
                         ctx->fields[field_index] = field_value;
-                        std::cout << "[DEBUG] Set field " << field_index << " in task context " << context_id << " (pre-scheduler)" << std::endl;
+
                         registers[pc->dst] = static_cast<int64_t>(1);
                     } else {
-                        std::cout << "[DEBUG] Task context " << context_id << " is null (pre-scheduler)" << std::endl;
+
                         registers[pc->dst] = static_cast<int64_t>(0);
                     }
                 } else {
-                    std::cout << "[DEBUG] Context ID " << context_id << " out of range, max: " << task_contexts.size() << std::endl;
+
                     registers[pc->dst] = static_cast<int64_t>(0);
                 }
                 break;
@@ -718,35 +715,26 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             }
             case LIR::LIR_Op::SchedulerInit: {
                 scheduler = std::make_unique<Scheduler>();
-                std::cout << "[DEBUG] Scheduler initialized" << std::endl;
-                registers[pc->dst] = static_cast<int64_t>(1);
                 break;
             }
             case LIR::LIR_Op::SchedulerAddTask: {
                 uint64_t context_id = static_cast<uint64_t>(to_int(registers[pc->a]));
-                std::cout << "[DEBUG] OP_SCHEDULER_ADD_TASK called with context_id: " << context_id << std::endl;
-                std::cout << "[DEBUG] task_contexts.size(): " << task_contexts.size() << std::endl;
-
                 if (context_id < task_contexts.size()) {
                     TaskContext* ctx = task_contexts[context_id].get();
                     if (ctx) {
-                        // Copy task context to the scheduler
+                        // Copy task context to scheduler
                         scheduler->add_fiber(std::make_unique<TaskContext>(*ctx));
-                        std::cout << "[DEBUG] Added task " << context_id << " to scheduler" << std::endl;
-                        std::cout << "[DEBUG] Scheduler now has " << scheduler->fibers.size() << " tasks" << std::endl;
                         registers[pc->dst] = static_cast<int64_t>(1);
                     } else {
-                        std::cout << "[DEBUG] Task context " << context_id << " is null" << std::endl;
                         registers[pc->dst] = static_cast<int64_t>(0);
                     }
                 } else {
-                    std::cout << "[DEBUG] Context ID " << context_id << " out of range (max: " << task_contexts.size() - 1 << ")" << std::endl;
                     registers[pc->dst] = static_cast<int64_t>(0);
                 }
                 break;
             }
             case LIR::LIR_Op::SchedulerRun: {
-                std::cout << "[DEBUG] Scheduler running with " << scheduler->fibers.size() << " tasks" << std::endl;
+
 
                 // Execute all running tasks (they should already be in scheduler via OP_SCHEDULER_ADD_TASK)
                 for (size_t i = 0; i < scheduler->fibers.size(); ++i) {
@@ -757,7 +745,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                     }
 
                     if (fiber->state == FiberState::RUNNING) {
-                        std::cout << "[DEBUG] Executing task " << (fiber->fiber_id + 1) << std::endl;
+
 
                         // Get task function name from task context field 4
                         auto func_name_it = fiber->task_context->fields.find(4);
@@ -775,7 +763,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                         std::string task_func_name;
                         if (std::holds_alternative<std::string>(func_name_it->second)) {
                             task_func_name = std::get<std::string>(func_name_it->second);
-                            std::cout << "[DEBUG] Found task function name: '" << task_func_name << "'" << std::endl;
+
                         } else {
                             std::cerr << "[ERROR] Task function name is not a string, type index: " << func_name_it->second.index() << std::endl;
                             fiber->state = FiberState::COMPLETED;
@@ -791,7 +779,6 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                             continue;
                         }
 
-                        std::cout << "Task " << (fiber->fiber_id + 1) << " calling function: " << task_func_name << std::endl;
 
                         // Save current register state
                         auto saved_registers = registers;
@@ -833,7 +820,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                         current_function_ = nullptr;
                         
                         fiber->state = FiberState::COMPLETED;
-                        std::cout << "[DEBUG] Task " << (fiber->fiber_id + 1) << " completed" << std::endl;
+
                     }
                 }
                 
@@ -856,12 +843,10 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 break;
             }
             case LIR::LIR_Op::ParallelInit: {
-                std::cout << "[DEBUG] Parallel execution initialized" << std::endl;
                 registers[pc->dst] = static_cast<int64_t>(1);
                 break;
             }
             case LIR::LIR_Op::ParallelSync: {
-                std::cout << "[DEBUG] Parallel execution synchronized" << std::endl;
                 registers[pc->dst] = static_cast<int64_t>(1);
                 break;
             }
@@ -870,7 +855,6 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 uint32_t cell_id = next_cell_id++;
                 
                 shared_cells[cell_id] = std::make_unique<SharedCell>(cell_id, 0);
-                std::cout << "[DEBUG] Allocated SharedCell ID " << cell_id << std::endl;
                 registers[pc->dst] = static_cast<int64_t>(cell_id);
                 break;
             }
@@ -880,9 +864,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 if (shared_cells.find(cell_id) != shared_cells.end()) {
                     int64_t value = shared_cells[cell_id]->value.load();
                     registers[pc->dst] = value;
-                    std::cout << "[DEBUG] Loaded " << value << " from SharedCell " << cell_id << std::endl;
                 } else {
-                    std::cerr << "[ERROR] SharedCell ID " << cell_id << " not found" << std::endl;
                     registers[pc->dst] = static_cast<int64_t>(0);
                 }
                 break;
@@ -893,10 +875,8 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 
                 if (shared_cells.find(cell_id) != shared_cells.end()) {
                     shared_cells[cell_id]->value.store(value);
-                    std::cout << "[DEBUG] Stored " << value << " to SharedCell " << cell_id << std::endl;
                     registers[pc->dst] = value;
                 } else {
-                    std::cerr << "[ERROR] SharedCell ID " << cell_id << " not found" << std::endl;
                     registers[pc->dst] = static_cast<int64_t>(0);
                 }
                 break;
@@ -908,8 +888,6 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 if (shared_cells.find(cell_id) != shared_cells.end()) {
                     int64_t old_value = shared_cells[cell_id]->value.fetch_add(value);
                     int64_t new_value = old_value + value;
-                    std::cout << "[DEBUG] Added " << value << " to SharedCell " << cell_id 
-                              << " (old: " << old_value << ", new: " << new_value << ")" << std::endl;
                     registers[pc->dst] = new_value;
                 } else {
                     std::cerr << "[ERROR] SharedCell ID " << cell_id << " not found" << std::endl;
@@ -924,8 +902,6 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 if (shared_cells.find(cell_id) != shared_cells.end()) {
                     int64_t old_value = shared_cells[cell_id]->value.fetch_sub(value);
                     int64_t new_value = old_value - value;
-                    std::cout << "[DEBUG] Subtracted " << value << " from SharedCell " << cell_id 
-                              << " (old: " << old_value << ", new: " << new_value << ")" << std::endl;
                     registers[pc->dst] = new_value;
                 } else {
                     std::cerr << "[ERROR] SharedCell ID " << cell_id << " not found" << std::endl;
