@@ -1,49 +1,49 @@
 print("=== Concurrent Block Tests ===");
 
+
 // ==========================================
-//  Basic concurrent execution (stream mode)
+//  Basic concurrent execution (tasks only)
 // ==========================================
-// concurrent = I/O-bound, uses channels only (no SharedCell)
-var input_events = channel();
 var output_results = channel();
 
-concurrent(ch=input_events, cores=Auto, on_error=Stop,
-           timeout=20s, grace=500ms) {
+concurrent(ch=output_results,
+           cores=Auto,
+           on_error=Stop,
+           timeout=20s,
+           grace=500ms) {
+
     task(i in 1..3) {
         print("Concurrent task {i} running");
-        sleep(randint(1, 3));
-        output_results.send("Task {i} completed");  // Channel communication only
+        sleep(3.00);
+        output_results.send("Task {i} completed");
     }
-} // auto-close input_events when done
-
-// Feed events to concurrent block
-input_events.send("event1");
-input_events.send("event2");
-input_events.send("event3");
+} // auto-close output_results
 
 iter (result in output_results) {
     print("Received result: {result}");
 }
+
 print("Concurrent block finished");
 
 
 // ==========================================
 //  Stream processing with workers
 // ==========================================
-var stream_in = channel();
 var stream_out = channel();
 
-concurrent(ch=stream_in, cores=4, timeout=15s, grace=500ms) {
-    worker(event) {
-        print("Processing event: {event}");
-        stream_out.send("Handled {event}");  // Channel communication only
-    }
-} // auto-close stream_in
+// input source is a stream, NOT a channel owned by concurrent
+var events = ["info1", "info2", "info3"];  // iterable → stream
 
-// Feed events to stream
-stream_in.send("data1");
-stream_in.send("data2");
-stream_in.send("data3");
+concurrent(ch=stream_out,
+           cores=4,
+           timeout=15s,
+           grace=500ms) {
+
+    worker(event from events) {
+        print("Processing event: {event}");
+        stream_out.send("Handled {event}");
+    }
+} // auto-close stream_out
 
 iter (msg in stream_out) {
     print("Result: {msg}");
@@ -51,39 +51,56 @@ iter (msg in stream_out) {
 
 
 // ==========================================
-//  Concurrent block with channel parameter assignment
+//  Multiple workers, same stream input
 // ==========================================
-var main_channel = channel();
+var results = channel();
+var jobs = channel(); // simple channel instead of jobStream
 
-concurrent(ch=main_channel, cores=2, timeout=10s) {
-    worker(item) {
-        processed = "Processed: {item}";
-        main_channel.send(processed);  // Channel communication only
-    }
+// Use iter to seed the jobs channel
+var job_items = ["job1", "job2", "job3"];
+
+iter (item in job_items) {
+    jobs.send(item);
 }
+jobs.close();
 
-// Feed items to workers
-main_channel.send("item1");
-main_channel.send("item2");
+concurrent(ch=results, cores=2, timeout=10s) {
 
-iter (result in main_channel) {
+    worker(item from jobs) {
+        results.send("Processed: {item}");
+    }
+} // auto-close results
+
+iter (result in results) {
     print("Final result: {result}");
 }
 
 
 // ==========================================
-//  Simple concurrent block with no parameters
+//  Tasks seeding a worker stream
 // ==========================================
-var simple_channel = channel();
+print("=== Tasks seeding a worker stream (seed via iter) ===");
 
-concurrent {
-    worker(data) {
-        simple_channel.send("Worker processed: {data}");  // Channel communication only
+var seeded_results = channel();
+var seed_stream = channel(); // external stream
+
+// Seed the stream using iter outside the concurrent block
+var seeds = ["bootstrap-1", "bootstrap-2"];
+
+iter (item in seeds) {
+    seed_stream.send(item);
+}
+seed_stream.close();  // close so worker knows no more items are coming
+
+// Worker consumes the pre-seeded stream
+concurrent(ch=seeded_results) {
+    worker(x from seed_stream) {
+        seeded_results.send("Handled: {x}");
     }
+} // auto-close seeded_results
+
+iter (msg in seeded_results) {
+    print("Seeded result: {msg}");
 }
 
-simple_channel.send("test_data");
 
-iter (result in simple_channel) {
-    print("Simple result: {result}");
-}

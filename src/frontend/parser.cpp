@@ -861,11 +861,19 @@ std::shared_ptr<AST::Statement> Parser::workerStatement() {
     stmt->line = peek().line;
 
     consume(TokenType::LEFT_PAREN, "Expected '(' after 'worker'.");
-    if (check(TokenType::RIGHT_PAREN)) {
-        // No parameter
-    } else {
-        stmt->param = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
+    
+    // Parse loop variable if present
+    if (check(TokenType::IDENTIFIER)) {
+        stmt->paramName = consume(TokenType::IDENTIFIER, "Expected loop variable name.").lexeme;
+        stmt->param = stmt->paramName; // Keep backward compatibility
+        
+        // Check for 'in' or 'from' keyword
+        if (match({TokenType::IN, TokenType::FROM})) {
+            // Parse the iterable expression (could be a range, list, channel, etc.)
+            stmt->iterable = expression();
+        }
     }
+    
     consume(TokenType::RIGHT_PAREN, "Expected ')' after worker arguments.");
 
     consume(TokenType::LEFT_BRACE, "Expected '{' before worker body.");
