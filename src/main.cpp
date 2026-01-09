@@ -286,91 +286,100 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 std::cout << "Debug mode enabled for register interpreter\n";
             }
             
+            std::cout << "[DEBUG] About to start LIR generation for register interpreter..." << std::endl;
             if (enableDebug) {
                 std::cout << "[DEBUG] Starting LIR generation for register interpreter..." << std::endl;
             }
-            LIR::Generator lir_generator;
-            auto lir_function = lir_generator.generate_program(post_opt_type_check);
-            if (enableDebug) {
-                std::cout << "[DEBUG] LIR generation completed for register interpreter." << std::endl;
-            }
             
-            if (!lir_function) {
-                std::cerr << "Failed to generate LIR function\n";
-                return 1;
-            }
-            
-            if (lir_generator.has_errors()) {
-                std::cerr << "LIR generation errors:\n";
-                for (const auto& error : lir_generator.get_errors()) {
-                    std::cerr << "  " << error << std::endl;
-                }
-                return 1;
-            }
-            
-            // Show LIR disassembly
-            std::cout << "\n=== LIR Disassembly ===\n";
-            LIR::Disassembler disassemble(*lir_function, true);
-            std::cout << disassemble.disassemble() << std::endl;
-
-
-                                // Display individual function LIR instructions
-                    auto& lir_func_manager = LIR::LIRFunctionManager::getInstance();
-                    auto function_names = lir_func_manager.getFunctionNames();
-                    
-                    std::cout << "\n=== Function LIR Instructions ===\n";
-                    for (const auto& func_name : function_names) {
-                        auto lir_func = lir_func_manager.getFunction(func_name);
-                        if (lir_func) {
-                            std::cout << "\n" << func_name << ":\n";
-                            const auto& instructions = lir_func->getInstructions();
-                            for (size_t i = 0; i < instructions.size(); ++i) {
-                                const auto& inst = instructions[i];
-                                std::cout << "[" << i << "] " << inst.to_string() << "\n";
-                            }
-                        }
-                    }
-            
-            // Execute using register interpreter with the new LIRFunctionManager
             try {
-                // Register the main function in LIRFunctionManager if it exists
-                std::shared_ptr<LIR::LIRFunction> main_lir_func;
-                if (lir_function) {
-                    auto& func_manager = LIR::LIRFunctionManager::getInstance();
-                    
-                    // Convert the old LIR function to new LIRFunction format
-                    std::vector<LIR::LIRParameter> main_params;
-                    main_lir_func = func_manager.createFunction("main", main_params, LIR::Type::I64, nullptr);
-                    main_lir_func->setInstructions(lir_function->instructions);
-                    
-                    register_vm.execute_lir_function(*main_lir_func);
-                } else {
-                    std::cerr << "No LIR function generated\n";
+                LIR::Generator lir_generator;
+                auto lir_function = lir_generator.generate_program(post_opt_type_check);
+                
+                std::cout << "[DEBUG] LIR generation completed, checking for errors..." << std::endl;
+                
+                if (enableDebug) {
+                    std::cout << "[DEBUG] LIR generation completed for register interpreter." << std::endl;
+                }
+                
+                if (!lir_function) {
+                    std::cerr << "Failed to generate LIR function\n";
                     return 1;
                 }
                 
-                // Check if the function has an explicit return statement
-                // For scripts, we only print the return value if there's an explicit return
-                bool should_print_result = false;
-                if (main_lir_func && !main_lir_func->getInstructions().empty()) {
-                    // Look for a Return instruction (explicit return)
-                    // Ret instruction is used for implicit returns
-                    for (const auto& inst : main_lir_func->getInstructions()) {
-                        if (inst.op == LIR::LIR_Op::Return) {
-                            should_print_result = true;
-                            break;
+                if (lir_generator.has_errors()) {
+                    std::cerr << "LIR generation errors:\n";
+                    for (const auto& error : lir_generator.get_errors()) {
+                        std::cerr << "  " << error << std::endl;
+                    }
+                    return 1;
+                }
+                
+                // Show LIR disassembly
+                std::cout << "\n=== LIR Disassembly ===\n";
+                LIR::Disassembler disassemble(*lir_function, true);
+                std::cout << disassemble.disassemble() << std::endl;
+
+                // Display individual function LIR instructions
+                auto& lir_func_manager = LIR::LIRFunctionManager::getInstance();
+                auto function_names = lir_func_manager.getFunctionNames();
+                
+                std::cout << "\n=== Function LIR Instructions ===\n";
+                for (const auto& func_name : function_names) {
+                    auto lir_func = lir_func_manager.getFunction(func_name);
+                    if (lir_func) {
+                        std::cout << "\n" << func_name << ":\n";
+                        const auto& instructions = lir_func->getInstructions();
+                        for (size_t i = 0; i < instructions.size(); ++i) {
+                            const auto& inst = instructions[i];
+                            std::cout << "[" << i << "] " << inst.to_string() << "\n";
                         }
                     }
                 }
                 
-                if (should_print_result) {
-                    auto result = register_vm.get_register(0);
-                    if (!std::holds_alternative<std::nullptr_t>(result)) {
-                        std::cout << register_vm.to_string(result) << std::endl;
+                // Execute using register interpreter with the new LIRFunctionManager
+                try {
+                    // Register the main function in LIRFunctionManager if it exists
+                    std::shared_ptr<LIR::LIRFunction> main_lir_func;
+                    if (lir_function) {
+                        auto& func_manager = LIR::LIRFunctionManager::getInstance();
+                        
+                        // Convert the old LIR function to new LIRFunction format
+                        std::vector<LIR::LIRParameter> main_params;
+                        main_lir_func = func_manager.createFunction("main", main_params, LIR::Type::I64, nullptr);
+                        main_lir_func->setInstructions(lir_function->instructions);
+                        
+                        register_vm.execute_lir_function(*main_lir_func);
+                    } else {
+                        std::cerr << "No LIR function generated\n";
+                        return 1;
                     }
+                    
+                    // Check if the function has an explicit return statement
+                    // For scripts, we only print the return value if there's an explicit return
+                    bool should_print_result = false;
+                    if (main_lir_func && !main_lir_func->getInstructions().empty()) {
+                        // Look for a Return instruction (explicit return)
+                        // Ret instruction is used for implicit returns
+                        for (const auto& inst : main_lir_func->getInstructions()) {
+                            if (inst.op == LIR::LIR_Op::Return) {
+                                should_print_result = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (should_print_result) {
+                        auto result = register_vm.get_register(0);
+                        if (!std::holds_alternative<std::nullptr_t>(result)) {
+                            std::cout << register_vm.to_string(result) << std::endl;
+                        }
+                    }
+                } catch (const std::exception& e) {
+                    std::cerr << "Error: " << e.what() << std::endl;
+                    return 1;
                 }
             } catch (const std::exception& e) {
-                std::cerr << "Error: " << e.what() << std::endl;
+                std::cerr << "LIR generation error: " << e.what() << std::endl;
                 return 1;
             }
         }

@@ -783,11 +783,11 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
     registerFunction(std::make_shared<LIRBuiltinFunction>(
         "channel",
         std::vector<TypeTag>{}, // No parameters
-        TypeTag::Any, // Returns channel handle as any
+        TypeTag::Channel, // Returns channel handle
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             // For LIR generation, return a placeholder channel handle
-            auto int_type = std::make_shared<::Type>(TypeTag::Any);
-            return std::make_shared<Value>(int_type, static_cast<int64_t>(0));
+            auto channel_type = std::make_shared<::Type>(TypeTag::Channel);
+            return std::make_shared<Value>(channel_type, static_cast<int64_t>(0));
         }
     ));
     

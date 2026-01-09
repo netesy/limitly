@@ -1,7 +1,7 @@
 #ifndef AST_PRINTER_H
 #define AST_PRINTER_H
 
-#include "../common/backend.hh"
+
 #include "../frontend/ast.hh"
 #include "../frontend/scanner.hh"
 #include <memory>
@@ -9,11 +9,11 @@
 #include <variant>
 
 // AST Printer backend - for debugging and visualization
-class ASTPrinter : public Backend {
+class ASTPrinter {
 public:
     ASTPrinter() = default;
     
-    virtual void process(const std::shared_ptr<AST::Program>& program) override;
+    void process(const std::shared_ptr<AST::Program>& program);
     
 private:
     void printNode(const std::shared_ptr<AST::Node>& node, int indent = 0);
