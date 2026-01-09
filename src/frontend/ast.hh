@@ -558,6 +558,7 @@ namespace AST {
         bool isAsync = false;
         std::string param;
         std::string paramName; // Name of the parameter variable
+        std::shared_ptr<Expression> iterable; // Source iterable (array, channel, etc.)
         std::shared_ptr<BlockStatement> body;
         std::string worker_function_name; // Generated function name for LIR
     };

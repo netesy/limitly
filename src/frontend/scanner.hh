@@ -150,6 +150,7 @@ enum class TokenType {
     ERR,        // err
     OK,         // ok
     VAL,        // val
+    FROM,       // from
     
     // Visibility keywords
     PUB,        // pub

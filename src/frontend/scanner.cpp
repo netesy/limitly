@@ -695,6 +695,7 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "err") return TokenType::ERR;
     if (rest == "ok") return TokenType::OK;
     if (rest == "val") return TokenType::VAL;
+    if (rest == "from") return TokenType::FROM;
     
     // Visibility keywords
     if (rest == "pub") return TokenType::PUB;
