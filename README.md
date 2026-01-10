@@ -35,6 +35,10 @@ build.bat
 
 # Using Unix Shell
 ./build.sh
+
+# Using CMake
+cmake .
+make
 ```
 
 ### Running

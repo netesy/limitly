@@ -101,6 +101,12 @@ You can build the project using `make`, a Windows batch script, or a Unix shell 
     ./docs/build.sh
     ```
 
+*   **Using CMake:**
+    ```bash
+    cmake .
+    make
+    ```
+
 **Running the Interpreter:**
 
 The `limitly` executable is the interpreter for the Limit language. It can be used to execute source files, inspect the compilation process, or start an interactive session (REPL).
@@ -749,6 +755,25 @@ class Circle : Shape {
 }
 ```
 
+### Worker Statement
+
+The `worker` statement provides a convenient syntax for processing items from a channel within a `concurrent` block. It is a specialized version of the `task` statement that is designed to simplify the common pattern of iterating over a channel and processing each item.
+
+```limit
+var my_channel = channel();
+
+// Send some data to the channel
+my_channel.send("hello");
+my_channel.send("world");
+
+concurrent(ch=my_channel) {
+    // A worker that processes items from the channel
+    worker(item in my_channel) {
+        print("Received: {item}");
+    }
+}
+```
+
 #### Final Classes and Methods
 
 A `final` class cannot be subclassed. A `final` method cannot be overridden by a subclass.
@@ -804,7 +829,7 @@ person.introduce(); // Output: Hi, I'm Jules and I'm 28 years old.
 
 ### The `self` Keyword
 
-The `self` keyword refers to the current instance of the class. It is used to access the instance's fields and methods.
+The `self` keyword refers to the current instance of the class. It is used to access the instance's fields and methods. As a convenience, `this` is also accepted as an alias for `self`.
 
 ### Inheritance
 
@@ -1201,8 +1226,8 @@ fn divide(a: int, b: int): int?DivisionByZero {
 
 var result = divide(10, 2);
 match (result) {
-    Ok(value) => { print("Result: {value}"); },
-    Err(e) => { print("Error: {e}"); }
+    val(value) => { print("Result: {value}"); },
+    err(e) => { print("Error: {e}"); }
 }
 ```
 
@@ -1414,42 +1439,37 @@ Limit's concurrency model is "structured," which means that the lifetime of conc
 `parallel` blocks are designed for CPU-bound workloads, where you want to take full advantage of multiple CPU cores.
 
 ```
-// Create a channel to receive messages from the tasks
-var messages = channel();
-
 // This block will run tasks on multiple cores
-parallel(ch=messages, mode=batch, cores="auto", timeout=10s, onError="stop") {
+parallel(cores="auto", timeout=10s, onError="stop") {
     task(i in 1..4) {
-        print("Running task {i}...");
+        print("Running CPU-intensive task {i}...");
         // Perform some CPU-intensive work here
-        messages.send("Task {i} is done.");
+        var result = 0;
+        for (var j = 0; j < 1000000; j += 1) {
+            result += j;
+        }
+        print("Task {i} is done.");
     }
 }
 
 // The block will wait for all tasks to finish
 print("All parallel tasks are complete.");
-
-// Process the results
-iter (message in messages) {
-    print("Received: {message}");
-}
 ```
 
-**Parameters for `parallel` and `concurrent` blocks:**
+**Parameters for `parallel` blocks:**
+
+*   `cores`: The number of CPU cores to use. Can be an integer or `"auto"` (default) to use all available cores.
+*   `onError`: Behavior upon task failure (`"stop"` or `"continue"`).
+*   `timeout`: A duration for the entire block (e.g., `5s`, `100ms`).
+*   `grace`: A grace period for tasks to complete after a timeout.
+
+**Parameters for `concurrent` blocks:**
 
 *   `ch`: The channel to be used for communication between tasks.
-*   `mode`: The execution mode. `"batch"` (default for `concurrent`) waits for all tasks to be submitted before execution, while `"fork-join"` (default for `parallel`) executes tasks as they are submitted.
-*   `cores`: (parallel only) The number of CPU cores to use. Can be an integer or `"auto"` (default) to use all available cores.
-*   `onError`: Behavior upon task failure.
-    *   `"stop"` (default): Stop all tasks immediately.
-    *   `"continue"`: Allow other tasks to continue.
-    *   A function reference to a custom error handler.
-*   `timeout`: A duration for the entire block (e.g., `5s`, `100ms`).
-*   `grace`: A grace period for tasks to complete after a timeout is reached.
-*   `onTimeout`: Behavior upon timeout.
-    *   `"partial"` (default): Return results from completed tasks.
-    *   `"stop"`: Stop all tasks.
-    *   A function reference to a custom timeout handler.
+*   `mode`: The execution mode (`"batch"` or `"fork-join"`).
+*   `onError`: Behavior upon task failure (`"stop"`, `"continue"`, or a function reference).
+*   `timeout`: A duration for the entire block.
+*   `onTimeout`: Behavior upon timeout (`"partial"`, `"stop"`, or a function reference).
 
 ### `concurrent` Blocks for I/O-Bound Tasks
 
