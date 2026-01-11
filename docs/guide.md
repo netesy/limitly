@@ -697,17 +697,23 @@ You can control the visibility of class members (fields and methods) using `pub`
 *   **`private`** (default): The member can only be accessed from within the class.
 *   **`prot`** (protected): The member can be accessed from within the class and by its subclasses.
 *   **`pub`** (public): The member can be accessed from anywhere.
+*   **`const`**: The member is public but read-only from outside the class.
 
 ```limit
 class MyClass {
     var private_field = 1;      // private by default
     pub var public_field = 2;
     prot var protected_field = 3;
+    const var read_only_field = 4;
 
     fn private_method() {}      // private by default
     pub fn public_method() {}
     prot fn protected_method() {}
 }
+
+var instance = MyClass();
+print(instance.read_only_field); // Allowed
+// instance.read_only_field = 5; // This would be a compile-time error
 ```
 
 #### Static Members
@@ -749,6 +755,54 @@ class Circle : Shape {
 }
 ```
 
+### Worker Statements
+
+A `worker` statement is a convenient syntax for processing items from a channel. It's a specialized version of a `task` that loops over a channel and executes its body for each item received.
+
+The following code shows a common pattern where one task produces data and sends it to a channel, while another task receives the data and processes it.
+
+```limit
+var ch = channel();
+
+concurrent {
+    // Producer task
+    task {
+        iter (i in 1..5) {
+            ch.send("Message {i}");
+        }
+        ch.close(); // Close the channel when done
+    }
+
+    // Consumer task
+    task {
+        iter (msg in ch) {
+            print("Processing: {msg}");
+        }
+    }
+}
+```
+
+The `worker` statement simplifies the consumer part of this pattern. The following code is equivalent to the previous example:
+
+```limit
+var ch = channel();
+
+concurrent(ch=ch) {
+    // Producer task
+    task {
+        iter (i in 1..5) {
+            ch.send("Message {i}");
+        }
+        ch.close();
+    }
+
+    // A worker that processes messages from the channel
+    worker(msg in ch) {
+        print("Processing: {msg}");
+    }
+}
+```
+
 #### Final Classes and Methods
 
 A `final` class cannot be subclassed. A `final` method cannot be overridden by a subclass.
@@ -763,7 +817,12 @@ class Parent {
 
 #### Data Classes
 
-A `data` class is a special kind of class that automatically generates useful methods, such as a constructor for all its fields. Data classes are implicitly `final`.
+A `data` class is a special kind of class designed to hold data. When you declare a class as a `data` class, the compiler automatically generates several useful methods, including:
+
+*   An `init` constructor that accepts all the fields as arguments.
+*   Read-only properties for all fields, promoting immutability.
+
+Data classes are implicitly `final`, meaning they cannot be inherited from. This makes them a concise and safe way to model structured data.
 
 ```limit
 data User {
@@ -771,8 +830,13 @@ data User {
     age: int
 }
 
+// The data class automatically provides an init(name, age) constructor.
 var user = User("Alice", 30);
+
 print(user.name); // Output: Alice
+print(user.age);  // Output: 30
+
+// user.name = "Bob"; // This would be a compile-time error because fields are read-only.
 ```
 
 ### Fields and Methods
@@ -1002,33 +1066,56 @@ print(a); // Output: 1
 
 ### Unsafe Blocks
 
-Limit is a memory-safe language, but sometimes you may need to interface with low-level code or perform operations that the compiler cannot guarantee are safe. For these cases, you can use an `unsafe` block.
+Limit is a memory-safe language by design, but there are rare situations where you may need to perform low-level operations that the compiler cannot guarantee are safe. For these cases, you can use an `unsafe` block to tell the compiler that you are taking responsibility for the code's safety.
+
+This is most commonly used when interfacing with C code or when performing manual memory management, which should be avoided in idiomatic Limit code.
 
 ```limit
 unsafe {
-    // Low-level operations
+    // Example: Calling a C function (hypothetical)
+    // var c_string = C.CString.new("hello");
+    // C.puts(c_string);
 }
 ```
+> **Warning:** Code inside an `unsafe` block can cause undefined behavior if not used correctly. Use it sparingly and only when absolutely necessary.
 
 ### Contract Statements
 
-Contracts are used to enforce preconditions, postconditions, and invariants in your code. They are useful for debugging and ensuring correctness.
+Limit supports design-by-contract through `contract` statements. Contracts are used to enforce preconditions, postconditions, and invariants in your code. If a contract fails, the program will terminate with an error message. They are a powerful tool for ensuring correctness, especially during development and debugging.
 
 ```limit
 fn divide(a: int, b: int): int {
+    // Precondition: b cannot be zero
     contract(b != 0, "Cannot divide by zero");
-    return a / b;
+
+    var result = a / b;
+
+    // Postcondition: The result must be less than 100 (for some reason)
+    contract(result < 100, "Result is too large!");
+
+    return result;
 }
 ```
+A contract takes two arguments: a boolean condition and a string message to display if the condition is false.
 
 ### Compile-Time Execution
 
-The `comptime` keyword allows you to execute code at compile time. This is useful for metaprogramming, generating lookup tables, or performing other computations before the program runs.
+The `comptime` keyword allows you to execute code at compile time. This is a powerful feature for metaprogramming, allowing you to generate code, create lookup tables, or perform other computations before your program is even run.
+
+Variables declared inside a `comptime` block can be used in the surrounding code as compile-time constants.
 
 ```limit
 comptime {
-    var my_compile_time_var = 123;
+    // This code runs at compile time
+    var values = [0, 1, 2, 3, 4];
+    var squared_values = [];
+    iter (v in values) {
+        squared_values.append(v * v);
+    }
 }
+
+// The 'squared_values' array was generated at compile time
+print(squared_values); // Output: [0, 1, 4, 9, 16]
 ```
 
 ## The Type System
@@ -1062,7 +1149,9 @@ Union types are especially powerful when combined with `match` statements to han
 
 ### Intersection Types
 
-An intersection type is a type that combines multiple types into one. A value of an intersection type must satisfy the requirements of all the types in the intersection. Intersection types are defined using the ampersand (`&`) character.
+An intersection type, defined using the `and` keyword or an ampersand (`&`), combines multiple types into a single type that has all the properties of the types being combined. A value of an intersection type must satisfy the requirements of all the types in the intersection.
+
+This is most commonly used with traits to require a type to implement multiple interfaces.
 
 ```limit
 trait HasName {
@@ -1073,7 +1162,8 @@ trait HasAge {
     fn get_age(): int;
 }
 
-type Person = HasName & HasAge;
+// A Person must have both a name and an age.
+type Person = HasName and HasAge;
 
 fn print_person_details(p: Person) {
     print("{p.get_name()} is {p.get_age()} years old.");
@@ -1082,22 +1172,25 @@ fn print_person_details(p: Person) {
 
 ### Refined Types
 
-A refined type allows you to add constraints to an existing type. This is useful for enforcing invariants at the type level. Refined types are defined using the `where` keyword.
+A refined type allows you to add constraints to an existing type using a `where` clause. This is useful for enforcing invariants at the type level, making your code safer and more self-documenting.
 
 ```limit
+// Define a type for positive integers
 type PositiveInt = int where value > 0;
 
 fn set_age(age: PositiveInt) {
-    // ...
+    // Now, it's guaranteed that 'age' is positive.
+    print("Age is {age}");
 }
 
 set_age(10); // Valid
-set_age(-5); // This would be a runtime error
+set_age(-5); // This would cause a runtime contract violation
 ```
+The `value` keyword in the `where` clause refers to the value of the variable being checked.
 
 ### Structural Types
 
-A structural type allows you to define a type based on its structure or shape, rather than by a specific name. This is useful for working with data that has a consistent structure but may not be an instance of a named class.
+A structural type allows you to define a type based on its structure or shape, rather than by a specific name. This is useful for working with data that has a consistent structure but may not be an instance of a named class. This is also known as "duck typing" but with static type checking.
 
 ```limit
 type Point = {x: float, y: float};
@@ -1106,23 +1199,48 @@ fn print_point(p: Point) {
     print("({p.x}, {p.y})");
 }
 
+// my_point is not an instance of a class, but it matches the structure of Point.
 var my_point = {x: 10.5, y: 20.0};
 print_point(my_point); // Output: (10.5, 20.0)
 ```
 
 ### Tuple Types
 
-A tuple is a fixed-size, ordered collection of elements of different types. Tuple types are defined using parentheses.
+A tuple is a fixed-size, ordered collection of elements that can be of different types. Tuples are created using parentheses `()`.
 
 ```limit
-type PersonInfo = (str, int, str);
+// A tuple holding a string and an integer
+var my_tuple = ("Alice", 30);
+```
 
-var person: PersonInfo = ("Alice", 30, "New York");
+You can define a type alias for a tuple type to make your code more readable.
+
+```limit
+type PersonInfo = (str, int);
+var person: PersonInfo = ("Bob", 42);
+```
+
+You can access elements in a tuple using zero-based indexing with dot notation.
+
+```limit
+print(person.0); // Output: Bob
+print(person.1); // Output: 42
+```
+
+Tuples are especially useful for returning multiple values from a function.
+
+```limit
+fn get_user(): (str, int) {
+    return ("Alice", 30);
+}
+
+var (name, age) = get_user();
+print("{name} is {age} years old."); // Output: Alice is 30 years old.
 ```
 
 ### Enum Declarations
 
-Enums (enumerations) allow you to define a type that can only be one of a specific set of values.
+Enums (enumerations) allow you to define a type that can only be one of a specific set of values, called variants.
 
 ```limit
 enum Status {
@@ -1135,20 +1253,80 @@ enum Status {
 var current_status: Status = Status.Running;
 ```
 
-### Traits and Interfaces
+Enums can also have variants with associated data, which is useful for representing more complex state.
 
-Traits and interfaces are used to define a set of methods that a class must implement. This is a powerful tool for abstraction and polymorphism.
+```limit
+enum WebEvent {
+    PageLoad,
+    KeyPress(str),
+    Click({x: int, y: int})
+}
+
+var event: WebEvent = WebEvent.KeyPress("k");
+```
+
+You can then use a `match` statement to handle the different variants.
+
+### Traits
+
+A trait defines a set of methods that a type must implement. It's a way to define shared behavior. Traits are similar to interfaces in other languages.
 
 ```limit
 trait Speaker {
-    fn speak();
+    fn speak(): str;
 }
+```
 
-class Dog : Speaker {
-    fn speak() {
-        print("Woof!");
+A class can implement a trait by providing implementations for all the methods defined in the trait.
+
+```limit
+class Dog {
+    fn speak(): str {
+        return "Woof!";
     }
 }
+
+// Dog implicitly implements the Speaker trait because it has a speak() method.
+// Limit's traits are structural.
+
+fn make_sound(s: Speaker) {
+    print(s.speak());
+}
+
+var my_dog = Dog();
+make_sound(my_dog); // Output: Woof!
+```
+
+### Interfaces
+
+Interfaces are similar to traits, but they are nominal, meaning a class must explicitly declare that it implements the interface using the `:` operator. This can make the code's intent clearer.
+
+```limit
+interface Serializable {
+    fn serialize(): str;
+}
+
+class User : Serializable {
+    var name: str;
+    var age: int;
+
+    fn init(n: str, a: int) {
+        self.name = n;
+        self.age = a;
+    }
+
+    fn serialize(): str {
+        return "{{'name': '{self.name}', 'age': {self.age}}}";
+    }
+}
+
+fn save(obj: Serializable) {
+    var serialized_data = obj.serialize();
+    print("Saving: {serialized_data}");
+}
+
+var user = User("Alice", 30);
+save(user); // Output: Saving: {'name': 'Alice', 'age': 30}
 ```
 
 ### Error Handling
@@ -1205,6 +1383,25 @@ match (result) {
     Err(e) => { print("Error: {e}"); }
 }
 ```
+
+### Matching on Success and Error with `val` and `err`
+
+To make error handling even more concise, Limit provides the `val` and `err` patterns for use in `match` statements. These are shorthands for the `Ok` and `Err` cases.
+
+*   `val(variable)`: Matches a success case and binds the unwrapped value to `variable`.
+*   `err(variable)`: Matches an error case and binds the error to `variable`.
+
+Here is the previous example rewritten with these patterns:
+
+```limit
+var result = divide(10, 0);
+match (result) {
+    val(value) => { print("Result: {value}"); },
+    err(e) => { print("Error: {e}"); } // This will be executed
+}
+```
+
+This syntax is cleaner and more intuitive, especially when the focus is on the success and error paths of a fallible operation.
 
 ### The Unified `Type?` System
 
@@ -1474,7 +1671,45 @@ print("All concurrent tasks have completed.");
 
 ### Channels
 
-Channels are the primary way for concurrent tasks to communicate. One or more tasks can send messages to a channel, and another task can receive them.
+Channels are the primary way for concurrent tasks to communicate. One or more tasks can send messages to a channel, and another task can receive them. Channels can be created with the `channel()` built-in function.
+
+#### Explicit Channel Operations
+
+While iterating over a channel with `iter` is a common way to receive messages, Limit also provides lower-level functions for more fine-grained control over channel communication.
+
+*   **`send(value)`**: Sends a value to the channel, blocking if the channel is full (for buffered channels) until space is available.
+*   **`recv()`**: Receives a value from the channel, blocking if the channel is empty until a value is available.
+*   **`offer(value)`**: A non-blocking send. It attempts to send a value to the channel and returns immediately. It returns `true` if the value was sent successfully and `false` if the channel was full.
+*   **`poll()`**: A non-blocking receive. It attempts to receive a value from the channel and returns immediately. If a value was available, it returns `Some(value)`; otherwise, it returns `None`.
+
+```limit
+var ch = channel();
+
+concurrent {
+    task {
+        // Blocking send
+        ch.send("Hello");
+
+        // Non-blocking send
+        if (!ch.offer("World")) {
+            print("Channel was full!");
+        }
+    }
+
+    task {
+        // Blocking receive
+        var msg1 = ch.recv();
+        print(msg1); // Output: Hello
+
+        // Non-blocking receive
+        var msg2 = ch.poll();
+        match (msg2) {
+            Some(value) => { print(value); }, // Output: World
+            None => { print("Channel was empty."); }
+        }
+    }
+}
+```
 
 ### Async/Await
 
