@@ -1,53 +1,53 @@
-// print("=== Concurrent Block Tests ===");
+print("=== Concurrent Block Tests ===");
 
 
-// // ==========================================
-// //  Basic concurrent execution (tasks only)
-// // ==========================================
-// var output_results = channel();
+// ==========================================
+//  Basic concurrent execution (tasks only)
+// ==========================================
+var output_results = channel();
 
-// concurrent(ch=output_results,
-//            cores=Auto,
-//            on_error=Stop,
-//            timeout=20s,
-//            grace=500ms) {
+concurrent(ch=output_results,
+           cores=Auto,
+           on_error=Stop,
+           timeout=20s,
+           grace=500ms) {
 
-//     task(i in 1..3) {
-//         print("Concurrent task {i} running");
-//         sleep(3.00);
-//         output_results.send("Task {i} completed");
-//     }
-// } // auto-close output_results
+    task(i in 1..3) {
+        print("Concurrent task {i} running");
+        sleep(3.00);
+        output_results.send("Task {i} completed");
+    }
+} // auto-close output_results
 
-// iter (result in output_results) {
-//     print("Received result: {result}");
-// }
+iter (result in output_results) {
+    print("Received result: {result}");
+}
 
-// print("Concurrent block finished");
+print("Concurrent block finished");
 
 
 // ==========================================
 //  Stream processing with workers
 // ==========================================
-// var stream_out = channel();
+var stream_out = channel();
 
-// // input source is a stream, NOT a channel owned by concurrent
-// var events = ["info1", "info2", "info3"];  // iterable → stream
+// input source is a stream, NOT a channel owned by concurrent
+var events = ["info1", "info2", "info3"];  // iterable → stream
 
-// concurrent(ch=stream_out,
-//            cores=4,
-//            timeout=15s,
-//            grace=500ms) {
+concurrent(ch=stream_out,
+           cores=4,
+           timeout=15s,
+           grace=500ms) {
 
-//     worker(event from events) {
-//         print("Processing event: {event}");
-//         stream_out.send("Handled {event}");
-//     }
-// } // auto-close stream_out
+    worker(event from events) {
+        print("Processing event: {event}");
+        stream_out.send("Handled {event}");
+    }
+} // auto-close stream_out
 
-// iter (msg in stream_out) {
-//     print("Result: {msg}");
-// }
+iter (msg in stream_out) {
+    print("Result: {msg}");
+}
 
 
 // ==========================================

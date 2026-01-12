@@ -37,8 +37,8 @@ endif
 # Directories
 # =============================
 BIN_DIR := bin
-OBJ_DIR := obj/$(MODE)
-RSP_DIR := rsp
+OBJ_DIR := build/obj/$(MODE)
+RSP_DIR := build/rsp
 
 # Runtime library
 RUNTIME_LIB := $(OBJ_DIR)/limitly_runtime.a
@@ -157,8 +157,8 @@ debug:
 # =============================
 clean:
 ifeq ($(PLATFORM),windows)
-	@powershell -Command "if (Test-Path 'obj') { Remove-Item -Recurse -Force 'obj' }"
-	@powershell -Command "if (Test-Path 'rsp') { Remove-Item -Recurse -Force 'rsp' }"
+	@powershell -Command "if (Test-Path 'build/obj') { Remove-Item -Recurse -Force 'build/obj' }"
+	@powershell -Command "if (Test-Path 'build/rsp') { Remove-Item -Recurse -Force 'build/rsp' }"
 	@powershell -Command "if (Test-Path 'bin') { Remove-Item -Recurse -Force 'bin\*.exe' }"
 else
 	rm -rf $(OBJ_DIR) $(BIN_DIR) $(RSP_DIR)
