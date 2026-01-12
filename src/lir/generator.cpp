@@ -3179,11 +3179,65 @@ void Generator::create_and_register_worker_function(const std::string& worker_na
         std::cout << "[DEBUG] Bound iterable to register " << iterable_reg << std::endl;
     }
     
-    // Emit worker body
+    // Emit worker body with channel iteration loop
     if (worker_stmt->body) {
         std::cout << "[DEBUG] About to emit worker body with " << worker_stmt->body->statements.size() << " statements" << std::endl;
+        
+        // Create loop structure for channel consumption
+        // Loop header: check if channel has more items
+        std::cout << "[DEBUG] About to emit worker loop header" << std::endl;
+        LIR_BasicBlock* loop_header = create_basic_block("worker_loop_header");
+        LIR_BasicBlock* loop_body = create_basic_block("worker_loop_body");
+        LIR_BasicBlock* loop_exit = create_basic_block("worker_loop_exit");
+        
+        // Jump to loop header
+        emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0));
+        set_current_block(loop_header);
+        
+        // Poll channel for next item
+        Reg item_reg = allocate_register();
+        Reg nil_reg = allocate_register();
+        Reg has_item_reg = allocate_register();
+        
+ 
+        emit_instruction(LIR_Inst(LIR_Op::ChannelPoll, item_reg, 1, 0)); // Poll from input channel (reg 1)
+        
+        // Check if item is nil (channel closed)
+        auto nil_type = std::make_shared<::Type>(::TypeTag::Nil);
+        //ValuePtr nil_val = std::make_shared<Value>(nil_type, nullptr); //!FIX The 
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, nil_reg, nullptr));
+        emit_instruction(LIR_Inst(LIR_Op::CmpEQ, has_item_reg, item_reg, nil_reg));
+
+  
+        // If item is NOT nil (has_item_reg == 0), jump to loop body
+        Reg not_nil_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::Neg, not_nil_reg, has_item_reg, 0, 0)); //use xor valeu true in place of not 
+        emit_instruction(LIR_Inst(LIR_Op::JumpIf, Type::Void, not_nil_reg, 0, 0));
+        set_current_block(loop_exit);
+        
+        // Set current block back to loop body for emitting worker statements
+        set_current_block(loop_body);
+        
+        // Bind the polled item to the worker parameter name
+        if (!worker_stmt->paramName.empty()) {
+            bind_variable(worker_stmt->paramName, item_reg);
+            auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
+            set_register_type(item_reg, int_type);
+            std::cout << "[DEBUG] Bound worker parameter '" << worker_stmt->paramName << "' to register " << item_reg << std::endl;
+        }
+
+               std::cout << "[DEBUG] About to emit the worket body" << std::endl;
+        
+        // Emit the actual worker body statements
         emit_stmt(*worker_stmt->body);
         std::cout << "[DEBUG] Worker body emitted successfully" << std::endl;
+        
+        // Jump back to loop header
+        emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0));
+        set_current_block(loop_header);
+        
+        // Set current block to loop exit for return
+        set_current_block(loop_exit);
     }
     
     // Add return to worker function
