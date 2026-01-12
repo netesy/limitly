@@ -95,7 +95,6 @@ std::string LIR_Inst::to_string() const {
         case LIR_Op::ToString:
             oss << " r" << dst << ", r" << a; // Convert to string
             break;
-        case LIR_Op::Concat:
         case LIR_Op::STR_CONCAT:
         case LIR_Op::STR_FORMAT:
             oss << " r" << dst << ", r" << a << ", r" << b;
@@ -178,7 +177,6 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::Store: return "store";
         case LIR_Op::Cast: return "cast";
         case LIR_Op::ToString: return "to_string";
-        case LIR_Op::Concat: return "concat";
         case LIR_Op::STR_CONCAT: return "str_concat";
         case LIR_Op::STR_FORMAT: return "str_format";
         case LIR_Op::ConstructError: return "error";

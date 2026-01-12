@@ -661,16 +661,6 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
             break;
             
         // String Operations
-        case LIR::LIR_Op::Concat: {
-            gccjit::lvalue dst = get_jit_register(inst.dst, m_const_char_ptr_type);
-            gccjit::rvalue a = get_jit_register(inst.a);
-            gccjit::rvalue b = get_jit_register(inst.b);
-            gccjit::rvalue result = compile_string_concat(a, b);
-            // compile_string_concat already returns const char*
-            m_current_block.add_assignment(dst, result);
-            return result;
-        }
-        
         case LIR::LIR_Op::STR_CONCAT: {
             gccjit::lvalue dst = get_jit_register(inst.dst, m_const_char_ptr_type);
             gccjit::rvalue a = get_jit_register(inst.a);

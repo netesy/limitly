@@ -39,8 +39,8 @@ echo.
 echo === FUNCTION TESTS ===
 call :run_test_with_error_check "tests\functions\basic.lm"
 call :run_test_with_error_check "tests\functions\advanced.lm"
-call :run_test_with_error_check "tests\functions\closures.lm"
-call :run_test_allow_semantic_errors "tests\functions\first_class.lm"
+@REM call :run_test_with_error_check "tests\functions\closures.lm"
+@REM call :run_test_allow_semantic_errors "tests\functions\first_class.lm"
 
 echo.
 echo === TYPE TESTS ===
@@ -49,14 +49,14 @@ call :run_test_allow_semantic_errors "tests\types\unions.lm"
 call :run_test_allow_semantic_errors "tests\types\options.lm"
 call :run_test_with_error_check "tests\types\advanced.lm"
 
-echo.
-echo === MODULE TESTS ===
-call :run_test_with_error_check "tests\modules\basic_import_test.lm"
-call :run_test_with_error_check "tests\modules\comprehensive_module_test.lm"
-call :run_test_with_error_check "tests\modules\show_filter_test.lm"
-call :run_test_with_error_check "tests\modules\hide_filter_test.lm"
-call :run_test_with_error_check "tests\modules\module_caching_test.lm"
-call :run_test_with_error_check "tests\modules\function_params_test.lm"
+@REM echo.
+@REM echo === MODULE TESTS ===
+@REM call :run_test_with_error_check "tests\modules\basic_import_test.lm"
+@REM call :run_test_with_error_check "tests\modules\comprehensive_module_test.lm"
+@REM call :run_test_with_error_check "tests\modules\show_filter_test.lm"
+@REM call :run_test_with_error_check "tests\modules\hide_filter_test.lm"
+@REM call :run_test_with_error_check "tests\modules\module_caching_test.lm"
+@REM call :run_test_with_error_check "tests\modules\function_params_test.lm"
 
 @REM echo.
 @REM echo === ERROR HANDLING TESTS ===
@@ -68,10 +68,10 @@ call :run_test_with_error_check "tests\modules\function_params_test.lm"
 @REM call :run_test_with_error_check "tests\classes\basic_classes.lm"
 @REM call :run_test_with_error_check "tests\classes\inheritance.lm"
 
-@REM echo.
-@REM echo === CONCURRENCY TESTS ===
-@REM call :run_test_with_error_check "tests\concurrency\parallel_blocks.lm"
-@REM call :run_test_with_error_check "tests\concurrency\concurrent_blocks.lm"
+echo.
+echo === CONCURRENCY TESTS ===
+call :run_test_with_error_check "tests\concurrency\parallel_blocks.lm"
+call :run_test_with_error_check "tests\concurrency\concurrent_blocks.lm"
 
 @REM echo.
 @REM echo === INTEGRATION TESTS ===

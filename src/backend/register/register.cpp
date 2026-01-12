@@ -578,10 +578,6 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 registers[pc->dst] = to_string(registers[pc->a]);
                 break;
             }
-            case LIR::LIR_Op::Concat: {
-                registers[pc->dst] = to_string(registers[pc->a]) + to_string(registers[pc->b]);
-                break;
-            }
             case LIR::LIR_Op::STR_CONCAT: {
                 registers[pc->dst] = to_string(registers[pc->a]) + to_string(registers[pc->b]);
                 break;
