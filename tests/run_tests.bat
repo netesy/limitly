@@ -15,6 +15,8 @@ call :run_test_with_error_check "tests\basic\variables.lm"
 call :run_test_with_error_check "tests\basic\literals.lm"
 call :run_test_with_error_check "tests\basic\control_flow.lm"
 call :run_test_with_error_check "tests\basic\print_statements.lm"
+call :run_test_with_error_check "tests\basic\list_dict_tuple.lm"
+
 
 echo.
 echo === EXPRESSION TESTS ===
