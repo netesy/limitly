@@ -17,7 +17,7 @@
 #include "../value.hh"
 
 extern "C" {
-#include "../../../runtime_string.h"
+#include "../../runtime/runtime_string.h"
 }
 
 // Global loop counter to prevent infinite loops

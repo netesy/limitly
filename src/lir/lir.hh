@@ -167,6 +167,15 @@ enum class LIR_Op : uint8_t {
     ListAppend,
     ListIndex,
     
+    // Dict operations
+    DictCreate,
+    DictSet,
+    DictGet,
+    
+    // Tuple operations
+    TupleCreate,
+    TupleGet,
+    
     // Class operations
     NewObject,
     GetField,

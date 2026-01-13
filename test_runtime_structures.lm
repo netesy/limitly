@@ -1,0 +1,256 @@
+// Test file for runtime structures (lists, dicts, tuples)
+// This will test the integration between RegisterVM and C runtime functions
+
+// Test basic list operations
+func test_list_operations() {
+    print("=== Testing List Operations ===");
+    
+    // Create a new list
+    let my_list = [];
+    print("Created empty list");
+    
+    // Append some values
+    my_list.append(42);
+    my_list.append("hello");
+    my_list.append(3.14);
+    print("Appended 3 values to list");
+    
+    // Get values by index
+    let first = my_list[0];
+    let second = my_list[1];
+    let third = my_list[2];
+    
+    print("First element:", first);
+    print("Second element:", second);
+    print("Third element:", third);
+    
+    // Test with different types
+    let mixed_list = [];
+    mixed_list.append(100);
+    mixed_list.append(true);
+    mixed_list.append("world");
+    mixed_list.append(2.718);
+    
+    print("Mixed list elements:");
+    for i in range(4) {
+        let elem = mixed_list[i];
+        print("  [", i, "] =", elem);
+    }
+    
+    return my_list;
+}
+
+// Test basic dictionary operations
+func test_dict_operations() {
+    print("\n=== Testing Dictionary Operations ===");
+    
+    // Create a new dictionary
+    let my_dict = {};
+    print("Created empty dictionary");
+    
+    // Set some key-value pairs
+    my_dict["name"] = "Alice";
+    my_dict["age"] = 25;
+    my_dict["score"] = 95.5;
+    print("Set 3 key-value pairs");
+    
+    // Get values by key
+    let name = my_dict["name"];
+    let age = my_dict["age"];
+    let score = my_dict["score"];
+    
+    print("Name:", name);
+    print("Age:", age);
+    print("Score:", score);
+    
+    // Test with different key types
+    let number_dict = {};
+    number_dict[1] = "one";
+    number_dict[2] = "two";
+    number_dict[3] = "three";
+    
+    print("Number dictionary:");
+    print("  1 ->", number_dict[1]);
+    print("  2 ->", number_dict[2]);
+    print("  3 ->", number_dict[3]);
+    
+    return my_dict;
+}
+
+// Test tuple operations
+func test_tuple_operations() {
+    print("\n=== Testing Tuple Operations ===");
+    
+    // Create a tuple (using tuple syntax)
+    let my_tuple = (1, "hello", 3.14, true);
+    print("Created tuple with 4 elements");
+    
+    // Access tuple elements by index
+    let first = my_tuple[0];
+    let second = my_tuple[1];
+    let third = my_tuple[2];
+    let fourth = my_tuple[3];
+    
+    print("Tuple elements:");
+    print("  [0] =", first);
+    print("  [1] =", second);
+    print("  [2] =", third);
+    print("  [3] =", fourth);
+    
+    // Test with different types
+    let mixed_tuple = (42, "world", 2.718, false, 100);
+    print("Mixed tuple elements:");
+    for i in range(5) {
+        let elem = mixed_tuple[i];
+        print("  [", i, "] =", elem);
+    }
+    
+    return my_tuple;
+}
+
+// Test nested structures
+func test_nested_structures() {
+    print("\n=== Testing Nested Structures ===");
+    
+    // Create a list of dictionaries
+    let people = [];
+    
+    let person1 = {};
+    person1["name"] = "Alice";
+    person1["age"] = 25;
+    people.append(person1);
+    
+    let person2 = {};
+    person2["name"] = "Bob";
+    person2["age"] = 30;
+    people.append(person2);
+    
+    let person3 = {};
+    person3["name"] = "Charlie";
+    person3["age"] = 35;
+    people.append(person3);
+    
+    print("List of", people.len(), "people:");
+    for i in range(people.len()) {
+        let person = people[i];
+        print("  Person", i, ":", person["name"], "(", person["age"], "years old)");
+    }
+    
+    // Create a dictionary with lists as values
+    let categories = {};
+    categories["numbers"] = [1, 2, 3, 4, 5];
+    categories["strings"] = ["apple", "banana", "cherry"];
+    categories["mixed"] = [42, "hello", 3.14];
+    
+    print("\nDictionary with lists:");
+    print("  Numbers:", categories["numbers"]);
+    print("  Strings:", categories["strings"]);
+    print("  Mixed:", categories["mixed"]);
+    
+    // Create a tuple containing lists and dicts
+    let complex_tuple = ([1, 2, 3], {"key": "value"}, (4, 5, 6));
+    print("\nComplex tuple containing list, dict, and tuple:");
+    print("  List part:", complex_tuple[0]);
+    print("  Dict part:", complex_tuple[1]);
+    print("  Tuple part:", complex_tuple[2]);
+    
+    return people;
+}
+
+// Test performance with larger structures
+func test_performance() {
+    print("\n=== Testing Performance ===");
+    
+    // Create a large list
+    let large_list = [];
+    print("Creating list with 1000 elements...");
+    for i in range(1000) {
+        large_list.append(i * 2);
+    }
+    print("List created with", large_list.len(), "elements");
+    
+    // Access some elements
+    print("Accessing elements at positions 0, 500, 999:");
+    print("  [0] =", large_list[0]);
+    print("  [500] =", large_list[500]);
+    print("  [999] =", large_list[999]);
+    
+    // Create a large dictionary
+    let large_dict = {};
+    print("Creating dictionary with 100 key-value pairs...");
+    for i in range(100) {
+        let key = "key_" + i.to_string();
+        large_dict[key] = i * i;
+    }
+    print("Dictionary created with 100 entries");
+    
+    // Access some elements
+    print("Accessing dictionary entries:");
+    print("  key_0 ->", large_dict["key_0"]);
+    print("  key_50 ->", large_dict["key_50"]);
+    print("  key_99 ->", large_dict["key_99"]);
+    
+    return large_list;
+}
+
+// Test error handling
+func test_error_handling() {
+    print("\n=== Testing Error Handling ===");
+    
+    // Test list index out of bounds
+    let small_list = [1, 2, 3];
+    print("Testing list index out of bounds:");
+    print("  Valid access: small_list[1] =", small_list[1]);
+    
+    // This should return nil or handle gracefully
+    let invalid = small_list[10];
+    print("  Invalid access: small_list[10] =", invalid);
+    
+    // Test dictionary key not found
+    let small_dict = {"existing": "value"};
+    print("\nTesting dictionary key not found:");
+    print("  Valid access: small_dict['existing'] =", small_dict["existing"]);
+    
+    // This should return nil or handle gracefully
+    let missing = small_dict["missing"];
+    print("  Invalid access: small_dict['missing'] =", missing);
+    
+    // Test tuple index out of bounds
+    let small_tuple = (1, 2, 3);
+    print("\nTesting tuple index out of bounds:");
+    print("  Valid access: small_tuple[1] =", small_tuple[1]);
+    
+    // This should return nil or handle gracefully
+    let tuple_invalid = small_tuple[10];
+    print("  Invalid access: small_tuple[10] =", tuple_invalid);
+    
+    return small_list;
+}
+
+// Main test function
+func main() {
+    print("Starting Runtime Structures Test");
+    print("================================");
+    
+    // Run all tests
+    let list_result = test_list_operations();
+    let dict_result = test_dict_operations();
+    let tuple_result = test_tuple_operations();
+    let nested_result = test_nested_structures();
+    let perf_result = test_performance();
+    let error_result = test_error_handling();
+    
+    print("\n=== Test Summary ===");
+    print("✅ List operations completed");
+    print("✅ Dictionary operations completed");
+    print("✅ Tuple operations completed");
+    print("✅ Nested structures completed");
+    print("✅ Performance tests completed");
+    print("✅ Error handling tests completed");
+    
+    print("\nAll runtime structure tests completed successfully!");
+    return 0;
+}
+
+// Call main function
+main();

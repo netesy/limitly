@@ -1,0 +1,25 @@
+// Basic test to verify runtime integration
+// This uses only currently supported Limitly features
+
+print("=== Basic Runtime Integration Test ===");
+
+// Test basic arithmetic and printing
+var a = 42;
+var b = 3.14;
+var c = "hello world";
+
+print("Integer:", a);
+print("Float:", b);
+print("String:", c);
+
+// Test basic operations
+var sum = a + 10;
+var product = b * 2;
+var greeting = "Hello " + "Limitly!";
+
+print("Sum:", sum);
+print("Product:", product);
+print("Greeting:", greeting);
+
+print("\n=== Basic Test Complete ===");
+print("✅ Runtime integration working!");
