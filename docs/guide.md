@@ -749,6 +749,28 @@ class Circle : Shape {
 }
 ```
 
+### Worker Statement
+
+The `worker` statement is a convenient syntax for processing items from a channel. It creates a pool of workers that will receive values from the specified channel and process them in parallel.
+
+```limit
+var messages = channel();
+
+// Send some messages to the channel
+concurrent {
+    task(i in 1..10) {
+        messages.send("Message {i}");
+    }
+}
+
+// Create a pool of workers to process the messages
+concurrent(ch=messages) {
+    worker(msg in ch) {
+        print("Worker received: {msg}");
+    }
+}
+```
+
 #### Final Classes and Methods
 
 A `final` class cannot be subclassed. A `final` method cannot be overridden by a subclass.
@@ -1004,31 +1026,53 @@ print(a); // Output: 1
 
 Limit is a memory-safe language, but sometimes you may need to interface with low-level code or perform operations that the compiler cannot guarantee are safe. For these cases, you can use an `unsafe` block.
 
+Inside an `unsafe` block, you can perform operations that are not normally allowed by the compiler, such as calling C functions or dereferencing raw pointers.
+
+> **Note:** `unsafe` code should be used sparingly and with great care. It is your responsibility to ensure that the code inside an `unsafe` block is actually safe.
+
 ```limit
+// This example assumes a C function `my_c_function` has been linked into the program
+extern fn my_c_function(x: int): int;
+
 unsafe {
-    // Low-level operations
+    // Call a C function
+    var result = my_c_function(10);
+    print("Result from C function: {result}");
 }
 ```
 
 ### Contract Statements
 
-Contracts are used to enforce preconditions, postconditions, and invariants in your code. They are useful for debugging and ensuring correctness.
+Contracts are used to enforce preconditions, postconditions, and invariants in your code. They are useful for debugging and ensuring correctness. If a contract fails, the program will halt with an error message.
+
+You can use the built-in `assert` function, which is an alias for `contract`. `assert` can take a single boolean argument or a boolean and a string message.
 
 ```limit
 fn divide(a: int, b: int): int {
-    contract(b != 0, "Cannot divide by zero");
+    assert(b != 0, "Cannot divide by zero");
     return a / b;
 }
+
+divide(10, 0); // This will halt the program and print the error message
 ```
 
 ### Compile-Time Execution
 
 The `comptime` keyword allows you to execute code at compile time. This is useful for metaprogramming, generating lookup tables, or performing other computations before the program runs.
 
+The code inside a `comptime` block is executed by the compiler, and the results are embedded into the final program. This allows you to perform complex calculations at compile time, which can improve the performance of your program at runtime.
+
 ```limit
+// Generate a lookup table at compile time
+var lookup_table: [int];
 comptime {
-    var my_compile_time_var = 123;
+    lookup_table = [];
+    for (var i = 0; i < 10; i += 1) {
+        lookup_table.append(i * i);
+    }
 }
+
+print(lookup_table); // Output: [0, 1, 4, 9, 16, 25, 36, 49, 64, 81]
 ```
 
 ## The Type System
@@ -1062,21 +1106,22 @@ Union types are especially powerful when combined with `match` statements to han
 
 ### Intersection Types
 
-An intersection type is a type that combines multiple types into one. A value of an intersection type must satisfy the requirements of all the types in the intersection. Intersection types are defined using the ampersand (`&`) character.
+An intersection type is a type that combines multiple types into one. A value of an intersection type must satisfy the requirements of all the types in the intersection. Intersection types are defined using the ampersand (`&`) or the `and` keyword.
 
 ```limit
-trait HasName {
-    fn get_name(): str;
+trait Persistable {
+    fn save(self);
 }
 
-trait HasAge {
-    fn get_age(): int;
+trait Loggable {
+    fn log(self, message: str);
 }
 
-type Person = HasName & HasAge;
+type Archivable = Persistable & Loggable;
 
-fn print_person_details(p: Person) {
-    print("{p.get_name()} is {p.get_age()} years old.");
+fn archive(item: Archivable) {
+    item.log("Archiving item...");
+    item.save();
 }
 ```
 
@@ -1085,14 +1130,14 @@ fn print_person_details(p: Person) {
 A refined type allows you to add constraints to an existing type. This is useful for enforcing invariants at the type level. Refined types are defined using the `where` keyword.
 
 ```limit
-type PositiveInt = int where value > 0;
+type NonEmptyString = str where value.length > 0;
 
-fn set_age(age: PositiveInt) {
-    // ...
+fn print_name(name: NonEmptyString) {
+    print("Your name is {name}");
 }
 
-set_age(10); // Valid
-set_age(-5); // This would be a runtime error
+print_name("Jules"); // Valid
+print_name(""); // This would be a runtime error
 ```
 
 ### Structural Types
@@ -1139,14 +1184,33 @@ var current_status: Status = Status.Running;
 
 Traits and interfaces are used to define a set of methods that a class must implement. This is a powerful tool for abstraction and polymorphism.
 
+- **Traits** are used to define a single, specific behavior that a class can implement. A class can implement multiple traits, allowing for a form of multiple inheritance.
+- **Interfaces** are used to define the full public API of a class. A class can only implement a single interface, and it must implement all of the methods defined in that interface.
+
 ```limit
-trait Speaker {
-    fn speak();
+// A trait for logging
+trait Loggable {
+    fn log(message: str);
 }
 
-class Dog : Speaker {
-    fn speak() {
-        print("Woof!");
+// An interface for a user repository
+interface UserRepository {
+    fn get_user(id: int): User;
+    fn save_user(user: User);
+}
+
+// A class that implements the UserRepository interface and the Loggable trait
+class InMemoryUserRepository : UserRepository, Loggable {
+    fn get_user(id: int): User {
+        // ...
+    }
+
+    fn save_user(user: User) {
+        // ...
+    }
+
+    fn log(message: str) {
+        print("LOG: {message}");
     }
 }
 ```
@@ -1475,6 +1539,24 @@ print("All concurrent tasks have completed.");
 ### Channels
 
 Channels are the primary way for concurrent tasks to communicate. One or more tasks can send messages to a channel, and another task can receive them.
+
+You create a channel using the built-in `channel()` function.
+
+```limit
+var messages = channel();
+```
+
+Limit provides both blocking and non-blocking ways to interact with channels.
+
+#### Blocking and Non-Blocking Operations
+
+- **Blocking operations** will pause the execution of a task until the operation can be completed.
+  - `channel.send(value)`: Sends a `value` to the channel, blocking if the channel is full (if it has a limited capacity and is at capacity).
+  - `value = channel.recv()`: Receives a value from the channel, blocking if the channel is empty.
+
+- **Non-blocking operations** will return immediately, whether the operation succeeded or not. This is useful for avoiding deadlocks or for tasks that need to remain responsive.
+  - `channel.offer(value)`: Attempts to send a `value` to the channel. Returns `true` if successful and `false` if the channel is full.
+  - `value = channel.poll()`: Attempts to receive a value from the channel. Returns the value if one is available, or `nil` if the channel is empty.
 
 ### Async/Await
 
