@@ -1,1 +1,19 @@
-print("Hello World")
+// List-based loop with explicit string list type
+var fruits = ["Apple", "Banana", "Cherry"];
+iter (fruit in fruits) {
+    print(fruit);
+}
+
+// Tuple-based loop with explicit string list type
+var fruites = ("Apples", "Bananas", "Cherries");
+iter (fruit in fruites) {
+    print(fruit);
+}
+
+// Dictionary-based loop with defined key/value type
+//type DictOfStrToInt = {str: int};
+var my_dict = { "a": 1, "b": 2, "c": 3 };
+iter (entry in my_dict) {
+    print("{entry.key}: {entry.value}");
+}
+

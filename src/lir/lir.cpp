@@ -99,6 +99,30 @@ std::string LIR_Inst::to_string() const {
         case LIR_Op::STR_FORMAT:
             oss << " r" << dst << ", r" << a << ", r" << b;
             break;
+        case LIR_Op::ListCreate:
+            oss << " r" << dst;
+            break;
+        case LIR_Op::ListAppend:
+            oss << " r" << dst << ", r" << a << ", r" << b;
+            break;
+        case LIR_Op::ListIndex:
+            oss << " r" << dst << ", r" << a << ", r" << b;
+            break;
+        case LIR_Op::DictCreate:
+            oss << " r" << dst;
+            break;
+        case LIR_Op::DictSet:
+            oss << " r" << dst << ", r" << a << ", r" << b;
+            break;
+        case LIR_Op::DictGet:
+            oss << " r" << dst << ", r" << a << ", r" << b;
+            break;
+        case LIR_Op::TupleCreate:
+            oss << " r" << dst;
+            break;
+        case LIR_Op::TupleGet:
+            oss << " r" << dst << ", r" << a << ", r" << b;
+            break;
         case LIR_Op::Nop:
             // No operands
             break;
