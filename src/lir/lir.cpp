@@ -221,6 +221,11 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::ListCreate: return "list_create";
         case LIR_Op::ListAppend: return "list_append";
         case LIR_Op::ListIndex: return "list_index";
+        case LIR_Op::DictCreate: return "dict_create";
+        case LIR_Op::DictSet: return "dict_set";
+        case LIR_Op::DictGet: return "dict_get";
+        case LIR_Op::TupleCreate: return "tuple_create";
+        case LIR_Op::TupleGet: return "tuple_get";
         case LIR_Op::NewObject: return "new";
         case LIR_Op::GetField: return "get_field";
         case LIR_Op::SetField: return "set_field";

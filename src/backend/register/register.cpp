@@ -1,16 +1,65 @@
-#include "register.hh"
 #include "../../lir/lir.hh"
 #include "../../lir/functions.hh"
 #include "../../lir/function_registry.hh"
 #include "../../lir/builtin_functions.hh"
 #include "../types.hh"
-#include "../value.hh"
+#include "register.hh"
+#include "../../lir/lir.hh"
+#include "../../runtime/runtime.h"
+#include "../../runtime/runtime_list.h"
+#include "../../runtime/runtime_dict.h"
 #include <iostream>
-#include <cstring>
-#include <unordered_map>
+#include <variant>
 #include <memory>
+#include <cstring>
+#include <cstdint>
 
 namespace Register {
+
+// Boxing/Unboxing functions for C runtime integration
+void* box_register_value(const RegisterValue& value) {
+    // Use the runtime boxing functions
+    if (std::holds_alternative<int64_t>(value)) {
+        return lm_box_int(std::get<int64_t>(value));
+    } else if (std::holds_alternative<double>(value)) {
+        return lm_box_float(std::get<double>(value));
+    } else if (std::holds_alternative<bool>(value)) {
+        return lm_box_bool(std::get<bool>(value) ? 1 : 0);
+    } else if (std::holds_alternative<std::string>(value)) {
+        return lm_box_string(std::get<std::string>(value).c_str());
+    } else if (std::holds_alternative<uint64_t>(value)) {
+        return lm_box_int(static_cast<int64_t>(std::get<uint64_t>(value)));
+    } else {
+        return lm_box_nullptr(); // nullptr stays nullptr
+    }
+}
+
+RegisterValue unbox_register_value(void* boxed_value) {
+    if (!boxed_value) {
+        return nullptr;
+    }
+    
+    // Use the runtime unboxing functions
+    LmBox* box = static_cast<LmBox*>(boxed_value);
+    if (!box) {
+        return nullptr;
+    }
+    
+    switch (box->type) {
+        case LM_BOX_INT:
+            return box->value.as_int;
+        case LM_BOX_FLOAT:
+            return box->value.as_float;
+        case LM_BOX_BOOL:
+            return box->value.as_bool ? true : false;
+        case LM_BOX_STRING:
+            return std::string(lm_unbox_string(box));
+        case LM_BOX_NULLPTR:
+            return nullptr;
+        default:
+            return nullptr;
+    }
+}
 
 // Helper functions
 bool is_numeric(const RegisterValue& value) {
@@ -598,15 +647,130 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 registers[pc->dst] = registers[pc->a];
                 break;
             }
-            case LIR::LIR_Op::Load:
-            case LIR::LIR_Op::Store:
-            case LIR::LIR_Op::ListCreate:
-            case LIR::LIR_Op::ListAppend:
-            case LIR::LIR_Op::ListIndex:
-            case LIR::LIR_Op::NewObject:
-            case LIR::LIR_Op::GetField:
-            case LIR::LIR_Op::SetField: {
-                registers[pc->dst] = nullptr;
+            case LIR::LIR_Op::ListCreate: {
+                // Create a new list using C runtime
+                // Store the list pointer as int64_t handle
+                void* list = lm_list_new();
+                registers[pc->dst] = static_cast<int64_t>(reinterpret_cast<uintptr_t>(list));
+                break;
+            }
+            case LIR::LIR_Op::ListAppend: {
+                // Append value to list using C runtime
+                auto& list_reg = registers[pc->a];
+                auto& value_reg = registers[pc->b];
+                
+                if (std::holds_alternative<int64_t>(list_reg)) {
+                    void* list = reinterpret_cast<void*>(static_cast<uintptr_t>(std::get<int64_t>(list_reg)));
+                    if (list) {
+                        // Box the value for C runtime
+                        void* boxed_value = box_register_value(value_reg);
+                        lm_list_append(static_cast<LmList*>(list), boxed_value);
+                        registers[pc->dst] = static_cast<int64_t>(1); // Success
+                    } else {
+                        registers[pc->dst] = nullptr; // Invalid list pointer
+                    }
+                } else {
+                    registers[pc->dst] = nullptr; // Invalid list register
+                }
+                break;
+            }
+            case LIR::LIR_Op::ListIndex: {
+                // Get value from list using C runtime
+                auto& list_reg = registers[pc->a];
+                auto& index_reg = registers[pc->b];
+                
+                if (std::holds_alternative<int64_t>(list_reg) && is_numeric(index_reg)) {
+                    void* list = reinterpret_cast<void*>(static_cast<uintptr_t>(std::get<int64_t>(list_reg)));
+                    if (list) {
+                        void* result = lm_list_get(static_cast<LmList*>(list), static_cast<uint64_t>(to_int(index_reg)));
+                        if (result) {
+                            registers[pc->dst] = unbox_register_value(result);
+                        } else {
+                            registers[pc->dst] = nullptr; // Index out of bounds
+                        }
+                    } else {
+                        registers[pc->dst] = nullptr; // Invalid list pointer
+                    }
+                } else {
+                    registers[pc->dst] = nullptr; // Invalid registers
+                }
+                break;
+            }
+            case LIR::LIR_Op::DictCreate: {
+                // Create a new dict using C runtime
+                void* dict = lm_dict_new(lm_hash_int, lm_cmp_int);
+                registers[pc->dst] = static_cast<int64_t>(reinterpret_cast<uintptr_t>(dict));
+                break;
+            }
+            case LIR::LIR_Op::DictSet: {
+                auto& dict_reg = registers[pc->a];
+                auto& key_reg = registers[pc->b];
+                LIR::Reg value_reg_idx = static_cast<LIR::Reg>(pc->imm);
+                auto& value_reg = registers[value_reg_idx];
+                
+                if (std::holds_alternative<int64_t>(dict_reg)) {
+                    void* dict_ptr = reinterpret_cast<void*>(static_cast<uintptr_t>(std::get<int64_t>(dict_reg)));
+                    void* key_ptr = box_register_value(key_reg);
+                    void* value_ptr = box_register_value(value_reg);
+                    
+                    lm_dict_set(static_cast<LmDict*>(dict_ptr), key_ptr, value_ptr);
+                    registers[pc->dst] = dict_reg;
+                } else {
+                    registers[pc->dst] = nullptr; // Invalid dict register
+                }
+                break;
+            }
+            case LIR::LIR_Op::DictGet: {
+                // Get value from dict using C runtime
+                auto& dict_reg = registers[pc->a];
+                auto& key_reg = registers[pc->b];
+                
+                if (std::holds_alternative<int64_t>(dict_reg)) {
+                    void* dict = reinterpret_cast<void*>(static_cast<uintptr_t>(std::get<int64_t>(dict_reg)));
+                    if (dict) {
+                        // Box key for C runtime
+                        void* boxed_key = box_register_value(key_reg);
+                        void* result = lm_dict_get(static_cast<LmDict*>(dict), boxed_key);
+                        if (result) {
+                            registers[pc->dst] = unbox_register_value(result);
+                        } else {
+                            registers[pc->dst] = nullptr; // Key not found
+                        }
+                    } else {
+                        registers[pc->dst] = nullptr; // Invalid dict pointer
+                    }
+                } else {
+                    registers[pc->dst] = nullptr; // Invalid dict register
+                }
+                break;
+            }
+            case LIR::LIR_Op::TupleCreate: {
+                // For tuples, we'll use a simple approach - store as a list handle
+                // In a real implementation, tuples would be fixed-size structs
+                void* tuple = lm_list_new(); // Reuse list structure for tuple
+                registers[pc->dst] = static_cast<int64_t>(reinterpret_cast<uintptr_t>(tuple));
+                break;
+            }
+            case LIR::LIR_Op::TupleGet: {
+                // Get value from tuple using C runtime (reuse list operations)
+                auto& tuple_reg = registers[pc->a];
+                auto& index_reg = registers[pc->b];
+                
+                if (std::holds_alternative<int64_t>(tuple_reg) && is_numeric(index_reg)) {
+                    void* tuple = reinterpret_cast<void*>(static_cast<uintptr_t>(std::get<int64_t>(tuple_reg)));
+                    if (tuple) {
+                        void* result = lm_list_get(static_cast<LmList*>(tuple), static_cast<uint64_t>(to_int(index_reg)));
+                        if (result) {
+                            registers[pc->dst] = unbox_register_value(result);
+                        } else {
+                            registers[pc->dst] = nullptr; // Index out of bounds
+                        }
+                    } else {
+                        registers[pc->dst] = nullptr; // Invalid tuple pointer
+                    }
+                } else {
+                    registers[pc->dst] = nullptr; // Invalid registers
+                }
                 break;
             }
             case LIR::LIR_Op::TaskContextAlloc: {
