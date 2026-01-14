@@ -335,7 +335,7 @@ iter (i in 0..10..2) {
     print("i = {i}"); // Output: 0, 2, 4, 6, 8
 }
 ```
-> **Note:** The step value feature is planned but not yet fully implemented in the parser.
+> **Note:** The step value feature is planned but not yet implemented.
 
 ### Ternary Operator
 
@@ -346,7 +346,7 @@ var x = 10;
 var result = x > 5 ? "Greater than 5" : "Not greater than 5";
 print(result); // Output: Greater than 5
 ```
-> **Note:** The ternary operator is planned but not yet implemented in the parser.
+> **Note:** The ternary operator is planned but not yet implemented.
 
 ### Match Statements
 
@@ -470,20 +470,6 @@ match (my_list) {
 // Output:
 // First: 1, Second: 2
 // Rest: [3, 4]
-```
-
-#### Destructuring Tuples
-
-Tuples can be destructured in a similar way.
-
-```limit
-var my_tuple = ("Jules", 42);
-
-match (my_tuple) {
-    (name, age) => { print("{name} is {age} years old."); },
-    _ => { print("Not a person tuple."); }
-}
-// Output: Jules is 42 years old.
 ```
 
 ## Data Structures
@@ -988,16 +974,12 @@ print(result); // Output: 50
 
 ### Destructuring Assignments
 
-You can unpack values from tuples and lists into separate variables.
+You can unpack values from tuples into separate variables.
 
 ```limit
 // Destructuring a tuple
 var (name, age) = ("Alice", 30);
 print("{name} is {age} years old."); // Output: Alice is 30 years old.
-
-// Destructuring a list
-var [a, b, c] = [1, 2, 3];
-print(a); // Output: 1
 ```
 
 ### Unsafe Blocks
@@ -1476,10 +1458,6 @@ print("All concurrent tasks have completed.");
 
 Channels are the primary way for concurrent tasks to communicate. One or more tasks can send messages to a channel, and another task can receive them.
 
-### Async/Await
-
-The `async` and `await` keywords are used for non-blocking operations, typically within a `concurrent` block. An `async` function returns immediately without blocking the thread, and you can use `await` to get its result when it's ready.
-
 ### Atomics
 
 For simple cases of shared state, such as counters, you can use `atomic` variables. These variables can be safely accessed and modified from multiple tasks at the same time without causing data races.
@@ -1494,22 +1472,4 @@ concurrent {
 }
 
 print("Final counter value: {shared_counter}"); // Output: 10
-```
-
-### Tasks
-
-A `task` statement is used inside a `parallel` or `concurrent` block to define a unit of work that can be executed concurrently. A task can also iterate over a collection, creating a new concurrent task for each item.
-
-```limit
-concurrent {
-    // A simple task
-    task {
-        print("Task 1");
-    }
-
-    // A task that iterates over a range
-    task(i in 1..5) {
-        print("Task {i}");
-    }
-}
 ```
