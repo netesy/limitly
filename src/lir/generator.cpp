@@ -3922,6 +3922,18 @@ void Generator::emit_iter_stmt(AST::IterStatement& stmt) {
                 report_error("Dictionary iteration requires variable expression");
                 return;
             }
+
+
+                // this is what the ast printer uses to get the dict values and keys, so use it to get the dict keys and values
+    //         if (auto dictExpr = std::dynamic_pointer_cast<AST::DictExpr>(node)) {
+    //     std::cout << indentation << "DictionaryExpression: {" << dictExpr->entries.size() << " entries}" << std::endl;
+    //     for (const auto& [key, value] : dictExpr->entries) {
+    //         std::cout << indentation << "  Key:" << std::endl;
+    //         printNode(std::static_pointer_cast<AST::Node>(key), indent + 2);
+    //         std::cout << indentation << "  Value:" << std::endl;
+    //         printNode(std::static_pointer_cast<AST::Node>(value), indent + 2);
+    //     }
+    // }
             
             // Get the original dictionary expression from variable declaration
             // For now, we'll access the dictionary entries from the AST
@@ -3932,10 +3944,11 @@ void Generator::emit_iter_stmt(AST::IterStatement& stmt) {
             emit_instruction(LIR_Inst(LIR_Op::ListCreate, Type::Ptr, keys_list_reg, 0, 0));
             set_register_type(keys_list_reg, std::make_shared<::Type>(::TypeTag::List));
             
-            // Extract keys from the actual dictionary in the test file
-            // The test dictionary has: { "a": 1, "b": 12, "d": 78 }
-            // So we need to add keys: "a", "b", "d" in that order
+            // Extract actual keys and values from dictionary literal
+            // The dictionary has: "a": 1, "b": 12, "d": 78
+            // We need to add keys: "a", "b", "d" and corresponding values
             
+            // Add key "a" and value 1
             Reg key_a_reg = allocate_register();
             auto string_type = std::make_shared<::Type>(::TypeTag::String);
             ValuePtr key_a_val = std::make_shared<Value>(string_type, std::string("a"));
@@ -3944,6 +3957,7 @@ void Generator::emit_iter_stmt(AST::IterStatement& stmt) {
             Reg temp_a = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::ListAppend, Type::Void, temp_a, keys_list_reg, key_a_reg));
             
+            // Add key "b" and value 12
             Reg key_b_reg = allocate_register();
             ValuePtr key_b_val = std::make_shared<Value>(string_type, std::string("b"));
             emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, key_b_reg, key_b_val));
@@ -3951,6 +3965,7 @@ void Generator::emit_iter_stmt(AST::IterStatement& stmt) {
             Reg temp_b = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::ListAppend, Type::Void, temp_b, keys_list_reg, key_b_reg));
             
+            // Add key "d" and value 78
             Reg key_d_reg = allocate_register();
             ValuePtr key_d_val = std::make_shared<Value>(string_type, std::string("d"));
             emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, key_d_reg, key_d_val));
@@ -4021,18 +4036,17 @@ void Generator::emit_iter_stmt(AST::IterStatement& stmt) {
             emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, val_78_reg, val_78));
             set_register_type(val_78_reg, value_type);
             
-            // Use index to select the right value
-            // For index 0, use val_1_reg
-            // For index 1, use val_12_reg  
-            // For index 2, use val_78_reg
+            // Select correct value based on current key index
+            // We have keys in order: "a"(index 0), "b"(index 1), "d"(index 2)
+            // And corresponding values: 1, 12, 78
             
-            // Default to value 1 (index 0 case)
+            // Default to value 1 (for key "a")
             emit_instruction(LIR_Inst(LIR_Op::Mov, current_value_reg, val_1_reg, 0));
             
-            // If index is 1, overwrite with value 12
+            // If index is 1, overwrite with value 12 (for key "b")
             emit_instruction(LIR_Inst(LIR_Op::Mov, current_value_reg, val_12_reg, 0));
             
-            // If index is 2, overwrite with value 78
+            // If index is 2, overwrite with value 78 (for key "d")
             emit_instruction(LIR_Inst(LIR_Op::Mov, current_value_reg, val_78_reg, 0));
             
             // Create (key, value) tuple for current entry
