@@ -630,6 +630,13 @@ void ASTPrinter::printNode(const std::shared_ptr<AST::Node>& node, int indent) {
             printNode(std::static_pointer_cast<AST::Node>(element), indent + 1);
         }
     }
+    else if (auto dictExpr = std::dynamic_pointer_cast<AST::TupleExpr>(node)) {
+        std::cout << indentation << "TupleExpression: (" << dictExpr->elements.size() << " elements)" << std::endl;
+        for (const auto& element : dictExpr->elements) {
+            // Convert Expression to Node using static_pointer_cast since Expression inherits from Node
+            printNode(std::static_pointer_cast<AST::Node>(element), indent + 1);
+        }
+    }
     else if (auto dictExpr = std::dynamic_pointer_cast<AST::DictExpr>(node)) {
         std::cout << indentation << "DictionaryExpression: {" << dictExpr->entries.size() << " entries}" << std::endl;
         for (const auto& [key, value] : dictExpr->entries) {
