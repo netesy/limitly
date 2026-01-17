@@ -171,10 +171,12 @@ enum class LIR_Op : uint8_t {
     DictCreate,
     DictSet,
     DictGet,
+    DictItems,  // Get dict items as flat array of (key, value) pairs
     
     // Tuple operations
     TupleCreate,
     TupleGet,
+    TupleSet,  // Set tuple element by index
     
     // Class operations
     NewObject,

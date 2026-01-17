@@ -1,0 +1,5 @@
+// Test tuple element access
+var my_tuple = ("Hello", "World", "Test")
+print(my_tuple[0])
+print(my_tuple[1]) 
+print(my_tuple[2])

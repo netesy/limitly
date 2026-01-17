@@ -90,6 +90,34 @@ RUNTIME_API void lm_dict_free(LmDict* dict) {
     free(dict);
 }
 
+RUNTIME_API void** lm_dict_items(LmDict* dict, uint64_t* out_count) {
+    if (!dict || dict->size == 0) {
+        *out_count = 0;
+        return NULL;
+    }
+    
+    // Allocate array for (key, value) pairs - 2 pointers per entry
+    void** items = (void**)malloc(sizeof(void*) * dict->size * 2);
+    if (!items) {
+        *out_count = 0;
+        return NULL;
+    }
+    
+    uint64_t index = 0;
+    for (uint64_t i = 0; i < dict->bucket_count; i++) {
+        LmDictEntry* entry = dict->buckets[i];
+        while (entry) {
+            items[index * 2] = entry->key;      // Even indices: keys
+            items[index * 2 + 1] = entry->value; // Odd indices: values
+            index++;
+            entry = entry->next;
+        }
+    }
+    
+    *out_count = dict->size;
+    return items;
+}
+
 RUNTIME_API uint64_t lm_hash_int(void* key) {
     int64_t k = (int64_t)key;
     return (uint64_t)(k * 2654435761ULL);
