@@ -350,6 +350,8 @@ print(result); // Output: Greater than 5
 
 ### Match Statements
 
+> **Note:** The `match` statement and all forms of pattern matching are planned but not yet implemented. The syntax and examples below represent the intended design.
+
 The `match` statement is a powerful tool for pattern matching. It can be used as an advanced `switch` statement.
 
 A `match` statement can match against literal values:
@@ -487,6 +489,8 @@ match (my_tuple) {
 ```
 
 ## Data Structures
+
+> **Note:** While the syntax for list and dictionary literals is supported, the full standard library for these data structures (including methods for manipulation, iteration, etc.) is not yet implemented.
 
 Limit provides built-in support for common data structures.
 
@@ -629,6 +633,8 @@ greet_default("Alice");   // Output: Hello, Alice!
 
 ### Higher-Order Functions
 
+> **Note:** Higher-order functions, closures, and other first-class function features are planned but not yet implemented. The syntax and examples below represent the intended design.
+
 Functions are first-class citizens in Limit, which means they can be passed as arguments to other functions.
 
 ```
@@ -666,6 +672,8 @@ print(counter()); // Output: 3
 ```
 
 ## Classes
+
+> **Note:** Basic class syntax is implemented, but advanced features like inheritance and method dispatch are not yet fully supported in the VM. The examples below represent the intended design for all class features.
 
 Limit is an object-oriented language and supports classes for creating user-defined types.
 
@@ -876,6 +884,8 @@ iter (animal: Animal in animals) {
 
 ## Modules and Imports
 
+> **Note:** The syntax for modules and imports is fully parsed, but the VM and runtime support for loading and using modules is not yet implemented. The examples below show the intended functionality.
+
 Limit supports a module system that allows you to organize your code into separate files and reuse code across your project.
 
 ### Defining a Module
@@ -960,7 +970,11 @@ When another file imports this module, it will only have access to the `public` 
 
 ## Advanced Features
 
+> **Note:** The advanced features described in this section are in various stages of planning and implementation. Most are parsed but not yet fully supported by the type checker or VM.
+
 ### Lambda Expressions (Anonymous Functions)
+
+> **Note:** This feature is planned but not yet implemented.
 
 Limit supports lambda expressions, also known as anonymous functions. These are functions that do not have a name and can be defined on the fly.
 
@@ -988,6 +1002,8 @@ print(result); // Output: 50
 
 ### Destructuring Assignments
 
+> **Note:** The `var (a, b) = ...` syntax for tuples is implemented, but list-style destructuring (`var [a, b] = ...`) is not yet supported.
+
 You can unpack values from tuples and lists into separate variables.
 
 ```limit
@@ -1002,6 +1018,8 @@ print(a); // Output: 1
 
 ### Unsafe Blocks
 
+> **Note:** This feature is planned but not yet implemented.
+
 Limit is a memory-safe language, but sometimes you may need to interface with low-level code or perform operations that the compiler cannot guarantee are safe. For these cases, you can use an `unsafe` block.
 
 ```limit
@@ -1011,6 +1029,8 @@ unsafe {
 ```
 
 ### Contract Statements
+
+> **Note:** The `contract` keyword is parsed, but full design-by-contract features are not yet implemented. The built-in `assert` function provides similar functionality.
 
 Contracts are used to enforce preconditions, postconditions, and invariants in your code. They are useful for debugging and ensuring correctness.
 
@@ -1022,6 +1042,8 @@ fn divide(a: int, b: int): int {
 ```
 
 ### Compile-Time Execution
+
+> **Note:** This feature is planned but not yet implemented.
 
 The `comptime` keyword allows you to execute code at compile time. This is useful for metaprogramming, generating lookup tables, or performing other computations before the program runs.
 
@@ -1062,6 +1084,8 @@ Union types are especially powerful when combined with `match` statements to han
 
 ### Intersection Types
 
+> **Note:** This feature is planned but not yet implemented.
+
 An intersection type is a type that combines multiple types into one. A value of an intersection type must satisfy the requirements of all the types in the intersection. Intersection types are defined using the ampersand (`&`) character.
 
 ```limit
@@ -1082,6 +1106,8 @@ fn print_person_details(p: Person) {
 
 ### Refined Types
 
+> **Note:** This feature is planned but not yet implemented.
+
 A refined type allows you to add constraints to an existing type. This is useful for enforcing invariants at the type level. Refined types are defined using the `where` keyword.
 
 ```limit
@@ -1096,6 +1122,8 @@ set_age(-5); // This would be a runtime error
 ```
 
 ### Structural Types
+
+> **Note:** The syntax for structural types is parsed, but the type system and VM support are not yet complete.
 
 A structural type allows you to define a type based on its structure or shape, rather than by a specific name. This is useful for working with data that has a consistent structure but may not be an instance of a named class.
 
@@ -1402,6 +1430,8 @@ var value: int = divide(10, 0)? else {
 This syntax is particularly useful for providing default values while maintaining Limit's null-free design principles.
 
 ## Concurrency
+
+> **Note:** The concurrency features described below, including `parallel` and `concurrent` blocks, `async`/`await`, and channels, are parsed but not yet implemented in the VM. The syntax and examples represent the intended design.
 
 Limit has powerful, high-level features for managing concurrent and parallel tasks.
 
