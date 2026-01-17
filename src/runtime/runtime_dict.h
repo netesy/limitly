@@ -33,6 +33,7 @@ RUNTIME_API LmDict* lm_dict_new(uint64_t (*hash_fn)(void*),
                                  int (*cmp_fn)(void*, void*));
 RUNTIME_API void lm_dict_set(LmDict* dict, void* key, void* value);
 RUNTIME_API void* lm_dict_get(LmDict* dict, void* key);
+RUNTIME_API void** lm_dict_items(LmDict* dict, uint64_t* out_count);
 RUNTIME_API int lm_dict_contains(LmDict* dict, void* key);
 RUNTIME_API void lm_dict_free(LmDict* dict);
 

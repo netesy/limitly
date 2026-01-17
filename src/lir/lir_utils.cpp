@@ -11,7 +11,7 @@ std::string Disassembler::disassemble() const {
     std::stringstream ss;
     
     // Main function header
-    ss << "function " << func.name << "(";
+    ss << "fn " << func.name << "(";
     for (uint32_t i = 0; i < func.param_count; ++i) {
         if (i > 0) ss << ", ";
         ss << "r" << i;

@@ -16,6 +16,7 @@ extern "C" {
 #include "runtime_list.h"
 #include "runtime_dict.h"
 #include "runtime_string.h"
+#include "runtime_tuple.h"
 
 // Boxing/Unboxing for primitive types
 typedef struct {

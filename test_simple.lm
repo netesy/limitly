@@ -12,7 +12,7 @@ iter (fruit in fruites) {
 
 // Dictionary-based loop with defined key/value type
 //type DictOfStrToInt = {str: int};
-var my_dict = { "at": 1, "bi": 12, "ce": 78, "de": 28 };
+var my_dict = { "at": 1, "bi": 12, "fce": 78, "de": 288 };
 iter (entry in my_dict) {
     print("{entry.key}: {entry.value}");
 }

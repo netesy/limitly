@@ -8,6 +8,7 @@
 #include "../../runtime/runtime.h"
 #include "../../runtime/runtime_list.h"
 #include "../../runtime/runtime_dict.h"
+#include "../../runtime/runtime_tuple.h"
 #include <iostream>
 #include <variant>
 #include <memory>
@@ -744,22 +745,82 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 }
                 break;
             }
+            case LIR::LIR_Op::DictItems: {
+                // Get dict items as flat array of (key, value) pairs
+                auto& dict_reg = registers[pc->a];
+                
+                if (std::holds_alternative<int64_t>(dict_reg)) {
+                    void* dict = reinterpret_cast<void*>(static_cast<uintptr_t>(std::get<int64_t>(dict_reg)));
+                    if (dict) {
+                        uint64_t count;
+                        void** items = lm_dict_items(static_cast<LmDict*>(dict), &count);
+                        
+                        // Create list of tuples using C runtime
+                        void* items_list = lm_list_new();
+                        if (!items_list) {
+                            // Create NULL box and use its pointer directly
+                            void* null_box = lm_box_nullptr();
+                            registers[pc->dst] = static_cast<int64_t>(reinterpret_cast<uintptr_t>(null_box));
+                            break;
+                        }
+                        
+                        for (uint64_t i = 0; i < count; i++) {
+                            // Create tuple for this key-value pair using proper tuple runtime
+                            void* tuple = lm_tuple_new(2); // Tuple with 2 elements (key, value)
+                            if (!tuple) {
+                                // Clean up on error
+                                for (uint64_t j = 0; j < i; j++) {
+                                    void* prev_tuple = lm_list_get(static_cast<LmList*>(items_list), j);
+                                    if (prev_tuple) {
+                                        // Free the tuple (but not its elements - they're managed by the dict)
+                                        free(prev_tuple);
+                                    }
+                                }
+                                free(items);
+                                registers[pc->dst] = 0;
+                                break;
+                            }
+                            
+                            // Add key (already boxed from dict)
+                            lm_tuple_set(static_cast<LmTuple*>(tuple), 0, items[i * 2]);     // key at index 0
+                            // Add value (already boxed from dict)  
+                            lm_tuple_set(static_cast<LmTuple*>(tuple), 1, items[i * 2 + 1]); // value at index 1
+                            
+                            // Add tuple to items list
+                            lm_list_append(static_cast<LmList*>(items_list), tuple);
+                        }
+                        
+                        free(items);
+                        registers[pc->dst] = static_cast<int64_t>(reinterpret_cast<uintptr_t>(items_list));
+                    } else {
+                        // Empty list for null dict
+                        void* empty_list = lm_list_new();
+                        registers[pc->dst] = static_cast<int64_t>(reinterpret_cast<uintptr_t>(empty_list));
+                    }
+                } else {
+                    // Empty list for invalid dict register
+                    void* empty_list = lm_list_new();
+                    registers[pc->dst] = static_cast<int64_t>(reinterpret_cast<uintptr_t>(empty_list));
+                }
+                break;
+            }
             case LIR::LIR_Op::TupleCreate: {
-                // For tuples, we'll use a simple approach - store as a list handle
-                // In a real implementation, tuples would be fixed-size structs
-                void* tuple = lm_list_new(); // Reuse list structure for tuple
+                // Create a proper tuple using C runtime with size
+                uint64_t size = static_cast<uint64_t>(to_int(registers[pc->imm]));
+                void* tuple = lm_tuple_new(size);
                 registers[pc->dst] = static_cast<int64_t>(reinterpret_cast<uintptr_t>(tuple));
                 break;
             }
             case LIR::LIR_Op::TupleGet: {
-                // Get value from tuple using C runtime (reuse list operations)
+                // Get value from tuple using C runtime
                 auto& tuple_reg = registers[pc->a];
                 auto& index_reg = registers[pc->b];
                 
-                if (std::holds_alternative<int64_t>(tuple_reg) && is_numeric(index_reg)) {
+                if (std::holds_alternative<int64_t>(tuple_reg)) {
                     void* tuple = reinterpret_cast<void*>(static_cast<uintptr_t>(std::get<int64_t>(tuple_reg)));
                     if (tuple) {
-                        void* result = lm_list_get(static_cast<LmList*>(tuple), static_cast<uint64_t>(to_int(index_reg)));
+                        uint64_t index = static_cast<uint64_t>(to_int(index_reg));
+                        void* result = lm_tuple_get(static_cast<LmTuple*>(tuple), index);
                         if (result) {
                             registers[pc->dst] = unbox_register_value(result);
                         } else {
@@ -769,7 +830,23 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                         registers[pc->dst] = nullptr; // Invalid tuple pointer
                     }
                 } else {
-                    registers[pc->dst] = nullptr; // Invalid registers
+                    registers[pc->dst] = nullptr; // Invalid tuple register
+                }
+                break;
+            }
+            case LIR::LIR_Op::TupleSet: {
+                // Set value in tuple using C runtime
+                auto& tuple_reg = registers[pc->a];
+                auto& index_reg = registers[pc->b];
+                auto& value_reg = registers[pc->dst];
+                
+                if (std::holds_alternative<int64_t>(tuple_reg)) {
+                    void* tuple = reinterpret_cast<void*>(static_cast<uintptr_t>(std::get<int64_t>(tuple_reg)));
+                    if (tuple) {
+                        uint64_t index = static_cast<uint64_t>(to_int(index_reg));
+                        void* boxed_value = box_register_value(value_reg);
+                        lm_tuple_set(static_cast<LmTuple*>(tuple), index, boxed_value);
+                    }
                 }
                 break;
             }

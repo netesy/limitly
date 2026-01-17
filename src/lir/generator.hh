@@ -187,6 +187,12 @@ private:
     void emit_concurrent_worker_init(AST::WorkerStatement& worker, size_t worker_id, Reg scheduler_reg, Reg channel_reg);
     void emit_worker_stmt(AST::WorkerStatement& stmt);
     void emit_iter_stmt(AST::IterStatement& stmt);
+    void emit_dict_iter_stmt(AST::IterStatement& stmt, AST::DictExpr& dict_expr);
+    void emit_list_iter_stmt(AST::IterStatement& stmt, AST::ListExpr& list_expr);
+    void emit_tuple_iter_stmt(AST::IterStatement& stmt, AST::TupleExpr& tuple_expr);
+    void emit_dict_var_iter_stmt(AST::IterStatement& stmt, Reg dict_reg);
+    void emit_list_var_iter_stmt(AST::IterStatement& stmt, Reg list_reg);
+    void emit_tuple_var_iter_stmt(AST::IterStatement& stmt, Reg tuple_reg, int64_t tuple_len);
     void emit_break_stmt(AST::BreakStatement& stmt);
     void emit_continue_stmt(AST::ContinueStatement& stmt);
     void emit_unsafe_stmt(AST::UnsafeStatement& stmt);

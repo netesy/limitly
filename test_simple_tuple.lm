@@ -1,0 +1,3 @@
+// Simple tuple test
+var my_tuple = ("Hello", "World", "Test")
+print(my_tuple)
