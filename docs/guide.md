@@ -350,6 +350,8 @@ print(result); // Output: Greater than 5
 
 ### Match Statements
 
+> **Note:** The `match` statement and all forms of pattern matching are planned but not yet implemented.
+
 The `match` statement is a powerful tool for pattern matching. It can be used as an advanced `switch` statement.
 
 A `match` statement can match against literal values:
@@ -390,6 +392,8 @@ match (value) {
 ```
 
 ### Advanced Pattern Matching
+
+> **Note:** Destructuring for structs, enums, dictionaries, lists, and tuples is planned but not yet implemented.
 
 Limit's `match` statement supports more than just literal and type matching. You can also destructure complex data types like enums, structs, lists, and tuples.
 
@@ -488,9 +492,13 @@ match (my_tuple) {
 
 ## Data Structures
 
+> **Note:** Standard library data structures like Lists and Dictionaries are planned but not yet implemented.
+
 Limit provides built-in support for common data structures.
 
 ### Lists
+
+> **Note:** Lists are planned but not yet implemented.
 
 A list is an ordered collection of values. Lists are created using square brackets `[]`.
 
@@ -508,6 +516,8 @@ print(fruits[2]); // Output: cherry
 ```
 
 ### Dictionaries
+
+> **Note:** Dictionaries are planned but not yet implemented.
 
 A dictionary is an unordered collection of key-value pairs. Dictionaries are created using curly braces `{}`.
 
@@ -542,7 +552,11 @@ print(person.0); // Output: Alice
 print(person.1); // Output: 30
 ```
 
+> **Note:** Destructuring assignments for tuples (`var (a, b) = ...`) are supported, but list-style destructuring (`var [a, b] = ...`) is not yet implemented.
+
 ### Object Literals
+
+> **Note:** Object literals are planned but not yet implemented.
 
 Object literals provide a way to create instances of user-defined types, like classes or enums, with a specific structure. This is especially useful for enums with associated data.
 
@@ -629,6 +643,8 @@ greet_default("Alice");   // Output: Hello, Alice!
 
 ### Higher-Order Functions
 
+> **Note:** Higher-order functions and closures are planned but not yet implemented.
+
 Functions are first-class citizens in Limit, which means they can be passed as arguments to other functions.
 
 ```
@@ -646,6 +662,8 @@ print(result); // Output: 50
 ```
 
 ### Closures
+
+> **Note:** Higher-order functions and closures are planned but not yet implemented.
 
 A function can be defined inside another function. This inner function "captures" the variables from its containing scope, creating a closure.
 
@@ -808,6 +826,8 @@ The `self` keyword refers to the current instance of the class. It is used to ac
 
 ### Inheritance
 
+> **Note:** Full class inheritance is planned but not yet implemented. The basic syntax is parsed, but the VM and type checker do not yet support it.
+
 A class can inherit from a parent class using the `:` operator. This allows the child class to inherit the fields and methods of the parent.
 
 ```
@@ -875,6 +895,8 @@ iter (animal: Animal in animals) {
 ```
 
 ## Modules and Imports
+
+> **Note:** The module system (`import`) is not yet fully implemented. The syntax is parsed, but the VM and runtime do not yet support module loading.
 
 Limit supports a module system that allows you to organize your code into separate files and reuse code across your project.
 
@@ -962,6 +984,8 @@ When another file imports this module, it will only have access to the `public` 
 
 ### Lambda Expressions (Anonymous Functions)
 
+> **Note:** Lambda expressions are planned but not yet implemented.
+
 Limit supports lambda expressions, also known as anonymous functions. These are functions that do not have a name and can be defined on the fly.
 
 ```limit
@@ -990,6 +1014,8 @@ print(result); // Output: 50
 
 You can unpack values from tuples and lists into separate variables.
 
+> **Note:** Destructuring assignments for tuples are implemented, but list-style destructuring (`var [a, b] = ...`) is not yet implemented.
+
 ```limit
 // Destructuring a tuple
 var (name, age) = ("Alice", 30);
@@ -1002,6 +1028,8 @@ print(a); // Output: 1
 
 ### Unsafe Blocks
 
+> **Note:** The `unsafe` block is planned but not yet implemented.
+
 Limit is a memory-safe language, but sometimes you may need to interface with low-level code or perform operations that the compiler cannot guarantee are safe. For these cases, you can use an `unsafe` block.
 
 ```limit
@@ -1011,6 +1039,8 @@ unsafe {
 ```
 
 ### Contract Statements
+
+> **Note:** The `contract` keyword is parsed, but full design-by-contract features are not yet implemented. For now, you can use the built-in `assert` function for similar checks.
 
 Contracts are used to enforce preconditions, postconditions, and invariants in your code. They are useful for debugging and ensuring correctness.
 
@@ -1022,6 +1052,8 @@ fn divide(a: int, b: int): int {
 ```
 
 ### Compile-Time Execution
+
+> **Note:** Compile-time execution (`comptime`) is planned but not yet implemented. The syntax is parsed, but the VM and interpreter do not yet support it.
 
 The `comptime` keyword allows you to execute code at compile time. This is useful for metaprogramming, generating lookup tables, or performing other computations before the program runs.
 
@@ -1062,6 +1094,8 @@ Union types are especially powerful when combined with `match` statements to han
 
 ### Intersection Types
 
+> **Note:** Intersection Types are planned but not yet implemented. The syntax is parsed, but the VM and type checker do not yet support them.
+
 An intersection type is a type that combines multiple types into one. A value of an intersection type must satisfy the requirements of all the types in the intersection. Intersection types are defined using the ampersand (`&`) character.
 
 ```limit
@@ -1082,6 +1116,8 @@ fn print_person_details(p: Person) {
 
 ### Refined Types
 
+> **Note:** Refined types are planned but not yet implemented.
+
 A refined type allows you to add constraints to an existing type. This is useful for enforcing invariants at the type level. Refined types are defined using the `where` keyword.
 
 ```limit
@@ -1096,6 +1132,8 @@ set_age(-5); // This would be a runtime error
 ```
 
 ### Structural Types
+
+> **Note:** The syntax for structural types is parsed, but the type system and VM do not yet support them.
 
 A structural type allows you to define a type based on its structure or shape, rather than by a specific name. This is useful for working with data that has a consistent structure but may not be an instance of a named class.
 
@@ -1136,6 +1174,8 @@ var current_status: Status = Status.Running;
 ```
 
 ### Traits and Interfaces
+
+> **Note:** Traits are planned but not yet implemented. The syntax is parsed, but the VM and type checker do not yet support them.
 
 Traits and interfaces are used to define a set of methods that a class must implement. This is a powerful tool for abstraction and polymorphism.
 
@@ -1402,6 +1442,8 @@ var value: int = divide(10, 0)? else {
 This syntax is particularly useful for providing default values while maintaining Limit's null-free design principles.
 
 ## Concurrency
+
+> **Note:** Concurrency features (`parallel`, `concurrent`) are planned but not yet implemented. The syntax is parsed, but the VM does not yet support them.
 
 Limit has powerful, high-level features for managing concurrent and parallel tasks.
 
