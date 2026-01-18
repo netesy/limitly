@@ -4627,36 +4627,27 @@ void Generator::collect_function_signature(AST::FunctionDeclaration& stmt) {
 }
 
 void Generator::lower_function_bodies(const TypeCheckResult& type_check_result) {
-    std::cout << "[DEBUG] lower_function_bodies started" << std::endl;
     for (const auto& stmt : type_check_result.program->statements) {
         if (auto func_stmt = dynamic_cast<AST::FunctionDeclaration*>(stmt.get())) {
-            std::cout << "[DEBUG] Lowering function body: " << func_stmt->name << std::endl;
-            lower_function_body(*func_stmt);
+             lower_function_body(*func_stmt);
         }
     }
-    
-    std::cout << "[DEBUG] About to call lower_task_bodies_recursive" << std::endl;
+
     // Also lower task bodies by searching through all statements
     lower_task_bodies_recursive(type_check_result.program->statements);
-    std::cout << "[DEBUG] lower_task_bodies_recursive completed" << std::endl;
 }
 
 void Generator::lower_task_bodies_recursive(const std::vector<std::shared_ptr<AST::Statement>>& statements) {
-    std::cout << "[DEBUG] lower_task_bodies_recursive started with " << statements.size() << " statements" << std::endl;
     for (const auto& stmt : statements) {
-        std::cout << "[DEBUG] Processing statement in lower_task_bodies_recursive: " << typeid(*stmt.get()).name() << std::endl;
         if (auto concurrent_stmt = dynamic_cast<AST::ConcurrentStatement*>(stmt.get())) {
-            std::cout << "[DEBUG] Found ConcurrentStatement in lower_task_bodies_recursive" << std::endl;
 
         } else if (auto parallel_stmt = dynamic_cast<AST::ParallelStatement*>(stmt.get())) {
             // === SHARED CELL PARALLEL HANDLING ===
             // Use SharedCell system instead of old task_variable_mappings_
             
             // Find variables accessed in task/worker bodies that need to be shared
-            std::cout << "[DEBUG] About to call find_accessed_variables_recursive for ParallelStatement" << std::endl;
             std::set<std::string> accessed_variables;
             // find_accessed_variables_recursive(parallel_stmt->body->statements, accessed_variables);
-            std::cout << "[DEBUG] find_accessed_variables_recursive SKIPPED for ParallelStatement" << std::endl;
             
             // Allocate SharedCell IDs for each accessed variable
             parallel_block_cell_ids_.clear();
@@ -4668,44 +4659,27 @@ void Generator::lower_task_bodies_recursive(const std::vector<std::shared_ptr<AS
                 // Store the SharedCell ID register for this variable
                 parallel_block_cell_ids_[var_name] = cell_id_reg;
                 
-                std::cout << "[DEBUG] Parallel: Allocated SharedCell for variable '" << var_name 
-                          << "' (register r" << cell_id_reg << ")" << std::endl;
-            }
+           }
             
-            // Store SharedCell information in tasks
-            for (const auto& stmt_ptr : parallel_stmt->body->statements) {
-                if (auto task = dynamic_cast<AST::TaskStatement*>(stmt_ptr.get())) {
-                    // TaskStatement no longer uses shared_cell_registers - removed in new model
-                }
-            }
-            
-            // Look for task and worker statements inside parallel blocks
-            std::cout << "[DEBUG] About to make another recursive call in ParallelStatement - SKIPPING" << std::endl;
-            // lower_task_bodies_recursive(parallel_stmt->body->statements);
-            std::cout << "[DEBUG] Second recursive call SKIPPED" << std::endl;
+
         } else if (auto task_stmt = dynamic_cast<AST::TaskStatement*>(stmt.get())) {
             lower_task_body(*task_stmt);
         } else if (auto worker_stmt = dynamic_cast<AST::WorkerStatement*>(stmt.get())) {
             lower_worker_body(*worker_stmt);
         } else if (auto block_stmt = dynamic_cast<AST::BlockStatement*>(stmt.get())) {
             // Recursively search within block statements
-            std::cout << "[DEBUG] About to make recursive call in BlockStatement - SKIPPING" << std::endl;
-            // lower_task_bodies_recursive(block_stmt->statements);
-            std::cout << "[DEBUG] BlockStatement recursive call SKIPPED" << std::endl;
         }
     }
 }
 
 void Generator::lower_function_body(AST::FunctionDeclaration& stmt) {
     // Use generate_function to create and register the function properly
-    std::cout << "[DEBUG] Lowering and registering function: " << stmt.name << std::endl;
     generate_function(stmt);
     
     // The function is now registered with FunctionRegistry
     // Store a reference in the function table for later use
     auto& func_info = function_table_[stmt.name];
     func_info.lir_function = nullptr; // Not needed since FunctionRegistry manages it
-    std::cout << "[DEBUG] Function lowered and registered: " << stmt.name << std::endl;
 }
 
 void Generator::lower_task_body(AST::TaskStatement& stmt) {
@@ -4743,17 +4717,10 @@ void Generator::lower_task_body(AST::TaskStatement& stmt) {
         bind_variable(stmt.loopVar, static_cast<Reg>(1));
     }
     
-    // === SHARED CELL CONTEXT SETUP ===
-    // Temporarily set the SharedCell context from the task statement
     auto saved_parallel_block_cell_ids = parallel_block_cell_ids_;
-    // TaskStatement no longer uses shared_cell_registers - removed in new model
-    // Use parallel_block_cell_ids_ directly instead
-    
     // Emit task body from AST
     if (stmt.body) {
-        // std::cout << "[DEBUG] Emitting task body with " << stmt.body->statements.size() << " statements" << std::endl;
         emit_stmt(*stmt.body);
-        // std::cout << "[DEBUG] Task body emitted, function has " << current_function_->instructions.size() << " instructions" << std::endl;
     }
     
     // Restore SharedCell context
@@ -4778,9 +4745,7 @@ void Generator::lower_task_body(AST::TaskStatement& stmt) {
     
     // Store the task function name for later reference
     stmt.task_function_name = task_func_name;
-    
-    std::cout << "[DEBUG] Task function '" << task_func_name << "' registered with FunctionRegistry" << std::endl;
-    
+
     // Restore context
     current_function_ = std::move(saved_function);
     next_register_ = saved_next_register;
@@ -4822,10 +4787,7 @@ void Generator::lower_worker_body(AST::WorkerStatement& stmt) {
     
     // Bind iterable if available for iteration
     if (stmt.iterable) {
-        // For workers with iterables, we need to set up iteration logic
-        // The iterable will be passed in register 1, and we'll need to iterate over it
-        std::cout << "[DEBUG] Worker has iterable, setting up iteration" << std::endl;
-        
+
         // For now, bind the iterable to a special variable that the worker can access
         // In a full implementation, this would involve proper iteration setup
         bind_variable("_iterable", static_cast<Reg>(1));
@@ -4965,9 +4927,7 @@ Reg Generator::emit_fallible_expr(AST::FallibleExpr& expr) {
         set_current_block(error_block);
         
         if (expr.elseHandler) {
-            // ? else {} construct - execute the else block instead of propagating
-            std::cout << "[DEBUG] Generating ? else {} block" << std::endl;
-            
+            // ? else {} construct - execute the else block instead of propagating          
             // Allocate register for the else block result
             Reg default_reg = allocate_register();
             
@@ -5022,9 +4982,7 @@ Reg Generator::emit_fallible_expr(AST::FallibleExpr& expr) {
         emit_instruction(LIR_Inst(LIR_Op::Label, Type::Void, error_label, 0, 0));
         
         if (expr.elseHandler) {
-            // ? else {} construct - execute the else block
-            std::cout << "[DEBUG] Generating ? else {} block (non-CFG)" << std::endl;
-            
+            // ? else {} construct - execute the else block           
             // Set up else block context
             else_context_.in_else_block = true;
             else_context_.result_register = unwrapped_reg;
@@ -5420,14 +5378,11 @@ void Generator::emit_concurrent_worker_init(AST::WorkerStatement& worker, size_t
     // Add worker to scheduler
     emit_instruction(LIR_Inst(LIR_Op::SchedulerAddTask, Type::Void, scheduler_reg, worker_context_reg, 0));
     
-    std::cout << "[DEBUG] Created worker " << worker_id 
-              << " with param '" << worker.paramName << "'" << std::endl;
 }
 
 // Channel operation implementations
 Reg Generator::emit_channel_offer_expr(AST::ChannelOfferExpr& expr) {
-    std::cout << "[DEBUG] Generating channel offer expression" << std::endl;
-    
+
     // Evaluate value to offer
     Reg value_reg = emit_expr(*expr.value);
     
@@ -5443,8 +5398,6 @@ Reg Generator::emit_channel_offer_expr(AST::ChannelOfferExpr& expr) {
 }
 
 Reg Generator::emit_channel_poll_expr(AST::ChannelPollExpr& expr) {
-    std::cout << "[DEBUG] Generating channel poll expression" << std::endl;
-    
     // Evaluate channel
     Reg channel_reg = emit_expr(*expr.channel);
     
@@ -5457,8 +5410,7 @@ Reg Generator::emit_channel_poll_expr(AST::ChannelPollExpr& expr) {
 }
 
 Reg Generator::emit_channel_send_expr(AST::ChannelSendExpr& expr) {
-    std::cout << "[DEBUG] Generating channel send expression" << std::endl;
-    
+
     // Evaluate value to send
     Reg value_reg = emit_expr(*expr.value);
     
@@ -5474,8 +5426,7 @@ Reg Generator::emit_channel_send_expr(AST::ChannelSendExpr& expr) {
 }
 
 Reg Generator::emit_channel_recv_expr(AST::ChannelRecvExpr& expr) {
-    std::cout << "[DEBUG] Generating channel recv expression" << std::endl;
-    
+
     // Evaluate channel
     Reg channel_reg = emit_expr(*expr.channel);
     
