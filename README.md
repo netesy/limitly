@@ -10,14 +10,12 @@ To learn how to use the Limit language, check out our comprehensive, step-by-ste
 
 ## ✨ Features
 
-*   **Static Typing:** A strong, static type system with type inference.
-*   **Structured Concurrency:** High-level `parallel` and `concurrent` blocks for safe and efficient multi-tasking.
-*   **Modern Error Handling:** `Option` and `Result` types for robust error handling without exceptions.
-*   **Object-Oriented:** Support for classes, inheritance, and polymorphism.
-*   **First-Class Functions:** Higher-order functions and closures.
-*   **Pattern Matching:** Powerful `match` statements for expressive control flow.
-*   **Modules:** A flexible module system for organizing code.
-*   **AOT Compilation:** An AOT compiler for high-performance applications.
+*   **Static Typing:** A strong, static type system with type inference, union types, and type aliases.
+*   **Modern Error Handling:** A unified `Type?` system with an error propagation (`?`) operator for robust, exception-free error handling.
+*   **Functions:** Support for optional parameters and default values.
+*   **Object-Oriented Programming (Partial):** Basic support for classes, fields, and methods.
+*   **Modules (Partial):** Parser and AST support for modules, with VM/runtime implementation in progress.
+*   **Concurrency (Partial):** Parser and AST support for `parallel` and `concurrent` blocks, with VM/runtime implementation in progress.
 
 ## 🛠️ Building and Running
 

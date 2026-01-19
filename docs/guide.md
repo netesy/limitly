@@ -335,9 +335,11 @@ iter (i in 0..10..2) {
     print("i = {i}"); // Output: 0, 2, 4, 6, 8
 }
 ```
-> **Note:** The step value feature is planned but not yet fully implemented in the parser.
+> **Note:** The step value feature is defined in the AST but not yet implemented in the parser.
 
 ### Ternary Operator
+
+> **Note:** This feature is planned but **not yet implemented**.
 
 Limit supports the ternary operator (`? :`) for concise conditional expressions.
 
@@ -346,153 +348,20 @@ var x = 10;
 var result = x > 5 ? "Greater than 5" : "Not greater than 5";
 print(result); // Output: Greater than 5
 ```
-> **Note:** The ternary operator is planned but not yet implemented in the parser.
 
 ### Match Statements
 
-The `match` statement is a powerful tool for pattern matching. It can be used as an advanced `switch` statement.
+> **Note:** This feature is planned but **not yet implemented**.
 
-A `match` statement can match against literal values:
-
-```
-var x = 2;
-match (x) {
-    1 => { print("One"); },
-    2 => { print("Two"); }, // This branch is executed
-    _ => { print("Something else"); } // The `_` is a wildcard
-}
-```
-
-It can also match based on type:
-
-```
-fn printType(value) {
-    match (value) {
-        int => { print("It's an integer."); },
-        str => { print("It's a string."); },
-        _   => { print("It's some other type."); }
-    }
-}
-
-printType(10);     // Output: It's an integer.
-printType("hello"); // Output: It's a string.
-```
-
-You can add conditions to your patterns using `where` guards:
-
-```
-var value = 15;
-match (value) {
-    x where x > 10 => { print("{x} is greater than 10"); },
-    x where x < 10 => { print("{x} is less than 10"); },
-    _              => { print("It must be 10"); }
-}
-```
-
-### Advanced Pattern Matching
-
-Limit's `match` statement supports more than just literal and type matching. You can also destructure complex data types like enums, structs, lists, and tuples.
-
-#### Destructuring Structs and Enums
-
-You can match on the structure of an enum or a struct and bind its inner values to variables.
-
-```limit
-enum Option {
-    Some(any),
-    None
-}
-
-fn print_option(opt: Option) {
-    match (opt) {
-        Some(value) => { print("Value is {value}"); },
-        None => { print("No value"); }
-    }
-}
-
-print_option(Some(10)); // Output: Value is 10
-print_option(None);     // Output: No value
-```
-
-You can also destructure records or objects with a similar syntax:
-
-```limit
-type Person = {name: str, age: int};
-
-fn greet(p: Person) {
-    match (p) {
-        {name: n, age: a} => { print("{n} is {a} years old."); }
-    }
-}
-
-greet({name: "Alice", age: 30}); // Output: Alice is 30 years old.
-```
-
-#### Destructuring Dictionaries
-
-You can destructure dictionaries to bind values to variables based on their keys. You can also capture the remaining key-value pairs using the `...` syntax.
-
-```limit
-var person = {
-    "name": "Alice",
-    "age": 30,
-    "city": "New York"
-};
-
-match (person) {
-    {name: n, age: a, ...rest} => {
-        print("{n} is {a} years old.");
-        print("Other info: {rest}");
-    },
-    _ => { print("Not a person."); }
-}
-// Output:
-// Alice is 30 years old.
-// Other info: {city: "New York"}
-```
-
-#### Destructuring Lists
-
-You can destructure lists to bind elements to variables. The `...` syntax can be used to bind the rest of the list to a variable.
-
-```limit
-var my_list = [1, 2, 3, 4];
-
-match (my_list) {
-    [] => { print("Empty list"); },
-    [x] => { print("Single element: {x}"); },
-    [a, b, ...rest] => {
-        print("First: {a}, Second: {b}");
-        print("Rest: {rest}");
-    },
-    _ => { print("Some other list"); }
-}
-// Output:
-// First: 1, Second: 2
-// Rest: [3, 4]
-```
-
-#### Destructuring Tuples
-
-Tuples can be destructured in a similar way.
-
-```limit
-var my_tuple = ("Jules", 42);
-
-match (my_tuple) {
-    (name, age) => { print("{name} is {age} years old."); },
-    _ => { print("Not a person tuple."); }
-}
-// Output: Jules is 42 years old.
-```
+The `match` statement is a powerful tool for pattern matching that will be available in a future version of Limit.
 
 ## Data Structures
 
-Limit provides built-in support for common data structures.
-
 ### Lists
 
-A list is an ordered collection of values. Lists are created using square brackets `[]`.
+> **Note:** This feature is planned but **not yet implemented**.
+
+A list is an ordered collection of values, created using square brackets `[]`.
 
 ```
 var numbers = [1, 2, 3, 4, 5];
@@ -509,7 +378,9 @@ print(fruits[2]); // Output: cherry
 
 ### Dictionaries
 
-A dictionary is an unordered collection of key-value pairs. Dictionaries are created using curly braces `{}`.
+> **Note:** This feature is planned but **not yet implemented**.
+
+A dictionary is an unordered collection of key-value pairs, created using curly braces `{}`.
 
 ```
 var person = {
@@ -629,6 +500,8 @@ greet_default("Alice");   // Output: Hello, Alice!
 
 ### Higher-Order Functions
 
+> **Note:** This feature is planned but **not yet implemented**.
+
 Functions are first-class citizens in Limit, which means they can be passed as arguments to other functions.
 
 ```
@@ -646,6 +519,8 @@ print(result); // Output: 50
 ```
 
 ### Closures
+
+> **Note:** This feature is planned but **not yet implemented**.
 
 A function can be defined inside another function. This inner function "captures" the variables from its containing scope, creating a closure.
 
@@ -666,6 +541,8 @@ print(counter()); // Output: 3
 ```
 
 ## Classes
+
+> **Note:** This feature is **partially implemented**. Basic class declarations, fields, and methods are supported, but inheritance and other advanced features are not yet complete.
 
 Limit is an object-oriented language and supports classes for creating user-defined types.
 
@@ -825,6 +702,8 @@ var my_dog: Dog = Dog();
 my_dog.speak(); // Output: The animal makes a sound.
 ```
 
+> **Note:** Inheritance is planned but **not yet implemented**.
+
 ### Method Overriding
 
 A child class can provide its own implementation of a method that it inherited from its parent.
@@ -839,6 +718,8 @@ class Cat : Animal {
 var my_cat: Cat = Cat();
 my_cat.speak(); // Output: The cat meows.
 ```
+
+> **Note:** Method overriding is planned but **not yet implemented**.
 
 ### The `super` Keyword
 
@@ -859,6 +740,8 @@ smart_dog.speak();
 // Woof woof!
 ```
 
+> **Note:** The `super` keyword is planned but **not yet implemented**.
+
 ### Polymorphism
 
 Polymorphism allows you to treat objects of different classes as objects of a common parent class.
@@ -874,7 +757,11 @@ iter (animal: Animal in animals) {
 // The animal makes a sound.
 ```
 
+> **Note:** Polymorphism is planned but **not yet implemented**.
+
 ## Modules and Imports
+
+> **Note:** This feature is **partially implemented**. The parser and AST support module syntax, but the VM and runtime do not yet load or handle modules.
 
 Limit supports a module system that allows you to organize your code into separate files and reuse code across your project.
 
@@ -962,6 +849,8 @@ When another file imports this module, it will only have access to the `public` 
 
 ### Lambda Expressions (Anonymous Functions)
 
+> **Note:** This feature is planned but **not yet implemented**.
+
 Limit supports lambda expressions, also known as anonymous functions. These are functions that do not have a name and can be defined on the fly.
 
 ```limit
@@ -988,19 +877,21 @@ print(result); // Output: 50
 
 ### Destructuring Assignments
 
-You can unpack values from tuples and lists into separate variables.
+You can unpack values from tuples into separate variables. List destructuring is not yet implemented.
 
 ```limit
 // Destructuring a tuple
 var (name, age) = ("Alice", 30);
 print("{name} is {age} years old."); // Output: Alice is 30 years old.
 
-// Destructuring a list
+// Destructuring a list (Not yet implemented)
 var [a, b, c] = [1, 2, 3];
 print(a); // Output: 1
 ```
 
 ### Unsafe Blocks
+
+> **Note:** This feature is planned but **not yet implemented**.
 
 Limit is a memory-safe language, but sometimes you may need to interface with low-level code or perform operations that the compiler cannot guarantee are safe. For these cases, you can use an `unsafe` block.
 
@@ -1012,6 +903,8 @@ unsafe {
 
 ### Contract Statements
 
+> **Note:** This feature is planned but **not yet implemented**. The built-in `assert` function provides similar functionality.
+
 Contracts are used to enforce preconditions, postconditions, and invariants in your code. They are useful for debugging and ensuring correctness.
 
 ```limit
@@ -1022,6 +915,8 @@ fn divide(a: int, b: int): int {
 ```
 
 ### Compile-Time Execution
+
+> **Note:** This feature is planned but **not yet implemented**.
 
 The `comptime` keyword allows you to execute code at compile time. This is useful for metaprogramming, generating lookup tables, or performing other computations before the program runs.
 
@@ -1060,7 +955,11 @@ my_num = 3.14;                 // This is also valid
 
 Union types are especially powerful when combined with `match` statements to handle all possible types that a variable could be.
 
+> **Note:** `match` statements are not yet implemented.
+
 ### Intersection Types
+
+> **Note:** This feature is planned but **not yet implemented**.
 
 An intersection type is a type that combines multiple types into one. A value of an intersection type must satisfy the requirements of all the types in the intersection. Intersection types are defined using the ampersand (`&`) character.
 
@@ -1082,6 +981,8 @@ fn print_person_details(p: Person) {
 
 ### Refined Types
 
+> **Note:** This feature is planned but **not yet implemented**.
+
 A refined type allows you to add constraints to an existing type. This is useful for enforcing invariants at the type level. Refined types are defined using the `where` keyword.
 
 ```limit
@@ -1096,6 +997,8 @@ set_age(-5); // This would be a runtime error
 ```
 
 ### Structural Types
+
+> **Note:** This feature is **partially implemented**. The parser and AST support structural type syntax, but the type checker and VM do not yet handle structural types.
 
 A structural type allows you to define a type based on its structure or shape, rather than by a specific name. This is useful for working with data that has a consistent structure but may not be an instance of a named class.
 
@@ -1403,6 +1306,8 @@ This syntax is particularly useful for providing default values while maintainin
 
 ## Concurrency
 
+> **Note:** This feature is **partially implemented**. The parser and AST support concurrency syntax (`parallel`, `concurrent`, `task`), but the VM and runtime do not yet execute these blocks concurrently.
+
 Limit has powerful, high-level features for managing concurrent and parallel tasks.
 
 ### Structured Concurrency
@@ -1478,9 +1383,13 @@ Channels are the primary way for concurrent tasks to communicate. One or more ta
 
 ### Async/Await
 
+> **Note:** This feature is planned but **not yet implemented**.
+
 The `async` and `await` keywords are used for non-blocking operations, typically within a `concurrent` block. An `async` function returns immediately without blocking the thread, and you can use `await` to get its result when it's ready.
 
 ### Atomics
+
+> **Note:** This feature is planned but **not yet implemented**.
 
 For simple cases of shared state, such as counters, you can use `atomic` variables. These variables can be safely accessed and modified from multiple tasks at the same time without causing data races.
 
