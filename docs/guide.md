@@ -18,28 +18,28 @@ Welcome to the official guide for the Limit programming language. This document 
     *   [While Loops](#while-loops)
     *   [Iter Loops](#iter-loops)
     *   [Ternary Operator](#ternary-operator)
-    *   [Match Statements](#match-statements)
+    *   <!-- [Match Statements](#match-statements) -->
 4.  [Data Structures](#data-structures)
-    *   [Lists](#lists)
-    *   [Dictionaries](#dictionaries)
+    *   <!-- [Lists](#lists) -->
+    *   <!-- [Dictionaries](#dictionaries) -->
 5.  [Functions](#functions)
     *   [Defining Functions](#defining-functions)
     *   [Parameters](#parameters)
     *   [Return Values](#return-values)
     *   [Optional Parameters](#optional-parameters)
     *   [Default Parameters](#default-parameters)
-    *   [Higher-Order Functions](#higher-order-functions)
-    *   [Closures](#closures)
+    *   <!-- [Higher-Order Functions](#higher-order-functions) -->
+    *   <!-- [Closures](#closures) -->
 6.  [Classes](#classes)
     *   [Defining Classes](#defining-classes)
     *   [Class Members and Modifiers](#class-members-and-modifiers)
     *   [Fields and Methods](#fields-and-methods)
     *   [The `init` Constructor](#the-init-constructor)
     *   [The `self` Keyword](#the-self-keyword)
-    *   [Inheritance](#inheritance)
-    *   [Method Overriding](#method-overriding)
-    *   [The `super` Keyword](#the-super-keyword)
-    *   [Polymorphism](#polymorphism)
+    *   <!-- [Inheritance](#inheritance) -->
+    *   <!-- [Method Overriding](#method-overriding) -->
+    *   <!-- [The `super` Keyword](#the-super-keyword) -->
+    *   <!-- [Polymorphism](#polymorphism) -->
 7.  [Modules and Imports](#modules-and-imports)
     *   [Defining a Module](#defining-a-module)
     *   [Importing a Module](#importing-a-module)
@@ -54,13 +54,13 @@ Welcome to the official guide for the Limit programming language. This document 
     *   [The Unified `Type?` System](#the-unified-type-system)
     *   [The `?` Operator](#the--operator)
 9.  [Concurrency](#concurrency)
-    *   [Structured Concurrency](#structured-concurrency)
-    *   [`parallel` Blocks for CPU-Bound Tasks](#parallel-blocks-for-cpu-bound-tasks)
-    *   [`concurrent` Blocks for I/O-Bound Tasks](#concurrent-blocks-for-io-bound-tasks)
-    *   [Channels](#channels)
-    *   [Async/Await](#asyncawait)
-    *   [Atomics](#atomics)
-- [Tasks](#tasks)
+    *   <!-- [Structured Concurrency](#structured-concurrency) -->
+    *   <!-- [`parallel` Blocks for CPU-Bound Tasks](#parallel-blocks-for-cpu-bound-tasks) -->
+    *   <!-- [`concurrent` Blocks for I/O-Bound Tasks](#concurrent-blocks-for-io-bound-tasks) -->
+    *   <!-- [Channels](#channels) -->
+    *   <!-- [Async/Await](#asyncawait) -->
+    *   <!-- [Atomics](#atomics) -->
+- <!-- [Tasks](#tasks) -->
 
 ---
 
@@ -350,6 +350,10 @@ print(result); // Output: Greater than 5
 
 ### Match Statements
 
+> **Note:** Match statements are planned but not yet implemented.
+
+<!--
+
 The `match` statement is a powerful tool for pattern matching. It can be used as an advanced `switch` statement.
 
 A `match` statement can match against literal values:
@@ -389,7 +393,13 @@ match (value) {
 }
 ```
 
+-->
+
 ### Advanced Pattern Matching
+
+> **Note:** Advanced pattern matching is planned but not yet implemented.
+
+<!--
 
 Limit's `match` statement supports more than just literal and type matching. You can also destructure complex data types like enums, structs, lists, and tuples.
 
@@ -486,11 +496,17 @@ match (my_tuple) {
 // Output: Jules is 42 years old.
 ```
 
+-->
+
 ## Data Structures
 
 Limit provides built-in support for common data structures.
 
 ### Lists
+
+> **Note:** Lists are planned but not yet implemented.
+
+<!--
 
 A list is an ordered collection of values. Lists are created using square brackets `[]`.
 
@@ -506,8 +522,12 @@ var fruits = ["apple", "banana", "cherry"];
 print(fruits[0]); // Output: apple
 print(fruits[2]); // Output: cherry
 ```
+-->
 
 ### Dictionaries
+> **Note:** Dictionaries are planned but not yet implemented.
+
+<!--
 
 A dictionary is an unordered collection of key-value pairs. Dictionaries are created using curly braces `{}`.
 
@@ -525,6 +545,7 @@ You can access values in a dictionary using their keys.
 print(person["name"]); // Output: Alice
 print(person["age"]);  // Output: 30
 ```
+-->
 
 ### Tuples
 
@@ -629,6 +650,10 @@ greet_default("Alice");   // Output: Hello, Alice!
 
 ### Higher-Order Functions
 
+> **Note:** Higher-order functions are planned but not yet implemented.
+
+<!--
+
 Functions are first-class citizens in Limit, which means they can be passed as arguments to other functions.
 
 ```
@@ -644,8 +669,13 @@ fn multiply(a: int, b: int): int {
 var result: int = apply(10, 5, multiply);
 print(result); // Output: 50
 ```
+-->
 
 ### Closures
+
+> **Note:** Closures are planned but not yet implemented.
+
+<!--
 
 A function can be defined inside another function. This inner function "captures" the variables from its containing scope, creating a closure.
 
@@ -664,10 +694,13 @@ print(counter()); // Output: 1
 print(counter()); // Output: 2
 print(counter()); // Output: 3
 ```
+-->
 
 ## Classes
 
 Limit is an object-oriented language and supports classes for creating user-defined types.
+
+> **Note:** Classes are partially implemented. Basic syntax and VM support are available, but inheritance and method dispatch are not yet fully functional.
 
 ### Defining Classes
 
@@ -808,6 +841,10 @@ The `self` keyword refers to the current instance of the class. It is used to ac
 
 ### Inheritance
 
+> **Note:** Inheritance is planned but not yet implemented.
+
+<!--
+
 A class can inherit from a parent class using the `:` operator. This allows the child class to inherit the fields and methods of the parent.
 
 ```
@@ -873,10 +910,13 @@ iter (animal: Animal in animals) {
 // The cat meows.
 // The animal makes a sound.
 ```
+-->
 
 ## Modules and Imports
 
 Limit supports a module system that allows you to organize your code into separate files and reuse code across your project.
+
+> **Note:** The module system is partially implemented. The parser and AST support the syntax, but the VM and runtime do not yet load or execute modules.
 
 ### Defining a Module
 
@@ -962,6 +1002,10 @@ When another file imports this module, it will only have access to the `public` 
 
 ### Lambda Expressions (Anonymous Functions)
 
+> **Note:** Lambda expressions are planned but not yet implemented.
+
+<!--
+
 Limit supports lambda expressions, also known as anonymous functions. These are functions that do not have a name and can be defined on the fly.
 
 ```limit
@@ -985,8 +1029,13 @@ fn apply(x: int, y: int, operation: fn(int, int): int): int {
 var result = apply(10, 5, fn(a, b) { return a * b; });
 print(result); // Output: 50
 ```
+-->
 
 ### Destructuring Assignments
+
+> **Note:** Destructuring assignments are planned but not yet implemented.
+
+<!--
 
 You can unpack values from tuples and lists into separate variables.
 
@@ -999,8 +1048,13 @@ print("{name} is {age} years old."); // Output: Alice is 30 years old.
 var [a, b, c] = [1, 2, 3];
 print(a); // Output: 1
 ```
+-->
 
 ### Unsafe Blocks
+
+> **Note:** Unsafe blocks are planned but not yet implemented.
+
+<!--
 
 Limit is a memory-safe language, but sometimes you may need to interface with low-level code or perform operations that the compiler cannot guarantee are safe. For these cases, you can use an `unsafe` block.
 
@@ -1009,8 +1063,13 @@ unsafe {
     // Low-level operations
 }
 ```
+-->
 
 ### Contract Statements
+
+> **Note:** Contract statements are planned but not yet implemented.
+
+<!--
 
 Contracts are used to enforce preconditions, postconditions, and invariants in your code. They are useful for debugging and ensuring correctness.
 
@@ -1020,6 +1079,7 @@ fn divide(a: int, b: int): int {
     return a / b;
 }
 ```
+-->
 
 ### Compile-Time Execution
 
@@ -1030,6 +1090,7 @@ comptime {
     var my_compile_time_var = 123;
 }
 ```
+> **Note:** The `comptime` keyword is parsed, but compile-time execution is not yet supported by the VM or interpreter.
 
 ## The Type System
 
@@ -1062,6 +1123,10 @@ Union types are especially powerful when combined with `match` statements to han
 
 ### Intersection Types
 
+> **Note:** Intersection types are planned but not yet implemented.
+
+<!--
+
 An intersection type is a type that combines multiple types into one. A value of an intersection type must satisfy the requirements of all the types in the intersection. Intersection types are defined using the ampersand (`&`) character.
 
 ```limit
@@ -1079,8 +1144,13 @@ fn print_person_details(p: Person) {
     print("{p.get_name()} is {p.get_age()} years old.");
 }
 ```
+-->
 
 ### Refined Types
+
+> **Note:** Refined types are planned but not yet implemented.
+
+<!--
 
 A refined type allows you to add constraints to an existing type. This is useful for enforcing invariants at the type level. Refined types are defined using the `where` keyword.
 
@@ -1094,6 +1164,7 @@ fn set_age(age: PositiveInt) {
 set_age(10); // Valid
 set_age(-5); // This would be a runtime error
 ```
+-->
 
 ### Structural Types
 
@@ -1109,6 +1180,7 @@ fn print_point(p: Point) {
 var my_point = {x: 10.5, y: 20.0};
 print_point(my_point); // Output: (10.5, 20.0)
 ```
+> **Note:** The syntax for structural types is parsed, but the type system and VM do not yet support them. You cannot create or use instances of structural types.
 
 ### Tuple Types
 
@@ -1137,6 +1209,10 @@ var current_status: Status = Status.Running;
 
 ### Traits and Interfaces
 
+> **Note:** Traits and interfaces are planned but not yet implemented.
+
+<!--
+
 Traits and interfaces are used to define a set of methods that a class must implement. This is a powerful tool for abstraction and polymorphism.
 
 ```limit
@@ -1150,6 +1226,7 @@ class Dog : Speaker {
     }
 }
 ```
+-->
 
 ### Error Handling
 
@@ -1403,6 +1480,10 @@ This syntax is particularly useful for providing default values while maintainin
 
 ## Concurrency
 
+> **Note:** The concurrency features (`parallel`, `concurrent`, `task`) are parsed, but the VM does not yet support them. The following examples will not run.
+
+<!--
+
 Limit has powerful, high-level features for managing concurrent and parallel tasks.
 
 ### Structured Concurrency
@@ -1478,9 +1559,19 @@ Channels are the primary way for concurrent tasks to communicate. One or more ta
 
 ### Async/Await
 
+> **Note:** Async/await is planned but not yet implemented.
+
+<!--
+
 The `async` and `await` keywords are used for non-blocking operations, typically within a `concurrent` block. An `async` function returns immediately without blocking the thread, and you can use `await` to get its result when it's ready.
 
+-->
+
 ### Atomics
+
+> **Note:** Atomics are planned but not yet implemented.
+
+<!--
 
 For simple cases of shared state, such as counters, you can use `atomic` variables. These variables can be safely accessed and modified from multiple tasks at the same time without causing data races.
 
@@ -1513,3 +1604,5 @@ concurrent {
     }
 }
 ```
+
+-->
