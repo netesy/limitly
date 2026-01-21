@@ -339,6 +339,8 @@ iter (i in 0..10..2) {
 
 ### Ternary Operator
 
+> **Note:** The ternary operator is planned but not yet implemented in the parser.
+
 Limit supports the ternary operator (`? :`) for concise conditional expressions.
 
 ```limit
@@ -346,9 +348,10 @@ var x = 10;
 var result = x > 5 ? "Greater than 5" : "Not greater than 5";
 print(result); // Output: Greater than 5
 ```
-> **Note:** The ternary operator is planned but not yet implemented in the parser.
 
 ### Match Statements
+
+> **Note:** The `match` statement and all forms of pattern matching are planned but not yet implemented.
 
 The `match` statement is a powerful tool for pattern matching. It can be used as an advanced `switch` statement.
 
@@ -629,6 +632,8 @@ greet_default("Alice");   // Output: Hello, Alice!
 
 ### Higher-Order Functions
 
+> **Note:** Higher-order functions and closures are planned but not yet implemented.
+
 Functions are first-class citizens in Limit, which means they can be passed as arguments to other functions.
 
 ```
@@ -808,6 +813,8 @@ The `self` keyword refers to the current instance of the class. It is used to ac
 
 ### Inheritance
 
+> **Note:** Full class inheritance is planned but not yet implemented. The basic syntax is parsed but not yet functional in the VM.
+
 A class can inherit from a parent class using the `:` operator. This allows the child class to inherit the fields and methods of the parent.
 
 ```
@@ -875,6 +882,8 @@ iter (animal: Animal in animals) {
 ```
 
 ## Modules and Imports
+
+> **Note:** The module system is not fully implemented. The syntax is parsed, but the VM and runtime do not yet support module loading.
 
 Limit supports a module system that allows you to organize your code into separate files and reuse code across your project.
 
@@ -962,6 +971,8 @@ When another file imports this module, it will only have access to the `public` 
 
 ### Lambda Expressions (Anonymous Functions)
 
+> **Note:** Lambda expressions are planned but not yet implemented.
+
 Limit supports lambda expressions, also known as anonymous functions. These are functions that do not have a name and can be defined on the fly.
 
 ```limit
@@ -986,21 +997,9 @@ var result = apply(10, 5, fn(a, b) { return a * b; });
 print(result); // Output: 50
 ```
 
-### Destructuring Assignments
-
-You can unpack values from tuples and lists into separate variables.
-
-```limit
-// Destructuring a tuple
-var (name, age) = ("Alice", 30);
-print("{name} is {age} years old."); // Output: Alice is 30 years old.
-
-// Destructuring a list
-var [a, b, c] = [1, 2, 3];
-print(a); // Output: 1
-```
-
 ### Unsafe Blocks
+
+> **Note:** `unsafe` blocks are planned but not yet implemented.
 
 Limit is a memory-safe language, but sometimes you may need to interface with low-level code or perform operations that the compiler cannot guarantee are safe. For these cases, you can use an `unsafe` block.
 
@@ -1012,6 +1011,8 @@ unsafe {
 
 ### Contract Statements
 
+> **Note:** `contract` statements are planned but not yet implemented.
+
 Contracts are used to enforce preconditions, postconditions, and invariants in your code. They are useful for debugging and ensuring correctness.
 
 ```limit
@@ -1022,6 +1023,8 @@ fn divide(a: int, b: int): int {
 ```
 
 ### Compile-Time Execution
+
+> **Note:** `comptime` blocks are planned but not yet implemented.
 
 The `comptime` keyword allows you to execute code at compile time. This is useful for metaprogramming, generating lookup tables, or performing other computations before the program runs.
 
@@ -1062,6 +1065,8 @@ Union types are especially powerful when combined with `match` statements to han
 
 ### Intersection Types
 
+> **Note:** Intersection types are planned but not yet implemented.
+
 An intersection type is a type that combines multiple types into one. A value of an intersection type must satisfy the requirements of all the types in the intersection. Intersection types are defined using the ampersand (`&`) character.
 
 ```limit
@@ -1082,6 +1087,8 @@ fn print_person_details(p: Person) {
 
 ### Refined Types
 
+> **Note:** Refined types are planned but not yet implemented.
+
 A refined type allows you to add constraints to an existing type. This is useful for enforcing invariants at the type level. Refined types are defined using the `where` keyword.
 
 ```limit
@@ -1096,6 +1103,8 @@ set_age(-5); // This would be a runtime error
 ```
 
 ### Structural Types
+
+> **Note:** The syntax for structural types is parsed, but the type system and VM support are not yet implemented.
 
 A structural type allows you to define a type based on its structure or shape, rather than by a specific name. This is useful for working with data that has a consistent structure but may not be an instance of a named class.
 
@@ -1136,6 +1145,8 @@ var current_status: Status = Status.Running;
 ```
 
 ### Traits and Interfaces
+
+> **Note:** Traits are planned but not yet implemented.
 
 Traits and interfaces are used to define a set of methods that a class must implement. This is a powerful tool for abstraction and polymorphism.
 
@@ -1402,6 +1413,8 @@ var value: int = divide(10, 0)? else {
 This syntax is particularly useful for providing default values while maintaining Limit's null-free design principles.
 
 ## Concurrency
+
+> **Note:** Concurrency features are not yet implemented. The syntax is parsed, but the VM does not yet support parallel execution.
 
 Limit has powerful, high-level features for managing concurrent and parallel tasks.
 
