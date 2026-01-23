@@ -214,6 +214,8 @@ print("The result is {result}"); // Output: The result is 12
 
 ## 📦 Organizing Your Code with Modules
 
+> **Note:** The module system is not yet fully implemented. The parser supports the syntax, but VM and runtime support are missing.
+
 As your programs grow larger, you'll want to split your code into multiple files. Limit's module system makes this easy.
 
 A module is just a separate `.lm` file. You can use the `import` keyword to use functions and variables from one file in another.
@@ -239,6 +241,8 @@ greetings.say_hi(); // Output: Hi there!
 This is just a brief introduction. The module system also supports aliasing, and importing or hiding specific parts of a module. To learn more, check out the [**Modules and Imports**](./guide.md#modules-and-imports) section in the full language guide.
 
 ## 🧺 Working with Collections
+
+> **Note:** Data structures like Lists and Dictionaries are planned but not yet implemented.
 
 Collections are data structures that can hold multiple values. Limit has two main types of collections: lists and dictionaries.
 
