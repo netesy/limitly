@@ -315,36 +315,34 @@ fn might_fail(): int? {
 
 fn do_something(): int? {
     var result = might_fail();
-    
-    match result {
-        Ok(value) => {
-            print("Got value: {value}");
-            return ok(value * 2);
-        },
-        Err => {
-            print("No value available");
-            return err();
-        }
+
+    if (result) {
+        var value = result.unwrap();
+        print("Got value: {value}");
+        return ok(value * 2);
+    } else {
+        print("No value available");
+        return err();
     }
 }
 ```
 
 ### Propagating Errors with `?`
 
-The `?` operator works for both error propagation and absence propagation:
+The `?` operator provides a convenient way to propagate errors up the call stack.
 
 ```limit
 fn might_fail(): int? {
-    return err(); // Absent value (treated as error)
+    return err();
 }
 
 fn do_something(): int? {
-    // If might_fail() returns Err (absent), the '?' will immediately
-    // stop do_something() and return that same Err.
-    // If it's Ok(value), the '?' will unwrap the value and continue.
+    // If might_fail() returns err(), the '?' will immediately
+    // stop do_something() and return that same err().
+    // If it's ok(value), the '?' will unwrap the value and continue.
     var result: int = might_fail()?;
 
-    // This part only runs if might_fail() had a value
+    // This part only runs if might_fail() returned a value
     print("It worked!");
     return ok(result);
 }
@@ -352,7 +350,7 @@ fn do_something(): int? {
 
 ### Inline Error Handling with `? else`
 
-Handle errors or absent values inline without a full `match` block:
+You can handle errors inline with the `? else` construct to provide a fallback value.
 
 ```limit
 fn divide(a: int, b: int): int? {
@@ -401,21 +399,19 @@ loop { // An infinite loop
 
     var guess_result: int? = to_int(input_str);
 
-    match (guess_result) {
-        Ok(guess) => {
-            print("You guessed: {guess}");
-            if (guess < secret_number) {
-                print("Too low!");
-            } else if (guess > secret_number) {
-                print("Too high!");
-            } else {
-                print("You win!");
-                break; // Exit the loop
-            }
-        },
-        Err => {
-            print("That's not a number! Please try again.");
+    if (guess_result) {
+        var guess = guess_result.unwrap();
+        print("You guessed: {guess}");
+        if (guess < secret_number) {
+            print("Too low!");
+        } else if (guess > secret_number) {
+            print("Too high!");
+        } else {
+            print("You win!");
+            break; // Exit the loop
         }
+    } else {
+        print("That's not a number! Please try again.");
     }
 
     // In a real game, we'd loop again. For this example, we'll just break.
@@ -424,7 +420,7 @@ loop { // An infinite loop
 ```
 
 **How it works:**
-*   **Error Handling with `match`:** The `to_int` function returns `int?` (an optional integer). We use a `match` statement to **handle** both the success case (`Ok`) and the error/absent case (`Err`). If the user enters bad input, we don't want the game to crash; we just want to print a message and let them try again. This demonstrates Limit's null-free approach where parsing failures result in absent values (treated as errors) rather than null values.
+*   **Error Handling:** The `to_int` function returns `int?`. We use an `if` statement to check if the result contains a value. If it does, we proceed with the game logic. If not, we print an error message. This demonstrates how to handle potential failures without crashing the program.
 *   **Looping:** The `loop` creates an infinite loop. The `break` keyword is used to exit the loop once the correct number has been guessed.
 
 **Your Challenge:**
