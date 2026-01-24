@@ -2046,8 +2046,7 @@ Reg Generator::emit_tuple_expr(AST::TupleExpr& expr) {
         ValuePtr index_val = std::make_shared<Value>(int_type, int64_t(i));
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, index_reg, index_val));
         set_register_type(index_reg, int_type);
-        
-        emit_instruction(LIR_Inst(LIR_Op::TupleSet, Type::Void, element_reg, tuple_reg, index_reg));
+        emit_instruction(LIR_Inst(LIR_Op::TupleSet, Type::Void, tuple_reg, index_reg, element_reg));
     }
     
     return tuple_reg;
