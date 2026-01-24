@@ -207,7 +207,139 @@ std::string RegisterVM::to_string(const RegisterValue& value) const {
     if (std::holds_alternative<std::string>(value)) {
         return std::get<std::string>(value);
     } else if (std::holds_alternative<int64_t>(value)) {
-        return std::to_string(std::get<int64_t>(value));
+        int64_t int_val = std::get<int64_t>(value);
+        
+        // Check if this might be a pointer to a collection
+        // We need to be careful here - only treat as pointer if it looks like one
+        if (int_val > 0x1000) {  // Heuristic: likely a pointer
+            void* ptr = reinterpret_cast<void*>(static_cast<uintptr_t>(int_val));
+            
+            // Try as tuple first (more specific structure)
+            LmTuple* tuple = static_cast<LmTuple*>(ptr);
+            if (tuple && tuple->elements && tuple->size < 1000000) {
+                std::string result = "(";
+                for (uint64_t i = 0; i < tuple->size; i++) {
+                    if (i > 0) result += ", ";
+                    void* elem = tuple->elements[i];
+                    if (elem) {
+                        LmBox* box = static_cast<LmBox*>(elem);
+                        if (box) {
+                            switch (box->type) {
+                                case LM_BOX_STRING:
+                                    result += "\"" + std::string(lm_unbox_string(box)) + "\"";
+                                    break;
+                                case LM_BOX_INT:
+                                    result += std::to_string(box->value.as_int);
+                                    break;
+                                case LM_BOX_FLOAT:
+                                    result += std::to_string(box->value.as_float);
+                                    break;
+                                case LM_BOX_BOOL:
+                                    result += box->value.as_bool ? "true" : "false";
+                                    break;
+                                default:
+                                    result += "?";
+                            }
+                        }
+                    } else {
+                        result += "nil";
+                    }
+                }
+                result += ")";
+                return result;
+            }
+            
+            // Try as list
+            LmList* list = static_cast<LmList*>(ptr);
+            if (list && list->data && list->size < 1000000) {
+                std::string result = "[";
+                for (uint64_t i = 0; i < list->size; i++) {
+                    if (i > 0) result += ", ";
+                    void* elem = list->data[i];
+                    if (elem) {
+                        LmBox* box = static_cast<LmBox*>(elem);
+                        if (box) {
+                            switch (box->type) {
+                                case LM_BOX_STRING:
+                                    result += "\"" + std::string(lm_unbox_string(box)) + "\"";
+                                    break;
+                                case LM_BOX_INT:
+                                    result += std::to_string(box->value.as_int);
+                                    break;
+                                case LM_BOX_FLOAT:
+                                    result += std::to_string(box->value.as_float);
+                                    break;
+                                case LM_BOX_BOOL:
+                                    result += box->value.as_bool ? "true" : "false";
+                                    break;
+                                default:
+                                    result += "?";
+                            }
+                        }
+                    } else {
+                        result += "nil";
+                    }
+                }
+                result += "]";
+                return result;
+            }
+            
+            // Try as dict
+            LmDict* dict = static_cast<LmDict*>(ptr);
+            if (dict && dict->buckets && dict->size < 1000000) {
+                std::string result = "{";
+                bool first = true;
+                
+                // Iterate through all buckets
+                for (uint64_t i = 0; i < dict->bucket_count; i++) {
+                    LmDictEntry* entry = dict->buckets[i];
+                    while (entry) {
+                        if (!first) result += ", ";
+                        first = false;
+                        
+                        // Format key
+                        if (entry->key) {
+                            LmBox* key_box = static_cast<LmBox*>(entry->key);
+                            if (key_box && key_box->type == LM_BOX_STRING) {
+                                result += "\"" + std::string(lm_unbox_string(key_box)) + "\": ";
+                            }
+                        }
+                        
+                        // Format value
+                        if (entry->value) {
+                            LmBox* val_box = static_cast<LmBox*>(entry->value);
+                            if (val_box) {
+                                switch (val_box->type) {
+                                    case LM_BOX_STRING:
+                                        result += "\"" + std::string(lm_unbox_string(val_box)) + "\"";
+                                        break;
+                                    case LM_BOX_INT:
+                                        result += std::to_string(val_box->value.as_int);
+                                        break;
+                                    case LM_BOX_FLOAT:
+                                        result += std::to_string(val_box->value.as_float);
+                                        break;
+                                    case LM_BOX_BOOL:
+                                        result += val_box->value.as_bool ? "true" : "false";
+                                        break;
+                                    default:
+                                        result += "?";
+                                }
+                            }
+                        } else {
+                            result += "nil";
+                        }
+                        
+                        entry = entry->next;
+                    }
+                }
+                result += "}";
+                return result;
+            }
+        }
+        
+        // Fall back to integer representation
+        return std::to_string(int_val);
     } else if (std::holds_alternative<double>(value)) {
         return std::to_string(std::get<double>(value));
     } else if (std::holds_alternative<bool>(value)) {
@@ -806,7 +938,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             }
             case LIR::LIR_Op::TupleCreate: {
                 // Create a proper tuple using C runtime with size
-                uint64_t size = static_cast<uint64_t>(to_int(registers[pc->imm]));
+                uint64_t size = static_cast<uint64_t>(pc->b);
                 void* tuple = lm_tuple_new(size);
                 registers[pc->dst] = static_cast<int64_t>(reinterpret_cast<uintptr_t>(tuple));
                 break;
@@ -836,9 +968,10 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             }
             case LIR::LIR_Op::TupleSet: {
                 // Set value in tuple using C runtime
-                auto& tuple_reg = registers[pc->a];
-                auto& index_reg = registers[pc->b];
-                auto& value_reg = registers[pc->dst];
+                // Format: tuple_set tuple, index, value
+                auto& tuple_reg = registers[pc->dst];
+                auto& index_reg = registers[pc->a];
+                auto& value_reg = registers[pc->b];
                 
                 if (std::holds_alternative<int64_t>(tuple_reg)) {
                     void* tuple = reinterpret_cast<void*>(static_cast<uintptr_t>(std::get<int64_t>(tuple_reg)));
