@@ -238,54 +238,7 @@ greetings.say_hi(); // Output: Hi there!
 
 This is just a brief introduction. The module system also supports aliasing, and importing or hiding specific parts of a module. To learn more, check out the [**Modules and Imports**](./guide.md#modules-and-imports) section in the full language guide.
 
-## 🧺 Working with Collections
-
-Collections are data structures that can hold multiple values. Limit has two main types of collections: lists and dictionaries.
-
-### Lists/Arrays
-
-A **list** is an ordered collection of items. You can create a list using square brackets `[]`. It's good practice to specify the type of items the list will hold.
-
-```limit
-var fruits: [str] = ["apple", "banana", "cherry"];
-print(fruits);
-```
-
-You can get an item from a list by its **index**. The index is the item's position in the list, starting from 0.
-
-```limit
-print(fruits[0]); // Output: apple
-print(fruits[2]); // Output: cherry
-```
-
-### Maps/Dictionaries
-
-A **dictionary** (or map) is a collection of key-value pairs. You can create a dictionary using curly braces `{}`.
-
-```limit
-var person: {str: any} = {
-    "name": "Alice",
-    "age": 30
-};
-```
-
-You can get a value from a dictionary by its **key**.
-
-```limit
-print(person["name"]); // Output: Alice
-```
-
-### Loops over Collections
-
-You can use the `iter` loop to go through each item in a collection.
-
-```limit
-var colors: [str] = ["red", "green", "blue"];
-
-iter (color: str in colors) {
-    print("Color: {color}");
-}
-```
+> **Note:** The collection types described below are planned but not yet implemented.
 
 ## 🧪 Errors and Optional Values
 
@@ -293,19 +246,18 @@ In Limit, errors and absent values are not seen as crashes, but as a normal part
 
 **Key Principle**: Limit is null-free by design. There are no null pointers or null references. Instead, we use a unified system where "absence of value" is treated as an error condition.
 
-There are two main ways to deal with potential errors or absent values: **handling** them immediately with a `match` statement, or **propagating** (passing) them up to the function that called your function.
+There are two main ways to deal with potential errors or absent values: **handling** them immediately with an `if` statement, or **propagating** (passing) them up to the function that called your function.
 
 ### The Unified Error and Optional Value System
 
 Limit uses a single system for both error handling and optional values:
 - **`Type?`** represents a value that might be present or absent (where absence is an error condition)
-- **`Type?ErrorType`** represents a value that might succeed or fail with specific error types
 - **`ok(value)`** creates a success/present value
 - **`err()`** creates an error/absent value (no nulls - absence is an error)
 
-### Handling Errors with `match`
+### Handling Errors with `if`
 
-When you have a function that might fail or return an absent value, you can use a `match` statement to handle both possibilities:
+When you have a function that might fail or return an absent value, you can use an `if` statement to handle both possibilities:
 
 ```limit
 fn might_fail(): int? {
@@ -313,18 +265,13 @@ fn might_fail(): int? {
     return err(); // Absence is treated as an error
 }
 
-fn do_something(): int? {
+fn do_something() {
     var result = might_fail();
     
-    match result {
-        Ok(value) => {
-            print("Got value: {value}");
-            return ok(value * 2);
-        },
-        Err => {
-            print("No value available");
-            return err();
-        }
+    if (result) {
+        print("Got value: {result}");
+    } else {
+        print("No value available");
     }
 }
 ```
@@ -352,7 +299,7 @@ fn do_something(): int? {
 
 ### Inline Error Handling with `? else`
 
-Handle errors or absent values inline without a full `match` block:
+Handle errors or absent values inline without a full `if` block:
 
 ```limit
 fn divide(a: int, b: int): int? {
@@ -401,21 +348,19 @@ loop { // An infinite loop
 
     var guess_result: int? = to_int(input_str);
 
-    match (guess_result) {
-        Ok(guess) => {
-            print("You guessed: {guess}");
-            if (guess < secret_number) {
-                print("Too low!");
-            } else if (guess > secret_number) {
-                print("Too high!");
-            } else {
-                print("You win!");
-                break; // Exit the loop
-            }
-        },
-        Err => {
-            print("That's not a number! Please try again.");
+    if (guess_result) {
+        var guess = guess_result;
+        print("You guessed: {guess}");
+        if (guess < secret_number) {
+            print("Too low!");
+        } else if (guess > secret_number) {
+            print("Too high!");
+        } else {
+            print("You win!");
+            break; // Exit the loop
         }
+    } else {
+        print("That's not a number! Please try again.");
     }
 
     // In a real game, we'd loop again. For this example, we'll just break.

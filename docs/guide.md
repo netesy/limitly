@@ -337,156 +337,9 @@ iter (i in 0..10..2) {
 ```
 > **Note:** The step value feature is planned but not yet fully implemented in the parser.
 
-### Ternary Operator
-
-Limit supports the ternary operator (`? :`) for concise conditional expressions.
-
-```limit
-var x = 10;
-var result = x > 5 ? "Greater than 5" : "Not greater than 5";
-print(result); // Output: Greater than 5
-```
-> **Note:** The ternary operator is planned but not yet implemented in the parser.
-
-### Match Statements
-
-The `match` statement is a powerful tool for pattern matching. It can be used as an advanced `switch` statement.
-
-A `match` statement can match against literal values:
-
-```
-var x = 2;
-match (x) {
-    1 => { print("One"); },
-    2 => { print("Two"); }, // This branch is executed
-    _ => { print("Something else"); } // The `_` is a wildcard
-}
-```
-
-It can also match based on type:
-
-```
-fn printType(value) {
-    match (value) {
-        int => { print("It's an integer."); },
-        str => { print("It's a string."); },
-        _   => { print("It's some other type."); }
-    }
-}
-
-printType(10);     // Output: It's an integer.
-printType("hello"); // Output: It's a string.
-```
-
-You can add conditions to your patterns using `where` guards:
-
-```
-var value = 15;
-match (value) {
-    x where x > 10 => { print("{x} is greater than 10"); },
-    x where x < 10 => { print("{x} is less than 10"); },
-    _              => { print("It must be 10"); }
-}
-```
-
-### Advanced Pattern Matching
-
-Limit's `match` statement supports more than just literal and type matching. You can also destructure complex data types like enums, structs, lists, and tuples.
-
-#### Destructuring Structs and Enums
-
-You can match on the structure of an enum or a struct and bind its inner values to variables.
-
-```limit
-enum Option {
-    Some(any),
-    None
-}
-
-fn print_option(opt: Option) {
-    match (opt) {
-        Some(value) => { print("Value is {value}"); },
-        None => { print("No value"); }
-    }
-}
-
-print_option(Some(10)); // Output: Value is 10
-print_option(None);     // Output: No value
-```
-
-You can also destructure records or objects with a similar syntax:
-
-```limit
-type Person = {name: str, age: int};
-
-fn greet(p: Person) {
-    match (p) {
-        {name: n, age: a} => { print("{n} is {a} years old."); }
-    }
-}
-
-greet({name: "Alice", age: 30}); // Output: Alice is 30 years old.
-```
-
-#### Destructuring Dictionaries
-
-You can destructure dictionaries to bind values to variables based on their keys. You can also capture the remaining key-value pairs using the `...` syntax.
-
-```limit
-var person = {
-    "name": "Alice",
-    "age": 30,
-    "city": "New York"
-};
-
-match (person) {
-    {name: n, age: a, ...rest} => {
-        print("{n} is {a} years old.");
-        print("Other info: {rest}");
-    },
-    _ => { print("Not a person."); }
-}
-// Output:
-// Alice is 30 years old.
-// Other info: {city: "New York"}
-```
-
-#### Destructuring Lists
-
-You can destructure lists to bind elements to variables. The `...` syntax can be used to bind the rest of the list to a variable.
-
-```limit
-var my_list = [1, 2, 3, 4];
-
-match (my_list) {
-    [] => { print("Empty list"); },
-    [x] => { print("Single element: {x}"); },
-    [a, b, ...rest] => {
-        print("First: {a}, Second: {b}");
-        print("Rest: {rest}");
-    },
-    _ => { print("Some other list"); }
-}
-// Output:
-// First: 1, Second: 2
-// Rest: [3, 4]
-```
-
-#### Destructuring Tuples
-
-Tuples can be destructured in a similar way.
-
-```limit
-var my_tuple = ("Jules", 42);
-
-match (my_tuple) {
-    (name, age) => { print("{name} is {age} years old."); },
-    _ => { print("Not a person tuple."); }
-}
-// Output: Jules is 42 years old.
-```
-
 ## Data Structures
+
+> **Note:** The data structures described below are planned but not yet implemented.
 
 Limit provides built-in support for common data structures.
 
@@ -627,43 +480,7 @@ greet_default();          // Output: Hello, World!
 greet_default("Alice");   // Output: Hello, Alice!
 ```
 
-### Higher-Order Functions
-
-Functions are first-class citizens in Limit, which means they can be passed as arguments to other functions.
-
-```
-// This function takes another function as a parameter
-fn apply(x: int, y: int, operation: fn(int, int): int): int {
-    return operation(x, y);
-}
-
-fn multiply(a: int, b: int): int {
-    return a * b;
-}
-
-var result: int = apply(10, 5, multiply);
-print(result); // Output: 50
-```
-
-### Closures
-
-A function can be defined inside another function. This inner function "captures" the variables from its containing scope, creating a closure.
-
-```
-fn createCounter(): fn(): int {
-    var count: int = 0;
-    fn increment(): int {
-        count += 1;
-        return count;
-    }
-    return increment;
-}
-
-var counter: fn(): int = createCounter();
-print(counter()); // Output: 1
-print(counter()); // Output: 2
-print(counter()); // Output: 3
-```
+> **Note:** Higher-order functions and closures are planned but not yet implemented.
 
 ## Classes
 
@@ -808,6 +625,8 @@ The `self` keyword refers to the current instance of the class. It is used to ac
 
 ### Inheritance
 
+> **Note:** Inheritance is only partially implemented.
+
 A class can inherit from a parent class using the `:` operator. This allows the child class to inherit the fields and methods of the parent.
 
 ```
@@ -860,6 +679,8 @@ smart_dog.speak();
 ```
 
 ### Polymorphism
+
+> **Note:** Polymorphism is only partially implemented.
 
 Polymorphism allows you to treat objects of different classes as objects of a common parent class.
 
@@ -958,78 +779,7 @@ module my_app.utils {
 
 When another file imports this module, it will only have access to the `public` members. `protected` members would be available to other modules within the `my_app` namespace (not yet fully implemented), and `private` members are internal to the module.
 
-## Advanced Features
-
-### Lambda Expressions (Anonymous Functions)
-
-Limit supports lambda expressions, also known as anonymous functions. These are functions that do not have a name and can be defined on the fly.
-
-```limit
-// A lambda that adds two numbers
-var add = fn(a: int, b: int): int {
-    return a + b;
-};
-
-var result = add(5, 10);
-print(result); // Output: 15
-```
-
-Lambdas are particularly useful when working with higher-order functions.
-
-```limit
-fn apply(x: int, y: int, operation: fn(int, int): int): int {
-    return operation(x, y);
-}
-
-// Pass a lambda directly to the apply function
-var result = apply(10, 5, fn(a, b) { return a * b; });
-print(result); // Output: 50
-```
-
-### Destructuring Assignments
-
-You can unpack values from tuples and lists into separate variables.
-
-```limit
-// Destructuring a tuple
-var (name, age) = ("Alice", 30);
-print("{name} is {age} years old."); // Output: Alice is 30 years old.
-
-// Destructuring a list
-var [a, b, c] = [1, 2, 3];
-print(a); // Output: 1
-```
-
-### Unsafe Blocks
-
-Limit is a memory-safe language, but sometimes you may need to interface with low-level code or perform operations that the compiler cannot guarantee are safe. For these cases, you can use an `unsafe` block.
-
-```limit
-unsafe {
-    // Low-level operations
-}
-```
-
-### Contract Statements
-
-Contracts are used to enforce preconditions, postconditions, and invariants in your code. They are useful for debugging and ensuring correctness.
-
-```limit
-fn divide(a: int, b: int): int {
-    contract(b != 0, "Cannot divide by zero");
-    return a / b;
-}
-```
-
-### Compile-Time Execution
-
-The `comptime` keyword allows you to execute code at compile time. This is useful for metaprogramming, generating lookup tables, or performing other computations before the program runs.
-
-```limit
-comptime {
-    var my_compile_time_var = 123;
-}
-```
+> **Note:** The advanced features described below are planned but not yet implemented.
 
 ## The Type System
 
@@ -1060,65 +810,7 @@ my_num = 3.14;                 // This is also valid
 
 Union types are especially powerful when combined with `match` statements to handle all possible types that a variable could be.
 
-### Intersection Types
-
-An intersection type is a type that combines multiple types into one. A value of an intersection type must satisfy the requirements of all the types in the intersection. Intersection types are defined using the ampersand (`&`) character.
-
-```limit
-trait HasName {
-    fn get_name(): str;
-}
-
-trait HasAge {
-    fn get_age(): int;
-}
-
-type Person = HasName & HasAge;
-
-fn print_person_details(p: Person) {
-    print("{p.get_name()} is {p.get_age()} years old.");
-}
-```
-
-### Refined Types
-
-A refined type allows you to add constraints to an existing type. This is useful for enforcing invariants at the type level. Refined types are defined using the `where` keyword.
-
-```limit
-type PositiveInt = int where value > 0;
-
-fn set_age(age: PositiveInt) {
-    // ...
-}
-
-set_age(10); // Valid
-set_age(-5); // This would be a runtime error
-```
-
-### Structural Types
-
-A structural type allows you to define a type based on its structure or shape, rather than by a specific name. This is useful for working with data that has a consistent structure but may not be an instance of a named class.
-
-```limit
-type Point = {x: float, y: float};
-
-fn print_point(p: Point) {
-    print("({p.x}, {p.y})");
-}
-
-var my_point = {x: 10.5, y: 20.0};
-print_point(my_point); // Output: (10.5, 20.0)
-```
-
-### Tuple Types
-
-A tuple is a fixed-size, ordered collection of elements of different types. Tuple types are defined using parentheses.
-
-```limit
-type PersonInfo = (str, int, str);
-
-var person: PersonInfo = ("Alice", 30, "New York");
-```
+> **Note:** The advanced type system features described below are planned but not yet implemented.
 
 ### Enum Declarations
 
@@ -1155,56 +847,7 @@ class Dog : Speaker {
 
 **Key Design Principle**: Limit is designed to be null-free. It does not have null pointers, references, or values. Instead, Limit uses a robust type-based system to handle optionality and errors.
 
-### The `Option` Type for Optional Values
-
-When a value can be present or absent, you should use the `Option` enum, which has two variants:
-- **`Some(value)`**: Represents the presence of a value.
-- **`None`**: Represents the absence of a value.
-
-```limit
-enum Option {
-    Some(any),
-    None
-}
-
-fn find_user(id: int): Option {
-    if (id == 1) {
-        return Some("Alice");
-    }
-    return None;
-}
-```
-
-You can then use a `match` statement to safely handle both cases:
-
-```limit
-var user = find_user(1);
-match (user) {
-    Some(name) => { print("Found user: {name}"); },
-    None => { print("User not found"); }
-}
-```
-
-### The `Result` Type for Operations That Can Fail
-
-For operations that can either succeed or fail, Limit uses a `Result` type (often implemented as a `Type?` or a custom enum). The common convention is:
-- **`Ok(value)`**: Represents a successful result.
-- **`Err(error)`**: Represents a failure, containing an error value.
-
-```limit
-fn divide(a: int, b: int): int?DivisionByZero {
-    if (b == 0) {
-        return Err(DivisionByZero("Cannot divide by zero"));
-    }
-    return Ok(a / b);
-}
-
-var result = divide(10, 2);
-match (result) {
-    Ok(value) => { print("Result: {value}"); },
-    Err(e) => { print("Error: {e}"); }
-}
-```
+> **Note:** The `Option` and `Result` enums are planned but not yet implemented. Error handling and optional values are currently managed through a unified `Type?` system.
 
 ### The Unified `Type?` System
 
@@ -1402,6 +1045,8 @@ var value: int = divide(10, 0)? else {
 This syntax is particularly useful for providing default values while maintaining Limit's null-free design principles.
 
 ## Concurrency
+
+> **Note:** The concurrency features described below are planned but not yet implemented. The syntax is parsed, but there is no VM support.
 
 Limit has powerful, high-level features for managing concurrent and parallel tasks.
 
