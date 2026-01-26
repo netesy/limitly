@@ -2198,55 +2198,14 @@ void Generator::emit_print_value(Reg value) {
                 break;
         }
     } else {
-        // Fallback: Check what type of value we actually have in the register
-        // Look at the last instruction to determine the type
-        if (!current_function_->instructions.empty()) {
-            const auto& last_inst = current_function_->instructions.back();
-            if (last_inst.dst == value) {
-                if (last_inst.const_val) {
-                    // This is a LoadConst instruction - check the constant's type
-                    if (last_inst.const_val->type) {
-                        switch (last_inst.const_val->type->tag) {
-                            case ::TypeTag::Int:
-                            case ::TypeTag::Int8:
-                            case ::TypeTag::Int16:
-                            case ::TypeTag::Int32:
-                            case ::TypeTag::Int64:
-                                emit_instruction(LIR_Inst(LIR_Op::PrintInt, Type::Void, 0, value, 0));
-                                break;
-                            case ::TypeTag::UInt:
-                            case ::TypeTag::UInt8:
-                            case ::TypeTag::UInt16:
-                            case ::TypeTag::UInt32:
-                            case ::TypeTag::UInt64:
-                                emit_instruction(LIR_Inst(LIR_Op::PrintUint, Type::Void, 0, value, 0));
-                                break;
-                            case ::TypeTag::Float32:
-                            case ::TypeTag::Float64:
-                                emit_instruction(LIR_Inst(LIR_Op::PrintFloat, Type::Void, 0, value, 0));
-                                break;
-                            case ::TypeTag::Bool:
-                                emit_instruction(LIR_Inst(LIR_Op::PrintBool, Type::Void, 0, value, 0));
-                                break;
-                            case ::TypeTag::String:
-                                emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
-                                break;
-                            default:
-                                // Convert to string and print
-                                Reg str_reg = allocate_register();
-                                emit_instruction(LIR_Inst(LIR_Op::ToString, Type::Ptr, str_reg, value, 0));
-                                auto string_type = std::make_shared<::Type>(::TypeTag::String);
-                                set_register_language_type(str_reg, string_type);
-                                emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, str_reg, 0));
-                                break;
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Final fallback - assume it's a string
-        emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
+        // Fallback: Type is unknown (likely Any or unset)
+        // Always convert to string first, then print
+        // This handles tuples, lists, dicts, and other complex types
+        Reg str_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::ToString, Type::Ptr, str_reg, value, 0));
+        auto string_type = std::make_shared<::Type>(::TypeTag::String);
+        set_register_language_type(str_reg, string_type);
+        emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, str_reg, 0));
     }
 }
 
@@ -3983,11 +3942,10 @@ void Generator::emit_list_var_iter_stmt(AST::IterStatement& stmt, Reg list_reg) 
 
     set_current_block(header_block);
     
-    // For now, use a fixed length (TODO: implement proper list length method)
+    // Get the actual list length using ListLen operation
     Reg len_reg = allocate_register();
     auto len_type = std::make_shared<::Type>(::TypeTag::Int64);
-    ValuePtr len_val = std::make_shared<Value>(len_type, int64_t(3)); // Assume 3 elements for now
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, len_reg, len_val));
+    emit_instruction(LIR_Inst(LIR_Op::ListLen, Type::I64, len_reg, list_reg));
     set_register_type(len_reg, len_type);
     
     // Compare index with length

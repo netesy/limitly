@@ -1,0 +1,3 @@
+var d = { "a": 1 };
+var items = d;
+print(items);

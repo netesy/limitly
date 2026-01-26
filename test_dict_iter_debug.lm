@@ -1,0 +1,9 @@
+var d = { "x": 10 };
+print("Dict created");
+print(d);
+print("Starting iteration");
+iter (entry in d) {
+    print("In loop");
+    print(entry);
+}
+print("Done");

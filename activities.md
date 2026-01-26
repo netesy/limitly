@@ -9,37 +9,31 @@ The Limit Programming Language is a modern programming language with features li
 - [x] Design and implement the scanner (lexical analyzer)
 - [x] Define token types for the language
 - [x] Implement token recognition for keywords, identifiers, literals, and operators
+- [x] Design the CST structure to represent the language constructs
 - [x] Design the AST structure to represent the language constructs
-- [x] Implement the parser to build the AST from tokens
+- [x] Implement the parser to build the AST from tokens/CST
 - [x] Support variable declarations with type annotations
 - [x] Support function declarations with parameters and return types
-- [x] Support control flow statements (if, for, while)
+- [x] Support control flow statements (if, for, while, iter)
 - [x] Support expression statements and operators
-- [x] Support class declarations with fields and methods
+- [x] Support oop declarations with fields and methods
 - [x] Support error handling with attempt-handle blocks
 - [x] Support concurrency with parallel and concurrent blocks
-- [x] Support asynchronous programming with async/await
 - [x] Support enums and pattern matching
 
 ### Phase 2: Backend Development ✅
-- [x] Design the bytecode instruction set
-- [x] Implement the bytecode generator
+- [x] Design the LIR instruction set
+- [x] Implement the LIR generator
 - [x] Implement AST visitor pattern for traversing the AST
 - [x] Enhance ASTPrinter for better debugging and visualization
 - [x] Update test_parser to save AST output to files for analysis
 - [x] Generate bytecode for variable declarations and assignments
 - [x] Implement complete VM with all core operations
-- [x] Fix critical control flow issues (jump offsets, stack management)
 - [x] Implement comprehensive function system with default parameters
-- [x] Implement complete OOP system with classes, objects, and methods
-- [x] Add object instantiation and method dispatch
+- [ ] Implement complete OOP system with frames, objects, and methods
+- [ ] Add object instantiation and method dispatch
 - [x] Integrate memory management for objects
 - [x] Complete string interpolation and all expression types
-- [x] Generate bytecode for function declarations and calls
-- [x] Generate bytecode for control flow statements
-- [x] Generate bytecode for expressions and operators
-- [x] Generate bytecode for error handling
-- [x] Generate bytecode for concurrency and asynchronous programming
 - [x] Implement a virtual machine to execute the bytecode (basic operations)
 - [x] **Fixed nested iteration support** - Implemented indexed temp variable system
 - [x] **Fixed string interpolation parsing** - Handle expressions at string start
@@ -52,27 +46,25 @@ The Limit Programming Language is a modern programming language with features li
 - [x] **Fixed float arithmetic** - Resolved type mismatch in float value handling causing runtime errors
 - [x] **Enhanced escape sequences** - Comprehensive escape sequence support in string literals
 - [x] **Complete function implementation** - Full support for function declarations, calls, parameters, return values, recursion, optional parameters, and default parameters
-- [x] **Complete OOP implementation** - Full object-oriented programming with classes, objects, constructors, methods, field declarations, property access
+- [ ] **Complete OOP implementation** - Full object-oriented programming with classes, objects, constructors, methods, field declarations, property access
 - [x] Implement break/continue statements for loops
-- [ ] Implement exception handling 
+- [x] Implement error handling 
 - [ ] Implement concurrency primitives (parallel/concurrent blocks)
-- [ ] Implement bytecode optimization
+- [x] Implement AST optimization
 
 ### Phase 3: Language Features 🔄
 - [x] Static typing with type inference
 - [x] Optional parameters with default values
 - [x] Error handling with return type
 - [x] Concurrency primitives (parallel and concurrent blocks)
-- [x] Asynchronous programming with async/await
 - [x] Enums and pattern matching
 - [x] Structural types with extensible records (row polymorphism)
 - [x] Union types and intersection types
-- [x] Refined types with constraints
+- [ ] Refined types with constraints
 - [x] Range expressions
 - [x] Compound assignment operators
 - [x] List and dictionary collections with indexing operations
 - [x] **Complete function system** - Function declarations, calls, parameters, return values, recursion, optional parameters, default parameters
-- [ ] Generics
 - [ ] Modules and imports
 - [ ] Standard library
 

@@ -1,0 +1,2 @@
+var t = ("A", "B", "C");
+print(t);

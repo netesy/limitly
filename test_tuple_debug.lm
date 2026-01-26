@@ -1,0 +1,3 @@
+var t = ("A", "B");
+var x = t;
+print(x);
