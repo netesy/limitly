@@ -265,11 +265,32 @@ std::string RegisterVM::to_string(const RegisterValue& value) const {
         int64_t int_val = std::get<int64_t>(value);
         
         // Check if this might be a pointer to a collection
-        // On Windows, heap pointers can be in various ranges, so we need to be more permissive
-        if (int_val > 0 && int_val != 0xCCCCCCCCCCCCCCCC && int_val != 0xCDCDCDCDCDCDCDCD) {
+        // Pointers are typically large values (> 0x10000 on most systems)
+        // Small values (< 0x10000) are likely just integers
+        if (int_val > 0x10000 && int_val != 0xCCCCCCCCCCCCCCCC && int_val != 0xCDCDCDCDCDCDCDCD) {
             void* ptr = reinterpret_cast<void*>(static_cast<uintptr_t>(int_val));
             
-            // Try as dict first (most specific structure with hash/cmp functions)
+            // Try as boxed value first (most common case from tuple_get)
+            LmBox* box = static_cast<LmBox*>(ptr);
+            if (box && box->type >= 0 && box->type <= 4) {
+                // It's a boxed value
+                switch (box->type) {
+                    case LM_BOX_STRING:
+                        return "\"" + std::string(lm_unbox_string(box)) + "\"";
+                    case LM_BOX_INT:
+                        return std::to_string(box->value.as_int);
+                    case LM_BOX_FLOAT:
+                        return std::to_string(box->value.as_float);
+                    case LM_BOX_BOOL:
+                        return box->value.as_bool ? "true" : "false";
+                    case LM_BOX_NULLPTR:
+                        return "nil";
+                    default:
+                        return "?";
+                }
+            }
+            
+            // Try as dict (most specific structure with hash/cmp functions)
             LmDict* dict = static_cast<LmDict*>(ptr);
             if (dict && dict->buckets && dict->bucket_count > 0 && dict->bucket_count < 1000000) {
                 std::string result = "{";
@@ -334,32 +355,34 @@ std::string RegisterVM::to_string(const RegisterValue& value) const {
                 return result;
             }
             
-            // Try as tuple (more specific structure)
+            // Try as tuple (use magic number for safe detection)
             LmTuple* tuple = static_cast<LmTuple*>(ptr);
-            if (tuple && tuple->elements && tuple->size < 1000000) {
+            if (tuple && tuple->magic == LM_TUPLE_MAGIC && tuple->elements && tuple->size > 0 && tuple->size < 1000000) {
                 std::string result = "(";
                 for (uint64_t i = 0; i < tuple->size; i++) {
                     if (i > 0) result += ", ";
                     void* elem = tuple->elements[i];
                     if (elem) {
-                        LmBox* box = static_cast<LmBox*>(elem);
-                        if (box) {
-                            switch (box->type) {
+                        LmBox* elem_box = static_cast<LmBox*>(elem);
+                        if (elem_box && elem_box->type >= 0 && elem_box->type <= 4) {  // Valid box type
+                            switch (elem_box->type) {
                                 case LM_BOX_STRING:
-                                    result += "\"" + std::string(lm_unbox_string(box)) + "\"";
+                                    result += "\"" + std::string(lm_unbox_string(elem_box)) + "\"";
                                     break;
                                 case LM_BOX_INT:
-                                    result += std::to_string(box->value.as_int);
+                                    result += std::to_string(elem_box->value.as_int);
                                     break;
                                 case LM_BOX_FLOAT:
-                                    result += std::to_string(box->value.as_float);
+                                    result += std::to_string(elem_box->value.as_float);
                                     break;
                                 case LM_BOX_BOOL:
-                                    result += box->value.as_bool ? "true" : "false";
+                                    result += elem_box->value.as_bool ? "true" : "false";
                                     break;
                                 default:
                                     result += "?";
                             }
+                        } else {
+                            result += "?";
                         }
                     } else {
                         result += "nil";
@@ -377,20 +400,20 @@ std::string RegisterVM::to_string(const RegisterValue& value) const {
                     if (i > 0) result += ", ";
                     void* elem = list->data[i];
                     if (elem) {
-                        LmBox* box = static_cast<LmBox*>(elem);
-                        if (box) {
-                            switch (box->type) {
+                        LmBox* elem_box = static_cast<LmBox*>(elem);
+                        if (elem_box) {
+                            switch (elem_box->type) {
                                 case LM_BOX_STRING:
-                                    result += "\"" + std::string(lm_unbox_string(box)) + "\"";
+                                    result += "\"" + std::string(lm_unbox_string(elem_box)) + "\"";
                                     break;
                                 case LM_BOX_INT:
-                                    result += std::to_string(box->value.as_int);
+                                    result += std::to_string(elem_box->value.as_int);
                                     break;
                                 case LM_BOX_FLOAT:
-                                    result += std::to_string(box->value.as_float);
+                                    result += std::to_string(elem_box->value.as_float);
                                     break;
                                 case LM_BOX_BOOL:
-                                    result += box->value.as_bool ? "true" : "false";
+                                    result += elem_box->value.as_bool ? "true" : "false";
                                     break;
                                 default:
                                     result += "?";
@@ -884,7 +907,15 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                     if (list) {
                         void* result = lm_list_get(static_cast<LmList*>(list), static_cast<uint64_t>(to_int(index_reg)));
                         if (result) {
-                            registers[pc->dst] = unbox_register_value(result);
+                            // Check if result is a boxed value or a raw pointer (like a tuple)
+                            LmBox* box = static_cast<LmBox*>(result);
+                            if (box && box->type >= 0 && box->type <= 4) {
+                                // It's a boxed value
+                                registers[pc->dst] = unbox_register_value(result);
+                            } else {
+                                // It's a raw pointer (like a tuple), store as int64
+                                registers[pc->dst] = static_cast<int64_t>(reinterpret_cast<uintptr_t>(result));
+                            }
                         } else {
                             registers[pc->dst] = nullptr; // Index out of bounds
                         }
@@ -1040,7 +1071,8 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                     // Set value at index 1 (already boxed from dict)
                     lm_tuple_set(static_cast<LmTuple*>(tuple), 1, items[i * 2 + 1]);
                     
-                    // Add tuple to the items list
+                    // Add tuple pointer directly to the items list
+                    // Lists store void* pointers, so we can store the tuple pointer directly
                     lm_list_append(static_cast<LmList*>(items_list), tuple);
                 }
                 

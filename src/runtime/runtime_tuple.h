@@ -14,10 +14,14 @@ extern "C" {
 
 // Complete tuple structure - fixed size array of boxed values
 typedef struct {
+    uint64_t magic;      // Magic number for safe type detection: 0x4C6D5475 ("LmTu")
     void** elements;
     uint64_t size;
     uint64_t capacity;
 } LmTuple;
+
+// Magic number for tuple detection
+#define LM_TUPLE_MAGIC 0x4C6D5475ULL  // "LmTu" in hex
 
 // Complete tuple operations
 RUNTIME_API LmTuple* lm_tuple_new(uint64_t size);

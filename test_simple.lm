@@ -16,4 +16,3 @@ var my_dict = { "at": 1, "bi": 12, "fce": 78, "de": 288 };
 iter (entry in my_dict) {
     print("{entry.key}: {entry.value}");
 }
-
