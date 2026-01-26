@@ -166,6 +166,7 @@ enum class LIR_Op : uint8_t {
     ListCreate,
     ListAppend,
     ListIndex,
+    ListLen,             // Get list length
     
     // Dict operations
     DictCreate,

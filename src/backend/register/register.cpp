@@ -829,9 +829,27 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 }
                 break;
             }
+            case LIR::LIR_Op::ListLen: {
+                // Get list length using C runtime
+                auto& list_reg = registers[pc->a];
+                
+                if (std::holds_alternative<int64_t>(list_reg)) {
+                    void* list = reinterpret_cast<void*>(static_cast<uintptr_t>(std::get<int64_t>(list_reg)));
+                    if (list) {
+                        uint64_t len = lm_list_len(static_cast<LmList*>(list));
+                        registers[pc->dst] = static_cast<int64_t>(len);
+                    } else {
+                        registers[pc->dst] = 0; // Invalid list pointer
+                    }
+                } else {
+                    registers[pc->dst] = 0; // Invalid register
+                }
+                break;
+            }
             case LIR::LIR_Op::DictCreate: {
                 // Create a new dict using C runtime
-                void* dict = lm_dict_new(lm_hash_int, lm_cmp_int);
+                // Use string hash and compare functions for string keys
+                void* dict = lm_dict_new(lm_hash_string, lm_cmp_string);
                 registers[pc->dst] = static_cast<int64_t>(reinterpret_cast<uintptr_t>(dict));
                 break;
             }
@@ -846,7 +864,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                     void* key_ptr = box_register_value(key_reg);
                     void* value_ptr = box_register_value(value_reg);
                     
-                    lm_dict_set(static_cast<LmDict*>(dict_ptr), key_ptr, value_ptr);
+                        lm_dict_set(static_cast<LmDict*>(dict_ptr), key_ptr, value_ptr);
                     registers[pc->dst] = dict_reg;
                 } else {
                     registers[pc->dst] = nullptr; // Invalid dict register

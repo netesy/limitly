@@ -111,7 +111,7 @@ print("\nTesting concurrent block with only workers...");
 var worker_only_results = channel();
 
 concurrent(ch=worker_only_results) {
-    worker(data) {
+    worker(datas) {
         worker_only_results.send("Worker processed: {data}");
     }
 }
