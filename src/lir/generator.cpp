@@ -1624,9 +1624,9 @@ Reg Generator::emit_call_expr(AST::CallExpr& expr) {
                 return 0;
             }
             
-            // Generate ChannelClose instruction (assuming it exists or use ChannelPush with special value)
+            // Generate ChannelClose instruction
             Reg result = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::ChannelPush, result, object_reg, 0)); // Use 0 as close marker
+            emit_instruction(LIR_Inst(LIR_Op::ChannelClose, result, object_reg));
             set_register_type(result, std::make_shared<::Type>(::TypeTag::Nil)); // Void return
             return result;
         }         
@@ -3591,10 +3591,6 @@ void Generator::emit_iter_stmt(AST::IterStatement& stmt) {
             add_block_edge(body_block, header_block);
 
             set_current_block(exit_block);
-            // Mark the block as terminated to prevent CFG validation error
-            if (get_current_block()) {
-                get_current_block()->terminated = true;
-            }
             exit_loop();
             exit_scope();
         }

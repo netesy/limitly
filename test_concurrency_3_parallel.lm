@@ -1,0 +1,25 @@
+// Test 3: Worker block from smoke test
+print("=== Testing Worker Statements ===");
+
+var worker_results = channel();
+
+concurrent(ch=worker_results, cores=2) {
+    worker(datas) {
+        processed = "Worker processed: {datas}";
+        worker_results.send(processed);  // Channel communication only
+    }
+}
+
+// Feed data to workers
+worker_results.send("data1");
+worker_results.send("data2");
+
+var worker_count = 0;
+iter (result in worker_results) {
+    print("Worker result: {result}");
+    worker_count = worker_count + 1;
+}
+
+assert(worker_count == 2, "Should receive 2 worker results");
+print("Worker tests completed");
+print("Final worker count: {worker_count}");
