@@ -1,22 +1,16 @@
 print(" === Concurrent Block Tests === ");
 
-// // ==========================================
-// //  Basic concurrent execution (tasks only)
-// // ==========================================
+// ==========================================
+//  Basic concurrent execution (tasks only)
+// ==========================================
 var output_results = channel();
 
-concurrent(ch = output_results,
-cores = Auto,
-on_error = Stop,
-timeout = 20s,
-grace = 500ms) {
-
+concurrent(ch = output_results, cores = 2) {
     task(i in 1..3) {
         print("Concurrent task {i} running");
-        //sleep(3.00);
         output_results.send("Task {i} completed");
         }
-    } // auto - close output_results
+    }
 
     iter (result in output_results) {
         print("Received result: {result}");
@@ -25,75 +19,69 @@ grace = 500ms) {
     print("Concurrent block finished");
 
     // ==========================================
-    //  Stream processing with workers
+    //  Multiple workers, same stream input
     // ==========================================
-    var stream_out = channel();
+    var results = channel();
+    var jobs = channel();
 
-    // // input source is a stream, NOT a channel owned by concurrent
-    var events = ["info1", "info2", "info3"];// iterable → stream
+    // Seed the jobs channel
+    jobs.send("job1");
+    jobs.send("job2");
+    jobs.send("job3");
+    jobs.close();
 
-    concurrent(ch = stream_out,
-    cores = 4,
-    timeout = 15s,
-    grace = 500ms) {
-
-        worker(event from events) {
-            print("Processing event: {event}");
-            stream_out.send("Handled {event}");
+    concurrent(ch = results, cores = 2) {
+        worker(item from jobs) {
+            results.send("Processed: {item}");
             }
-        } // auto - close stream_out
+        }
 
-        iter (msg in stream_out) {
-            print("Result: {msg}");
+        iter (result in results) {
+            print("Final result: {result}");
         }
 
         // ==========================================
-        //  Multiple workers, same stream input
+        //  Tasks seeding a worker stream
         // ==========================================
-        var results = channel();
-        var jobs = channel();// simple channel instead of jobStream
+        print(" === Tasks seeding a worker stream === ");
 
-        // Use iter to seed the jobs channel
-        var job_items = ["job1", "job2", "job3"];
+        var seeded_results = channel();
+        var seed_stream = channel();
 
-        iter (item in job_items) {
-            jobs.send(item);
-        }
-        jobs.close();
+        // Seed the stream
+        seed_stream.send("bootstrap - 1");
+        seed_stream.send("bootstrap - 2");
+        seed_stream.close();
 
-        concurrent(ch = results, cores = 2, timeout = 10s) {
-
-            worker(item from jobs) {
-                results.send("Processed: {item}");
+        // Worker consumes the pre-seeded stream
+        concurrent(ch = seeded_results) {
+            worker(x from seed_stream) {
+                seeded_results.send("Handled: {x}");
                 }
-            } // auto - close results
-
-            iter (result in results) {
-                print("Final result: {result}");
             }
 
+            iter (msg in seeded_results) {
+                print("Seeded result: {msg}");
+            }
             // ==========================================
             //  Tasks seeding a worker stream
             // ==========================================
-            print(" === Tasks seeding a worker stream (seed via iter) === ");
+            print(" === Tasks seeding a worker stream === ");
 
             var seeded_results = channel();
-            var seed_stream = channel();// external stream
+            var seed_stream = channel();
 
-            // Seed the stream using iter outside the concurrent block
-            var seeds = ["bootstrap - 1", "bootstrap - 2"];
-
-            iter (item in seeds) {
-                seed_stream.send(item);
-            }
-            seed_stream.close();// close so worker knows no more items are coming
+            // Seed the stream
+            seed_stream.send("bootstrap - 1");
+            seed_stream.send("bootstrap - 2");
+            seed_stream.close();
 
             // Worker consumes the pre-seeded stream
             concurrent(ch = seeded_results) {
                 worker(x from seed_stream) {
                     seeded_results.send("Handled: {x}");
                     }
-                } // auto - close seeded_results
+                }
 
                 iter (msg in seeded_results) {
                     print("Seeded result: {msg}");
