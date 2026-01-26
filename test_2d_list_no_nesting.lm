@@ -1,0 +1,53 @@
+// Test 2D list without nested iter in parallel
+print("=== 2D List Test (No Nesting) ===");
+
+// Create a simple 2D list
+var matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]];
+
+print("Matrix created");
+
+// Test 1: Access rows
+print("\n--- Test 1: Row Access ---");
+var row0 = matrix[0];
+print("Row 0: {row0}");
+
+var row1 = matrix[1];
+print("Row 1: {row1}");
+
+var row2 = matrix[2];
+print("Row 2: {row2}");
+
+// Test 2: Parallel processing without nesting
+print("\n--- Test 2: Parallel Processing (Single Iter) ---");
+var results = channel();
+
+parallel(cores=3) {
+    iter(i in 0..8) {
+        results.send(i + 1);
+    }
+}
+
+print("Parallel processing complete");
+
+// Collect results
+var count = 0;
+var sum = 0;
+
+iter (result in results) {
+    sum = sum + result;
+    count = count + 1;
+}
+
+print("Total results: {count}");
+print("Sum: {sum}");
+
+// Test 3: Verify
+print("\n--- Test 3: Verification ---");
+print("Expected: 9 results, sum = 45");
+print("Actual: {count} results, sum = {sum}");
+
+if (count == 9 && sum == 45) {
+    print("✓ Test passed!");
+} else {
+    print("✗ Test failed");
+}

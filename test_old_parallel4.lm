@@ -1,0 +1,11 @@
+var matrix: list[100][100] = 0;
+
+parallel(cores=4) {
+    iter(i in 0..9) {
+        iter(j in 0..9) {
+            matrix[i][j] = i * 100 + j;
+        }
+    }
+}
+
+print("Done");

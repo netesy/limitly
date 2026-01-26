@@ -1,0 +1,12 @@
+print("=== List Indexing Test ===");
+
+var myList = [10, 20, 30, 40, 50];
+print("List: {myList}");
+
+print("myList[0] = {myList[0]}");
+print("myList[1] = {myList[1]}");
+print("myList[2] = {myList[2]}");
+print("myList[3] = {myList[3]}");
+print("myList[4] = {myList[4]}");
+
+print("Test complete");

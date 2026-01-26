@@ -1,0 +1,29 @@
+// Test 2D list with parallel blocks - simplified
+print("=== 2D List Parallel Test (Simplified) ===");
+
+// Create a simple 2D list
+var matrix = [[1, 2], [3, 4]];
+
+print("Matrix created");
+
+// Test parallel with nested iter
+var results = channel();
+
+parallel(cores=2) {
+    iter(i in 0..1) {
+        iter(j in 0..1) {
+            results.send(i * 10 + j);
+        }
+    }
+}
+
+print("Parallel processing complete");
+
+// Collect results
+var count = 0;
+iter (result in results) {
+    print("Result: {result}");
+    count = count + 1;
+}
+
+print("Total results: {count}");

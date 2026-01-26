@@ -1,5 +1,5 @@
-// Test parallel blocks with iter-based execution
-print("=== Parallel Block Tests ===");
+// Test parallel blocks with fixed syntax and types
+print("=== Parallel Block Tests (Fixed) ===");
 
 // ==========================================
 //  Simple parallel block with iter

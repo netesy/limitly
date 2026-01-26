@@ -1,0 +1,21 @@
+// Test parallel blocks 
+print("=== Parallel Block Tests ===");
+
+// ==========================================
+//  Simple parallel block (CPU bound)
+// ==========================================
+var counter = 0;
+var results: list = 0;
+
+parallel {
+    // Direct SharedCell operations - no task statements
+    iter(i in 0..999) {
+        results[i] = i * 2;  // SharedCell access to results array
+        counter = counter + 1;  // SharedCell access to counter
+    }
+}
+
+print("Parallel processing complete");
+print("Counter: {counter}");
+print("First result: {results[0]}");
+print("Last result: {results[999]}");
