@@ -17,25 +17,25 @@ Generator::Generator() : current_function_(nullptr), next_register_(0), next_lab
 
 
 std::unique_ptr<LIR_Function> Generator::generate_program(const TypeCheckResult& type_check_result) {
-    std::cout << "[DEBUG] generate_program started" << std::endl;
+   // std::cout << "[DEBUG] generate_program started" << std::endl;
     
     // Set type system reference
-    std::cout << "[DEBUG] Setting type system reference" << std::endl;
+   // std::cout << "[DEBUG] Setting type system reference" << std::endl;
     type_system = &type_check_result.type_system;
     
     // PASS 0: Collect function, class, and module signatures only
-    std::cout << "[DEBUG] PASS 0: Collecting signatures" << std::endl;
+   // std::cout << "[DEBUG] PASS 0: Collecting signatures" << std::endl;
     collect_function_signatures(type_check_result);
-    std::cout << "[DEBUG] Function signatures collected" << std::endl;
+   // std::cout << "[DEBUG] Function signatures collected" << std::endl;
     collect_class_signatures(*type_check_result.program);
-    std::cout << "[DEBUG] Class signatures collected" << std::endl;
+   // std::cout << "[DEBUG] Class signatures collected" << std::endl;
     collect_module_signatures(*type_check_result.program);
-    std::cout << "[DEBUG] Module signatures collected" << std::endl;
+   // std::cout << "[DEBUG] Module signatures collected" << std::endl;
     
     // PASS 1: Lower function bodies into separate LIR functions
-    std::cout << "[DEBUG] PASS 1: Lowering function bodies" << std::endl;
+   // std::cout << "[DEBUG] PASS 1: Lowering function bodies" << std::endl;
     lower_function_bodies(type_check_result);
-    std::cout << "[DEBUG] Function bodies lowered" << std::endl;
+   // std::cout << "[DEBUG] Function bodies lowered" << std::endl;
     
     // PASS 2: Generate main function with top-level code only
     current_function_ = std::make_unique<LIR_Function>("main", 0);
@@ -217,9 +217,9 @@ void Generator::exit_scope() {
 }
 
 void Generator::bind_variable(const std::string& name, Reg reg) {
-    // std::cout << "[DEBUG] Binding variable '" << name << "' to register " << reg << std::endl;
+    //// std::cout << "[DEBUG] Binding variable '" << name << "' to register " << reg << std::endl;
     if (scope_stack_.empty()) {
-        // std::cout << "[DEBUG] Creating new scope for variable binding" << std::endl;
+        //// std::cout << "[DEBUG] Creating new scope for variable binding" << std::endl;
         enter_scope();
     }
     scope_stack_.back().vars[name] = reg;
@@ -237,15 +237,15 @@ void Generator::update_variable_binding(const std::string& name, Reg reg) {
 }
 
 Reg Generator::resolve_variable(const std::string& name) {
-    std::cout << "[DEBUG] Resolving variable '" << name << "' in " << scope_stack_.size() << " scopes" << std::endl;
+   // std::cout << "[DEBUG] Resolving variable '" << name << "' in " << scope_stack_.size() << " scopes" << std::endl;
     for (auto it = scope_stack_.rbegin(); it != scope_stack_.rend(); ++it) {
         auto found = it->vars.find(name);
         if (found != it->vars.end()) {
-            std::cout << "[DEBUG] Found variable '" << name << "' -> register " << found->second << std::endl;
+           // std::cout << "[DEBUG] Found variable '" << name << "' -> register " << found->second << std::endl;
             return found->second;
         }
     }
-    std::cout << "[DEBUG] Variable '" << name << "' not found" << std::endl;
+   // std::cout << "[DEBUG] Variable '" << name << "' not found" << std::endl;
     return UINT32_MAX;
 }
 
@@ -394,13 +394,13 @@ void Generator::report_error(const std::string& message) {
 
 // AST node visitors
 void Generator::emit_stmt(AST::Statement& stmt) {
-    std::cout << "[DEBUG] emit_stmt called with type: " << typeid(stmt).name() << std::endl;
+   // std::cout << "[DEBUG] emit_stmt called with type: " << typeid(stmt).name() << std::endl;
     
     if (auto expr_stmt = dynamic_cast<AST::ExprStatement*>(&stmt)) {
-        std::cout << "[DEBUG] Emitting ExprStatement" << std::endl;
+       // std::cout << "[DEBUG] Emitting ExprStatement" << std::endl;
         emit_expr_stmt(*expr_stmt);
     } else if (auto print_stmt = dynamic_cast<AST::PrintStatement*>(&stmt)) {
-        std::cout << "[DEBUG] Emitting PrintStatement" << std::endl;
+       // std::cout << "[DEBUG] Emitting PrintStatement" << std::endl;
         emit_print_stmt(*print_stmt);
     } else if (auto var_stmt = dynamic_cast<AST::VarDeclaration*>(&stmt)) {
         emit_var_stmt(*var_stmt);
@@ -433,7 +433,7 @@ void Generator::emit_stmt(AST::Statement& stmt) {
     } else if (auto parallel_stmt = dynamic_cast<AST::ParallelStatement*>(&stmt)) {
         emit_parallel_stmt(*parallel_stmt);
     } else if (auto concurrent_stmt = dynamic_cast<AST::ConcurrentStatement*>(&stmt)) {
-        std::cout << "[DEBUG] Emitting ConcurrentStatement" << std::endl;
+       // std::cout << "[DEBUG] Emitting ConcurrentStatement" << std::endl;
         emit_concurrent_stmt(*concurrent_stmt);
     } else if (auto task_stmt = dynamic_cast<AST::TaskStatement*>(&stmt)) {
         emit_task_stmt(*task_stmt);
@@ -822,11 +822,11 @@ Reg Generator::emit_literal_expr(AST::LiteralExpr& expr, TypePtr expected_type) 
                         if (expectUnsigned) {
                             // Expected type is unsigned, parse as unsigned
                             uint64_t uintVal = std::stoull(stringValue);
-                            std::cout << "[DEBUG] Parsing unsigned literal '" << stringValue 
-                                      << "' as uint64_t: " << uintVal << std::endl;
+                           // std::cout << "[DEBUG] Parsing unsigned literal '" << stringValue
+                           //           << "' as uint64_t: " << uintVal << std::endl;
                             const_val = std::make_shared<Value>(int_type, uintVal);
-                            std::cout << "[DEBUG] Created Value with data: '" << const_val->data 
-                                      << "' and type tag: " << static_cast<int>(const_val->type->tag) << std::endl;
+                           // std::cout << "[DEBUG] Created Value with data: '" << const_val->data 
+                           //           << "' and type tag: " << static_cast<int>(const_val->type->tag) << std::endl;
                         } else {
                             // Expected type is signed or no specific expectation
                             uint64_t uintVal = std::stoull(stringValue);
@@ -934,7 +934,7 @@ Reg Generator::emit_variable_expr(AST::VariableExpr& expr) {
     // Check if we're in a task body and this variable is a shared variable
     if (!parallel_block_cell_ids_.empty() && parallel_block_cell_ids_.find(expr.name) != parallel_block_cell_ids_.end()) {
         // This is a shared variable in a task body - use SharedCell operations
-        std::cout << "[DEBUG] Task body accessing shared variable '" << expr.name << "' via SharedCell" << std::endl;
+       // std::cout << "[DEBUG] Task body accessing shared variable '" << expr.name << "' via SharedCell" << std::endl;
         
         // Get the SharedCell ID register for this variable
         Reg cell_id_reg = parallel_block_cell_ids_[expr.name];
@@ -1234,7 +1234,7 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
         emit_instruction(LIR_Inst(op, abi_type, dst, left, right));
     } else {
         // Fallback for operations without result type
-        std::cout << "[DEBUG] Emitting instruction: op=" << static_cast<int>(op) << " dst=" << dst << " left=" << left << " right=" << right << std::endl;
+       // std::cout << "[DEBUG] Emitting instruction: op=" << static_cast<int>(op) << " dst=" << dst << " left=" << left << " right=" << right << std::endl;
         emit_instruction(LIR_Inst(op, dst, left, right));
     }
     
@@ -1374,8 +1374,8 @@ Reg Generator::emit_unary_expr(AST::UnaryExpr& expr) {
             emit_instruction(LIR_Inst(LIR_Op::Label, Type::Void, continue_label, 0, 0));
         }
         
-        std::cout << "[DEBUG] Generated error propagation (?) for register " << operand 
-                  << " -> " << dst << std::endl;
+       // std::cout << "[DEBUG] Generated error propagation (?) for register " << operand 
+      //            << " -> " << dst << std::endl;
     } else {
         report_error("Unknown unary operator");
         return 0;
@@ -1409,7 +1409,7 @@ Reg Generator::emit_call_expr(AST::CallExpr& expr) {
                     return 0;
                 }
                 
-                std::cout << "[DEBUG] LIR Generator: Generating module function call to '" << qualified_name << "'" << std::endl;
+               // std::cout << "[DEBUG] LIR Generator: Generating module function call to '" << qualified_name << "'" << std::endl;
                 
                 // Evaluate arguments and store them in registers
                 std::vector<Reg> arg_regs;
@@ -1439,22 +1439,22 @@ Reg Generator::emit_call_expr(AST::CallExpr& expr) {
         }
         
         if (BuiltinUtils::isBuiltinFunction(func_name)) {
-            std::cout << "[DEBUG] LIR Generator: Generating builtin call to '" << func_name << "'" << std::endl;
+           // std::cout << "[DEBUG] LIR Generator: Generating builtin call to '" << func_name << "'" << std::endl;
             
             // Special handling for channel() function
             if (func_name == "channel") {
-                std::cout << "[DEBUG] Processing channel() builtin function" << std::endl;
+               // std::cout << "[DEBUG] Processing channel() builtin function" << std::endl;
                 if (!expr.arguments.empty()) {
-                    std::cout << "[DEBUG] channel() has arguments, reporting error" << std::endl;
+                   // std::cout << "[DEBUG] channel() has arguments, reporting error" << std::endl;
                     report_error("channel() function takes no arguments");
                     return 0;
                 }
                 
-                std::cout << "[DEBUG] Allocating result register for channel" << std::endl;
+               // std::cout << "[DEBUG] Allocating result register for channel" << std::endl;
                 // Allocate result register
                 Reg result = allocate_register();
                 
-                std::cout << "[DEBUG] Setting channel type for register " << result << std::endl;
+               // std::cout << "[DEBUG] Setting channel type for register " << result << std::endl;
                 
                 // Set the result type to Channel
                 auto channel_type = std::make_shared<::Type>(::TypeTag::Channel);
@@ -1464,7 +1464,7 @@ Reg Generator::emit_call_expr(AST::CallExpr& expr) {
                 // Generate ChannelAlloc instruction with default capacity
                 emit_instruction(LIR_Inst(LIR_Op::ChannelAlloc, result, 32, 0));
                 
-                std::cout << "[DEBUG] Generated ChannelAlloc: channel_alloc r" << result << std::endl;
+               // std::cout << "[DEBUG] Generated ChannelAlloc: channel_alloc r" << result << std::endl;
                 return result;
             }
             
@@ -1488,17 +1488,17 @@ Reg Generator::emit_call_expr(AST::CallExpr& expr) {
                 set_register_abi_type(result, language_type_to_abi_type(any_type));
             }
             
-            std::cout << "[DEBUG] Builtin function '" << func_name << "' called with " << arg_regs.size() << " arguments" << std::endl;
+           // std::cout << "[DEBUG] Builtin function '" << func_name << "' called with " << arg_regs.size() << " arguments" << std::endl;
             
             // Generate builtin call using new format: call r2, builtin_func(r0, r1, r2, ...)
             emit_instruction(LIR_Inst(LIR_Op::Call, result, func_name, arg_regs));
             
-            std::cout << "[DEBUG] Generated call: call r" << result << ", " << func_name << "(...)" << std::endl;
+           // std::cout << "[DEBUG] Generated call: call r" << result << ", " << func_name << "(...)" << std::endl;
             
             return result;
             
         } else if (function_table_.find(func_name) != function_table_.end()) {
-            std::cout << "[DEBUG] LIR Generator: Generating call to user function '" << func_name << "'" << std::endl;
+           // std::cout << "[DEBUG] LIR Generator: Generating call to user function '" << func_name << "'" << std::endl;
             
             // Evaluate arguments and store them in registers
             std::vector<Reg> arg_regs;
@@ -1678,7 +1678,7 @@ Reg Generator::emit_assign_expr(AST::AssignExpr& expr) {
     // Check if we're in a task body and this variable is a shared variable
     if (!expr.name.empty() && !parallel_block_cell_ids_.empty() && parallel_block_cell_ids_.find(expr.name) != parallel_block_cell_ids_.end()) {
         // This is a shared variable assignment in a task body - use SharedCell operations
-        std::cout << "[DEBUG] Task body assigning to shared variable '" << expr.name << "' via SharedCell" << std::endl;
+       // std::cout << "[DEBUG] Task body assigning to shared variable '" << expr.name << "' via SharedCell" << std::endl;
         
         // Get the SharedCell ID register for this variable
         Reg cell_id_reg = parallel_block_cell_ids_[expr.name];
@@ -1747,7 +1747,7 @@ Reg Generator::emit_assign_expr(AST::AssignExpr& expr) {
             // Convert the TypePtr to ABI Type for the instruction
             Type abi_type = language_type_to_abi_type(expr.inferred_type);
             
-            std::cout << "[DEBUG] Compound assignment: op=" << static_cast<int>(expr.op) << " dst=" << dst << " value_reg=" << value << std::endl;
+           // std::cout << "[DEBUG] Compound assignment: op=" << static_cast<int>(expr.op) << " dst=" << dst << " value_reg=" << value << std::endl;
             
             // Check if this should be string concatenation instead of arithmetic
             if (expr.op == TokenType::PLUS_EQUAL) {
@@ -1755,7 +1755,7 @@ Reg Generator::emit_assign_expr(AST::AssignExpr& expr) {
                 TypePtr dst_type = get_register_type(dst);
                 if (dst_type && dst_type->tag == TypeTag::String) {
                     // String += something -> use string concatenation
-                    std::cout << "[DEBUG] PLUS_EQUAL with string variable, using STR_CONCAT" << std::endl;
+                   // std::cout << "[DEBUG] PLUS_EQUAL with string variable, using STR_CONCAT" << std::endl;
                     auto string_type = std::make_shared<::Type>(::TypeTag::String);
                     emit_instruction(LIR_Inst(LIR_Op::STR_CONCAT, Type::Ptr, dst, dst, value));
                     set_register_type(dst, string_type);
@@ -1765,7 +1765,7 @@ Reg Generator::emit_assign_expr(AST::AssignExpr& expr) {
             
             switch (expr.op) {
                 case TokenType::PLUS_EQUAL:
-                    std::cout << "[DEBUG] Emitting PLUS_EQUAL Add instruction" << std::endl;
+                   // std::cout << "[DEBUG] Emitting PLUS_EQUAL Add instruction" << std::endl;
                     emit_instruction(LIR_Inst(LIR_Op::Add, abi_type, dst, dst, value));
                     break;
                 case TokenType::MINUS_EQUAL:
@@ -1983,7 +1983,7 @@ Reg Generator::emit_member_expr(AST::MemberExpr& expr) {
         Reg index_reg = allocate_register();
         auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
         ValuePtr one_val = std::make_shared<Value>(int_type, int64_t(1));
-        std::cout << "[DEBUG] Emitting Dict value: "<< std::endl;
+       // std::cout << "[DEBUG] Emitting Dict value: "<< std::endl;
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, index_reg, one_val));
         set_register_type(index_reg, int_type);
         
@@ -2206,17 +2206,18 @@ void Generator::emit_print_value(Reg value) {
         auto string_type = std::make_shared<::Type>(::TypeTag::String);
         set_register_language_type(str_reg, string_type);
         emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, str_reg, 0));
-    }
+}
 }
 
+
 void Generator::emit_var_stmt(AST::VarDeclaration& stmt) {
-    std::cout << "[DEBUG] emit_var_stmt called for variable: " << stmt.name << std::endl;
+   // std::cout << "[DEBUG] emit_var_stmt called for variable: " << stmt.name << std::endl;
     Reg value_reg;
     
     // Determine the declared type first, before processing the initializer
     TypePtr declared_type = nullptr;
     if (stmt.type.has_value()) {
-        std::cout << "[DEBUG] Variable has explicit type" << std::endl;
+       // std::cout << "[DEBUG] Variable has explicit type" << std::endl;
         // Convert TypeAnnotation to Type - handle all basic types including 128-bit
         auto type_annotation = *stmt.type.value();
         if (type_annotation.typeName == "u32") {
@@ -2254,18 +2255,18 @@ void Generator::emit_var_stmt(AST::VarDeclaration& stmt) {
         }
     }
     
-    std::cout << "[DEBUG] Checking if variable has initializer" << std::endl;
+   // std::cout << "[DEBUG] Checking if variable has initializer" << std::endl;
     if (stmt.initializer) {
-        std::cout << "[DEBUG] Variable has initializer, processing..." << std::endl;
+       // std::cout << "[DEBUG] Variable has initializer, processing..." << std::endl;
         // Check if the initializer is a literal - if so, optimize by directly using it
         if (auto literal = dynamic_cast<AST::LiteralExpr*>(stmt.initializer.get())) {
             // For literal initializers, emit the literal with the expected type
             value_reg = emit_literal_expr(*literal, declared_type);
         } else {
             // For non-literal initializers, evaluate and move
-            std::cout << "[DEBUG] Processing non-literal initializer" << std::endl;
+           // std::cout << "[DEBUG] Processing non-literal initializer" << std::endl;
             Reg value = emit_expr(*stmt.initializer);
-            std::cout << "[DEBUG] emit_expr completed, value=" << value << std::endl;
+           // std::cout << "[DEBUG] emit_expr completed, value=" << value << std::endl;
             value_reg = allocate_register();
             Type abi_type = language_type_to_abi_type(stmt.inferred_type);
             emit_instruction(LIR_Inst(LIR_Op::Mov, abi_type, value_reg, value, 0));
@@ -2285,9 +2286,9 @@ void Generator::emit_var_stmt(AST::VarDeclaration& stmt) {
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, abi_type, value_reg, nil_val));
         set_register_type(value_reg, nil_type);
     }
-    std::cout << "[DEBUG] Binding variable: " << stmt.name << " to register " << value_reg << std::endl;
+   // std::cout << "[DEBUG] Binding variable: " << stmt.name << " to register " << value_reg << std::endl;
     bind_variable(stmt.name, value_reg);
-    std::cout << "[DEBUG] emit_var_stmt completed for: " << stmt.name << std::endl;
+   // std::cout << "[DEBUG] emit_var_stmt completed for: " << stmt.name << std::endl;
 }
 
 void Generator::emit_block_stmt(AST::BlockStatement& stmt) {
@@ -2691,7 +2692,7 @@ void Generator::emit_return_stmt(AST::ReturnStatement& stmt) {
 }
 
 void Generator::emit_func_stmt(AST::FunctionDeclaration& stmt) {
-    std::cout << "[DEBUG] LIR Generator: Processing function declaration '" << stmt.name << "'" << std::endl;
+   // std::cout << "[DEBUG] LIR Generator: Processing function declaration '" << stmt.name << "'" << std::endl;
     
     // Collect parameter registers
     std::vector<Reg> param_regs;
@@ -2709,9 +2710,6 @@ void Generator::emit_func_stmt(AST::FunctionDeclaration& stmt) {
     emit_instruction(LIR_Inst(LIR_Op::FuncDef, stmt.name, param_regs, return_reg));
     
     // Generate function body (this will be handled by the separate function generation pass)
-    // For now, just emit a placeholder
-    std::cout << "[DEBUG] Function '" << stmt.name << "' definition emitted with " 
-              << param_regs.size() << " parameters" << std::endl;
 }
 
 void Generator::emit_import_stmt(AST::ImportStatement& stmt) {
@@ -2719,7 +2717,7 @@ void Generator::emit_import_stmt(AST::ImportStatement& stmt) {
     std::string alias = stmt.alias.value_or(stmt.modulePath);
     import_aliases_[alias] = stmt.modulePath;
     
-    std::cout << "[DEBUG] Import registered: " << alias << " -> " << stmt.modulePath << std::endl;
+   // std::cout << "[DEBUG] Import registered: " << alias << " -> " << stmt.modulePath << std::endl;
 }
 
 void Generator::emit_contract_stmt(AST::ContractStatement& stmt) {
@@ -2731,7 +2729,7 @@ void Generator::emit_comptime_stmt(AST::ComptimeStatement& stmt) {
 }
 
 void Generator::emit_parallel_stmt(AST::ParallelStatement& stmt) {
-    std::cout << "[DEBUG] Emitting ParallelStatement" << std::endl;
+   // std::cout << "[DEBUG] Emitting ParallelStatement" << std::endl;
     
     auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
     
@@ -2763,10 +2761,7 @@ void Generator::emit_parallel_stmt(AST::ParallelStatement& stmt) {
         error_strategy = stmt.on_error;
     }
     
-    std::cout << "[DEBUG] Parallel block: cores=" << num_cores 
-              << " timeout=" << timeout_ms << "ms grace=" << grace_ms 
-              << "ms on_error=" << error_strategy << std::endl;
-    
+  
     // According to spec: Parallel blocks should NOT use task statements
     // They should use direct code with SharedCell operations and work queue system
     
@@ -2774,7 +2769,7 @@ void Generator::emit_parallel_stmt(AST::ParallelStatement& stmt) {
     std::set<std::string> accessed_variables;
     collect_variables_from_statement(*stmt.body, accessed_variables);
     
-    std::cout << "[DEBUG] Found " << accessed_variables.size() << " variables to share via SharedCell" << std::endl;
+   // std::cout << "[DEBUG] Found " << accessed_variables.size() << " variables to share via SharedCell" << std::endl;
     
     // 2. Allocate SharedCell IDs for each accessed variable
     parallel_block_cell_ids_.clear();
@@ -2783,15 +2778,14 @@ void Generator::emit_parallel_stmt(AST::ParallelStatement& stmt) {
         emit_instruction(LIR_Inst(LIR_Op::SharedCellAlloc, Type::I64, cell_id_reg, 0, 0));
         parallel_block_cell_ids_[var_name] = cell_id_reg;
         
-        std::cout << "[DEBUG] Allocated SharedCell for variable '" << var_name 
-                  << "' in register r" << cell_id_reg << std::endl;
+
     }
     
     // 3. Initialize parallel execution system (using available operations)
     Reg parallel_context_reg = allocate_register();
     emit_instruction(LIR_Inst(LIR_Op::ParallelInit, parallel_context_reg, num_cores, 0));
     
-    std::cout << "[DEBUG] Initialized parallel execution for " << num_cores << " cores" << std::endl;
+   // std::cout << "[DEBUG] Initialized parallel execution for " << num_cores << " cores" << std::endl;
     
     // 4. Set up SharedCell context for the parallel block body
     auto saved_parallel_block_cell_ids = parallel_block_cell_ids_;
@@ -2806,7 +2800,7 @@ void Generator::emit_parallel_stmt(AST::ParallelStatement& stmt) {
             }
             
             // For parallel blocks, execute statements directly with SharedCell context
-            std::cout << "[DEBUG] Executing parallel statement directly" << std::endl;
+           // std::cout << "[DEBUG] Executing parallel statement directly" << std::endl;
             emit_stmt(*body_stmt);
         }
     }
@@ -2827,16 +2821,14 @@ void Generator::emit_parallel_stmt(AST::ParallelStatement& stmt) {
         Reg var_reg = resolve_variable(var_name);
         if (var_reg != UINT32_MAX) {
             emit_instruction(LIR_Inst(LIR_Op::Store, var_reg, current_value_reg, 0));
-            
-            std::cout << "[DEBUG] Synchronized SharedCell for variable '" << var_name 
-                      << "' back to register r" << var_reg << std::endl;
+
         }
     }
     
     // Restore SharedCell context
     parallel_block_cell_ids_ = saved_parallel_block_cell_ids;
     
-    std::cout << "[DEBUG] Parallel block completed using SharedCell + direct execution" << std::endl;
+   // std::cout << "[DEBUG] Parallel block completed using SharedCell + direct execution" << std::endl;
 }
 
 // Helper functions for parsing timeout and grace period strings
@@ -2897,36 +2889,36 @@ std::optional<ValuePtr> Generator::evaluate_constant_expression(std::shared_ptr<
 }
 
 void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
-    std::cout << "[DEBUG] Processing concurrent statement" << std::endl;
+   // std::cout << "[DEBUG] Processing concurrent statement" << std::endl;
     auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
     scheduler_initialized_ = true;
-    std::cout << "[DEBUG] About to handle channel parameter assignment" << std::endl;
+   // std::cout << "[DEBUG] About to handle channel parameter assignment" << std::endl;
     // Handle channel parameter assignment (e.g., "ch=counts")
-    std::cout << "[DEBUG] Handling channel parameter assignment" << std::endl;
-    std::cout << "[DEBUG] Channel param: '" << stmt.channelParam << "'" << std::endl;
-    std::cout << "[DEBUG] Channel name: '" << stmt.channel << "'" << std::endl;
+   // std::cout << "[DEBUG] Handling channel parameter assignment" << std::endl;
+   // std::cout << "[DEBUG] Channel param: '" << stmt.channelParam << "'" << std::endl;
+   // std::cout << "[DEBUG] Channel name: '" << stmt.channel << "'" << std::endl;
     Reg channel_reg;
     if (!stmt.channelParam.empty()) {
-        std::cout << "[DEBUG] Channel param is not empty: " << stmt.channelParam << std::endl;
+       // std::cout << "[DEBUG] Channel param is not empty: " << stmt.channelParam << std::endl;
         // We have a parameter assignment: param_name = channel_name
         std::string param_name = stmt.channelParam;
         std::string channel_name = stmt.channel;
         
-        std::cout << "[DEBUG] Resolving existing channel variable: " << channel_name << std::endl;
+       // std::cout << "[DEBUG] Resolving existing channel variable: " << channel_name << std::endl;
         // Resolve to existing channel variable
         channel_reg = resolve_variable(channel_name);
         if (channel_reg == UINT32_MAX) {
-            std::cout << "[DEBUG] Channel variable not found: " << channel_name << std::endl;
+           // std::cout << "[DEBUG] Channel variable not found: " << channel_name << std::endl;
             report_error("Undefined channel variable: " + channel_name);
             return;
         }
         
-        std::cout << "[DEBUG] Binding parameter name to channel: " << param_name << std::endl;
+       // std::cout << "[DEBUG] Binding parameter name to channel: " << param_name << std::endl;
         // Bind the parameter name to the existing channel
         bind_variable(param_name, channel_reg);
         set_register_type(channel_reg, int_type);
     } else {
-        std::cout << "[DEBUG] No channel param, allocating new channel" << std::endl;
+       // std::cout << "[DEBUG] No channel param, allocating new channel" << std::endl;
         // Original behavior: allocate new channel
         channel_reg = allocate_register();
         emit_instruction(LIR_Inst(LIR_Op::ChannelAlloc, channel_reg, 32, 0));
@@ -2937,7 +2929,7 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
     current_concurrent_block_id_ = std::to_string(reinterpret_cast<uintptr_t>(&stmt));
     
     // Initialize scheduler for concurrent execution
-    std::cout << "[DEBUG] Initializing scheduler for concurrent block: " << current_concurrent_block_id_ << std::endl;
+   // std::cout << "[DEBUG] Initializing scheduler for concurrent block: " << current_concurrent_block_id_ << std::endl;
     Reg scheduler_reg = allocate_register();
     emit_instruction(LIR_Inst(LIR_Op::SchedulerInit, scheduler_reg, 0, 0));
     scheduler_initialized_ = true;
@@ -3008,33 +3000,33 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
                     }
                 } else if (auto worker_stmt = dynamic_cast<AST::WorkerStatement*>(body_stmt.get())) {
                     // Handle worker statement: worker(item from jobs) or worker(item in jobs)
-                    std::cout << "[DEBUG] Processing worker statement with param '" << worker_stmt->paramName << "'" << std::endl;
+                   // std::cout << "[DEBUG] Processing worker statement with param '" << worker_stmt->paramName << "'" << std::endl;
                     
                     // Set channel parameter for this worker to use main channel
                     worker_stmt->channel_param = stmt.channel;
-                    std::cout << "[DEBUG] Set worker channel_param to: " << worker_stmt->channel_param << std::endl;
+                   // std::cout << "[DEBUG] Set worker channel_param to: " << worker_stmt->channel_param << std::endl;
                     
                     // Handle worker iteration
                     if (worker_stmt->iterable) {
-                        std::cout << "[DEBUG] Worker has iterable, processing..." << std::endl;
-                        std::cout << "[DEBUG] About to evaluate iterable expression" << std::endl;
+                       // std::cout << "[DEBUG] Worker has iterable, processing..." << std::endl;
+                       // std::cout << "[DEBUG] About to evaluate iterable expression" << std::endl;
                         
                         // For now, create a single worker task that will handle iteration
                         // In a full implementation, this would create multiple workers based on cores
                         std::string worker_name = "worker_" + std::to_string(worker_counter_++);
-                        std::cout << "[DEBUG] Generated worker name: " << worker_name << std::endl;
+                       // std::cout << "[DEBUG] Generated worker name: " << worker_name << std::endl;
                         
                         // Create worker function
-                        std::cout << "[DEBUG] About to create worker function" << std::endl;
+                       // std::cout << "[DEBUG] About to create worker function" << std::endl;
                         create_and_register_worker_function(worker_name, worker_stmt);
-                        std::cout << "[DEBUG] Worker function created and registered" << std::endl;
+                       // std::cout << "[DEBUG] Worker function created and registered" << std::endl;
                         
                         // Add worker to scheduler
-                        std::cout << "[DEBUG] About to add worker to scheduler" << std::endl;
+                       // std::cout << "[DEBUG] About to add worker to scheduler" << std::endl;
                         Reg worker_context_reg = allocate_register();
                         Reg context_id_reg = allocate_register();
                         emit_instruction(LIR_Inst(LIR_Op::TaskContextAlloc, worker_context_reg, 1, 0));
-                        std::cout << "[DEBUG] Task context allocated" << std::endl;
+                       // std::cout << "[DEBUG] Task context allocated" << std::endl;
                         
                         // Store context_id for later use in TaskSetField calls
                         emit_instruction(LIR_Inst(LIR_Op::Mov, context_id_reg, worker_context_reg, 0));
@@ -3045,20 +3037,20 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
                         ValuePtr worker_id_val = std::make_shared<Value>(int_type, static_cast<int64_t>(0));
                         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, worker_id_reg, worker_id_val));
                         emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, worker_id_reg, context_id_reg, 0, 0));
-                        std::cout << "[DEBUG] Worker ID set" << std::endl;
+                       // std::cout << "[DEBUG] Worker ID set" << std::endl;
                         
                         // Set iterable (channel/array) in field 1 - evaluate iterable expression
-                        std::cout << "[DEBUG] About to evaluate iterable expression" << std::endl;
+                       // std::cout << "[DEBUG] About to evaluate iterable expression" << std::endl;
                         Reg iterable_reg = emit_expr(*worker_stmt->iterable);
-                        std::cout << "[DEBUG] Iterable expression evaluated to register: " << iterable_reg << std::endl;
+                       // std::cout << "[DEBUG] Iterable expression evaluated to register: " << iterable_reg << std::endl;
                         emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, iterable_reg, context_id_reg, 0, 1));
-                        std::cout << "[DEBUG] Iterable field set" << std::endl;
+                       // std::cout << "[DEBUG] Iterable field set" << std::endl;
                         
                         // Set channel register (use a fresh register to avoid overwriting channel_reg)
                         Reg channel_copy_reg = allocate_register();
                         emit_instruction(LIR_Inst(LIR_Op::Mov, channel_copy_reg, channel_reg, 0));
                         emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, channel_copy_reg, context_id_reg, 0, 2));
-                        std::cout << "[DEBUG] Channel field set" << std::endl;
+                       // std::cout << "[DEBUG] Channel field set" << std::endl;
                         
                         // Set worker function name in field 4
                         Reg worker_name_reg = allocate_register();
@@ -3066,13 +3058,13 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
                         ValuePtr worker_name_val = std::make_shared<Value>(string_type, worker_name);
                         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, worker_name_reg, worker_name_val));
                         emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, worker_name_reg, context_id_reg, 0, 4));
-                        std::cout << "[DEBUG] Worker function name field set" << std::endl;
+                       // std::cout << "[DEBUG] Worker function name field set" << std::endl;
                         
                         // Add worker to scheduler
                         emit_instruction(LIR_Inst(LIR_Op::SchedulerAddTask, Type::Void, context_id_reg, worker_context_reg, 0));
-                        std::cout << "[DEBUG] Worker added to scheduler" << std::endl;
+                       // std::cout << "[DEBUG] Worker added to scheduler" << std::endl;
                     } else {
-                        std::cout << "[DEBUG] Worker has no iterable, creating single worker" << std::endl;
+                       // std::cout << "[DEBUG] Worker has no iterable, creating single worker" << std::endl;
                         // Handle worker without iterable (single execution)
                         std::string worker_name = "worker_" + std::to_string(worker_counter_++);
                         create_and_register_worker_function(worker_name, worker_stmt);
@@ -3100,9 +3092,9 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
                         emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, worker_name_reg, context_id_reg, 0, 4));
                         
                         emit_instruction(LIR_Inst(LIR_Op::SchedulerAddTask, Type::Void, context_id_reg, worker_context_reg, 0));
-                        std::cout << "[DEBUG] Single worker added to scheduler" << std::endl;
+                       // std::cout << "[DEBUG] Single worker added to scheduler" << std::endl;
                     }
-                    std::cout << "[DEBUG] Worker processing completed" << std::endl;
+                   // std::cout << "[DEBUG] Worker processing completed" << std::endl;
                 } else {
                     // For non-task statements, emit directly
                     emit_stmt(*body_stmt);
@@ -3112,14 +3104,14 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
     }
     
     // Run scheduler to execute all tasks
-    std::cout << "[DEBUG] Running scheduler for concurrent block: " << current_concurrent_block_id_ << std::endl;
+   // std::cout << "[DEBUG] Running scheduler for concurrent block: " << current_concurrent_block_id_ << std::endl;
     emit_instruction(LIR_Inst(LIR_Op::SchedulerRun, scheduler_reg, 0, 0));
     
-    std::cout << "[DEBUG] Concurrent statement processing completed" << std::endl;
+   // std::cout << "[DEBUG] Concurrent statement processing completed" << std::endl;
 }
 
 void Generator::create_parallel_work_item(const std::string& work_item_name, std::shared_ptr<AST::Statement> stmt) {
-    std::cout << "[DEBUG] Creating parallel work item: " << work_item_name << std::endl;
+   // std::cout << "[DEBUG] Creating parallel work item: " << work_item_name << std::endl;
     
     // Save current context
     auto saved_function = std::move(current_function_);
@@ -3152,7 +3144,7 @@ void Generator::create_parallel_work_item(const std::string& work_item_name, std
     cfg_context_ = saved_cfg_context;
     cfg_context_.current_block = saved_current_block;
     
-    std::cout << "[DEBUG] Work item function " << work_item_name << " registered" << std::endl;
+   // std::cout << "[DEBUG] Work item function " << work_item_name << " registered" << std::endl;
 }
 
 void Generator::collect_variables_from_statement(AST::Statement& stmt, std::set<std::string>& variables) {
@@ -3183,7 +3175,7 @@ void Generator::collect_variables_from_expression(AST::Expression& expr, std::se
 }
 
 void Generator::create_and_register_task_function(const std::string& task_name, AST::TaskStatement* task_stmt, int64_t loop_value) {
-    std::cout << "[DEBUG] Creating task function: " << task_name << " with loop value " << loop_value << std::endl;
+   // std::cout << "[DEBUG] Creating task function: " << task_name << " with loop value " << loop_value << std::endl;
     
     // Save current context
     auto saved_function = std::move(current_function_);
@@ -3216,7 +3208,7 @@ void Generator::create_and_register_task_function(const std::string& task_name, 
         bind_variable(task_stmt->channel_param, channel_reg);
         auto channel_type = std::make_shared<::Type>(::TypeTag::Channel);
         set_register_type(channel_reg, channel_type);
-        std::cout << "[DEBUG] Bound channel variable '" << task_stmt->channel_param << "' to register " << channel_reg << std::endl;
+       // std::cout << "[DEBUG] Bound channel variable '" << task_stmt->channel_param << "' to register " << channel_reg << std::endl;
     }
     
     // Emit task body
@@ -3239,14 +3231,14 @@ void Generator::create_and_register_task_function(const std::string& task_name, 
     cfg_context_ = saved_cfg_context;
     cfg_context_.current_block = saved_current_block;
     
-    std::cout << "[DEBUG] Task function " << task_name << " registered" << std::endl;
+   // std::cout << "[DEBUG] Task function " << task_name << " registered" << std::endl;
 }
 
 void Generator::create_and_register_worker_function(const std::string& worker_name, AST::WorkerStatement* worker_stmt) {
-    std::cout << "[DEBUG] Creating worker function: " << worker_name << std::endl;
-    std::cout << "[DEBUG] Worker param name: '" << worker_stmt->paramName << "'" << std::endl;
-    std::cout << "[DEBUG] Worker has iterable: " << (worker_stmt->iterable ? "YES" : "NO") << std::endl;
-    std::cout << "[DEBUG] Worker channel_param: '" << worker_stmt->channel_param << "'" << std::endl;
+   // std::cout << "[DEBUG] Creating worker function: " << worker_name << std::endl;
+   // std::cout << "[DEBUG] Worker param name: '" << worker_stmt->paramName << "'" << std::endl;
+   // std::cout << "[DEBUG] Worker has iterable: " << (worker_stmt->iterable ? "YES" : "NO") << std::endl;
+   // std::cout << "[DEBUG] Worker channel_param: '" << worker_stmt->channel_param << "'" << std::endl;
     
     // Save current context
     auto saved_function = std::move(current_function_);
@@ -3269,7 +3261,7 @@ void Generator::create_and_register_worker_function(const std::string& worker_na
         bind_variable(worker_stmt->paramName, param_reg);
         auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
         set_register_type(param_reg, int_type);
-        std::cout << "[DEBUG] Bound worker parameter '" << worker_stmt->paramName << "' to register " << param_reg << std::endl;
+       // std::cout << "[DEBUG] Bound worker parameter '" << worker_stmt->paramName << "' to register " << param_reg << std::endl;
     }
     
     // Bind channel variable if specified
@@ -3279,7 +3271,7 @@ void Generator::create_and_register_worker_function(const std::string& worker_na
         bind_variable(worker_stmt->channel_param, channel_reg);
         auto channel_type = std::make_shared<::Type>(::TypeTag::Channel);
         set_register_type(channel_reg, channel_type);
-        std::cout << "[DEBUG] Bound channel variable '" << worker_stmt->channel_param << "' to register " << channel_reg << std::endl;
+       // std::cout << "[DEBUG] Bound channel variable '" << worker_stmt->channel_param << "' to register " << channel_reg << std::endl;
     }
     
     // Bind iterable if available (for worker iteration logic)
@@ -3289,14 +3281,14 @@ void Generator::create_and_register_worker_function(const std::string& worker_na
         Reg iterable_reg = 1;  // Use register 1 for iterable access
         auto iterable_type = std::make_shared<::Type>(::TypeTag::Channel); // Default to channel type
         set_register_type(iterable_reg, iterable_type);
-        std::cout << "[DEBUG] Bound iterable to register " << iterable_reg << std::endl;
+       // std::cout << "[DEBUG] Bound iterable to register " << iterable_reg << std::endl;
     }
     
     // Emit worker body directly (worker will be called in a loop by scheduler)
     if (worker_stmt->body) {
-        std::cout << "[DEBUG] About to emit worker body with " << worker_stmt->body->statements.size() << " statements" << std::endl;
+       // std::cout << "[DEBUG] About to emit worker body with " << worker_stmt->body->statements.size() << " statements" << std::endl;
         emit_stmt(*worker_stmt->body);
-        std::cout << "[DEBUG] Worker body emitted successfully" << std::endl;
+       // std::cout << "[DEBUG] Worker body emitted successfully" << std::endl;
     }
     
     // Add return to worker function
@@ -3314,15 +3306,15 @@ void Generator::create_and_register_worker_function(const std::string& worker_na
     cfg_context_ = saved_cfg_context;
     cfg_context_.current_block = saved_current_block;
     
-    std::cout << "[DEBUG] Worker function " << worker_name << " registered" << std::endl;
+   // std::cout << "[DEBUG] Worker function " << worker_name << " registered" << std::endl;
 }
 
 void Generator::emit_task_stmt(AST::TaskStatement& stmt) {
-    std::cout << "[DEBUG] Processing TaskStatement" << std::endl;
+   // std::cout << "[DEBUG] Processing TaskStatement" << std::endl;
     
     // Check if we're in a concurrent block - if so, convert to iter for direct execution
     if (!current_concurrent_block_id_.empty()) {
-        std::cout << "[DEBUG] Converting task to iter in concurrent block" << std::endl;
+       // std::cout << "[DEBUG] Converting task to iter in concurrent block" << std::endl;
         
         // Create a temporary IterStatement to reuse existing iter logic
         auto temp_iter_stmt = std::make_unique<AST::IterStatement>();
@@ -3337,7 +3329,7 @@ void Generator::emit_task_stmt(AST::TaskStatement& stmt) {
 
     // Check if we're in a parallel block (SharedCell context) or concurrent block
     if (!parallel_block_cell_ids_.empty()) {
-        std::cout << "[DEBUG] TaskStatement within parallel block - using SharedCell approach" << std::endl;
+       // std::cout << "[DEBUG] TaskStatement within parallel block - using SharedCell approach" << std::endl;
         
         // For task statements within parallel blocks, emit the body directly
         // SharedCell operations will handle variable access automatically
@@ -3345,7 +3337,7 @@ void Generator::emit_task_stmt(AST::TaskStatement& stmt) {
             emit_stmt(*stmt.body);
         }
     } else {
-        std::cout << "[DEBUG] TaskStatement within concurrent block - using task function approach" << std::endl;
+       // std::cout << "[DEBUG] TaskStatement within concurrent block - using task function approach" << std::endl;
         
         // For task statements within concurrent blocks, create separate task functions
         if (stmt.body) {
@@ -3399,8 +3391,6 @@ void Generator::emit_task_init_and_step(AST::TaskStatement& task, size_t task_id
     if (!task.task_function_name.empty()) {
         auto& func_registry = LIR::FunctionRegistry::getInstance();
         if (func_registry.hasFunction(task.task_function_name)) {
-            std::cout << "[DEBUG] Task function '" << task.task_function_name 
-                      << "' found in FunctionRegistry" << std::endl;
             
             // Store the task function name in the task context for the scheduler to call
             Reg func_name_reg = allocate_register();
@@ -3412,20 +3402,18 @@ void Generator::emit_task_init_and_step(AST::TaskStatement& task, size_t task_id
             // Store the function name in task context field 4 (after task_id, loop_var, channel, shared_counter)
             emit_instruction(LIR_Inst(LIR_Op::TaskSetField, 0, task_context_reg, func_name_reg, 4));
             
-            std::cout << "[DEBUG] Task " << task_id 
-                      << " will call function: " << task.task_function_name << std::endl;
         } else {
-            std::cout << "[ERROR] Task function '" << task.task_function_name << "' not found in FunctionRegistry" << std::endl;
+           // std::cout << "[ERROR] Task function '" << task.task_function_name << "' not found in FunctionRegistry" << std::endl;
         }
     } else {
-        std::cout << "[ERROR] No task function name for task " << task_id << std::endl;
+       // std::cout << "[ERROR] No task function name for task " << task_id << std::endl;
     }
 }
 
 void Generator::emit_worker_stmt(AST::WorkerStatement& stmt) {
     // Workers are handled during the lowering phase, similar to tasks
     // This function should not be called during normal statement emission
-    std::cout << "[DEBUG] Worker statement encountered during emission - should be handled in lowering phase" << std::endl;
+   // std::cout << "[DEBUG] Worker statement encountered during emission - should be handled in lowering phase" << std::endl;
 }
 
 void Generator::emit_iter_stmt(AST::IterStatement& stmt) {
@@ -4752,9 +4740,9 @@ void Generator::lower_worker_body(AST::WorkerStatement& stmt) {
     
     // Emit worker body from AST
     if (stmt.body) {
-        std::cout << "[DEBUG] Emitting worker body with " << stmt.body->statements.size() << " statements" << std::endl;
+       // std::cout << "[DEBUG] Emitting worker body with " << stmt.body->statements.size() << " statements" << std::endl;
         emit_stmt(*stmt.body);
-        std::cout << "[DEBUG] Worker body emitted, function has " << current_function_->instructions.size() << " instructions" << std::endl;
+       // std::cout << "[DEBUG] Worker body emitted, function has " << current_function_->instructions.size() << " instructions" << std::endl;
     }
     
     // Ensure function has a return instruction
@@ -4777,7 +4765,7 @@ void Generator::lower_worker_body(AST::WorkerStatement& stmt) {
     // Store the worker function name for later reference
     stmt.worker_function_name = worker_func_name;
     
-    std::cout << "[DEBUG] Worker function '" << worker_func_name << "' registered with FunctionRegistry" << std::endl;
+   // std::cout << "[DEBUG] Worker function '" << worker_func_name << "' registered with FunctionRegistry" << std::endl;
     
     // Restore context
     current_function_ = std::move(saved_function);
@@ -5224,48 +5212,48 @@ void Generator::emit_module_stmt(AST::ModuleDeclaration& stmt) {
 
 // Variable capture analysis for concurrent statements
 void Generator::find_accessed_variables_in_concurrent(AST::ConcurrentStatement& stmt, std::set<std::string>& accessed_variables) {
-    std::cout << "[DEBUG] find_accessed_variables_in_concurrent started" << std::endl;
+   // std::cout << "[DEBUG] find_accessed_variables_in_concurrent started" << std::endl;
     if (stmt.body) {
-        std::cout << "[DEBUG] Statement has body with " << stmt.body->statements.size() << " statements" << std::endl;
+       // std::cout << "[DEBUG] Statement has body with " << stmt.body->statements.size() << " statements" << std::endl;
         find_accessed_variables_recursive(stmt.body->statements, accessed_variables);
-        std::cout << "[DEBUG] find_accessed_variables_recursive completed" << std::endl;
+       // std::cout << "[DEBUG] find_accessed_variables_recursive completed" << std::endl;
     }
-    std::cout << "[DEBUG] find_accessed_variables_in_concurrent completed" << std::endl;
+   // std::cout << "[DEBUG] find_accessed_variables_in_concurrent completed" << std::endl;
 }
 
 void Generator::find_accessed_variables_recursive(const std::vector<std::shared_ptr<AST::Statement>>& statements, std::set<std::string>& accessed_variables) {
     static int recursion_depth = 0;
     recursion_depth++;
-    std::cout << "[DEBUG] find_accessed_variables_recursive started with " << statements.size() << " statements, depth: " << recursion_depth << std::endl;
+   // std::cout << "[DEBUG] find_accessed_variables_recursive started with " << statements.size() << " statements, depth: " << recursion_depth << std::endl;
     
     if (recursion_depth > 10) {
-        std::cout << "[DEBUG] RECURSION DEPTH TOO HIGH, ABORTING" << std::endl;
+       // std::cout << "[DEBUG] RECURSION DEPTH TOO HIGH, ABORTING" << std::endl;
         recursion_depth--;
         return;
     }
     
     for (const auto& stmt : statements) {
-        std::cout << "[DEBUG] Processing statement type: " << typeid(*stmt.get()).name() << std::endl;
+       // std::cout << "[DEBUG] Processing statement type: " << typeid(*stmt.get()).name() << std::endl;
         if (auto task_stmt = dynamic_cast<AST::TaskStatement*>(stmt.get())) {
-            std::cout << "[DEBUG] Found TaskStatement" << std::endl;
+           // std::cout << "[DEBUG] Found TaskStatement" << std::endl;
             if (task_stmt->body) {
                 find_accessed_variables_recursive(task_stmt->body->statements, accessed_variables);
             }
         } else if (auto expr_stmt = dynamic_cast<AST::ExprStatement*>(stmt.get())) {
-            std::cout << "[DEBUG] Found ExprStatement" << std::endl;
+           // std::cout << "[DEBUG] Found ExprStatement" << std::endl;
             if (expr_stmt->expression) {
                 find_accessed_variables_in_expr(*expr_stmt->expression, accessed_variables);
             }
         } else if (auto block_stmt = dynamic_cast<AST::BlockStatement*>(stmt.get())) {
-            std::cout << "[DEBUG] Found BlockStatement" << std::endl;
+           // std::cout << "[DEBUG] Found BlockStatement" << std::endl;
             find_accessed_variables_recursive(block_stmt->statements, accessed_variables);
         } else {
-            std::cout << "[DEBUG] Statement type not handled: " << typeid(*stmt.get()).name() << std::endl;
+           // std::cout << "[DEBUG] Statement type not handled: " << typeid(*stmt.get()).name() << std::endl;
         }
         // Add other statement types as needed
     }
     
-    std::cout << "[DEBUG] find_accessed_variables_recursive completed, depth: " << recursion_depth << std::endl;
+   // std::cout << "[DEBUG] find_accessed_variables_recursive completed, depth: " << recursion_depth << std::endl;
     recursion_depth--;
 }
 

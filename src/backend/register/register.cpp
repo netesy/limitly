@@ -284,9 +284,9 @@ std::string RegisterVM::to_string(const RegisterValue& value) const {
                 return result;
             }
             
-            // Try as dict
+            // Try as dict - check for valid dict structure
             LmDict* dict = static_cast<LmDict*>(ptr);
-            if (dict && dict->buckets && dict->size < 1000000) {
+            if (dict && dict->buckets && dict->bucket_count > 0 && dict->bucket_count < 1000000) {
                 std::string result = "{";
                 bool first = true;
                 
@@ -302,6 +302,18 @@ std::string RegisterVM::to_string(const RegisterValue& value) const {
                             LmBox* key_box = static_cast<LmBox*>(entry->key);
                             if (key_box && key_box->type == LM_BOX_STRING) {
                                 result += "\"" + std::string(lm_unbox_string(key_box)) + "\": ";
+                            } else if (key_box) {
+                                // Handle non-string keys
+                                switch (key_box->type) {
+                                    case LM_BOX_INT:
+                                        result += std::to_string(key_box->value.as_int) + ": ";
+                                        break;
+                                    case LM_BOX_FLOAT:
+                                        result += std::to_string(key_box->value.as_float) + ": ";
+                                        break;
+                                    default:
+                                        result += "?: ";
+                                }
                             }
                         }
                         
@@ -847,111 +859,141 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 break;
             }
             case LIR::LIR_Op::DictCreate: {
-                // Create a new dict using C runtime
-                // Use string hash and compare functions for string keys
+                // Create a new dict using C runtime with string hash/compare functions
                 void* dict = lm_dict_new(lm_hash_string, lm_cmp_string);
-                registers[pc->dst] = static_cast<int64_t>(reinterpret_cast<uintptr_t>(dict));
-                break;
-            }
-            case LIR::LIR_Op::DictSet: {
-                auto& dict_reg = registers[pc->a];
-                auto& key_reg = registers[pc->b];
-                LIR::Reg value_reg_idx = static_cast<LIR::Reg>(pc->imm);
-                auto& value_reg = registers[value_reg_idx];
-                
-                if (std::holds_alternative<int64_t>(dict_reg)) {
-                    void* dict_ptr = reinterpret_cast<void*>(static_cast<uintptr_t>(std::get<int64_t>(dict_reg)));
-                    void* key_ptr = box_register_value(key_reg);
-                    void* value_ptr = box_register_value(value_reg);
-                    
-                        lm_dict_set(static_cast<LmDict*>(dict_ptr), key_ptr, value_ptr);
-                    registers[pc->dst] = dict_reg;
+                if (dict) {
+                    registers[pc->dst] = static_cast<int64_t>(reinterpret_cast<uintptr_t>(dict));
                 } else {
-                    registers[pc->dst] = nullptr; // Invalid dict register
+                    registers[pc->dst] = nullptr;
                 }
                 break;
             }
-            case LIR::LIR_Op::DictGet: {
-                // Get value from dict using C runtime
-                auto& dict_reg = registers[pc->a];
-                auto& key_reg = registers[pc->b];
+            case LIR::LIR_Op::DictSet: {
+                // DictSet: dst=dict, a=key, b=value
+                // Instruction format: DictSet dict_reg, key_reg, value_reg
+                const RegisterValue& dict_val = registers[pc->dst];
+                const RegisterValue& key_val = registers[pc->a];
+                const RegisterValue& value_val = registers[pc->b];
                 
-                if (std::holds_alternative<int64_t>(dict_reg)) {
-                    void* dict = reinterpret_cast<void*>(static_cast<uintptr_t>(std::get<int64_t>(dict_reg)));
-                    if (dict) {
-                        // Box key for C runtime
-                        void* boxed_key = box_register_value(key_reg);
-                        void* result = lm_dict_get(static_cast<LmDict*>(dict), boxed_key);
-                        if (result) {
-                            registers[pc->dst] = unbox_register_value(result);
-                        } else {
-                            registers[pc->dst] = nullptr; // Key not found
-                        }
-                    } else {
-                        registers[pc->dst] = nullptr; // Invalid dict pointer
-                    }
+                // Validate dict register contains a pointer
+                if (!std::holds_alternative<int64_t>(dict_val)) {
+                    registers[pc->dst] = nullptr;
+                    break;
+                }
+                
+                void* dict_ptr = reinterpret_cast<void*>(static_cast<uintptr_t>(std::get<int64_t>(dict_val)));
+                if (!dict_ptr) {
+                    registers[pc->dst] = nullptr;
+                    break;
+                }
+                
+                // Box key and value for C runtime
+                void* boxed_key = box_register_value(key_val);
+                void* boxed_value = box_register_value(value_val);
+                
+                if (!boxed_key || !boxed_value) {
+                    registers[pc->dst] = nullptr;
+                    break;
+                }
+                
+                // Set the key-value pair in the dict
+                lm_dict_set(static_cast<LmDict*>(dict_ptr), boxed_key, boxed_value);
+                
+                // Return the dict register (for chaining)
+                registers[pc->dst] = dict_val;
+                break;
+            }
+            case LIR::LIR_Op::DictGet: {
+                // DictGet: dst=result, a=dict, b=key
+                // Instruction format: DictGet result_reg, dict_reg, key_reg
+                const RegisterValue& dict_val = registers[pc->a];
+                const RegisterValue& key_val = registers[pc->b];
+                
+                // Validate dict register contains a pointer
+                if (!std::holds_alternative<int64_t>(dict_val)) {
+                    registers[pc->dst] = nullptr;
+                    break;
+                }
+                
+                void* dict_ptr = reinterpret_cast<void*>(static_cast<uintptr_t>(std::get<int64_t>(dict_val)));
+                if (!dict_ptr) {
+                    registers[pc->dst] = nullptr;
+                    break;
+                }
+                
+                // Box key for C runtime lookup
+                void* boxed_key = box_register_value(key_val);
+                if (!boxed_key) {
+                    registers[pc->dst] = nullptr;
+                    break;
+                }
+                
+                // Get the value from the dict
+                void* result = lm_dict_get(static_cast<LmDict*>(dict_ptr), boxed_key);
+                if (result) {
+                    registers[pc->dst] = unbox_register_value(result);
                 } else {
-                    registers[pc->dst] = nullptr; // Invalid dict register
+                    registers[pc->dst] = nullptr;
                 }
                 break;
             }
             case LIR::LIR_Op::DictItems: {
-                // Get dict items as flat array of (key, value) pairs
-                auto& dict_reg = registers[pc->a];
+                // DictItems: dst=result_list, a=dict
+                // Instruction format: DictItems result_reg, dict_reg
+                const RegisterValue& dict_val = registers[pc->a];
                 
-                if (std::holds_alternative<int64_t>(dict_reg)) {
-                    void* dict = reinterpret_cast<void*>(static_cast<uintptr_t>(std::get<int64_t>(dict_reg)));
-                    if (dict) {
-                        uint64_t count;
-                        void** items = lm_dict_items(static_cast<LmDict*>(dict), &count);
-                        
-                        // Create list of tuples using C runtime
-                        void* items_list = lm_list_new();
-                        if (!items_list) {
-                            // Create NULL box and use its pointer directly
-                            void* null_box = lm_box_nullptr();
-                            registers[pc->dst] = static_cast<int64_t>(reinterpret_cast<uintptr_t>(null_box));
-                            break;
-                        }
-                        
-                        for (uint64_t i = 0; i < count; i++) {
-                            // Create tuple for this key-value pair using proper tuple runtime
-                            void* tuple = lm_tuple_new(2); // Tuple with 2 elements (key, value)
-                            if (!tuple) {
-                                // Clean up on error
-                                for (uint64_t j = 0; j < i; j++) {
-                                    void* prev_tuple = lm_list_get(static_cast<LmList*>(items_list), j);
-                                    if (prev_tuple) {
-                                        // Free the tuple (but not its elements - they're managed by the dict)
-                                        free(prev_tuple);
-                                    }
-                                }
-                                free(items);
-                                registers[pc->dst] = 0;
-                                break;
-                            }
-                            
-                            // Add key (already boxed from dict)
-                            lm_tuple_set(static_cast<LmTuple*>(tuple), 0, items[i * 2]);     // key at index 0
-                            // Add value (already boxed from dict)  
-                            lm_tuple_set(static_cast<LmTuple*>(tuple), 1, items[i * 2 + 1]); // value at index 1
-                            
-                            // Add tuple to items list
-                            lm_list_append(static_cast<LmList*>(items_list), tuple);
-                        }
-                        
-                        free(items);
-                        registers[pc->dst] = static_cast<int64_t>(reinterpret_cast<uintptr_t>(items_list));
-                    } else {
-                        // Empty list for null dict
-                        void* empty_list = lm_list_new();
-                        registers[pc->dst] = static_cast<int64_t>(reinterpret_cast<uintptr_t>(empty_list));
-                    }
-                } else {
-                    // Empty list for invalid dict register
+                // Validate dict register contains a pointer
+                if (!std::holds_alternative<int64_t>(dict_val)) {
                     void* empty_list = lm_list_new();
                     registers[pc->dst] = static_cast<int64_t>(reinterpret_cast<uintptr_t>(empty_list));
+                    break;
                 }
+                
+                void* dict_ptr = reinterpret_cast<void*>(static_cast<uintptr_t>(std::get<int64_t>(dict_val)));
+                if (!dict_ptr) {
+                    void* empty_list = lm_list_new();
+                    registers[pc->dst] = static_cast<int64_t>(reinterpret_cast<uintptr_t>(empty_list));
+                    break;
+                }
+                
+                // Get all items from the dict
+                uint64_t count = 0;
+                void** items = lm_dict_items(static_cast<LmDict*>(dict_ptr), &count);
+                
+                // Create a list to hold the (key, value) tuples
+                void* items_list = lm_list_new();
+                if (!items_list) {
+                    if (items) free(items);
+                    registers[pc->dst] = nullptr;
+                    break;
+                }
+                
+                // Process each key-value pair
+                for (uint64_t i = 0; i < count; i++) {
+                    // Create a tuple for this (key, value) pair
+                    void* tuple = lm_tuple_new(2);
+                    if (!tuple) {
+                        // Cleanup on error
+                        if (items) free(items);
+                        registers[pc->dst] = nullptr;
+                        break;
+                    }
+                    
+                    // Set key at index 0 (already boxed from dict)
+                    lm_tuple_set(static_cast<LmTuple*>(tuple), 0, items[i * 2]);
+                    
+                    // Set value at index 1 (already boxed from dict)
+                    lm_tuple_set(static_cast<LmTuple*>(tuple), 1, items[i * 2 + 1]);
+                    
+                    // Add tuple to the items list
+                    lm_list_append(static_cast<LmList*>(items_list), tuple);
+                }
+                
+                // Cleanup items array
+                if (items) free(items);
+                
+                // Return the list of tuples
+                registers[pc->dst] = static_cast<int64_t>(reinterpret_cast<uintptr_t>(items_list));
                 break;
             }
             case LIR::LIR_Op::TupleCreate: {
