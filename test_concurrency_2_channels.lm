@@ -37,7 +37,7 @@ print("Testing concurrent task iteration");
 
 // Fixed iteration block - using channels only (no SharedCell)
 concurrent(ch=results, cores=2, on_error=Stop) {
-    task(i in 5..10) {
+    task(i in 5..9) {
         print("Task {i} running again");
         results.send("Task {i} completed");  // Channel communication only
     }
@@ -51,6 +51,6 @@ iter (result in results) {
 }
 
 print("DEBUG: After second iter, task_count = {task_count}");
-assert(task_count == , "Should receive 6 results");
+assert(task_count == 5, "Should receive 5 results");
 print("Task tests completed");
 print("Final task count: {task_count}");

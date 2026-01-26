@@ -1348,92 +1348,139 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             }
             case LIR::LIR_Op::SchedulerRun: {
 
-
                 // Execute all running tasks (they should already be in scheduler via OP_SCHEDULER_ADD_TASK)
-                for (size_t i = 0; i < scheduler->fibers.size(); ++i) {
-                    auto& fiber = scheduler->fibers[i];
+                // Keep running until all fibers are completed
+                bool all_completed = false;
+                while (!all_completed) {
+                    all_completed = true;
+                    
+                    for (size_t i = 0; i < scheduler->fibers.size(); ++i) {
+                        auto& fiber = scheduler->fibers[i];
 
-                    if (fiber->state == FiberState::CREATED) {
-                        fiber->state = FiberState::RUNNING;
-                    }
-
-                    if (fiber->state == FiberState::RUNNING) {
-
-
-                        // Get task function name from task context field 4
-                        auto func_name_it = fiber->task_context->fields.find(4);
-                        if (func_name_it == fiber->task_context->fields.end()) {
-                            std::cerr << "[ERROR] Task function name not found in task context" << std::endl;
-                            std::cerr << "[DEBUG] Task context has " << fiber->task_context->fields.size() << " fields:" << std::endl;
-                            for (const auto& field : fiber->task_context->fields) {
-                                std::cerr << "[DEBUG] Field " << field.first << " type: " << field.second.index() << std::endl;
-                            }
-                            fiber->state = FiberState::COMPLETED;
-                            continue;
+                        if (fiber->state == FiberState::CREATED) {
+                            fiber->state = FiberState::RUNNING;
                         }
 
-                        // Extract function name from register value
-                        std::string task_func_name;
-                        if (std::holds_alternative<std::string>(func_name_it->second)) {
-                            task_func_name = std::get<std::string>(func_name_it->second);
+                        if (fiber->state == FiberState::RUNNING) {
+                            all_completed = false;
 
-                        } else {
-                            std::cerr << "[ERROR] Task function name is not a string, type index: " << func_name_it->second.index() << std::endl;
-                            fiber->state = FiberState::COMPLETED;
-                            continue;
-                        }
-
-                        // Get task function from registry
-                        auto& func_registry = LIR::FunctionRegistry::getInstance();
-                        LIR::LIR_Function* task_func = func_registry.getFunction(task_func_name);
-                        if (!task_func) {
-                            std::cerr << "[ERROR] Task function '" << task_func_name << "' not found in registry" << std::endl;
-                            fiber->state = FiberState::COMPLETED;
-                            continue;
-                        }
-
-
-                        // Save current register state
-                        auto saved_registers = registers;
-
-                        // Initialize a fresh register context for this task
-                        registers.clear();
-                        registers.resize(1024);
-                        for (auto& reg : registers) {
-                            reg = nullptr;
-                        }
-
-                        // Set up task context parameters in fresh register space
-                        if (fiber) {
-                            // Set task ID from task context field 0
-                            auto task_id_it = fiber->task_context->fields.find(0);
-                            if (task_id_it != fiber->task_context->fields.end()) {
-                                registers[0] = task_id_it->second;
+                            // Get task function name from task context field 4
+                            auto func_name_it = fiber->task_context->fields.find(4);
+                            if (func_name_it == fiber->task_context->fields.end()) {
+                                std::cerr << "[ERROR] Task function name not found in task context" << std::endl;
+                                std::cerr << "[DEBUG] Task context has " << fiber->task_context->fields.size() << " fields:" << std::endl;
+                                for (const auto& field : fiber->task_context->fields) {
+                                    std::cerr << "[DEBUG] Field " << field.first << " type: " << field.second.index() << std::endl;
+                                }
+                                fiber->state = FiberState::COMPLETED;
+                                continue;
                             }
 
-                            // Set loop variable value from task context field 1
-                            auto loop_var_it = fiber->task_context->fields.find(1);
-                            if (loop_var_it != fiber->task_context->fields.end()) {
-                                registers[1] = loop_var_it->second;
+                            // Extract function name from register value
+                            std::string task_func_name;
+                            if (std::holds_alternative<std::string>(func_name_it->second)) {
+                                task_func_name = std::get<std::string>(func_name_it->second);
+
+                            } else {
+                                std::cerr << "[ERROR] Task function name is not a string, type index: " << func_name_it->second.index() << std::endl;
+                                fiber->state = FiberState::COMPLETED;
+                                continue;
                             }
 
-                            // Set channel from task context field 2
-                            auto channel_it = fiber->task_context->fields.find(2);
-                            if (channel_it != fiber->task_context->fields.end()) {
-                                registers[2] = channel_it->second;
+                            // Get task function from registry
+                            auto& func_registry = LIR::FunctionRegistry::getInstance();
+                            LIR::LIR_Function* task_func = func_registry.getFunction(task_func_name);
+                            if (!task_func) {
+                                std::cerr << "[ERROR] Task function '" << task_func_name << "' not found in registry" << std::endl;
+                                fiber->state = FiberState::COMPLETED;
+                                continue;
                             }
+
+                            // Save current register state
+                            auto saved_registers = registers;
+
+                            // Initialize a fresh register context for this task
+                            registers.clear();
+                            registers.resize(1024);
+                            for (auto& reg : registers) {
+                                reg = nullptr;
+                            }
+
+                            // Track if this is a channel worker
+                            bool is_channel_worker = false;
+
+                            // Set up task context parameters in fresh register space
+                            if (fiber) {
+                                // Set task ID from task context field 0
+                                auto task_id_it = fiber->task_context->fields.find(0);
+                                if (task_id_it != fiber->task_context->fields.end()) {
+                                    registers[0] = task_id_it->second;
+                                }
+
+                                // Set loop variable value from task context field 1
+                                auto loop_var_it = fiber->task_context->fields.find(1);
+                                if (loop_var_it != fiber->task_context->fields.end()) {
+                                    // Check if field 1 is a channel (for worker iteration)
+                                    // If it's an int64, it might be a channel ID
+                                    if (std::holds_alternative<int64_t>(loop_var_it->second)) {
+                                        int64_t potential_channel_id = std::get<int64_t>(loop_var_it->second);
+                                        
+                                        // Check if this is a valid channel ID
+                                        if (potential_channel_id >= 0 && potential_channel_id < static_cast<int64_t>(channels.size())) {
+                                            // This is a channel - poll it for data
+                                            auto& channel = channels[potential_channel_id];
+                                            if (channel && channel->has_data()) {
+                                                // Poll the channel for data
+                                                RegisterValue data;
+                                                if (channel->poll(data)) {
+                                                    registers[1] = data;
+                                                    is_channel_worker = true;
+                                                } else {
+                                                    // Channel is closed or empty
+                                                    fiber->state = FiberState::COMPLETED;
+                                                    registers = saved_registers;
+                                                    current_function_ = nullptr;
+                                                    continue;
+                                                }
+                                            } else {
+                                                // Channel is empty or closed
+                                                fiber->state = FiberState::COMPLETED;
+                                                registers = saved_registers;
+                                                current_function_ = nullptr;
+                                                continue;
+                                            }
+                                        } else {
+                                            // Not a channel, use as-is (could be list pointer or other value)
+                                            registers[1] = loop_var_it->second;
+                                        }
+                                    } else {
+                                        // Not an int64, use as-is
+                                        registers[1] = loop_var_it->second;
+                                    }
+                                }
+
+                                // Set channel from task context field 2
+                                auto channel_it = fiber->task_context->fields.find(2);
+                                if (channel_it != fiber->task_context->fields.end()) {
+                                    registers[2] = channel_it->second;
+                                }
+                            }
+
+                            // Execute task function
+                            current_function_ = task_func;
+                            execute_instructions(*task_func, 0, task_func->instructions.size());
+                            
+                            // Restore register state and current function
+                            registers = saved_registers;
+                            current_function_ = nullptr;
+                            
+                            // Only mark as completed if not a channel worker
+                            // Channel workers will be marked completed when channel is empty
+                            if (!is_channel_worker) {
+                                fiber->state = FiberState::COMPLETED;
+                            }
+
                         }
-
-                        // Execute task function
-                        current_function_ = task_func;
-                        execute_instructions(*task_func, 0, task_func->instructions.size());
-                        
-                        // Restore register state and current function
-                        registers = saved_registers;
-                        current_function_ = nullptr;
-                        
-                        fiber->state = FiberState::COMPLETED;
-
                     }
                 }
                 
