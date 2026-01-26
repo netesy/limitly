@@ -1,0 +1,27 @@
+print("=== Simple Dict Access Test ===");
+
+// Test 1: Basic dict creation and access
+var dict1 = {"a": 1, "b": 2, "c": 3};
+print("Dict created: {dict1}");
+
+var val_a = dict1["a"];
+var val_b = dict1["b"];
+var val_c = dict1["c"];
+
+print("dict1[\"a\"] = {val_a}");
+print("dict1[\"b\"] = {val_b}");
+print("dict1[\"c\"] = {val_c}");
+
+// Test 2: Numeric keys
+var dict2 = {1: "one", 2: "two", 3: "three"};
+print("Dict with numeric keys: {dict2}");
+
+var val_1 = dict2[1];
+var val_2 = dict2[2];
+var val_3 = dict2[3];
+
+print("dict2[1] = {val_1}");
+print("dict2[2] = {val_2}");
+print("dict2[3] = {val_3}");
+
+print("Test complete");

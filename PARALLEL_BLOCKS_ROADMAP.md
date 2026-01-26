@@ -20,7 +20,7 @@ The next phase of concurrency development focuses on implementing `parallel` blo
 ### Syntax
 ```limit
 parallel(cores=4) {
-    task(i in 1..100) {
+    iter(i in 1..100) {
         // CPU-bound work
         result = expensive_computation(i);
         results.send(result);

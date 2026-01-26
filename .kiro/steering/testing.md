@@ -47,6 +47,8 @@ tests/
 - ✅ **String interpolation tests pass**: All interpolation patterns supported
 - ✅ **Expression tests pass**: Arithmetic, comparison, logical operations
 - ✅ **Clean test execution**: No spurious output or stack pollution
+- ✅ **Parallel block tests pass**: Parallel execution with iter statements
+- ✅ **Concurrent block tests pass**: Concurrent execution with task statements
 
 ## Testing Tools
 
@@ -138,10 +140,11 @@ tests/
 - [x] Function declarations and calls - **COMPLETED**
 - [x] Basic type system (aliases, unions, Option) - **COMPLETED**  
 - [x] Module system (import/export) - **COMPLETED**
+- [x] Parallel blocks with iter statements - **COMPLETED**
+- [x] Concurrent blocks with task statements - **COMPLETED**
 - [ ] Classes and objects (basic syntax exists, VM implementation needed)
 - [ ] Closures and higher-order functions
 - [ ] Error handling VM implementation (syntax exists)
-- [ ] Concurrency primitives (syntax exists)
 - [ ] Advanced type features (generics, structural types)
 - [ ] Pattern matching (match expressions)
 - [ ] Traits and interfaces

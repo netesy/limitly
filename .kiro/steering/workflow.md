@@ -11,13 +11,12 @@ The project is currently in Phase 2 (Backend Development) with major achievement
 - ✅ **Advanced type system**: Type aliases, union types, Option types implemented
 - ✅ **Error handling framework**: Compile-time error checking with ? operator syntax
 - ✅ **Module system**: Basic import/export with aliasing and filtering
+- ✅ **Concurrency primitives**: Parallel blocks with iter and concurrent blocks with task statements
 
 **Current priorities**:
 - Completing object-oriented features (classes, inheritance, method dispatch)
 - Implementing closures and higher-order functions
 - Completing error handling VM implementation (?else{}, error propagation)
-- Implementing concurrency primitives (parallel/concurrent blocks)
-- Adding advanced type features (generics, structural types)
 
 ### Next Steps
 - Complete Phase 2 (Backend Development)

@@ -38,7 +38,6 @@ Limit is a modern programming language designed with static typing, concurrency 
 - **Object-Oriented Features**: Class declarations (syntax complete, basic VM implementation in progress)
 - **Closures and Higher-Order Functions**: Advanced function features (syntax exists, VM implementation needed)
 - **Error Handling**: Result types and error propagation (syntax complete, VM implementation pending)
-- **Concurrency**: parallel/concurrent blocks (syntax complete, VM implementation pending)
 
 ### 📋 Planned Features
 - Generics and advanced type features
@@ -67,12 +66,12 @@ rent Implementation Summary (Based on Test Suite Analysis)
 5. **String Features**: Interpolation, operations, all patterns
 6. **Iterators**: Range-based iteration with full nesting support
 7. **Memory Management**: Region-based allocation, clean execution
+8. **Concurrency**: Parallel blocks with `iter` and concurrent blocks with `task` statements
 
 ### 🔄 Syntax Complete, VM Implementation In Progress
 1. **Classes**: Basic class syntax, method calls (partial VM implementation)
 2. **Error Handling**: `?` operator, error types (compile-time validation working)
 3. **Pattern Matching**: `match` expressions (syntax parsed, VM execution pending)
-4. **Concurrency**: `parallel`/`concurrent` blocks (syntax parsed, VM execution pending)
 
 ### 📋 Planned Features
 1. **Advanced Functions**: Closures, higher-order functions

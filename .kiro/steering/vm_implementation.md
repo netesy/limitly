@@ -138,6 +138,8 @@ The Limit VM is a stack-based virtual machine that executes bytecode generated f
 - ✅ **Default Parameters**: Functions with default parameter values
 - ✅ **Type System**: Type aliases, union types, Option types
 - ✅ **Module System**: Basic import/export with aliasing and filtering
+- ✅ **Parallel Blocks**: Parallel execution with `iter` statements and channels
+- ✅ **Concurrent Blocks**: Concurrent execution with `task` statements and channels
 
 ## Implementation Priorities
 
@@ -147,10 +149,10 @@ The Limit VM is a stack-based virtual machine that executes bytecode generated f
 3. ✅ ~~Implement optional/default parameters~~ **COMPLETED**
 4. ✅ ~~Implement basic type system~~ **COMPLETED**
 5. ✅ ~~Implement module system~~ **COMPLETED**
-6. **Complete object-oriented features (classes, methods, inheritance)** - IN PROGRESS
-7. **Implement closures and higher-order functions** - NEXT
-8. **Complete error handling VM implementation** - NEXT
-9. **Implement concurrency primitives (parallel/concurrent blocks)** - NEXT
+6. ✅ ~~Implement parallel/concurrent blocks~~ **COMPLETED**
+7. **Complete object-oriented features (classes, methods, inheritance)** - IN PROGRESS
+8. **Implement closures and higher-order functions** - NEXT
+9. **Complete error handling VM implementation** - NEXT
 
 ### Future Work
 10. Add advanced type features (generics, structural types)
