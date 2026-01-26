@@ -1,0 +1,40 @@
+// Test basic functionality without assert
+print("=== Regression Tests ===");
+
+// Variables
+var x = 10;
+var y = 5;
+print("Variables: x={x}, y={y}");
+
+// If statements
+if (x > y) {
+    print("If statement works");
+}
+
+// Lists
+var list = [1, 2, 3];
+print("List: {list}");
+
+// Tuples
+var tuple = ("a", 1);
+print("Tuple: {tuple}");
+
+// Dicts
+var dict = { "key": "value" };
+print("Dict: {dict}");
+
+// Dict iteration
+iter (entry in dict) {
+    print("Dict entry: {entry}");
+}
+
+// While loop
+var i = 0;
+while (i < 3) {
+    print("While loop: {i}");
+    i = i + 1;
+}
+
+// For loop
+for (var j = 0; j < 3; j = j + 1) {
+    print("For loop: {j}");
