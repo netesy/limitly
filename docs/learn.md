@@ -212,80 +212,6 @@ var result: int = add(5, 7);
 print("The result is {result}"); // Output: The result is 12
 ```
 
-## 📦 Organizing Your Code with Modules
-
-As your programs grow larger, you'll want to split your code into multiple files. Limit's module system makes this easy.
-
-A module is just a separate `.lm` file. You can use the `import` keyword to use functions and variables from one file in another.
-
-**Example:**
-
-Let's say you have a file named `greetings.lm`:
-```limit
-// greetings.lm
-fn say_hi() {
-    print("Hi there!");
-}
-```
-
-In your main file, you can import and use the `say_hi` function:
-```limit
-// main.lm
-import greetings;
-
-greetings.say_hi(); // Output: Hi there!
-```
-
-This is just a brief introduction. The module system also supports aliasing, and importing or hiding specific parts of a module. To learn more, check out the [**Modules and Imports**](./guide.md#modules-and-imports) section in the full language guide.
-
-## 🧺 Working with Collections
-
-Collections are data structures that can hold multiple values. Limit has two main types of collections: lists and dictionaries.
-
-### Lists/Arrays
-
-A **list** is an ordered collection of items. You can create a list using square brackets `[]`. It's good practice to specify the type of items the list will hold.
-
-```limit
-var fruits: [str] = ["apple", "banana", "cherry"];
-print(fruits);
-```
-
-You can get an item from a list by its **index**. The index is the item's position in the list, starting from 0.
-
-```limit
-print(fruits[0]); // Output: apple
-print(fruits[2]); // Output: cherry
-```
-
-### Maps/Dictionaries
-
-A **dictionary** (or map) is a collection of key-value pairs. You can create a dictionary using curly braces `{}`.
-
-```limit
-var person: {str: any} = {
-    "name": "Alice",
-    "age": 30
-};
-```
-
-You can get a value from a dictionary by its **key**.
-
-```limit
-print(person["name"]); // Output: Alice
-```
-
-### Loops over Collections
-
-You can use the `iter` loop to go through each item in a collection.
-
-```limit
-var colors: [str] = ["red", "green", "blue"];
-
-iter (color: str in colors) {
-    print("Color: {color}");
-}
-```
 
 ## 🧪 Errors and Optional Values
 
@@ -303,9 +229,9 @@ Limit uses a single system for both error handling and optional values:
 - **`ok(value)`** creates a success/present value
 - **`err()`** creates an error/absent value (no nulls - absence is an error)
 
-### Handling Errors with `match`
+### Handling Errors and Optional Values
 
-When you have a function that might fail or return an absent value, you can use a `match` statement to handle both possibilities:
+When you call a function that returns a `Type?`, you can check if it returned a value or an error using a simple `if` statement, because `Type?` values can be used in boolean contexts.
 
 ```limit
 fn might_fail(): int? {
@@ -313,35 +239,29 @@ fn might_fail(): int? {
     return err(); // Absence is treated as an error
 }
 
-fn do_something(): int? {
+fn do_something() {
     var result = might_fail();
     
-    match result {
-        Ok(value) => {
-            print("Got value: {value}");
-            return ok(value * 2);
-        },
-        Err => {
-            print("No value available");
-            return err();
-        }
+    if (result) {
+        print("Got value: {result}");
+    } else {
+        print("No value available");
     }
 }
 ```
 
 ### Propagating Errors with `?`
 
-The `?` operator works for both error propagation and absence propagation:
+If you don't want to handle an error right away, you can use the `?` operator to pass it up to the function that called yours.
 
 ```limit
 fn might_fail(): int? {
     return err(); // Absent value (treated as error)
 }
 
-fn do_something(): int? {
-    // If might_fail() returns Err (absent), the '?' will immediately
-    // stop do_something() and return that same Err.
-    // If it's Ok(value), the '?' will unwrap the value and continue.
+fn do_something_else(): int? {
+    // If might_fail() returns an error, the '?' will immediately
+    // stop do_something_else() and return that same error.
     var result: int = might_fail()?;
 
     // This part only runs if might_fail() had a value
@@ -352,84 +272,52 @@ fn do_something(): int? {
 
 ### Inline Error Handling with `? else`
 
-Handle errors or absent values inline without a full `match` block:
+You can also handle an error on a single line with `? else`, which is useful for providing a default value.
 
 ```limit
 fn divide(a: int, b: int): int? {
     if (b == 0) {
-        return err(); // Division by zero is an error (no null values)
+        return err(); // Division by zero is an error
     }
     return ok(a / b);
 }
 
-// Provide a default value if division fails or is absent
+// Provide a default value if division fails
 var result: int = divide(10, 0)? else {
-    print("Division failed or result absent");
-    return -1; // Default value (not null - Limit is null-free)
+    print("Division failed!");
+    return -1; // Default value
 };
 
 print("The final result is: {result}"); // Output: The final result is: -1
 ```
 
-This unified approach means you learn one pattern that works for both error handling and optional values, while maintaining Limit's null-free design.
+## 🚀 Mini Project: A Simple Function
 
-## 🚀 Mini Project: Number Guessing Game
-
-Now it's time to put everything you've learned together! Let's build a simple number guessing game. This example will also show you how to handle potential errors gracefully.
-
-The goal is for the user to guess a secret number. The program will tell them if their guess is too high or too low. If they enter something that isn't a number, our program will handle it without crashing.
+Let's write a program that uses a function with optional parameters to greet a user. This will demonstrate how to handle values that may or may not be present.
 
 ```limit
-// --- Number Guessing Game ---
+// --- Greeting Program ---
 
-// Let's assume the language provides these built-in functions.
-// fn randint(min: int, max: int): int { ... }
-// fn read_line(): str { ... }
-// fn to_int(s: str): int? { ... }
-
-// --- The Game Code ---
-
-var secret_number: int = 7; // In a real game, you'd use randint(1, 100)
-print("I'm thinking of a number between 1 and 100. Guess what it is!");
-
-loop { // An infinite loop
-    print("Please input your guess:");
-
-    // For this example, we'll simulate user input.
-    // In a real program, you would use: var input_str: str = read_line();
-    var input_str: str = "7"; // Let's pretend the user guessed "7"
-
-    var guess_result: int? = to_int(input_str);
-
-    match (guess_result) {
-        Ok(guess) => {
-            print("You guessed: {guess}");
-            if (guess < secret_number) {
-                print("Too low!");
-            } else if (guess > secret_number) {
-                print("Too high!");
-            } else {
-                print("You win!");
-                break; // Exit the loop
-            }
-        },
-        Err => {
-            print("That's not a number! Please try again.");
-        }
+fn greet(name: str?) {
+    if (name) {
+        print("Hello, {name}!");
+    } else {
+        print("Hello, stranger!");
     }
-
-    // In a real game, we'd loop again. For this example, we'll just break.
-    break;
 }
+
+// --- Main Code ---
+
+greet("Alice"); // Prints "Hello, Alice!"
+greet(nil);     // Prints "Hello, stranger!"
 ```
 
 **How it works:**
-*   **Error Handling with `match`:** The `to_int` function returns `int?` (an optional integer). We use a `match` statement to **handle** both the success case (`Ok`) and the error/absent case (`Err`). If the user enters bad input, we don't want the game to crash; we just want to print a message and let them try again. This demonstrates Limit's null-free approach where parsing failures result in absent values (treated as errors) rather than null values.
-*   **Looping:** The `loop` creates an infinite loop. The `break` keyword is used to exit the loop once the correct number has been guessed.
+*   **Optional Parameter:** The `greet` function takes an optional string `name: str?`. This means you can call it with a string or with `nil`.
+*   **Checking for a Value:** The `if (name)` statement checks if a name was provided. If `name` is not `nil`, the condition is true.
 
 **Your Challenge:**
-*   Can you modify the code to get a random number instead of using a fixed one? You'll have to imagine a `randint(min, max)` function exists.
-*   Can you remove the `break` at the end of the `match` statement to allow the user to guess multiple times?
+*   Can you modify the `greet` function to have a default name, like "World", if no name is provided? (Hint: Look at the `Default Parameters` section in the full guide).
 
 ## 📎 Next Steps / Resources
 

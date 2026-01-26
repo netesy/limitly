@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Limit programming language implements a zero-cost, union-type based system that handles both errors and optional values through a unified `Type?` syntax. This system provides type-safe error propagation and null-safety without the overhead of exceptions or null pointers. The system is designed to be both performant and ergonomic, ensuring that errors and absent values cannot be silently ignored while maintaining excellent runtime performance and Limit's null-free design principles.
+The Limit programming language implements a zero-cost, union-type based system that handles both errors and optional values through a unified `Type?` syntax. This system is the practical implementation of concepts often found in other languages as `Option` and `Result` types. It provides type-safe error propagation and null-safety without the overhead of exceptions or null pointers. The system is designed to be both performant and ergonomic, ensuring that errors and absent values cannot be silently ignored while maintaining excellent runtime performance and Limit's null-free design principles.
 
 ## Core Concepts
 
@@ -46,26 +46,22 @@ fn process_user(id: int): str? {
 
 ### Handling Errors and Absent Values
 
-Both errors and absent values can be handled using the `?else` syntax or pattern matching:
+Errors and absent values can be handled using an `if` statement (since `Type?` can be used in a boolean context) or with the `?else` syntax.
 
 ```limit
+// Using an `if` statement
+var result = find_user(123);
+if (result) {
+    print("Found user: {result}");
+} else {
+    print("User not found.");
+}
+
 // Using ?else for inline handling
-var result = divide(10, 0)? else {
+var value = divide(10, 0)? else {
     print("Division failed or result absent");
     return 0;  // Default value (not null - Limit is null-free)
 };
-
-// Using pattern matching
-match divide(10, 0) {
-    Ok(result) => print("Success: " + result),
-    Err => print("Division failed")  // Handles both errors and absence
-}
-
-// Pattern matching with specific error types
-match divide_with_error(10, 0) {
-    Ok(result) => print("Success: " + result),
-    Err(DivisionByZero(msg)) => print("Division error: " + msg)
-}
 ```
 
 ## Performance Optimizations
@@ -251,22 +247,6 @@ The unified optional/error system integrates seamlessly with the type system:
 - The system maintains Limit's null-free design principles
 - Error and optional types participate in type checking
 
-### Pattern Matching
-
-The unified system works seamlessly with pattern matching:
-
-```limit
-match some_operation() {
-    Ok(result) => handle_success(result),
-    Err => handle_absence_or_generic_error()
-}
-
-match specific_operation() {
-    Ok(result) => handle_success(result),
-    Err(Error1(msg)) => handle_error1(msg),
-    Err(Error2(code, msg)) => handle_error2(code, msg)
-}
-```
 
 ## Future Enhancements
 
