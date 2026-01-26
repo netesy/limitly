@@ -1,0 +1,7 @@
+var d = { "a": 1 };
+print("Dict created");
+iter (entry in d) {
+    print("Got entry");
+    print(entry);
+}
+print("Done");

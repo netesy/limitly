@@ -12,6 +12,7 @@ RUNTIME_API LmTuple* lm_tuple_new(uint64_t size) {
         return NULL;
     }
     
+    tuple->magic = LM_TUPLE_MAGIC;  // Set magic number for safe detection
     tuple->size = size;  // Set size correctly
     tuple->capacity = size;
     

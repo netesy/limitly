@@ -4,6 +4,7 @@ print(d);
 print("Starting iteration");
 iter (entry in d) {
     print("In loop");
-    print(entry);
+    print(entry.key);
+    print(entry.value);
 }
 print("Done");
