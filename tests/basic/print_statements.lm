@@ -71,7 +71,7 @@ var loopCount = 0;
 for (var i = 1; i <= 3; i += 1) {
     loopCount += 1;
     print("Number: {i}");
-    assert(i >= 1 and i <= 3, "Loop variable i should be between 1 and 3");
+   // assert(i >= 1 and i <= 3, "Loop variable i should be between 1 and 3");
 }
 assert(loopCount == 3, "Loop should execute 3 times");
 

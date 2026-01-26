@@ -265,9 +265,14 @@ std::string RegisterVM::to_string(const RegisterValue& value) const {
         int64_t int_val = std::get<int64_t>(value);
         
         // Check if this might be a pointer to a collection
-        // Pointers are typically large values (> 0x10000 on most systems)
-        // Small values (< 0x10000) are likely just integers
-        if (int_val > 0x10000 && int_val != 0xCCCCCCCCCCCCCCCC && int_val != 0xCDCDCDCDCDCDCDCD) {
+        // Pointers on Windows are typically in the range 0x00400000 to 0x7FFFFFFF for user space
+        // We use a conservative range to avoid treating large integers as pointers
+        // Valid heap pointers are typically between 0x00400000 and 0x7FFFFFFF
+        const int64_t MIN_HEAP_PTR = 0x00400000LL;
+        const int64_t MAX_HEAP_PTR = 0x7FFFFFFFLL;
+        
+        if (int_val >= MIN_HEAP_PTR && int_val <= MAX_HEAP_PTR && 
+            int_val != 0xCCCCCCCCCCCCCCCC && int_val != 0xCDCDCDCDCDCDCDCD) {
             void* ptr = reinterpret_cast<void*>(static_cast<uintptr_t>(int_val));
             
             // Try as boxed value first (most common case from tuple_get)
@@ -638,6 +643,97 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 } else {
                     registers[pc->dst] = nullptr;
                 }
+                break;
+            }
+            case LIR::LIR_Op::Mul: {
+                const RegisterValue* temp_a = &registers[pc->a];
+                const RegisterValue* temp_b = &registers[pc->b];
+                if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
+                    TypePtr result_type = (pc->result_type == LIR::Type::F64) ? 
+                                          type_system->FLOAT64_TYPE : type_system->INT64_TYPE;
+                    
+                    bool a_is_float = std::holds_alternative<double>(*temp_a);
+                    bool b_is_float = std::holds_alternative<double>(*temp_b);
+                    
+                    if (result_type->tag == TypeTag::Float32 || result_type->tag == TypeTag::Float64 || a_is_float || b_is_float) {
+                        registers[pc->dst] = to_float(*temp_a) * to_float(*temp_b);
+                    } else {
+                        int64_t int_result = to_int(*temp_a) * to_int(*temp_b);
+                        registers[pc->dst] = int_result;
+                    }
+                } else {
+                    registers[pc->dst] = nullptr;
+                }
+                break;
+            }
+            case LIR::LIR_Op::Div: {
+                const RegisterValue* temp_a = &registers[pc->a];
+                const RegisterValue* temp_b = &registers[pc->b];
+                if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
+                    TypePtr result_type = (pc->result_type == LIR::Type::F64) ? 
+                                          type_system->FLOAT64_TYPE : type_system->INT64_TYPE;
+                    
+                    bool a_is_float = std::holds_alternative<double>(*temp_a);
+                    bool b_is_float = std::holds_alternative<double>(*temp_b);
+                    
+                    if (result_type->tag == TypeTag::Float32 || result_type->tag == TypeTag::Float64 || a_is_float || b_is_float) {
+                        double divisor = to_float(*temp_b);
+                        if (divisor != 0.0) {
+                            registers[pc->dst] = to_float(*temp_a) / divisor;
+                        } else {
+                            registers[pc->dst] = nullptr; // Division by zero
+                        }
+                    } else {
+                        int64_t divisor = to_int(*temp_b);
+                        if (divisor != 0) {
+                            int64_t int_result = to_int(*temp_a) / divisor;
+                            registers[pc->dst] = int_result;
+                        } else {
+                            registers[pc->dst] = nullptr; // Division by zero
+                        }
+                    }
+                } else {
+                    registers[pc->dst] = nullptr;
+                }
+                break;
+            }
+            case LIR::LIR_Op::Mod: {
+                const RegisterValue* temp_a = &registers[pc->a];
+                const RegisterValue* temp_b = &registers[pc->b];
+                if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
+                    int64_t divisor = to_int(*temp_b);
+                    if (divisor != 0) {
+                        int64_t int_result = to_int(*temp_a) % divisor;
+                        registers[pc->dst] = int_result;
+                    } else {
+                        registers[pc->dst] = nullptr; // Modulo by zero
+                    }
+                } else {
+                    registers[pc->dst] = nullptr;
+                }
+                break;
+            }
+            case LIR::LIR_Op::And: {
+                // Logical AND for booleans
+                const RegisterValue* temp_a = &registers[pc->a];
+                const RegisterValue* temp_b = &registers[pc->b];
+                registers[pc->dst] = to_bool(*temp_a) && to_bool(*temp_b);
+                break;
+            }
+            case LIR::LIR_Op::Or: {
+                // Logical OR for booleans
+                const RegisterValue* temp_a = &registers[pc->a];
+                const RegisterValue* temp_b = &registers[pc->b];
+                registers[pc->dst] = to_bool(*temp_a) || to_bool(*temp_b);
+                break;
+            }
+            case LIR::LIR_Op::Xor: {
+                // Logical XOR for booleans
+                const RegisterValue* temp_a = &registers[pc->a];
+                const RegisterValue* temp_b = &registers[pc->b];
+                bool a_bool = to_bool(*temp_a);
+                bool b_bool = to_bool(*temp_b);
+                registers[pc->dst] = (a_bool && !b_bool) || (!a_bool && b_bool);
                 break;
             }
             case LIR::LIR_Op::CmpLT: {
