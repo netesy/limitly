@@ -35,6 +35,61 @@ void* box_register_value(const RegisterValue& value) {
     }
 }
 
+// Hash function for boxed values
+uint64_t hash_boxed_value(void* key) {
+    if (!key) return 0;
+    LmBox* box = static_cast<LmBox*>(key);
+    
+    switch (box->type) {
+        case LM_BOX_INT:
+            return lm_hash_int(reinterpret_cast<void*>(box->value.as_int));
+        case LM_BOX_STRING: {
+            const char* str = lm_unbox_string(box);
+            return lm_hash_string(const_cast<void*>(reinterpret_cast<const void*>(str)));
+        }
+        case LM_BOX_FLOAT: {
+            int64_t int_val = static_cast<int64_t>(box->value.as_float);
+            return lm_hash_int(reinterpret_cast<void*>(int_val));
+        }
+        case LM_BOX_BOOL:
+            return lm_hash_int(reinterpret_cast<void*>(static_cast<int64_t>(box->value.as_bool)));
+        default:
+            return 0;
+    }
+}
+
+// Compare function for boxed values
+int cmp_boxed_value(void* k1, void* k2) {
+    if (!k1 || !k2) return (k1 != k2) ? 1 : 0;
+    
+    LmBox* box1 = static_cast<LmBox*>(k1);
+    LmBox* box2 = static_cast<LmBox*>(k2);
+    
+    // Different types are not equal
+    if (box1->type != box2->type) return 1;
+    
+    switch (box1->type) {
+        case LM_BOX_INT:
+            return lm_cmp_int(reinterpret_cast<void*>(box1->value.as_int),
+                            reinterpret_cast<void*>(box2->value.as_int));
+        case LM_BOX_STRING: {
+            const char* str1 = lm_unbox_string(box1);
+            const char* str2 = lm_unbox_string(box2);
+            return lm_cmp_string(const_cast<void*>(reinterpret_cast<const void*>(str1)),
+                               const_cast<void*>(reinterpret_cast<const void*>(str2)));
+        }
+        case LM_BOX_FLOAT: {
+            double diff = box1->value.as_float - box2->value.as_float;
+            return (diff > 0) - (diff < 0);
+        }
+        case LM_BOX_BOOL:
+            return (box1->value.as_bool > box2->value.as_bool) - 
+                   (box1->value.as_bool < box2->value.as_bool);
+        default:
+            return 0;
+    }
+}
+
 RegisterValue unbox_register_value(void* boxed_value) {
     if (!boxed_value) {
         return nullptr;
@@ -210,11 +265,76 @@ std::string RegisterVM::to_string(const RegisterValue& value) const {
         int64_t int_val = std::get<int64_t>(value);
         
         // Check if this might be a pointer to a collection
-        // We need to be careful here - only treat as pointer if it looks like one
-        if (int_val > 0x1000) {  // Heuristic: likely a pointer
+        // On Windows, heap pointers can be in various ranges, so we need to be more permissive
+        if (int_val > 0 && int_val != 0xCCCCCCCCCCCCCCCC && int_val != 0xCDCDCDCDCDCDCDCD) {
             void* ptr = reinterpret_cast<void*>(static_cast<uintptr_t>(int_val));
             
-            // Try as tuple first (more specific structure)
+            // Try as dict first (most specific structure with hash/cmp functions)
+            LmDict* dict = static_cast<LmDict*>(ptr);
+            if (dict && dict->buckets && dict->bucket_count > 0 && dict->bucket_count < 1000000) {
+                std::string result = "{";
+                bool first = true;
+                
+                // Iterate through all buckets
+                for (uint64_t i = 0; i < dict->bucket_count; i++) {
+                    LmDictEntry* entry = dict->buckets[i];
+                    while (entry) {
+                        if (!first) result += ", ";
+                        first = false;
+                        
+                        // Format key
+                        if (entry->key) {
+                            LmBox* key_box = static_cast<LmBox*>(entry->key);
+                            if (key_box && key_box->type == LM_BOX_STRING) {
+                                result += "\"" + std::string(lm_unbox_string(key_box)) + "\": ";
+                            } else if (key_box) {
+                                // Handle non-string keys
+                                switch (key_box->type) {
+                                    case LM_BOX_INT:
+                                        result += std::to_string(key_box->value.as_int) + ": ";
+                                        break;
+                                    case LM_BOX_FLOAT:
+                                        result += std::to_string(key_box->value.as_float) + ": ";
+                                        break;
+                                    default:
+                                        result += "?: ";
+                                }
+                            }
+                        }
+                        
+                        // Format value
+                        if (entry->value) {
+                            LmBox* val_box = static_cast<LmBox*>(entry->value);
+                            if (val_box) {
+                                switch (val_box->type) {
+                                    case LM_BOX_STRING:
+                                        result += "\"" + std::string(lm_unbox_string(val_box)) + "\"";
+                                        break;
+                                    case LM_BOX_INT:
+                                        result += std::to_string(val_box->value.as_int);
+                                        break;
+                                    case LM_BOX_FLOAT:
+                                        result += std::to_string(val_box->value.as_float);
+                                        break;
+                                    case LM_BOX_BOOL:
+                                        result += val_box->value.as_bool ? "true" : "false";
+                                        break;
+                                    default:
+                                        result += "?";
+                                }
+                            }
+                        } else {
+                            result += "nil";
+                        }
+                        
+                        entry = entry->next;
+                    }
+                }
+                result += "}";
+                return result;
+            }
+            
+            // Try as tuple (more specific structure)
             LmTuple* tuple = static_cast<LmTuple*>(ptr);
             if (tuple && tuple->elements && tuple->size < 1000000) {
                 std::string result = "(";
@@ -281,71 +401,6 @@ std::string RegisterVM::to_string(const RegisterValue& value) const {
                     }
                 }
                 result += "]";
-                return result;
-            }
-            
-            // Try as dict - check for valid dict structure
-            LmDict* dict = static_cast<LmDict*>(ptr);
-            if (dict && dict->buckets && dict->bucket_count > 0 && dict->bucket_count < 1000000) {
-                std::string result = "{";
-                bool first = true;
-                
-                // Iterate through all buckets
-                for (uint64_t i = 0; i < dict->bucket_count; i++) {
-                    LmDictEntry* entry = dict->buckets[i];
-                    while (entry) {
-                        if (!first) result += ", ";
-                        first = false;
-                        
-                        // Format key
-                        if (entry->key) {
-                            LmBox* key_box = static_cast<LmBox*>(entry->key);
-                            if (key_box && key_box->type == LM_BOX_STRING) {
-                                result += "\"" + std::string(lm_unbox_string(key_box)) + "\": ";
-                            } else if (key_box) {
-                                // Handle non-string keys
-                                switch (key_box->type) {
-                                    case LM_BOX_INT:
-                                        result += std::to_string(key_box->value.as_int) + ": ";
-                                        break;
-                                    case LM_BOX_FLOAT:
-                                        result += std::to_string(key_box->value.as_float) + ": ";
-                                        break;
-                                    default:
-                                        result += "?: ";
-                                }
-                            }
-                        }
-                        
-                        // Format value
-                        if (entry->value) {
-                            LmBox* val_box = static_cast<LmBox*>(entry->value);
-                            if (val_box) {
-                                switch (val_box->type) {
-                                    case LM_BOX_STRING:
-                                        result += "\"" + std::string(lm_unbox_string(val_box)) + "\"";
-                                        break;
-                                    case LM_BOX_INT:
-                                        result += std::to_string(val_box->value.as_int);
-                                        break;
-                                    case LM_BOX_FLOAT:
-                                        result += std::to_string(val_box->value.as_float);
-                                        break;
-                                    case LM_BOX_BOOL:
-                                        result += val_box->value.as_bool ? "true" : "false";
-                                        break;
-                                    default:
-                                        result += "?";
-                                }
-                            }
-                        } else {
-                            result += "nil";
-                        }
-                        
-                        entry = entry->next;
-                    }
-                }
-                result += "}";
                 return result;
             }
         }
@@ -859,8 +914,8 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 break;
             }
             case LIR::LIR_Op::DictCreate: {
-                // Create a new dict using C runtime with string hash/compare functions
-                void* dict = lm_dict_new(lm_hash_string, lm_cmp_string);
+                // Create a new dict using C runtime with boxed value hash/compare functions
+                void* dict = lm_dict_new(hash_boxed_value, cmp_boxed_value);
                 if (dict) {
                     registers[pc->dst] = static_cast<int64_t>(reinterpret_cast<uintptr_t>(dict));
                 } else {
