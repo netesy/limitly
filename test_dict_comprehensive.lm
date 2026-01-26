@@ -1,0 +1,11 @@
+// Test dict creation and printing
+var d1 = { "a": 1, "b": 2, "c": 3 };
+print(d1);
+
+// Test empty dict
+var d2 = {};
+print(d2);
+
+// Test dict with mixed types
+var d3 = { "x": 10, "y": 20 };
+print(d3);
