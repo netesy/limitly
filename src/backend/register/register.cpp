@@ -1406,8 +1406,9 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                                 reg = nullptr;
                             }
 
-                            // Track if this is a channel worker
+                            // Track if this is a channel worker or list worker
                             bool is_channel_worker = false;
+                            bool is_list_worker = false;
 
                             // Set up task context parameters in fresh register space
                             if (fiber) {
@@ -1421,14 +1422,14 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                                 auto loop_var_it = fiber->task_context->fields.find(1);
                                 if (loop_var_it != fiber->task_context->fields.end()) {
                                     // Check if field 1 is a channel (for worker iteration)
-                                    // If it's an int64, it might be a channel ID
+                                    // If it's an int64, it might be a channel ID or list pointer
                                     if (std::holds_alternative<int64_t>(loop_var_it->second)) {
-                                        int64_t potential_channel_id = std::get<int64_t>(loop_var_it->second);
+                                        int64_t potential_id = std::get<int64_t>(loop_var_it->second);
                                         
-                                        // Check if this is a valid channel ID
-                                        if (potential_channel_id >= 0 && potential_channel_id < static_cast<int64_t>(channels.size())) {
+                                        // Check if this is a valid channel ID (0 to channels.size()-1)
+                                        if (potential_id >= 0 && potential_id < static_cast<int64_t>(channels.size())) {
                                             // This is a channel - poll it for data
-                                            auto& channel = channels[potential_channel_id];
+                                            auto& channel = channels[potential_id];
                                             if (channel && channel->has_data()) {
                                                 // Poll the channel for data
                                                 RegisterValue data;
@@ -1449,8 +1450,48 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                                                 current_function_ = nullptr;
                                                 continue;
                                             }
+                                        } else if (potential_id > static_cast<int64_t>(channels.size()) && potential_id > 1000000) {
+                                            // This might be a list pointer - only try if it's a large number (typical heap address)
+                                            void* list_ptr = reinterpret_cast<void*>(static_cast<uintptr_t>(potential_id));
+                                            
+                                            // Get or initialize list iteration index (field 5)
+                                            int64_t list_index = 0;
+                                            if (fiber->task_context->fields.count(5)) {
+                                                if (std::holds_alternative<int64_t>(fiber->task_context->fields[5])) {
+                                                    list_index = std::get<int64_t>(fiber->task_context->fields[5]);
+                                                }
+                                            }
+                                            
+                                            // Get list size - this will validate the pointer
+                                            size_t list_size = lm_list_len(static_cast<LmList*>(list_ptr));
+                                            
+                                            // Check if we've processed all elements
+                                            if (list_index >= static_cast<int64_t>(list_size)) {
+                                                // List iteration complete
+                                                fiber->state = FiberState::COMPLETED;
+                                                registers = saved_registers;
+                                                current_function_ = nullptr;
+                                                continue;
+                                            }
+                                            
+                                            // Get current element from list
+                                            void* element_ptr = lm_list_get(static_cast<LmList*>(list_ptr), list_index);
+                                            if (element_ptr) {
+                                                RegisterValue current_element = unbox_register_value(element_ptr);
+                                                registers[1] = current_element;
+                                                is_list_worker = true;
+                                                
+                                                // Increment list index for next iteration
+                                                fiber->task_context->fields[5] = static_cast<int64_t>(list_index + 1);
+                                            } else {
+                                                // Element is null, mark as completed
+                                                fiber->state = FiberState::COMPLETED;
+                                                registers = saved_registers;
+                                                current_function_ = nullptr;
+                                                continue;
+                                            }
                                         } else {
-                                            // Not a channel, use as-is (could be list pointer or other value)
+                                            // Not a channel or list, use as-is
                                             registers[1] = loop_var_it->second;
                                         }
                                     } else {
@@ -1474,9 +1515,9 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                             registers = saved_registers;
                             current_function_ = nullptr;
                             
-                            // Only mark as completed if not a channel worker
-                            // Channel workers will be marked completed when channel is empty
-                            if (!is_channel_worker) {
+                            // Only mark as completed if not a channel or list worker
+                            // Channel/list workers will be marked completed when done iterating
+                            if (!is_channel_worker && !is_list_worker) {
                                 fiber->state = FiberState::COMPLETED;
                             }
 
