@@ -1,15 +1,11 @@
-#include "backend/ast_printer.hh"
-#include "backend/bytecode_printer.hh"
-#include "backend/type_checker.hh"
-#include "frontend/scanner.hh"
-#include "frontend/parser.hh"
+#include "lm/backend/ast_printer.hh"
+#include "lm/frontend/scanner.hh"
+#include "lm/frontend/parser.hh"
 // CST parser functionality is now integrated into parser.hh
-#include "frontend/cst_printer.hh"
-#include "frontend/cst_utils.hh"
-#include "frontend/ast_builder.hh"
-#include "common/backend.hh"
-#include "backend/vm/vm.hh"
-#include "common/opcodes.hh"
+#include "lm/frontend/cst/printer.hh"
+#include "lm/frontend/cst/utils.hh"
+#include "lm/frontend/ast_builder.hh"
+#include "lm/backend/vm/register.hh"
 #include <iostream>
 #include <fstream>
 #include <sstream>

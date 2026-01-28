@@ -57,31 +57,31 @@ RUNTIME_SRCS := $(wildcard $(RUNTIME_DIR)/*.c)
 RUNTIME_OBJS := $(patsubst $(RUNTIME_DIR)/%.c,$(OBJ_DIR)/runtime/%.o,$(RUNTIME_SRCS))
 
 # =============================
-# Sources
+# Sources (New LM:: namespace structure)
 # =============================
-FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp src/common/debugger.cpp \
-              src/frontend/cst.cpp src/frontend/cst_printer.cpp src/frontend/cst_utils.cpp \
-              src/frontend/ast_builder.cpp src/frontend/type_checker.cpp src/frontend/memory_checker.cpp \
-              src/frontend/ast_optimizer.cpp src/lir/generator.cpp
+FRONT_SRCS := src/lm/frontend/scanner.cpp src/lm/frontend/parser.cpp src/lm/debug/debugger.cpp \
+              src/lm/frontend/cst/node.cpp src/lm/frontend/cst/printer.cpp src/lm/frontend/cst/utils.cpp \
+              src/lm/frontend/ast_builder.cpp src/lm/frontend/type_checker.cpp src/lm/frontend/memory_checker.cpp \
+              src/lm/frontend/ast_optimizer.cpp src/lm/lir/generator.cpp
 
-BACK_SRCS := src/backend/jit/jit_backend.cpp src/backend/jit/jit.cpp
+BACK_SRCS := src/lm/backend/jit/backend.cpp src/lm/backend/jit/compiler.cpp
 
-REGISTER_SRCS := src/backend/register/register.cpp
+REGISTER_SRCS := src/lm/backend/vm/register.cpp
 
-LIR_CORE_SRCS := src/lir/lir.cpp src/lir/lir_utils.cpp src/lir/functions.cpp \
-                 src/lir/builtin_functions.cpp src/lir/lir_types.cpp
+LIR_CORE_SRCS := src/lm/lir/instruction.cpp src/lm/lir/utils.cpp src/lm/lir/functions.cpp \
+                 src/lm/lir/builtin_functions.cpp src/lm/lir/types.cpp
 
-BACKEND_COMMON_SRCS := src/backend/symbol_table.cpp src/backend/value.cpp src/backend/ast_printer.cpp
+BACKEND_COMMON_SRCS := src/lm/backend/symbol_table.cpp src/lm/backend/value.cpp src/lm/backend/ast_printer.cpp
 
-ERROR_SRCS := src/error/error_formatter.cpp src/error/error_code_generator.cpp \
-              src/error/contextual_hint_provider.cpp src/error/source_code_formatter.cpp \
-              src/error/console_formatter.cpp src/error/error_catalog.cpp
+ERROR_SRCS := src/lm/error/formatter.cpp src/lm/error/code_generator.cpp \
+              src/lm/error/hint_provider.cpp src/lm/error/source_formatter.cpp \
+              src/lm/error/console_formatter.cpp src/lm/error/catalog.cpp
 
 MAIN_SRCS := src/main.cpp $(BACKEND_COMMON_SRCS) $(BACK_SRCS) $(ERROR_SRCS) \
-             $(FRONT_SRCS) $(REGISTER_SRCS) $(LIR_CORE_SRCS) src/lir/function_registry.cpp
+             $(FRONT_SRCS) $(REGISTER_SRCS) $(LIR_CORE_SRCS) src/lm/lir/function_registry.cpp
 
 TEST_SRCS := src/test_parser.cpp $(BACKEND_COMMON_SRCS) $(LIR_CORE_SRCS) $(ERROR_SRCS) \
-             $(FRONT_SRCS) src/lir/function_registry.cpp
+             $(FRONT_SRCS) src/lm/lir/function_registry.cpp
 
 # =============================
 # Objects and response files

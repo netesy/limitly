@@ -1,15 +1,15 @@
 
-#include "frontend/scanner.hh"
-#include "frontend/parser.hh"
-#include "frontend/cst_printer.hh"
-#include "frontend/type_checker.hh"
-#include "frontend/memory_checker.hh"
-#include "frontend/ast.hh"
-#include "backend/ast_printer.hh"
-#include "backend/register/register.hh"
-#include "lir/generator.hh"
-#include "lir/functions.hh"
-#include "backend/jit/jit.hh"
+#include "lm/frontend/scanner.hh"
+#include "lm/frontend/parser.hh"
+#include "lm/frontend/cst/printer.hh"
+#include "lm/frontend/type_checker.hh"
+#include "lm/frontend/memory_checker.hh"
+#include "lm/frontend/ast.hh"
+#include "lm/backend/ast_printer.hh"
+#include "lm/backend/vm/register.hh"
+#include "lm/lir/generator.hh"
+#include "lm/lir/functions.hh"
+#include "lm/backend/jit/compiler.hh"
 #include <iostream>
 #include <fstream>
 #include <sstream>
