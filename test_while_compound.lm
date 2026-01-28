@@ -1,0 +1,9 @@
+print("=== While Loop with += Test ===");
+
+var i = 0;
+while (i < 3) {
+    print("i = {i}");
+    i += 1;
+}
+
+print("Loop complete");
