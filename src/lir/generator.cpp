@@ -1928,12 +1928,21 @@ Reg Generator::emit_index_expr(AST::IndexExpr& expr) {
         emit_instruction(LIR_Inst(LIR_Op::TupleGet, abi_type, result_reg, object_reg, index_reg));
         set_register_type(result_reg, result_type);
         return result_reg;
+    } else if (object_type && object_type->tag == ::TypeTag::Dict) {
+        // Use DictGet for dictionaries
+        Reg result_reg = allocate_register();
+        Type abi_type = language_type_to_abi_type(result_type);
+        emit_instruction(LIR_Inst(LIR_Op::DictGet, abi_type, result_reg, object_reg, index_reg));
+        set_register_type(result_reg, result_type);
+        set_register_language_type(result_reg, result_type);  // Ensure language type is set
+        return result_reg;
     } else {
-        // Use ListIndex for lists, dicts, and other types
+        // Use ListIndex for lists and other types
         Reg result_reg = allocate_register();
         Type abi_type = language_type_to_abi_type(result_type);
         emit_instruction(LIR_Inst(LIR_Op::ListIndex, abi_type, result_reg, object_reg, index_reg));
         set_register_type(result_reg, result_type);
+        set_register_language_type(result_reg, result_type);  // Ensure language type is set
         return result_reg;
     }
 }

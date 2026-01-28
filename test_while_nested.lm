@@ -1,0 +1,14 @@
+print("=== Nested While Loops Test ===");
+
+var outer = 0;
+while (outer < 2) {
+    print("outer = {outer}");
+    var inner = 0;
+    while (inner < 2) {
+        print("  inner = {inner}");
+        inner = inner + 1;
+    }
+    outer = outer + 1;
+}
+
+print("Done");
