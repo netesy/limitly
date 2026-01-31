@@ -1,10 +1,12 @@
 #ifndef CST_PRINTER_H
 #define CST_PRINTER_H
 
-#include "cst.hh"
+#include "../cst.hh"
 #include <string>
 #include <ostream>
 #include <memory>
+namespace LM {
+namespace Frontend {
 
 namespace CST {
 
@@ -119,7 +121,7 @@ namespace CST {
         
         // Specialized JSON serializers
         std::string serializeNodeMetadata(const Node* node, const JSONOptions& options);
-        std::string serializeTokenMetadata(const Token& token, const JSONOptions& options);
+        std::string serializeTokenMetadata(const LM::Frontend::Token& token, const JSONOptions& options);
         std::string serializeSourcePosition(size_t start, size_t end);
         std::string serializeErrorInfo(const Node* node);
         
@@ -143,7 +145,7 @@ namespace CST {
         // XML serialization functions
         std::string serializeCST(const Node* root, const XMLOptions& options = {});
         std::string serializeNode(const Node* node, const XMLOptions& options, int depth = 0);
-        std::string serializeToken(const Token& token, const XMLOptions& options, int depth = 0);
+        std::string serializeToken(const LM::Frontend::Token& token, const XMLOptions& options, int depth = 0);
         
         // XML utility functions
         std::string escapeXMLText(const std::string& text);
@@ -179,7 +181,7 @@ namespace CST {
         // Debug printing functions
         std::string debugPrint(const Node* root, const DebugOptions& options = {});
         std::string debugPrintNode(const Node* node, const DebugOptions& options, int depth = 0);
-        std::string debugPrintToken(const Token& token, const DebugOptions& options);
+        std::string debugPrintToken(const LM::Frontend::Token& token, const DebugOptions& options);
         
         // Diagnostic functions
         std::string printDiagnostics(const Node* root);
@@ -279,5 +281,6 @@ namespace CST {
     std::ostream& operator<<(std::ostream& os, const Node* node);
 
 } // namespace CST
-
+} // namespace Frontend
+} // namespace LM
 #endif // CST_PRINTER_H

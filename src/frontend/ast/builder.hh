@@ -6,10 +6,11 @@
 #include <string>
 #include <unordered_map>
 #include <optional>
-#include "ast.hh"
-#include "cst.hh"
+#include "../ast.hh"
+#include "../cst.hh"
 
-namespace frontend {
+namespace LM {
+namespace Frontend {
 
     // Type resolution strategy for different AST nodes
     enum class TypeResolutionStrategy {
@@ -305,6 +306,6 @@ namespace frontend {
         std::vector<std::string> parseUnionTypes(const std::string& typeStr);
     }
 
-} // namespace frontend
-
+} // namespace Frontend
+} // namespace LM
 #endif // AST_BUILDER_H

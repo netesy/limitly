@@ -13,12 +13,15 @@
 #include "cst.hh"
 #include "../error/error_message.hh"
 
+namespace LM {
+namespace Frontend {
+
 // CST parser class - responsible for parsing tokens into AST (copied from legacy parser)
 class Parser {
 public:
     Parser(Scanner &scanner, bool cstMode = true) : scanner(scanner), current(0), cstMode(cstMode) {}
 
-    std::shared_ptr<AST::Program> parse();
+    std::shared_ptr<LM::Frontend::AST::Program> parse();
     
     // Public accessor for testing
     bool isCSTMode() const { return cstMode; }
@@ -59,23 +62,23 @@ public:
     bool hadError() const { return !errors.empty(); }
 
     // Helper to create a placeholder error expression
-    std::shared_ptr<AST::LiteralExpr> makeErrorExpr() {
-        auto errorExpr = std::make_shared<AST::LiteralExpr>();
+    std::shared_ptr<LM::Frontend::AST::LiteralExpr> makeErrorExpr() {
+        auto errorExpr = std::make_shared<LM::Frontend::AST::LiteralExpr>();
         errorExpr->line = peek().line;
         errorExpr->value = nullptr; // Use null as a placeholder
         return errorExpr;
     };
 
-    // Unified node creation helper - creates CST::Node or AST::Node based on cstMode
+    // Unified node creation helper - creates CST::Node or LM::Frontend::AST::Node based on cstMode
     template<typename ASTNodeType>
-    auto createNode() -> std::conditional_t<std::is_same_v<ASTNodeType, AST::Program>, 
-                                           std::shared_ptr<AST::Program>,
+    auto createNode() -> std::conditional_t<std::is_same_v<ASTNodeType, LM::Frontend::AST::Program>, 
+                                           std::shared_ptr<LM::Frontend::AST::Program>,
                                            std::shared_ptr<ASTNodeType>>;
     
     // Enhanced node creation with context management
     template<typename ASTNodeType>
-    auto createNodeWithContext() -> std::conditional_t<std::is_same_v<ASTNodeType, AST::Program>, 
-                                                      std::shared_ptr<AST::Program>,
+    auto createNodeWithContext() -> std::conditional_t<std::is_same_v<ASTNodeType, LM::Frontend::AST::Program>, 
+                                                      std::shared_ptr<LM::Frontend::AST::Program>,
                                                       std::shared_ptr<ASTNodeType>>;
     
     // AST to CST NodeKind mapping
@@ -90,7 +93,7 @@ public:
     void attachTriviaFromTokens(const std::vector<Token>& tokens);
     
     // Current node being built (for trivia attachment in CST mode)
-    std::variant<std::shared_ptr<AST::Node>, std::unique_ptr<CST::Node>> currentNode;
+    std::variant<std::shared_ptr<LM::Frontend::AST::Node>, std::unique_ptr<CST::Node>> currentNode;
     
     // CST root node (when in CST mode)
     std::unique_ptr<CST::Node> cstRoot;
@@ -129,38 +132,38 @@ public:
     void popBlockContext();
     std::optional<ErrorHandling::BlockContext> getCurrentBlockContext() const;
     std::string generateCausedByMessage(const ErrorHandling::BlockContext& context) const;
-    std::shared_ptr<AST::Statement> parseStatementWithContext(const std::string& blockType, const Token& contextToken);
+    std::shared_ptr<LM::Frontend::AST::Statement> parseStatementWithContext(const std::string& blockType, const Token& contextToken);
 
     // Parsing methods for statements
-    std::shared_ptr<AST::Statement> declaration();
-    std::shared_ptr<AST::Statement> varDeclaration();
-    std::shared_ptr<AST::Statement> statement();
-    std::shared_ptr<AST::Statement> expressionStatement();
-    std::shared_ptr<AST::Statement> printStatement();
-    std::shared_ptr<AST::Statement> ifStatement();
-    std::shared_ptr<AST::BlockStatement> block();
-    std::shared_ptr<AST::Statement> forStatement();
-    std::shared_ptr<AST::Statement> whileStatement();
-    std::shared_ptr<AST::Statement> breakStatement();
-    std::shared_ptr<AST::Statement> continueStatement();
-    std::shared_ptr<AST::FunctionDeclaration> function(const std::string &kind);
-    std::shared_ptr<AST::Statement> returnStatement();
-    std::shared_ptr<AST::ClassDeclaration> classDeclaration();
-    std::shared_ptr<AST::Statement> parallelStatement();
-    std::shared_ptr<AST::Statement> concurrentStatement();
-    std::shared_ptr<AST::Statement> taskStatement();
-    std::shared_ptr<AST::Statement> workerStatement();
-    std::shared_ptr<AST::Statement> importStatement();
-    std::shared_ptr<AST::EnumDeclaration> enumDeclaration();
-    std::shared_ptr<AST::Statement> matchStatement();
-    std::shared_ptr<AST::Statement> typeDeclaration();
-    std::shared_ptr<AST::Statement> traitDeclaration();
-    std::shared_ptr<AST::Statement> interfaceDeclaration();
-    std::shared_ptr<AST::Statement> moduleDeclaration();
-    std::shared_ptr<AST::Statement> iterStatement();
-    std::shared_ptr<AST::Statement> unsafeBlock();
-    std::shared_ptr<AST::Statement> contractStatement();
-    std::shared_ptr<AST::Statement> comptimeStatement();
+    std::shared_ptr<LM::Frontend::AST::Statement> declaration();
+    std::shared_ptr<LM::Frontend::AST::Statement> varDeclaration();
+    std::shared_ptr<LM::Frontend::AST::Statement> statement();
+    std::shared_ptr<LM::Frontend::AST::Statement> expressionStatement();
+    std::shared_ptr<LM::Frontend::AST::Statement> printStatement();
+    std::shared_ptr<LM::Frontend::AST::Statement> ifStatement();
+    std::shared_ptr<LM::Frontend::AST::BlockStatement> block();
+    std::shared_ptr<LM::Frontend::AST::Statement> forStatement();
+    std::shared_ptr<LM::Frontend::AST::Statement> whileStatement();
+    std::shared_ptr<LM::Frontend::AST::Statement> breakStatement();
+    std::shared_ptr<LM::Frontend::AST::Statement> continueStatement();
+    std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> function(const std::string &kind);
+    std::shared_ptr<LM::Frontend::AST::Statement> returnStatement();
+    std::shared_ptr<LM::Frontend::AST::ClassDeclaration> classDeclaration();
+    std::shared_ptr<LM::Frontend::AST::Statement> parallelStatement();
+    std::shared_ptr<LM::Frontend::AST::Statement> concurrentStatement();
+    std::shared_ptr<LM::Frontend::AST::Statement> taskStatement();
+    std::shared_ptr<LM::Frontend::AST::Statement> workerStatement();
+    std::shared_ptr<LM::Frontend::AST::Statement> importStatement();
+    std::shared_ptr<LM::Frontend::AST::EnumDeclaration> enumDeclaration();
+    std::shared_ptr<LM::Frontend::AST::Statement> matchStatement();
+    std::shared_ptr<LM::Frontend::AST::Statement> typeDeclaration();
+    std::shared_ptr<LM::Frontend::AST::Statement> traitDeclaration();
+    std::shared_ptr<LM::Frontend::AST::Statement> interfaceDeclaration();
+    std::shared_ptr<LM::Frontend::AST::Statement> moduleDeclaration();
+    std::shared_ptr<LM::Frontend::AST::Statement> iterStatement();
+    std::shared_ptr<LM::Frontend::AST::Statement> unsafeBlock();
+    std::shared_ptr<LM::Frontend::AST::Statement> contractStatement();
+    std::shared_ptr<LM::Frontend::AST::Statement> comptimeStatement();
 
     // Concurrency parsing helper
     void parseConcurrencyParams(
@@ -174,52 +177,53 @@ public:
     );
 
     // Type parsing methods
-    std::shared_ptr<AST::TypeAnnotation> parseTypeAnnotation();
-    std::shared_ptr<AST::TypeAnnotation> parseUnionType();
-    std::shared_ptr<AST::TypeAnnotation> parseBasicType();
-    std::shared_ptr<AST::TypeAnnotation> parseBraceType();
-    std::shared_ptr<AST::TypeAnnotation> parseDictionaryType();
-    std::shared_ptr<AST::TypeAnnotation> parseStructuralType(const std::string& typeName = "");
-    std::shared_ptr<AST::TypeAnnotation> parseContainerType();
+    std::shared_ptr<LM::Frontend::AST::TypeAnnotation> parseTypeAnnotation();
+    std::shared_ptr<LM::Frontend::AST::TypeAnnotation> parseUnionType();
+    std::shared_ptr<LM::Frontend::AST::TypeAnnotation> parseBasicType();
+    std::shared_ptr<LM::Frontend::AST::TypeAnnotation> parseBraceType();
+    std::shared_ptr<LM::Frontend::AST::TypeAnnotation> parseDictionaryType();
+    std::shared_ptr<LM::Frontend::AST::TypeAnnotation> parseStructuralType(const std::string& typeName = "");
+    std::shared_ptr<LM::Frontend::AST::TypeAnnotation> parseContainerType();
     bool isPrimitiveType(TokenType type);
     bool isKnownTypeName(const std::string& name);
     std::string tokenTypeToString(TokenType type);
     
     // Function type parsing methods
-    std::shared_ptr<AST::FunctionTypeAnnotation> parseFunctionTypeAnnotation();
-    std::shared_ptr<AST::TypeAnnotation> parseLegacyFunctionType();
-    AST::FunctionParameter parseFunctionParameter();
+    std::shared_ptr<LM::Frontend::AST::FunctionTypeAnnotation> parseFunctionTypeAnnotation();
+    std::shared_ptr<LM::Frontend::AST::TypeAnnotation> parseLegacyFunctionType();
+    LM::Frontend::AST::FunctionParameter parseFunctionParameter();
     bool isValidParameterName(const std::string& name);
 
     // Parsing methods for expressions
-    std::shared_ptr<AST::Expression> expression();
-    std::shared_ptr<AST::Expression> assignment();
-    std::shared_ptr<AST::Expression> logicalOr();
-    std::shared_ptr<AST::Expression> logicalAnd();
-    std::shared_ptr<AST::Expression> equality();
-    std::shared_ptr<AST::Expression> comparison();
-    std::shared_ptr<AST::Expression> term();
-    std::shared_ptr<AST::Expression> factor();
-    std::shared_ptr<AST::Expression> power();
-    std::shared_ptr<AST::Expression> unary();
-    std::shared_ptr<AST::Expression> call();
-    std::shared_ptr<AST::Expression> primary();
-    std::shared_ptr<AST::Expression> finishCall(std::shared_ptr<AST::Expression> callee);
-    std::shared_ptr<AST::LambdaExpr> lambdaExpression();
+    std::shared_ptr<LM::Frontend::AST::Expression> expression();
+    std::shared_ptr<LM::Frontend::AST::Expression> assignment();
+    std::shared_ptr<LM::Frontend::AST::Expression> logicalOr();
+    std::shared_ptr<LM::Frontend::AST::Expression> logicalAnd();
+    std::shared_ptr<LM::Frontend::AST::Expression> equality();
+    std::shared_ptr<LM::Frontend::AST::Expression> comparison();
+    std::shared_ptr<LM::Frontend::AST::Expression> term();
+    std::shared_ptr<LM::Frontend::AST::Expression> factor();
+    std::shared_ptr<LM::Frontend::AST::Expression> power();
+    std::shared_ptr<LM::Frontend::AST::Expression> unary();
+    std::shared_ptr<LM::Frontend::AST::Expression> call();
+    std::shared_ptr<LM::Frontend::AST::Expression> primary();
+    std::shared_ptr<LM::Frontend::AST::Expression> finishCall(std::shared_ptr<LM::Frontend::AST::Expression> callee);
+    std::shared_ptr<LM::Frontend::AST::LambdaExpr> lambdaExpression();
 
     // Pattern parsing methods for match statements
-    std::shared_ptr<AST::Expression> parsePattern();
-    std::shared_ptr<AST::Expression> parseBindingPattern();
-    std::shared_ptr<AST::Expression> parseListPattern();
-    std::shared_ptr<AST::Expression> parseDictPattern();
-    std::shared_ptr<AST::Expression> parseTuplePattern();
-    std::shared_ptr<AST::Expression> parseValPattern();
-    std::shared_ptr<AST::Expression> parseErrPattern();
-    std::shared_ptr<AST::Expression> parseErrorTypePattern();
+    std::shared_ptr<LM::Frontend::AST::Expression> parsePattern();
+    std::shared_ptr<LM::Frontend::AST::Expression> parseBindingPattern();
+    std::shared_ptr<LM::Frontend::AST::Expression> parseListPattern();
+    std::shared_ptr<LM::Frontend::AST::Expression> parseDictPattern();
+    std::shared_ptr<LM::Frontend::AST::Expression> parseTuplePattern();
+    std::shared_ptr<LM::Frontend::AST::Expression> parseValPattern();
+    std::shared_ptr<LM::Frontend::AST::Expression> parseErrPattern();
+    std::shared_ptr<LM::Frontend::AST::Expression> parseErrorTypePattern();
     
     // Helper methods for error pattern matching
     bool isErrorType(const std::string& name);
 };
 
-
+} // namespace Frontend
+} // namespace LM
 #endif // CST_PARSER_H

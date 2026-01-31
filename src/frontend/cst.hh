@@ -7,7 +7,8 @@
 #include <unordered_map>
 #include <variant>
 #include "scanner.hh"
-
+namespace LM {
+namespace Frontend {
 namespace CST {
 
     // NodeKind enum covering all language constructs
@@ -338,5 +339,6 @@ namespace CST {
     };
     
 } // namespace CST
-
+} // namespace Frontend
+} // namespace LM
 #endif // CST_H

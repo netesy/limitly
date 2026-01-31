@@ -11,11 +11,10 @@
 #include <algorithm>
 #include <unordered_set>
 
-// =============================================================================
-// TYPE CHECKER IMPLEMENTATION
-// =============================================================================
+namespace LM {
+namespace Frontend {
 
-bool TypeChecker::check_program(std::shared_ptr<AST::Program> program) {
+bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> program) {
     if (!program) {
         add_error("Null program provided");
         return false;
@@ -28,7 +27,7 @@ bool TypeChecker::check_program(std::shared_ptr<AST::Program> program) {
     
     // First pass: collect function declarations
     for (const auto& stmt : program->statements) {
-        if (auto func_decl = std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt)) {
+        if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
             check_function_declaration(func_decl);
         }
     }
@@ -97,7 +96,7 @@ std::string TypeChecker::get_code_context(int line) {
     return "";
 }
 
-void TypeChecker::check_assert_call(const std::shared_ptr<AST::CallExpr>& expr) {
+void TypeChecker::check_assert_call(const std::shared_ptr<LM::Frontend::AST::CallExpr>& expr) {
     if (expr->arguments.size() != 2) {
         add_error("assert() expects exactly 2 arguments: condition (bool) and message (string), got " + 
                 std::to_string(expr->arguments.size()), expr->line, 0, 
@@ -501,39 +500,39 @@ void TypeChecker::mark_variable_dropped(const std::string& name) {
     check_variable_drop(name);
 }
 
-TypePtr TypeChecker::check_statement(std::shared_ptr<AST::Statement> stmt) {
+TypePtr TypeChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statement> stmt) {
     if (!stmt) return nullptr;
     
-    if (auto func_decl = std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt)) {
+    if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
         return check_function_declaration(func_decl);
-    } else if (auto var_decl = std::dynamic_pointer_cast<AST::VarDeclaration>(stmt)) {
+    } else if (auto var_decl = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
         return check_var_declaration(var_decl);
-    } else if (auto type_decl = std::dynamic_pointer_cast<AST::TypeDeclaration>(stmt)) {
+    } else if (auto type_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TypeDeclaration>(stmt)) {
         return check_type_declaration(type_decl);
-    } else if (auto block = std::dynamic_pointer_cast<AST::BlockStatement>(stmt)) {
+    } else if (auto block = std::dynamic_pointer_cast<LM::Frontend::AST::BlockStatement>(stmt)) {
         return check_block_statement(block);
-    } else if (auto if_stmt = std::dynamic_pointer_cast<AST::IfStatement>(stmt)) {
+    } else if (auto if_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::IfStatement>(stmt)) {
         return check_if_statement(if_stmt);
-    } else if (auto while_stmt = std::dynamic_pointer_cast<AST::WhileStatement>(stmt)) {
+    } else if (auto while_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::WhileStatement>(stmt)) {
         return check_while_statement(while_stmt);
-    } else if (auto for_stmt = std::dynamic_pointer_cast<AST::ForStatement>(stmt)) {
+    } else if (auto for_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ForStatement>(stmt)) {
         return check_for_statement(for_stmt);
-    } else if (auto return_stmt = std::dynamic_pointer_cast<AST::ReturnStatement>(stmt)) {
+    } else if (auto return_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ReturnStatement>(stmt)) {
         return check_return_statement(return_stmt);
-    } else if (auto print_stmt = std::dynamic_pointer_cast<AST::PrintStatement>(stmt)) {
+    } else if (auto print_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::PrintStatement>(stmt)) {
         return check_print_statement(print_stmt);
-    } else if (auto match_stmt = std::dynamic_pointer_cast<AST::MatchStatement>(stmt)) {
+    } else if (auto match_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::MatchStatement>(stmt)) {
         return check_match_statement(match_stmt);
-    } else if (auto contract_stmt = std::dynamic_pointer_cast<AST::ContractStatement>(stmt)) {
+    } else if (auto contract_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ContractStatement>(stmt)) {
         return check_contract_statement(contract_stmt);
-    } else if (auto expr_stmt = std::dynamic_pointer_cast<AST::ExprStatement>(stmt)) {
+    } else if (auto expr_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ExprStatement>(stmt)) {
         return check_expression(expr_stmt->expression);
     }
     
     return nullptr;
 }
 
-TypePtr TypeChecker::check_function_declaration(std::shared_ptr<AST::FunctionDeclaration> func) {
+TypePtr TypeChecker::check_function_declaration(std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> func) {
     if (!func) return nullptr;
     
     // Enter new memory region for this function
@@ -625,7 +624,7 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<AST::FunctionDec
     return return_type;
 }
 
-TypePtr TypeChecker::check_var_declaration(std::shared_ptr<AST::VarDeclaration> var_decl) {
+TypePtr TypeChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::VarDeclaration> var_decl) {
     if (!var_decl) return nullptr;
     
     TypePtr declared_type = nullptr;
@@ -639,7 +638,7 @@ TypePtr TypeChecker::check_var_declaration(std::shared_ptr<AST::VarDeclaration> 
         init_type = check_expression_with_expected_type(var_decl->initializer, declared_type);
         
         // Check if initializing from another variable (potential move)
-        if (auto var_expr = std::dynamic_pointer_cast<AST::VariableExpr>(var_decl->initializer)) {
+        if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(var_decl->initializer)) {
             // For complex types, this would be a move
             // For now, we'll implement basic move semantics for all types
             check_variable_move(var_expr->name);
@@ -682,7 +681,7 @@ TypePtr TypeChecker::check_var_declaration(std::shared_ptr<AST::VarDeclaration> 
     return final_type;
 }
 
-TypePtr TypeChecker::check_type_declaration(std::shared_ptr<AST::TypeDeclaration> type_decl) {
+TypePtr TypeChecker::check_type_declaration(std::shared_ptr<LM::Frontend::AST::TypeDeclaration> type_decl) {
     if (!type_decl) return nullptr;
     
     // Resolve the underlying type
@@ -701,7 +700,7 @@ TypePtr TypeChecker::check_type_declaration(std::shared_ptr<AST::TypeDeclaration
     return underlying_type;
 }
 
-TypePtr TypeChecker::check_block_statement(std::shared_ptr<AST::BlockStatement> block) {
+TypePtr TypeChecker::check_block_statement(std::shared_ptr<LM::Frontend::AST::BlockStatement> block) {
     if (!block) return nullptr;
     
     enter_scope();
@@ -721,7 +720,7 @@ TypePtr TypeChecker::check_block_statement(std::shared_ptr<AST::BlockStatement> 
     return last_type;
 }
 
-TypePtr TypeChecker::check_if_statement(std::shared_ptr<AST::IfStatement> if_stmt) {
+TypePtr TypeChecker::check_if_statement(std::shared_ptr<LM::Frontend::AST::IfStatement> if_stmt) {
     if (!if_stmt) return nullptr;
     
     // Check condition
@@ -745,7 +744,7 @@ TypePtr TypeChecker::check_if_statement(std::shared_ptr<AST::IfStatement> if_stm
     return result_type;
 }
 
-TypePtr TypeChecker::check_while_statement(std::shared_ptr<AST::WhileStatement> while_stmt) {
+TypePtr TypeChecker::check_while_statement(std::shared_ptr<LM::Frontend::AST::WhileStatement> while_stmt) {
     if (!while_stmt) return nullptr;
     
     // Check condition
@@ -767,7 +766,7 @@ TypePtr TypeChecker::check_while_statement(std::shared_ptr<AST::WhileStatement> 
     return result_type;
 }
 
-TypePtr TypeChecker::check_for_statement(std::shared_ptr<AST::ForStatement> for_stmt) {
+TypePtr TypeChecker::check_for_statement(std::shared_ptr<LM::Frontend::AST::ForStatement> for_stmt) {
     if (!for_stmt) return nullptr;
     
     enter_scope();
@@ -805,7 +804,7 @@ TypePtr TypeChecker::check_for_statement(std::shared_ptr<AST::ForStatement> for_
     return result_type;
 }
 
-TypePtr TypeChecker::check_return_statement(std::shared_ptr<AST::ReturnStatement> return_stmt) {
+TypePtr TypeChecker::check_return_statement(std::shared_ptr<LM::Frontend::AST::ReturnStatement> return_stmt) {
     if (!return_stmt) return nullptr;
     
     TypePtr return_type = nullptr;
@@ -816,9 +815,9 @@ TypePtr TypeChecker::check_return_statement(std::shared_ptr<AST::ReturnStatement
         if (current_return_type && type_system.isFallibleType(current_return_type)) {
             // Check if the return value is already an error construct or ok construct
             bool is_already_wrapped = false;
-            if (auto error_construct = std::dynamic_pointer_cast<AST::ErrorConstructExpr>(return_stmt->value)) {
+            if (auto error_construct = std::dynamic_pointer_cast<LM::Frontend::AST::ErrorConstructExpr>(return_stmt->value)) {
                 is_already_wrapped = true;
-            } else if (auto ok_construct = std::dynamic_pointer_cast<AST::OkConstructExpr>(return_stmt->value)) {
+            } else if (auto ok_construct = std::dynamic_pointer_cast<LM::Frontend::AST::OkConstructExpr>(return_stmt->value)) {
                 is_already_wrapped = true;
             }
             
@@ -828,7 +827,7 @@ TypePtr TypeChecker::check_return_statement(std::shared_ptr<AST::ReturnStatement
                 
                 if (expected_success_type && is_type_compatible(expected_success_type, return_type)) {
                     // Automatically wrap the return value in ok()
-                    auto ok_construct = std::make_shared<AST::OkConstructExpr>();
+                    auto ok_construct = std::make_shared<LM::Frontend::AST::OkConstructExpr>();
                     ok_construct->value = return_stmt->value;
                     ok_construct->line = return_stmt->line;
                     ok_construct->inferred_type = current_return_type;
@@ -857,7 +856,7 @@ TypePtr TypeChecker::check_return_statement(std::shared_ptr<AST::ReturnStatement
     return return_type;
 }
 
-TypePtr TypeChecker::check_print_statement(std::shared_ptr<AST::PrintStatement> print_stmt) {
+TypePtr TypeChecker::check_print_statement(std::shared_ptr<LM::Frontend::AST::PrintStatement> print_stmt) {
     if (!print_stmt) return nullptr;
     
     for (const auto& arg : print_stmt->arguments) {
@@ -871,44 +870,44 @@ TypePtr TypeChecker::check_print_statement(std::shared_ptr<AST::PrintStatement> 
     return result_type;
 }
 
-TypePtr TypeChecker::check_expression(std::shared_ptr<AST::Expression> expr) {
+TypePtr TypeChecker::check_expression(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
     if (!expr) return nullptr;
     
     TypePtr type = nullptr;
     
-    if (auto literal = std::dynamic_pointer_cast<AST::LiteralExpr>(expr)) {
+    if (auto literal = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr)) {
         type = check_literal_expr(literal);
-    } else if (auto call = std::dynamic_pointer_cast<AST::CallExpr>(expr)) {
+    } else if (auto call = std::dynamic_pointer_cast<LM::Frontend::AST::CallExpr>(expr)) {
         type = check_call_expr(call);
-    } else if (auto variable = std::dynamic_pointer_cast<AST::VariableExpr>(expr)) {
+    } else if (auto variable = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr)) {
         type = check_variable_expr(variable);
-    } else if (auto binary = std::dynamic_pointer_cast<AST::BinaryExpr>(expr)) {
+    } else if (auto binary = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
         type = check_binary_expr(binary);
-    } else if (auto unary = std::dynamic_pointer_cast<AST::UnaryExpr>(expr)) {
+    } else if (auto unary = std::dynamic_pointer_cast<LM::Frontend::AST::UnaryExpr>(expr)) {
         type = check_unary_expr(unary);
-    } else if (auto assign = std::dynamic_pointer_cast<AST::AssignExpr>(expr)) {
+    } else if (auto assign = std::dynamic_pointer_cast<LM::Frontend::AST::AssignExpr>(expr)) {
         type = check_assign_expr(assign);
-    } else if (auto grouping = std::dynamic_pointer_cast<AST::GroupingExpr>(expr)) {
+    } else if (auto grouping = std::dynamic_pointer_cast<LM::Frontend::AST::GroupingExpr>(expr)) {
         type = check_grouping_expr(grouping);
-    } else if (auto member = std::dynamic_pointer_cast<AST::MemberExpr>(expr)) {
+    } else if (auto member = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(expr)) {
         type = check_member_expr(member);
-    } else if (auto index = std::dynamic_pointer_cast<AST::IndexExpr>(expr)) {
+    } else if (auto index = std::dynamic_pointer_cast<LM::Frontend::AST::IndexExpr>(expr)) {
         type = check_index_expr(index);
-    } else if (auto list = std::dynamic_pointer_cast<AST::ListExpr>(expr)) {
+    } else if (auto list = std::dynamic_pointer_cast<LM::Frontend::AST::ListExpr>(expr)) {
         type = check_list_expr(list);
-    } else if (auto tuple = std::dynamic_pointer_cast<AST::TupleExpr>(expr)) {
+    } else if (auto tuple = std::dynamic_pointer_cast<LM::Frontend::AST::TupleExpr>(expr)) {
         type = check_tuple_expr(tuple);
-    } else if (auto dict = std::dynamic_pointer_cast<AST::DictExpr>(expr)) {
+    } else if (auto dict = std::dynamic_pointer_cast<LM::Frontend::AST::DictExpr>(expr)) {
         type = check_dict_expr(dict);
-    } else if (auto interpolated = std::dynamic_pointer_cast<AST::InterpolatedStringExpr>(expr)) {
+    } else if (auto interpolated = std::dynamic_pointer_cast<LM::Frontend::AST::InterpolatedStringExpr>(expr)) {
         type = check_interpolated_string_expr(interpolated);
-    } else if (auto lambda = std::dynamic_pointer_cast<AST::LambdaExpr>(expr)) {
+    } else if (auto lambda = std::dynamic_pointer_cast<LM::Frontend::AST::LambdaExpr>(expr)) {
         type = check_lambda_expr(lambda);
-    } else if (auto error_construct = std::dynamic_pointer_cast<AST::ErrorConstructExpr>(expr)) {
+    } else if (auto error_construct = std::dynamic_pointer_cast<LM::Frontend::AST::ErrorConstructExpr>(expr)) {
         type = check_error_construct_expr(error_construct);
-    } else if (auto ok_construct = std::dynamic_pointer_cast<AST::OkConstructExpr>(expr)) {
+    } else if (auto ok_construct = std::dynamic_pointer_cast<LM::Frontend::AST::OkConstructExpr>(expr)) {
         type = check_ok_construct_expr(ok_construct);
-    } else if (auto fallible = std::dynamic_pointer_cast<AST::FallibleExpr>(expr)) {
+    } else if (auto fallible = std::dynamic_pointer_cast<LM::Frontend::AST::FallibleExpr>(expr)) {
         type = check_fallible_expr(fallible);
     } else {
         add_error("Unknown expression type", expr->line);
@@ -921,44 +920,44 @@ TypePtr TypeChecker::check_expression(std::shared_ptr<AST::Expression> expr) {
     return type;
 }
 
-TypePtr TypeChecker::check_expression_with_expected_type(std::shared_ptr<AST::Expression> expr, TypePtr expected_type) {
+TypePtr TypeChecker::check_expression_with_expected_type(std::shared_ptr<LM::Frontend::AST::Expression> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
     TypePtr type = nullptr;
     
-    if (auto literal = std::dynamic_pointer_cast<AST::LiteralExpr>(expr)) {
+    if (auto literal = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr)) {
         type = check_literal_expr_with_expected_type(literal, expected_type);
-    } else if (auto call = std::dynamic_pointer_cast<AST::CallExpr>(expr)) {
+    } else if (auto call = std::dynamic_pointer_cast<LM::Frontend::AST::CallExpr>(expr)) {
         type = check_call_expr(call);
-    } else if (auto variable = std::dynamic_pointer_cast<AST::VariableExpr>(expr)) {
+    } else if (auto variable = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr)) {
         type = check_variable_expr(variable);
-    } else if (auto binary = std::dynamic_pointer_cast<AST::BinaryExpr>(expr)) {
+    } else if (auto binary = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
         type = check_binary_expr(binary);
-    } else if (auto unary = std::dynamic_pointer_cast<AST::UnaryExpr>(expr)) {
+    } else if (auto unary = std::dynamic_pointer_cast<LM::Frontend::AST::UnaryExpr>(expr)) {
         type = check_unary_expr(unary);
-    } else if (auto assign = std::dynamic_pointer_cast<AST::AssignExpr>(expr)) {
+    } else if (auto assign = std::dynamic_pointer_cast<LM::Frontend::AST::AssignExpr>(expr)) {
         type = check_assign_expr(assign);
-    } else if (auto grouping = std::dynamic_pointer_cast<AST::GroupingExpr>(expr)) {
+    } else if (auto grouping = std::dynamic_pointer_cast<LM::Frontend::AST::GroupingExpr>(expr)) {
         type = check_grouping_expr(grouping);
-    } else if (auto member = std::dynamic_pointer_cast<AST::MemberExpr>(expr)) {
+    } else if (auto member = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(expr)) {
         type = check_member_expr(member);
-    } else if (auto index = std::dynamic_pointer_cast<AST::IndexExpr>(expr)) {
+    } else if (auto index = std::dynamic_pointer_cast<LM::Frontend::AST::IndexExpr>(expr)) {
         type = check_index_expr(index);
-    } else if (auto list = std::dynamic_pointer_cast<AST::ListExpr>(expr)) {
+    } else if (auto list = std::dynamic_pointer_cast<LM::Frontend::AST::ListExpr>(expr)) {
         type = check_list_expr(list);
-    } else if (auto tuple = std::dynamic_pointer_cast<AST::TupleExpr>(expr)) {
+    } else if (auto tuple = std::dynamic_pointer_cast<LM::Frontend::AST::TupleExpr>(expr)) {
         type = check_tuple_expr(tuple);
-    } else if (auto dict = std::dynamic_pointer_cast<AST::DictExpr>(expr)) {
+    } else if (auto dict = std::dynamic_pointer_cast<LM::Frontend::AST::DictExpr>(expr)) {
         type = check_dict_expr(dict);
-    } else if (auto interpolated = std::dynamic_pointer_cast<AST::InterpolatedStringExpr>(expr)) {
+    } else if (auto interpolated = std::dynamic_pointer_cast<LM::Frontend::AST::InterpolatedStringExpr>(expr)) {
         type = check_interpolated_string_expr(interpolated);
-    } else if (auto lambda = std::dynamic_pointer_cast<AST::LambdaExpr>(expr)) {
+    } else if (auto lambda = std::dynamic_pointer_cast<LM::Frontend::AST::LambdaExpr>(expr)) {
         type = check_lambda_expr(lambda);
-    } else if (auto error_construct = std::dynamic_pointer_cast<AST::ErrorConstructExpr>(expr)) {
+    } else if (auto error_construct = std::dynamic_pointer_cast<LM::Frontend::AST::ErrorConstructExpr>(expr)) {
         type = check_error_construct_expr(error_construct);
-    } else if (auto ok_construct = std::dynamic_pointer_cast<AST::OkConstructExpr>(expr)) {
+    } else if (auto ok_construct = std::dynamic_pointer_cast<LM::Frontend::AST::OkConstructExpr>(expr)) {
         type = check_ok_construct_expr(ok_construct);
-    } else if (auto fallible = std::dynamic_pointer_cast<AST::FallibleExpr>(expr)) {
+    } else if (auto fallible = std::dynamic_pointer_cast<LM::Frontend::AST::FallibleExpr>(expr)) {
         type = check_fallible_expr(fallible);
     } else {
         add_error("Unknown expression type", expr->line);
@@ -971,7 +970,7 @@ TypePtr TypeChecker::check_expression_with_expected_type(std::shared_ptr<AST::Ex
     return type;
 }
 
-TypePtr TypeChecker::check_literal_expr(std::shared_ptr<AST::LiteralExpr> expr) {
+TypePtr TypeChecker::check_literal_expr(std::shared_ptr<LM::Frontend::AST::LiteralExpr> expr) {
     if (!expr) return nullptr;
     
     // CRITICAL FIX: If the literal already has a type (from constant propagation), preserve it
@@ -1011,7 +1010,7 @@ TypePtr TypeChecker::check_literal_expr(std::shared_ptr<AST::LiteralExpr> expr) 
     return type_system.STRING_TYPE;
 }
 
-TypePtr TypeChecker::check_literal_expr_with_expected_type(std::shared_ptr<AST::LiteralExpr> expr, TypePtr expected_type) {
+TypePtr TypeChecker::check_literal_expr_with_expected_type(std::shared_ptr<LM::Frontend::AST::LiteralExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
     // Set type based on the literal value and token type, considering expected type
@@ -1060,7 +1059,7 @@ TypePtr TypeChecker::check_literal_expr_with_expected_type(std::shared_ptr<AST::
     return type_system.STRING_TYPE;
 }
 
-TypePtr TypeChecker::check_variable_expr(std::shared_ptr<AST::VariableExpr> expr) {
+TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::VariableExpr> expr) {
     if (!expr) return nullptr;
     
     // Check if this is a reference
@@ -1092,7 +1091,7 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<AST::VariableExpr> expr
     return type;
 }
 
-TypePtr TypeChecker::check_binary_expr(std::shared_ptr<AST::BinaryExpr> expr) {
+TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::BinaryExpr> expr) {
     if (!expr) return nullptr;
     
     TypePtr left_type = check_expression(expr->left);
@@ -1144,7 +1143,7 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<AST::BinaryExpr> expr) {
     }
 }
 
-TypePtr TypeChecker::check_unary_expr(std::shared_ptr<AST::UnaryExpr> expr) {
+TypePtr TypeChecker::check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryExpr> expr) {
     if (!expr) return nullptr;
     
     TypePtr right_type = check_expression(expr->right);
@@ -1167,7 +1166,7 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<AST::UnaryExpr> expr) {
             // Special case: Handle large integers that were parsed as float due to overflow
             // but should be integers when negated (e.g., -9223372036854775808 = INT64_MIN)
             if (expr->op == TokenType::MINUS && right_type->tag == TypeTag::Float64) {
-                if (auto literal = std::dynamic_pointer_cast<AST::LiteralExpr>(expr->right)) {
+                if (auto literal = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr->right)) {
                     if (std::holds_alternative<std::string>(literal->value)) {
                         const std::string& str = std::get<std::string>(literal->value);
                         
@@ -1218,7 +1217,7 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<AST::UnaryExpr> expr) {
     }
 }
 
-TypePtr TypeChecker::check_call_expr(std::shared_ptr<AST::CallExpr> expr) {
+TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr> expr) {
     if (!expr) return nullptr;
     
     // Check arguments first
@@ -1228,7 +1227,7 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<AST::CallExpr> expr) {
     }
     
     // Check if callee is a function (before checking the callee as an expression)
-    if (auto var_expr = std::dynamic_pointer_cast<AST::VariableExpr>(expr->callee)) {
+    if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->callee)) {
         TypePtr result_type = nullptr;
         if (check_function_call(var_expr->name, arg_types, result_type)) {
             expr->inferred_type = result_type;
@@ -1237,7 +1236,7 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<AST::CallExpr> expr) {
     }
     
     // Check if callee is a member expression (method call)
-    if (auto member_expr = std::dynamic_pointer_cast<AST::MemberExpr>(expr->callee)) {
+    if (auto member_expr = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(expr->callee)) {
         TypePtr result_type = check_expression(expr->callee);
         if (result_type) {
             expr->inferred_type = result_type;
@@ -1252,7 +1251,7 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<AST::CallExpr> expr) {
     return type_system.STRING_TYPE;
 }
 
-TypePtr TypeChecker::check_assign_expr(std::shared_ptr<AST::AssignExpr> expr) {
+TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::AssignExpr> expr) {
     if (!expr) return nullptr;
     
     TypePtr value_type = check_expression(expr->value);
@@ -1266,7 +1265,7 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<AST::AssignExpr> expr) {
             }
             
             // Check if we're assigning from another variable (create reference or move)
-            if (auto var_expr = std::dynamic_pointer_cast<AST::VariableExpr>(expr->value)) {
+            if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->value)) {
                 if (linear_types.find(var_expr->name) != linear_types.end()) {
                     // This is a linear type - move it and increment generation
                     move_linear_type(var_expr->name, var_expr->line);
@@ -1298,12 +1297,12 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<AST::AssignExpr> expr) {
     return value_type;
 }
 
-TypePtr TypeChecker::check_grouping_expr(std::shared_ptr<AST::GroupingExpr> expr) {
+TypePtr TypeChecker::check_grouping_expr(std::shared_ptr<LM::Frontend::AST::GroupingExpr> expr) {
     if (!expr) return nullptr;
     return check_expression(expr->expression);
 }
 
-TypePtr TypeChecker::check_member_expr(std::shared_ptr<AST::MemberExpr> expr) {
+TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::MemberExpr> expr) {
     if (!expr) return nullptr;
     
     TypePtr object_type = check_expression(expr->object);
@@ -1334,7 +1333,7 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<AST::MemberExpr> expr) {
     return type_system.STRING_TYPE;
 }
 
-TypePtr TypeChecker::check_index_expr(std::shared_ptr<AST::IndexExpr> expr) {
+TypePtr TypeChecker::check_index_expr(std::shared_ptr<LM::Frontend::AST::IndexExpr> expr) {
     if (!expr) return nullptr;
     
     TypePtr object_type = check_expression(expr->object);
@@ -1345,7 +1344,7 @@ TypePtr TypeChecker::check_index_expr(std::shared_ptr<AST::IndexExpr> expr) {
     return type_system.STRING_TYPE;
 }
 
-TypePtr TypeChecker::check_list_expr(std::shared_ptr<AST::ListExpr> expr) {
+TypePtr TypeChecker::check_list_expr(std::shared_ptr<LM::Frontend::AST::ListExpr> expr) {
     if (!expr) return nullptr;
     
     if (expr->elements.empty()) {
@@ -1378,7 +1377,7 @@ TypePtr TypeChecker::check_list_expr(std::shared_ptr<AST::ListExpr> expr) {
     return listType;
 }
 
-TypePtr TypeChecker::check_tuple_expr(std::shared_ptr<AST::TupleExpr> expr) {
+TypePtr TypeChecker::check_tuple_expr(std::shared_ptr<LM::Frontend::AST::TupleExpr> expr) {
     if (!expr) return nullptr;
     
     // Check all elements and collect their types
@@ -1394,7 +1393,7 @@ TypePtr TypeChecker::check_tuple_expr(std::shared_ptr<AST::TupleExpr> expr) {
     return tupleType;
 }
 
-TypePtr TypeChecker::check_dict_expr(std::shared_ptr<AST::DictExpr> expr) {
+TypePtr TypeChecker::check_dict_expr(std::shared_ptr<LM::Frontend::AST::DictExpr> expr) {
     if (!expr) return nullptr;
     
     if (expr->entries.empty()) {
@@ -1444,19 +1443,19 @@ TypePtr TypeChecker::check_dict_expr(std::shared_ptr<AST::DictExpr> expr) {
     return dictType;
 }
 
-TypePtr TypeChecker::check_interpolated_string_expr(std::shared_ptr<AST::InterpolatedStringExpr> expr) {
+TypePtr TypeChecker::check_interpolated_string_expr(std::shared_ptr<LM::Frontend::AST::InterpolatedStringExpr> expr) {
     if (!expr) return nullptr;
     
     for (const auto& part : expr->parts) {
-        if (std::holds_alternative<std::shared_ptr<AST::Expression>>(part)) {
-            check_expression(std::get<std::shared_ptr<AST::Expression>>(part));
+        if (std::holds_alternative<std::shared_ptr<LM::Frontend::AST::Expression>>(part)) {
+            check_expression(std::get<std::shared_ptr<LM::Frontend::AST::Expression>>(part));
         }
     }
     
     return type_system.STRING_TYPE;
 }
 
-TypePtr TypeChecker::check_lambda_expr(std::shared_ptr<AST::LambdaExpr> expr) {
+TypePtr TypeChecker::check_lambda_expr(std::shared_ptr<LM::Frontend::AST::LambdaExpr> expr) {
     if (!expr) return nullptr;
     
     // Create new scope for lambda parameters
@@ -1512,7 +1511,7 @@ TypePtr TypeChecker::check_lambda_expr(std::shared_ptr<AST::LambdaExpr> expr) {
     return functionType;
 }
 
-TypePtr TypeChecker::check_error_construct_expr(std::shared_ptr<AST::ErrorConstructExpr> expr) {
+TypePtr TypeChecker::check_error_construct_expr(std::shared_ptr<LM::Frontend::AST::ErrorConstructExpr> expr) {
     if (!expr) return nullptr;
     
     // For err() constructs, we need to infer the Type? from the function's return type context
@@ -1536,7 +1535,7 @@ TypePtr TypeChecker::check_error_construct_expr(std::shared_ptr<AST::ErrorConstr
     return error_union_type;
 }
 
-TypePtr TypeChecker::check_ok_construct_expr(std::shared_ptr<AST::OkConstructExpr> expr) {
+TypePtr TypeChecker::check_ok_construct_expr(std::shared_ptr<LM::Frontend::AST::OkConstructExpr> expr) {
     if (!expr) return nullptr;
     
     // Check the value expression first
@@ -1569,7 +1568,7 @@ TypePtr TypeChecker::check_ok_construct_expr(std::shared_ptr<AST::OkConstructExp
     return ok_type;
 }
 
-TypePtr TypeChecker::check_fallible_expr(std::shared_ptr<AST::FallibleExpr> expr) {
+TypePtr TypeChecker::check_fallible_expr(std::shared_ptr<LM::Frontend::AST::FallibleExpr> expr) {
     if (!expr) return nullptr;
     
     // Check the expression that might be fallible
@@ -1596,7 +1595,7 @@ TypePtr TypeChecker::check_fallible_expr(std::shared_ptr<AST::FallibleExpr> expr
     return success_type;
 }
 
-TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<AST::TypeAnnotation> annotation) {
+TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::TypeAnnotation> annotation) {
     if (!annotation) return nullptr;
     
     // Handle structural types (basic support - just return a placeholder for now)
@@ -1860,7 +1859,7 @@ TypePtr TypeChecker::promote_numeric_types(TypePtr left, TypePtr right) {
 // ADVANCED ERROR HANDLING METHODS
 // =============================================================================
 
-void TypeChecker::validate_function_error_types(const std::shared_ptr<AST::FunctionDeclaration>& stmt) {
+void TypeChecker::validate_function_error_types(const std::shared_ptr<LM::Frontend::AST::FunctionDeclaration>& stmt) {
     // Validate consistency between return type and declared error types
     if (stmt->returnType && *stmt->returnType) {
         auto returnType = resolve_type_annotation(*stmt->returnType);
@@ -1898,7 +1897,7 @@ void TypeChecker::validate_function_error_types(const std::shared_ptr<AST::Funct
     }
 }
 
-void TypeChecker::validate_function_body_error_types(const std::shared_ptr<AST::FunctionDeclaration>& stmt) {
+void TypeChecker::validate_function_body_error_types(const std::shared_ptr<LM::Frontend::AST::FunctionDeclaration>& stmt) {
     if (!stmt->canFail) {
         return; // No error type validation needed for non-fallible functions
     }
@@ -1925,20 +1924,20 @@ void TypeChecker::validate_function_body_error_types(const std::shared_ptr<AST::
     }
 }
 
-std::vector<std::string> TypeChecker::infer_function_error_types(const std::shared_ptr<AST::Statement>& body) {
+std::vector<std::string> TypeChecker::infer_function_error_types(const std::shared_ptr<LM::Frontend::AST::Statement>& body) {
     std::vector<std::string> errorTypes;
     
-    if (auto blockStmt = std::dynamic_pointer_cast<AST::BlockStatement>(body)) {
+    if (auto blockStmt = std::dynamic_pointer_cast<LM::Frontend::AST::BlockStatement>(body)) {
         for (const auto& stmt : blockStmt->statements) {
             auto stmtErrors = infer_function_error_types(stmt);
             errorTypes.insert(errorTypes.end(), stmtErrors.begin(), stmtErrors.end());
         }
-    } else if (auto returnStmt = std::dynamic_pointer_cast<AST::ReturnStatement>(body)) {
+    } else if (auto returnStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ReturnStatement>(body)) {
         if (returnStmt->value) {
             auto returnErrors = infer_expression_error_types(returnStmt->value);
             errorTypes.insert(errorTypes.end(), returnErrors.begin(), returnErrors.end());
         }
-    } else if (auto ifStmt = std::dynamic_pointer_cast<AST::IfStatement>(body)) {
+    } else if (auto ifStmt = std::dynamic_pointer_cast<LM::Frontend::AST::IfStatement>(body)) {
         auto thenErrors = infer_function_error_types(ifStmt->thenBranch);
         errorTypes.insert(errorTypes.end(), thenErrors.begin(), thenErrors.end());
         
@@ -1946,7 +1945,7 @@ std::vector<std::string> TypeChecker::infer_function_error_types(const std::shar
             auto elseErrors = infer_function_error_types(ifStmt->elseBranch);
             errorTypes.insert(errorTypes.end(), elseErrors.begin(), elseErrors.end());
         }
-    } else if (auto exprStmt = std::dynamic_pointer_cast<AST::ExprStatement>(body)) {
+    } else if (auto exprStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ExprStatement>(body)) {
         // Check for fallible expressions that might propagate errors
         auto exprErrors = infer_expression_error_types(exprStmt->expression);
         errorTypes.insert(errorTypes.end(), exprErrors.begin(), exprErrors.end());
@@ -1959,28 +1958,28 @@ std::vector<std::string> TypeChecker::infer_function_error_types(const std::shar
     return errorTypes;
 }
 
-std::vector<std::string> TypeChecker::infer_expression_error_types(const std::shared_ptr<AST::Expression>& expr) {
+std::vector<std::string> TypeChecker::infer_expression_error_types(const std::shared_ptr<LM::Frontend::AST::Expression>& expr) {
     std::vector<std::string> errorTypes;
     
-    if (auto errorConstruct = std::dynamic_pointer_cast<AST::ErrorConstructExpr>(expr)) {
+    if (auto errorConstruct = std::dynamic_pointer_cast<LM::Frontend::AST::ErrorConstructExpr>(expr)) {
         // Direct error construction
         errorTypes.push_back(errorConstruct->errorType);
         
-    } else if (auto fallibleExpr = std::dynamic_pointer_cast<AST::FallibleExpr>(expr)) {
+    } else if (auto fallibleExpr = std::dynamic_pointer_cast<LM::Frontend::AST::FallibleExpr>(expr)) {
         // Fallible expression with ? operator - propagates errors from inner expression
         auto innerErrors = infer_expression_error_types(fallibleExpr->expression);
         errorTypes.insert(errorTypes.end(), innerErrors.begin(), innerErrors.end());
         
-    } else if (auto callExpr = std::dynamic_pointer_cast<AST::CallExpr>(expr)) {
+    } else if (auto callExpr = std::dynamic_pointer_cast<LM::Frontend::AST::CallExpr>(expr)) {
         // Function call - check if called function can produce errors
-        if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(callExpr->callee)) {
+        if (auto varExpr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(callExpr->callee)) {
             auto it = function_signatures.find(varExpr->name);
             if (it != function_signatures.end() && it->second.can_fail) {
                 errorTypes.insert(errorTypes.end(), it->second.error_types.begin(), it->second.error_types.end());
             }
         }
         
-    } else if (auto binaryExpr = std::dynamic_pointer_cast<AST::BinaryExpr>(expr)) {
+    } else if (auto binaryExpr = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
         // Binary expressions might produce built-in errors (e.g., division by zero)
         if (binaryExpr->op == TokenType::SLASH) {
             errorTypes.push_back("DivisionByZero");
@@ -1992,7 +1991,7 @@ std::vector<std::string> TypeChecker::infer_expression_error_types(const std::sh
         errorTypes.insert(errorTypes.end(), leftErrors.begin(), leftErrors.end());
         errorTypes.insert(errorTypes.end(), rightErrors.begin(), rightErrors.end());
         
-    } else if (auto indexExpr = std::dynamic_pointer_cast<AST::IndexExpr>(expr)) {
+    } else if (auto indexExpr = std::dynamic_pointer_cast<LM::Frontend::AST::IndexExpr>(expr)) {
         // Array/dict indexing can produce IndexOutOfBounds errors
         errorTypes.push_back("IndexOutOfBounds");
         
@@ -2010,26 +2009,26 @@ std::vector<std::string> TypeChecker::infer_expression_error_types(const std::sh
     return errorTypes;
 }
 
-bool TypeChecker::can_function_produce_error_type(const std::shared_ptr<AST::Statement>& body, 
+bool TypeChecker::can_function_produce_error_type(const std::shared_ptr<LM::Frontend::AST::Statement>& body, 
                                              const std::string& errorType) {
     // Check if function body can produce specified error type
     
-    if (auto blockStmt = std::dynamic_pointer_cast<AST::BlockStatement>(body)) {
+    if (auto blockStmt = std::dynamic_pointer_cast<LM::Frontend::AST::BlockStatement>(body)) {
         for (const auto& stmt : blockStmt->statements) {
             if (can_function_produce_error_type(stmt, errorType)) {
                 return true;
             }
         }
-    } else if (auto returnStmt = std::dynamic_pointer_cast<AST::ReturnStatement>(body)) {
+    } else if (auto returnStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ReturnStatement>(body)) {
         if (returnStmt->value) {
             // Check if return expression can produce error type
             auto returnErrors = infer_expression_error_types(returnStmt->value);
             return std::find(returnErrors.begin(), returnErrors.end(), errorType) != returnErrors.end();
         }
-    } else if (auto ifStmt = std::dynamic_pointer_cast<AST::IfStatement>(body)) {
+    } else if (auto ifStmt = std::dynamic_pointer_cast<LM::Frontend::AST::IfStatement>(body)) {
         return can_function_produce_error_type(ifStmt->thenBranch, errorType) ||
                (ifStmt->elseBranch && can_function_produce_error_type(ifStmt->elseBranch, errorType));
-    } else if (auto exprStmt = std::dynamic_pointer_cast<AST::ExprStatement>(body)) {
+    } else if (auto exprStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ExprStatement>(body)) {
         // Check for fallible expressions that might propagate errors
         auto exprErrors = infer_expression_error_types(exprStmt->expression);
         return std::find(exprErrors.begin(), exprErrors.end(), errorType) != exprErrors.end();
@@ -2090,7 +2089,7 @@ std::string TypeChecker::join_error_types(const std::vector<std::string>& errorT
 // PATTERN MATCHING METHODS
 // =============================================================================
 
-bool TypeChecker::is_exhaustive_error_match(const std::vector<std::shared_ptr<AST::MatchCase>>& cases, TypePtr type) {
+bool TypeChecker::is_exhaustive_error_match(const std::vector<std::shared_ptr<LM::Frontend::AST::MatchCase>>& cases, TypePtr type) {
     if (!is_error_union_type(type)) {
         return true; // Non-error types don't need exhaustive error matching
     }
@@ -2103,9 +2102,9 @@ bool TypeChecker::is_exhaustive_error_match(const std::vector<std::shared_ptr<AS
     
     for (const auto& matchCase : cases) {
         // Enhanced pattern analysis for error matching
-        if (auto valPattern = std::dynamic_pointer_cast<AST::ValPatternExpr>(matchCase->pattern)) {
+        if (auto valPattern = std::dynamic_pointer_cast<LM::Frontend::AST::ValPatternExpr>(matchCase->pattern)) {
             hasSuccessCase = true;
-        } else if (auto errPattern = std::dynamic_pointer_cast<AST::ErrPatternExpr>(matchCase->pattern)) {
+        } else if (auto errPattern = std::dynamic_pointer_cast<LM::Frontend::AST::ErrPatternExpr>(matchCase->pattern)) {
             if (errPattern->errorType.has_value()) {
                 // Specific error type in err pattern
                 coveredErrors.insert(errPattern->errorType.value());
@@ -2113,7 +2112,7 @@ bool TypeChecker::is_exhaustive_error_match(const std::vector<std::shared_ptr<AS
                 // Generic error pattern
                 hasGenericErrorCase = true;
             }
-        } else if (auto bindingPattern = std::dynamic_pointer_cast<AST::BindingPatternExpr>(matchCase->pattern)) {
+        } else if (auto bindingPattern = std::dynamic_pointer_cast<LM::Frontend::AST::BindingPatternExpr>(matchCase->pattern)) {
             if (bindingPattern->typeName == "val") {
                 hasSuccessCase = true;
             } else if (bindingPattern->typeName == "err") {
@@ -2145,7 +2144,7 @@ bool TypeChecker::is_exhaustive_error_match(const std::vector<std::shared_ptr<AS
     return hasSuccessCase && allErrorsCovered;
 }
 
-bool TypeChecker::is_exhaustive_union_match(TypePtr union_type, const std::vector<std::shared_ptr<AST::MatchCase>>& cases) {
+bool TypeChecker::is_exhaustive_union_match(TypePtr union_type, const std::vector<std::shared_ptr<LM::Frontend::AST::MatchCase>>& cases) {
     if (!is_union_type(union_type)) {
         return true; // Non-union types don't need union exhaustiveness checking
     }
@@ -2160,10 +2159,10 @@ bool TypeChecker::is_exhaustive_union_match(TypePtr union_type, const std::vecto
     bool hasWildcard = false;
     
     for (const auto& matchCase : cases) {
-        if (auto bindingPattern = std::dynamic_pointer_cast<AST::BindingPatternExpr>(matchCase->pattern)) {
+        if (auto bindingPattern = std::dynamic_pointer_cast<LM::Frontend::AST::BindingPatternExpr>(matchCase->pattern)) {
             // Pattern like Some(x), None, etc.
             coveredTypeNames.insert(bindingPattern->typeName);
-        } else if (auto typePattern = std::dynamic_pointer_cast<AST::TypePatternExpr>(matchCase->pattern)) {
+        } else if (auto typePattern = std::dynamic_pointer_cast<LM::Frontend::AST::TypePatternExpr>(matchCase->pattern)) {
             // Pattern matching specific types
             if (typePattern->type) {
                 coveredTypeNames.insert(typePattern->type->typeName);
@@ -2173,7 +2172,7 @@ bool TypeChecker::is_exhaustive_union_match(TypePtr union_type, const std::vecto
                     coveredTypeTags.insert(resolvedType->tag);
                 }
             }
-        } else if (auto literalExpr = std::dynamic_pointer_cast<AST::LiteralExpr>(matchCase->pattern)) {
+        } else if (auto literalExpr = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(matchCase->pattern)) {
             // Literal patterns - check if they match union variant types
             if (std::holds_alternative<std::string>(literalExpr->value)) {
                 std::string literalValue = std::get<std::string>(literalExpr->value);
@@ -2182,7 +2181,7 @@ bool TypeChecker::is_exhaustive_union_match(TypePtr union_type, const std::vecto
                 // This is a wildcard pattern represented as nil literal
                 hasWildcard = true;
             }
-        } else if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(matchCase->pattern)) {
+        } else if (auto varExpr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(matchCase->pattern)) {
             // Variable patterns - check for wildcard or specific variant names
             if (varExpr->name == "_") {
                 hasWildcard = true;
@@ -2249,13 +2248,13 @@ bool TypeChecker::is_exhaustive_union_match(TypePtr union_type, const std::vecto
     return true;
 }
 
-bool TypeChecker::is_exhaustive_option_match(const std::vector<std::shared_ptr<AST::MatchCase>>& cases) {
+bool TypeChecker::is_exhaustive_option_match(const std::vector<std::shared_ptr<LM::Frontend::AST::MatchCase>>& cases) {
     bool hasSomeCase = false;
     bool hasNoneCase = false;
     bool hasWildcard = false;
     
     for (const auto& matchCase : cases) {
-        if (auto bindingPattern = std::dynamic_pointer_cast<AST::BindingPatternExpr>(matchCase->pattern)) {
+        if (auto bindingPattern = std::dynamic_pointer_cast<LM::Frontend::AST::BindingPatternExpr>(matchCase->pattern)) {
             if (bindingPattern->typeName == "Some" || bindingPattern->typeName == "some") {
                 hasSomeCase = true;
             } else if (bindingPattern->typeName == "None" || bindingPattern->typeName == "none") {
@@ -2263,7 +2262,7 @@ bool TypeChecker::is_exhaustive_option_match(const std::vector<std::shared_ptr<A
             } else if (bindingPattern->typeName == "_" || bindingPattern->typeName == "any") {
                 hasWildcard = true;
             }
-        } else if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(matchCase->pattern)) {
+        } else if (auto varExpr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(matchCase->pattern)) {
             if (varExpr->name == "_" || varExpr->name == "any") {
                 hasWildcard = true;
             }
@@ -2279,7 +2278,7 @@ bool TypeChecker::is_exhaustive_option_match(const std::vector<std::shared_ptr<A
     return hasSomeCase && hasNoneCase;
 }
 
-std::string TypeChecker::get_missing_union_variants(TypePtr union_type, const std::vector<std::shared_ptr<AST::MatchCase>>& cases) {
+std::string TypeChecker::get_missing_union_variants(TypePtr union_type, const std::vector<std::shared_ptr<LM::Frontend::AST::MatchCase>>& cases) {
     if (!is_union_type(union_type)) {
         return "";
     }
@@ -2294,9 +2293,9 @@ std::string TypeChecker::get_missing_union_variants(TypePtr union_type, const st
     
     // Collect covered types
     for (const auto& matchCase : cases) {
-        if (auto bindingPattern = std::dynamic_pointer_cast<AST::BindingPatternExpr>(matchCase->pattern)) {
+        if (auto bindingPattern = std::dynamic_pointer_cast<LM::Frontend::AST::BindingPatternExpr>(matchCase->pattern)) {
             coveredTypeNames.insert(bindingPattern->typeName);
-        } else if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(matchCase->pattern)) {
+        } else if (auto varExpr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(matchCase->pattern)) {
             if (varExpr->name == "_") {
                 hasWildcard = true;
             } else {
@@ -2331,13 +2330,13 @@ std::string TypeChecker::get_missing_union_variants(TypePtr union_type, const st
     return result;
 }
 
-void TypeChecker::validate_pattern_compatibility(std::shared_ptr<AST::Expression> pattern_node, TypePtr match_type, int line) {
+void TypeChecker::validate_pattern_compatibility(std::shared_ptr<LM::Frontend::AST::Expression> pattern_node, TypePtr match_type, int line) {
     // Basic pattern compatibility validation
     if (!pattern_node || !match_type) {
         return;
     }
     
-    if (auto bindingPattern = std::dynamic_pointer_cast<AST::BindingPatternExpr>(pattern_node)) {
+    if (auto bindingPattern = std::dynamic_pointer_cast<LM::Frontend::AST::BindingPatternExpr>(pattern_node)) {
         // Check if binding pattern is compatible with match type
         if (bindingPattern->typeName == "val") {
             // val pattern expects success type
@@ -2354,7 +2353,7 @@ void TypeChecker::validate_pattern_compatibility(std::shared_ptr<AST::Expression
                 add_error("err pattern can only be used with error union types", line);
             }
         }
-    } else if (auto typePattern = std::dynamic_pointer_cast<AST::TypePatternExpr>(pattern_node)) {
+    } else if (auto typePattern = std::dynamic_pointer_cast<LM::Frontend::AST::TypePatternExpr>(pattern_node)) {
         // Type pattern - check compatibility
         if (typePattern->type) {
             TypePtr patternType = resolve_type_annotation(typePattern->type);
@@ -2362,7 +2361,7 @@ void TypeChecker::validate_pattern_compatibility(std::shared_ptr<AST::Expression
                 add_error("Type pattern type " + patternType->toString() + " does not match match type " + match_type->toString(), line);
             }
         }
-    } else if (auto literalPattern = std::dynamic_pointer_cast<AST::LiteralExpr>(pattern_node)) {
+    } else if (auto literalPattern = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(pattern_node)) {
         // Literal pattern - check compatibility
         TypePtr literalType = check_literal_expr(literalPattern);
         if (!is_type_compatible(literalType, match_type)) {
@@ -2376,18 +2375,18 @@ void TypeChecker::validate_pattern_compatibility(std::shared_ptr<AST::Expression
 // ENHANCED TYPE INFERENCE METHODS
 // =============================================================================
 
-TypePtr TypeChecker::infer_lambda_return_type(const std::shared_ptr<AST::Statement>& body) {
+TypePtr TypeChecker::infer_lambda_return_type(const std::shared_ptr<LM::Frontend::AST::Statement>& body) {
     // Try to infer return type from lambda body
     if (!body) {
         return type_system.NIL_TYPE;
     }
     
     // If body is a block statement, look for return statements
-    if (auto blockStmt = std::dynamic_pointer_cast<AST::BlockStatement>(body)) {
+    if (auto blockStmt = std::dynamic_pointer_cast<LM::Frontend::AST::BlockStatement>(body)) {
         std::vector<TypePtr> returnTypes;
         
         for (const auto& stmt : blockStmt->statements) {
-            if (auto returnStmt = std::dynamic_pointer_cast<AST::ReturnStatement>(stmt)) {
+            if (auto returnStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ReturnStatement>(stmt)) {
                 if (returnStmt->value) {
                     TypePtr returnType = check_expression(returnStmt->value);
                     returnTypes.push_back(returnType);
@@ -2416,7 +2415,7 @@ TypePtr TypeChecker::infer_lambda_return_type(const std::shared_ptr<AST::Stateme
     }
     
     // If body is an expression statement, infer from expression
-    if (auto exprStmt = std::dynamic_pointer_cast<AST::ExprStatement>(body)) {
+    if (auto exprStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ExprStatement>(body)) {
         return check_expression(exprStmt->expression);
     }
     
@@ -2424,7 +2423,7 @@ TypePtr TypeChecker::infer_lambda_return_type(const std::shared_ptr<AST::Stateme
     return type_system.NIL_TYPE;
 }
 
-TypePtr TypeChecker::infer_literal_type(const std::shared_ptr<AST::LiteralExpr>& expr, TypePtr expected_type) {
+TypePtr TypeChecker::infer_literal_type(const std::shared_ptr<LM::Frontend::AST::LiteralExpr>& expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
     // Handle string-based literal values with enhanced type inference
@@ -2513,7 +2512,7 @@ TypePtr TypeChecker::infer_literal_type(const std::shared_ptr<AST::LiteralExpr>&
 // CONTRACT STATEMENT CHECKING
 // =============================================================================
 
-TypePtr TypeChecker::check_contract_statement(std::shared_ptr<AST::ContractStatement> contract_stmt) {
+TypePtr TypeChecker::check_contract_statement(std::shared_ptr<LM::Frontend::AST::ContractStatement> contract_stmt) {
     if (!contract_stmt) return nullptr;
     
     if (!contract_stmt->condition) {
@@ -2546,7 +2545,7 @@ TypePtr TypeChecker::check_contract_statement(std::shared_ptr<AST::ContractState
     return type_system.NIL_TYPE;
 }
 
-TypePtr TypeChecker::check_match_statement(std::shared_ptr<AST::MatchStatement> match_stmt) {
+TypePtr TypeChecker::check_match_statement(std::shared_ptr<LM::Frontend::AST::MatchStatement> match_stmt) {
     if (!match_stmt) return nullptr;
     
     // Check the matched expression
@@ -2570,10 +2569,10 @@ TypePtr TypeChecker::check_match_statement(std::shared_ptr<AST::MatchStatement> 
     }
     
     // Convert cases to shared_ptr vector for function calls
-    std::vector<std::shared_ptr<AST::MatchCase>> case_ptrs;
+    std::vector<std::shared_ptr<LM::Frontend::AST::MatchCase>> case_ptrs;
     case_ptrs.reserve(match_stmt->cases.size());
     for (const auto& case_item : match_stmt->cases) {
-        case_ptrs.push_back(std::make_shared<AST::MatchCase>(case_item));
+        case_ptrs.push_back(std::make_shared<LM::Frontend::AST::MatchCase>(case_item));
     }
     
     // Enhanced exhaustiveness checking for different type categories
@@ -2628,7 +2627,7 @@ void TypeChecker::register_builtin_function(const std::string& name,
 
 namespace TypeCheckerFactory {
 
-TypeCheckResult check_program(std::shared_ptr<AST::Program> program, const std::string& source, const std::string& file_path) {
+TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> program, const std::string& source, const std::string& file_path) {
     // Create memory manager and region for type system
     static MemoryManager<> memoryManager;
     static MemoryManager<>::Region memoryRegion(memoryManager);
@@ -2746,3 +2745,5 @@ void register_builtin_functions(TypeChecker& checker) {
 }
 
 } // namespace TypeCheckerFactory
+} // namespace Frontend
+} // namespace LM

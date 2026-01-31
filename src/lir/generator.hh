@@ -13,16 +13,16 @@
 #include <optional>
 #include <variant>
 
+
 //All semantic decisions about functions, classes, and variables are made in the generator. JIT only sees registers, memory offsets, and low-level types.
 namespace LIR {
-
 class Generator {
 public:
     explicit Generator();
     
-    // Main entry point - now takes TypeCheckResult instead of raw AST
-    std::unique_ptr<LIR_Function> generate_program(const TypeCheckResult& type_check_result);
-    void generate_function(AST::FunctionDeclaration& fn);
+    // Main entry point - now takes TypeCheckResult instead of raw LM::Frontend::AST
+    std::unique_ptr<LIR_Function> generate_program(const LM::Frontend::TypeCheckResult& type_check_result);
+    void generate_function(LM::Frontend::AST::FunctionDeclaration& fn);
     
     // Error handling
     bool has_errors() const;
@@ -40,15 +40,15 @@ private:
     TypeSystem* type_system = nullptr;
     
     // Symbol collection (Pass 0)
-    void collect_function_signatures(const TypeCheckResult& type_check_result);
-    void collect_function_signature(AST::FunctionDeclaration& stmt);
+    void collect_function_signatures(const LM::Frontend::TypeCheckResult& type_check_result);
+    void collect_function_signature(LM::Frontend::AST::FunctionDeclaration& stmt);
     
     // Function body lowering (Pass 1)
-    void lower_function_bodies(const TypeCheckResult& type_check_result);
-    void lower_function_body(AST::FunctionDeclaration& stmt);
-    void lower_task_body(AST::TaskStatement& stmt);
-    void lower_worker_body(AST::WorkerStatement& stmt);
-    void lower_task_bodies_recursive(const std::vector<std::shared_ptr<AST::Statement>>& statements);
+    void lower_function_bodies(const LM::Frontend::TypeCheckResult& type_check_result);
+    void lower_function_body(LM::Frontend::AST::FunctionDeclaration& stmt);
+    void lower_task_body(LM::Frontend::AST::TaskStatement& stmt);
+    void lower_worker_body(LM::Frontend::AST::WorkerStatement& stmt);
+    void lower_task_bodies_recursive(const std::vector<std::shared_ptr<LM::Frontend::AST::Statement>>& statements);
     
     // Helper methods
     Reg allocate_register();
@@ -68,7 +68,7 @@ private:
     
     // Type conversion helpers
     Type language_type_to_abi_type(TypePtr lang_type);
-    Type get_expression_abi_type(AST::Expression& expr);
+    Type get_expression_abi_type(LM::Frontend::AST::Expression& expr);
     
     void emit_instruction(const LIR_Inst& inst);
     void emit_typed_instruction(const LIR_Inst& inst);
@@ -116,92 +116,92 @@ private:
     T* create_object(Args&&... args);
     void cleanup_memory();
     
-    // AST node visitors
-    void emit_stmt(AST::Statement& stmt);
-    Reg emit_expr(AST::Expression& expr);
+    // LM::Frontend::AST node visitors
+    void emit_stmt(LM::Frontend::AST::Statement& stmt);
+    Reg emit_expr(LM::Frontend::AST::Expression& expr);
     
     // Specific expression handlers
-    Reg emit_literal_expr(AST::LiteralExpr& expr, TypePtr expected_type = nullptr);
-    Reg emit_variable_expr(AST::VariableExpr& expr);
-    Reg emit_interpolated_string_expr(AST::InterpolatedStringExpr& expr);
-    Reg emit_binary_expr(AST::BinaryExpr& expr);
-    Reg emit_unary_expr(AST::UnaryExpr& expr);
-    Reg emit_grouping_expr(AST::GroupingExpr& expr);
-    Reg emit_call_expr(AST::CallExpr& expr);
-    Reg emit_assign_expr(AST::AssignExpr& expr);
-    Reg emit_list_expr(AST::ListExpr& expr);
-    Reg emit_call_closure_expr(AST::CallClosureExpr& expr);
+    Reg emit_literal_expr(LM::Frontend::AST::LiteralExpr& expr, TypePtr expected_type = nullptr);
+    Reg emit_variable_expr(LM::Frontend::AST::VariableExpr& expr);
+    Reg emit_interpolated_string_expr(LM::Frontend::AST::InterpolatedStringExpr& expr);
+    Reg emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr);
+    Reg emit_unary_expr(LM::Frontend::AST::UnaryExpr& expr);
+    Reg emit_grouping_expr(LM::Frontend::AST::GroupingExpr& expr);
+    Reg emit_call_expr(LM::Frontend::AST::CallExpr& expr);
+    Reg emit_assign_expr(LM::Frontend::AST::AssignExpr& expr);
+    Reg emit_list_expr(LM::Frontend::AST::ListExpr& expr);
+    Reg emit_call_closure_expr(LM::Frontend::AST::CallClosureExpr& expr);
     
     // Loop helper methods
-    void emit_traditional_for_loop(AST::ForStatement& stmt);
-    Reg emit_ternary_expr(AST::TernaryExpr& expr);
-    Reg emit_index_expr(AST::IndexExpr& expr);
-    Reg emit_member_expr(AST::MemberExpr& expr);
-    Reg emit_tuple_expr(AST::TupleExpr& expr);
-    Reg emit_dict_expr(AST::DictExpr& expr);
-    Reg emit_range_expr(AST::RangeExpr& expr);
-    Reg emit_lambda_expr(AST::LambdaExpr& expr);
-    Reg emit_error_construct_expr(AST::ErrorConstructExpr& expr);
-    Reg emit_ok_construct_expr(AST::OkConstructExpr& expr);
-    Reg emit_fallible_expr(AST::FallibleExpr& expr);
+    void emit_traditional_for_loop(LM::Frontend::AST::ForStatement& stmt);
+    Reg emit_ternary_expr(LM::Frontend::AST::TernaryExpr& expr);
+    Reg emit_index_expr(LM::Frontend::AST::IndexExpr& expr);
+    Reg emit_member_expr(LM::Frontend::AST::MemberExpr& expr);
+    Reg emit_tuple_expr(LM::Frontend::AST::TupleExpr& expr);
+    Reg emit_dict_expr(LM::Frontend::AST::DictExpr& expr);
+    Reg emit_range_expr(LM::Frontend::AST::RangeExpr& expr);
+    Reg emit_lambda_expr(LM::Frontend::AST::LambdaExpr& expr);
+    Reg emit_error_construct_expr(LM::Frontend::AST::ErrorConstructExpr& expr);
+    Reg emit_ok_construct_expr(LM::Frontend::AST::OkConstructExpr& expr);
+    Reg emit_fallible_expr(LM::Frontend::AST::FallibleExpr& expr);
     
     // Channel operation handlers
-    Reg emit_channel_offer_expr(AST::ChannelOfferExpr& expr);
-    Reg emit_channel_poll_expr(AST::ChannelPollExpr& expr);
-    Reg emit_channel_send_expr(AST::ChannelSendExpr& expr);
-    Reg emit_channel_recv_expr(AST::ChannelRecvExpr& expr);
+    Reg emit_channel_offer_expr(LM::Frontend::AST::ChannelOfferExpr& expr);
+    Reg emit_channel_poll_expr(LM::Frontend::AST::ChannelPollExpr& expr);
+    Reg emit_channel_send_expr(LM::Frontend::AST::ChannelSendExpr& expr);
+    Reg emit_channel_recv_expr(LM::Frontend::AST::ChannelRecvExpr& expr);
     
     // Class system expression handlers
-    Reg emit_object_literal_expr(AST::ObjectLiteralExpr& expr);
-    Reg emit_this_expr(AST::ThisExpr& expr);
+    Reg emit_object_literal_expr(LM::Frontend::AST::ObjectLiteralExpr& expr);
+    Reg emit_this_expr(LM::Frontend::AST::ThisExpr& expr);
     
     // Specific statement handlers
-    void emit_expr_stmt(AST::ExprStatement& stmt);
-    void emit_print_stmt(AST::PrintStatement& stmt);
+    void emit_expr_stmt(LM::Frontend::AST::ExprStatement& stmt);
+    void emit_print_stmt(LM::Frontend::AST::PrintStatement& stmt);
     void emit_print_value(Reg value);  // Helper for printing single values
-    void emit_var_stmt(AST::VarDeclaration& stmt);
-    void emit_block_stmt(AST::BlockStatement& stmt);
-    void emit_if_stmt(AST::IfStatement& stmt);
-    void emit_if_stmt_cfg(AST::IfStatement& stmt);
-    void emit_if_stmt_linear(AST::IfStatement& stmt);
-    void emit_while_stmt(AST::WhileStatement& stmt);
-    void emit_while_stmt_cfg(AST::WhileStatement& stmt);
-    void emit_while_stmt_linear(AST::WhileStatement& stmt);
-    void emit_for_stmt(AST::ForStatement& stmt);
-    void emit_for_stmt_cfg(AST::ForStatement& stmt);
-    void emit_for_stmt_linear(AST::ForStatement& stmt);
-    void emit_return_stmt(AST::ReturnStatement& stmt);
-    void emit_func_stmt(AST::FunctionDeclaration& stmt);
-    void emit_import_stmt(AST::ImportStatement& stmt);
-    void emit_contract_stmt(AST::ContractStatement& stmt);
-    void emit_comptime_stmt(AST::ComptimeStatement& stmt);
-    void emit_parallel_stmt(AST::ParallelStatement& stmt);
-    void emit_concurrent_stmt(AST::ConcurrentStatement& stmt);
-    void emit_task_init_and_step(AST::TaskStatement& task, size_t task_id, Reg contexts_reg, Reg channel_reg, Reg counter_reg, int64_t loop_var_value = 0);
-    void emit_task_stmt(AST::TaskStatement& stmt);
-    void create_and_register_task_function(const std::string& task_name, AST::TaskStatement* task_stmt, int64_t loop_value);
-    void create_and_register_worker_function(const std::string& worker_name, AST::WorkerStatement* worker_stmt);
-    void create_parallel_work_item(const std::string& work_item_name, std::shared_ptr<AST::Statement> stmt);
-    void collect_variables_from_statement(AST::Statement& stmt, std::set<std::string>& variables);
-    void collect_variables_from_expression(AST::Expression& expr, std::set<std::string>& variables);
-    void emit_concurrent_worker_init(AST::WorkerStatement& worker, size_t worker_id, Reg scheduler_reg, Reg channel_reg);
-    void emit_worker_stmt(AST::WorkerStatement& stmt);
-    void emit_iter_stmt(AST::IterStatement& stmt);
-    void emit_dict_iter_stmt(AST::IterStatement& stmt, AST::DictExpr& dict_expr);
-    void emit_list_iter_stmt(AST::IterStatement& stmt, AST::ListExpr& list_expr);
-    void emit_tuple_iter_stmt(AST::IterStatement& stmt, AST::TupleExpr& tuple_expr);
-    void emit_dict_var_iter_stmt(AST::IterStatement& stmt, Reg dict_reg);
-    void emit_list_var_iter_stmt(AST::IterStatement& stmt, Reg list_reg);
-    void emit_tuple_var_iter_stmt(AST::IterStatement& stmt, Reg tuple_reg, int64_t tuple_len);
-    void emit_break_stmt(AST::BreakStatement& stmt);
-    void emit_continue_stmt(AST::ContinueStatement& stmt);
-    void emit_unsafe_stmt(AST::UnsafeStatement& stmt);
-    void emit_class_stmt(AST::ClassDeclaration& stmt);
-    void emit_match_stmt(AST::MatchStatement& stmt);
-    void emit_module_stmt(AST::ModuleDeclaration& stmt);
+    void emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt);
+    void emit_block_stmt(LM::Frontend::AST::BlockStatement& stmt);
+    void emit_if_stmt(LM::Frontend::AST::IfStatement& stmt);
+    void emit_if_stmt_cfg(LM::Frontend::AST::IfStatement& stmt);
+    void emit_if_stmt_linear(LM::Frontend::AST::IfStatement& stmt);
+    void emit_while_stmt(LM::Frontend::AST::WhileStatement& stmt);
+    void emit_while_stmt_cfg(LM::Frontend::AST::WhileStatement& stmt);
+    void emit_while_stmt_linear(LM::Frontend::AST::WhileStatement& stmt);
+    void emit_for_stmt(LM::Frontend::AST::ForStatement& stmt);
+    void emit_for_stmt_cfg(LM::Frontend::AST::ForStatement& stmt);
+    void emit_for_stmt_linear(LM::Frontend::AST::ForStatement& stmt);
+    void emit_return_stmt(LM::Frontend::AST::ReturnStatement& stmt);
+    void emit_func_stmt(LM::Frontend::AST::FunctionDeclaration& stmt);
+    void emit_import_stmt(LM::Frontend::AST::ImportStatement& stmt);
+    void emit_contract_stmt(LM::Frontend::AST::ContractStatement& stmt);
+    void emit_comptime_stmt(LM::Frontend::AST::ComptimeStatement& stmt);
+    void emit_parallel_stmt(LM::Frontend::AST::ParallelStatement& stmt);
+    void emit_concurrent_stmt(LM::Frontend::AST::ConcurrentStatement& stmt);
+    void emit_task_init_and_step(LM::Frontend::AST::TaskStatement& task, size_t task_id, Reg contexts_reg, Reg channel_reg, Reg counter_reg, int64_t loop_var_value = 0);
+    void emit_task_stmt(LM::Frontend::AST::TaskStatement& stmt);
+    void create_and_register_task_function(const std::string& task_name, LM::Frontend::AST::TaskStatement* task_stmt, int64_t loop_value);
+    void create_and_register_worker_function(const std::string& worker_name, LM::Frontend::AST::WorkerStatement* worker_stmt);
+    void create_parallel_work_item(const std::string& work_item_name, std::shared_ptr<LM::Frontend::AST::Statement> stmt);
+    void collect_variables_from_statement(LM::Frontend::AST::Statement& stmt, std::set<std::string>& variables);
+    void collect_variables_from_expression(LM::Frontend::AST::Expression& expr, std::set<std::string>& variables);
+    void emit_concurrent_worker_init(LM::Frontend::AST::WorkerStatement& worker, size_t worker_id, Reg scheduler_reg, Reg channel_reg);
+    void emit_worker_stmt(LM::Frontend::AST::WorkerStatement& stmt);
+    void emit_iter_stmt(LM::Frontend::AST::IterStatement& stmt);
+    void emit_dict_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::Frontend::AST::DictExpr& dict_expr);
+    void emit_list_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::Frontend::AST::ListExpr& list_expr);
+    void emit_tuple_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::Frontend::AST::TupleExpr& tuple_expr);
+    void emit_dict_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, Reg dict_reg);
+    void emit_list_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, Reg list_reg);
+    void emit_tuple_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, Reg tuple_reg, int64_t tuple_len);
+    void emit_break_stmt(LM::Frontend::AST::BreakStatement& stmt);
+    void emit_continue_stmt(LM::Frontend::AST::ContinueStatement& stmt);
+    void emit_unsafe_stmt(LM::Frontend::AST::UnsafeStatement& stmt);
+    void emit_class_stmt(LM::Frontend::AST::ClassDeclaration& stmt);
+    void emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt);
+    void emit_module_stmt(LM::Frontend::AST::ModuleDeclaration& stmt);
     
     // Helper functions
-    std::optional<ValuePtr> evaluate_constant_expression(std::shared_ptr<AST::Expression> expr);
+    std::optional<ValuePtr> evaluate_constant_expression(std::shared_ptr<LM::Frontend::AST::Expression> expr);
     uint64_t parse_timeout(const std::string& timeout_str);
     uint64_t parse_grace_period(const std::string& grace_str);
     
@@ -242,7 +242,7 @@ private:
     std::shared_ptr<TypeSystem> type_system_;
     std::string current_function_name_;
     std::set<std::string> function_names_;
-    std::map<std::string, std::shared_ptr<AST::Expression>> constant_expressions_;
+    std::map<std::string, std::shared_ptr<LM::Frontend::AST::Expression>> constant_expressions_;
     std::map<std::string, int64_t> constant_values_;
     std::map<std::string, Reg> variable_registers_;
     std::map<std::string, Reg> channel_registers_;
@@ -271,7 +271,7 @@ private:
     struct FunctionInfo {
         std::string name;
         std::unique_ptr<LIR_Function> lir_function;  // Separate LIR function
-        AST::VisibilityLevel visibility;
+        LM::Frontend::AST::VisibilityLevel visibility;
         size_t param_count;
         size_t optional_param_count;
         bool has_closure;
@@ -284,7 +284,7 @@ private:
         std::string qualified_name;  // module::symbol
         std::string module_name;
         std::string symbol_name;
-        AST::VisibilityLevel visibility;
+        LM::Frontend::AST::VisibilityLevel visibility;
         size_t param_count = 0;
         bool is_function = false;
         bool is_variable = false;
@@ -318,25 +318,25 @@ private:
     
    
     // Variable capture analysis for concurrent statements
-    void find_accessed_variables_in_concurrent(AST::ConcurrentStatement& stmt, std::set<std::string>& accessed_variables);
-    void find_accessed_variables_recursive(const std::vector<std::shared_ptr<AST::Statement>>& statements, std::set<std::string>& accessed_variables);
-    void find_accessed_variables_in_expr(const AST::Expression& expr, std::set<std::string>& accessed_variables);
+    void find_accessed_variables_in_concurrent(LM::Frontend::AST::ConcurrentStatement& stmt, std::set<std::string>& accessed_variables);
+    void find_accessed_variables_recursive(const std::vector<std::shared_ptr<LM::Frontend::AST::Statement>>& statements, std::set<std::string>& accessed_variables);
+    void find_accessed_variables_in_expr(const LM::Frontend::AST::Expression& expr, std::set<std::string>& accessed_variables);
     
     // Helper methods
-    std::shared_ptr<::Type> convert_ast_type_to_lir_type(const std::shared_ptr<AST::TypeAnnotation>& ast_type);
+    std::shared_ptr<::Type> convert_ast_type_to_lir_type(const std::shared_ptr<LM::Frontend::AST::TypeAnnotation>& ast_type);
     
     // Class system helper methods
-    void collect_class_signatures(AST::Program& program);
-    void collect_class_signature(AST::ClassDeclaration& class_decl);
+    void collect_class_signatures(LM::Frontend::AST::Program& program);
+    void collect_class_signature(LM::Frontend::AST::ClassDeclaration& class_decl);
     void calculate_class_layout(ClassInfo& class_info);
     size_t get_field_offset(const std::string& class_name, const std::string& field_name);
     size_t get_method_index(const std::string& class_name, const std::string& method_name);
     
     // Smart module system helper methods
-    void collect_module_signatures(AST::Program& program);
-    void collect_module_declaration(AST::ModuleDeclaration& module_decl);
+    void collect_module_signatures(LM::Frontend::AST::Program& program);
+    void collect_module_declaration(LM::Frontend::AST::ModuleDeclaration& module_decl);
     void register_module_symbol(const std::string& module_name, const std::string& symbol_name, 
-                                AST::VisibilityLevel visibility, bool is_function = false, size_t param_count = 0);
+                                LM::Frontend::AST::VisibilityLevel visibility, bool is_function = false, size_t param_count = 0);
     ModuleSymbolInfo* resolve_module_symbol(const std::string& qualified_name);
     bool can_access_module_symbol(const ModuleSymbolInfo& symbol, const std::string& from_module = "");
 };

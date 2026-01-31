@@ -2,11 +2,15 @@
 #define AST_PRINTER_H
 
 
-#include "../frontend/ast.hh"
-#include "../frontend/scanner.hh"
+#include "../ast.hh"
+#include "../scanner.hh"
 #include <memory>
 #include <string>
 #include <variant>
+
+namespace LM {
+namespace Frontend {
+namespace AST {
 
 // AST Printer backend - for debugging and visualization
 class ASTPrinter {
@@ -25,5 +29,9 @@ private:
     std::string typeToString(const std::shared_ptr<AST::TypeAnnotation>& type) const;
     std::string typePtrToString(const TypePtr& type) const;
 };
+
+} // namespace AST
+} // namespace Frontend
+} // namespace LM
 
 #endif // AST_PRINTER_HH

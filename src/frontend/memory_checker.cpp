@@ -1,12 +1,10 @@
 #include "memory_checker.hh"
 #include "../common/debugger.hh"
 #include <sstream>
+namespace LM {
+namespace Frontend {
 
-// =============================================================================
-// MEMORY CHECKER IMPLEMENTATION
-// =============================================================================
-
-MemoryCheckResult MemoryChecker::check_program(std::shared_ptr<AST::Program> program, 
+MemoryCheckResult MemoryChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> program, 
                                                const std::string& source, 
                                                const std::string& filename) {
     if (!program) {
@@ -58,27 +56,27 @@ MemoryCheckResult MemoryChecker::check_program(std::shared_ptr<AST::Program> pro
     return result;
 }
 
-void MemoryChecker::check_statement(std::shared_ptr<AST::Statement> stmt) {
+void MemoryChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statement> stmt) {
     if (!stmt) return;
     
-    if (auto var_decl = std::dynamic_pointer_cast<AST::VarDeclaration>(stmt)) {
+    if (auto var_decl = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
         check_var_declaration(var_decl);
-    } else if (auto assignment = std::dynamic_pointer_cast<AST::AssignExpr>(stmt)) {
+    } else if (auto assignment = std::dynamic_pointer_cast<LM::Frontend::AST::AssignExpr>(stmt)) {
         check_assignment(assignment);
-    } else if (auto block = std::dynamic_pointer_cast<AST::BlockStatement>(stmt)) {
+    } else if (auto block = std::dynamic_pointer_cast<LM::Frontend::AST::BlockStatement>(stmt)) {
         check_block_statement(block);
-    } else if (auto expr_stmt = std::dynamic_pointer_cast<AST::ExprStatement>(stmt)) {
+    } else if (auto expr_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ExprStatement>(stmt)) {
         check_expression(expr_stmt->expression);
-    } else if (auto if_stmt = std::dynamic_pointer_cast<AST::IfStatement>(stmt)) {
+    } else if (auto if_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::IfStatement>(stmt)) {
         check_expression(if_stmt->condition);
         check_statement(if_stmt->thenBranch);
         if (if_stmt->elseBranch) {
             check_statement(if_stmt->elseBranch);
         }
-    } else if (auto while_stmt = std::dynamic_pointer_cast<AST::WhileStatement>(stmt)) {
+    } else if (auto while_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::WhileStatement>(stmt)) {
         check_expression(while_stmt->condition);
         check_statement(while_stmt->body);
-    } else if (auto for_stmt = std::dynamic_pointer_cast<AST::ForStatement>(stmt)) {
+    } else if (auto for_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ForStatement>(stmt)) {
         if (for_stmt->initializer) check_statement(for_stmt->initializer);
         if (for_stmt->condition) check_expression(for_stmt->condition);
         if (for_stmt->increment) check_expression(for_stmt->increment);
@@ -86,7 +84,7 @@ void MemoryChecker::check_statement(std::shared_ptr<AST::Statement> stmt) {
     }
 }
 
-void MemoryChecker::check_var_declaration(std::shared_ptr<AST::VarDeclaration> var_decl) {
+void MemoryChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::VarDeclaration> var_decl) {
     if (!var_decl) return;
     
     // Check if variable has a type (should be set by type checker)
@@ -106,7 +104,7 @@ void MemoryChecker::check_var_declaration(std::shared_ptr<AST::VarDeclaration> v
         mark_variable_initialized(var_decl->name);
         
         // Check if initializing from another variable (potential move)
-        if (auto var_expr = std::dynamic_pointer_cast<AST::VariableExpr>(var_decl->initializer)) {
+        if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(var_decl->initializer)) {
             if (is_variable_moved(var_expr->name)) {
                 add_memory_error("Use-after-move", var_expr->name,
                                "Variable '" + var_expr->name + "' used after being moved",
@@ -119,14 +117,14 @@ void MemoryChecker::check_var_declaration(std::shared_ptr<AST::VarDeclaration> v
     }
 }
 
-void MemoryChecker::check_assignment(std::shared_ptr<AST::AssignExpr> assignment) {
+void MemoryChecker::check_assignment(std::shared_ptr<LM::Frontend::AST::AssignExpr> assignment) {
     if (!assignment) return;
     
     // Check the value being assigned
     check_expression(assignment->value);
     
     // Check if assigning from a moved variable
-    if (auto var_expr = std::dynamic_pointer_cast<AST::VariableExpr>(assignment->value)) {
+    if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(assignment->value)) {
         if (is_variable_moved(var_expr->name)) {
             add_memory_error("Use-after-move", var_expr->name,
                            "Variable '" + var_expr->name + "' used after being moved",
@@ -141,24 +139,24 @@ void MemoryChecker::check_assignment(std::shared_ptr<AST::AssignExpr> assignment
     mark_variable_initialized(assignment->name);
 }
 
-void MemoryChecker::check_expression(std::shared_ptr<AST::Expression> expr) {
+void MemoryChecker::check_expression(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
     if (!expr) return;
     
-    if (auto var_expr = std::dynamic_pointer_cast<AST::VariableExpr>(expr)) {
+    if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr)) {
         check_variable_access(var_expr);
-    } else if (auto call_expr = std::dynamic_pointer_cast<AST::CallExpr>(expr)) {
+    } else if (auto call_expr = std::dynamic_pointer_cast<LM::Frontend::AST::CallExpr>(expr)) {
         check_function_call(call_expr);
-    } else if (auto binary_expr = std::dynamic_pointer_cast<AST::BinaryExpr>(expr)) {
+    } else if (auto binary_expr = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
         check_expression(binary_expr->left);
         check_expression(binary_expr->right);
-    } else if (auto unary_expr = std::dynamic_pointer_cast<AST::UnaryExpr>(expr)) {
+    } else if (auto unary_expr = std::dynamic_pointer_cast<LM::Frontend::AST::UnaryExpr>(expr)) {
         check_expression(unary_expr->right);
-    } else if (auto group_expr = std::dynamic_pointer_cast<AST::GroupingExpr>(expr)) {
+    } else if (auto group_expr = std::dynamic_pointer_cast<LM::Frontend::AST::GroupingExpr>(expr)) {
         check_expression(group_expr->expression);
     }
 }
 
-void MemoryChecker::check_variable_access(std::shared_ptr<AST::VariableExpr> var_expr) {
+void MemoryChecker::check_variable_access(std::shared_ptr<LM::Frontend::AST::VariableExpr> var_expr) {
     if (!var_expr) return;
     
     const std::string& name = var_expr->name;
@@ -180,7 +178,7 @@ void MemoryChecker::check_variable_access(std::shared_ptr<AST::VariableExpr> var
     }
 }
 
-void MemoryChecker::check_function_call(std::shared_ptr<AST::CallExpr> call) {
+void MemoryChecker::check_function_call(std::shared_ptr<LM::Frontend::AST::CallExpr> call) {
     if (!call) return;
     
     // Check all arguments
@@ -188,7 +186,7 @@ void MemoryChecker::check_function_call(std::shared_ptr<AST::CallExpr> call) {
         check_expression(arg);
         
         // If argument is a variable, it might be moved into the function
-        if (auto var_expr = std::dynamic_pointer_cast<AST::VariableExpr>(arg)) {
+        if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(arg)) {
             if (is_variable_moved(var_expr->name)) {
                 add_memory_error("Use-after-move", var_expr->name,
                                "Variable '" + var_expr->name + "' used after being moved",
@@ -200,7 +198,7 @@ void MemoryChecker::check_function_call(std::shared_ptr<AST::CallExpr> call) {
     }
 }
 
-void MemoryChecker::check_block_statement(std::shared_ptr<AST::BlockStatement> block) {
+void MemoryChecker::check_block_statement(std::shared_ptr<LM::Frontend::AST::BlockStatement> block) {
     if (!block) return;
     
     // Enter new memory region for block
@@ -223,39 +221,39 @@ void MemoryChecker::check_block_statement(std::shared_ptr<AST::BlockStatement> b
     exit_memory_region();
 }
 
-void MemoryChecker::insert_memory_operations(std::shared_ptr<AST::Statement> stmt) {
+void MemoryChecker::insert_memory_operations(std::shared_ptr<LM::Frontend::AST::Statement> stmt) {
     // This would insert memory operation nodes into the AST
     // For now, we just set memory info on the statement
     if (stmt) {
-        stmt->memory_info = AST::MemoryInfo(current_region_id, current_generation);
+        stmt->memory_info = LM::Frontend::AST::MemoryInfo(current_region_id, current_generation);
     }
 }
 
-void MemoryChecker::insert_make_linear(std::shared_ptr<AST::Expression> expr) {
+void MemoryChecker::insert_make_linear(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
     // Insert MakeLinearExpr node - for now just set memory info
     if (expr) {
-        expr->memory_info = AST::MemoryInfo(current_region_id, current_generation);
+        expr->memory_info = LM::Frontend::AST::MemoryInfo(current_region_id, current_generation);
     }
 }
 
-void MemoryChecker::insert_make_ref(std::shared_ptr<AST::Expression> expr) {
+void MemoryChecker::insert_make_ref(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
     // Insert MakeRefExpr node - for now just set memory info
     if (expr) {
-        expr->memory_info = AST::MemoryInfo(current_region_id, current_generation);
+        expr->memory_info = LM::Frontend::AST::MemoryInfo(current_region_id, current_generation);
     }
 }
 
-void MemoryChecker::insert_move(std::shared_ptr<AST::Expression> expr) {
+void MemoryChecker::insert_move(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
     // Insert MoveExpr node - for now just set memory info
     if (expr) {
-        expr->memory_info = AST::MemoryInfo(current_region_id, current_generation);
+        expr->memory_info = LM::Frontend::AST::MemoryInfo(current_region_id, current_generation);
     }
 }
 
-void MemoryChecker::insert_drop(std::shared_ptr<AST::Expression> expr) {
+void MemoryChecker::insert_drop(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
     // Insert DropExpr node - for now just set memory info
     if (expr) {
-        expr->memory_info = AST::MemoryInfo(current_region_id, current_generation);
+        expr->memory_info = LM::Frontend::AST::MemoryInfo(current_region_id, current_generation);
     }
 }
 
@@ -342,9 +340,14 @@ void MemoryChecker::add_warning(const std::string& message, int line) {
 // FACTORY IMPLEMENTATION
 // =============================================================================
 
-MemoryCheckResult MemoryCheckerFactory::check_program(std::shared_ptr<AST::Program> program, 
+MemoryCheckResult MemoryCheckerFactory::check_program(std::shared_ptr<LM::Frontend::AST::Program> program, 
                                                       const std::string& source, 
                                                       const std::string& filename) {
     MemoryChecker checker;
     return checker.check_program(program, source, filename);
 }
+
+
+
+} // namespace Frontend
+} // namespace LM

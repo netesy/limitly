@@ -14,6 +14,9 @@
 // MEMORY CHECKER - Separate phase after type checking
 // =============================================================================
 
+namespace LM {
+namespace Frontend {
+
 struct MemoryCheckResult {
     bool success;
     std::shared_ptr<AST::Program> program;
@@ -26,7 +29,7 @@ public:
     MemoryChecker() = default;
     
     // Main entry point - check memory safety after type checking
-    MemoryCheckResult check_program(std::shared_ptr<AST::Program> program, 
+   MemoryCheckResult check_program(std::shared_ptr<AST::Program> program, 
                                    const std::string& source = "", 
                                    const std::string& filename = "");
 
@@ -87,3 +90,6 @@ public:
                                           const std::string& source = "", 
                                           const std::string& filename = "");
 };
+
+} // namespace Frontend
+} // namespace LM

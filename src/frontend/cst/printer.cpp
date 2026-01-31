@@ -1,9 +1,10 @@
-#include "cst_printer.hh"
-#include "cst_utils.hh"
+#include "printer.hh"
+#include "utils.hh"
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
-
+namespace LM {
+namespace Frontend {
 namespace CST {
 
     // Printer utilities implementation
@@ -714,3 +715,5 @@ namespace CST {
     }
 
 } // namespace CST
+} // namespace Frontend
+} // namespace LM

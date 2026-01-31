@@ -3,9 +3,11 @@
 #include "function_registry.hh"
 #include "builtin_functions.hh"
 #include "../frontend/ast.hh"
+#include "../frontend/scanner.hh"
 #include <algorithm>
 #include <map>
 #include <limits>
+
 using namespace LIR;
 
 namespace LIR {
@@ -16,7 +18,7 @@ Generator::Generator() : current_function_(nullptr), next_register_(0), next_lab
 }
 
 
-std::unique_ptr<LIR_Function> Generator::generate_program(const TypeCheckResult& type_check_result) {
+std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::TypeCheckResult& type_check_result) {
    // std::cout << "[DEBUG] generate_program started" << std::endl;
     
     // Set type system reference
@@ -58,7 +60,7 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const TypeCheckResult&
     
     // Generate top-level statements (excluding function definitions)
     for (const auto& stmt : type_check_result.program->statements) {
-        if (auto func_stmt = dynamic_cast<AST::FunctionDeclaration*>(stmt.get())) {
+        if (auto func_stmt = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(stmt.get())) {
             // Skip function definitions - they're already lowered
             continue;
         }
@@ -105,7 +107,7 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const TypeCheckResult&
     return result;
 }
 
-void Generator::generate_function(AST::FunctionDeclaration& fn) {
+void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     
     auto& func_manager = LIRFunctionManager::getInstance();
     
@@ -303,7 +305,7 @@ Type Generator::language_type_to_abi_type(TypePtr lang_type) {
     return LIR::language_type_to_abi_type(lang_type);
 }
 
-Type Generator::get_expression_abi_type(AST::Expression& expr) {
+Type Generator::get_expression_abi_type(LM::Frontend::AST::Expression& expr) {
     if (expr.inferred_type && type_system) {
         return language_type_to_abi_type(expr.inferred_type);
     }
@@ -393,117 +395,117 @@ void Generator::report_error(const std::string& message) {
 }
 
 // AST node visitors
-void Generator::emit_stmt(AST::Statement& stmt) {
+void Generator::emit_stmt(LM::Frontend::AST::Statement& stmt) {
    // std::cout << "[DEBUG] emit_stmt called with type: " << typeid(stmt).name() << std::endl;
     
-    if (auto expr_stmt = dynamic_cast<AST::ExprStatement*>(&stmt)) {
+    if (auto expr_stmt = dynamic_cast<LM::Frontend::AST::ExprStatement*>(&stmt)) {
        // std::cout << "[DEBUG] Emitting ExprStatement" << std::endl;
         emit_expr_stmt(*expr_stmt);
-    } else if (auto print_stmt = dynamic_cast<AST::PrintStatement*>(&stmt)) {
+    } else if (auto print_stmt = dynamic_cast<LM::Frontend::AST::PrintStatement*>(&stmt)) {
        // std::cout << "[DEBUG] Emitting PrintStatement" << std::endl;
         emit_print_stmt(*print_stmt);
-    } else if (auto var_stmt = dynamic_cast<AST::VarDeclaration*>(&stmt)) {
+    } else if (auto var_stmt = dynamic_cast<LM::Frontend::AST::VarDeclaration*>(&stmt)) {
         emit_var_stmt(*var_stmt);
-    } else if (auto block_stmt = dynamic_cast<AST::BlockStatement*>(&stmt)) {
+    } else if (auto block_stmt = dynamic_cast<LM::Frontend::AST::BlockStatement*>(&stmt)) {
         emit_block_stmt(*block_stmt);
-    } else if (auto if_stmt = dynamic_cast<AST::IfStatement*>(&stmt)) {
+    } else if (auto if_stmt = dynamic_cast<LM::Frontend::AST::IfStatement*>(&stmt)) {
         emit_if_stmt(*if_stmt);
-    } else if (auto while_stmt = dynamic_cast<AST::WhileStatement*>(&stmt)) {
+    } else if (auto while_stmt = dynamic_cast<LM::Frontend::AST::WhileStatement*>(&stmt)) {
         emit_while_stmt(*while_stmt);
-    } else if (auto for_stmt = dynamic_cast<AST::ForStatement*>(&stmt)) {
+    } else if (auto for_stmt = dynamic_cast<LM::Frontend::AST::ForStatement*>(&stmt)) {
         emit_for_stmt(*for_stmt);
-    } else if (auto iter_stmt = dynamic_cast<AST::IterStatement*>(&stmt)) {
+    } else if (auto iter_stmt = dynamic_cast<LM::Frontend::AST::IterStatement*>(&stmt)) {
         emit_iter_stmt(*iter_stmt);
-    } else if (auto break_stmt = dynamic_cast<AST::BreakStatement*>(&stmt)) {
+    } else if (auto break_stmt = dynamic_cast<LM::Frontend::AST::BreakStatement*>(&stmt)) {
         emit_break_stmt(*break_stmt);
-    } else if (auto continue_stmt = dynamic_cast<AST::ContinueStatement*>(&stmt)) {
+    } else if (auto continue_stmt = dynamic_cast<LM::Frontend::AST::ContinueStatement*>(&stmt)) {
         emit_continue_stmt(*continue_stmt);
-    } else if (auto return_stmt = dynamic_cast<AST::ReturnStatement*>(&stmt)) {
+    } else if (auto return_stmt = dynamic_cast<LM::Frontend::AST::ReturnStatement*>(&stmt)) {
         emit_return_stmt(*return_stmt);
-    } else if (auto func_stmt = dynamic_cast<AST::FunctionDeclaration*>(&stmt)) {
+    } else if (auto func_stmt = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(&stmt)) {
         emit_func_stmt(*func_stmt);
-    } else if (auto import_stmt = dynamic_cast<AST::ImportStatement*>(&stmt)) {
+    } else if (auto import_stmt = dynamic_cast<LM::Frontend::AST::ImportStatement*>(&stmt)) {
         emit_import_stmt(*import_stmt);
-    } else if (auto match_stmt = dynamic_cast<AST::MatchStatement*>(&stmt)) {
+    } else if (auto match_stmt = dynamic_cast<LM::Frontend::AST::MatchStatement*>(&stmt)) {
         emit_match_stmt(*match_stmt);
-    } else if (auto contract_stmt = dynamic_cast<AST::ContractStatement*>(&stmt)) {
+    } else if (auto contract_stmt = dynamic_cast<LM::Frontend::AST::ContractStatement*>(&stmt)) {
         emit_contract_stmt(*contract_stmt);
-    } else if (auto comptime_stmt = dynamic_cast<AST::ComptimeStatement*>(&stmt)) {
+    } else if (auto comptime_stmt = dynamic_cast<LM::Frontend::AST::ComptimeStatement*>(&stmt)) {
         emit_comptime_stmt(*comptime_stmt);
-    } else if (auto parallel_stmt = dynamic_cast<AST::ParallelStatement*>(&stmt)) {
+    } else if (auto parallel_stmt = dynamic_cast<LM::Frontend::AST::ParallelStatement*>(&stmt)) {
         emit_parallel_stmt(*parallel_stmt);
-    } else if (auto concurrent_stmt = dynamic_cast<AST::ConcurrentStatement*>(&stmt)) {
+    } else if (auto concurrent_stmt = dynamic_cast<LM::Frontend::AST::ConcurrentStatement*>(&stmt)) {
        // std::cout << "[DEBUG] Emitting ConcurrentStatement" << std::endl;
         emit_concurrent_stmt(*concurrent_stmt);
-    } else if (auto task_stmt = dynamic_cast<AST::TaskStatement*>(&stmt)) {
+    } else if (auto task_stmt = dynamic_cast<LM::Frontend::AST::TaskStatement*>(&stmt)) {
         emit_task_stmt(*task_stmt);
-    } else if (auto worker_stmt = dynamic_cast<AST::WorkerStatement*>(&stmt)) {
+    } else if (auto worker_stmt = dynamic_cast<LM::Frontend::AST::WorkerStatement*>(&stmt)) {
         emit_worker_stmt(*worker_stmt);
-    } else if (auto unsafe_stmt = dynamic_cast<AST::UnsafeStatement*>(&stmt)) {
+    } else if (auto unsafe_stmt = dynamic_cast<LM::Frontend::AST::UnsafeStatement*>(&stmt)) {
         emit_unsafe_stmt(*unsafe_stmt);
-    } else if (auto class_stmt = dynamic_cast<AST::ClassDeclaration*>(&stmt)) {
+    } else if (auto class_stmt = dynamic_cast<LM::Frontend::AST::ClassDeclaration*>(&stmt)) {
         emit_class_stmt(*class_stmt);
-    } else if (auto match_stmt = dynamic_cast<AST::MatchStatement*>(&stmt)) {
+    } else if (auto match_stmt = dynamic_cast<LM::Frontend::AST::MatchStatement*>(&stmt)) {
         emit_match_stmt(*match_stmt);
-    } else if (auto module_stmt = dynamic_cast<AST::ModuleDeclaration*>(&stmt)) {
+    } else if (auto module_stmt = dynamic_cast<LM::Frontend::AST::ModuleDeclaration*>(&stmt)) {
         emit_module_stmt(*module_stmt);
     } else {
         report_error("Unsupported statement type in LIR generator");
     }
 }
 
-Reg Generator::emit_expr(AST::Expression& expr) {
-    if (auto literal = dynamic_cast<AST::LiteralExpr*>(&expr)) {
+Reg Generator::emit_expr(LM::Frontend::AST::Expression& expr) {
+    if (auto literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(&expr)) {
         return emit_literal_expr(*literal, nullptr);
-    } else if (auto variable = dynamic_cast<AST::VariableExpr*>(&expr)) {
+    } else if (auto variable = dynamic_cast<LM::Frontend::AST::VariableExpr*>(&expr)) {
         return emit_variable_expr(*variable);
-    } else if (auto interpolated = dynamic_cast<AST::InterpolatedStringExpr*>(&expr)) {
+    } else if (auto interpolated = dynamic_cast<LM::Frontend::AST::InterpolatedStringExpr*>(&expr)) {
         return emit_interpolated_string_expr(*interpolated);
-    } else if (auto binary = dynamic_cast<AST::BinaryExpr*>(&expr)) {
+    } else if (auto binary = dynamic_cast<LM::Frontend::AST::BinaryExpr*>(&expr)) {
         return emit_binary_expr(*binary);
-    } else if (auto unary = dynamic_cast<AST::UnaryExpr*>(&expr)) {
+    } else if (auto unary = dynamic_cast<LM::Frontend::AST::UnaryExpr*>(&expr)) {
         return emit_unary_expr(*unary);
-    } else if (auto assign = dynamic_cast<AST::AssignExpr*>(&expr)) {
+    } else if (auto assign = dynamic_cast<LM::Frontend::AST::AssignExpr*>(&expr)) {
         return emit_assign_expr(*assign);
-    } else if (auto call = dynamic_cast<AST::CallExpr*>(&expr)) {
+    } else if (auto call = dynamic_cast<LM::Frontend::AST::CallExpr*>(&expr)) {
         return emit_call_expr(*call);
-    } else if (auto closure_call = dynamic_cast<AST::CallClosureExpr*>(&expr)) {
+    } else if (auto closure_call = dynamic_cast<LM::Frontend::AST::CallClosureExpr*>(&expr)) {
         return emit_call_closure_expr(*closure_call);
-    } else if (auto list = dynamic_cast<AST::ListExpr*>(&expr)) {
+    } else if (auto list = dynamic_cast<LM::Frontend::AST::ListExpr*>(&expr)) {
         return emit_list_expr(*list);
-    } else if (auto grouping = dynamic_cast<AST::GroupingExpr*>(&expr)) {
+    } else if (auto grouping = dynamic_cast<LM::Frontend::AST::GroupingExpr*>(&expr)) {
         return emit_grouping_expr(*grouping);
-    } else if (auto ternary = dynamic_cast<AST::TernaryExpr*>(&expr)) {
+    } else if (auto ternary = dynamic_cast<LM::Frontend::AST::TernaryExpr*>(&expr)) {
         return emit_ternary_expr(*ternary);
-    } else if (auto index = dynamic_cast<AST::IndexExpr*>(&expr)) {
+    } else if (auto index = dynamic_cast<LM::Frontend::AST::IndexExpr*>(&expr)) {
         return emit_index_expr(*index);
-    } else if (auto member = dynamic_cast<AST::MemberExpr*>(&expr)) {
+    } else if (auto member = dynamic_cast<LM::Frontend::AST::MemberExpr*>(&expr)) {
         return emit_member_expr(*member);
-    } else if (auto tuple = dynamic_cast<AST::TupleExpr*>(&expr)) {
+    } else if (auto tuple = dynamic_cast<LM::Frontend::AST::TupleExpr*>(&expr)) {
         return emit_tuple_expr(*tuple);
-    } else if (auto dict = dynamic_cast<AST::DictExpr*>(&expr)) {
+    } else if (auto dict = dynamic_cast<LM::Frontend::AST::DictExpr*>(&expr)) {
         return emit_dict_expr(*dict);
-    } else if (auto range = dynamic_cast<AST::RangeExpr*>(&expr)) {
+    } else if (auto range = dynamic_cast<LM::Frontend::AST::RangeExpr*>(&expr)) {
         return emit_range_expr(*range);
-    } else if (auto lambda = dynamic_cast<AST::LambdaExpr*>(&expr)) {
+    } else if (auto lambda = dynamic_cast<LM::Frontend::AST::LambdaExpr*>(&expr)) {
         return emit_lambda_expr(*lambda);
-    } else if (auto error_construct = dynamic_cast<AST::ErrorConstructExpr*>(&expr)) {
+    } else if (auto error_construct = dynamic_cast<LM::Frontend::AST::ErrorConstructExpr*>(&expr)) {
         return emit_error_construct_expr(*error_construct);
-    } else if (auto ok_construct = dynamic_cast<AST::OkConstructExpr*>(&expr)) {
+    } else if (auto ok_construct = dynamic_cast<LM::Frontend::AST::OkConstructExpr*>(&expr)) {
         return emit_ok_construct_expr(*ok_construct);
-    } else if (auto fallible = dynamic_cast<AST::FallibleExpr*>(&expr)) {
+    } else if (auto fallible = dynamic_cast<LM::Frontend::AST::FallibleExpr*>(&expr)) {
         return emit_fallible_expr(*fallible);
-    } else if (auto object_literal = dynamic_cast<AST::ObjectLiteralExpr*>(&expr)) {
+    } else if (auto object_literal = dynamic_cast<LM::Frontend::AST::ObjectLiteralExpr*>(&expr)) {
         return emit_object_literal_expr(*object_literal);
-    } else if (auto this_expr = dynamic_cast<AST::ThisExpr*>(&expr)) {
+    } else if (auto this_expr = dynamic_cast<LM::Frontend::AST::ThisExpr*>(&expr)) {
         return emit_this_expr(*this_expr);
-    } else if (auto channel_offer = dynamic_cast<AST::ChannelOfferExpr*>(&expr)) {
+    } else if (auto channel_offer = dynamic_cast<LM::Frontend::AST::ChannelOfferExpr*>(&expr)) {
         return emit_channel_offer_expr(*channel_offer);
-    } else if (auto channel_poll = dynamic_cast<AST::ChannelPollExpr*>(&expr)) {
+    } else if (auto channel_poll = dynamic_cast<LM::Frontend::AST::ChannelPollExpr*>(&expr)) {
         return emit_channel_poll_expr(*channel_poll);
-    } else if (auto channel_send = dynamic_cast<AST::ChannelSendExpr*>(&expr)) {
+    } else if (auto channel_send = dynamic_cast<LM::Frontend::AST::ChannelSendExpr*>(&expr)) {
         return emit_channel_send_expr(*channel_send);
-    } else if (auto channel_recv = dynamic_cast<AST::ChannelRecvExpr*>(&expr)) {
+    } else if (auto channel_recv = dynamic_cast<LM::Frontend::AST::ChannelRecvExpr*>(&expr)) {
         return emit_channel_recv_expr(*channel_recv);
     } else {
         report_error("Unknown expression type");
@@ -710,7 +712,7 @@ bool Generator::types_match(TypePtr type1, TypePtr type2) {
 }
 
 // Expression handlers
-Reg Generator::emit_literal_expr(AST::LiteralExpr& expr, TypePtr expected_type) {
+Reg Generator::emit_literal_expr(LM::Frontend::AST::LiteralExpr& expr, TypePtr expected_type) {
     Reg dst = allocate_register();
     
     // CRITICAL FIX: Use AST's inferred type first, then expected type, then default inference
@@ -891,7 +893,7 @@ Reg Generator::emit_literal_expr(AST::LiteralExpr& expr, TypePtr expected_type) 
     return dst;
 }
 
-Reg Generator::emit_variable_expr(AST::VariableExpr& expr) {
+Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
     // First check if this is a module variable access (e.g., "math.pi")
     size_t dot_pos = expr.name.find("::");
     if (dot_pos != std::string::npos) {
@@ -970,7 +972,7 @@ Reg Generator::emit_variable_expr(AST::VariableExpr& expr) {
     return reg;
 }
 
-Reg Generator::emit_interpolated_string_expr(AST::InterpolatedStringExpr& expr) {
+Reg Generator::emit_interpolated_string_expr(LM::Frontend::AST::InterpolatedStringExpr& expr) {
     auto string_type = std::make_shared<::Type>(::TypeTag::String);
 
     if (expr.parts.empty()) {
@@ -1011,9 +1013,9 @@ Reg Generator::emit_interpolated_string_expr(AST::InterpolatedStringExpr& expr) 
     for (const auto& part : expr.parts) {
         if (std::holds_alternative<std::string>(part)) {
             format_string += std::get<std::string>(part);
-        } else if (std::holds_alternative<std::shared_ptr<AST::Expression>>(part)) {
+        } else if (std::holds_alternative<std::shared_ptr<LM::Frontend::AST::Expression>>(part)) {
             format_string += "%s"; // Simple placeholder for now
-            auto expr_part = std::get<std::shared_ptr<AST::Expression>>(part);
+            auto expr_part = std::get<std::shared_ptr<LM::Frontend::AST::Expression>>(part);
             Reg expr_reg = emit_expr(*expr_part);
             arg_regs.push_back(expr_reg);
         }
@@ -1048,9 +1050,9 @@ Reg Generator::emit_interpolated_string_expr(AST::InterpolatedStringExpr& expr) 
     return result;
 }
 
-Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
+Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
     // Handle PLUS operator - check for string concatenation first
-    if (expr.op == TokenType::PLUS) {
+    if (expr.op == LM::Frontend::TokenType::PLUS) {
         // Emit left and right operands FIRST to get their types
         Reg left = emit_expr(*expr.left);
         Reg right = emit_expr(*expr.right);
@@ -1095,10 +1097,10 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
     
     // Map operator to LIR operation
     LIR_Op op;
-    if (expr.op == TokenType::PLUS) op = LIR_Op::Add;
-    else if (expr.op == TokenType::MINUS) op = LIR_Op::Sub;
-    else if (expr.op == TokenType::STAR) op = LIR_Op::Mul;
-    else if (expr.op == TokenType::SLASH) {
+    if (expr.op == LM::Frontend::TokenType::PLUS) op = LIR_Op::Add;
+    else if (expr.op == LM::Frontend::TokenType::MINUS) op = LIR_Op::Sub;
+    else if (expr.op == LM::Frontend::TokenType::STAR) op = LIR_Op::Mul;
+    else if (expr.op == LM::Frontend::TokenType::SLASH) {
         // Handle division with proper type checking
         TypePtr left_type = get_register_type(left);
         TypePtr right_type = get_register_type(right);
@@ -1137,22 +1139,22 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
             }
         }
     }
-    else if (expr.op == TokenType::MODULUS) op = LIR_Op::Mod;
-    else if (expr.op == TokenType::POWER) {
+    else if (expr.op == LM::Frontend::TokenType::MODULUS) op = LIR_Op::Mod;
+    else if (expr.op == LM::Frontend::TokenType::POWER) {
         // Power operation - for now, use multiplication (a * a for simple cases)
         // TODO: Implement proper power operation or call to math library
         emit_instruction(LIR_Inst(LIR_Op::Mul, dst, left, left));
         return dst;
     }
-    else if (expr.op == TokenType::EQUAL_EQUAL) op = LIR_Op::CmpEQ;
-    else if (expr.op == TokenType::BANG_EQUAL) op = LIR_Op::CmpNEQ;
-    else if (expr.op == TokenType::LESS) op = LIR_Op::CmpLT;
-    else if (expr.op == TokenType::LESS_EQUAL) op = LIR_Op::CmpLE;
-    else if (expr.op == TokenType::GREATER) op = LIR_Op::CmpGT;
-    else if (expr.op == TokenType::GREATER_EQUAL) op = LIR_Op::CmpGE;
-    else if (expr.op == TokenType::AND) op = LIR_Op::And;
-    else if (expr.op == TokenType::OR) op = LIR_Op::Or;
-    else if (expr.op == TokenType::CARET) op = LIR_Op::Xor;
+    else if (expr.op == LM::Frontend::TokenType::EQUAL_EQUAL) op = LIR_Op::CmpEQ;
+    else if (expr.op == LM::Frontend::TokenType::BANG_EQUAL) op = LIR_Op::CmpNEQ;
+    else if (expr.op == LM::Frontend::TokenType::LESS) op = LIR_Op::CmpLT;
+    else if (expr.op == LM::Frontend::TokenType::LESS_EQUAL) op = LIR_Op::CmpLE;
+    else if (expr.op == LM::Frontend::TokenType::GREATER) op = LIR_Op::CmpGT;
+    else if (expr.op == LM::Frontend::TokenType::GREATER_EQUAL) op = LIR_Op::CmpGE;
+    else if (expr.op == LM::Frontend::TokenType::AND) op = LIR_Op::And;
+    else if (expr.op == LM::Frontend::TokenType::OR) op = LIR_Op::Or;
+    else if (expr.op == LM::Frontend::TokenType::CARET) op = LIR_Op::Xor;
     else {
         report_error("Unknown binary operator");
         return 0;
@@ -1185,12 +1187,12 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
             
             // Re-emit the smaller/lower rank operand to match the larger one
             if (left_rank < right_rank) {
-                if (auto left_literal = dynamic_cast<AST::LiteralExpr*>(expr.left.get())) {
+                if (auto left_literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(expr.left.get())) {
                     left = emit_literal_expr(*left_literal, right_type);
                     left_type = right_type;
                 }
             } else if (right_rank < left_rank) {
-                if (auto right_literal = dynamic_cast<AST::LiteralExpr*>(expr.right.get())) {
+                if (auto right_literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(expr.right.get())) {
                     right = emit_literal_expr(*right_literal, left_type);
                     right_type = left_type;
                 }
@@ -1201,13 +1203,13 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
                 bool right_is_signed = is_signed_integer_type(right_type);
                 
                 if (!left_is_signed && right_is_signed) {
-                    auto left_literal = dynamic_cast<AST::LiteralExpr*>(expr.left.get());
+                    auto left_literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(expr.left.get());
                     if (left_literal) {
                         left = emit_literal_expr(*left_literal, right_type);
                         left_type = right_type;
                     }
                 } else if (left_is_signed && !right_is_signed) {
-                    auto right_literal = dynamic_cast<AST::LiteralExpr*>(expr.right.get());
+                    auto right_literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(expr.right.get());
                     if (right_literal) {
                         right = emit_literal_expr(*right_literal, left_type);
                         right_type = left_type;
@@ -1241,25 +1243,25 @@ Reg Generator::emit_binary_expr(AST::BinaryExpr& expr) {
     return dst;
 }
 
-Reg Generator::emit_unary_expr(AST::UnaryExpr& expr) {
+Reg Generator::emit_unary_expr(LM::Frontend::AST::UnaryExpr& expr) {
     Reg operand = emit_expr(*expr.right);
     Reg dst = allocate_register();
     TypePtr operand_type = get_register_type(operand);
     TypePtr result_type = nullptr;
     
-    if (expr.op == TokenType::MINUS) {
+    if (expr.op == LM::Frontend::TokenType::MINUS) {
         // Result type is same as operand type
         result_type = operand_type;
         set_register_type(dst, result_type);
         // Use Neg operation for unary minus (more efficient than Sub from 0)
         emit_instruction(LIR_Inst(LIR_Op::Neg, dst, operand, 0));
-    } else if (expr.op == TokenType::PLUS) {
+    } else if (expr.op == LM::Frontend::TokenType::PLUS) {
         // Result type is same as operand type
         result_type = operand_type;
         set_register_type(dst, result_type);
         // Unary plus - just copy the value (no operation needed)
         emit_instruction(LIR_Inst(LIR_Op::Mov, dst, operand, 0));
-    } else if (expr.op == TokenType::BANG) {
+    } else if (expr.op == LM::Frontend::TokenType::BANG) {
         // Result type is bool
         result_type = std::make_shared<::Type>(::TypeTag::Bool);
         set_register_type(dst, result_type);
@@ -1270,7 +1272,7 @@ Reg Generator::emit_unary_expr(AST::UnaryExpr& expr) {
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Bool, true_reg, true_val));
         set_register_type(true_reg, bool_type);
         emit_instruction(LIR_Inst(LIR_Op::CmpNEQ, dst, operand, true_reg));
-    } else if (expr.op == TokenType::TILDE) {
+    } else if (expr.op == LM::Frontend::TokenType::TILDE) {
         // Result type is int
         auto int_type = std::make_shared<::Type>(::TypeTag::Int);
         result_type = int_type;
@@ -1281,7 +1283,7 @@ Reg Generator::emit_unary_expr(AST::UnaryExpr& expr) {
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, all_bits, neg_one_val));
         set_register_type(all_bits, int_type);
         emit_instruction(LIR_Inst(LIR_Op::Xor, dst, operand, all_bits));
-    } else if (expr.op == TokenType::QUESTION) {
+    } else if (expr.op == LM::Frontend::TokenType::QUESTION) {
         // Error propagation operator (?)
         // This should check if operand is an error, and if so, return early from the function
         // Pattern: if (is_error(operand)) return operand; else return unwrap(operand);
@@ -1384,8 +1386,8 @@ Reg Generator::emit_unary_expr(AST::UnaryExpr& expr) {
     return dst;
 }
 
-Reg Generator::emit_call_expr(AST::CallExpr& expr) {
-    if (auto var_expr = dynamic_cast<AST::VariableExpr*>(expr.callee.get())) {
+Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
+    if (auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(expr.callee.get())) {
         std::string func_name = var_expr->name;
         
         // Check if this is a module function call (e.g., "math::add")
@@ -1529,7 +1531,7 @@ Reg Generator::emit_call_expr(AST::CallExpr& expr) {
             report_error("Unknown function: " + func_name);
             return 0;
         }
-    } else if (auto member_expr = dynamic_cast<AST::MemberExpr*>(expr.callee.get())) {
+    } else if (auto member_expr = dynamic_cast<LM::Frontend::AST::MemberExpr*>(expr.callee.get())) {
         // Method call: obj.method(args...)
         std::string method_name = member_expr->name;
         
@@ -1671,7 +1673,7 @@ Reg Generator::emit_call_expr(AST::CallExpr& expr) {
     }
 }
 
-Reg Generator::emit_assign_expr(AST::AssignExpr& expr) {
+Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
     Reg value = emit_expr(*expr.value);
     
     // === SHARED CELL TASK BODY ASSIGNMENT HANDLING ===
@@ -1684,7 +1686,7 @@ Reg Generator::emit_assign_expr(AST::AssignExpr& expr) {
         Reg cell_id_reg = parallel_block_cell_ids_[expr.name];
         
         // Handle compound assignment operators
-        if (expr.op != TokenType::EQUAL) {
+        if (expr.op != LM::Frontend::TokenType::EQUAL) {
             // For compound assignment (+=, -=, *=, /=, %=), we need to:
             // 1. Load current value from SharedCell
             // 2. Perform operation with new value
@@ -1696,19 +1698,19 @@ Reg Generator::emit_assign_expr(AST::AssignExpr& expr) {
             // Perform the operation
             Reg result_reg = allocate_register();
             switch (expr.op) {
-                case TokenType::PLUS_EQUAL:
+                case LM::Frontend::TokenType::PLUS_EQUAL:
                     emit_instruction(LIR_Inst(LIR_Op::Add, Type::I64, result_reg, current_value_reg, value));
                     break;
-                case TokenType::MINUS_EQUAL:
+                case LM::Frontend::TokenType::MINUS_EQUAL:
                     emit_instruction(LIR_Inst(LIR_Op::Sub, Type::I64, result_reg, current_value_reg, value));
                     break;
-                case TokenType::STAR_EQUAL:
+                case LM::Frontend::TokenType::STAR_EQUAL:
                     emit_instruction(LIR_Inst(LIR_Op::Mul, Type::I64, result_reg, current_value_reg, value));
                     break;
-                case TokenType::SLASH_EQUAL:
+                case LM::Frontend::TokenType::SLASH_EQUAL:
                     emit_instruction(LIR_Inst(LIR_Op::Div, Type::I64, result_reg, current_value_reg, value));
                     break;
-                case TokenType::MODULUS_EQUAL:
+                case LM::Frontend::TokenType::MODULUS_EQUAL:
                     emit_instruction(LIR_Inst(LIR_Op::Mod, Type::I64, result_reg, current_value_reg, value));
                     break;
                 default:
@@ -1738,7 +1740,7 @@ Reg Generator::emit_assign_expr(AST::AssignExpr& expr) {
         }
         
         // Handle compound assignment operators
-        if (expr.op != TokenType::EQUAL) {
+        if (expr.op != LM::Frontend::TokenType::EQUAL) {
             // For compound assignment (+=, -=, *=, /=, %=), we need to:
             // 1. Load current value
             // 2. Perform operation with new value
@@ -1750,7 +1752,7 @@ Reg Generator::emit_assign_expr(AST::AssignExpr& expr) {
            // std::cout << "[DEBUG] Compound assignment: op=" << static_cast<int>(expr.op) << " dst=" << dst << " value_reg=" << value << std::endl;
             
             // Check if this should be string concatenation instead of arithmetic
-            if (expr.op == TokenType::PLUS_EQUAL) {
+            if (expr.op == LM::Frontend::TokenType::PLUS_EQUAL) {
                 // Get the type of the left operand (current variable value)
                 TypePtr dst_type = get_register_type(dst);
                 if (dst_type && dst_type->tag == TypeTag::String) {
@@ -1764,20 +1766,20 @@ Reg Generator::emit_assign_expr(AST::AssignExpr& expr) {
             }
             
             switch (expr.op) {
-                case TokenType::PLUS_EQUAL:
+                case LM::Frontend::TokenType::PLUS_EQUAL:
                    // std::cout << "[DEBUG] Emitting PLUS_EQUAL Add instruction" << std::endl;
                     emit_instruction(LIR_Inst(LIR_Op::Add, abi_type, dst, dst, value));
                     break;
-                case TokenType::MINUS_EQUAL:
+                case LM::Frontend::TokenType::MINUS_EQUAL:
                     emit_instruction(LIR_Inst(LIR_Op::Sub, abi_type, dst, dst, value));
                     break;
-                case TokenType::STAR_EQUAL:
+                case LM::Frontend::TokenType::STAR_EQUAL:
                     emit_instruction(LIR_Inst(LIR_Op::Mul, abi_type, dst, dst, value));
                     break;
-                case TokenType::SLASH_EQUAL:
+                case LM::Frontend::TokenType::SLASH_EQUAL:
                     emit_instruction(LIR_Inst(LIR_Op::Div, abi_type, dst, dst, value));
                     break;
-                case TokenType::MODULUS_EQUAL:
+                case LM::Frontend::TokenType::MODULUS_EQUAL:
                     emit_instruction(LIR_Inst(LIR_Op::Mod, abi_type, dst, dst, value));
                     break;
                 default:
@@ -1832,7 +1834,7 @@ Reg Generator::emit_assign_expr(AST::AssignExpr& expr) {
     }
 }
 
-Reg Generator::emit_call_closure_expr(AST::CallClosureExpr& expr) {
+Reg Generator::emit_call_closure_expr(LM::Frontend::AST::CallClosureExpr& expr) {
     // Handle closure calls - calling a function stored in a variable
     // This enables first-order functions and closures
     
@@ -1875,7 +1877,7 @@ Reg Generator::emit_call_closure_expr(AST::CallClosureExpr& expr) {
     return result;
 }
 
-Reg Generator::emit_list_expr(AST::ListExpr& expr) {
+Reg Generator::emit_list_expr(LM::Frontend::AST::ListExpr& expr) {
     // Create a new list using ListCreate operation
     Reg list_reg = allocate_register();
     Type abi_type = language_type_to_abi_type(expr.inferred_type);
@@ -1894,16 +1896,16 @@ Reg Generator::emit_list_expr(AST::ListExpr& expr) {
     return list_reg;
 }
 
-Reg Generator::emit_grouping_expr(AST::GroupingExpr& expr) {
+Reg Generator::emit_grouping_expr(LM::Frontend::AST::GroupingExpr& expr) {
     return emit_expr(*expr.expression);
 }
 
-Reg Generator::emit_ternary_expr(AST::TernaryExpr& expr) {
+Reg Generator::emit_ternary_expr(LM::Frontend::AST::TernaryExpr& expr) {
     report_error("Ternary expressions not yet implemented");
     return 0;
 }
 
-Reg Generator::emit_index_expr(AST::IndexExpr& expr) {
+Reg Generator::emit_index_expr(LM::Frontend::AST::IndexExpr& expr) {
     // Evaluate the object (list/dict/tuple)
     Reg object_reg = emit_expr(*expr.object);
     
@@ -1947,7 +1949,7 @@ Reg Generator::emit_index_expr(AST::IndexExpr& expr) {
     }
 }
 
-Reg Generator::emit_member_expr(AST::MemberExpr& expr) {
+Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
     // First evaluate the object expression
     Reg object_reg = emit_expr(*expr.object);
     
@@ -2038,7 +2040,7 @@ Reg Generator::emit_member_expr(AST::MemberExpr& expr) {
     return 0;
 }
 
-Reg Generator::emit_tuple_expr(AST::TupleExpr& expr) {
+Reg Generator::emit_tuple_expr(LM::Frontend::AST::TupleExpr& expr) {
     // Create a new tuple using TupleCreate operation
     Reg tuple_reg = allocate_register();
     Type abi_type = language_type_to_abi_type(expr.inferred_type);
@@ -2061,7 +2063,7 @@ Reg Generator::emit_tuple_expr(AST::TupleExpr& expr) {
     return tuple_reg;
 }
 
-Reg Generator::emit_dict_expr(AST::DictExpr& expr) {
+Reg Generator::emit_dict_expr(LM::Frontend::AST::DictExpr& expr) {
     // Create a new dictionary using DictCreate operation
     Reg dict_reg = allocate_register();
     Type abi_type = language_type_to_abi_type(expr.inferred_type);
@@ -2082,22 +2084,22 @@ Reg Generator::emit_dict_expr(AST::DictExpr& expr) {
     return dict_reg;
 }
 
-Reg Generator::emit_range_expr(AST::RangeExpr& expr) {
+Reg Generator::emit_range_expr(LM::Frontend::AST::RangeExpr& expr) {
     report_error("Range expressions not yet implemented");
     return 0;
 }
 
-Reg Generator::emit_lambda_expr(AST::LambdaExpr& expr) {
+Reg Generator::emit_lambda_expr(LM::Frontend::AST::LambdaExpr& expr) {
     report_error("Lambda expressions not yet implemented");
     return 0;
 }
 
 // Statement handlers
-void Generator::emit_expr_stmt(AST::ExprStatement& stmt) {
+void Generator::emit_expr_stmt(LM::Frontend::AST::ExprStatement& stmt) {
     emit_expr(*stmt.expression);
 }
 
-void Generator::emit_print_stmt(AST::PrintStatement& stmt) {
+void Generator::emit_print_stmt(LM::Frontend::AST::PrintStatement& stmt) {
     if (stmt.arguments.empty()) {
         // Empty print statement - just print a newline
         Reg newline_reg = allocate_register();
@@ -2219,7 +2221,7 @@ void Generator::emit_print_value(Reg value) {
 }
 
 
-void Generator::emit_var_stmt(AST::VarDeclaration& stmt) {
+void Generator::emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt) {
    // std::cout << "[DEBUG] emit_var_stmt called for variable: " << stmt.name << std::endl;
     Reg value_reg;
     
@@ -2268,7 +2270,7 @@ void Generator::emit_var_stmt(AST::VarDeclaration& stmt) {
     if (stmt.initializer) {
        // std::cout << "[DEBUG] Variable has initializer, processing..." << std::endl;
         // Check if the initializer is a literal - if so, optimize by directly using it
-        if (auto literal = dynamic_cast<AST::LiteralExpr*>(stmt.initializer.get())) {
+        if (auto literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(stmt.initializer.get())) {
             // For literal initializers, emit the literal with the expected type
             value_reg = emit_literal_expr(*literal, declared_type);
         } else {
@@ -2300,7 +2302,7 @@ void Generator::emit_var_stmt(AST::VarDeclaration& stmt) {
    // std::cout << "[DEBUG] emit_var_stmt completed for: " << stmt.name << std::endl;
 }
 
-void Generator::emit_block_stmt(AST::BlockStatement& stmt) {
+void Generator::emit_block_stmt(LM::Frontend::AST::BlockStatement& stmt) {
     enter_scope();
     for (const auto& block_stmt : stmt.statements) {
         emit_stmt(*block_stmt);
@@ -2308,7 +2310,7 @@ void Generator::emit_block_stmt(AST::BlockStatement& stmt) {
     exit_scope();
 }
 
-void Generator::emit_if_stmt(AST::IfStatement& stmt) {
+void Generator::emit_if_stmt(LM::Frontend::AST::IfStatement& stmt) {
     if (cfg_context_.building_cfg) {
         // CFG mode: create basic blocks
         emit_if_stmt_cfg(stmt);
@@ -2318,7 +2320,7 @@ void Generator::emit_if_stmt(AST::IfStatement& stmt) {
     }
 }
 
-void Generator::emit_if_stmt_cfg(AST::IfStatement& stmt) {
+void Generator::emit_if_stmt_cfg(LM::Frontend::AST::IfStatement& stmt) {
     // CFG mode: create basic blocks
     LIR_BasicBlock* then_block = create_basic_block("if_then");
     LIR_BasicBlock* else_block = stmt.elseBranch ? create_basic_block("if_else") : nullptr;
@@ -2395,7 +2397,7 @@ void Generator::emit_if_stmt_cfg(AST::IfStatement& stmt) {
     }
 }
 
-void Generator::emit_if_stmt_linear(AST::IfStatement& stmt) {
+void Generator::emit_if_stmt_linear(LM::Frontend::AST::IfStatement& stmt) {
     // Emit condition
     Reg condition = emit_expr(*stmt.condition);
     Reg condition_bool = allocate_register();
@@ -2445,7 +2447,7 @@ void Generator::emit_if_stmt_linear(AST::IfStatement& stmt) {
     }
 }
 
-void Generator::emit_while_stmt(AST::WhileStatement& stmt) {
+void Generator::emit_while_stmt(LM::Frontend::AST::WhileStatement& stmt) {
     if (cfg_context_.building_cfg) {
         // CFG mode: create basic blocks
         emit_while_stmt_cfg(stmt);
@@ -2455,7 +2457,7 @@ void Generator::emit_while_stmt(AST::WhileStatement& stmt) {
     }
 }
 
-void Generator::emit_while_stmt_cfg(AST::WhileStatement& stmt) {
+void Generator::emit_while_stmt_cfg(LM::Frontend::AST::WhileStatement& stmt) {
     // CFG mode: create basic blocks for while loop
     enter_scope();
     enter_loop();
@@ -2527,7 +2529,7 @@ void Generator::emit_while_stmt_cfg(AST::WhileStatement& stmt) {
     }
 }
 
-void Generator::emit_while_stmt_linear(AST::WhileStatement& stmt) {
+void Generator::emit_while_stmt_linear(LM::Frontend::AST::WhileStatement& stmt) {
     // For linear mode, implement a simple while loop
     // TODO: This is a simplified version - proper implementation needs labels/jumps
     
@@ -2537,7 +2539,7 @@ void Generator::emit_while_stmt_linear(AST::WhileStatement& stmt) {
     }
 }
 
-void Generator::emit_for_stmt(AST::ForStatement& stmt) {
+void Generator::emit_for_stmt(LM::Frontend::AST::ForStatement& stmt) {
     if (cfg_context_.building_cfg) {
         // CFG mode: create basic blocks
         emit_for_stmt_cfg(stmt);
@@ -2547,7 +2549,7 @@ void Generator::emit_for_stmt(AST::ForStatement& stmt) {
     }
 }
 
-void Generator::emit_for_stmt_cfg(AST::ForStatement& stmt) {
+void Generator::emit_for_stmt_cfg(LM::Frontend::AST::ForStatement& stmt) {
     // CFG mode: create basic blocks for for loop
     enter_scope();
     enter_loop();
@@ -2633,7 +2635,7 @@ void Generator::emit_for_stmt_cfg(AST::ForStatement& stmt) {
     // Emit increment - for loop increment is typically an assignment expression
     if (stmt.increment) {
         // Create an expression statement from increment expression
-        AST::ExprStatement expr_stmt;
+        LM::Frontend::AST::ExprStatement expr_stmt;
         expr_stmt.expression = stmt.increment;
         emit_stmt(expr_stmt);
     }
@@ -2657,7 +2659,7 @@ void Generator::emit_for_stmt_cfg(AST::ForStatement& stmt) {
     }
 }
 
-void Generator::emit_for_stmt_linear(AST::ForStatement& stmt) {
+void Generator::emit_for_stmt_linear(LM::Frontend::AST::ForStatement& stmt) {
     // For linear mode, implement a simple for loop
     // TODO: This is a simplified version - proper implementation needs labels/jumps
     
@@ -2677,7 +2679,7 @@ void Generator::emit_for_stmt_linear(AST::ForStatement& stmt) {
     }
 }
 
-void Generator::emit_return_stmt(AST::ReturnStatement& stmt) {
+void Generator::emit_return_stmt(LM::Frontend::AST::ReturnStatement& stmt) {
     if (else_context_.in_else_block) {
         // Inside an else block - store the value in the result register instead of returning
         if (stmt.value) {
@@ -2700,7 +2702,7 @@ void Generator::emit_return_stmt(AST::ReturnStatement& stmt) {
     }
 }
 
-void Generator::emit_func_stmt(AST::FunctionDeclaration& stmt) {
+void Generator::emit_func_stmt(LM::Frontend::AST::FunctionDeclaration& stmt) {
    // std::cout << "[DEBUG] LIR Generator: Processing function declaration '" << stmt.name << "'" << std::endl;
     
     // Collect parameter registers
@@ -2721,7 +2723,7 @@ void Generator::emit_func_stmt(AST::FunctionDeclaration& stmt) {
     // Generate function body (this will be handled by the separate function generation pass)
 }
 
-void Generator::emit_import_stmt(AST::ImportStatement& stmt) {
+void Generator::emit_import_stmt(LM::Frontend::AST::ImportStatement& stmt) {
     // Smart import resolution - just update alias map, no LIR emission
     std::string alias = stmt.alias.value_or(stmt.modulePath);
     import_aliases_[alias] = stmt.modulePath;
@@ -2729,15 +2731,15 @@ void Generator::emit_import_stmt(AST::ImportStatement& stmt) {
    // std::cout << "[DEBUG] Import registered: " << alias << " -> " << stmt.modulePath << std::endl;
 }
 
-void Generator::emit_contract_stmt(AST::ContractStatement& stmt) {
+void Generator::emit_contract_stmt(LM::Frontend::AST::ContractStatement& stmt) {
     report_error("Contract statements not yet implemented");
 }
 
-void Generator::emit_comptime_stmt(AST::ComptimeStatement& stmt) {
+void Generator::emit_comptime_stmt(LM::Frontend::AST::ComptimeStatement& stmt) {
     report_error("Comptime statements not yet implemented");
 }
 
-void Generator::emit_parallel_stmt(AST::ParallelStatement& stmt) {
+void Generator::emit_parallel_stmt(LM::Frontend::AST::ParallelStatement& stmt) {
    // std::cout << "[DEBUG] Emitting ParallelStatement" << std::endl;
     
     auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
@@ -2800,10 +2802,10 @@ void Generator::emit_parallel_stmt(AST::ParallelStatement& stmt) {
     auto saved_parallel_block_cell_ids = parallel_block_cell_ids_;
     
     // 5. Process parallel block body - execute directly with SharedCell context
-    if (auto block_stmt = dynamic_cast<AST::BlockStatement*>(stmt.body.get())) {
+    if (auto block_stmt = dynamic_cast<LM::Frontend::AST::BlockStatement*>(stmt.body.get())) {
         for (auto& body_stmt : block_stmt->statements) {
             // According to spec: NO task statements in parallel blocks
-            if (auto task_stmt = dynamic_cast<AST::TaskStatement*>(body_stmt.get())) {
+            if (auto task_stmt = dynamic_cast<LM::Frontend::AST::TaskStatement*>(body_stmt.get())) {
                 report_error("Task statements are not allowed in parallel blocks. Use concurrent blocks for task-based parallelism.");
                 return;
             }
@@ -2870,11 +2872,11 @@ uint64_t Generator::parse_grace_period(const std::string& grace_str) {
         return 1000; // fallback
     }
 }
-std::optional<ValuePtr> Generator::evaluate_constant_expression(std::shared_ptr<AST::Expression> expr) {
+std::optional<ValuePtr> Generator::evaluate_constant_expression(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
     if (!expr) return std::nullopt;
     
     // Handle literal expressions
-    if (auto literal = dynamic_cast<AST::LiteralExpr*>(expr.get())) {
+    if (auto literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(expr.get())) {
         if (std::holds_alternative<std::string>(literal->value)) {
             // Try to parse string as integer
             std::string str_val = std::get<std::string>(literal->value);
@@ -2897,7 +2899,7 @@ std::optional<ValuePtr> Generator::evaluate_constant_expression(std::shared_ptr<
     return std::nullopt;
 }
 
-void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
+void Generator::emit_concurrent_stmt(LM::Frontend::AST::ConcurrentStatement& stmt) {
    // std::cout << "[DEBUG] Processing concurrent statement" << std::endl;
     auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
     scheduler_initialized_ = true;
@@ -2944,15 +2946,15 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
     scheduler_initialized_ = true;
     if (stmt.body) {
         // Look for TaskStatement in the body
-        if (auto block_stmt = dynamic_cast<AST::BlockStatement*>(stmt.body.get())) {
+        if (auto block_stmt = dynamic_cast<LM::Frontend::AST::BlockStatement*>(stmt.body.get())) {
             for (auto& body_stmt : block_stmt->statements) {
-                if (auto task_stmt = dynamic_cast<AST::TaskStatement*>(body_stmt.get())) {
+                if (auto task_stmt = dynamic_cast<LM::Frontend::AST::TaskStatement*>(body_stmt.get())) {
                     // Set the channel parameter for this task to use main channel
                     task_stmt->channel_param = stmt.channel;
                     
                     // Handle range iteration: task(i in 1..4)
                     if (task_stmt->iterable) {
-                        if (auto range_expr = dynamic_cast<AST::RangeExpr*>(task_stmt->iterable.get())) {
+                        if (auto range_expr = dynamic_cast<LM::Frontend::AST::RangeExpr*>(task_stmt->iterable.get())) {
                             // Evaluate range bounds
                             auto start_val = evaluate_constant_expression(range_expr->start);
                             auto end_val = evaluate_constant_expression(range_expr->end);
@@ -3007,7 +3009,7 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
                             }
                         }
                     }
-                } else if (auto worker_stmt = dynamic_cast<AST::WorkerStatement*>(body_stmt.get())) {
+                } else if (auto worker_stmt = dynamic_cast<LM::Frontend::AST::WorkerStatement*>(body_stmt.get())) {
                     // Handle worker statement: worker(item from jobs) or worker(item in jobs)
                    // std::cout << "[DEBUG] Processing worker statement with param '" << worker_stmt->paramName << "'" << std::endl;
                     
@@ -3119,7 +3121,7 @@ void Generator::emit_concurrent_stmt(AST::ConcurrentStatement& stmt) {
    // std::cout << "[DEBUG] Concurrent statement processing completed" << std::endl;
 }
 
-void Generator::create_parallel_work_item(const std::string& work_item_name, std::shared_ptr<AST::Statement> stmt) {
+void Generator::create_parallel_work_item(const std::string& work_item_name, std::shared_ptr<LM::Frontend::AST::Statement> stmt) {
    // std::cout << "[DEBUG] Creating parallel work item: " << work_item_name << std::endl;
     
     // Save current context
@@ -3156,14 +3158,14 @@ void Generator::create_parallel_work_item(const std::string& work_item_name, std
    // std::cout << "[DEBUG] Work item function " << work_item_name << " registered" << std::endl;
 }
 
-void Generator::collect_variables_from_statement(AST::Statement& stmt, std::set<std::string>& variables) {
-    if (auto block_stmt = dynamic_cast<AST::BlockStatement*>(&stmt)) {
+void Generator::collect_variables_from_statement(LM::Frontend::AST::Statement& stmt, std::set<std::string>& variables) {
+    if (auto block_stmt = dynamic_cast<LM::Frontend::AST::BlockStatement*>(&stmt)) {
         for (const auto& body_stmt : block_stmt->statements) {
             collect_variables_from_statement(*body_stmt, variables);
         }
-    } else if (auto expr_stmt = dynamic_cast<AST::ExprStatement*>(&stmt)) {
+    } else if (auto expr_stmt = dynamic_cast<LM::Frontend::AST::ExprStatement*>(&stmt)) {
         collect_variables_from_expression(*expr_stmt->expression, variables);
-    } else if (auto print_stmt = dynamic_cast<AST::PrintStatement*>(&stmt)) {
+    } else if (auto print_stmt = dynamic_cast<LM::Frontend::AST::PrintStatement*>(&stmt)) {
         for (const auto& arg : print_stmt->arguments) {
             collect_variables_from_expression(*arg, variables);
         }
@@ -3171,19 +3173,19 @@ void Generator::collect_variables_from_statement(AST::Statement& stmt, std::set<
     // Add other statement types as needed
 }
 
-void Generator::collect_variables_from_expression(AST::Expression& expr, std::set<std::string>& variables) {
-    if (auto var_expr = dynamic_cast<AST::VariableExpr*>(&expr)) {
+void Generator::collect_variables_from_expression(LM::Frontend::AST::Expression& expr, std::set<std::string>& variables) {
+    if (auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(&expr)) {
         variables.insert(var_expr->name);
-    } else if (auto binary_expr = dynamic_cast<AST::BinaryExpr*>(&expr)) {
+    } else if (auto binary_expr = dynamic_cast<LM::Frontend::AST::BinaryExpr*>(&expr)) {
         collect_variables_from_expression(*binary_expr->left, variables);
         collect_variables_from_expression(*binary_expr->right, variables);
-    } else if (auto unary_expr = dynamic_cast<AST::UnaryExpr*>(&expr)) {
+    } else if (auto unary_expr = dynamic_cast<LM::Frontend::AST::UnaryExpr*>(&expr)) {
         collect_variables_from_expression(*unary_expr->right, variables);
     }
     // Add other expression types as needed
 }
 
-void Generator::create_and_register_task_function(const std::string& task_name, AST::TaskStatement* task_stmt, int64_t loop_value) {
+void Generator::create_and_register_task_function(const std::string& task_name, LM::Frontend::AST::TaskStatement* task_stmt, int64_t loop_value) {
    // std::cout << "[DEBUG] Creating task function: " << task_name << " with loop value " << loop_value << std::endl;
     
     // Save current context
@@ -3243,7 +3245,7 @@ void Generator::create_and_register_task_function(const std::string& task_name, 
    // std::cout << "[DEBUG] Task function " << task_name << " registered" << std::endl;
 }
 
-void Generator::create_and_register_worker_function(const std::string& worker_name, AST::WorkerStatement* worker_stmt) {
+void Generator::create_and_register_worker_function(const std::string& worker_name, LM::Frontend::AST::WorkerStatement* worker_stmt) {
    // std::cout << "[DEBUG] Creating worker function: " << worker_name << std::endl;
    // std::cout << "[DEBUG] Worker param name: '" << worker_stmt->paramName << "'" << std::endl;
    // std::cout << "[DEBUG] Worker has iterable: " << (worker_stmt->iterable ? "YES" : "NO") << std::endl;
@@ -3318,7 +3320,7 @@ void Generator::create_and_register_worker_function(const std::string& worker_na
    // std::cout << "[DEBUG] Worker function " << worker_name << " registered" << std::endl;
 }
 
-void Generator::emit_task_stmt(AST::TaskStatement& stmt) {
+void Generator::emit_task_stmt(LM::Frontend::AST::TaskStatement& stmt) {
    // std::cout << "[DEBUG] Processing TaskStatement" << std::endl;
     
     // Check if we're in a concurrent block - if so, convert to iter for direct execution
@@ -3326,7 +3328,7 @@ void Generator::emit_task_stmt(AST::TaskStatement& stmt) {
        // std::cout << "[DEBUG] Converting task to iter in concurrent block" << std::endl;
         
         // Create a temporary IterStatement to reuse existing iter logic
-        auto temp_iter_stmt = std::make_unique<AST::IterStatement>();
+        auto temp_iter_stmt = std::make_unique<LM::Frontend::AST::IterStatement>();
         temp_iter_stmt->loopVars = {stmt.loopVar};
         temp_iter_stmt->iterable = stmt.iterable;
         temp_iter_stmt->body = stmt.body;
@@ -3355,7 +3357,7 @@ void Generator::emit_task_stmt(AST::TaskStatement& stmt) {
     }
 }
 
-void Generator::emit_task_init_and_step(AST::TaskStatement& task, size_t task_id, Reg contexts_reg, Reg channel_reg, Reg counter_reg, int64_t loop_var_value) {
+void Generator::emit_task_init_and_step(LM::Frontend::AST::TaskStatement& task, size_t task_id, Reg contexts_reg, Reg channel_reg, Reg counter_reg, int64_t loop_var_value) {
     auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
     
     // Load task_id as the context register value
@@ -3419,18 +3421,18 @@ void Generator::emit_task_init_and_step(AST::TaskStatement& task, size_t task_id
     }
 }
 
-void Generator::emit_worker_stmt(AST::WorkerStatement& stmt) {
+void Generator::emit_worker_stmt(LM::Frontend::AST::WorkerStatement& stmt) {
     // Workers are handled during the lowering phase, similar to tasks
     // This function should not be called during normal statement emission
    // std::cout << "[DEBUG] Worker statement encountered during emission - should be handled in lowering phase" << std::endl;
 }
 
-void Generator::emit_iter_stmt(AST::IterStatement& stmt) {
-    auto range_expr = dynamic_cast<AST::RangeExpr*>(stmt.iterable.get());
-    auto var_expr = dynamic_cast<AST::VariableExpr*>(stmt.iterable.get());
-    auto list_expr = dynamic_cast<AST::ListExpr*>(stmt.iterable.get());
-    auto dict_expr = dynamic_cast<AST::DictExpr*>(stmt.iterable.get());
-    auto tuple_expr = dynamic_cast<AST::TupleExpr*>(stmt.iterable.get());
+void Generator::emit_iter_stmt(LM::Frontend::AST::IterStatement& stmt) {
+    auto range_expr = dynamic_cast<LM::Frontend::AST::RangeExpr*>(stmt.iterable.get());
+    auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(stmt.iterable.get());
+    auto list_expr = dynamic_cast<LM::Frontend::AST::ListExpr*>(stmt.iterable.get());
+    auto dict_expr = dynamic_cast<LM::Frontend::AST::DictExpr*>(stmt.iterable.get());
+    auto tuple_expr = dynamic_cast<LM::Frontend::AST::TupleExpr*>(stmt.iterable.get());
     
     if (range_expr) {
         // Handle range iteration (existing logic)
@@ -3609,7 +3611,7 @@ void Generator::emit_iter_stmt(AST::IterStatement& stmt) {
     }
 }
 
-void Generator::emit_dict_iter_stmt(AST::IterStatement& stmt, AST::DictExpr& dict_expr) {
+void Generator::emit_dict_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::Frontend::AST::DictExpr& dict_expr) {
     // Handle dict iteration (simplified - iterate over keys)
     if (stmt.loopVars.size() != 1) {
         report_error("dict iteration currently supports only one loop variable");
@@ -3708,7 +3710,7 @@ void Generator::emit_dict_iter_stmt(AST::IterStatement& stmt, AST::DictExpr& dic
     exit_scope();
 }
 
-void Generator::emit_list_iter_stmt(AST::IterStatement& stmt, AST::ListExpr& list_expr) {
+void Generator::emit_list_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::Frontend::AST::ListExpr& list_expr) {
     // Handle list iteration
     if (stmt.loopVars.size() != 1) {
         report_error("list iteration currently supports only one loop variable");
@@ -3796,7 +3798,7 @@ void Generator::emit_list_iter_stmt(AST::IterStatement& stmt, AST::ListExpr& lis
     exit_scope();
 }
 
-void Generator::emit_tuple_iter_stmt(AST::IterStatement& stmt, AST::TupleExpr& tuple_expr) {
+void Generator::emit_tuple_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::Frontend::AST::TupleExpr& tuple_expr) {
     // Handle tuple iteration (similar to list)
     if (stmt.loopVars.size() != 1) {
         report_error("tuple iteration currently supports only one loop variable");
@@ -3888,7 +3890,7 @@ void Generator::emit_tuple_iter_stmt(AST::IterStatement& stmt, AST::TupleExpr& t
     exit_scope();
 }
 
-void Generator::emit_dict_var_iter_stmt(AST::IterStatement& stmt, Reg dict_reg) {
+void Generator::emit_dict_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, Reg dict_reg) {
     // Convert dict to list of tuples using DictItems operation
     // The runtime does the heavy lifting (walking the hash table)
     LIR::Reg items_reg = allocate_register();
@@ -3898,7 +3900,7 @@ void Generator::emit_dict_var_iter_stmt(AST::IterStatement& stmt, Reg dict_reg) 
     emit_list_var_iter_stmt(stmt, items_reg);
 }
 
-void Generator::emit_list_var_iter_stmt(AST::IterStatement& stmt, Reg list_reg) {
+void Generator::emit_list_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, Reg list_reg) {
     // Handle list iteration for variables
     if (stmt.loopVars.size() != 1) {
         report_error("list iteration currently supports only one loop variable");
@@ -3990,7 +3992,7 @@ void Generator::emit_list_var_iter_stmt(AST::IterStatement& stmt, Reg list_reg) 
     exit_scope();
 }
 
-void Generator::emit_tuple_var_iter_stmt(AST::IterStatement& stmt, Reg tuple_reg, int64_t tuple_len) {
+void Generator::emit_tuple_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, Reg tuple_reg, int64_t tuple_len) {
     // Handle tuple iteration for variables (similar to list)
     if (stmt.loopVars.size() != 1) {
         report_error("tuple iteration currently supports only one loop variable");
@@ -4075,7 +4077,7 @@ void Generator::emit_tuple_var_iter_stmt(AST::IterStatement& stmt, Reg tuple_reg
     exit_scope();
 }
 
-void Generator::emit_break_stmt(AST::BreakStatement& stmt) {
+void Generator::emit_break_stmt(LM::Frontend::AST::BreakStatement& stmt) {
     uint32_t break_label = get_break_label();
     if (break_label != 0) {
         emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, break_label));
@@ -4091,7 +4093,7 @@ void Generator::emit_break_stmt(AST::BreakStatement& stmt) {
     }
 }
 
-void Generator::emit_continue_stmt(AST::ContinueStatement& stmt) {
+void Generator::emit_continue_stmt(LM::Frontend::AST::ContinueStatement& stmt) {
     uint32_t continue_label = get_continue_label();
     if (continue_label != 0) {
         emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, continue_label));
@@ -4107,7 +4109,7 @@ void Generator::emit_continue_stmt(AST::ContinueStatement& stmt) {
     }
 }
 
-void Generator::emit_unsafe_stmt(AST::UnsafeStatement& stmt) {
+void Generator::emit_unsafe_stmt(LM::Frontend::AST::UnsafeStatement& stmt) {
     report_error("Unsafe statements not yet implemented");
 }
 
@@ -4529,7 +4531,7 @@ bool Generator::validate_cfg() {
     return is_valid;
 }
 
-std::shared_ptr<::Type> Generator::convert_ast_type_to_lir_type(const std::shared_ptr<AST::TypeAnnotation>& ast_type) {
+std::shared_ptr<::Type> Generator::convert_ast_type_to_lir_type(const std::shared_ptr<LM::Frontend::AST::TypeAnnotation>& ast_type) {
     if (!ast_type) {
         return nullptr;
     }
@@ -4555,15 +4557,15 @@ std::shared_ptr<::Type> Generator::convert_ast_type_to_lir_type(const std::share
 }
 
 // Symbol collection methods (Pass 0)
-void Generator::collect_function_signatures(const TypeCheckResult& type_check_result) {
+void Generator::collect_function_signatures(const LM::Frontend::TypeCheckResult& type_check_result) {
     for (const auto& stmt : type_check_result.program->statements) {
-        if (auto func_stmt = dynamic_cast<AST::FunctionDeclaration*>(stmt.get())) {
+        if (auto func_stmt = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(stmt.get())) {
             collect_function_signature(*func_stmt);
         }
     }
 }
 
-void Generator::collect_function_signature(AST::FunctionDeclaration& stmt) {
+void Generator::collect_function_signature(LM::Frontend::AST::FunctionDeclaration& stmt) {
     // Store function info in table - body will be lowered in Pass 1
     FunctionInfo info;
     info.name = stmt.name;
@@ -4576,9 +4578,9 @@ void Generator::collect_function_signature(AST::FunctionDeclaration& stmt) {
     function_table_[stmt.name] = std::move(info);
 }
 
-void Generator::lower_function_bodies(const TypeCheckResult& type_check_result) {
+void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_check_result) {
     for (const auto& stmt : type_check_result.program->statements) {
-        if (auto func_stmt = dynamic_cast<AST::FunctionDeclaration*>(stmt.get())) {
+        if (auto func_stmt = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(stmt.get())) {
              lower_function_body(*func_stmt);
         }
     }
@@ -4587,11 +4589,11 @@ void Generator::lower_function_bodies(const TypeCheckResult& type_check_result) 
     lower_task_bodies_recursive(type_check_result.program->statements);
 }
 
-void Generator::lower_task_bodies_recursive(const std::vector<std::shared_ptr<AST::Statement>>& statements) {
+void Generator::lower_task_bodies_recursive(const std::vector<std::shared_ptr<LM::Frontend::AST::Statement>>& statements) {
     for (const auto& stmt : statements) {
-        if (auto concurrent_stmt = dynamic_cast<AST::ConcurrentStatement*>(stmt.get())) {
+        if (auto concurrent_stmt = dynamic_cast<LM::Frontend::AST::ConcurrentStatement*>(stmt.get())) {
 
-        } else if (auto parallel_stmt = dynamic_cast<AST::ParallelStatement*>(stmt.get())) {
+        } else if (auto parallel_stmt = dynamic_cast<LM::Frontend::AST::ParallelStatement*>(stmt.get())) {
             // === SHARED CELL PARALLEL HANDLING ===
             // Use SharedCell system instead of old task_variable_mappings_
             
@@ -4612,17 +4614,17 @@ void Generator::lower_task_bodies_recursive(const std::vector<std::shared_ptr<AS
            }
             
 
-        } else if (auto task_stmt = dynamic_cast<AST::TaskStatement*>(stmt.get())) {
+        } else if (auto task_stmt = dynamic_cast<LM::Frontend::AST::TaskStatement*>(stmt.get())) {
             lower_task_body(*task_stmt);
-        } else if (auto worker_stmt = dynamic_cast<AST::WorkerStatement*>(stmt.get())) {
+        } else if (auto worker_stmt = dynamic_cast<LM::Frontend::AST::WorkerStatement*>(stmt.get())) {
             lower_worker_body(*worker_stmt);
-        } else if (auto block_stmt = dynamic_cast<AST::BlockStatement*>(stmt.get())) {
+        } else if (auto block_stmt = dynamic_cast<LM::Frontend::AST::BlockStatement*>(stmt.get())) {
             // Recursively search within block statements
         }
     }
 }
 
-void Generator::lower_function_body(AST::FunctionDeclaration& stmt) {
+void Generator::lower_function_body(LM::Frontend::AST::FunctionDeclaration& stmt) {
     // Use generate_function to create and register the function properly
     generate_function(stmt);
     
@@ -4632,7 +4634,7 @@ void Generator::lower_function_body(AST::FunctionDeclaration& stmt) {
     func_info.lir_function = nullptr; // Not needed since FunctionRegistry manages it
 }
 
-void Generator::lower_task_body(AST::TaskStatement& stmt) {
+void Generator::lower_task_body(LM::Frontend::AST::TaskStatement& stmt) {
     // Create separate LIR function for this task body
     std::string task_func_name = "_task_" + std::to_string(reinterpret_cast<uintptr_t>(&stmt));
     
@@ -4703,7 +4705,7 @@ void Generator::lower_task_body(AST::TaskStatement& stmt) {
     register_types_ = std::move(saved_register_types);
 }
 
-void Generator::lower_worker_body(AST::WorkerStatement& stmt) {
+void Generator::lower_worker_body(LM::Frontend::AST::WorkerStatement& stmt) {
     // Create separate LIR function for this worker body
     std::string worker_func_name = "_worker_" + std::to_string(reinterpret_cast<uintptr_t>(&stmt));
     auto func = std::make_unique<LIR_Function>(worker_func_name, 4); // task_id, loop_var, channel, shared_counter
@@ -4780,7 +4782,7 @@ void Generator::lower_worker_body(AST::WorkerStatement& stmt) {
 }
 
 // Error and Result type expression handlers - Unified Type? system
-Reg Generator::emit_error_construct_expr(AST::ErrorConstructExpr& expr) {
+Reg Generator::emit_error_construct_expr(LM::Frontend::AST::ErrorConstructExpr& expr) {
     Reg dst = allocate_register();
     
     // For the unified Type? system, err() creates a generic error
@@ -4794,7 +4796,7 @@ Reg Generator::emit_error_construct_expr(AST::ErrorConstructExpr& expr) {
     // If there are arguments, the first one should be the error message
     if (!expr.arguments.empty()) {
         // Handle string literal messages
-        if (auto literalExpr = std::dynamic_pointer_cast<AST::LiteralExpr>(expr.arguments[0])) {
+        if (auto literalExpr = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr.arguments[0])) {
             if (std::holds_alternative<std::string>(literalExpr->value)) {
                 errorMessage = std::get<std::string>(literalExpr->value);
             }
@@ -4810,7 +4812,7 @@ Reg Generator::emit_error_construct_expr(AST::ErrorConstructExpr& expr) {
     return dst;
 }
 
-Reg Generator::emit_ok_construct_expr(AST::OkConstructExpr& expr) {
+Reg Generator::emit_ok_construct_expr(LM::Frontend::AST::OkConstructExpr& expr) {
     Reg dst = allocate_register();
     
     // First evaluate the value to be wrapped
@@ -4825,7 +4827,7 @@ Reg Generator::emit_ok_construct_expr(AST::OkConstructExpr& expr) {
     return dst;
 }
 
-Reg Generator::emit_fallible_expr(AST::FallibleExpr& expr) {
+Reg Generator::emit_fallible_expr(LM::Frontend::AST::FallibleExpr& expr) {
     // Evaluate the expression that may return a Result (Type?)
     Reg result_reg = emit_expr(*expr.expression);
     
@@ -4957,15 +4959,15 @@ Reg Generator::emit_fallible_expr(AST::FallibleExpr& expr) {
 }
 
 // Class system implementations
-void Generator::collect_class_signatures(AST::Program& program) {
+void Generator::collect_class_signatures(LM::Frontend::AST::Program& program) {
     for (const auto& stmt : program.statements) {
-        if (auto class_decl = dynamic_cast<AST::ClassDeclaration*>(stmt.get())) {
+        if (auto class_decl = dynamic_cast<LM::Frontend::AST::ClassDeclaration*>(stmt.get())) {
             collect_class_signature(*class_decl);
         }
     }
 }
 
-void Generator::collect_class_signature(AST::ClassDeclaration& class_decl) {
+void Generator::collect_class_signature(LM::Frontend::AST::ClassDeclaration& class_decl) {
     ClassInfo class_info;
     class_info.name = class_decl.name;
     class_info.super_class_name = class_decl.superClassName;
@@ -4985,7 +4987,7 @@ void Generator::collect_class_signature(AST::ClassDeclaration& class_decl) {
         FunctionInfo func_info;
         func_info.name = class_decl.name + "." + method->name;
         func_info.param_count = method->params.size() + 1; // +1 for 'this'
-        func_info.visibility = AST::VisibilityLevel::Public; // TODO: Get from method
+        func_info.visibility = LM::Frontend::AST::VisibilityLevel::Public; // TODO: Get from method
         func_info.has_closure = false;
         function_table_[func_info.name] = std::move(func_info);
     }
@@ -5046,13 +5048,13 @@ size_t Generator::get_method_index(const std::string& class_name, const std::str
     return index_it->second;
 }
 
-void Generator::emit_class_stmt(AST::ClassDeclaration& stmt) {
+void Generator::emit_class_stmt(LM::Frontend::AST::ClassDeclaration& stmt) {
     // Class declarations are handled in Pass 0 (signature collection)
     // This function is called during Pass 2 but doesn't need to emit anything
     // since the class layout and methods are already registered
 }
 
-Reg Generator::emit_object_literal_expr(AST::ObjectLiteralExpr& expr) {
+Reg Generator::emit_object_literal_expr(LM::Frontend::AST::ObjectLiteralExpr& expr) {
     Reg dst = allocate_register();
     
     // Create new object
@@ -5073,7 +5075,7 @@ Reg Generator::emit_object_literal_expr(AST::ObjectLiteralExpr& expr) {
     return dst;
 }
 
-Reg Generator::emit_this_expr(AST::ThisExpr& expr) {
+Reg Generator::emit_this_expr(LM::Frontend::AST::ThisExpr& expr) {
     if (this_register_ == UINT32_MAX) {
         report_error("'this' used outside of method context");
         return 0;
@@ -5082,45 +5084,45 @@ Reg Generator::emit_this_expr(AST::ThisExpr& expr) {
 }
 
 // Smart module system implementations
-void Generator::collect_module_signatures(AST::Program& program) {
+void Generator::collect_module_signatures(LM::Frontend::AST::Program& program) {
     for (const auto& stmt : program.statements) {
-        if (auto module_decl = dynamic_cast<AST::ModuleDeclaration*>(stmt.get())) {
+        if (auto module_decl = dynamic_cast<LM::Frontend::AST::ModuleDeclaration*>(stmt.get())) {
             collect_module_declaration(*module_decl);
         }
     }
 }
 
-void Generator::collect_module_declaration(AST::ModuleDeclaration& module_decl) {
+void Generator::collect_module_declaration(LM::Frontend::AST::ModuleDeclaration& module_decl) {
     std::string saved_module = current_module_;
     current_module_ = module_decl.name;
     
     // Process public members
     for (const auto& member : module_decl.publicMembers) {
-        if (auto func_decl = dynamic_cast<AST::FunctionDeclaration*>(member.get())) {
-            register_module_symbol(module_decl.name, func_decl->name, AST::VisibilityLevel::Public, 
+        if (auto func_decl = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(member.get())) {
+            register_module_symbol(module_decl.name, func_decl->name, LM::Frontend::AST::VisibilityLevel::Public, 
                                 true, func_decl->params.size());
-        } else if (auto var_decl = dynamic_cast<AST::VarDeclaration*>(member.get())) {
-            register_module_symbol(module_decl.name, var_decl->name, AST::VisibilityLevel::Public, false);
+        } else if (auto var_decl = dynamic_cast<LM::Frontend::AST::VarDeclaration*>(member.get())) {
+            register_module_symbol(module_decl.name, var_decl->name, LM::Frontend::AST::VisibilityLevel::Public, false);
         }
     }
     
     // Process protected members
     for (const auto& member : module_decl.protectedMembers) {
-        if (auto func_decl = dynamic_cast<AST::FunctionDeclaration*>(member.get())) {
-            register_module_symbol(module_decl.name, func_decl->name, AST::VisibilityLevel::Protected, 
+        if (auto func_decl = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(member.get())) {
+            register_module_symbol(module_decl.name, func_decl->name, LM::Frontend::AST::VisibilityLevel::Protected, 
                                 true, func_decl->params.size());
-        } else if (auto var_decl = dynamic_cast<AST::VarDeclaration*>(member.get())) {
-            register_module_symbol(module_decl.name, var_decl->name, AST::VisibilityLevel::Protected, false);
+        } else if (auto var_decl = dynamic_cast<LM::Frontend::AST::VarDeclaration*>(member.get())) {
+            register_module_symbol(module_decl.name, var_decl->name, LM::Frontend::AST::VisibilityLevel::Protected, false);
         }
     }
     
     // Process private members
     for (const auto& member : module_decl.privateMembers) {
-        if (auto func_decl = dynamic_cast<AST::FunctionDeclaration*>(member.get())) {
-            register_module_symbol(module_decl.name, func_decl->name, AST::VisibilityLevel::Private, 
+        if (auto func_decl = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(member.get())) {
+            register_module_symbol(module_decl.name, func_decl->name, LM::Frontend::AST::VisibilityLevel::Private, 
                                 true, func_decl->params.size());
-        } else if (auto var_decl = dynamic_cast<AST::VarDeclaration*>(member.get())) {
-            register_module_symbol(module_decl.name, var_decl->name, AST::VisibilityLevel::Private, false);
+        } else if (auto var_decl = dynamic_cast<LM::Frontend::AST::VarDeclaration*>(member.get())) {
+            register_module_symbol(module_decl.name, var_decl->name, LM::Frontend::AST::VisibilityLevel::Private, false);
         }
     }
     
@@ -5128,7 +5130,7 @@ void Generator::collect_module_declaration(AST::ModuleDeclaration& module_decl) 
 }
 
 void Generator::register_module_symbol(const std::string& module_name, const std::string& symbol_name, 
-                                       AST::VisibilityLevel visibility, bool is_function, size_t param_count) {
+                                       LM::Frontend::AST::VisibilityLevel visibility, bool is_function, size_t param_count) {
     ModuleSymbolInfo symbol_info;
     symbol_info.qualified_name = module_name + "::" + symbol_name;
     symbol_info.module_name = module_name;
@@ -5151,7 +5153,7 @@ Generator::ModuleSymbolInfo* Generator::resolve_module_symbol(const std::string&
 
 bool Generator::can_access_module_symbol(const ModuleSymbolInfo& symbol, const std::string& from_module) {
     // Public symbols are always accessible
-    if (symbol.visibility == AST::VisibilityLevel::Public) {
+    if (symbol.visibility == LM::Frontend::AST::VisibilityLevel::Public) {
         return true;
     }
     
@@ -5159,7 +5161,7 @@ bool Generator::can_access_module_symbol(const ModuleSymbolInfo& symbol, const s
     return from_module == symbol.module_name;
 }
 
-void Generator::emit_match_stmt(AST::MatchStatement& stmt) {
+void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
     // Evaluate the value to match
     Reg value_reg = emit_expr(*stmt.value);
     
@@ -5177,7 +5179,7 @@ void Generator::emit_match_stmt(AST::MatchStatement& stmt) {
         const auto& match_case = stmt.cases[i];
         
         // For simple literal patterns, emit comparison
-        if (auto literal = dynamic_cast<AST::LiteralExpr*>(match_case.pattern.get())) {
+        if (auto literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(match_case.pattern.get())) {
             Reg pattern_reg = emit_expr(*literal);
             Reg compare_reg = allocate_register();
             
@@ -5209,14 +5211,14 @@ void Generator::emit_match_stmt(AST::MatchStatement& stmt) {
     emit_instruction(LIR_Inst(LIR_Op::Label, end_label, 0, 0));
 }
 
-void Generator::emit_module_stmt(AST::ModuleDeclaration& stmt) {
+void Generator::emit_module_stmt(LM::Frontend::AST::ModuleDeclaration& stmt) {
     // Module declarations are handled in Pass 0 (signature collection)
     // This function is called during Pass 2 but doesn't emit LIR
     // since modules are handled through the symbol resolution system
 }
 
 // Variable capture analysis for concurrent statements
-void Generator::find_accessed_variables_in_concurrent(AST::ConcurrentStatement& stmt, std::set<std::string>& accessed_variables) {
+void Generator::find_accessed_variables_in_concurrent(LM::Frontend::AST::ConcurrentStatement& stmt, std::set<std::string>& accessed_variables) {
    // std::cout << "[DEBUG] find_accessed_variables_in_concurrent started" << std::endl;
     if (stmt.body) {
        // std::cout << "[DEBUG] Statement has body with " << stmt.body->statements.size() << " statements" << std::endl;
@@ -5226,7 +5228,7 @@ void Generator::find_accessed_variables_in_concurrent(AST::ConcurrentStatement& 
    // std::cout << "[DEBUG] find_accessed_variables_in_concurrent completed" << std::endl;
 }
 
-void Generator::find_accessed_variables_recursive(const std::vector<std::shared_ptr<AST::Statement>>& statements, std::set<std::string>& accessed_variables) {
+void Generator::find_accessed_variables_recursive(const std::vector<std::shared_ptr<LM::Frontend::AST::Statement>>& statements, std::set<std::string>& accessed_variables) {
     static int recursion_depth = 0;
     recursion_depth++;
    // std::cout << "[DEBUG] find_accessed_variables_recursive started with " << statements.size() << " statements, depth: " << recursion_depth << std::endl;
@@ -5239,17 +5241,17 @@ void Generator::find_accessed_variables_recursive(const std::vector<std::shared_
     
     for (const auto& stmt : statements) {
        // std::cout << "[DEBUG] Processing statement type: " << typeid(*stmt.get()).name() << std::endl;
-        if (auto task_stmt = dynamic_cast<AST::TaskStatement*>(stmt.get())) {
+        if (auto task_stmt = dynamic_cast<LM::Frontend::AST::TaskStatement*>(stmt.get())) {
            // std::cout << "[DEBUG] Found TaskStatement" << std::endl;
             if (task_stmt->body) {
                 find_accessed_variables_recursive(task_stmt->body->statements, accessed_variables);
             }
-        } else if (auto expr_stmt = dynamic_cast<AST::ExprStatement*>(stmt.get())) {
+        } else if (auto expr_stmt = dynamic_cast<LM::Frontend::AST::ExprStatement*>(stmt.get())) {
            // std::cout << "[DEBUG] Found ExprStatement" << std::endl;
             if (expr_stmt->expression) {
                 find_accessed_variables_in_expr(*expr_stmt->expression, accessed_variables);
             }
-        } else if (auto block_stmt = dynamic_cast<AST::BlockStatement*>(stmt.get())) {
+        } else if (auto block_stmt = dynamic_cast<LM::Frontend::AST::BlockStatement*>(stmt.get())) {
            // std::cout << "[DEBUG] Found BlockStatement" << std::endl;
             find_accessed_variables_recursive(block_stmt->statements, accessed_variables);
         } else {
@@ -5262,25 +5264,25 @@ void Generator::find_accessed_variables_recursive(const std::vector<std::shared_
     recursion_depth--;
 }
 
-void Generator::find_accessed_variables_in_expr(const AST::Expression& expr, std::set<std::string>& accessed_variables) {
-    if (auto var_expr = dynamic_cast<const AST::VariableExpr*>(&expr)) {
+void Generator::find_accessed_variables_in_expr(const LM::Frontend::AST::Expression& expr, std::set<std::string>& accessed_variables) {
+    if (auto var_expr = dynamic_cast<const LM::Frontend::AST::VariableExpr*>(&expr)) {
         // Check if this variable is defined in the current scope or outer scope
         // For now, we'll capture all variable expressions
         accessed_variables.insert(var_expr->name);
-    } else if (auto assign_expr = dynamic_cast<const AST::AssignExpr*>(&expr)) {
+    } else if (auto assign_expr = dynamic_cast<const LM::Frontend::AST::AssignExpr*>(&expr)) {
         // Capture both the target variable and the right-hand side expression
         accessed_variables.insert(assign_expr->name);
         if (assign_expr->value) {
             find_accessed_variables_in_expr(*assign_expr->value, accessed_variables);
         }
-    } else if (auto binary_expr = dynamic_cast<const AST::BinaryExpr*>(&expr)) {
+    } else if (auto binary_expr = dynamic_cast<const LM::Frontend::AST::BinaryExpr*>(&expr)) {
         if (binary_expr->left) {
             find_accessed_variables_in_expr(*binary_expr->left, accessed_variables);
         }
         if (binary_expr->right) {
             find_accessed_variables_in_expr(*binary_expr->right, accessed_variables);
         }
-    } else if (auto call_expr = dynamic_cast<const AST::CallExpr*>(&expr)) {
+    } else if (auto call_expr = dynamic_cast<const LM::Frontend::AST::CallExpr*>(&expr)) {
         if (call_expr->callee) {
             find_accessed_variables_in_expr(*call_expr->callee, accessed_variables);
         }
@@ -5289,10 +5291,10 @@ void Generator::find_accessed_variables_in_expr(const AST::Expression& expr, std
                 find_accessed_variables_in_expr(*arg, accessed_variables);
             }
         }
-    } else if (auto interp_expr = dynamic_cast<const AST::InterpolatedStringExpr*>(&expr)) {
+    } else if (auto interp_expr = dynamic_cast<const LM::Frontend::AST::InterpolatedStringExpr*>(&expr)) {
         for (const auto& part : interp_expr->parts) {
-            if (std::holds_alternative<std::shared_ptr<AST::Expression>>(part)) {
-                auto expr_part = std::get<std::shared_ptr<AST::Expression>>(part);
+            if (std::holds_alternative<std::shared_ptr<LM::Frontend::AST::Expression>>(part)) {
+                auto expr_part = std::get<std::shared_ptr<LM::Frontend::AST::Expression>>(part);
                 if (expr_part) {
                     find_accessed_variables_in_expr(*expr_part, accessed_variables);
                 }
@@ -5301,7 +5303,7 @@ void Generator::find_accessed_variables_in_expr(const AST::Expression& expr, std
     }
 }
 
-void Generator::emit_concurrent_worker_init(AST::WorkerStatement& worker, size_t worker_id, Reg scheduler_reg, Reg channel_reg) {
+void Generator::emit_concurrent_worker_init(LM::Frontend::AST::WorkerStatement& worker, size_t worker_id, Reg scheduler_reg, Reg channel_reg) {
     auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
     
     // Create worker context for scheduler
@@ -5331,7 +5333,7 @@ void Generator::emit_concurrent_worker_init(AST::WorkerStatement& worker, size_t
 }
 
 // Channel operation implementations
-Reg Generator::emit_channel_offer_expr(AST::ChannelOfferExpr& expr) {
+Reg Generator::emit_channel_offer_expr(LM::Frontend::AST::ChannelOfferExpr& expr) {
 
     // Evaluate value to offer
     Reg value_reg = emit_expr(*expr.value);
@@ -5347,7 +5349,7 @@ Reg Generator::emit_channel_offer_expr(AST::ChannelOfferExpr& expr) {
     return result;
 }
 
-Reg Generator::emit_channel_poll_expr(AST::ChannelPollExpr& expr) {
+Reg Generator::emit_channel_poll_expr(LM::Frontend::AST::ChannelPollExpr& expr) {
     // Evaluate channel
     Reg channel_reg = emit_expr(*expr.channel);
     
@@ -5359,7 +5361,7 @@ Reg Generator::emit_channel_poll_expr(AST::ChannelPollExpr& expr) {
     return result;
 }
 
-Reg Generator::emit_channel_send_expr(AST::ChannelSendExpr& expr) {
+Reg Generator::emit_channel_send_expr(LM::Frontend::AST::ChannelSendExpr& expr) {
 
     // Evaluate value to send
     Reg value_reg = emit_expr(*expr.value);
@@ -5375,7 +5377,7 @@ Reg Generator::emit_channel_send_expr(AST::ChannelSendExpr& expr) {
     return result;
 }
 
-Reg Generator::emit_channel_recv_expr(AST::ChannelRecvExpr& expr) {
+Reg Generator::emit_channel_recv_expr(LM::Frontend::AST::ChannelRecvExpr& expr) {
 
     // Evaluate channel
     Reg channel_reg = emit_expr(*expr.channel);
