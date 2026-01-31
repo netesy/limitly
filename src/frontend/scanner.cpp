@@ -1,6 +1,8 @@
 #include "scanner.hh"
 #include "../common/debugger.hh"
 
+using namespace LM::Frontend;
+
 std::vector<Token> Scanner::scanTokens() {
     return scanTokens(ScanMode::LEGACY);
 }

@@ -60,26 +60,26 @@ RUNTIME_OBJS := $(patsubst $(RUNTIME_DIR)/%.c,$(OBJ_DIR)/runtime/%.o,$(RUNTIME_S
 # Sources
 # =============================
 FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp src/common/debugger.cpp \
-              src/frontend/cst.cpp src/frontend/cst_printer.cpp src/frontend/cst_utils.cpp \
-              src/frontend/ast_builder.cpp src/frontend/type_checker.cpp src/frontend/memory_checker.cpp \
-              src/frontend/ast_optimizer.cpp src/lir/generator.cpp
+              src/frontend/cst.cpp src/frontend/cst/printer.cpp src/frontend/cst/utils.cpp \
+              src/frontend/ast/builder.cpp src/frontend/ast/printer.cpp src/frontend/type_checker.cpp src/frontend/memory_checker.cpp \
+              src/frontend/ast/optimizer.cpp 
 
 BACK_SRCS := src/backend/jit/jit_backend.cpp src/backend/jit/jit.cpp
 
 REGISTER_SRCS := src/backend/register/register.cpp
 
 LIR_CORE_SRCS := src/lir/lir.cpp src/lir/lir_utils.cpp src/lir/functions.cpp \
-                 src/lir/builtin_functions.cpp src/lir/lir_types.cpp
+                 src/lir/builtin_functions.cpp src/lir/lir_types.cpp src/lir/generator.cpp src/lir/function_registry.cpp
 
-BACKEND_COMMON_SRCS := src/backend/symbol_table.cpp src/backend/value.cpp src/backend/ast_printer.cpp
+BACKEND_COMMON_SRCS := src/backend/symbol_table.cpp src/backend/value.cpp 
 
 ERROR_SRCS := src/error/error_formatter.cpp src/error/error_code_generator.cpp \
               src/error/contextual_hint_provider.cpp src/error/source_code_formatter.cpp \
               src/error/console_formatter.cpp src/error/error_catalog.cpp
 
 MAIN_SRCS := src/main.cpp $(BACKEND_COMMON_SRCS) $(BACK_SRCS) $(ERROR_SRCS) \
-             $(FRONT_SRCS) $(REGISTER_SRCS) $(LIR_CORE_SRCS) src/lir/function_registry.cpp
-
+             $(FRONT_SRCS) $(REGISTER_SRCS) $(LIR_CORE_SRCS) 
+			 
 TEST_SRCS := src/test_parser.cpp $(BACKEND_COMMON_SRCS) $(LIR_CORE_SRCS) $(ERROR_SRCS) \
              $(FRONT_SRCS) src/lir/function_registry.cpp
 

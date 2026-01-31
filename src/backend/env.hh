@@ -16,10 +16,10 @@ public:
         std::lock_guard<std::mutex> lock(mutex);
         values[name] = value;
         // Default to private visibility for module-level variables
-        visibility[name] = AST::VisibilityLevel::Private;
+        visibility[name] = LM::Frontend::AST::VisibilityLevel::Private;
     }
     
-    void define(const std::string& name, const ValuePtr& value, AST::VisibilityLevel vis) {
+    void define(const std::string& name, const ValuePtr& value, LM::Frontend::AST::VisibilityLevel vis) {
         std::lock_guard<std::mutex> lock(mutex);
         values[name] = value;
         visibility[name] = vis;
@@ -71,8 +71,8 @@ public:
             auto visIt = visibility.find(name);
             if (visIt != visibility.end()) {
                 // Only allow public access from external modules
-                if (visIt->second == AST::VisibilityLevel::Public || 
-                    visIt->second == AST::VisibilityLevel::Const) {
+                if (visIt->second == LM::Frontend::AST::VisibilityLevel::Public || 
+                    visIt->second == LM::Frontend::AST::VisibilityLevel::Const) {
                     return it->second;
                 } else {
                     throw std::runtime_error("Cannot access private variable '" + name + "' from external module");
@@ -194,16 +194,16 @@ public:
     }
     
     // Get visibility level of a variable
-    AST::VisibilityLevel getVisibility(const std::string& name) const {
+    LM::Frontend::AST::VisibilityLevel getVisibility(const std::string& name) const {
         std::lock_guard<std::mutex> lock(mutex);
         auto it = visibility.find(name);
-        return (it != visibility.end()) ? it->second : AST::VisibilityLevel::Private;
+        return (it != visibility.end()) ? it->second : LM::Frontend::AST::VisibilityLevel::Private;
     }
     
     // Check if a variable can be accessed externally
     bool canAccessExternally(const std::string& name) const {
-        AST::VisibilityLevel vis = getVisibility(name);
-        return vis == AST::VisibilityLevel::Public || vis == AST::VisibilityLevel::Const;
+        LM::Frontend::AST::VisibilityLevel vis = getVisibility(name);
+        return vis == LM::Frontend::AST::VisibilityLevel::Public || vis == LM::Frontend::AST::VisibilityLevel::Const;
     }
     
     // Check if a variable exists in the current scope only (not parent scopes)
@@ -217,7 +217,7 @@ public:
 private:
     std::unordered_map<std::string, ValuePtr> values;
     std::unordered_map<std::string, ValuePtr> capturedVariables;  // Captured variables for closures
-    std::unordered_map<std::string, AST::VisibilityLevel> visibility; // Variable visibility levels
+    std::unordered_map<std::string, LM::Frontend::AST::VisibilityLevel> visibility; // Variable visibility levels
     std::shared_ptr<Environment> closureParent;  // Parent environment for closures
     mutable std::mutex mutex;
 };

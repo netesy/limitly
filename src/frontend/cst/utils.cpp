@@ -1,4 +1,4 @@
-#include "cst_utils.hh"
+#include "utils.hh"
 #include <queue>
 #include <stack>
 #include <algorithm>
@@ -8,12 +8,14 @@
 #include <cmath>
 #include <iostream>
 
+namespace LM {
+namespace Frontend {
 namespace CST {
 
     // Traversal utilities implementation
     namespace Traversal {
         
-        void forEachChild(const CST::Node* node, CST::NodeVisitor visitor) {
+        void forEachChild(const LM::Frontend::CST::Node* node, CST::NodeVisitor visitor) {
             if (!node || !visitor) return;
             
             auto children = node->getChildNodes();
@@ -24,13 +26,13 @@ namespace CST {
             }
         }
         
-        void forEachDescendant(const CST::Node* node, CST::NodeVisitor visitor) {
+        void forEachDescendant(const LM::Frontend::CST::Node* node, CST::NodeVisitor visitor) {
             if (!node || !visitor) return;
             
             traversePreOrder(node, visitor);
         }
         
-        void forEachToken(const Node* node, TokenVisitor visitor) {
+        void forEachToken(const LM::Frontend::CST::Node* node, TokenVisitor visitor) {
             if (!node || !visitor) return;
             
             auto tokens = node->getAllTokens();
@@ -39,7 +41,7 @@ namespace CST {
             }
         }
         
-        void forEachSignificantToken(const Node* node, TokenVisitor visitor) {
+        void forEachSignificantToken(const LM::Frontend::CST::Node* node, TokenVisitor visitor) {
             if (!node || !visitor) return;
             
             auto tokens = node->getAllTokens();
@@ -50,7 +52,7 @@ namespace CST {
             }
         }
         
-        void traversePreOrder(const Node* node, NodeVisitor visitor) {
+        void traversePreOrder(const LM::Frontend::CST::Node* node, NodeVisitor visitor) {
             if (!node || !visitor) return;
             
             visitor(node);
@@ -63,7 +65,7 @@ namespace CST {
             }
         }
         
-        void traversePostOrder(const Node* node, NodeVisitor visitor) {
+        void traversePostOrder(const LM::Frontend::CST::Node* node, NodeVisitor visitor) {
             if (!node || !visitor) return;
             
             auto children = node->getChildNodes();
@@ -76,14 +78,14 @@ namespace CST {
             visitor(node);
         }
         
-        void traverseBreadthFirst(const Node* node, NodeVisitor visitor) {
+        void traverseBreadthFirst(const LM::Frontend::CST::Node* node, NodeVisitor visitor) {
             if (!node || !visitor) return;
             
-            std::queue<const Node*> queue;
+            std::queue<const LM::Frontend::CST::Node*> queue;
             queue.push(node);
             
             while (!queue.empty()) {
-                const Node* current = queue.front();
+                const LM::Frontend::CST::Node* current = queue.front();
                 queue.pop();
                 
                 visitor(current);
@@ -97,11 +99,11 @@ namespace CST {
             }
         }
         
-        const Node* findFirst(const Node* root, NodePredicate predicate) {
+        const LM::Frontend::CST::Node* findFirst(const LM::Frontend::CST::Node* root, NodePredicate predicate) {
             if (!root || !predicate) return nullptr;
             
-            const Node* result = nullptr;
-            traversePreOrder(root, [&](const Node* node) {
+            const LM::Frontend::CST::Node* result = nullptr;
+            traversePreOrder(root, [&](const LM::Frontend::CST::Node* node) {
                 if (!result && predicate(node)) {
                     result = node;
                 }
@@ -110,11 +112,11 @@ namespace CST {
             return result;
         }
         
-        std::vector<const Node*> findAll(const Node* root, NodePredicate predicate) {
-            std::vector<const Node*> results;
+        std::vector<const LM::Frontend::CST::Node*> findAll(const LM::Frontend::CST::Node* root, NodePredicate predicate) {
+            std::vector<const LM::Frontend::CST::Node*> results;
             if (!root || !predicate) return results;
             
-            traversePreOrder(root, [&](const Node* node) {
+            traversePreOrder(root, [&](const LM::Frontend::CST::Node* node) {
                 if (predicate(node)) {
                     results.push_back(node);
                 }
@@ -123,24 +125,24 @@ namespace CST {
             return results;
         }
         
-        const Node* findByKind(const Node* root, NodeKind kind) {
-            return findFirst(root, [kind](const Node* node) {
+        const LM::Frontend::CST::Node* findByKind(const LM::Frontend::CST::Node* root, LM::Frontend::CST::NodeKind kind) {
+            return findFirst(root, [kind](const LM::Frontend::CST::Node* node) {
                 return node->kind == kind;
             });
         }
         
-        std::vector<const Node*> findAllByKind(const Node* root, NodeKind kind) {
-            return findAll(root, [kind](const Node* node) {
+        std::vector<const LM::Frontend::CST::Node*> findAllByKind(const LM::Frontend::CST::Node* root, LM::Frontend::CST::NodeKind kind) {
+            return findAll(root, [kind](const LM::Frontend::CST::Node* node) {
                 return node->kind == kind;
             });
         }
         
-        std::vector<const Node*> getPath(const Node* root, const Node* target) {
-            std::vector<const Node*> path;
+        std::vector<const LM::Frontend::CST::Node*> getPath(const LM::Frontend::CST::Node* root, const LM::Frontend::CST::Node* target) {
+            std::vector<const LM::Frontend::CST::Node*> path;
             if (!root || !target) return path;
             
-            std::function<bool(const Node*, std::vector<const Node*>&)> findPath = 
-                [&](const Node* node, std::vector<const Node*>& currentPath) -> bool {
+            std::function<bool(const LM::Frontend::CST::Node*, std::vector<const LM::Frontend::CST::Node*>&)> findPath = 
+                [&](const LM::Frontend::CST::Node* node, std::vector<const LM::Frontend::CST::Node*>& currentPath) -> bool {
                 currentPath.push_back(node);
                 
                 if (node == target) {
@@ -162,11 +164,11 @@ namespace CST {
             return path;
         }
         
-        const Node* getParent(const Node* root, const Node* child) {
+        const LM::Frontend::CST::Node* getParent(const LM::Frontend::CST::Node* root, const LM::Frontend::CST::Node* child) {
             if (!root || !child || root == child) return nullptr;
             
-            const Node* parent = nullptr;
-            traversePreOrder(root, [&](const Node* node) {
+            const LM::Frontend::CST::Node* parent = nullptr;
+            traversePreOrder(root, [&](const LM::Frontend::CST::Node* node) {
                 if (!parent) {
                     auto children = node->getChildNodes();
                     for (const auto* nodeChild : children) {
@@ -181,11 +183,11 @@ namespace CST {
             return parent;
         }
         
-        std::vector<const Node*> getSiblings(const Node* root, const Node* node) {
-            std::vector<const Node*> siblings;
+        std::vector<const LM::Frontend::CST::Node*> getSiblings(const LM::Frontend::CST::Node* root, const LM::Frontend::CST::Node* node) {
+            std::vector<const LM::Frontend::CST::Node*> siblings;
             if (!root || !node) return siblings;
             
-            const Node* parent = getParent(root, node);
+            const LM::Frontend::CST::Node* parent = getParent(root, node);
             if (!parent) return siblings;
             
             auto children = parent->getChildNodes();
@@ -198,11 +200,11 @@ namespace CST {
             return siblings;
         }
         
-        const Node* findNodeAtPosition(const Node* root, size_t position) {
+        const LM::Frontend::CST::Node* findNodeAtPosition(const LM::Frontend::CST::Node* root, size_t position) {
             if (!root) return nullptr;
             
-            const Node* result = nullptr;
-            traversePreOrder(root, [&](const Node* node) {
+            const LM::Frontend::CST::Node* result = nullptr;
+            traversePreOrder(root, [&](const LM::Frontend::CST::Node* node) {
                 if (!result && position >= node->startPos && position <= node->endPos) {
                     result = node;
                 }
@@ -211,11 +213,11 @@ namespace CST {
             return result;
         }
         
-        std::vector<const Node*> findNodesInRange(const Node* root, size_t start, size_t end) {
-            std::vector<const Node*> results;
+        std::vector<const LM::Frontend::CST::Node*> findNodesInRange(const LM::Frontend::CST::Node* root, size_t start, size_t end) {
+            std::vector<const LM::Frontend::CST::Node*> results;
             if (!root) return results;
             
-            traversePreOrder(root, [&](const Node* node) {
+            traversePreOrder(root, [&](const LM::Frontend::CST::Node* node) {
                 // Check if node overlaps with the range
                 if (!(node->endPos < start || node->startPos > end)) {
                     results.push_back(node);
@@ -230,12 +232,12 @@ namespace CST {
     // Token extraction utilities implementation
     namespace TokenUtils {
         
-        std::vector<Token> getTokens(const Node* node) {
+        std::vector<Token> getTokens(const LM::Frontend::CST::Node* node) {
             if (!node) return {};
             return node->getAllTokens();
         }
         
-        std::vector<Token> getSignificantTokens(const Node* node) {
+        std::vector<Token> getSignificantTokens(const LM::Frontend::CST::Node* node) {
             if (!node) return {};
             
             auto allTokens = node->getAllTokens();
@@ -250,7 +252,7 @@ namespace CST {
             return significant;
         }
         
-        std::vector<Token> getTriviaTokens(const Node* node) {
+        std::vector<Token> getTriviaTokens(const LM::Frontend::CST::Node* node) {
             if (!node) return {};
             
             auto allTokens = node->getAllTokens();
@@ -265,7 +267,7 @@ namespace CST {
             return trivia;
         }
         
-        std::vector<Token> getTokensByType(const Node* node, TokenType type) {
+        std::vector<Token> getTokensByType(const LM::Frontend::CST::Node* node, LM::Frontend::TokenType type) {
             if (!node) return {};
             
             auto allTokens = node->getAllTokens();
@@ -280,7 +282,7 @@ namespace CST {
             return filtered;
         }
         
-        std::vector<Token> getWhitespaceTokens(const Node* node) {
+        std::vector<Token> getWhitespaceTokens(const LM::Frontend::CST::Node* node) {
             if (!node) return {};
             
             auto allTokens = node->getAllTokens();
@@ -295,7 +297,7 @@ namespace CST {
             return whitespace;
         }
         
-        std::vector<Token> getCommentTokens(const Node* node) {
+        std::vector<Token> getCommentTokens(const LM::Frontend::CST::Node* node) {
             if (!node) return {};
             
             auto allTokens = node->getAllTokens();
@@ -335,7 +337,7 @@ namespace CST {
             });
         }
         
-        Token getFirstToken(const Node* node) {
+        Token getFirstToken(const LM::Frontend::CST::Node* node) {
             if (!node) return Token{};
             
             auto tokens = node->getAllTokens();
@@ -344,7 +346,7 @@ namespace CST {
             return tokens.front();
         }
         
-        Token getLastToken(const Node* node) {
+        Token getLastToken(const LM::Frontend::CST::Node* node) {
             if (!node) return Token{};
             
             auto tokens = node->getAllTokens();
@@ -353,7 +355,7 @@ namespace CST {
             return tokens.back();
         }
         
-        std::vector<Token> getTokensInRange(const Node* node, size_t start, size_t end) {
+        std::vector<Token> getTokensInRange(const LM::Frontend::CST::Node* node, size_t start, size_t end) {
             if (!node) return {};
             
             auto allTokens = node->getAllTokens();
@@ -374,24 +376,24 @@ namespace CST {
     // Text reconstruction utilities implementation
     namespace TextUtils {
         
-        std::string getText(const Node* node) {
+        std::string getText(const LM::Frontend::CST::Node* node) {
             if (!node) return "";
             return node->getText();
         }
         
-        std::string getTextWithoutTrivia(const Node* node) {
+        std::string getTextWithoutTrivia(const LM::Frontend::CST::Node* node) {
             if (!node) return "";
             return node->getTextWithoutTrivia();
         }
         
-        std::string getTextWithNormalizedWhitespace(const Node* node) {
+        std::string getTextWithNormalizedWhitespace(const LM::Frontend::CST::Node* node) {
             if (!node) return "";
             
             std::string text = node->getText();
             return normalizeWhitespace(text);
         }
         
-        std::string reconstructSource(const Node* node, const ReconstructionOptions& options) {
+        std::string reconstructSource(const LM::Frontend::CST::Node* node, const ReconstructionOptions& options) {
             if (!node) return "";
             
             std::string result;
@@ -412,7 +414,7 @@ namespace CST {
                     }
                     
                     std::string tokenText = token.lexeme;
-                    if (options.normalizeNewlines && token.type == TokenType::NEWLINE) {
+                    if (options.normalizeNewlines && token.type == LM::Frontend::TokenType::NEWLINE) {
                         tokenText = "\n";
                     }
                     
@@ -504,7 +506,7 @@ namespace CST {
             return oss.str();
         }
         
-        SourceSpan getSourceSpan(const Node* node) {
+        SourceSpan getSourceSpan(const LM::Frontend::CST::Node* node) {
             if (!node) return {0, 0, 0, 0, ""};
             
             return {
@@ -516,7 +518,7 @@ namespace CST {
             };
         }
         
-        std::vector<SourceSpan> getSourceSpans(const std::vector<const Node*>& nodes) {
+        std::vector<SourceSpan> getSourceSpans(const std::vector<const LM::Frontend::CST::Node*>& nodes) {
             std::vector<SourceSpan> spans;
             for (const auto* node : nodes) {
                 spans.push_back(getSourceSpan(node));
@@ -529,7 +531,7 @@ namespace CST {
     // Validation utilities implementation
     namespace Validation {
         
-        void ValidationResult::addError(const std::string& message, const Node* node) {
+        void ValidationResult::addError(const std::string& message, const LM::Frontend::CST::Node* node) {
             errors.push_back(message);
             if (node) {
                 errorNodes.push_back(node);
@@ -537,14 +539,14 @@ namespace CST {
             isValid = false;
         }
         
-        void ValidationResult::addWarning(const std::string& message, const Node* node) {
+        void ValidationResult::addWarning(const std::string& message, const LM::Frontend::CST::Node* node) {
             warnings.push_back(message);
             if (node) {
                 warningNodes.push_back(node);
             }
         }
         
-        ValidationResult validateCST(const Node* root) {
+        ValidationResult validateCST(const LM::Frontend::CST::Node* root) {
             ValidationResult result;
             if (!root) {
                 result.addError("Root node is null");
@@ -582,7 +584,7 @@ namespace CST {
             return result;
         }
         
-        ValidationResult validateStructure(const Node* root) {
+        ValidationResult validateStructure(const LM::Frontend::CST::Node* root) {
             ValidationResult result;
             if (!root) {
                 result.addError("Root node is null");
@@ -595,14 +597,14 @@ namespace CST {
             }
             
             // Validate each node
-            Traversal::traversePreOrder(root, [&](const Node* node) {
+            Traversal::traversePreOrder(root, [&](const LM::Frontend::CST::Node* node) {
                 if (!node) {
                     result.addError("Null node found in tree");
                     return;
                 }
                 
                 // Check node kind validity
-                if (node->kind == static_cast<NodeKind>(-1)) {
+                if (node->kind == static_cast<LM::Frontend::CST::NodeKind>(-1)) {
                     result.addError("Invalid node kind", node);
                 }
                 
@@ -615,14 +617,14 @@ namespace CST {
             return result;
         }
         
-        ValidationResult validateSourceSpans(const Node* root) {
+        ValidationResult validateSourceSpans(const LM::Frontend::CST::Node* root) {
             ValidationResult result;
             if (!root) {
                 result.addError("Root node is null");
                 return result;
             }
             
-            Traversal::traversePreOrder(root, [&](const Node* node) {
+            Traversal::traversePreOrder(root, [&](const LM::Frontend::CST::Node* node) {
                 if (!hasValidSourceSpans(node)) {
                     result.addError("Invalid source spans", node);
                 }
@@ -639,7 +641,7 @@ namespace CST {
             return result;
         }
         
-        ValidationResult validateTokenOrder(const Node* root) {
+        ValidationResult validateTokenOrder(const LM::Frontend::CST::Node* root) {
             ValidationResult result;
             if (!root) {
                 result.addError("Root node is null");
@@ -653,14 +655,14 @@ namespace CST {
             return result;
         }
         
-        ValidationResult validateCompleteness(const Node* root) {
+        ValidationResult validateCompleteness(const LM::Frontend::CST::Node* root) {
             ValidationResult result;
             if (!root) {
                 result.addError("Root node is null");
                 return result;
             }
             
-            Traversal::traversePreOrder(root, [&](const Node* node) {
+            Traversal::traversePreOrder(root, [&](const LM::Frontend::CST::Node* node) {
                 if (!isComplete(node)) {
                     result.addWarning("Incomplete node", node);
                 }
@@ -669,12 +671,12 @@ namespace CST {
             return result;
         }
         
-        bool hasValidSourceSpans(const Node* node) {
+        bool hasValidSourceSpans(const LM::Frontend::CST::Node* node) {
             if (!node) return false;
             return node->startPos <= node->endPos;
         }
         
-        bool hasConsistentTokenOrder(const Node* node) {
+        bool hasConsistentTokenOrder(const LM::Frontend::CST::Node* node) {
             if (!node) return false;
             
             auto tokens = node->getAllTokens();
@@ -687,7 +689,7 @@ namespace CST {
             return true;
         }
         
-        bool isComplete(const Node* node) {
+        bool isComplete(const LM::Frontend::CST::Node* node) {
             if (!node) return false;
             
             // Check if this is an error recovery node
@@ -700,13 +702,13 @@ namespace CST {
             return node->isValid;
         }
         
-        bool hasCircularReferences(const Node* root) {
+        bool hasCircularReferences(const LM::Frontend::CST::Node* root) {
             if (!root) return false;
             
-            std::set<const Node*> visited;
-            std::set<const Node*> recursionStack;
+            std::set<const LM::Frontend::CST::Node*> visited;
+            std::set<const LM::Frontend::CST::Node*> recursionStack;
             
-            std::function<bool(const Node*)> checkCircular = [&](const Node* node) -> bool {
+            std::function<bool(const LM::Frontend::CST::Node*)> checkCircular = [&](const LM::Frontend::CST::Node* node) -> bool {
                 if (!node) return false;
                 
                 if (recursionStack.count(node)) {
@@ -734,21 +736,21 @@ namespace CST {
             return checkCircular(root);
         }
         
-        std::vector<const Node*> findErrorNodes(const Node* root) {
-            return Traversal::findAll(root, [](const Node* node) {
-                return node->kind == NodeKind::ERROR_NODE;
+        std::vector<const LM::Frontend::CST::Node*> findErrorNodes(const LM::Frontend::CST::Node* root) {
+            return Traversal::findAll(root, [](const LM::Frontend::CST::Node* node) {
+                return node->kind == LM::Frontend::CST::NodeKind::ERROR_NODE;
             });
         }
         
-        std::vector<const Node*> findMissingNodes(const Node* root) {
-            return Traversal::findAll(root, [](const Node* node) {
-                return node->kind == NodeKind::MISSING_NODE;
+        std::vector<const LM::Frontend::CST::Node*> findMissingNodes(const LM::Frontend::CST::Node* root) {
+            return Traversal::findAll(root, [](const LM::Frontend::CST::Node* node) {
+                return node->kind == LM::Frontend::CST::NodeKind::MISSING_NODE;
             });
         }
         
-        std::vector<const Node*> findIncompleteNodes(const Node* root) {
-            return Traversal::findAll(root, [](const Node* node) {
-                return node->kind == NodeKind::INCOMPLETE_NODE;
+        std::vector<const LM::Frontend::CST::Node*> findIncompleteNodes(const LM::Frontend::CST::Node* root) {
+            return Traversal::findAll(root, [](const LM::Frontend::CST::Node* node) {
+                return node->kind == LM::Frontend::CST::NodeKind::INCOMPLETE_NODE;
             });
         }
         
@@ -758,23 +760,23 @@ namespace CST {
     namespace Utils {
         
         // Text reconstruction
-        std::string getText(const Node* node) {
+        std::string getText(const LM::Frontend::CST::Node* node) {
             if (!node) return "";
             return node->getText();
         }
         
-        std::string getTextWithoutTrivia(const Node* node) {
+        std::string getTextWithoutTrivia(const LM::Frontend::CST::Node* node) {
             if (!node) return "";
             return node->getTextWithoutTrivia();
         }
         
         // Token extraction
-        std::vector<Token> getAllTokens(const Node* node) {
+        std::vector<Token> getAllTokens(const LM::Frontend::CST::Node* node) {
             if (!node) return {};
             return node->getAllTokens();
         }
         
-        std::vector<Token> getSignificantTokens(const Node* node) {
+        std::vector<Token> getSignificantTokens(const LM::Frontend::CST::Node* node) {
             if (!node) return {};
             
             auto allTokens = node->getAllTokens();
@@ -790,7 +792,7 @@ namespace CST {
         }
         
         // Tree traversal
-        void forEachChild(const Node* node, std::function<void(const Node*)> visitor) {
+        void forEachChild(const LM::Frontend::CST::Node* node, std::function<void(const LM::Frontend::CST::Node*)> visitor) {
             if (!node || !visitor) return;
             
             auto children = node->getChildNodes();
@@ -801,7 +803,7 @@ namespace CST {
             }
         }
         
-        void forEachDescendant(const Node* node, std::function<void(const Node*)> visitor) {
+        void forEachDescendant(const LM::Frontend::CST::Node* node, std::function<void(const LM::Frontend::CST::Node*)> visitor) {
             if (!node || !visitor) return;
             
             visitor(node);
@@ -815,7 +817,7 @@ namespace CST {
         }
         
         // Find operations
-        const Node* findByKind(const Node* root, NodeKind kind) {
+        const LM::Frontend::CST::Node* findByKind(const LM::Frontend::CST::Node* root, LM::Frontend::CST::NodeKind kind) {
             if (!root) return nullptr;
             
             if (root->kind == kind) {
@@ -825,7 +827,7 @@ namespace CST {
             auto children = root->getChildNodes();
             for (const auto* child : children) {
                 if (child) {
-                    const Node* result = findByKind(child, kind);
+                    const LM::Frontend::CST::Node* result = findByKind(child, kind);
                     if (result) {
                         return result;
                     }
@@ -835,11 +837,11 @@ namespace CST {
             return nullptr;
         }
         
-        std::vector<const Node*> findAllByKind(const Node* root, NodeKind kind) {
-            std::vector<const Node*> results;
+        std::vector<const LM::Frontend::CST::Node*> findAllByKind(const LM::Frontend::CST::Node* root, LM::Frontend::CST::NodeKind kind) {
+            std::vector<const LM::Frontend::CST::Node*> results;
             if (!root) return results;
             
-            forEachDescendant(root, [&](const Node* node) {
+            forEachDescendant(root, [&](const LM::Frontend::CST::Node* node) {
                 if (node->kind == kind) {
                     results.push_back(node);
                 }
@@ -849,7 +851,7 @@ namespace CST {
         }
         
         // Source reconstruction
-        std::string reconstructSource(const Node* node) {
+        std::string reconstructSource(const LM::Frontend::CST::Node* node) {
             if (!node) return "";
             
             std::string result;
@@ -870,12 +872,12 @@ namespace CST {
         }
         
         // Validation
-        bool validateCST(const Node* root) {
+        bool validateCST(const LM::Frontend::CST::Node* root) {
             if (!root) return false;
             
             bool isValid = true;
             
-            forEachDescendant(root, [&](const Node* node) {
+            forEachDescendant(root, [&](const LM::Frontend::CST::Node* node) {
                 if (!node->isValid) {
                     isValid = false;
                 }
@@ -885,26 +887,26 @@ namespace CST {
         }
         
         // Statistics
-        size_t countNodes(const Node* root) {
+        size_t countNodes(const LM::Frontend::CST::Node* root) {
             if (!root) return 0;
             
             size_t count = 0;
-            forEachDescendant(root, [&](const Node* node) {
+            forEachDescendant(root, [&](const LM::Frontend::CST::Node* node) {
                 count++;
             });
             
             return count;
         }
         
-        size_t countTokens(const Node* root) {
+        size_t countTokens(const LM::Frontend::CST::Node* root) {
             if (!root) return 0;
             
             auto tokens = root->getAllTokens();
             return tokens.size();
         }
         
-        std::vector<const Node*> findErrorNodes(const Node* root) {
-            return findAllByKind(root, NodeKind::ERROR_NODE);
+        std::vector<const LM::Frontend::CST::Node*> findErrorNodes(const LM::Frontend::CST::Node* root) {
+            return findAllByKind(root, LM::Frontend::CST::NodeKind::ERROR_NODE);
         }
 
         void Printer::printNode(const Node *node, std::ostream &out, int indent, bool includeTrivia) {
@@ -1000,11 +1002,11 @@ namespace CST {
     /*
     namespace Analysis {
         
-        Analysis::TreeStatistics analyzeTree(const CST::Node* root) {
+        Analysis::TreeStatistics analyzeTree(const CST::LM::Frontend::CST::Node* root) {
             Analysis::TreeStatistics stats;
             if (!root) return stats;
             
-            CST::Traversal::traversePreOrder(root, [&](const CST::Node* node) {
+            CST::Traversal::traversePreOrder(root, [&](const CST::LM::Frontend::CST::Node* node) {
                 stats.totalNodes++;
                 stats.nodeKindCounts[node->kind]++;
                 
@@ -1032,7 +1034,7 @@ namespace CST {
             return stats;
         }
         
-        std::vector<const CST::Node*> getAncestors(const CST::Node* root, const CST::Node* node) {
+        std::vector<const CST::LM::Frontend::CST::Node*> getAncestors(const CST::LM::Frontend::CST::Node* root, const CST::LM::Frontend::CST::Node* node) {
             if (!root || !node) return {};
             
             auto path = CST::Traversal::getPath(root, node);
@@ -1043,11 +1045,11 @@ namespace CST {
             return path;
         }
         
-        std::vector<const CST::Node*> getDescendants(const CST::Node* node) {
-            std::vector<const CST::Node*> descendants;
+        std::vector<const CST::LM::Frontend::CST::Node*> getDescendants(const CST::LM::Frontend::CST::Node* node) {
+            std::vector<const CST::LM::Frontend::CST::Node*> descendants;
             if (!node) return descendants;
             
-            CST::Traversal::traversePreOrder(node, [&](const CST::Node* n) {
+            CST::Traversal::traversePreOrder(node, [&](const CST::LM::Frontend::CST::Node* n) {
                 if (n != node) { // Exclude the node itself
                     descendants.push_back(n);
                 }
@@ -1056,20 +1058,20 @@ namespace CST {
             return descendants;
         }
         
-        size_t getDepth(const Node* root, const Node* node) {
+        size_t getDepth(const LM::Frontend::CST::Node* root, const LM::Frontend::CST::Node* node) {
             if (!root || !node) return 0;
             
             auto path = Traversal::getPath(root, node);
             return path.size() > 0 ? path.size() - 1 : 0;
         }
         
-        size_t getMaxDepth(const Node* root) {
+        size_t getMaxDepth(const LM::Frontend::CST::Node* root) {
             if (!root) return 0;
             
             size_t maxDepth = 0;
             
-            std::function<size_t(const Node*, size_t)> calculateDepth = 
-                [&](const Node* node, size_t currentDepth) -> size_t {
+            std::function<size_t(const LM::Frontend::CST::Node*, size_t)> calculateDepth = 
+                [&](const LM::Frontend::CST::Node* node, size_t currentDepth) -> size_t {
                 if (!node) return currentDepth;
                 
                 maxDepth = std::max(maxDepth, currentDepth);
@@ -1088,12 +1090,12 @@ namespace CST {
             return maxDepth;
         }
         
-        std::vector<std::string> extractIdentifiers(const Node* root) {
+        std::vector<std::string> extractIdentifiers(const LM::Frontend::CST::Node* root) {
             std::vector<std::string> identifiers;
             if (!root) return identifiers;
             
             Traversal::forEachToken(root, [&](const Token& token) {
-                if (token.type == TokenType::IDENTIFIER) {
+                if (token.type == LM::Frontend::TokenType::IDENTIFIER) {
                     identifiers.push_back(token.lexeme);
                 }
             });
@@ -1101,15 +1103,15 @@ namespace CST {
             return identifiers;
         }
         
-        std::vector<std::string> extractLiterals(const Node* root) {
+        std::vector<std::string> extractLiterals(const LM::Frontend::CST::Node* root) {
             std::vector<std::string> literals;
             if (!root) return literals;
             
             Traversal::forEachToken(root, [&](const Token& token) {
-                if (token.type == TokenType::STRING || 
-                    token.type == TokenType::NUMBER ||
-                    token.type == TokenType::TRUE ||
-                    token.type == TokenType::FALSE) {
+                if (token.type == LM::Frontend::TokenType::STRING || 
+                    token.type == LM::Frontend::TokenType::NUMBER ||
+                    token.type == LM::Frontend::TokenType::TRUE ||
+                    token.type == LM::Frontend::TokenType::FALSE) {
                     literals.push_back(token.lexeme);
                 }
             });
@@ -1117,7 +1119,7 @@ namespace CST {
             return literals;
         }
         
-        std::vector<std::string> extractComments(const Node* root) {
+        std::vector<std::string> extractComments(const LM::Frontend::CST::Node* root) {
             std::vector<std::string> comments;
             if (!root) return comments;
             
@@ -1130,29 +1132,29 @@ namespace CST {
             return comments;
         }
         
-        size_t countNodes(const Node* root) {
+        size_t countNodes(const LM::Frontend::CST::Node* root) {
             if (!root) return 0;
             
             size_t count = 0;
-            Traversal::traversePreOrder(root, [&](const Node* node) {
+            Traversal::traversePreOrder(root, [&](const LM::Frontend::CST::Node* node) {
                 count++;
             });
             
             return count;
         }
         
-        size_t countTokens(const Node* root) {
+        size_t countTokens(const LM::Frontend::CST::Node* root) {
             if (!root) return 0;
             
             auto tokens = root->getAllTokens();
             return tokens.size();
         }
         
-        size_t countSignificantNodes(const Node* root) {
+        size_t countSignificantNodes(const LM::Frontend::CST::Node* root) {
             if (!root) return 0;
             
             size_t count = 0;
-            Traversal::traversePreOrder(root, [&](const Node* node) {
+            Traversal::traversePreOrder(root, [&](const LM::Frontend::CST::Node* node) {
                 if (!isTriviaNode(node->kind)) {
                     count++;
                 }
@@ -1161,7 +1163,7 @@ namespace CST {
             return count;
         }
         
-        double calculateComplexity(const Node* root) {
+        double calculateComplexity(const LM::Frontend::CST::Node* root) {
             if (!root) return 0.0;
             
             // Simple complexity metric based on node count and depth
@@ -1179,7 +1181,7 @@ namespace CST {
     /*
     namespace Comparison {
         
-        void ComparisonResult::addDifference(const std::string& message, const Node* node) {
+        void ComparisonResult::addDifference(const std::string& message, const LM::Frontend::CST::Node* node) {
             differences.push_back(message);
             if (node) {
                 differentNodes.push_back(node);
@@ -1187,7 +1189,7 @@ namespace CST {
             isEqual = false;
         }
         
-        ComparisonResult compareCSTs(const Node* left, const Node* right, const ComparisonOptions& options) {
+        ComparisonResult compareCSTs(const LM::Frontend::CST::Node* left, const LM::Frontend::CST::Node* right, const ComparisonOptions& options) {
             ComparisonResult result;
             
             if (!left && !right) {
@@ -1274,12 +1276,12 @@ namespace CST {
             return result;
         }
         
-        bool areEqual(const Node* left, const Node* right, const ComparisonOptions& options) {
+        bool areEqual(const LM::Frontend::CST::Node* left, const LM::Frontend::CST::Node* right, const ComparisonOptions& options) {
             auto result = compareCSTs(left, right, options);
             return result.isEqual;
         }
         
-        bool areStructurallyEqual(const Node* left, const Node* right) {
+        bool areStructurallyEqual(const LM::Frontend::CST::Node* left, const LM::Frontend::CST::Node* right) {
             ComparisonOptions options;
             options.ignoreTrivia = true;
             options.ignoreSourcePositions = true;
@@ -1289,7 +1291,7 @@ namespace CST {
             return areEqual(left, right, options);
         }
         
-        bool areTextuallyEqual(const Node* left, const Node* right) {
+        bool areTextuallyEqual(const LM::Frontend::CST::Node* left, const LM::Frontend::CST::Node* right) {
             if (!left || !right) return left == right;
             
             return left->getText() == right->getText();
@@ -1302,13 +1304,13 @@ namespace CST {
     /*
     namespace Transform {
         
-        std::unique_ptr<Node> transformTree(const Node* root, NodeTransformer transformer) {
+        std::unique_ptr<Node> transformTree(const LM::Frontend::CST::Node* root, NodeTransformer transformer) {
             if (!root || !transformer) return nullptr;
             
             return transformer(root);
         }
         
-        std::unique_ptr<Node> transformTokens(const Node* root, TokenTransformer transformer) {
+        std::unique_ptr<Node> transformTokens(const LM::Frontend::CST::Node* root, TokenTransformer transformer) {
             if (!root || !transformer) return nullptr;
             
             auto newNode = createNode(root->kind, root->startPos, root->endPos);
@@ -1333,7 +1335,7 @@ namespace CST {
             return newNode;
         }
         
-        std::unique_ptr<Node> removeTrivia(const Node* root) {
+        std::unique_ptr<Node> removeTrivia(const LM::Frontend::CST::Node* root) {
             if (!root) return nullptr;
             
             auto newNode = createNode(root->kind, root->startPos, root->endPos);
@@ -1359,12 +1361,12 @@ namespace CST {
             return newNode;
         }
         
-        std::unique_ptr<Node> removeComments(const Node* root) {
+        std::unique_ptr<Node> removeComments(const LM::Frontend::CST::Node* root) {
             return transformTokens(root, [](const Token& token) -> Token {
                 if (isCommentToken(token)) {
                     // Replace comment with whitespace
                     Token whitespace = token;
-                    whitespace.type = TokenType::WHITESPACE;
+                    whitespace.type = LM::Frontend::TokenType::WHITESPACE;
                     whitespace.lexeme = " ";
                     return whitespace;
                 }
@@ -1372,13 +1374,13 @@ namespace CST {
             });
         }
         
-        std::unique_ptr<Node> removeErrorNodes(const Node* root) {
-            return filterNodes(root, [](const Node* node) {
+        std::unique_ptr<Node> removeErrorNodes(const LM::Frontend::CST::Node* root) {
+            return filterNodes(root, [](const LM::Frontend::CST::Node* node) {
                 return !isErrorRecoveryNode(node->kind);
             });
         }
         
-        std::unique_ptr<Node> normalizeWhitespace(const Node* root) {
+        std::unique_ptr<Node> normalizeWhitespace(const LM::Frontend::CST::Node* root) {
             return transformTokens(root, [](const Token& token) -> Token {
                 if (isWhitespaceToken(token)) {
                     Token normalized = token;
@@ -1389,7 +1391,7 @@ namespace CST {
             });
         }
         
-        std::unique_ptr<Node> filterNodes(const Node* root, NodePredicate predicate) {
+        std::unique_ptr<Node> filterNodes(const LM::Frontend::CST::Node* root, NodePredicate predicate) {
             if (!root || !predicate) return nullptr;
             
             if (!predicate(root)) {
@@ -1419,7 +1421,7 @@ namespace CST {
             return newNode;
         }
         
-        std::unique_ptr<Node> filterTokens(const Node* root, TokenPredicate predicate) {
+        std::unique_ptr<Node> filterTokens(const LM::Frontend::CST::Node* root, TokenPredicate predicate) {
             if (!root || !predicate) return nullptr;
             
             auto newNode = createNode(root->kind, root->startPos, root->endPos);
@@ -1456,17 +1458,17 @@ namespace CST {
             // Query parsing would be implemented here
         }
         
-        std::vector<const Node*> CSTQuery::execute(const Node* root) const {
+        std::vector<const LM::Frontend::CST::Node*> CSTQuery::execute(const LM::Frontend::CST::Node* root) const {
             // Simple implementation - would be expanded for full query language
             return {};
         }
         
-        const Node* CSTQuery::executeFirst(const Node* root) const {
+        const LM::Frontend::CST::Node* CSTQuery::executeFirst(const LM::Frontend::CST::Node* root) const {
             auto results = execute(root);
             return results.empty() ? nullptr : results[0];
         }
         
-        CSTQuery CSTQuery::byKind(NodeKind kind) {
+        CSTQuery CSTQuery::byKind(LM::Frontend::CST::NodeKind kind) {
             return CSTQuery("kind=" + nodeKindToString(kind));
         }
         
@@ -1482,17 +1484,17 @@ namespace CST {
             return CSTQuery("range=" + std::to_string(start) + "-" + std::to_string(end));
         }
         
-        std::vector<const Node*> selectByKind(const Node* root, NodeKind kind) {
+        std::vector<const LM::Frontend::CST::Node*> selectByKind(const LM::Frontend::CST::Node* root, LM::Frontend::CST::NodeKind kind) {
             return Traversal::findAllByKind(root, kind);
         }
         
-        std::vector<const Node*> selectByText(const Node* root, const std::string& text) {
-            return Traversal::findAll(root, [&text](const Node* node) {
+        std::vector<const LM::Frontend::CST::Node*> selectByText(const LM::Frontend::CST::Node* root, const std::string& text) {
+            return Traversal::findAll(root, [&text](const LM::Frontend::CST::Node* node) {
                 return node->getText() == text;
             });
         }
         
-        std::vector<const Node*> selectByPredicate(const Node* root, NodePredicate predicate) {
+        std::vector<const LM::Frontend::CST::Node*> selectByPredicate(const LM::Frontend::CST::Node* root, NodePredicate predicate) {
             return Traversal::findAll(root, predicate);
         }
         
@@ -1500,3 +1502,5 @@ namespace CST {
     */
 
 } // namespace CST
+} // namespace Frontend
+} // namespace LM

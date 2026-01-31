@@ -6,6 +6,9 @@
 #include <variant>
 #include <vector>
 
+namespace LM {
+namespace Frontend {
+
 enum class TokenType {
     // Group: Delimiters
     LEFT_PAREN,    // (
@@ -328,5 +331,6 @@ private:
     void collectTrivia(TokenType triviaType);  // Collect trivia into buffer
     void attachTriviaToToken(Token& token);    // Attach buffered trivia to token
 };
-
+} // namespace Frontend
+} // namespace LM
 #endif // SCANNER_H

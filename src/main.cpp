@@ -1,7 +1,8 @@
 
 #include "frontend/scanner.hh"
 #include "frontend/parser.hh"
-#include "frontend/cst_printer.hh"
+#include "frontend/cst/printer.hh"
+#include "frontend/ast/printer.hh"
 #include "frontend/type_checker.hh"
 #include "frontend/memory_checker.hh"
 #include "frontend/ast.hh"
@@ -15,6 +16,8 @@
 #include <sstream>
 #include <string>
 #include <memory>
+
+using namespace LM;
 
 void printUsage(const char* programName) {
     std::cout << "Limit Programming Language" << std::endl;
@@ -49,7 +52,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         std::string source = readFile(filename);
         
         // Frontend: Lexical analysis (scanning)
-        Scanner scanner(source, filename);
+        Frontend::Scanner scanner(source, filename);
         scanner.scanTokens();
         
         // Print tokens if requested
@@ -64,12 +67,12 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         
         // Frontend: Syntax analysis (parsing)
         bool useCSTMode = printCst; // Use CST mode if CST printing is requested
-        Parser parser(scanner, useCSTMode);
-        std::shared_ptr<AST::Program> ast = parser.parse();
+        Frontend::Parser parser(scanner, useCSTMode);
+        std::shared_ptr<LM::Frontend::AST::Program> ast = parser.parse();
         
         // Phase 1: Type checking (sets inferred types on AST nodes)
         std::cout << "=== Phase 1: Type Checking ===\n";
-        auto type_check_result = TypeCheckerFactory::check_program(ast, source, filename);
+        auto type_check_result = LM::Frontend::TypeCheckerFactory::check_program(ast, source, filename);
         if (!type_check_result.success) {
             std::cerr << "Type checking errors:\n";
             for (const auto& error : type_check_result.errors) {
@@ -81,7 +84,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         
         // Phase 2: Memory safety analysis (after types are set)
         std::cout << "=== Phase 2: Memory Safety Analysis ===\n";
-        auto memory_check_result = MemoryCheckerFactory::check_program(type_check_result.program, source, filename);
+        auto memory_check_result = LM::Frontend::MemoryCheckerFactory::check_program(type_check_result.program, source, filename);
         if (!memory_check_result.success) {
             std::cerr << "Memory safety errors detected:\n";
             // Memory errors are now reported through Debugger, so they'll show with proper formatting
@@ -104,7 +107,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         
         // Phase 3: Post-optimization verification
         std::cout << "=== Phase 3: Post-Optimization Verification ===\n";
-        auto post_opt_type_check = TypeCheckerFactory::check_program(ast, source, filename);
+        auto post_opt_type_check = LM::Frontend::TypeCheckerFactory::check_program(ast, source, filename);
         if (!post_opt_type_check.success) {
             std::cerr << "Post-optimization type errors:\n";
             for (const auto& error : post_opt_type_check.errors) {
@@ -123,7 +126,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         // Print AST after optimization if debug mode is enabled
         if (enableDebug || jitDebug) {
             std::cout << "=== AST After Optimization ===\n";
-            ASTPrinter printer_after;
+            LM::Frontend::AST::ASTPrinter printer_after;
             printer_after.process(ast);
             std::cout << std::endl;
         }
@@ -138,9 +141,9 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         // Print CST if requested
         if (printCst) {
             std::cout << "=== CST ===\n";
-            const CST::Node* cstRoot = parser.getCST();
+            const Frontend::CST::Node* cstRoot = parser.getCST();
             if (cstRoot) {
-                std::cout << CST::Printer::printCST(cstRoot) << std::endl;
+                std::cout << Frontend::CST::Printer::printCST(cstRoot) << std::endl;
             } else {
                 std::cout << "No CST available (parser not in CST mode)" << std::endl;
             }
@@ -149,7 +152,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         // Print AST if requested
         if (printAst) {
             std::cout << "=== AST ===\n";
-            ASTPrinter printer;
+            LM::Frontend::AST::ASTPrinter printer;
             printer.process(ast);
             std::cout << std::endl;
         }
@@ -432,15 +435,15 @@ void startRepl() {
         
         try {
             // Frontend: Lexical analysis (scanning)
-            Scanner scanner(line);
+            LM::Frontend::Scanner scanner(line);
             scanner.scanTokens();
             
             // Frontend: Syntax analysis (parsing)
-            Parser parser(scanner, false); // Use legacy mode for optimal REPL performance
-            std::shared_ptr<AST::Program> ast = parser.parse();
+            LM::Frontend::Parser parser(scanner, false); // Use legacy mode for optimal REPL performance
+            std::shared_ptr<LM::Frontend::AST::Program> ast = parser.parse();
             
             // Phase 1: Type checking (sets inferred types on AST nodes)
-            auto type_check_result = TypeCheckerFactory::check_program(ast);
+            auto type_check_result = LM::Frontend::TypeCheckerFactory::check_program(ast);
             if (!type_check_result.success) {
                 std::cerr << "Type checking errors:\n";
                 for (const auto& error : type_check_result.errors) {
@@ -450,7 +453,7 @@ void startRepl() {
             }
             
             // Phase 2: Memory safety analysis (after types are set)
-            auto memory_check_result = MemoryCheckerFactory::check_program(type_check_result.program);
+            auto memory_check_result = LM::Frontend::MemoryCheckerFactory::check_program(type_check_result.program);
             if (!memory_check_result.success) {
                 // Memory errors are now reported through Debugger, so they'll show with proper formatting
                 continue;
@@ -462,7 +465,7 @@ void startRepl() {
             ast = memory_check_result.program; // Use unoptimized AST
             
             // Phase 3: Post-optimization verification
-            auto post_opt_type_check = TypeCheckerFactory::check_program(ast);
+            auto post_opt_type_check = LM::Frontend::TypeCheckerFactory::check_program(ast);
             if (!post_opt_type_check.success) {
                 std::cerr << "Post-optimization type errors:\n";
                 for (const auto& error : post_opt_type_check.errors) {

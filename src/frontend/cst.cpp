@@ -2,6 +2,8 @@
 #include <sstream>
 #include <algorithm>
 
+namespace LM {
+namespace Frontend {
 namespace CST {
 
     // Node utility methods implementation
@@ -665,3 +667,5 @@ namespace CST {
     }
 
 } // namespace CST
+} // namespace Frontend
+} // namespace LM

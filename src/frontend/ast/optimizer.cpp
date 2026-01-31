@@ -1,9 +1,11 @@
-#include "ast.hh"
+#include "../ast.hh"
 #include <stdexcept>
 #include <cmath>
 #include <iomanip>
 #include <sstream>
 
+namespace LM {
+namespace Frontend {
 namespace AST {
 
 // Helper function to infer type of a literal value (similar to type checker)
@@ -132,32 +134,32 @@ std::shared_ptr<Program> ASTOptimizer::optimizeProgram(std::shared_ptr<Program> 
     return program;
 }
 
-std::shared_ptr<Expression> ASTOptimizer::optimizeExpression(std::shared_ptr<Expression> expr) {
+std::shared_ptr<LM::Frontend::AST::Expression> ASTOptimizer::optimizeExpression(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
     if (!expr) return nullptr;
 
     // Apply optimizations based on expression type
-    if (auto binary = std::dynamic_pointer_cast<BinaryExpr>(expr)) {
+    if (auto binary = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
         auto result = optimizeBinaryExpr(binary);
         // If optimization resulted in a different type (like literal), return it directly
         if (result != binary) {
             return std::dynamic_pointer_cast<Expression>(result);
         }
         return binary;
-    } else if (auto unary = std::dynamic_pointer_cast<UnaryExpr>(expr)) {
+    } else if (auto unary = std::dynamic_pointer_cast<LM::Frontend::AST::UnaryExpr>(expr)) {
         auto result = optimizeUnaryExpr(unary);
         if (result != unary) {
-            return std::dynamic_pointer_cast<Expression>(result);
+            return std::dynamic_pointer_cast<LM::Frontend::AST::Expression>(result);
         }
         return unary;
-    } else if (auto interpolated = std::dynamic_pointer_cast<InterpolatedStringExpr>(expr)) {
+    } else if (auto interpolated = std::dynamic_pointer_cast<LM::Frontend::AST::InterpolatedStringExpr>(expr)) {
         auto result = optimizeInterpolatedStringExpr(interpolated);
         if (result != interpolated) {
             return std::dynamic_pointer_cast<Expression>(result);
         }
         return interpolated;
-    } else if (auto literal = std::dynamic_pointer_cast<LiteralExpr>(expr)) {
+    } else if (auto literal = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr)) {
         return optimizeLiteralExpr(literal);
-    } else if (auto variable = std::dynamic_pointer_cast<VariableExpr>(expr)) {
+    } else if (auto variable = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr)) {
         auto result = optimizeVariableExpr(variable);
         // Check if constant propagation happened
         auto propagated = propagateConstants(variable);
@@ -165,44 +167,44 @@ std::shared_ptr<Expression> ASTOptimizer::optimizeExpression(std::shared_ptr<Exp
             return propagated;  // Return the literal from constant propagation
         }
         return variable;
-    } else if (auto grouping = std::dynamic_pointer_cast<GroupingExpr>(expr)) {
+    } else if (auto grouping = std::dynamic_pointer_cast<LM::Frontend::AST::GroupingExpr>(expr)) {
         return optimizeGroupingExpr(grouping);
-    } else if (auto ternary = std::dynamic_pointer_cast<TernaryExpr>(expr)) {
+    } else if (auto ternary = std::dynamic_pointer_cast<LM::Frontend::AST::TernaryExpr>(expr)) {
         return optimizeTernaryExpr(ternary);
-    } else if (auto assign = std::dynamic_pointer_cast<AssignExpr>(expr)) {
+    } else if (auto assign = std::dynamic_pointer_cast<LM::Frontend::AST::AssignExpr>(expr)) {
         return optimizeAssignExpr(assign);
     }
     
     return expr;
 }
 
-std::shared_ptr<Statement> ASTOptimizer::optimizeStatement(std::shared_ptr<Statement> stmt) {
+std::shared_ptr<LM::Frontend::AST::Statement> ASTOptimizer::optimizeStatement(std::shared_ptr<LM::Frontend::AST::Statement> stmt) {
     if (!stmt) return nullptr;
     
     // Apply optimizations based on statement type
-    if (auto varDecl = std::dynamic_pointer_cast<VarDeclaration>(stmt)) {
+    if (auto varDecl = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
         return optimizeVarDeclaration(varDecl);
-    } else if (auto block = std::dynamic_pointer_cast<BlockStatement>(stmt)) {
+    } else if (auto block = std::dynamic_pointer_cast<LM::Frontend::AST::BlockStatement>(stmt)) {
         return optimizeBlockStatement(block);
-    } else if (auto ifStmt = std::dynamic_pointer_cast<IfStatement>(stmt)) {
+    } else if (auto ifStmt = std::dynamic_pointer_cast<LM::Frontend::AST::IfStatement>(stmt)) {
         auto optimized = optimizeIfStatement(ifStmt);
         // If the if statement was optimized away (null), return null
         // The caller (like optimizeBlockStatement) should handle this
         return optimized;
-    } else if (auto whileStmt = std::dynamic_pointer_cast<WhileStatement>(stmt)) {
+    } else if (auto whileStmt = std::dynamic_pointer_cast<LM::Frontend::AST::WhileStatement>(stmt)) {
         return optimizeWhileStatement(whileStmt);
-    } else if (auto forStmt = std::dynamic_pointer_cast<ForStatement>(stmt)) {
+    } else if (auto forStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ForStatement>(stmt)) {
         return optimizeForStatement(forStmt);
-    } else if (auto returnStmt = std::dynamic_pointer_cast<ReturnStatement>(stmt)) {
+    } else if (auto returnStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ReturnStatement>(stmt)) {
         return optimizeReturnStatement(returnStmt);
-    } else if (auto printStmt = std::dynamic_pointer_cast<PrintStatement>(stmt)) {
+    } else if (auto printStmt = std::dynamic_pointer_cast<LM::Frontend::AST::PrintStatement>(stmt)) {
         return optimizePrintStatement(printStmt);
     }
     
     return stmt;
 }
 
-std::shared_ptr<PrintStatement> ASTOptimizer::optimizePrintStatement(std::shared_ptr<PrintStatement> stmt) {
+std::shared_ptr<LM::Frontend::AST::PrintStatement> ASTOptimizer::optimizePrintStatement(std::shared_ptr<LM::Frontend::AST::PrintStatement> stmt) {
     if (!stmt) return nullptr;
     
     // Optimize all arguments
@@ -217,7 +219,7 @@ std::shared_ptr<PrintStatement> ASTOptimizer::optimizePrintStatement(std::shared
 // EXPRESSION OPTIMIZATIONS
 // ============================================================================
 
-std::shared_ptr<Expression> ASTOptimizer::optimizeBinaryExpr(std::shared_ptr<BinaryExpr> expr) {
+std::shared_ptr<LM::Frontend::AST::Expression> ASTOptimizer::optimizeBinaryExpr(std::shared_ptr<LM::Frontend::AST::BinaryExpr> expr) {
     if (!expr) return nullptr;
     
     // Optimize operands first
@@ -248,7 +250,7 @@ std::shared_ptr<Expression> ASTOptimizer::optimizeBinaryExpr(std::shared_ptr<Bin
     return expr;
 }
 
-std::shared_ptr<Expression> ASTOptimizer::optimizeUnaryExpr(std::shared_ptr<UnaryExpr> expr) {
+std::shared_ptr<LM::Frontend::AST::Expression> ASTOptimizer::optimizeUnaryExpr(std::shared_ptr<LM::Frontend::AST::UnaryExpr> expr) {
     if (!expr) return nullptr;
     
     // Optimize the operand first
@@ -264,14 +266,14 @@ std::shared_ptr<Expression> ASTOptimizer::optimizeUnaryExpr(std::shared_ptr<Unar
     return expr;
 }
 
-std::shared_ptr<Expression> ASTOptimizer::optimizeInterpolatedStringExpr(std::shared_ptr<InterpolatedStringExpr> expr) {
+std::shared_ptr<LM::Frontend::AST::Expression> ASTOptimizer::optimizeInterpolatedStringExpr(std::shared_ptr<LM::Frontend::AST::InterpolatedStringExpr> expr) {
     if (!expr) return nullptr;
 
     std::cout << "DEBUG: optimizeInterpolatedStringExpr called with " << expr->parts.size() << " parts" << std::endl;
 
     // Optimize all expression parts
     for (auto& part : expr->parts) {
-        if (auto exprPart = std::get_if<std::shared_ptr<Expression>>(&part)) {
+        if (auto exprPart = std::get_if<std::shared_ptr<LM::Frontend::AST::Expression>>(&part)) {
             *exprPart = optimizeExpression(*exprPart);
         }
     }
@@ -287,7 +289,7 @@ std::shared_ptr<Expression> ASTOptimizer::optimizeInterpolatedStringExpr(std::sh
     return expr;
 }
 
-std::shared_ptr<LiteralExpr> ASTOptimizer::optimizeLiteralExpr(std::shared_ptr<LiteralExpr> expr) {
+std::shared_ptr<LM::Frontend::AST::LiteralExpr> ASTOptimizer::optimizeLiteralExpr(std::shared_ptr<LM::Frontend::AST::LiteralExpr> expr) {
     if (!expr) return nullptr;
     
     // CRITICAL: Set inferred type using type inference if not already set
@@ -299,7 +301,7 @@ std::shared_ptr<LiteralExpr> ASTOptimizer::optimizeLiteralExpr(std::shared_ptr<L
     return expr;
 }
 
-std::shared_ptr<VariableExpr> ASTOptimizer::optimizeVariableExpr(std::shared_ptr<VariableExpr> expr) {
+std::shared_ptr<LM::Frontend::AST::VariableExpr> ASTOptimizer::optimizeVariableExpr(std::shared_ptr<LM::Frontend::AST::VariableExpr> expr) {
     if (!expr) return nullptr;
     
     // Variable expressions don't need optimization themselves
@@ -307,21 +309,21 @@ std::shared_ptr<VariableExpr> ASTOptimizer::optimizeVariableExpr(std::shared_ptr
     return expr;
 }
 
-std::shared_ptr<Expression> ASTOptimizer::optimizeGroupingExpr(std::shared_ptr<GroupingExpr> expr) {
+std::shared_ptr<LM::Frontend::AST::Expression> ASTOptimizer::optimizeGroupingExpr(std::shared_ptr<LM::Frontend::AST::GroupingExpr> expr) {
     if (!expr) return nullptr;
     
     // Optimize the grouped expression
     expr->expression = optimizeExpression(expr->expression);
     
     // If the grouped expression is a literal, remove the grouping
-    if (auto literal = std::dynamic_pointer_cast<LiteralExpr>(expr->expression)) {
+    if (auto literal = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr->expression)) {
         return literal;
     }
     
     return expr;
 }
 
-std::shared_ptr<CallExpr> ASTOptimizer::optimizeCallExpr(std::shared_ptr<CallExpr> expr) {
+std::shared_ptr<LM::Frontend::AST::CallExpr> ASTOptimizer::optimizeCallExpr(std::shared_ptr<LM::Frontend::AST::CallExpr> expr) {
     if (!expr) return nullptr;
     
     // Optimize callee and arguments
@@ -336,7 +338,7 @@ std::shared_ptr<CallExpr> ASTOptimizer::optimizeCallExpr(std::shared_ptr<CallExp
     return expr;
 }
 
-std::shared_ptr<TernaryExpr> ASTOptimizer::optimizeTernaryExpr(std::shared_ptr<TernaryExpr> expr) {
+std::shared_ptr<LM::Frontend::AST::TernaryExpr> ASTOptimizer::optimizeTernaryExpr(std::shared_ptr<LM::Frontend::AST::TernaryExpr> expr) {
     if (!expr) return nullptr;
     
     // Optimize condition, then, and else branches
@@ -347,13 +349,13 @@ std::shared_ptr<TernaryExpr> ASTOptimizer::optimizeTernaryExpr(std::shared_ptr<T
     // Apply branch simplification
     auto simplified = simplifyBranches(expr);
     if (simplified != expr) {
-        return std::dynamic_pointer_cast<TernaryExpr>(simplified);
+        return std::dynamic_pointer_cast<LM::Frontend::AST::TernaryExpr>(simplified);
     }
     
     return expr;
 }
 
-std::shared_ptr<AssignExpr> ASTOptimizer::optimizeAssignExpr(std::shared_ptr<AssignExpr> expr) {
+std::shared_ptr<LM::Frontend::AST::AssignExpr> ASTOptimizer::optimizeAssignExpr(std::shared_ptr<LM::Frontend::AST::AssignExpr> expr) {
     if (!expr) return nullptr;
     
     // Optimize the right-hand side value first
@@ -370,7 +372,7 @@ std::shared_ptr<AssignExpr> ASTOptimizer::optimizeAssignExpr(std::shared_ptr<Ass
 // STATEMENT OPTIMIZATIONS
 // ============================================================================
 
-std::shared_ptr<VarDeclaration> ASTOptimizer::optimizeVarDeclaration(std::shared_ptr<VarDeclaration> stmt) {
+std::shared_ptr<LM::Frontend::AST::VarDeclaration> ASTOptimizer::optimizeVarDeclaration(std::shared_ptr<LM::Frontend::AST::VarDeclaration> stmt) {
     if (!stmt) return nullptr;
     
     // Optimize initializer if present
@@ -392,14 +394,14 @@ std::shared_ptr<VarDeclaration> ASTOptimizer::optimizeVarDeclaration(std::shared
     return stmt;
 }
 
-std::shared_ptr<BlockStatement> ASTOptimizer::optimizeBlockStatement(std::shared_ptr<BlockStatement> stmt) {
+std::shared_ptr<LM::Frontend::AST::BlockStatement> ASTOptimizer::optimizeBlockStatement(std::shared_ptr<LM::Frontend::AST::BlockStatement> stmt) {
     if (!stmt) return nullptr;
     
     // Enter new scope
     context.pushScope();
     
     // Optimize all statements
-    std::vector<std::shared_ptr<Statement>> optimized_stmts;
+    std::vector<std::shared_ptr<LM::Frontend::AST::Statement>> optimized_stmts;
     for (auto& s : stmt->statements) {
         auto optimized = optimizeStatement(s);
         
@@ -419,7 +421,7 @@ std::shared_ptr<BlockStatement> ASTOptimizer::optimizeBlockStatement(std::shared
     return stmt;
 }
 
-std::shared_ptr<Statement> ASTOptimizer::optimizeIfStatement(std::shared_ptr<IfStatement> stmt) {
+std::shared_ptr<LM::Frontend::AST::Statement> ASTOptimizer::optimizeIfStatement(std::shared_ptr<LM::Frontend::AST::IfStatement> stmt) {
     if (!stmt) return nullptr;
     
     // Optimize condition first
@@ -450,7 +452,7 @@ std::shared_ptr<Statement> ASTOptimizer::optimizeIfStatement(std::shared_ptr<IfS
     return stmt;
 }
 
-std::shared_ptr<WhileStatement> ASTOptimizer::optimizeWhileStatement(std::shared_ptr<WhileStatement> stmt) {
+std::shared_ptr<LM::Frontend::AST::WhileStatement> ASTOptimizer::optimizeWhileStatement(std::shared_ptr<LM::Frontend::AST::WhileStatement> stmt) {
     if (!stmt) return nullptr;
     
     // Set in_loop flag and optimize body and condition
@@ -469,7 +471,7 @@ std::shared_ptr<WhileStatement> ASTOptimizer::optimizeWhileStatement(std::shared
     return stmt;
 }
 
-std::shared_ptr<ForStatement> ASTOptimizer::optimizeForStatement(std::shared_ptr<ForStatement> stmt) {
+std::shared_ptr<LM::Frontend::AST::ForStatement> ASTOptimizer::optimizeForStatement(std::shared_ptr<LM::Frontend::AST::ForStatement> stmt) {
     if (!stmt) return nullptr;
     
     // Optimize initializer first (outside loop)
@@ -491,7 +493,7 @@ std::shared_ptr<ForStatement> ASTOptimizer::optimizeForStatement(std::shared_ptr
     return stmt;
 }
 
-std::shared_ptr<ReturnStatement> ASTOptimizer::optimizeReturnStatement(std::shared_ptr<ReturnStatement> stmt) {
+std::shared_ptr<LM::Frontend::AST::ReturnStatement> ASTOptimizer::optimizeReturnStatement(std::shared_ptr<LM::Frontend::AST::ReturnStatement> stmt) {
     if (!stmt) return nullptr;
     
     // Optimize return value if present
@@ -506,11 +508,11 @@ std::shared_ptr<ReturnStatement> ASTOptimizer::optimizeReturnStatement(std::shar
 // CORE OPTIMIZATION UTILITIES
 // ============================================================================
 
-std::shared_ptr<Expression> ASTOptimizer::foldConstants(std::shared_ptr<Expression> expr) {
+std::shared_ptr<LM::Frontend::AST::Expression> ASTOptimizer::foldConstants(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
     if (!expr) return nullptr;
     
     // Handle binary expressions
-    if (auto binary = std::dynamic_pointer_cast<BinaryExpr>(expr)) {
+    if (auto binary = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
         if (isLiteralConstant(binary->left) && isLiteralConstant(binary->right)) {
             auto result = evaluateBinaryOp(binary->op, binary->left, binary->right);
             if (result) {
@@ -521,7 +523,7 @@ std::shared_ptr<Expression> ASTOptimizer::foldConstants(std::shared_ptr<Expressi
     }
     
     // Handle unary expressions
-    if (auto unary = std::dynamic_pointer_cast<UnaryExpr>(expr)) {
+    if (auto unary = std::dynamic_pointer_cast<LM::Frontend::AST::UnaryExpr>(expr)) {
         if (isLiteralConstant(unary->right)) {
             auto result = evaluateUnaryOp(unary->op, unary->right);
             if (result) {
@@ -534,7 +536,7 @@ std::shared_ptr<Expression> ASTOptimizer::foldConstants(std::shared_ptr<Expressi
     return expr;
 }
 
-std::shared_ptr<Expression> ASTOptimizer::propagateConstants(std::shared_ptr<Expression> expr) {
+std::shared_ptr<LM::Frontend::AST::Expression> ASTOptimizer::propagateConstants(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
     if (!expr) return nullptr;
     
     // Don't propagate inside loops
@@ -543,7 +545,7 @@ std::shared_ptr<Expression> ASTOptimizer::propagateConstants(std::shared_ptr<Exp
     }
     
     // Handle variable references
-    if (auto variable = std::dynamic_pointer_cast<VariableExpr>(expr)) {
+    if (auto variable = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr)) {
         // Don't propagate reassigned variables (like loop counters)
         if (context.reassigned_vars.find(variable->name) != context.reassigned_vars.end()) {
             return expr;
@@ -555,8 +557,8 @@ std::shared_ptr<Expression> ASTOptimizer::propagateConstants(std::shared_ptr<Exp
             auto constant = context.getConstant(variable->name);
             if (constant) {
                 // Create a copy of the constant to avoid modifying the original
-                if (auto literal = std::dynamic_pointer_cast<LiteralExpr>(constant)) {
-                    auto copy = std::make_shared<LiteralExpr>(*literal);
+                if (auto literal = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(constant)) {
+                    auto copy = std::make_shared<LM::Frontend::AST::LiteralExpr>(*literal);
                     
                     std::cout << "[DEBUG] Constant propagation for variable '" << variable->name << "':" << std::endl;
                     std::cout << "  - Variable has inferred_type: " << (variable->inferred_type ? "YES" : "NO") << std::endl;
@@ -594,11 +596,11 @@ std::shared_ptr<Expression> ASTOptimizer::propagateConstants(std::shared_ptr<Exp
     return expr;
 }
 
-std::shared_ptr<Expression> ASTOptimizer::simplifyBranches(std::shared_ptr<Expression> expr) {
+std::shared_ptr<LM::Frontend::AST::Expression> ASTOptimizer::simplifyBranches(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
     if (!expr) return nullptr;
     
     // Handle ternary expressions
-    if (auto ternary = std::dynamic_pointer_cast<TernaryExpr>(expr)) {
+    if (auto ternary = std::dynamic_pointer_cast<LM::Frontend::AST::TernaryExpr>(expr)) {
         if (isCompileTimeTrue(ternary->condition)) {
             return ternary->thenBranch;
         } else if (isCompileTimeFalse(ternary->condition)) {
@@ -609,14 +611,14 @@ std::shared_ptr<Expression> ASTOptimizer::simplifyBranches(std::shared_ptr<Expre
     return expr;
 }
 
-std::shared_ptr<Expression> ASTOptimizer::simplifyAlgebraic(std::shared_ptr<Expression> expr) {
+std::shared_ptr<LM::Frontend::AST::Expression> ASTOptimizer::simplifyAlgebraic(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
     if (!expr) return nullptr;
     
     // Handle binary expressions
-    if (auto binary = std::dynamic_pointer_cast<BinaryExpr>(expr)) {
+    if (auto binary = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
         // x + 0 -> x
         if (binary->op == TokenType::PLUS && isLiteralConstant(binary->right)) {
-            if (auto rightLiteral = std::dynamic_pointer_cast<LiteralExpr>(binary->right)) {
+            if (auto rightLiteral = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(binary->right)) {
                 if (std::get_if<std::string>(&rightLiteral->value)) {
                     auto strVal = std::get<std::string>(rightLiteral->value);
                     if (strVal == "0") {
@@ -629,7 +631,7 @@ std::shared_ptr<Expression> ASTOptimizer::simplifyAlgebraic(std::shared_ptr<Expr
         
         // x * 1 -> x
         if (binary->op == TokenType::STAR && isLiteralConstant(binary->right)) {
-            if (auto rightLiteral = std::dynamic_pointer_cast<LiteralExpr>(binary->right)) {
+            if (auto rightLiteral = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(binary->right)) {
                 if (std::get_if<std::string>(&rightLiteral->value)) {
                     auto strVal = std::get<std::string>(rightLiteral->value);
                     if (strVal == "1") {
@@ -657,7 +659,7 @@ std::shared_ptr<Expression> ASTOptimizer::simplifyAlgebraic(std::shared_ptr<Expr
     return expr;
 }
 
-std::shared_ptr<Expression> ASTOptimizer::lowerInterpolation(std::shared_ptr<InterpolatedStringExpr> expr) {
+std::shared_ptr<LM::Frontend::AST::Expression> ASTOptimizer::lowerInterpolation(std::shared_ptr<LM::Frontend::AST::InterpolatedStringExpr> expr) {
     if (!expr) return nullptr;
 
     std::cout << "DEBUG: lowerInterpolation called with " << expr->parts.size() << " parts" << std::endl;
@@ -684,7 +686,7 @@ std::shared_ptr<Expression> ASTOptimizer::lowerInterpolation(std::shared_ptr<Int
                 break;
             }
             // Check if this expression part is now a literal after optimization
-            if (auto literal = std::dynamic_pointer_cast<LiteralExpr>(*exprPart)) {
+            if (auto literal = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(*exprPart)) {
                 std::cout << "DEBUG: Expression part is a literal" << std::endl;
                 if (std::holds_alternative<std::string>(literal->value)) {
                     // It's a string literal - add it to the result
@@ -741,7 +743,7 @@ std::shared_ptr<Expression> ASTOptimizer::lowerInterpolation(std::shared_ptr<Int
             if (!strPart->empty()) {
                 current = createStringLiteral(*strPart, expr->line);
             }
-        } else if (auto exprPart = std::get_if<std::shared_ptr<Expression>>(&part)) {
+        } else if (auto exprPart = std::get_if<std::shared_ptr<LM::Frontend::AST::Expression>>(&part)) {
             current = *exprPart;
             // If the expression is not a string, convert it to string
             if (current && current->inferred_type && 
@@ -756,7 +758,7 @@ std::shared_ptr<Expression> ASTOptimizer::lowerInterpolation(std::shared_ptr<Int
                 result = current;
             } else {
                 // Create concatenation
-                auto concat = std::make_shared<BinaryExpr>();
+                auto concat = std::make_shared<LM::Frontend::AST::BinaryExpr>();
                 concat->left = result;
                 concat->right = current;
                 concat->op = TokenType::PLUS;
@@ -775,14 +777,14 @@ std::shared_ptr<Expression> ASTOptimizer::lowerInterpolation(std::shared_ptr<Int
     return expr;
 }
 
-std::shared_ptr<Expression> ASTOptimizer::canonicalizeStrings(std::shared_ptr<Expression> expr) {
+std::shared_ptr<LM::Frontend::AST::Expression> ASTOptimizer::canonicalizeStrings(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
     if (!expr) return nullptr;
     
     // Handle binary string concatenation
-    if (auto binary = std::dynamic_pointer_cast<BinaryExpr>(expr)) {
+    if (auto binary = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
         if (binary->op == TokenType::PLUS) {
-            auto leftLiteral = std::dynamic_pointer_cast<LiteralExpr>(binary->left);
-            auto rightLiteral = std::dynamic_pointer_cast<LiteralExpr>(binary->right);
+            auto leftLiteral = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(binary->left);
+            auto rightLiteral = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(binary->right);
             
             if (leftLiteral && rightLiteral) {
                 // Concatenate if either is a string (string + anything)
@@ -813,13 +815,13 @@ std::shared_ptr<Expression> ASTOptimizer::canonicalizeStrings(std::shared_ptr<Ex
 // UTILITY METHODS
 // ============================================================================
 
-bool ASTOptimizer::isLiteralConstant(std::shared_ptr<Expression> expr) {
-    return std::dynamic_pointer_cast<LiteralExpr>(expr) != nullptr;
+bool ASTOptimizer::isLiteralConstant(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
+    return std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr) != nullptr;
 }
 
-std::shared_ptr<Expression> ASTOptimizer::evaluateBinaryOp(TokenType op, std::shared_ptr<Expression> left, std::shared_ptr<Expression> right) {
-    auto leftLiteral = std::dynamic_pointer_cast<LiteralExpr>(left);
-    auto rightLiteral = std::dynamic_pointer_cast<LiteralExpr>(right);
+std::shared_ptr<LM::Frontend::AST::Expression> ASTOptimizer::evaluateBinaryOp(TokenType op, std::shared_ptr<LM::Frontend::AST::Expression> left, std::shared_ptr<LM::Frontend::AST::Expression> right) {
+    auto leftLiteral = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(left);
+    auto rightLiteral = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(right);
     
     if (!leftLiteral || !rightLiteral) return nullptr;
     
@@ -900,7 +902,7 @@ std::shared_ptr<Expression> ASTOptimizer::evaluateBinaryOp(TokenType op, std::sh
                 }
                 
                 // Create the folded literal with higher precision
-                auto foldedLiteral = std::make_shared<LiteralExpr>();
+                auto foldedLiteral = std::make_shared<LM::Frontend::AST::LiteralExpr>();
                 
                 // Use higher precision formatting
                 std::ostringstream oss;
@@ -971,8 +973,8 @@ std::shared_ptr<Expression> ASTOptimizer::evaluateBinaryOp(TokenType op, std::sh
     return nullptr;
 }
 
-std::shared_ptr<Expression> ASTOptimizer::evaluateUnaryOp(TokenType op, std::shared_ptr<Expression> right) {
-    auto rightLiteral = std::dynamic_pointer_cast<LiteralExpr>(right);
+std::shared_ptr<LM::Frontend::AST::Expression> ASTOptimizer::evaluateUnaryOp(TokenType op, std::shared_ptr<LM::Frontend::AST::Expression> right) {
+    auto rightLiteral = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(right);
     if (!rightLiteral) return nullptr;
     
     // Handle boolean negation
@@ -1034,7 +1036,7 @@ std::shared_ptr<Expression> ASTOptimizer::evaluateUnaryOp(TokenType op, std::sha
     return nullptr;
 }
 
-bool ASTOptimizer::isCompileTimeFalse(std::shared_ptr<Expression> expr) {
+bool ASTOptimizer::isCompileTimeFalse(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
     if (auto literal = std::dynamic_pointer_cast<LiteralExpr>(expr)) {
         if (auto boolVal = std::get_if<bool>(&literal->value)) {
             return !*boolVal;
@@ -1046,8 +1048,8 @@ bool ASTOptimizer::isCompileTimeFalse(std::shared_ptr<Expression> expr) {
     return false;
 }
 
-bool ASTOptimizer::isCompileTimeTrue(std::shared_ptr<Expression> expr) {
-    if (auto literal = std::dynamic_pointer_cast<LiteralExpr>(expr)) {
+bool ASTOptimizer::isCompileTimeTrue(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
+    if (auto literal = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr)) {
         if (auto boolVal = std::get_if<bool>(&literal->value)) {
             return *boolVal;
         }
@@ -1058,7 +1060,7 @@ bool ASTOptimizer::isCompileTimeTrue(std::shared_ptr<Expression> expr) {
     return false;
 }
 
-bool ASTOptimizer::isUnreachableCode(std::shared_ptr<Statement> stmt) {
+bool ASTOptimizer::isUnreachableCode(std::shared_ptr<LM::Frontend::AST::Statement> stmt) {
     // Check for statements after return statements
     if (!stmt) return true; // null statement is unreachable
     
@@ -1077,12 +1079,12 @@ bool ASTOptimizer::isUnreachableCode(std::shared_ptr<Statement> stmt) {
     return false; // Conservative approach - assume reachable
 }
 
-std::shared_ptr<Statement> ASTOptimizer::eliminateDeadCode(std::shared_ptr<Statement> stmt) {
+std::shared_ptr<LM::Frontend::AST::Statement> ASTOptimizer::eliminateDeadCode(std::shared_ptr<LM::Frontend::AST::Statement> stmt) {
     if (!stmt) return nullptr;
     
     // Handle different statement types for dead code elimination
     
-    if (auto ifStmt = std::dynamic_pointer_cast<IfStatement>(stmt)) {
+    if (auto ifStmt = std::dynamic_pointer_cast<LM::Frontend::AST::IfStatement>(stmt)) {
         // Optimize condition first
         ifStmt->condition = optimizeExpression(ifStmt->condition);
         
@@ -1110,7 +1112,7 @@ std::shared_ptr<Statement> ASTOptimizer::eliminateDeadCode(std::shared_ptr<State
         return ifStmt;
     }
     
-    if (auto whileStmt = std::dynamic_pointer_cast<WhileStatement>(stmt)) {
+    if (auto whileStmt = std::dynamic_pointer_cast<LM::Frontend::AST::WhileStatement>(stmt)) {
         // Optimize condition
         whileStmt->condition = optimizeExpression(whileStmt->condition);
         
@@ -1126,10 +1128,10 @@ std::shared_ptr<Statement> ASTOptimizer::eliminateDeadCode(std::shared_ptr<State
         return whileStmt;
     }
     
-    if (auto blockStmt = std::dynamic_pointer_cast<BlockStatement>(stmt)) {
+    if (auto blockStmt = std::dynamic_pointer_cast<LM::Frontend::AST::BlockStatement>(stmt)) {
         context.pushScope();
         
-        std::vector<std::shared_ptr<Statement>> optimizedStatements;
+        std::vector<std::shared_ptr<LM::Frontend::AST::Statement>> optimizedStatements;
         bool foundReturn = false;
         
         for (auto& s : blockStmt->statements) {
@@ -1142,7 +1144,7 @@ std::shared_ptr<Statement> ASTOptimizer::eliminateDeadCode(std::shared_ptr<State
             auto optimized = optimizeStatement(s);
             
             // Check if this is a return statement
-            if (std::dynamic_pointer_cast<ReturnStatement>(optimized)) {
+            if (std::dynamic_pointer_cast<LM::Frontend::AST::ReturnStatement>(optimized)) {
                 foundReturn = true;
             }
             
@@ -1159,13 +1161,13 @@ std::shared_ptr<Statement> ASTOptimizer::eliminateDeadCode(std::shared_ptr<State
     }
     
     // For other statement types, just optimize their expressions
-    if (auto returnStmt = std::dynamic_pointer_cast<ReturnStatement>(stmt)) {
+    if (auto returnStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ReturnStatement>(stmt)) {
         if (returnStmt->value) {
             returnStmt->value = optimizeExpression(returnStmt->value);
         }
     }
     
-    if (auto exprStmt = std::dynamic_pointer_cast<ExprStatement>(stmt)) {
+    if (auto exprStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ExprStatement>(stmt)) {
         if (exprStmt->expression) {
             exprStmt->expression = optimizeExpression(exprStmt->expression);
             
@@ -1178,7 +1180,7 @@ std::shared_ptr<Statement> ASTOptimizer::eliminateDeadCode(std::shared_ptr<State
         }
     }
     
-    if (auto varDecl = std::dynamic_pointer_cast<VarDeclaration>(stmt)) {
+    if (auto varDecl = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
         if (varDecl->initializer) {
             varDecl->initializer = optimizeExpression(varDecl->initializer);
         }
@@ -1200,28 +1202,28 @@ void ASTOptimizer::preAnalyzeReassignments(std::shared_ptr<Program> program) {
     }
 }
 
-void ASTOptimizer::preAnalyzeStatement(std::shared_ptr<Statement> stmt) {
+void ASTOptimizer::preAnalyzeStatement(std::shared_ptr<LM::Frontend::AST::Statement> stmt) {
     if (!stmt) return;
     
-    if (auto varDecl = std::dynamic_pointer_cast<VarDeclaration>(stmt)) {
+    if (auto varDecl = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
         // Variable declarations don't count as reassignments
         if (varDecl->initializer) {
             preAnalyzeExpression(varDecl->initializer);
         }
-    } else if (auto block = std::dynamic_pointer_cast<BlockStatement>(stmt)) {
+    } else if (auto block = std::dynamic_pointer_cast<LM::Frontend::AST::BlockStatement>(stmt)) {
         for (auto& s : block->statements) {
             preAnalyzeStatement(s);
         }
-    } else if (auto ifStmt = std::dynamic_pointer_cast<IfStatement>(stmt)) {
+    } else if (auto ifStmt = std::dynamic_pointer_cast<LM::Frontend::AST::IfStatement>(stmt)) {
         preAnalyzeExpression(ifStmt->condition);
         preAnalyzeStatement(ifStmt->thenBranch);
         if (ifStmt->elseBranch) {
             preAnalyzeStatement(ifStmt->elseBranch);
         }
-    } else if (auto whileStmt = std::dynamic_pointer_cast<WhileStatement>(stmt)) {
+    } else if (auto whileStmt = std::dynamic_pointer_cast<LM::Frontend::AST::WhileStatement>(stmt)) {
         preAnalyzeExpression(whileStmt->condition);
         preAnalyzeStatement(whileStmt->body);
-    } else if (auto forStmt = std::dynamic_pointer_cast<ForStatement>(stmt)) {
+    } else if (auto forStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ForStatement>(stmt)) {
         if (forStmt->initializer) {
             preAnalyzeStatement(forStmt->initializer);
         }
@@ -1232,44 +1234,44 @@ void ASTOptimizer::preAnalyzeStatement(std::shared_ptr<Statement> stmt) {
             preAnalyzeExpression(forStmt->increment);
         }
         preAnalyzeStatement(forStmt->body);
-    } else if (auto returnStmt = std::dynamic_pointer_cast<ReturnStatement>(stmt)) {
+    } else if (auto returnStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ReturnStatement>(stmt)) {
         if (returnStmt->value) {
             preAnalyzeExpression(returnStmt->value);
         }
-    } else if (auto printStmt = std::dynamic_pointer_cast<PrintStatement>(stmt)) {
+    } else if (auto printStmt = std::dynamic_pointer_cast<LM::Frontend::AST::PrintStatement>(stmt)) {
         for (auto& arg : printStmt->arguments) {
             preAnalyzeExpression(arg);
         }
-    } else if (auto exprStmt = std::dynamic_pointer_cast<ExprStatement>(stmt)) {
+    } else if (auto exprStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ExprStatement>(stmt)) {
         preAnalyzeExpression(exprStmt->expression);
     }
 }
 
-void ASTOptimizer::preAnalyzeExpression(std::shared_ptr<Expression> expr) {
+void ASTOptimizer::preAnalyzeExpression(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
     if (!expr) return;
     
-    if (auto assign = std::dynamic_pointer_cast<AssignExpr>(expr)) {
+    if (auto assign = std::dynamic_pointer_cast<LM::Frontend::AST::AssignExpr>(expr)) {
         // This is a reassignment - mark the variable as reassigned
         context.markReassigned(assign->name);
         preAnalyzeExpression(assign->value);
-    } else if (auto binary = std::dynamic_pointer_cast<BinaryExpr>(expr)) {
+    } else if (auto binary = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
         preAnalyzeExpression(binary->left);
         preAnalyzeExpression(binary->right);
-    } else if (auto unary = std::dynamic_pointer_cast<UnaryExpr>(expr)) {
+    } else if (auto unary = std::dynamic_pointer_cast<LM::Frontend::AST::UnaryExpr>(expr)) {
         preAnalyzeExpression(unary->right);
-    } else if (auto interpolated = std::dynamic_pointer_cast<InterpolatedStringExpr>(expr)) {
+    } else if (auto interpolated = std::dynamic_pointer_cast<LM::Frontend::AST::InterpolatedStringExpr>(expr)) {
         for (const auto& part : interpolated->parts) {
-            if (auto exprPart = std::get_if<std::shared_ptr<Expression>>(&part)) {
+            if (auto exprPart = std::get_if<std::shared_ptr<LM::Frontend::AST::Expression>>(&part)) {
                 preAnalyzeExpression(*exprPart);
             }
         }
-    } else if (auto grouping = std::dynamic_pointer_cast<GroupingExpr>(expr)) {
+    } else if (auto grouping = std::dynamic_pointer_cast<LM::Frontend::AST::GroupingExpr>(expr)) {
         preAnalyzeExpression(grouping->expression);
-    } else if (auto ternary = std::dynamic_pointer_cast<TernaryExpr>(expr)) {
+    } else if (auto ternary = std::dynamic_pointer_cast<LM::Frontend::AST::TernaryExpr>(expr)) {
         preAnalyzeExpression(ternary->condition);
         preAnalyzeExpression(ternary->thenBranch);
         preAnalyzeExpression(ternary->elseBranch);
-    } else if (auto call = std::dynamic_pointer_cast<CallExpr>(expr)) {
+    } else if (auto call = std::dynamic_pointer_cast<LM::Frontend::AST::CallExpr>(expr)) {
         preAnalyzeExpression(call->callee);
         for (auto& arg : call->arguments) {
             preAnalyzeExpression(arg);
@@ -1282,3 +1284,5 @@ void ASTOptimizer::preAnalyzeExpression(std::shared_ptr<Expression> expr) {
 }
 
 } // namespace AST
+} // namespace Frontend
+} // namespace LM

@@ -1,9 +1,10 @@
-#include "ast_builder.hh"
+#include "builder.hh"
 #include <sstream>
 #include <algorithm>
 #include <cctype>
 
-namespace frontend {
+namespace LM {
+namespace Frontend {
 
     // Constructor
     ASTBuilder::ASTBuilder(const BuildConfig& config) : config_(config) {
@@ -1292,4 +1293,6 @@ namespace frontend {
         return genericType;
     }
 
-} // namespace frontend
+
+} // namespace Frontend
+} // namespace LM

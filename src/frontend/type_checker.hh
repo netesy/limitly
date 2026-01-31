@@ -14,6 +14,9 @@
 // Implements the mental model: AST -> Typed AST (with memory safety) -> LIR (typed) -> JIT
 // =============================================================================
 
+namespace LM {
+namespace Frontend {
+
 class TypeChecker {
 private:
     TypeSystem& type_system;
@@ -42,7 +45,7 @@ private:
         std::string name;
         std::vector<TypePtr> param_types;
         TypePtr return_type;
-        std::shared_ptr<AST::FunctionDeclaration> declaration;
+        std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> declaration;
         bool can_fail = false;
         std::vector<std::string> error_types;
         std::vector<bool> optional_params;
@@ -59,7 +62,7 @@ private:
     std::unordered_map<std::string, FunctionSignature> function_signatures;
     
     // Current context
-    std::shared_ptr<AST::FunctionDeclaration> current_function = nullptr;
+    std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> current_function = nullptr;
     TypePtr current_return_type = nullptr;
     bool in_loop = false;
     
@@ -96,7 +99,7 @@ public:
     explicit TypeChecker(TypeSystem& ts) : type_system(ts) {}
     
     // Main entry point - type check entire program
-    bool check_program(std::shared_ptr<AST::Program> program);
+    bool check_program(std::shared_ptr<LM::Frontend::AST::Program> program);
     
     // Get errors after checking
     const std::vector<std::string>& get_errors() const { return errors; }
@@ -123,7 +126,7 @@ private:
                  const std::string& lexeme = "", const std::string& expected_value = "");
     void add_type_error(const std::string& expected, const std::string& found, int line = 0);
     std::string get_code_context(int line);
-    void check_assert_call(const std::shared_ptr<AST::CallExpr>& expr);
+    void check_assert_call(const std::shared_ptr<LM::Frontend::AST::CallExpr>& expr);
     
     // Linear type reference methods
     void check_linear_type_access(const std::string& var_name, int line);
@@ -169,43 +172,43 @@ private:
     void mark_variable_initialized(const std::string& name);
     
     // Type checking methods
-    TypePtr check_expression(std::shared_ptr<AST::Expression> expr);
-    TypePtr check_expression_with_expected_type(std::shared_ptr<AST::Expression> expr, TypePtr expected_type);
-    TypePtr check_statement(std::shared_ptr<AST::Statement> stmt);
-    TypePtr check_function_declaration(std::shared_ptr<AST::FunctionDeclaration> func);
-    TypePtr check_var_declaration(std::shared_ptr<AST::VarDeclaration> var_decl);
-    TypePtr check_type_declaration(std::shared_ptr<AST::TypeDeclaration> type_decl);
-    TypePtr check_block_statement(std::shared_ptr<AST::BlockStatement> block);
-    TypePtr check_if_statement(std::shared_ptr<AST::IfStatement> if_stmt);
-    TypePtr check_while_statement(std::shared_ptr<AST::WhileStatement> while_stmt);
-    TypePtr check_for_statement(std::shared_ptr<AST::ForStatement> for_stmt);
-    TypePtr check_return_statement(std::shared_ptr<AST::ReturnStatement> return_stmt);
-    TypePtr check_print_statement(std::shared_ptr<AST::PrintStatement> print_stmt);
-    TypePtr check_match_statement(std::shared_ptr<AST::MatchStatement> match_stmt);
-    TypePtr check_contract_statement(std::shared_ptr<AST::ContractStatement> contract_stmt);
+    TypePtr check_expression(std::shared_ptr<LM::Frontend::AST::Expression> expr);
+    TypePtr check_expression_with_expected_type(std::shared_ptr<LM::Frontend::AST::Expression> expr, TypePtr expected_type);
+    TypePtr check_statement(std::shared_ptr<LM::Frontend::AST::Statement> stmt);
+    TypePtr check_function_declaration(std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> func);
+    TypePtr check_var_declaration(std::shared_ptr<LM::Frontend::AST::VarDeclaration> var_decl);
+    TypePtr check_type_declaration(std::shared_ptr<LM::Frontend::AST::TypeDeclaration> type_decl);
+    TypePtr check_block_statement(std::shared_ptr<LM::Frontend::AST::BlockStatement> block);
+    TypePtr check_if_statement(std::shared_ptr<LM::Frontend::AST::IfStatement> if_stmt);
+    TypePtr check_while_statement(std::shared_ptr<LM::Frontend::AST::WhileStatement> while_stmt);
+    TypePtr check_for_statement(std::shared_ptr<LM::Frontend::AST::ForStatement> for_stmt);
+    TypePtr check_return_statement(std::shared_ptr<LM::Frontend::AST::ReturnStatement> return_stmt);
+    TypePtr check_print_statement(std::shared_ptr<LM::Frontend::AST::PrintStatement> print_stmt);
+    TypePtr check_match_statement(std::shared_ptr<LM::Frontend::AST::MatchStatement> match_stmt);
+    TypePtr check_contract_statement(std::shared_ptr<LM::Frontend::AST::ContractStatement> contract_stmt);
     
     // Expression type checking
-    TypePtr check_literal_expr(std::shared_ptr<AST::LiteralExpr> expr);
-    TypePtr check_literal_expr_with_expected_type(std::shared_ptr<AST::LiteralExpr> expr, TypePtr expected_type);
-    TypePtr check_variable_expr(std::shared_ptr<AST::VariableExpr> expr);
-    TypePtr check_binary_expr(std::shared_ptr<AST::BinaryExpr> expr);
-    TypePtr check_unary_expr(std::shared_ptr<AST::UnaryExpr> expr);
-    TypePtr check_call_expr(std::shared_ptr<AST::CallExpr> expr);
-    TypePtr check_assign_expr(std::shared_ptr<AST::AssignExpr> expr);
-    TypePtr check_grouping_expr(std::shared_ptr<AST::GroupingExpr> expr);
-    TypePtr check_member_expr(std::shared_ptr<AST::MemberExpr> expr);
-    TypePtr check_index_expr(std::shared_ptr<AST::IndexExpr> expr);
-    TypePtr check_list_expr(std::shared_ptr<AST::ListExpr> expr);
-    TypePtr check_tuple_expr(std::shared_ptr<AST::TupleExpr> expr);
-    TypePtr check_dict_expr(std::shared_ptr<AST::DictExpr> expr);
-    TypePtr check_interpolated_string_expr(std::shared_ptr<AST::InterpolatedStringExpr> expr);
-    TypePtr check_lambda_expr(std::shared_ptr<AST::LambdaExpr> expr);
-    TypePtr check_error_construct_expr(std::shared_ptr<AST::ErrorConstructExpr> expr);
-    TypePtr check_ok_construct_expr(std::shared_ptr<AST::OkConstructExpr> expr);
-    TypePtr check_fallible_expr(std::shared_ptr<AST::FallibleExpr> expr);
+    TypePtr check_literal_expr(std::shared_ptr<LM::Frontend::AST::LiteralExpr> expr);
+    TypePtr check_literal_expr_with_expected_type(std::shared_ptr<LM::Frontend::AST::LiteralExpr> expr, TypePtr expected_type);
+    TypePtr check_variable_expr(std::shared_ptr<LM::Frontend::AST::VariableExpr> expr);
+    TypePtr check_binary_expr(std::shared_ptr<LM::Frontend::AST::BinaryExpr> expr);
+    TypePtr check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryExpr> expr);
+    TypePtr check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr> expr);
+    TypePtr check_assign_expr(std::shared_ptr<LM::Frontend::AST::AssignExpr> expr);
+    TypePtr check_grouping_expr(std::shared_ptr<LM::Frontend::AST::GroupingExpr> expr);
+    TypePtr check_member_expr(std::shared_ptr<LM::Frontend::AST::MemberExpr> expr);
+    TypePtr check_index_expr(std::shared_ptr<LM::Frontend::AST::IndexExpr> expr);
+    TypePtr check_list_expr(std::shared_ptr<LM::Frontend::AST::ListExpr> expr);
+    TypePtr check_tuple_expr(std::shared_ptr<LM::Frontend::AST::TupleExpr> expr);
+    TypePtr check_dict_expr(std::shared_ptr<LM::Frontend::AST::DictExpr> expr);
+    TypePtr check_interpolated_string_expr(std::shared_ptr<LM::Frontend::AST::InterpolatedStringExpr> expr);
+    TypePtr check_lambda_expr(std::shared_ptr<LM::Frontend::AST::LambdaExpr> expr);
+    TypePtr check_error_construct_expr(std::shared_ptr<LM::Frontend::AST::ErrorConstructExpr> expr);
+    TypePtr check_ok_construct_expr(std::shared_ptr<LM::Frontend::AST::OkConstructExpr> expr);
+    TypePtr check_fallible_expr(std::shared_ptr<LM::Frontend::AST::FallibleExpr> expr);
     
     // Type annotation resolution
-    TypePtr resolve_type_annotation(std::shared_ptr<AST::TypeAnnotation> annotation);
+    TypePtr resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::TypeAnnotation> annotation);
     
     // Type compatibility checking
     bool is_type_compatible(TypePtr expected, TypePtr actual);
@@ -238,25 +241,25 @@ private:
     TypePtr promote_numeric_types(TypePtr left, TypePtr right);
     
     // Advanced error handling methods
-    void validate_function_error_types(const std::shared_ptr<AST::FunctionDeclaration>& stmt);
-    void validate_function_body_error_types(const std::shared_ptr<AST::FunctionDeclaration>& stmt);
-    std::vector<std::string> infer_function_error_types(const std::shared_ptr<AST::Statement>& body);
-    std::vector<std::string> infer_expression_error_types(const std::shared_ptr<AST::Expression>& expr);
-    bool can_function_produce_error_type(const std::shared_ptr<AST::Statement>& body, const std::string& error_type);
+    void validate_function_error_types(const std::shared_ptr<LM::Frontend::AST::FunctionDeclaration>& stmt);
+    void validate_function_body_error_types(const std::shared_ptr<LM::Frontend::AST::FunctionDeclaration>& stmt);
+    std::vector<std::string> infer_function_error_types(const std::shared_ptr<LM::Frontend::AST::Statement>& body);
+    std::vector<std::string> infer_expression_error_types(const std::shared_ptr<LM::Frontend::AST::Expression>& expr);
+    bool can_function_produce_error_type(const std::shared_ptr<LM::Frontend::AST::Statement>& body, const std::string& error_type);
     bool can_propagate_error(const std::vector<std::string>& source_errors, const std::vector<std::string>& target_errors);
     bool is_error_union_compatible(TypePtr from, TypePtr to);
     std::string join_error_types(const std::vector<std::string>& error_types);
     
     // Pattern matching methods
-    bool is_exhaustive_error_match(const std::vector<std::shared_ptr<AST::MatchCase>>& cases, TypePtr type);
-    bool is_exhaustive_union_match(TypePtr union_type, const std::vector<std::shared_ptr<AST::MatchCase>>& cases);
-    bool is_exhaustive_option_match(const std::vector<std::shared_ptr<AST::MatchCase>>& cases);
-    std::string get_missing_union_variants(TypePtr union_type, const std::vector<std::shared_ptr<AST::MatchCase>>& cases);
-    void validate_pattern_compatibility(std::shared_ptr<AST::Expression> pattern_node, TypePtr match_type, int line);
+    bool is_exhaustive_error_match(const std::vector<std::shared_ptr<LM::Frontend::AST::MatchCase>>& cases, TypePtr type);
+    bool is_exhaustive_union_match(TypePtr union_type, const std::vector<std::shared_ptr<LM::Frontend::AST::MatchCase>>& cases);
+    bool is_exhaustive_option_match(const std::vector<std::shared_ptr<LM::Frontend::AST::MatchCase>>& cases);
+    std::string get_missing_union_variants(TypePtr union_type, const std::vector<std::shared_ptr<LM::Frontend::AST::MatchCase>>& cases);
+    void validate_pattern_compatibility(std::shared_ptr<LM::Frontend::AST::Expression> pattern_node, TypePtr match_type, int line);
     
     // Enhanced type inference
-    TypePtr infer_lambda_return_type(const std::shared_ptr<AST::Statement>& body);
-    TypePtr infer_literal_type(const std::shared_ptr<AST::LiteralExpr>& expr, TypePtr expected_type = nullptr);
+    TypePtr infer_lambda_return_type(const std::shared_ptr<LM::Frontend::AST::Statement>& body);
+    TypePtr infer_literal_type(const std::shared_ptr<LM::Frontend::AST::LiteralExpr>& expr, TypePtr expected_type = nullptr);
     
     // Scope management
     struct Scope {
@@ -286,12 +289,12 @@ private:
 // =============================================================================
 
 struct TypeCheckResult {
-    std::shared_ptr<AST::Program> program;  // AST with inferred_type set
+    std::shared_ptr<LM::Frontend::AST::Program> program;  // AST with inferred_type set
     TypeSystem& type_system;
     bool success;
     std::vector<std::string> errors;
     
-    TypeCheckResult(std::shared_ptr<AST::Program> prog, TypeSystem& ts, bool succ, 
+    TypeCheckResult(std::shared_ptr<LM::Frontend::AST::Program> prog, TypeSystem& ts, bool succ, 
                     const std::vector<std::string>& errs)
         : program(prog), type_system(ts), success(succ), errors(errs) {}
 };
@@ -302,7 +305,7 @@ struct TypeCheckResult {
 
 namespace TypeCheckerFactory {
     // Create and run type checker
-    TypeCheckResult check_program(std::shared_ptr<AST::Program> program, const std::string& source = "", const std::string& file_path = "");
+    TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> program, const std::string& source = "", const std::string& file_path = "");
     
     // Create type checker instance (for testing)
     std::unique_ptr<TypeChecker> create(TypeSystem& type_system);
@@ -310,3 +313,6 @@ namespace TypeCheckerFactory {
     // Register builtin functions with the type checker
     void register_builtin_functions(TypeChecker& checker);
 }
+
+} // namespace Frontend
+} // namespace LM

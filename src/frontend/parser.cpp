@@ -4,6 +4,7 @@
 #include <limits>
 #include <set>
 #include <cmath>
+using namespace LM::Frontend;
 
 // Helper methods
 Token Parser::peek() {
@@ -186,10 +187,10 @@ std::string Parser::parseStringLiteral(const std::string& tokenLexeme) {
     return result;
 }
 
-// Unified node creation helper - creates CST::Node or AST::Node based on cstMode
+// Unified node creation helper - creates CST::Node or LM::Frontend::AST::Node based on cstMode
 template<typename ASTNodeType>
-auto Parser::createNode() -> std::conditional_t<std::is_same_v<ASTNodeType, AST::Program>, 
-                                                   std::shared_ptr<AST::Program>,
+auto Parser::createNode() -> std::conditional_t<std::is_same_v<ASTNodeType, LM::Frontend::AST::Program>, 
+                                                   std::shared_ptr<LM::Frontend::AST::Program>,
                                                    std::shared_ptr<ASTNodeType>> {
     if (cstMode) {
         // In CST mode, create CST::Node and return nullptr for AST (will be handled separately)
@@ -226,8 +227,8 @@ auto Parser::createNode() -> std::conditional_t<std::is_same_v<ASTNodeType, AST:
 
 // Enhanced node creation with context management
 template<typename ASTNodeType>
-auto Parser::createNodeWithContext() -> std::conditional_t<std::is_same_v<ASTNodeType, AST::Program>, 
-                                                          std::shared_ptr<AST::Program>,
+auto Parser::createNodeWithContext() -> std::conditional_t<std::is_same_v<ASTNodeType, LM::Frontend::AST::Program>, 
+                                                          std::shared_ptr<LM::Frontend::AST::Program>,
                                                           std::shared_ptr<ASTNodeType>> {
     if (cstMode) {
         // Create AST node
@@ -412,63 +413,63 @@ bool Parser::isContainerNode(CST::NodeKind kind) {
 }
 
 // Explicit template instantiations for common AST node types
-template auto Parser::createNode<AST::Program>() -> std::shared_ptr<AST::Program>;
-template auto Parser::createNode<AST::VarDeclaration>() -> std::shared_ptr<AST::VarDeclaration>;
-template auto Parser::createNode<AST::DestructuringDeclaration>() -> std::shared_ptr<AST::DestructuringDeclaration>;
-template auto Parser::createNode<AST::FunctionDeclaration>() -> std::shared_ptr<AST::FunctionDeclaration>;
-template auto Parser::createNode<AST::ClassDeclaration>() -> std::shared_ptr<AST::ClassDeclaration>;
-template auto Parser::createNode<AST::IfStatement>() -> std::shared_ptr<AST::IfStatement>;
-template auto Parser::createNode<AST::ForStatement>() -> std::shared_ptr<AST::ForStatement>;
-template auto Parser::createNode<AST::WhileStatement>() -> std::shared_ptr<AST::WhileStatement>;
-template auto Parser::createNode<AST::IterStatement>() -> std::shared_ptr<AST::IterStatement>;
-template auto Parser::createNode<AST::BlockStatement>() -> std::shared_ptr<AST::BlockStatement>;
-template auto Parser::createNode<AST::ExprStatement>() -> std::shared_ptr<AST::ExprStatement>;
-template auto Parser::createNode<AST::ReturnStatement>() -> std::shared_ptr<AST::ReturnStatement>;
-template auto Parser::createNode<AST::PrintStatement>() -> std::shared_ptr<AST::PrintStatement>;
-template auto Parser::createNode<AST::ContractStatement>() -> std::shared_ptr<AST::ContractStatement>;
-template auto Parser::createNode<AST::MatchStatement>() -> std::shared_ptr<AST::MatchStatement>;
-template auto Parser::createNode<AST::ConcurrentStatement>() -> std::shared_ptr<AST::ConcurrentStatement>;
-template auto Parser::createNode<AST::ParallelStatement>() -> std::shared_ptr<AST::ParallelStatement>;
-template auto Parser::createNode<AST::BinaryExpr>() -> std::shared_ptr<AST::BinaryExpr>;
-template auto Parser::createNode<AST::UnaryExpr>() -> std::shared_ptr<AST::UnaryExpr>;
-template auto Parser::createNode<AST::LiteralExpr>() -> std::shared_ptr<AST::LiteralExpr>;
-template auto Parser::createNode<AST::ObjectLiteralExpr>() -> std::shared_ptr<AST::ObjectLiteralExpr>;
-template auto Parser::createNode<AST::VariableExpr>() -> std::shared_ptr<AST::VariableExpr>;
-template auto Parser::createNode<AST::CallExpr>() -> std::shared_ptr<AST::CallExpr>;
-template auto Parser::createNode<AST::AssignExpr>() -> std::shared_ptr<AST::AssignExpr>;
-template auto Parser::createNode<AST::GroupingExpr>() -> std::shared_ptr<AST::GroupingExpr>;
-template auto Parser::createNode<AST::MemberExpr>() -> std::shared_ptr<AST::MemberExpr>;
-template auto Parser::createNode<AST::IndexExpr>() -> std::shared_ptr<AST::IndexExpr>;
-template auto Parser::createNode<AST::ThisExpr>() -> std::shared_ptr<AST::ThisExpr>;
-template auto Parser::createNode<AST::SuperExpr>() -> std::shared_ptr<AST::SuperExpr>;
+template auto Parser::createNode<LM::Frontend::AST::Program>() -> std::shared_ptr<LM::Frontend::AST::Program>;
+template auto Parser::createNode<LM::Frontend::AST::VarDeclaration>() -> std::shared_ptr<LM::Frontend::AST::VarDeclaration>;
+template auto Parser::createNode<LM::Frontend::AST::DestructuringDeclaration>() -> std::shared_ptr<LM::Frontend::AST::DestructuringDeclaration>;
+template auto Parser::createNode<LM::Frontend::AST::FunctionDeclaration>() -> std::shared_ptr<LM::Frontend::AST::FunctionDeclaration>;
+template auto Parser::createNode<LM::Frontend::AST::ClassDeclaration>() -> std::shared_ptr<LM::Frontend::AST::ClassDeclaration>;
+template auto Parser::createNode<LM::Frontend::AST::IfStatement>() -> std::shared_ptr<LM::Frontend::AST::IfStatement>;
+template auto Parser::createNode<LM::Frontend::AST::ForStatement>() -> std::shared_ptr<LM::Frontend::AST::ForStatement>;
+template auto Parser::createNode<LM::Frontend::AST::WhileStatement>() -> std::shared_ptr<LM::Frontend::AST::WhileStatement>;
+template auto Parser::createNode<LM::Frontend::AST::IterStatement>() -> std::shared_ptr<LM::Frontend::AST::IterStatement>;
+template auto Parser::createNode<LM::Frontend::AST::BlockStatement>() -> std::shared_ptr<LM::Frontend::AST::BlockStatement>;
+template auto Parser::createNode<LM::Frontend::AST::ExprStatement>() -> std::shared_ptr<LM::Frontend::AST::ExprStatement>;
+template auto Parser::createNode<LM::Frontend::AST::ReturnStatement>() -> std::shared_ptr<LM::Frontend::AST::ReturnStatement>;
+template auto Parser::createNode<LM::Frontend::AST::PrintStatement>() -> std::shared_ptr<LM::Frontend::AST::PrintStatement>;
+template auto Parser::createNode<LM::Frontend::AST::ContractStatement>() -> std::shared_ptr<LM::Frontend::AST::ContractStatement>;
+template auto Parser::createNode<LM::Frontend::AST::MatchStatement>() -> std::shared_ptr<LM::Frontend::AST::MatchStatement>;
+template auto Parser::createNode<LM::Frontend::AST::ConcurrentStatement>() -> std::shared_ptr<LM::Frontend::AST::ConcurrentStatement>;
+template auto Parser::createNode<LM::Frontend::AST::ParallelStatement>() -> std::shared_ptr<LM::Frontend::AST::ParallelStatement>;
+template auto Parser::createNode<LM::Frontend::AST::BinaryExpr>() -> std::shared_ptr<LM::Frontend::AST::BinaryExpr>;
+template auto Parser::createNode<LM::Frontend::AST::UnaryExpr>() -> std::shared_ptr<LM::Frontend::AST::UnaryExpr>;
+template auto Parser::createNode<LM::Frontend::AST::LiteralExpr>() -> std::shared_ptr<LM::Frontend::AST::LiteralExpr>;
+template auto Parser::createNode<LM::Frontend::AST::ObjectLiteralExpr>() -> std::shared_ptr<LM::Frontend::AST::ObjectLiteralExpr>;
+template auto Parser::createNode<LM::Frontend::AST::VariableExpr>() -> std::shared_ptr<LM::Frontend::AST::VariableExpr>;
+template auto Parser::createNode<LM::Frontend::AST::CallExpr>() -> std::shared_ptr<LM::Frontend::AST::CallExpr>;
+template auto Parser::createNode<LM::Frontend::AST::AssignExpr>() -> std::shared_ptr<LM::Frontend::AST::AssignExpr>;
+template auto Parser::createNode<LM::Frontend::AST::GroupingExpr>() -> std::shared_ptr<LM::Frontend::AST::GroupingExpr>;
+template auto Parser::createNode<LM::Frontend::AST::MemberExpr>() -> std::shared_ptr<LM::Frontend::AST::MemberExpr>;
+template auto Parser::createNode<LM::Frontend::AST::IndexExpr>() -> std::shared_ptr<LM::Frontend::AST::IndexExpr>;
+template auto Parser::createNode<LM::Frontend::AST::ThisExpr>() -> std::shared_ptr<LM::Frontend::AST::ThisExpr>;
+template auto Parser::createNode<LM::Frontend::AST::SuperExpr>() -> std::shared_ptr<LM::Frontend::AST::SuperExpr>;
 
 // Explicit template instantiations for createNodeWithContext
-template auto Parser::createNodeWithContext<AST::Program>() -> std::shared_ptr<AST::Program>;
-template auto Parser::createNodeWithContext<AST::VarDeclaration>() -> std::shared_ptr<AST::VarDeclaration>;
-template auto Parser::createNodeWithContext<AST::DestructuringDeclaration>() -> std::shared_ptr<AST::DestructuringDeclaration>;
-template auto Parser::createNodeWithContext<AST::FunctionDeclaration>() -> std::shared_ptr<AST::FunctionDeclaration>;
-template auto Parser::createNodeWithContext<AST::ClassDeclaration>() -> std::shared_ptr<AST::ClassDeclaration>;
-template auto Parser::createNodeWithContext<AST::IfStatement>() -> std::shared_ptr<AST::IfStatement>;
-template auto Parser::createNodeWithContext<AST::ForStatement>() -> std::shared_ptr<AST::ForStatement>;
-template auto Parser::createNodeWithContext<AST::WhileStatement>() -> std::shared_ptr<AST::WhileStatement>;
-template auto Parser::createNodeWithContext<AST::IterStatement>() -> std::shared_ptr<AST::IterStatement>;
-template auto Parser::createNodeWithContext<AST::BlockStatement>() -> std::shared_ptr<AST::BlockStatement>;
-template auto Parser::createNodeWithContext<AST::ExprStatement>() -> std::shared_ptr<AST::ExprStatement>;
-template auto Parser::createNodeWithContext<AST::ReturnStatement>() -> std::shared_ptr<AST::ReturnStatement>;
-template auto Parser::createNodeWithContext<AST::PrintStatement>() -> std::shared_ptr<AST::PrintStatement>;
-template auto Parser::createNodeWithContext<AST::ContractStatement>() -> std::shared_ptr<AST::ContractStatement>;
-template auto Parser::createNodeWithContext<AST::MatchStatement>() -> std::shared_ptr<AST::MatchStatement>;
-template auto Parser::createNodeWithContext<AST::ConcurrentStatement>() -> std::shared_ptr<AST::ConcurrentStatement>;
-template auto Parser::createNodeWithContext<AST::ParallelStatement>() -> std::shared_ptr<AST::ParallelStatement>;
-template auto Parser::createNodeWithContext<AST::LiteralExpr>() -> std::shared_ptr<AST::LiteralExpr>;
-template auto Parser::createNodeWithContext<AST::VariableExpr>() -> std::shared_ptr<AST::VariableExpr>;
-template auto Parser::createNodeWithContext<AST::GroupingExpr>() -> std::shared_ptr<AST::GroupingExpr>;
-template auto Parser::createNodeWithContext<AST::ThisExpr>() -> std::shared_ptr<AST::ThisExpr>;
-template auto Parser::createNodeWithContext<AST::SuperExpr>() -> std::shared_ptr<AST::SuperExpr>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::Program>() -> std::shared_ptr<LM::Frontend::AST::Program>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::VarDeclaration>() -> std::shared_ptr<LM::Frontend::AST::VarDeclaration>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::DestructuringDeclaration>() -> std::shared_ptr<LM::Frontend::AST::DestructuringDeclaration>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::FunctionDeclaration>() -> std::shared_ptr<LM::Frontend::AST::FunctionDeclaration>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::ClassDeclaration>() -> std::shared_ptr<LM::Frontend::AST::ClassDeclaration>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::IfStatement>() -> std::shared_ptr<LM::Frontend::AST::IfStatement>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::ForStatement>() -> std::shared_ptr<LM::Frontend::AST::ForStatement>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::WhileStatement>() -> std::shared_ptr<LM::Frontend::AST::WhileStatement>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::IterStatement>() -> std::shared_ptr<LM::Frontend::AST::IterStatement>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::BlockStatement>() -> std::shared_ptr<LM::Frontend::AST::BlockStatement>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::ExprStatement>() -> std::shared_ptr<LM::Frontend::AST::ExprStatement>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::ReturnStatement>() -> std::shared_ptr<LM::Frontend::AST::ReturnStatement>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::PrintStatement>() -> std::shared_ptr<LM::Frontend::AST::PrintStatement>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::ContractStatement>() -> std::shared_ptr<LM::Frontend::AST::ContractStatement>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::MatchStatement>() -> std::shared_ptr<LM::Frontend::AST::MatchStatement>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::ConcurrentStatement>() -> std::shared_ptr<LM::Frontend::AST::ConcurrentStatement>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::ParallelStatement>() -> std::shared_ptr<LM::Frontend::AST::ParallelStatement>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::LiteralExpr>() -> std::shared_ptr<LM::Frontend::AST::LiteralExpr>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::VariableExpr>() -> std::shared_ptr<LM::Frontend::AST::VariableExpr>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::GroupingExpr>() -> std::shared_ptr<LM::Frontend::AST::GroupingExpr>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::ThisExpr>() -> std::shared_ptr<LM::Frontend::AST::ThisExpr>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::SuperExpr>() -> std::shared_ptr<LM::Frontend::AST::SuperExpr>;
 
 // Main parse method
-std::shared_ptr<AST::Program> Parser::parse() {
-    auto program = createNodeWithContext<AST::Program>();
+std::shared_ptr<LM::Frontend::AST::Program> Parser::parse() {
+    auto program = createNodeWithContext<LM::Frontend::AST::Program>();
     program->line = 1;
 
     // If in CST mode, create CST root for trivia reconstruction
@@ -563,13 +564,13 @@ void Parser::skipTrivia() {
     }
 }
 
-std::shared_ptr<AST::Statement> Parser::declaration() {
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::declaration() {
     try {
         // Collect leading annotations
         std::vector<Token> annotations = collectAnnotations();
         
         // Parse modifiers for module-level declarations
-        AST::VisibilityLevel visibility = AST::VisibilityLevel::Private; // Default to private
+        LM::Frontend::AST::VisibilityLevel visibility = LM::Frontend::AST::VisibilityLevel::Private; // Default to private
         bool isStatic = false;
         bool isAbstract = false;
         bool isFinal = false;
@@ -581,11 +582,11 @@ std::shared_ptr<AST::Statement> Parser::declaration() {
                check(TokenType::DATA)) {
             
             if (match({TokenType::PUB})) {
-                visibility = AST::VisibilityLevel::Public;
+                visibility = LM::Frontend::AST::VisibilityLevel::Public;
             } else if (match({TokenType::PROT})) {
-                visibility = AST::VisibilityLevel::Protected;
+                visibility = LM::Frontend::AST::VisibilityLevel::Protected;
             } else if (match({TokenType::CONST})) {
-                visibility = AST::VisibilityLevel::Const;
+                visibility = LM::Frontend::AST::VisibilityLevel::Const;
             } else if (match({TokenType::STATIC})) {
                 isStatic = true;
             } else if (match({TokenType::ABSTRACT})) {
@@ -621,7 +622,7 @@ std::shared_ptr<AST::Statement> Parser::declaration() {
         }
         // if (match({TokenType::ASYNC})) {
         //     consume(TokenType::FN, "Expected 'fn' after 'async'.");
-        //     auto asyncFn = std::make_shared<AST::AsyncFunctionDeclaration>(*function("async function"));
+        //     auto asyncFn = std::make_shared<LM::Frontend::AST::AsyncFunctionDeclaration>(*function("async function"));
         //     asyncFn->annotations = annotations;
         //     asyncFn->visibility = visibility;
         //     asyncFn->isStatic = isStatic;
@@ -634,7 +635,7 @@ std::shared_ptr<AST::Statement> Parser::declaration() {
             if (decl) {
                 decl->annotations = annotations;
                 // Cast to VarDeclaration to access visibility fields
-                if (auto varDecl = std::dynamic_pointer_cast<AST::VarDeclaration>(decl)) {
+                if (auto varDecl = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(decl)) {
                     varDecl->visibility = visibility;
                     varDecl->isStatic = isStatic;
                 }
@@ -681,13 +682,13 @@ std::shared_ptr<AST::Statement> Parser::declaration() {
     }
 }
 
-std::shared_ptr<AST::Statement> Parser::varDeclaration() {
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::varDeclaration() {
     int line = previous().line;
 
     // Check for tuple destructuring: var (a, b, c) = tuple;
     if (check(TokenType::LEFT_PAREN)) {
         // This is tuple destructuring - create DestructuringDeclaration
-        auto destructuring = std::make_shared<AST::DestructuringDeclaration>();
+        auto destructuring = std::make_shared<LM::Frontend::AST::DestructuringDeclaration>();
         destructuring->line = line;
         destructuring->isTuple = true;
         
@@ -716,7 +717,7 @@ std::shared_ptr<AST::Statement> Parser::varDeclaration() {
     }
 
     // Regular variable declaration
-    auto var = createNodeWithContext<AST::VarDeclaration>();
+    auto var = createNodeWithContext<LM::Frontend::AST::VarDeclaration>();
     var->line = line;
 
     // Parse variable name
@@ -739,7 +740,7 @@ std::shared_ptr<AST::Statement> Parser::varDeclaration() {
     return var;
 }
 
-std::shared_ptr<AST::Statement> Parser::statement() {
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::statement() {
     if (match({TokenType::PRINT})) {
         return printStatement();
     }
@@ -789,10 +790,10 @@ std::shared_ptr<AST::Statement> Parser::statement() {
     return expressionStatement();
 }
 
-std::shared_ptr<AST::Statement> Parser::expressionStatement() {
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::expressionStatement() {
     try {
         // Create expression statement using createNodeWithContext for proper CST support
-        auto stmt = createNodeWithContext<AST::ExprStatement>();
+        auto stmt = createNodeWithContext<LM::Frontend::AST::ExprStatement>();
         stmt->line = peek().line;
         
         // Parse the expression - this will be a child of the EXPRESSION_STATEMENT CST node
@@ -805,15 +806,15 @@ std::shared_ptr<AST::Statement> Parser::expressionStatement() {
         return stmt;
     } catch (const std::exception &e) {
         // If we can't parse an expression, return an empty statement
-        auto stmt = createNodeWithContext<AST::ExprStatement>();
+        auto stmt = createNodeWithContext<LM::Frontend::AST::ExprStatement>();
         stmt->line = peek().line;
         stmt->expression = nullptr;
         return stmt;
     }
 }
 
-std::shared_ptr<AST::Statement> Parser::printStatement() {
-    auto stmt = createNodeWithContext<AST::PrintStatement>();
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::printStatement() {
+    auto stmt = createNodeWithContext<LM::Frontend::AST::PrintStatement>();
     stmt->line = previous().line;
 
     consume(TokenType::LEFT_PAREN, "Expected '(' after 'print'.");
@@ -832,8 +833,8 @@ std::shared_ptr<AST::Statement> Parser::printStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> Parser::taskStatement() {
-    auto stmt = std::make_shared<AST::TaskStatement>();
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::taskStatement() {
+    auto stmt = std::make_shared<LM::Frontend::AST::TaskStatement>();
     stmt->line = peek().line;
 
     consume(TokenType::LEFT_PAREN, "Expected '(' after 'task'.");
@@ -856,8 +857,8 @@ std::shared_ptr<AST::Statement> Parser::taskStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> Parser::workerStatement() {
-    auto stmt = std::make_shared<AST::WorkerStatement>();
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::workerStatement() {
+    auto stmt = std::make_shared<LM::Frontend::AST::WorkerStatement>();
     stmt->line = peek().line;
 
     consume(TokenType::LEFT_PAREN, "Expected '(' after 'worker'.");
@@ -882,9 +883,9 @@ std::shared_ptr<AST::Statement> Parser::workerStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> Parser::traitDeclaration() {
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::traitDeclaration() {
     // Create a new trait declaration statement
-    auto traitDecl = std::make_shared<AST::TraitDeclaration>();
+    auto traitDecl = std::make_shared<LM::Frontend::AST::TraitDeclaration>();
     traitDecl->line = previous().line;
 
     // Check for @open annotation
@@ -903,7 +904,7 @@ std::shared_ptr<AST::Statement> Parser::traitDeclaration() {
     while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
         if (match({TokenType::FN})) {
             // For traits, we need to handle method declarations that might not have bodies
-            auto method = std::make_shared<AST::FunctionDeclaration>();
+            auto method = std::make_shared<LM::Frontend::AST::FunctionDeclaration>();
             method->line = previous().line;
             
             // Parse function name
@@ -935,7 +936,7 @@ std::shared_ptr<AST::Statement> Parser::traitDeclaration() {
             // Check if there's a semicolon (no body) or a brace (with body)
             if (match({TokenType::SEMICOLON})) {
                 // Method declaration without body (interface/trait style)
-                method->body = std::make_shared<AST::BlockStatement>();
+                method->body = std::make_shared<LM::Frontend::AST::BlockStatement>();
                 method->body->line = method->line;
             } else {
                 // Method with body
@@ -947,7 +948,7 @@ std::shared_ptr<AST::Statement> Parser::traitDeclaration() {
         } else {
             error("Expected method declaration in trait.");
             // Create a placeholder expression to allow parsing to continue
-            auto errorExpr = std::make_shared<AST::LiteralExpr>();
+            auto errorExpr = std::make_shared<LM::Frontend::AST::LiteralExpr>();
             errorExpr->line = peek().line;
             errorExpr->value = nullptr; // Use null as a placeholder
             // return errorExpr;
@@ -960,9 +961,9 @@ std::shared_ptr<AST::Statement> Parser::traitDeclaration() {
     return traitDecl;
 }
 
-std::shared_ptr<AST::Statement> Parser::interfaceDeclaration() {
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::interfaceDeclaration() {
     // Create a new interface declaration statement
-    auto interfaceDecl = std::make_shared<AST::InterfaceDeclaration>();
+    auto interfaceDecl = std::make_shared<LM::Frontend::AST::InterfaceDeclaration>();
     interfaceDecl->line = previous().line;
 
     // Check for @open annotation
@@ -996,9 +997,9 @@ std::shared_ptr<AST::Statement> Parser::interfaceDeclaration() {
     return interfaceDecl;
 }
 
-std::shared_ptr<AST::Statement> Parser::moduleDeclaration() {
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::moduleDeclaration() {
     // Create a new module declaration statement
-    auto moduleDecl = std::make_shared<AST::ModuleDeclaration>();
+    auto moduleDecl = std::make_shared<LM::Frontend::AST::ModuleDeclaration>();
     moduleDecl->line = previous().line;
 
     // Parse module name
@@ -1041,8 +1042,8 @@ std::shared_ptr<AST::Statement> Parser::moduleDeclaration() {
     return moduleDecl;
 }
 
-std::shared_ptr<AST::Statement> Parser::iterStatement() {
-    auto stmt = createNodeWithContext<AST::IterStatement>();
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::iterStatement() {
+    auto stmt = createNodeWithContext<LM::Frontend::AST::IterStatement>();
     Token iterToken = previous();
     stmt->line = iterToken.line;
 
@@ -1183,22 +1184,22 @@ std::shared_ptr<AST::Statement> Parser::iterStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> Parser::breakStatement() {
-    auto stmt = std::make_shared<AST::BreakStatement>();
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::breakStatement() {
+    auto stmt = std::make_shared<LM::Frontend::AST::BreakStatement>();
     stmt->line = previous().line;
     consume(TokenType::SEMICOLON, "Expected ';' after 'break'.");
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> Parser::continueStatement() {
-    auto stmt = std::make_shared<AST::ContinueStatement>();
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::continueStatement() {
+    auto stmt = std::make_shared<LM::Frontend::AST::ContinueStatement>();
     stmt->line = previous().line;
     consume(TokenType::SEMICOLON, "Expected ';' after 'continue'.");
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> Parser::unsafeBlock() {
-    auto stmt = std::make_shared<AST::UnsafeStatement>();
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::unsafeBlock() {
+    auto stmt = std::make_shared<LM::Frontend::AST::UnsafeStatement>();
     stmt->line = previous().line;
 
     consume(TokenType::LEFT_BRACE, "Expected '{' after 'unsafe'.");
@@ -1207,8 +1208,8 @@ std::shared_ptr<AST::Statement> Parser::unsafeBlock() {
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> Parser::contractStatement() {
-    auto stmt = createNodeWithContext<AST::ContractStatement>();
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::contractStatement() {
+    auto stmt = createNodeWithContext<LM::Frontend::AST::ContractStatement>();
     stmt->line = previous().line;
 
     consume(TokenType::LEFT_PAREN, "Expected '(' after 'contract'.");
@@ -1217,7 +1218,7 @@ std::shared_ptr<AST::Statement> Parser::contractStatement() {
     if (match({TokenType::COMMA})) {
         // Parse error message
         if (match({TokenType::STRING})) {
-            auto literalExpr = std::make_shared<AST::LiteralExpr>();
+            auto literalExpr = std::make_shared<LM::Frontend::AST::LiteralExpr>();
             literalExpr->line = previous().line;
             literalExpr->value = previous().lexeme;
             stmt->message = literalExpr;
@@ -1232,8 +1233,8 @@ std::shared_ptr<AST::Statement> Parser::contractStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> Parser::comptimeStatement() {
-    auto stmt = std::make_shared<AST::ComptimeStatement>();
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::comptimeStatement() {
+    auto stmt = std::make_shared<LM::Frontend::AST::ComptimeStatement>();
     stmt->line = previous().line;
 
     // Parse the declaration that should be evaluated at compile time
@@ -1242,8 +1243,8 @@ std::shared_ptr<AST::Statement> Parser::comptimeStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> Parser::ifStatement() {
-    auto stmt = createNodeWithContext<AST::IfStatement>();
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::ifStatement() {
+    auto stmt = createNodeWithContext<LM::Frontend::AST::IfStatement>();
     Token ifToken = previous();
     stmt->line = ifToken.line;
 
@@ -1289,7 +1290,7 @@ std::shared_ptr<AST::Statement> Parser::ifStatement() {
         Token elifToken = previous();
         
         // Create a nested if statement for the elif with proper CST context
-        auto elifStmt = createNodeWithContext<AST::IfStatement>();
+        auto elifStmt = createNodeWithContext<LM::Frontend::AST::IfStatement>();
         elifStmt->line = elifToken.line;
         
         // Get the elif CST node that was just created
@@ -1339,10 +1340,10 @@ std::shared_ptr<AST::Statement> Parser::ifStatement() {
             stmt->elseBranch = elifStmt;
         } else {
             // Find the last elif in the chain and attach this one
-            auto current = std::dynamic_pointer_cast<AST::IfStatement>(stmt->elseBranch);
+            auto current = std::dynamic_pointer_cast<LM::Frontend::AST::IfStatement>(stmt->elseBranch);
             while (current && current->elseBranch && 
-                   std::dynamic_pointer_cast<AST::IfStatement>(current->elseBranch)) {
-                current = std::dynamic_pointer_cast<AST::IfStatement>(current->elseBranch);
+                   std::dynamic_pointer_cast<LM::Frontend::AST::IfStatement>(current->elseBranch)) {
+                current = std::dynamic_pointer_cast<LM::Frontend::AST::IfStatement>(current->elseBranch);
             }
             if (current) {
                 current->elseBranch = elifStmt;
@@ -1363,10 +1364,10 @@ std::shared_ptr<AST::Statement> Parser::ifStatement() {
             stmt->elseBranch = elseStmt;
         } else {
             // Find the last elif in the chain and attach the else
-            auto current = std::dynamic_pointer_cast<AST::IfStatement>(stmt->elseBranch);
+            auto current = std::dynamic_pointer_cast<LM::Frontend::AST::IfStatement>(stmt->elseBranch);
             while (current && current->elseBranch && 
-                   std::dynamic_pointer_cast<AST::IfStatement>(current->elseBranch)) {
-                current = std::dynamic_pointer_cast<AST::IfStatement>(current->elseBranch);
+                   std::dynamic_pointer_cast<LM::Frontend::AST::IfStatement>(current->elseBranch)) {
+                current = std::dynamic_pointer_cast<LM::Frontend::AST::IfStatement>(current->elseBranch);
             }
             if (current) {
                 current->elseBranch = elseStmt;
@@ -1382,9 +1383,9 @@ std::shared_ptr<AST::Statement> Parser::ifStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::BlockStatement> Parser::block() {
+std::shared_ptr<LM::Frontend::AST::BlockStatement> Parser::block() {
     // Use createNode instead of createNodeWithContext for manual context management
-    auto block = createNodeWithContext<AST::BlockStatement>();
+    auto block = createNodeWithContext<LM::Frontend::AST::BlockStatement>();
     Token leftBrace = previous();
     block->line = leftBrace.line;
     
@@ -1428,7 +1429,7 @@ std::shared_ptr<AST::BlockStatement> Parser::block() {
                     if (peek().lexeme == "task") {
                         advance(); // consume 'task'
                         auto stmt = taskStatement();
-                        auto task_stmt = std::dynamic_pointer_cast<AST::TaskStatement>(stmt);
+                        auto task_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::TaskStatement>(stmt);
                         if (task_stmt) task_stmt->isAsync = is_async;
                         block->statements.push_back(stmt);
                         continue;
@@ -1436,7 +1437,7 @@ std::shared_ptr<AST::BlockStatement> Parser::block() {
                     if (peek().lexeme == "worker") {
                         advance(); // consume 'worker'
                         auto stmt = workerStatement();
-                        auto worker_stmt = std::dynamic_pointer_cast<AST::WorkerStatement>(stmt);
+                        auto worker_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::WorkerStatement>(stmt);
                         if (worker_stmt) worker_stmt->isAsync = is_async;
                         block->statements.push_back(stmt);
                         continue;
@@ -1471,8 +1472,8 @@ std::shared_ptr<AST::BlockStatement> Parser::block() {
     return block;
 }
 
-std::shared_ptr<AST::Statement> Parser::forStatement() {
-    auto stmt = createNodeWithContext<AST::ForStatement>();
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::forStatement() {
+    auto stmt = createNodeWithContext<LM::Frontend::AST::ForStatement>();
     Token forToken = previous();
     stmt->line = forToken.line;
 
@@ -1502,7 +1503,7 @@ std::shared_ptr<AST::Statement> Parser::forStatement() {
         Token name = consumeWithTrivia(TokenType::IDENTIFIER, "Expected variable name.");
         if (cstMode && forCSTNode) forCSTNode->addToken(name);
 
-        auto varDecl = std::make_shared<AST::VarDeclaration>();
+        auto varDecl = std::make_shared<LM::Frontend::AST::VarDeclaration>();
         varDecl->line = name.line;
         varDecl->name = name.lexeme;
 
@@ -1569,8 +1570,8 @@ std::shared_ptr<AST::Statement> Parser::forStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> Parser::whileStatement() {
-    auto stmt = createNodeWithContext<AST::WhileStatement>();
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::whileStatement() {
+    auto stmt = createNodeWithContext<LM::Frontend::AST::WhileStatement>();
     Token whileToken = previous();
     stmt->line = whileToken.line;
 
@@ -1616,8 +1617,8 @@ std::shared_ptr<AST::Statement> Parser::whileStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::FunctionDeclaration> Parser::function(const std::string& kind) {
-    auto func = createNodeWithContext<AST::FunctionDeclaration>();
+std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> Parser::function(const std::string& kind) {
+    auto func = createNodeWithContext<LM::Frontend::AST::FunctionDeclaration>();
     func->line = previous().line;
     
     attachTriviaFromToken(previous());
@@ -1643,7 +1644,7 @@ std::shared_ptr<AST::FunctionDeclaration> Parser::function(const std::string& ki
             auto paramName = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
 
             // Parse optional parameter type
-            std::shared_ptr<AST::TypeAnnotation> paramType = nullptr;
+            std::shared_ptr<LM::Frontend::AST::TypeAnnotation> paramType = nullptr;
             if (match({TokenType::COLON})) {
                 paramType = parseTypeAnnotation();
             }
@@ -1651,7 +1652,7 @@ std::shared_ptr<AST::FunctionDeclaration> Parser::function(const std::string& ki
             // Check if parameter has a default value (making it optional)
             if (match({TokenType::EQUAL})) {
                 // This is an optional parameter with a default value
-                std::shared_ptr<AST::Expression> defaultValue = expression();
+                std::shared_ptr<LM::Frontend::AST::Expression> defaultValue = expression();
                 func->optionalParams.push_back({paramName, {paramType, defaultValue}});
             } else if (paramType && paramType->isOptional) {
                 // This is an optional parameter with nullable type (no default value)
@@ -1711,8 +1712,8 @@ std::shared_ptr<AST::FunctionDeclaration> Parser::function(const std::string& ki
     return func;
 }
 
-std::shared_ptr<AST::Statement> Parser::returnStatement() {
-    auto stmt = std::make_shared<AST::ReturnStatement>();
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::returnStatement() {
+    auto stmt = std::make_shared<LM::Frontend::AST::ReturnStatement>();
     stmt->line = previous().line;
 
     if (!check(TokenType::SEMICOLON) && !check(TokenType::RIGHT_BRACE)) {
@@ -1725,8 +1726,8 @@ std::shared_ptr<AST::Statement> Parser::returnStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::ClassDeclaration> Parser::classDeclaration() {
-    auto classDecl = createNodeWithContext<AST::ClassDeclaration>();
+std::shared_ptr<LM::Frontend::AST::ClassDeclaration> Parser::classDeclaration() {
+    auto classDecl = createNodeWithContext<LM::Frontend::AST::ClassDeclaration>();
     classDecl->line = previous().line;
 
     // Parse class name
@@ -1778,7 +1779,7 @@ std::shared_ptr<AST::ClassDeclaration> Parser::classDeclaration() {
     // Parse class members
     while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
         // Parse visibility modifiers
-        AST::VisibilityLevel visibility = AST::VisibilityLevel::Private; // Default to private
+        LM::Frontend::AST::VisibilityLevel visibility = LM::Frontend::AST::VisibilityLevel::Private; // Default to private
         bool isStatic = false;
         bool isAbstract = false;
         bool isFinal = false;
@@ -1789,11 +1790,11 @@ std::shared_ptr<AST::ClassDeclaration> Parser::classDeclaration() {
                check(TokenType::STATIC) || check(TokenType::ABSTRACT) || check(TokenType::FINAL)) {
             
             if (match({TokenType::PUB})) {
-                visibility = AST::VisibilityLevel::Public;
+                visibility = LM::Frontend::AST::VisibilityLevel::Public;
             } else if (match({TokenType::PROT})) {
-                visibility = AST::VisibilityLevel::Protected;
+                visibility = LM::Frontend::AST::VisibilityLevel::Protected;
             } else if (match({TokenType::CONST})) {
-                visibility = AST::VisibilityLevel::Const;
+                visibility = LM::Frontend::AST::VisibilityLevel::Const;
                 isConst = true;
             } else if (match({TokenType::STATIC})) {
                 isStatic = true;
@@ -1806,7 +1807,7 @@ std::shared_ptr<AST::ClassDeclaration> Parser::classDeclaration() {
         
         if (match({TokenType::VAR})) {
             // Parse field
-            auto field = std::dynamic_pointer_cast<AST::VarDeclaration>(varDeclaration());
+            auto field = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(varDeclaration());
             if (field) {
                 classDecl->fields.push_back(field);
                 
@@ -1846,10 +1847,10 @@ std::shared_ptr<AST::ClassDeclaration> Parser::classDeclaration() {
         } else if (check(TokenType::VAR)) {
             // Handle var without visibility modifiers
             match({TokenType::VAR});
-            auto field = std::dynamic_pointer_cast<AST::VarDeclaration>(varDeclaration());
+            auto field = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(varDeclaration());
             if (field) {
                 classDecl->fields.push_back(field);
-                classDecl->fieldVisibility[field->name] = AST::VisibilityLevel::Private; // Default to private
+                classDecl->fieldVisibility[field->name] = LM::Frontend::AST::VisibilityLevel::Private; // Default to private
             }
         } else if (check(TokenType::FN)) {
             // Handle fn without visibility modifiers
@@ -1857,13 +1858,13 @@ std::shared_ptr<AST::ClassDeclaration> Parser::classDeclaration() {
             auto method = function("method");
             if (method) {
                 classDecl->methods.push_back(method);
-                classDecl->methodVisibility[method->name] = AST::VisibilityLevel::Private; // Default to private
-                method->visibility = AST::VisibilityLevel::Private; // Set visibility on the method itself
+                classDecl->methodVisibility[method->name] = LM::Frontend::AST::VisibilityLevel::Private; // Default to private
+                method->visibility = LM::Frontend::AST::VisibilityLevel::Private; // Set visibility on the method itself
             }
         } else if (check(TokenType::IDENTIFIER) && peek().lexeme == classDecl->name) {
             // Parse constructor
             advance(); // Consume the class name
-            auto constructor = std::make_shared<AST::FunctionDeclaration>();
+            auto constructor = std::make_shared<LM::Frontend::AST::FunctionDeclaration>();
             constructor->line = previous().line;
             constructor->name = classDecl->name;
             
@@ -1898,7 +1899,7 @@ std::shared_ptr<AST::ClassDeclaration> Parser::classDeclaration() {
                 advance(); // consume ':'
                 
                 // Create a VarDeclaration for this field
-                auto field = std::make_shared<AST::VarDeclaration>();
+                auto field = std::make_shared<LM::Frontend::AST::VarDeclaration>();
                 field->line = fieldName.line;
                 field->name = fieldName.lexeme;
                 field->type = parseTypeAnnotation();
@@ -1940,7 +1941,7 @@ std::shared_ptr<AST::ClassDeclaration> Parser::classDeclaration() {
 
     // Generate automatic init constructor if class has inline constructor parameters
     if (classDecl->hasInlineConstructor) {
-        auto initMethod = std::make_shared<AST::FunctionDeclaration>();
+        auto initMethod = std::make_shared<LM::Frontend::AST::FunctionDeclaration>();
         initMethod->line = classDecl->line;
         initMethod->name = "init";
         
@@ -1950,24 +1951,24 @@ std::shared_ptr<AST::ClassDeclaration> Parser::classDeclaration() {
         }
         
         // Create constructor body
-        auto body = std::make_shared<AST::BlockStatement>();
+        auto body = std::make_shared<LM::Frontend::AST::BlockStatement>();
         body->line = classDecl->line;
         
         // Add super constructor call if there's inheritance
         if (!classDecl->superClassName.empty()) {
             // Create super.init() call
-            auto superCall = std::make_shared<AST::ExprStatement>();
+            auto superCall = std::make_shared<LM::Frontend::AST::ExprStatement>();
             superCall->line = classDecl->line;
             
-            auto callExpr = std::make_shared<AST::CallExpr>();
+            auto callExpr = std::make_shared<LM::Frontend::AST::CallExpr>();
             callExpr->line = classDecl->line;
             
             // Create super.init member expression
-            auto memberExpr = std::make_shared<AST::MemberExpr>();
+            auto memberExpr = std::make_shared<LM::Frontend::AST::MemberExpr>();
             memberExpr->line = classDecl->line;
             memberExpr->name = "init";
             
-            auto superExpr = std::make_shared<AST::VariableExpr>();
+            auto superExpr = std::make_shared<LM::Frontend::AST::VariableExpr>();
             superExpr->line = classDecl->line;
             superExpr->name = "super";
             memberExpr->object = superExpr;
@@ -1985,19 +1986,19 @@ std::shared_ptr<AST::ClassDeclaration> Parser::classDeclaration() {
         
         // Add automatic field assignments for constructor parameters
         for (const auto& param : classDecl->constructorParams) {
-            auto assignment = std::make_shared<AST::ExprStatement>();
+            auto assignment = std::make_shared<LM::Frontend::AST::ExprStatement>();
             assignment->line = classDecl->line;
             
-            auto assignExpr = std::make_shared<AST::AssignExpr>();
+            auto assignExpr = std::make_shared<LM::Frontend::AST::AssignExpr>();
             assignExpr->line = classDecl->line;
             assignExpr->op = TokenType::EQUAL;
             
             // Create self.paramName member expression
-            auto memberExpr = std::make_shared<AST::MemberExpr>();
+            auto memberExpr = std::make_shared<LM::Frontend::AST::MemberExpr>();
             memberExpr->line = classDecl->line;
             memberExpr->name = param.first;
             
-            auto thisExpr = std::make_shared<AST::ThisExpr>();
+            auto thisExpr = std::make_shared<LM::Frontend::AST::ThisExpr>();
             thisExpr->line = classDecl->line;
             memberExpr->object = thisExpr;
             
@@ -2005,7 +2006,7 @@ std::shared_ptr<AST::ClassDeclaration> Parser::classDeclaration() {
             assignExpr->member = param.first;
             
             // Create parameter variable expression
-            auto paramExpr = std::make_shared<AST::VariableExpr>();
+            auto paramExpr = std::make_shared<LM::Frontend::AST::VariableExpr>();
             paramExpr->line = classDecl->line;
             paramExpr->name = param.first;
             
@@ -2154,8 +2155,8 @@ void Parser::parseConcurrencyParams(
     }
 }
 
-std::shared_ptr<AST::Statement> Parser::parallelStatement() {
-    auto stmt = createNodeWithContext<AST::ParallelStatement>();
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::parallelStatement() {
+    auto stmt = createNodeWithContext<LM::Frontend::AST::ParallelStatement>();
     stmt->line = previous().line;
 
     // Set default values
@@ -2184,8 +2185,8 @@ std::shared_ptr<AST::Statement> Parser::parallelStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> Parser::concurrentStatement() {
-    auto stmt = createNodeWithContext<AST::ConcurrentStatement>();
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::concurrentStatement() {
+    auto stmt = createNodeWithContext<LM::Frontend::AST::ConcurrentStatement>();
     stmt->line = previous().line;
 
     // Set default values
@@ -2226,8 +2227,8 @@ std::shared_ptr<AST::Statement> Parser::concurrentStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::Statement> Parser::importStatement() {
-    auto stmt = std::make_shared<AST::ImportStatement>();
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::importStatement() {
+    auto stmt = std::make_shared<LM::Frontend::AST::ImportStatement>();
     stmt->line = previous().line;
 
     // Parse module path
@@ -2257,8 +2258,8 @@ std::shared_ptr<AST::Statement> Parser::importStatement() {
 
     // Parse optional filter
     if (match({TokenType::SHOW, TokenType::HIDE})) {
-        AST::ImportFilter filter;
-        filter.type = previous().type == TokenType::SHOW ? AST::ImportFilterType::Show : AST::ImportFilterType::Hide;
+        LM::Frontend::AST::ImportFilter filter;
+        filter.type = previous().type == TokenType::SHOW ? LM::Frontend::AST::ImportFilterType::Show : LM::Frontend::AST::ImportFilterType::Hide;
 
         do {
             if (check(TokenType::IDENTIFIER) || check(TokenType::MODULE)) {
@@ -2278,8 +2279,8 @@ std::shared_ptr<AST::Statement> Parser::importStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::EnumDeclaration> Parser::enumDeclaration() {
-    auto enumDecl = std::make_shared<AST::EnumDeclaration>();
+std::shared_ptr<LM::Frontend::AST::EnumDeclaration> Parser::enumDeclaration() {
+    auto enumDecl = std::make_shared<LM::Frontend::AST::EnumDeclaration>();
     enumDecl->line = previous().line;
 
     // Parse enum name
@@ -2293,7 +2294,7 @@ std::shared_ptr<AST::EnumDeclaration> Parser::enumDeclaration() {
         do {
             std::string variantName = consume(TokenType::IDENTIFIER, "Expected variant name.").lexeme;
 
-            std::optional<std::shared_ptr<AST::TypeAnnotation>> variantType;
+            std::optional<std::shared_ptr<LM::Frontend::AST::TypeAnnotation>> variantType;
             if (match({TokenType::LEFT_PAREN})) {
                 variantType = parseTypeAnnotation();
                 consume(TokenType::RIGHT_PAREN, "Expected ')' after variant type.");
@@ -2308,8 +2309,8 @@ std::shared_ptr<AST::EnumDeclaration> Parser::enumDeclaration() {
 }
 
 // Parse match statement: match(value) { pattern => statement, ... }
-std::shared_ptr<AST::Statement> Parser::matchStatement() {
-    auto stmt = createNodeWithContext<AST::MatchStatement>();
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::matchStatement() {
+    auto stmt = createNodeWithContext<LM::Frontend::AST::MatchStatement>();
     stmt->line = previous().line;
 
     consume(TokenType::LEFT_PAREN, "Expected '(' after 'match'.");
@@ -2320,7 +2321,7 @@ std::shared_ptr<AST::Statement> Parser::matchStatement() {
 
     // Parse match cases: pattern => statement, ...
     while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
-        AST::MatchCase matchCase;
+        LM::Frontend::AST::MatchCase matchCase;
 
         // Parse pattern
         matchCase.pattern = parsePattern();
@@ -2353,7 +2354,7 @@ std::shared_ptr<AST::Statement> Parser::matchStatement() {
     return stmt;
 }
 
-std::shared_ptr<AST::Expression> Parser::parsePattern() {
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::parsePattern() {
     // Error pattern matching: val identifier
     if (check(TokenType::VAL)) {
         return parseValPattern();
@@ -2372,7 +2373,7 @@ std::shared_ptr<AST::Expression> Parser::parsePattern() {
     // Wildcard pattern
     if (match({TokenType::DEFAULT}) || (check(TokenType::IDENTIFIER) && peek().lexeme == "_")) {
         if (previous().type != TokenType::DEFAULT) advance(); // consume '_' if it was an identifier
-        auto pattern = std::make_shared<AST::LiteralExpr>();
+        auto pattern = std::make_shared<LM::Frontend::AST::LiteralExpr>();
         pattern->line = previous().line;
         pattern->value = nullptr; // Represent wildcard with null
         return pattern;
@@ -2403,7 +2404,7 @@ std::shared_ptr<AST::Expression> Parser::parsePattern() {
     if (isPrimitiveType(peek().type) || 
         check(TokenType::LIST_TYPE) || check(TokenType::DICT_TYPE) ||
         (check(TokenType::IDENTIFIER) && (peek().lexeme == "string" || peek().lexeme == "list" || peek().lexeme == "dict"))) {
-        auto typePattern = std::make_shared<AST::TypePatternExpr>();
+        auto typePattern = std::make_shared<LM::Frontend::AST::TypePatternExpr>();
         typePattern->line = peek().line;
         typePattern->type = parseTypeAnnotation();
         return typePattern;
@@ -2422,8 +2423,8 @@ std::shared_ptr<AST::Expression> Parser::parsePattern() {
     return makeErrorExpr();
 }
 
-std::shared_ptr<AST::Expression> Parser::parseBindingPattern() {
-    auto pattern = std::make_shared<AST::BindingPatternExpr>();
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseBindingPattern() {
+    auto pattern = std::make_shared<LM::Frontend::AST::BindingPatternExpr>();
     pattern->line = peek().line;
     pattern->typeName = consume(TokenType::IDENTIFIER, "Expected type name in binding pattern.").lexeme;
     consume(TokenType::LEFT_PAREN, "Expected '(' after type name in binding pattern.");
@@ -2432,8 +2433,8 @@ std::shared_ptr<AST::Expression> Parser::parseBindingPattern() {
     return pattern;
 }
 
-std::shared_ptr<AST::Expression> Parser::parseListPattern() {
-    auto pattern = std::make_shared<AST::ListPatternExpr>();
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseListPattern() {
+    auto pattern = std::make_shared<LM::Frontend::AST::ListPatternExpr>();
     pattern->line = peek().line;
     consume(TokenType::LEFT_BRACKET, "Expected '[' at start of list pattern.");
 
@@ -2451,8 +2452,8 @@ std::shared_ptr<AST::Expression> Parser::parseListPattern() {
     return pattern;
 }
 
-std::shared_ptr<AST::Expression> Parser::parseDictPattern() {
-    auto pattern = std::make_shared<AST::DictPatternExpr>();
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseDictPattern() {
+    auto pattern = std::make_shared<LM::Frontend::AST::DictPatternExpr>();
     pattern->line = peek().line;
     consume(TokenType::LEFT_BRACE, "Expected '{' at start of dict pattern.");
 
@@ -2469,7 +2470,7 @@ std::shared_ptr<AST::Expression> Parser::parseDictPattern() {
 
             // Parse field pattern: key or key: binding
             std::string key = consume(TokenType::IDENTIFIER, "Expected field name in dict pattern.").lexeme;
-            AST::DictPatternExpr::Field field;
+            LM::Frontend::AST::DictPatternExpr::Field field;
             field.key = key;
 
             if (match({TokenType::COLON})) {
@@ -2488,8 +2489,8 @@ std::shared_ptr<AST::Expression> Parser::parseDictPattern() {
     return pattern;
 }
 
-std::shared_ptr<AST::Expression> Parser::parseTuplePattern() {
-    auto pattern = std::make_shared<AST::TuplePatternExpr>();
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseTuplePattern() {
+    auto pattern = std::make_shared<LM::Frontend::AST::TuplePatternExpr>();
     pattern->line = peek().line;
     consume(TokenType::LEFT_PAREN, "Expected '(' at start of tuple pattern.");
 
@@ -2504,7 +2505,7 @@ std::shared_ptr<AST::Expression> Parser::parseTuplePattern() {
 }
 
 // Expression parsing methods
-std::shared_ptr<AST::Expression> Parser::expression() {
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::expression() {
     try {
         auto expr = assignment();
         
@@ -2543,7 +2544,7 @@ std::shared_ptr<AST::Expression> Parser::expression() {
     }
 }
 
-std::shared_ptr<AST::Expression> Parser::assignment() {
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::assignment() {
     auto expr = logicalOr();
 
     if (match({TokenType::EQUAL, TokenType::PLUS_EQUAL, TokenType::MINUS_EQUAL,
@@ -2551,8 +2552,8 @@ std::shared_ptr<AST::Expression> Parser::assignment() {
         auto op = previous();
         auto value = assignment();
 
-        if (auto varExpr = std::dynamic_pointer_cast<AST::VariableExpr>(expr)) {
-            auto assignExpr = std::make_shared<AST::AssignExpr>();
+        if (auto varExpr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr)) {
+            auto assignExpr = std::make_shared<LM::Frontend::AST::AssignExpr>();
             assignExpr->line = op.line;
             assignExpr->name = varExpr->name;
             assignExpr->op = op.type;
@@ -2568,8 +2569,8 @@ std::shared_ptr<AST::Expression> Parser::assignment() {
             }
 
             return assignExpr;
-        } else if (auto memberExpr = std::dynamic_pointer_cast<AST::MemberExpr>(expr)) {
-            auto assignExpr = std::make_shared<AST::AssignExpr>();
+        } else if (auto memberExpr = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(expr)) {
+            auto assignExpr = std::make_shared<LM::Frontend::AST::AssignExpr>();
             assignExpr->line = op.line;
             assignExpr->object = memberExpr->object;
             assignExpr->member = memberExpr->name;
@@ -2586,8 +2587,8 @@ std::shared_ptr<AST::Expression> Parser::assignment() {
             }
 
             return assignExpr;
-        } else if (auto indexExpr = std::dynamic_pointer_cast<AST::IndexExpr>(expr)) {
-            auto assignExpr = std::make_shared<AST::AssignExpr>();
+        } else if (auto indexExpr = std::dynamic_pointer_cast<LM::Frontend::AST::IndexExpr>(expr)) {
+            auto assignExpr = std::make_shared<LM::Frontend::AST::AssignExpr>();
             assignExpr->line = op.line;
             assignExpr->object = indexExpr->object;
             assignExpr->index = indexExpr->index;
@@ -2612,14 +2613,14 @@ std::shared_ptr<AST::Expression> Parser::assignment() {
     return expr;
 }
 
-std::shared_ptr<AST::Expression> Parser::logicalOr() {
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::logicalOr() {
     auto expr = logicalAnd();
 
     while (match({TokenType::OR})) {
         auto op = previous();
         auto right = logicalAnd();
 
-        auto binaryExpr = std::make_shared<AST::BinaryExpr>();
+        auto binaryExpr = std::make_shared<LM::Frontend::AST::BinaryExpr>();
         binaryExpr->line = op.line;
         binaryExpr->left = expr;
         binaryExpr->op = op.type;
@@ -2653,14 +2654,14 @@ std::shared_ptr<AST::Expression> Parser::logicalOr() {
     return expr;
 }
 
-std::shared_ptr<AST::Expression> Parser::logicalAnd() {
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::logicalAnd() {
     auto expr = equality();
 
     while (match({TokenType::AND})) {
         auto op = previous();
         auto right = equality();
 
-        auto binaryExpr = std::make_shared<AST::BinaryExpr>();
+        auto binaryExpr = std::make_shared<LM::Frontend::AST::BinaryExpr>();
         binaryExpr->line = op.line;
         binaryExpr->left = expr;
         binaryExpr->op = op.type;
@@ -2691,14 +2692,14 @@ std::shared_ptr<AST::Expression> Parser::logicalAnd() {
     return expr;
 }
 
-std::shared_ptr<AST::Expression> Parser::equality() {
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::equality() {
     auto expr = comparison();
 
     while (match({TokenType::BANG_EQUAL, TokenType::EQUAL_EQUAL})) {
         auto op = previous();
         auto right = comparison();
 
-        auto binaryExpr = std::make_shared<AST::BinaryExpr>();
+        auto binaryExpr = std::make_shared<LM::Frontend::AST::BinaryExpr>();
         binaryExpr->line = op.line;
         binaryExpr->left = expr;
         binaryExpr->op = op.type;
@@ -2729,12 +2730,12 @@ std::shared_ptr<AST::Expression> Parser::equality() {
     return expr;
 }
 
-std::shared_ptr<AST::Expression> Parser::comparison() {
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::comparison() {
     auto expr = term();
 
     // Check for range expressions (e.g., 1..10)
     if (match({TokenType::RANGE})) {
-        auto rangeExpr = std::make_shared<AST::RangeExpr>();
+        auto rangeExpr = std::make_shared<LM::Frontend::AST::RangeExpr>();
         rangeExpr->line = previous().line;
         rangeExpr->start = expr;
         rangeExpr->end = term();
@@ -2768,7 +2769,7 @@ std::shared_ptr<AST::Expression> Parser::comparison() {
         auto op = previous();
         auto right = term();
 
-        auto binaryExpr = std::make_shared<AST::BinaryExpr>();
+        auto binaryExpr = std::make_shared<LM::Frontend::AST::BinaryExpr>();
         binaryExpr->line = op.line;
         binaryExpr->left = expr;
         binaryExpr->op = op.type;
@@ -2799,14 +2800,14 @@ std::shared_ptr<AST::Expression> Parser::comparison() {
     return expr;
 }
 
-std::shared_ptr<AST::Expression> Parser::term() {
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::term() {
     auto expr = factor();
 
     while (match({TokenType::MINUS, TokenType::PLUS})) {
         auto op = previous();
         auto right = factor();
 
-        auto binaryExpr = std::make_shared<AST::BinaryExpr>();
+        auto binaryExpr = std::make_shared<LM::Frontend::AST::BinaryExpr>();
         binaryExpr->line = op.line;
         binaryExpr->left = expr;
         binaryExpr->op = op.type;
@@ -2837,14 +2838,14 @@ std::shared_ptr<AST::Expression> Parser::term() {
     return expr;
 }
 
-std::shared_ptr<AST::Expression> Parser::factor() {
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::factor() {
     auto expr = power();
 
     while (match({TokenType::SLASH, TokenType::STAR, TokenType::MODULUS})) {
         auto op = previous();
         auto right = unary();
 
-        auto binaryExpr = std::make_shared<AST::BinaryExpr>();
+        auto binaryExpr = std::make_shared<LM::Frontend::AST::BinaryExpr>();
         binaryExpr->line = op.line;
         binaryExpr->left = expr;
         binaryExpr->op = op.type;
@@ -2875,12 +2876,12 @@ std::shared_ptr<AST::Expression> Parser::factor() {
     return expr;
 }
 
-std::shared_ptr<AST::Expression> Parser::power() {
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::power() {
     auto expr = unary();
     while (match({TokenType::POWER})) { // Assuming POWER is '**'
         auto op = previous();
         auto right = power(); // Right-associative!
-        auto binaryExpr = createNodeWithContext<AST::BinaryExpr>();
+        auto binaryExpr = createNodeWithContext<LM::Frontend::AST::BinaryExpr>();
         binaryExpr->line = op.line;
         binaryExpr->left = expr;
         binaryExpr->op = op.type;
@@ -2912,12 +2913,12 @@ std::shared_ptr<AST::Expression> Parser::power() {
     return expr;
 }
 
-std::shared_ptr<AST::Expression> Parser::unary() {
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::unary() {
     if (match({TokenType::BANG, TokenType::MINUS, TokenType::PLUS})) {
         auto op = previous();
         auto right = unary();
 
-        auto unaryExpr = std::make_shared<AST::UnaryExpr>();
+        auto unaryExpr = std::make_shared<LM::Frontend::AST::UnaryExpr>();
         unaryExpr->line = op.line;
         unaryExpr->op = op.type;
         unaryExpr->right = right;
@@ -2946,7 +2947,7 @@ std::shared_ptr<AST::Expression> Parser::unary() {
 
     // if (match({TokenType::AWAIT})) {
     //     auto awaitToken = previous();
-    //     auto awaitExpr = std::make_shared<AST::AwaitExpr>();
+    //     auto awaitExpr = std::make_shared<LM::Frontend::AST::AwaitExpr>();
     //     awaitExpr->line = awaitToken.line;
     //     awaitExpr->expression = unary();
     //
@@ -2975,7 +2976,7 @@ std::shared_ptr<AST::Expression> Parser::unary() {
     return call();
 }
 
-std::shared_ptr<AST::Expression> Parser::call() {
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::call() {
     auto expr = primary();
 
     while (true) {
@@ -2990,12 +2991,12 @@ std::shared_ptr<AST::Expression> Parser::call() {
                 auto numberToken = advance();
                 
                 // Create an index expression for tuple access
-                auto indexExpr = std::make_shared<AST::IndexExpr>();
+                auto indexExpr = std::make_shared<LM::Frontend::AST::IndexExpr>();
                 indexExpr->line = numberToken.line;
                 indexExpr->object = expr;
                 
                 // Create a literal expression for the index
-                auto indexLiteral = std::make_shared<AST::LiteralExpr>();
+                auto indexLiteral = std::make_shared<LM::Frontend::AST::LiteralExpr>();
                 indexLiteral->line = numberToken.line;
                 
                 // Parse the number as a string
@@ -3018,7 +3019,7 @@ std::shared_ptr<AST::Expression> Parser::call() {
                 // Regular member access
                 auto name = consume(TokenType::IDENTIFIER, "Expected property name after '.'.");
 
-                auto memberExpr = std::make_shared<AST::MemberExpr>();
+                auto memberExpr = std::make_shared<LM::Frontend::AST::MemberExpr>();
                 memberExpr->line = name.line;
                 memberExpr->object = expr;
                 memberExpr->name = name.lexeme;
@@ -3051,7 +3052,7 @@ std::shared_ptr<AST::Expression> Parser::call() {
             auto index = expression();
             auto rightBracket = consume(TokenType::RIGHT_BRACKET, "Expected ']' after index.");
 
-            auto indexExpr = std::make_shared<AST::IndexExpr>();
+            auto indexExpr = std::make_shared<LM::Frontend::AST::IndexExpr>();
             indexExpr->line = rightBracket.line;
             indexExpr->object = expr;
             indexExpr->index = index;
@@ -3080,7 +3081,7 @@ std::shared_ptr<AST::Expression> Parser::call() {
             expr = indexExpr;
         } else if (match({TokenType::QUESTION})) {
             // Handle fallible expression with ? operator
-            auto fallibleExpr = std::make_shared<AST::FallibleExpr>();
+            auto fallibleExpr = std::make_shared<LM::Frontend::AST::FallibleExpr>();
             fallibleExpr->line = previous().line;
             fallibleExpr->expression = expr;
             
@@ -3104,9 +3105,9 @@ std::shared_ptr<AST::Expression> Parser::call() {
     return expr;
 }
 
-std::shared_ptr<AST::Expression> Parser::finishCall(std::shared_ptr<AST::Expression> callee) {
-    std::vector<std::shared_ptr<AST::Expression>> arguments;
-    std::unordered_map<std::string, std::shared_ptr<AST::Expression>> namedArgs;
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::finishCall(std::shared_ptr<LM::Frontend::AST::Expression> callee) {
+    std::vector<std::shared_ptr<LM::Frontend::AST::Expression>> arguments;
+    std::unordered_map<std::string, std::shared_ptr<LM::Frontend::AST::Expression>> namedArgs;
     std::vector<Token> callTokens; // Track tokens for CST
 
     // Track left paren for CST
@@ -3157,7 +3158,7 @@ std::shared_ptr<AST::Expression> Parser::finishCall(std::shared_ptr<AST::Express
         callTokens.push_back(paren);
     }
 
-    auto callExpr = std::make_shared<AST::CallExpr>();
+    auto callExpr = std::make_shared<LM::Frontend::AST::CallExpr>();
     callExpr->line = paren.line;
     callExpr->callee = callee;
     callExpr->arguments = arguments;
@@ -3189,9 +3190,9 @@ std::shared_ptr<AST::Expression> Parser::finishCall(std::shared_ptr<AST::Express
     return callExpr;
 }
 
-std::shared_ptr<AST::Expression> Parser::primary() {
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::primary() {
     if (match({TokenType::FALSE})) {
-        auto literalExpr = createNodeWithContext<AST::LiteralExpr>();
+        auto literalExpr = createNodeWithContext<LM::Frontend::AST::LiteralExpr>();
         literalExpr->line = previous().line;
         literalExpr->value = false;
         
@@ -3211,7 +3212,7 @@ std::shared_ptr<AST::Expression> Parser::primary() {
     }
 
     if (match({TokenType::TRUE})) {
-        auto literalExpr = createNodeWithContext<AST::LiteralExpr>();
+        auto literalExpr = createNodeWithContext<LM::Frontend::AST::LiteralExpr>();
         literalExpr->line = previous().line;
         literalExpr->value = true;
         
@@ -3231,7 +3232,7 @@ std::shared_ptr<AST::Expression> Parser::primary() {
     }
 
     // if (match({TokenType::NONE})) {
-    //     auto literalExpr = createNodeWithContext<AST::LiteralExpr>();
+    //     auto literalExpr = createNodeWithContext<LM::Frontend::AST::LiteralExpr>();
     //     literalExpr->line = previous().line;
     //     literalExpr->value = nullptr;
     //     attachTriviaFromToken(previous());
@@ -3239,7 +3240,7 @@ std::shared_ptr<AST::Expression> Parser::primary() {
     // }
 
     if (match({TokenType::NIL})) {
-        auto literalExpr = createNodeWithContext<AST::LiteralExpr>();
+        auto literalExpr = createNodeWithContext<LM::Frontend::AST::LiteralExpr>();
         literalExpr->line = previous().line;
         literalExpr->value = nullptr;
         attachTriviaFromToken(previous());
@@ -3248,7 +3249,7 @@ std::shared_ptr<AST::Expression> Parser::primary() {
 
     if (match({TokenType::INT_LITERAL, TokenType::FLOAT_LITERAL, TokenType::SCIENTIFIC_LITERAL})) {
         auto token = previous();
-        auto literalExpr = createNodeWithContext<AST::LiteralExpr>();
+        auto literalExpr = createNodeWithContext<LM::Frontend::AST::LiteralExpr>();
         literalExpr->line = token.line;
         
         literalExpr->value = token.lexeme;
@@ -3271,7 +3272,7 @@ std::shared_ptr<AST::Expression> Parser::primary() {
     
     if (match({TokenType::STRING})) {
         // Regular string literal (interpolated strings start with INTERPOLATION_START, not STRING)
-        auto literalExpr = std::make_shared<AST::LiteralExpr>();
+        auto literalExpr = std::make_shared<LM::Frontend::AST::LiteralExpr>();
         literalExpr->line = previous().line;
         
         // AST gets the parsed string value (without quotes)
@@ -3301,7 +3302,7 @@ std::shared_ptr<AST::Expression> Parser::primary() {
             startPart = startPart.substr(1, startPart.length() - 2);
         }
         
-        auto interpolated = std::make_shared<AST::InterpolatedStringExpr>();
+        auto interpolated = std::make_shared<LM::Frontend::AST::InterpolatedStringExpr>();
         interpolated->line = previous().line;
         
         // Add the string part from INTERPOLATION_START token
@@ -3344,7 +3345,7 @@ std::shared_ptr<AST::Expression> Parser::primary() {
     }
 
     if (match({TokenType::THIS})) {
-        auto thisExpr = std::make_shared<AST::ThisExpr>();
+        auto thisExpr = std::make_shared<LM::Frontend::AST::ThisExpr>();
         thisExpr->line = previous().line;
         return thisExpr;
     }
@@ -3353,14 +3354,14 @@ std::shared_ptr<AST::Expression> Parser::primary() {
         auto token = previous();
         // Check if this is 'self' keyword
         if (token.lexeme == "self" || token.lexeme == "this" ) {
-            auto thisExpr = std::make_shared<AST::ThisExpr>();
+            auto thisExpr = std::make_shared<LM::Frontend::AST::ThisExpr>();
             thisExpr->line = token.line;
             return thisExpr;
         } else {
             // Check if this is an object literal: Identifier { ... }
             if (check(TokenType::LEFT_BRACE)) {
                 // This is an object literal with constructor name
-                auto objExpr = std::make_shared<AST::ObjectLiteralExpr>();
+                auto objExpr = std::make_shared<LM::Frontend::AST::ObjectLiteralExpr>();
                 objExpr->line = token.line;
                 objExpr->constructorName = token.lexeme;
                 
@@ -3383,7 +3384,7 @@ std::shared_ptr<AST::Expression> Parser::primary() {
                 consume(TokenType::RIGHT_BRACE, "Expected '}' after object literal properties.");
                 return objExpr;
             } else {
-                auto varExpr = createNodeWithContext<AST::VariableExpr>();
+                auto varExpr = createNodeWithContext<LM::Frontend::AST::VariableExpr>();
                 varExpr->line = token.line;
                 varExpr->name = token.lexeme;
                 
@@ -3406,7 +3407,7 @@ std::shared_ptr<AST::Expression> Parser::primary() {
 
     if (match({TokenType::SLEEP})) {
         // Treat SLEEP as a function call
-        auto varExpr = createNodeWithContext<AST::VariableExpr>();
+        auto varExpr = createNodeWithContext<LM::Frontend::AST::VariableExpr>();
         varExpr->line = previous().line;
         varExpr->name = "sleep";
         attachTriviaFromToken(previous());
@@ -3415,7 +3416,7 @@ std::shared_ptr<AST::Expression> Parser::primary() {
 
     // Handle error construction: err(ErrorType) or err(ErrorType(args)) or err() for unified system
     if (match({TokenType::ERR})) {
-        auto errorExpr = std::make_shared<AST::ErrorConstructExpr>();
+        auto errorExpr = std::make_shared<LM::Frontend::AST::ErrorConstructExpr>();
         errorExpr->line = previous().line;
         
         consume(TokenType::LEFT_PAREN, "Expected '(' after 'err'.");
@@ -3448,7 +3449,7 @@ std::shared_ptr<AST::Expression> Parser::primary() {
 
     // Handle success construction: ok(value)
     if (match({TokenType::OK})) {
-        auto okExpr = std::make_shared<AST::OkConstructExpr>();
+        auto okExpr = std::make_shared<LM::Frontend::AST::OkConstructExpr>();
         okExpr->line = previous().line;
         
         consume(TokenType::LEFT_PAREN, "Expected '(' after 'ok'.");
@@ -3470,7 +3471,7 @@ std::shared_ptr<AST::Expression> Parser::primary() {
         if (check(TokenType::RIGHT_PAREN)) {
             auto rightParen = consume(TokenType::RIGHT_PAREN, "Expected ')' after empty tuple.");
             
-            auto tupleExpr = std::make_shared<AST::TupleExpr>();
+            auto tupleExpr = std::make_shared<LM::Frontend::AST::TupleExpr>();
             tupleExpr->line = rightParen.line;
             // Empty tuple
             
@@ -3482,7 +3483,7 @@ std::shared_ptr<AST::Expression> Parser::primary() {
         // Check if this is a tuple (has comma) or grouping expression
         if (match({TokenType::COMMA})) {
             // This is a tuple
-            std::vector<std::shared_ptr<AST::Expression>> elements;
+            std::vector<std::shared_ptr<LM::Frontend::AST::Expression>> elements;
             elements.push_back(firstExpr);
             
             // Parse remaining elements
@@ -3495,7 +3496,7 @@ std::shared_ptr<AST::Expression> Parser::primary() {
             
             auto rightParen = consume(TokenType::RIGHT_PAREN, "Expected ')' after tuple elements.");
             
-            auto tupleExpr = std::make_shared<AST::TupleExpr>();
+            auto tupleExpr = std::make_shared<LM::Frontend::AST::TupleExpr>();
             tupleExpr->line = rightParen.line;
             tupleExpr->elements = elements;
             
@@ -3504,7 +3505,7 @@ std::shared_ptr<AST::Expression> Parser::primary() {
             // This is a grouping expression
             auto rightParen = consume(TokenType::RIGHT_PAREN, "Expected ')' after expression.");
 
-            auto groupingExpr = std::make_shared<AST::GroupingExpr>();
+            auto groupingExpr = std::make_shared<LM::Frontend::AST::GroupingExpr>();
             groupingExpr->line = rightParen.line;
             groupingExpr->expression = firstExpr;
 
@@ -3536,7 +3537,7 @@ std::shared_ptr<AST::Expression> Parser::primary() {
     if (match({TokenType::LEFT_BRACKET})) {
         // Parse list literal
         auto leftBracket = previous();
-        std::vector<std::shared_ptr<AST::Expression>> elements;
+        std::vector<std::shared_ptr<LM::Frontend::AST::Expression>> elements;
 
         if (!check(TokenType::RIGHT_BRACKET)) {
             do {
@@ -3546,7 +3547,7 @@ std::shared_ptr<AST::Expression> Parser::primary() {
 
         auto rightBracket = consume(TokenType::RIGHT_BRACKET, "Expected ']' after list elements.");
 
-        auto listExpr = std::make_shared<AST::ListExpr>();
+        auto listExpr = std::make_shared<LM::Frontend::AST::ListExpr>();
         listExpr->line = rightBracket.line;
         listExpr->elements = elements;
 
@@ -3567,7 +3568,7 @@ std::shared_ptr<AST::Expression> Parser::primary() {
     if (match({TokenType::LEFT_BRACE})) {
         // Parse dictionary literal
         auto leftBrace = previous();
-        std::vector<std::pair<std::shared_ptr<AST::Expression>, std::shared_ptr<AST::Expression>>> entries;
+        std::vector<std::pair<std::shared_ptr<LM::Frontend::AST::Expression>, std::shared_ptr<LM::Frontend::AST::Expression>>> entries;
 
         if (!check(TokenType::RIGHT_BRACE)) {
             do {
@@ -3581,7 +3582,7 @@ std::shared_ptr<AST::Expression> Parser::primary() {
 
         auto rightBrace = consume(TokenType::RIGHT_BRACE, "Expected '}' after dictionary entries.");
 
-        auto dictExpr = std::make_shared<AST::DictExpr>();
+        auto dictExpr = std::make_shared<LM::Frontend::AST::DictExpr>();
         dictExpr->line = rightBrace.line;
         dictExpr->entries = entries;
 
@@ -3604,19 +3605,19 @@ std::shared_ptr<AST::Expression> Parser::primary() {
         scanner.getTokens()[current-1].type == TokenType::LEFT_BRACE && 
         scanner.getTokens()[current].type == TokenType::RIGHT_BRACE) {
         // This is likely an empty block, so we'll create a placeholder expression
-        auto placeholderExpr = std::make_shared<AST::LiteralExpr>();
+        auto placeholderExpr = std::make_shared<LM::Frontend::AST::LiteralExpr>();
         placeholderExpr->line = peek().line;
         placeholderExpr->value = nullptr; // Use null as a placeholder
         return placeholderExpr;
     } else if (match({TokenType::SELF, TokenType::THIS})) {
         // Handle 'self' as a special case
-        auto thisExpr = createNodeWithContext<AST::ThisExpr>();
+        auto thisExpr = createNodeWithContext<LM::Frontend::AST::ThisExpr>();
         thisExpr->line = previous().line;
         attachTriviaFromToken(previous());
         return thisExpr;
     } else if (match({TokenType::SUPER})) {
         // Handle 'super' for parent class access
-        auto superExpr = createNodeWithContext<AST::SuperExpr>();
+        auto superExpr = createNodeWithContext<LM::Frontend::AST::SuperExpr>();
         superExpr->line = previous().line;
         attachTriviaFromToken(previous());
         return superExpr;
@@ -3631,9 +3632,9 @@ std::shared_ptr<AST::Expression> Parser::primary() {
     }
 }
 
-std::shared_ptr<AST::Statement> Parser::typeDeclaration() {
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::typeDeclaration() {
     // Create a new type declaration statement
-    auto typeDecl = std::make_shared<AST::TypeDeclaration>();
+    auto typeDecl = std::make_shared<LM::Frontend::AST::TypeDeclaration>();
     typeDecl->line = previous().line;
 
     // Parse type name
@@ -3647,7 +3648,7 @@ std::shared_ptr<AST::Statement> Parser::typeDeclaration() {
     
     // For list literals like [any], [str], [Person]
     if (match({TokenType::LEFT_BRACKET})) {
-        auto listType = std::make_shared<AST::TypeAnnotation>();
+        auto listType = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
         listType->typeName = "list";
         listType->isList = true;
         
@@ -3658,7 +3659,7 @@ std::shared_ptr<AST::Statement> Parser::typeDeclaration() {
             listType->elementType = elementType;
         } else {
             // Default to any if no element type is specified
-            auto anyType = std::make_shared<AST::TypeAnnotation>();
+            auto anyType = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
             anyType->typeName = "any";
             anyType->isPrimitive = true;
             listType->elementType = anyType;
@@ -3702,13 +3703,13 @@ std::shared_ptr<AST::Statement> Parser::typeDeclaration() {
         
         if (isDictionary) {
             // Parse as dictionary type
-            auto dictType = std::make_shared<AST::TypeAnnotation>();
+            auto dictType = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
             dictType->typeName = "dict";
             dictType->isDict = true;
             
             // Parse key type
             Token keyToken = advance();
-            auto keyType = std::make_shared<AST::TypeAnnotation>();
+            auto keyType = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
             if (isPrimitiveType(keyToken.type)) {
                 keyType->typeName = tokenTypeToString(keyToken.type);
                 keyType->isPrimitive = true;
@@ -3739,7 +3740,7 @@ std::shared_ptr<AST::Statement> Parser::typeDeclaration() {
             typeDecl->type = dictType;
         } else {
             // Parse as structural type
-            auto structType = std::make_shared<AST::TypeAnnotation>();
+            auto structType = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
             structType->typeName = "struct";
             structType->isStructural = true;
             
@@ -3818,7 +3819,7 @@ std::shared_ptr<AST::Statement> Parser::typeDeclaration() {
         // Check if this is a union type (e.g., Some | None)
         if (match({TokenType::PIPE})) {
             // This is a union type
-            auto unionType = std::make_shared<AST::TypeAnnotation>();
+            auto unionType = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
             unionType->typeName = "union";
             unionType->isUnion = true;
             unionType->unionTypes.push_back(firstType);
@@ -3833,7 +3834,7 @@ std::shared_ptr<AST::Statement> Parser::typeDeclaration() {
         // Check if this is an intersection type (e.g., HasName and HasAge)
         else if (match({TokenType::AND})) {
             // This is an intersection type
-            auto intersectionType = std::make_shared<AST::TypeAnnotation>();
+            auto intersectionType = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
             intersectionType->typeName = "intersection";
             intersectionType->isIntersection = true;
             intersectionType->unionTypes.push_back(firstType);
@@ -3859,7 +3860,7 @@ std::shared_ptr<AST::Statement> Parser::typeDeclaration() {
     }
     // For nil type
     else if (match({TokenType::NIL})) {
-        auto nilType = std::make_shared<AST::TypeAnnotation>();
+        auto nilType = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
         nilType->typeName = "nil";
         nilType->isPrimitive = true;
         typeDecl->type = nilType;
@@ -3875,14 +3876,14 @@ std::shared_ptr<AST::Statement> Parser::typeDeclaration() {
 }
             
 // Type annotation parsing
-std::shared_ptr<AST::TypeAnnotation> Parser::parseTypeAnnotation() {
+std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::parseTypeAnnotation() {
     // Parse the base type first
     auto type = parseBasicType();
     
     // Check for union types (e.g., int | float)
     if (check(TokenType::PIPE)) {
         // This is a union type - create a union and add the first type
-        auto unionType = std::make_shared<AST::TypeAnnotation>();
+        auto unionType = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
         unionType->typeName = "union";
         unionType->isUnion = true;
         unionType->unionTypes.push_back(type);
@@ -3899,7 +3900,7 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseTypeAnnotation() {
     // Check for intersection types (e.g., HasName and HasAge)
     if (check(TokenType::AND)) {
         // This is an intersection type
-        auto intersectionType = std::make_shared<AST::TypeAnnotation>();
+        auto intersectionType = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
         intersectionType->typeName = "intersection";
         intersectionType->isIntersection = true;
         intersectionType->unionTypes.push_back(type); // Reuse unionTypes for intersection types
@@ -3964,8 +3965,8 @@ std::string Parser::tokenTypeToString(TokenType type) {
 }
 
 // Parse union type (e.g., Some | None, int | str | bool)
-std::shared_ptr<AST::TypeAnnotation> Parser::parseUnionType() {
-    auto unionType = std::make_shared<AST::TypeAnnotation>();
+std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::parseUnionType() {
+    auto unionType = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
     unionType->typeName = "union";
     unionType->isUnion = true;
     
@@ -3983,13 +3984,13 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseUnionType() {
 }
 
 // Parse a basic type without union/intersection logic (to avoid recursion)
-std::shared_ptr<AST::TypeAnnotation> Parser::parseBasicType() {
-    auto type = std::make_shared<AST::TypeAnnotation>();
+std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::parseBasicType() {
+    auto type = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
 
     // Check for container types (e.g., [int], {str: int})
     if (match({TokenType::LEFT_BRACKET})) {
         // Parse list type [elementType] - [ is already consumed
-        auto type = std::make_shared<AST::TypeAnnotation>();
+        auto type = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
         type->isList = true;
         type->typeName = "list";
         
@@ -3999,7 +4000,7 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseBasicType() {
             type->elementType = parseBasicType();
         } else {
             // Default to any if no element type is specified
-            auto anyType = std::make_shared<AST::TypeAnnotation>();
+            auto anyType = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
             anyType->typeName = "list";
             anyType->isPrimitive = true;
             type->elementType = anyType;
@@ -4112,7 +4113,7 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseBasicType() {
         // Parse function type with unified syntax: fn(param1: Type1, param2: Type2): ReturnType
         auto funcType = parseFunctionTypeAnnotation();
         // Convert to TypeAnnotation for compatibility
-        auto type = std::make_shared<AST::TypeAnnotation>();
+        auto type = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
         type->typeName = "function";
         type->isFunction = true;
         type->functionParameters = funcType->parameters;
@@ -4210,7 +4211,7 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseBasicType() {
 }
 
 // Parse brace type - either dictionary {keyType: valueType} or structural {field: type, ...}
-std::shared_ptr<AST::TypeAnnotation> Parser::parseBraceType() {
+std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::parseBraceType() {
     // Opening brace is already consumed by parseBasicType()
     
     // Improved heuristic to distinguish dictionary from structural type:
@@ -4234,7 +4235,7 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseBraceType() {
     
     if (isDictionary) {
         // Parse dictionary type - { is already consumed
-        auto type = std::make_shared<AST::TypeAnnotation>();
+        auto type = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
         type->isDict = true;
         type->typeName = "dict";
         
@@ -4252,7 +4253,7 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseBraceType() {
         return type;
     } else {
         // Parse structural type - { is already consumed
-        auto type = std::make_shared<AST::TypeAnnotation>();
+        auto type = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
         type->isStructural = true;
         type->typeName = "struct";
 
@@ -4325,8 +4326,8 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseBraceType() {
 }
 
 // Parse dictionary type {keyType: valueType} - assumes '{' is already consumed
-std::shared_ptr<AST::TypeAnnotation> Parser::parseDictionaryType() {
-    auto type = std::make_shared<AST::TypeAnnotation>();
+std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::parseDictionaryType() {
+    auto type = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
     type->isDict = true;
     type->typeName = "dict";
     
@@ -4355,8 +4356,8 @@ bool Parser::isKnownTypeName(const std::string& name) {
 }
 
 // Parse structural type (e.g., { name: str, age: int, ...baseRecord })
-std::shared_ptr<AST::TypeAnnotation> Parser::parseStructuralType(const std::string& typeName) {
-    auto type = std::make_shared<AST::TypeAnnotation>();
+std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::parseStructuralType(const std::string& typeName) {
+    auto type = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
     type->isStructural = true;
     type->typeName = typeName.empty() ? "struct" : typeName;
 
@@ -4428,12 +4429,12 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseStructuralType(const std::stri
 }
 
 // Parse container type - handles both [elementType] and {keyType: valueType} syntax
-std::shared_ptr<AST::TypeAnnotation> Parser::parseContainerType() {
+std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::parseContainerType() {
     // Check for list type [elementType]
     if (check(TokenType::LEFT_BRACKET)) {
         advance(); // consume '['
         
-        auto type = std::make_shared<AST::TypeAnnotation>();
+        auto type = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
         type->isList = true;
         type->typeName = "list";
         
@@ -4443,7 +4444,7 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseContainerType() {
             type->elementType = parseTypeAnnotation();
         } else {
             // Default to any if no element type is specified
-            auto anyType = std::make_shared<AST::TypeAnnotation>();
+            auto anyType = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
             anyType->typeName = "any";
             anyType->isPrimitive = true;
             type->elementType = anyType;
@@ -4457,7 +4458,7 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseContainerType() {
     if (check(TokenType::LEFT_BRACE)) {
         advance(); // consume '{'
         
-        auto type = std::make_shared<AST::TypeAnnotation>();
+        auto type = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
         type->isDict = true;
         type->typeName = "dict";
         
@@ -4483,8 +4484,8 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseContainerType() {
 // Error pattern parsing methods
 
 // Parse val pattern: val identifier
-std::shared_ptr<AST::Expression> Parser::parseValPattern() {
-    auto pattern = std::make_shared<AST::ValPatternExpr>();
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseValPattern() {
+    auto pattern = std::make_shared<LM::Frontend::AST::ValPatternExpr>();
     pattern->line = peek().line;
     
     consume(TokenType::VAL, "Expected 'val' keyword.");
@@ -4494,8 +4495,8 @@ std::shared_ptr<AST::Expression> Parser::parseValPattern() {
 }
 
 // Parse err pattern: err identifier or err ErrorType
-std::shared_ptr<AST::Expression> Parser::parseErrPattern() {
-    auto pattern = std::make_shared<AST::ErrPatternExpr>();
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseErrPattern() {
+    auto pattern = std::make_shared<LM::Frontend::AST::ErrPatternExpr>();
     pattern->line = peek().line;
     
     consume(TokenType::ERR, "Expected 'err' keyword.");
@@ -4521,8 +4522,8 @@ std::shared_ptr<AST::Expression> Parser::parseErrPattern() {
 }
 
 // Parse specific error type pattern: ErrorType or ErrorType(params)
-std::shared_ptr<AST::Expression> Parser::parseErrorTypePattern() {
-    auto pattern = std::make_shared<AST::ErrorTypePatternExpr>();
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseErrorTypePattern() {
+    auto pattern = std::make_shared<LM::Frontend::AST::ErrorTypePatternExpr>();
     pattern->line = peek().line;
     
     pattern->errorType = consume(TokenType::IDENTIFIER, "Expected error type name.").lexeme;
@@ -4586,7 +4587,7 @@ std::string Parser::generateCausedByMessage(const ErrorHandling::BlockContext& c
     return message;
 }
 
-std::shared_ptr<AST::Statement> Parser::parseStatementWithContext(const std::string& blockType, const Token& contextToken) {
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::parseStatementWithContext(const std::string& blockType, const Token& contextToken) {
     if (check(TokenType::LEFT_BRACE)) {
         pushBlockContext(blockType, contextToken);
         auto stmt = statement();
@@ -4598,8 +4599,8 @@ std::shared_ptr<AST::Statement> Parser::parseStatementWithContext(const std::str
 }
 
 // Parse lambda expression: fn(param1, param2): returnType {body}
-std::shared_ptr<AST::LambdaExpr> Parser::lambdaExpression() {
-    auto lambda = std::make_shared<AST::LambdaExpr>();
+std::shared_ptr<LM::Frontend::AST::LambdaExpr> Parser::lambdaExpression() {
+    auto lambda = std::make_shared<LM::Frontend::AST::LambdaExpr>();
     lambda->line = peek().line;
     
     // Consume 'fn'
@@ -4614,7 +4615,7 @@ std::shared_ptr<AST::LambdaExpr> Parser::lambdaExpression() {
             std::string paramName = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
             
             // Check for type annotation
-            std::shared_ptr<AST::TypeAnnotation> paramType = nullptr;
+            std::shared_ptr<LM::Frontend::AST::TypeAnnotation> paramType = nullptr;
             if (match({TokenType::COLON})) {
                 paramType = parseTypeAnnotation();
             }
@@ -4634,7 +4635,7 @@ std::shared_ptr<AST::LambdaExpr> Parser::lambdaExpression() {
     // Parse lambda body (block statement)
     consume(TokenType::LEFT_BRACE, "Expected '{' before lambda body.");
     
-    auto lambdaBody = std::make_shared<AST::BlockStatement>();
+    auto lambdaBody = std::make_shared<LM::Frontend::AST::BlockStatement>();
     lambdaBody->line = previous().line;
     
     // Parse statements in the lambda body
@@ -4649,8 +4650,8 @@ std::shared_ptr<AST::LambdaExpr> Parser::lambdaExpression() {
 }
 
 // Parse unified function type annotation: fn(param1: Type1, param2: Type2): ReturnType
-std::shared_ptr<AST::FunctionTypeAnnotation> Parser::parseFunctionTypeAnnotation() {
-    auto funcType = std::make_shared<AST::FunctionTypeAnnotation>();
+std::shared_ptr<LM::Frontend::AST::FunctionTypeAnnotation> Parser::parseFunctionTypeAnnotation() {
+    auto funcType = std::make_shared<LM::Frontend::AST::FunctionTypeAnnotation>();
     // Note: FunctionTypeAnnotation inherits from TypeAnnotation which has line field
     
     consume(TokenType::LEFT_PAREN, "Expected '(' after 'fn' in function type.");
@@ -4658,7 +4659,7 @@ std::shared_ptr<AST::FunctionTypeAnnotation> Parser::parseFunctionTypeAnnotation
     // Parse parameter types with optional names
     if (!check(TokenType::RIGHT_PAREN)) {
         do {
-            AST::FunctionParameter param = parseFunctionParameter();
+            LM::Frontend::AST::FunctionParameter param = parseFunctionParameter();
             funcType->parameters.push_back(param);
         } while (match({TokenType::COMMA}));
     }
@@ -4670,7 +4671,7 @@ std::shared_ptr<AST::FunctionTypeAnnotation> Parser::parseFunctionTypeAnnotation
         funcType->returnType = parseTypeAnnotation(); // Use full type annotation parsing for union types
     } else {
         // Default to void/nil return type if not specified
-        auto voidType = std::make_shared<AST::TypeAnnotation>();
+        auto voidType = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
         voidType->typeName = "nil";
         voidType->isPrimitive = true;
         funcType->returnType = voidType;
@@ -4680,8 +4681,8 @@ std::shared_ptr<AST::FunctionTypeAnnotation> Parser::parseFunctionTypeAnnotation
 }
 
 // Parse legacy function type for backward compatibility
-std::shared_ptr<AST::TypeAnnotation> Parser::parseLegacyFunctionType() {
-    auto type = std::make_shared<AST::TypeAnnotation>();
+std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::parseLegacyFunctionType() {
+    auto type = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
     type->typeName = "function";
     type->isFunction = true;
     
@@ -4717,8 +4718,8 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseLegacyFunctionType() {
 }
 
 // Parse a single function parameter with optional name and type
-AST::FunctionParameter Parser::parseFunctionParameter() {
-    AST::FunctionParameter param;
+LM::Frontend::AST::FunctionParameter Parser::parseFunctionParameter() {
+    LM::Frontend::AST::FunctionParameter param;
     
     // Check if we have a parameter name followed by colon
     if (check(TokenType::IDENTIFIER)) {

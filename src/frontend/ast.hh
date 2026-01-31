@@ -16,6 +16,9 @@
 #include "scanner.hh"
 #include "../backend/types.hh"
 
+namespace LM {
+namespace Frontend {
+
 // Forward declarations
 namespace AST {
     struct Node;
@@ -152,7 +155,7 @@ namespace AST {
 
     // Base statement type
     struct Statement : public Node {
-        std::vector<Token> annotations;
+        std::vector<LM::Frontend::Token> annotations;
         
         // inferred_type is inherited from Node
         // For statements, this typically represents the type of value produced by the statement
@@ -258,13 +261,13 @@ namespace AST {
     // Binary expression (e.g., a + b, x == y)
     struct BinaryExpr : public Expression {
         std::shared_ptr<Expression> left;
-        TokenType op;
+        LM::Frontend::TokenType op;
         std::shared_ptr<Expression> right;
     };
 
     // Unary expression (e.g., !x, -y)
     struct UnaryExpr : public Expression {
-        TokenType op;
+        LM::Frontend::TokenType op;
         std::shared_ptr<Expression> right;
     };
 
@@ -287,7 +290,7 @@ namespace AST {
     // Literal values (numbers, strings, booleans, nil)
     struct LiteralExpr : public Expression {
         std::variant<std::string, bool, std::nullptr_t> value;
-        TokenType literalType = TokenType::STRING; // Store the original token type for type inference
+        LM::Frontend::TokenType literalType = LM::Frontend::TokenType::STRING; // Store the original token type for type inference
     };
 
     // Variable reference
@@ -329,7 +332,7 @@ namespace AST {
 
 
         std::shared_ptr<Expression> value;
-        TokenType op = TokenType::EQUAL; // Default is simple assignment, but can be +=, -=, etc.
+        LM::Frontend::TokenType op = LM::Frontend::TokenType::EQUAL; // Default is simple assignment, but can be +=, -=, etc.
     };
 
     // Ternary expression (condition ? thenExpr : elseExpr)
@@ -955,8 +958,8 @@ namespace AST {
         
         // Utility methods
         bool isLiteralConstant(std::shared_ptr<Expression> expr);
-        std::shared_ptr<Expression> evaluateBinaryOp(TokenType op, std::shared_ptr<Expression> left, std::shared_ptr<Expression> right);
-        std::shared_ptr<Expression> evaluateUnaryOp(TokenType op, std::shared_ptr<Expression> right);
+        std::shared_ptr<Expression> evaluateBinaryOp(LM::Frontend::TokenType op, std::shared_ptr<Expression> left, std::shared_ptr<Expression> right);
+        std::shared_ptr<Expression> evaluateUnaryOp(LM::Frontend::TokenType op, std::shared_ptr<Expression> right);
         bool isCompileTimeFalse(std::shared_ptr<Expression> expr);
         bool isCompileTimeTrue(std::shared_ptr<Expression> expr);
         
@@ -1051,4 +1054,8 @@ namespace AST {
     }
 }
 
-#endif // AST_H
+} // namespace Frontend
+} // namespace LM
+
+#endif // AST_H#endif
+ // AST_H
