@@ -2,7 +2,7 @@
 #include "../../lir/lir.hh"
 #include "../../lir/functions.hh"
 #include "../../lir/builtin_functions.hh"
-#include "../memory.hh"
+#include "../../memory/memory.hh"
 #include "../register/register.hh"
 #include <libgccjit++.h>
 #include <memory>
@@ -229,7 +229,7 @@ JITBackend::~JITBackend() {
 }
 
 // C wrapper implementations
-static MemoryManager<> g_jit_memory_manager;
+static LM::Memory::MemoryManager<> g_jit_memory_manager;
 
 #if defined(_WIN32) || defined(__CYGWIN__)
     #define JIT_EXPORT __declspec(dllexport)
@@ -2066,7 +2066,7 @@ std::vector<std::string> JITBackend::get_errors() const {
 // Memory management methods
 void JITBackend::enter_memory_region() {
     if (!current_memory_region_) {
-        current_memory_region_ = new MemoryManager<>::Region(memory_manager_);
+        current_memory_region_ = new LM::Memory::MemoryManager<>::Region(memory_manager_);
     }
 }
 

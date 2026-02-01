@@ -1,6 +1,6 @@
 #pragma once
 
-#include "memory_analyzer.hh"
+#include "analyzer.hh"
 #include <algorithm>
 #include <atomic>
 #include <cassert>
@@ -22,6 +22,9 @@
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 #define TRACE_INFO() (std::string(__FUNCTION__) + " at line " + TOSTRING(__LINE__))
+
+namespace LM {
+namespace Memory {
 
 constexpr size_t MIN_ALLOC_SIZE = 4;
 constexpr size_t MAX_ALLOC_SIZE = 256;
@@ -664,3 +667,6 @@ public:
         return instance;
     }
 };
+
+} // namespace LM
+} // namespace Memory

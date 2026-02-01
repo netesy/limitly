@@ -4,7 +4,7 @@
 #include "../../lir/lir.hh"
 #include "../../lir/functions.hh"
 #include "../types.hh"
-#include "../memory.hh"
+#include "../../memory/memory.hh"
 #include "../value.hh"
 #include "../task.hh"
 #include "../channel.hh"
@@ -84,8 +84,8 @@ private:
     const LIR::LIR_Function* current_function_ = nullptr;
     
     // Memory management for type system
-    MemoryManager<> memoryManager;
-    MemoryManager<>::Region memoryRegion;
+    LM::Memory::MemoryManager<> memoryManager;
+    LM::Memory::MemoryManager<>::Region memoryRegion;
     
     // Type system instance
     std::unique_ptr<TypeSystem> type_system;

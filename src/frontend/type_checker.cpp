@@ -2629,8 +2629,8 @@ namespace TypeCheckerFactory {
 
 TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> program, const std::string& source, const std::string& file_path) {
     // Create memory manager and region for type system
-    static MemoryManager<> memoryManager;
-    static MemoryManager<>::Region memoryRegion(memoryManager);
+    static LM::Memory::MemoryManager<> memoryManager;
+    static LM::Memory::MemoryManager<>::Region memoryRegion(memoryManager);
     static TypeSystem type_system(memoryManager, memoryRegion);
     auto checker = create(type_system);
     

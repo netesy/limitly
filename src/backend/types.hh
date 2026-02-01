@@ -1,7 +1,7 @@
 //types.hh
 #pragma once
 
-#include "memory.hh"
+#include "../memory/memory.hh"
 #include "value.hh"
 #include <algorithm>
 #include <array>
@@ -30,8 +30,8 @@ private:
     std::map<std::string, TypePtr> userDefinedTypes;
     std::map<std::string, TypePtr> typeAliases;
     std::map<std::string, TypePtr> errorTypes;
-    MemoryManager<> &memoryManager;
-    MemoryManager<>::Region &region;
+    LM::Memory::MemoryManager<> &memoryManager;
+    LM::Memory::MemoryManager<>::Region &region;
 
     // Circular dependency detection for type aliases
     bool hasCircularDependency(const std::string& aliasName, TypePtr type, 
@@ -310,7 +310,7 @@ private:
     }
 
 public:
-    TypeSystem(MemoryManager<> &memManager, MemoryManager<>::Region &reg)
+    TypeSystem(LM::Memory::MemoryManager<> &memManager, LM::Memory::MemoryManager<>::Region &reg)
         : memoryManager(memManager), region(reg) {
         registerBuiltinErrors();
     }

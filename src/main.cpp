@@ -6,7 +6,6 @@
 #include "frontend/type_checker.hh"
 #include "frontend/memory_checker.hh"
 #include "frontend/ast.hh"
-#include "backend/ast_printer.hh"
 #include "backend/register/register.hh"
 #include "lir/generator.hh"
 #include "lir/functions.hh"
