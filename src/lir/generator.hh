@@ -2,7 +2,7 @@
 #define LIR_GENERATOR_H
 
 #include "lir.hh"
-#include "../backend/memory.hh"
+#include "../memory/memory.hh"
 #include "../frontend/ast.hh"
 #include "../frontend/type_checker.hh"
 #include <memory>
@@ -211,7 +211,7 @@ private:
     // Member variables
     struct Scope {
         std::unordered_map<std::string, Reg> vars;
-        MemoryManager<>::Region* memory_region = nullptr;
+        LM::Memory::MemoryManager<>::Region* memory_region = nullptr;
     };
 
     struct LoopContext {
@@ -309,8 +309,8 @@ private:
     Reg this_register_ = UINT32_MAX;  // Register holding 'this' pointer in methods
     
     // Memory management
-    MemoryManager<> memory_manager_;
-    MemoryManager<>::Region* current_memory_region_ = nullptr;
+    LM::Memory::MemoryManager<> memory_manager_;
+    LM::Memory::MemoryManager<>::Region* current_memory_region_ = nullptr;
     
     
     // Channel context for concurrent blocks

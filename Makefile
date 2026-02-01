@@ -64,7 +64,7 @@ FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp src/common/debugg
               src/frontend/ast/builder.cpp src/frontend/ast/printer.cpp src/frontend/type_checker.cpp src/frontend/memory_checker.cpp \
               src/frontend/ast/optimizer.cpp 
 
-BACK_SRCS := src/backend/jit/jit_backend.cpp src/backend/jit/jit.cpp
+BACK_SRCS :=  src/backend/jit/jit.cpp
 
 REGISTER_SRCS := src/backend/register/register.cpp
 
@@ -79,7 +79,7 @@ ERROR_SRCS := src/error/error_formatter.cpp src/error/error_code_generator.cpp \
 
 MAIN_SRCS := src/main.cpp $(BACKEND_COMMON_SRCS) $(BACK_SRCS) $(ERROR_SRCS) \
              $(FRONT_SRCS) $(REGISTER_SRCS) $(LIR_CORE_SRCS) 
-			 
+
 TEST_SRCS := src/test_parser.cpp $(BACKEND_COMMON_SRCS) $(LIR_CORE_SRCS) $(ERROR_SRCS) \
              $(FRONT_SRCS) src/lir/function_registry.cpp
 

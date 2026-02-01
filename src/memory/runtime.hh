@@ -8,7 +8,8 @@
 
 // This file contains ONLY compile-time utilities for the compiler
 // No runtime code is generated - all safety is compile-time proven
-
+namespace LM {
+namespace Memory {
 namespace compiler_memory {
 
 /// ===============================================================
@@ -79,6 +80,8 @@ constexpr bool is_generation_valid(std::size_t ref_gen, std::size_t current_gen)
 #endif
 
 } // namespace compiler_memory
+} // namespace LM
+} // namespace Memory
 
 /// ===============================================================
 /// WHAT THE COMPILER ACTUALLY GENERATES

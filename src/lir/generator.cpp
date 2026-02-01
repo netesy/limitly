@@ -205,7 +205,7 @@ Reg Generator::allocate_register() {
 void Generator::enter_scope() {
     scope_stack_.push_back({});
     // Create memory region for this scope
-    scope_stack_.back().memory_region = new MemoryManager<>::Region(memory_manager_);
+    scope_stack_.back().memory_region = new LM::Memory::MemoryManager<>::Region(memory_manager_);
 }
 
 void Generator::exit_scope() {
@@ -4116,7 +4116,7 @@ void Generator::emit_unsafe_stmt(LM::Frontend::AST::UnsafeStatement& stmt) {
 // Memory management methods
 void Generator::enter_memory_region() {
     if (!current_memory_region_) {
-        current_memory_region_ = new MemoryManager<>::Region(memory_manager_);
+        current_memory_region_ = new LM::Memory::MemoryManager<>::Region(memory_manager_);
     }
 }
 
@@ -4133,7 +4133,7 @@ void* Generator::allocate_in_region(size_t size, size_t alignment) {
     }
     auto& current_scope = scope_stack_.back();
     if (!current_scope.memory_region) {
-        current_scope.memory_region = new MemoryManager<>::Region(memory_manager_);
+        current_scope.memory_region = new LM::Memory::MemoryManager<>::Region(memory_manager_);
     }
     return memory_manager_.allocate(size, alignment);
 }
@@ -4145,7 +4145,7 @@ T* Generator::create_object(Args&&... args) {
     }
     auto& current_scope = scope_stack_.back();
     if (!current_scope.memory_region) {
-        current_scope.memory_region = new MemoryManager<>::Region(memory_manager_);
+        current_scope.memory_region = new LM::Memory::MemoryManager<>::Region(memory_manager_);
     }
     return current_scope.memory_region->create<T>(std::forward<Args>(args)...);
 }

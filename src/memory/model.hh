@@ -7,7 +7,8 @@
 // Compile-Time Memory Proof Model
 // Zero runtime presence. JIT-safe.
 //
-
+namespace LM {
+namespace Memory {
 namespace memory_model {
 
 /// ===============================================================
@@ -559,3 +560,5 @@ constexpr void assert_linear_usage() {
 }
 
 } // namespace memory_model
+} // namespace LM
+} // namespace Memory

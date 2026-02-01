@@ -3,7 +3,7 @@
 
 #include "../../lir/lir.hh"
 #include "../../lir/functions.hh"
-#include "../memory.hh"
+#include "../../memory/memory.hh"
 #include <libgccjit++.h>
 #include <memory>
 #include <string>
@@ -180,8 +180,8 @@ private:
     bool m_debug_mode;
     
     // Memory management
-    MemoryManager<> memory_manager_;
-    MemoryManager<>::Region* current_memory_region_ = nullptr;
+    LM::Memory::MemoryManager<> memory_manager_;
+    LM::Memory::MemoryManager<>::Region* current_memory_region_ = nullptr;
     
     // State
     std::vector<std::string> errors;

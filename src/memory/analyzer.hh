@@ -19,6 +19,8 @@
 #include <unordered_map>
 #include <vector>
 
+namespace LM {
+namespace Memory {
 class MemoryAnalyzer {
 private:
     mutable std::ofstream logFile;
@@ -1107,3 +1109,5 @@ private:
         return ss.str();
     }
 };
+} // namespace LM
+} // namespace Memory
