@@ -4,6 +4,7 @@
 #include "../backend/types.hh"
 #include <iostream>
 
+namespace LM {
 namespace LIR {
 
 // Helper function to convert TypeTag to LIR::Type
@@ -282,3 +283,4 @@ std::shared_ptr<LIRFunction> createUnaryOpFunction(
 }
 
 } // namespace LIR
+} // namespace LM

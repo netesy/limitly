@@ -2,6 +2,7 @@
 #include <stdexcept>
 #include <iostream>
 
+namespace LM {
 namespace LIR {
 
 // Singleton implementation
@@ -48,4 +49,6 @@ void FunctionRegistry::clear() {
     lir_functions_.clear();
 }
 
+
 } // namespace LIR
+} // namespace LM

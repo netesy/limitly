@@ -5,7 +5,8 @@
 #include <unordered_map>
 #include <cstdint>
 
-namespace Register {
+namespace LM {
+namespace Backend {
 
 // Task states for threadless concurrency
 enum class TaskState {
@@ -41,6 +42,7 @@ struct TaskContext {
           body_end_pc(other.body_end_pc) {}
 };
 
-} // namespace Register
+} // namespace Backend
+} // namespace LM
 
 #endif // TASK_H

@@ -21,6 +21,9 @@
 #include <memory>
 #include <atomic>
 
+namespace LM {
+namespace Backend {
+namespace VM {
 namespace Register {
 
     class RegisterVM {
@@ -92,7 +95,7 @@ private:
     
     // Concurrency management
     std::vector<std::unique_ptr<TaskContext>> task_contexts;
-    std::vector<std::unique_ptr<Register::Channel>> channels;
+    std::vector<std::unique_ptr<LM::Backend::Channel>> channels;
     std::unique_ptr<Scheduler> scheduler;
     uint64_t current_time;
     
@@ -108,7 +111,7 @@ private:
     std::atomic<uint64_t> work_queue_counter{0};
     
     // Instruction count limit to prevent infinite loops
-    static constexpr uint64_t MAX_INSTRUCTIONS = 1000000;
+    static constexpr uint64_t MAX_INSTRUCTIONS = 100000000;
     uint64_t instruction_count = 0;
     
     // Helper methods - all inlined for performance
@@ -166,5 +169,8 @@ private:
 };
 
 } // namespace Register
+} // namespace VM
+} // namespace Backend
+} // namespace LM
 
 #endif // REGISTER_H

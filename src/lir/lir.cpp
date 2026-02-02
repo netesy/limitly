@@ -4,7 +4,9 @@
 #include <iomanip>
 #include <algorithm>
 
+namespace LM {
 namespace LIR {
+
 
 // LIR_Inst implementations
 std::string LIR_Inst::to_string() const {
@@ -384,3 +386,4 @@ void LIR_CFG::dump_dot() const {
 }
 
 } // namespace LIR
+} // namespace LM

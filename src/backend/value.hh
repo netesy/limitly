@@ -13,13 +13,14 @@
 #include <iomanip>
 #include <optional>
 #include <charconv>
-#include "../common/opcodes.hh"
 #include "channel.hh"
 #include <atomic>
 
 // Forward declaration for Register::Channel
-namespace Register {
+namespace LM {
+namespace Backend {
     struct Channel;
+}
 }
 
 // Forward declarations for AST types
@@ -73,7 +74,7 @@ class Environment;
 
 struct ModuleValue {
     std::shared_ptr<Environment> env;
-    std::vector<Instruction> bytecode;
+    //std::vector<Instruction> bytecode;
 };
 
 // Closure value for capturing variables from enclosing scope
@@ -898,7 +899,7 @@ struct Value {
                  IteratorValuePtr,
                  ObjectInstancePtr,
                  std::shared_ptr<backend::ClassDefinition>,
-                 std::shared_ptr<Register::Channel>,
+                 std::shared_ptr<LM::Backend::Channel>,
                  AtomicValue,
                  ModuleValue,
                  std::shared_ptr<backend::UserDefinedFunction>,
@@ -985,7 +986,7 @@ struct Value {
 
     Value(TypePtr t, const IteratorValuePtr& iter) : type(std::move(t)), data(""), complexData(iter) {}
 
-    Value(TypePtr t, const std::shared_ptr<Register::Channel>& ch) : type(std::move(t)), data(""), complexData(ch) {}
+    Value(TypePtr t, const std::shared_ptr<LM::Backend::Channel>& ch) : type(std::move(t)), data(""), complexData(ch) {}
 
     Value(TypePtr t, const AtomicValue& av) : type(std::move(t)), data(""), complexData(av) {}
 

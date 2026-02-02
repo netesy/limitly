@@ -8,7 +8,8 @@
 #include <deque>
 #include <cstddef>
 
-namespace Register {
+namespace LM {
+namespace Backend {
 
 // Modern Channel for Limitly concurrency
 struct Channel {
@@ -134,6 +135,7 @@ struct Channel {
     }
 };
 
-} // namespace Register
+} // namespace Backend
+} // namespace LM
 
 #endif // CHANNEL_H

@@ -1,5 +1,5 @@
 #include "scanner.hh"
-#include "../common/debugger.hh"
+#include "../error/debugger.hh"
 
 using namespace LM::Frontend;
 

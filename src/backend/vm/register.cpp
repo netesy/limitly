@@ -15,6 +15,9 @@
 #include <cstring>
 #include <cstdint>
 
+namespace LM {
+namespace Backend {
+namespace VM {
 namespace Register {
 
 // Boxing/Unboxing functions for C runtime integration
@@ -1790,3 +1793,6 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
 }
 
 } // namespace Register
+} // namespace VM
+} // namespace Backend
+} // namespace LM

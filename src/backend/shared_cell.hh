@@ -4,7 +4,8 @@
 #include <cstdint>
 #include <atomic>
 
-namespace Register {
+namespace LM {
+namespace Backend {
 
 // SharedCell structure for parallel execution
 struct SharedCell {
@@ -15,6 +16,7 @@ struct SharedCell {
         : id(cell_id), value(initial_value) {}
 };
 
-} // namespace Register
+} // namespace Backend
+} // namespace LM
 
 #endif // SHARED_CELL_H

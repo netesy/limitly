@@ -1,5 +1,5 @@
 #include "type_checker.hh"
-#include "../common/debugger.hh"
+#include "../error/debugger.hh"
 #include "../memory/model.hh"
 #include <memory>
 #include <vector>

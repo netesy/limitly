@@ -7,7 +7,9 @@
 #include <string>
 #include <vector>
 
+namespace LM {
 namespace LIR {
+
 
 // LIR Function Registry - manages LIR functions for JIT compilation
 class FunctionRegistry {
@@ -39,5 +41,6 @@ private:
 };
 
 } // namespace LIR
+} // namespace LM
 
 #endif // FUNCTION_REGISTRY_H

@@ -11,6 +11,7 @@
 #include "../backend/value.hh"
 #include "../backend/types.hh"
 
+namespace LM {
 namespace LIR {
 
 // Register and Immediate types
@@ -599,5 +600,6 @@ std::string type_to_string(Type type);
 Type language_type_to_abi_type(TypePtr lang_type);
 
 } // namespace LIR
+} // namespace LM
 
 #endif // LIR_H

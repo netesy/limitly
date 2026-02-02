@@ -12,7 +12,10 @@
 #include <functional>
 #include <chrono>  
 
+namespace LM {
+namespace Backend {
 namespace JIT {
+namespace Compiler {
 
 // Compilation modes
 enum class CompileMode {
@@ -221,6 +224,9 @@ private:
     };
 };
 
+} // namespace Compiler
 } // namespace JIT
+} // namespace Backend
+} // namespace LM
 
 #endif // JIT_H

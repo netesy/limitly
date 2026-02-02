@@ -8,9 +8,11 @@
 #include <map>
 #include <limits>
 
-using namespace LIR;
+using namespace LM::LIR;
 
+namespace LM {
 namespace LIR {
+
 
 Generator::Generator() : current_function_(nullptr), next_register_(0), next_label_(0) {
     // Initialize LIR function system
@@ -5391,3 +5393,4 @@ Reg Generator::emit_channel_recv_expr(LM::Frontend::AST::ChannelRecvExpr& expr) 
 }
 
 } // namespace LIR
+} // namespace LM

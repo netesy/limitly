@@ -9,7 +9,7 @@
 #include <set>
 
 // Include error handling structures
-#include "../error/error_message.hh"
+#include "error_message.hh"
 
 class Debugger
 {

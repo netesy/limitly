@@ -1,5 +1,5 @@
 #include "memory_checker.hh"
-#include "../common/debugger.hh"
+#include "../error/debugger.hh"
 #include <sstream>
 namespace LM {
 namespace Frontend {

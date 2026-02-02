@@ -11,6 +11,7 @@
 #include "../backend/value.hh"
 #include "../backend/types.hh"
 
+namespace LM {
 namespace LIR {
 
 // LIR-specific parameter and signature types (independent from backend)
@@ -150,5 +151,6 @@ std::shared_ptr<LIRFunction> createUnaryOpFunction(
 } // namespace LIRFunctionUtils
 
 } // namespace LIR
+} // namespace LM
 
 #endif // LIR_FUNCTIONS_HH

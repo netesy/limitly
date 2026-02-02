@@ -4,7 +4,8 @@
 #include "task.hh"
 #include <cstdint>
 
-namespace Register {
+namespace LM {
+namespace Backend {
 
 // Fiber states for execution management
 enum class FiberState {
@@ -82,6 +83,7 @@ struct Fiber {
     }
 };
 
-} // namespace Register
+} // namespace Backend
+} // namespace LM
 
 #endif // FIBER_H

@@ -1,6 +1,7 @@
 #include "lir.hh"
 #include <stdexcept>
 
+namespace LM {
 namespace LIR {
 
 std::string type_to_string(Type type) {
@@ -82,3 +83,4 @@ Type language_type_to_abi_type(TypePtr lang_type) {
 }
 
 } // namespace LIR
+} // namespace LM
