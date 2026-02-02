@@ -2,7 +2,19 @@
 
 ## Overview
 
-This design document outlines the architecture for refactoring the Limit programming language's module system to provide intelligent dependency resolution, bytecode optimization, and enhanced performance. The new system will feature a dedicated module manager, smart compilation strategies, and seamless integration with the existing VM architecture.
+This design document outlines the architecture for refactoring the Limit programming language's module system to provide intelligent compile-time dependency resolution, bytecode optimization, and enhanced performance through JIT compilation. The new system will feature a dedicated module manager, smart compilation strategies, and seamless integration with the existing JIT compiler architecture.
+
+## Execution Model
+
+This feature is compiled to native code via JIT compilation at compile-time. The register VM is used only for development and building.
+
+### Compile-Time Module System
+- All module resolution occurs at compile-time
+- Module visibility is enforced at compile-time
+- Import filtering is validated at compile-time
+- Circular dependencies are detected at compile-time
+- Dead code elimination happens at compile-time
+- Module optimization occurs at compile-time before JIT compilation
 
 ## Architecture
 
@@ -16,21 +28,52 @@ graph TB
     D --> E[Module Manager]
     E --> F[Smart Bytecode Generator]
     F --> G[Optimized Bytecode]
-    G --> H[VM Execution]
+    G --> H[JIT Compiler]
+    H --> I[Native Code Execution]
     
-    E --> I[Module Cache]
-    E --> J[Dependency Graph]
-    E --> K[Usage Analyzer]
+    E --> J[Module Cache]
+    E --> K[Dependency Graph]
+    E --> L[Usage Analyzer]
     
     subgraph "Module Manager Components"
         E
-        I
         J
         K
-        L[Dead Code Eliminator]
-        M[Import Filter Processor]
+        L
+        M[Dead Code Eliminator]
+        N[Import Filter Processor]
+    end
+    
+    subgraph "JIT Compilation"
+        H
+        O[Code Generation]
+        P[Optimization Passes]
+        Q[Native Code]
     end
 ```
+
+## JIT Compilation Strategy
+
+### Compile-Time Optimization
+- Module system is optimized at compile-time via JIT
+- Dead code elimination: Unused symbols are removed before JIT compilation
+- Module-level inlining: Small module functions are inlined during JIT compilation
+- Cross-module optimization: JIT compiler optimizes across module boundaries
+- Visibility enforcement: Module visibility constraints are enforced at compile-time
+
+### Code Generation for JIT
+- LIR generation includes module information for optimization
+- Module boundaries are preserved in generated code for optimization opportunities
+- Visibility constraints are enforced in generated code
+- Module-level optimizations are applied before native code generation
+- Import filtering results are embedded in the generated code
+
+### Register VM (Development Only)
+- Used for development and building
+- Not for production execution
+- Provides debugging capabilities
+- Supports incremental compilation
+- Enables testing before JIT compilation
 
 ### Core Components
 

@@ -1,134 +1,139 @@
 # Advanced Module System Implementation Plan
 
-- [ ] 1. Create core module system infrastructure
+## Compile-Time Module Resolution Focus
+
+This implementation plan focuses on compile-time module resolution with JIT compilation as the primary execution model. The register VM is used only for development and building.
+
+- [ ] 1. Create core module system infrastructure for compile-time resolution
   - Create `src/backend/modules.hh` with core data structures and interfaces
   - Define Module, SymbolInfo, ImportSpec, and ImportFilter structures
-  - Implement ModuleManagerInterface base class
+  - Implement ModuleManagerInterface base class for compile-time operations
+  - Add compile-time module metadata tracking
   - _Requirements: 5.1, 5.2_
 
-- [ ] 2. Implement basic ModuleManager class
+- [ ] 2. Implement compile-time ModuleManager class
   - Create `src/backend/modules.cpp` with ModuleManager implementation
-  - Implement basic module loading and file resolution
+  - Implement compile-time module loading and file resolution
   - Add module path resolution with dot notation support
-  - Create basic module caching mechanism
+  - Create compile-time module caching mechanism
   - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 3. Implement enhanced Module data structure
+- [ ] 3. Implement enhanced Module data structure for compile-time analysis
   - Create Module struct with metadata fields (path, source, AST, environment, bytecode)
-  - Add symbol table with SymbolInfo tracking
+  - Add symbol table with SymbolInfo tracking for compile-time analysis
   - Implement dependency tracking and last modified timestamps
-  - Add optimization metadata fields
+  - Add optimization metadata fields for JIT compilation
   - _Requirements: 5.1, 6.1_
 
-- [ ] 4. Create dependency analysis system
+- [ ] 4. Create compile-time dependency analysis system
   - Implement DependencyAnalyzer class in modules.cpp
-  - Add AST traversal for symbol usage analysis
+  - Add AST traversal for symbol usage analysis at compile-time
   - Create DependencyGraph structure with topological sorting
   - Implement circular dependency detection with clear error reporting
   - _Requirements: 1.6, 7.2_
 
-- [ ] 5. Implement smart import filtering
-  - Create ImportProcessor class for handling show/hide filters
+- [ ] 5. Implement compile-time smart import filtering
+  - Create ImportProcessor class for handling show/hide filters at compile-time
   - Implement show filter logic to include only specified symbols
   - Implement hide filter logic to exclude specified symbols
   - Add validation for filter symbols with helpful error messages
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 7.4_
 
-- [ ] 6. Create symbol usage analysis system
-  - Implement AST visitor pattern for tracking symbol usage
+- [ ] 6. Create compile-time symbol usage analysis system
+  - Implement AST visitor pattern for tracking symbol usage at compile-time
   - Add function call tracking and variable access detection
   - Create usage context tracking for nested scopes
-  - Implement cross-module dependency tracking
+  - Implement cross-module dependency tracking for compile-time optimization
   - _Requirements: 1.3, 1.4, 1.5_
 
-- [ ] 7. Implement dead code elimination
+- [ ] 7. Implement compile-time dead code elimination
   - Create DeadCodeEliminator class with bytecode analysis
   - Implement symbol range identification in bytecode
   - Add external effects detection to preserve side effects
-  - Create bytecode reconstruction for optimized modules
+  - Create bytecode reconstruction for optimized modules before JIT compilation
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 8. Enhance module caching system
-  - Implement ModuleCache class with LRU eviction
+- [ ] 8. Enhance compile-time module caching system
+  - Implement ModuleCache class with LRU eviction for compile-time caching
   - Add file modification time checking for cache invalidation
   - Create source hash comparison for change detection
   - Implement cache size limits and memory management
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 9. Create enhanced symbol table system
+- [ ] 9. Create enhanced symbol table system for compile-time analysis
   - Implement EnhancedSymbolTable with detailed symbol metadata
   - Add bytecode location tracking for each symbol
   - Create dependency relationship tracking between symbols
-  - Add usage counting and export status tracking
+  - Add usage counting and export status tracking for optimization
   - _Requirements: 1.1, 1.2, 6.2_
 
-- [ ] 10. Implement comprehensive error handling
+- [ ] 10. Implement comprehensive compile-time error handling
   - Create ModuleError namespace with specific error types
   - Implement ModuleErrorHandler with recovery strategies
   - Add suggestion system for missing symbols
   - Create detailed error formatting with dependency chains
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6_
 
-- [ ] 11. Integrate ModuleManager with VM
-  - Update VM class to use ModuleManagerInterface
-  - Modify handleImportModule and related methods to use new system
-  - Add friend class access for essential VM operations only
-  - Update import opcodes to work with new module system
+- [ ] 11. Integrate ModuleManager with JIT compiler
+  - Update JIT compiler to use ModuleManagerInterface
+  - Modify module handling to use new compile-time system
+  - Add friend class access for essential JIT operations only
+  - Update import handling to work with new module system
   - _Requirements: 5.3, 5.4, 8.1_
 
-- [ ] 12. Implement bytecode optimization pipeline
-  - Create optimization pipeline in ModuleManager
-  - Add optimization level configuration
-  - Implement bytecode sharing for common sequences
-  - Add performance metrics collection
+- [ ] 12. Implement JIT code generation for module boundaries
+  - Create JIT code generation for module imports
+  - Add module-level inlining opportunities for JIT
+  - Implement cross-module optimization in JIT compiler
+  - Add performance metrics collection for JIT compilation
   - _Requirements: 2.6, 6.1, 6.2, 6.3, 6.6_
 
-- [ ] 13. Create module memory management system
-  - Implement ModuleMemoryManager for efficient memory usage
+- [ ] 13. Create module memory management system for compile-time
+  - Implement ModuleMemoryManager for efficient memory usage during compilation
   - Add memory pools for module, bytecode, and symbol allocations
   - Create memory usage tracking and reporting
   - Implement memory compaction and cleanup strategies
   - _Requirements: 6.4, 6.5_
 
-- [ ] 14. Add performance monitoring and metrics
-  - Create ModulePerformanceMetrics structure
+- [ ] 14. Add compile-time performance monitoring and metrics
+  - Create ModulePerformanceMetrics structure for compile-time metrics
   - Implement timing measurements for all module operations
   - Add memory usage tracking and optimization ratio calculation
   - Create performance reporting and debugging output
   - _Requirements: 6.6, 7.6_
 
-- [ ] 15. Implement advanced import syntax support
+- [ ] 15. Implement advanced compile-time import syntax support
   - Implement nested module path resolution (`import module.submodule`)
   - Add alias support with filtering (`import module as alias show func`)
-  - Create comprehensive import syntax validation
+  - Create comprehensive import syntax validation at compile-time
   - _Requirements: 4.4, 4.5, 4.6_
 
-- [ ] 16. Create comprehensive test suite for module system
+- [ ] 16. Create comprehensive test suite for compile-time module system
   - Write unit tests for ModuleManager core functionality
   - Create tests for dependency analysis and circular dependency detection
   - Add tests for import filtering (show/hide) with edge cases
   - Write tests for dead code elimination and optimization
   - _Requirements: All requirements - comprehensive testing_
 
-- [ ] 17. Implement integration tests with existing language features
-  - Test module system with function calls and closures
+- [ ] 17. Implement integration tests with JIT compilation
+  - Test module system with JIT code generation
   - Verify integration with error handling and type system
   - Test module system with concurrency features
   - Create tests for cross-module function calls and variable access
   - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6_
 
-- [ ] 18. Add debugging and introspection capabilities
-  - Implement debug mode with detailed logging
+- [ ] 18. Add compile-time debugging and introspection capabilities
+  - Implement debug mode with detailed logging for compile-time operations
   - Add module information reporting (dependencies, symbols, optimization)
   - Create dependency graph visualization output
   - Add bytecode comparison tools for optimization verification
   - _Requirements: 1.6, 2.6, 7.6_
 
-- [ ] 19. Optimize performance for large projects
+- [ ] 19. Optimize compile-time performance for large projects
   - Implement parallel dependency analysis where safe
   - Add incremental compilation support
-  - Create memory-mapped file loading for large modules
-  - Implement lazy loading strategies
+  - Create efficient module loading strategies
+  - Implement lazy loading strategies for compile-time
   - _Requirements: 6.1, 6.2, 6.3_
 
 - [ ] 20. Create documentation and examples
@@ -145,7 +150,7 @@
   - Test all existing module functionality with new system
   - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6_
 
-- [ ] 22. Add advanced optimization features
+- [ ] 22. Add advanced compile-time optimization features
   - Implement bytecode deduplication across modules
   - Add constant folding and propagation across module boundaries
   - Create inlining opportunities for small module functions

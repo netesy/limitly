@@ -4,6 +4,18 @@
 
 This specification defines the refinement of the Limit programming language's type system to achieve better simplicity, safety, and performance. The goal is to consolidate existing type features into a more coherent system that eliminates redundancy while adding missing capabilities for domain precision and compile-time safety.
 
+## Execution Model
+
+This feature is compiled to native code via JIT compilation at compile-time. The register VM is used only for development and building.
+
+### Compile-Time Type System
+- All type checking occurs at compile-time
+- Type inference is performed during compilation
+- Pattern matching exhaustiveness is validated at compile-time
+- Refinement type constraints are validated at compile-time where possible
+- Runtime validation is generated only for dynamic constraints
+- Type specialization enables aggressive JIT optimization
+
 ## Glossary
 
 - **Type_System**: The Limit language's compile-time type checking and inference system
@@ -31,14 +43,14 @@ This specification defines the refinement of the Limit programming language's ty
 
 ### Requirement 2: Flow-Sensitive Type Narrowing
 
-**User Story:** As a developer, I want the type checker to track type changes through control flow, so that I need fewer runtime type checks.
+**User Story:** As a developer, I want the type checker to track type changes through control flow, so that the compiler can generate optimized code without unnecessary type checks.
 
 #### Acceptance Criteria
 
 1. WHEN a type guard or pattern match occurs, THE Type_System SHALL narrow the type in subsequent code paths
 2. THE Type_System SHALL track type information through if/else branches, loops, and function calls
 3. IF a variable is checked for a specific type, THEN THE Type_System SHALL remember that type in the positive branch
-4. THE Type_System SHALL eliminate redundant runtime type checks when compile-time information is sufficient
+4. THE Type_System SHALL generate specialized code paths when compile-time type information is sufficient
 5. WHERE control flow merges, THE Type_System SHALL compute the union of possible types
 
 ### Requirement 3: Enhanced Error Handling with Propagation
@@ -55,15 +67,15 @@ This specification defines the refinement of the Limit programming language's ty
 
 ### Requirement 4: Value-Based Refinement Types
 
-**User Story:** As a developer, I want to define types with value constraints, so that I can express domain-specific requirements precisely.
+**User Story:** As a developer, I want to define types with value constraints, so that I can express domain-specific requirements precisely at compile-time.
 
 #### Acceptance Criteria
 
 1. THE Type_System SHALL support refinement types with value-based constraints using `where` clauses
 2. WHEN a refinement type is declared, THE Type_System SHALL validate constraints at compile time where possible
-3. THE Type_System SHALL generate runtime checks for refinement constraints that cannot be verified statically
-4. THE Type_System SHALL provide clear error messages when refinement constraints are violated
-5. WHERE refinement types are used in function signatures, THE Type_System SHALL enforce constraint satisfaction
+3. THE Type_System SHALL generate specialized code for refinement constraints that can be verified statically
+4. THE Type_System SHALL provide clear error messages when refinement constraints cannot be satisfied
+5. WHERE refinement types are used in function signatures, THE Type_System SHALL enforce constraint satisfaction at compile-time
 
 ### Requirement 5: Exhaustive Pattern Matching with Tag Binding
 

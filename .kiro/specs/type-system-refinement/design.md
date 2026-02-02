@@ -96,7 +96,7 @@ struct ErrorPropagationSystem {
 
 ### 4. Refinement Type System
 
-**New Component**: Value-based type constraints
+**New Component**: Value-based type constraints validated at compile-time
 
 ```cpp
 struct RefinementType {
@@ -104,8 +104,8 @@ struct RefinementType {
     std::string constraintExpression;  // e.g., "x > 0"
     bool isStaticallyVerifiable;
     
-    // Runtime validation generation
-    std::string generateValidationCode() const;
+    // Compile-time constraint validation
+    bool validateStatically() const;
 };
 ```
 
@@ -115,6 +115,116 @@ type PositiveInt = int where x > 0;
 type NonEmptyString = str where len(x) > 0;
 type ValidEmail = str where matches(x, email_regex);
 ```
+
+## JIT Compilation Strategy
+
+### Compile-Time Type Specialization
+
+The type system enables aggressive compile-time specialization for JIT compilation:
+
+#### 1. Monomorphic Specialization
+- **Concept**: Generate specialized code for each concrete type combination
+- **Benefit**: Eliminates runtime type checks and enables inline caching
+- **Example**:
+  ```limit
+  fn process(value: int | str) {
+      match value {
+          case int(x) -> print("Int: {x}");
+          case str(s) -> print("Str: {s}");
+      }
+  }
+  
+  // JIT generates two specialized versions:
+  // process_int(int) - direct int handling
+  // process_str(str) - direct str handling
+  ```
+
+#### 2. Union Type Specialization
+- **Concept**: Generate optimized code paths for each union variant
+- **Benefit**: Eliminates discriminant checks in hot paths
+- **Implementation**:
+  - Discriminated unions generate tag-based dispatch
+  - JIT inlines tag checks for monomorphic call sites
+  - Polymorphic call sites use efficient jump tables
+
+#### 3. Refinement Type Specialization
+- **Concept**: Generate specialized code for refined types
+- **Benefit**: Eliminates unnecessary constraint checks when statically verifiable
+- **Example**:
+  ```limit
+  type PositiveInt = int where x > 0;
+  
+  fn double(x: PositiveInt) -> PositiveInt {
+      return x * 2;  // No constraint check needed - JIT knows x > 0
+  }
+  ```
+
+#### 4. Flow-Sensitive Specialization
+- **Concept**: Generate specialized code based on type narrowing
+- **Benefit**: Eliminates unnecessary type checks after narrowing
+- **Example**:
+  ```limit
+  var value: int | str = ...;
+  if value is int {
+      // JIT specializes this block to int-only operations
+      print(value + 1);  // No type check needed
+  }
+  ```
+
+### Code Generation for JIT
+
+#### LIR Generation with Type Information
+- **Type Tags**: Include type information in LIR for optimization
+- **Specialization Hints**: Mark code paths for specialization
+- **Constraint Information**: Embed refinement type constraints in LIR
+
+#### Optimization Passes
+1. **Type Specialization Pass**
+   - Identify monomorphic call sites
+   - Generate specialized code versions
+   - Create dispatch tables for polymorphic sites
+
+2. **Constraint Elimination Pass**
+   - Remove unnecessary constraint checks when statically verifiable
+   - Eliminate checks after type narrowing
+   - Optimize discriminant checks
+
+3. **Inline Caching Pass**
+   - Cache type information at call sites
+   - Inline frequently used type paths
+   - Generate fallback paths for uncommon types
+
+#### Native Code Generation
+- **Discriminated Unions**: Generate efficient tag-based dispatch
+- **Pattern Matching**: Generate optimized jump tables
+- **Type Checks**: Inline type checks where possible
+- **Constraint Validation**: Generate minimal validation code
+
+### Register VM (Development Only)
+
+The register VM is used for development and testing:
+- **Interpretation**: Direct interpretation of LIR instructions
+- **Debugging**: Full debugging capabilities with breakpoints
+- **Testing**: Comprehensive test execution
+- **Not for Production**: Register VM is never used in production execution
+
+### Performance Characteristics
+
+#### Compile-Time Overhead
+- Type specialization analysis: O(n) where n = number of call sites
+- Code generation: O(m) where m = number of specialized versions
+- Optimization passes: O(k) where k = code size
+
+#### Runtime Performance
+- **Monomorphic Calls**: Direct function calls (no dispatch overhead)
+- **Polymorphic Calls**: Efficient jump tables (minimal overhead)
+- **Type Checks**: Inlined where possible (single instruction)
+- **Constraint Checks**: Eliminated when statically verifiable
+
+#### Memory Usage
+- **Code Size**: Increases with specialization (typically 1.5-2x)
+- **Type Information**: Minimal overhead in compiled code
+- **Dispatch Tables**: Compact jump tables for polymorphic sites
 
 ## Data Models
 
