@@ -11,7 +11,7 @@
 #include "scanner.hh"
 #include "ast.hh"
 #include "cst.hh"
-#include "../error/error_message.hh"
+#include "../error/message.hh"
 
 namespace LM {
 namespace Frontend {
@@ -46,7 +46,7 @@ private:
     bool in_concurrent_block = false;
     
     // Block context tracking for enhanced error messages
-    std::stack<ErrorHandling::BlockContext> blockStack;
+    std::stack<LM::Error::BlockContext> blockStack;
 
     struct ParseError {
         std::string message;
@@ -130,8 +130,8 @@ public:
     // Block context tracking methods
     void pushBlockContext(const std::string& blockType, const Token& startToken);
     void popBlockContext();
-    std::optional<ErrorHandling::BlockContext> getCurrentBlockContext() const;
-    std::string generateCausedByMessage(const ErrorHandling::BlockContext& context) const;
+    std::optional<LM::Error::BlockContext> getCurrentBlockContext() const;
+    std::string generateCausedByMessage(const LM::Error::BlockContext& context) const;
     std::shared_ptr<LM::Frontend::AST::Statement> parseStatementWithContext(const std::string& blockType, const Token& contextToken);
 
     // Parsing methods for statements

@@ -3,8 +3,7 @@
 #include <sstream>
 namespace LM {
 namespace Frontend {
-
-MemoryCheckResult MemoryChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> program, 
+using namespace LM::Error;MemoryCheckResult MemoryChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> program, 
                                                const std::string& source, 
                                                const std::string& filename) {
     if (!program) {

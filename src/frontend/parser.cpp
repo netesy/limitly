@@ -5,6 +5,7 @@
 #include <set>
 #include <cmath>
 using namespace LM::Frontend;
+using namespace LM::Error;
 
 // Helper methods
 Token Parser::peek() {
@@ -4555,7 +4556,7 @@ bool Parser::isErrorType(const std::string& name) {
 // Block context tracking methods implementation
 
 void Parser::pushBlockContext(const std::string& blockType, const Token& startToken) {
-    ErrorHandling::BlockContext context(blockType, startToken.line, startToken.start, startToken.lexeme);
+    LM::Error::BlockContext context(blockType, startToken.line, startToken.start, startToken.lexeme);
     blockStack.push(context);
 }
 
@@ -4565,14 +4566,14 @@ void Parser::popBlockContext() {
     }
 }
 
-std::optional<ErrorHandling::BlockContext> Parser::getCurrentBlockContext() const {
+std::optional<LM::Error::BlockContext> Parser::getCurrentBlockContext() const {
     if (blockStack.empty()) {
         return std::nullopt;
     }
     return blockStack.top();
 }
 
-std::string Parser::generateCausedByMessage(const ErrorHandling::BlockContext& context) const {
+std::string Parser::generateCausedByMessage(const LM::Error::BlockContext& context) const {
     std::string message = "Caused by: Unterminated " + context.blockType + " starting at line " + 
                          std::to_string(context.startLine) + ":";
     message += "\n" + std::to_string(context.startLine) + " | " + context.startLexeme;

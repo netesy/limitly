@@ -2,6 +2,7 @@
 #include "../error/debugger.hh"
 
 using namespace LM::Frontend;
+using namespace LM::Error;
 
 std::vector<Token> Scanner::scanTokens() {
     return scanTokens(ScanMode::LEGACY);
