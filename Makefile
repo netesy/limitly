@@ -73,9 +73,7 @@ LIR_CORE_SRCS := src/lir/lir.cpp src/lir/lir_utils.cpp src/lir/functions.cpp \
 
 BACKEND_COMMON_SRCS := src/backend/symbol_table.cpp src/backend/value.cpp 
 
-ERROR_SRCS := src/error/error_formatter.cpp src/error/error_code_generator.cpp \
-              src/error/contextual_hint_provider.cpp src/error/source_code_formatter.cpp \
-              src/error/console_formatter.cpp src/error/error_catalog.cpp src/error/debugger.cpp
+ERROR_SRCS := src/error/debugger.cpp
 
 MAIN_SRCS := src/main.cpp $(BACKEND_COMMON_SRCS) $(BACK_SRCS) $(ERROR_SRCS) \
              $(FRONT_SRCS) $(REGISTER_SRCS) $(LIR_CORE_SRCS) 

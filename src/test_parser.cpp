@@ -1,455 +1,192 @@
-#include "backend/ast_printer.hh"
-#include "backend/bytecode_printer.hh"
-#include "backend/type_checker.hh"
+// test_parser.cpp - Parser testing utility
+// Tests the scanner and parser on a given source file
+
 #include "frontend/scanner.hh"
 #include "frontend/parser.hh"
-// CST parser functionality is now integrated into parser.hh
-#include "frontend/cst_printer.hh"
-#include "frontend/cst_utils.hh"
-#include "frontend/ast_builder.hh"
-#include "common/backend.hh"
-#include "backend/vm/vm.hh"
-#include "common/opcodes.hh"
+#include "frontend/ast/printer.hh"
+#include "frontend/cst/printer.hh"
+#include "frontend/type_checker.hh"
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <iomanip>
-#include <unordered_map>
-#include <algorithm>
+#include <memory>
 
-// Function to print all opcode values and names (for debugging)
-void printOpcodeValues() {
-    std::cout << "Opcode values and names:" << std::endl;
-    std::cout << "------------------------" << std::endl;
-    std::cout << "Use BytecodePrinter for detailed bytecode output" << std::endl;
-    std::cout << "------------------------" << std::endl;
+using namespace LM;
+using namespace LM::Frontend;
+
+void printUsage(const char* programName) {
+    std::cout << "Parser Testing Utility\n";
+    std::cout << "Usage: " << programName << " <source_file> [options]\n";
+    std::cout << "\nOptions:\n";
+    std::cout << "  --tokens    Print tokens only\n";
+    std::cout << "  --ast       Print AST (default)\n";
+    std::cout << "  --cst       Print CST structure\n";
+    std::cout << "  --types     Perform type checking\n";
+    std::cout << "  --all       Print all outputs\n";
 }
 
 int main(int argc, char* argv[]) {
-    // Check for --list-opcodes flag
-    if (argc > 1 && std::string(argv[1]) == "--list-opcodes") {
-        printOpcodeValues();
-        return 0;
-    }
-    
     if (argc < 2) {
-        std::cout << "Usage: " << argv[0] << " <source_file> [--cst|--legacy]" << std::endl;
-        std::cout << "       " << argv[0] << " --list-opcodes" << std::endl;
-        std::cout << "Options:" << std::endl;
-        std::cout << "  --cst     Use CST parser (default)" << std::endl;
-        std::cout << "  --legacy  Use legacy parser" << std::endl;
+        printUsage(argv[0]);
         return 1;
     }
-    
-    // Parse command line options
-    bool useCSTParser = true;  // Default to CST parser
+
     std::string filename = argv[1];
-    
+    bool printTokens = false;
+    bool printAST = true;
+    bool printCST = false;
+    bool printTypes = false;
+
+    // Parse options
     for (int i = 2; i < argc; i++) {
         std::string arg = argv[i];
-        if (arg == "--legacy") {
-            useCSTParser = false;
+        if (arg == "--tokens") {
+            printTokens = true;
+            printAST = false;
+        } else if (arg == "--ast") {
+            printAST = true;
         } else if (arg == "--cst") {
-            useCSTParser = true;
+            printCST = true;
+        } else if (arg == "--types") {
+            printTypes = true;
+        } else if (arg == "--all") {
+            printTokens = true;
+            printAST = true;
+            printCST = true;
+            printTypes = true;
         }
     }
-    
+
     // Read source file
     std::ifstream file(filename);
     if (!file.is_open()) {
         std::cerr << "Error: Could not open file " << filename << std::endl;
         return 1;
     }
-    
+
     std::stringstream buffer;
     buffer << file.rdbuf();
     std::string source = buffer.str();
-    
+    file.close();
+
     try {
-        std::shared_ptr<AST::Program> ast;
-        
-        if (useCSTParser) {
-            std::cout << "=== Using New Unified Parser (CST mode) ===\n";
-            
-            // Frontend: CST scanning with trivia collection
-            Scanner scanner(source, filename);
-            auto tokens = scanner.scanTokens(ScanMode::CST);
-            
-            // Print tokens with trivia information
-            std::cout << "=== Tokens with Trivia ===\n";
-            
-            // Capture token output for both console and file
-            std::ostringstream tokenOutput;
-            tokenOutput << "=== Tokens with Trivia ===\n";
-            
-            for (const auto& token : tokens) {
-                std::string tokenLine = "Line " + std::to_string(token.line) + ": "
-                                      + scanner.tokenTypeToString(token.type)
-                                      + " = '" + token.lexeme + "'";
-                
-                // Show leading trivia
-                if (!token.getLeadingTrivia().empty()) {
-                    tokenLine += " [leading: ";
-                    for (const auto& trivia : token.getLeadingTrivia()) {
-                        tokenLine += scanner.tokenTypeToString(trivia.type) + "('" + trivia.lexeme + "') ";
-                    }
-                    tokenLine += "]";
-                }
-                
-                // Show trailing trivia
-                if (!token.getTrailingTrivia().empty()) {
-                    tokenLine += " [trailing: ";
-                    for (const auto& trivia : token.getTrailingTrivia()) {
-                        tokenLine += scanner.tokenTypeToString(trivia.type) + "('" + trivia.lexeme + "') ";
-                    }
-                    tokenLine += "]";
-                }
-                
-                tokenLine += "\n";
-                std::cout << tokenLine;
-                tokenOutput << tokenLine;
+        // Scanning phase
+        std::cout << "=== Scanning ===\n";
+        Scanner scanner(source, filename);
+        auto tokens = scanner.scanTokens();
+        std::cout << "✓ Scanned " << tokens.size() << " tokens\n\n";
+
+        // Print tokens if requested
+        if (printTokens) {
+            std::cout << "=== Tokens ===\n";
+            for (size_t i = 0; i < tokens.size(); i++) {
+                const auto& token = tokens[i];
+                std::cout << "[" << i << "] Line " << token.line << ", Col " << token.column 
+                         << ": " << scanner.tokenTypeToString(token.type) 
+                         << " = '" << token.lexeme << "'\n";
             }
-            std::cout << std::endl;
-            
-            // Save tokens to file
-            std::string tokensFilename = filename + ".tokens.txt";
-            std::ofstream tokensFile(tokensFilename);
-            if (tokensFile.is_open()) {
-                tokensFile << "Tokens for " << filename << "\n";
-                tokensFile << "Parser: New Unified Parser (CST mode)\n";
-                tokensFile << "Mode: CST with trivia preservation\n";
-                tokensFile << "========================================\n\n";
-                tokensFile << tokenOutput.str();
-                tokensFile.close();
-                std::cout << "Tokens output saved to " << tokensFilename << std::endl;
-            } else {
-                std::cerr << "Warning: Could not open " << tokensFilename << " for writing" << std::endl;
-            }
-            
-            // Use new Parser with CST mode enabled
-            std::cout << "=== Testing New CST Parser (cstMode=true) ===\n";
-            Parser cstParser(scanner, true);  // CST mode enabled
-            cstParser.enableDetailedExpressionNodes(true);  // Enable detailed expression CST nodes
-            
-            try {
-                ast = cstParser.parse();
-                
-                if (cstParser.hadError()) {
-                    std::cout << "Parse errors found: " << cstParser.getErrors().size() << std::endl;
-                    for (const auto& error : cstParser.getErrors()) {
-                        std::cout << "  Line " << error.line << ": " << error.message << std::endl;
-                    }
-                } else {
-                    std::cout << "✓ CST parsing completed successfully without std::bad_alloc!\n";
-                    std::cout << "✓ Using proven parsing logic from legacy parser\n";
-                    std::cout << "✓ CST nodes created internally with trivia attachment\n";
-                    std::cout << "✓ AST returned for compatibility with existing pipeline\n";
-                }
-                
-                // Show CST statistics
-                std::cout << "\n=== CST Parser Statistics ===\n";
-                std::cout << "CST mode enabled: " << (cstParser.isCSTMode() ? "YES" : "NO") << std::endl;
-                std::cout << "CST nodes created: " << cstParser.getCSTNodeCount() << std::endl;
-                std::cout << "Trivia attachments: " << cstParser.getTriviaAttachmentCount() << std::endl;
-                
-            } catch (const std::bad_alloc& e) {
-                std::cerr << "❌ FAILED: std::bad_alloc occurred in CST parser!" << std::endl;
-                std::cerr << "This indicates the memory issue is not yet fixed." << std::endl;
-                return 1;
-            } catch (const std::exception& e) {
-                std::cerr << "❌ FAILED: Exception in CST parser: " << e.what() << std::endl;
-                return 1;
-            }
-            
-            // Test fallback mode for compatibility
-            std::cout << "\n=== Testing Fallback Mode (cstMode=false) ===\n";
-            Scanner scanner2(source, filename);
-            scanner2.scanTokens(ScanMode::LEGACY);  // Use legacy scan mode for fallback
-            Parser fallbackParser(scanner2, false);  // CST mode disabled
-            
-            try {
-                auto astFallback = fallbackParser.parse();
-                
-                if (fallbackParser.hadError()) {
-                    std::cout << "Parse errors found in fallback mode: " << fallbackParser.getErrors().size() << std::endl;
-                } else {
-                    std::cout << "✓ Fallback AST parsing completed successfully!\n";
-                }
-                
-                // Show fallback mode evidence
-                std::cout << "\n=== Fallback Mode Evidence ===\n";
-                std::cout << "CST mode enabled: " << (fallbackParser.isCSTMode() ? "YES" : "NO") << std::endl;
-                std::cout << "CST nodes created: " << fallbackParser.getCSTNodeCount() << std::endl;
-                std::cout << "Trivia attachments: " << fallbackParser.getTriviaAttachmentCount() << std::endl;
-                
-                // Compare the two modes
-                std::cout << "\n=== Mode Comparison ===\n";
-                std::cout << "CST mode AST statements: " << (ast ? ast->statements.size() : 0) << std::endl;
-                std::cout << "Fallback mode AST statements: " << (astFallback ? astFallback->statements.size() : 0) << std::endl;
-                
-                if (ast && astFallback && ast->statements.size() == astFallback->statements.size()) {
-                    std::cout << "✓ Both modes produced the same number of statements\n";
-                    std::cout << "✓ CST parser maintains compatibility with legacy behavior\n";
-                } else {
-                    std::cout << "⚠ Different number of statements between modes\n";
-                    std::cout << "  This may indicate parsing differences to investigate\n";
-                }
-                
-            } catch (const std::exception& e) {
-                std::cerr << "❌ FAILED: Exception in fallback mode: " << e.what() << std::endl;
-            }
-            
-            // Print CST structure if available
-            std::cout << "\n=== CST Structure ===\n";
-            const CST::Node* cstRoot = cstParser.getCST();
-            if (cstRoot) {
-                std::cout << "✓ CST root node available\n";
-                std::cout << "✓ CST structure created successfully\n";
-                
-                // Print CST to console using CST printer
-                CST::Printer::PrintOptions consoleOptions;
-                consoleOptions.includeTrivia = false; // Simplify console output
-                consoleOptions.maxDepth = 3; // Limit depth for console readability
-                std::cout << CST::Printer::printCST(cstRoot, consoleOptions) << std::endl;
-                
-                // Save CST to file for detailed analysis
-                std::string cstOutputFilename = filename + ".cst.txt";
-                std::ofstream cstFile(cstOutputFilename);
-                if (cstFile.is_open()) {
-                    // Redirect cout to file (same pattern as AST printer)
-                    std::streambuf *coutbuf = std::cout.rdbuf();
-                    std::cout.rdbuf(cstFile.rdbuf());
-                    
-                    // Print CST to file
-                    std::cout << "CST for " << filename << "\n";
-                    std::cout << "Parser: New Unified Parser (CST mode)\n";
-                    std::cout << "Mode: CST (cstMode=true)\n";
-                    std::cout << "========================================\n\n";
-                    
-                    std::cout << "CST Statistics:\n";
-                    std::cout << "- CST nodes created: " << cstParser.getCSTNodeCount() << "\n";
-                    std::cout << "- Trivia attachments: " << cstParser.getTriviaAttachmentCount() << "\n";
-                    std::cout << "- Parse errors: " << cstParser.getErrors().size() << "\n\n";
-                    
-                    if (cstParser.hadError()) {
-                        std::cout << "Parse Errors:\n";
-                        for (const auto& error : cstParser.getErrors()) {
-                            std::cout << "  Line " << error.line << ": " << error.message << "\n";
-                        }
-                        std::cout << "\n";
-                    }
-                    
-                    // Print full CST structure using CST printer
-                    std::cout << "=== Full CST Structure ===\n";
-                    CST::Printer::PrintOptions fileOptions;
-                    fileOptions.includeTrivia = true; // Include all trivia in file output
-                    fileOptions.includeTokens = true; // Include all tokens
-                    fileOptions.includeSourcePositions = true; // Include source positions
-                    fileOptions.includeErrorInfo = true; // Include error information
-                    std::cout << CST::Printer::printCST(cstRoot, fileOptions) << std::endl;
-                    
-                    // Restore cout
-                    std::cout.rdbuf(coutbuf);
-                    
-                    std::cout << "CST output saved to " << cstOutputFilename << std::endl;
-                } else {
-                    std::cerr << "Warning: Could not open " << cstOutputFilename << " for writing" << std::endl;
-                }
-            } else {
-                std::cout << "⚠ No CST root available\n";
-                std::cout << "  CST creation may have failed - check parser implementation\n";
-            }
-            
-        } else {
-            std::cout << "=== Using New Unified Parser (Legacy mode) ===\n";
-            
-            // Frontend: Lexical analysis (scanning) - no trivia collection
-            Scanner scanner(source, filename);
-            auto tokens = scanner.scanTokens(ScanMode::LEGACY);
-            
-            // Print tokens to stdout
-            std::cout << "=== Tokens (Legacy Mode) ===\n";
-            
-            // Capture token output for both console and file
-            std::ostringstream tokenOutput;
-            tokenOutput << "=== Tokens (Legacy Mode) ===\n";
-            
-            for (const auto& token : tokens) {
-                std::string tokenLine = "Line " + std::to_string(token.line) + ": "
-                                      + scanner.tokenTypeToString(token.type)
-                                      + " = '" + token.lexeme + "'\n";
-                std::cout << tokenLine;
-                tokenOutput << tokenLine;
-            }
-            std::cout << std::endl;
-            
-            // Save tokens to file
-            std::string tokensFilename = filename + ".tokens.txt";
-            std::ofstream tokensFile(tokensFilename);
-            if (tokensFile.is_open()) {
-                tokensFile << "Tokens for " << filename << "\n";
-                tokensFile << "Parser: New Unified Parser (Legacy mode)\n";
-                tokensFile << "Mode: Legacy AST only (no trivia preservation)\n";
-                tokensFile << "========================================\n\n";
-                tokensFile << tokenOutput.str();
-                tokensFile.close();
-                std::cout << "Tokens output saved to " << tokensFilename << std::endl;
-            } else {
-                std::cerr << "Warning: Could not open " << tokensFilename << " for writing" << std::endl;
-            }
-            
-            // Frontend: Syntax analysis (parsing)
-            std::cout << "=== Legacy Mode Parsing ===\n";
-            Parser parser(scanner, false);  // CST mode disabled for legacy behavior
-            
-            try {
-                ast = parser.parse();
-                
-                if (parser.hadError()) {
-                    std::cout << "Parse errors found: " << parser.getErrors().size() << std::endl;
-                    for (const auto& error : parser.getErrors()) {
-                        std::cout << "  Line " << error.line << ": " << error.message << std::endl;
-                    }
-                } else {
-                    std::cout << "✓ Legacy mode parsing completed successfully!\n";
-                    std::cout << "✓ No trivia preservation (legacy behavior)\n";
-                    std::cout << "✓ Direct AST creation without CST overhead\n";
-                }
-                
-            } catch (const std::exception& e) {
-                std::cerr << "❌ FAILED: Exception in legacy parser: " << e.what() << std::endl;
-                return 1;
-            }
-            
-            std::cout << std::endl;
-        }
-        
-        // Backend: Print AST to console and file
-        std::cout << "=== AST Structure ===\n";
-        if (ast) {
-            ASTPrinter printer;
-            
-            // Print to console
-            printer.process(ast);
-            std::cout << std::endl;
-            
-            // Save to file
-            std::string outputFilename = filename + ".ast.txt";
-            std::ofstream outFile(outputFilename);
-            if (outFile.is_open()) {
-                // Redirect cout to file
-                std::streambuf *coutbuf = std::cout.rdbuf();
-                std::cout.rdbuf(outFile.rdbuf());
-                
-                // Print AST to file
-                std::cout << "AST for " << filename << "\n";
-                std::cout << "Parser: " << (useCSTParser ? "New Unified Parser (CST mode)" : "New Unified Parser (Legacy mode)") << "\n";
-                std::cout << "Mode: " << (useCSTParser ? "CST with AST compatibility" : "Legacy AST only") << "\n";
-                if (useCSTParser) {
-                    std::cout << "Note: CST nodes were created internally with trivia preservation\n";
-                    std::cout << "      AST output shown below for compatibility testing\n";
-                }
-                std::cout << "========================================\n\n";
-                printer.process(ast);
-                
-                // Restore cout
-                std::cout.rdbuf(coutbuf);
-                
-                std::cout << "AST output saved to " << outputFilename << std::endl;
-            } else {
-                std::cerr << "Warning: Could not open " << outputFilename << " for writing" << std::endl;
-            }
-        } else {
-            std::cout << "❌ No AST available - parsing failed\n";
-        }
-        
-        // Type Checking
-        std::cout << "=== Type Checking ===\n";
-        if (ast) {
-            BytecodeGenerator generator;
-            generator.setSourceContext(source, filename);
-            std::vector<TypeCheckError> typeErrors = generator.performTypeChecking(ast);
-            
-            // Print type checking results to console
-            if (typeErrors.empty()) {
-                std::cout << "✓ No type errors found\n";
-            } else {
-                std::cout << "❌ Found " << typeErrors.size() << " type error(s):\n";
-                for (const auto& error : typeErrors) {
-                    std::cout << "  Line " << error.line << ": " << error.message << "\n";
-                }
-            }
-            
-            // Output type checking results to file
-            std::string typeCheckFilename = filename + ".typecheck.txt";
-            std::ofstream typeCheckFile(typeCheckFilename);
-            if (typeCheckFile.is_open()) {
-                typeCheckFile << "Type Checking Results for " << filename << "\n";
-                typeCheckFile << "Parser: " << (useCSTParser ? "New Unified Parser (CST mode)" : "New Unified Parser (Legacy mode)") << "\n";
-                typeCheckFile << "========================================\n\n";
-                
-                if (typeErrors.empty()) {
-                    typeCheckFile << "✓ No type errors found\n";
-                    typeCheckFile << "All visibility rules and type constraints are satisfied.\n";
-                } else {
-                    typeCheckFile << "❌ Found " << typeErrors.size() << " type error(s):\n\n";
-                    for (size_t i = 0; i < typeErrors.size(); ++i) {
-                        const auto& error = typeErrors[i];
-                        typeCheckFile << "Error " << (i + 1) << ":\n";
-                        typeCheckFile << "  Line: " << error.line;
-                        if (error.column > 0) {
-                            typeCheckFile << ", Column: " << error.column;
-                        }
-                        typeCheckFile << "\n";
-                        typeCheckFile << "  Message: " << error.message << "\n";
-                        if (!error.context.empty()) {
-                            typeCheckFile << "  Context: " << error.context << "\n";
-                        }
-                        typeCheckFile << "\n";
-                    }
-                }
-                
-                std::cout << "Type checking output saved to " << typeCheckFilename << std::endl;
-            } else {
-                std::cerr << "Warning: Could not open " << typeCheckFilename << " for writing" << std::endl;
-            }
-        } else {
-            std::cout << "❌ No type checking performed - AST not available\n";
+            std::cout << "\n";
         }
 
-        // Backend: Generate bytecode
-        std::cout << "=== Bytecode Generation ===\n";
-        if (ast) {
-            BytecodeGenerator generator;
-            generator.setSourceContext(source, filename);
-            generator.process(ast);
-            
-            // Print bytecode to console
-            BytecodePrinter::print(generator.getBytecode());
-            
-            // Output bytecode to file
-            std::string bytecodeFilename = filename + ".bytecode.txt";
-            std::ofstream bytecodeFile(bytecodeFilename);
-            if (bytecodeFile.is_open()) {
-                bytecodeFile << "Bytecode for " << filename << "\n";
-                bytecodeFile << "Parser: " << (useCSTParser ? "New Unified Parser (CST mode)" : "New Unified Parser (Legacy mode)") << "\n";
-                bytecodeFile << "========================================\n\n";
-                
-                // Use BytecodePrinter for file output too
-                BytecodePrinter::print(generator.getBytecode(), bytecodeFile);
-                
-                std::cout << "Bytecode output saved to " << bytecodeFilename << std::endl;
-            } else {
-                std::cerr << "Warning: Could not open " << bytecodeFilename << " for writing" << std::endl;
-            }
-        } else {
-            std::cout << "❌ No bytecode generated - AST not available\n";
+        // Parsing phase
+        std::cout << "=== Parsing ===\n";
+        Parser parser(scanner);
+        auto program = parser.parse();
+        
+        if (Error::Debugger::hasError()) {
+            std::cerr << "✗ Parse errors occurred\n";
+            return 1;
         }
         
+        std::cout << "✓ Parsing completed successfully\n";
+        if (program) {
+            std::cout << "✓ Program has " << program->statements.size() << " statements\n";
+        }
+        std::cout << "\n";
+
+        // Print AST if requested
+        if (printAST && program) {
+            std::cout << "=== Abstract Syntax Tree ===\n";
+            AST::Printer astPrinter;
+            astPrinter.print(program);
+            std::cout << "\n";
+        }
+
+        // Print CST if requested
+        if (printCST) {
+            std::cout << "=== Concrete Syntax Tree ===\n";
+            std::cout << "CST mode: " << (parser.isCSTMode() ? "enabled" : "disabled") << "\n";
+            std::cout << "CST nodes created: " << parser.getCSTNodeCount() << "\n";
+            std::cout << "Trivia attachments: " << parser.getTriviaAttachmentCount() << "\n";
+            std::cout << "\n";
+        }
+
+        // Type checking if requested
+        if (printTypes && program) {
+            std::cout << "=== Type Checking ===\n";
+            TypeChecker typeChecker;
+            bool typeCheckPassed = typeChecker.check(program, source, filename);
+            
+            if (typeCheckPassed) {
+                std::cout << "✓ Type checking passed\n";
+            } else {
+                std::cout << "✗ Type checking failed\n";
+            }
+            std::cout << "\n";
+        }
+
+        // Save outputs to files
+        std::string baseName = filename;
+        size_t lastDot = baseName.find_last_of('.');
+        if (lastDot != std::string::npos) {
+            baseName = baseName.substr(0, lastDot);
+        }
+
+        // Save AST to file
+        if (program) {
+            std::string astFile = baseName + ".ast.txt";
+            std::ofstream out(astFile);
+            if (out.is_open()) {
+                out << "AST for " << filename << "\n";
+                out << "========================================\n\n";
+                
+                // Redirect cout to file temporarily
+                std::streambuf* coutbuf = std::cout.rdbuf();
+                std::cout.rdbuf(out.rdbuf());
+                
+                AST::Printer astPrinter;
+                astPrinter.print(program);
+                
+                std::cout.rdbuf(coutbuf);
+                out.close();
+                std::cout << "AST saved to " << astFile << "\n";
+            }
+        }
+
+        // Save tokens to file
+        if (printTokens) {
+            std::string tokensFile = baseName + ".tokens.txt";
+            std::ofstream out(tokensFile);
+            if (out.is_open()) {
+                out << "Tokens for " << filename << "\n";
+                out << "========================================\n\n";
+                
+                for (size_t i = 0; i < tokens.size(); i++) {
+                    const auto& token = tokens[i];
+                    out << "[" << i << "] Line " << token.line << ", Col " << token.column 
+                       << ": " << scanner.tokenTypeToString(token.type) 
+                       << " = '" << token.lexeme << "'\n";
+                }
+                out.close();
+                std::cout << "Tokens saved to " << tokensFile << "\n";
+            }
+        }
+
+        std::cout << "\n✓ Test completed successfully\n";
+        return 0;
+
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
         return 1;
     }
-    
-    return 0;
 }

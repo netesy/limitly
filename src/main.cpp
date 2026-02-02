@@ -1,3 +1,5 @@
+// main.cpp - Limit Programming Language Interpreter
+// Main entry point for the Limit language interpreter
 
 #include "frontend/scanner.hh"
 #include "frontend/parser.hh"
@@ -6,10 +8,10 @@
 #include "frontend/type_checker.hh"
 #include "frontend/memory_checker.hh"
 #include "frontend/ast.hh"
-#include "backend/vm/register.hh"
 #include "lir/generator.hh"
 #include "lir/functions.hh"
 #include "backend/jit/jit.hh"
+#include "backend/vm/register.hh"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -19,16 +21,16 @@
 using namespace LM;
 
 void printUsage(const char* programName) {
-    std::cout << "Limit Programming Language" << std::endl;
-    std::cout << "Usage:" << std::endl;
-    std::cout << "  " << programName << " <source_file>    - Execute a source file" << std::endl;
-    std::cout << "  " << programName << " -ast <source_file> - Print the AST for a source file" << std::endl;
-    std::cout << "  " << programName << " -cst <source_file> - Print the CST for a source file" << std::endl;
-    std::cout << "  " << programName << " -tokens <source_file> - Print the tokens for a source file" << std::endl;
-    std::cout << "  " << programName << " -jit <source_file>    - JIT compile a source file" << std::endl;
-    std::cout << "  " << programName << " -jit-debug <source_file> - JIT compile and run directly (debug mode)" << std::endl;
-    std::cout << "  " << programName << " -debug <source_file> - Execute with debug output enabled" << std::endl;
-    std::cout << "  " << programName << " -repl           - Start the REPL (interactive mode)" << std::endl;
+    std::cout << "Limit Programming Language\n";
+    std::cout << "Usage:\n";
+    std::cout << "  " << programName << " <source_file>           - Execute a source file\n";
+    std::cout << "  " << programName << " -ast <source_file>      - Print the AST\n";
+    std::cout << "  " << programName << " -cst <source_file>      - Print the CST\n";
+    std::cout << "  " << programName << " -tokens <source_file>   - Print tokens\n";
+    std::cout << "  " << programName << " -jit <source_file>      - JIT compile to executable\n";
+    std::cout << "  " << programName << " -jit-debug <source_file> - JIT compile and run directly\n";
+    std::cout << "  " << programName << " -debug <source_file>    - Execute with debug output\n";
+    std::cout << "  " << programName << " -repl                   - Start interactive REPL\n";
 }
 
 std::string readFile(const std::string& filename) {
@@ -42,7 +44,9 @@ std::string readFile(const std::string& filename) {
     return buffer.str();
 }
 
-int executeFile(const std::string& filename, bool printAst = false, bool printCst = false, bool printTokens = false, bool useJit = false, bool jitDebug = false, bool enableDebug = false) {
+int executeFile(const std::string& filename, bool printAst = false, bool printCst = false, 
+                bool printTokens = false, bool useJit = false, bool jitDebug = false, 
+                bool enableDebug = false) {
     try {
         // Initialize LIR function systems
         LIR::FunctionUtils::initializeFunctions();
@@ -61,80 +65,35 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 std::cout << scanner.tokenTypeToString(token.type) 
                           << ": '" << token.lexeme << "' (line " << token.line << ")\n";
             }
-            std::cout << std::endl;
+            std::cout << "\n";
         }
         
         // Frontend: Syntax analysis (parsing)
-        bool useCSTMode = printCst; // Use CST mode if CST printing is requested
+        bool useCSTMode = printCst;
         Frontend::Parser parser(scanner, useCSTMode);
         std::shared_ptr<LM::Frontend::AST::Program> ast = parser.parse();
         
-        // Phase 1: Type checking (sets inferred types on AST nodes)
-        std::cout << "=== Phase 1: Type Checking ===\n";
+        // Phase 1: Type checking
         auto type_check_result = LM::Frontend::TypeCheckerFactory::check_program(ast, source, filename);
         if (!type_check_result.success) {
-            std::cerr << "Type checking errors:\n";
-            for (const auto& error : type_check_result.errors) {
-                std::cerr << "  " << error << std::endl;
-            }
+            std::cerr << "Type checking failed\n";
             return 1;
         }
-        std::cout << "✅ Type checking passed\n\n";
         
-        // Phase 2: Memory safety analysis (after types are set)
-        std::cout << "=== Phase 2: Memory Safety Analysis ===\n";
-        auto memory_check_result = LM::Frontend::MemoryCheckerFactory::check_program(type_check_result.program, source, filename);
+        // Phase 2: Memory safety analysis
+        auto memory_check_result = LM::Frontend::MemoryCheckerFactory::check_program(
+            type_check_result.program, source, filename);
         if (!memory_check_result.success) {
-            std::cerr << "Memory safety errors detected:\n";
-            // Memory errors are now reported through Debugger, so they'll show with proper formatting
             return 1;
         }
         
-        // Show warnings if any
-        if (!memory_check_result.warnings.empty()) {
-            std::cout << "Memory safety warnings:\n";
-            for (const auto& warning : memory_check_result.warnings) {
-                std::cout << "  " << warning << std::endl;
-            }
-        }
-        std::cout << "✅ Memory safety analysis passed\n\n";
-        
-        // AST Optimization (DISABLED FOR DEBUGGING)
-        // AST::ASTOptimizer optimizer;
-        // ast = optimizer.optimize(memory_check_result.program);
-        ast = memory_check_result.program; // Use unoptimized AST
+        ast = memory_check_result.program;
         
         // Phase 3: Post-optimization verification
-        std::cout << "=== Phase 3: Post-Optimization Verification ===\n";
         auto post_opt_type_check = LM::Frontend::TypeCheckerFactory::check_program(ast, source, filename);
         if (!post_opt_type_check.success) {
-            std::cerr << "Post-optimization type errors:\n";
-            for (const auto& error : post_opt_type_check.errors) {
-                std::cerr << "  " << error << std::endl;
-            }
+            std::cerr << "Post-optimization type checking failed\n";
             return 1;
-        }
-        std::cout << "✅ Post-optimization verification passed\n\n";
-        
-        // Print optimization statistics (DISABLED)
-        // const auto& stats = optimizer.getStats();
-        std::cout << "=== AST Optimization Statistics (DISABLED) ===\n";
-        std::cout << "AST optimization temporarily disabled for debugging\n";
-        std::cout << std::endl;
-        
-        // Print AST after optimization if debug mode is enabled
-        if (enableDebug || jitDebug) {
-            std::cout << "=== AST After Optimization ===\n";
-            LM::Frontend::AST::ASTPrinter printer_after;
-            printer_after.process(ast);
-            std::cout << std::endl;
-        }
-        
-        // Print optimization statistics if debug mode is enabled (DISABLED)
-        if (enableDebug || jitDebug) {
-            // const auto& stats = optimizer.getStats();
-            std::cout << "=== AST Optimization Statistics (DISABLED) ===\n";
-            std::cout << "AST optimization temporarily disabled for debugging\n";
         }
         
         // Print CST if requested
@@ -142,9 +101,9 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             std::cout << "=== CST ===\n";
             const Frontend::CST::Node* cstRoot = parser.getCST();
             if (cstRoot) {
-                std::cout << Frontend::CST::Printer::printCST(cstRoot) << std::endl;
+                std::cout << Frontend::CST::Printer::printCST(cstRoot) << "\n";
             } else {
-                std::cout << "No CST available (parser not in CST mode)" << std::endl;
+                std::cout << "No CST available (parser not in CST mode)\n";
             }
         }
 
@@ -153,25 +112,14 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             std::cout << "=== AST ===\n";
             LM::Frontend::AST::ASTPrinter printer;
             printer.process(ast);
-            std::cout << std::endl;
+            std::cout << "\n";
         }
 
         if (useJit) {
             try {
-                // Generate LIR from optimized AST
-                if (enableDebug || jitDebug) {
-                    std::cout << "[DEBUG] Starting LIR generation..." << std::endl;
-                }
+                // Generate LIR from AST
                 LIR::Generator lir_generator;
                 auto lir_function = lir_generator.generate_program(post_opt_type_check);
-                if (enableDebug || jitDebug) {
-                    std::cout << "[DEBUG] LIR generation completed." << std::endl;
-                }
-                
-                // Initialize and run LIR disassembler (includes all functions)
-                LIR::Disassembler disassemble(*lir_function, true);
-                std::cout << "\n=== LIR Disassembly ===\n";
-                std::cout << disassemble.disassemble() << std::endl;
                 
                 if (!lir_function) {
                     std::cerr << "Failed to generate LIR function\n";
@@ -179,77 +127,17 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 }
                 
                 if (lir_generator.has_errors()) {
-                    std::cerr << "LIR generation errors:\n";
-                    for (const auto& error : lir_generator.get_errors()) {
-                        std::cerr << "  " << error << std::endl;
-                    }
+                    std::cerr << "LIR generation errors\n";
                     return 1;
                 }
                 
-                std::cout << "Generated LIR function with " << lir_function->instructions.size() << " instructions\n";
-                std::cout << "CFG generation completed with " << lir_function->cfg->blocks.size() << " blocks\n";
-                
-                if (jitDebug || enableDebug) {
-                    std::cout << "\n=== LIR Instructions ===\n";
-                    for (size_t i = 0; i < lir_function->instructions.size(); ++i) {
-                        const auto& inst = lir_function->instructions[i];
-                        std::cout << "[" << i << "] " << inst.to_string() << "\n";
-                    }
-                    
-                    // Display individual function LIR instructions
-                    auto& lir_func_manager = LIR::LIRFunctionManager::getInstance();
-                    auto function_names = lir_func_manager.getFunctionNames();
-                    
-                    std::cout << "\n=== Function LIR Instructions ===\n";
-                    for (const auto& func_name : function_names) {
-                        auto lir_func = lir_func_manager.getFunction(func_name);
-                        if (lir_func) {
-                            std::cout << "\n" << func_name << ":\n";
-                            const auto& instructions = lir_func->getInstructions();
-                            for (size_t i = 0; i < instructions.size(); ++i) {
-                                const auto& inst = instructions[i];
-                                std::cout << "[" << i << "] " << inst.to_string() << "\n";
-                            }
-                        }
-                    }
-                    
-                    std::cout << "\n=== CFG Blocks ===\n";
-                    for (size_t i = 0; i < lir_function->cfg->blocks.size(); ++i) {
-                        const auto& block = lir_function->cfg->blocks[i];
-                        std::cout << "Block " << block->id << ": " << block->label << " (";
-                        if (block->is_entry) std::cout << "entry ";
-                        if (block->is_exit) std::cout << "exit ";
-                        std::cout << ")\n";
-                    }
-                    std::cout << "\n";
-                }
-                
-                // Initialize JIT backend only after LIR and CFG is complete
+                // Initialize JIT backend
                 LM::Backend::JIT::Compiler::JITBackend jit;
-                jit.set_debug_mode(true); // Enable debug to see what's happening
-                
-                // Process the main LIR function with JIT (now that CFG is fully built)
+                jit.set_debug_mode(enableDebug || jitDebug);
                 jit.process_function(*lir_function);
                 
-                // Process all user-defined LIR functions that were registered
-                auto& lir_func_manager = LIR::LIRFunctionManager::getInstance();
-                auto function_names = lir_func_manager.getFunctionNames();
-                
-                std::cout << "Registering " << function_names.size() << " user-defined LIR functions with JIT..." << std::endl;
-                
-                for (const auto& func_name : function_names) {
-                    auto lir_func = lir_func_manager.getFunction(func_name);
-                    if (lir_func) {
-                        std::cout << "JIT registering function: " << func_name << std::endl;
-                        // TODO: Register function with JIT backend
-                        // For now, the JIT will resolve calls via function ID
-                    }
-                }
-                
                 if (jitDebug) {
-                    std::cout << "=== JIT Debug Mode - Running Directly ===\n";
                     int exit_code = jit.execute_compiled_function();
-                    std::cout << "JIT execution completed with exit code: " << exit_code << std::endl;
                     return exit_code;
                 } else {
                     std::string output_filename = filename;
@@ -257,51 +145,30 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                     if (dot_pos != std::string::npos) {
                         output_filename.erase(dot_pos);
                     }
-                    // Add platform-specific executable extension
                     #ifdef _WIN32
                         output_filename += ".exe";
                     #endif
                     
-                    std::cout << "Compiling to executable: " << output_filename << "\n";
-                    auto result = jit.compile(LM::Backend::JIT::Compiler::CompileMode::ToExecutable, output_filename);
+                    auto result = jit.compile(LM::Backend::JIT::Compiler::CompileMode::ToExecutable, 
+                                            output_filename);
                     if (result.success) {
-                        std::cout << "Compiled to " << result.output_file << ". Run ./" << result.output_file << " to see the result.\n";
+                        std::cout << "Compiled to " << result.output_file << "\n";
                     } else {
-                        std::cerr << "JIT compilation failed: " << result.error_message << std::endl;
+                        std::cerr << "JIT compilation failed: " << result.error_message << "\n";
                         return 1;
                     }
                 }
             } catch (const std::exception& e) {
-                std::cerr << "JIT Error: " << e.what() << std::endl;
-                return 1;
-            } catch (...) {
-                std::cerr << "Unknown JIT error occurred" << std::endl;
+                std::cerr << "JIT Error: " << e.what() << "\n";
                 return 1;
             }
         } else {
-
-            // Backend: Use register interpreter instead of VM
+            // Backend: Use register interpreter
             LM::Backend::VM::Register::RegisterVM register_vm;
-            
-            // Enable debug mode if requested
-            if (enableDebug) {
-                std::cout << "Debug mode enabled for register interpreter\n";
-            }
-            
-            std::cout << "[DEBUG] About to start LIR generation for register interpreter..." << std::endl;
-            if (enableDebug) {
-                std::cout << "[DEBUG] Starting LIR generation for register interpreter..." << std::endl;
-            }
             
             try {
                 LIR::Generator lir_generator;
                 auto lir_function = lir_generator.generate_program(post_opt_type_check);
-                
-                std::cout << "[DEBUG] LIR generation completed, checking for errors..." << std::endl;
-                
-                if (enableDebug) {
-                    std::cout << "[DEBUG] LIR generation completed for register interpreter." << std::endl;
-                }
                 
                 if (!lir_function) {
                     std::cerr << "Failed to generate LIR function\n";
@@ -309,59 +176,24 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 }
                 
                 if (lir_generator.has_errors()) {
-                    std::cerr << "LIR generation errors:\n";
-                    for (const auto& error : lir_generator.get_errors()) {
-                        std::cerr << "  " << error << std::endl;
-                    }
+                    std::cerr << "LIR generation errors\n";
                     return 1;
                 }
                 
-                // Show LIR disassembly
-                std::cout << "\n=== LIR Disassembly ===\n";
-                LIR::Disassembler disassemble(*lir_function, true);
-                std::cout << disassemble.disassemble() << std::endl;
-
-                // Display individual function LIR instructions
-                auto& lir_func_manager = LIR::LIRFunctionManager::getInstance();
-                auto function_names = lir_func_manager.getFunctionNames();
-                
-                std::cout << "\n=== Function LIR Instructions ===\n";
-                for (const auto& func_name : function_names) {
-                    auto lir_func = lir_func_manager.getFunction(func_name);
-                    if (lir_func) {
-                        std::cout << "\n" << func_name << ":\n";
-                        const auto& instructions = lir_func->getInstructions();
-                        for (size_t i = 0; i < instructions.size(); ++i) {
-                            const auto& inst = instructions[i];
-                            std::cout << "[" << i << "] " << inst.to_string() << "\n";
-                        }
-                    }
-                }
-                
-                // Execute using register interpreter with the new LIRFunctionManager
+                // Execute using register interpreter
                 try {
-                    // Register the main function in LIRFunctionManager if it exists
                     std::shared_ptr<LIR::LIRFunction> main_lir_func;
-                    if (lir_function) {
-                        auto& func_manager = LIR::LIRFunctionManager::getInstance();
-                        
-                        // Convert the old LIR function to new LIRFunction format
-                        std::vector<LIR::LIRParameter> main_params;
-                        main_lir_func = func_manager.createFunction("main", main_params, LIR::Type::I64, nullptr);
-                        main_lir_func->setInstructions(lir_function->instructions);
-                        
-                        register_vm.execute_lir_function(*main_lir_func);
-                    } else {
-                        std::cerr << "No LIR function generated\n";
-                        return 1;
-                    }
+                    auto& func_manager = LIR::LIRFunctionManager::getInstance();
                     
-                    // Check if the function has an explicit return statement
-                    // For scripts, we only print the return value if there's an explicit return
+                    std::vector<LIR::LIRParameter> main_params;
+                    main_lir_func = func_manager.createFunction("main", main_params, LIR::Type::I64, nullptr);
+                    main_lir_func->setInstructions(lir_function->instructions);
+                    
+                    register_vm.execute_lir_function(*main_lir_func);
+                    
+                    // Check for explicit return statement
                     bool should_print_result = false;
                     if (main_lir_func && !main_lir_func->getInstructions().empty()) {
-                        // Look for a Return instruction (explicit return)
-                        // Ret instruction is used for implicit returns
                         for (const auto& inst : main_lir_func->getInstructions()) {
                             if (inst.op == LIR::LIR_Op::Return) {
                                 should_print_result = true;
@@ -373,21 +205,21 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                     if (should_print_result) {
                         auto result = register_vm.get_register(0);
                         if (!std::holds_alternative<std::nullptr_t>(result)) {
-                            std::cout << register_vm.to_string(result) << std::endl;
+                            std::cout << register_vm.to_string(result) << "\n";
                         }
                     }
                 } catch (const std::exception& e) {
-                    std::cerr << "Error: " << e.what() << std::endl;
+                    std::cerr << "Runtime error: " << e.what() << "\n";
                     return 1;
                 }
             } catch (const std::exception& e) {
-                std::cerr << "LIR generation error: " << e.what() << std::endl;
+                std::cerr << "LIR generation error: " << e.what() << "\n";
                 return 1;
             }
         }
         
     } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+        std::cerr << "Error: " << e.what() << "\n";
         return 1;
     }
     
@@ -395,14 +227,13 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
 }
 
 void startRepl() {
-    std::cout << "Limit Programming Language REPL (Interactive Mode)" << std::endl;
-    std::cout << "Type 'exit' to quit, '.registers' to show register state, '.debug' to toggle debug mode" << std::endl;
+    std::cout << "Limit Programming Language REPL\n";
+    std::cout << "Type 'exit' to quit, '.registers' to show register state\n\n";
     
     // Initialize LIR function systems
     LIR::FunctionUtils::initializeFunctions();
     
     LM::Backend::VM::Register::RegisterVM register_vm;
-    bool debugMode = false;
     std::string line;
     
     while (true) {
@@ -413,72 +244,49 @@ void startRepl() {
         if (line == "exit") {
             break;
         } else if (line == ".registers") {
-            std::cout << "Current register state:\n";
+            std::cout << "Register state:\n";
             for (size_t i = 0; i < 10; ++i) {
                 auto reg_val = register_vm.get_register(i);
                 if (!std::holds_alternative<std::nullptr_t>(reg_val)) {
-                    std::cout << "  r" << i << ": " << register_vm.to_string(reg_val) << std::endl;
+                    std::cout << "  r" << i << ": " << register_vm.to_string(reg_val) << "\n";
                 }
             }
-            continue;
-        } else if (line == ".stack") {
-            std::cout << ".stack command not supported with register interpreter. Use .registers to see register state.\n";
-            continue;
-        } else if (line == ".debug") {
-            debugMode = !debugMode;
-            std::cout << "Debug mode " << (debugMode ? "enabled" : "disabled") << std::endl;
             continue;
         } else if (line.empty()) {
             continue;
         }
         
         try {
-            // Frontend: Lexical analysis (scanning)
+            // Frontend: Lexical analysis
             LM::Frontend::Scanner scanner(line);
             scanner.scanTokens();
             
-            // Frontend: Syntax analysis (parsing)
-            LM::Frontend::Parser parser(scanner, false); // Use legacy mode for optimal REPL performance
+            // Frontend: Syntax analysis
+            LM::Frontend::Parser parser(scanner, false);
             std::shared_ptr<LM::Frontend::AST::Program> ast = parser.parse();
             
-            // Phase 1: Type checking (sets inferred types on AST nodes)
+            // Type checking
             auto type_check_result = LM::Frontend::TypeCheckerFactory::check_program(ast);
             if (!type_check_result.success) {
-                std::cerr << "Type checking errors:\n";
-                for (const auto& error : type_check_result.errors) {
-                    std::cerr << "  " << error << std::endl;
-                }
                 continue;
             }
             
-            // Phase 2: Memory safety analysis (after types are set)
-            auto memory_check_result = LM::Frontend::MemoryCheckerFactory::check_program(type_check_result.program);
+            // Memory safety analysis
+            auto memory_check_result = LM::Frontend::MemoryCheckerFactory::check_program(
+                type_check_result.program);
             if (!memory_check_result.success) {
-                // Memory errors are now reported through Debugger, so they'll show with proper formatting
                 continue;
             }
             
-            // AST Optimization (DISABLED FOR DEBUGGING)
-            // AST::ASTOptimizer optimizer;
-            // ast = optimizer.optimize(memory_check_result.program);
-            ast = memory_check_result.program; // Use unoptimized AST
+            ast = memory_check_result.program;
             
-            // Phase 3: Post-optimization verification
+            // Post-optimization verification
             auto post_opt_type_check = LM::Frontend::TypeCheckerFactory::check_program(ast);
             if (!post_opt_type_check.success) {
-                std::cerr << "Post-optimization type errors:\n";
-                for (const auto& error : post_opt_type_check.errors) {
-                    std::cerr << "  " << error << std::endl;
-                }
                 continue;
             }
             
-            // Print optimization statistics in debug mode (DISABLED)
-            if (debugMode) {
-                std::cout << "AST Optimization: disabled for debugging\n";
-            }
-            
-            // Backend: Generate LIR and execute with register interpreter
+            // Backend: Generate LIR and execute
             LIR::Generator lir_generator;
             auto lir_function = lir_generator.generate_program(post_opt_type_check);
             
@@ -491,38 +299,16 @@ void startRepl() {
             try {
                 register_vm.execute_function(*lir_function);
                 
-                // Get result from register 0 (conventional return register)
                 auto result = register_vm.get_register(0);
                 if (!std::holds_alternative<std::nullptr_t>(result)) {
-                    std::cout << "=> " << register_vm.to_string(result) << std::endl;
+                    std::cout << "=> " << register_vm.to_string(result) << "\n";
                 }
-                
-                // Show registers after execution in debug mode
-                if (debugMode) {
-                    std::cout << "Register state after execution:\n";
-                    for (size_t i = 0; i < 10; ++i) { // Show first 10 registers
-                        auto reg_val = register_vm.get_register(i);
-                        if (!std::holds_alternative<std::nullptr_t>(reg_val)) {
-                            std::cout << "  r" << i << ": " << register_vm.to_string(reg_val) << std::endl;
-                        }
-                    }
-                }
-                
             } catch (const std::exception& e) {
-                std::cerr << "Runtime error: " << e.what() << std::endl;
-                if (debugMode) {
-                    std::cout << "Register state after error:\n";
-                    for (size_t i = 0; i < 10; ++i) {
-                        auto reg_val = register_vm.get_register(i);
-                        if (!std::holds_alternative<std::nullptr_t>(reg_val)) {
-                            std::cout << "  r" << i << ": " << register_vm.to_string(reg_val) << std::endl;
-                        }
-                    }
-                }
+                std::cerr << "Runtime error: " << e.what() << "\n";
             }
             
         } catch (const std::exception& e) {
-            std::cerr << "Error: " << e.what() << std::endl;
+            std::cerr << "Error: " << e.what() << "\n";
         }
     }
 }
@@ -551,7 +337,7 @@ int main(int argc, char* argv[]) {
     } else if (arg == "-debug" && argc >= 3) {
         return executeFile(argv[2], false, false, false, false, false, true);
     } else if (arg[0] == '-') {
-        std::cerr << "Unknown option: " << arg << std::endl;
+        std::cerr << "Unknown option: " << arg << "\n";
         printUsage(argv[0]);
         return 1;
     } else {

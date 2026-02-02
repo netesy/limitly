@@ -1,4 +1,3 @@
-// debugger.h
 #pragma once
 
 #include <iostream>
@@ -8,13 +7,31 @@
 #include <optional>
 #include <set>
 
-// Include error handling structures
-#include "error_message.hh"
+#include "message.hh"
 
-class Debugger
-{
+namespace LM {
+namespace Error {
+
+/**
+ * @brief Debugger class for error reporting and diagnostics
+ * Provides centralized error reporting with support for:
+ * - Multiple error reporting methods
+ * - Duplicate error prevention
+ * - Console and log file output
+ * - Context-aware error messages
+ */
+class Debugger {
 public:
-    // Original method for reporting errors with source code (maintained for backward compatibility)
+    /**
+     * @brief Report error with source code context
+     * @param errorMessage The error message text
+     * @param line Line number where error occurred
+     * @param column Column number where error occurred
+     * @param stage Interpretation stage when error occurred
+     * @param code Complete source code for context
+     * @param lexeme The specific token causing the error
+     * @param expectedValue What was expected (if applicable)
+     */
     static void error(const std::string &errorMessage,
                       int line,
                       int column,
@@ -23,7 +40,17 @@ public:
                       const std::string &lexeme = "",
                       const std::string &expectedValue = "");
 
-    // Enhanced error reporting methods with file path support
+    /**
+     * @brief Report error with file path
+     * @param errorMessage The error message text
+     * @param line Line number where error occurred
+     * @param column Column number where error occurred
+     * @param stage Interpretation stage when error occurred
+     * @param code Complete source code for context
+     * @param filePath Path to the source file
+     * @param lexeme The specific token causing the error
+     * @param expectedValue What was expected (if applicable)
+     */
     static void error(const std::string &errorMessage,
                       int line,
                       int column,
@@ -33,65 +60,67 @@ public:
                       const std::string &lexeme = "",
                       const std::string &expectedValue = "");
 
-    // Enhanced error reporting with block context for unclosed constructs
+    /**
+     * @brief Report error with block context for unclosed constructs
+     * @param errorMessage The error message text
+     * @param line Line number where error occurred
+     * @param column Column number where error occurred
+     * @param stage Interpretation stage when error occurred
+     * @param code Complete source code for context
+     * @param filePath Path to the source file
+     * @param blockContext Context about unclosed block (function, if, while, etc.)
+     * @param lexeme The specific token causing the error
+     * @param expectedValue What was expected (if applicable)
+     */
     static void error(const std::string &errorMessage,
                       int line,
                       int column,
                       InterpretationStage stage,
                       const std::string &code,
                       const std::string &filePath,
-                      const std::optional<ErrorHandling::BlockContext> &blockContext,
+                      const std::optional<BlockContext> &blockContext,
                       const std::string &lexeme = "",
                       const std::string &expectedValue = "");
 
-    // Method for reporting errors with pre-built ErrorMessage
-    static void error(const ErrorHandling::ErrorMessage &errorMessage);
+    /**
+     * @brief Report pre-built error message
+     * @param errorMessage Complete Message structure
+     */
+    static void error(const Message &errorMessage);
 
-    // Method to check if any errors have occurred
+    /**
+     * @brief Check if any errors have been reported
+     * @return true if errors occurred, false otherwise
+     */
     static bool hasError() { return hadError; }
 
-    // Method to reset error state
+    /**
+     * @brief Reset error state for fresh error reporting
+     */
     static void resetError() { 
         hadError = false; 
-        reportedErrors.clear(); // Clear reported errors to allow fresh error reporting
+        reportedErrors.clear();
     }
 
 private:
-    static std::vector<std::string> sourceCodez;
+    static std::vector<std::string> sourceCodeLines;
     static bool hadError;
-    static bool useEnhancedFormatting;
-    static std::set<std::string> reportedErrors; // Track reported errors to prevent duplicates
+    static std::set<std::string> reportedErrors;
 
-    // Enhanced console and log methods using new formatters
-    static void debugConsole(const ErrorHandling::ErrorMessage &errorMessage);
-    static void debugLog(const ErrorHandling::ErrorMessage &errorMessage);
+    // Console and log output methods
+    static void debugConsole(const Message &errorMessage);
+    static void debugLog(const Message &errorMessage);
 
-    // Legacy methods (kept for backward compatibility)
-    static void debugConsole(const std::string &errorMessage,
-                             int line,
-                             int column,
-                             InterpretationStage stage,
-                             const std::string &lexeme,
-                             const std::string &expectedValue);
-    static void debugLog(const std::string &errorMessage,
-                         int line,
-                         int column,
-                         InterpretationStage stage,
-                         const std::string &lexeme,
-                         const std::string &expectedValue);
-
-    // Legacy helper methods (kept for backward compatibility)
+    // Helper methods
     static void printContextLines(std::ostream &out, int errorLine, int errorColumn);
     static std::vector<std::string> splitLines(const std::string &sourceCode);
     static std::string getTime();
     static std::string getSuggestion(const std::string &errorMessage,
                                      const std::string &expectedValue);
-    static std::string getSampleSolution(const std::string &errorMessage,
-                                         const std::string &expectedValue);
     static std::string stageToString(InterpretationStage stage);
 
-    // Helper method to create enhanced error message
-    static ErrorHandling::ErrorMessage createEnhancedErrorMessage(
+    // Create enhanced error message from components
+    static Message createEnhancedErrorMessage(
         const std::string &errorMessage,
         int line,
         int column,
@@ -100,8 +129,8 @@ private:
         const std::string &filePath = "",
         const std::string &lexeme = "",
         const std::string &expectedValue = "",
-        const std::optional<ErrorHandling::BlockContext> &blockContext = std::nullopt);
-
-    // Method to enable/disable enhanced formatting
-    static void setEnhancedFormatting(bool enabled) { useEnhancedFormatting = enabled; }
+        const std::optional<BlockContext> &blockContext = std::nullopt);
 };
+
+} // namespace Error
+} // namespace LM

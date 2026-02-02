@@ -13,8 +13,7 @@
 
 namespace LM {
 namespace Frontend {
-
-bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> program) {
+using namespace LM::Error;bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> program) {
     if (!program) {
         add_error("Null program provided");
         return false;

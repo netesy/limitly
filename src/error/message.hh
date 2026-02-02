@@ -5,9 +5,12 @@
 #include <optional>
 
 // Forward declaration to avoid circular dependency
-enum class InterpretationStage { SCANNING, PARSING, SYNTAX, SEMANTIC, MEMORY, BYTECODE, INTERPRETING, COMPILING };
+enum class InterpretationStage { 
+    SCANNING, PARSING, SYNTAX, SEMANTIC, MEMORY, BYTECODE, INTERPRETING, COMPILING 
+};
 
-namespace ErrorHandling {
+namespace LM {
+namespace Error {
 
 /**
  * @brief Represents context information about a block structure (function, if, while, etc.)
@@ -46,31 +49,11 @@ struct ErrorContext {
 };
 
 /**
- * @brief Definition of an error type in the error catalog
- * Contains templates and patterns for generating consistent error messages
- */
-struct ErrorDefinition {
-    std::string code;                               // Error code (e.g., "E102")
-    std::string type;                               // Error type (e.g., "SyntaxError")
-    std::string pattern;                            // Pattern to match error message
-    std::string hintTemplate;                       // Template for hint generation
-    std::string suggestionTemplate;                 // Template for suggestion generation
-    std::vector<std::string> commonCauses;          // Common root causes for this error
-    
-    ErrorDefinition() = default;
-    ErrorDefinition(const std::string& errorCode, const std::string& errorType,
-                   const std::string& messagePattern, const std::string& hint,
-                   const std::string& suggestion, const std::vector<std::string>& causes = {})
-        : code(errorCode), type(errorType), pattern(messagePattern),
-          hintTemplate(hint), suggestionTemplate(suggestion), commonCauses(causes) {}
-};
-
-/**
  * @brief Complete structured error message with all enhanced information
  * This is the main data structure that contains all the information needed
  * for generating both human-readable and machine-readable error output
  */
-struct ErrorMessage {
+struct Message {
     std::string errorCode;                          // Unique error code (e.g., "E102")
     std::string errorType;                          // Error type (e.g., "SyntaxError")
     std::string description;                        // Main error description
@@ -85,14 +68,14 @@ struct ErrorMessage {
     InterpretationStage stage;                      // Stage where error occurred
     
     // Constructor with all required fields
-    ErrorMessage(const std::string& code, const std::string& type, const std::string& desc,
+    Message(const std::string& code, const std::string& type, const std::string& desc,
                 const std::string& file, int ln, int col, const std::string& token,
                 InterpretationStage errorStage)
         : errorCode(code), errorType(type), description(desc), filePath(file),
           line(ln), column(col), problematicToken(token), stage(errorStage) {}
     
     // Default constructor
-    ErrorMessage() : line(0), column(0), stage(InterpretationStage::SCANNING) {}
+    Message() : line(0), column(0), stage(InterpretationStage::SCANNING) {}
     
     // Method to check if this is a complete error message
     bool isComplete() const {
@@ -106,4 +89,5 @@ struct ErrorMessage {
     }
 };
 
-} // namespace ErrorHandling
+} // namespace Error
+} // namespace LM
