@@ -8,7 +8,8 @@
 #include <queue>
 #include <algorithm>
 
-namespace Register {
+namespace LM {
+namespace Backend {
 
 // Scheduler for fiber-based concurrency
 struct Scheduler {
@@ -152,6 +153,7 @@ private:
     static Scheduler* instance_; // For static methods access
 };
 
-} // namespace Register
+} // namespace Backend
+} // namespace LM
 
 #endif // SCHEDULER_H

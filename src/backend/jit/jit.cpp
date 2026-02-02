@@ -3,7 +3,7 @@
 #include "../../lir/functions.hh"
 #include "../../lir/builtin_functions.hh"
 #include "../../memory/memory.hh"
-#include "../register/register.hh"
+#include "../vm/register.hh"
 #include <libgccjit++.h>
 #include <memory>
 #include <string>
@@ -43,7 +43,10 @@ extern "C" {
     void limitly_mem_deallocate(void* ptr);
 }
 
+namespace LM {
+namespace Backend {
 namespace JIT {
+namespace Compiler {
 
 JITBackend::JITBackend() 
     : m_context(gccjit::context::acquire()), 
@@ -2296,4 +2299,7 @@ void JITBackend::compile_function_body(gccjit::function& native_func,
     label_blocks = saved_label_blocks;
 }
 
+} // namespace Compiler
 } // namespace JIT
+} // namespace Backend
+} // namespace LM

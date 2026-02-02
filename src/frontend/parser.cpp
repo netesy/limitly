@@ -1,5 +1,5 @@
 #include "parser.hh"
-#include "../common/debugger.hh"
+#include "../error/debugger.hh"
 #include <stdexcept>
 #include <limits>
 #include <set>

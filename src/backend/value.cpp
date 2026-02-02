@@ -212,11 +212,11 @@ bool IteratorValue::hasNext() const {
 
             // Attempt to receive from the channel (this will block until value or closed)
             try {
-                if (auto chPtr = std::get_if<std::shared_ptr<Register::Channel>>(&iterable->complexData)) {
-                    Register::RegisterValue rv;
+                if (auto chPtr = std::get_if<std::shared_ptr<LM::Backend::Channel>>(&iterable->complexData)) {
+                    LM::Backend::RegisterValue rv;
                     bool ok = (*chPtr)->poll(rv);
                     if (ok) {
-                        // Convert Register::RegisterValue to ValuePtr with proper types
+                        // Convert LM::Backend::RegisterValue to ValuePtr with proper types
                         if (auto valPtr = std::get_if<std::string>(&rv)) {
                             auto stringType = std::make_shared<Type>(TypeTag::String);
                             bufferedValue = std::make_shared<Value>(stringType, *valPtr);
@@ -297,11 +297,11 @@ ValuePtr IteratorValue::next() {
             return res;
         }
         // As a fallback, try to receive directly
-        if (auto chPtr = std::get_if<std::shared_ptr<Register::Channel>>(&iterable->complexData)) {
-            Register::RegisterValue rv;
+        if (auto chPtr = std::get_if<std::shared_ptr<LM::Backend::Channel>>(&iterable->complexData)) {
+            LM::Backend::RegisterValue rv;
             bool ok = (*chPtr)->poll(rv);
             if (ok) {
-                // Convert Register::RegisterValue to ValuePtr with proper types
+                // Convert LM::Backend::RegisterValue to ValuePtr with proper types
                 if (auto valPtr = std::get_if<std::string>(&rv)) {
                     auto stringType = std::make_shared<Type>(TypeTag::String);
                     return std::make_shared<Value>(stringType, *valPtr);
@@ -485,7 +485,7 @@ std::string Value::toString() const {
                            oss << "<null iterator>";
                        }
                    },
-                   [&](const std::shared_ptr<Register::Channel>&){
+                   [&](const std::shared_ptr<LM::Backend::Channel>&){
                        oss << "<channel>";
                    },
                    [&](const AtomicValue& av) {
@@ -592,7 +592,7 @@ std::string Value::getRawString() const {
                            oss << "<null iterator>";
                        }
                    },
-                   [&](const std::shared_ptr<Register::Channel>&){
+                   [&](const std::shared_ptr<LM::Backend::Channel>&){
                        oss << "<channel>";
                    },
                    [&](const AtomicValue& av) {

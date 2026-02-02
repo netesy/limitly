@@ -5,7 +5,9 @@
 #include <sstream>
 #include <set>
 
+namespace LM {
 namespace LIR {
+
 
 std::string Disassembler::disassemble() const {
     std::stringstream ss;
@@ -352,3 +354,4 @@ bool Optimizer::dead_code_elimination() {
 }
 
 } // namespace LIR
+} // namespace LM

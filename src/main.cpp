@@ -6,7 +6,7 @@
 #include "frontend/type_checker.hh"
 #include "frontend/memory_checker.hh"
 #include "frontend/ast.hh"
-#include "backend/register/register.hh"
+#include "backend/vm/register.hh"
 #include "lir/generator.hh"
 #include "lir/functions.hh"
 #include "backend/jit/jit.hh"
@@ -225,7 +225,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 }
                 
                 // Initialize JIT backend only after LIR and CFG is complete
-                JIT::JITBackend jit;
+                LM::Backend::JIT::Compiler::JITBackend jit;
                 jit.set_debug_mode(true); // Enable debug to see what's happening
                 
                 // Process the main LIR function with JIT (now that CFG is fully built)
@@ -263,7 +263,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                     #endif
                     
                     std::cout << "Compiling to executable: " << output_filename << "\n";
-                    auto result = jit.compile(JIT::CompileMode::ToExecutable, output_filename);
+                    auto result = jit.compile(LM::Backend::JIT::Compiler::CompileMode::ToExecutable, output_filename);
                     if (result.success) {
                         std::cout << "Compiled to " << result.output_file << ". Run ./" << result.output_file << " to see the result.\n";
                     } else {
@@ -281,7 +281,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         } else {
 
             // Backend: Use register interpreter instead of VM
-            Register::RegisterVM register_vm;
+            LM::Backend::VM::Register::RegisterVM register_vm;
             
             // Enable debug mode if requested
             if (enableDebug) {
@@ -401,7 +401,7 @@ void startRepl() {
     // Initialize LIR function systems
     LIR::FunctionUtils::initializeFunctions();
     
-    Register::RegisterVM register_vm;
+    LM::Backend::VM::Register::RegisterVM register_vm;
     bool debugMode = false;
     std::string line;
     

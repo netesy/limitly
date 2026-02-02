@@ -13,9 +13,9 @@
 #include <optional>
 #include <variant>
 
-
-//All semantic decisions about functions, classes, and variables are made in the generator. JIT only sees registers, memory offsets, and low-level types.
+namespace LM {
 namespace LIR {
+
 class Generator {
 public:
     explicit Generator();
@@ -342,5 +342,6 @@ private:
 };
 
 } // namespace LIR
+} // namespace LM
 
 #endif // LIR_GENERATOR_H

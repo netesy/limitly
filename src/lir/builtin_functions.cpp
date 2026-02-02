@@ -14,6 +14,7 @@
 #include <thread>
 #include <ctime>
 
+namespace LM {
 namespace LIR {
 
 // LIRBuiltinFunction implementation
@@ -1484,3 +1485,4 @@ ValuePtr callBuiltinFunction(const std::string& name, const std::vector<ValuePtr
 } // namespace BuiltinUtils
 
 } // namespace LIR
+} // namespace LM

@@ -10,6 +10,7 @@
 #include "../backend/types.hh"
 #include "functions.hh"
 
+namespace LM {
 namespace LIR {
 
 // Forward declarations
@@ -107,5 +108,5 @@ ValuePtr callBuiltinFunction(const std::string& name, const std::vector<ValuePtr
 } // namespace BuiltinUtils
 
 } // namespace LIR
-
+} // namespace LM
 #endif // LIR_BUILTIN_FUNCTIONS_HH

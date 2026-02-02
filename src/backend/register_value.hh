@@ -5,11 +5,13 @@
 #include <string>
 #include <cstdint>
 
-namespace Register {
+namespace LM {
+namespace Backend {
 
 // Register value type
 using RegisterValue = std::variant<int64_t, uint64_t, double, bool, std::string, std::nullptr_t>;
 
-} // namespace Register
+} // namespace Backend
+} // namespace LM
 
 #endif // REGISTER_VALUE_H
