@@ -123,7 +123,15 @@ private:
     gccjit::function m_lm_int_to_string_func;
     gccjit::function m_lm_double_to_string_func;
     gccjit::function m_lm_bool_to_string_func;
+    gccjit::function m_lm_value_to_string_func;
     gccjit::function m_lm_string_free_func;
+    
+    // Runtime boxing functions
+    gccjit::function m_lm_box_int_func;
+    gccjit::function m_lm_box_float_func;
+    gccjit::function m_lm_box_bool_func;
+    gccjit::function m_lm_box_string_func;
+    gccjit::function m_lm_box_nullptr_func;
     
     // Helper methods
     gccjit::rvalue convert_to_jit_type(gccjit::rvalue value, gccjit::type target_type);
@@ -141,6 +149,9 @@ private:
     gccjit::rvalue compile_to_string(gccjit::rvalue value);
     gccjit::rvalue compile_to_cstring(gccjit::rvalue value);
     gccjit::rvalue convert_to_lm_string(gccjit::rvalue value);
+    
+    // Boxing operations
+    gccjit::rvalue box_value(gccjit::rvalue value, gccjit::type value_type);
     
     // Control flow
     void compile_jump(const LIR::LIR_Inst& inst);

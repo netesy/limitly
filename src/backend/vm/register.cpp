@@ -9,6 +9,7 @@
 #include "../../runtime/runtime_list.h"
 #include "../../runtime/runtime_dict.h"
 #include "../../runtime/runtime_tuple.h"
+#include "../../runtime/runtime_value.h"
 #include <iostream>
 #include <variant>
 #include <memory>
@@ -267,177 +268,12 @@ std::string RegisterVM::to_string(const RegisterValue& value) const {
     } else if (std::holds_alternative<int64_t>(value)) {
         int64_t int_val = std::get<int64_t>(value);
         
-        // Check if this might be a pointer to a collection
-        // Pointers on Windows are typically in the range 0x00400000 to 0x7FFFFFFF for user space
-        // We use a conservative range to avoid treating large integers as pointers
-        // Valid heap pointers are typically between 0x00400000 and 0x7FFFFFFF
-        const int64_t MIN_HEAP_PTR = 0x00400000LL;
-        const int64_t MAX_HEAP_PTR = 0x7FFFFFFFLL;
-        
-        if (int_val >= MIN_HEAP_PTR && int_val <= MAX_HEAP_PTR && 
-            int_val != 0xCCCCCCCCCCCCCCCC && int_val != 0xCDCDCDCDCDCDCDCD) {
-            void* ptr = reinterpret_cast<void*>(static_cast<uintptr_t>(int_val));
-            
-            // Try as boxed value first (most common case from tuple_get)
-            LmBox* box = static_cast<LmBox*>(ptr);
-            if (box && box->type >= 0 && box->type <= 4) {
-                // It's a boxed value
-                switch (box->type) {
-                    case LM_BOX_STRING:
-                        return "\"" + std::string(lm_unbox_string(box)) + "\"";
-                    case LM_BOX_INT:
-                        return std::to_string(box->value.as_int);
-                    case LM_BOX_FLOAT:
-                        return std::to_string(box->value.as_float);
-                    case LM_BOX_BOOL:
-                        return box->value.as_bool ? "true" : "false";
-                    case LM_BOX_NULLPTR:
-                        return "nil";
-                    default:
-                        return "?";
-                }
-            }
-            
-            // Try as dict (most specific structure with hash/cmp functions)
-            LmDict* dict = static_cast<LmDict*>(ptr);
-            if (dict && dict->buckets && dict->bucket_count > 0 && dict->bucket_count < 1000000) {
-                std::string result = "{";
-                bool first = true;
-                
-                // Iterate through all buckets
-                for (uint64_t i = 0; i < dict->bucket_count; i++) {
-                    LmDictEntry* entry = dict->buckets[i];
-                    while (entry) {
-                        if (!first) result += ", ";
-                        first = false;
-                        
-                        // Format key
-                        if (entry->key) {
-                            LmBox* key_box = static_cast<LmBox*>(entry->key);
-                            if (key_box && key_box->type == LM_BOX_STRING) {
-                                result += "\"" + std::string(lm_unbox_string(key_box)) + "\": ";
-                            } else if (key_box) {
-                                // Handle non-string keys
-                                switch (key_box->type) {
-                                    case LM_BOX_INT:
-                                        result += std::to_string(key_box->value.as_int) + ": ";
-                                        break;
-                                    case LM_BOX_FLOAT:
-                                        result += std::to_string(key_box->value.as_float) + ": ";
-                                        break;
-                                    default:
-                                        result += "?: ";
-                                }
-                            }
-                        }
-                        
-                        // Format value
-                        if (entry->value) {
-                            LmBox* val_box = static_cast<LmBox*>(entry->value);
-                            if (val_box) {
-                                switch (val_box->type) {
-                                    case LM_BOX_STRING:
-                                        result += "\"" + std::string(lm_unbox_string(val_box)) + "\"";
-                                        break;
-                                    case LM_BOX_INT:
-                                        result += std::to_string(val_box->value.as_int);
-                                        break;
-                                    case LM_BOX_FLOAT:
-                                        result += std::to_string(val_box->value.as_float);
-                                        break;
-                                    case LM_BOX_BOOL:
-                                        result += val_box->value.as_bool ? "true" : "false";
-                                        break;
-                                    default:
-                                        result += "?";
-                                }
-                            }
-                        } else {
-                            result += "nil";
-                        }
-                        
-                        entry = entry->next;
-                    }
-                }
-                result += "}";
-                return result;
-            }
-            
-            // Try as tuple (use magic number for safe detection)
-            LmTuple* tuple = static_cast<LmTuple*>(ptr);
-            if (tuple && tuple->magic == LM_TUPLE_MAGIC && tuple->elements && tuple->size > 0 && tuple->size < 1000000) {
-                std::string result = "(";
-                for (uint64_t i = 0; i < tuple->size; i++) {
-                    if (i > 0) result += ", ";
-                    void* elem = tuple->elements[i];
-                    if (elem) {
-                        LmBox* elem_box = static_cast<LmBox*>(elem);
-                        if (elem_box && elem_box->type >= 0 && elem_box->type <= 4) {  // Valid box type
-                            switch (elem_box->type) {
-                                case LM_BOX_STRING:
-                                    result += "\"" + std::string(lm_unbox_string(elem_box)) + "\"";
-                                    break;
-                                case LM_BOX_INT:
-                                    result += std::to_string(elem_box->value.as_int);
-                                    break;
-                                case LM_BOX_FLOAT:
-                                    result += std::to_string(elem_box->value.as_float);
-                                    break;
-                                case LM_BOX_BOOL:
-                                    result += elem_box->value.as_bool ? "true" : "false";
-                                    break;
-                                default:
-                                    result += "?";
-                            }
-                        } else {
-                            result += "?";
-                        }
-                    } else {
-                        result += "nil";
-                    }
-                }
-                result += ")";
-                return result;
-            }
-            
-            // Try as list
-            LmList* list = static_cast<LmList*>(ptr);
-            if (list && list->data && list->size < 1000000) {
-                std::string result = "[";
-                for (uint64_t i = 0; i < list->size; i++) {
-                    if (i > 0) result += ", ";
-                    void* elem = list->data[i];
-                    if (elem) {
-                        LmBox* elem_box = static_cast<LmBox*>(elem);
-                        if (elem_box) {
-                            switch (elem_box->type) {
-                                case LM_BOX_STRING:
-                                    result += "\"" + std::string(lm_unbox_string(elem_box)) + "\"";
-                                    break;
-                                case LM_BOX_INT:
-                                    result += std::to_string(elem_box->value.as_int);
-                                    break;
-                                case LM_BOX_FLOAT:
-                                    result += std::to_string(elem_box->value.as_float);
-                                    break;
-                                case LM_BOX_BOOL:
-                                    result += elem_box->value.as_bool ? "true" : "false";
-                                    break;
-                                default:
-                                    result += "?";
-                            }
-                        }
-                    } else {
-                        result += "nil";
-                    }
-                }
-                result += "]";
-                return result;
-            }
-        }
-        
-        // Fall back to integer representation
-        return std::to_string(int_val);
+        // Use the runtime function to convert any value to string
+        // This handles primitives and collections uniformly
+        LmString result = lm_value_to_string(int_val);
+        std::string str_result(result.data, result.len);
+        lm_string_free(result);
+        return str_result;
     } else if (std::holds_alternative<double>(value)) {
         return std::to_string(std::get<double>(value));
     } else if (std::holds_alternative<bool>(value)) {

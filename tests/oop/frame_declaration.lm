@@ -1,0 +1,111 @@
+// Test frame declaration parsing
+// This tests basic frame syntax, fields, methods, and trait implementation
+
+// Simple frame with fields and methods
+frame Person {
+    pub name: str;
+    pub age: int;
+    prot email: str;
+
+    fn greet(): str {
+        return "Hello, {name}";
+        }
+
+        fn birthday() {
+            age = age + 1;
+            }
+        }
+
+        // Frame with init() method
+        frame Point {
+            pub x: int;
+            pub y: int;
+
+            init(px: int, py: int) {
+                x = px;
+                y = py;
+                }
+
+                fn distance(): int {
+                    return x + y;
+                    }
+                }
+
+                // Frame with deinit() method
+                frame Resource {
+                    pub id: int;
+
+                    init(resource_id: int) {
+                        id = resource_id;
+                        }
+
+                        deinit() {
+                            print("Cleaning up resource");
+                            }
+                        }
+
+                        // Frame with default field values
+                        frame Config {
+                            pub debug: bool = false;
+                            pub timeout: int = 30;
+                            pub name: str = "default";
+                        }
+
+                        // Frame implementing traits
+                        frame Animal: Movable, Drawable {
+                            pub name: str;
+                            pub age: int;
+
+                            fn move() {
+                                print("Moving");
+                                }
+
+                                fn draw() {
+                                    print("Drawing");
+                                    }
+                                }
+
+                                // Frame with visibility modifiers
+                                frame BankAccount {
+                                    pub accountNumber: str;
+                                    prot balance: int;
+
+                                    pub fn deposit(amount: int) {
+                                        balance = balance + amount;
+                                        }
+
+                                        prot fn calculateInterest(): int {
+                                            return balance / 100;
+                                            }
+                                        }
+
+                                        // Frame with multiple methods
+                                        frame Calculator {
+                                            pub fn add(a: int, b: int): int {
+                                                return a + b;
+                                                }
+
+                                                pub fn subtract(a: int, b: int): int {
+                                                    return a - b;
+                                                    }
+
+                                                    pub fn multiply(a: int, b: int): int {
+                                                        return a * b;
+                                                        }
+                                                    }
+
+                                                    // Test instantiation and method calls
+                                                    var person = Person();
+                                                    person.name = "Alice";
+                                                    person.age = 30;
+                                                    print(person.greet());
+
+                                                    var point = Point(10, 20);
+                                                    print(point.distance());
+
+                                                    var config = Config();
+                                                    print(config.debug);
+                                                    print(config.timeout);
+
+                                                    var calc = Calculator();
+                                                    print(calc.add(5, 3));

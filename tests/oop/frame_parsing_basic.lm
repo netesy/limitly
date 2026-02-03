@@ -1,0 +1,58 @@
+// Test basic frame declaration parsing
+// This file tests that frame syntax is correctly parsed without execution
+
+// Simple frame with fields
+frame Person {
+    pub name: str;
+    pub age: int;
+}
+
+// Frame with methods
+frame Calculator {
+    pub fn add(a: int, b: int): int {
+        return a + b;
+    }
+}
+
+// Frame with init method
+frame Point {
+    pub x: int;
+    pub y: int;
+    
+    init(px: int, py: int) {
+        x = px;
+        y = py;
+    }
+}
+
+// Frame with deinit method
+frame Resource {
+    pub id: int;
+    
+    deinit() {
+        print("Cleanup");
+    }
+}
+
+// Frame implementing traits
+frame Animal : Movable, Drawable {
+    pub name: str;
+}
+
+// Frame with visibility modifiers
+frame BankAccount {
+    pub accountNumber: str;
+    prot balance: int;
+    
+    pub fn deposit(amount: int) {
+        balance = balance + amount;
+    }
+}
+
+// Frame with default field values
+frame Config {
+    pub debug: bool = false;
+    pub timeout: int = 30;
+}
+
+print("Frame parsing test completed");
