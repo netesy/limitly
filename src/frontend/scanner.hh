@@ -102,6 +102,7 @@ enum class TokenType {
     AND,        // and
     AS,         // as
     CLASS,      // class
+    FRAME,      // frame
     FALSE,      // false
     FN,         // fn
     ELIF,       // else if

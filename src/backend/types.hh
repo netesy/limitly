@@ -1317,6 +1317,9 @@ public:
         case TypeTag::Class:
         case TypeTag::Object:
         case TypeTag::Module:
+        case TypeTag::Frame:
+        case TypeTag::Trait:
+        case TypeTag::TraitObject:
             // TODO: implement checks for these
             return false;
 

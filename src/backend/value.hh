@@ -171,7 +171,10 @@ enum class TypeTag {
     Class,
     Channel,
     Object,
-    Module
+    Module,
+    Frame,
+    Trait,
+    TraitObject
 };
 
 // Forward declaration for ClosureValue factory method with proper TypePtr
@@ -315,12 +318,36 @@ struct ErrorUnionType
     bool isGenericError = false;             // True for Type?, false for Type?Error1, Error2
 };
 
+struct FrameType
+{
+    std::string name;                        // Frame type name
+    std::vector<std::pair<std::string, TypePtr>> fields;  // Field names and types
+    std::vector<std::string> implements;     // Trait names this frame implements
+    std::map<std::string, TypePtr> methodSignatures;  // Method name to return type
+    bool hasInit = false;                    // Whether frame has init() method
+    bool hasDeinit = false;                  // Whether frame has deinit() method
+};
+
+struct TraitType
+{
+    std::string name;                        // Trait name
+    std::vector<std::pair<std::string, TypePtr>> methodSignatures;  // Method name to function type
+    std::vector<std::string> extends;        // Trait inheritance
+};
+
+struct TraitObjectType
+{
+    std::string traitName;                   // Name of the trait
+    TypePtr underlyingType;                  // The concrete frame type (for static dispatch)
+    // For dynamic dispatch, this will be resolved at runtime via vtable
+};
+
 struct Type
 {
     TypeTag tag;
     bool isList = false;
     bool isDict = false;
-    std::variant<std::monostate, ListType, DictType, TupleType, EnumType, FunctionType, SumType, UnionType, ErrorUnionType, UserDefinedType>
+    std::variant<std::monostate, ListType, DictType, TupleType, EnumType, FunctionType, SumType, UnionType, ErrorUnionType, UserDefinedType, FrameType, TraitType, TraitObjectType>
         extra;
 
     Type(TypeTag t)
@@ -336,7 +363,10 @@ struct Type
                             SumType,
                             UnionType,
                             ErrorUnionType,
-                            UserDefinedType> &ex)
+                            UserDefinedType,
+                            FrameType,
+                            TraitType,
+                            TraitObjectType> &ex)
         : tag(t)
         , extra(ex)
     {}
@@ -432,6 +462,24 @@ struct Type
             return "Class";
         case TypeTag::Module:
             return "Module";
+        case TypeTag::Frame: {
+            if (const auto* frameType = std::get_if<FrameType>(&extra)) {
+                return "Frame<" + frameType->name + ">";
+            }
+            return "Frame";
+        }
+        case TypeTag::Trait: {
+            if (const auto* traitType = std::get_if<TraitType>(&extra)) {
+                return "Trait<" + traitType->name + ">";
+            }
+            return "Trait";
+        }
+        case TypeTag::TraitObject: {
+            if (const auto* traitObjType = std::get_if<TraitObjectType>(&extra)) {
+                return "&" + traitObjType->traitName;
+            }
+            return "TraitObject";
+        }
         default:
             return "Unknown Type";
         }

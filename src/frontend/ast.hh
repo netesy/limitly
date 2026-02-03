@@ -88,6 +88,9 @@ namespace AST {
     struct TypeDeclaration;
     struct TraitDeclaration;
     struct InterfaceDeclaration;
+    struct FrameDeclaration;
+    struct FrameField;
+    struct FrameMethod;
     struct ModuleDeclaration;
     struct UnsafeStatement;
     struct ContractStatement;
@@ -699,7 +702,51 @@ namespace AST {
     struct TraitDeclaration : public Statement {
         std::string name;
         std::vector<std::shared_ptr<FunctionDeclaration>> methods;
+        std::vector<std::string> extends;  // Trait inheritance
         bool isOpen = false;
+    };
+    
+    // Frame field with visibility and default values
+    struct FrameField {
+        std::string name;
+        std::shared_ptr<TypeAnnotation> type;
+        VisibilityLevel visibility;
+        std::shared_ptr<Expression> defaultValue;  // Optional default value
+        
+        FrameField() : visibility(VisibilityLevel::Private), defaultValue(nullptr) {}
+        FrameField(const std::string& n, std::shared_ptr<TypeAnnotation> t, 
+                   VisibilityLevel v = VisibilityLevel::Private)
+            : name(n), type(t), visibility(v), defaultValue(nullptr) {}
+    };
+    
+    // Frame method with visibility
+    struct FrameMethod {
+        std::string name;
+        std::shared_ptr<TypeAnnotation> returnType;
+        std::vector<std::pair<std::string, std::shared_ptr<TypeAnnotation>>> parameters;
+        std::vector<std::pair<std::string, std::pair<std::shared_ptr<TypeAnnotation>, std::shared_ptr<Expression>>>> optionalParams;
+        VisibilityLevel visibility;
+        std::shared_ptr<BlockStatement> body;
+        bool isInit = false;  // Special marker for init() method
+        bool isDeinit = false;  // Special marker for deinit() method
+        
+        FrameMethod() : visibility(VisibilityLevel::Private), body(nullptr), isInit(false), isDeinit(false) {}
+    };
+    
+    // Frame declaration - modern OOP construct
+    struct FrameDeclaration : public Statement {
+        std::string name;
+        std::vector<std::shared_ptr<FrameField>> fields;
+        std::vector<std::shared_ptr<FrameMethod>> methods;
+        std::vector<std::string> implements;  // Trait names this frame implements
+        std::shared_ptr<FrameMethod> init;    // Optional init() method
+        std::shared_ptr<FrameMethod> deinit;  // Optional deinit() method
+        
+        // Visibility and modifiers
+        bool isAbstract = false;
+        bool isFinal = false;
+        
+        FrameDeclaration() : init(nullptr), deinit(nullptr), isAbstract(false), isFinal(false) {}
     };
     
     // Interface declaration
