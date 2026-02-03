@@ -2221,8 +2221,8 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
             
             consume(TokenType::RIGHT_PAREN, "Expected ')' after parameters.");
             
-            // Parse return type if present
-            if (match({TokenType::ARROW})) {
+            // Parse return type if present (using COLON)
+            if (match({TokenType::COLON})) {
                 initMethod->returnType = parseTypeAnnotation();
             }
             

@@ -1,0 +1,49 @@
+// Test frame declaration parsing - syntax only
+// No code execution, just frame declarations
+
+frame Person {
+    pub name: str;
+    pub age: int;
+}
+
+frame Calculator {
+    pub fn add(a: int, b: int): int {
+        return a + b;
+    }
+}
+
+frame Point {
+    pub x: int;
+    pub y: int;
+    
+    init(px: int, py: int) {
+        x = px;
+        y = py;
+    }
+}
+
+frame Resource {
+    pub id: int;
+    
+    deinit() {
+        print("Cleanup");
+    }
+}
+
+frame Animal : Movable, Drawable {
+    pub name: str;
+}
+
+frame BankAccount {
+    pub accountNumber: str;
+    prot balance: int;
+    
+    pub fn deposit(amount: int) {
+        balance = balance + amount;
+    }
+}
+
+frame Config {
+    pub debug: bool = false;
+    pub timeout: int = 30;
+}

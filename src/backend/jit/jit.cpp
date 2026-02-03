@@ -180,6 +180,11 @@ JITBackend::JITBackend()
     bool_to_string_params.push_back(m_context.new_param(m_context.get_type(GCC_JIT_TYPE_UINT8_T), "value"));
     m_lm_bool_to_string_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_lm_string_type, "lm_bool_to_string", bool_to_string_params, 0);
     
+    // Set up lm_value_to_string function (unified value-to-string conversion)
+    std::vector<gccjit::param> value_to_string_params;
+    value_to_string_params.push_back(m_context.new_param(m_context.get_type(GCC_JIT_TYPE_INT64_T), "value"));
+    m_lm_value_to_string_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_lm_string_type, "lm_value_to_string", value_to_string_params, 0);
+    
     // Set up lm_string_free function
     std::vector<gccjit::param> string_free_params;
     string_free_params.push_back(m_context.new_param(m_lm_string_type, "str"));
@@ -208,6 +213,26 @@ JITBackend::JITBackend()
     interpolate_params.push_back(m_context.new_param(m_lm_string_type.get_pointer(), "args"));
     interpolate_params.push_back(m_context.new_param(m_context.get_type(GCC_JIT_TYPE_UINT64_T), "arg_count"));
     m_lm_string_interpolate_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_lm_string_type, "lm_string_interpolate", interpolate_params, 0);
+    
+    // Set up boxing functions
+    std::vector<gccjit::param> box_int_params;
+    box_int_params.push_back(m_context.new_param(m_context.get_type(GCC_JIT_TYPE_INT64_T), "value"));
+    m_lm_box_int_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "lm_box_int", box_int_params, 0);
+    
+    std::vector<gccjit::param> box_float_params;
+    box_float_params.push_back(m_context.new_param(m_double_type, "value"));
+    m_lm_box_float_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "lm_box_float", box_float_params, 0);
+    
+    std::vector<gccjit::param> box_bool_params;
+    box_bool_params.push_back(m_context.new_param(m_context.get_type(GCC_JIT_TYPE_UINT8_T), "value"));
+    m_lm_box_bool_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "lm_box_bool", box_bool_params, 0);
+    
+    std::vector<gccjit::param> box_string_params;
+    box_string_params.push_back(m_context.new_param(m_const_char_ptr_type, "value"));
+    m_lm_box_string_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "lm_box_string", box_string_params, 0);
+    
+    std::vector<gccjit::param> box_nullptr_params;
+    m_lm_box_nullptr_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "lm_box_nullptr", box_nullptr_params, 0);
     
     // Register loop counter check function
     std::vector<gccjit::param> loop_check_params;
@@ -304,8 +329,9 @@ void JITBackend::compile_function(const LIR::LIR_Function& function) {
     // Add current executable to library search path for JIT
     m_context.set_str_option(GCC_JIT_STR_OPTION_PROGNAME, "limitly.exe");
     
-    // Add runtime library directly to linker options
-    m_context.add_driver_option("obj/release/limitly_runtime.a");
+    // Add runtime library to linker options
+    // Pass the full path to the static library so libgccjit can link against it
+    m_context.add_driver_option("build/obj/release/limitly_runtime.a");
     
     gcc_jit_result* jit_result = m_context.compile();
     if (!jit_result) {
@@ -418,21 +444,90 @@ void JITBackend::compile_function_single_pass(const LIR::LIR_Function& function)
 }
 
 gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
+    // Debug output for LIR instructions
+    if (m_debug_mode) {
+        std::cout << "[JIT DEBUG] Compiling LIR instruction: ";
+        switch (inst.op) {
+            case LIR::LIR_Op::Nop: std::cout << "Nop"; break;
+            case LIR::LIR_Op::Mov: std::cout << "Mov r" << inst.dst << " = r" << inst.a; break;
+            case LIR::LIR_Op::LoadConst: std::cout << "LoadConst r" << inst.dst << " = " << (inst.const_val ? inst.const_val->data : "null"); break;
+            case LIR::LIR_Op::Add: std::cout << "Add r" << inst.dst << " = r" << inst.a << " + r" << inst.b; break;
+            case LIR::LIR_Op::Sub: std::cout << "Sub r" << inst.dst << " = r" << inst.a << " - r" << inst.b; break;
+            case LIR::LIR_Op::Mul: std::cout << "Mul r" << inst.dst << " = r" << inst.a << " * r" << inst.b; break;
+            case LIR::LIR_Op::Div: std::cout << "Div r" << inst.dst << " = r" << inst.a << " / r" << inst.b; break;
+            case LIR::LIR_Op::Mod: std::cout << "Mod r" << inst.dst << " = r" << inst.a << " % r" << inst.b; break;
+            case LIR::LIR_Op::And: std::cout << "And r" << inst.dst << " = r" << inst.a << " && r" << inst.b; break;
+            case LIR::LIR_Op::Or: std::cout << "Or r" << inst.dst << " = r" << inst.a << " || r" << inst.b; break;
+            case LIR::LIR_Op::Xor: std::cout << "Xor r" << inst.dst << " = r" << inst.a << " ^ r" << inst.b; break;
+            case LIR::LIR_Op::CmpEQ: std::cout << "CmpEQ r" << inst.dst << " = r" << inst.a << " == r" << inst.b; break;
+            case LIR::LIR_Op::CmpNEQ: std::cout << "CmpNEQ r" << inst.dst << " = r" << inst.a << " != r" << inst.b; break;
+            case LIR::LIR_Op::CmpLT: std::cout << "CmpLT r" << inst.dst << " = r" << inst.a << " < r" << inst.b; break;
+            case LIR::LIR_Op::CmpLE: std::cout << "CmpLE r" << inst.dst << " = r" << inst.a << " <= r" << inst.b; break;
+            case LIR::LIR_Op::CmpGT: std::cout << "CmpGT r" << inst.dst << " = r" << inst.a << " > r" << inst.b; break;
+            case LIR::LIR_Op::CmpGE: std::cout << "CmpGE r" << inst.dst << " = r" << inst.a << " >= r" << inst.b; break;
+            case LIR::LIR_Op::Jump: std::cout << "Jump to " << inst.imm; break;
+            case LIR::LIR_Op::JumpIfFalse: std::cout << "JumpIfFalse r" << inst.a << " to " << inst.imm; break;
+            case LIR::LIR_Op::Call: std::cout << "Call r" << inst.dst << " = " << inst.func_name << "(" << inst.call_args.size() << " args)"; break;
+            case LIR::LIR_Op::Return: std::cout << "Return r" << inst.dst; break;
+            case LIR::LIR_Op::PrintInt: std::cout << "PrintInt r" << inst.a; break;
+            case LIR::LIR_Op::PrintUint: std::cout << "PrintUint r" << inst.a; break;
+            case LIR::LIR_Op::PrintFloat: std::cout << "PrintFloat r" << inst.a; break;
+            case LIR::LIR_Op::PrintBool: std::cout << "PrintBool r" << inst.a; break;
+            case LIR::LIR_Op::PrintString: std::cout << "PrintString r" << inst.a; break;
+            case LIR::LIR_Op::ListCreate: std::cout << "ListCreate r" << inst.dst; break;
+            case LIR::LIR_Op::ListAppend: std::cout << "ListAppend r" << inst.a << ", r" << inst.b; break;
+            case LIR::LIR_Op::ListIndex: std::cout << "ListIndex r" << inst.dst << " = r" << inst.a << "[r" << inst.b << "]"; break;
+            case LIR::LIR_Op::ListLen: std::cout << "ListLen r" << inst.dst << " = len(r" << inst.a << ")"; break;
+            case LIR::LIR_Op::DictCreate: std::cout << "DictCreate r" << inst.dst; break;
+            case LIR::LIR_Op::DictSet: std::cout << "DictSet r" << inst.dst << "[r" << inst.a << "] = r" << inst.b; break;
+            case LIR::LIR_Op::DictGet: std::cout << "DictGet r" << inst.dst << " = r" << inst.a << "[r" << inst.b << "]"; break;
+            case LIR::LIR_Op::DictItems: std::cout << "DictItems r" << inst.dst << " = items(r" << inst.a << ")"; break;
+            case LIR::LIR_Op::TupleCreate: std::cout << "TupleCreate r" << inst.dst << " size=" << inst.b; break;
+            case LIR::LIR_Op::TupleGet: std::cout << "TupleGet r" << inst.dst << " = r" << inst.a << "[r" << inst.b << "]"; break;
+            case LIR::LIR_Op::TupleSet: std::cout << "TupleSet r" << inst.dst << "[r" << inst.a << "] = r" << inst.b; break;
+            case LIR::LIR_Op::ChannelSend: std::cout << "ChannelSend r" << inst.a << ", r" << inst.b; break;
+            case LIR::LIR_Op::ChannelRecv: std::cout << "ChannelRecv r" << inst.dst << " = recv(r" << inst.a << ")"; break;
+            case LIR::LIR_Op::ChannelOffer: std::cout << "ChannelOffer r" << inst.dst << " = offer(r" << inst.a << ", r" << inst.b << ")"; break;
+            case LIR::LIR_Op::ChannelPoll: std::cout << "ChannelPoll r" << inst.dst << " = poll(r" << inst.a << ")"; break;
+            case LIR::LIR_Op::ChannelClose: std::cout << "ChannelClose r" << inst.a; break;
+            case LIR::LIR_Op::Cast: std::cout << "Cast r" << inst.dst << " = (cast) r" << inst.a; break;
+            case LIR::LIR_Op::ToString: std::cout << "ToString r" << inst.dst << " = str(r" << inst.a << ")"; break;
+            case LIR::LIR_Op::STR_CONCAT: std::cout << "STR_CONCAT r" << inst.dst << " = r" << inst.a << " + r" << inst.b; break;
+            case LIR::LIR_Op::STR_FORMAT: std::cout << "STR_FORMAT r" << inst.dst << " = format(r" << inst.a << ", r" << inst.b << ")"; break;
+            case LIR::LIR_Op::Neg: std::cout << "Neg r" << inst.dst << " = -r" << inst.a; break;
+            case LIR::LIR_Op::JumpIf: std::cout << "JumpIf r" << inst.a << " to " << inst.imm; break;
+            case LIR::LIR_Op::Label: std::cout << "Label " << inst.imm; break;
+            case LIR::LIR_Op::CallVoid: std::cout << "CallVoid " << inst.func_name << "(" << inst.call_args.size() << " args)"; break;
+            case LIR::LIR_Op::CallIndirect: std::cout << "CallIndirect r" << inst.dst << " = r" << inst.a << "(" << inst.call_args.size() << " args)"; break;
+            case LIR::LIR_Op::CallBuiltin: std::cout << "CallBuiltin r" << inst.dst << " = " << inst.func_name << "(" << inst.call_args.size() << " args)"; break;
+            case LIR::LIR_Op::CallVariadic: std::cout << "CallVariadic r" << inst.dst << " = " << inst.func_name << "(" << inst.call_args.size() << " args)"; break;
+            case LIR::LIR_Op::FuncDef: std::cout << "FuncDef " << inst.func_name; break;
+            case LIR::LIR_Op::Param: std::cout << "Param r" << inst.dst; break;
+            case LIR::LIR_Op::Ret: std::cout << "Ret r" << inst.a; break;
+            case LIR::LIR_Op::VaStart: std::cout << "VaStart r" << inst.dst; break;
+            case LIR::LIR_Op::VaArg: std::cout << "VaArg r" << inst.dst << " from r" << inst.a; break;
+            case LIR::LIR_Op::VaEnd: std::cout << "VaEnd r" << inst.a; break;
+            case LIR::LIR_Op::Copy: std::cout << "Copy r" << inst.dst << " = r" << inst.a; break;
+            case LIR::LIR_Op::ConstructError: std::cout << "ConstructError r" << inst.dst; break;
+            case LIR::LIR_Op::ConstructOk: std::cout << "ConstructOk r" << inst.dst << " = r" << inst.a; break;
+            case LIR::LIR_Op::IsError: std::cout << "IsError r" << inst.dst << " = is_error(r" << inst.a << ")"; break;
+            case LIR::LIR_Op::Unwrap: std::cout << "Unwrap r" << inst.dst << " = unwrap(r" << inst.a << ")"; break;
+            case LIR::LIR_Op::UnwrapOr: std::cout << "UnwrapOr r" << inst.dst << " = unwrap_or(r" << inst.a << ", r" << inst.b << ")"; break;
+        }
+        std::cout << " (result_type=" << static_cast<int>(inst.result_type) << ")" << std::endl;
+    }
+
     switch (inst.op) {
         // Data Movement
         case LIR::LIR_Op::Mov: {
             gccjit::rvalue src = get_jit_register(inst.a);
             
-            // Use the result type from the instruction
-            gccjit::type result_type = to_jit_type(inst.result_type);
+            // Use the source register's type, not the result_type
+            // result_type might be Void which is invalid for variables
+            gccjit::type src_type = src.get_type();
             
-            // Cast source to result type if needed
-            if (src.get_type().get_inner_type() != result_type.get_inner_type()) {
-                src = m_context.new_cast(src, result_type);
-            }
-            
-            // Get or create destination register with the result type
-            gccjit::lvalue dst = get_jit_register(inst.dst, result_type);
+            // Get or create destination register with the source type
+            gccjit::lvalue dst = get_jit_register(inst.dst, src_type);
             m_current_block.add_assignment(dst, src);
             return src;
         }
@@ -708,370 +803,297 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
             // No operation
             break;
             
-        // === THREADLESS CONCURRENCY OPERATIONS ===
-        // All generated inline - no external runtime functions needed!
+
         
-        case LIR::LIR_Op::ChannelAlloc: {
-            // Generate: void* ch = malloc(sizeof(Channel) + capacity * sizeof(int));
-            // Initialize inline using raw memory operations
+        // === COLLECTION OPERATIONS ===
+        case LIR::LIR_Op::ListCreate: {
+            // Create a new list: void* lm_list_new()
+            std::vector<gccjit::param> list_new_params;
+            gccjit::function list_new_func = m_context.new_function(
+                GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "lm_list_new", list_new_params, 0);
             
+            gccjit::rvalue result = m_current_block.add_call(list_new_func);
             gccjit::lvalue dst = get_jit_register(inst.dst, m_void_ptr_type);
-            gccjit::rvalue capacity = get_jit_register(inst.a);
-            
-            // Calculate total size: sizeof(Channel) approx + buffer size
-            gccjit::rvalue size_of_int = m_context.new_rvalue(m_size_t_type, static_cast<long>(sizeof(int)));
-            gccjit::rvalue capacity_as_uintptr = m_context.new_cast(capacity, m_uint_type); // Use uint as intermediate
-            gccjit::rvalue capacity_as_size = m_context.new_cast(capacity_as_uintptr, m_size_t_type);
-            gccjit::rvalue buffer_size = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_size_t_type, capacity_as_size, size_of_int);
-            gccjit::rvalue header_size = m_context.new_rvalue(m_size_t_type, static_cast<long>(32)); // Approx header size
-            gccjit::rvalue total_size = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_size_t_type, buffer_size, header_size);
-            
-            // Allocate memory
-            std::vector<gccjit::rvalue> malloc_args = {total_size};
-            gccjit::rvalue channel_ptr = m_context.new_call(m_malloc_func, malloc_args);
-            
-            // Initialize using memset (zero everything)
-            std::vector<gccjit::rvalue> memset_args = {channel_ptr, m_context.new_rvalue(m_int_type, 0), total_size};
-            m_context.new_call(m_memset_func, memset_args);
-            
-            // Store capacity at offset 0 (approximate struct layout)
-            gccjit::lvalue capacity_ptr = m_context.new_cast(channel_ptr, m_int_type.get_pointer()).dereference();
-            m_current_block.add_assignment(capacity_ptr, capacity);
-            
-            m_current_block.add_assignment(dst, channel_ptr);
-            return channel_ptr;
+            m_current_block.add_assignment(dst, result);
+            return result;
         }
         
-        case LIR::LIR_Op::ChannelPush: {
-            // Generate simplified inline channel push using raw memory
-            
-            gccjit::rvalue channel_ptr = get_jit_register(inst.a);
+        case LIR::LIR_Op::ListAppend: {
+            // Append to list: void lm_list_append(void* list, void* value)
+            gccjit::rvalue list = get_jit_register(inst.a);
             gccjit::rvalue value = get_jit_register(inst.b);
-            gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
             
-            // Simplified: assume always succeeds for now
-            // In real implementation, would track write_pos/read_pos
+            // Cast list from int64_t to void*
+            gccjit::rvalue list_ptr = m_context.new_cast(list, m_void_ptr_type);
             
-            // For now, just return success (1)
-            m_current_block.add_assignment(dst, m_context.new_rvalue(m_int_type, 1));
-            return dst;
+            // Box the value before appending
+            gccjit::type value_type = value.get_type();
+            gccjit::rvalue boxed_value = box_value(value, value_type);
+            
+            std::vector<gccjit::param> append_params;
+            append_params.push_back(m_context.new_param(m_void_ptr_type, "list"));
+            append_params.push_back(m_context.new_param(m_void_ptr_type, "value"));
+            gccjit::function append_func = m_context.new_function(
+                GCC_JIT_FUNCTION_IMPORTED, m_void_type, "lm_list_append", append_params, 0);
+            
+            m_current_block.add_call(append_func, list_ptr, boxed_value);
+            
+            return list;
         }
         
-        case LIR::LIR_Op::ChannelPop: {
-            // Generate simplified inline channel pop using raw memory
+        case LIR::LIR_Op::ListIndex: {
+            // Get element from list: void* lm_list_get(void* list, uint64_t index)
+            gccjit::rvalue list = get_jit_register(inst.a);
+            gccjit::rvalue index = get_jit_register(inst.b);
             
-            gccjit::rvalue channel_ptr = get_jit_register(inst.a);
-            gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+            std::vector<gccjit::param> get_params;
+            get_params.push_back(m_context.new_param(m_void_ptr_type, "list"));
+            get_params.push_back(m_context.new_param(m_context.get_type(GCC_JIT_TYPE_UINT64_T), "index"));
+            gccjit::function get_func = m_context.new_function(
+                GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "lm_list_get", get_params, 0);
             
-            // Simplified: return 0 for now (no data)
-            // In real implementation, would track write_pos/read_pos
-            
-            m_current_block.add_assignment(dst, m_context.new_rvalue(m_int_type, 0));
-            return dst;
-        }
-        
-        case LIR::LIR_Op::ChannelHasData: {
-            // Generate simplified inline channel check
-            
-            gccjit::rvalue channel_ptr = get_jit_register(inst.a);
-            gccjit::lvalue dst = get_jit_register(inst.dst, m_bool_type);
-            
-            // Simplified: return false for now
-            m_current_block.add_assignment(dst, m_context.new_rvalue(m_bool_type, 0));
-            return dst;
-        }
-        
-        case LIR::LIR_Op::TaskContextAlloc: {
-            // Generate: TaskContext* tasks = malloc(count * sizeof(TaskContext));
+            gccjit::rvalue result = m_current_block.add_call(get_func, list, 
+                m_context.new_cast(index, m_context.get_type(GCC_JIT_TYPE_UINT64_T)));
             
             gccjit::lvalue dst = get_jit_register(inst.dst, m_void_ptr_type);
-            
-            // Get count - create a new temp register to avoid type conflicts
-            gccjit::rvalue count_src_raw = get_jit_register(inst.a);
-            gccjit::rvalue count_src = count_src_raw;
-            
-            // Cast count to int if needed
-            if (count_src.get_type().get_inner_type() != m_int_type.get_inner_type()) {
-                count_src = m_context.new_cast(count_src, m_int_type);
-            }
-            
-            // Approximate TaskContext size
-            gccjit::rvalue task_size = m_context.new_rvalue(m_size_t_type, static_cast<long>(128)); // Approx size
-            gccjit::rvalue count_as_uintptr = m_context.new_cast(count_src, m_uint_type); // Use uint as intermediate
-            gccjit::rvalue count_as_size = m_context.new_cast(count_as_uintptr, m_size_t_type);
-            gccjit::rvalue total_size = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_size_t_type, count_as_size, task_size);
-            
-            // Allocate array
-            std::vector<gccjit::rvalue> malloc_args = {total_size};
-            gccjit::rvalue tasks_ptr = m_context.new_call(m_malloc_func, malloc_args);
-            
-            // Initialize to zero
-            std::vector<gccjit::rvalue> memset_args = {tasks_ptr, m_context.new_rvalue(m_int_type, 0), total_size};
-            m_context.new_call(m_memset_func, memset_args);
-            
-            m_current_block.add_assignment(dst, tasks_ptr);
-            return tasks_ptr;
+            m_current_block.add_assignment(dst, result);
+            return result;
         }
         
-        case LIR::LIR_Op::TaskContextInit: {
-            // Generate: tasks[task_id].state = TASK_STATE_INIT;
-            // Generate: tasks[task_id].task_id = task_id;
+        case LIR::LIR_Op::ListLen: {
+            // Get list length: uint64_t lm_list_len(void* list)
+            gccjit::rvalue list = get_jit_register(inst.a);
             
-            gccjit::rvalue tasks_ptr = get_jit_register(inst.dst);
-            gccjit::rvalue task_id = get_jit_register(inst.a);
+            std::vector<gccjit::param> len_params;
+            len_params.push_back(m_context.new_param(m_void_ptr_type, "list"));
+            gccjit::function len_func = m_context.new_function(
+                GCC_JIT_FUNCTION_IMPORTED, m_context.get_type(GCC_JIT_TYPE_UINT64_T), "lm_list_len", len_params, 0);
             
-            // Calculate task offset: task_id * task_size
-            gccjit::rvalue task_size = m_context.new_rvalue(m_size_t_type, static_cast<long>(128));
-            gccjit::rvalue task_id_as_uintptr = m_context.new_cast(task_id, m_uint_type); // Use uint as intermediate
-            gccjit::rvalue task_id_as_size = m_context.new_cast(task_id_as_uintptr, m_size_t_type);
-            gccjit::rvalue task_offset = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_size_t_type, task_id_as_size, task_size);
-            
-            // Get task pointer: tasks_ptr + task_offset
-            gccjit::rvalue task_ptr = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_void_ptr_type, tasks_ptr, task_offset);
-            
-            // Set state at offset 0
-            gccjit::lvalue state_ptr = m_context.new_cast(task_ptr, m_int_type.get_pointer()).dereference();
-            m_current_block.add_assignment(state_ptr, m_context.new_rvalue(m_int_type, 0)); // TASK_STATE_INIT
-            
-            // Set task_id at offset 4 (approximate)
-            gccjit::rvalue offset_4 = m_context.new_rvalue(m_size_t_type, static_cast<long>(4));
-            gccjit::rvalue task_id_ptr = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_void_ptr_type, 
-                task_ptr, offset_4);
-            gccjit::lvalue task_id_field = m_context.new_cast(task_id_ptr, m_int_type.get_pointer()).dereference();
-            m_current_block.add_assignment(task_id_field, task_id);
-            
-            return task_id;
+            gccjit::rvalue result = m_current_block.add_call(len_func, list);
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_context.get_type(GCC_JIT_TYPE_UINT64_T));
+            m_current_block.add_assignment(dst, result);
+            return result;
         }
         
-        case LIR::LIR_Op::TaskSetField: {
-            // Generate: tasks[task_index].fields[field_index] = value;
+        case LIR::LIR_Op::DictCreate: {
+            // Create a new dict: void* lm_dict_new(hash_fn, cmp_fn)
+            // For JIT, we'll use simplified version without custom hash/cmp
+            std::vector<gccjit::param> dict_new_params;
+            gccjit::function dict_new_func = m_context.new_function(
+                GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "lm_dict_new", dict_new_params, 0);
             
-            gccjit::rvalue tasks_ptr = get_jit_register(inst.dst);
-            gccjit::rvalue task_index = get_jit_register(inst.a);
-            gccjit::rvalue field_index = get_jit_register(inst.b);
-            gccjit::rvalue value = get_jit_register(inst.imm);
-            
-            // Calculate task offset
-            gccjit::rvalue task_size = m_context.new_rvalue(m_size_t_type, static_cast<long>(128));
-            gccjit::rvalue task_index_as_uintptr = m_context.new_cast(task_index, m_uint_type); // Use uint as intermediate
-            gccjit::rvalue task_index_as_size = m_context.new_cast(task_index_as_uintptr, m_size_t_type);
-            gccjit::rvalue task_offset = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_size_t_type, task_index_as_size, task_size);
-            
-            // Get task pointer
-            gccjit::rvalue task_ptr = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_void_ptr_type, tasks_ptr, task_offset);
-            
-            // Calculate field offset (approximate: base_offset + field_index * 4)
-            gccjit::rvalue base_field_offset = m_context.new_rvalue(m_size_t_type, static_cast<long>(16)); // Start after basic fields
-            gccjit::rvalue field_index_as_uintptr = m_context.new_cast(field_index, m_uint_type); // Use uint as intermediate
-            gccjit::rvalue field_index_as_size = m_context.new_cast(field_index_as_uintptr, m_size_t_type);
-            gccjit::rvalue field_offset = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_size_t_type, 
-                field_index_as_size, m_context.new_rvalue(m_size_t_type, static_cast<long>(4)));
-            gccjit::rvalue total_field_offset = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_size_t_type, base_field_offset, field_offset);
-            
-            // Get field pointer
-            gccjit::rvalue field_ptr = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_void_ptr_type, task_ptr, total_field_offset);
-            gccjit::lvalue field = m_context.new_cast(field_ptr, m_int_type.get_pointer()).dereference();
-            
-            m_current_block.add_assignment(field, value);
-            return value;
+            gccjit::rvalue result = m_current_block.add_call(dict_new_func);
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_void_ptr_type);
+            m_current_block.add_assignment(dst, result);
+            return result;
         }
         
-        case LIR::LIR_Op::SchedulerRun: {
-            // Generate simplified scheduler loop
+        case LIR::LIR_Op::DictSet: {
+            // Set dict value: void lm_dict_set(void* dict, void* key, void* value)
+            gccjit::rvalue dict = get_jit_register(inst.dst);
+            gccjit::rvalue key = get_jit_register(inst.a);
+            gccjit::rvalue value = get_jit_register(inst.b);
             
-            gccjit::rvalue tasks_ptr = get_jit_register(inst.dst);
-            gccjit::rvalue task_count = get_jit_register(inst.a);
+            // Cast dict from int64_t to void*
+            gccjit::rvalue dict_ptr = m_context.new_cast(dict, m_void_ptr_type);
             
-            // For now, just return 0 (simplified)
-            // Real implementation would generate the full scheduler loop
-            gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
-            m_current_block.add_assignment(dst, m_context.new_rvalue(m_int_type, 0));
-            return dst;
+            // Box key and value before setting
+            gccjit::rvalue boxed_key = box_value(key, key.get_type());
+            gccjit::rvalue boxed_value = box_value(value, value.get_type());
+            
+            std::vector<gccjit::param> set_params;
+            set_params.push_back(m_context.new_param(m_void_ptr_type, "dict"));
+            set_params.push_back(m_context.new_param(m_void_ptr_type, "key"));
+            set_params.push_back(m_context.new_param(m_void_ptr_type, "value"));
+            gccjit::function set_func = m_context.new_function(
+                GCC_JIT_FUNCTION_IMPORTED, m_void_type, "lm_dict_set", set_params, 0);
+            
+            m_current_block.add_call(set_func, dict_ptr, boxed_key, boxed_value);
+            
+            return dict;
         }
         
-        case LIR::LIR_Op::GetTickCount: {
-            // Generate: return get_ticks(); (imported from platform header)
+        case LIR::LIR_Op::DictGet: {
+            // Get dict value: void* lm_dict_get(void* dict, void* key)
+            gccjit::rvalue dict = get_jit_register(inst.a);
+            gccjit::rvalue key = get_jit_register(inst.b);
             
-            gccjit::lvalue dst = get_jit_register(inst.dst, m_uint_type);
-            std::vector<gccjit::rvalue> get_ticks_args = {}; // No arguments
-            gccjit::rvalue ticks = m_context.new_call(m_get_ticks_func, get_ticks_args);
-            m_current_block.add_assignment(dst, ticks);
-            return ticks;
+            // Cast dict from int64_t to void*
+            gccjit::rvalue dict_ptr = m_context.new_cast(dict, m_void_ptr_type);
+            
+            // Box key before getting
+            gccjit::rvalue boxed_key = box_value(key, key.get_type());
+            
+            std::vector<gccjit::param> get_params;
+            get_params.push_back(m_context.new_param(m_void_ptr_type, "dict"));
+            get_params.push_back(m_context.new_param(m_void_ptr_type, "key"));
+            gccjit::function get_func = m_context.new_function(
+                GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "lm_dict_get", get_params, 0);
+            
+            gccjit::rvalue result = m_current_block.add_call(get_func, dict_ptr, boxed_key);
+            
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_void_ptr_type);
+            m_current_block.add_assignment(dst, result);
+            return result;
         }
         
-        case LIR::LIR_Op::DelayUntil: {
-            // Generate: return (current_ticks >= target_ticks);
+        case LIR::LIR_Op::DictItems: {
+            // Get dict items as list: void* lm_dict_items(void* dict)
+            gccjit::rvalue dict = get_jit_register(inst.a);
             
-            gccjit::rvalue target_ticks = get_jit_register(inst.a);
-            gccjit::lvalue dst = get_jit_register(inst.dst, m_bool_type);
+            std::vector<gccjit::param> items_params;
+            items_params.push_back(m_context.new_param(m_void_ptr_type, "dict"));
+            gccjit::function items_func = m_context.new_function(
+                GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "lm_dict_items", items_params, 0);
             
-            // Get current ticks
-            std::vector<gccjit::rvalue> get_ticks_args = {};
-            gccjit::rvalue current_ticks = m_context.new_call(m_get_ticks_func, get_ticks_args);
-            
-            // Compare
-            gccjit::rvalue expired = m_context.new_comparison(GCC_JIT_COMPARISON_GE, current_ticks, target_ticks);
-            m_current_block.add_assignment(dst, expired);
-            return expired;
+            gccjit::rvalue result = m_current_block.add_call(items_func, dict);
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_void_ptr_type);
+            m_current_block.add_assignment(dst, result);
+            return result;
         }
         
-        case LIR::LIR_Op::TaskGetState: {
-            // Generate: return tasks[task_id].state;
+        case LIR::LIR_Op::TupleCreate: {
+            // Create a new tuple: void* lm_tuple_new(uint64_t size)
+            gccjit::rvalue size = m_context.new_rvalue(m_context.get_type(GCC_JIT_TYPE_UINT64_T), 
+                                                       static_cast<long>(inst.b));
             
-            gccjit::rvalue tasks_ptr = get_jit_register(inst.a);
-            gccjit::rvalue task_id = get_jit_register(inst.b);
-            gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+            std::vector<gccjit::param> tuple_new_params;
+            tuple_new_params.push_back(m_context.new_param(m_context.get_type(GCC_JIT_TYPE_UINT64_T), "size"));
+            gccjit::function tuple_new_func = m_context.new_function(
+                GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "lm_tuple_new", tuple_new_params, 0);
             
-            // Calculate task offset
-            gccjit::rvalue task_size = m_context.new_rvalue(m_size_t_type, static_cast<long>(128));
-            gccjit::rvalue task_id_as_uintptr = m_context.new_cast(task_id, m_uint_type);
-            gccjit::rvalue task_id_as_size = m_context.new_cast(task_id_as_uintptr, m_size_t_type);
-            gccjit::rvalue task_offset = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_size_t_type, task_id_as_size, task_size);
-            
-            // Get task pointer
-            gccjit::rvalue task_ptr = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_void_ptr_type, tasks_ptr, task_offset);
-            
-            // Get state at offset 0
-            gccjit::lvalue state_ptr = m_context.new_cast(task_ptr, m_int_type.get_pointer()).dereference();
-            gccjit::rvalue state = state_ptr;
-            m_current_block.add_assignment(dst, state);
-            return state;
+            gccjit::rvalue result = m_current_block.add_call(tuple_new_func, size);
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_void_ptr_type);
+            m_current_block.add_assignment(dst, result);
+            return result;
         }
         
-        case LIR::LIR_Op::TaskSetState: {
-            // Generate: tasks[task_id].state = new_state;
+        case LIR::LIR_Op::TupleGet: {
+            // Get tuple element: void* lm_tuple_get(void* tuple, uint64_t index)
+            gccjit::rvalue tuple = get_jit_register(inst.a);
+            gccjit::rvalue index = get_jit_register(inst.b);
             
-            gccjit::rvalue tasks_ptr = get_jit_register(inst.dst);
-            gccjit::rvalue task_id = get_jit_register(inst.a);
-            gccjit::rvalue new_state = get_jit_register(inst.b);
+            std::vector<gccjit::param> get_params;
+            get_params.push_back(m_context.new_param(m_void_ptr_type, "tuple"));
+            get_params.push_back(m_context.new_param(m_context.get_type(GCC_JIT_TYPE_UINT64_T), "index"));
+            gccjit::function get_func = m_context.new_function(
+                GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "lm_tuple_get", get_params, 0);
             
-            // Calculate task offset
-            gccjit::rvalue task_size = m_context.new_rvalue(m_size_t_type, static_cast<long>(128));
-            gccjit::rvalue task_id_as_uintptr = m_context.new_cast(task_id, m_uint_type);
-            gccjit::rvalue task_id_as_size = m_context.new_cast(task_id_as_uintptr, m_size_t_type);
-            gccjit::rvalue task_offset = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_size_t_type, task_id_as_size, task_size);
+            gccjit::rvalue result = m_current_block.add_call(get_func, tuple,
+                m_context.new_cast(index, m_context.get_type(GCC_JIT_TYPE_UINT64_T)));
             
-            // Get task pointer
-            gccjit::rvalue task_ptr = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_void_ptr_type, tasks_ptr, task_offset);
-            
-            // Set state at offset 0
-            gccjit::lvalue state_ptr = m_context.new_cast(task_ptr, m_int_type.get_pointer()).dereference();
-            m_current_block.add_assignment(state_ptr, new_state);
-            return new_state;
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_void_ptr_type);
+            m_current_block.add_assignment(dst, result);
+            return result;
         }
         
-        case LIR::LIR_Op::TaskGetField: {
-            // Generate: return tasks[task_index].fields[field_index];
+        case LIR::LIR_Op::TupleSet: {
+            // Set tuple element: void lm_tuple_set(void* tuple, uint64_t index, void* value)
+            gccjit::rvalue tuple = get_jit_register(inst.dst);
+            gccjit::rvalue index = get_jit_register(inst.a);
+            gccjit::rvalue value = get_jit_register(inst.b);
             
-            gccjit::rvalue tasks_ptr = get_jit_register(inst.a);
-            gccjit::rvalue task_index = get_jit_register(inst.b);
-            gccjit::rvalue field_index = get_jit_register(inst.imm);
-            gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+            // Cast tuple from int64_t to void*
+            gccjit::rvalue tuple_ptr = m_context.new_cast(tuple, m_void_ptr_type);
             
-            // Calculate task offset
-            gccjit::rvalue task_size = m_context.new_rvalue(m_size_t_type, static_cast<long>(128));
-            gccjit::rvalue task_index_as_uintptr = m_context.new_cast(task_index, m_uint_type);
-            gccjit::rvalue task_index_as_size = m_context.new_cast(task_index_as_uintptr, m_size_t_type);
-            gccjit::rvalue task_offset = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_size_t_type, task_index_as_size, task_size);
+            // Box value before setting
+            gccjit::rvalue boxed_value = box_value(value, value.get_type());
             
-            // Get task pointer
-            gccjit::rvalue task_ptr = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_void_ptr_type, tasks_ptr, task_offset);
+            std::vector<gccjit::param> set_params;
+            set_params.push_back(m_context.new_param(m_void_ptr_type, "tuple"));
+            set_params.push_back(m_context.new_param(m_context.get_type(GCC_JIT_TYPE_UINT64_T), "index"));
+            set_params.push_back(m_context.new_param(m_void_ptr_type, "value"));
+            gccjit::function set_func = m_context.new_function(
+                GCC_JIT_FUNCTION_IMPORTED, m_void_type, "lm_tuple_set", set_params, 0);
             
-            // Calculate field offset (approximate: base_offset + field_index * 4)
-            gccjit::rvalue base_field_offset = m_context.new_rvalue(m_size_t_type, static_cast<long>(16));
-            gccjit::rvalue field_index_as_uintptr = m_context.new_cast(field_index, m_uint_type);
-            gccjit::rvalue field_index_as_size = m_context.new_cast(field_index_as_uintptr, m_size_t_type);
-            gccjit::rvalue field_offset = m_context.new_binary_op(GCC_JIT_BINARY_OP_MULT, m_size_t_type, 
-                field_index_as_size, m_context.new_rvalue(m_size_t_type, static_cast<long>(4)));
-            gccjit::rvalue total_field_offset = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_size_t_type, base_field_offset, field_offset);
+            m_current_block.add_call(set_func, tuple_ptr,
+                m_context.new_cast(index, m_context.get_type(GCC_JIT_TYPE_UINT64_T)), boxed_value);
             
-            // Get field pointer
-            gccjit::rvalue field_ptr = m_context.new_binary_op(GCC_JIT_BINARY_OP_PLUS, m_void_ptr_type, task_ptr, total_field_offset);
-            gccjit::lvalue field = m_context.new_cast(field_ptr, m_int_type.get_pointer()).dereference();
-            gccjit::rvalue value = field;
-            m_current_block.add_assignment(dst, value);
-            return value;
+            return tuple;
         }
         
-        case LIR::LIR_Op::SchedulerInit: {
-            // Generate: return 0; (simplified - no initialization needed)
+        // === CHANNEL OPERATIONS ===
+        case LIR::LIR_Op::ChannelSend: {
+            // Send on channel: void lm_channel_send(void* channel, void* value)
+            gccjit::rvalue channel = get_jit_register(inst.a);
+            gccjit::rvalue value = get_jit_register(inst.b);
+            
+            // Cast channel from int64_t to void*
+            gccjit::rvalue channel_ptr = m_context.new_cast(channel, m_void_ptr_type);
+            
+            // Box value before sending
+            gccjit::rvalue boxed_value = box_value(value, value.get_type());
+            
+            std::vector<gccjit::param> send_params;
+            send_params.push_back(m_context.new_param(m_void_ptr_type, "channel"));
+            send_params.push_back(m_context.new_param(m_void_ptr_type, "value"));
+            gccjit::function send_func = m_context.new_function(
+                GCC_JIT_FUNCTION_IMPORTED, m_void_type, "lm_channel_send", send_params, 0);
+            
+            m_current_block.add_call(send_func, channel_ptr, boxed_value);
+            
+            return channel;
+        }
+        
+        case LIR::LIR_Op::ChannelRecv: {
+            // Receive from channel: void* lm_channel_recv(void* channel)
+            gccjit::rvalue channel = get_jit_register(inst.a);
+            
+            std::vector<gccjit::param> recv_params;
+            recv_params.push_back(m_context.new_param(m_void_ptr_type, "channel"));
+            gccjit::function recv_func = m_context.new_function(
+                GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "lm_channel_recv", recv_params, 0);
+            
+            gccjit::rvalue result = m_current_block.add_call(recv_func, channel);
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_void_ptr_type);
+            m_current_block.add_assignment(dst, result);
+            return result;
+        }
+        
+        case LIR::LIR_Op::ChannelOffer: {
+            // Non-blocking send: int lm_channel_offer(void* channel, void* value)
+            gccjit::rvalue channel = get_jit_register(inst.a);
+            gccjit::rvalue value = get_jit_register(inst.b);
+            
+            std::vector<gccjit::param> offer_params;
+            offer_params.push_back(m_context.new_param(m_void_ptr_type, "channel"));
+            offer_params.push_back(m_context.new_param(m_void_ptr_type, "value"));
+            gccjit::function offer_func = m_context.new_function(
+                GCC_JIT_FUNCTION_IMPORTED, m_int_type, "lm_channel_offer", offer_params, 0);
+            
+            gccjit::rvalue result = m_current_block.add_call(offer_func, channel, value);
             
             gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
-            m_current_block.add_assignment(dst, m_context.new_rvalue(m_int_type, 0));
-            return dst;
+            m_current_block.add_assignment(dst, result);
+            return result;
         }
         
-        case LIR::LIR_Op::SchedulerTick: {
-            // Generate: return 0; (simplified - single tick)
+        case LIR::LIR_Op::ChannelPoll: {
+            // Non-blocking receive: void* lm_channel_poll(void* channel)
+            gccjit::rvalue channel = get_jit_register(inst.a);
             
-            gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
-            m_current_block.add_assignment(dst, m_context.new_rvalue(m_int_type, 0));
-            return dst;
+            std::vector<gccjit::param> poll_params;
+            poll_params.push_back(m_context.new_param(m_void_ptr_type, "channel"));
+            gccjit::function poll_func = m_context.new_function(
+                GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "lm_channel_poll", poll_params, 0);
+            
+            gccjit::rvalue result = m_current_block.add_call(poll_func, channel);
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_void_ptr_type);
+            m_current_block.add_assignment(dst, result);
+            return result;
         }
         
-        // === SHARED CELL OPERATIONS ===
-        case LIR::LIR_Op::SharedCellAlloc: {
-            // Allocate a new SharedCell ID
-            // For now, just return a simple incrementing ID
-            // In a real implementation, this would allocate from the global shared_cells table
+        case LIR::LIR_Op::ChannelClose: {
+            // Close channel: void lm_channel_close(void* channel)
+            gccjit::rvalue channel = get_jit_register(inst.a);
             
-            gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
+            std::vector<gccjit::param> close_params;
+            close_params.push_back(m_context.new_param(m_void_ptr_type, "channel"));
+            gccjit::function close_func = m_context.new_function(
+                GCC_JIT_FUNCTION_IMPORTED, m_void_type, "lm_channel_close", close_params, 0);
             
-            // Simple implementation: use a static counter
-            // TODO: Make this thread-safe with atomic operations
-            static uint32_t next_cell_id = 0;
-            uint32_t cell_id = next_cell_id++;
-            
-            gccjit::rvalue cell_id_rvalue = m_context.new_rvalue(m_int_type, static_cast<int>(cell_id));
-            m_current_block.add_assignment(dst, cell_id_rvalue);
-            
-            return dst;
-        }
-        
-        case LIR::LIR_Op::SharedCellLoad: {
-            // Load value from SharedCell: dst = shared_cells[cell_id].value
-            gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
-            gccjit::rvalue cell_id = get_jit_register(inst.a);
-            
-            // For now, implement as a simple array lookup
-            // TODO: Implement proper SharedCell table access
-            gccjit::rvalue zero = m_context.new_rvalue(m_int_type, 0);
-            m_current_block.add_assignment(dst, zero);
-            
-            return dst;
-        }
-        
-        case LIR::LIR_Op::SharedCellStore: {
-            // Store value to SharedCell: shared_cells[cell_id].value = src
-            gccjit::rvalue cell_id = get_jit_register(inst.a);
-            gccjit::rvalue src = get_jit_register(inst.b);
-            
-            // For now, just a no-op
-            // TODO: Implement proper SharedCell table store with atomic operations
-            
-            return src;
-        }
-        
-        case LIR::LIR_Op::SharedCellAdd: {
-            // Atomic add to SharedCell: shared_cells[cell_id].value += src
-            gccjit::rvalue cell_id = get_jit_register(inst.a);
-            gccjit::rvalue src = get_jit_register(inst.b);
-            
-            // For now, just a no-op
-            // TODO: Implement proper atomic SharedCell add operation
-            
-            return src;
-        }
-        
-        case LIR::LIR_Op::SharedCellSub: {
-            // Atomic sub from SharedCell: shared_cells[cell_id].value -= src
-            gccjit::rvalue cell_id = get_jit_register(inst.a);
-            gccjit::rvalue src = get_jit_register(inst.b);
-            
-            // For now, just a no-op
-            // TODO: Implement proper atomic SharedCell sub operation
-            
-            return src;
+            m_current_block.add_call(close_func, channel);
+            return channel;
         }
             
         default:
@@ -1331,8 +1353,9 @@ void JITBackend::compile_call(const LIR::LIR_Inst& inst) {
                         } else {
                             gccjit::rvalue call_result = m_current_block.add_call(native_func);
                             if (inst.dst != 0) {
+                                // Use int_type as safe default, matching Register VM behavior
                                 gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
-                                m_current_block.add_assignment(dst, call_result);
+                                m_current_block.add_assignment(dst, m_context.new_cast(call_result, m_int_type));
                             }
                         }
                     } else if (call_args.size() == 1) {
@@ -1342,7 +1365,7 @@ void JITBackend::compile_call(const LIR::LIR_Inst& inst) {
                             gccjit::rvalue call_result = m_current_block.add_call(native_func, call_args[0]);
                             if (inst.dst != 0) {
                                 gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
-                                m_current_block.add_assignment(dst, call_result);
+                                m_current_block.add_assignment(dst, m_context.new_cast(call_result, m_int_type));
                             }
                         }
                     } else if (call_args.size() == 2) {
@@ -1352,7 +1375,7 @@ void JITBackend::compile_call(const LIR::LIR_Inst& inst) {
                             gccjit::rvalue call_result = m_current_block.add_call(native_func, call_args[0], call_args[1]);
                             if (inst.dst != 0) {
                                 gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
-                                m_current_block.add_assignment(dst, call_result);
+                                m_current_block.add_assignment(dst, m_context.new_cast(call_result, m_int_type));
                             }
                         }
                     } else if (call_args.size() == 3) {
@@ -1362,7 +1385,7 @@ void JITBackend::compile_call(const LIR::LIR_Inst& inst) {
                             gccjit::rvalue call_result = m_current_block.add_call(native_func, call_args[0], call_args[1], call_args[2]);
                             if (inst.dst != 0) {
                                 gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
-                                m_current_block.add_assignment(dst, call_result);
+                                m_current_block.add_assignment(dst, m_context.new_cast(call_result, m_int_type));
                             }
                         }
                     } else if (call_args.size() == 4) {
@@ -1372,7 +1395,7 @@ void JITBackend::compile_call(const LIR::LIR_Inst& inst) {
                             gccjit::rvalue call_result = m_current_block.add_call(native_func, call_args[0], call_args[1], call_args[2], call_args[3]);
                             if (inst.dst != 0) {
                                 gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
-                                m_current_block.add_assignment(dst, call_result);
+                                m_current_block.add_assignment(dst, m_context.new_cast(call_result, m_int_type));
                             }
                         }
                     } else {
@@ -1383,7 +1406,7 @@ void JITBackend::compile_call(const LIR::LIR_Inst& inst) {
                             gccjit::rvalue call_result = m_context.new_call(native_func, call_args);
                             if (inst.dst != 0) {
                                 gccjit::lvalue dst = get_jit_register(inst.dst, m_int_type);
-                                m_current_block.add_assignment(dst, call_result);
+                                m_current_block.add_assignment(dst, m_context.new_cast(call_result, m_int_type));
                             }
                         }
                     }
@@ -1765,6 +1788,21 @@ gccjit::rvalue JITBackend::compile_to_cstring(gccjit::rvalue value) {
         return value;
     }
     
+    // For int64_t values, use the unified runtime function lm_value_to_string
+    // which handles both primitives and collections
+    if (c_type == m_int_type.get_inner_type()) {
+        // Call lm_value_to_string(value) which returns LmString
+        std::vector<gccjit::rvalue> value_to_string_args = {value};
+        gccjit::rvalue lm_string_result = m_context.new_call(m_lm_value_to_string_func, value_to_string_args);
+        
+        // Extract the data pointer from LmString
+        std::vector<gccjit::rvalue> get_data_args = {lm_string_result};
+        gccjit::rvalue c_string = m_context.new_call(m_lm_string_get_data_func, get_data_args);
+        
+        return c_string;
+    }
+    
+    // For other primitive types, use snprintf
     // Allocate buffer for conversion. 128 bytes should be plenty for primitives.
     gccjit::rvalue buffer_size = m_context.new_rvalue(m_size_t_type, 128);
     std::vector<gccjit::rvalue> malloc_args = {buffer_size};
@@ -1773,9 +1811,7 @@ gccjit::rvalue JITBackend::compile_to_cstring(gccjit::rvalue value) {
     const char* format_str_cstr;
     gccjit::rvalue value_to_format = value;
 
-    if (c_type == m_int_type.get_inner_type()) {
-        format_str_cstr = "%lld";
-    } else if (c_type == m_uint_type.get_inner_type()) {
+    if (c_type == m_uint_type.get_inner_type()) {
         format_str_cstr = "%llu";
     } else if (c_type == m_double_type.get_inner_type()) {
         format_str_cstr = "%g";
@@ -1844,6 +1880,37 @@ gccjit::rvalue JITBackend::convert_to_lm_string(gccjit::rvalue value) {
     return m_context.new_call(m_lm_string_from_cstr_func, from_cstr_args);
 }
 
+gccjit::rvalue JITBackend::box_value(gccjit::rvalue value, gccjit::type value_type) {
+    // Box a value for use in collections
+    // Returns a void* pointer to the boxed value
+    
+    gcc_jit_type* c_type = value_type.get_inner_type();
+    
+    if (c_type == m_int_type.get_inner_type()) {
+        // Box as int
+        std::vector<gccjit::rvalue> box_args = {value};
+        return m_context.new_call(m_lm_box_int_func, box_args);
+    } else if (c_type == m_double_type.get_inner_type()) {
+        // Box as float
+        std::vector<gccjit::rvalue> box_args = {value};
+        return m_context.new_call(m_lm_box_float_func, box_args);
+    } else if (c_type == m_bool_type.get_inner_type()) {
+        // Box as bool - need to cast bool to uint8_t
+        gccjit::rvalue bool_as_uint8 = m_context.new_cast(value, m_context.get_type(GCC_JIT_TYPE_UINT8_T));
+        std::vector<gccjit::rvalue> box_args = {bool_as_uint8};
+        return m_context.new_call(m_lm_box_bool_func, box_args);
+    } else if (c_type == m_const_char_ptr_type.get_inner_type()) {
+        // Box as string
+        std::vector<gccjit::rvalue> box_args = {value};
+        return m_context.new_call(m_lm_box_string_func, box_args);
+    } else if (c_type == m_void_ptr_type.get_inner_type()) {
+        // Already a pointer, just cast it
+        return m_context.new_cast(value, m_void_ptr_type);
+    } else {
+        // Default: cast to void*
+        return m_context.new_cast(value, m_void_ptr_type);
+    }
+}
 
 gccjit::type JITBackend::to_jit_type(LIR::Type type) {
     switch (type) {
@@ -1858,7 +1925,8 @@ gccjit::type JITBackend::to_jit_type(LIR::Type type) {
         case LIR::Type::Ptr:
             return m_const_char_ptr_type;
         case LIR::Type::Void:
-            return m_void_type;
+            // Never return void type - use int as safe default
+            return m_int_type;
         default:
             return m_int_type;
     }

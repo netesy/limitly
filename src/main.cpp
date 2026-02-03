@@ -27,6 +27,7 @@ void printUsage(const char* programName) {
     std::cout << "  " << programName << " -ast <source_file>      - Print the AST\n";
     std::cout << "  " << programName << " -cst <source_file>      - Print the CST\n";
     std::cout << "  " << programName << " -tokens <source_file>   - Print tokens\n";
+    std::cout << "  " << programName << " -lir <source_file>      - Print the LIR (Low-level IR)\n";
     std::cout << "  " << programName << " -jit <source_file>      - JIT compile to executable\n";
     std::cout << "  " << programName << " -jit-debug <source_file> - JIT compile and run directly\n";
     std::cout << "  " << programName << " -debug <source_file>    - Execute with debug output\n";
@@ -46,16 +47,17 @@ std::string readFile(const std::string& filename) {
 
 int executeFile(const std::string& filename, bool printAst = false, bool printCst = false, 
                 bool printTokens = false, bool useJit = false, bool jitDebug = false, 
-                bool enableDebug = false) {
+                bool enableDebug = false, bool printLir = false) {
     try {
         // Initialize LIR function systems
-        LIR::FunctionUtils::initializeFunctions();
+        // Note: Temporarily disabled due to crash in BuiltinUtils::initializeBuiltins()
+        // LIR::FunctionUtils::initializeFunctions();
         
         // Read source file
         std::string source = readFile(filename);
         
         // Frontend: Lexical analysis (scanning)
-        Frontend::Scanner scanner(source, filename);
+        LM::Frontend::Scanner scanner(source, filename);
         scanner.scanTokens();
         
         // Print tokens if requested
@@ -70,7 +72,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         
         // Frontend: Syntax analysis (parsing)
         bool useCSTMode = printCst;
-        Frontend::Parser parser(scanner, useCSTMode);
+        LM::Frontend::Parser parser(scanner, useCSTMode);
         std::shared_ptr<LM::Frontend::AST::Program> ast = parser.parse();
         
         // Phase 1: Type checking
@@ -96,6 +98,11 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             return 1;
         }
         
+        if (!post_opt_type_check.program) {
+            std::cerr << "Post-optimization type check returned null program\n";
+            return 1;
+        }
+
         // Print CST if requested
         if (printCst) {
             std::cout << "=== CST ===\n";
@@ -115,22 +122,64 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             std::cout << "\n";
         }
 
+        // Generate LIR once for all backends
+        LIR::Generator lir_generator;
+        auto lir_function = lir_generator.generate_program(post_opt_type_check);
+        
+        if (!lir_function) {
+            std::cerr << "Failed to generate LIR function\n";
+            return 1;
+        }
+        
+        if (lir_generator.has_errors()) {
+            std::cerr << "LIR generation errors:\n";
+            for (const auto& error : lir_generator.get_errors()) {
+                std::cerr << "  " << error << std::endl;
+            }
+            return 1;
+        }
+
+        // Print LIR if requested
+        if (printLir) {
+            std::cout << "Generated LIR function with " << lir_function->instructions.size() << " instructions\n";
+            std::cout << "CFG generation completed with " << lir_function->cfg->blocks.size() << " blocks\n";
+            
+            // Initialize and run LIR disassembler
+            LIR::Disassembler disassemble(*lir_function, true);
+            std::cout << "\n=== LIR Disassembly ===\n";
+            std::cout << disassemble.disassemble() << std::endl;
+            
+            std::cout << "\n=== Detailed Instruction Analysis with Types ===\n";
+            for (size_t i = 0; i < lir_function->instructions.size(); ++i) {
+                const auto& inst = lir_function->instructions[i];
+                std::cout << "[" << i << "] " << inst.to_string();
+                
+                // Show types
+                std::cout << " [result_type=" << static_cast<int>(inst.result_type);
+                if (inst.type_a != LIR::Type::Void) {
+                    std::cout << ", type_a=" << static_cast<int>(inst.type_a);
+                }
+                if (inst.type_b != LIR::Type::Void) {
+                    std::cout << ", type_b=" << static_cast<int>(inst.type_b);
+                }
+                std::cout << "]\n";
+            }
+            
+            std::cout << "\n=== CFG Blocks ===\n";
+            for (size_t i = 0; i < lir_function->cfg->blocks.size(); ++i) {
+                const auto& block = lir_function->cfg->blocks[i];
+                std::cout << "Block " << block->id << ": " << block->label << " (";
+                if (block->is_entry) std::cout << "entry ";
+                if (block->is_exit) std::cout << "exit ";
+                std::cout << ")\n";
+            }
+            std::cout << "\n";
+            
+            return 0;
+        }
+
         if (useJit) {
             try {
-                // Generate LIR from AST
-                LIR::Generator lir_generator;
-                auto lir_function = lir_generator.generate_program(post_opt_type_check);
-                
-                if (!lir_function) {
-                    std::cerr << "Failed to generate LIR function\n";
-                    return 1;
-                }
-                
-                if (lir_generator.has_errors()) {
-                    std::cerr << "LIR generation errors\n";
-                    return 1;
-                }
-                
                 // Initialize JIT backend
                 LM::Backend::JIT::Compiler::JITBackend jit;
                 jit.set_debug_mode(enableDebug || jitDebug);
@@ -163,57 +212,38 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 return 1;
             }
         } else {
-            // Backend: Use register interpreter
-            LM::Backend::VM::Register::RegisterVM register_vm;
-            
+           
             try {
-                LIR::Generator lir_generator;
-                auto lir_function = lir_generator.generate_program(post_opt_type_check);
+                // Backend: Use register interpreter
+                LM::Backend::VM::Register::RegisterVM register_vm;
+                std::shared_ptr<LIR::LIRFunction> main_lir_func;
+                auto& func_manager = LIR::LIRFunctionManager::getInstance();
                 
-                if (!lir_function) {
-                    std::cerr << "Failed to generate LIR function\n";
-                    return 1;
-                }
+                std::vector<LIR::LIRParameter> main_params;
+                main_lir_func = func_manager.createFunction("main", main_params, LIR::Type::I64, nullptr);
+                main_lir_func->setInstructions(lir_function->instructions);
                 
-                if (lir_generator.has_errors()) {
-                    std::cerr << "LIR generation errors\n";
-                    return 1;
-                }
+                register_vm.execute_lir_function(*main_lir_func);
                 
-                // Execute using register interpreter
-                try {
-                    std::shared_ptr<LIR::LIRFunction> main_lir_func;
-                    auto& func_manager = LIR::LIRFunctionManager::getInstance();
-                    
-                    std::vector<LIR::LIRParameter> main_params;
-                    main_lir_func = func_manager.createFunction("main", main_params, LIR::Type::I64, nullptr);
-                    main_lir_func->setInstructions(lir_function->instructions);
-                    
-                    register_vm.execute_lir_function(*main_lir_func);
-                    
-                    // Check for explicit return statement
-                    bool should_print_result = false;
-                    if (main_lir_func && !main_lir_func->getInstructions().empty()) {
-                        for (const auto& inst : main_lir_func->getInstructions()) {
-                            if (inst.op == LIR::LIR_Op::Return) {
-                                should_print_result = true;
-                                break;
-                            }
+                // Check for explicit return statement
+                bool should_print_result = false;
+                if (main_lir_func && !main_lir_func->getInstructions().empty()) {
+                    for (const auto& inst : main_lir_func->getInstructions()) {
+                        if (inst.op == LIR::LIR_Op::Return) {
+                            should_print_result = true;
+                            break;
                         }
                     }
-                    
-                    if (should_print_result) {
-                        auto result = register_vm.get_register(0);
-                        if (!std::holds_alternative<std::nullptr_t>(result)) {
-                            std::cout << register_vm.to_string(result) << "\n";
-                        }
+                }
+                
+                if (should_print_result) {
+                    auto result = register_vm.get_register(0);
+                    if (!std::holds_alternative<std::nullptr_t>(result)) {
+                        std::cout << register_vm.to_string(result) << "\n";
                     }
-                } catch (const std::exception& e) {
-                    std::cerr << "Runtime error: " << e.what() << "\n";
-                    return 1;
                 }
             } catch (const std::exception& e) {
-                std::cerr << "LIR generation error: " << e.what() << "\n";
+                std::cerr << "Runtime error: " << e.what() << "\n";
                 return 1;
             }
         }
@@ -325,17 +355,19 @@ int main(int argc, char* argv[]) {
         startRepl();
         return 0;
     } else if (arg == "-ast" && argc >= 3) {
-        return executeFile(argv[2], true, false, false, false);
+        return executeFile(argv[2], true, false, false, false, false, false, false);
     } else if (arg == "-cst" && argc >= 3) {
-        return executeFile(argv[2], false, true, false, false);
+        return executeFile(argv[2], false, true, false, false, false, false, false);
     } else if (arg == "-tokens" && argc >= 3) {
-        return executeFile(argv[2], false, false, true, false);
+        return executeFile(argv[2], false, false, true, false, false, false, false);
+    } else if (arg == "-lir" && argc >= 3) {
+        return executeFile(argv[2], false, false, false, false, false, false, true);
     } else if (arg == "-jit" && argc >= 3) {
-        return executeFile(argv[2], false, false, false, true, false);
+        return executeFile(argv[2], false, false, false, true, false, false, false);
     } else if (arg == "-jit-debug" && argc >= 3) {
-        return executeFile(argv[2], false, false, false, true, true);
+        return executeFile(argv[2], false, false, false, true, true, false, false);
     } else if (arg == "-debug" && argc >= 3) {
-        return executeFile(argv[2], false, false, false, false, false, true);
+        return executeFile(argv[2], false, false, false, false, false, true, false);
     } else if (arg[0] == '-') {
         std::cerr << "Unknown option: " << arg << "\n";
         printUsage(argv[0]);

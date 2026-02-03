@@ -217,10 +217,12 @@ struct LIR_SourceLoc {
     }
 };
 
-// LIR Instruction structure (typed)
+// LIR Instruction structure (typed with operand types)
 struct LIR_Inst {
     LIR_Op op;             // Operation
     Type result_type;      // Type of the result register (ABI-level)
+    Type type_a;           // Type of operand a
+    Type type_b;           // Type of operand b
     Reg dst;               // Destination register
     Reg a;                 // Operand 1 (source register)
     Reg b;                 // Operand 2 (source register, optional)
@@ -230,36 +232,48 @@ struct LIR_Inst {
     // Enhanced function call support
     std::string func_name;          // Function name (for calls and function definitions)
     std::vector<Reg> call_args;     // Arguments for calls, parameters for declarations
+    std::vector<Type> call_arg_types; // Types of call arguments
     
     // Debug information
     std::string comment;
     LIR_SourceLoc loc;
     
-    LIR_Inst(LIR_Op op, Type result_type, Reg dst = 0, Reg a = 0, Reg b = 0, Imm imm = 0)
-        : op(op), result_type(result_type), dst(dst), a(a), b(b), imm(imm) {}
+    LIR_Inst(LIR_Op op, Type result_type, Reg dst = 0, Reg a = 0, Reg b = 0, Imm imm = 0,
+             Type type_a = Type::Void, Type type_b = Type::Void)
+        : op(op), result_type(result_type), type_a(type_a), type_b(type_b), 
+          dst(dst), a(a), b(b), imm(imm) {}
     
     LIR_Inst(LIR_Op op, Type result_type, Reg dst, ValuePtr constant)
-        : op(op), result_type(result_type), dst(dst), a(0), b(0), imm(0), const_val(constant) {}
+        : op(op), result_type(result_type), type_a(Type::Void), type_b(Type::Void),
+          dst(dst), a(0), b(0), imm(0), const_val(constant) {}
     
     // Legacy constructors for backward compatibility
     LIR_Inst(LIR_Op op, Reg dst = 0, Reg a = 0, Reg b = 0, Imm imm = 0)
-        : op(op), result_type(Type::Void), dst(dst), a(a), b(b), imm(imm) {}
+        : op(op), result_type(Type::Void), type_a(Type::Void), type_b(Type::Void),
+          dst(dst), a(a), b(b), imm(imm) {}
     
     LIR_Inst(LIR_Op op, Reg dst, ValuePtr constant)
-        : op(op), result_type(Type::Void), dst(dst), a(0), b(0), imm(0), const_val(constant) {}
+        : op(op), result_type(Type::Void), type_a(Type::Void), type_b(Type::Void),
+          dst(dst), a(0), b(0), imm(0), const_val(constant) {}
     
     // Enhanced constructors for function calls and declarations
     // Function call with return value: call r2, add(r0, r1)
-    LIR_Inst(LIR_Op op, Reg dst, const std::string& func, const std::vector<Reg>& args)
-        : op(op), result_type(Type::Void), dst(dst), a(0), b(0), imm(0), func_name(func), call_args(args) {}
+    LIR_Inst(LIR_Op op, Reg dst, const std::string& func, const std::vector<Reg>& args,
+             const std::vector<Type>& arg_types = {})
+        : op(op), result_type(Type::Void), type_a(Type::Void), type_b(Type::Void),
+          dst(dst), a(0), b(0), imm(0), func_name(func), call_args(args), call_arg_types(arg_types) {}
     
     // Void function call: call print(r0)
-    LIR_Inst(LIR_Op op, const std::string& func, const std::vector<Reg>& args)
-        : op(op), result_type(Type::Void), dst(0), a(0), b(0), imm(0), func_name(func), call_args(args) {}
+    LIR_Inst(LIR_Op op, const std::string& func, const std::vector<Reg>& args,
+             const std::vector<Type>& arg_types = {})
+        : op(op), result_type(Type::Void), type_a(Type::Void), type_b(Type::Void),
+          dst(0), a(0), b(0), imm(0), func_name(func), call_args(args), call_arg_types(arg_types) {}
     
     // Function definition: fn r2, add(r0, r1)
-    LIR_Inst(LIR_Op op, const std::string& func, const std::vector<Reg>& params, Reg return_reg)
-        : op(op), result_type(Type::Void), dst(return_reg), a(0), b(0), imm(0), func_name(func), call_args(params) {}
+    LIR_Inst(LIR_Op op, const std::string& func, const std::vector<Reg>& params, Reg return_reg,
+             const std::vector<Type>& param_types = {})
+        : op(op), result_type(Type::Void), type_a(Type::Void), type_b(Type::Void),
+          dst(return_reg), a(0), b(0), imm(0), func_name(func), call_args(params), call_arg_types(param_types) {}
     
     // Check if this instruction is a return instruction
     bool isReturn() const {
