@@ -651,6 +651,7 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "and") return TokenType::AND;
     if (rest == "as") return TokenType::AS;
     if (rest == "class") return TokenType::CLASS;
+    if (rest == "frame") return TokenType::FRAME;
     if (rest == "elif") return TokenType::ELIF;
     if (rest == "else") return TokenType::ELSE;
     if (rest == "false") return TokenType::FALSE;

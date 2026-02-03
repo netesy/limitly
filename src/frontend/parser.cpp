@@ -54,6 +54,7 @@ void Parser::synchronize() {
 
         switch (peek().type) {
             case TokenType::CLASS:
+            case TokenType::FRAME:
             case TokenType::FN:
             case TokenType::VAR:
             case TokenType::FOR:
@@ -607,6 +608,15 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::declaration() {
                 decl->isAbstract = isAbstract;
                 decl->isFinal = isFinal;
                 decl->isDataClass = isDataClass;
+            }
+            return decl;
+        }
+        if (match({TokenType::FRAME})) {
+            auto decl = frameDeclaration();
+            if (decl) {
+                decl->annotations = annotations;
+                decl->isAbstract = isAbstract;
+                decl->isFinal = isFinal;
             }
             return decl;
         }
@@ -2154,6 +2164,175 @@ void Parser::parseConcurrencyParams(
         }
         consume(TokenType::RIGHT_PAREN, "Expected ')' after parameters");
     }
+}
+
+std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() {
+    auto frameDecl = createNodeWithContext<LM::Frontend::AST::FrameDeclaration>();
+    frameDecl->line = previous().line;
+
+    // Parse frame name
+    Token name = consume(TokenType::IDENTIFIER, "Expected frame name.");
+    frameDecl->name = name.lexeme;
+
+    // Check for trait implementation list: frame Name : Trait1, Trait2
+    if (match({TokenType::COLON})) {
+        do {
+            Token traitName = consume(TokenType::IDENTIFIER, "Expected trait name.");
+            frameDecl->implements.push_back(traitName.lexeme);
+        } while (match({TokenType::COMMA}));
+    }
+
+    Token leftBrace = consume(TokenType::LEFT_BRACE, "Expected '{' before frame body.");
+    pushBlockContext("frame", leftBrace);
+
+    // Parse frame members
+    while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
+        // Parse visibility modifiers
+        LM::Frontend::AST::VisibilityLevel visibility = LM::Frontend::AST::VisibilityLevel::Private; // Default to private
+        
+        // Parse visibility keywords
+        while (check(TokenType::PUB) || check(TokenType::PROT)) {
+            if (match({TokenType::PUB})) {
+                visibility = LM::Frontend::AST::VisibilityLevel::Public;
+            } else if (match({TokenType::PROT})) {
+                visibility = LM::Frontend::AST::VisibilityLevel::Protected;
+            }
+        }
+        
+        // Check for init() method
+        if (check(TokenType::IDENTIFIER) && peek().lexeme == "init") {
+            advance(); // consume 'init'
+            consume(TokenType::LEFT_PAREN, "Expected '(' after 'init'.");
+            
+            auto initMethod = std::make_shared<LM::Frontend::AST::FrameMethod>();
+            initMethod->name = "init";
+            initMethod->visibility = visibility;
+            initMethod->isInit = true;
+            
+            // Parse parameters
+            if (!check(TokenType::RIGHT_PAREN)) {
+                do {
+                    auto paramName = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
+                    consume(TokenType::COLON, "Expected ':' after parameter name.");
+                    auto paramType = parseTypeAnnotation();
+                    initMethod->parameters.push_back({paramName, paramType});
+                } while (match({TokenType::COMMA}));
+            }
+            
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after parameters.");
+            
+            // Parse return type if present
+            if (match({TokenType::ARROW})) {
+                initMethod->returnType = parseTypeAnnotation();
+            }
+            
+            // Parse method body
+            consume(TokenType::LEFT_BRACE, "Expected '{' before init body.");
+            initMethod->body = block();
+            
+            frameDecl->init = initMethod;
+        }
+        // Check for deinit() method
+        else if (check(TokenType::IDENTIFIER) && peek().lexeme == "deinit") {
+            advance(); // consume 'deinit'
+            consume(TokenType::LEFT_PAREN, "Expected '(' after 'deinit'.");
+            
+            auto deinitMethod = std::make_shared<LM::Frontend::AST::FrameMethod>();
+            deinitMethod->name = "deinit";
+            deinitMethod->visibility = visibility;
+            deinitMethod->isDeinit = true;
+            
+            // deinit takes no parameters
+            if (!check(TokenType::RIGHT_PAREN)) {
+                error("deinit() method cannot have parameters.");
+            }
+            
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after deinit.");
+            
+            // Parse method body
+            consume(TokenType::LEFT_BRACE, "Expected '{' before deinit body.");
+            deinitMethod->body = block();
+            
+            frameDecl->deinit = deinitMethod;
+        }
+        // Parse regular method
+        else if (match({TokenType::FN})) {
+            auto method = function("method");
+            if (method) {
+                auto frameMethod = std::make_shared<LM::Frontend::AST::FrameMethod>();
+                frameMethod->name = method->name;
+                frameMethod->visibility = visibility;
+                // Handle optional return type
+                if (method->returnType) {
+                    frameMethod->returnType = method->returnType.value();
+                }
+                frameMethod->body = method->body;
+                
+                // Convert function parameters to frame method parameters
+                for (const auto& param : method->params) {
+                    frameMethod->parameters.push_back(param);
+                }
+                
+                frameDecl->methods.push_back(frameMethod);
+            }
+        }
+        // Parse field
+        else if (match({TokenType::VAR})) {
+            auto fieldName = consume(TokenType::IDENTIFIER, "Expected field name.").lexeme;
+            consume(TokenType::COLON, "Expected ':' after field name.");
+            auto fieldType = parseTypeAnnotation();
+            
+            auto field = std::make_shared<LM::Frontend::AST::FrameField>();
+            field->name = fieldName;
+            field->type = fieldType;
+            field->visibility = visibility;
+            
+            // Check for default value
+            if (match({TokenType::EQUAL})) {
+                field->defaultValue = expression();
+            }
+            
+            consume(TokenType::SEMICOLON, "Expected ';' after field declaration.");
+            frameDecl->fields.push_back(field);
+        }
+        // Parse field without var keyword (direct field declaration)
+        else if (check(TokenType::IDENTIFIER)) {
+            Token fieldName = advance(); // consume field name
+            
+            if (check(TokenType::COLON)) {
+                advance(); // consume ':'
+                
+                auto field = std::make_shared<LM::Frontend::AST::FrameField>();
+                field->name = fieldName.lexeme;
+                field->type = parseTypeAnnotation();
+                field->visibility = visibility;
+                
+                // Check for default value
+                if (match({TokenType::EQUAL})) {
+                    field->defaultValue = expression();
+                }
+                
+                consume(TokenType::SEMICOLON, "Expected ';' after field declaration.");
+                frameDecl->fields.push_back(field);
+            } else {
+                error("Expected ':' after field name in frame member declaration.");
+                break;
+            }
+        } else {
+            error("Expected frame member declaration (field or method).");
+            break;
+        }
+    }
+
+    consume(TokenType::RIGHT_BRACE, "Expected '}' after frame body.");
+    popBlockContext();
+
+    // Pop CST context when exiting frame declaration
+    if (cstMode && !cstContextStack.empty()) {
+        popCSTContext();
+    }
+
+    return frameDecl;
 }
 
 std::shared_ptr<LM::Frontend::AST::Statement> Parser::parallelStatement() {

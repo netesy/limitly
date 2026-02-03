@@ -32,7 +32,13 @@ This implementation plan breaks down the frames OOP system into discrete, manage
 
 ## Phase 1: Core Frame System Foundation
 
-- [ ] 1. Add frame-related AST nodes and type definitions
+- [x] 1. Add frame-related AST nodes and type definitions
+
+
+
+
+
+
   - Add `FrameDeclaration` AST node with fields, methods, and trait list
   - Add `FrameField` node for frame members with visibility and default values
   - Add `FrameMethod` node for frame methods with visibility and body
@@ -45,6 +51,23 @@ This implementation plan breaks down the frames OOP system into discrete, manage
   - **Status**: AST nodes exist for ClassDeclaration; need to create frame-specific versions
 
 - [ ] 2. Implement frame declaration parsing
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   - Add `frame` keyword to scanner (if not already present)
   - Implement frame declaration parsing in parser
   - Parse frame fields with type annotations and visibility modifiers
