@@ -111,7 +111,7 @@ private:
     std::atomic<uint64_t> work_queue_counter{0};
     
     // Instruction count limit to prevent infinite loops
-    static constexpr uint64_t MAX_INSTRUCTIONS = 100000000;
+    static constexpr uint64_t MAX_INSTRUCTIONS = 1000;
     uint64_t instruction_count = 0;
     
     // Helper methods - all inlined for performance

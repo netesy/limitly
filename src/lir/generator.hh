@@ -163,6 +163,7 @@ private:
     void emit_block_stmt(LM::Frontend::AST::BlockStatement& stmt);
     void emit_if_stmt(LM::Frontend::AST::IfStatement& stmt);
     void emit_if_stmt_cfg(LM::Frontend::AST::IfStatement& stmt);
+    void emit_if_stmt_cfg_with_end(LM::Frontend::AST::IfStatement& stmt, LIR_BasicBlock* outer_end_block);
     void emit_if_stmt_linear(LM::Frontend::AST::IfStatement& stmt);
     void emit_while_stmt(LM::Frontend::AST::WhileStatement& stmt);
     void emit_while_stmt_cfg(LM::Frontend::AST::WhileStatement& stmt);

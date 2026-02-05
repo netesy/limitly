@@ -1,4 +1,5 @@
+print("start");
 var d = { "a": 1 };
-iter (entry in d) {
-    print(entry);
-}
+print("dict created");
+print(d);
+print("done");

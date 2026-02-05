@@ -2,6 +2,7 @@
 #include "runtime_dict.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 #define INITIAL_BUCKET_COUNT 16
 
@@ -141,4 +142,66 @@ RUNTIME_API int lm_cmp_int(void* k1, void* k2) {
 
 RUNTIME_API int lm_cmp_string(void* k1, void* k2) {
     return strcmp((const char*)k1, (const char*)k2);
+}
+
+// Include boxing definitions for boxed value functions
+#include "runtime.h"
+
+// Hash function for boxed values (used by both VM and JIT)
+RUNTIME_API uint64_t hash_boxed_value(void* key) {
+    if (!key) return 0;
+    LmBox* box = (LmBox*)key;
+    
+    switch (box->type) {
+        case LM_BOX_INT:
+            return lm_hash_int((void*)(intptr_t)box->value.as_int);
+        case LM_BOX_STRING: {
+            const char* str = lm_unbox_string(box);
+            return lm_hash_string((void*)str);
+        }
+        case LM_BOX_FLOAT: {
+            int64_t int_val = (int64_t)box->value.as_float;
+            return lm_hash_int((void*)(intptr_t)int_val);
+        }
+        case LM_BOX_BOOL:
+            return lm_hash_int((void*)(intptr_t)box->value.as_bool);
+        default:
+            return 0;
+    }
+}
+
+// Compare function for boxed values (used by both VM and JIT)
+RUNTIME_API int cmp_boxed_value(void* k1, void* k2) {
+    if (!k1 || !k2) return (k1 != k2) ? 1 : 0;
+    
+    LmBox* box1 = (LmBox*)k1;
+    LmBox* box2 = (LmBox*)k2;
+    
+    // Different types are not equal
+    if (box1->type != box2->type) return 1;
+    
+    switch (box1->type) {
+        case LM_BOX_INT:
+            return lm_cmp_int((void*)(intptr_t)box1->value.as_int,
+                            (void*)(intptr_t)box2->value.as_int);
+        case LM_BOX_STRING: {
+            const char* str1 = lm_unbox_string(box1);
+            const char* str2 = lm_unbox_string(box2);
+            return lm_cmp_string((void*)str1, (void*)str2);
+        }
+        case LM_BOX_FLOAT: {
+            double diff = box1->value.as_float - box2->value.as_float;
+            return (diff > 0) - (diff < 0);
+        }
+        case LM_BOX_BOOL:
+            return (box1->value.as_bool > box2->value.as_bool) - 
+                   (box1->value.as_bool < box2->value.as_bool);
+        default:
+            return 0;
+    }
+}
+
+// Wrapper function for JIT to create dicts with proper hash/compare functions
+RUNTIME_API void* jit_dict_new(void) {
+    return lm_dict_new(hash_boxed_value, cmp_boxed_value);
 }
