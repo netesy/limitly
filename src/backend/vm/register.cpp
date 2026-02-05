@@ -39,59 +39,10 @@ void* box_register_value(const RegisterValue& value) {
     }
 }
 
-// Hash function for boxed values
-uint64_t hash_boxed_value(void* key) {
-    if (!key) return 0;
-    LmBox* box = static_cast<LmBox*>(key);
-    
-    switch (box->type) {
-        case LM_BOX_INT:
-            return lm_hash_int(reinterpret_cast<void*>(box->value.as_int));
-        case LM_BOX_STRING: {
-            const char* str = lm_unbox_string(box);
-            return lm_hash_string(const_cast<void*>(reinterpret_cast<const void*>(str)));
-        }
-        case LM_BOX_FLOAT: {
-            int64_t int_val = static_cast<int64_t>(box->value.as_float);
-            return lm_hash_int(reinterpret_cast<void*>(int_val));
-        }
-        case LM_BOX_BOOL:
-            return lm_hash_int(reinterpret_cast<void*>(static_cast<int64_t>(box->value.as_bool)));
-        default:
-            return 0;
-    }
-}
-
-// Compare function for boxed values
-int cmp_boxed_value(void* k1, void* k2) {
-    if (!k1 || !k2) return (k1 != k2) ? 1 : 0;
-    
-    LmBox* box1 = static_cast<LmBox*>(k1);
-    LmBox* box2 = static_cast<LmBox*>(k2);
-    
-    // Different types are not equal
-    if (box1->type != box2->type) return 1;
-    
-    switch (box1->type) {
-        case LM_BOX_INT:
-            return lm_cmp_int(reinterpret_cast<void*>(box1->value.as_int),
-                            reinterpret_cast<void*>(box2->value.as_int));
-        case LM_BOX_STRING: {
-            const char* str1 = lm_unbox_string(box1);
-            const char* str2 = lm_unbox_string(box2);
-            return lm_cmp_string(const_cast<void*>(reinterpret_cast<const void*>(str1)),
-                               const_cast<void*>(reinterpret_cast<const void*>(str2)));
-        }
-        case LM_BOX_FLOAT: {
-            double diff = box1->value.as_float - box2->value.as_float;
-            return (diff > 0) - (diff < 0);
-        }
-        case LM_BOX_BOOL:
-            return (box1->value.as_bool > box2->value.as_bool) - 
-                   (box1->value.as_bool < box2->value.as_bool);
-        default:
-            return 0;
-    }
+// Hash function for boxed values - now defined in runtime_dict.c
+extern "C" {
+    uint64_t hash_boxed_value(void* key);
+    int cmp_boxed_value(void* k1, void* k2);
 }
 
 RegisterValue unbox_register_value(void* boxed_value) {
@@ -270,7 +221,8 @@ std::string RegisterVM::to_string(const RegisterValue& value) const {
         
         // Use the runtime function to convert any value to string
         // This handles primitives and collections uniformly
-        LmString result = lm_value_to_string(int_val);
+        void* ptr = reinterpret_cast<void*>(static_cast<uintptr_t>(int_val));
+        LmString result = lm_value_to_string(ptr);
         std::string str_result(result.data, result.len);
         lm_string_free(result);
         return str_result;
@@ -782,7 +734,19 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 break;
             }
             case LIR::LIR_Op::ToString: {
-                registers[pc->dst] = to_string(registers[pc->a]);
+                // Convert value to string using type information
+                // If type_a is Ptr, the value is a pointer to a collection
+                if (pc->type_a == LIR::Type::Ptr) {
+                    // Value is a pointer - call runtime function to handle collections
+                    int64_t ptr_value = std::get<int64_t>(registers[pc->a]);
+                    void* ptr = reinterpret_cast<void*>(static_cast<uintptr_t>(ptr_value));
+                    LmString result = lm_value_to_string(ptr);
+                    registers[pc->dst] = std::string(result.data, result.len);
+                    lm_string_free(result);
+                } else {
+                    // Value is a primitive - use standard conversion
+                    registers[pc->dst] = to_string(registers[pc->a]);
+                }
                 break;
             }
             case LIR::LIR_Op::STR_CONCAT: {

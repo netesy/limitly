@@ -7,6 +7,7 @@
 #include "runtime_list.h"
 #include "runtime_dict.h"
 #include "runtime_tuple.h"
+#include "runtime.h"
 
 // Forward declarations for helper functions
 static LmString format_list(LmList* list);
@@ -37,7 +38,12 @@ static LmString format_value(int64_t value);
 
 // Format list as string: [elem1, elem2, ...]
 static LmString format_list(LmList* list) {
-    if (!list || !list->data) {
+    if (!list) {
+        return lm_string_from_cstr("[]");
+    }
+    
+    // Safety check: verify list structure looks valid
+    if (!list->data || list->size > 1000000 || list->capacity < list->size) {
         return lm_string_from_cstr("[]");
     }
     
@@ -56,8 +62,10 @@ static LmString format_list(LmList* list) {
         // Format element
         int64_t elem = (int64_t)(uintptr_t)list->data[i];
         LmString elem_str = format_value(elem);
-        append_to_buffer(&buf, &pos, &capacity, elem_str.data);
-        lm_string_free(elem_str);
+        if (elem_str.data) {
+            append_to_buffer(&buf, &pos, &capacity, elem_str.data);
+            lm_string_free(elem_str);
+        }
     }
     
     append_to_buffer(&buf, &pos, &capacity, "]");
@@ -145,39 +153,60 @@ static LmString format_tuple(LmTuple* tuple) {
 
 // Format a single value (handles primitives and collections)
 static LmString format_value(int64_t value) {
-    // Check if it's a pointer to a collection
-    // Heap pointers are typically in a specific range
-    const int64_t MIN_HEAP_PTR = 0x00400000LL;
-    const int64_t MAX_HEAP_PTR = 0x7FFFFFFFLL;
+    // Since we now have explicit type information in LIR instructions,
+    // we should only reach this function when we know the value is a pointer
+    // to a collection. We trust the type system and don't do pointer range detection.
     
-    if (value >= MIN_HEAP_PTR && value <= MAX_HEAP_PTR) {
-        void* ptr = (void*)(uintptr_t)value;
-        
-        // Try as tuple (has magic number)
-        LmTuple* tuple = (LmTuple*)ptr;
-        if (tuple && tuple->magic == LM_TUPLE_MAGIC && tuple->elements && tuple->size < 1000000) {
-            return format_tuple(tuple);
-        }
-        
-        // Try as list
-        LmList* list = (LmList*)ptr;
-        if (list && list->data && list->size < 1000000 && list->capacity >= list->size) {
-            return format_list(list);
-        }
-        
-        // Try as dict
-        LmDict* dict = (LmDict*)ptr;
-        if (dict && dict->buckets && dict->bucket_count > 0 && dict->bucket_count < 1000000) {
-            return format_dict(dict);
+    void* ptr = (void*)(uintptr_t)value;
+    
+    // Try as boxed value FIRST (for elements in collections)
+    // Boxed values have a type field at the beginning
+    LmBox* box = (LmBox*)ptr;
+    if (box && box->type >= 0 && box->type <= 4) {
+        // It's a boxed value, format it
+        switch (box->type) {
+            case LM_BOX_INT:
+                return lm_int_to_string(box->value.as_int);
+            case LM_BOX_FLOAT: {
+                return lm_double_to_string(box->value.as_float);
+            }
+            case LM_BOX_BOOL:
+                return lm_bool_to_string(box->value.as_bool ? 1 : 0);
+            case LM_BOX_STRING: {
+                const char* str = lm_unbox_string(box);
+                return lm_string_from_cstr(str);
+            }
+            case LM_BOX_NULLPTR:
+                return lm_string_from_cstr("nil");
+            default:
+                return lm_string_from_cstr("?");
         }
     }
     
-    // Fall back to integer representation
+    // Try as tuple (has magic number - most reliable)
+    LmTuple* tuple = (LmTuple*)ptr;
+    if (tuple && tuple->magic == LM_TUPLE_MAGIC && tuple->elements && tuple->size < 1000000) {
+        return format_tuple(tuple);
+    }
+    
+    // Try as list
+    LmList* list = (LmList*)ptr;
+    if (list && list->data && list->size < 1000000 && list->capacity >= list->size) {
+        return format_list(list);
+    }
+    
+    // Try as dict
+    LmDict* dict = (LmDict*)ptr;
+    if (dict && dict->buckets && dict->bucket_count > 0 && dict->bucket_count < 1000000) {
+        return format_dict(dict);
+    }
+    
+    // If none of the above, fall back to integer representation
     return lm_int_to_string(value);
 }
 
 // Main API: Convert any value to a printable string
 // This is the function called by both JIT and Register VM
-RUNTIME_API LmString lm_value_to_string(int64_t value) {
-    return format_value(value);
+RUNTIME_API LmString lm_value_to_string(void* value) {
+    return format_value((int64_t)(uintptr_t)value);
 }

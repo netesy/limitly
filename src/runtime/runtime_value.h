@@ -16,7 +16,8 @@ extern "C" {
 // Convert any value to a printable string
 // Handles primitives (int, bool, etc.) and collections (list, dict, tuple)
 // This is the unified function used by both JIT and Register VM
-RUNTIME_API LmString lm_value_to_string(int64_t value);
+// Note: Accepts void* pointer which is interpreted as int64_t internally
+RUNTIME_API LmString lm_value_to_string(void* value);
 
 #ifdef __cplusplus
 }

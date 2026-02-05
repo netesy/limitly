@@ -54,11 +54,11 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
     enter_memory_region();
     
     // Use CFG mode for proper JIT compatibility
-    cfg_context_.building_cfg = false;
+    cfg_context_.building_cfg = false;  // DISABLED: CFG linearization has bugs with elif
     cfg_context_.current_block = nullptr;
     
-    // Create CFG for JIT compatibility
-    start_cfg_build();
+    // Create CFG for JIT compatibility (disabled for now)
+    // start_cfg_build();
     
     // Generate top-level statements (excluding function definitions)
     for (const auto& stmt : type_check_result.program->statements) {
@@ -130,8 +130,8 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     enter_scope();
     enter_memory_region();
     
-    // Start CFG building
-    start_cfg_build();
+    // Start CFG building (disabled for now - has bugs with elif)
+    // start_cfg_build();
     
     // Register regular parameters
     for (size_t i = 0; i < fn.params.size(); ++i) {
@@ -2204,7 +2204,10 @@ void Generator::emit_print_value(Reg value) {
             default:
                 // Convert to string and print
                 Reg str_reg = allocate_register();
-                emit_instruction(LIR_Inst(LIR_Op::ToString, Type::Ptr, str_reg, value, 0));
+                // Get the type of the value being converted
+                TypePtr val_type = get_register_language_type(value);
+                LIR::Type lir_type = (val_type && val_type->tag != ::TypeTag::String) ? LIR::Type::Ptr : LIR::Type::I64;
+                emit_instruction(LIR_Inst(LIR_Op::ToString, Type::Ptr, str_reg, value, 0, 0, lir_type));
                 auto string_type = std::make_shared<::Type>(::TypeTag::String);
                 set_register_language_type(str_reg, string_type);
                 emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, str_reg, 0));
@@ -2215,7 +2218,8 @@ void Generator::emit_print_value(Reg value) {
         // Always convert to string first, then print
         // This handles tuples, lists, dicts, and other complex types
         Reg str_reg = allocate_register();
-        emit_instruction(LIR_Inst(LIR_Op::ToString, Type::Ptr, str_reg, value, 0));
+        // Assume unknown types are pointers to collections
+        emit_instruction(LIR_Inst(LIR_Op::ToString, Type::Ptr, str_reg, value, 0, 0, LIR::Type::Ptr));
         auto string_type = std::make_shared<::Type>(::TypeTag::String);
         set_register_language_type(str_reg, string_type);
         emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, str_reg, 0));
@@ -2383,9 +2387,12 @@ void Generator::emit_if_stmt_cfg(LM::Frontend::AST::IfStatement& stmt) {
         }
         
         // Jump to end after else branch (only if no terminator already exists)
-        if (get_current_block() && !get_current_block()->has_terminator()) {
+        // This is important: we only jump if the current block doesn't already have a terminator
+        // (like a return statement from a nested if)
+        LIR_BasicBlock* current = get_current_block();
+        if (current && !current->has_terminator()) {
             emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, end_block->id));
-            add_block_edge(else_block, end_block);  // Add CFG edge
+            add_block_edge(current, end_block);  // Add CFG edge
         }
     }
     
@@ -2398,6 +2405,7 @@ void Generator::emit_if_stmt_cfg(LM::Frontend::AST::IfStatement& stmt) {
         end_block->terminated = true;
     }
 }
+
 
 void Generator::emit_if_stmt_linear(LM::Frontend::AST::IfStatement& stmt) {
     // Emit condition
@@ -4327,22 +4335,69 @@ void Generator::flatten_cfg_to_instructions() {
     // Create a map from block ID to instruction position (label)
     std::unordered_map<uint32_t, size_t> block_positions;
     
-    // First pass: calculate positions for each block in order
-    size_t current_pos = 0;
-    
-    // Sort blocks by ID to ensure consistent ordering
+    // Use a smarter linearization that respects control flow structure
+    // Strategy: Use BFS but prioritize blocks that are not end blocks
     std::vector<LIR_BasicBlock*> sorted_blocks;
+    std::unordered_set<uint32_t> visited;
+    std::queue<uint32_t> queue;
+    
+    // Start from entry block
+    if (current_function_->cfg->entry_block_id != UINT32_MAX) {
+        queue.push(current_function_->cfg->entry_block_id);
+        visited.insert(current_function_->cfg->entry_block_id);
+    }
+    
+    // BFS traversal
+    while (!queue.empty()) {
+        uint32_t block_id = queue.front();
+        queue.pop();
+        
+        auto block = current_function_->cfg->get_block(block_id);
+        if (!block) continue;
+        
+        sorted_blocks.push_back(block);
+        
+        // Add successors to queue, but prioritize non-end blocks
+        std::vector<uint32_t> end_block_successors;
+        std::vector<uint32_t> other_successors;
+        
+        for (uint32_t successor_id : block->successors) {
+            if (visited.count(successor_id)) continue;
+            
+            auto successor = current_function_->cfg->get_block(successor_id);
+            if (successor && successor->label.find("_end") != std::string::npos) {
+                end_block_successors.push_back(successor_id);
+            } else {
+                other_successors.push_back(successor_id);
+            }
+        }
+        
+        // Add non-end blocks first
+        for (uint32_t successor_id : other_successors) {
+            if (!visited.count(successor_id)) {
+                visited.insert(successor_id);
+                queue.push(successor_id);
+            }
+        }
+        
+        // Add end blocks last
+        for (uint32_t successor_id : end_block_successors) {
+            if (!visited.count(successor_id)) {
+                visited.insert(successor_id);
+                queue.push(successor_id);
+            }
+        }
+    }
+    
+    // Add any remaining blocks (shouldn't happen in well-formed CFG)
     for (const auto& block : current_function_->cfg->blocks) {
-        if (block) {
+        if (block && !visited.count(block->id)) {
             sorted_blocks.push_back(block.get());
         }
     }
-    std::sort(sorted_blocks.begin(), sorted_blocks.end(), 
-              [](const LIR_BasicBlock* a, const LIR_BasicBlock* b) {
-                  return a->id < b->id;
-              });
     
     // Calculate positions for each block
+    size_t current_pos = 0;
     for (const auto* block : sorted_blocks) {
         block_positions[block->id] = current_pos;
         current_pos += block->instructions.size();

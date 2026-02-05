@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <set>
 #include <functional>
 #include <chrono>
 #include <cstdio>
@@ -182,7 +183,7 @@ JITBackend::JITBackend()
     
     // Set up lm_value_to_string function (unified value-to-string conversion)
     std::vector<gccjit::param> value_to_string_params;
-    value_to_string_params.push_back(m_context.new_param(m_context.get_type(GCC_JIT_TYPE_INT64_T), "value"));
+    value_to_string_params.push_back(m_context.new_param(m_void_ptr_type, "value"));
     m_lm_value_to_string_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_lm_string_type, "lm_value_to_string", value_to_string_params, 0);
     
     // Set up lm_string_free function
@@ -395,50 +396,89 @@ void JITBackend::compile_function_single_pass(const LIR::LIR_Function& function)
     
     // Track whether current block is terminated
     bool current_block_terminated = false;
+    std::set<uint32_t> terminated_blocks;
     
     // Process all instructions in a single pass
     for (size_t i = 0; i < function.instructions.size(); ++i) {
         const auto& inst = function.instructions[i];
         
-        // Check if this instruction position is a jump target
-        auto it = label_blocks.find(i);
-        if (it != label_blocks.end() && i != UINT32_MAX) {
-            m_current_block = it->second;
-            current_block_terminated = false;
-        } else if (current_block_terminated) {
+        // If previous block was terminated, create a new one
+        if (current_block_terminated) {
             // Previous instruction terminated the block, create a new one for this instruction
             std::string new_block_name = "inst_" + std::to_string(i);
             m_current_block = m_current_func.new_block(new_block_name);
-            label_blocks[i] = m_current_block;
             current_block_terminated = false;
-        }
-        
-        // Pre-create jump target blocks
-        if (inst.op == LIR::LIR_Op::Jump || inst.op == LIR::LIR_Op::JumpIfFalse) {
-            uint32_t target_label = inst.imm;
-            if (label_blocks.find(target_label) == label_blocks.end()) {
-                std::string block_name = "label_" + std::to_string(target_label);
-                gccjit::block target_block = m_current_func.new_block(block_name);
-                label_blocks[target_label] = target_block;
-            }
         }
         
         // Emit the instruction
         if (inst.op == LIR::LIR_Op::Jump) {
             compile_jump(inst);
             current_block_terminated = true;
+            terminated_blocks.insert(i);
             m_stats.instructions_compiled++;
         } else if (inst.op == LIR::LIR_Op::JumpIfFalse) {
             compile_conditional_jump(inst, i);
-            current_block_terminated = true;
+            // Don't mark as terminated - compile_conditional_jump switches to continuation block
+            current_block_terminated = false;
             m_stats.instructions_compiled++;
         } else if (inst.op == LIR::LIR_Op::Return) {
             compile_instruction(inst);
             current_block_terminated = true;
+            terminated_blocks.insert(i);
             m_stats.instructions_compiled++;
         } else {
             compile_instruction(inst);
             m_stats.instructions_compiled++;
+            
+            // After a non-terminating instruction, check if the next instruction is a label target
+            // If so, we need to add an implicit jump to it
+            if (!current_block_terminated && i + 1 < function.instructions.size()) {
+                auto next_it = label_blocks.find(i + 1);
+                if (next_it != label_blocks.end()) {
+                    // Next instruction is a label target, add implicit jump
+                    try {
+                        m_current_block.end_with_jump(next_it->second);
+                        current_block_terminated = true;
+                        terminated_blocks.insert(i);
+                    } catch (const std::exception& e) {
+                        // Block might already be terminated
+                    }
+                }
+            }
+        }
+    }
+    
+    // Finalize: ensure all blocks are properly terminated
+    if (!current_block_terminated) {
+        gccjit::type return_type = determine_function_return_type(function.instructions);
+        if (return_type.get_inner_type() == m_context.get_type(GCC_JIT_TYPE_VOID).get_inner_type()) {
+            m_current_block.end_with_return();
+        } else {
+            // Return the value from register 0 (standard return register)
+            if (jit_registers.find(0) != jit_registers.end()) {
+                m_current_block.end_with_return(jit_registers[0]);
+            } else {
+                m_current_block.end_with_return(m_context.new_rvalue(return_type, 0));
+            }
+        }
+    }
+    
+    // Terminate any unterminated label blocks
+    for (auto& pair : label_blocks) {
+        if (pair.first == UINT32_MAX) continue; // Skip entry block
+        if (terminated_blocks.count(pair.first)) continue; // Skip already terminated blocks
+        
+        gccjit::block block = pair.second;
+        try {
+            // Try to add a return to any unterminated blocks
+            gccjit::type return_type = determine_function_return_type(function.instructions);
+            if (return_type.get_inner_type() == m_context.get_type(GCC_JIT_TYPE_VOID).get_inner_type()) {
+                block.end_with_return();
+            } else {
+                block.end_with_return(m_context.new_rvalue(return_type, 0));
+            }
+        } catch (const std::exception& e) {
+            // Block is already terminated, which is fine
         }
     }
 }
@@ -794,9 +834,30 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
         case LIR::LIR_Op::ToString: {
             gccjit::lvalue dst = get_jit_register(inst.dst, m_const_char_ptr_type);
             gccjit::rvalue src = get_jit_register(inst.a);
-            gccjit::rvalue result = compile_to_string(src);
-            m_current_block.add_assignment(dst, result);
-            return result;
+            
+            // Use type information to decide how to convert
+            // If type_a is Ptr, the value is a pointer to a collection
+            if (inst.type_a == LIR::Type::Ptr) {
+                // Value is a pointer - call runtime function to handle collections
+                // The runtime function expects int64_t, but we have void*
+                // We can pass it directly since they're the same size on 64-bit systems
+                
+                // Call lm_value_to_string(value) which returns LmString
+                std::vector<gccjit::rvalue> value_to_string_args = {src};
+                gccjit::rvalue lm_string_result = m_context.new_call(m_lm_value_to_string_func, value_to_string_args);
+                
+                // Extract the data pointer from LmString
+                std::vector<gccjit::rvalue> get_data_args = {lm_string_result};
+                gccjit::rvalue c_string = m_context.new_call(m_lm_string_get_data_func, get_data_args);
+                
+                m_current_block.add_assignment(dst, c_string);
+                return c_string;
+            } else {
+                // Value is a primitive - use standard conversion
+                gccjit::rvalue result = compile_to_cstring(src);
+                m_current_block.add_assignment(dst, result);
+                return result;
+            }
         }
         
         case LIR::LIR_Op::Nop:
@@ -876,11 +937,10 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
         }
         
         case LIR::LIR_Op::DictCreate: {
-            // Create a new dict: void* lm_dict_new(hash_fn, cmp_fn)
-            // For JIT, we'll use simplified version without custom hash/cmp
+            // Create a new dict using wrapper function that includes hash/compare functions
             std::vector<gccjit::param> dict_new_params;
             gccjit::function dict_new_func = m_context.new_function(
-                GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "lm_dict_new", dict_new_params, 0);
+                GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "jit_dict_new", dict_new_params, 0);
             
             gccjit::rvalue result = m_current_block.add_call(dict_new_func);
             gccjit::lvalue dst = get_jit_register(inst.dst, m_void_ptr_type);
@@ -1184,19 +1244,25 @@ gccjit::rvalue JITBackend::compile_bitwise_op(LIR::LIR_Op op, gccjit::rvalue a, 
 }
 
 void JITBackend::compile_jump(const LIR::LIR_Inst& inst) {
-    // Simple direct jump - target block should already exist from pass 1
+    // Simple direct jump - create target block if it doesn't exist
     uint32_t target_label = inst.imm;
     
+    gccjit::block target_block;
     auto it = label_blocks.find(target_label);
     if (it != label_blocks.end()) {
-        gccjit::block target_block = it->second;
-        try {
-            m_current_block.end_with_jump(target_block);
-        } catch (const std::exception& e) {
-            // Block might already be terminated - this can happen in complex control flow
-            // For now, just report and continue
-            report_error("Jump block already terminated: " + std::string(e.what()));
-        }
+        target_block = it->second;
+    } else {
+        std::string block_name = "label_" + std::to_string(target_label);
+        target_block = m_current_func.new_block(block_name);
+        label_blocks[target_label] = target_block;
+    }
+    
+    try {
+        m_current_block.end_with_jump(target_block);
+    } catch (const std::exception& e) {
+        // Block might already be terminated - this can happen in complex control flow
+        // For now, just report and continue
+        report_error("Jump block already terminated: " + std::string(e.what()));
     }
 }
 
@@ -1216,24 +1282,18 @@ void JITBackend::compile_conditional_jump(const LIR::LIR_Inst& inst, size_t curr
     }
     
     // Create continuation block (true branch - next instruction)
+    // Don't store this in label_blocks - let the main loop handle block creation
     size_t continuation_pos = current_instruction_pos + 1;
-    gccjit::block continuation_block;
-    
-    // Check if continuation block already exists
-    auto cont_it = label_blocks.find(continuation_pos);
-    if (cont_it != label_blocks.end()) {
-        continuation_block = cont_it->second;
-    } else {
-        std::string cont_name = "cont_" + std::to_string(continuation_pos);
-        continuation_block = m_current_func.new_block(cont_name);
-        label_blocks[continuation_pos] = continuation_block;
-    }
+    std::string cont_name = "cont_" + std::to_string(continuation_pos);
+    gccjit::block continuation_block = m_current_func.new_block(cont_name);
     
     // Conditional jump: if false, go to target; if true, continue
     m_current_block.end_with_conditional(condition, continuation_block, target_block);
     
-    // DON'T switch to continuation block here - let the main loop handle it
-    // The block is terminated, so we can't add more instructions to it
+    // Switch to continuation block for the next instruction
+    m_current_block = continuation_block;
+    
+    // DON'T mark as terminated - the continuation block is active and ready for more instructions
 }
 
 void JITBackend::compile_call(const LIR::LIR_Inst& inst) {
@@ -2304,9 +2364,16 @@ void JITBackend::compile_function_body(gccjit::function& native_func,
         for (size_t i = 0; i < instructions.size(); ++i) {
             const auto& inst = instructions[i];
             
+            if (m_debug_mode) {
+                std::cout << "[JIT DEBUG] Processing instruction " << i << ", terminated=" << current_block_terminated << std::endl;
+            }
+            
             // Check if this instruction position is a jump target
             auto it = label_blocks.find(i);
             if (it != label_blocks.end()) {
+                if (m_debug_mode) {
+                    std::cout << "[JIT DEBUG] Instruction " << i << " is a label target, switching blocks" << std::endl;
+                }
                 m_current_block = it->second;
                 current_block_terminated = false;
             } else if (current_block_terminated) {
@@ -2328,6 +2395,28 @@ void JITBackend::compile_function_body(gccjit::function& native_func,
                 current_block_terminated = true;
             } else {
                 compile_instruction(inst);
+                
+                // After a non-terminating instruction, check if the next instruction is a label target
+                // If so, we need to add an implicit jump to it
+                if (!current_block_terminated && i + 1 < instructions.size()) {
+                    auto next_it = label_blocks.find(i + 1);
+                    if (next_it != label_blocks.end()) {
+                        // Next instruction is a label target, add implicit jump
+                        if (m_debug_mode) {
+                            std::cout << "[JIT DEBUG] Adding implicit jump from instruction " << i 
+                                      << " to label " << (i + 1) << std::endl;
+                        }
+                        try {
+                            m_current_block.end_with_jump(next_it->second);
+                            current_block_terminated = true;
+                        } catch (const std::exception& e) {
+                            // Block might already be terminated
+                            if (m_debug_mode) {
+                                std::cout << "[JIT DEBUG] Failed to add implicit jump: " << e.what() << std::endl;
+                            }
+                        }
+                    }
+                }
             }
         }
         

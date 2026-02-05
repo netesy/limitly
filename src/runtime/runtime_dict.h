@@ -48,3 +48,10 @@ RUNTIME_API int lm_cmp_string(void* k1, void* k2);
 #endif
 
 #endif // RUNTIME_DICT_H
+
+// Boxed value hash and compare functions (used by both VM and JIT)
+RUNTIME_API uint64_t hash_boxed_value(void* key);
+RUNTIME_API int cmp_boxed_value(void* k1, void* k2);
+
+// Wrapper function for JIT to create dicts with proper hash/compare functions
+RUNTIME_API void* jit_dict_new(void);
