@@ -189,6 +189,7 @@ Limit has several built-in primitive types:
 
 ```
 var my_integer: int = 42;
+var my_uint: uint = 100;
 var my_float: float = 3.14;
 var my_boolean: bool = true;
 var my_string: str = "Hello, Limit!";
@@ -335,7 +336,6 @@ iter (i in 0..10..2) {
     print("i = {i}"); // Output: 0, 2, 4, 6, 8
 }
 ```
-> **Note:** The step value feature is planned but not yet fully implemented in the parser.
 
 ### Ternary Operator
 
@@ -346,7 +346,6 @@ var x = 10;
 var result = x > 5 ? "Greater than 5" : "Not greater than 5";
 print(result); // Output: Greater than 5
 ```
-> **Note:** The ternary operator is planned but not yet implemented in the parser.
 
 ### Match Statements
 
@@ -427,6 +426,23 @@ fn greet(p: Person) {
 
 greet({name: "Alice", age: 30}); // Output: Alice is 30 years old.
 ```
+
+#### Matching on success and error
+
+When working with fallible operations that return a `Type?`, you can use `val` and `err` patterns to concisely handle success and error cases.
+
+```limit
+fn might_fail(): int? {
+    // This function might return ok(10) or err()
+}
+
+match (might_fail()) {
+    val(v) => { print("Succeeded with value: {v}"); },
+    err(e) => { print("Failed with error: {e}"); }
+}
+```
+
+This is a cleaner alternative to matching on `Ok(value)` and `Err(error)`.
 
 #### Destructuring Dictionaries
 
@@ -697,12 +713,14 @@ You can control the visibility of class members (fields and methods) using `pub`
 *   **`private`** (default): The member can only be accessed from within the class.
 *   **`prot`** (protected): The member can be accessed from within the class and by its subclasses.
 *   **`pub`** (public): The member can be accessed from anywhere.
+*   **`const`**: The member is public but cannot be reassigned.
 
 ```limit
 class MyClass {
     var private_field = 1;      // private by default
     pub var public_field = 2;
     prot var protected_field = 3;
+    const var const_field = 4;
 
     fn private_method() {}      // private by default
     pub fn public_method() {}
@@ -745,6 +763,24 @@ class Circle : Shape {
 
     fn area(): float {
         return 3.14 * self.radius * self.radius;
+    }
+}
+```
+
+### Workers
+
+A `worker` statement is used inside a `parallel` or `concurrent` block to process data streams from a channel.
+
+```limit
+var my_channel = channel();
+
+concurrent(ch=my_channel) {
+    task {
+        my_channel.send("Hello from a task!");
+    }
+
+    worker(msg in my_channel) {
+        print("Worker received: {msg}");
     }
 }
 ```
@@ -1151,60 +1187,100 @@ class Dog : Speaker {
 }
 ```
 
-### Error Handling
+### Intersection Types
+
+An intersection type is a type that combines multiple types into one. A value of an intersection type must satisfy the requirements of all the types in the intersection. Intersection types are defined using the ampersand (`&`) character.
+
+```limit
+trait HasName {
+    fn get_name(): str;
+}
+
+trait HasAge {
+    fn get_age(): int;
+}
+
+type Person = HasName & HasAge;
+
+fn print_person_details(p: Person) {
+    print("{p.get_name()} is {p.get_age()} years old.");
+}
+```
+
+### Refined Types
+
+A refined type allows you to add constraints to an existing type. This is useful for enforcing invariants at the type level. Refined types are defined using the `where` keyword.
+
+```limit
+type PositiveInt = int where value > 0;
+
+fn set_age(age: PositiveInt) {
+    // ...
+}
+
+set_age(10); // Valid
+set_age(-5); // This would be a runtime error
+```
+
+### Structural Types
+
+A structural type allows you to define a type based on its structure or shape, rather than by a specific name. This is useful for working with data that has a consistent structure but may not be an instance of a named class.
+
+```limit
+type Point = {x: float, y: float};
+
+fn print_point(p: Point) {
+    print("({p.x}, {p.y})");
+}
+
+var my_point = {x: 10.5, y: 20.0};
+print_point(my_point); // Output: (10.5, 20.0)
+```
+
+### Tuple Types
+
+A tuple is a fixed-size, ordered collection of elements of different types. Tuple types are defined using parentheses.
+
+```limit
+type PersonInfo = (str, int, str);
+
+var person: PersonInfo = ("Alice", 30, "New York");
+```
+
+### Enum Declarations
+
+Enums (enumerations) allow you to define a type that can only be one of a specific set of values.
+
+```limit
+enum Status {
+    Pending,
+    Running,
+    Completed,
+    Failed
+}
+
+var current_status: Status = Status.Running;
+```
+
+### Traits and Interfaces
+
+Traits and interfaces are used to define a set of methods that a class must implement. This is a powerful tool for abstraction and polymorphism.
+
+```limit
+trait Speaker {
+    fn speak();
+}
+
+class Dog : Speaker {
+    fn speak() {
+        print("Woof!");
+    }
+}
+```
+
+### Optional Values and Error Handling
 
 **Key Design Principle**: Limit is designed to be null-free. It does not have null pointers, references, or values. Instead, Limit uses a robust type-based system to handle optionality and errors.
-
-### The `Option` Type for Optional Values
-
-When a value can be present or absent, you should use the `Option` enum, which has two variants:
-- **`Some(value)`**: Represents the presence of a value.
-- **`None`**: Represents the absence of a value.
-
-```limit
-enum Option {
-    Some(any),
-    None
-}
-
-fn find_user(id: int): Option {
-    if (id == 1) {
-        return Some("Alice");
-    }
-    return None;
-}
-```
-
-You can then use a `match` statement to safely handle both cases:
-
-```limit
-var user = find_user(1);
-match (user) {
-    Some(name) => { print("Found user: {name}"); },
-    None => { print("User not found"); }
-}
-```
-
-### The `Result` Type for Operations That Can Fail
-
-For operations that can either succeed or fail, Limit uses a `Result` type (often implemented as a `Type?` or a custom enum). The common convention is:
-- **`Ok(value)`**: Represents a successful result.
-- **`Err(error)`**: Represents a failure, containing an error value.
-
-```limit
-fn divide(a: int, b: int): int?DivisionByZero {
-    if (b == 0) {
-        return Err(DivisionByZero("Cannot divide by zero"));
-    }
-    return Ok(a / b);
-}
-
-var result = divide(10, 2);
-match (result) {
-    Ok(value) => { print("Result: {value}"); },
-    Err(e) => { print("Error: {e}"); }
-}
-```
 
 ### The Unified `Type?` System
 
@@ -1212,14 +1288,16 @@ For convenience, Limit provides the `Type?` syntax as a shorthand for fallible o
 - **`Type?`**: A type that can either hold a value of `Type` or an error.
 - **`ok(value)`**: Constructs a success value.
 - **`err()`**: Constructs an error value.
+- **`Some(value)`**: Constructs an optional value that is present.
+- **`None`**: Constructs an optional value that is absent.
 
 ### The `?` Operator for Propagating Errors
 
-The `?` operator is a convenient way to propagate errors up the call stack. If a function call returns an `Err`, the `?` operator will immediately return that `Err` from the current function.
+The `?` operator is a convenient way to propagate errors up the call stack. If a function call returns an `err()`, the `?` operator will immediately return that `err()` from the current function.
 
 ```limit
 fn get_number_from_string(s: str): int? {
-    var number: int = to_int(s)?; // If to_int returns Err, this function also returns Err
+    var number: int = to_int(s)?; // If to_int returns err(), this function also returns err()
     return ok(number * 2);
 }
 ```
@@ -1479,6 +1557,20 @@ Channels are the primary way for concurrent tasks to communicate. One or more ta
 ### Async/Await
 
 The `async` and `await` keywords are used for non-blocking operations, typically within a `concurrent` block. An `async` function returns immediately without blocking the thread, and you can use `await` to get its result when it's ready.
+
+```limit
+async fn fetch_data(): str {
+    // Simulate a network request
+    return "Some data";
+}
+
+concurrent {
+    task {
+        var data = await fetch_data();
+        print("Data received: {data}");
+    }
+}
+```
 
 ### Atomics
 
