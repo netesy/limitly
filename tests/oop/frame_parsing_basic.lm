@@ -1,58 +1,59 @@
 // Test basic frame declaration parsing
-// This file tests that frame syntax is correctly parsed without execution
 
 // Simple frame with fields
-frame Person {
-    pub name: str;
-    pub age: int;
-}
-
-// Frame with methods
-frame Calculator {
-    pub fn add(a: int, b: int): int {
-        return a + b;
-    }
-}
-
-// Frame with init method
 frame Point {
     pub x: int;
     pub y: int;
+}
+
+// Frame with methods
+frame Counter {
+    prot count: int = 0;
     
-    init(px: int, py: int) {
-        x = px;
-        y = py;
+    pub fn increment() {
+        this.count = this.count + 1;
+    }
+    
+    pub fn get_count(): int {
+        return this.count;
     }
 }
 
-// Frame with deinit method
+// Frame with trait implementation
+frame Logger : Printable {
+    pub message: str;
+    
+    pub fn prints() {
+        print(this.message);
+    }
+}
+
+// Frame with init and deinit
 frame Resource {
-    pub id: int;
+    prot handle: int;
     
-    deinit() {
-        print("Cleanup");
+    pub init(h: int) {
+        this.handle = h;
+        print("Resource initialized");
+    }
+    
+    pub deinit() {
+        print("Resource cleaned up");
     }
 }
 
-// Frame implementing traits
-frame Animal : Movable, Drawable {
-    pub name: str;
-}
-
-// Frame with visibility modifiers
-frame BankAccount {
-    pub accountNumber: str;
-    prot balance: int;
+// Frame with multiple traits
+frame DataStore : Readable, Writable {
+    datas: str = "";
     
-    pub fn deposit(amount: int) {
-        balance = balance + amount;
+    pub fn read(): str {
+        return this.datas;
+    }
+    
+    pub fn write(value: str) {
+        this.datas = value;
     }
 }
-
-// Frame with default field values
-frame Config {
-    pub debug: bool = false;
-    pub timeout: int = 30;
 }
 
 print("Frame parsing test completed");

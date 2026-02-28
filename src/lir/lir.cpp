@@ -267,6 +267,12 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::NewObject: return "new";
         case LIR_Op::GetField: return "get_field";
         case LIR_Op::SetField: return "set_field";
+        case LIR_Op::NewFrame: return "new_frame";
+        case LIR_Op::FrameGetField: return "frame_get_field";
+        case LIR_Op::FrameSetField: return "frame_set_field";
+        case LIR_Op::FrameCallMethod: return "frame_call_method";
+        case LIR_Op::FrameCallInit: return "frame_call_init";
+        case LIR_Op::FrameCallDeinit: return "frame_call_deinit";
         case LIR_Op::ImportModule: return "import_module";
         case LIR_Op::ExportSymbol: return "export_symbol";
         case LIR_Op::BeginModule: return "begin_module";

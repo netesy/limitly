@@ -81,7 +81,7 @@ int main(int argc, char* argv[]) {
             std::cout << "=== Tokens ===\n";
             for (size_t i = 0; i < tokens.size(); i++) {
                 const auto& token = tokens[i];
-                std::cout << "[" << i << "] Line " << token.line << ", Col " << token.column 
+                std::cout << "[" << i << "] Line " << token.line 
                          << ": " << scanner.tokenTypeToString(token.type) 
                          << " = '" << token.lexeme << "'\n";
             }
@@ -93,7 +93,7 @@ int main(int argc, char* argv[]) {
         Parser parser(scanner);
         auto program = parser.parse();
         
-        if (Error::Debugger::hasError()) {
+        if (parser.hadError()) {
             std::cerr << "✗ Parse errors occurred\n";
             return 1;
         }
@@ -107,8 +107,8 @@ int main(int argc, char* argv[]) {
         // Print AST if requested
         if (printAST && program) {
             std::cout << "=== Abstract Syntax Tree ===\n";
-            AST::Printer astPrinter;
-            astPrinter.print(program);
+            LM::Frontend::AST::ASTPrinter astPrinter;
+            astPrinter.process(program);
             std::cout << "\n";
         }
 
@@ -124,14 +124,7 @@ int main(int argc, char* argv[]) {
         // Type checking if requested
         if (printTypes && program) {
             std::cout << "=== Type Checking ===\n";
-            TypeChecker typeChecker;
-            bool typeCheckPassed = typeChecker.check(program, source, filename);
-            
-            if (typeCheckPassed) {
-                std::cout << "✓ Type checking passed\n";
-            } else {
-                std::cout << "✗ Type checking failed\n";
-            }
+            std::cout << "Type checking not yet integrated with test_parser\n";
             std::cout << "\n";
         }
 
@@ -154,8 +147,8 @@ int main(int argc, char* argv[]) {
                 std::streambuf* coutbuf = std::cout.rdbuf();
                 std::cout.rdbuf(out.rdbuf());
                 
-                AST::Printer astPrinter;
-                astPrinter.print(program);
+                LM::Frontend::AST::ASTPrinter astPrinter;
+                astPrinter.process(program);
                 
                 std::cout.rdbuf(coutbuf);
                 out.close();
@@ -173,7 +166,7 @@ int main(int argc, char* argv[]) {
                 
                 for (size_t i = 0; i < tokens.size(); i++) {
                     const auto& token = tokens[i];
-                    out << "[" << i << "] Line " << token.line << ", Col " << token.column 
+                    out << "[" << i << "] Line " << token.line 
                        << ": " << scanner.tokenTypeToString(token.type) 
                        << " = '" << token.lexeme << "'\n";
                 }

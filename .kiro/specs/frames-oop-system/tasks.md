@@ -50,20 +50,7 @@ This implementation plan breaks down the frames OOP system into discrete, manage
   - **JIT Focus**: Include frame layout and method dispatch information in type definitions for compile-time optimization
   - **Status**: AST nodes exist for ClassDeclaration; need to create frame-specific versions
 
-- [ ] 2. Implement frame declaration parsing
-
-
-
-
-
-
-
-
-
-
-
-
-
+- [x] 2. Implement frame declaration parsing
 
 
 
@@ -78,7 +65,16 @@ This implementation plan breaks down the frames OOP system into discrete, manage
   - **JIT Focus**: Generate AST with complete frame layout information for compile-time method dispatch resolution
   - **Status**: Parser has class parsing; adapt for frames
 
-- [ ] 3. Implement frame instantiation parsing and type checking
+- [x] 3. Implement frame instantiation parsing and type checking
+
+
+
+
+
+
+
+
+
   - Parse `FrameName()` syntax for frame creation
   - Parse `FrameName(field1=value1, field2=value2)` syntax
   - Implement type checking for frame instantiation
@@ -87,7 +83,16 @@ This implementation plan breaks down the frames OOP system into discrete, manage
   - **JIT Focus**: Validate frame instantiation at compile-time and generate specialized code for each frame type
   - **Status**: Class instantiation exists; adapt for frames
 
-- [ ] 4. Implement frame field and method access
+- [x] 4. Implement frame field and method access
+
+
+
+
+
+
+
+
+
   - Parse member access syntax (`frame.field`, `frame.method()`)
   - Implement type checking for field access
   - Implement type checking for method calls
@@ -97,7 +102,11 @@ This implementation plan breaks down the frames OOP system into discrete, manage
   - **Optimization**: Eliminate runtime method lookup overhead through compile-time resolution
   - **Status**: Class member access exists; adapt for frames
 
-- [ ] 5. Implement frame LIR code generation
+- [x] 5. Implement frame LIR code generation
+
+
+
+
   - Generate LIR for frame instantiation (allocate memory, initialize fields)
   - Generate LIR for field access (load/store operations)
   - Generate LIR for method calls (function calls with frame context)
@@ -108,6 +117,10 @@ This implementation plan breaks down the frames OOP system into discrete, manage
   - **Status**: Class LIR generation exists; adapt for frames
 
 - [ ] 6. Implement frame VM execution
+
+
+
+
   - Add frame value representation to VM
   - Implement frame allocation in memory system
   - Implement field access in VM

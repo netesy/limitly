@@ -130,6 +130,8 @@ bool to_bool(const RegisterValue& value) {
         return std::get<double>(value) != 0.0;
     } else if (std::holds_alternative<std::string>(value)) {
         return !std::get<std::string>(value).empty();
+    } else if (std::holds_alternative<FrameInstancePtr>(value)) {
+        return std::get<FrameInstancePtr>(value) != nullptr;
     } else {
         return false;
     }
@@ -216,6 +218,36 @@ void RegisterVM::execute_lir_function(const LIR::LIRFunction& function) {
 std::string RegisterVM::to_string(const RegisterValue& value) const {
     if (std::holds_alternative<std::string>(value)) {
         return std::get<std::string>(value);
+    } else if (std::holds_alternative<FrameInstancePtr>(value)) {
+        auto frame = std::get<FrameInstancePtr>(value);
+        if (!frame) {
+            return "nil";
+        }
+        std::string result = frame->frame_type + "{";
+        bool first = true;
+        for (const auto& [field_name, field_value] : frame->fields) {
+            if (!first) result += ", ";
+            first = false;
+            result += field_name + ": ";
+            // Convert field value to string
+            if (std::holds_alternative<int64_t>(field_value)) {
+                result += std::to_string(std::get<int64_t>(field_value));
+            } else if (std::holds_alternative<uint64_t>(field_value)) {
+                result += std::to_string(std::get<uint64_t>(field_value));
+            } else if (std::holds_alternative<double>(field_value)) {
+                result += std::to_string(std::get<double>(field_value));
+            } else if (std::holds_alternative<bool>(field_value)) {
+                result += std::get<bool>(field_value) ? "true" : "false";
+            } else if (std::holds_alternative<std::string>(field_value)) {
+                result += std::get<std::string>(field_value);
+            } else if (std::holds_alternative<std::nullptr_t>(field_value)) {
+                result += "nil";
+            } else if (std::holds_alternative<FrameInstancePtr>(field_value)) {
+                result += "<frame>";
+            }
+        }
+        result += "}";
+        return result;
     } else if (std::holds_alternative<int64_t>(value)) {
         int64_t int_val = std::get<int64_t>(value);
         
@@ -1582,6 +1614,62 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 // Placeholder implementations
                 break;
             }
+            case LIR::LIR_Op::NewFrame: {
+                // Allocate and initialize a new frame instance
+                // dst = frame register, imm = frame size (number of fields)
+                auto frame = std::make_shared<FrameInstance>();
+                registers[pc->dst] = frame;
+                break;
+            }
+            case LIR::LIR_Op::FrameGetField: {
+                // Load field from frame instance
+                // dst = destination register, a = frame register, b = field offset (as field name index)
+                if (std::holds_alternative<FrameInstancePtr>(registers[pc->a])) {
+                    auto frame = std::get<FrameInstancePtr>(registers[pc->a]);
+                    // For now, use field offset as a simple index
+                    // In a real implementation, we'd need to map offsets to field names
+                    std::string field_name = "field_" + std::to_string(pc->b);
+                    if (frame->hasField(field_name)) {
+                        auto field_value = frame->fields[field_name];
+                        registers[pc->dst] = field_value;
+                    } else {
+                        registers[pc->dst] = nullptr;
+                    }
+                } else {
+                    registers[pc->dst] = nullptr;
+                }
+                break;
+            }
+            case LIR::LIR_Op::FrameSetField: {
+                // Store field to frame instance
+                // dst = frame register, a = field offset, b = value register
+                if (std::holds_alternative<FrameInstancePtr>(registers[pc->dst])) {
+                    auto frame = std::get<FrameInstancePtr>(registers[pc->dst]);
+                    std::string field_name = "field_" + std::to_string(pc->a);
+                    frame->fields[field_name] = registers[pc->b];
+                } else {
+                    // Error: not a frame instance
+                }
+                break;
+            }
+            case LIR::LIR_Op::FrameCallMethod: {
+                // Call frame method (static dispatch)
+                // This is a placeholder - actual method calls would be handled by Call instruction
+                // with the frame as the first argument
+                break;
+            }
+            case LIR::LIR_Op::FrameCallInit: {
+                // Call frame init() method
+                // dst = frame register
+                // For now, this is a placeholder - actual init calls would be handled by Call instruction
+                break;
+            }
+            case LIR::LIR_Op::FrameCallDeinit: {
+                // Call frame deinit() method
+                // dst = frame register
+                // For now, this is a placeholder - actual deinit calls would be handled by Call instruction
+                break;
+            }
             default: {
                 std::cerr << "Error: Unknown LIR operation: " << static_cast<int>(pc->op) << std::endl;
                 return;
@@ -1590,6 +1678,30 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
         
         pc++; // Move to next instruction
     }
+}
+
+// Frame management method implementations
+FrameInstancePtr RegisterVM::createFrameInstance(const std::string& frame_type) {
+    auto frame = std::make_shared<FrameInstance>(frame_type);
+    return frame;
+}
+
+void RegisterVM::setFrameField(FrameInstancePtr frame, const std::string& field_name, const RegisterValue& value) {
+    if (!frame) {
+        throw std::runtime_error("Cannot set field on null frame");
+    }
+    frame->fields[field_name] = value;
+}
+
+RegisterValue RegisterVM::getFrameField(FrameInstancePtr frame, const std::string& field_name) const {
+    if (!frame) {
+        throw std::runtime_error("Cannot get field from null frame");
+    }
+    auto it = frame->fields.find(field_name);
+    if (it == frame->fields.end()) {
+        throw std::runtime_error("Field not found: " + field_name);
+    }
+    return it->second;
 }
 
 } // namespace Register

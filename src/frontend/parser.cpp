@@ -2215,7 +2215,19 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
                     auto paramName = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
                     consume(TokenType::COLON, "Expected ':' after parameter name.");
                     auto paramType = parseTypeAnnotation();
-                    initMethod->parameters.push_back({paramName, paramType});
+                    
+                    // Check for default value (optional parameter with default)
+                    if (match({TokenType::EQUAL})) {
+                        // This is an optional parameter with a default value
+                        std::shared_ptr<LM::Frontend::AST::Expression> defaultValue = expression();
+                        initMethod->optionalParams.push_back({paramName, {paramType, defaultValue}});
+                    } else if (paramType && paramType->isOptional) {
+                        // This is an optional parameter with nullable type (no default value)
+                        initMethod->optionalParams.push_back({paramName, {paramType, nullptr}});
+                    } else {
+                        // This is a required parameter
+                        initMethod->parameters.push_back({paramName, paramType});
+                    }
                 } while (match({TokenType::COMMA}));
             }
             
@@ -2257,24 +2269,49 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
         }
         // Parse regular method
         else if (match({TokenType::FN})) {
-            auto method = function("method");
-            if (method) {
-                auto frameMethod = std::make_shared<LM::Frontend::AST::FrameMethod>();
-                frameMethod->name = method->name;
-                frameMethod->visibility = visibility;
-                // Handle optional return type
-                if (method->returnType) {
-                    frameMethod->returnType = method->returnType.value();
-                }
-                frameMethod->body = method->body;
-                
-                // Convert function parameters to frame method parameters
-                for (const auto& param : method->params) {
-                    frameMethod->parameters.push_back(param);
-                }
-                
-                frameDecl->methods.push_back(frameMethod);
+            auto frameMethod = std::make_shared<LM::Frontend::AST::FrameMethod>();
+            frameMethod->visibility = visibility;
+            
+            // Parse method name
+            Token methodName = consume(TokenType::IDENTIFIER, "Expected method name.");
+            frameMethod->name = methodName.lexeme;
+            
+            // Parse parameters
+            consume(TokenType::LEFT_PAREN, "Expected '(' after method name.");
+            
+            if (!check(TokenType::RIGHT_PAREN)) {
+                do {
+                    auto paramName = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
+                    consume(TokenType::COLON, "Expected ':' after parameter name.");
+                    auto paramType = parseTypeAnnotation();
+                    
+                    // Check for default value (optional parameter with default)
+                    if (match({TokenType::EQUAL})) {
+                        // This is an optional parameter with a default value
+                        std::shared_ptr<LM::Frontend::AST::Expression> defaultValue = expression();
+                        frameMethod->optionalParams.push_back({paramName, {paramType, defaultValue}});
+                    } else if (paramType && paramType->isOptional) {
+                        // This is an optional parameter with nullable type (no default value)
+                        frameMethod->optionalParams.push_back({paramName, {paramType, nullptr}});
+                    } else {
+                        // This is a required parameter
+                        frameMethod->parameters.push_back({paramName, paramType});
+                    }
+                } while (match({TokenType::COMMA}));
             }
+            
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after parameters.");
+            
+            // Parse optional return type (using colon syntax)
+            if (match({TokenType::COLON})) {
+                frameMethod->returnType = parseTypeAnnotation();
+            }
+            
+            // Parse method body
+            consume(TokenType::LEFT_BRACE, "Expected '{' before method body.");
+            frameMethod->body = block();
+            
+            frameDecl->methods.push_back(frameMethod);
         }
         // Parse field
         else if (match({TokenType::VAR})) {
@@ -3338,11 +3375,45 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::finishCall(std::shared_pt
         callTokens.push_back(paren);
     }
 
-    auto callExpr = std::make_shared<LM::Frontend::AST::CallExpr>();
-    callExpr->line = paren.line;
-    callExpr->callee = callee;
-    callExpr->arguments = arguments;
-    callExpr->namedArgs = namedArgs;
+    // Check if this might be a frame instantiation
+    // Frame instantiation: FrameName() or FrameName(field1=value1, field2=value2)
+    // Characteristics:
+    // 1. Callee is a simple variable (identifier)
+    // 2. Either no arguments, or all arguments are named (field=value)
+    // 3. No positional arguments mixed with named arguments
+    bool isFrameInstantiation = false;
+    if (auto varExpr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(callee)) {
+        // Check if this looks like a frame instantiation
+        // Frame names typically start with uppercase (convention)
+        // And either has no args or all named args
+        if (arguments.empty() && (namedArgs.empty() || !namedArgs.empty())) {
+            // Could be frame instantiation: FrameName() or FrameName(field=value, ...)
+            // We'll let the type checker decide if it's actually a frame
+            isFrameInstantiation = true;
+        }
+    }
+
+    std::shared_ptr<LM::Frontend::AST::Expression> result;
+    
+    if (isFrameInstantiation && arguments.empty()) {
+        // Create a FrameInstantiationExpr
+        auto frameExpr = std::make_shared<LM::Frontend::AST::FrameInstantiationExpr>();
+        frameExpr->line = paren.line;
+        if (auto varExpr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(callee)) {
+            frameExpr->frameName = varExpr->name;
+        }
+        frameExpr->positionalArgs = arguments;
+        frameExpr->namedArgs = namedArgs;
+        result = frameExpr;
+    } else {
+        // Create a regular CallExpr
+        auto callExpr = std::make_shared<LM::Frontend::AST::CallExpr>();
+        callExpr->line = paren.line;
+        callExpr->callee = callee;
+        callExpr->arguments = arguments;
+        callExpr->namedArgs = namedArgs;
+        result = callExpr;
+    }
 
     // Create detailed CST node if enabled
     if (cstMode && config.detailedExpressionNodes) {
@@ -3367,7 +3438,7 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::finishCall(std::shared_pt
         popCSTContext();
     }
 
-    return callExpr;
+    return result;
 }
 
 std::shared_ptr<LM::Frontend::AST::Expression> Parser::primary() {
