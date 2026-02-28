@@ -180,9 +180,12 @@ var c: int = 3;
 
 Limit has several built-in primitive types:
 
-*   **`int`**: A signed integer (e.g., `10`, `-5`, `0`).
-*   **`uint`**: An unsigned integer.
-*   **`float`**: A floating-point number (e.g., `3.14`, `-0.01`).
+*   **`int`**: A 32-bit signed integer (e.g., `10`, `-5`, `0`).
+*   **`i8`, `i16`, `i32`, `i64`, `i128`**: Signed integers with 8, 16, 32, 64, and 128 bits, respectively.
+*   **`uint`**: A 32-bit unsigned integer.
+*   **`u8`, `u16`, `u32`, `u64`, `u128`**: Unsigned integers with 8, 16, 32, 64, and 128 bits, respectively.
+*   **`float`**: A 32-bit floating-point number (e.g., `3.14`, `-0.01`).
+*   **`f32`, `f64`**: Floating-point numbers with 32 and 64 bits, respectively.
 *   **`bool`**: A boolean value, which can be `true` or `false`.
 *   **`str`**: A string of characters (e.g., `"Hello, World!"`).
 *   **`nil`**: A special value representing "nothing" or "null".
@@ -335,7 +338,6 @@ iter (i in 0..10..2) {
     print("i = {i}"); // Output: 0, 2, 4, 6, 8
 }
 ```
-> **Note:** The step value feature is planned but not yet fully implemented in the parser.
 
 ### Ternary Operator
 
@@ -346,7 +348,6 @@ var x = 10;
 var result = x > 5 ? "Greater than 5" : "Not greater than 5";
 print(result); // Output: Greater than 5
 ```
-> **Note:** The ternary operator is planned but not yet implemented in the parser.
 
 ### Match Statements
 
@@ -484,6 +485,33 @@ match (my_tuple) {
     _ => { print("Not a person tuple."); }
 }
 // Output: Jules is 42 years old.
+```
+
+#### Matching on `Result` and `Option` types
+
+You can use `val` and `err` patterns to concisely handle success and error cases from fallible operations.
+
+```limit
+fn might_fail(should_fail: bool): str? {
+    if (should_fail) {
+        return err("It failed!");
+    }
+    return ok("Success!");
+}
+
+var result = might_fail(false);
+match (result) {
+    val v => { print("Succeeded with value: {v}"); },
+    err e => { print("Failed with error: {e}"); }
+}
+// Output: Succeeded with value: Success!
+
+var result2 = might_fail(true);
+match (result2) {
+    val v => { print("Succeeded with value: {v}"); },
+    err e => { print("Failed with error: {e}"); }
+}
+// Output: Failed with error: It failed!
 ```
 
 ## Data Structures
