@@ -350,6 +350,8 @@ print(result); // Output: Greater than 5
 
 ### Match Statements
 
+> **Note:** The `match` statement is planned but not yet implemented.
+
 The `match` statement is a powerful tool for pattern matching. It can be used as an advanced `switch` statement.
 
 A `match` statement can match against literal values:
@@ -391,7 +393,7 @@ match (value) {
 
 ### Advanced Pattern Matching
 
-Limit's `match` statement supports more than just literal and type matching. You can also destructure complex data types like enums, structs, lists, and tuples.
+> **Note:** Advanced pattern matching features are planned but not yet implemented.
 
 #### Destructuring Structs and Enums
 
@@ -488,6 +490,8 @@ match (my_tuple) {
 
 ## Data Structures
 
+> **Note:** Data structures like Lists and Dictionaries are planned but not yet implemented.
+
 Limit provides built-in support for common data structures.
 
 ### Lists
@@ -528,6 +532,8 @@ print(person["age"]);  // Output: 30
 
 ### Tuples
 
+> **Note:** Tuples are planned but not yet implemented.
+
 A tuple is a fixed-size, ordered collection of elements that can be of different types. Tuples are created using parentheses `()`.
 
 ```limit
@@ -543,6 +549,8 @@ print(person.1); // Output: 30
 ```
 
 ### Object Literals
+
+> **Note:** Object literals are planned but not yet implemented.
 
 Object literals provide a way to create instances of user-defined types, like classes or enums, with a specific structure. This is especially useful for enums with associated data.
 
@@ -628,6 +636,8 @@ greet_default("Alice");   // Output: Hello, Alice!
 ```
 
 ### Higher-Order Functions
+
+> **Note:** Higher-order functions and closures are planned but not yet implemented.
 
 Functions are first-class citizens in Limit, which means they can be passed as arguments to other functions.
 
@@ -808,6 +818,8 @@ The `self` keyword refers to the current instance of the class. It is used to ac
 
 ### Inheritance
 
+> **Note:** Full class inheritance is planned but not yet implemented. Basic syntax is parsed, but VM support is partial.
+
 A class can inherit from a parent class using the `:` operator. This allows the child class to inherit the fields and methods of the parent.
 
 ```
@@ -875,6 +887,8 @@ iter (animal: Animal in animals) {
 ```
 
 ## Modules and Imports
+
+> **Note:** The module system is not yet fully implemented. The parser supports the syntax, but VM and runtime support are missing.
 
 Limit supports a module system that allows you to organize your code into separate files and reuse code across your project.
 
@@ -959,6 +973,8 @@ module my_app.utils {
 When another file imports this module, it will only have access to the `public` members. `protected` members would be available to other modules within the `my_app` namespace (not yet fully implemented), and `private` members are internal to the module.
 
 ## Advanced Features
+
+> **Note:** The features in this section are planned but not yet implemented.
 
 ### Lambda Expressions (Anonymous Functions)
 
@@ -1062,6 +1078,8 @@ Union types are especially powerful when combined with `match` statements to han
 
 ### Intersection Types
 
+> **Note:** Intersection, Refined, and Structural Types are planned but not yet implemented.
+
 An intersection type is a type that combines multiple types into one. A value of an intersection type must satisfy the requirements of all the types in the intersection. Intersection types are defined using the ampersand (`&`) character.
 
 ```limit
@@ -1137,6 +1155,8 @@ var current_status: Status = Status.Running;
 
 ### Traits and Interfaces
 
+> **Note:** Traits are planned but not yet implemented.
+
 Traits and interfaces are used to define a set of methods that a class must implement. This is a powerful tool for abstraction and polymorphism.
 
 ```limit
@@ -1156,6 +1176,8 @@ class Dog : Speaker {
 **Key Design Principle**: Limit is designed to be null-free. It does not have null pointers, references, or values. Instead, Limit uses a robust type-based system to handle optionality and errors.
 
 ### The `Option` Type for Optional Values
+
+> **Note:** The `Option` and `Result` types are not yet implemented as enums. The language currently uses a unified `Type?` system for error handling and optional values.
 
 When a value can be present or absent, you should use the `Option` enum, which has two variants:
 - **`Some(value)`**: Represents the presence of a value.
@@ -1402,6 +1424,8 @@ var value: int = divide(10, 0)? else {
 This syntax is particularly useful for providing default values while maintaining Limit's null-free design principles.
 
 ## Concurrency
+
+> **Note:** Concurrency features are planned but not yet implemented. The syntax is parsed, but there is no VM support.
 
 Limit has powerful, high-level features for managing concurrent and parallel tasks.
 

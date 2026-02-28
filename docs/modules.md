@@ -101,24 +101,11 @@ print(math2.PI);  // 3.14159
 
 ## Current Limitations
 
-### Function Calls with Parameters
-Currently, module function calls with parameters are not fully implemented:
+The module system is currently in the early stages of development. While the syntax for importing modules is parsed by the compiler, the virtual machine (VM) and runtime do not yet support module loading or execution.
 
-```limit
-// This works:
-module.simple_function();
-
-// This doesn't work yet:
-// var result = module.function_with_params(a, b);
-```
-
-### Function Return Values
-Functions that return values are not yet fully supported in module context:
-
-```limit
-// This doesn't work yet:
-// var result = module.get_value();
-```
+This means that:
+- **No code from imported modules can be executed.** This includes calling functions, accessing variables, or using any other definitions from another file.
+- **All `import` statements will be parsed without error**, but they will not have any effect at runtime.
 
 ## Error Handling
 
