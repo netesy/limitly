@@ -61,6 +61,7 @@ Welcome to the official guide for the Limit programming language. This document 
     *   [Async/Await](#asyncawait)
     *   [Atomics](#atomics)
 - [Tasks](#tasks)
+- [Built-in Functions](#built-in-functions)
 
 ---
 
@@ -1151,6 +1152,31 @@ class Dog : Speaker {
 }
 ```
 
+### Type Operators
+
+Limit provides operators for checking and converting types.
+
+#### `is` for Type Checking
+
+The `is` operator checks if a value is of a certain type.
+
+```limit
+var my_var: any = 10;
+
+if (my_var is int) {
+    print("It's an integer!");
+}
+```
+
+#### `as` for Type Casting
+
+The `as` operator attempts to convert a value to a different type. If the conversion is not possible, it will result in a runtime error.
+
+```limit
+var my_var: any = "123";
+var my_int: int = my_var as int;
+```
+
 ### Error Handling
 
 **Key Design Principle**: Limit is designed to be null-free. It does not have null pointers, references, or values. Instead, Limit uses a robust type-based system to handle optionality and errors.
@@ -1512,4 +1538,51 @@ concurrent {
         print("Task {i}");
     }
 }
+```
+### `worker` for Simplified Channel Processing
+
+The `worker` statement provides a more concise syntax for processing items from a channel within a `concurrent` block. It automatically receives items from the channel and executes a block of code for each item.
+
+```limit
+var my_channel = channel();
+// ... send items to my_channel ...
+
+concurrent(ch=my_channel) {
+    worker(item) {
+        print("Processing item: {item}");
+    }
+}
+```
+
+This is equivalent to writing a `task` with a loop that receives from the channel.
+
+## Built-in Functions
+
+Limit provides several built-in functions that are available in the global scope.
+
+### `assert(condition: bool, message: str?)`
+
+The `assert` function is a debugging aid that checks if a condition is true. If the condition is false, the program will terminate and print the provided message.
+
+```limit
+var x = 10;
+assert(x == 10, "x should be 10"); // This will pass
+
+assert(x > 20, "x should be greater than 20"); // This will fail and terminate the program
+```
+
+### `trace(message: str)`
+
+The `trace` function prints a message to the console, followed by the current stack trace. This can be useful for debugging complex call chains.
+
+```limit
+fn foo() {
+    trace("Entering foo");
+}
+
+fn bar() {
+    foo();
+}
+
+bar();
 ```

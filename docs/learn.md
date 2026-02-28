@@ -21,6 +21,7 @@ To get started with Limit, you'll need to build the interpreter from source. Don
 **Prerequisites:**
 - CMake 3.10 or higher
 - A C++17 compatible compiler (like GCC, Clang, or MSVC)
+- `make`
 
 **Build Instructions:**
 
@@ -133,6 +134,13 @@ print(a + b); // Output: 15
 print(a - b); // Output: 5
 print(a * b); // Output: 50
 print(a / b); // Output: 2
+```
+
+You can also use the `assert` function to check that your code is behaving as you expect.
+
+```limit
+var result = 10 + 5;
+assert(result == 15, "10 + 5 should be 15");
 ```
 
 ### If/Else Statements
@@ -317,11 +325,11 @@ fn do_something(): int? {
     var result = might_fail();
     
     match result {
-        Ok(value) => {
+        val(value) => {
             print("Got value: {value}");
             return ok(value * 2);
         },
-        Err => {
+        err => {
             print("No value available");
             return err();
         }
@@ -339,9 +347,9 @@ fn might_fail(): int? {
 }
 
 fn do_something(): int? {
-    // If might_fail() returns Err (absent), the '?' will immediately
-    // stop do_something() and return that same Err.
-    // If it's Ok(value), the '?' will unwrap the value and continue.
+    // If might_fail() returns err, the '?' will immediately
+    // stop do_something() and return that same err.
+    // If it's ok(value), the '?' will unwrap the value and continue.
     var result: int = might_fail()?;
 
     // This part only runs if might_fail() had a value
@@ -402,7 +410,7 @@ loop { // An infinite loop
     var guess_result: int? = to_int(input_str);
 
     match (guess_result) {
-        Ok(guess) => {
+        val(guess) => {
             print("You guessed: {guess}");
             if (guess < secret_number) {
                 print("Too low!");
@@ -413,7 +421,7 @@ loop { // An infinite loop
                 break; // Exit the loop
             }
         },
-        Err => {
+        err => {
             print("That's not a number! Please try again.");
         }
     }
@@ -424,7 +432,7 @@ loop { // An infinite loop
 ```
 
 **How it works:**
-*   **Error Handling with `match`:** The `to_int` function returns `int?` (an optional integer). We use a `match` statement to **handle** both the success case (`Ok`) and the error/absent case (`Err`). If the user enters bad input, we don't want the game to crash; we just want to print a message and let them try again. This demonstrates Limit's null-free approach where parsing failures result in absent values (treated as errors) rather than null values.
+*   **Error Handling with `match`:** The `to_int` function returns `int?` (an optional integer). We use a `match` statement to **handle** both the success case (`val`) and the error/absent case (`err`). If the user enters bad input, we don't want the game to crash; we just want to print a message and let them try again. This demonstrates Limit's null-free approach where parsing failures result in absent values (treated as errors) rather than null values.
 *   **Looping:** The `loop` creates an infinite loop. The `break` keyword is used to exit the loop once the correct number has been guessed.
 
 **Your Challenge:**
