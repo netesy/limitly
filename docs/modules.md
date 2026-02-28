@@ -2,6 +2,8 @@
 
 ## Overview
 
+> **Note:** The module system is currently implemented in the parser and AST, but is not yet supported by the VM. This means that while you can write code with `import` statements, you cannot yet run it.
+
 The Limit programming language includes a comprehensive module system that allows you to organize code into reusable modules and import functionality from other files.
 
 ## Basic Module Import
