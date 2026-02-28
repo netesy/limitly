@@ -335,7 +335,6 @@ iter (i in 0..10..2) {
     print("i = {i}"); // Output: 0, 2, 4, 6, 8
 }
 ```
-> **Note:** The step value feature is planned but not yet fully implemented in the parser.
 
 ### Ternary Operator
 
@@ -346,7 +345,6 @@ var x = 10;
 var result = x > 5 ? "Greater than 5" : "Not greater than 5";
 print(result); // Output: Greater than 5
 ```
-> **Note:** The ternary operator is planned but not yet implemented in the parser.
 
 ### Match Statements
 
