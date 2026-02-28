@@ -317,11 +317,11 @@ fn do_something(): int? {
     var result = might_fail();
     
     match result {
-        Ok(value) => {
+        ok(value) => {
             print("Got value: {value}");
             return ok(value * 2);
         },
-        Err => {
+        err => {
             print("No value available");
             return err();
         }
@@ -339,9 +339,9 @@ fn might_fail(): int? {
 }
 
 fn do_something(): int? {
-    // If might_fail() returns Err (absent), the '?' will immediately
-    // stop do_something() and return that same Err.
-    // If it's Ok(value), the '?' will unwrap the value and continue.
+    // If might_fail() returns err (absent), the '?' will immediately
+    // stop do_something() and return that same err.
+    // If it's ok(value), the '?' will unwrap the value and continue.
     var result: int = might_fail()?;
 
     // This part only runs if might_fail() had a value
@@ -402,7 +402,7 @@ loop { // An infinite loop
     var guess_result: int? = to_int(input_str);
 
     match (guess_result) {
-        Ok(guess) => {
+        ok(guess) => {
             print("You guessed: {guess}");
             if (guess < secret_number) {
                 print("Too low!");
@@ -413,7 +413,7 @@ loop { // An infinite loop
                 break; // Exit the loop
             }
         },
-        Err => {
+        err => {
             print("That's not a number! Please try again.");
         }
     }
