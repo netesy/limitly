@@ -349,6 +349,7 @@ print(result); // Output: Greater than 5
 > **Note:** The ternary operator is planned but not yet implemented in the parser.
 
 ### Match Statements
+> **Note:** The `match` statement and all forms of pattern matching are planned but not yet implemented.
 
 The `match` statement is a powerful tool for pattern matching. It can be used as an advanced `switch` statement.
 
@@ -390,6 +391,7 @@ match (value) {
 ```
 
 ### Advanced Pattern Matching
+> **Note:** The `match` statement and all forms of pattern matching are planned but not yet implemented.
 
 Limit's `match` statement supports more than just literal and type matching. You can also destructure complex data types like enums, structs, lists, and tuples.
 
@@ -487,6 +489,7 @@ match (my_tuple) {
 ```
 
 ## Data Structures
+> **Note:** The standard library, including collections like Lists and Dictionaries, is planned but not yet implemented.
 
 Limit provides built-in support for common data structures.
 
@@ -628,6 +631,7 @@ greet_default("Alice");   // Output: Hello, Alice!
 ```
 
 ### Higher-Order Functions
+> **Note:** First-class functions (including higher-order functions and closures) are planned but not yet implemented.
 
 Functions are first-class citizens in Limit, which means they can be passed as arguments to other functions.
 
@@ -646,6 +650,7 @@ print(result); // Output: 50
 ```
 
 ### Closures
+> **Note:** First-class functions (including higher-order functions and closures) are planned but not yet implemented.
 
 A function can be defined inside another function. This inner function "captures" the variables from its containing scope, creating a closure.
 
@@ -807,6 +812,7 @@ person.introduce(); // Output: Hi, I'm Jules and I'm 28 years old.
 The `self` keyword refers to the current instance of the class. It is used to access the instance's fields and methods.
 
 ### Inheritance
+> **Note:** Class inheritance is planned but not yet implemented.
 
 A class can inherit from a parent class using the `:` operator. This allows the child class to inherit the fields and methods of the parent.
 
@@ -826,6 +832,7 @@ my_dog.speak(); // Output: The animal makes a sound.
 ```
 
 ### Method Overriding
+> **Note:** Method overriding is planned but not yet implemented.
 
 A child class can provide its own implementation of a method that it inherited from its parent.
 
@@ -841,6 +848,7 @@ my_cat.speak(); // Output: The cat meows.
 ```
 
 ### The `super` Keyword
+> **Note:** The `super` keyword is planned but not yet implemented.
 
 The `super` keyword can be used to call methods from the parent class.
 
@@ -860,6 +868,7 @@ smart_dog.speak();
 ```
 
 ### Polymorphism
+> **Note:** Polymorphism is planned but not yet implemented.
 
 Polymorphism allows you to treat objects of different classes as objects of a common parent class.
 
@@ -875,6 +884,7 @@ iter (animal: Animal in animals) {
 ```
 
 ## Modules and Imports
+> **Note:** The module system is currently under development. The syntax is finalized, but the VM and runtime support are not yet complete.
 
 Limit supports a module system that allows you to organize your code into separate files and reuse code across your project.
 
@@ -961,6 +971,7 @@ When another file imports this module, it will only have access to the `public` 
 ## Advanced Features
 
 ### Lambda Expressions (Anonymous Functions)
+> **Note:** Lambda expressions are planned but not yet implemented.
 
 Limit supports lambda expressions, also known as anonymous functions. These are functions that do not have a name and can be defined on the fly.
 
@@ -987,6 +998,7 @@ print(result); // Output: 50
 ```
 
 ### Destructuring Assignments
+> **Note:** Destructuring assignments are planned but not yet implemented.
 
 You can unpack values from tuples and lists into separate variables.
 
@@ -1022,6 +1034,7 @@ fn divide(a: int, b: int): int {
 ```
 
 ### Compile-Time Execution
+> **Note:** Compile-time execution is planned but not yet implemented.
 
 The `comptime` keyword allows you to execute code at compile time. This is useful for metaprogramming, generating lookup tables, or performing other computations before the program runs.
 
@@ -1061,6 +1074,7 @@ my_num = 3.14;                 // This is also valid
 Union types are especially powerful when combined with `match` statements to handle all possible types that a variable could be.
 
 ### Intersection Types
+> **Note:** Intersection types are planned but not yet implemented.
 
 An intersection type is a type that combines multiple types into one. A value of an intersection type must satisfy the requirements of all the types in the intersection. Intersection types are defined using the ampersand (`&`) character.
 
@@ -1081,6 +1095,7 @@ fn print_person_details(p: Person) {
 ```
 
 ### Refined Types
+> **Note:** Refined types are planned but not yet implemented.
 
 A refined type allows you to add constraints to an existing type. This is useful for enforcing invariants at the type level. Refined types are defined using the `where` keyword.
 
@@ -1096,6 +1111,7 @@ set_age(-5); // This would be a runtime error
 ```
 
 ### Structural Types
+> **Note:** The parser supports structural type syntax, but the type checker and VM implementation are not yet complete.
 
 A structural type allows you to define a type based on its structure or shape, rather than by a specific name. This is useful for working with data that has a consistent structure but may not be an instance of a named class.
 
@@ -1136,6 +1152,7 @@ var current_status: Status = Status.Running;
 ```
 
 ### Traits and Interfaces
+> **Note:** Traits and interfaces are planned but not yet implemented.
 
 Traits and interfaces are used to define a set of methods that a class must implement. This is a powerful tool for abstraction and polymorphism.
 
@@ -1402,6 +1419,7 @@ var value: int = divide(10, 0)? else {
 This syntax is particularly useful for providing default values while maintaining Limit's null-free design principles.
 
 ## Concurrency
+> **Note:** The concurrency features (`parallel`, `concurrent`, `async`/`await`, channels, and atomics) are planned, and the syntax is implemented in the parser. However, the VM and runtime support are not yet complete.
 
 Limit has powerful, high-level features for managing concurrent and parallel tasks.
 
