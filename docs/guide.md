@@ -339,6 +339,8 @@ iter (i in 0..10..2) {
 
 ### Ternary Operator
 
+> **Note:** This feature is planned but not yet implemented.
+
 Limit supports the ternary operator (`? :`) for concise conditional expressions.
 
 ```limit
@@ -346,9 +348,10 @@ var x = 10;
 var result = x > 5 ? "Greater than 5" : "Not greater than 5";
 print(result); // Output: Greater than 5
 ```
-> **Note:** The ternary operator is planned but not yet implemented in the parser.
 
 ### Match Statements
+
+> **Note:** This feature is planned but not yet implemented.
 
 The `match` statement is a powerful tool for pattern matching. It can be used as an advanced `switch` statement.
 
@@ -390,6 +393,8 @@ match (value) {
 ```
 
 ### Advanced Pattern Matching
+
+> **Note:** This feature is planned but not yet implemented.
 
 Limit's `match` statement supports more than just literal and type matching. You can also destructure complex data types like enums, structs, lists, and tuples.
 
@@ -487,6 +492,8 @@ match (my_tuple) {
 ```
 
 ## Data Structures
+
+> **Note:** The data structures described in this section are planned but not yet implemented.
 
 Limit provides built-in support for common data structures.
 
@@ -629,6 +636,8 @@ greet_default("Alice");   // Output: Hello, Alice!
 
 ### Higher-Order Functions
 
+> **Note:** This feature is planned but not yet implemented.
+
 Functions are first-class citizens in Limit, which means they can be passed as arguments to other functions.
 
 ```
@@ -646,6 +655,8 @@ print(result); // Output: 50
 ```
 
 ### Closures
+
+> **Note:** This feature is planned but not yet implemented.
 
 A function can be defined inside another function. This inner function "captures" the variables from its containing scope, creating a closure.
 
@@ -808,6 +819,8 @@ The `self` keyword refers to the current instance of the class. It is used to ac
 
 ### Inheritance
 
+> **Note:** This feature is planned but not yet implemented.
+
 A class can inherit from a parent class using the `:` operator. This allows the child class to inherit the fields and methods of the parent.
 
 ```
@@ -827,6 +840,8 @@ my_dog.speak(); // Output: The animal makes a sound.
 
 ### Method Overriding
 
+> **Note:** This feature is planned but not yet implemented.
+
 A child class can provide its own implementation of a method that it inherited from its parent.
 
 ```
@@ -841,6 +856,8 @@ my_cat.speak(); // Output: The cat meows.
 ```
 
 ### The `super` Keyword
+
+> **Note:** This feature is planned but not yet implemented.
 
 The `super` keyword can be used to call methods from the parent class.
 
@@ -861,6 +878,8 @@ smart_dog.speak();
 
 ### Polymorphism
 
+> **Note:** This feature is planned but not yet implemented.
+
 Polymorphism allows you to treat objects of different classes as objects of a common parent class.
 
 ```
@@ -875,6 +894,8 @@ iter (animal: Animal in animals) {
 ```
 
 ## Modules and Imports
+
+> **Note:** The module system is parsed but not yet implemented in the VM.
 
 Limit supports a module system that allows you to organize your code into separate files and reuse code across your project.
 
@@ -962,6 +983,8 @@ When another file imports this module, it will only have access to the `public` 
 
 ### Lambda Expressions (Anonymous Functions)
 
+> **Note:** This feature is planned but not yet implemented.
+
 Limit supports lambda expressions, also known as anonymous functions. These are functions that do not have a name and can be defined on the fly.
 
 ```limit
@@ -987,6 +1010,8 @@ print(result); // Output: 50
 ```
 
 ### Destructuring Assignments
+
+> **Note:** This feature is planned but not yet implemented.
 
 You can unpack values from tuples and lists into separate variables.
 
@@ -1062,6 +1087,8 @@ Union types are especially powerful when combined with `match` statements to han
 
 ### Intersection Types
 
+> **Note:** This feature is planned but not yet implemented.
+
 An intersection type is a type that combines multiple types into one. A value of an intersection type must satisfy the requirements of all the types in the intersection. Intersection types are defined using the ampersand (`&`) character.
 
 ```limit
@@ -1082,6 +1109,8 @@ fn print_person_details(p: Person) {
 
 ### Refined Types
 
+> **Note:** This feature is planned but not yet implemented.
+
 A refined type allows you to add constraints to an existing type. This is useful for enforcing invariants at the type level. Refined types are defined using the `where` keyword.
 
 ```limit
@@ -1096,6 +1125,8 @@ set_age(-5); // This would be a runtime error
 ```
 
 ### Structural Types
+
+> **Note:** The syntax for structural types is parsed, but the type system backend is not yet implemented.
 
 A structural type allows you to define a type based on its structure or shape, rather than by a specific name. This is useful for working with data that has a consistent structure but may not be an instance of a named class.
 
@@ -1402,6 +1433,8 @@ var value: int = divide(10, 0)? else {
 This syntax is particularly useful for providing default values while maintaining Limit's null-free design principles.
 
 ## Concurrency
+
+> **Note:** The concurrency features described in this section are parsed but not yet implemented in the VM.
 
 Limit has powerful, high-level features for managing concurrent and parallel tasks.
 

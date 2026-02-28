@@ -1,5 +1,7 @@
 # Module System Documentation
 
+> **Note:** The module system is parsed but not yet implemented in the VM. The features described in this document are planned for a future release.
+
 ## Overview
 
 The Limit programming language includes a comprehensive module system that allows you to organize code into reusable modules and import functionality from other files.
