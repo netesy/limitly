@@ -28,6 +28,8 @@ using namespace LM::Error;bool TypeChecker::check_program(std::shared_ptr<LM::Fr
     for (const auto& stmt : program->statements) {
         if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
             check_function_declaration(func_decl);
+        } else if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
+            check_frame_declaration(frame_decl);
         }
     }
     
@@ -504,6 +506,8 @@ TypePtr TypeChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statemen
     
     if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
         return check_function_declaration(func_decl);
+    } else if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
+        return check_frame_declaration(frame_decl);
     } else if (auto var_decl = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
         return check_var_declaration(var_decl);
     } else if (auto type_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TypeDeclaration>(stmt)) {
@@ -880,6 +884,14 @@ TypePtr TypeChecker::check_expression(std::shared_ptr<LM::Frontend::AST::Express
         type = check_call_expr(call);
     } else if (auto variable = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr)) {
         type = check_variable_expr(variable);
+    } else if (auto this_expr = std::dynamic_pointer_cast<LM::Frontend::AST::ThisExpr>(expr)) {
+        // Handle 'this' reference in frame methods
+        if (current_frame) {
+            type = type_system.createFrameType(current_frame->name);
+        } else {
+            add_error("'this' can only be used inside frame methods", expr->line);
+            type = type_system.ANY_TYPE;
+        }
     } else if (auto binary = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
         type = check_binary_expr(binary);
     } else if (auto unary = std::dynamic_pointer_cast<LM::Frontend::AST::UnaryExpr>(expr)) {
@@ -908,6 +920,8 @@ TypePtr TypeChecker::check_expression(std::shared_ptr<LM::Frontend::AST::Express
         type = check_ok_construct_expr(ok_construct);
     } else if (auto fallible = std::dynamic_pointer_cast<LM::Frontend::AST::FallibleExpr>(expr)) {
         type = check_fallible_expr(fallible);
+    } else if (auto frame_inst = std::dynamic_pointer_cast<LM::Frontend::AST::FrameInstantiationExpr>(expr)) {
+        type = check_frame_instantiation_expr(frame_inst);
     } else {
         add_error("Unknown expression type", expr->line);
         type = type_system.STRING_TYPE; // Default fallback
@@ -958,6 +972,8 @@ TypePtr TypeChecker::check_expression_with_expected_type(std::shared_ptr<LM::Fro
         type = check_ok_construct_expr(ok_construct);
     } else if (auto fallible = std::dynamic_pointer_cast<LM::Frontend::AST::FallibleExpr>(expr)) {
         type = check_fallible_expr(fallible);
+    } else if (auto frame_inst = std::dynamic_pointer_cast<LM::Frontend::AST::FrameInstantiationExpr>(expr)) {
+        type = check_frame_instantiation_expr(frame_inst);
     } else {
         add_error("Unknown expression type", expr->line);
         type = type_system.STRING_TYPE; // Default fallback
@@ -1236,6 +1252,95 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
     
     // Check if callee is a member expression (method call)
     if (auto member_expr = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(expr->callee)) {
+        // Get the object type
+        TypePtr object_type = check_expression(member_expr->object);
+        
+        // Handle frame method calls
+        if (object_type && object_type->tag == TypeTag::Frame) {
+            // Get the frame name from the FrameType
+            auto frameTypeData = std::get_if<FrameType>(&object_type->extra);
+            if (!frameTypeData) {
+                add_error("Invalid frame type", expr->line);
+                return type_system.ANY_TYPE;
+            }
+            
+            std::string frame_name = frameTypeData->name;
+            std::string method_name = member_expr->name;
+            
+            // Look up the frame declaration
+            auto frame_it = frame_declarations.find(frame_name);
+            if (frame_it == frame_declarations.end()) {
+                add_error("Unknown frame type: " + frame_name, expr->line);
+                return type_system.ANY_TYPE;
+            }
+            
+            const FrameInfo& frame_info = frame_it->second;
+            
+            // Find the method in the frame
+            std::shared_ptr<LM::Frontend::AST::FrameMethod> method = nullptr;
+            for (const auto& m : frame_info.declaration->methods) {
+                if (m->name == method_name) {
+                    method = m;
+                    break;
+                }
+            }
+            
+            // Check init and deinit methods
+            if (!method && method_name == "init") {
+                method = frame_info.declaration->init;
+            }
+            if (!method && method_name == "deinit") {
+                method = frame_info.declaration->deinit;
+            }
+            
+            if (!method) {
+                add_error("Frame '" + frame_name + "' has no method '" + method_name + "'", expr->line);
+                return type_system.ANY_TYPE;
+            }
+            
+            // Check visibility
+            // TODO: Implement proper visibility checking based on context
+            
+            // Check parameter count and types
+            size_t required_params = method->parameters.size();
+            size_t optional_params = method->optionalParams.size();
+            size_t total_params = required_params + optional_params;
+            size_t provided_args = arg_types.size();
+            
+            if (provided_args < required_params) {
+                add_error("Method '" + method_name + "' requires " + std::to_string(required_params) + 
+                         " arguments, but " + std::to_string(provided_args) + " were provided", expr->line);
+            } else if (provided_args > total_params) {
+                add_error("Method '" + method_name + "' accepts at most " + std::to_string(total_params) + 
+                         " arguments, but " + std::to_string(provided_args) + " were provided", expr->line);
+            }
+            
+            // Check parameter types
+            for (size_t i = 0; i < std::min(provided_args, total_params); ++i) {
+                TypePtr expected_type = nullptr;
+                if (i < required_params) {
+                    expected_type = resolve_type_annotation(method->parameters[i].second);
+                } else {
+                    expected_type = resolve_type_annotation(method->optionalParams[i - required_params].second.first);
+                }
+                
+                if (!is_type_compatible(expected_type, arg_types[i])) {
+                    add_type_error(expected_type->toString(), arg_types[i]->toString(), expr->line);
+                }
+            }
+            
+            // Return the method's return type
+            if (method->returnType) {
+                TypePtr return_type = resolve_type_annotation(method->returnType);
+                expr->inferred_type = return_type;
+                return return_type;
+            } else {
+                expr->inferred_type = type_system.NIL_TYPE;
+                return type_system.NIL_TYPE;
+            }
+        }
+        
+        // For other types, just check the member expression
         TypePtr result_type = check_expression(expr->callee);
         if (result_type) {
             expr->inferred_type = result_type;
@@ -1254,6 +1359,68 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
     if (!expr) return nullptr;
     
     TypePtr value_type = check_expression(expr->value);
+    
+    // Handle member assignment (e.g., obj.field = value)
+    if (expr->object && expr->member) {
+        TypePtr object_type = check_expression(expr->object);
+        
+        // Handle frame field assignment
+        if (object_type && object_type->tag == TypeTag::Frame) {
+            // Get the frame name from the FrameType
+            auto frameTypeData = std::get_if<FrameType>(&object_type->extra);
+            if (!frameTypeData) {
+                add_error("Invalid frame type", expr->line);
+                return value_type;
+            }
+            
+            std::string frame_name = frameTypeData->name;
+            std::string field_name = *expr->member;
+            
+            // Look up the frame declaration
+            auto frame_it = frame_declarations.find(frame_name);
+            if (frame_it == frame_declarations.end()) {
+                add_error("Unknown frame type: " + frame_name, expr->line);
+                return value_type;
+            }
+            
+            const FrameInfo& frame_info = frame_it->second;
+            
+            // Find the field
+            TypePtr field_type = nullptr;
+            for (const auto& [fname, ftype] : frame_info.fields) {
+                if (fname == field_name) {
+                    field_type = ftype;
+                    break;
+                }
+            }
+            
+            if (!field_type) {
+                add_error("Frame '" + frame_name + "' has no field '" + field_name + "'", expr->line);
+                return value_type;
+            }
+            
+            // Check visibility
+            // TODO: Implement proper visibility checking based on context
+            
+            // Check type compatibility
+            if (!is_type_compatible(field_type, value_type)) {
+                add_type_error(field_type->toString(), value_type->toString(), expr->line);
+            }
+            
+            return value_type;
+        }
+        
+        // For other types, just return the value type
+        return value_type;
+    }
+    
+    // Handle index assignment (e.g., arr[0] = value)
+    if (expr->object && expr->index) {
+        // Just check the object and index expressions
+        check_expression(expr->object);
+        check_expression(expr->index);
+        return value_type;
+    }
     
     // For simple variable assignment
     if (!expr->object && !expr->member && !expr->index) {
@@ -1325,6 +1492,86 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
             add_error("Unknown channel method: " + method_name, expr->line);
             return type_system.ANY_TYPE;
         }
+    }
+    
+    // Handle frame member access
+    if (object_type && object_type->tag == TypeTag::Frame) {
+        // Get the frame name from the FrameType
+        auto frameTypeData = std::get_if<FrameType>(&object_type->extra);
+        if (!frameTypeData) {
+            add_error("Invalid frame type", expr->line);
+            return type_system.ANY_TYPE;
+        }
+        
+        std::string frame_name = frameTypeData->name;
+        std::string member_name = expr->name;
+        
+        // Look up the frame declaration
+        auto frame_it = frame_declarations.find(frame_name);
+        if (frame_it == frame_declarations.end()) {
+            add_error("Unknown frame type: " + frame_name, expr->line);
+            return type_system.ANY_TYPE;
+        }
+        
+        const FrameInfo& frame_info = frame_it->second;
+        
+        // Check if member is a field
+        for (const auto& [field_name, field_type] : frame_info.fields) {
+            if (field_name == member_name) {
+                // Check visibility
+                // Find the field in the frame declaration to get visibility
+                for (const auto& field : frame_info.declaration->fields) {
+                    if (field->name == member_name) {
+                        // For now, we'll allow all access
+                        // TODO: Implement proper visibility checking based on context
+                        // (private: only within frame, protected: within frame and traits, public: anywhere)
+                        expr->inferred_type = field_type;
+                        return field_type;
+                    }
+                }
+            }
+        }
+        
+        // Check if member is a method
+        for (const auto& method : frame_info.declaration->methods) {
+            if (method->name == member_name) {
+                // Check visibility
+                // For now, we'll allow all access
+                // TODO: Implement proper visibility checking based on context
+                
+                // Return the method's return type
+                if (method->returnType) {
+                    TypePtr return_type = resolve_type_annotation(method->returnType);
+                    expr->inferred_type = return_type;
+                    return return_type;
+                } else {
+                    // Method has no explicit return type, assume nil
+                    expr->inferred_type = type_system.NIL_TYPE;
+                    return type_system.NIL_TYPE;
+                }
+            }
+        }
+        
+        // Check init and deinit methods
+        if (member_name == "init" && frame_info.declaration->init) {
+            if (frame_info.declaration->init->returnType) {
+                TypePtr return_type = resolve_type_annotation(frame_info.declaration->init->returnType);
+                expr->inferred_type = return_type;
+                return return_type;
+            } else {
+                expr->inferred_type = type_system.NIL_TYPE;
+                return type_system.NIL_TYPE;
+            }
+        }
+        
+        if (member_name == "deinit" && frame_info.declaration->deinit) {
+            expr->inferred_type = type_system.NIL_TYPE;
+            return type_system.NIL_TYPE;
+        }
+        
+        // Member not found
+        add_error("Frame '" + frame_name + "' has no member '" + member_name + "'", expr->line);
+        return type_system.ANY_TYPE;
     }
     
     // For now, assume all other member access returns string
@@ -1625,12 +1872,14 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
     
     // First try to get the base type from the type system (handles built-in types and aliases)
     TypePtr base_type = type_system.getType(annotation->typeName);
-    if (!base_type) {
-        // Check if it's a registered type alias
+    
+    // Check if getType returned NIL_TYPE (which means type not found)
+    if (base_type && base_type->tag == TypeTag::Nil) {
+        // Type not found, try type alias
         base_type = type_system.getTypeAlias(annotation->typeName);
     }
     
-    if (!base_type) {
+    if (!base_type || base_type->tag == TypeTag::Nil) {
         // Handle special cases that might not be in the type system yet
         if (annotation->typeName == "atomic") {
             // atomic is an alias for i64
@@ -2744,5 +2993,217 @@ void register_builtin_functions(TypeChecker& checker) {
 }
 
 } // namespace TypeCheckerFactory
+
+// =============================================================================
+// FRAME DECLARATION AND INSTANTIATION TYPE CHECKING
+// =============================================================================
+
+TypePtr TypeChecker::check_frame_declaration(std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame) {
+    if (!frame) return nullptr;
+    
+    // Set current frame context
+    auto prev_frame = current_frame;
+    current_frame = frame;
+    
+    // Create frame info for tracking
+    FrameInfo frame_info;
+    frame_info.name = frame->name;
+    frame_info.declaration = frame;
+    
+    // Check all fields
+    for (const auto& field : frame->fields) {
+        if (!field) continue;
+        
+        // Resolve field type
+        TypePtr field_type = nullptr;
+        if (field->type) {
+            field_type = resolve_type_annotation(field->type);
+        } else {
+            add_error("Frame field '" + field->name + "' must have a type annotation", frame->line);
+            field_type = type_system.ANY_TYPE;
+        }
+        
+        // Check if field has a default value
+        bool has_default = (field->defaultValue != nullptr);
+        
+        // If field has default value, check its type
+        if (has_default) {
+            TypePtr default_type = check_expression(field->defaultValue);
+            if (!is_type_compatible(field_type, default_type)) {
+                add_type_error(field_type->toString(), default_type->toString(), frame->line);
+            }
+        }
+        
+        // Store field info
+        frame_info.fields.push_back({field->name, field_type});
+        frame_info.field_has_default.push_back({field->name, has_default});
+    }
+    
+    // Store frame info BEFORE checking methods so they can reference the frame
+    frame_declarations[frame->name] = frame_info;
+    
+    // Create a frame type
+    TypePtr frame_type = type_system.createFrameType(frame->name);
+    frame->inferred_type = frame_type;
+    
+    // Declare the frame name as a type in the current scope
+    declare_variable(frame->name, frame_type);
+    
+    // Check init() method if present
+    if (frame->init) {
+        // Type check init method
+        // Init methods are like regular methods but called during instantiation
+        enter_scope();
+        
+        // Declare parameters
+        for (const auto& param : frame->init->parameters) {
+            TypePtr param_type = resolve_type_annotation(param.second);
+            declare_variable(param.first, param_type);
+        }
+        
+        // Check optional parameters
+        for (const auto& opt_param : frame->init->optionalParams) {
+            TypePtr param_type = resolve_type_annotation(opt_param.second.first);
+            declare_variable(opt_param.first, param_type);
+            
+            // Check default value if present
+            if (opt_param.second.second) {
+                TypePtr default_type = check_expression(opt_param.second.second);
+                if (!is_type_compatible(param_type, default_type)) {
+                    add_type_error(param_type->toString(), default_type->toString(), frame->line);
+                }
+            }
+        }
+        
+        // Check init body
+        if (frame->init->body) {
+            check_statement(frame->init->body);
+        }
+        
+        exit_scope();
+    }
+    
+    // Check deinit() method if present
+    if (frame->deinit) {
+        // Type check deinit method
+        // Deinit methods should have no parameters
+        if (!frame->deinit->parameters.empty() || !frame->deinit->optionalParams.empty()) {
+            add_error("deinit() method cannot have parameters", frame->line);
+        }
+        
+        // Check deinit body
+        if (frame->deinit->body) {
+            enter_scope();
+            check_statement(frame->deinit->body);
+            exit_scope();
+        }
+    }
+    
+    // Check other methods
+    for (const auto& method : frame->methods) {
+        if (!method) continue;
+        
+        enter_scope();
+        
+        // Declare parameters
+        for (const auto& param : method->parameters) {
+            TypePtr param_type = resolve_type_annotation(param.second);
+            declare_variable(param.first, param_type);
+        }
+        
+        // Check optional parameters
+        for (const auto& opt_param : method->optionalParams) {
+            TypePtr param_type = resolve_type_annotation(opt_param.second.first);
+            declare_variable(opt_param.first, param_type);
+            
+            // Check default value if present
+            if (opt_param.second.second) {
+                TypePtr default_type = check_expression(opt_param.second.second);
+                if (!is_type_compatible(param_type, default_type)) {
+                    add_type_error(param_type->toString(), default_type->toString(), frame->line);
+                }
+            }
+        }
+        
+        // Check method body
+        if (method->body) {
+            check_statement(method->body);
+        }
+        
+        exit_scope();
+    }
+    
+    // Restore previous frame context
+    current_frame = prev_frame;
+    
+    return frame_type;
+}
+
+TypePtr TypeChecker::check_frame_instantiation_expr(std::shared_ptr<LM::Frontend::AST::FrameInstantiationExpr> expr) {
+    if (!expr) return nullptr;
+    
+    // Look up the frame declaration
+    auto frame_it = frame_declarations.find(expr->frameName);
+    if (frame_it == frame_declarations.end()) {
+        add_error("Unknown frame type: " + expr->frameName, expr->line);
+        return type_system.ANY_TYPE;
+    }
+    
+    const FrameInfo& frame_info = frame_it->second;
+    
+    // Check that all required fields are provided
+    std::set<std::string> provided_fields;
+    
+    // Check positional arguments (if any)
+    if (!expr->positionalArgs.empty()) {
+        add_error("Frame instantiation does not support positional arguments. Use named arguments: " + 
+                 expr->frameName + "(field1=value1, field2=value2)", expr->line);
+    }
+    
+    // Check named arguments
+    for (const auto& [field_name, field_value] : expr->namedArgs) {
+        // Check if field exists in frame
+        bool field_found = false;
+        TypePtr expected_type = nullptr;
+        
+        for (size_t i = 0; i < frame_info.fields.size(); ++i) {
+            if (frame_info.fields[i].first == field_name) {
+                field_found = true;
+                expected_type = frame_info.fields[i].second;
+                break;
+            }
+        }
+        
+        if (!field_found) {
+            add_error("Frame '" + expr->frameName + "' has no field named '" + field_name + "'", expr->line);
+            continue;
+        }
+        
+        // Check field value type
+        TypePtr actual_type = check_expression(field_value);
+        if (!is_type_compatible(expected_type, actual_type)) {
+            add_type_error(expected_type->toString(), actual_type->toString(), expr->line);
+        }
+        
+        provided_fields.insert(field_name);
+    }
+    
+    // Check that all required fields (those without defaults) are provided
+    for (size_t i = 0; i < frame_info.fields.size(); ++i) {
+        const std::string& field_name = frame_info.fields[i].first;
+        bool has_default = frame_info.field_has_default[i].second;
+        
+        if (!has_default && provided_fields.find(field_name) == provided_fields.end()) {
+            add_error("Frame instantiation missing required field: '" + field_name + "'", expr->line);
+        }
+    }
+    
+    // Return the frame type
+    TypePtr frame_type = type_system.createFrameType(expr->frameName);
+    expr->inferred_type = frame_type;
+    
+    return frame_type;
+}
+
 } // namespace Frontend
 } // namespace LM

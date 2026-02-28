@@ -69,7 +69,22 @@ private:
     // Handle boolean type conversions
     if (from->tag == TypeTag::Bool && to->tag == TypeTag::Bool) {
         return true;
-    }   
+    }
+    
+    // Handle frame type conversions
+    if (from->tag == TypeTag::Frame && to->tag == TypeTag::Frame) {
+        // Get frame names from both types
+        auto fromFrameType = std::get_if<FrameType>(&from->extra);
+        auto toFrameType = std::get_if<FrameType>(&to->extra);
+        
+        if (fromFrameType && toFrameType) {
+            // Frames are compatible if they have the same name
+            return fromFrameType->name == toFrameType->name;
+        }
+        
+        // If we can't get frame type info, fall back to pointer comparison
+        return from == to;
+    }
 
         // Numeric type conversions - all integer types are compatible with each other
         bool fromIsInt = (from->tag == TypeTag::Int || from->tag == TypeTag::Int8 || 
@@ -1086,6 +1101,27 @@ public:
         dictType.keyType = keyType;
         dictType.valueType = valueType;
         return std::make_shared<Type>(TypeTag::Dict, dictType);
+    }
+    
+    // Create frame type (for OOP frames)
+    TypePtr createFrameType(const std::string& frameName) {
+        // Check if frame type already exists
+        auto it = userDefinedTypes.find(frameName);
+        if (it != userDefinedTypes.end()) {
+            return it->second;
+        }
+        
+        // Create a FrameType with the frame name
+        FrameType frameTypeData;
+        frameTypeData.name = frameName;
+        
+        // Create a frame type with the Frame tag and FrameType data
+        TypePtr frameType = std::make_shared<Type>(TypeTag::Frame, frameTypeData);
+        
+        // Store the frame name in the user-defined types map
+        userDefinedTypes[frameName] = frameType;
+        
+        return frameType;
     }
     
     // Create function type from AST function type annotation (implemented below)

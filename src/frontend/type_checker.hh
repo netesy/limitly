@@ -61,8 +61,18 @@ private:
     };
     std::unordered_map<std::string, FunctionSignature> function_signatures;
     
+    // Frame declarations tracking
+    struct FrameInfo {
+        std::string name;
+        std::vector<std::pair<std::string, TypePtr>> fields;  // field name -> type
+        std::vector<std::pair<std::string, bool>> field_has_default;  // field name -> has default
+        std::shared_ptr<LM::Frontend::AST::FrameDeclaration> declaration;
+    };
+    std::unordered_map<std::string, FrameInfo> frame_declarations;
+    
     // Current context
     std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> current_function = nullptr;
+    std::shared_ptr<LM::Frontend::AST::FrameDeclaration> current_frame = nullptr;
     TypePtr current_return_type = nullptr;
     bool in_loop = false;
     
@@ -206,6 +216,8 @@ private:
     TypePtr check_error_construct_expr(std::shared_ptr<LM::Frontend::AST::ErrorConstructExpr> expr);
     TypePtr check_ok_construct_expr(std::shared_ptr<LM::Frontend::AST::OkConstructExpr> expr);
     TypePtr check_fallible_expr(std::shared_ptr<LM::Frontend::AST::FallibleExpr> expr);
+    TypePtr check_frame_instantiation_expr(std::shared_ptr<LM::Frontend::AST::FrameInstantiationExpr> expr);
+    TypePtr check_frame_declaration(std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame);
     
     // Type annotation resolution
     TypePtr resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::TypeAnnotation> annotation);

@@ -185,6 +185,14 @@ enum class LIR_Op : uint8_t {
     GetField,
     SetField,
     
+    // Frame operations (modern OOP)
+    NewFrame,        // Allocate and initialize frame instance
+    FrameGetField,   // Load field from frame instance
+    FrameSetField,   // Store field to frame instance
+    FrameCallMethod, // Call frame method (static dispatch)
+    FrameCallInit,   // Call frame init() method
+    FrameCallDeinit, // Call frame deinit() method
+    
     // Module operations
     ImportModule,
     ExportSymbol,

@@ -46,6 +46,10 @@ private:
     // Function body lowering (Pass 1)
     void lower_function_bodies(const LM::Frontend::TypeCheckResult& type_check_result);
     void lower_function_body(LM::Frontend::AST::FunctionDeclaration& stmt);
+    void lower_frame_methods(LM::Frontend::AST::FrameDeclaration& frame_decl);
+    void lower_frame_method(const std::string& frame_name, LM::Frontend::AST::FrameMethod& method);
+    void lower_frame_init_method(const std::string& frame_name, LM::Frontend::AST::FrameMethod& init_method);
+    void lower_frame_deinit_method(const std::string& frame_name, LM::Frontend::AST::FrameMethod& deinit_method);
     void lower_task_body(LM::Frontend::AST::TaskStatement& stmt);
     void lower_worker_body(LM::Frontend::AST::WorkerStatement& stmt);
     void lower_task_bodies_recursive(const std::vector<std::shared_ptr<LM::Frontend::AST::Statement>>& statements);
@@ -155,6 +159,9 @@ private:
     Reg emit_object_literal_expr(LM::Frontend::AST::ObjectLiteralExpr& expr);
     Reg emit_this_expr(LM::Frontend::AST::ThisExpr& expr);
     
+    // Frame system expression handlers
+    Reg emit_frame_instantiation_expr(LM::Frontend::AST::FrameInstantiationExpr& expr);
+    
     // Specific statement handlers
     void emit_expr_stmt(LM::Frontend::AST::ExprStatement& stmt);
     void emit_print_stmt(LM::Frontend::AST::PrintStatement& stmt);
@@ -198,6 +205,7 @@ private:
     void emit_continue_stmt(LM::Frontend::AST::ContinueStatement& stmt);
     void emit_unsafe_stmt(LM::Frontend::AST::UnsafeStatement& stmt);
     void emit_class_stmt(LM::Frontend::AST::ClassDeclaration& stmt);
+    void emit_frame_stmt(LM::Frontend::AST::FrameDeclaration& stmt);
     void emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt);
     void emit_module_stmt(LM::Frontend::AST::ModuleDeclaration& stmt);
     
@@ -213,6 +221,7 @@ private:
     struct Scope {
         std::unordered_map<std::string, Reg> vars;
         LM::Memory::MemoryManager<>::Region* memory_region = nullptr;
+        std::vector<std::pair<std::string, Reg>> frame_instances;  // frame_name -> register for deinit tracking
     };
 
     struct LoopContext {
@@ -309,6 +318,21 @@ private:
     std::unordered_map<std::string, ClassInfo> class_table_;
     Reg this_register_ = UINT32_MAX;  // Register holding 'this' pointer in methods
     
+    // Frame system support (modern OOP)
+    struct FrameInfo {
+        std::string name;
+        std::vector<std::pair<std::string, TypePtr>> fields;  // field name -> type
+        std::vector<std::string> method_names;                // ordered method names
+        std::unordered_map<std::string, size_t> field_offsets; // field name -> offset
+        std::unordered_map<std::string, size_t> method_indices; // method name -> index
+        std::vector<std::string> implements;                  // trait names
+        bool has_init = false;
+        bool has_deinit = false;
+        size_t total_field_size = 0;
+    };
+    std::unordered_map<std::string, FrameInfo> frame_table_;
+    Reg frame_this_register_ = UINT32_MAX;  // Register holding 'this' pointer in frame methods
+    
     // Memory management
     LM::Memory::MemoryManager<> memory_manager_;
     LM::Memory::MemoryManager<>::Region* current_memory_region_ = nullptr;
@@ -332,6 +356,13 @@ private:
     void calculate_class_layout(ClassInfo& class_info);
     size_t get_field_offset(const std::string& class_name, const std::string& field_name);
     size_t get_method_index(const std::string& class_name, const std::string& method_name);
+    
+    // Frame system helper methods
+    void collect_frame_signatures(LM::Frontend::AST::Program& program);
+    void collect_frame_signature(LM::Frontend::AST::FrameDeclaration& frame_decl);
+    void calculate_frame_layout(FrameInfo& frame_info);
+    size_t get_frame_field_offset(const std::string& frame_name, const std::string& field_name);
+    size_t get_frame_method_index(const std::string& frame_name, const std::string& method_name);
     
     // Smart module system helper methods
     void collect_module_signatures(LM::Frontend::AST::Program& program);

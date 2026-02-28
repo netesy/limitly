@@ -41,6 +41,7 @@ namespace AST {
     struct ListExpr;
     struct DictExpr;
     struct ObjectLiteralExpr;
+    struct FrameInstantiationExpr;
     struct RangeExpr;
     struct ExprStatement;
     struct VarDeclaration;
@@ -381,6 +382,13 @@ namespace AST {
     struct ObjectLiteralExpr : public Expression {
         std::string constructorName;
         std::unordered_map<std::string, std::shared_ptr<Expression>> properties;
+    };
+    
+    // Frame instantiation expression (e.g., Point() or Point(x=1, y=2))
+    struct FrameInstantiationExpr : public Expression {
+        std::string frameName;
+        std::vector<std::shared_ptr<Expression>> positionalArgs;  // For positional arguments
+        std::unordered_map<std::string, std::shared_ptr<Expression>> namedArgs;  // For named arguments (field=value)
     };
     
     // Range expression (e.g., 1..10)

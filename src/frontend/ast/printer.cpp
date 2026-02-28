@@ -436,6 +436,152 @@ void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node,
             }
         }
     }
+    else if (auto frameDecl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(node)) {
+        std::cout << indentation << "FrameDeclaration: " << frameDecl->name;
+        
+        // Show frame modifiers
+        if (frameDecl->isAbstract) std::cout << " (abstract)";
+        if (frameDecl->isFinal) std::cout << " (final)";
+        
+        std::cout << std::endl;
+        
+        // Show implemented traits
+        if (!frameDecl->implements.empty()) {
+            std::cout << indentation << "  Implements:";
+            for (size_t i = 0; i < frameDecl->implements.size(); ++i) {
+                if (i > 0) std::cout << ",";
+                std::cout << " " << frameDecl->implements[i];
+            }
+            std::cout << std::endl;
+        }
+        
+        // Helper function to get visibility string
+        auto getVisibilityString = [](LM::Frontend::AST::VisibilityLevel vis) -> std::string {
+            switch (vis) {
+                case LM::Frontend::AST::VisibilityLevel::Private: return "private";
+                case LM::Frontend::AST::VisibilityLevel::Protected: return "prot";
+                case LM::Frontend::AST::VisibilityLevel::Public: return "pub";
+                case LM::Frontend::AST::VisibilityLevel::Const: return "const";
+                default: return "unknown";
+            }
+        };
+        
+        // Print fields
+        if (!frameDecl->fields.empty()) {
+            std::cout << indentation << "  Fields:" << std::endl;
+            for (const auto& field : frameDecl->fields) {
+                std::cout << indentation << "    [" << getVisibilityString(field->visibility) << "] ";
+                std::cout << field->name;
+                if (field->type) {
+                    std::cout << ": " << typeToString(field->type);
+                }
+                if (field->defaultValue) {
+                    std::cout << " = <default>";
+                }
+                std::cout << std::endl;
+                
+                // Print default value if present
+                if (field->defaultValue) {
+                    std::cout << indentation << "      Default:" << std::endl;
+                    printNode(field->defaultValue, indent + 3);
+                }
+            }
+        }
+        
+        // Print init method if present
+        if (frameDecl->init) {
+            std::cout << indentation << "  Init Method:" << std::endl;
+            std::cout << indentation << "    [" << getVisibilityString(frameDecl->init->visibility) << "] init()" << std::endl;
+            
+            if (!frameDecl->init->parameters.empty() || !frameDecl->init->optionalParams.empty()) {
+                std::cout << indentation << "      Parameters:" << std::endl;
+                
+                // Required parameters
+                for (const auto& [name, type] : frameDecl->init->parameters) {
+                    std::cout << indentation << "        " << name;
+                    if (type) {
+                        std::cout << ": " << typeToString(type);
+                    }
+                    std::cout << std::endl;
+                }
+                
+                // Optional parameters
+                for (const auto& [name, param] : frameDecl->init->optionalParams) {
+                    std::cout << indentation << "        " << name << " (optional)";
+                    if (param.first) {
+                        std::cout << ": " << typeToString(param.first);
+                    }
+                    std::cout << std::endl;
+                    
+                    if (param.second) {
+                        std::cout << indentation << "          Default value:" << std::endl;
+                        printNode(param.second, indent + 5);
+                    }
+                }
+            }
+            
+            if (frameDecl->init->body) {
+                std::cout << indentation << "      Body:" << std::endl;
+                printNode(frameDecl->init->body, indent + 3);
+            }
+        }
+        
+        // Print deinit method if present
+        if (frameDecl->deinit) {
+            std::cout << indentation << "  Deinit Method:" << std::endl;
+            std::cout << indentation << "    [" << getVisibilityString(frameDecl->deinit->visibility) << "] deinit()" << std::endl;
+            
+            if (frameDecl->deinit->body) {
+                std::cout << indentation << "      Body:" << std::endl;
+                printNode(frameDecl->deinit->body, indent + 3);
+            }
+        }
+        
+        // Print regular methods
+        if (!frameDecl->methods.empty()) {
+            std::cout << indentation << "  Methods:" << std::endl;
+            for (const auto& method : frameDecl->methods) {
+                std::cout << indentation << "    [" << getVisibilityString(method->visibility) << "] ";
+                std::cout << method->name << "()" << std::endl;
+                
+                if (!method->parameters.empty() || !method->optionalParams.empty()) {
+                    std::cout << indentation << "      Parameters:" << std::endl;
+                    
+                    // Required parameters
+                    for (const auto& [name, type] : method->parameters) {
+                        std::cout << indentation << "        " << name;
+                        if (type) {
+                            std::cout << ": " << typeToString(type);
+                        }
+                        std::cout << std::endl;
+                    }
+                    
+                    // Optional parameters
+                    for (const auto& [name, param] : method->optionalParams) {
+                        std::cout << indentation << "        " << name << " (optional)";
+                        if (param.first) {
+                            std::cout << ": " << typeToString(param.first);
+                        }
+                        std::cout << std::endl;
+                        
+                        if (param.second) {
+                            std::cout << indentation << "          Default value:" << std::endl;
+                            printNode(param.second, indent + 5);
+                        }
+                    }
+                }
+                
+                if (method->returnType) {
+                    std::cout << indentation << "      ReturnType: " << typeToString(method->returnType) << std::endl;
+                }
+                
+                if (method->body) {
+                    std::cout << indentation << "      Body:" << std::endl;
+                    printNode(method->body, indent + 3);
+                }
+            }
+        }
+    }
     else if (auto moduleDecl = std::dynamic_pointer_cast<LM::Frontend::AST::ModuleDeclaration>(node)) {
         std::cout << indentation << "ModuleDeclaration: " << moduleDecl->name << std::endl;
         

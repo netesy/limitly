@@ -33,6 +33,8 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
    // std::cout << "[DEBUG] Function signatures collected" << std::endl;
     collect_class_signatures(*type_check_result.program);
    // std::cout << "[DEBUG] Class signatures collected" << std::endl;
+    collect_frame_signatures(*type_check_result.program);
+   // std::cout << "[DEBUG] Frame signatures collected" << std::endl;
     collect_module_signatures(*type_check_result.program);
    // std::cout << "[DEBUG] Module signatures collected" << std::endl;
     
@@ -212,6 +214,14 @@ void Generator::enter_scope() {
 
 void Generator::exit_scope() {
     if (!scope_stack_.empty()) {
+        // Emit deinit calls for all frame instances in this scope (in reverse order)
+        const auto& scope = scope_stack_.back();
+        for (auto it = scope.frame_instances.rbegin(); it != scope.frame_instances.rend(); ++it) {
+            const auto& [frame_name, frame_reg] = *it;
+            // Generate FrameCallDeinit instruction
+            emit_instruction(LIR_Inst(LIR_Op::FrameCallDeinit, Type::Void, frame_reg, 0, 0));
+        }
+        
         // Clean up memory region for this scope
         if (scope_stack_.back().memory_region) {
             delete scope_stack_.back().memory_region;
@@ -447,6 +457,8 @@ void Generator::emit_stmt(LM::Frontend::AST::Statement& stmt) {
         emit_unsafe_stmt(*unsafe_stmt);
     } else if (auto class_stmt = dynamic_cast<LM::Frontend::AST::ClassDeclaration*>(&stmt)) {
         emit_class_stmt(*class_stmt);
+    } else if (auto frame_stmt = dynamic_cast<LM::Frontend::AST::FrameDeclaration*>(&stmt)) {
+        emit_frame_stmt(*frame_stmt);
     } else if (auto match_stmt = dynamic_cast<LM::Frontend::AST::MatchStatement*>(&stmt)) {
         emit_match_stmt(*match_stmt);
     } else if (auto module_stmt = dynamic_cast<LM::Frontend::AST::ModuleDeclaration*>(&stmt)) {
@@ -499,6 +511,8 @@ Reg Generator::emit_expr(LM::Frontend::AST::Expression& expr) {
         return emit_fallible_expr(*fallible);
     } else if (auto object_literal = dynamic_cast<LM::Frontend::AST::ObjectLiteralExpr*>(&expr)) {
         return emit_object_literal_expr(*object_literal);
+    } else if (auto frame_inst = dynamic_cast<LM::Frontend::AST::FrameInstantiationExpr*>(&expr)) {
+        return emit_frame_instantiation_expr(*frame_inst);
     } else if (auto this_expr = dynamic_cast<LM::Frontend::AST::ThisExpr*>(&expr)) {
         return emit_this_expr(*this_expr);
     } else if (auto channel_offer = dynamic_cast<LM::Frontend::AST::ChannelOfferExpr*>(&expr)) {
@@ -1563,6 +1577,38 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             }
         }
         
+        // Try to find the method in any frame
+        for (const auto& [frame_name, frame_info] : frame_table_) {
+            auto method_it = frame_info.method_indices.find(method_name);
+            if (method_it != frame_info.method_indices.end()) {
+                // Found the method - generate frame method call
+                Reg result = allocate_register();
+                
+                // Set the result type if available from type checking
+                if (expr.inferred_type) {
+                    set_register_language_type(result, expr.inferred_type);
+                    set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
+                } else {
+                    auto any_type = std::make_shared<::Type>(::TypeTag::Any);
+                    set_register_language_type(result, any_type);
+                    set_register_abi_type(result, language_type_to_abi_type(any_type));
+                }
+                
+                // Generate frame method call using FrameCallMethod
+                // dst = result, a = frame_reg, b = method_index, imm = arg_count
+                std::string full_method_name = frame_name + "." + method_name;
+                emit_instruction(LIR_Inst(LIR_Op::FrameCallMethod, Type::Ptr, result, object_reg, method_it->second, arg_regs.size() - 1));
+                
+                // Store arguments for the method call (excluding 'this')
+                for (size_t i = 1; i < arg_regs.size(); i++) {
+                    // Arguments will be passed through the call instruction
+                    // The VM will handle argument passing
+                }
+                
+                return result;
+            }
+        }
+        
         // Check for special channel methods
         if (method_name == "send") {
             if (expr.arguments.size() != 1) {
@@ -1807,12 +1853,22 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
             Reg object_reg = emit_expr(*expr.object);
             std::string field_name = expr.member.value();
             
-            // Find field offset
+            // Find field offset in classes
             for (const auto& [class_name, class_info] : class_table_) {
                 auto offset_it = class_info.field_offsets.find(field_name);
                 if (offset_it != class_info.field_offsets.end()) {
                     // Found the field - emit SetField
                     emit_instruction(LIR_Inst(LIR_Op::SetField, object_reg, offset_it->second, value));
+                    return value;
+                }
+            }
+            
+            // Find field offset in frames
+            for (const auto& [frame_name, frame_info] : frame_table_) {
+                auto offset_it = frame_info.field_offsets.find(field_name);
+                if (offset_it != frame_info.field_offsets.end()) {
+                    // Found the field - emit FrameSetField
+                    emit_instruction(LIR_Inst(LIR_Op::FrameSetField, Type::Void, object_reg, static_cast<uint32_t>(offset_it->second), value));
                     return value;
                 }
             }
@@ -2018,6 +2074,23 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
             // Set field type
             if (offset_it->second < class_info.fields.size()) {
                 set_register_type(dst, class_info.fields[offset_it->second].second);
+            }
+            
+            return dst;
+        }
+    }
+    
+    // Try to find field offset by checking all frames
+    for (const auto& [frame_name, frame_info] : frame_table_) {
+        auto offset_it = frame_info.field_offsets.find(expr.name);
+        if (offset_it != frame_info.field_offsets.end()) {
+            // Found the field - emit FrameGetField
+            Reg dst = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::FrameGetField, Type::Ptr, dst, object_reg, offset_it->second));
+            
+            // Set field type
+            if (offset_it->second < frame_info.fields.size()) {
+                set_register_type(dst, frame_info.fields[offset_it->second].second);
             }
             
             return dst;
@@ -4639,6 +4712,9 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
     for (const auto& stmt : type_check_result.program->statements) {
         if (auto func_stmt = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(stmt.get())) {
              lower_function_body(*func_stmt);
+        } else if (auto frame_stmt = dynamic_cast<LM::Frontend::AST::FrameDeclaration*>(stmt.get())) {
+            // Lower frame methods
+            lower_frame_methods(*frame_stmt);
         }
     }
 
@@ -4688,6 +4764,300 @@ void Generator::lower_function_body(LM::Frontend::AST::FunctionDeclaration& stmt
     // The function is now registered with FunctionRegistry
     // Store a reference in the function table for later use
     auto& func_info = function_table_[stmt.name];
+    func_info.lir_function = nullptr; // Not needed since FunctionRegistry manages it
+}
+
+void Generator::lower_frame_methods(LM::Frontend::AST::FrameDeclaration& frame_decl) {
+    // Lower all frame methods into separate LIR functions
+    
+    // Lower regular methods
+    for (const auto& method : frame_decl.methods) {
+        lower_frame_method(frame_decl.name, *method);
+    }
+    
+    // Lower init method if present
+    if (frame_decl.init) {
+        lower_frame_init_method(frame_decl.name, *frame_decl.init);
+    }
+    
+    // Lower deinit method if present
+    if (frame_decl.deinit) {
+        lower_frame_deinit_method(frame_decl.name, *frame_decl.deinit);
+    }
+}
+
+void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::AST::FrameMethod& method) {
+    // Create a function with the frame method name (frame_name.method_name)
+    std::string full_method_name = frame_name + "." + method.name;
+    
+    auto& func_manager = LIRFunctionManager::getInstance();
+    
+    // Pre-register a placeholder for recursive calls
+    if (!func_manager.hasFunction(full_method_name)) {
+        std::vector<LIRParameter> empty_params;
+        auto placeholder = func_manager.createFunction(full_method_name, empty_params, Type::I64, nullptr);
+    }
+    
+    // Create function with parameters (including 'this' as first parameter)
+    size_t total_params = method.parameters.size() + 1; // +1 for 'this'
+    current_function_ = std::make_unique<LIR_Function>(full_method_name, total_params);
+    next_register_ = total_params;
+    next_label_ = 0;
+    scope_stack_.clear();
+    loop_stack_.clear();
+    register_types_.clear();
+    enter_scope();
+    enter_memory_region();
+    
+    // Use CFG mode for proper JIT compatibility (disabled for now)
+    cfg_context_.building_cfg = false;  // DISABLED: CFG linearization has bugs with elif
+    cfg_context_.current_block = nullptr;
+    
+    // Register 'this' parameter as first parameter (register 0)
+    this_register_ = 0;  // Set this_register_ for 'this' context
+    bind_variable("this", 0);
+    auto frame_type = std::make_shared<::Type>(::TypeTag::UserDefined);
+    set_register_type(0, frame_type);
+    set_register_abi_type(0, Type::Ptr);
+    
+    // Register method parameters
+    for (size_t i = 0; i < method.parameters.size(); ++i) {
+        size_t reg_index = i + 1; // +1 for 'this'
+        bind_variable(method.parameters[i].first, static_cast<Reg>(reg_index));
+        set_register_type(static_cast<Reg>(reg_index), nullptr);
+    }
+    
+    // Emit method body
+    if (method.body) {
+        emit_stmt(*method.body);
+    }
+    
+    // Add implicit return if none exists
+    if (!cfg_context_.building_cfg) {
+        // Linear mode - add implicit return if function doesn't end with return
+        if (current_function_->instructions.empty() || 
+            !current_function_->instructions.back().isReturn()) {
+            emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, 0, 0));
+        }
+    }
+    
+    // Finish CFG building (only if CFG was used)
+    if (cfg_context_.building_cfg) {
+        if (!validate_cfg()) {
+            report_error("CFG validation failed for frame method: " + full_method_name);
+        }
+        finish_cfg_build();
+    }
+
+    exit_scope();
+    exit_memory_region();
+    this_register_ = UINT32_MAX;  // Clear this_register_
+    
+    // Convert LIR_Function to LIRFunction and update the registration
+    auto result = std::move(current_function_);
+    current_function_ = nullptr;
+    
+    // Create proper LIRFunction from our LIR_Function
+    std::vector<LIRParameter> params;
+    
+    // Add 'this' parameter
+    LIRParameter this_param;
+    this_param.name = "this";
+    this_param.type = Type::Ptr;
+    params.push_back(this_param);
+    
+    // Add method parameters
+    for (const auto& param : method.parameters) {
+        LIRParameter lir_param;
+        lir_param.name = param.first;
+        // Convert type - for now use I64 as default
+        lir_param.type = Type::I64;
+        params.push_back(lir_param);
+    }
+    
+    // Create function with I64 return type for now
+    auto lir_func = func_manager.createFunction(full_method_name, params, Type::I64, nullptr);
+    
+    // Update function table
+    auto& func_info = function_table_[full_method_name];
+    func_info.lir_function = nullptr; // Not needed since FunctionRegistry manages it
+}
+
+void Generator::lower_frame_init_method(const std::string& frame_name, LM::Frontend::AST::FrameMethod& init_method) {
+    // Create a function with the frame init method name (frame_name.init)
+    std::string full_method_name = frame_name + ".init";
+    
+    auto& func_manager = LIRFunctionManager::getInstance();
+    
+    // Pre-register a placeholder for recursive calls
+    if (!func_manager.hasFunction(full_method_name)) {
+        std::vector<LIRParameter> empty_params;
+        auto placeholder = func_manager.createFunction(full_method_name, empty_params, Type::I64, nullptr);
+    }
+    
+    // Create function with parameters (including 'this' as first parameter)
+    size_t total_params = init_method.parameters.size() + 1; // +1 for 'this'
+    current_function_ = std::make_unique<LIR_Function>(full_method_name, total_params);
+    next_register_ = total_params;
+    next_label_ = 0;
+    scope_stack_.clear();
+    loop_stack_.clear();
+    register_types_.clear();
+    enter_scope();
+    enter_memory_region();
+    
+    // Use CFG mode for proper JIT compatibility (disabled for now)
+    cfg_context_.building_cfg = false;  // DISABLED: CFG linearization has bugs with elif
+    cfg_context_.current_block = nullptr;
+    
+    // Register 'this' parameter as first parameter (register 0)
+    this_register_ = 0;  // Set this_register_ for 'this' context
+    bind_variable("this", 0);
+    auto frame_type = std::make_shared<::Type>(::TypeTag::UserDefined);
+    set_register_type(0, frame_type);
+    set_register_abi_type(0, Type::Ptr);
+    
+    // Register init parameters
+    for (size_t i = 0; i < init_method.parameters.size(); ++i) {
+        size_t reg_index = i + 1; // +1 for 'this'
+        bind_variable(init_method.parameters[i].first, static_cast<Reg>(reg_index));
+        set_register_type(static_cast<Reg>(reg_index), nullptr);
+    }
+    
+    // Emit init method body
+    if (init_method.body) {
+        emit_stmt(*init_method.body);
+    }
+    
+    // Add implicit return if none exists
+    if (!cfg_context_.building_cfg) {
+        // Linear mode - add implicit return if function doesn't end with return
+        if (current_function_->instructions.empty() || 
+            !current_function_->instructions.back().isReturn()) {
+            emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, 0, 0));
+        }
+    }
+    
+    // Finish CFG building (only if CFG was used)
+    if (cfg_context_.building_cfg) {
+        if (!validate_cfg()) {
+            report_error("CFG validation failed for frame init method: " + full_method_name);
+        }
+        finish_cfg_build();
+    }
+
+    exit_scope();
+    exit_memory_region();
+    this_register_ = UINT32_MAX;  // Clear this_register_
+    
+    // Convert LIR_Function to LIRFunction and update the registration
+    auto result = std::move(current_function_);
+    current_function_ = nullptr;
+    
+    // Create proper LIRFunction from our LIR_Function
+    std::vector<LIRParameter> params;
+    
+    // Add 'this' parameter
+    LIRParameter this_param;
+    this_param.name = "this";
+    this_param.type = Type::Ptr;
+    params.push_back(this_param);
+    
+    // Add init parameters
+    for (const auto& param : init_method.parameters) {
+        LIRParameter lir_param;
+        lir_param.name = param.first;
+        // Convert type - for now use I64 as default
+        lir_param.type = Type::I64;
+        params.push_back(lir_param);
+    }
+    
+    // Create function with I64 return type for now
+    auto lir_func = func_manager.createFunction(full_method_name, params, Type::I64, nullptr);
+    
+    // Update function table
+    auto& func_info = function_table_[full_method_name];
+    func_info.lir_function = nullptr; // Not needed since FunctionRegistry manages it
+}
+
+void Generator::lower_frame_deinit_method(const std::string& frame_name, LM::Frontend::AST::FrameMethod& deinit_method) {
+    // Create a function with the frame deinit method name (frame_name.deinit)
+    std::string full_method_name = frame_name + ".deinit";
+    
+    auto& func_manager = LIRFunctionManager::getInstance();
+    
+    // Pre-register a placeholder for recursive calls
+    if (!func_manager.hasFunction(full_method_name)) {
+        std::vector<LIRParameter> empty_params;
+        auto placeholder = func_manager.createFunction(full_method_name, empty_params, Type::I64, nullptr);
+    }
+    
+    // Create function with only 'this' parameter (deinit takes no other parameters)
+    size_t total_params = 1; // Only 'this'
+    current_function_ = std::make_unique<LIR_Function>(full_method_name, total_params);
+    next_register_ = total_params;
+    next_label_ = 0;
+    scope_stack_.clear();
+    loop_stack_.clear();
+    register_types_.clear();
+    enter_scope();
+    enter_memory_region();
+    
+    // Use CFG mode for proper JIT compatibility (disabled for now)
+    cfg_context_.building_cfg = false;  // DISABLED: CFG linearization has bugs with elif
+    cfg_context_.current_block = nullptr;
+    
+    // Register 'this' parameter as first parameter (register 0)
+    this_register_ = 0;  // Set this_register_ for 'this' context
+    bind_variable("this", 0);
+    auto frame_type = std::make_shared<::Type>(::TypeTag::UserDefined);
+    set_register_type(0, frame_type);
+    set_register_abi_type(0, Type::Ptr);
+    
+    // Emit deinit method body
+    if (deinit_method.body) {
+        emit_stmt(*deinit_method.body);
+    }
+    
+    // Add implicit return if none exists
+    if (!cfg_context_.building_cfg) {
+        // Linear mode - add implicit return if function doesn't end with return
+        if (current_function_->instructions.empty() || 
+            !current_function_->instructions.back().isReturn()) {
+            emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, 0, 0));
+        }
+    }
+    
+    // Finish CFG building (only if CFG was used)
+    if (cfg_context_.building_cfg) {
+        if (!validate_cfg()) {
+            report_error("CFG validation failed for frame deinit method: " + full_method_name);
+        }
+        finish_cfg_build();
+    }
+
+    exit_scope();
+    exit_memory_region();
+    this_register_ = UINT32_MAX;  // Clear this_register_
+    
+    // Convert LIR_Function to LIRFunction and update the registration
+    auto result = std::move(current_function_);
+    current_function_ = nullptr;
+    
+    // Create proper LIRFunction from our LIR_Function
+    std::vector<LIRParameter> params;
+    
+    // Add 'this' parameter
+    LIRParameter this_param;
+    this_param.name = "this";
+    this_param.type = Type::Ptr;
+    params.push_back(this_param);
+    
+    // Create function with I64 return type for now
+    auto lir_func = func_manager.createFunction(full_method_name, params, Type::I64, nullptr);
+    
+    // Update function table
+    auto& func_info = function_table_[full_method_name];
     func_info.lir_function = nullptr; // Not needed since FunctionRegistry manages it
 }
 
@@ -5449,3 +5819,190 @@ Reg Generator::emit_channel_recv_expr(LM::Frontend::AST::ChannelRecvExpr& expr) 
 
 } // namespace LIR
 } // namespace LM
+
+// Frame system implementations
+void Generator::collect_frame_signatures(LM::Frontend::AST::Program& program) {
+    for (const auto& stmt : program.statements) {
+        if (auto frame_decl = dynamic_cast<LM::Frontend::AST::FrameDeclaration*>(stmt.get())) {
+            collect_frame_signature(*frame_decl);
+        }
+    }
+}
+
+void Generator::collect_frame_signature(LM::Frontend::AST::FrameDeclaration& frame_decl) {
+    FrameInfo frame_info;
+    frame_info.name = frame_decl.name;
+    frame_info.implements = frame_decl.implements;
+    frame_info.has_init = (frame_decl.init != nullptr);
+    frame_info.has_deinit = (frame_decl.deinit != nullptr);
+    
+    // Collect field information
+    for (const auto& field : frame_decl.fields) {
+        TypePtr field_type = nullptr;
+        // Convert AST type annotation to TypePtr if available
+        if (field->type && type_system) {
+            // TODO: Convert from AST type annotation to TypePtr
+            // For now, use a placeholder type
+            field_type = std::make_shared<::Type>(::TypeTag::Any);
+        }
+        frame_info.fields.push_back({field->name, field_type});
+    }
+    
+    // Collect method information
+    for (const auto& method : frame_decl.methods) {
+        frame_info.method_names.push_back(method->name);
+        frame_info.method_indices[method->name] = frame_info.method_names.size() - 1;
+        
+        // Register method in function table
+        FunctionInfo func_info;
+        func_info.name = frame_decl.name + "." + method->name;
+        func_info.param_count = method->parameters.size() + 1; // +1 for 'this'
+        func_info.visibility = method->visibility;
+        func_info.has_closure = false;
+        function_table_[func_info.name] = std::move(func_info);
+    }
+    
+    // Register init method if present
+    if (frame_decl.init) {
+        FunctionInfo init_info;
+        init_info.name = frame_decl.name + ".init";
+        init_info.param_count = frame_decl.init->parameters.size() + 1; // +1 for 'this'
+        init_info.visibility = frame_decl.init->visibility;
+        init_info.has_closure = false;
+        function_table_[init_info.name] = std::move(init_info);
+    }
+    
+    // Register deinit method if present
+    if (frame_decl.deinit) {
+        FunctionInfo deinit_info;
+        deinit_info.name = frame_decl.name + ".deinit";
+        deinit_info.param_count = 1; // Only 'this'
+        deinit_info.visibility = frame_decl.deinit->visibility;
+        deinit_info.has_closure = false;
+        function_table_[deinit_info.name] = std::move(deinit_info);
+    }
+    
+    // Calculate field offsets and total size
+    calculate_frame_layout(frame_info);
+    
+    // Store frame information
+    frame_table_[frame_decl.name] = frame_info;
+}
+
+void Generator::calculate_frame_layout(FrameInfo& frame_info) {
+    size_t offset = 0;
+    
+    // Calculate field offsets
+    for (auto& field : frame_info.fields) {
+        frame_info.field_offsets[field.first] = offset;
+        offset++; // Simple layout - each field is one register slot
+    }
+    
+    frame_info.total_field_size = offset;
+}
+
+size_t Generator::get_frame_field_offset(const std::string& frame_name, const std::string& field_name) {
+    auto it = frame_table_.find(frame_name);
+    if (it == frame_table_.end()) {
+        report_error("Unknown frame: " + frame_name);
+        return UINT32_MAX;
+    }
+    
+    auto offset_it = it->second.field_offsets.find(field_name);
+    if (offset_it == it->second.field_offsets.end()) {
+        report_error("Unknown field '" + field_name + "' in frame '" + frame_name + "'");
+        return UINT32_MAX;
+    }
+    
+    return offset_it->second;
+}
+
+size_t Generator::get_frame_method_index(const std::string& frame_name, const std::string& method_name) {
+    auto it = frame_table_.find(frame_name);
+    if (it == frame_table_.end()) {
+        report_error("Unknown frame: " + frame_name);
+        return UINT32_MAX;
+    }
+    
+    auto index_it = it->second.method_indices.find(method_name);
+    if (index_it == it->second.method_indices.end()) {
+        report_error("Unknown method '" + method_name + "' in frame '" + frame_name + "'");
+        return UINT32_MAX;
+    }
+    
+    return index_it->second;
+}
+
+void Generator::emit_frame_stmt(LM::Frontend::AST::FrameDeclaration& stmt) {
+    // Frame declarations are handled in Pass 0 (signature collection)
+    // This function is called during Pass 2 but doesn't need to emit anything
+    // since the frame layout and methods are already registered
+}
+
+Reg Generator::emit_frame_instantiation_expr(LM::Frontend::AST::FrameInstantiationExpr& expr) {
+    // Look up frame information
+    auto it = frame_table_.find(expr.frameName);
+    if (it == frame_table_.end()) {
+        report_error("Unknown frame: " + expr.frameName);
+        return 0;
+    }
+    
+    const FrameInfo& frame_info = it->second;
+    
+    // Allocate register for frame instance
+    Reg frame_reg = allocate_register();
+    
+    // Generate NewFrame instruction to allocate memory and initialize fields
+    // The imm field contains the frame size (number of fields)
+    emit_instruction(LIR_Inst(LIR_Op::NewFrame, Type::Ptr, frame_reg, 0, 0, static_cast<uint32_t>(frame_info.total_field_size)));
+    
+    // Set frame type
+    auto frame_type = std::make_shared<::Type>(::TypeTag::UserDefined);
+    set_register_type(frame_reg, frame_type);
+    set_register_abi_type(frame_reg, Type::Ptr);
+    
+    // Initialize fields with provided arguments or default values
+    for (size_t i = 0; i < frame_info.fields.size(); i++) {
+        const auto& field = frame_info.fields[i];
+        const std::string& field_name = field.first;
+        size_t field_offset = frame_info.field_offsets.at(field_name);
+        
+        Reg value_reg = 0;
+        bool has_value = false;
+        
+        // Check if value is provided in named arguments
+        auto named_it = expr.namedArgs.find(field_name);
+        if (named_it != expr.namedArgs.end()) {
+            value_reg = emit_expr(*named_it->second);
+            has_value = true;
+        }
+        // Check if value is provided in positional arguments
+        else if (i < expr.positionalArgs.size()) {
+            value_reg = emit_expr(*expr.positionalArgs[i]);
+            has_value = true;
+        }
+        
+        // If value is provided, set the field
+        if (has_value) {
+            // Generate FrameSetField instruction
+            // dst = frame_reg, a = field_offset, b = value_reg
+            emit_instruction(LIR_Inst(LIR_Op::FrameSetField, Type::Void, frame_reg, static_cast<uint32_t>(field_offset), value_reg));
+        }
+        // Otherwise, the field will use its default value (handled by NewFrame)
+    }
+    
+    // Call init() method if it exists
+    if (frame_info.has_init) {
+        // Generate FrameCallInit instruction
+        // This will call the init() method with the frame instance as 'this'
+        emit_instruction(LIR_Inst(LIR_Op::FrameCallInit, Type::Void, frame_reg, 0, 0));
+    }
+    
+    // Track frame instance in current scope for deinit tracking
+    if (!scope_stack_.empty() && frame_info.has_deinit) {
+        scope_stack_.back().frame_instances.push_back({expr.frameName, frame_reg});
+    }
+    
+    return frame_reg;
+}
+

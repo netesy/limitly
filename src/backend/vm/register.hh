@@ -105,6 +105,10 @@ private:
     // SharedCell operations for parallel execution
     std::unordered_map<uint32_t, std::unique_ptr<SharedCell>> shared_cells;
     
+    // Frame instance storage for VM execution
+    std::unordered_map<uint64_t, FrameInstancePtr> frame_instances;
+    uint64_t next_frame_id = 1;
+    
     // Atomic variables and work queues for lock-free parallel operations
     std::atomic<int64_t> default_atomic{0};
     std::vector<std::queue<uint64_t>> work_queues;
@@ -164,6 +168,11 @@ private:
     ValuePtr createErrorValue(const std::string& errorType, const std::string& message = "");
     ValuePtr createSuccessValue(const RegisterValue& value);
     bool isErrorValue(LIR::Reg reg) const;
+    
+    // Frame management methods
+    FrameInstancePtr createFrameInstance(const std::string& frame_type);
+    void setFrameField(FrameInstancePtr frame, const std::string& field_name, const RegisterValue& value);
+    RegisterValue getFrameField(FrameInstancePtr frame, const std::string& field_name) const;
     
 
 };

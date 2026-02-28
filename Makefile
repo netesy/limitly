@@ -79,7 +79,7 @@ MAIN_SRCS := src/main.cpp $(BACKEND_COMMON_SRCS) $(BACK_SRCS) $(ERROR_SRCS) \
              $(FRONT_SRCS) $(REGISTER_SRCS) $(LIR_CORE_SRCS) 
 
 TEST_SRCS := src/test_parser.cpp $(BACKEND_COMMON_SRCS) $(LIR_CORE_SRCS) $(ERROR_SRCS) \
-             $(FRONT_SRCS) src/lir/function_registry.cpp
+             $(FRONT_SRCS)
 
 # =============================
 # Objects and response files
