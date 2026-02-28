@@ -339,152 +339,11 @@ iter (i in 0..10..2) {
 
 ### Ternary Operator
 
-Limit supports the ternary operator (`? :`) for concise conditional expressions.
-
-```limit
-var x = 10;
-var result = x > 5 ? "Greater than 5" : "Not greater than 5";
-print(result); // Output: Greater than 5
-```
-> **Note:** The ternary operator is planned but not yet implemented in the parser.
+> **Note:** The ternary operator (`? :`) is a planned feature but has not yet been implemented.
 
 ### Match Statements
 
-The `match` statement is a powerful tool for pattern matching. It can be used as an advanced `switch` statement.
-
-A `match` statement can match against literal values:
-
-```
-var x = 2;
-match (x) {
-    1 => { print("One"); },
-    2 => { print("Two"); }, // This branch is executed
-    _ => { print("Something else"); } // The `_` is a wildcard
-}
-```
-
-It can also match based on type:
-
-```
-fn printType(value) {
-    match (value) {
-        int => { print("It's an integer."); },
-        str => { print("It's a string."); },
-        _   => { print("It's some other type."); }
-    }
-}
-
-printType(10);     // Output: It's an integer.
-printType("hello"); // Output: It's a string.
-```
-
-You can add conditions to your patterns using `where` guards:
-
-```
-var value = 15;
-match (value) {
-    x where x > 10 => { print("{x} is greater than 10"); },
-    x where x < 10 => { print("{x} is less than 10"); },
-    _              => { print("It must be 10"); }
-}
-```
-
-### Advanced Pattern Matching
-
-Limit's `match` statement supports more than just literal and type matching. You can also destructure complex data types like enums, structs, lists, and tuples.
-
-#### Destructuring Structs and Enums
-
-You can match on the structure of an enum or a struct and bind its inner values to variables.
-
-```limit
-enum Option {
-    Some(any),
-    None
-}
-
-fn print_option(opt: Option) {
-    match (opt) {
-        Some(value) => { print("Value is {value}"); },
-        None => { print("No value"); }
-    }
-}
-
-print_option(Some(10)); // Output: Value is 10
-print_option(None);     // Output: No value
-```
-
-You can also destructure records or objects with a similar syntax:
-
-```limit
-type Person = {name: str, age: int};
-
-fn greet(p: Person) {
-    match (p) {
-        {name: n, age: a} => { print("{n} is {a} years old."); }
-    }
-}
-
-greet({name: "Alice", age: 30}); // Output: Alice is 30 years old.
-```
-
-#### Destructuring Dictionaries
-
-You can destructure dictionaries to bind values to variables based on their keys. You can also capture the remaining key-value pairs using the `...` syntax.
-
-```limit
-var person = {
-    "name": "Alice",
-    "age": 30,
-    "city": "New York"
-};
-
-match (person) {
-    {name: n, age: a, ...rest} => {
-        print("{n} is {a} years old.");
-        print("Other info: {rest}");
-    },
-    _ => { print("Not a person."); }
-}
-// Output:
-// Alice is 30 years old.
-// Other info: {city: "New York"}
-```
-
-#### Destructuring Lists
-
-You can destructure lists to bind elements to variables. The `...` syntax can be used to bind the rest of the list to a variable.
-
-```limit
-var my_list = [1, 2, 3, 4];
-
-match (my_list) {
-    [] => { print("Empty list"); },
-    [x] => { print("Single element: {x}"); },
-    [a, b, ...rest] => {
-        print("First: {a}, Second: {b}");
-        print("Rest: {rest}");
-    },
-    _ => { print("Some other list"); }
-}
-// Output:
-// First: 1, Second: 2
-// Rest: [3, 4]
-```
-
-#### Destructuring Tuples
-
-Tuples can be destructured in a similar way.
-
-```limit
-var my_tuple = ("Jules", 42);
-
-match (my_tuple) {
-    (name, age) => { print("{name} is {age} years old."); },
-    _ => { print("Not a person tuple."); }
-}
-// Output: Jules is 42 years old.
-```
+> **Note:** The `match` statement is a planned feature for powerful pattern matching, but it has not yet been implemented.
 
 ## Data Structures
 
@@ -528,32 +387,7 @@ print(person["age"]);  // Output: 30
 
 ### Tuples
 
-A tuple is a fixed-size, ordered collection of elements that can be of different types. Tuples are created using parentheses `()`.
-
-```limit
-var my_tuple = (1, "hello", true);
-```
-
-You can access elements in a tuple using zero-based indexing with dot notation.
-
-```limit
-var person = ("Alice", 30);
-print(person.0); // Output: Alice
-print(person.1); // Output: 30
-```
-
-### Object Literals
-
-Object literals provide a way to create instances of user-defined types, like classes or enums, with a specific structure. This is especially useful for enums with associated data.
-
-```limit
-enum Option {
-    Some(any),
-    None
-}
-
-var my_option = Some { value: 42 };
-```
+> **Note:** Tuples are a planned feature for fixed-size, ordered collections. The syntax is parsed but full implementation is not yet complete.
 
 ## Functions
 
@@ -629,41 +463,7 @@ greet_default("Alice");   // Output: Hello, Alice!
 
 ### Higher-Order Functions
 
-Functions are first-class citizens in Limit, which means they can be passed as arguments to other functions.
-
-```
-// This function takes another function as a parameter
-fn apply(x: int, y: int, operation: fn(int, int): int): int {
-    return operation(x, y);
-}
-
-fn multiply(a: int, b: int): int {
-    return a * b;
-}
-
-var result: int = apply(10, 5, multiply);
-print(result); // Output: 50
-```
-
-### Closures
-
-A function can be defined inside another function. This inner function "captures" the variables from its containing scope, creating a closure.
-
-```
-fn createCounter(): fn(): int {
-    var count: int = 0;
-    fn increment(): int {
-        count += 1;
-        return count;
-    }
-    return increment;
-}
-
-var counter: fn(): int = createCounter();
-print(counter()); // Output: 1
-print(counter()); // Output: 2
-print(counter()); // Output: 3
-```
+> **Note:** Higher-order functions, closures, and first-class functions are planned features but have not yet been implemented.
 
 ## Classes
 
@@ -808,161 +608,17 @@ The `self` keyword refers to the current instance of the class. It is used to ac
 
 ### Inheritance
 
-A class can inherit from a parent class using the `:` operator. This allows the child class to inherit the fields and methods of the parent.
-
-```
-class Animal {
-    fn speak() {
-        print("The animal makes a sound.");
-    }
-}
-
-class Dog : Animal {
-    // Dog inherits the speak() method from Animal
-}
-
-var my_dog: Dog = Dog();
-my_dog.speak(); // Output: The animal makes a sound.
-```
-
-### Method Overriding
-
-A child class can provide its own implementation of a method that it inherited from its parent.
-
-```
-class Cat : Animal {
-    fn speak() {
-        print("The cat meows.");
-    }
-}
-
-var my_cat: Cat = Cat();
-my_cat.speak(); // Output: The cat meows.
-```
-
-### The `super` Keyword
-
-The `super` keyword can be used to call methods from the parent class.
-
-```
-class SmartDog : Dog {
-    fn speak() {
-        super.speak(); // Call the speak() method from the parent (Dog)
-        print("Woof woof!");
-    }
-}
-
-var smart_dog: SmartDog = SmartDog();
-smart_dog.speak();
-// Output:
-// The animal makes a sound.
-// Woof woof!
-```
-
-### Polymorphism
-
-Polymorphism allows you to treat objects of different classes as objects of a common parent class.
-
-```
-var animals: [Animal] = [Dog(), Cat(), Animal()];
-iter (animal: Animal in animals) {
-    animal.speak();
-}
-// Output:
-// The animal makes a sound.
-// The cat meows.
-// The animal makes a sound.
-```
+> **Note:** Class inheritance is a planned feature. The basic syntax is parsed, but the VM and type checker do not yet support it.
 
 ## Modules and Imports
 
-Limit supports a module system that allows you to organize your code into separate files and reuse code across your project.
-
-### Defining a Module
-
-A module is simply a Limit source file. For example, you could have a file named `my_module.lm` with the following content:
-
-```limit
-// my_module.lm
-fn greet() {
-    print("Hello from my_module!");
-}
-
-var my_variable = 123;
-```
-
-### Importing a Module
-
-You can import a module using the `import` statement. The module path is specified using dot notation, and it corresponds to the file path. For example, to import `my_module.lm` from the same directory, you would write:
-
-```limit
-import my_module;
-
-my_module.greet(); // Output: Hello from my_module!
-print(my_module.my_variable); // Output: 123
-```
-
-### Import with an Alias
-
-You can provide an alias for an imported module to make it easier to reference.
-
-```limit
-import my_module as mod;
-
-mod.greet();
-```
-
-### Importing Specific Symbols
-
-If you only need specific functions or variables from a module, you can use the `show` keyword to import only them into the current scope.
-
-```limit
-import my_module show greet, my_variable;
-
-greet(); // Directly accessible
-print(my_variable);
-```
-
-### Hiding Imported Symbols
-
-Conversely, you can use the `hide` keyword to import all symbols from a module *except* for the ones specified.
-
-```limit
-import my_module hide my_variable;
-
-greet(); // greet is imported
-// my_variable is not imported
-```
-
-### Module Declarations
-
-For more explicit control over what a module exposes, you can use a `module` block. This allows you to define `public`, `protected`, and `private` sections for your module's members.
-
-```limit
-// in file my_app/utils.lm
-module my_app.utils {
-    @public
-    fn format_user(user: User): str {
-        // ...
-    }
-
-    @protected
-    class StringHelper {
-        // ...
-    }
-
-    @private
-    var api_key = "secret";
-}
-```
-
-When another file imports this module, it will only have access to the `public` members. `protected` members would be available to other modules within the `my_app` namespace (not yet fully implemented), and `private` members are internal to the module.
+> **Note:** The module system is a planned feature. The `import` syntax is parsed, but the VM and runtime do not yet support loading or using modules.
 
 ## Advanced Features
 
 ### Lambda Expressions (Anonymous Functions)
 
-Limit supports lambda expressions, also known as anonymous functions. These are functions that do not have a name and can be defined on the fly.
+> **Note:** Lambda expressions are a planned feature but have not yet been implemented.
 
 ```limit
 // A lambda that adds two numbers
@@ -988,48 +644,19 @@ print(result); // Output: 50
 
 ### Destructuring Assignments
 
-You can unpack values from tuples and lists into separate variables.
-
-```limit
-// Destructuring a tuple
-var (name, age) = ("Alice", 30);
-print("{name} is {age} years old."); // Output: Alice is 30 years old.
-
-// Destructuring a list
-var [a, b, c] = [1, 2, 3];
-print(a); // Output: 1
-```
+> **Note:** Destructuring assignments are a planned feature but have not yet been implemented.
 
 ### Unsafe Blocks
 
-Limit is a memory-safe language, but sometimes you may need to interface with low-level code or perform operations that the compiler cannot guarantee are safe. For these cases, you can use an `unsafe` block.
-
-```limit
-unsafe {
-    // Low-level operations
-}
-```
+> **Note:** `unsafe` blocks are a planned feature but have not yet been implemented.
 
 ### Contract Statements
 
-Contracts are used to enforce preconditions, postconditions, and invariants in your code. They are useful for debugging and ensuring correctness.
-
-```limit
-fn divide(a: int, b: int): int {
-    contract(b != 0, "Cannot divide by zero");
-    return a / b;
-}
-```
+> **Note:** `contract` statements are a planned feature. The `assert` built-in function provides similar functionality and is fully implemented.
 
 ### Compile-Time Execution
 
-The `comptime` keyword allows you to execute code at compile time. This is useful for metaprogramming, generating lookup tables, or performing other computations before the program runs.
-
-```limit
-comptime {
-    var my_compile_time_var = 123;
-}
-```
+> **Note:** `comptime` is a planned feature but has not yet been implemented.
 
 ## The Type System
 
@@ -1058,168 +685,34 @@ var my_num: Number = 10;       // This is valid
 my_num = 3.14;                 // This is also valid
 ```
 
-Union types are especially powerful when combined with `match` statements to handle all possible types that a variable could be.
+### Advanced Type System Features
 
-### Intersection Types
-
-An intersection type is a type that combines multiple types into one. A value of an intersection type must satisfy the requirements of all the types in the intersection. Intersection types are defined using the ampersand (`&`) character.
-
-```limit
-trait HasName {
-    fn get_name(): str;
-}
-
-trait HasAge {
-    fn get_age(): int;
-}
-
-type Person = HasName & HasAge;
-
-fn print_person_details(p: Person) {
-    print("{p.get_name()} is {p.get_age()} years old.");
-}
-```
-
-### Refined Types
-
-A refined type allows you to add constraints to an existing type. This is useful for enforcing invariants at the type level. Refined types are defined using the `where` keyword.
-
-```limit
-type PositiveInt = int where value > 0;
-
-fn set_age(age: PositiveInt) {
-    // ...
-}
-
-set_age(10); // Valid
-set_age(-5); // This would be a runtime error
-```
-
-### Structural Types
-
-A structural type allows you to define a type based on its structure or shape, rather than by a specific name. This is useful for working with data that has a consistent structure but may not be an instance of a named class.
-
-```limit
-type Point = {x: float, y: float};
-
-fn print_point(p: Point) {
-    print("({p.x}, {p.y})");
-}
-
-var my_point = {x: 10.5, y: 20.0};
-print_point(my_point); // Output: (10.5, 20.0)
-```
-
-### Tuple Types
-
-A tuple is a fixed-size, ordered collection of elements of different types. Tuple types are defined using parentheses.
-
-```limit
-type PersonInfo = (str, int, str);
-
-var person: PersonInfo = ("Alice", 30, "New York");
-```
-
-### Enum Declarations
-
-Enums (enumerations) allow you to define a type that can only be one of a specific set of values.
-
-```limit
-enum Status {
-    Pending,
-    Running,
-    Completed,
-    Failed
-}
-
-var current_status: Status = Status.Running;
-```
-
-### Traits and Interfaces
-
-Traits and interfaces are used to define a set of methods that a class must implement. This is a powerful tool for abstraction and polymorphism.
-
-```limit
-trait Speaker {
-    fn speak();
-}
-
-class Dog : Speaker {
-    fn speak() {
-        print("Woof!");
-    }
-}
-```
+> **Note:** The following advanced type system features are planned but have not yet been implemented:
+> *   **Intersection Types** (`&`)
+> *   **Refined Types** (`where`)
+> *   **Structural Types** (`{x: float, y: float}`)
+> *   **Tuple Types** (`(str, int)`)
+> *   **Traits and Interfaces**
+> *   **Enums**
 
 ### Error Handling
 
 **Key Design Principle**: Limit is designed to be null-free. It does not have null pointers, references, or values. Instead, Limit uses a robust type-based system to handle optionality and errors.
 
-### The `Option` Type for Optional Values
-
-When a value can be present or absent, you should use the `Option` enum, which has two variants:
-- **`Some(value)`**: Represents the presence of a value.
-- **`None`**: Represents the absence of a value.
-
-```limit
-enum Option {
-    Some(any),
-    None
-}
-
-fn find_user(id: int): Option {
-    if (id == 1) {
-        return Some("Alice");
-    }
-    return None;
-}
-```
-
-You can then use a `match` statement to safely handle both cases:
-
-```limit
-var user = find_user(1);
-match (user) {
-    Some(name) => { print("Found user: {name}"); },
-    None => { print("User not found"); }
-}
-```
-
-### The `Result` Type for Operations That Can Fail
-
-For operations that can either succeed or fail, Limit uses a `Result` type (often implemented as a `Type?` or a custom enum). The common convention is:
-- **`Ok(value)`**: Represents a successful result.
-- **`Err(error)`**: Represents a failure, containing an error value.
-
-```limit
-fn divide(a: int, b: int): int?DivisionByZero {
-    if (b == 0) {
-        return Err(DivisionByZero("Cannot divide by zero"));
-    }
-    return Ok(a / b);
-}
-
-var result = divide(10, 2);
-match (result) {
-    Ok(value) => { print("Result: {value}"); },
-    Err(e) => { print("Error: {e}"); }
-}
-```
-
 ### The Unified `Type?` System
 
-For convenience, Limit provides the `Type?` syntax as a shorthand for fallible operations. The `Type?` syntax is syntactic sugar for `Result<Type, DefaultError>`, where `DefaultError` is a generic error type used when a specific one is not provided.
+Limit provides the `Type?` syntax for fallible operations.
 - **`Type?`**: A type that can either hold a value of `Type` or an error.
 - **`ok(value)`**: Constructs a success value.
 - **`err()`**: Constructs an error value.
 
 ### The `?` Operator for Propagating Errors
 
-The `?` operator is a convenient way to propagate errors up the call stack. If a function call returns an `Err`, the `?` operator will immediately return that `Err` from the current function.
+The `?` operator is a convenient way to propagate errors up the call stack. If a function call returns an `err`, the `?` operator will immediately return that `err` from the current function.
 
 ```limit
 fn get_number_from_string(s: str): int? {
-    var number: int = to_int(s)?; // If to_int returns Err, this function also returns Err
+    var number: int = to_int(s)?; // If to_int returns err, this function also returns err
     return ok(number * 2);
 }
 ```
@@ -1403,113 +896,4 @@ This syntax is particularly useful for providing default values while maintainin
 
 ## Concurrency
 
-Limit has powerful, high-level features for managing concurrent and parallel tasks.
-
-### Structured Concurrency
-
-Limit's concurrency model is "structured," which means that the lifetime of concurrent tasks is tied to a specific block of code. When the block finishes, all the tasks spawned within it are guaranteed to be completed. This eliminates many common concurrency bugs, such as leaked threads.
-
-### `parallel` Blocks for CPU-Bound Tasks
-
-`parallel` blocks are designed for CPU-bound workloads, where you want to take full advantage of multiple CPU cores.
-
-```
-// Create a channel to receive messages from the tasks
-var messages = channel();
-
-// This block will run tasks on multiple cores
-parallel(ch=messages, mode=batch, cores="auto", timeout=10s, onError="stop") {
-    task(i in 1..4) {
-        print("Running task {i}...");
-        // Perform some CPU-intensive work here
-        messages.send("Task {i} is done.");
-    }
-}
-
-// The block will wait for all tasks to finish
-print("All parallel tasks are complete.");
-
-// Process the results
-iter (message in messages) {
-    print("Received: {message}");
-}
-```
-
-**Parameters for `parallel` and `concurrent` blocks:**
-
-*   `ch`: The channel to be used for communication between tasks.
-*   `mode`: The execution mode. `"batch"` (default for `concurrent`) waits for all tasks to be submitted before execution, while `"fork-join"` (default for `parallel`) executes tasks as they are submitted.
-*   `cores`: (parallel only) The number of CPU cores to use. Can be an integer or `"auto"` (default) to use all available cores.
-*   `onError`: Behavior upon task failure.
-    *   `"stop"` (default): Stop all tasks immediately.
-    *   `"continue"`: Allow other tasks to continue.
-    *   A function reference to a custom error handler.
-*   `timeout`: A duration for the entire block (e.g., `5s`, `100ms`).
-*   `grace`: A grace period for tasks to complete after a timeout is reached.
-*   `onTimeout`: Behavior upon timeout.
-    *   `"partial"` (default): Return results from completed tasks.
-    *   `"stop"`: Stop all tasks.
-    *   A function reference to a custom timeout handler.
-
-### `concurrent` Blocks for I/O-Bound Tasks
-
-`concurrent` blocks are designed for I/O-bound workloads, such as waiting for network requests or reading from files. These tasks can be run efficiently on a smaller number of threads because they spend most of their time waiting.
-
-```
-var results = channel();
-
-concurrent(ch=results, mode=batch) {
-    task() {
-        var data = await fetchData(); // Non-blocking network call
-        results.send(data);
-    }
-    task() {
-        var file_content = await readFile("data.txt"); // Non-blocking file I/O
-        results.send(file_content);
-    }
-}
-
-print("All concurrent tasks have completed.");
-```
-
-### Channels
-
-Channels are the primary way for concurrent tasks to communicate. One or more tasks can send messages to a channel, and another task can receive them.
-
-### Async/Await
-
-The `async` and `await` keywords are used for non-blocking operations, typically within a `concurrent` block. An `async` function returns immediately without blocking the thread, and you can use `await` to get its result when it's ready.
-
-### Atomics
-
-For simple cases of shared state, such as counters, you can use `atomic` variables. These variables can be safely accessed and modified from multiple tasks at the same time without causing data races.
-
-```
-var shared_counter: atomic = 0;
-
-concurrent {
-    task(i in 1..10) {
-        shared_counter += 1; // This is a thread-safe operation
-    }
-}
-
-print("Final counter value: {shared_counter}"); // Output: 10
-```
-
-### Tasks
-
-A `task` statement is used inside a `parallel` or `concurrent` block to define a unit of work that can be executed concurrently. A task can also iterate over a collection, creating a new concurrent task for each item.
-
-```limit
-concurrent {
-    // A simple task
-    task {
-        print("Task 1");
-    }
-
-    // A task that iterates over a range
-    task(i in 1..5) {
-        print("Task {i}");
-    }
-}
-```
+> **Note:** Concurrency features, including `parallel` and `concurrent` blocks, are a planned feature. The syntax is parsed, but the VM and runtime do not yet support them.
