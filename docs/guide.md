@@ -874,6 +874,8 @@ iter (animal: Animal in animals) {
 // The animal makes a sound.
 ```
 
+> **Note:** The module system is planned but not yet fully implemented in the VM and runtime. The syntax is parsed, but the functionality is not yet available.
+<!--
 ## Modules and Imports
 
 Limit supports a module system that allows you to organize your code into separate files and reuse code across your project.
@@ -957,7 +959,10 @@ module my_app.utils {
 ```
 
 When another file imports this module, it will only have access to the `public` members. `protected` members would be available to other modules within the `my_app` namespace (not yet fully implemented), and `private` members are internal to the module.
+-->
 
+> **Note:** The advanced features in this section are planned but not yet fully implemented. The syntax may be parsed, but the functionality is not yet available.
+<!--
 ## Advanced Features
 
 ### Lambda Expressions (Anonymous Functions)
@@ -1030,6 +1035,7 @@ comptime {
     var my_compile_time_var = 123;
 }
 ```
+-->
 
 ## The Type System
 
@@ -1060,6 +1066,8 @@ my_num = 3.14;                 // This is also valid
 
 Union types are especially powerful when combined with `match` statements to handle all possible types that a variable could be.
 
+> **Note:** The advanced type system features in this section are planned but not yet fully implemented. The syntax may be parsed, but the functionality is not yet available.
+<!--
 ### Intersection Types
 
 An intersection type is a type that combines multiple types into one. A value of an intersection type must satisfy the requirements of all the types in the intersection. Intersection types are defined using the ampersand (`&`) character.
@@ -1094,6 +1102,7 @@ fn set_age(age: PositiveInt) {
 set_age(10); // Valid
 set_age(-5); // This would be a runtime error
 ```
+-->
 
 ### Structural Types
 
@@ -1135,6 +1144,7 @@ enum Status {
 var current_status: Status = Status.Running;
 ```
 
+<!--
 ### Traits and Interfaces
 
 Traits and interfaces are used to define a set of methods that a class must implement. This is a powerful tool for abstraction and polymorphism.
@@ -1150,6 +1160,7 @@ class Dog : Speaker {
     }
 }
 ```
+-->
 
 ### Error Handling
 
@@ -1401,6 +1412,8 @@ var value: int = divide(10, 0)? else {
 
 This syntax is particularly useful for providing default values while maintaining Limit's null-free design principles.
 
+> **Note:** Concurrency features are planned but not yet fully implemented in the VM. The syntax is parsed, but the functionality is not yet available.
+<!--
 ## Concurrency
 
 Limit has powerful, high-level features for managing concurrent and parallel tasks.
@@ -1513,3 +1526,4 @@ concurrent {
     }
 }
 ```
+-->
