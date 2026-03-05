@@ -39,13 +39,13 @@ private:
     // Type system reference from type checker
     TypeSystem* type_system = nullptr;
     
-    // Symbol collection (Pass 0)
-    void collect_function_signatures(const LM::Frontend::TypeCheckResult& type_check_result);
-    void collect_function_signature(LM::Frontend::AST::FunctionDeclaration& stmt);
-    
     // Function body lowering (Pass 1)
     void lower_function_bodies(const LM::Frontend::TypeCheckResult& type_check_result);
     void lower_function_body(LM::Frontend::AST::FunctionDeclaration& stmt);
+
+    // Symbol collection (Pass 0)
+    void collect_function_signatures(const LM::Frontend::TypeCheckResult& type_check_result);
+    void collect_function_signature(LM::Frontend::AST::FunctionDeclaration& stmt);
     void lower_frame_methods(LM::Frontend::AST::FrameDeclaration& frame_decl);
     void lower_frame_method(const std::string& frame_name, LM::Frontend::AST::FrameMethod& method);
     void lower_frame_init_method(const std::string& frame_name, LM::Frontend::AST::FrameMethod& init_method);
@@ -155,8 +155,7 @@ private:
     Reg emit_channel_send_expr(LM::Frontend::AST::ChannelSendExpr& expr);
     Reg emit_channel_recv_expr(LM::Frontend::AST::ChannelRecvExpr& expr);
     
-    // Class system expression handlers
-    Reg emit_object_literal_expr(LM::Frontend::AST::ObjectLiteralExpr& expr);
+    // Frame system expression handlers
     Reg emit_this_expr(LM::Frontend::AST::ThisExpr& expr);
     
     // Frame system expression handlers
@@ -204,7 +203,6 @@ private:
     void emit_break_stmt(LM::Frontend::AST::BreakStatement& stmt);
     void emit_continue_stmt(LM::Frontend::AST::ContinueStatement& stmt);
     void emit_unsafe_stmt(LM::Frontend::AST::UnsafeStatement& stmt);
-    void emit_class_stmt(LM::Frontend::AST::ClassDeclaration& stmt);
     void emit_frame_stmt(LM::Frontend::AST::FrameDeclaration& stmt);
     void emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt);
     void emit_module_stmt(LM::Frontend::AST::ModuleDeclaration& stmt);
@@ -305,23 +303,13 @@ private:
     std::unordered_map<std::string, std::string> import_aliases_;
     std::string current_module_ = "";  // Current module context
     
-    // Class system support
-    struct ClassInfo {
-        std::string name;
-        std::vector<std::pair<std::string, TypePtr>> fields;  // field name -> type with offset
-        std::vector<std::string> method_names;               // ordered method names for V-Table
-        std::unordered_map<std::string, size_t> field_offsets; // field name -> offset
-        std::unordered_map<std::string, size_t> method_indices; // method name -> V-Table index
-        std::string super_class_name;
-        size_t total_field_size = 0;
-    };
-    std::unordered_map<std::string, ClassInfo> class_table_;
     Reg this_register_ = UINT32_MAX;  // Register holding 'this' pointer in methods
     
     // Frame system support (modern OOP)
     struct FrameInfo {
         std::string name;
         std::vector<std::pair<std::string, TypePtr>> fields;  // field name -> type
+        std::unordered_map<std::string, LM::Frontend::AST::VisibilityLevel> field_visibilities;
         std::vector<std::string> method_names;                // ordered method names
         std::unordered_map<std::string, size_t> field_offsets; // field name -> offset
         std::unordered_map<std::string, size_t> method_indices; // method name -> index
@@ -329,6 +317,7 @@ private:
         bool has_init = false;
         bool has_deinit = false;
         size_t total_field_size = 0;
+        std::shared_ptr<LM::Frontend::AST::FrameDeclaration> declaration;
     };
     std::unordered_map<std::string, FrameInfo> frame_table_;
     Reg frame_this_register_ = UINT32_MAX;  // Register holding 'this' pointer in frame methods
@@ -350,16 +339,11 @@ private:
     // Helper methods
     std::shared_ptr<::Type> convert_ast_type_to_lir_type(const std::shared_ptr<LM::Frontend::AST::TypeAnnotation>& ast_type);
     
-    // Class system helper methods
-    void collect_class_signatures(LM::Frontend::AST::Program& program);
-    void collect_class_signature(LM::Frontend::AST::ClassDeclaration& class_decl);
-    void calculate_class_layout(ClassInfo& class_info);
-    size_t get_field_offset(const std::string& class_name, const std::string& field_name);
-    size_t get_method_index(const std::string& class_name, const std::string& method_name);
     
     // Frame system helper methods
+    bool is_visible(LM::Frontend::AST::VisibilityLevel level, const std::string& frame_name);
     void collect_frame_signatures(LM::Frontend::AST::Program& program);
-    void collect_frame_signature(LM::Frontend::AST::FrameDeclaration& frame_decl);
+    void collect_frame_signature(std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame_decl);
     void calculate_frame_layout(FrameInfo& frame_info);
     size_t get_frame_field_offset(const std::string& frame_name, const std::string& field_name);
     size_t get_frame_method_index(const std::string& frame_name, const std::string& method_name);

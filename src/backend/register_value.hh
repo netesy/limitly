@@ -14,38 +14,37 @@ namespace Backend {
 struct FrameInstance;
 using FrameInstancePtr = std::shared_ptr<FrameInstance>;
 
+// Register value type - now includes frame instances
+using RegisterValue = std::variant<int64_t, uint64_t, double, bool, std::string, std::nullptr_t, std::shared_ptr<struct FrameInstance>>;
+
 // Frame instance representation for VM execution
 struct FrameInstance {
     std::string frame_type;                    // Frame type name
-    std::unordered_map<std::string, std::variant<int64_t, uint64_t, double, bool, std::string, std::nullptr_t, FrameInstancePtr>> fields;  // Field values
+    std::vector<RegisterValue> fields;         // Field values (indexed)
     
     FrameInstance() = default;
     explicit FrameInstance(const std::string& type_name) : frame_type(type_name) {}
+    explicit FrameInstance(const std::string& type_name, size_t field_count)
+        : frame_type(type_name), fields(field_count, nullptr) {}
     
     // Get field value
-    template<typename T>
-    T getField(const std::string& field_name) const {
-        auto it = fields.find(field_name);
-        if (it == fields.end()) {
-            throw std::runtime_error("Field not found: " + field_name);
+    const RegisterValue& getField(size_t index) const {
+        if (index >= fields.size()) {
+            throw std::runtime_error("Field index out of bounds: " + std::to_string(index));
         }
-        return std::get<T>(it->second);
+        return fields[index];
     }
     
     // Set field value
-    template<typename T>
-    void setField(const std::string& field_name, const T& value) {
-        fields[field_name] = value;
-    }
-    
-    // Check if field exists
-    bool hasField(const std::string& field_name) const {
-        return fields.find(field_name) != fields.end();
+    void setField(size_t index, const RegisterValue& value) {
+        if (index >= fields.size()) {
+            fields.resize(index + 1, nullptr);
+        }
+        fields[index] = value;
     }
 };
 
-// Register value type - now includes frame instances
-using RegisterValue = std::variant<int64_t, uint64_t, double, bool, std::string, std::nullptr_t, FrameInstancePtr>;
+using FrameInstancePtr = std::shared_ptr<FrameInstance>;
 
 } // namespace Backend
 } // namespace LM

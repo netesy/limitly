@@ -57,8 +57,7 @@ Type language_type_to_abi_type(TypePtr lang_type) {
         case TypeTag::Tuple:
         case TypeTag::Function:
         case TypeTag::Closure:
-        case TypeTag::Class:
-        case TypeTag::Object:
+        case TypeTag::Frame:
             return Type::Ptr;
             
         // Other types

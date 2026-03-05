@@ -1350,7 +1350,6 @@ public:
         case TypeTag::ErrorUnion:
         case TypeTag::Range:
         case TypeTag::UserDefined:
-        case TypeTag::Class:
         case TypeTag::Object:
         case TypeTag::Module:
         case TypeTag::Frame:

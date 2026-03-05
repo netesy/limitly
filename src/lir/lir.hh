@@ -180,10 +180,6 @@ enum class LIR_Op : uint8_t {
     TupleGet,
     TupleSet,  // Set tuple element by index
     
-    // Class operations
-    NewObject,
-    GetField,
-    SetField,
     
     // Frame operations (modern OOP)
     NewFrame,        // Allocate and initialize frame instance

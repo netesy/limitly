@@ -115,7 +115,7 @@ private:
     std::atomic<uint64_t> work_queue_counter{0};
     
     // Instruction count limit to prevent infinite loops
-    static constexpr uint64_t MAX_INSTRUCTIONS = 1000;
+    static constexpr uint64_t MAX_INSTRUCTIONS = 100000;
     uint64_t instruction_count = 0;
     
     // Helper methods - all inlined for performance
@@ -171,8 +171,8 @@ private:
     
     // Frame management methods
     FrameInstancePtr createFrameInstance(const std::string& frame_type);
-    void setFrameField(FrameInstancePtr frame, const std::string& field_name, const RegisterValue& value);
-    RegisterValue getFrameField(FrameInstancePtr frame, const std::string& field_name) const;
+    void setFrameField(FrameInstancePtr frame, size_t index, const RegisterValue& value);
+    RegisterValue getFrameField(FrameInstancePtr frame, size_t index) const;
     
 
 };

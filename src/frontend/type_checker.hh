@@ -240,6 +240,9 @@ private:
     void check_break_statement(int line);
     void check_continue_statement(int line);
     
+    // Visibility checking
+    bool is_visible(const std::string& frame_name, LM::Frontend::AST::VisibilityLevel visibility, int line);
+
     // Helper methods
     bool is_numeric_type(TypePtr type);
     bool is_integer_type(TypePtr type);

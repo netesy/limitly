@@ -24,12 +24,75 @@ using namespace LM::Error;bool TypeChecker::check_program(std::shared_ptr<LM::Fr
     errors.clear();
     current_scope = std::make_unique<Scope>();
     
-    // First pass: collect function declarations
+    // First pass: collect function and frame declarations
     for (const auto& stmt : program->statements) {
         if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
-            check_function_declaration(func_decl);
+            // Only collect signature for now
+            TypePtr return_type = type_system.STRING_TYPE;
+            if (func_decl->returnType) {
+                return_type = resolve_type_annotation(func_decl->returnType.value());
+            }
+            FunctionSignature signature;
+            signature.name = func_decl->name;
+            signature.return_type = return_type;
+            signature.declaration = func_decl;
+            signature.can_fail = func_decl->canFail || func_decl->throws;
+            signature.error_types = func_decl->declaredErrorTypes;
+            for (const auto& param : func_decl->params) {
+                signature.param_types.push_back(resolve_type_annotation(param.second));
+                signature.optional_params.push_back(false);
+            }
+            for (const auto& optional_param : func_decl->optionalParams) {
+                signature.param_types.push_back(resolve_type_annotation(optional_param.second.first));
+                signature.optional_params.push_back(true);
+            }
+            function_signatures[func_decl->name] = signature;
+            declare_variable(func_decl->name, type_system.FUNCTION_TYPE);
         } else if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
-            check_frame_declaration(frame_decl);
+            // Collect frame signature
+            FrameInfo frame_info;
+            frame_info.name = frame_decl->name;
+            frame_info.declaration = frame_decl;
+            for (const auto& field : frame_decl->fields) {
+                TypePtr field_type = field->type ? resolve_type_annotation(field->type) : type_system.ANY_TYPE;
+                frame_info.fields.push_back({field->name, field_type});
+                frame_info.field_has_default.push_back({field->name, field->defaultValue != nullptr});
+            }
+            frame_declarations[frame_decl->name] = frame_info;
+            declare_variable(frame_decl->name, type_system.createFrameType(frame_decl->name));
+
+            // Also register frame methods in function_signatures
+            if (frame_decl->init) {
+                std::string init_name = frame_decl->name + ".init";
+                FunctionSignature signature;
+                signature.name = init_name;
+                signature.return_type = type_system.NIL_TYPE;
+                signature.param_types.push_back(type_system.createFrameType(frame_decl->name)); // this
+                for (const auto& param : frame_decl->init->parameters) {
+                    signature.param_types.push_back(resolve_type_annotation(param.second));
+                }
+                function_signatures[init_name] = signature;
+            }
+
+            for (const auto& method : frame_decl->methods) {
+                std::string method_name = frame_decl->name + "." + method->name;
+                FunctionSignature signature;
+                signature.name = method_name;
+                signature.return_type = method->returnType ? resolve_type_annotation(method->returnType) : type_system.NIL_TYPE;
+                signature.param_types.push_back(type_system.createFrameType(frame_decl->name)); // this
+                for (const auto& param : method->parameters) {
+                    signature.param_types.push_back(resolve_type_annotation(param.second));
+                }
+                function_signatures[method_name] = signature;
+            }
+            if (frame_decl->deinit) {
+                std::string deinit_name = frame_decl->name + ".deinit";
+                FunctionSignature signature;
+                signature.name = deinit_name;
+                signature.return_type = type_system.NIL_TYPE;
+                signature.param_types.push_back(type_system.createFrameType(frame_decl->name)); // this
+                function_signatures[deinit_name] = signature;
+            }
         }
     }
     
@@ -311,11 +374,6 @@ void TypeChecker::exit_memory_region() {
     // Drop all variables in this region that haven't been dropped
     for (auto it = variable_memory_info.begin(); it != variable_memory_info.end();) {
         if (it->second.region_id == current_region_id && it->second.memory_state != "dropped") {
-            // Check if this is a class/struct type that needs explicit drop
-            if (it->second.type && it->second.type->tag == TypeTag::Class) {
-                add_error("Variable '" + it->first + "' of type '" + 
-                         it->second.type->toString() + "' was not dropped before going out of scope");
-            }
             it = variable_memory_info.erase(it);
         } else {
             ++it;
@@ -474,23 +532,42 @@ void TypeChecker::check_borrow_safety(const std::string& var_name) {
 }
 
 void TypeChecker::check_escape_analysis(const std::string& var_name, const std::string& target_context) {
-    auto it = variable_memory_info.find(var_name);
-    if (it != variable_memory_info.end()) {
-        // Simple escape analysis: if target_context is different from current region
-        // and the variable is a class/struct, it might escape
-        if (it->second.type && it->second.type->tag == TypeTag::Class) {
-            if (target_context != "current_function") {
-                add_error("Variable '" + var_name + "' of type '" + 
-                         it->second.type->toString() + "' cannot escape current scope");
-            }
-        }
-    }
+    // Escape analysis logic - to be updated for frames
 }
 
 bool TypeChecker::is_variable_alive(const std::string& name) {
     auto it = variable_memory_info.find(name);
     return (it != variable_memory_info.end() && 
             (it->second.memory_state == "owned" || it->second.memory_state == "borrowed"));
+}
+
+bool TypeChecker::is_visible(const std::string& frame_name, LM::Frontend::AST::VisibilityLevel visibility, int line) {
+    // Public and Const are always visible
+    if (visibility == LM::Frontend::AST::VisibilityLevel::Public ||
+        visibility == LM::Frontend::AST::VisibilityLevel::Const) {
+        return true;
+    }
+
+    // Private and Protected require being inside the frame or a subtype
+    if (!current_frame) {
+        return false;
+    }
+
+    // Check if we are inside the same frame
+    if (current_frame->name == frame_name) {
+        return true;
+    }
+
+    // Protected allows access from sub-frames (traits in this system)
+    if (visibility == LM::Frontend::AST::VisibilityLevel::Protected) {
+        // Find if current frame implements any trait that corresponds to the target frame
+        // In this system, traits don't have fields, so protected fields are only between frames.
+        // Since there's no frame inheritance yet, protected is same as private for now.
+        // TODO: Implement trait-based protected access if needed
+        return false;
+    }
+
+    return false;
 }
 
 void TypeChecker::mark_variable_moved(const std::string& name) {
@@ -1235,14 +1312,60 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryEx
 TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr> expr) {
     if (!expr) return nullptr;
     
-    // Check arguments first
+    // Check positional arguments first
     std::vector<TypePtr> arg_types;
     for (const auto& arg : expr->arguments) {
         arg_types.push_back(check_expression(arg));
     }
     
-    // Check if callee is a function (before checking the callee as an expression)
+    // Check if callee is a variable (could be function or frame name)
     if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->callee)) {
+        // Check if it's a frame instantiation
+        auto frame_it = frame_declarations.find(var_expr->name);
+        if (frame_it != frame_declarations.end()) {
+            const FrameInfo& frame_info = frame_it->second;
+
+            // Validate named arguments (setting fields)
+            for (const auto& [name, value] : expr->namedArgs) {
+                bool found = false;
+                for (const auto& field : frame_info.fields) {
+                    if (field.first == name) {
+                        found = true;
+                        TypePtr val_type = check_expression(value);
+                        if (!is_type_compatible(field.second, val_type)) {
+                            add_type_error(field.second->toString(), val_type->toString(), expr->line);
+                        }
+                        break;
+                    }
+                }
+                if (!found) {
+                    add_error("Frame '" + var_expr->name + "' has no field named '" + name + "'", expr->line);
+                }
+            }
+
+            // Validate positional arguments (passing to init)
+            if (!expr->arguments.empty()) {
+                std::string init_name = var_expr->name + ".init";
+                auto sig_it = function_signatures.find(init_name);
+                if (sig_it == function_signatures.end()) {
+                    add_error("Frame '" + var_expr->name + "' has no init() method to accept positional arguments", expr->line);
+                } else {
+                    // Check arguments against init signature
+                    // skip 'this' which is the first parameter in the signature
+                    std::vector<TypePtr> expected_params = sig_it->second.param_types;
+                    if (!expected_params.empty()) {
+                        expected_params.erase(expected_params.begin());
+                    }
+                    validate_argument_types(expected_params, arg_types, init_name);
+                }
+            }
+
+            TypePtr frame_type = type_system.createFrameType(var_expr->name);
+            expr->inferred_type = frame_type;
+            return frame_type;
+        }
+
+        // Check if it's a function call
         TypePtr result_type = nullptr;
         if (check_function_call(var_expr->name, arg_types, result_type)) {
             expr->inferred_type = result_type;
@@ -1299,7 +1422,10 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
             }
             
             // Check visibility
-            // TODO: Implement proper visibility checking based on context
+            if (!is_visible(frame_name, method->visibility, expr->line)) {
+                add_error("Cannot access " + LM::Frontend::AST::visibilityToString(method->visibility) +
+                         " method '" + method_name + "' of frame '" + frame_name + "'", expr->line);
+            }
             
             // Check parameter count and types
             size_t required_params = method->parameters.size();
@@ -1522,9 +1648,10 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
                 // Find the field in the frame declaration to get visibility
                 for (const auto& field : frame_info.declaration->fields) {
                     if (field->name == member_name) {
-                        // For now, we'll allow all access
-                        // TODO: Implement proper visibility checking based on context
-                        // (private: only within frame, protected: within frame and traits, public: anywhere)
+                        if (!is_visible(frame_name, field->visibility, expr->line)) {
+                            add_error("Cannot access " + LM::Frontend::AST::visibilityToString(field->visibility) +
+                                     " field '" + member_name + "' of frame '" + frame_name + "'", expr->line);
+                        }
                         expr->inferred_type = field_type;
                         return field_type;
                     }
@@ -1536,8 +1663,10 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
         for (const auto& method : frame_info.declaration->methods) {
             if (method->name == member_name) {
                 // Check visibility
-                // For now, we'll allow all access
-                // TODO: Implement proper visibility checking based on context
+                if (!is_visible(frame_name, method->visibility, expr->line)) {
+                    add_error("Cannot access " + LM::Frontend::AST::visibilityToString(method->visibility) +
+                             " method '" + member_name + "' of frame '" + frame_name + "'", expr->line);
+                }
                 
                 // Return the method's return type
                 if (method->returnType) {

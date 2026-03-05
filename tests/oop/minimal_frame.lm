@@ -1,0 +1,9 @@
+frame Simple {
+    pub value: int;
+    pub init(v: int) {
+        this.value = v;
+    }
+}
+
+var s = Simple(42);
+print(s.value);

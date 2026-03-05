@@ -134,6 +134,29 @@ std::string LIR_Inst::to_string() const {
         case LIR_Op::TupleSet:
             oss << " r" << dst << ", r" << a << ", r" << b;
             break;
+        case LIR_Op::NewFrame:
+            oss << " r" << dst << ", " << func_name << ", fields=" << imm;
+            break;
+        case LIR_Op::FrameGetField:
+            oss << " r" << dst << ", r" << a << ", offset=" << b;
+            break;
+        case LIR_Op::FrameSetField:
+            oss << " r" << dst << ", offset=" << a << ", r" << b;
+            break;
+        case LIR_Op::FrameCallMethod:
+            oss << " r" << dst << ", r" << a << ", " << func_name << "(";
+            for (size_t i = 0; i < call_args.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << "r" << call_args[i];
+            }
+            oss << ")";
+            break;
+        case LIR_Op::FrameCallInit:
+            oss << " r" << dst << ", " << func_name << ".init()";
+            break;
+        case LIR_Op::FrameCallDeinit:
+            oss << " r" << dst << ", " << func_name << ".deinit()";
+            break;
         case LIR_Op::Nop:
             // No operands
             break;
@@ -229,6 +252,8 @@ std::string lir_op_to_string(LIR_Op op) {
 
         //  === CHANNEL OPERATIONS ===
         case LIR_Op::ChannelOffer: return "channel_offer";
+        case LIR_Op::ChannelPush: return "channel_push";
+        case LIR_Op::ChannelPop: return "channel_pop";
         case LIR_Op::ChannelRecv: return "channel_recv";
         case LIR_Op::ChannelPoll: return "channel_poll";
         case LIR_Op::ChannelClose: return "channel_close";
@@ -264,9 +289,6 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::TupleCreate: return "tuple_create";
         case LIR_Op::TupleGet: return "tuple_get";
         case LIR_Op::TupleSet: return "tuple_set";
-        case LIR_Op::NewObject: return "new";
-        case LIR_Op::GetField: return "get_field";
-        case LIR_Op::SetField: return "set_field";
         case LIR_Op::NewFrame: return "new_frame";
         case LIR_Op::FrameGetField: return "frame_get_field";
         case LIR_Op::FrameSetField: return "frame_set_field";

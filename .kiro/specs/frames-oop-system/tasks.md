@@ -116,7 +116,7 @@ This implementation plan breaks down the frames OOP system into discrete, manage
   - **Optimization**: Inline frame method calls where possible; generate specialized code for each frame type
   - **Status**: Class LIR generation exists; adapt for frames
 
-- [ ] 6. Implement frame VM execution
+- [x] 6. Implement frame VM execution
 
 
 
@@ -128,17 +128,18 @@ This implementation plan breaks down the frames OOP system into discrete, manage
   - Implement frame cleanup on scope exit
   - _Requirements: 1.1, 1.5_
   - **JIT Focus**: Register VM used for development/testing only; production uses JIT-compiled native code
-  - **Status**: Class VM execution exists; adapt for frames
+  - **Status**: Completed
 
-- [ ] 7. Create basic frame tests
+- [x] 7. Create basic frame tests
   - Test frame declaration and instantiation
   - Test field initialization with defaults
   - Test field access (public fields)
   - Test method calls on frames
   - Test frame cleanup
   - _Requirements: 1.1, 1.5_
+  - **Status**: Completed
 
-- [ ] 7.1 Remove unused class infrastructure
+- [x] 7.1 Remove unused class infrastructure
   - Remove `ClassDeclaration` AST node and related parsing code
   - Remove class-specific type checking logic from type checker
   - Remove class-specific LIR generation code
@@ -147,13 +148,13 @@ This implementation plan breaks down the frames OOP system into discrete, manage
   - Update AST header files to remove class-related nodes
   - _Requirements: 1.1_
   - **JIT Focus**: Eliminate dead code paths; simplify compiler for frame-only OOP model
-  - **Cleanup**: Reduce codebase complexity and maintenance burden
+  - **Cleanup**: Completed
 
 ---
 
 ## Phase 2: Visibility and Access Control
 
-- [ ] 8. Implement visibility enforcement in type checker
+- [x] 8. Implement visibility enforcement in type checker
   - Enforce private field access restrictions
   - Enforce protected field access restrictions
   - Enforce public field access permissions
@@ -161,24 +162,26 @@ This implementation plan breaks down the frames OOP system into discrete, manage
   - _Requirements: 2.1, 2.2, 2.3_
   - **JIT Focus**: Validate visibility at compile-time; eliminate runtime visibility checks
   - **Optimization**: Generate code only for valid access patterns
-  - **Status**: Visibility system exists for classes; extend for frames
+  - **Status**: Completed
 
-- [ ] 9. Implement visibility enforcement in LIR generation
+- [x] 9. Implement visibility enforcement in LIR generation
   - Verify visibility during code generation
   - Ensure visibility checks are consistent with type checker
   - Generate appropriate error messages
   - _Requirements: 2.1, 2.2, 2.3_
   - **JIT Focus**: Compile-time visibility validation ensures no runtime checks needed
+  - **Status**: Completed
 
-- [ ] 10. Create visibility enforcement tests
+- [x] 10. Create visibility enforcement tests
   - Test private field access restrictions
   - Test protected field access in trait implementations
   - Test public field access from outside frame
   - Test private method access restrictions
   - Test protected method access
   - _Requirements: 2.1, 2.2, 2.3_
+  - **Status**: Completed
 
-- [ ] 10.1 Clean up visibility system
+- [x] 10.1 Clean up visibility system
   - Remove any class-specific visibility enforcement code
   - Consolidate visibility checking into frame-specific logic
   - Update type checker to use unified visibility system

@@ -101,8 +101,6 @@ namespace Frontend {
                 return buildVarDeclaration(cst);
             case CST::NodeKind::FUNCTION_DECLARATION:
                 return buildFunctionDeclaration(cst);
-            case CST::NodeKind::CLASS_DECLARATION:
-                return buildClassDeclaration(cst);
             case CST::NodeKind::TYPE_DECLARATION:
                 return buildTypeDeclaration(cst);
             case CST::NodeKind::ENUM_DECLARATION:
@@ -279,41 +277,6 @@ namespace Frontend {
         return funcDecl;
     }
 
-    std::shared_ptr<AST::ClassDeclaration> ASTBuilder::buildClassDeclaration(const CST::Node& cst) {
-        auto classDecl = std::make_shared<AST::ClassDeclaration>();
-        copySourceInfo(cst, *classDecl);
-        
-        // Extract class name
-        auto nameNode = findChild(cst, CST::NodeKind::IDENTIFIER);
-        if (nameNode) {
-            classDecl->name = extractIdentifier(*nameNode);
-        } else {
-            reportError("Missing class name in declaration", cst);
-            classDecl->name = "<missing>";
-        }
-        
-        // Extract fields and methods from class body
-        auto bodyNode = findChild(cst, CST::NodeKind::BLOCK_STATEMENT);
-        if (bodyNode) {
-            auto children = getSignificantChildren(*bodyNode);
-            for (const auto& child : children) {
-                if (child->kind == CST::NodeKind::VAR_DECLARATION) {
-                    auto field = buildVarDeclaration(*child);
-                    if (field) {
-                        classDecl->fields.push_back(field);
-                    }
-                } else if (child->kind == CST::NodeKind::FUNCTION_DECLARATION) {
-                    auto method = buildFunctionDeclaration(*child);
-                    if (method) {
-                        classDecl->methods.push_back(method);
-                    }
-                }
-            }
-        }
-        
-        addSourceMapping(cst, classDecl);
-        return classDecl;
-    }
 
     // Expression transformation methods
     std::shared_ptr<AST::BinaryExpr> ASTBuilder::buildBinaryExpr(const CST::Node& cst) {

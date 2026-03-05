@@ -7,105 +7,91 @@ frame Person {
     pub age: int;
     prot email: str;
 
-    fn greet(): str {
-        return "Hello, {name}";
-        }
+    pub fn greet(): str {
+        return "Hello, {this.name}";
+    }
 
-        fn birthday() {
-            age = age + 1;
-            }
-        }
+    pub fn birthday() {
+        this.age = this.age + 1;
+    }
+}
 
-        // Frame with init() method
-        frame Point {
-            pub x: int;
-            pub y: int;
+// Frame with init() method
+frame Point {
+    pub x: int;
+    pub y: int;
 
-            init(px: int, py: int) {
-                x = px;
-                y = py;
-                }
+    pub init(px: int, py: int) {
+        this.x = px;
+        this.y = py;
+    }
 
-                fn distance(): int {
-                    return x + y;
-                    }
-                }
+    pub fn distance(): int {
+        return this.x + this.y;
+    }
+}
 
-                // Frame with deinit() method
-                frame Resource {
-                    pub id: int;
+// Frame with deinit() method
+frame Resource {
+    pub id: int;
 
-                    init(resource_id: int) {
-                        id = resource_id;
-                        }
+    pub init(resource_id: int) {
+        this.id = resource_id;
+    }
 
-                        deinit() {
-                            print("Cleaning up resource");
-                            }
-                        }
+    pub deinit() {
+        print("Cleaning up resource");
+    }
+}
 
-                        // Frame with default field values
-                        frame Config {
-                            pub debug: bool = false;
-                            pub timeout: int = 30;
-                            pub name: str = "default";
-                        }
+// Frame with default field values
+frame Config {
+    pub debug: bool = false;
+    pub timeout: int = 30;
+    pub name: str = "default";
+}
 
-                        // Frame implementing traits
-                        frame Animal: Movable, Drawable {
-                            pub name: str;
-                            pub age: int;
+// Frame with visibility modifiers
+frame BankAccount {
+    pub accountNumber: str;
+    prot balance: int;
 
-                            fn move() {
-                                print("Moving");
-                                }
+    pub fn deposit(amount: int) {
+        this.balance = this.balance + amount;
+    }
 
-                                fn draw() {
-                                    print("Drawing");
-                                    }
-                                }
+    prot fn calculateInterest(): int {
+        return this.balance / 100;
+    }
+}
 
-                                // Frame with visibility modifiers
-                                frame BankAccount {
-                                    pub accountNumber: str;
-                                    prot balance: int;
+// Frame with multiple methods
+frame Calculator {
+    pub fn add(a: int, b: int): int {
+        return a + b;
+    }
 
-                                    pub fn deposit(amount: int) {
-                                        balance = balance + amount;
-                                        }
+    pub fn subtract(a: int, b: int): int {
+        return a - b;
+    }
 
-                                        prot fn calculateInterest(): int {
-                                            return balance / 100;
-                                            }
-                                        }
+    pub fn multiply(a: int, b: int): int {
+        return a * b;
+    }
+}
 
-                                        // Frame with multiple methods
-                                        frame Calculator {
-                                            pub fn add(a: int, b: int): int {
-                                                return a + b;
-                                                }
+// Test instantiation and method calls
+var person = Person(name="Alice", age=30, email="alice@example.com");
+print(person.greet());
 
-                                                pub fn subtract(a: int, b: int): int {
-                                                    return a - b;
-                                                    }
+var point = Point(10, 20);
+print(point.distance());
 
-                                                    pub fn multiply(a: int, b: int): int {
-                                                        return a * b;
-                                                        }
-                                                    }
+var config = Config();
+print(config.debug);
+print(config.timeout);
 
-                                                    // Test instantiation and method calls
-                                                    var person = Person();
-                                                    person.name = "Alice";
-                                                    person.age = 30;
-                                                    print(person.greet());
+var calc = Calculator();
+print(calc.add(5, 3));
 
-                                                    var point = Point(10, 20);
-                                                    print(point.distance());
-
-                                                    var config = Config();
-                                                    print(config.debug);
-                                                    print(config.timeout);
-
-                                                    var calc = Calculator();
-                                                    print(calc.add(5, 3));
+var res = Resource(123);

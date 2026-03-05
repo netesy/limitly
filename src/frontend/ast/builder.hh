@@ -156,7 +156,6 @@ namespace Frontend {
         // Declaration-specific type resolution (immediate)
         void resolveDeclarationType(std::shared_ptr<AST::VarDeclaration> varDecl, const CST::Node& cst);
         void resolveFunctionSignature(std::shared_ptr<AST::FunctionDeclaration> funcDecl, const CST::Node& cst);
-        void resolveClassTypes(std::shared_ptr<AST::ClassDeclaration> classDecl, const CST::Node& cst);
         
         // Expression-specific type handling (deferred)
         void deferExpressionType(std::shared_ptr<AST::Expression> expr, const CST::Node& cst, const std::string& context);
@@ -165,7 +164,6 @@ namespace Frontend {
         // Declaration transformation methods
         std::shared_ptr<AST::VarDeclaration> buildVarDeclaration(const CST::Node& cst);
         std::shared_ptr<AST::FunctionDeclaration> buildFunctionDeclaration(const CST::Node& cst);
-        std::shared_ptr<AST::ClassDeclaration> buildClassDeclaration(const CST::Node& cst);
         std::shared_ptr<AST::TypeDeclaration> buildTypeDeclaration(const CST::Node& cst);
         std::shared_ptr<AST::EnumDeclaration> buildEnumDeclaration(const CST::Node& cst);
         std::shared_ptr<AST::ImportStatement> buildImportStatement(const CST::Node& cst);
