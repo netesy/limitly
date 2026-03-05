@@ -168,7 +168,6 @@ enum class TypeTag {
     ErrorUnion,
     Range,
     UserDefined,
-    Class,
     Channel,
     Object,
     Module,
@@ -458,8 +457,6 @@ struct Type
             return "UserDefined";
         case TypeTag::Object:
             return "Object";
-        case TypeTag::Class:
-            return "Class";
         case TypeTag::Module:
             return "Module";
         case TypeTag::Frame: {
@@ -946,7 +943,6 @@ struct Value {
                  UserDefinedValue,
                  IteratorValuePtr,
                  ObjectInstancePtr,
-                 std::shared_ptr<backend::ClassDefinition>,
                  std::shared_ptr<LM::Backend::Channel>,
                  AtomicValue,
                  ModuleValue,
@@ -1039,8 +1035,6 @@ struct Value {
     Value(TypePtr t, const AtomicValue& av) : type(std::move(t)), data(""), complexData(av) {}
 
     Value(TypePtr t, const ObjectInstancePtr& obj) : type(std::move(t)), data(""), complexData(obj) {}
-
-    Value(TypePtr t, const std::shared_ptr<backend::ClassDefinition>& classDef) : type(std::move(t)), data(""), complexData(classDef) {}
 
     Value(TypePtr t, const std::shared_ptr<backend::UserDefinedFunction>& func) : type(std::move(t)), data(""), complexData(func) {}
 

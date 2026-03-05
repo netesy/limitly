@@ -18,9 +18,12 @@ else
 	CC := gcc
 	AR := ar
 	LIBS := -lgccjit
-	LIBGCCJIT_PATH := $(shell find /usr -name libgccjit.so 2>/dev/null)
+	LIBGCCJIT_PATH := $(shell find /usr -name libgccjit.so 2>/dev/null | head -n 1)
 	ifneq ($(LIBGCCJIT_PATH),)
 		LDFLAGS := -L$(shell dirname $(LIBGCCJIT_PATH))
+	else
+		# Fallback for Ubuntu 24.04 with gcc-14
+		LDFLAGS += -L/usr/lib/gcc/x86_64-linux-gnu/14
 	endif
 endif
 
@@ -30,10 +33,10 @@ endif
 MODE ?= release
 
 ifeq ($(MODE),debug)
-	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit -I/usr/lib/gcc/x86_64-linux-gnu/14/include $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -g -fPIC -I.
 else
-	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit -I/usr/lib/gcc/x86_64-linux-gnu/14/include $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -O3 -fPIC -I.
 endif
 

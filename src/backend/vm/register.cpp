@@ -216,55 +216,28 @@ void RegisterVM::execute_lir_function(const LIR::LIRFunction& function) {
 }
 
 std::string RegisterVM::to_string(const RegisterValue& value) const {
-    if (std::holds_alternative<std::string>(value)) {
-        return std::get<std::string>(value);
-    } else if (std::holds_alternative<FrameInstancePtr>(value)) {
-        auto frame = std::get<FrameInstancePtr>(value);
-        if (!frame) {
-            return "nil";
-        }
-        std::string result = frame->frame_type + "{";
-        bool first = true;
-        for (const auto& [field_name, field_value] : frame->fields) {
-            if (!first) result += ", ";
-            first = false;
-            result += field_name + ": ";
-            // Convert field value to string
-            if (std::holds_alternative<int64_t>(field_value)) {
-                result += std::to_string(std::get<int64_t>(field_value));
-            } else if (std::holds_alternative<uint64_t>(field_value)) {
-                result += std::to_string(std::get<uint64_t>(field_value));
-            } else if (std::holds_alternative<double>(field_value)) {
-                result += std::to_string(std::get<double>(field_value));
-            } else if (std::holds_alternative<bool>(field_value)) {
-                result += std::get<bool>(field_value) ? "true" : "false";
-            } else if (std::holds_alternative<std::string>(field_value)) {
-                result += std::get<std::string>(field_value);
-            } else if (std::holds_alternative<std::nullptr_t>(field_value)) {
-                result += "nil";
-            } else if (std::holds_alternative<FrameInstancePtr>(field_value)) {
-                result += "<frame>";
+    return std::visit(overloaded{
+        [](std::nullptr_t) -> std::string { return "nil"; },
+        [](int64_t v) -> std::string { return std::to_string(v); },
+        [](uint64_t v) -> std::string { return std::to_string(v); },
+        [](double v) -> std::string {
+            std::ostringstream oss;
+            oss << v;
+            return oss.str();
+        },
+        [](bool v) -> std::string { return v ? "true" : "false"; },
+        [](const std::string& v) -> std::string { return v; },
+        [this](const FrameInstancePtr& frame) -> std::string {
+            if (!frame) return "nil";
+            std::string result = frame->frame_type + "{";
+            for (size_t i = 0; i < frame->fields.size(); ++i) {
+                if (i > 0) result += ", ";
+                result += "field_" + std::to_string(i) + ": " + this->to_string(frame->fields[i]);
             }
+            result += "}";
+            return result;
         }
-        result += "}";
-        return result;
-    } else if (std::holds_alternative<int64_t>(value)) {
-        int64_t int_val = std::get<int64_t>(value);
-        
-        // Use the runtime function to convert any value to string
-        // This handles primitives and collections uniformly
-        void* ptr = reinterpret_cast<void*>(static_cast<uintptr_t>(int_val));
-        LmString result = lm_value_to_string(ptr);
-        std::string str_result(result.data, result.len);
-        lm_string_free(result);
-        return str_result;
-    } else if (std::holds_alternative<double>(value)) {
-        return std::to_string(std::get<double>(value));
-    } else if (std::holds_alternative<bool>(value)) {
-        return std::get<bool>(value) ? "true" : "false";
-    } else {
-        return "nil";
-    }
+    }, value);
 }
 
 ValuePtr RegisterVM::createErrorValue(const std::string& errorType, const std::string& message) {
@@ -423,6 +396,13 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                     }
                 }
                 break;
+            }
+            case LIR::LIR_Op::Ret: {
+                // Copy return value from specified register to register 0 (standard return register)
+                if (pc->dst != 0) {
+                    registers[0] = registers[pc->dst];
+                }
+                return;
             }
             case LIR::LIR_Op::Add: {
                 const RegisterValue* temp_a = &registers[pc->a];
@@ -767,17 +747,41 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             }
             case LIR::LIR_Op::ToString: {
                 // Convert value to string using type information
-                // If type_a is Ptr, the value is a pointer to a collection
-                if (pc->type_a == LIR::Type::Ptr) {
+                const auto& value = registers[pc->a];
+                if (std::holds_alternative<FrameInstancePtr>(value) || std::holds_alternative<std::nullptr_t>(value)) {
+                    registers[pc->dst] = to_string(value);
+                } else if (pc->type_a == LIR::Type::Ptr) {
                     // Value is a pointer - call runtime function to handle collections
-                    int64_t ptr_value = std::get<int64_t>(registers[pc->a]);
-                    void* ptr = reinterpret_cast<void*>(static_cast<uintptr_t>(ptr_value));
-                    LmString result = lm_value_to_string(ptr);
-                    registers[pc->dst] = std::string(result.data, result.len);
-                    lm_string_free(result);
+                    if (std::holds_alternative<int64_t>(value)) {
+                        int64_t ptr_value = std::get<int64_t>(value);
+
+                        // Defensive check: don't pass small integers as pointers to the runtime
+                        if (ptr_value > 0 && ptr_value < 4096) {
+                            registers[pc->dst] = std::to_string(ptr_value);
+                        } else if (ptr_value == 0) {
+                            registers[pc->dst] = "nil";
+                        } else {
+                            void* ptr = reinterpret_cast<void*>(static_cast<uintptr_t>(ptr_value));
+                            LmString result = lm_value_to_string(ptr);
+                            registers[pc->dst] = std::string(result.data, result.len);
+                            lm_string_free(result);
+                        }
+                    } else if (std::holds_alternative<uint64_t>(value)) {
+                        uint64_t ptr_value = std::get<uint64_t>(value);
+                        if (ptr_value > 0 && ptr_value < 4096) {
+                            registers[pc->dst] = std::to_string(ptr_value);
+                        } else {
+                            void* ptr = reinterpret_cast<void*>(static_cast<uintptr_t>(ptr_value));
+                            LmString result = lm_value_to_string(ptr);
+                            registers[pc->dst] = std::string(result.data, result.len);
+                            lm_string_free(result);
+                        }
+                    } else {
+                        registers[pc->dst] = to_string(value);
+                    }
                 } else {
                     // Value is a primitive - use standard conversion
-                    registers[pc->dst] = to_string(registers[pc->a]);
+                    registers[pc->dst] = to_string(value);
                 }
                 break;
             }
@@ -1409,6 +1413,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 if (!pc->func_name.empty()) {
                     std::string func_name = pc->func_name;
                     const auto& arg_regs = pc->call_args;
+                    // std::cout << "[VM DEBUG] Call: " << func_name << " dst=" << pc->dst << std::endl;
                     
                     // First try builtin functions
                     if (LIR::BuiltinUtils::isBuiltinFunction(func_name)) {
@@ -1479,25 +1484,38 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                         if (func) {
                             auto saved_registers = registers;
                             
-                            // Set up parameters (copy arguments to parameter registers r0, r1, r2, ...)
-                            for (size_t i = 0; i < func->getParameters().size(); ++i) {
-                                if (i < arg_regs.size()) {
-                                    registers[i] = registers[arg_regs[i]];
+                            // Use a temporary vector to avoid overwriting registers that are used as source for subsequent parameters
+                            std::vector<RegisterValue> args;
+                            for (size_t i = 0; i < arg_regs.size(); ++i) {
+                                args.push_back(registers[arg_regs[i]]);
+                            }
+
+                            // Save current context
+                            const LIR::LIR_Function* saved_func = current_function_;
+
+                            // Set up parameters and clear other registers to prevent state leakage/corruption
+                            size_t param_count = func->getParameters().size();
+                            for (size_t i = 0; i < registers.size(); ++i) {
+                                if (i < param_count) {
+                                    registers[i] = (i < args.size()) ? args[i] : nullptr;
                                 } else {
                                     registers[i] = nullptr;
                                 }
                             }
                             
-                            // Execute function directly without resetting registers
-                            LIR::LIR_Function temp_wrapper(func->getName(), func->getParameters().size());
+                            // Execute function
+                            LIR::LIR_Function temp_wrapper(func->getName(), param_count);
                             temp_wrapper.instructions = func->getInstructions();
-                            execute_instructions(temp_wrapper, 0, func->getInstructions().size());
+                            current_function_ = &temp_wrapper;
+
+                            execute_instructions(temp_wrapper, 0, temp_wrapper.instructions.size());
                             
                             // Get return value from register 0 (standard return register)
                             RegisterValue return_value = registers[0];
                             
-                            // Restore caller's registers
+                            // Restore caller's context
                             registers = saved_registers;
+                            current_function_ = saved_func;
                             
                             // Set return value in destination register
                             registers[pc->dst] = return_value;
@@ -1532,10 +1550,6 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             case LIR::LIR_Op::Label:
             case LIR::LIR_Op::FuncDef:
             case LIR::LIR_Op::Param:
-            case LIR::LIR_Op::Ret: {
-                // These are handled elsewhere or are no-ops in this context
-                break;
-            }
             case LIR::LIR_Op::ConstructError: {
                 std::string errorType = "DefaultError";
                 std::string errorMessage = "Operation failed";
@@ -1617,21 +1631,18 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             case LIR::LIR_Op::NewFrame: {
                 // Allocate and initialize a new frame instance
                 // dst = frame register, imm = frame size (number of fields)
-                auto frame = std::make_shared<FrameInstance>();
+                auto frame = std::make_shared<FrameInstance>(pc->func_name, pc->imm);
                 registers[pc->dst] = frame;
                 break;
             }
             case LIR::LIR_Op::FrameGetField: {
                 // Load field from frame instance
-                // dst = destination register, a = frame register, b = field offset (as field name index)
+                // dst = destination register, a = frame register, b = field offset
+                // std::cout << "[VM DEBUG] FrameGetField: frame_reg=" << pc->a << " offset=" << pc->b << " dst=" << pc->dst << std::endl;
                 if (std::holds_alternative<FrameInstancePtr>(registers[pc->a])) {
                     auto frame = std::get<FrameInstancePtr>(registers[pc->a]);
-                    // For now, use field offset as a simple index
-                    // In a real implementation, we'd need to map offsets to field names
-                    std::string field_name = "field_" + std::to_string(pc->b);
-                    if (frame->hasField(field_name)) {
-                        auto field_value = frame->fields[field_name];
-                        registers[pc->dst] = field_value;
+                    if (frame && pc->b < frame->fields.size()) {
+                        registers[pc->dst] = frame->fields[pc->b];
                     } else {
                         registers[pc->dst] = nullptr;
                     }
@@ -1643,10 +1654,12 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             case LIR::LIR_Op::FrameSetField: {
                 // Store field to frame instance
                 // dst = frame register, a = field offset, b = value register
+                // std::cout << "[VM DEBUG] FrameSetField: frame_reg=" << pc->dst << " offset=" << pc->a << " val_reg=" << pc->b << std::endl;
                 if (std::holds_alternative<FrameInstancePtr>(registers[pc->dst])) {
                     auto frame = std::get<FrameInstancePtr>(registers[pc->dst]);
-                    std::string field_name = "field_" + std::to_string(pc->a);
-                    frame->fields[field_name] = registers[pc->b];
+                    if (frame) {
+                        frame->setField(pc->a, registers[pc->b]);
+                    }
                 } else {
                     // Error: not a frame instance
                 }
@@ -1667,7 +1680,37 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             case LIR::LIR_Op::FrameCallDeinit: {
                 // Call frame deinit() method
                 // dst = frame register
-                // For now, this is a placeholder - actual deinit calls would be handled by Call instruction
+                if (pc->dst < registers.size() && std::holds_alternative<FrameInstancePtr>(registers[pc->dst])) {
+                    auto frame = std::get<FrameInstancePtr>(registers[pc->dst]);
+                    if (frame) {
+                        std::string deinit_name = frame->frame_type + ".deinit";
+                        auto& func_manager = LIR::LIRFunctionManager::getInstance();
+                        if (func_manager.hasFunction(deinit_name)) {
+                            auto func = func_manager.getFunction(deinit_name);
+                            if (func) {
+                                // Save current context
+                                auto saved_registers = registers;
+                                const LIR::LIR_Function* saved_func = current_function_;
+
+                                // Prepare fresh register set for deinit call to prevent corruption
+                                registers.assign(registers.size(), nullptr);
+                                registers[0] = frame; // 'this'
+
+                                // Create a temporary LIR_Function for execution
+                                LIR::LIR_Function deinit_wrapper(func->getName(), 1);
+                                deinit_wrapper.instructions = func->getInstructions();
+                                current_function_ = &deinit_wrapper;
+
+                                // Execute deinit instructions
+                                execute_instructions(deinit_wrapper, 0, deinit_wrapper.instructions.size());
+
+                                // Restore caller context
+                                registers = saved_registers;
+                                current_function_ = saved_func;
+                            }
+                        }
+                    }
+                }
                 break;
             }
             default: {
@@ -1686,22 +1729,18 @@ FrameInstancePtr RegisterVM::createFrameInstance(const std::string& frame_type) 
     return frame;
 }
 
-void RegisterVM::setFrameField(FrameInstancePtr frame, const std::string& field_name, const RegisterValue& value) {
+void RegisterVM::setFrameField(FrameInstancePtr frame, size_t index, const RegisterValue& value) {
     if (!frame) {
         throw std::runtime_error("Cannot set field on null frame");
     }
-    frame->fields[field_name] = value;
+    frame->setField(index, value);
 }
 
-RegisterValue RegisterVM::getFrameField(FrameInstancePtr frame, const std::string& field_name) const {
+RegisterValue RegisterVM::getFrameField(FrameInstancePtr frame, size_t index) const {
     if (!frame) {
         throw std::runtime_error("Cannot get field from null frame");
     }
-    auto it = frame->fields.find(field_name);
-    if (it == frame->fields.end()) {
-        throw std::runtime_error("Field not found: " + field_name);
-    }
-    return it->second;
+    return frame->getField(index);
 }
 
 } // namespace Register

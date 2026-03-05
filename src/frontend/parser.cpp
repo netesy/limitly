@@ -53,7 +53,6 @@ void Parser::synchronize() {
         if (previous().type == TokenType::SEMICOLON) return;
 
         switch (peek().type) {
-            case TokenType::CLASS:
             case TokenType::FRAME:
             case TokenType::FN:
             case TokenType::VAR:
@@ -279,7 +278,7 @@ CST::NodeKind Parser::mapASTNodeKind(const std::string& astNodeType) {
     if (className.find("VarDeclaration") != std::string::npos) return CST::NodeKind::VAR_DECLARATION;
     if (className.find("DestructuringDeclaration") != std::string::npos) return CST::NodeKind::VAR_DECLARATION; // Use same CST kind as VarDeclaration
     if (className.find("FunctionDeclaration") != std::string::npos) return CST::NodeKind::FUNCTION_DECLARATION;
-    if (className.find("ClassDeclaration") != std::string::npos) return CST::NodeKind::CLASS_DECLARATION;
+    if (className.find("FrameDeclaration") != std::string::npos) return CST::NodeKind::CLASS_DECLARATION;
     if (className.find("EnumDeclaration") != std::string::npos) return CST::NodeKind::ENUM_DECLARATION;
     if (className.find("TypeDeclaration") != std::string::npos) return CST::NodeKind::TYPE_DECLARATION;
     if (className.find("TraitDeclaration") != std::string::npos) return CST::NodeKind::TRAIT_DECLARATION;
@@ -404,7 +403,7 @@ bool Parser::isContainerNode(CST::NodeKind kind) {
         case CST::NodeKind::WHILE_STATEMENT:
         case CST::NodeKind::ITER_STATEMENT:
         case CST::NodeKind::FUNCTION_DECLARATION:
-        case CST::NodeKind::CLASS_DECLARATION:
+        case CST::NodeKind::CLASS_DECLARATION: // Also used for FrameDeclaration
         case CST::NodeKind::MATCH_STATEMENT:
         case CST::NodeKind::PARALLEL_STATEMENT:
         case CST::NodeKind::CONCURRENT_STATEMENT:
@@ -419,7 +418,6 @@ template auto Parser::createNode<LM::Frontend::AST::Program>() -> std::shared_pt
 template auto Parser::createNode<LM::Frontend::AST::VarDeclaration>() -> std::shared_ptr<LM::Frontend::AST::VarDeclaration>;
 template auto Parser::createNode<LM::Frontend::AST::DestructuringDeclaration>() -> std::shared_ptr<LM::Frontend::AST::DestructuringDeclaration>;
 template auto Parser::createNode<LM::Frontend::AST::FunctionDeclaration>() -> std::shared_ptr<LM::Frontend::AST::FunctionDeclaration>;
-template auto Parser::createNode<LM::Frontend::AST::ClassDeclaration>() -> std::shared_ptr<LM::Frontend::AST::ClassDeclaration>;
 template auto Parser::createNode<LM::Frontend::AST::IfStatement>() -> std::shared_ptr<LM::Frontend::AST::IfStatement>;
 template auto Parser::createNode<LM::Frontend::AST::ForStatement>() -> std::shared_ptr<LM::Frontend::AST::ForStatement>;
 template auto Parser::createNode<LM::Frontend::AST::WhileStatement>() -> std::shared_ptr<LM::Frontend::AST::WhileStatement>;
@@ -450,7 +448,6 @@ template auto Parser::createNodeWithContext<LM::Frontend::AST::Program>() -> std
 template auto Parser::createNodeWithContext<LM::Frontend::AST::VarDeclaration>() -> std::shared_ptr<LM::Frontend::AST::VarDeclaration>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::DestructuringDeclaration>() -> std::shared_ptr<LM::Frontend::AST::DestructuringDeclaration>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::FunctionDeclaration>() -> std::shared_ptr<LM::Frontend::AST::FunctionDeclaration>;
-template auto Parser::createNodeWithContext<LM::Frontend::AST::ClassDeclaration>() -> std::shared_ptr<LM::Frontend::AST::ClassDeclaration>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::IfStatement>() -> std::shared_ptr<LM::Frontend::AST::IfStatement>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::ForStatement>() -> std::shared_ptr<LM::Frontend::AST::ForStatement>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::WhileStatement>() -> std::shared_ptr<LM::Frontend::AST::WhileStatement>;
@@ -579,14 +576,17 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::declaration() {
         bool isDataClass = false;
         
         // Parse visibility and modifiers
-        while (check(TokenType::PUB) || check(TokenType::PROT) || check(TokenType::CONST) || 
-               check(TokenType::STATIC) || check(TokenType::ABSTRACT) || check(TokenType::FINAL) || 
-               check(TokenType::DATA)) {
+        while (check(TokenType::PUB) || check(TokenType::PROT) || check(TokenType::PUBLIC) ||
+               check(TokenType::PRIVATE) || check(TokenType::PROTECTED) ||
+               check(TokenType::CONST) || check(TokenType::STATIC) ||
+               check(TokenType::ABSTRACT) || check(TokenType::FINAL) || check(TokenType::DATA)) {
             
-            if (match({TokenType::PUB})) {
+            if (match({TokenType::PUB}) || match({TokenType::PUBLIC})) {
                 visibility = LM::Frontend::AST::VisibilityLevel::Public;
-            } else if (match({TokenType::PROT})) {
+            } else if (match({TokenType::PROT}) || match({TokenType::PROTECTED})) {
                 visibility = LM::Frontend::AST::VisibilityLevel::Protected;
+            } else if (match({TokenType::PRIVATE})) {
+                visibility = LM::Frontend::AST::VisibilityLevel::Private;
             } else if (match({TokenType::CONST})) {
                 visibility = LM::Frontend::AST::VisibilityLevel::Const;
             } else if (match({TokenType::STATIC})) {
@@ -601,16 +601,6 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::declaration() {
             }
         }
         
-        if (match({TokenType::CLASS})) {
-            auto decl = classDeclaration();
-            if (decl) {
-                decl->annotations = annotations;
-                decl->isAbstract = isAbstract;
-                decl->isFinal = isFinal;
-                decl->isDataClass = isDataClass;
-            }
-            return decl;
-        }
         if (match({TokenType::FRAME})) {
             auto decl = frameDeclaration();
             if (decl) {
@@ -1737,301 +1727,6 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::returnStatement() {
     return stmt;
 }
 
-std::shared_ptr<LM::Frontend::AST::ClassDeclaration> Parser::classDeclaration() {
-    auto classDecl = createNodeWithContext<LM::Frontend::AST::ClassDeclaration>();
-    classDecl->line = previous().line;
-
-    // Parse class name
-    Token name = consume(TokenType::IDENTIFIER, "Expected class name.");
-    classDecl->name = name.lexeme;
-
-    // Check for inline constructor parameters
-    if (check(TokenType::LEFT_PAREN)) {
-        classDecl->hasInlineConstructor = true;
-        advance(); // consume '('
-        
-        // Parse constructor parameters
-        if (!check(TokenType::RIGHT_PAREN)) {
-            do {
-                auto paramName = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
-                consume(TokenType::COLON, "Expected ':' after parameter name.");
-                auto paramType = parseTypeAnnotation();
-                classDecl->constructorParams.push_back({paramName, paramType});
-            } while (match({TokenType::COMMA}));
-        }
-        
-        consume(TokenType::RIGHT_PAREN, "Expected ')' after constructor parameters.");
-    }
-
-    // Check for inheritance
-    if (match({TokenType::COLON})) {
-        // Parse superclass name
-        Token superName = consume(TokenType::IDENTIFIER, "Expected superclass name.");
-        classDecl->superClassName = superName.lexeme;
-        
-        // Check for super constructor call
-        if (check(TokenType::LEFT_PAREN)) {
-            advance(); // consume '('
-            
-            // Parse super constructor arguments
-            if (!check(TokenType::RIGHT_PAREN)) {
-                do {
-                    classDecl->superConstructorArgs.push_back(expression());
-                } while (match({TokenType::COMMA}));
-            }
-            
-            consume(TokenType::RIGHT_PAREN, "Expected ')' after super constructor arguments.");
-        }
-    }
-
-    Token leftBrace = consume(TokenType::LEFT_BRACE, "Expected '{' before class body.");
-    pushBlockContext("class", leftBrace);
-
-    // Parse class members
-    while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
-        // Parse visibility modifiers
-        LM::Frontend::AST::VisibilityLevel visibility = LM::Frontend::AST::VisibilityLevel::Private; // Default to private
-        bool isStatic = false;
-        bool isAbstract = false;
-        bool isFinal = false;
-        bool isConst = false;
-        
-        // Parse visibility and modifier keywords
-        while (check(TokenType::PUB) || check(TokenType::PROT) || check(TokenType::CONST) || 
-               check(TokenType::STATIC) || check(TokenType::ABSTRACT) || check(TokenType::FINAL)) {
-            
-            if (match({TokenType::PUB})) {
-                visibility = LM::Frontend::AST::VisibilityLevel::Public;
-            } else if (match({TokenType::PROT})) {
-                visibility = LM::Frontend::AST::VisibilityLevel::Protected;
-            } else if (match({TokenType::CONST})) {
-                visibility = LM::Frontend::AST::VisibilityLevel::Const;
-                isConst = true;
-            } else if (match({TokenType::STATIC})) {
-                isStatic = true;
-            } else if (match({TokenType::ABSTRACT})) {
-                isAbstract = true;
-            } else if (match({TokenType::FINAL})) {
-                isFinal = true;
-            }
-        }
-        
-        if (match({TokenType::VAR})) {
-            // Parse field
-            auto field = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(varDeclaration());
-            if (field) {
-                classDecl->fields.push_back(field);
-                
-                // Store visibility information
-                classDecl->fieldVisibility[field->name] = visibility;
-                if (isStatic) {
-                    classDecl->staticMembers.insert(field->name);
-                }
-                if (isConst) {
-                    classDecl->readOnlyFields.insert(field->name);
-                }
-            }
-        } else if (match({TokenType::FN})) {
-            // Parse method
-            auto method = function("method");
-            if (method) {
-                classDecl->methods.push_back(method);
-                
-                // Store visibility information
-                classDecl->methodVisibility[method->name] = visibility;
-                method->visibility = visibility; // Set visibility on the method itself
-                if (isStatic) {
-                    classDecl->staticMembers.insert(method->name);
-                }
-                if (isAbstract) {
-                    classDecl->abstractMethods.insert(method->name);
-                    
-                    // Abstract methods don't have a body - handle this case
-                    if (method->body && method->body->statements.empty()) {
-                        // This is fine for abstract methods
-                    }
-                }
-                if (isFinal) {
-                    classDecl->finalMethods.insert(method->name);
-                }
-            }
-        } else if (check(TokenType::VAR)) {
-            // Handle var without visibility modifiers
-            match({TokenType::VAR});
-            auto field = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(varDeclaration());
-            if (field) {
-                classDecl->fields.push_back(field);
-                classDecl->fieldVisibility[field->name] = LM::Frontend::AST::VisibilityLevel::Private; // Default to private
-            }
-        } else if (check(TokenType::FN)) {
-            // Handle fn without visibility modifiers
-            match({TokenType::FN});
-            auto method = function("method");
-            if (method) {
-                classDecl->methods.push_back(method);
-                classDecl->methodVisibility[method->name] = LM::Frontend::AST::VisibilityLevel::Private; // Default to private
-                method->visibility = LM::Frontend::AST::VisibilityLevel::Private; // Set visibility on the method itself
-            }
-        } else if (check(TokenType::IDENTIFIER) && peek().lexeme == classDecl->name) {
-            // Parse constructor
-            advance(); // Consume the class name
-            auto constructor = std::make_shared<LM::Frontend::AST::FunctionDeclaration>();
-            constructor->line = previous().line;
-            constructor->name = classDecl->name;
-            
-            consume(TokenType::LEFT_PAREN, "Expected '(' after constructor name.");
-            
-            // Parse parameters
-            if (!check(TokenType::RIGHT_PAREN)) {
-                do {
-                    auto paramName = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
-                    
-                    // Parse parameter type
-                    consume(TokenType::COLON, "Expected ':' after parameter name.");
-                    auto paramType = parseTypeAnnotation();
-                    
-                    constructor->params.push_back({paramName, paramType});
-                } while (match({TokenType::COMMA}));
-            }
-            
-            consume(TokenType::RIGHT_PAREN, "Expected ')' after parameters.");
-            
-            // Parse constructor body
-            consume(TokenType::LEFT_BRACE, "Expected '{' before constructor body.");
-            constructor->body = block();
-            
-            classDecl->methods.push_back(constructor);
-        } else if (check(TokenType::IDENTIFIER)) {
-            // Parse direct field declaration (without 'var' keyword)
-            // Format: [visibility] fieldName: type [= initializer];
-            Token fieldName = advance(); // consume field name
-            
-            if (check(TokenType::COLON)) {
-                advance(); // consume ':'
-                
-                // Create a VarDeclaration for this field
-                auto field = std::make_shared<LM::Frontend::AST::VarDeclaration>();
-                field->line = fieldName.line;
-                field->name = fieldName.lexeme;
-                field->type = parseTypeAnnotation();
-                
-                // Check for initializer
-                if (match({TokenType::EQUAL})) {
-                    field->initializer = expression();
-                }
-                
-                consume(TokenType::SEMICOLON, "Expected ';' after field declaration.");
-                
-                classDecl->fields.push_back(field);
-                
-                // Store visibility information
-                classDecl->fieldVisibility[field->name] = visibility;
-                if (isStatic) {
-                    classDecl->staticMembers.insert(field->name);
-                }
-                if (isConst) {
-                    classDecl->readOnlyFields.insert(field->name);
-                }
-            } else {
-                error("Expected ':' after field name in class member declaration.");
-                break;
-            }
-        } else {
-            error("Expected class member declaration.");
-            break;
-        }
-    }
-
-    consume(TokenType::RIGHT_BRACE, "Expected '}' after class body.");
-    popBlockContext();
-
-    // Pop CST context when exiting class declaration
-    if (cstMode && !cstContextStack.empty()) {
-        popCSTContext();
-    }
-
-    // Generate automatic init constructor if class has inline constructor parameters
-    if (classDecl->hasInlineConstructor) {
-        auto initMethod = std::make_shared<LM::Frontend::AST::FunctionDeclaration>();
-        initMethod->line = classDecl->line;
-        initMethod->name = "init";
-        
-        // Copy constructor parameters to init method
-        for (const auto& param : classDecl->constructorParams) {
-            initMethod->params.push_back(param);
-        }
-        
-        // Create constructor body
-        auto body = std::make_shared<LM::Frontend::AST::BlockStatement>();
-        body->line = classDecl->line;
-        
-        // Add super constructor call if there's inheritance
-        if (!classDecl->superClassName.empty()) {
-            // Create super.init() call
-            auto superCall = std::make_shared<LM::Frontend::AST::ExprStatement>();
-            superCall->line = classDecl->line;
-            
-            auto callExpr = std::make_shared<LM::Frontend::AST::CallExpr>();
-            callExpr->line = classDecl->line;
-            
-            // Create super.init member expression
-            auto memberExpr = std::make_shared<LM::Frontend::AST::MemberExpr>();
-            memberExpr->line = classDecl->line;
-            memberExpr->name = "init";
-            
-            auto superExpr = std::make_shared<LM::Frontend::AST::VariableExpr>();
-            superExpr->line = classDecl->line;
-            superExpr->name = "super";
-            memberExpr->object = superExpr;
-            
-            callExpr->callee = memberExpr;
-            
-            // Add super constructor arguments
-            for (const auto& arg : classDecl->superConstructorArgs) {
-                callExpr->arguments.push_back(arg);
-            }
-            
-            superCall->expression = callExpr;
-            body->statements.push_back(superCall);
-        }
-        
-        // Add automatic field assignments for constructor parameters
-        for (const auto& param : classDecl->constructorParams) {
-            auto assignment = std::make_shared<LM::Frontend::AST::ExprStatement>();
-            assignment->line = classDecl->line;
-            
-            auto assignExpr = std::make_shared<LM::Frontend::AST::AssignExpr>();
-            assignExpr->line = classDecl->line;
-            assignExpr->op = TokenType::EQUAL;
-            
-            // Create self.paramName member expression
-            auto memberExpr = std::make_shared<LM::Frontend::AST::MemberExpr>();
-            memberExpr->line = classDecl->line;
-            memberExpr->name = param.first;
-            
-            auto thisExpr = std::make_shared<LM::Frontend::AST::ThisExpr>();
-            thisExpr->line = classDecl->line;
-            memberExpr->object = thisExpr;
-            
-            assignExpr->object = memberExpr;
-            assignExpr->member = param.first;
-            
-            // Create parameter variable expression
-            auto paramExpr = std::make_shared<LM::Frontend::AST::VariableExpr>();
-            paramExpr->line = classDecl->line;
-            paramExpr->name = param.first;
-            
-            assignExpr->value = paramExpr;
-            assignment->expression = assignExpr;
-            body->statements.push_back(assignment);
-        }
-        
-        initMethod->body = body;
-        classDecl->methods.push_back(initMethod);
-    }
-
-    return classDecl;
-}
 
 void Parser::parseConcurrencyParams(
     std::string& channel,
@@ -2191,11 +1886,16 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
         LM::Frontend::AST::VisibilityLevel visibility = LM::Frontend::AST::VisibilityLevel::Private; // Default to private
         
         // Parse visibility keywords
-        while (check(TokenType::PUB) || check(TokenType::PROT)) {
-            if (match({TokenType::PUB})) {
+        while (check(TokenType::PUB) || check(TokenType::PROT) || check(TokenType::PUBLIC) ||
+               check(TokenType::PRIVATE) || check(TokenType::PROTECTED) || check(TokenType::CONST)) {
+            if (match({TokenType::PUB}) || match({TokenType::PUBLIC})) {
                 visibility = LM::Frontend::AST::VisibilityLevel::Public;
-            } else if (match({TokenType::PROT})) {
+            } else if (match({TokenType::PROT}) || match({TokenType::PROTECTED})) {
                 visibility = LM::Frontend::AST::VisibilityLevel::Protected;
+            } else if (match({TokenType::PRIVATE})) {
+                visibility = LM::Frontend::AST::VisibilityLevel::Private;
+            } else if (match({TokenType::CONST})) {
+                visibility = LM::Frontend::AST::VisibilityLevel::Const;
             }
         }
         
@@ -4827,7 +4527,7 @@ std::string Parser::generateCausedByMessage(const LM::Error::BlockContext& conte
     std::string message = "Caused by: Unterminated " + context.blockType + " starting at line " + 
                          std::to_string(context.startLine) + ":";
     message += "\n" + std::to_string(context.startLine) + " | " + context.startLexeme;
-    if (context.blockType == "function" || context.blockType == "class") {
+    if (context.blockType == "function" || context.blockType == "frame") {
         message += " - unclosed " + context.blockType + " starts here";
     } else {
         message += " - unclosed block starts here";

@@ -47,7 +47,6 @@ namespace AST {
     struct VarDeclaration;
     struct DestructuringDeclaration;
     struct FunctionDeclaration;
-    struct ClassDeclaration;
     struct BlockStatement;
     struct IfStatement;
     struct ForStatement;
@@ -120,6 +119,16 @@ namespace AST {
         Const       // const (read-only public)
     };
 
+    inline std::string visibilityToString(VisibilityLevel level) {
+        switch (level) {
+            case VisibilityLevel::Private: return "private";
+            case VisibilityLevel::Protected: return "protected";
+            case VisibilityLevel::Public: return "public";
+            case VisibilityLevel::Const: return "const";
+            default: return "unknown";
+        }
+    }
+
     // Memory ownership and lifetime information
     struct MemoryInfo {
         std::size_t region_id = 0;           // Which memory region owns this value
@@ -137,7 +146,7 @@ namespace AST {
     };
 
     // Base node type
-    struct Node {
+    struct Node : public std::enable_shared_from_this<Node> {
         int line;
         
         // Inferred type after type checking (null before type checking)
@@ -459,35 +468,6 @@ namespace AST {
         
         // Default constructor
         AsyncFunctionDeclaration() = default;
-    };
-
-    // Class declaration
-    struct ClassDeclaration : public Statement {
-        std::string name;
-        std::vector<std::shared_ptr<VarDeclaration>> fields;
-        std::vector<std::shared_ptr<FunctionDeclaration>> methods;
-        
-        // Inheritance support
-        std::string superClassName;  // Name of the parent class
-        std::vector<std::shared_ptr<Expression>> superConstructorArgs;  // Arguments for super constructor call
-        
-        // Inline constructor support
-        std::vector<std::pair<std::string, std::shared_ptr<TypeAnnotation>>> constructorParams;  // Constructor parameters
-        bool hasInlineConstructor = false;
-        
-        // Visibility and modifiers
-        bool isAbstract = false;
-        bool isFinal = false;
-        bool isDataClass = false;
-        std::vector<std::string> interfaces;
-        
-        // Field and method visibility
-        std::map<std::string, VisibilityLevel> fieldVisibility;
-        std::map<std::string, VisibilityLevel> methodVisibility;
-        std::set<std::string> staticMembers;
-        std::set<std::string> abstractMethods;
-        std::set<std::string> finalMethods;
-        std::set<std::string> readOnlyFields;
     };
 
     // Block statement (sequence of statements)

@@ -1,0 +1,22 @@
+frame Resource {
+    pub name: str;
+    private id: int;
+    prot secret: str;
+
+    pub init(n: str, i: int, s: str) {
+        this.name = n;
+        this.id = i;
+        this.secret = s;
+    }
+
+    pub fn print_all() {
+        print("Printing all fields");
+    }
+
+    private fn secret_method() {
+        print("Secret");
+    }
+}
+
+var r = Resource("MyResource", 123, "shhh");
+r.secret_method();

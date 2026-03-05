@@ -498,9 +498,6 @@ std::string Value::toString() const {
                    [&](const ObjectInstancePtr& obj) {
                        oss << "<object>";
                    },
-                   [&](const std::shared_ptr<backend::ClassDefinition>&) {
-                       oss << "<class>";
-                   },
                    [&](const ModuleValue&) {
                        oss << "<module>";
                    },
@@ -605,9 +602,6 @@ std::string Value::getRawString() const {
                    },
                    [&](const ObjectInstancePtr& obj) {
                        oss << "<object>";
-                   },
-                   [&](const std::shared_ptr<backend::ClassDefinition>&) {
-                       oss << "<class>";
                    },
                    [&](const ModuleValue&) {
                        oss << "<module>";
