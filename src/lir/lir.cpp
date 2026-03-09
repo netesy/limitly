@@ -157,6 +157,17 @@ std::string LIR_Inst::to_string() const {
         case LIR_Op::FrameCallDeinit:
             oss << " r" << dst << ", " << func_name << ".deinit()";
             break;
+        case LIR_Op::TraitCallMethod:
+            oss << " r" << dst << ", trait=" << type_name << ", method=" << func_name << "(";
+            for (size_t i = 0; i < call_args.size(); ++i) {
+                if (i > 0) oss << ", ";
+                oss << "r" << call_args[i];
+            }
+            oss << ")";
+            break;
+        case LIR_Op::MakeTraitObject:
+            oss << " r" << dst << ", instance=r" << a << ", frame=" << func_name << ", trait=" << type_name;
+            break;
         case LIR_Op::Nop:
             // No operands
             break;
@@ -295,6 +306,8 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::FrameCallMethod: return "frame_call_method";
         case LIR_Op::FrameCallInit: return "frame_call_init";
         case LIR_Op::FrameCallDeinit: return "frame_call_deinit";
+        case LIR_Op::TraitCallMethod: return "trait_call_method";
+        case LIR_Op::MakeTraitObject: return "make_trait_object";
         case LIR_Op::ImportModule: return "import_module";
         case LIR_Op::ExportSymbol: return "export_symbol";
         case LIR_Op::BeginModule: return "begin_module";

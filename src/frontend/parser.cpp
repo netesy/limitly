@@ -898,6 +898,14 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::traitDeclaration() {
     Token name = consume(TokenType::IDENTIFIER, "Expected trait name.");
     traitDecl->name = name.lexeme;
 
+    // Check for trait inheritance: trait Name : Parent1, Parent2
+    if (match({TokenType::COLON})) {
+        do {
+            Token parentName = consume(TokenType::IDENTIFIER, "Expected parent trait name.");
+            traitDecl->extends.push_back(parentName.lexeme);
+        } while (match({TokenType::COMMA}));
+    }
+
     // Parse trait body
     consume(TokenType::LEFT_BRACE, "Expected '{' before trait body.");
 

@@ -1,0 +1,43 @@
+// tests/oop/traits_dynamic.lm
+trait Shape {
+    fn area(): int;
+    fn name(): str;
+}
+
+frame Circle : Shape {
+    var radius: int;
+    
+    fn area(): int {
+        return 3 * self.radius * self.radius; // Simplified PI
+    }
+    
+    fn name(): str {
+        return "Circle";
+    }
+}
+
+frame Square : Shape {
+    var side: int;
+    
+    fn area(): int {
+        return self.side * self.side;
+    }
+    
+    fn name(): str {
+        return "Square";
+    }
+}
+
+fn print_shape_info(s: &Shape) {
+    print(s.name());
+    print(s.area());
+}
+
+fn main() {
+    var c = Circle(radius=5);
+    var s = Square(side=10);
+    
+    // Dynamic dispatch via trait objects
+    print_shape_info(c);
+    print_shape_info(s);
+}

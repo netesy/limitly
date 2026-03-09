@@ -185,9 +185,15 @@ enum class LIR_Op : uint8_t {
     NewFrame,        // Allocate and initialize frame instance
     FrameGetField,   // Load field from frame instance
     FrameSetField,   // Store field to frame instance
+    FrameGetFieldAtomic, // Atomic load field from frame instance
+    FrameSetFieldAtomic, // Atomic store field to frame instance
+    FrameFieldAtomicAdd, // Atomic add to frame field
+    FrameFieldAtomicSub, // Atomic sub from frame field
     FrameCallMethod, // Call frame method (static dispatch)
     FrameCallInit,   // Call frame init() method
     FrameCallDeinit, // Call frame deinit() method
+    TraitCallMethod, // Call trait method (dynamic dispatch via vtable)
+    MakeTraitObject, // Package instance and vtable into trait object
     
     // Module operations
     ImportModule,
@@ -235,6 +241,7 @@ struct LIR_Inst {
     
     // Enhanced function call support
     std::string func_name;          // Function name (for calls and function definitions)
+    std::string type_name;          // Type name (for trait objects and vtable generation)
     std::vector<Reg> call_args;     // Arguments for calls, parameters for declarations
     std::vector<Type> call_arg_types; // Types of call arguments
     

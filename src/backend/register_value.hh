@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <memory>
 #include <unordered_map>
+#include <mutex>
 
 namespace LM {
 namespace Backend {
@@ -21,6 +22,7 @@ using RegisterValue = std::variant<int64_t, uint64_t, double, bool, std::string,
 struct FrameInstance {
     std::string frame_type;                    // Frame type name
     std::vector<RegisterValue> fields;         // Field values (indexed)
+    mutable std::mutex mutex;                  // Mutex for atomic field access
     
     FrameInstance() = default;
     explicit FrameInstance(const std::string& type_name) : frame_type(type_name) {}

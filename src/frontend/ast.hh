@@ -692,6 +692,9 @@ namespace AST {
         std::vector<std::shared_ptr<FunctionDeclaration>> methods;
         std::vector<std::string> extends;  // Trait inheritance
         bool isOpen = false;
+        
+        // JIT Focus: Dynamic dispatch info
+        std::vector<std::string> method_names;
     };
     
     // Frame field with visibility and default values

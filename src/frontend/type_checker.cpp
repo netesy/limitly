@@ -585,6 +585,8 @@ TypePtr TypeChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statemen
         return check_function_declaration(func_decl);
     } else if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
         return check_frame_declaration(frame_decl);
+    } else if (auto trait_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
+        return check_trait_declaration(trait_decl);
     } else if (auto var_decl = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
         return check_var_declaration(var_decl);
     } else if (auto type_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TypeDeclaration>(stmt)) {
@@ -597,6 +599,14 @@ TypePtr TypeChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statemen
         return check_while_statement(while_stmt);
     } else if (auto for_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ForStatement>(stmt)) {
         return check_for_statement(for_stmt);
+    } else if (auto parallel_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ParallelStatement>(stmt)) {
+        return check_parallel_statement(parallel_stmt);
+    } else if (auto concurrent_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ConcurrentStatement>(stmt)) {
+        return check_concurrent_statement(concurrent_stmt);
+    } else if (auto task_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::TaskStatement>(stmt)) {
+        return check_task_statement(task_stmt);
+    } else if (auto worker_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::WorkerStatement>(stmt)) {
+        return check_worker_statement(worker_stmt);
     } else if (auto return_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ReturnStatement>(stmt)) {
         return check_return_statement(return_stmt);
     } else if (auto print_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::PrintStatement>(stmt)) {
@@ -882,6 +892,95 @@ TypePtr TypeChecker::check_for_statement(std::shared_ptr<LM::Frontend::AST::ForS
     for_stmt->inferred_type = result_type;
     
     return result_type;
+}
+
+TypePtr TypeChecker::check_parallel_statement(std::shared_ptr<LM::Frontend::AST::ParallelStatement> parallel_stmt) {
+    if (!parallel_stmt) return nullptr;
+    
+    enter_scope();
+    // Parallel blocks have direct access to outer scope variables, but with SharedCell semantics
+    // For type checking, we check the body normally
+    if (parallel_stmt->body) {
+        check_statement(parallel_stmt->body);
+    }
+    exit_scope();
+    
+    parallel_stmt->inferred_type = type_system.NIL_TYPE;
+    return type_system.NIL_TYPE;
+}
+
+TypePtr TypeChecker::check_concurrent_statement(std::shared_ptr<LM::Frontend::AST::ConcurrentStatement> concurrent_stmt) {
+    if (!concurrent_stmt) return nullptr;
+    
+    enter_scope();
+    
+    // Declare channel if present
+    if (!concurrent_stmt->channel.empty()) {
+        declare_variable(concurrent_stmt->channel, type_system.CHANNEL_TYPE);
+    }
+    
+    // Check body
+    if (concurrent_stmt->body) {
+        check_statement(concurrent_stmt->body);
+    }
+    
+    exit_scope();
+    
+    concurrent_stmt->inferred_type = type_system.NIL_TYPE;
+    return type_system.NIL_TYPE;
+}
+
+TypePtr TypeChecker::check_task_statement(std::shared_ptr<LM::Frontend::AST::TaskStatement> task_stmt) {
+    if (!task_stmt) return nullptr;
+    
+    enter_scope();
+    
+    // Check iterable
+    if (task_stmt->iterable) {
+        TypePtr iterable_type = check_expression(task_stmt->iterable);
+        // For now, allow any iterable, but could be restricted to ranges/collections
+    }
+    
+    // Bind loop variable
+    if (!task_stmt->loopVar.empty()) {
+        declare_variable(task_stmt->loopVar, type_system.INT64_TYPE);
+    }
+    
+    // Check body
+    if (task_stmt->body) {
+        check_statement(task_stmt->body);
+    }
+    
+    exit_scope();
+    
+    task_stmt->inferred_type = type_system.NIL_TYPE;
+    return type_system.NIL_TYPE;
+}
+
+TypePtr TypeChecker::check_worker_statement(std::shared_ptr<LM::Frontend::AST::WorkerStatement> worker_stmt) {
+    if (!worker_stmt) return nullptr;
+    
+    enter_scope();
+    
+    // Check iterable
+    if (worker_stmt->iterable) {
+        TypePtr iterable_type = check_expression(worker_stmt->iterable);
+    }
+    
+    // Bind parameter
+    if (!worker_stmt->paramName.empty()) {
+        declare_variable(worker_stmt->paramName, type_system.ANY_TYPE);
+    }
+    
+    // Check body
+    if (worker_stmt->body) {
+        check_statement(worker_stmt->body);
+    }
+    
+    exit_scope();
+    
+    worker_stmt->inferred_type = type_system.NIL_TYPE;
+    return type_system.NIL_TYPE;
 }
 
 TypePtr TypeChecker::check_return_statement(std::shared_ptr<LM::Frontend::AST::ReturnStatement> return_stmt) {
@@ -1417,6 +1516,20 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
             }
             
             if (!method) {
+                // Not found in frame, check implemented traits
+                for (const auto& trait_name : frame_info.declaration->implements) {
+                    auto trait_it = trait_declarations.find(trait_name);
+                    if (trait_it != trait_declarations.end()) {
+                        for (const auto& tm : trait_it->second.declaration->methods) {
+                            if (tm->name == method_name) {
+                                // Found in trait
+                                TypePtr trait_return_type = tm->returnType ? resolve_type_annotation(tm->returnType.value()) : type_system.NIL_TYPE;
+                                expr->inferred_type = trait_return_type;
+                                return trait_return_type;
+                            }
+                        }
+                    }
+                }
                 add_error("Frame '" + frame_name + "' has no method '" + method_name + "'", expr->line);
                 return type_system.ANY_TYPE;
             }
@@ -3005,11 +3118,9 @@ void TypeChecker::register_builtin_function(const std::string& name,
 namespace TypeCheckerFactory {
 
 TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> program, const std::string& source, const std::string& file_path) {
-    // Create memory manager and region for type system
-    static LM::Memory::MemoryManager<> memoryManager;
-    static LM::Memory::MemoryManager<>::Region memoryRegion(memoryManager);
-    static TypeSystem type_system(memoryManager, memoryRegion);
-    auto checker = create(type_system);
+    // Create type system
+    auto type_system = std::make_shared<TypeSystem>();
+    auto checker = create(*type_system);
     
     // Set source context for error reporting
     checker->set_source_context(source, file_path);
@@ -3127,6 +3238,48 @@ void register_builtin_functions(TypeChecker& checker) {
 // FRAME DECLARATION AND INSTANTIATION TYPE CHECKING
 // =============================================================================
 
+TypePtr TypeChecker::check_trait_declaration(std::shared_ptr<LM::Frontend::AST::TraitDeclaration> trait) {
+    if (!trait) return nullptr;
+
+    TraitInfo trait_info;
+    trait_info.name = trait->name;
+    trait_info.extends = trait->extends;
+    trait_info.declaration = trait;
+
+    // Resolve parent traits
+    for (const auto& parent_name : trait->extends) {
+        if (trait_declarations.find(parent_name) == trait_declarations.end()) {
+            add_error("Unknown parent trait: " + parent_name, trait->line);
+        }
+    }
+
+    // Register methods
+    for (const auto& method : trait->methods) {
+        std::string method_name = trait->name + "." + method->name;
+        FunctionSignature signature;
+        signature.name = method_name;
+        signature.return_type = method->returnType ? resolve_type_annotation(method->returnType.value()) : type_system.NIL_TYPE;
+        
+        // Traits are like frames in that they have a 'this' pointer for their methods
+        // but it's a polymorphic 'this' (the frame that implements the trait)
+        signature.param_types.push_back(type_system.ANY_TYPE); // 'this'
+        
+        for (const auto& param : method->params) {
+            signature.param_types.push_back(resolve_type_annotation(param.second));
+        }
+        function_signatures[method_name] = signature;
+    }
+
+    trait_declarations[trait->name] = trait_info;
+    
+    TypePtr trait_type = std::make_shared<::Type>(TypeTag::Trait);
+    type_system.addUserDefinedType(trait->name, trait_type);
+    // TODO: add TraitType extra info
+    trait->inferred_type = trait_type;
+    
+    return trait_type;
+}
+
 TypePtr TypeChecker::check_frame_declaration(std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame) {
     if (!frame) return nullptr;
     
@@ -3139,6 +3292,37 @@ TypePtr TypeChecker::check_frame_declaration(std::shared_ptr<LM::Frontend::AST::
     frame_info.name = frame->name;
     frame_info.declaration = frame;
     
+    // Verify trait implementations
+    for (const auto& trait_name : frame->implements) {
+        auto it = trait_declarations.find(trait_name);
+        if (it == trait_declarations.end()) {
+            add_error("Frame '" + frame->name + "' implements unknown trait: " + trait_name, frame->line);
+            continue;
+        }
+
+        const auto& trait_info = it->second;
+        for (const auto& trait_method : trait_info.declaration->methods) {
+            // Check if frame implements this method
+            bool implemented = false;
+            for (const auto& frame_method : frame->methods) {
+                if (frame_method->name == trait_method->name) {
+                    implemented = true;
+                    // TODO: Verify signature matches
+                    break;
+                }
+            }
+            
+            if (!implemented) {
+                // Check if trait has default implementation
+                if (trait_method->body && !trait_method->body->statements.empty()) {
+                    // It has a default implementation, we're good
+                } else {
+                    add_error("Frame '" + frame->name + "' does not implement required trait method: " + trait_method->name, frame->line);
+                }
+            }
+        }
+    }
+
     // Check all fields
     for (const auto& field : frame->fields) {
         if (!field) continue;

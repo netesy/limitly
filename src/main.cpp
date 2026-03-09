@@ -79,6 +79,11 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         auto type_check_result = LM::Frontend::TypeCheckerFactory::check_program(ast, source, filename);
         if (!type_check_result.success) {
             std::cerr << "Type checking failed\n";
+            if (!type_check_result.errors.empty()) {
+                for (const auto& err : type_check_result.errors) {
+                    std::cerr << "  " << err << "\n";
+                }
+            }
             return 1;
         }
         
@@ -95,6 +100,11 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         auto post_opt_type_check = LM::Frontend::TypeCheckerFactory::check_program(ast, source, filename);
         if (!post_opt_type_check.success) {
             std::cerr << "Post-optimization type checking failed\n";
+             if (!post_opt_type_check.errors.empty()) {
+                for (const auto& err : post_opt_type_check.errors) {
+                    std::cerr << "  " << err << "\n";
+                }
+            }
             return 1;
         }
         

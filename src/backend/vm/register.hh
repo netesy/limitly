@@ -86,9 +86,6 @@ private:
     // Current function for task execution
     const LIR::LIR_Function* current_function_ = nullptr;
     
-    // Memory management for type system
-    LM::Memory::MemoryManager<> memoryManager;
-    LM::Memory::MemoryManager<>::Region memoryRegion;
     
     // Type system instance
     std::unique_ptr<TypeSystem> type_system;

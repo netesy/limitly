@@ -53,6 +53,23 @@ RUNTIME_API void* lm_unbox_ptr(LmBox* box);
 // Memory management
 RUNTIME_API void lm_box_free(LmBox* box);
 
+// Frame runtime support
+typedef struct {
+    char* name;
+    void** fields;
+    int field_count;
+    void* mutex; // Used for atomic operations in concurrency contexts
+} LmFrame;
+
+RUNTIME_API void* lm_frame_alloc(const char* name, int fields);
+RUNTIME_API void* lm_frame_get_field(void* frame, int offset);
+RUNTIME_API void lm_frame_set_field(void* frame, int offset, void* value);
+RUNTIME_API void* lm_frame_get_field_atomic(void* frame, int offset);
+RUNTIME_API void lm_frame_set_field_atomic(void* frame, int offset, void* value);
+RUNTIME_API void lm_frame_field_atomic_add(void* frame, int offset, void* value);
+RUNTIME_API void lm_frame_field_atomic_sub(void* frame, int offset, void* value);
+RUNTIME_API void* lm_trait_dispatch(void* trait_obj, const char* trait_name, const char* method_name);
+
 #ifdef __cplusplus
 }
 #endif

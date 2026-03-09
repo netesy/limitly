@@ -1,0 +1,27 @@
+trait Speaker {
+    fn speak();
+}
+
+frame Human : Speaker {
+    pub name: str;
+    pub init(n: str) { this.name = n; }
+    pub fn speak() {
+        print("I am a human named " + this.name);
+    }
+}
+
+frame Dog : Speaker {
+    pub fn speak() {
+        print("Woof!");
+    }
+}
+
+fn make_it_speak(s: Speaker) {
+    s.speak();
+}
+
+var h = Human("Alice");
+var d = Dog();
+
+make_it_speak(h);
+make_it_speak(d);
