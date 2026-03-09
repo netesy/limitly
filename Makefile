@@ -67,7 +67,7 @@ FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp  \
               src/frontend/ast/builder.cpp src/frontend/ast/printer.cpp src/frontend/type_checker.cpp src/frontend/memory_checker.cpp \
               src/frontend/ast/optimizer.cpp 
 
-BACK_SRCS :=  src/backend/jit/jit.cpp
+BACK_SRCS :=  src/backend/jit/jit.cpp src/backend/fyra.cpp src/backend/fyra_ir_generator.cpp
 
 REGISTER_SRCS := src/backend/vm/register.cpp
 

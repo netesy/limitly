@@ -1,0 +1,3 @@
+[submodule "src/backend/fyra"]
+	path = src/backend/fyra
+	url = https://github.com/netesy/fyra.git

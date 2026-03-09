@@ -12,6 +12,8 @@
 #include "lir/functions.hh"
 #include "backend/jit/jit.hh"
 #include "backend/vm/register.hh"
+#include "backend/fyra.hh"
+#include "backend/fyra_ir_generator.hh"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -28,8 +30,12 @@ void printUsage(const char* programName) {
     std::cout << "  " << programName << " -cst <source_file>      - Print the CST\n";
     std::cout << "  " << programName << " -tokens <source_file>   - Print tokens\n";
     std::cout << "  " << programName << " -lir <source_file>      - Print the LIR (Low-level IR)\n";
+    std::cout << "  " << programName << " -fyra-ir <source_file>  - Print the Fyra IR\n";
     std::cout << "  " << programName << " -jit <source_file>      - JIT compile to executable\n";
     std::cout << "  " << programName << " -jit-debug <source_file> - JIT compile and run directly\n";
+    std::cout << "  " << programName << " -aot <source_file>      - AOT compile with Fyra\n";
+    std::cout << "  " << programName << " -wasm <source_file>     - Compile to WebAssembly\n";
+    std::cout << "  " << programName << " -wasi <source_file>     - Compile to WASI\n";
     std::cout << "  " << programName << " -debug <source_file>    - Execute with debug output\n";
     std::cout << "  " << programName << " -repl                   - Start interactive REPL\n";
 }
@@ -47,7 +53,8 @@ std::string readFile(const std::string& filename) {
 
 int executeFile(const std::string& filename, bool printAst = false, bool printCst = false, 
                 bool printTokens = false, bool useJit = false, bool jitDebug = false, 
-                bool enableDebug = false, bool printLir = false) {
+                bool enableDebug = false, bool printLir = false, bool useAot = false,
+                bool useWasm = false, bool useWasi = false, bool printFyraIr = false) {
     try {
         // Initialize LIR function systems
         // Note: Temporarily disabled due to crash in BuiltinUtils::initializeBuiltins()
@@ -132,6 +139,34 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             std::cout << "\n";
         }
 
+        // Generate Fyra IR if requested (before LIR generation)
+        if (printFyraIr) {
+            try {
+                LM::Backend::Fyra::FyraIRGenerator fyra_ir_gen;
+                auto fyra_ir_func = fyra_ir_gen.generate_from_ast(post_opt_type_check.program);
+                
+                if (!fyra_ir_func) {
+                    std::cerr << "Failed to generate Fyra IR\n";
+                    return 1;
+                }
+                
+                if (fyra_ir_gen.has_errors()) {
+                    std::cerr << "Fyra IR generation errors:\n";
+                    for (const auto& error : fyra_ir_gen.get_errors()) {
+                        std::cerr << "  " << error << "\n";
+                    }
+                    return 1;
+                }
+                
+                std::cout << "=== Fyra IR ===\n";
+                std::cout << fyra_ir_func->to_ir_string() << "\n";
+                return 0;
+            } catch (const std::exception& e) {
+                std::cerr << "Fyra IR generation error: " << e.what() << "\n";
+                return 1;
+            }
+        }
+
         // Generate LIR once for all backends
         LIR::Generator lir_generator;
         auto lir_function = lir_generator.generate_program(post_opt_type_check);
@@ -188,7 +223,69 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             return 0;
         }
 
-        if (useJit) {
+        if (useAot || useWasm || useWasi) {
+            try {
+                // Generate Fyra IR directly from verified AST (bypassing LIR)
+                LM::Backend::Fyra::FyraIRGenerator fyra_ir_gen;
+                auto fyra_ir_func = fyra_ir_gen.generate_from_ast(post_opt_type_check.program);
+                
+                if (!fyra_ir_func) {
+                    std::cerr << "Failed to generate Fyra IR\n";
+                    return 1;
+                }
+                
+                if (fyra_ir_gen.has_errors()) {
+                    std::cerr << "Fyra IR generation errors:\n";
+                    for (const auto& error : fyra_ir_gen.get_errors()) {
+                        std::cerr << "  " << error << "\n";
+                    }
+                    return 1;
+                }
+                
+                if (enableDebug) {
+                    std::cout << "=== Generated Fyra IR ===\n";
+                    std::cout << fyra_ir_func->to_ir_string() << "\n";
+                }
+                
+                // Initialize Fyra compiler with IR
+                LM::Backend::Fyra::FyraCompiler fyra;
+                fyra.set_debug_mode(enableDebug);
+                
+                std::string output_filename = filename;
+                size_t dot_pos = output_filename.rfind(".lm");
+                if (dot_pos != std::string::npos) {
+                    output_filename.erase(dot_pos);
+                }
+                
+                LM::Backend::Fyra::CompileResult result;
+                
+                if (useAot) {
+                    #ifdef _WIN32
+                        output_filename += ".exe";
+                    #endif
+                    result = fyra.compile_aot(*lir_function, output_filename);
+                    std::cout << "AOT compilation with Fyra (from Fyra IR)\n";
+                } else if (useWasm) {
+                    output_filename += ".wasm";
+                    result = fyra.compile_wasm(*lir_function, output_filename);
+                    std::cout << "WebAssembly compilation with Fyra (from Fyra IR)\n";
+                } else if (useWasi) {
+                    output_filename += ".wasi";
+                    result = fyra.compile_wasi(*lir_function, output_filename);
+                    std::cout << "WASI compilation with Fyra (from Fyra IR)\n";
+                }
+                
+                if (result.success) {
+                    std::cout << "Compiled to " << result.output_file << "\n";
+                } else {
+                    std::cerr << "Fyra compilation failed: " << result.error_message << "\n";
+                    return 1;
+                }
+            } catch (const std::exception& e) {
+                std::cerr << "Fyra Error: " << e.what() << "\n";
+                return 1;
+            }
+        } else if (useJit) {
             try {
                 // Initialize JIT backend
                 LM::Backend::JIT::Compiler::JITBackend jit;
@@ -365,24 +462,32 @@ int main(int argc, char* argv[]) {
         startRepl();
         return 0;
     } else if (arg == "-ast" && argc >= 3) {
-        return executeFile(argv[2], true, false, false, false, false, false, false);
+        return executeFile(argv[2], true, false, false, false, false, false, false, false, false, false);
     } else if (arg == "-cst" && argc >= 3) {
-        return executeFile(argv[2], false, true, false, false, false, false, false);
+        return executeFile(argv[2], false, true, false, false, false, false, false, false, false, false);
     } else if (arg == "-tokens" && argc >= 3) {
-        return executeFile(argv[2], false, false, true, false, false, false, false);
+        return executeFile(argv[2], false, false, true, false, false, false, false, false, false, false);
     } else if (arg == "-lir" && argc >= 3) {
-        return executeFile(argv[2], false, false, false, false, false, false, true);
+        return executeFile(argv[2], false, false, false, false, false, false, true, false, false, false, false);
+    } else if (arg == "-fyra-ir" && argc >= 3) {
+        return executeFile(argv[2], false, false, false, false, false, false, false, false, false, false, true);
     } else if (arg == "-jit" && argc >= 3) {
-        return executeFile(argv[2], false, false, false, true, false, false, false);
+        return executeFile(argv[2], false, false, false, true, false, false, false, false, false, false, false);
     } else if (arg == "-jit-debug" && argc >= 3) {
-        return executeFile(argv[2], false, false, false, true, true, false, false);
+        return executeFile(argv[2], false, false, false, true, true, false, false, false, false, false, false);
+    } else if (arg == "-aot" && argc >= 3) {
+        return executeFile(argv[2], false, false, false, false, false, false, false, true, false, false, false);
+    } else if (arg == "-wasm" && argc >= 3) {
+        return executeFile(argv[2], false, false, false, false, false, false, false, false, true, false, false);
+    } else if (arg == "-wasi" && argc >= 3) {
+        return executeFile(argv[2], false, false, false, false, false, false, false, false, false, true, false);
     } else if (arg == "-debug" && argc >= 3) {
-        return executeFile(argv[2], false, false, false, false, false, true, false);
+        return executeFile(argv[2], false, false, false, false, false, true, false, false, false, false, false);
     } else if (arg[0] == '-') {
         std::cerr << "Unknown option: " << arg << "\n";
         printUsage(argv[0]);
         return 1;
     } else {
-        return executeFile(arg);
+        return executeFile(arg, false, false, false, false, false, false, false, false, false, false, false);
     }
 }
