@@ -3301,20 +3301,51 @@ TypePtr TypeChecker::check_frame_declaration(std::shared_ptr<LM::Frontend::AST::
         }
 
         const auto& trait_info = it->second;
+        auto ts_trait = type_system.getTraitInfo(trait_name);
+
         for (const auto& trait_method : trait_info.declaration->methods) {
             // Check if frame implements this method
             bool implemented = false;
             for (const auto& frame_method : frame->methods) {
                 if (frame_method->name == trait_method->name) {
                     implemented = true;
-                    // TODO: Verify signature matches
+
+                    // Verify signature matches
+                    if (ts_trait) {
+                        auto it_sig = ts_trait->methodSignatures.find(trait_method->name);
+                        if (it_sig != ts_trait->methodSignatures.end()) {
+                            auto trait_sig = std::get<FunctionType>(it_sig->second->extra);
+
+                            // Check parameter count (excluding 'this')
+                            if (frame_method->parameters.size() != trait_sig.paramTypes.size() - 1) {
+                                add_error("Method '" + frame_method->name + "' in frame '" + frame->name +
+                                          "' has different parameter count than trait '" + trait_name + "'", frame_method->line);
+                            } else {
+                                // Check parameter types
+                                for (size_t i = 0; i < frame_method->parameters.size(); ++i) {
+                                    TypePtr p_type = resolve_type_annotation(frame_method->parameters[i].second);
+                                    if (!is_type_compatible(trait_sig.paramTypes[i + 1], p_type)) {
+                                        add_error("Parameter '" + frame_method->parameters[i].first + "' of method '" +
+                                                  frame_method->name + "' has incompatible type with trait '" + trait_name + "'", frame_method->line);
+                                    }
+                                }
+
+                                // Check return type
+                                TypePtr r_type = frame_method->returnType ? resolve_type_annotation(frame_method->returnType) : type_system.NIL_TYPE;
+                                if (!is_type_compatible(trait_sig.returnType, r_type)) {
+                                    add_error("Return type of method '" + frame_method->name + "' is incompatible with trait '" +
+                                              trait_name + "'", frame_method->line);
+                                }
+                            }
+                        }
+                    }
                     break;
                 }
             }
             
             if (!implemented) {
                 // Check if trait has default implementation
-                if (trait_method->body && !trait_method->body->statements.empty()) {
+                if (!trait_method->isAbstract) {
                     // It has a default implementation, we're good
                 } else {
                     add_error("Frame '" + frame->name + "' does not implement required trait method: " + trait_method->name, frame->line);
