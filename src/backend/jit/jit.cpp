@@ -4,7 +4,9 @@
 #include "../../lir/builtin_functions.hh"
 #include "../../memory/memory.hh"
 #include "../vm/register.hh"
+#ifdef HAS_LIBGCCJIT
 #include <libgccjit++.h>
+#endif
 #include <memory>
 #include <string>
 #include <vector>
@@ -54,9 +56,8 @@ JITBackend::JITBackend()
       m_optimizations_enabled(false),
       m_debug_mode(false),
       m_compiled_function(nullptr),
-      m_jit_result(nullptr),
-      current_memory_region_(nullptr) {
-    
+      m_jit_result(nullptr)
+{
 #if defined(_WIN32) || defined(__CYGWIN__)
     // Export all symbols so JITed code can see runtime functions
     // Windows-specific options to export all symbols and disable static linking for JIT
@@ -64,7 +65,6 @@ JITBackend::JITBackend()
 #endif
     
     // Initialize memory manager with audit mode disabled for performance
-    memory_manager_.setAuditMode(false);
     
     // Initialize basic types
     m_void_type = m_context.get_type(GCC_JIT_TYPE_VOID);
@@ -562,6 +562,11 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
             case LIR::LIR_Op::IsError: std::cout << "IsError r" << inst.dst << " = is_error(r" << inst.a << ")"; break;
             case LIR::LIR_Op::Unwrap: std::cout << "Unwrap r" << inst.dst << " = unwrap(r" << inst.a << ")"; break;
             case LIR::LIR_Op::UnwrapOr: std::cout << "UnwrapOr r" << inst.dst << " = unwrap_or(r" << inst.a << ", r" << inst.b << ")"; break;
+            case LIR::LIR_Op::NewFrame: std::cout << "NewFrame r" << inst.dst << " " << inst.func_name; break;
+            case LIR::LIR_Op::FrameGetField: std::cout << "FrameGetField r" << inst.dst << " = r" << inst.a << "[" << inst.b << "]"; break;
+            case LIR::LIR_Op::FrameSetField: std::cout << "FrameSetField r" << inst.dst << "[" << inst.a << "] = r" << inst.b; break;
+            case LIR::LIR_Op::TraitCallMethod: std::cout << "TraitCallMethod r" << inst.dst << " = trait " << inst.type_name << " method " << inst.func_name; break;
+            case LIR::LIR_Op::MakeTraitObject: std::cout << "MakeTraitObject r" << inst.dst << " = r" << inst.a; break;
         }
         std::cout << " (result_type=" << static_cast<int>(inst.result_type) << ")" << std::endl;
     }
@@ -1163,6 +1168,118 @@ gccjit::rvalue JITBackend::compile_instruction(const LIR::LIR_Inst& inst) {
             
             m_current_block.add_call(close_func, channel);
             return channel;
+        }
+
+        case LIR::LIR_Op::NewFrame: {
+            std::vector<gccjit::param> params;
+            params.push_back(m_context.new_param(m_const_char_ptr_type, "name"));
+            params.push_back(m_context.new_param(m_int_type, "fields"));
+            gccjit::function alloc_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "lm_frame_alloc", params, 0);
+            gccjit::rvalue name_val = m_context.new_rvalue(inst.func_name);
+            gccjit::rvalue fields_val = m_context.new_rvalue(m_int_type, static_cast<long>(inst.imm));
+            gccjit::rvalue frame_ptr = m_current_block.add_call(alloc_func, name_val, fields_val);
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_void_ptr_type);
+            m_current_block.add_assignment(dst, frame_ptr);
+            return frame_ptr;
+        }
+
+        case LIR::LIR_Op::FrameGetField: {
+            std::vector<gccjit::param> params;
+            params.push_back(m_context.new_param(m_void_ptr_type, "frame"));
+            params.push_back(m_context.new_param(m_int_type, "offset"));
+            gccjit::function get_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "lm_frame_get_field", params, 0);
+            gccjit::rvalue frame_val = get_jit_register(inst.a);
+            gccjit::rvalue offset_val = m_context.new_rvalue(m_int_type, static_cast<long>(inst.b));
+            gccjit::rvalue field_val = m_current_block.add_call(get_func, frame_val, offset_val);
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_void_ptr_type);
+            m_current_block.add_assignment(dst, field_val);
+            return field_val;
+        }
+
+        case LIR::LIR_Op::FrameSetField: {
+            std::vector<gccjit::param> params;
+            params.push_back(m_context.new_param(m_void_ptr_type, "frame"));
+            params.push_back(m_context.new_param(m_int_type, "offset"));
+            params.push_back(m_context.new_param(m_void_ptr_type, "value"));
+            gccjit::function set_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_void_type, "lm_frame_set_field", params, 0);
+            gccjit::rvalue frame_val = get_jit_register(inst.dst);
+            gccjit::rvalue offset_val = m_context.new_rvalue(m_int_type, static_cast<long>(inst.a));
+            gccjit::rvalue value_val = get_jit_register(inst.b);
+            m_current_block.add_eval(m_current_block.add_call(set_func, frame_val, offset_val, value_val));
+            return frame_val;
+        }
+
+        case LIR::LIR_Op::FrameGetFieldAtomic: {
+            std::vector<gccjit::param> params;
+            params.push_back(m_context.new_param(m_void_ptr_type, "frame"));
+            params.push_back(m_context.new_param(m_int_type, "offset"));
+            gccjit::function get_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "lm_frame_get_field_atomic", params, 0);
+            gccjit::rvalue frame_val = get_jit_register(inst.a);
+            gccjit::rvalue offset_val = m_context.new_rvalue(m_int_type, static_cast<long>(inst.b));
+            gccjit::rvalue field_val = m_current_block.add_call(get_func, frame_val, offset_val);
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_void_ptr_type);
+            m_current_block.add_assignment(dst, field_val);
+            return field_val;
+        }
+
+        case LIR::LIR_Op::FrameSetFieldAtomic: {
+            std::vector<gccjit::param> params;
+            params.push_back(m_context.new_param(m_void_ptr_type, "frame"));
+            params.push_back(m_context.new_param(m_int_type, "offset"));
+            params.push_back(m_context.new_param(m_void_ptr_type, "value"));
+            gccjit::function set_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_void_type, "lm_frame_set_field_atomic", params, 0);
+            gccjit::rvalue frame_val = get_jit_register(inst.dst);
+            gccjit::rvalue offset_val = m_context.new_rvalue(m_int_type, static_cast<long>(inst.a));
+            gccjit::rvalue value_val = get_jit_register(inst.b);
+            m_current_block.add_eval(m_current_block.add_call(set_func, frame_val, offset_val, value_val));
+            return frame_val;
+        }
+
+        case LIR::LIR_Op::FrameFieldAtomicAdd: {
+            std::vector<gccjit::param> params;
+            params.push_back(m_context.new_param(m_void_ptr_type, "frame"));
+            params.push_back(m_context.new_param(m_int_type, "offset"));
+            params.push_back(m_context.new_param(m_int_type, "value"));
+            gccjit::function add_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_void_type, "lm_frame_field_atomic_add", params, 0);
+            gccjit::rvalue frame_val = get_jit_register(inst.dst);
+            gccjit::rvalue offset_val = m_context.new_rvalue(m_int_type, static_cast<long>(inst.a));
+            gccjit::rvalue value_val = get_jit_register(inst.b);
+            m_current_block.add_eval(m_current_block.add_call(add_func, frame_val, offset_val, value_val));
+            return frame_val;
+        }
+
+        case LIR::LIR_Op::FrameFieldAtomicSub: {
+            std::vector<gccjit::param> params;
+            params.push_back(m_context.new_param(m_void_ptr_type, "frame"));
+            params.push_back(m_context.new_param(m_int_type, "offset"));
+            params.push_back(m_context.new_param(m_int_type, "value"));
+            gccjit::function sub_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_void_type, "lm_frame_field_atomic_sub", params, 0);
+            gccjit::rvalue frame_val = get_jit_register(inst.dst);
+            gccjit::rvalue offset_val = m_context.new_rvalue(m_int_type, static_cast<long>(inst.a));
+            gccjit::rvalue value_val = get_jit_register(inst.b);
+            m_current_block.add_eval(m_current_block.add_call(sub_func, frame_val, offset_val, value_val));
+            return frame_val;
+        }
+
+        case LIR::LIR_Op::TraitCallMethod: {
+            std::vector<gccjit::param> params;
+            params.push_back(m_context.new_param(m_void_ptr_type, "trait_obj"));
+            params.push_back(m_context.new_param(m_const_char_ptr_type, "trait_name"));
+            params.push_back(m_context.new_param(m_const_char_ptr_type, "method_name"));
+            gccjit::function resolve_func = m_context.new_function(GCC_JIT_FUNCTION_IMPORTED, m_void_ptr_type, "lm_trait_dispatch", params, 0);
+            gccjit::rvalue obj_val = get_jit_register(inst.call_args[0]);
+            gccjit::rvalue trait_name = m_context.new_rvalue(inst.type_name);
+            gccjit::rvalue method_name = m_context.new_rvalue(inst.func_name);
+            gccjit::rvalue method_ptr = m_current_block.add_call(resolve_func, obj_val, trait_name, method_name);
+            // This is a placeholder, a full implementation would use an indirect call
+            return method_ptr;
+        }
+
+        case LIR::LIR_Op::MakeTraitObject: {
+            gccjit::lvalue dst = get_jit_register(inst.dst, m_void_ptr_type);
+            gccjit::rvalue src = get_jit_register(inst.a);
+            m_current_block.add_assignment(dst, src);
+            return src;
         }
             
         default:
@@ -2212,38 +2329,11 @@ std::vector<std::string> JITBackend::get_errors() const {
 }
 
 // Memory management methods
-void JITBackend::enter_memory_region() {
-    if (!current_memory_region_) {
-        current_memory_region_ = new LM::Memory::MemoryManager<>::Region(memory_manager_);
-    }
-}
-
-void JITBackend::exit_memory_region() {
-    if (current_memory_region_) {
-        delete current_memory_region_;
-        current_memory_region_ = nullptr;
-    }
-}
-
-void* JITBackend::allocate_in_region(size_t size, size_t alignment) {
-    if (!current_memory_region_) {
-        enter_memory_region();
-    }
-    return memory_manager_.allocate(size, alignment);
-}
-
-template<typename T, typename... Args>
-T* JITBackend::create_object(Args&&... args) {
-    if (!current_memory_region_) {
-        enter_memory_region();
-    }
-    return current_memory_region_->create<T>(std::forward<Args>(args)...);
-}
-
-void JITBackend::cleanup_memory() {
-    exit_memory_region();
-   // memory_manager_.analyzeMemoryUsage();
-}
+void JITBackend::enter_memory_region() {}
+void JITBackend::exit_memory_region() {}
+void* JITBackend::allocate_in_region(size_t size, size_t alignment) { return nullptr; }
+template<typename T, typename... Args> T* JITBackend::create_object(Args&&... args) { return nullptr; }
+void JITBackend::cleanup_memory() {}
 
 // Function compilation methods
 gccjit::function JITBackend::get_or_create_native_function(const std::string& func_name, 

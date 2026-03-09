@@ -70,6 +70,14 @@ private:
     };
     std::unordered_map<std::string, FrameInfo> frame_declarations;
     
+    // Trait declarations tracking
+    struct TraitInfo {
+        std::string name;
+        std::vector<std::string> extends;
+        std::shared_ptr<LM::Frontend::AST::TraitDeclaration> declaration;
+    };
+    std::unordered_map<std::string, TraitInfo> trait_declarations;
+
     // Current context
     std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> current_function = nullptr;
     std::shared_ptr<LM::Frontend::AST::FrameDeclaration> current_frame = nullptr;
@@ -192,6 +200,10 @@ private:
     TypePtr check_if_statement(std::shared_ptr<LM::Frontend::AST::IfStatement> if_stmt);
     TypePtr check_while_statement(std::shared_ptr<LM::Frontend::AST::WhileStatement> while_stmt);
     TypePtr check_for_statement(std::shared_ptr<LM::Frontend::AST::ForStatement> for_stmt);
+    TypePtr check_parallel_statement(std::shared_ptr<LM::Frontend::AST::ParallelStatement> parallel_stmt);
+    TypePtr check_concurrent_statement(std::shared_ptr<LM::Frontend::AST::ConcurrentStatement> concurrent_stmt);
+    TypePtr check_task_statement(std::shared_ptr<LM::Frontend::AST::TaskStatement> task_stmt);
+    TypePtr check_worker_statement(std::shared_ptr<LM::Frontend::AST::WorkerStatement> worker_stmt);
     TypePtr check_return_statement(std::shared_ptr<LM::Frontend::AST::ReturnStatement> return_stmt);
     TypePtr check_print_statement(std::shared_ptr<LM::Frontend::AST::PrintStatement> print_stmt);
     TypePtr check_match_statement(std::shared_ptr<LM::Frontend::AST::MatchStatement> match_stmt);
@@ -218,7 +230,8 @@ private:
     TypePtr check_fallible_expr(std::shared_ptr<LM::Frontend::AST::FallibleExpr> expr);
     TypePtr check_frame_instantiation_expr(std::shared_ptr<LM::Frontend::AST::FrameInstantiationExpr> expr);
     TypePtr check_frame_declaration(std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame);
-    
+    TypePtr check_trait_declaration(std::shared_ptr<LM::Frontend::AST::TraitDeclaration> trait);
+
     // Type annotation resolution
     TypePtr resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::TypeAnnotation> annotation);
     
@@ -305,11 +318,11 @@ private:
 
 struct TypeCheckResult {
     std::shared_ptr<LM::Frontend::AST::Program> program;  // AST with inferred_type set
-    TypeSystem& type_system;
+    std::shared_ptr<TypeSystem> type_system;
     bool success;
     std::vector<std::string> errors;
     
-    TypeCheckResult(std::shared_ptr<LM::Frontend::AST::Program> prog, TypeSystem& ts, bool succ, 
+    TypeCheckResult(std::shared_ptr<LM::Frontend::AST::Program> prog, std::shared_ptr<TypeSystem> ts, bool succ, 
                     const std::vector<std::string>& errs)
         : program(prog), type_system(ts), success(succ), errors(errs) {}
 };

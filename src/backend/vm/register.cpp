@@ -274,8 +274,7 @@ bool RegisterVM::isErrorValue(LIR::Reg reg) const {
 }
 
 RegisterVM::RegisterVM() 
-    : memoryRegion(memoryManager), 
-      type_system(std::make_unique<TypeSystem>(memoryManager, memoryRegion)) {
+    : type_system(std::make_unique<TypeSystem>()) {
     registers.resize(1024, nullptr);
     scheduler = std::make_unique<Scheduler>();
     current_time = 0;
@@ -327,6 +326,103 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
         switch (pc->op) {
             case LIR::LIR_Op::Nop: {
                 // No operation
+                break;
+            }
+
+            case LIR::LIR_Op::TraitCallMethod: {
+                // Dynamic dispatch (simplified for VM)
+                if (!pc->call_args.empty() && pc->call_args[0] < registers.size()) {
+                    auto& obj = registers[pc->call_args[0]];
+                    if (std::holds_alternative<FrameInstancePtr>(obj)) {
+                        auto frame = std::get<FrameInstancePtr>(obj);
+                        if (frame) {
+                            std::string frame_method_name = frame->frame_type + "." + pc->func_name;
+                            auto& func_manager = LIR::LIRFunctionManager::getInstance();
+                            if (!func_manager.hasFunction(frame_method_name)) {
+                                frame_method_name = pc->type_name + "." + pc->func_name;
+                            }
+                            
+                            if (func_manager.hasFunction(frame_method_name)) {
+                                auto func = func_manager.getFunction(frame_method_name);
+                                std::vector<RegisterValue> arg_vals;
+                                for (auto arg_reg : pc->call_args) arg_vals.push_back(registers[arg_reg]);
+
+                                auto saved_registers = registers;
+                                const LIR::LIR_Function* saved_func = current_function_;
+                                registers.assign(registers.size(), nullptr);
+                                for (size_t i = 0; i < arg_vals.size() && i < registers.size(); ++i) registers[i] = arg_vals[i];
+
+                                LIR::LIR_Function temp_wrapper(func->getName(), static_cast<uint32_t>(arg_vals.size()));
+                                temp_wrapper.instructions = func->getInstructions();
+                                current_function_ = &temp_wrapper;
+                                execute_instructions(temp_wrapper, 0, temp_wrapper.instructions.size());
+
+                                RegisterValue return_value = registers[0];
+                                registers = saved_registers;
+                                current_function_ = saved_func;
+                                registers[pc->dst] = return_value;
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+            case LIR::LIR_Op::FrameGetFieldAtomic: {
+                // In Register VM, we use mutex for atomic frame field access
+                if (std::holds_alternative<FrameInstancePtr>(registers[pc->a])) {
+                    auto frame = std::get<FrameInstancePtr>(registers[pc->a]);
+                    if (frame && pc->b < frame->fields.size()) {
+                        std::lock_guard<std::mutex> lock(frame->mutex);
+                        registers[pc->dst] = frame->fields[pc->b];
+                    } else {
+                        registers[pc->dst] = nullptr;
+                    }
+                } else {
+                    registers[pc->dst] = nullptr;
+                }
+                break;
+            }
+            case LIR::LIR_Op::FrameSetFieldAtomic: {
+                if (std::holds_alternative<FrameInstancePtr>(registers[pc->dst])) {
+                    auto frame = std::get<FrameInstancePtr>(registers[pc->dst]);
+                    if (frame) {
+                        std::lock_guard<std::mutex> lock(frame->mutex);
+                        frame->setField(pc->a, registers[pc->b]);
+                    }
+                }
+                break;
+            }
+            case LIR::LIR_Op::FrameFieldAtomicAdd: {
+                if (std::holds_alternative<FrameInstancePtr>(registers[pc->dst])) {
+                    auto frame = std::get<FrameInstancePtr>(registers[pc->dst]);
+                    if (frame) {
+                        std::lock_guard<std::mutex> lock(frame->mutex);
+                        auto& field = frame->fields[pc->a];
+                        if (std::holds_alternative<int64_t>(field) && std::holds_alternative<int64_t>(registers[pc->b])) {
+                            field = std::get<int64_t>(field) + std::get<int64_t>(registers[pc->b]);
+                        }
+                    }
+                }
+                break;
+            }
+            case LIR::LIR_Op::FrameFieldAtomicSub: {
+                if (std::holds_alternative<FrameInstancePtr>(registers[pc->dst])) {
+                    auto frame = std::get<FrameInstancePtr>(registers[pc->dst]);
+                    if (frame) {
+                        std::lock_guard<std::mutex> lock(frame->mutex);
+                        auto& field = frame->fields[pc->a];
+                        if (std::holds_alternative<int64_t>(field) && std::holds_alternative<int64_t>(registers[pc->b])) {
+                            field = std::get<int64_t>(field) - std::get<int64_t>(registers[pc->b]);
+                        }
+                    }
+                }
+                break;
+            }
+
+            case LIR::LIR_Op::MakeTraitObject: {
+                if (pc->a < registers.size()) {
+                    registers[pc->dst] = registers[pc->a];
+                }
                 break;
             }
             case LIR::LIR_Op::Mov: {

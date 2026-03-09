@@ -22,22 +22,27 @@ Generator::Generator() : current_function_(nullptr), next_register_(0), next_lab
 
 std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::TypeCheckResult& type_check_result) {
     // Set type system reference BEFORE Pass 0
-    type_system = &type_check_result.type_system;
+    type_system_ = type_check_result.type_system;
     
     // PASS 0: Collect function, frame, and module signatures only
     collect_frame_signatures(*type_check_result.program);
+    
    // std::cout << "[DEBUG] PASS 0: Collecting signatures" << std::endl;
     collect_function_signatures(type_check_result);
+    
    // std::cout << "[DEBUG] Function signatures collected" << std::endl;
     collect_module_signatures(*type_check_result.program);
+    
    // std::cout << "[DEBUG] Module signatures collected" << std::endl;
     
     // PASS 1: Lower function bodies into separate LIR functions
    // std::cout << "[DEBUG] PASS 1: Lowering function bodies" << std::endl;
     lower_function_bodies(type_check_result);
+    
    // std::cout << "[DEBUG] Function bodies lowered" << std::endl;
     
     // PASS 2: Generate main function with top-level code only
+    std::cout << "[LIR DEBUG] Pass 2 initialization started" << std::endl;
     current_function_ = std::make_unique<LIR_Function>("main", 0);
     next_register_ = 0;
     next_label_ = 0;
@@ -47,7 +52,6 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
     register_abi_types_.clear();
     register_language_types_.clear();
     enter_scope();
-    enter_memory_region();
     
     // Use CFG mode for proper JIT compatibility
     cfg_context_.building_cfg = false;  // DISABLED: CFG linearization has bugs with elif
@@ -58,16 +62,17 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
     
     // Generate top-level statements (excluding function definitions)
     for (const auto& stmt : type_check_result.program->statements) {
+        if (!stmt) continue;
         if (auto func_stmt = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(stmt.get())) {
             // Skip function definitions - they're already lowered
             continue;
         }
+        std::cout << "[LIR DEBUG] Emitting top-level stmt" << std::endl;
         emit_stmt(*stmt);
     }
     
     // Call exit_scope BEFORE implicit return to ensure deinitializers are called
     exit_scope();
-    exit_memory_region();
 
     // Add implicit return if none exists
     if (cfg_context_.building_cfg && get_current_block() && !get_current_block()->has_terminator()) {
@@ -125,7 +130,6 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     loop_stack_.clear();
     register_types_.clear();
     enter_scope();
-    enter_memory_region();
     
     // Start CFG building (disabled for now - has bugs with elif)
     // start_cfg_build();
@@ -153,7 +157,6 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     
     // Call exit_scope BEFORE implicit return to ensure deinitializers are called
     exit_scope();
-    exit_memory_region();
 
     // Add implicit return if none exists
     if (get_current_block() && !get_current_block()->has_terminator()) {
@@ -204,8 +207,6 @@ Reg Generator::allocate_register() {
 
 void Generator::enter_scope() {
     scope_stack_.push_back({});
-    // Create memory region for this scope
-    scope_stack_.back().memory_region = new LM::Memory::MemoryManager<>::Region(memory_manager_);
 }
 
 void Generator::exit_scope() {
@@ -221,10 +222,6 @@ void Generator::exit_scope() {
             emit_instruction(deinit_inst);
         }
 
-        // Clean up memory region for this scope
-        if (scope_stack_.back().memory_region) {
-            delete scope_stack_.back().memory_region;
-        }
         scope_stack_.pop_back();
     }
 }
@@ -289,7 +286,7 @@ void Generator::set_register_language_type(Reg reg, TypePtr lang_type) {
     }
     
     // Also set the ABI type
-    if (lang_type && type_system) {
+    if (lang_type && type_system_) {
         Type abi_type = language_type_to_abi_type(lang_type);
         set_register_abi_type(reg, abi_type);
     }
@@ -312,12 +309,12 @@ TypePtr Generator::get_register_language_type(Reg reg) const {
 }
 
 Type Generator::language_type_to_abi_type(TypePtr lang_type) {
-    if (!type_system || !lang_type) return Type::Void;
+    if (!type_system_ || !lang_type) return Type::Void;
     return LIR::language_type_to_abi_type(lang_type);
 }
 
 Type Generator::get_expression_abi_type(LM::Frontend::AST::Expression& expr) {
-    if (expr.inferred_type && type_system) {
+    if (expr.inferred_type && type_system_) {
         return language_type_to_abi_type(expr.inferred_type);
     }
     return Type::Void;
@@ -454,6 +451,8 @@ void Generator::emit_stmt(LM::Frontend::AST::Statement& stmt) {
         emit_worker_stmt(*worker_stmt);
     } else if (auto unsafe_stmt = dynamic_cast<LM::Frontend::AST::UnsafeStatement*>(&stmt)) {
         emit_unsafe_stmt(*unsafe_stmt);
+    } else if (auto trait_stmt = dynamic_cast<LM::Frontend::AST::TraitDeclaration*>(&stmt)) {
+        emit_trait_stmt(*trait_stmt);
     } else if (auto frame_stmt = dynamic_cast<LM::Frontend::AST::FrameDeclaration*>(&stmt)) {
         emit_frame_stmt(*frame_stmt);
     } else if (auto match_stmt = dynamic_cast<LM::Frontend::AST::MatchStatement*>(&stmt)) {
@@ -1675,6 +1674,24 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
 
                         return result;
                     }
+
+                    // Check if it's a trait method call
+                    for (const auto& trait_name : frame_info.implements) {
+                        std::string full_trait_method_name = trait_name + "." + method_name;
+                        if (LIRFunctionManager::getInstance().hasFunction(full_trait_method_name)) {
+                            // Generate call to trait method (possibly default implementation)
+                            Reg result = allocate_register();
+                            if (expr.inferred_type) {
+                                set_register_language_type(result, expr.inferred_type);
+                                set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
+                            }
+                            
+                            LIR_Inst call_inst(LIR_Op::Call, result, full_trait_method_name, arg_regs);
+                            for (Reg r : arg_regs) call_inst.call_arg_types.push_back(get_register_abi_type(r));
+                            emit_instruction(call_inst);
+                            return result;
+                        }
+                    }
                 }
             }
         } else {
@@ -1972,7 +1989,18 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
                         auto offset_it = it->second.field_offsets.find(field_name);
                         if (offset_it != it->second.field_offsets.end()) {
                             // Found the field - emit FrameSetField
-                            emit_instruction(LIR_Inst(LIR_Op::FrameSetField, Type::Void, object_reg, static_cast<uint32_t>(offset_it->second), value));
+                            LIR_Op set_op = LIR_Op::FrameSetField;
+                            if (is_in_concurrency_context()) {
+                                if (expr.op == LM::Frontend::TokenType::EQUAL) {
+                                    set_op = LIR_Op::FrameSetFieldAtomic;
+                                } else if (expr.op == LM::Frontend::TokenType::PLUS_EQUAL) {
+                                    set_op = LIR_Op::FrameFieldAtomicAdd;
+                                } else if (expr.op == LM::Frontend::TokenType::MINUS_EQUAL) {
+                                    set_op = LIR_Op::FrameFieldAtomicSub;
+                                }
+                            }
+
+                            emit_instruction(LIR_Inst(set_op, Type::Void, object_reg, static_cast<uint32_t>(offset_it->second), value));
                             return value;
                         }
                     }
@@ -2203,7 +2231,13 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
                     TypePtr field_lang_type = it->second.fields[offset_it->second].second;
                     Type field_abi_type = language_type_to_abi_type(field_lang_type);
 
-                    emit_instruction(LIR_Inst(LIR_Op::FrameGetField, field_abi_type, dst, object_reg, static_cast<uint32_t>(offset_it->second)));
+                    // Check if we are in a parallel block and need atomic access
+                    LIR_Op get_op = LIR_Op::FrameGetField;
+                    if (is_in_concurrency_context()) {
+                        get_op = LIR_Op::FrameGetFieldAtomic;
+                    }
+
+                    emit_instruction(LIR_Inst(get_op, field_abi_type, dst, object_reg, static_cast<uint32_t>(offset_it->second)));
 
                     // Set field type
                     if (offset_it->second < it->second.fields.size()) {
@@ -3019,6 +3053,7 @@ void Generator::emit_parallel_stmt(LM::Frontend::AST::ParallelStatement& stmt) {
     
     // 4. Set up SharedCell context for the parallel block body
     auto saved_parallel_block_cell_ids = parallel_block_cell_ids_;
+    enter_concurrency_context();
     
     // 5. Process parallel block body - execute directly with SharedCell context
     if (auto block_stmt = dynamic_cast<LM::Frontend::AST::BlockStatement*>(stmt.body.get())) {
@@ -3337,6 +3372,7 @@ void Generator::emit_concurrent_stmt(LM::Frontend::AST::ConcurrentStatement& stm
    // std::cout << "[DEBUG] Running scheduler for concurrent block: " << current_concurrent_block_id_ << std::endl;
     emit_instruction(LIR_Inst(LIR_Op::SchedulerRun, scheduler_reg, 0, 0));
     
+    exit_concurrency_context();
    // std::cout << "[DEBUG] Concurrent statement processing completed" << std::endl;
 }
 
@@ -3357,6 +3393,7 @@ void Generator::create_parallel_work_item(const std::string& work_item_name, std
     enter_scope();
     
     // Emit the statement directly (no task wrapper)
+        std::cout << "[LIR DEBUG] Emitting top-level stmt" << std::endl;
     emit_stmt(*stmt);
     
     // Add return to work item function
@@ -4332,46 +4369,8 @@ void Generator::emit_unsafe_stmt(LM::Frontend::AST::UnsafeStatement& stmt) {
     report_error("Unsafe statements not yet implemented");
 }
 
-// Memory management methods
-void Generator::enter_memory_region() {
-    if (!current_memory_region_) {
-        current_memory_region_ = new LM::Memory::MemoryManager<>::Region(memory_manager_);
-    }
-}
-
-void Generator::exit_memory_region() {
-    if (current_memory_region_) {
-        delete current_memory_region_;
-        current_memory_region_ = nullptr;
-    }
-}
-
-void* Generator::allocate_in_region(size_t size, size_t alignment) {
-    if (scope_stack_.empty()) {
-        enter_scope();
-    }
-    auto& current_scope = scope_stack_.back();
-    if (!current_scope.memory_region) {
-        current_scope.memory_region = new LM::Memory::MemoryManager<>::Region(memory_manager_);
-    }
-    return memory_manager_.allocate(size, alignment);
-}
-
-template<typename T, typename... Args>
-T* Generator::create_object(Args&&... args) {
-    if (scope_stack_.empty()) {
-        enter_scope();
-    }
-    auto& current_scope = scope_stack_.back();
-    if (!current_scope.memory_region) {
-        current_scope.memory_region = new LM::Memory::MemoryManager<>::Region(memory_manager_);
-    }
-    return current_scope.memory_region->create<T>(std::forward<Args>(args)...);
-}
 
 void Generator::cleanup_memory() {
-    exit_memory_region();
-    memory_manager_.analyzeMemoryUsage();
 }
 
 // Loop management methods
@@ -4838,6 +4837,7 @@ std::shared_ptr<::Type> Generator::convert_ast_type_to_lir_type(const std::share
 
 // Symbol collection methods (Pass 0)
 void Generator::collect_function_signatures(const LM::Frontend::TypeCheckResult& type_check_result) {
+    
     for (const auto& stmt : type_check_result.program->statements) {
         if (auto func_stmt = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(stmt.get())) {
             collect_function_signature(*func_stmt);
@@ -4859,9 +4859,12 @@ void Generator::collect_function_signature(LM::Frontend::AST::FunctionDeclaratio
 }
 
 void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_check_result) {
+    
     for (const auto& stmt : type_check_result.program->statements) {
         if (auto func_stmt = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(stmt.get())) {
              lower_function_body(*func_stmt);
+        } else if (auto trait_stmt = dynamic_cast<LM::Frontend::AST::TraitDeclaration*>(stmt.get())) {
+            lower_trait_declaration(*trait_stmt);
         } else if (auto frame_stmt = dynamic_cast<LM::Frontend::AST::FrameDeclaration*>(stmt.get())) {
             // Lower frame methods
             lower_frame_methods(*frame_stmt);
@@ -4917,6 +4920,84 @@ void Generator::lower_function_body(LM::Frontend::AST::FunctionDeclaration& stmt
     func_info.lir_function = nullptr; // Not needed since FunctionRegistry manages it
 }
 
+void Generator::lower_trait_declaration(LM::Frontend::AST::TraitDeclaration& trait_decl) {
+    for (const auto& method : trait_decl.methods) {
+        lower_trait_method(trait_decl.name, *method);
+    }
+}
+
+void Generator::lower_trait_method(const std::string& trait_name, LM::Frontend::AST::FunctionDeclaration& method) {
+    std::string full_method_name = trait_name + "." + method.name;
+    
+    // If method has no body, it's abstract, nothing to lower
+    if (!method.body || method.body->statements.empty()) {
+        return;
+    }
+
+    auto& func_manager = LIRFunctionManager::getInstance();
+    
+    // Create function with parameters (including 'this' as first parameter)
+    size_t total_params = method.params.size() + 1; // +1 for 'this'
+    current_function_ = std::make_unique<LIR_Function>(full_method_name, total_params);
+    next_register_ = total_params;
+    next_label_ = 0;
+    scope_stack_.clear();
+    loop_stack_.clear();
+    register_types_.clear();
+    enter_scope();
+    
+    cfg_context_.building_cfg = false;
+    cfg_context_.current_block = nullptr;
+    
+    // Register 'this' parameter as first parameter (register 0)
+    this_register_ = 0;
+    bind_variable("this", 0);
+    auto any_type = std::make_shared<::Type>(::TypeTag::Any);
+    set_register_language_type(0, any_type);
+    set_register_abi_type(0, Type::Ptr);
+    
+    // Register method parameters
+    for (size_t i = 0; i < method.params.size(); ++i) {
+        size_t reg_index = i + 1; // +1 for 'this'
+        bind_variable(method.params[i].first, static_cast<Reg>(reg_index));
+        set_register_type(static_cast<Reg>(reg_index), nullptr);
+    }
+    
+    // Emit method body
+    if (method.body) {
+        emit_stmt(*method.body);
+    }
+    
+    // Add implicit return
+    if (!current_function_->instructions.empty() && !current_function_->instructions.back().isReturn()) {
+        emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, 0, 0));
+    } else if (current_function_->instructions.empty()) {
+        emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, 0, 0));
+    }
+
+    exit_scope();
+    this_register_ = UINT32_MAX;
+    
+    auto result = std::move(current_function_);
+    current_function_ = nullptr;
+    
+    std::vector<LIRParameter> params;
+    LIRParameter this_param;
+    this_param.name = "this";
+    this_param.type = Type::Ptr;
+    params.push_back(this_param);
+    
+    for (const auto& param : method.params) {
+        LIRParameter lir_param;
+        lir_param.name = param.first;
+        lir_param.type = Type::I64;
+        params.push_back(lir_param);
+    }
+    
+    auto lir_func = func_manager.createFunction(full_method_name, params, Type::I64, nullptr);
+    lir_func->setInstructions(result->instructions);
+}
+
 void Generator::lower_frame_methods(LM::Frontend::AST::FrameDeclaration& frame_decl) {
     // Lower all frame methods into separate LIR functions
     
@@ -4957,7 +5038,6 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
     loop_stack_.clear();
     register_types_.clear();
     enter_scope();
-    enter_memory_region();
     
     // Use CFG mode for proper JIT compatibility (disabled for now)
     cfg_context_.building_cfg = false;  // DISABLED: CFG linearization has bugs with elif
@@ -5003,7 +5083,6 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
     }
 
     exit_scope();
-    exit_memory_region();
     this_register_ = UINT32_MAX;  // Clear this_register_
     
     // Convert LIR_Function to LIRFunction and update the registration
@@ -5060,7 +5139,6 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
     loop_stack_.clear();
     register_types_.clear();
     enter_scope();
-    enter_memory_region();
     
     // Use CFG mode for proper JIT compatibility (disabled for now)
     cfg_context_.building_cfg = false;  // DISABLED: CFG linearization has bugs with elif
@@ -5106,7 +5184,6 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
     }
 
     exit_scope();
-    exit_memory_region();
     this_register_ = UINT32_MAX;  // Clear this_register_
     
     // Convert LIR_Function to LIRFunction and update the registration
@@ -5163,7 +5240,6 @@ void Generator::lower_frame_deinit_method(const std::string& frame_name, LM::Fro
     loop_stack_.clear();
     register_types_.clear();
     enter_scope();
-    enter_memory_region();
     
     // Use CFG mode for proper JIT compatibility (disabled for now)
     cfg_context_.building_cfg = false;  // DISABLED: CFG linearization has bugs with elif
@@ -5202,7 +5278,6 @@ void Generator::lower_frame_deinit_method(const std::string& frame_name, LM::Fro
     }
 
     exit_scope();
-    exit_memory_region();
     this_register_ = UINT32_MAX;  // Clear this_register_
     
     // Convert LIR_Function to LIRFunction and update the registration
@@ -5458,7 +5533,7 @@ Reg Generator::emit_fallible_expr(LM::Frontend::AST::FallibleExpr& expr) {
         
         Reg unwrapped_reg = allocate_register();
         TypePtr fallible_type = get_register_type(result_reg);
-        TypePtr success_type = type_system->STRING_TYPE; // Should extract from ErrorUnion type
+        TypePtr success_type = type_system_->STRING_TYPE; // Should extract from ErrorUnion type
         set_register_type(unwrapped_reg, success_type);
         
         emit_instruction(LIR_Inst(LIR_Op::Unwrap, Type::I64, unwrapped_reg, result_reg, 0));
@@ -5517,7 +5592,7 @@ Reg Generator::emit_fallible_expr(LM::Frontend::AST::FallibleExpr& expr) {
         
         // Success path: unwrap the value
         Reg unwrapped_reg = allocate_register();
-        TypePtr success_type = type_system->STRING_TYPE;
+        TypePtr success_type = type_system_->STRING_TYPE;
         set_register_type(unwrapped_reg, success_type);
         
         emit_instruction(LIR_Inst(LIR_Op::Unwrap, Type::I64, unwrapped_reg, result_reg, 0));
@@ -5563,6 +5638,7 @@ Reg Generator::emit_this_expr(LM::Frontend::AST::ThisExpr& expr) {
 
 // Smart module system implementations
 void Generator::collect_module_signatures(LM::Frontend::AST::Program& program) {
+    
     for (const auto& stmt : program.statements) {
         if (auto module_decl = dynamic_cast<LM::Frontend::AST::ModuleDeclaration*>(stmt.get())) {
             collect_module_declaration(*module_decl);
@@ -5899,6 +5975,7 @@ Reg Generator::emit_channel_recv_expr(LM::Frontend::AST::ChannelRecvExpr& expr) 
 
 // Frame system implementations
 void Generator::collect_frame_signatures(LM::Frontend::AST::Program& program) {
+    
     for (const auto& stmt : program.statements) {
         if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
             collect_frame_signature(frame_decl);
@@ -6015,6 +6092,10 @@ size_t Generator::get_frame_method_index(const std::string& frame_name, const st
     }
     
     return index_it->second;
+}
+
+void Generator::emit_trait_stmt(LM::Frontend::AST::TraitDeclaration& stmt) {
+    // Trait declarations are handled in Pass 0 and Pass 1
 }
 
 void Generator::emit_frame_stmt(LM::Frontend::AST::FrameDeclaration& stmt) {

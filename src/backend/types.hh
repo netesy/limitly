@@ -30,8 +30,6 @@ private:
     std::map<std::string, TypePtr> userDefinedTypes;
     std::map<std::string, TypePtr> typeAliases;
     std::map<std::string, TypePtr> errorTypes;
-    LM::Memory::MemoryManager<> &memoryManager;
-    LM::Memory::MemoryManager<>::Region &region;
 
     // Circular dependency detection for type aliases
     bool hasCircularDependency(const std::string& aliasName, TypePtr type, 
@@ -255,7 +253,7 @@ private:
     bool isDictType(TypePtr type) const { return type->tag == TypeTag::Dict; }
     ValuePtr stringToNumber(const std::string &str, TypePtr targetType)
     {
-        ValuePtr result = memoryManager.makeRef<Value>(region);
+        ValuePtr result = std::make_shared<Value>();
         result->type = targetType;
 
         try {
@@ -305,7 +303,7 @@ private:
     }
     ValuePtr numberToString(const ValuePtr &value)
     {
-        ValuePtr result = memoryManager.makeRef<Value>(region);
+        ValuePtr result = std::make_shared<Value>();
         result->type = STRING_TYPE;
 
         // For numeric types, the data is already a string representation
@@ -325,8 +323,7 @@ private:
     }
 
 public:
-    TypeSystem(LM::Memory::MemoryManager<> &memManager, LM::Memory::MemoryManager<>::Region &reg)
-        : memoryManager(memManager), region(reg) {
+    TypeSystem() {
         registerBuiltinErrors();
     }
 
@@ -420,7 +417,7 @@ public:
 
     ValuePtr createValue(TypePtr type)
     {
-        ValuePtr value = memoryManager.makeRef<Value>(region);
+        ValuePtr value = std::make_shared<Value>();
         value->type = type;
 
         switch (type->tag) {
@@ -675,7 +672,7 @@ public:
         TypePtr fallibleType = createFallibleType(successType);
         
         // Create a value that represents the success case
-        ValuePtr okValue = memoryManager.makeRef<Value>(region);
+        ValuePtr okValue = std::make_shared<Value>();
         okValue->type = fallibleType;
         okValue->data = value->data;
         okValue->complexData = value->complexData;
@@ -690,7 +687,7 @@ public:
         // Create error value
         ErrorValue errorValue("DefaultError", errorMessage);
         
-        ValuePtr errValue = memoryManager.makeRef<Value>(region);
+        ValuePtr errValue = std::make_shared<Value>();
         errValue->type = fallibleType;
         errValue->complexData = errorValue;
         
@@ -730,7 +727,7 @@ public:
         }
         
         // Create a new value with the extracted data and correct type
-        ValuePtr extractedValue = memoryManager.makeRef<Value>(region);
+        ValuePtr extractedValue = std::make_shared<Value>();
         extractedValue->type = successType;
         extractedValue->data = fallibleValue->data;
         extractedValue->complexData = fallibleValue->complexData;
@@ -751,7 +748,7 @@ public:
         }
         
         // Create a new value with the extracted data and correct type
-        ValuePtr extractedValue = memoryManager.makeRef<Value>(region);
+        ValuePtr extractedValue = std::make_shared<Value>();
         extractedValue->type = successType;
         extractedValue->data = fallibleValue->data;
         extractedValue->complexData = fallibleValue->complexData;
@@ -804,7 +801,7 @@ public:
             throw std::runtime_error("Union variant value type mismatch");
         }
         
-        ValuePtr unionValue = memoryManager.makeRef<Value>(region);
+        ValuePtr unionValue = std::make_shared<Value>();
         unionValue->type = unionType;
         unionValue->activeUnionVariant = variantIndex;
         
@@ -966,7 +963,7 @@ public:
         TypePtr optionType = createOptionType(valueType);
         
         // Create nil value
-        ValuePtr nilValue = memoryManager.makeRef<Value>(region);
+        ValuePtr nilValue = std::make_shared<Value>();
         nilValue->type = NIL_TYPE;
         nilValue->data = ""; // Empty string represents nil
         
@@ -1007,7 +1004,7 @@ public:
         }
         
         // Create a new value with the extracted data and correct type
-        ValuePtr extractedValue = memoryManager.makeRef<Value>(region);
+        ValuePtr extractedValue = std::make_shared<Value>();
         extractedValue->type = valueType;
         extractedValue->data = optionValue->data;
         
@@ -1027,7 +1024,7 @@ public:
         }
         
         // Create a new value with the extracted data and correct type
-        ValuePtr extractedValue = memoryManager.makeRef<Value>(region);
+        ValuePtr extractedValue = std::make_shared<Value>();
         extractedValue->type = valueType;
         extractedValue->data = optionValue->data;
         

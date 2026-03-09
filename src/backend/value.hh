@@ -372,7 +372,7 @@ struct Type
 
     // In value.hh, add this inside the Type struct
     Type(const Type& other)
-        : tag(other.tag), extra(other.extra) {
+        : tag(other.tag), isList(other.isList), isDict(other.isDict), extra(other.extra) {
     }
 
     std::string toString() const
@@ -1002,7 +1002,7 @@ struct Value {
 
     // Copy constructor
     Value(const Value& other)
-        : type(other.type ? std::make_shared<Type>(*other.type) : nullptr),
+        : type(other.type),
         data(other.data),
         complexData(other.complexData) {
 

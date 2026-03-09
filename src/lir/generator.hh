@@ -36,8 +36,6 @@ public:
     const std::unordered_map<Reg, ErrorInfo>& get_error_info_table() const { return error_info_table_; }
 
 private:
-    // Type system reference from type checker
-    TypeSystem* type_system = nullptr;
     
     // Function body lowering (Pass 1)
     void lower_function_bodies(const LM::Frontend::TypeCheckResult& type_check_result);
@@ -46,6 +44,8 @@ private:
     // Symbol collection (Pass 0)
     void collect_function_signatures(const LM::Frontend::TypeCheckResult& type_check_result);
     void collect_function_signature(LM::Frontend::AST::FunctionDeclaration& stmt);
+    void lower_trait_declaration(LM::Frontend::AST::TraitDeclaration& trait_decl);
+    void lower_trait_method(const std::string& trait_name, LM::Frontend::AST::FunctionDeclaration& method);
     void lower_frame_methods(LM::Frontend::AST::FrameDeclaration& frame_decl);
     void lower_frame_method(const std::string& frame_name, LM::Frontend::AST::FrameMethod& method);
     void lower_frame_init_method(const std::string& frame_name, LM::Frontend::AST::FrameMethod& init_method);
@@ -203,6 +203,7 @@ private:
     void emit_break_stmt(LM::Frontend::AST::BreakStatement& stmt);
     void emit_continue_stmt(LM::Frontend::AST::ContinueStatement& stmt);
     void emit_unsafe_stmt(LM::Frontend::AST::UnsafeStatement& stmt);
+    void emit_trait_stmt(LM::Frontend::AST::TraitDeclaration& stmt);
     void emit_frame_stmt(LM::Frontend::AST::FrameDeclaration& stmt);
     void emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt);
     void emit_module_stmt(LM::Frontend::AST::ModuleDeclaration& stmt);
@@ -218,7 +219,6 @@ private:
     // Member variables
     struct Scope {
         std::unordered_map<std::string, Reg> vars;
-        LM::Memory::MemoryManager<>::Region* memory_region = nullptr;
         std::vector<std::pair<std::string, Reg>> frame_instances;  // frame_name -> register for deinit tracking
     };
 
@@ -305,6 +305,12 @@ private:
     
     Reg this_register_ = UINT32_MAX;  // Register holding 'this' pointer in methods
     
+    // Concurrency context tracking
+    int concurrency_nesting_level_ = 0;
+    void enter_concurrency_context() { concurrency_nesting_level_++; }
+    void exit_concurrency_context() { concurrency_nesting_level_--; }
+    bool is_in_concurrency_context() const { return concurrency_nesting_level_ > 0; }
+
     // Frame system support (modern OOP)
     struct FrameInfo {
         std::string name;
@@ -321,10 +327,6 @@ private:
     };
     std::unordered_map<std::string, FrameInfo> frame_table_;
     Reg frame_this_register_ = UINT32_MAX;  // Register holding 'this' pointer in frame methods
-    
-    // Memory management
-    LM::Memory::MemoryManager<> memory_manager_;
-    LM::Memory::MemoryManager<>::Region* current_memory_region_ = nullptr;
     
     
     // Channel context for concurrent blocks

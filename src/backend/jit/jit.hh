@@ -4,7 +4,9 @@
 #include "../../lir/lir.hh"
 #include "../../lir/functions.hh"
 #include "../../memory/memory.hh"
+#ifdef HAS_LIBGCCJIT
 #include <libgccjit++.h>
+#endif
 #include <memory>
 #include <string>
 #include <vector>

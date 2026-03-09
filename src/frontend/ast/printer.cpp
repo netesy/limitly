@@ -682,9 +682,9 @@ void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node,
             printNode(std::static_pointer_cast<LM::Frontend::AST::Node>(element), indent + 1);
         }
     }
-    else if (auto dictExpr = std::dynamic_pointer_cast<LM::Frontend::AST::TupleExpr>(node)) {
-        std::cout << indentation << "TupleExpression: (" << dictExpr->elements.size() << " elements)" << std::endl;
-        for (const auto& element : dictExpr->elements) {
+    else if (auto tupleExpr = std::dynamic_pointer_cast<LM::Frontend::AST::TupleExpr>(node)) {
+        std::cout << indentation << "TupleExpression: (" << tupleExpr->elements.size() << " elements)" << std::endl;
+        for (const auto& element : tupleExpr->elements) {
             // Convert Expression to Node using static_pointer_cast since Expression inherits from Node
             printNode(std::static_pointer_cast<LM::Frontend::AST::Node>(element), indent + 1);
         }

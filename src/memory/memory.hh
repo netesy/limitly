@@ -128,7 +128,7 @@ public:
 
 class DefaultAllocator {
 private:
-    static constexpr size_t NUM_POOLS = 6;  // 4, 8, 16, 32, 64, 128, 256 bytes
+    static constexpr size_t NUM_POOLS = 7;  // 4, 8, 16, 32, 64, 128, 256 bytes
     std::array<std::unique_ptr<MemoryPool>, NUM_POOLS> memoryPools;
     
     // Size to pool index lookup
