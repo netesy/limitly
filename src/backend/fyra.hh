@@ -45,21 +45,21 @@ public:
     ~FyraCompiler();
     
     // Compile LIR to native code or WebAssembly
-    CompileResult compile(const LIR::LIRFunction& lir_func, 
+    CompileResult compile(const LIR::LIR_Function& lir_func, 
                          const FyraCompileOptions& options);
     
     // Compile to AOT executable
-    CompileResult compile_aot(const LIR::LIRFunction& lir_func,
+    CompileResult compile_aot(const LIR::LIR_Function& lir_func,
                              const std::string& output_file,
                              OptimizationLevel opt_level = OptimizationLevel::O2);
     
     // Compile to WebAssembly
-    CompileResult compile_wasm(const LIR::LIRFunction& lir_func,
+    CompileResult compile_wasm(const LIR::LIR_Function& lir_func,
                               const std::string& output_file,
                               OptimizationLevel opt_level = OptimizationLevel::O2);
     
     // Compile to WASI (WebAssembly System Interface)
-    CompileResult compile_wasi(const LIR::LIRFunction& lir_func,
+    CompileResult compile_wasi(const LIR::LIR_Function& lir_func,
                               const std::string& output_file,
                               OptimizationLevel opt_level = OptimizationLevel::O2);
     
@@ -69,12 +69,37 @@ public:
     // Get last error message
     std::string get_last_error() const { return last_error_; }
     
+public:
+    struct TranslationDiagnostic {
+        enum class Severity {
+            Error,
+            Warning
+        };
+
+        Severity severity = Severity::Warning;
+        size_t instruction_index = 0;
+        std::string message;
+    };
+
+    struct TranslationReport {
+        std::vector<TranslationDiagnostic> diagnostics;
+
+        bool has_errors() const {
+            for (const auto& diagnostic : diagnostics) {
+                if (diagnostic.severity == TranslationDiagnostic::Severity::Error) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    };
+
 private:
     bool debug_mode_ = false;
     std::string last_error_;
-    
+
     // Internal conversion from LIR to Fyra IR
-    std::string convert_lir_to_fyra_ir(const LIR::LIRFunction& lir_func);
+    std::string convert_lir_to_fyra_ir(const LIR::LIR_Function& lir_func, TranslationReport& report);
     
     // Invoke Fyra compiler
     CompileResult invoke_fyra(const std::string& ir_code,

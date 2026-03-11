@@ -40,6 +40,31 @@ struct CompileResult {
     CompileResult() : success(false), compiled_function(nullptr) {}
 };
 
+#ifndef HAS_LIBGCCJIT
+class JITBackend {
+public:
+    JITBackend() = default;
+    ~JITBackend() = default;
+
+    void process_function(const LIR::LIR_Function&) {}
+    CompileResult compile(CompileMode = CompileMode::ToMemory, const std::string& = "") {
+        CompileResult result;
+        result.success = false;
+        result.error_message = "JIT backend unavailable: libgccjit support is disabled";
+        return result;
+    }
+    int execute_compiled_function(const std::vector<int>& = {}) { return 1; }
+    void enable_optimizations(bool = true) {}
+    void set_debug_mode(bool = true) {}
+
+    struct Stats {
+        size_t functions_compiled = 0;
+        size_t instructions_compiled = 0;
+        double compilation_time_ms = 0.0;
+    };
+    Stats get_stats() const { return {}; }
+};
+#else
 class JITBackend {
 public:
     JITBackend();
@@ -237,6 +262,7 @@ private:
     };
 };
 
+#endif
 } // namespace Compiler
 } // namespace JIT
 } // namespace Backend
