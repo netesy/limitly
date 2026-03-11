@@ -10,14 +10,14 @@ ifeq ($(OS),Windows_NT)
 	CXX := $(MSYS2_PATH)/mingw64/bin/g++.exe
 	CC := $(MSYS2_PATH)/mingw64/bin/gcc.exe
 	AR := $(MSYS2_PATH)/mingw64/bin/ar.exe
-	LIBS := -lws2_32 -lgccjit
+	LIBS := -lws2_32
 else
 	PLATFORM := linux
 	EXE_EXT :=
 	CXX := g++
 	CC := gcc
 	AR := ar
-	LIBS := -lgccjit
+	LIBS :=
 	LIBGCCJIT_PATH := $(shell find /usr -name libgccjit.so 2>/dev/null | head -n 1)
 	ifneq ($(LIBGCCJIT_PATH),)
 		LDFLAGS := -L$(shell dirname $(LIBGCCJIT_PATH))
@@ -27,12 +27,38 @@ else
 	endif
 endif
 
+
+# Optional libgccjit support
+USE_LIBGCCJIT ?= auto
+LIBGCCJIT_HEADER := $(shell find /usr -name libgccjit++.h 2>/dev/null | head -n 1)
+ifeq ($(USE_LIBGCCJIT),auto)
+	ifeq ($(LIBGCCJIT_HEADER),)
+		USE_LIBGCCJIT := 0
+	else
+		USE_LIBGCCJIT := 1
+	endif
+endif
+
+ifeq ($(USE_LIBGCCJIT),1)
+	LIBS += -lgccjit
+	LIBGCCJIT_CXXFLAGS := -DHAS_LIBGCCJIT
+	ifneq ($(LIBGCCJIT_HEADER),)
+		LIBGCCJIT_CXXFLAGS += -I$(shell dirname $(LIBGCCJIT_HEADER))
+	endif
+else
+	LIBGCCJIT_CXXFLAGS :=
+endif
+
 # =============================
 # Build mode
 # =============================
 MODE ?= release
 
 ifeq ($(MODE),debug)
+	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit $(LIBGCCJIT_CXXFLAGS) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CFLAGS := -std=c99 -g -fPIC -I.
+else
+	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit $(LIBGCCJIT_CXXFLAGS) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit -I/usr/lib/gcc/x86_64-linux-gnu/13/include -DHAS_LIBGCCJIT $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -g -fPIC -I.
 else
@@ -67,7 +93,10 @@ FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp  \
               src/frontend/ast/builder.cpp src/frontend/ast/printer.cpp src/frontend/type_checker.cpp src/frontend/memory_checker.cpp \
               src/frontend/ast/optimizer.cpp 
 
-BACK_SRCS :=  src/backend/jit/jit.cpp src/backend/fyra.cpp src/backend/fyra_ir_generator.cpp
+BACK_SRCS := src/backend/fyra.cpp src/backend/fyra_ir_generator.cpp
+ifeq ($(USE_LIBGCCJIT),1)
+	BACK_SRCS += src/backend/jit/jit.cpp
+endif
 
 REGISTER_SRCS := src/backend/vm/register.cpp
 
@@ -111,7 +140,7 @@ ifeq ($(PLATFORM),windows)
 	@powershell -Command "if (-not (Test-Path '$(MSYS2_PATH)')) { Write-Error 'MSYS2 not found at $(MSYS2_PATH)'; exit 1 }"
 	@powershell -Command "if (-not (Test-Path '$(CXX)')) { Write-Error 'g++ not found in MSYS2'; exit 1 }"
 endif
-	@echo "Dependencies OK for $(PLATFORM) in $(MODE) mode."
+	@echo "Dependencies OK for $(PLATFORM) in $(MODE) mode. libgccjit=$(USE_LIBGCCJIT)"
 
 # =============================
 # Directories
