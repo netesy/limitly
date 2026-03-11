@@ -42,7 +42,6 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
    // std::cout << "[DEBUG] Function bodies lowered" << std::endl;
     
     // PASS 2: Generate main function with top-level code only
-    std::cout << "[LIR DEBUG] Pass 2 initialization started" << std::endl;
     current_function_ = std::make_unique<LIR_Function>("main", 0);
     next_register_ = 0;
     next_label_ = 0;
@@ -67,7 +66,6 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
             // Skip function definitions - they're already lowered
             continue;
         }
-        std::cout << "[LIR DEBUG] Emitting top-level stmt" << std::endl;
         emit_stmt(*stmt);
     }
     
@@ -1843,6 +1841,31 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
 
 Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
     Reg value = emit_expr(*expr.value);
+
+    // Ownership transfer: If we assign a frame instance to a field, 
+    // it's no longer managed by the current scope.
+    if (expr.object && expr.member) {
+        // Find if 'value' corresponds to a frame instance in current scope
+        Reg source_reg = value;
+        
+        // Follow Mov chains to find original allocation
+        for (auto it = current_function_->instructions.rbegin(); it != current_function_->instructions.rend(); ++it) {
+            if (it->op == LIR_Op::Mov && it->dst == source_reg) {
+                source_reg = it->a;
+            }
+        }
+
+        if (!scope_stack_.empty()) {
+            auto& scope = scope_stack_.back();
+            for (auto it = scope.frame_instances.begin(); it != scope.frame_instances.end(); ++it) {
+                if (it->second == source_reg) {
+                    // Transfer ownership to the object field
+                    scope.frame_instances.erase(it);
+                    break;
+                }
+            }
+        }
+    }
     
     // === SHARED CELL TASK BODY ASSIGNMENT HANDLING ===
     // Check if we're in a task body and this variable is a shared variable
@@ -3393,7 +3416,6 @@ void Generator::create_parallel_work_item(const std::string& work_item_name, std
     enter_scope();
     
     // Emit the statement directly (no task wrapper)
-        std::cout << "[LIR DEBUG] Emitting top-level stmt" << std::endl;
     emit_stmt(*stmt);
     
     // Add return to work item function
@@ -5255,6 +5277,18 @@ void Generator::lower_frame_deinit_method(const std::string& frame_name, LM::Fro
     set_register_language_type(0, frame_type);
     set_register_abi_type(0, Type::Ptr);
     
+    // 1. Recursive cleanup: Call deinit on all frame-typed fields
+    auto frame_it = frame_table_.find(frame_name);
+    if (frame_it != frame_table_.end()) {
+        for (size_t i = 0; i < frame_it->second.fields.size(); ++i) {
+            if (frame_it->second.fields[i].second->tag == TypeTag::Frame) {
+                Reg field_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::FrameGetField, Type::Ptr, field_reg, 0, static_cast<uint32_t>(i)));
+                emit_instruction(LIR_Inst(LIR_Op::FrameCallDeinit, Type::Void, field_reg, 0, 0));
+            }
+        }
+    }
+
     // Emit deinit method body
     if (deinit_method.body) {
         emit_stmt(*deinit_method.body);
@@ -5986,7 +6020,6 @@ void Generator::collect_frame_signatures(LM::Frontend::AST::Program& program) {
 void Generator::collect_frame_signature(std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame_decl) {
     if (!frame_decl) return;
 
-    // std::cout << "[LIR DEBUG] Collecting signature for frame: " << frame_decl->name << std::endl;
     FrameInfo frame_info;
     frame_info.declaration = frame_decl;
     frame_info.name = frame_decl->name;
@@ -5996,7 +6029,6 @@ void Generator::collect_frame_signature(std::shared_ptr<LM::Frontend::AST::Frame
     
     // Collect field information
     for (const auto& field : frame_decl->fields) {
-        // std::cout << "[LIR DEBUG]   Field: " << field->name << " visibility=" << static_cast<int>(field->visibility) << std::endl;
         TypePtr field_type = nullptr;
         // Convert AST type annotation to TypePtr if available
         if (field->type) {
