@@ -20,7 +20,7 @@ FyraCompiler::~FyraCompiler() {
     // Cleanup if needed
 }
 
-std::string FyraCompiler::convert_lir_to_fyra_ir(const LIR::LIRFunction& lir_func) {
+std::string FyraCompiler::convert_lir_to_fyra_ir(const LIR::LIR_Function& lir_func) {
     std::stringstream ir;
     
     // Convert LIR instructions to Fyra IR format
@@ -31,8 +31,9 @@ std::string FyraCompiler::convert_lir_to_fyra_ir(const LIR::LIRFunction& lir_fun
     ir << "// Instructions: " << lir_func.instructions.size() << "\n\n";
     
     // Iterate through LIR instructions and convert to Fyra IR
-    for (size_t i = 0; i < lir_func.instructions.size(); ++i) {
-        const auto& inst = lir_func.instructions[i];
+    const auto& instructions = lir_func.instructions;
+    for (size_t i = 0; i < instructions.size(); ++i) {
+        const auto& inst = instructions[i];
         
         // Convert each LIR instruction to Fyra IR
         // This is a simplified placeholder
@@ -42,7 +43,7 @@ std::string FyraCompiler::convert_lir_to_fyra_ir(const LIR::LIRFunction& lir_fun
     return ir.str();
 }
 
-CompileResult FyraCompiler::compile(const LIR::LIRFunction& lir_func,
+CompileResult FyraCompiler::compile(const LIR::LIR_Function& lir_func,
                                    const FyraCompileOptions& options) {
     CompileResult result;
     
@@ -66,7 +67,7 @@ CompileResult FyraCompiler::compile(const LIR::LIRFunction& lir_func,
     return result;
 }
 
-CompileResult FyraCompiler::compile_aot(const LIR::LIRFunction& lir_func,
+CompileResult FyraCompiler::compile_aot(const LIR::LIR_Function& lir_func,
                                        const std::string& output_file,
                                        OptimizationLevel opt_level) {
     FyraCompileOptions options;
@@ -78,7 +79,7 @@ CompileResult FyraCompiler::compile_aot(const LIR::LIRFunction& lir_func,
     return compile(lir_func, options);
 }
 
-CompileResult FyraCompiler::compile_wasm(const LIR::LIRFunction& lir_func,
+CompileResult FyraCompiler::compile_wasm(const LIR::LIR_Function& lir_func,
                                         const std::string& output_file,
                                         OptimizationLevel opt_level) {
     FyraCompileOptions options;
@@ -90,7 +91,7 @@ CompileResult FyraCompiler::compile_wasm(const LIR::LIRFunction& lir_func,
     return compile(lir_func, options);
 }
 
-CompileResult FyraCompiler::compile_wasi(const LIR::LIRFunction& lir_func,
+CompileResult FyraCompiler::compile_wasi(const LIR::LIR_Function& lir_func,
                                         const std::string& output_file,
                                         OptimizationLevel opt_level) {
     FyraCompileOptions options;

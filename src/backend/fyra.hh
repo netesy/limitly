@@ -45,21 +45,21 @@ public:
     ~FyraCompiler();
     
     // Compile LIR to native code or WebAssembly
-    CompileResult compile(const LIR::LIRFunction& lir_func, 
+    CompileResult compile(const LIR::LIR_Function& lir_func,
                          const FyraCompileOptions& options);
     
     // Compile to AOT executable
-    CompileResult compile_aot(const LIR::LIRFunction& lir_func,
+    CompileResult compile_aot(const LIR::LIR_Function& lir_func,
                              const std::string& output_file,
                              OptimizationLevel opt_level = OptimizationLevel::O2);
     
     // Compile to WebAssembly
-    CompileResult compile_wasm(const LIR::LIRFunction& lir_func,
+    CompileResult compile_wasm(const LIR::LIR_Function& lir_func,
                               const std::string& output_file,
                               OptimizationLevel opt_level = OptimizationLevel::O2);
     
     // Compile to WASI (WebAssembly System Interface)
-    CompileResult compile_wasi(const LIR::LIRFunction& lir_func,
+    CompileResult compile_wasi(const LIR::LIR_Function& lir_func,
                               const std::string& output_file,
                               OptimizationLevel opt_level = OptimizationLevel::O2);
     
@@ -74,7 +74,7 @@ private:
     std::string last_error_;
     
     // Internal conversion from LIR to Fyra IR
-    std::string convert_lir_to_fyra_ir(const LIR::LIRFunction& lir_func);
+    std::string convert_lir_to_fyra_ir(const LIR::LIR_Function& lir_func);
     
     // Invoke Fyra compiler
     CompileResult invoke_fyra(const std::string& ir_code,

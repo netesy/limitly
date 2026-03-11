@@ -2019,7 +2019,16 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
             consume(TokenType::LEFT_BRACE, "Expected '{' before method body.");
             frameMethod->body = block();
             
-            frameDecl->methods.push_back(frameMethod);
+            // Check if this is a lifecycle hook
+            if (frameMethod->name == "init") {
+                frameMethod->isInit = true;
+                frameDecl->init = frameMethod;
+            } else if (frameMethod->name == "deinit") {
+                frameMethod->isDeinit = true;
+                frameDecl->deinit = frameMethod;
+            } else {
+                frameDecl->methods.push_back(frameMethod);
+            }
         }
         // Parse field
         else if (match({TokenType::VAR})) {

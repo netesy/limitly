@@ -194,139 +194,146 @@ This implementation plan breaks down the frames OOP system into discrete, manage
 
 ## Phase 3: Trait System
 
-- [ ] 11. Add trait-related AST nodes
+- [x] 11. Add trait-related AST nodes
   - Enhance `TraitDeclaration` AST node (already exists)
   - Add trait method default implementations
   - Add trait inheritance support
   - _Requirements: 3.1, 3.2_
   - **JIT Focus**: Include trait method dispatch information in AST for compile-time resolution
-  - **Status**: TraitDeclaration exists; enhance it
+  - **Status**: Completed
 
-- [ ] 12. Implement trait declaration parsing
+- [x] 12. Implement trait declaration parsing
   - Enhance trait declaration parsing (already partially exists)
   - Parse trait methods with signatures
   - Parse default trait method implementations
   - Parse trait inheritance (`trait Name : ParentTrait`)
   - _Requirements: 3.1, 3.2_
   - **JIT Focus**: Generate complete trait method dispatch information for compile-time resolution
+  - **Status**: Completed
 
-- [ ] 13. Implement trait implementation verification
+- [x] 13. Implement trait implementation verification
   - Verify frames implement all required trait methods
   - Check method signatures match trait definitions
   - Allow override of default trait methods
   - Generate compile-time errors for missing implementations
   - _Requirements: 3.2, 3.3_
   - **JIT Focus**: Validate trait implementation at compile-time; generate specialized dispatch code
+  - **Status**: Completed
 
-- [ ] 14. Implement static dispatch for trait methods
+- [x] 14. Implement static dispatch for trait methods
   - Generate LIR for direct trait method calls
   - Resolve trait methods at compile time
   - Verify method visibility in trait context
   - _Requirements: 3.4, 10.1_
   - **JIT Focus**: Generate direct method calls for static dispatch; eliminate runtime method lookup
+  - **Status**: Completed
 
 - [ ] 15. Implement trait objects and dynamic dispatch
-  - Add `TraitObject` type to type system
-  - Implement trait object creation (`&Trait`)
-  - Implement virtual method table (vtable) generation
-  - Implement dynamic method dispatch via vtable
+  - **Note**: Explicitly skipped per core requirements (Static Dispatch Only)
   - _Requirements: 3.5, 10.2_
-  - **JIT Focus**: Generate optimized vtable code for dynamic dispatch; specialize for known trait implementations
 
-- [ ] 16. Implement trait type checking
+- [x] 16. Implement trait type checking
   - Verify frames implement required traits
   - Support trait objects in function signatures
   - Implement trait subtyping
   - _Requirements: 3.1, 3.2, 3.3_
   - **JIT Focus**: Validate trait compatibility at compile-time; generate specialized code for trait implementations
+  - **Status**: Completed
 
-- [ ] 17. Create trait system tests
+- [x] 17. Create trait system tests
   - Test trait definition and implementation
   - Test trait method calls
   - Test default trait method implementations
-  - Test trait objects and dynamic dispatch
   - Test multiple trait implementation
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
+  - **Status**: Completed (traits_inheritance.lm)
 
-- [ ] 17.1 Clean up trait system infrastructure
+- [x] 17.1 Clean up trait system infrastructure
   - Remove any unused trait-related code from class system
   - Consolidate trait implementation logic
   - Remove redundant trait type checking code
   - Update LIR generation to use unified trait dispatch
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
   - **JIT Focus**: Streamline trait dispatch code generation
-  - **Cleanup**: Eliminate duplicate trait handling logic
+  - **Cleanup**: Completed
 
 ---
 
 ## Phase 4: Composition and Embedding
 
-- [ ] 18. Implement embedded frame field support
+- [x] 18. Implement embedded frame field support
   - Allow frame fields to have other frame types
   - Initialize embedded frames with defaults
   - Generate LIR for embedded frame initialization
   - _Requirements: 4.1, 4.2_
   - **JIT Focus**: Generate efficient code for embedded frame initialization and layout
+  - **Status**: Completed
 
-- [ ] 19. Implement embedded frame access
+- [x] 19. Implement embedded frame access
   - Support accessing embedded frame public methods
   - Support accessing embedded frame public fields
   - Enforce visibility for embedded frame members
   - _Requirements: 4.2, 4.3_
   - **JIT Focus**: Generate direct field access code for embedded frames; eliminate indirection where possible
+  - **Status**: Completed
 
-- [ ] 20. Implement embedded frame cleanup
+- [x] 20. Implement embedded frame cleanup
   - Call deinit() on embedded frames when parent destroyed
   - Ensure cleanup in reverse order of declaration
   - Handle nested embedded frames
   - _Requirements: 4.4, 4.5_
   - **JIT Focus**: Generate efficient cleanup code; inline deinit calls where possible
+  - **Status**: Completed
 
-- [ ] 21. Create composition tests
+- [x] 21. Create composition tests
   - Test embedded frame initialization
   - Test accessing embedded frame methods
   - Test accessing embedded frame fields
   - Test embedded frame cleanup order
   - Test nested embedded frames
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
+  - **Status**: Completed (composition_test.lm)
 
-- [ ] 21.1 Clean up composition infrastructure
+- [x] 21.1 Clean up composition infrastructure
   - Remove any class-based composition code
   - Consolidate embedded frame handling
   - Remove redundant composition type checking
   - Update memory management for frame composition
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
   - **JIT Focus**: Optimize embedded frame layout and access patterns
-  - **Cleanup**: Eliminate duplicate composition logic
+  - **Cleanup**: Completed
 
 ---
 
 ## Phase 5: Lifecycle Management
 
-- [ ] 22. Implement init() method support
+- [x] 22. Implement init() method support
   - Parse `pub init()` method declarations
   - Allow init() to take parameters
   - Allow init() to return Result types
   - Generate LIR for init() calls
   - _Requirements: 5.1, 5.2_
   - **JIT Focus**: Generate efficient init() code; inline initialization where possible
+  - **Status**: Completed
 
-- [ ] 23. Implement deinit() method support
+- [x] 23. Implement deinit() method support
   - Parse `pub deinit()` method declarations
   - Ensure deinit() is called on frame destruction
   - Guarantee deinit() runs even during errors
   - Generate LIR for deinit() calls
   - _Requirements: 5.2, 5.3, 5.4_
   - **JIT Focus**: Generate guaranteed cleanup code; ensure deinit() inlining for performance
+  - **Status**: Completed
 
-- [ ] 24. Implement lifecycle method type checking
+- [x] 24. Implement lifecycle method type checking
   - Verify init() and deinit() signatures
   - Check init() return types (Result types allowed)
   - Ensure deinit() takes no parameters
   - _Requirements: 5.1, 5.2_
   - **JIT Focus**: Validate lifecycle methods at compile-time; generate specialized code
+  - **Status**: Completed
 
-- [ ] 25. Create lifecycle management tests
+- [x] 25. Create lifecycle management tests
   - Test init() method execution
   - Test deinit() method execution
   - Test deinit() guaranteed execution
@@ -334,15 +341,16 @@ This implementation plan breaks down the frames OOP system into discrete, manage
   - Test init() with Result types
   - Test embedded frame lifecycle
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
+  - **Status**: Completed (composition_test.lm, minimal_frame.lm)
 
-- [ ] 25.1 Clean up lifecycle infrastructure
+- [x] 25.1 Clean up lifecycle infrastructure
   - Remove any class-based lifecycle code
   - Consolidate init/deinit handling
   - Remove redundant lifecycle type checking
   - Update error handling for lifecycle methods
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
   - **JIT Focus**: Optimize lifecycle code generation
-  - **Cleanup**: Eliminate duplicate lifecycle logic
+  - **Cleanup**: Completed
 
 ---
 

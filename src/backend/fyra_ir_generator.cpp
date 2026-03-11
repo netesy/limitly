@@ -107,14 +107,16 @@ std::shared_ptr<FyraIRFunction> FyraIRGenerator::generate_function(
     
     // Convert parameters
     for (const auto& param : func_decl->params) {
-        std::string param_name = param->name;
-        FyraType param_type = ast_type_to_fyra_type(param->type);
+        std::string param_name = param.first;
+        std::string type_name = param.second ? param.second->typeName : "int";
+        FyraType param_type = ast_type_to_fyra_type(type_name);
         fyra_func->parameters.push_back({param_name, param_type});
         current_locals_[param_name] = param_type;
     }
     
     // Convert return type
-    fyra_func->return_type = ast_type_to_fyra_type(func_decl->return_type);
+    std::string ret_type_name = func_decl->returnType.has_value() ? func_decl->returnType.value()->typeName : "void";
+    fyra_func->return_type = ast_type_to_fyra_type(ret_type_name);
     
     // Process function body
     if (func_decl->body) {
@@ -217,21 +219,21 @@ std::string FyraIRGenerator::emit_binary_expr(
     std::string result = generate_temp_var();
     
     std::string op;
-    switch (expr->op.type) {
-        case Frontend::TokenType::Plus: op = "add"; break;
-        case Frontend::TokenType::Minus: op = "sub"; break;
-        case Frontend::TokenType::Star: op = "mul"; break;
-        case Frontend::TokenType::Slash: op = "div"; break;
-        case Frontend::TokenType::Percent: op = "mod"; break;
-        case Frontend::TokenType::EqualEqual: op = "eq"; break;
-        case Frontend::TokenType::BangEqual: op = "neq"; break;
-        case Frontend::TokenType::Less: op = "lt"; break;
-        case Frontend::TokenType::LessEqual: op = "le"; break;
-        case Frontend::TokenType::Greater: op = "gt"; break;
-        case Frontend::TokenType::GreaterEqual: op = "ge"; break;
-        case Frontend::TokenType::Ampersand: op = "and"; break;
-        case Frontend::TokenType::Pipe: op = "or"; break;
-        case Frontend::TokenType::Caret: op = "xor"; break;
+    switch (expr->op) {
+        case Frontend::TokenType::PLUS: op = "add"; break;
+        case Frontend::TokenType::MINUS: op = "sub"; break;
+        case Frontend::TokenType::STAR: op = "mul"; break;
+        case Frontend::TokenType::SLASH: op = "div"; break;
+        case Frontend::TokenType::MODULUS: op = "mod"; break;
+        case Frontend::TokenType::EQUAL_EQUAL: op = "eq"; break;
+        case Frontend::TokenType::BANG_EQUAL: op = "neq"; break;
+        case Frontend::TokenType::LESS: op = "lt"; break;
+        case Frontend::TokenType::LESS_EQUAL: op = "le"; break;
+        case Frontend::TokenType::GREATER: op = "gt"; break;
+        case Frontend::TokenType::GREATER_EQUAL: op = "ge"; break;
+        case Frontend::TokenType::AMPERSAND: op = "and"; break;
+        case Frontend::TokenType::PIPE: op = "or"; break;
+        case Frontend::TokenType::CARET: op = "xor"; break;
         default: op = "unknown"; break;
     }
     
@@ -246,9 +248,9 @@ std::string FyraIRGenerator::emit_unary_expr(
     std::string result = generate_temp_var();
     
     std::string op;
-    switch (expr->op.type) {
-        case Frontend::TokenType::Minus: op = "neg"; break;
-        case Frontend::TokenType::Bang: op = "not"; break;
+    switch (expr->op) {
+        case Frontend::TokenType::MINUS: op = "neg"; break;
+        case Frontend::TokenType::BANG: op = "not"; break;
         default: op = "unknown"; break;
     }
     
@@ -260,7 +262,15 @@ std::string FyraIRGenerator::emit_literal_expr(
     const std::shared_ptr<Frontend::AST::LiteralExpr>& expr) {
     
     std::string result = generate_temp_var();
-    emit_instruction("const", result, {expr->value}, FyraType::I64, "literal: " + expr->value);
+    std::string value_str;
+    if (std::holds_alternative<std::string>(expr->value)) {
+        value_str = std::get<std::string>(expr->value);
+    } else if (std::holds_alternative<bool>(expr->value)) {
+        value_str = std::get<bool>(expr->value) ? "true" : "false";
+    } else {
+        value_str = "nil";
+    }
+    emit_instruction("const", result, {value_str}, FyraType::I64, "literal: " + value_str);
     return result;
 }
 
@@ -280,7 +290,10 @@ std::string FyraIRGenerator::emit_call_expr(
         args.push_back(emit_expression(arg));
     }
     
-    std::string func_name = expr->callee->name;
+    std::string func_name = "unknown";
+    if (auto var = std::dynamic_pointer_cast<Frontend::AST::VariableExpr>(expr->callee)) {
+        func_name = var->name;
+    }
     emit_instruction("call", result, args, FyraType::I64, "call " + func_name);
     return result;
 }
@@ -312,7 +325,7 @@ std::string FyraIRGenerator::emit_member_expr(
     std::string object = emit_expression(expr->object);
     std::string result = generate_temp_var();
     
-    emit_instruction("member", result, {object}, FyraType::I64, "member: " + expr->property);
+    emit_instruction("member", result, {object}, FyraType::I64, "member: " + expr->name);
     return result;
 }
 
@@ -352,7 +365,11 @@ std::string FyraIRGenerator::emit_range_expr(
 void FyraIRGenerator::emit_var_declaration(
     const std::shared_ptr<Frontend::AST::VarDeclaration>& decl) {
     
-    FyraType var_type = ast_type_to_fyra_type(decl->type);
+    std::string type_name = "int";
+    if (decl->type.has_value() && decl->type.value()) {
+        type_name = decl->type.value()->typeName;
+    }
+    FyraType var_type = ast_type_to_fyra_type(type_name);
     current_locals_[decl->name] = var_type;
     
     if (decl->initializer) {
@@ -385,12 +402,12 @@ void FyraIRGenerator::emit_if_statement(
     
     emit_instruction("jmpif", "", {cond, else_label}, FyraType::Void, "if condition");
     
-    emit_statement(stmt->then_branch);
+    emit_statement(stmt->thenBranch);
     emit_instruction("jmp", "", {end_label}, FyraType::Void, "if then branch");
     
     emit_instruction("label", else_label, {}, FyraType::Void, "else label");
-    if (stmt->else_branch) {
-        emit_statement(stmt->else_branch);
+    if (stmt->elseBranch) {
+        emit_statement(stmt->elseBranch);
     }
     
     emit_instruction("label", end_label, {}, FyraType::Void, "if end");
@@ -452,7 +469,8 @@ void FyraIRGenerator::emit_iter_statement(
     std::string end_label = generate_label();
     
     emit_instruction("label", loop_label, {}, FyraType::Void, "iter loop");
-    emit_instruction("iter", stmt->variable, {iterable}, FyraType::I64, "iterate");
+    std::string loopVar = stmt->loopVars.empty() ? "unused" : stmt->loopVars[0];
+    emit_instruction("iter", loopVar, {iterable}, FyraType::I64, "iterate");
     emit_statement(stmt->body);
     emit_instruction("jmp", "", {loop_label}, FyraType::Void, "iter loop back");
     emit_instruction("label", end_label, {}, FyraType::Void, "iter end");
@@ -472,7 +490,7 @@ void FyraIRGenerator::emit_return_statement(
 void FyraIRGenerator::emit_print_statement(
     const std::shared_ptr<Frontend::AST::PrintStatement>& stmt) {
     
-    for (const auto& expr : stmt->expressions) {
+    for (const auto& expr : stmt->arguments) {
         std::string value = emit_expression(expr);
         emit_instruction("print", "", {value}, FyraType::Void, "print");
     }
