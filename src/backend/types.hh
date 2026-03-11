@@ -106,10 +106,28 @@ private:
         return false; // No circular dependency detected for basic types
     }
 
-    bool canConvert(TypePtr from, TypePtr to)
-    {
-        if (from == to || to->tag == TypeTag::Any)
-            return true;
+	    bool canConvert(TypePtr from, TypePtr to)
+	    {
+	        if (!from || !to) {
+	            return false;
+	        }
+
+	        if (from == to || to->tag == TypeTag::Any)
+	            return true;
+
+	        // Canonical compatibility for simple same-tag scalar types that may
+	        // be represented by distinct TypePtr instances.
+	        if (from->tag == to->tag) {
+	            switch (from->tag) {
+	                case TypeTag::String:
+	                case TypeTag::Bool:
+	                case TypeTag::Nil:
+	                case TypeTag::Any:
+	                    return true;
+	                default:
+	                    break;
+	            }
+	        }
 
     // Handle boolean type conversions
     if (from->tag == TypeTag::Bool && to->tag == TypeTag::Bool) {

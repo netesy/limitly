@@ -17,13 +17,29 @@ else
 	CXX := g++
 	CC := gcc
 	AR := ar
-	LIBS := -lgccjit
-	LIBGCCJIT_PATH := $(shell find /usr -name libgccjit.so 2>/dev/null | head -n 1)
-	ifneq ($(LIBGCCJIT_PATH),)
-		LDFLAGS := -L$(shell dirname $(LIBGCCJIT_PATH))
+	FYRA_VENDOR_SRC := src/backend/fyra/src/fyra_embed.c
+	FYRA_VENDOR_OBJ := build/obj/$(MODE)/fyra/fyra_embed.o
+	FYRA_VENDOR_LIB := build/obj/$(MODE)/fyra/libfyra.a
+	ifneq ($(wildcard $(FYRA_VENDOR_SRC)),)
+		HAS_LIBFYRA := 1
+		LIBFYRA_LIBS := $(FYRA_VENDOR_LIB)
+		FYRA_VENDOR_DEPS := $(FYRA_VENDOR_LIB)
+		LIBFYRA_CXXFLAGS := -DHAS_LIBFYRA -Isrc/backend/fyra/include
 	else
-		# Fallback for Ubuntu 24.04 with gcc-14
-		LDFLAGS += -L/usr/lib/gcc/x86_64-linux-gnu/14
+		HAS_LIBFYRA := 0
+		LIBFYRA_LIBS :=
+		FYRA_VENDOR_DEPS :=
+		LIBFYRA_CXXFLAGS :=
+	endif
+	LIBGCCJIT_SO := $(firstword $(wildcard /usr/lib*/**/libgccjit.so* /lib*/**/libgccjit.so*))
+	LIBGCCJIT_HEADER := $(firstword $(wildcard /usr/include/libgccjit++.h /usr/lib/gcc/*/*/include/libgccjit++.h))
+	ifneq ($(and $(LIBGCCJIT_SO),$(LIBGCCJIT_HEADER)),)
+		HAS_LIBGCCJIT := 1
+		LIBS := -lgccjit $(LIBFYRA_LIBS)
+		LDFLAGS += -L$(shell dirname $(LIBGCCJIT_SO))
+	else
+		HAS_LIBGCCJIT := 0
+		LIBS := $(LIBFYRA_LIBS)
 	endif
 endif
 
@@ -33,10 +49,10 @@ endif
 MODE ?= release
 
 ifeq ($(MODE),debug)
-	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit -I/usr/lib/gcc/x86_64-linux-gnu/14/include -DHAS_LIBGCCJIT $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit $(if $(LIBGCCJIT_HEADER),-I$(shell dirname $(LIBGCCJIT_HEADER))) $(if $(filter 1,$(HAS_LIBGCCJIT)),-DHAS_LIBGCCJIT) $(LIBFYRA_CXXFLAGS) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -g -fPIC -I.
 else
-	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit -I/usr/lib/gcc/x86_64-linux-gnu/14/include -DHAS_LIBGCCJIT $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit $(if $(LIBGCCJIT_HEADER),-I$(shell dirname $(LIBGCCJIT_HEADER))) $(if $(filter 1,$(HAS_LIBGCCJIT)),-DHAS_LIBGCCJIT) $(LIBFYRA_CXXFLAGS) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -O3 -fPIC -I.
 endif
 
@@ -67,7 +83,10 @@ FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp  \
               src/frontend/ast/builder.cpp src/frontend/ast/printer.cpp src/frontend/type_checker.cpp src/frontend/memory_checker.cpp \
               src/frontend/ast/optimizer.cpp 
 
-BACK_SRCS :=  src/backend/jit/jit.cpp src/backend/fyra.cpp src/backend/fyra_ir_generator.cpp
+BACK_SRCS := src/backend/fyra.cpp src/backend/fyra_ir_generator.cpp
+ifeq ($(HAS_LIBGCCJIT),1)
+BACK_SRCS += src/backend/jit/jit.cpp
+endif
 
 REGISTER_SRCS := src/backend/vm/register.cpp
 
@@ -128,6 +147,9 @@ $(RSP_DIR):
 $(OBJ_DIR)/runtime:
 	@mkdir -p $@
 
+$(OBJ_DIR)/fyra:
+	@mkdir -p $@
+
 # =============================
 # Object compilation - C++ files
 # =============================
@@ -141,6 +163,15 @@ $(OBJ_DIR)/%.o: %.cpp | $(OBJ_DIR)
 $(OBJ_DIR)/runtime/%.o: $(RUNTIME_DIR)/%.c | $(OBJ_DIR)/runtime
 	@echo "Compiling runtime: $<"
 	$(CC) $(CFLAGS) -c $< -o $@
+
+$(FYRA_VENDOR_OBJ): $(FYRA_VENDOR_SRC) | $(OBJ_DIR)/fyra
+	@echo "Compiling vendored Fyra shim: $<"
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(FYRA_VENDOR_LIB): $(FYRA_VENDOR_OBJ)
+	@echo "Building vendored Fyra library: $@"
+	@mkdir -p $(dir $@)
+	$(AR) rcs $@ $^
 
 # =============================
 # Runtime library
@@ -167,12 +198,12 @@ $(TEST_RSP): $(TEST_OBJS) | $(RSP_DIR)
 # =============================
 # Build targets
 # =============================
-windows: $(BIN_DIR) $(MAIN_RSP) $(RUNTIME_LIB)
+windows: $(BIN_DIR) $(MAIN_RSP) $(RUNTIME_LIB) $(FYRA_VENDOR_DEPS)
 	@echo "🔨 Linking limitly.exe ..."
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(RUNTIME_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS)
 	@echo "✅ limitly.exe built."
 
-linux: $(BIN_DIR) $(MAIN_RSP) $(RUNTIME_LIB)
+linux: $(BIN_DIR) $(MAIN_RSP) $(RUNTIME_LIB) $(FYRA_VENDOR_DEPS)
 	@echo "🔨 Linking limitly ..."
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(RUNTIME_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS)
 	@echo "✅ limitly built."

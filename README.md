@@ -27,6 +27,8 @@ To learn how to use the Limit language, check out our comprehensive, step-by-ste
 
 ### Build Instructions
 ```bash
+# Fyra backend is vendored in-tree under src/backend/fyra
+
 # Using Make (recommended for cross-platform)
 make
 
@@ -42,6 +44,17 @@ build.bat
 # Execute a source file
 ./limitly sample.lm
 
+# Print frontend/IR forms
+./limitly -ast sample.lm
+./limitly -lir sample.lm
+./limitly -fyra-ir sample.lm
+
+# Production path (preferred): AST -> Fyra IR -> executable
+./limitly -aot sample.lm
+
+# Compatibility path: LIR -> Register VM interpreter
+./limitly sample.lm
+
 # Start the REPL (interactive mode)
 ./limitly -repl
 ```
@@ -54,5 +67,8 @@ The project includes a comprehensive test suite in the `tests/` directory.
 # Run all tests (silent mode)
 ./tests/run_tests.bat
 ./tests/run_tests.sh
+
+# Run embedded Fyra AOT on all non-OOP tests (skips classes/oop suites)
+./tests/run_fyra_non_oop_tests.sh
 
 ```

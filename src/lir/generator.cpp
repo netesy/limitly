@@ -53,11 +53,11 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
     enter_scope();
     
     // Use CFG mode for proper JIT compatibility
-    cfg_context_.building_cfg = false;  // DISABLED: CFG linearization has bugs with elif
+    cfg_context_.building_cfg = true;
     cfg_context_.current_block = nullptr;
     
-    // Create CFG for JIT compatibility (disabled for now)
-    // start_cfg_build();
+    // Create CFG for JIT compatibility
+    start_cfg_build();
     
     // Generate top-level statements (excluding function definitions)
     for (const auto& stmt : type_check_result.program->statements) {
@@ -95,8 +95,7 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
     // Finish CFG building for main (only if CFG was used)
     if (cfg_context_.building_cfg) {
         // Validate CFG before finishing
-        // Temporarily disable CFG validation for concurrent debugging
-        if (false && !validate_cfg()) {
+        if (!validate_cfg()) {
             report_error("CFG validation failed for main function");
         }
         finish_cfg_build();
@@ -129,8 +128,10 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     register_types_.clear();
     enter_scope();
     
-    // Start CFG building (disabled for now - has bugs with elif)
-    // start_cfg_build();
+    // Keep function lowering in linear mode for now.
+    // (CFG mode for functions has unresolved recursion/call flow issues.)
+    cfg_context_.building_cfg = false;
+    cfg_context_.current_block = nullptr;
     
     // Register regular parameters
     for (size_t i = 0; i < fn.params.size(); ++i) {
@@ -161,11 +162,13 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
         emit_instruction(LIR_Inst(LIR_Op::Return));
     }
     
-    // Finish CFG building
-    if (!validate_cfg()) {
-        report_error("CFG validation failed for function: " + fn.name);
+    // Finish CFG building only if CFG mode was enabled for this function.
+    if (cfg_context_.building_cfg) {
+        if (!validate_cfg()) {
+            report_error("CFG validation failed for function: " + fn.name);
+        }
+        finish_cfg_build();
     }
-    finish_cfg_build();
     
     // Convert LIR_Function to LIRFunction and update the registration
     auto result = std::move(current_function_);
@@ -4717,7 +4720,8 @@ bool Generator::validate_cfg() {
                 !(block->is_entry && current_function_->cfg->blocks.size() <= 2) &&
                 // Allow continuation blocks to not have terminators
                 block->label.find("_continue") == std::string::npos &&
-                block->label.find("_end") == std::string::npos) {
+                block->label.find("_end") == std::string::npos &&
+                block->label.find("_exit") == std::string::npos) {
                 report_error("CFG validation: Block " + std::to_string(block->id) + 
                             " (" + block->label + ") has no terminator and no successors");
                 is_valid = false;
@@ -6148,4 +6152,3 @@ Reg Generator::emit_frame_instantiation_expr(LM::Frontend::AST::FrameInstantiati
     
     return emit_call_expr(callExpr);
 }
-

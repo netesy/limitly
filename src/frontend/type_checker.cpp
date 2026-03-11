@@ -1494,6 +1494,13 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
             expr->inferred_type = result_type;
             return result_type;
         }
+
+        // Avoid cascading "undefined variable" / "non-function" errors when
+        // a known function exists but argument validation failed.
+        if (function_signatures.find(var_expr->name) != function_signatures.end()) {
+            expr->inferred_type = type_system.ANY_TYPE;
+            return type_system.ANY_TYPE;
+        }
     }
     
     // Check if callee is a member expression (method call)

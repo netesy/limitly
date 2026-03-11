@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <sstream>
 #include <set>
+#include <unordered_set>
 
 namespace LM {
 namespace LIR {
@@ -274,6 +275,11 @@ std::string Disassembler::disassemble_instruction(const LIR_Inst& inst) const {
 
 bool Optimizer::optimize() {
     bool changed = false;
+
+    Verifier verifier(func);
+    if (!verifier.verify()) {
+        return false;
+    }
     
     if (func.optimizations.enable_peephole) {
         changed |= peephole_optimize();
@@ -281,6 +287,14 @@ bool Optimizer::optimize() {
     
     if (func.optimizations.enable_const_fold) {
         changed |= constant_folding();
+    }
+
+    if (func.optimizations.enable_peephole) {
+        changed |= copy_propagation();
+    }
+
+    if (func.optimizations.enable_dead_code_elim) {
+        changed |= dead_store_elimination();
     }
     
     if (func.optimizations.enable_dead_code_elim) {
@@ -327,6 +341,74 @@ bool Optimizer::constant_folding() {
     return changed;
 }
 
+bool Optimizer::copy_propagation() {
+    bool changed = false;
+    std::unordered_map<Reg, Reg> aliases;
+
+    for (auto& inst : func.instructions) {
+        auto resolve_alias = [&aliases](Reg reg) {
+            auto it = aliases.find(reg);
+            while (it != aliases.end() && it->second != reg) {
+                reg = it->second;
+                it = aliases.find(reg);
+            }
+            return reg;
+        };
+
+        Reg resolved_a = resolve_alias(inst.a);
+        if (resolved_a != inst.a) {
+            inst.a = resolved_a;
+            changed = true;
+        }
+
+        Reg resolved_b = resolve_alias(inst.b);
+        if (resolved_b != inst.b) {
+            inst.b = resolved_b;
+            changed = true;
+        }
+
+        if (inst.op == LIR_Op::Mov || inst.op == LIR_Op::Copy) {
+            aliases[inst.dst] = resolve_alias(inst.a);
+        } else if (inst.dst != 0) {
+            aliases.erase(inst.dst);
+        }
+    }
+
+    return changed;
+}
+
+bool Optimizer::dead_store_elimination() {
+    bool changed = false;
+    std::unordered_set<Reg> live;
+
+    auto has_side_effect = [](LIR_Op op) {
+        return op == LIR_Op::Store || op == LIR_Op::CallVoid || op == LIR_Op::CallBuiltin ||
+               op == LIR_Op::CallVariadic || op == LIR_Op::Return || op == LIR_Op::Ret ||
+               op == LIR_Op::Jump || op == LIR_Op::JumpIf || op == LIR_Op::JumpIfFalse;
+    };
+
+    for (auto it = func.instructions.rbegin(); it != func.instructions.rend();) {
+        const bool writes_reg = (it->dst != 0);
+        const bool needed_write = !writes_reg || live.find(it->dst) != live.end();
+
+        if (!needed_write && !has_side_effect(it->op)) {
+            it = std::reverse_iterator(func.instructions.erase(std::next(it).base()));
+            changed = true;
+            continue;
+        }
+
+        if (writes_reg) {
+            live.erase(it->dst);
+        }
+
+        if (it->a != 0) live.insert(it->a);
+        if (it->b != 0) live.insert(it->b);
+        ++it;
+    }
+
+    return changed;
+}
+
 bool Optimizer::dead_code_elimination() {
     // Simple dead code elimination
     std::vector<bool> used(func.register_count, false);
@@ -351,6 +433,101 @@ bool Optimizer::dead_code_elimination() {
     }
     
     return changed;
+}
+
+bool Verifier::check_register_in_range(Reg reg) const {
+    return reg == 0 || reg < func.register_count;
+}
+
+bool Verifier::check_uses_and_defs() {
+    std::vector<bool> defined(func.register_count, false);
+    for (uint32_t i = 0; i < func.param_count && i < func.register_count; ++i) {
+        defined[i] = true;
+    }
+
+    for (size_t i = 0; i < func.instructions.size(); ++i) {
+        const auto& inst = func.instructions[i];
+
+        if (!check_register_in_range(inst.dst) || !check_register_in_range(inst.a) || !check_register_in_range(inst.b)) {
+            error_ = "register out of range at instruction " + std::to_string(i);
+            return false;
+        }
+
+        if (inst.a != 0 && !defined[inst.a]) {
+            error_ = "use before def (a) at instruction " + std::to_string(i);
+            return false;
+        }
+        if (inst.b != 0 && !defined[inst.b]) {
+            error_ = "use before def (b) at instruction " + std::to_string(i);
+            return false;
+        }
+
+        if (inst.dst != 0 && inst.op != LIR_Op::Store && inst.op != LIR_Op::Jump &&
+            inst.op != LIR_Op::JumpIf && inst.op != LIR_Op::JumpIfFalse && inst.op != LIR_Op::CallVoid) {
+            defined[inst.dst] = true;
+        }
+    }
+
+    return true;
+}
+
+bool Verifier::check_jump_targets() const {
+    for (size_t i = 0; i < func.instructions.size(); ++i) {
+        const auto& inst = func.instructions[i];
+        if (inst.op == LIR_Op::Jump || inst.op == LIR_Op::JumpIf || inst.op == LIR_Op::JumpIfFalse) {
+            if (inst.imm >= func.instructions.size()) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool Verifier::check_return_shape() const {
+    if (func.instructions.empty()) {
+        return true;
+    }
+    for (const auto& inst : func.instructions) {
+        if ((inst.op == LIR_Op::Return || inst.op == LIR_Op::Ret) && inst.b != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool Verifier::check_type_consistency() const {
+    for (size_t i = 0; i < func.instructions.size(); ++i) {
+        const auto& inst = func.instructions[i];
+        if (inst.dst == 0 || inst.result_type == Type::Void) {
+            continue;
+        }
+
+        Type known = func.get_register_abi_type(inst.dst);
+        if (known != Type::Void && known != inst.result_type) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool Verifier::verify() {
+    error_.clear();
+    if (!check_uses_and_defs()) {
+        return false;
+    }
+    if (!check_jump_targets()) {
+        error_ = "invalid jump target";
+        return false;
+    }
+    if (!check_return_shape()) {
+        error_ = "invalid return instruction shape";
+        return false;
+    }
+    if (!check_type_consistency()) {
+        error_ = "register ABI type mismatch";
+        return false;
+    }
+    return true;
 }
 
 } // namespace LIR

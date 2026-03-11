@@ -1,13 +1,14 @@
 // fyra.cpp - Fyra Backend Integration Implementation
 
 #include "fyra.hh"
+#include "fyra_ir_generator.hh"
 #include <iostream>
-#include <fstream>
 #include <sstream>
-#include <cstdlib>
-#include <filesystem>
+#include <array>
 
-namespace fs = std::filesystem;
+#ifdef HAS_LIBFYRA
+#include "fyra/include/fyra_embed.h"
+#endif
 
 namespace LM::Backend::Fyra {
 
@@ -20,7 +21,7 @@ FyraCompiler::~FyraCompiler() {
     // Cleanup if needed
 }
 
-std::string FyraCompiler::convert_lir_to_fyra_ir(const LIR::LIRFunction& lir_func) {
+std::string FyraCompiler::convert_lir_to_fyra_ir(const LIR::LIR_Function& lir_func) {
     std::stringstream ir;
     
     // Convert LIR instructions to Fyra IR format
@@ -42,7 +43,7 @@ std::string FyraCompiler::convert_lir_to_fyra_ir(const LIR::LIRFunction& lir_fun
     return ir.str();
 }
 
-CompileResult FyraCompiler::compile(const LIR::LIRFunction& lir_func,
+CompileResult FyraCompiler::compile(const LIR::LIR_Function& lir_func,
                                    const FyraCompileOptions& options) {
     CompileResult result;
     
@@ -66,7 +67,15 @@ CompileResult FyraCompiler::compile(const LIR::LIRFunction& lir_func,
     return result;
 }
 
-CompileResult FyraCompiler::compile_aot(const LIR::LIRFunction& lir_func,
+CompileResult FyraCompiler::compile_ir(const FyraIRFunction& ir_func,
+                                      const FyraCompileOptions& options) {
+    if (debug_mode_) {
+        std::cout << "Generated Fyra IR:\n" << ir_func.to_ir_string() << "\n";
+    }
+    return invoke_fyra(ir_func.to_ir_string(), options);
+}
+
+CompileResult FyraCompiler::compile_aot(const LIR::LIR_Function& lir_func,
                                        const std::string& output_file,
                                        OptimizationLevel opt_level) {
     FyraCompileOptions options;
@@ -78,7 +87,18 @@ CompileResult FyraCompiler::compile_aot(const LIR::LIRFunction& lir_func,
     return compile(lir_func, options);
 }
 
-CompileResult FyraCompiler::compile_wasm(const LIR::LIRFunction& lir_func,
+CompileResult FyraCompiler::compile_ir_aot(const FyraIRFunction& ir_func,
+                                          const std::string& output_file,
+                                          OptimizationLevel opt_level) {
+    FyraCompileOptions options;
+    options.target = CompileTarget::AOT;
+    options.output_file = output_file;
+    options.opt_level = opt_level;
+    options.debug_info = debug_mode_;
+    return compile_ir(ir_func, options);
+}
+
+CompileResult FyraCompiler::compile_wasm(const LIR::LIR_Function& lir_func,
                                         const std::string& output_file,
                                         OptimizationLevel opt_level) {
     FyraCompileOptions options;
@@ -90,7 +110,18 @@ CompileResult FyraCompiler::compile_wasm(const LIR::LIRFunction& lir_func,
     return compile(lir_func, options);
 }
 
-CompileResult FyraCompiler::compile_wasi(const LIR::LIRFunction& lir_func,
+CompileResult FyraCompiler::compile_ir_wasm(const FyraIRFunction& ir_func,
+                                           const std::string& output_file,
+                                           OptimizationLevel opt_level) {
+    FyraCompileOptions options;
+    options.target = CompileTarget::WASM;
+    options.output_file = output_file;
+    options.opt_level = opt_level;
+    options.debug_info = debug_mode_;
+    return compile_ir(ir_func, options);
+}
+
+CompileResult FyraCompiler::compile_wasi(const LIR::LIR_Function& lir_func,
                                         const std::string& output_file,
                                         OptimizationLevel opt_level) {
     FyraCompileOptions options;
@@ -102,76 +133,76 @@ CompileResult FyraCompiler::compile_wasi(const LIR::LIRFunction& lir_func,
     return compile(lir_func, options);
 }
 
+CompileResult FyraCompiler::compile_ir_wasi(const FyraIRFunction& ir_func,
+                                           const std::string& output_file,
+                                           OptimizationLevel opt_level) {
+    FyraCompileOptions options;
+    options.target = CompileTarget::WASI;
+    options.output_file = output_file;
+    options.opt_level = opt_level;
+    options.debug_info = debug_mode_;
+    return compile_ir(ir_func, options);
+}
+
 CompileResult FyraCompiler::invoke_fyra(const std::string& ir_code,
                                        const FyraCompileOptions& options) {
     CompileResult result;
     
     try {
-        // Create temporary IR file
-        std::string temp_ir_file = "temp_fyra_ir.ll";
-        std::ofstream ir_file(temp_ir_file);
-        ir_file << ir_code;
-        ir_file.close();
-        
-        // Build Fyra command line
-        std::string cmd = "fyra";
-        
-        // Add target
+        std::string target = "aot";
         switch (options.target) {
             case CompileTarget::AOT:
-                cmd += " --target aot";
+                target = "aot";
                 break;
             case CompileTarget::WASM:
-                cmd += " --target wasm";
+                target = "wasm";
                 break;
             case CompileTarget::WASI:
-                cmd += " --target wasi";
+                target = "wasi";
                 break;
         }
-        
-        // Add optimization level
+
+        int opt = 2;
         switch (options.opt_level) {
-            case OptimizationLevel::O0:
-                cmd += " -O0";
-                break;
-            case OptimizationLevel::O1:
-                cmd += " -O1";
-                break;
-            case OptimizationLevel::O2:
-                cmd += " -O2";
-                break;
-            case OptimizationLevel::O3:
-                cmd += " -O3";
-                break;
+            case OptimizationLevel::O0: opt = 0; break;
+            case OptimizationLevel::O1: opt = 1; break;
+            case OptimizationLevel::O2: opt = 2; break;
+            case OptimizationLevel::O3: opt = 3; break;
         }
-        
-        // Add output file
-        cmd += " -o " + options.output_file;
-        
-        // Add debug info if requested
-        if (options.debug_info) {
-            cmd += " -g";
-        }
-        
-        // Add input file
-        cmd += " " + temp_ir_file;
-        
+
+#ifdef HAS_LIBFYRA
         if (options.verbose) {
-            std::cout << "Executing: " << cmd << "\n";
+            std::cout << "Compiling with embedded libfyra target=" << target
+                      << " opt=" << opt << " output=" << options.output_file << "\n";
         }
-        
-        // Execute Fyra compiler
-        int exit_code = std::system(cmd.c_str());
-        
-        // Clean up temporary file
-        fs::remove(temp_ir_file);
-        
+        std::array<char, 1024> error_buffer{};
+        const int exit_code = fyra_compile_ir_to_file(ir_code.c_str(),
+                                                      options.output_file.c_str(),
+                                                      target.c_str(),
+                                                      opt,
+                                                      options.debug_info ? 1 : 0,
+                                                      error_buffer.data(),
+                                                      error_buffer.size());
+#else
+        const int exit_code = -1;
+        constexpr const char* missing_lib_msg =
+            "Fyra AOT backend unavailable: libfyra.a not linked. Build the vendored Fyra library in src/backend/fyra.";
+#endif
+
         if (exit_code == 0) {
             result.success = true;
             result.output_file = options.output_file;
         } else {
             result.success = false;
-            result.error_message = "Fyra compiler exited with code " + std::to_string(exit_code);
+#ifdef HAS_LIBFYRA
+            result.error_message = "libfyra compilation failed (code " + std::to_string(exit_code) + ")";
+            if (error_buffer[0] != '\0') {
+                result.error_message += ": ";
+                result.error_message += error_buffer.data();
+            }
+#else
+            result.error_message = missing_lib_msg;
+#endif
             last_error_ = result.error_message;
         }
         

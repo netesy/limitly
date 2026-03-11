@@ -36,6 +36,9 @@ enum class Type : uint8_t {
 // Convert Type to string
 std::string type_to_string(Type type);
 
+// Type conversion utilities (simplified)
+Type language_type_to_abi_type(TypePtr lang_type);
+
 // Add new call-related operations following Fyra IL best practices
 enum class LIR_Op : uint8_t {
     // Move and constants
@@ -548,18 +551,22 @@ public:
     }
 
     void set_register_type(Reg reg, TypePtr type) {
-        // Legacy method - convert to ABI type
+        // Legacy method - keep conservative behavior for non-LIRFunction callers.
+        // ABI/language typing should use explicit set_register_abi_type/set_register_language_type.
         register_types[reg] = Type::I64;
     }
 
     TypePtr get_register_type(Reg reg) const {
-        // Legacy method - return nullptr since we're moving away from TypePtr
+        // Legacy method intentionally remains nullable.
         return nullptr;
     }
 
     // New simplified methods
     void set_register_abi_type(Reg reg, Type abi_type) {
         register_types[reg] = abi_type;
+        if (abi_type == Type::Void) {
+            register_language_types.erase(reg);
+        }
     }
 
     void set_register_language_type(Reg reg, TypePtr lang_type) {
@@ -603,6 +610,8 @@ class Optimizer {
     
     bool peephole_optimize();
     bool constant_folding();
+    bool copy_propagation();
+    bool dead_store_elimination();
     bool dead_code_elimination();
     
 public:
@@ -617,12 +626,27 @@ public:
     }
 };
 
+// Verifier
+class Verifier {
+    const LIR_Function& func;
+    std::string error_;
+
+    bool check_register_in_range(Reg reg) const;
+    bool check_uses_and_defs();
+    bool check_jump_targets() const;
+    bool check_return_shape() const;
+    bool check_type_consistency() const;
+
+public:
+    explicit Verifier(const LIR_Function& f) : func(f) {}
+
+    bool verify();
+    const std::string& error() const { return error_; }
+};
+
 // Utility functions
 std::string lir_op_to_string(LIR_Op op);
 std::string type_to_string(Type type);
-
-// Type conversion utilities (simplified)
-Type language_type_to_abi_type(TypePtr lang_type);
 
 } // namespace LIR
 } // namespace LM
