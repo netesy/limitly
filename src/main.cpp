@@ -10,7 +10,9 @@
 #include "frontend/ast.hh"
 #include "lir/generator.hh"
 #include "lir/functions.hh"
+#ifdef HAS_LIBGCCJIT
 #include "backend/jit/jit.hh"
+#endif
 #include "backend/vm/register.hh"
 #include "backend/fyra.hh"
 #include "backend/fyra_ir_generator.hh"
@@ -167,25 +169,30 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             }
         }
 
-        // Generate LIR once for all backends
-        LIR::Generator lir_generator;
-        auto lir_function = lir_generator.generate_program(post_opt_type_check);
-        
-        if (!lir_function) {
-            std::cerr << "Failed to generate LIR function\n";
-            return 1;
-        }
-        
-        if (lir_generator.has_errors()) {
-            std::cerr << "LIR generation errors:\n";
-            for (const auto& error : lir_generator.get_errors()) {
-                std::cerr << "  " << error << std::endl;
+        std::shared_ptr<LIR::LIR_Function> lir_function;
+        auto ensure_lir = [&]() -> bool {
+            if (lir_function) {
+                return true;
             }
-            return 1;
-        }
+            LIR::Generator lir_generator;
+            lir_function = lir_generator.generate_program(post_opt_type_check);
+            if (!lir_function) {
+                std::cerr << "Failed to generate LIR function\n";
+                return false;
+            }
+            if (lir_generator.has_errors()) {
+                std::cerr << "LIR generation errors:\n";
+                for (const auto& error : lir_generator.get_errors()) {
+                    std::cerr << "  " << error << std::endl;
+                }
+                return false;
+            }
+            return true;
+        };
 
         // Print LIR if requested
         if (printLir) {
+            if (!ensure_lir()) return 1;
             std::cout << "Generated LIR function with " << lir_function->instructions.size() << " instructions\n";
             std::cout << "CFG generation completed with " << lir_function->cfg->blocks.size() << " blocks\n";
             
@@ -263,16 +270,16 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                     #ifdef _WIN32
                         output_filename += ".exe";
                     #endif
-                    result = fyra.compile_aot(*lir_function, output_filename);
-                    std::cout << "AOT compilation with Fyra (from Fyra IR)\n";
+                    result = fyra.compile_ir_aot(*fyra_ir_func, output_filename);
+                    std::cout << "AOT compilation with Fyra (AST -> Fyra IR)\n";
                 } else if (useWasm) {
                     output_filename += ".wasm";
-                    result = fyra.compile_wasm(*lir_function, output_filename);
-                    std::cout << "WebAssembly compilation with Fyra (from Fyra IR)\n";
+                    result = fyra.compile_ir_wasm(*fyra_ir_func, output_filename);
+                    std::cout << "WebAssembly compilation with Fyra (AST -> Fyra IR)\n";
                 } else if (useWasi) {
                     output_filename += ".wasi";
-                    result = fyra.compile_wasi(*lir_function, output_filename);
-                    std::cout << "WASI compilation with Fyra (from Fyra IR)\n";
+                    result = fyra.compile_ir_wasi(*fyra_ir_func, output_filename);
+                    std::cout << "WASI compilation with Fyra (AST -> Fyra IR)\n";
                 }
                 
                 if (result.success) {
@@ -286,6 +293,8 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 return 1;
             }
         } else if (useJit) {
+            if (!ensure_lir()) return 1;
+#ifdef HAS_LIBGCCJIT
             try {
                 // Initialize JIT backend
                 LM::Backend::JIT::Compiler::JITBackend jit;
@@ -318,7 +327,12 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 std::cerr << "JIT Error: " << e.what() << "\n";
                 return 1;
             }
+#else
+            std::cerr << "JIT backend unavailable: build without HAS_LIBGCCJIT\n";
+            return 1;
+#endif
         } else {
+            if (!ensure_lir()) return 1;
            
             try {
                 // Backend: Use register interpreter

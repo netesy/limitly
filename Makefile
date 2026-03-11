@@ -17,13 +17,15 @@ else
 	CXX := g++
 	CC := gcc
 	AR := ar
-	LIBS := -lgccjit
-	LIBGCCJIT_PATH := $(shell find /usr -name libgccjit.so 2>/dev/null | head -n 1)
-	ifneq ($(LIBGCCJIT_PATH),)
-		LDFLAGS := -L$(shell dirname $(LIBGCCJIT_PATH))
+	LIBGCCJIT_SO := $(firstword $(wildcard /usr/lib*/**/libgccjit.so* /lib*/**/libgccjit.so*))
+	LIBGCCJIT_HEADER := $(firstword $(wildcard /usr/include/libgccjit++.h /usr/lib/gcc/*/*/include/libgccjit++.h))
+	ifneq ($(and $(LIBGCCJIT_SO),$(LIBGCCJIT_HEADER)),)
+		HAS_LIBGCCJIT := 1
+		LIBS := -lgccjit
+		LDFLAGS += -L$(shell dirname $(LIBGCCJIT_SO))
 	else
-		# Fallback for Ubuntu 24.04 with gcc-14
-		LDFLAGS += -L/usr/lib/gcc/x86_64-linux-gnu/14
+		HAS_LIBGCCJIT := 0
+		LIBS :=
 	endif
 endif
 
@@ -33,10 +35,10 @@ endif
 MODE ?= release
 
 ifeq ($(MODE),debug)
-	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit -I/usr/lib/gcc/x86_64-linux-gnu/14/include -DHAS_LIBGCCJIT $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit $(if $(LIBGCCJIT_HEADER),-I$(shell dirname $(LIBGCCJIT_HEADER))) $(if $(filter 1,$(HAS_LIBGCCJIT)),-DHAS_LIBGCCJIT) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -g -fPIC -I.
 else
-	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit -I/usr/lib/gcc/x86_64-linux-gnu/14/include -DHAS_LIBGCCJIT $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit $(if $(LIBGCCJIT_HEADER),-I$(shell dirname $(LIBGCCJIT_HEADER))) $(if $(filter 1,$(HAS_LIBGCCJIT)),-DHAS_LIBGCCJIT) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -O3 -fPIC -I.
 endif
 
@@ -67,7 +69,10 @@ FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp  \
               src/frontend/ast/builder.cpp src/frontend/ast/printer.cpp src/frontend/type_checker.cpp src/frontend/memory_checker.cpp \
               src/frontend/ast/optimizer.cpp 
 
-BACK_SRCS :=  src/backend/jit/jit.cpp src/backend/fyra.cpp src/backend/fyra_ir_generator.cpp
+BACK_SRCS := src/backend/fyra.cpp src/backend/fyra_ir_generator.cpp
+ifeq ($(HAS_LIBGCCJIT),1)
+BACK_SRCS += src/backend/jit/jit.cpp
+endif
 
 REGISTER_SRCS := src/backend/vm/register.cpp
 
