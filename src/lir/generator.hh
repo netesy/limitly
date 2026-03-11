@@ -326,6 +326,13 @@ private:
         std::shared_ptr<LM::Frontend::AST::FrameDeclaration> declaration;
     };
     std::unordered_map<std::string, FrameInfo> frame_table_;
+
+    struct TraitInfo {
+        std::string name;
+        std::vector<std::string> extends;
+        std::shared_ptr<LM::Frontend::AST::TraitDeclaration> declaration;
+    };
+    std::unordered_map<std::string, TraitInfo> trait_table_;
     Reg frame_this_register_ = UINT32_MAX;  // Register holding 'this' pointer in frame methods
     
     
@@ -344,6 +351,8 @@ private:
     
     // Frame system helper methods
     bool is_visible(LM::Frontend::AST::VisibilityLevel level, const std::string& frame_name);
+    void collect_trait_signatures(LM::Frontend::AST::Program& program);
+    void collect_trait_signature(std::shared_ptr<LM::Frontend::AST::TraitDeclaration> trait_decl);
     void collect_frame_signatures(LM::Frontend::AST::Program& program);
     void collect_frame_signature(std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame_decl);
     void calculate_frame_layout(FrameInfo& frame_info);

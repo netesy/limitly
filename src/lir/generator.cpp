@@ -25,6 +25,7 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
     type_system_ = type_check_result.type_system;
     
     // PASS 0: Collect function, frame, and module signatures only
+    collect_trait_signatures(*type_check_result.program);
     collect_frame_signatures(*type_check_result.program);
     
    // std::cout << "[DEBUG] PASS 0: Collecting signatures" << std::endl;
@@ -42,7 +43,7 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
    // std::cout << "[DEBUG] Function bodies lowered" << std::endl;
     
     // PASS 2: Generate main function with top-level code only
-    current_function_ = std::make_unique<LIR_Function>("main", 0);
+    current_function_ = std::make_unique<LIR_Function>("__top_level_wrapper__", 0);
     next_register_ = 0;
     next_label_ = 0;
     scope_stack_.clear();
@@ -75,7 +76,7 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
     // Add implicit return if none exists
     if (cfg_context_.building_cfg && get_current_block() && !get_current_block()->has_terminator()) {
         // For main function, use halt instead of return for proper termination
-        if (current_function_->name == "main") {
+        if (current_function_->name == "__top_level_wrapper__") {
             emit_instruction(LIR_Inst(LIR_Op::Ret, Type::Void, 0, 0, 0)); // Use Ret for main termination
         } else {
             emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, 0, 0));
@@ -84,7 +85,7 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
         // Linear mode - add implicit return if function doesn't end with return
         if (current_function_->instructions.empty() || 
             !current_function_->instructions.back().isReturn()) {
-            if (current_function_->name == "main") {
+            if (current_function_->name == "__top_level_wrapper__") {
                 emit_instruction(LIR_Inst(LIR_Op::Ret, Type::Void, 0, 0, 0)); // Use Ret for main termination
             } else {
                 emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, 0, 0));
@@ -157,15 +158,23 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     exit_scope();
 
     // Add implicit return if none exists
-    if (get_current_block() && !get_current_block()->has_terminator()) {
-        emit_instruction(LIR_Inst(LIR_Op::Return));
+    if (cfg_context_.building_cfg) {
+        if (get_current_block() && !get_current_block()->has_terminator()) {
+            emit_instruction(LIR_Inst(LIR_Op::Return));
+        }
+
+        // Finish CFG building
+        if (!validate_cfg()) {
+            report_error("CFG validation failed for function: " + fn.name);
+        }
+        finish_cfg_build();
+    } else {
+        // Linear mode - add implicit return if function doesn't end with return
+        if (current_function_->instructions.empty() ||
+            !current_function_->instructions.back().isReturn()) {
+            emit_instruction(LIR_Inst(LIR_Op::Return));
+        }
     }
-    
-    // Finish CFG building
-    if (!validate_cfg()) {
-        report_error("CFG validation failed for function: " + fn.name);
-    }
-    finish_cfg_build();
     
     // Convert LIR_Function to LIRFunction and update the registration
     auto result = std::move(current_function_);
@@ -1673,11 +1682,20 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                         return result;
                     }
 
-                    // Check if it's a trait method call
-                    for (const auto& trait_name : frame_info.implements) {
-                        std::string full_trait_method_name = trait_name + "." + method_name;
+                    // Check if it's a trait method call recursively
+                    std::vector<std::string> trait_worklist = frame_info.implements;
+                    std::unordered_set<std::string> visited_traits;
+
+                    while (!trait_worklist.empty()) {
+                        std::string current_trait = trait_worklist.back();
+                        trait_worklist.pop_back();
+
+                        if (visited_traits.count(current_trait)) continue;
+                        visited_traits.insert(current_trait);
+
+                        std::string full_trait_method_name = current_trait + "." + method_name;
                         if (LIRFunctionManager::getInstance().hasFunction(full_trait_method_name)) {
-                            // Generate call to trait method (possibly default implementation)
+                            // Generate call to trait method (static dispatch)
                             Reg result = allocate_register();
                             if (expr.inferred_type) {
                                 set_register_language_type(result, expr.inferred_type);
@@ -1688,6 +1706,15 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                             for (Reg r : arg_regs) call_inst.call_arg_types.push_back(get_register_abi_type(r));
                             emit_instruction(call_inst);
                             return result;
+                        }
+
+                        // Add parent traits to worklist
+                        // We need to look up trait info to find parent traits
+                        auto trait_it = trait_table_.find(current_trait);
+                        if (trait_it != trait_table_.end()) {
+                            for (const auto& parent : trait_it->second.extends) {
+                                trait_worklist.push_back(parent);
+                            }
                         }
                     }
                 }
@@ -2200,7 +2227,10 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
     }
     
     // Check for tuple field access (key, value)
-    if (expr.name == "key") {
+    TypePtr object_lang_type = get_register_language_type(object_reg);
+    bool is_tuple = object_lang_type && object_lang_type->tag == ::TypeTag::Tuple;
+
+    if (is_tuple && expr.name == "key") {
         // Access first element of tuple (index 0)
         Reg index_reg = allocate_register();
         auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
@@ -2214,7 +2244,7 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
         return result_reg;
     }
     
-    if (expr.name == "value") {
+    if (is_tuple && expr.name == "value") {
         // Access second element of tuple (index 1)
         Reg index_reg = allocate_register();
         auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
@@ -6128,6 +6158,37 @@ size_t Generator::get_frame_method_index(const std::string& frame_name, const st
 
 void Generator::emit_trait_stmt(LM::Frontend::AST::TraitDeclaration& stmt) {
     // Trait declarations are handled in Pass 0 and Pass 1
+}
+
+void Generator::collect_trait_signatures(LM::Frontend::AST::Program& program) {
+    for (const auto& stmt : program.statements) {
+        if (auto trait_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
+            collect_trait_signature(trait_decl);
+        }
+    }
+}
+
+void Generator::collect_trait_signature(std::shared_ptr<LM::Frontend::AST::TraitDeclaration> trait_decl) {
+    if (!trait_decl) return;
+
+    TraitInfo info;
+    info.name = trait_decl->name;
+    info.extends = trait_decl->extends;
+    info.declaration = trait_decl;
+    trait_table_[trait_decl->name] = info;
+
+    // Register methods in function table
+    for (const auto& method : trait_decl->methods) {
+        // Only register if it has a body (default implementation)
+        if (method->body && !method->body->statements.empty()) {
+            FunctionInfo func_info;
+            func_info.name = trait_decl->name + "." + method->name;
+            func_info.param_count = method->params.size() + 1; // +1 for 'this'
+            func_info.visibility = LM::Frontend::AST::VisibilityLevel::Public;
+            func_info.has_closure = false;
+            function_table_[func_info.name] = std::move(func_info);
+        }
+    }
 }
 
 void Generator::emit_frame_stmt(LM::Frontend::AST::FrameDeclaration& stmt) {

@@ -1540,20 +1540,34 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
             }
             
             if (!method) {
-                // Not found in frame, check implemented traits
-                for (const auto& trait_name : frame_info.declaration->implements) {
-                    auto trait_it = trait_declarations.find(trait_name);
+                // Not found in frame, check implemented traits recursively
+                std::vector<std::string> trait_worklist = frame_info.declaration->implements;
+                std::unordered_set<std::string> visited_traits;
+
+                while (!trait_worklist.empty()) {
+                    std::string current_trait = trait_worklist.back();
+                    trait_worklist.pop_back();
+
+                    if (visited_traits.count(current_trait)) continue;
+                    visited_traits.insert(current_trait);
+
+                    auto trait_it = trait_declarations.find(current_trait);
                     if (trait_it != trait_declarations.end()) {
                         for (const auto& tm : trait_it->second.declaration->methods) {
                             if (tm->name == method_name) {
-                                // Found in trait
+                                // Found in trait hierarchy (static dispatch)
                                 TypePtr trait_return_type = tm->returnType ? resolve_type_annotation(tm->returnType.value()) : type_system.NIL_TYPE;
                                 expr->inferred_type = trait_return_type;
                                 return trait_return_type;
                             }
                         }
+                        // Add parent traits to worklist
+                        for (const auto& parent : trait_it->second.extends) {
+                            trait_worklist.push_back(parent);
+                        }
                     }
                 }
+
                 add_error("Frame '" + frame_name + "' has no method '" + method_name + "'", expr->line);
                 return type_system.ANY_TYPE;
             }
@@ -3316,8 +3330,17 @@ TypePtr TypeChecker::check_frame_declaration(std::shared_ptr<LM::Frontend::AST::
     frame_info.name = frame->name;
     frame_info.declaration = frame;
     
-    // Verify trait implementations
-    for (const auto& trait_name : frame->implements) {
+    // Verify trait implementations recursively
+    std::vector<std::string> trait_worklist = frame->implements;
+    std::unordered_set<std::string> visited_traits;
+
+    while (!trait_worklist.empty()) {
+        std::string trait_name = trait_worklist.back();
+        trait_worklist.pop_back();
+
+        if (visited_traits.count(trait_name)) continue;
+        visited_traits.insert(trait_name);
+
         auto it = trait_declarations.find(trait_name);
         if (it == trait_declarations.end()) {
             add_error("Frame '" + frame->name + "' implements unknown trait: " + trait_name, frame->line);
@@ -3331,7 +3354,6 @@ TypePtr TypeChecker::check_frame_declaration(std::shared_ptr<LM::Frontend::AST::
             for (const auto& frame_method : frame->methods) {
                 if (frame_method->name == trait_method->name) {
                     implemented = true;
-                    // TODO: Verify signature matches
                     break;
                 }
             }
@@ -3344,6 +3366,11 @@ TypePtr TypeChecker::check_frame_declaration(std::shared_ptr<LM::Frontend::AST::
                     add_error("Frame '" + frame->name + "' does not implement required trait method: " + trait_method->name, frame->line);
                 }
             }
+        }
+
+        // Add parent traits to verify them too
+        for (const auto& parent : trait_info.extends) {
+            trait_worklist.push_back(parent);
         }
     }
 
