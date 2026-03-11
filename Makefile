@@ -17,15 +17,25 @@ else
 	CXX := g++
 	CC := gcc
 	AR := ar
+	LIBFYRA_A := $(firstword $(wildcard src/backend/fyra/lib/libfyra.a src/backend/fyra/libfyra.a))
+	ifneq ($(LIBFYRA_A),)
+		HAS_LIBFYRA := 1
+		LIBFYRA_LIBS := $(LIBFYRA_A)
+		LIBFYRA_CXXFLAGS := -DHAS_LIBFYRA -Isrc/backend/fyra/include
+	else
+		HAS_LIBFYRA := 0
+		LIBFYRA_LIBS :=
+		LIBFYRA_CXXFLAGS :=
+	endif
 	LIBGCCJIT_SO := $(firstword $(wildcard /usr/lib*/**/libgccjit.so* /lib*/**/libgccjit.so*))
 	LIBGCCJIT_HEADER := $(firstword $(wildcard /usr/include/libgccjit++.h /usr/lib/gcc/*/*/include/libgccjit++.h))
 	ifneq ($(and $(LIBGCCJIT_SO),$(LIBGCCJIT_HEADER)),)
 		HAS_LIBGCCJIT := 1
-		LIBS := -lgccjit
+		LIBS := -lgccjit $(LIBFYRA_LIBS)
 		LDFLAGS += -L$(shell dirname $(LIBGCCJIT_SO))
 	else
 		HAS_LIBGCCJIT := 0
-		LIBS :=
+		LIBS := $(LIBFYRA_LIBS)
 	endif
 endif
 
@@ -35,10 +45,10 @@ endif
 MODE ?= release
 
 ifeq ($(MODE),debug)
-	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit $(if $(LIBGCCJIT_HEADER),-I$(shell dirname $(LIBGCCJIT_HEADER))) $(if $(filter 1,$(HAS_LIBGCCJIT)),-DHAS_LIBGCCJIT) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit $(if $(LIBGCCJIT_HEADER),-I$(shell dirname $(LIBGCCJIT_HEADER))) $(if $(filter 1,$(HAS_LIBGCCJIT)),-DHAS_LIBGCCJIT) $(LIBFYRA_CXXFLAGS) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -g -fPIC -I.
 else
-	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit $(if $(LIBGCCJIT_HEADER),-I$(shell dirname $(LIBGCCJIT_HEADER))) $(if $(filter 1,$(HAS_LIBGCCJIT)),-DHAS_LIBGCCJIT) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit $(if $(LIBGCCJIT_HEADER),-I$(shell dirname $(LIBGCCJIT_HEADER))) $(if $(filter 1,$(HAS_LIBGCCJIT)),-DHAS_LIBGCCJIT) $(LIBFYRA_CXXFLAGS) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -O3 -fPIC -I.
 endif
 

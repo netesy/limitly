@@ -27,6 +27,9 @@ To learn how to use the Limit language, check out our comprehensive, step-by-ste
 
 ### Build Instructions
 ```bash
+# Initialize Fyra backend submodule (required for embedded AOT backend)
+git submodule update --init --recursive
+
 # Using Make (recommended for cross-platform)
 make
 
@@ -66,7 +69,7 @@ The project includes a comprehensive test suite in the `tests/` directory.
 ./tests/run_tests.bat
 ./tests/run_tests.sh
 
-# Run Fyra AOT on all non-OOP tests (skips classes/oop suites)
+# Run embedded Fyra AOT on all non-OOP tests (skips classes/oop suites)
 ./tests/run_fyra_non_oop_tests.sh
 
 ```

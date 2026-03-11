@@ -3,12 +3,18 @@
 #include "fyra.hh"
 #include "fyra_ir_generator.hh"
 #include <iostream>
-#include <fstream>
 #include <sstream>
-#include <cstdlib>
-#include <filesystem>
+#include <array>
 
-namespace fs = std::filesystem;
+#ifdef HAS_LIBFYRA
+extern "C" int fyra_compile_ir_to_file(const char* ir_text,
+                                       const char* output_path,
+                                       const char* target,
+                                       int opt_level,
+                                       int debug_enabled,
+                                       char* error_buffer,
+                                       size_t error_buffer_size);
+#endif
 
 namespace LM::Backend::Fyra {
 
@@ -149,71 +155,60 @@ CompileResult FyraCompiler::invoke_fyra(const std::string& ir_code,
     CompileResult result;
     
     try {
-        // Create temporary IR file
-        std::string temp_ir_file = "temp_fyra_ir.ll";
-        std::ofstream ir_file(temp_ir_file);
-        ir_file << ir_code;
-        ir_file.close();
-        
-        // Build Fyra command line
-        std::string cmd = "fyra";
-        
-        // Add target
+        std::string target = "aot";
         switch (options.target) {
             case CompileTarget::AOT:
-                cmd += " --target aot";
+                target = "aot";
                 break;
             case CompileTarget::WASM:
-                cmd += " --target wasm";
+                target = "wasm";
                 break;
             case CompileTarget::WASI:
-                cmd += " --target wasi";
+                target = "wasi";
                 break;
         }
-        
-        // Add optimization level
+
+        int opt = 2;
         switch (options.opt_level) {
-            case OptimizationLevel::O0:
-                cmd += " -O0";
-                break;
-            case OptimizationLevel::O1:
-                cmd += " -O1";
-                break;
-            case OptimizationLevel::O2:
-                cmd += " -O2";
-                break;
-            case OptimizationLevel::O3:
-                cmd += " -O3";
-                break;
+            case OptimizationLevel::O0: opt = 0; break;
+            case OptimizationLevel::O1: opt = 1; break;
+            case OptimizationLevel::O2: opt = 2; break;
+            case OptimizationLevel::O3: opt = 3; break;
         }
-        
-        // Add output file
-        cmd += " -o " + options.output_file;
-        
-        // Add debug info if requested
-        if (options.debug_info) {
-            cmd += " -g";
-        }
-        
-        // Add input file
-        cmd += " " + temp_ir_file;
-        
+
+#ifdef HAS_LIBFYRA
         if (options.verbose) {
-            std::cout << "Executing: " << cmd << "\n";
+            std::cout << "Compiling with embedded libfyra target=" << target
+                      << " opt=" << opt << " output=" << options.output_file << "\n";
         }
-        
-        // Execute Fyra compiler
-        int exit_code = std::system(cmd.c_str());
-        
-        // Clean up temporary file
-        fs::remove(temp_ir_file);
-        
+        std::array<char, 1024> error_buffer{};
+        const int exit_code = fyra_compile_ir_to_file(ir_code.c_str(),
+                                                      options.output_file.c_str(),
+                                                      target.c_str(),
+                                                      opt,
+                                                      options.debug_info ? 1 : 0,
+                                                      error_buffer.data(),
+                                                      error_buffer.size());
+#else
+        const int exit_code = -1;
+        constexpr const char* missing_lib_msg =
+            "Fyra AOT backend unavailable: libfyra.a not linked. Initialize the Fyra submodule and build libfyra.";
+#endif
+
         if (exit_code == 0) {
             result.success = true;
             result.output_file = options.output_file;
         } else {
             result.success = false;
-            result.error_message = "Fyra compiler exited with code " + std::to_string(exit_code);
+#ifdef HAS_LIBFYRA
+            result.error_message = "libfyra compilation failed (code " + std::to_string(exit_code) + ")";
+            if (error_buffer[0] != '\0') {
+                result.error_message += ": ";
+                result.error_message += error_buffer.data();
+            }
+#else
+            result.error_message = missing_lib_msg;
+#endif
             last_error_ = result.error_message;
         }
         

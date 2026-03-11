@@ -9,9 +9,12 @@ if [[ ! -x "$LIMITLY" ]]; then
   exit 1
 fi
 
-if ! command -v fyra >/dev/null 2>&1; then
-  echo "warning: 'fyra' binary not found in PATH; cannot execute Fyra AOT tests in this environment" >&2
-  exit 2
+PROBE_FILE="tests/basic/literals.lm"
+if ! "$LIMITLY" -aot "$PROBE_FILE" >/tmp/limitly_fyra_probe.log 2>&1; then
+  if rg -q "libfyra\.a not linked|Fyra AOT backend unavailable" /tmp/limitly_fyra_probe.log; then
+    echo "warning: libfyra is unavailable in this environment; cannot execute embedded Fyra AOT tests" >&2
+    exit 2
+  fi
 fi
 
 mapfile -t TEST_FILES < <(find "$ROOT" -type f -name '*.lm' \
