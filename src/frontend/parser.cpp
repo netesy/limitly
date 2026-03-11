@@ -3083,45 +3083,15 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::finishCall(std::shared_pt
         callTokens.push_back(paren);
     }
 
-    // Check if this might be a frame instantiation
-    // Frame instantiation: FrameName() or FrameName(field1=value1, field2=value2)
-    // Characteristics:
-    // 1. Callee is a simple variable (identifier)
-    // 2. Either no arguments, or all arguments are named (field=value)
-    // 3. No positional arguments mixed with named arguments
-    bool isFrameInstantiation = false;
-    if (auto varExpr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(callee)) {
-        // Check if this looks like a frame instantiation
-        // Frame names typically start with uppercase (convention)
-        // And either has no args or all named args
-        if (arguments.empty() && (namedArgs.empty() || !namedArgs.empty())) {
-            // Could be frame instantiation: FrameName() or FrameName(field=value, ...)
-            // We'll let the type checker decide if it's actually a frame
-            isFrameInstantiation = true;
-        }
-    }
-
-    std::shared_ptr<LM::Frontend::AST::Expression> result;
-    
-    if (isFrameInstantiation && arguments.empty()) {
-        // Create a FrameInstantiationExpr
-        auto frameExpr = std::make_shared<LM::Frontend::AST::FrameInstantiationExpr>();
-        frameExpr->line = paren.line;
-        if (auto varExpr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(callee)) {
-            frameExpr->frameName = varExpr->name;
-        }
-        frameExpr->positionalArgs = arguments;
-        frameExpr->namedArgs = namedArgs;
-        result = frameExpr;
-    } else {
-        // Create a regular CallExpr
-        auto callExpr = std::make_shared<LM::Frontend::AST::CallExpr>();
-        callExpr->line = paren.line;
-        callExpr->callee = callee;
-        callExpr->arguments = arguments;
-        callExpr->namedArgs = namedArgs;
-        result = callExpr;
-    }
+    // Always create a regular CallExpr. The TypeChecker will determine if it's
+    // a function call, a frame instantiation, or something else.
+    // This avoids misidentifying zero-argument function calls as frame instantiations.
+    auto callExpr = std::make_shared<LM::Frontend::AST::CallExpr>();
+    callExpr->line = paren.line;
+    callExpr->callee = callee;
+    callExpr->arguments = arguments;
+    callExpr->namedArgs = namedArgs;
+    std::shared_ptr<LM::Frontend::AST::Expression> result = callExpr;
 
     // Create detailed CST node if enabled
     if (cstMode && config.detailedExpressionNodes) {

@@ -16,20 +16,67 @@
 #include <variant>
 #include <vector>
 #include <cmath>
+#include <functional>
 
 // Forward declarations for AST types
+namespace LM {
+namespace Frontend {
 namespace AST {
     struct TypeAnnotation;
     struct FunctionTypeAnnotation;
     struct LambdaExpr;
+    struct FrameDeclaration;
+    struct TraitDeclaration;
+    enum class VisibilityLevel;
 }
+}
+}
+
+using AST_TypeAnnotation = LM::Frontend::AST::TypeAnnotation;
+using AST_FunctionTypeAnnotation = LM::Frontend::AST::FunctionTypeAnnotation;
+using AST_LambdaExpr = LM::Frontend::AST::LambdaExpr;
+using AST_FrameDeclaration = LM::Frontend::AST::FrameDeclaration;
+using AST_TraitDeclaration = LM::Frontend::AST::TraitDeclaration;
+using VisibilityLevel = LM::Frontend::AST::VisibilityLevel;
 
 class TypeSystem
 {
+public:
+    struct FrameInfo {
+        std::string name;
+        std::vector<std::pair<std::string, TypePtr>> fields;
+        std::map<std::string, VisibilityLevel> fieldVisibilities;
+        std::map<std::string, size_t> fieldOffsets;
+        std::map<std::string, TypePtr> methodSignatures;
+        std::map<std::string, size_t> methodIndices;
+        std::vector<std::string> implements;
+        bool hasInit = false;
+        bool hasDeinit = false;
+        size_t totalFieldSize = 0;
+        std::shared_ptr<AST_FrameDeclaration> declaration;
+    };
+
+    struct TraitInfo {
+        std::string name;
+        std::vector<std::string> extends;
+        std::map<std::string, TypePtr> methodSignatures;
+        std::shared_ptr<AST_TraitDeclaration> declaration;
+    };
+
 private:
     std::map<std::string, TypePtr> userDefinedTypes;
     std::map<std::string, TypePtr> typeAliases;
     std::map<std::string, TypePtr> errorTypes;
+
+    // Canonicalization cache for structural types
+    std::map<std::string, TypePtr> typeCache;
+
+    // Contextual scoping (stack of maps)
+    std::vector<std::map<std::string, TypePtr>> scopeStack;
+    
+    // Persistent registries for cross-pass identity
+    std::map<std::string, FrameInfo> frameRegistry;
+    std::map<std::string, TraitInfo> traitRegistry;
 
     // Circular dependency detection for type aliases
     bool hasCircularDependency(const std::string& aliasName, TypePtr type, 
@@ -324,7 +371,44 @@ private:
 
 public:
     TypeSystem() {
+        // Initialize with global scope
+        scopeStack.push_back({});
         registerBuiltinErrors();
+    }
+
+    // --- Scoping Methods ---
+    void pushScope() { scopeStack.push_back({}); }
+    void popScope() { if (scopeStack.size() > 1) scopeStack.pop_back(); }
+    
+    void registerType(const std::string& name, TypePtr type) {
+        scopeStack.back()[name] = type;
+    }
+
+    // --- Persistence Methods ---
+    void registerFrame(const std::string& name, const FrameInfo& info) {
+        frameRegistry[name] = info;
+    }
+    
+    FrameInfo* getFrameInfo(const std::string& name) {
+        if (frameRegistry.count(name)) return &frameRegistry[name];
+        return nullptr;
+    }
+
+    void registerTrait(const std::string& name, const TraitInfo& info) {
+        traitRegistry[name] = info;
+    }
+
+    TraitInfo* getTraitInfo(const std::string& name) {
+        if (traitRegistry.count(name)) return &traitRegistry[name];
+        return nullptr;
+    }
+
+    // --- Canonicalization ---
+    TypePtr getCanonicalType(const std::string& key, std::function<TypePtr()> creator) {
+        if (typeCache.count(key)) return typeCache[key];
+        TypePtr newType = creator();
+        typeCache[key] = newType;
+        return newType;
     }
 
     const TypePtr NIL_TYPE = std::make_shared<Type>(TypeTag::Nil);
@@ -366,8 +450,34 @@ public:
     const TypePtr PARSE_ERROR = std::make_shared<Type>(TypeTag::UserDefined);
     const TypePtr NETWORK_ERROR = std::make_shared<Type>(TypeTag::UserDefined);
 
+    // Built-in Error Constants
+    const std::string DIVISION_BY_ZERO_ERROR_STR = "DivisionByZeroError";
+    const std::string INDEX_OUT_OF_BOUNDS_ERROR_STR = "IndexOutOfBoundsError";
+    const std::string KEY_NOT_FOUND_ERROR_STR = "KeyNotFoundError";
+    const std::string TYPE_MISMATCH_ERROR_STR = "TypeMismatchError";
+    const std::string NULL_POINTER_ERROR_STR = "NullPointerError";
+    const std::string IO_ERROR_STR = "IOError";
+    const std::string NETWORK_ERROR_STR = "NetworkError";
+    const std::string PERMISSION_DENIED_ERROR_STR = "PermissionDeniedError";
+    const std::string OVERFLOW_ERROR_STR = "OverflowError";
+    const std::string TIMEOUT_ERROR_STR = "TimeoutError";
+
     TypePtr getType(const std::string& name) {
-        // First check built-in types
+        // 1. Check contextual scopes (inner to outer)
+        for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
+            auto found = it->find(name);
+            if (found != it->end()) return found->second;
+        }
+
+        // 2. Check persistent registries for frames/traits
+        if (frameRegistry.count(name)) return createFrameType(name);
+        if (traitRegistry.count(name)) {
+            return getCanonicalType("trait:" + name, [&]() {
+                return std::make_shared<Type>(TypeTag::Trait);
+            });
+        }
+
+        // 3. Check built-in types
         if (name == "bigint" || name == "int" || name == "i64" || name == "u64" || 
             name == "i32" || name == "u32" || name == "i16" || name == "u16" ||
             name == "i8" || name == "u8" || name == "i128" || name == "u128" ||
@@ -539,6 +649,29 @@ public:
     }
 
     bool isCompatible(TypePtr source, TypePtr target) { return canConvert(source, target); }
+
+    // --- Helper Methods ---
+    bool isListType(TypePtr type) { return type && type->tag == TypeTag::List; }
+    bool isDictType(TypePtr type) { return type && type->tag == TypeTag::Dict; }
+    bool isTupleType(TypePtr type) { return type && type->tag == TypeTag::Tuple; }
+    bool isStringType(TypePtr type) { return type && type->tag == TypeTag::String; }
+    bool isIntegerType(TypePtr type) {
+        return type && (type->tag >= TypeTag::Int && type->tag <= TypeTag::UInt128);
+    }
+    bool isFloatType(TypePtr type) {
+        return type && (type->tag == TypeTag::Float32 || type->tag == TypeTag::Float64);
+    }
+    bool isNumericType(TypePtr type) {
+        return isIntegerType(type) || isFloatType(type);
+    }
+
+    double stringToNumber(const std::string& str) {
+        try {
+            return std::stod(str);
+        } catch (...) {
+            return 0.0;
+        }
+    }
 
     TypePtr getCommonType(TypePtr a, TypePtr b)
     {   if(!a || !b)
@@ -1122,10 +1255,10 @@ public:
     }
     
     // Create function type from AST function type annotation (implemented below)
-    TypePtr createFunctionTypeFromAST(const AST::FunctionTypeAnnotation& funcTypeAnnotation);
+    TypePtr createFunctionTypeFromAST(const LM::Frontend::AST::FunctionTypeAnnotation& funcTypeAnnotation);
     
     // Function type inference for lambda expressions (implemented below)
-    TypePtr inferFunctionType(const AST::LambdaExpr& lambda);
+    TypePtr inferFunctionType(const LM::Frontend::AST::LambdaExpr& lambda);
     
     // Function type compatibility checking
     bool areFunctionTypesCompatible(TypePtr fromFunc, TypePtr toFunc) {
@@ -1700,7 +1833,7 @@ public:
 
 private:
     // Helper method to convert AST::TypeAnnotation to TypePtr (implemented in function_types.cpp)
-    TypePtr convertASTTypeToTypePtr(std::shared_ptr<AST::TypeAnnotation> astType);
+    TypePtr convertASTTypeToTypePtr(std::shared_ptr<LM::Frontend::AST::TypeAnnotation> astType);
 
 
 };

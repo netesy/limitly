@@ -13,7 +13,7 @@ To learn how to use the Limit language, check out our comprehensive, step-by-ste
 *   **Static Typing:** A strong, static type system with type inference.
 *   **Structured Concurrency:** High-level `parallel` and `concurrent` blocks for safe and efficient multi-tasking.
 *   **Modern Error Handling:** `Option` and `Result` types for robust error handling without exceptions.
-*   **Object-Oriented:** Support for classes, inheritance, and polymorphism.
+*   **Object-Oriented (Frames & Traits):** Efficient, modern OOP with static dispatch, traits, and automatic lifecycle management (init/deinit).
 *   **First-Class Functions:** Higher-order functions and closures.
 *   **Pattern Matching:** Powerful `match` statements for expressive control flow.
 *   **Modules:** A flexible module system for organizing code.

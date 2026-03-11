@@ -1,0 +1,9 @@
+frame Inner {
+    value: int;
+}
+
+frame Outer {
+    inner: Inner;
+}
+
+print("OK");

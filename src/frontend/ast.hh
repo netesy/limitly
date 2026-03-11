@@ -711,7 +711,7 @@ namespace AST {
     };
     
     // Frame method with visibility
-    struct FrameMethod {
+    struct FrameMethod : public Statement {
         std::string name;
         std::shared_ptr<TypeAnnotation> returnType;
         std::vector<std::pair<std::string, std::shared_ptr<TypeAnnotation>>> parameters;
@@ -1095,5 +1095,4 @@ namespace AST {
 } // namespace Frontend
 } // namespace LM
 
-#endif // AST_H#endif
- // AST_H
+#endif // AST_H

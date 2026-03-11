@@ -1,0 +1,46 @@
+// tests/oop/composition_test.lm
+frame Inner {
+    var value: int;
+    
+    pub fn init(v: int) {
+        self.value = v;
+        print("Inner init");
+    }
+    
+    pub fn deinit() {
+        print("Inner deinit");
+    }
+    
+    pub fn say_hi() {
+        print("Hi from Inner: ");
+        print(self.value);
+    }
+}
+
+frame Outer {
+    var comp: Inner;
+    
+    pub fn init() {
+        print("Outer init");
+        self.comp = Inner(456);
+    }
+    
+    pub fn deinit() {
+        print("Outer deinit");
+    }
+    
+    pub fn test() {
+        self.comp.say_hi();
+    }
+}
+
+fn run_test() {
+    print("Start");
+    {
+        var o = Outer();
+        o.test();
+    }
+    print("End");
+}
+
+run_test();

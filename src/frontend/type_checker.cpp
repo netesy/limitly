@@ -19,92 +19,114 @@ using namespace LM::Error;bool TypeChecker::check_program(std::shared_ptr<LM::Fr
         return false;
     }
     
-    // Reset error state before checking
     Debugger::resetError();
     errors.clear();
     current_scope = std::make_unique<Scope>();
     
-    // First pass: collect function and frame declarations
+    // PASS 1: Name Registration
     for (const auto& stmt : program->statements) {
-        if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
-            // Only collect signature for now
-            TypePtr return_type = type_system.STRING_TYPE;
-            if (func_decl->returnType) {
-                return_type = resolve_type_annotation(func_decl->returnType.value());
-            }
-            FunctionSignature signature;
-            signature.name = func_decl->name;
-            signature.return_type = return_type;
-            signature.declaration = func_decl;
-            signature.can_fail = func_decl->canFail || func_decl->throws;
-            signature.error_types = func_decl->declaredErrorTypes;
-            for (const auto& param : func_decl->params) {
-                signature.param_types.push_back(resolve_type_annotation(param.second));
-                signature.optional_params.push_back(false);
-            }
-            for (const auto& optional_param : func_decl->optionalParams) {
-                signature.param_types.push_back(resolve_type_annotation(optional_param.second.first));
-                signature.optional_params.push_back(true);
-            }
-            function_signatures[func_decl->name] = signature;
-            declare_variable(func_decl->name, type_system.FUNCTION_TYPE);
-        } else if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
-            // Collect frame signature
-            FrameInfo frame_info;
-            frame_info.name = frame_decl->name;
-            frame_info.declaration = frame_decl;
+        if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
+            type_system.addUserDefinedType(frame_decl->name, type_system.createFrameType(frame_decl->name));
+        } else if (auto trait_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
+            TypePtr trait_type = std::make_shared<::Type>(TypeTag::Trait);
+            type_system.addUserDefinedType(trait_decl->name, trait_type);
+        }
+    }
+
+    // PASS 2: Signature Resolution
+    for (const auto& stmt : program->statements) {
+        if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
+            TypeSystem::FrameInfo info;
+            info.name = frame_decl->name;
+            info.declaration = frame_decl;
+            info.implements = frame_decl->implements;
+            info.hasInit = (frame_decl->init != nullptr);
+            info.hasDeinit = (frame_decl->deinit != nullptr);
+
+            size_t offset = 0;
             for (const auto& field : frame_decl->fields) {
                 TypePtr field_type = field->type ? resolve_type_annotation(field->type) : type_system.ANY_TYPE;
-                frame_info.fields.push_back({field->name, field_type});
-                frame_info.field_has_default.push_back({field->name, field->defaultValue != nullptr});
+                info.fields.push_back({field->name, field_type});
+                info.fieldVisibilities[field->name] = field->visibility;
+                info.fieldOffsets[field->name] = offset++;
             }
-            frame_declarations[frame_decl->name] = frame_info;
-            declare_variable(frame_decl->name, type_system.createFrameType(frame_decl->name));
+            info.totalFieldSize = offset;
 
-            // Also register frame methods in function_signatures
             if (frame_decl->init) {
                 std::string init_name = frame_decl->name + ".init";
-                FunctionSignature signature;
-                signature.name = init_name;
-                signature.return_type = type_system.NIL_TYPE;
-                signature.param_types.push_back(type_system.createFrameType(frame_decl->name)); // this
-                for (const auto& param : frame_decl->init->parameters) {
-                    signature.param_types.push_back(resolve_type_annotation(param.second));
-                }
-                function_signatures[init_name] = signature;
+                FunctionSignature sig;
+                sig.name = init_name;
+                sig.return_type = type_system.NIL_TYPE;
+                sig.param_types.push_back(type_system.createFrameType(frame_decl->name));
+                for (const auto& p : frame_decl->init->parameters) sig.param_types.push_back(resolve_type_annotation(p.second));
+                function_signatures[init_name] = sig;
             }
-
-            for (const auto& method : frame_decl->methods) {
-                std::string method_name = frame_decl->name + "." + method->name;
-                FunctionSignature signature;
-                signature.name = method_name;
-                signature.return_type = method->returnType ? resolve_type_annotation(method->returnType) : type_system.NIL_TYPE;
-                signature.param_types.push_back(type_system.createFrameType(frame_decl->name)); // this
-                for (const auto& param : method->parameters) {
-                    signature.param_types.push_back(resolve_type_annotation(param.second));
-                }
-                function_signatures[method_name] = signature;
+            for (const auto& m : frame_decl->methods) {
+                std::string m_name = frame_decl->name + "." + m->name;
+                FunctionSignature sig;
+                sig.name = m_name;
+                sig.return_type = m->returnType ? resolve_type_annotation(m->returnType) : type_system.NIL_TYPE;
+                sig.param_types.push_back(type_system.createFrameType(frame_decl->name));
+                for (const auto& p : m->parameters) sig.param_types.push_back(resolve_type_annotation(p.second));
+                function_signatures[m_name] = sig;
+                info.methodSignatures[m->name] = sig.return_type;
             }
             if (frame_decl->deinit) {
                 std::string deinit_name = frame_decl->name + ".deinit";
-                FunctionSignature signature;
-                signature.name = deinit_name;
-                signature.return_type = type_system.NIL_TYPE;
-                signature.param_types.push_back(type_system.createFrameType(frame_decl->name)); // this
-                function_signatures[deinit_name] = signature;
+                FunctionSignature sig;
+                sig.name = deinit_name;
+                sig.return_type = type_system.NIL_TYPE;
+                sig.param_types.push_back(type_system.createFrameType(frame_decl->name));
+                function_signatures[deinit_name] = sig;
             }
+
+            type_system.registerFrame(frame_decl->name, info);
+            frame_declarations[frame_decl->name].name = info.name;
+            frame_declarations[frame_decl->name].declaration = frame_decl;
+            frame_declarations[frame_decl->name].fields = info.fields;
+
+        } else if (auto trait_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
+            TypeSystem::TraitInfo info;
+            info.name = trait_decl->name;
+            info.declaration = trait_decl;
+            info.extends = trait_decl->extends;
+            for (const auto& m : trait_decl->methods) {
+                std::string m_name = trait_decl->name + "." + m->name;
+                FunctionSignature sig;
+                sig.name = m_name;
+                sig.return_type = m->returnType ? resolve_type_annotation(m->returnType.value()) : type_system.NIL_TYPE;
+                sig.param_types.push_back(type_system.ANY_TYPE);
+                for (const auto& p : m->params) sig.param_types.push_back(resolve_type_annotation(p.second));
+                function_signatures[m_name] = sig;
+                info.methodSignatures[m->name] = sig.return_type;
+            }
+            type_system.registerTrait(trait_decl->name, info);
+        } else if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
+            FunctionSignature sig;
+            sig.name = func_decl->name;
+            sig.return_type = func_decl->returnType ? resolve_type_annotation(func_decl->returnType.value()) : type_system.STRING_TYPE;
+            sig.declaration = func_decl;
+            sig.can_fail = func_decl->canFail || func_decl->throws;
+            sig.error_types = func_decl->declaredErrorTypes;
+            for (const auto& p : func_decl->params) {
+                sig.param_types.push_back(resolve_type_annotation(p.second));
+                sig.optional_params.push_back(false);
+            }
+            for (const auto& op : func_decl->optionalParams) {
+                sig.param_types.push_back(resolve_type_annotation(op.second.first));
+                sig.optional_params.push_back(true);
+            }
+            function_signatures[func_decl->name] = sig;
+            declare_variable(func_decl->name, type_system.FUNCTION_TYPE);
         }
     }
-    
-    // Second pass: check all statements
+
+    // PASS 3: Body Verification
     for (const auto& stmt : program->statements) {
         check_statement(stmt);
     }
     
-    // Set the inferred type on the program node
-    // For a program, we could use void type or the type of the last statement
-    program->inferred_type = type_system.NIL_TYPE; // Programs don't return values
-    
+    program->inferred_type = type_system.NIL_TYPE;
     return !Debugger::hasError();
 }
 
@@ -295,6 +317,7 @@ void TypeChecker::check_reference_validity(const std::string& ref_name, int line
 void TypeChecker::enter_scope() {
     current_scope_level++;
     current_scope = std::make_unique<Scope>(std::move(current_scope));
+    type_system.pushScope();
 }
 
 void TypeChecker::exit_scope() {
@@ -302,6 +325,7 @@ void TypeChecker::exit_scope() {
     if (current_scope && current_scope->parent) {
         current_scope = std::move(current_scope->parent);
     }
+    type_system.popScope();
 }
 
 void TypeChecker::check_mutable_aliasing(const std::string& linear_var, const std::string& ref_var, bool is_mutable, int line) {
