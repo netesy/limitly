@@ -327,7 +327,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 auto& func_manager = LIR::LIRFunctionManager::getInstance();
                 
                 std::vector<LIR::LIRParameter> main_params;
-                main_lir_func = func_manager.createFunction("main", main_params, LIR::Type::I64, nullptr);
+                main_lir_func = func_manager.createFunction("__top_level_wrapper__", main_params, LIR::Type::I64, nullptr);
                 main_lir_func->setInstructions(lir_function->instructions);
                 
                 register_vm.execute_lir_function(*main_lir_func);

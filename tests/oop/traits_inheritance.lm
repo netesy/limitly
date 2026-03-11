@@ -32,3 +32,6 @@ fn main() {
     // Test default implementation from trait
     print(f.greet());
 }
+
+// Top-level entry point
+main();

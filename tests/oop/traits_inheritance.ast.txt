@@ -1,0 +1,72 @@
+AST for tests/oop/traits_inheritance.lm
+========================================
+
+AST Dump:
+==========
+TraitDeclaration: Base
+  Methods:
+    FunctionDeclaration: [private] name
+      ReturnType: str
+      Body:
+        BlockStatement:
+    FunctionDeclaration: [private] greet
+      ReturnType: str
+      Body:
+        BlockStatement:
+          ReturnStatement:
+            Value:
+              Literal: "Hello from Base"
+TraitDeclaration: Extended
+  Methods:
+    FunctionDeclaration: [private] version
+      ReturnType: int
+      Body:
+        BlockStatement:
+FrameDeclaration: MyFrame
+  Implements: Extended
+  Fields:
+    [private] id: int
+  Methods:
+    [pub] name()
+      ReturnType: str
+      Body:
+      BlockStatement:
+        ReturnStatement:
+          Value:
+            Literal: "MyFrame"
+    [pub] version()
+      ReturnType: int
+      Body:
+      BlockStatement:
+        ReturnStatement:
+          Value:
+            Literal: "1"
+FunctionDeclaration: [private] main
+  Body:
+    BlockStatement:
+      VarDeclaration: [private] f
+        Initializer:
+          CallExpression:
+            Callee:
+              Variable: MyFrame
+            Named Arguments:
+              id:
+                Literal: "42"
+      PrintStatement:
+        CallExpression:
+          Callee:
+            MemberExpression: .name
+              Object:
+                Variable: f
+      PrintStatement:
+        CallExpression:
+          Callee:
+            MemberExpression: .version
+              Object:
+                Variable: f
+      PrintStatement:
+        CallExpression:
+          Callee:
+            MemberExpression: .greet
+              Object:
+                Variable: f

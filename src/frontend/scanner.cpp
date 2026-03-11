@@ -885,6 +885,8 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "AS";
     case TokenType::CLASS:
         return "CLASS";
+    case TokenType::FRAME:
+        return "FRAME";
     case TokenType::FALSE:
         return "FALSE";
     case TokenType::FN:
