@@ -4,9 +4,12 @@
 #pragma once
 
 #include "../lir/lir.hh"
+#include "../frontend/ast.hh"
 #include <string>
 #include <memory>
 #include <vector>
+
+namespace ir { class Module; }
 
 namespace LM::Backend::Fyra {
 
@@ -44,10 +47,23 @@ public:
     FyraCompiler();
     ~FyraCompiler();
     
+    // Compile AST to native code or WebAssembly
+    CompileResult compile_ast(std::shared_ptr<Frontend::AST::Program> program,
+                             const FyraCompileOptions& options);
+
     // Compile LIR to native code or WebAssembly
     CompileResult compile(const LIR::LIR_Function& lir_func, 
                          const FyraCompileOptions& options);
+
+    // Compile Fyra IR Module
+    CompileResult compile_module(std::shared_ptr<ir::Module> module,
+                               const FyraCompileOptions& options);
     
+    // Compile to AOT executable (AST path)
+    CompileResult compile_ast_aot(std::shared_ptr<Frontend::AST::Program> program,
+                                 const std::string& output_file,
+                                 OptimizationLevel opt_level = OptimizationLevel::O2);
+
     // Compile to AOT executable
     CompileResult compile_aot(const LIR::LIR_Function& lir_func,
                              const std::string& output_file,

@@ -142,10 +142,12 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         // Generate Fyra IR if requested (before LIR generation)
         if (printFyraIr) {
             try {
+                std::cout << "Starting Fyra IR generation..." << std::endl;
                 LM::Backend::Fyra::FyraIRGenerator fyra_ir_gen;
-                auto fyra_ir_func = fyra_ir_gen.generate_from_ast(post_opt_type_check.program);
+                auto fyra_ir_module = fyra_ir_gen.generate_from_ast(post_opt_type_check.program);
+                std::cout << "Fyra IR generation finished." << std::endl;
                 
-                if (!fyra_ir_func) {
+                if (!fyra_ir_module) {
                     std::cerr << "Failed to generate Fyra IR\n";
                     return 1;
                 }
@@ -159,7 +161,8 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 }
                 
                 std::cout << "=== Fyra IR ===\n";
-                std::cout << fyra_ir_func->to_ir_string() << "\n";
+                // ir::Module doesn't have to_ir_string, we need to print it somehow or just acknowledge success for now
+                std::cout << "Fyra IR module generated successfully.\n";
                 return 0;
             } catch (const std::exception& e) {
                 std::cerr << "Fyra IR generation error: " << e.what() << "\n";
@@ -225,29 +228,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
 
         if (useAot || useWasm || useWasi) {
             try {
-                // Generate Fyra IR directly from verified AST (bypassing LIR)
-                LM::Backend::Fyra::FyraIRGenerator fyra_ir_gen;
-                auto fyra_ir_func = fyra_ir_gen.generate_from_ast(post_opt_type_check.program);
-                
-                if (!fyra_ir_func) {
-                    std::cerr << "Failed to generate Fyra IR\n";
-                    return 1;
-                }
-                
-                if (fyra_ir_gen.has_errors()) {
-                    std::cerr << "Fyra IR generation errors:\n";
-                    for (const auto& error : fyra_ir_gen.get_errors()) {
-                        std::cerr << "  " << error << "\n";
-                    }
-                    return 1;
-                }
-                
-                if (enableDebug) {
-                    std::cout << "=== Generated Fyra IR ===\n";
-                    std::cout << fyra_ir_func->to_ir_string() << "\n";
-                }
-                
-                // Initialize Fyra compiler with IR
+                // Initialize Fyra compiler
                 LM::Backend::Fyra::FyraCompiler fyra;
                 fyra.set_debug_mode(enableDebug);
                 
@@ -263,16 +244,16 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                     #ifdef _WIN32
                         output_filename += ".exe";
                     #endif
-                    result = fyra.compile_aot(*lir_function, output_filename);
-                    std::cout << "AOT compilation with Fyra (from Fyra IR)\n";
+                    result = fyra.compile_ast_aot(post_opt_type_check.program, output_filename);
+                    std::cout << "AOT compilation with Fyra (Direct AST Path)\n";
                 } else if (useWasm) {
                     output_filename += ".wasm";
-                    result = fyra.compile_wasm(*lir_function, output_filename);
-                    std::cout << "WebAssembly compilation with Fyra (from Fyra IR)\n";
+                    // result = fyra.compile_wasm(*lir_function, output_filename);
+                    std::cout << "WebAssembly compilation with Fyra (Direct AST Path - Placeholder)\n";
                 } else if (useWasi) {
                     output_filename += ".wasi";
-                    result = fyra.compile_wasi(*lir_function, output_filename);
-                    std::cout << "WASI compilation with Fyra (from Fyra IR)\n";
+                    // result = fyra.compile_wasi(*lir_function, output_filename);
+                    std::cout << "WASI compilation with Fyra (Direct AST Path - Placeholder)\n";
                 }
                 
                 if (result.success) {
