@@ -1,6 +1,10 @@
 // fyra.cpp - Fyra Backend Integration Implementation
 
 #include "fyra.hh"
+#include "fyra_ir_generator.hh"
+#include "codegen/CodeGen.h"
+#include "codegen/target/TargetInfo.h"
+#include "codegen/target/SystemV_x64.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -43,20 +47,70 @@ std::string FyraCompiler::convert_lir_to_fyra_ir(const LIR::LIR_Function& lir_fu
     return ir.str();
 }
 
+CompileResult FyraCompiler::compile_ast(std::shared_ptr<Frontend::AST::Program> program,
+                                       const FyraCompileOptions& options) {
+    FyraIRGenerator generator;
+    auto module = generator.generate_from_ast(program);
+
+    if (!module) {
+        CompileResult result;
+        result.success = false;
+        result.error_message = "Failed to generate Fyra IR from AST";
+        if (generator.has_errors()) {
+             result.error_message += ": " + generator.get_errors()[0];
+        }
+        return result;
+    }
+
+    return compile_module(module, options);
+}
+
 CompileResult FyraCompiler::compile(const LIR::LIR_Function& lir_func,
                                    const FyraCompileOptions& options) {
     CompileResult result;
+    result.success = false;
+    result.error_message = "LIR to Fyra IR path is deprecated. Use AST to Fyra IR instead.";
+    return result;
+}
+
+CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
+                                         const FyraCompileOptions& options) {
+    CompileResult result;
     
     try {
-        // Convert LIR to Fyra IR
-        std::string fyra_ir = convert_lir_to_fyra_ir(lir_func);
+        if (!module) {
+            result.success = false;
+            result.error_message = "Null module";
+            return result;
+        }
+
+        std::string asm_file = options.output_file + ".s";
+        std::ofstream ofs(asm_file);
+
+        // Use Fyra's CodeGen directly
+        auto target_info = std::make_unique<codegen::target::SystemV_x64>();
+        codegen::CodeGen generator(*module, std::move(target_info), &ofs);
         
+        generator.emit(true);
+        ofs.close();
+
+        // Invoke GCC to compile assembly to executable
+        std::string cmd = "gcc -no-pie " + asm_file + " src/runtime/runtime.c -o " + options.output_file + " -lpthread";
         if (debug_mode_) {
-            std::cout << "Generated Fyra IR:\n" << fyra_ir << "\n";
         }
         
-        // Invoke Fyra compiler
-        result = invoke_fyra(fyra_ir, options);
+        int exit_code = std::system(cmd.c_str());
+        if (exit_code == 0) {
+            result.success = true;
+            result.output_file = options.output_file;
+            // Clean up temporary assembly file
+            if (!options.debug_info) {
+                fs::remove(asm_file);
+            }
+        } else {
+            result.success = false;
+            result.error_message = "GCC exited with code " + std::to_string(exit_code);
+        }
         
     } catch (const std::exception& e) {
         result.success = false;
@@ -65,6 +119,18 @@ CompileResult FyraCompiler::compile(const LIR::LIR_Function& lir_func,
     }
     
     return result;
+}
+
+CompileResult FyraCompiler::compile_ast_aot(std::shared_ptr<Frontend::AST::Program> program,
+                                           const std::string& output_file,
+                                           OptimizationLevel opt_level) {
+    FyraCompileOptions options;
+    options.target = CompileTarget::AOT;
+    options.output_file = output_file;
+    options.opt_level = opt_level;
+    options.debug_info = debug_mode_;
+
+    return compile_ast(program, options);
 }
 
 CompileResult FyraCompiler::compile_aot(const LIR::LIR_Function& lir_func,
@@ -158,7 +224,6 @@ CompileResult FyraCompiler::invoke_fyra(const std::string& ir_code,
         cmd += " " + temp_ir_file;
         
         if (options.verbose) {
-            std::cout << "Executing: " << cmd << "\n";
         }
         
         // Execute Fyra compiler

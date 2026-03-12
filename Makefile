@@ -17,14 +17,7 @@ else
 	CXX := g++
 	CC := gcc
 	AR := ar
-	LIBS := -lgccjit
-	LIBGCCJIT_PATH := $(shell find /usr -name libgccjit.so 2>/dev/null | head -n 1)
-	ifneq ($(LIBGCCJIT_PATH),)
-		LDFLAGS := -L$(shell dirname $(LIBGCCJIT_PATH))
-	else
-		# Fallback for Ubuntu 24.04 with gcc-14
-		LDFLAGS += -L/usr/lib/gcc/x86_64-linux-gnu/14
-	endif
+	LIBS :=
 endif
 
 # =============================
@@ -33,10 +26,10 @@ endif
 MODE ?= release
 
 ifeq ($(MODE),debug)
-	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit -I/usr/lib/gcc/x86_64-linux-gnu/13/include -DHAS_LIBGCCJIT $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit -Isrc/backend/fyra/include $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -g -fPIC -I.
 else
-	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit -I/usr/lib/gcc/x86_64-linux-gnu/13/include -DHAS_LIBGCCJIT $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit -Isrc/backend/fyra/include $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -O3 -fPIC -I.
 endif
 
@@ -68,6 +61,21 @@ FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp  \
               src/frontend/ast/optimizer.cpp 
 
 BACK_SRCS :=  src/backend/jit/jit.cpp src/backend/fyra.cpp src/backend/fyra_ir_generator.cpp
+
+FYRA_DIR := src/backend/fyra
+FYRA_SRCS := $(wildcard $(FYRA_DIR)/src/ir/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/codegen/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/codegen/target/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/codegen/execgen/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/codegen/objectgen/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/codegen/debug/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/codegen/profiling/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/codegen/validation/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/transforms/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/parser/*.cpp)
+
+FYRA_OBJS := $(patsubst src/backend/fyra/src/%.cpp,$(OBJ_DIR)/fyra/%.o,$(FYRA_SRCS))
+FYRA_LIB := $(OBJ_DIR)/libfyra.a
 
 REGISTER_SRCS := src/backend/vm/register.cpp
 
@@ -128,10 +136,17 @@ $(RSP_DIR):
 $(OBJ_DIR)/runtime:
 	@mkdir -p $@
 
+$(OBJ_DIR)/fyra:
+	@mkdir -p $@
+
 # =============================
 # Object compilation - C++ files
 # =============================
 $(OBJ_DIR)/%.o: %.cpp | $(OBJ_DIR)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/fyra/%.o: src/backend/fyra/src/%.cpp | $(OBJ_DIR)/fyra
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
@@ -154,6 +169,17 @@ $(RUNTIME_LIB): $(RUNTIME_OBJS)
 	@echo "✅ Runtime library built: $@"
 
 # =============================
+# Fyra library
+# =============================
+fyra: $(FYRA_LIB)
+
+$(FYRA_LIB): $(FYRA_OBJS)
+	@echo "Building fyra library: $@"
+	@mkdir -p $(dir $@)
+	$(AR) rcs $@ $^
+	@echo "✅ Fyra library built: $@"
+
+# =============================
 # Response files generation
 # =============================
 $(MAIN_RSP): $(MAIN_OBJS) | $(RSP_DIR)
@@ -172,9 +198,9 @@ windows: $(BIN_DIR) $(MAIN_RSP) $(RUNTIME_LIB)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(RUNTIME_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS)
 	@echo "✅ limitly.exe built."
 
-linux: $(BIN_DIR) $(MAIN_RSP) $(RUNTIME_LIB)
+linux: $(BIN_DIR) $(MAIN_RSP) $(RUNTIME_LIB) $(FYRA_LIB)
 	@echo "🔨 Linking limitly ..."
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(RUNTIME_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(RUNTIME_LIB) $(FYRA_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS) -lpthread
 	@echo "✅ limitly built."
 
 # =============================
