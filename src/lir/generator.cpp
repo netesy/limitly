@@ -1408,14 +1408,13 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
         std::string func_name = var_expr->name;
 
         // Check if it's a frame instantiation
-        auto frame_it = frame_table_.find(func_name);
-        if (frame_it != frame_table_.end()) {
+        auto* frame_info = type_system_->getFrameInfo(func_name);
+        if (frame_info) {
             // Treat as instantiation
             Reg frame_reg = allocate_register();
-            const FrameInfo& frame_info = frame_it->second;
 
             // NewFrame allocates the object
-            LIR_Inst new_frame_inst(LIR_Op::NewFrame, Type::Ptr, frame_reg, 0, 0, static_cast<uint32_t>(frame_info.total_field_size));
+            LIR_Inst new_frame_inst(LIR_Op::NewFrame, Type::Ptr, frame_reg, 0, 0, static_cast<uint32_t>(frame_info->totalFieldSize));
             new_frame_inst.func_name = func_name;
             emit_instruction(new_frame_inst);
 
@@ -1428,9 +1427,9 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             set_register_abi_type(frame_reg, Type::Ptr);
 
             // 1. Set default values for ALL fields
-            if (frame_info.declaration) {
-                for (size_t i = 0; i < frame_info.declaration->fields.size(); ++i) {
-                    auto field = frame_info.declaration->fields[i];
+            if (frame_info->declaration) {
+                for (size_t i = 0; i < frame_info->declaration->fields.size(); ++i) {
+                    auto field = frame_info->declaration->fields[i];
                     Reg val_reg = 0;
                     if (field->defaultValue) {
                         val_reg = emit_expr(*field->defaultValue);
@@ -1445,15 +1444,15 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
 
             // 2. Overwrite with named arguments
             for (const auto& [name, arg_expr] : expr.namedArgs) {
-                auto offset_it = frame_info.field_offsets.find(name);
-                if (offset_it != frame_info.field_offsets.end()) {
+                auto offset_it = frame_info->fieldOffsets.find(name);
+                if (offset_it != frame_info->fieldOffsets.end()) {
                     Reg val_reg = emit_expr(*arg_expr);
                     emit_instruction(LIR_Inst(LIR_Op::FrameSetField, Type::Void, frame_reg, static_cast<uint32_t>(offset_it->second), val_reg));
                 }
             }
 
             // 3. Call init if present
-            if (frame_info.has_init) {
+            if (frame_info->hasInit) {
                 std::string init_name = func_name + ".init";
                 std::vector<Reg> arg_regs;
                 arg_regs.push_back(frame_reg);
@@ -1471,7 +1470,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             }
 
             // Track instance for deinit at scope exit
-            if (frame_info.has_deinit && !scope_stack_.empty()) {
+            if (frame_info->hasDeinit && !scope_stack_.empty()) {
                 scope_stack_.back().frame_instances.push_back({func_name, frame_reg});
             }
 
@@ -1640,11 +1639,10 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             auto frame_type_info = std::get_if<FrameType>(&object_type->extra);
             if (frame_type_info) {
                 std::string frame_name = frame_type_info->name;
-                auto it = frame_table_.find(frame_name);
-                if (it != frame_table_.end()) {
-                    const FrameInfo& frame_info = it->second;
-                    auto method_it = frame_info.method_indices.find(method_name);
-                    if (method_it != frame_info.method_indices.end()) {
+                auto* frame_info = type_system_->getFrameInfo(frame_name);
+                if (frame_info) {
+                    auto method_it = frame_info->methodIndices.find(method_name);
+                    if (method_it != frame_info->methodIndices.end()) {
                         // Check visibility
                         std::string full_method_name = frame_name + "." + method_name;
                         auto func_it = function_table_.find(full_method_name);
@@ -1683,7 +1681,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                     }
 
                     // Check if it's a trait method call recursively
-                    std::vector<std::string> trait_worklist = frame_info.implements;
+                    std::vector<std::string> trait_worklist = frame_info->implements;
                     std::unordered_set<std::string> visited_traits;
 
                     while (!trait_worklist.empty()) {
@@ -1710,9 +1708,9 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
 
                         // Add parent traits to worklist
                         // We need to look up trait info to find parent traits
-                        auto trait_it = trait_table_.find(current_trait);
-                        if (trait_it != trait_table_.end()) {
-                            for (const auto& parent : trait_it->second.extends) {
+                        auto* trait_info = type_system_->getTraitInfo(current_trait);
+                        if (trait_info) {
+                            for (const auto& parent : trait_info->extends) {
                                 trait_worklist.push_back(parent);
                             }
                         }
@@ -1722,9 +1720,9 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
         } else {
             // Fallback for when type inference is missing - still try to find the method in ANY frame
             // This is less safe but better than failing if inference is incomplete
-            for (const auto& [frame_name, frame_info] : frame_table_) {
-                auto method_it = frame_info.method_indices.find(method_name);
-                if (method_it != frame_info.method_indices.end()) {
+            for (const auto& [frame_name, frame_info] : type_system_->frameRegistry) {
+                auto method_it = frame_info.methodIndices.find(method_name);
+                if (method_it != frame_info.methodIndices.end()) {
                     // Found the method - generate frame method call
                     Reg result = allocate_register();
 
@@ -2024,11 +2022,11 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
             if (object_type && object_type->tag == TypeTag::Frame) {
                 auto frame_type_info = std::get_if<FrameType>(&object_type->extra);
                 if (frame_type_info) {
-                    auto it = frame_table_.find(frame_type_info->name);
-                    if (it != frame_table_.end()) {
+                    auto* frame_info = type_system_->getFrameInfo(frame_type_info->name);
+                    if (frame_info) {
                         // Check visibility
-                        auto vis_it = it->second.field_visibilities.find(field_name);
-                        if (vis_it != it->second.field_visibilities.end()) {
+                        auto vis_it = frame_info->fieldVisibilities.find(field_name);
+                        if (vis_it != frame_info->fieldVisibilities.end()) {
                             if (!is_visible(vis_it->second, frame_type_info->name)) {
                                 report_error("Cannot access " + LM::Frontend::AST::visibilityToString(vis_it->second) +
                                            " field '" + field_name + "' of frame '" + frame_type_info->name + "'");
@@ -2036,8 +2034,8 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
                             }
                         }
 
-                        auto offset_it = it->second.field_offsets.find(field_name);
-                        if (offset_it != it->second.field_offsets.end()) {
+                        auto offset_it = frame_info->fieldOffsets.find(field_name);
+                        if (offset_it != frame_info->fieldOffsets.end()) {
                             // Found the field - emit FrameSetField
                             LIR_Op set_op = LIR_Op::FrameSetField;
                             if (is_in_concurrency_context()) {
@@ -2057,9 +2055,9 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
                 }
             } else {
                 // Fallback: search all frames
-                for (const auto& [frame_name, frame_info] : frame_table_) {
-                    auto offset_it = frame_info.field_offsets.find(field_name);
-                    if (offset_it != frame_info.field_offsets.end()) {
+                for (const auto& [frame_name, frame_info] : type_system_->frameRegistry) {
+                    auto offset_it = frame_info.fieldOffsets.find(field_name);
+                    if (offset_it != frame_info.fieldOffsets.end()) {
                         // Found the field - emit FrameSetField
                         emit_instruction(LIR_Inst(LIR_Op::FrameSetField, Type::Void, object_reg, static_cast<uint32_t>(offset_it->second), value));
                         return value;
@@ -2264,11 +2262,11 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
     if (object_type && object_type->tag == TypeTag::Frame) {
         auto frame_type_info = std::get_if<FrameType>(&object_type->extra);
         if (frame_type_info) {
-            auto it = frame_table_.find(frame_type_info->name);
-            if (it != frame_table_.end()) {
+            auto* frame_info = type_system_->getFrameInfo(frame_type_info->name);
+            if (frame_info) {
                 // Check visibility
-                auto vis_it = it->second.field_visibilities.find(expr.name);
-                if (vis_it != it->second.field_visibilities.end()) {
+                auto vis_it = frame_info->fieldVisibilities.find(expr.name);
+                if (vis_it != frame_info->fieldVisibilities.end()) {
                     if (!is_visible(vis_it->second, frame_type_info->name)) {
                         report_error("Cannot access " + LM::Frontend::AST::visibilityToString(vis_it->second) +
                                    " field '" + expr.name + "' of frame '" + frame_type_info->name + "'");
@@ -2276,12 +2274,12 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
                     }
                 }
 
-                auto offset_it = it->second.field_offsets.find(expr.name);
-                if (offset_it != it->second.field_offsets.end()) {
+                auto offset_it = frame_info->fieldOffsets.find(expr.name);
+                if (offset_it != frame_info->fieldOffsets.end()) {
                     // Found the field - emit FrameGetField
                     Reg dst = allocate_register();
 
-                    TypePtr field_lang_type = it->second.fields[offset_it->second].second;
+                    TypePtr field_lang_type = frame_info->fields[offset_it->second].second;
                     Type field_abi_type = language_type_to_abi_type(field_lang_type);
 
                     // Check if we are in a parallel block and need atomic access
@@ -2293,7 +2291,7 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
                     emit_instruction(LIR_Inst(get_op, field_abi_type, dst, object_reg, static_cast<uint32_t>(offset_it->second)));
 
                     // Set field type
-                    if (offset_it->second < it->second.fields.size()) {
+                    if (offset_it->second < frame_info->fields.size()) {
                         set_register_language_type(dst, field_lang_type);
                     }
 
@@ -2303,9 +2301,9 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
         }
     } else {
         // Fallback: search all frames
-        for (const auto& [frame_name, frame_info] : frame_table_) {
-            auto offset_it = frame_info.field_offsets.find(expr.name);
-            if (offset_it != frame_info.field_offsets.end()) {
+        for (const auto& [frame_name, frame_info] : type_system_->frameRegistry) {
+            auto offset_it = frame_info.fieldOffsets.find(expr.name);
+            if (offset_it != frame_info.fieldOffsets.end()) {
                 // Found the field - emit FrameGetField
                 Reg dst = allocate_register();
                 emit_instruction(LIR_Inst(LIR_Op::FrameGetField, Type::Ptr, dst, object_reg, static_cast<uint32_t>(offset_it->second)));
@@ -4875,7 +4873,7 @@ std::shared_ptr<::Type> Generator::convert_ast_type_to_lir_type(const std::share
     }
     
     // Check if it's a frame type
-    if (frame_table_.find(typeName) != frame_table_.end()) {
+    if (type_system_->getFrameInfo(typeName)) {
         auto type = std::make_shared<::Type>(::TypeTag::Frame);
         FrameType ft;
         ft.name = typeName;
@@ -5308,10 +5306,10 @@ void Generator::lower_frame_deinit_method(const std::string& frame_name, LM::Fro
     set_register_abi_type(0, Type::Ptr);
     
     // 1. Recursive cleanup: Call deinit on all frame-typed fields
-    auto frame_it = frame_table_.find(frame_name);
-    if (frame_it != frame_table_.end()) {
-        for (size_t i = 0; i < frame_it->second.fields.size(); ++i) {
-            if (frame_it->second.fields[i].second->tag == TypeTag::Frame) {
+    auto* frame_info = type_system_->getFrameInfo(frame_name);
+    if (frame_info) {
+        for (size_t i = 0; i < frame_info->fields.size(); ++i) {
+            if (frame_info->fields[i].second->tag == TypeTag::Frame) {
                 Reg field_reg = allocate_register();
                 emit_instruction(LIR_Inst(LIR_Op::FrameGetField, Type::Ptr, field_reg, 0, static_cast<uint32_t>(i)));
                 emit_instruction(LIR_Inst(LIR_Op::FrameCallDeinit, Type::Void, field_reg, 0, 0));
@@ -6050,33 +6048,11 @@ void Generator::collect_frame_signatures(LM::Frontend::AST::Program& program) {
 void Generator::collect_frame_signature(std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame_decl) {
     if (!frame_decl) return;
 
-    FrameInfo frame_info;
-    frame_info.declaration = frame_decl;
-    frame_info.name = frame_decl->name;
-    frame_info.implements = frame_decl->implements;
-    frame_info.has_init = (frame_decl->init != nullptr);
-    frame_info.has_deinit = (frame_decl->deinit != nullptr);
-    
-    // Collect field information
-    for (const auto& field : frame_decl->fields) {
-        TypePtr field_type = nullptr;
-        // Convert AST type annotation to TypePtr if available
-        if (field->type) {
-            field_type = convert_ast_type_to_lir_type(field->type);
-        } else {
-            // Default to Any if no type annotation
-            field_type = std::make_shared<::Type>(::TypeTag::Any);
-        }
-        frame_info.fields.push_back({field->name, field_type});
-        frame_info.field_visibilities[field->name] = field->visibility;
-    }
-    
-    // Collect method information
+    auto* frame_info = type_system_->getFrameInfo(frame_decl->name);
+    if (!frame_info) return;
+
+    // Register method in function table for LIR bookkeeping
     for (const auto& method : frame_decl->methods) {
-        frame_info.method_names.push_back(method->name);
-        frame_info.method_indices[method->name] = frame_info.method_names.size() - 1;
-        
-        // Register method in function table
         FunctionInfo func_info;
         func_info.name = frame_decl->name + "." + method->name;
         func_info.param_count = method->parameters.size() + 1; // +1 for 'this'
@@ -6104,35 +6080,17 @@ void Generator::collect_frame_signature(std::shared_ptr<LM::Frontend::AST::Frame
         deinit_info.has_closure = false;
         function_table_[deinit_info.name] = std::move(deinit_info);
     }
-    
-    // Calculate field offsets and total size
-    calculate_frame_layout(frame_info);
-    
-    // Store frame information
-    frame_table_[frame_decl->name] = frame_info;
-}
-
-void Generator::calculate_frame_layout(FrameInfo& frame_info) {
-    size_t offset = 0;
-    
-    // Calculate field offsets
-    for (auto& field : frame_info.fields) {
-        frame_info.field_offsets[field.first] = offset;
-        offset++; // Simple layout - each field is one register slot
-    }
-    
-    frame_info.total_field_size = offset;
 }
 
 size_t Generator::get_frame_field_offset(const std::string& frame_name, const std::string& field_name) {
-    auto it = frame_table_.find(frame_name);
-    if (it == frame_table_.end()) {
+    auto* frame_info = type_system_->getFrameInfo(frame_name);
+    if (!frame_info) {
         report_error("Unknown frame: " + frame_name);
         return UINT32_MAX;
     }
     
-    auto offset_it = it->second.field_offsets.find(field_name);
-    if (offset_it == it->second.field_offsets.end()) {
+    auto offset_it = frame_info->fieldOffsets.find(field_name);
+    if (offset_it == frame_info->fieldOffsets.end()) {
         report_error("Unknown field '" + field_name + "' in frame '" + frame_name + "'");
         return UINT32_MAX;
     }
@@ -6141,14 +6099,14 @@ size_t Generator::get_frame_field_offset(const std::string& frame_name, const st
 }
 
 size_t Generator::get_frame_method_index(const std::string& frame_name, const std::string& method_name) {
-    auto it = frame_table_.find(frame_name);
-    if (it == frame_table_.end()) {
+    auto* frame_info = type_system_->getFrameInfo(frame_name);
+    if (!frame_info) {
         report_error("Unknown frame: " + frame_name);
         return UINT32_MAX;
     }
     
-    auto index_it = it->second.method_indices.find(method_name);
-    if (index_it == it->second.method_indices.end()) {
+    auto index_it = frame_info->methodIndices.find(method_name);
+    if (index_it == frame_info->methodIndices.end()) {
         report_error("Unknown method '" + method_name + "' in frame '" + frame_name + "'");
         return UINT32_MAX;
     }
@@ -6170,12 +6128,6 @@ void Generator::collect_trait_signatures(LM::Frontend::AST::Program& program) {
 
 void Generator::collect_trait_signature(std::shared_ptr<LM::Frontend::AST::TraitDeclaration> trait_decl) {
     if (!trait_decl) return;
-
-    TraitInfo info;
-    info.name = trait_decl->name;
-    info.extends = trait_decl->extends;
-    info.declaration = trait_decl;
-    trait_table_[trait_decl->name] = info;
 
     // Register methods in function table
     for (const auto& method : trait_decl->methods) {

@@ -1,4 +1,4 @@
-﻿
+
 #pragma once
 
 #include "../backend/types.hh"
@@ -9,10 +9,17 @@
 #include <vector>
 #include <unordered_map>
 #include <string>
+#include <set>
 
 namespace LM {
 namespace Frontend {
 
+using TypePtr = LM::Backend::TypePtr;
+using TypeSystem = LM::Backend::TypeSystem;
+using TypeTag = LM::Backend::TypeTag;
+using FrameType = LM::Backend::FrameType;
+using UnionType = LM::Backend::UnionType;
+using ErrorUnionType = LM::Backend::ErrorUnionType;
 
 // =============================================================================
 // TYPE CHECKER - Runs BEFORE LIR generation
@@ -63,8 +70,25 @@ private:
     };
     std::unordered_map<std::string, FunctionSignature> function_signatures;
     
+    // OOP metadata tracking (bridging AST and TypeSystem)
+    struct FrameInfo {
+        std::string name;
+        std::shared_ptr<AST::FrameDeclaration> declaration;
+        std::vector<std::pair<std::string, TypePtr>> fields;
+        std::vector<std::pair<std::string, bool>> field_has_default;
+    };
+    std::unordered_map<std::string, FrameInfo> frame_declarations;
+
+    struct TraitInfo {
+        std::string name;
+        std::vector<std::string> extends;
+        std::shared_ptr<AST::TraitDeclaration> declaration;
+    };
+    std::unordered_map<std::string, TraitInfo> trait_declarations;
+
     // Current context
     std::shared_ptr<AST::FunctionDeclaration> current_function = nullptr;
+    std::shared_ptr<AST::FrameDeclaration> current_frame = nullptr;
     TypePtr current_return_type = nullptr;
     bool in_loop = false;
     
@@ -172,6 +196,7 @@ private:
     void mark_variable_moved(const std::string& name);
     void mark_variable_dropped(const std::string& name);
     void mark_variable_initialized(const std::string& name);
+    bool is_visible(const std::string& frame_name, AST::VisibilityLevel visibility, int line);
     
     // Type checking methods
     TypePtr check_expression(std::shared_ptr<AST::Expression> expr);
@@ -180,10 +205,16 @@ private:
     TypePtr check_function_declaration(std::shared_ptr<AST::FunctionDeclaration> func);
     TypePtr check_var_declaration(std::shared_ptr<AST::VarDeclaration> var_decl);
     TypePtr check_type_declaration(std::shared_ptr<AST::TypeDeclaration> type_decl);
+    TypePtr check_frame_declaration(std::shared_ptr<AST::FrameDeclaration> frame);
+    TypePtr check_trait_declaration(std::shared_ptr<AST::TraitDeclaration> trait);
     TypePtr check_block_statement(std::shared_ptr<AST::BlockStatement> block);
     TypePtr check_if_statement(std::shared_ptr<AST::IfStatement> if_stmt);
     TypePtr check_while_statement(std::shared_ptr<AST::WhileStatement> while_stmt);
     TypePtr check_for_statement(std::shared_ptr<AST::ForStatement> for_stmt);
+    TypePtr check_parallel_statement(std::shared_ptr<AST::ParallelStatement> parallel_stmt);
+    TypePtr check_concurrent_statement(std::shared_ptr<AST::ConcurrentStatement> concurrent_stmt);
+    TypePtr check_task_statement(std::shared_ptr<AST::TaskStatement> task_stmt);
+    TypePtr check_worker_statement(std::shared_ptr<AST::WorkerStatement> worker_stmt);
     TypePtr check_return_statement(std::shared_ptr<AST::ReturnStatement> return_stmt);
     TypePtr check_print_statement(std::shared_ptr<AST::PrintStatement> print_stmt);
     TypePtr check_match_statement(std::shared_ptr<AST::MatchStatement> match_stmt);
@@ -208,12 +239,13 @@ private:
     TypePtr check_error_construct_expr(std::shared_ptr<AST::ErrorConstructExpr> expr);
     TypePtr check_ok_construct_expr(std::shared_ptr<AST::OkConstructExpr> expr);
     TypePtr check_fallible_expr(std::shared_ptr<AST::FallibleExpr> expr);
+    TypePtr check_frame_instantiation_expr(std::shared_ptr<AST::FrameInstantiationExpr> expr);
     
     // Type annotation resolution
     TypePtr resolve_type_annotation(std::shared_ptr<AST::TypeAnnotation> annotation);
     
     // Type compatibility checking
-    bool is_type_compatible(TypePtr expected, TypePtr actual);
+    bool is_type_compatible(TypePtr actual, TypePtr expected);
     TypePtr get_common_type(TypePtr left, TypePtr right);
     bool can_implicitly_convert(TypePtr from, TypePtr to);
     
@@ -292,11 +324,11 @@ private:
 
 struct TypeCheckResult {
     std::shared_ptr<AST::Program> program;  // AST with inferred_type set
-    TypeSystem& type_system;
+    std::shared_ptr<TypeSystem> type_system;
     bool success;
     std::vector<std::string> errors;
     
-    TypeCheckResult(std::shared_ptr<AST::Program> prog, TypeSystem& ts, bool succ, 
+    TypeCheckResult(std::shared_ptr<AST::Program> prog, std::shared_ptr<TypeSystem> ts, bool succ,
                     const std::vector<std::string>& errs)
         : program(prog), type_system(ts), success(succ), errors(errs) {}
 };

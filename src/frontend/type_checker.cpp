@@ -36,7 +36,7 @@ using namespace LM::Error;bool TypeChecker::check_program(std::shared_ptr<LM::Fr
     // PASS 2: Signature Resolution
     for (const auto& stmt : program->statements) {
         if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
-            TypeSystem::FrameInfo info;
+            LM::Backend::FrameInfo info;
             info.name = frame_decl->name;
             info.declaration = frame_decl;
             info.implements = frame_decl->implements;
@@ -86,7 +86,7 @@ using namespace LM::Error;bool TypeChecker::check_program(std::shared_ptr<LM::Fr
             frame_declarations[frame_decl->name].fields = info.fields;
 
         } else if (auto trait_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
-            TypeSystem::TraitInfo info;
+            LM::Backend::TraitInfo info;
             info.name = trait_decl->name;
             info.declaration = trait_decl;
             info.extends = trait_decl->extends;
@@ -120,6 +120,9 @@ using namespace LM::Error;bool TypeChecker::check_program(std::shared_ptr<LM::Fr
             declare_variable(func_decl->name, type_system.FUNCTION_TYPE);
         }
     }
+
+    // PASS 2.5: Register Built-in Functions in Scope
+    TypeCheckerFactory::register_builtin_functions(*this);
 
     // PASS 3: Body Verification
     for (const auto& stmt : program->statements) {
@@ -3147,6 +3150,7 @@ void TypeChecker::register_builtin_function(const std::string& name,
     sig.declaration = nullptr; // Builtin functions have no declaration
     
     function_signatures[name] = sig;
+    declare_variable(name, type_system.FUNCTION_TYPE);
 }
 
 // =============================================================================

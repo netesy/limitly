@@ -8,6 +8,7 @@
 #include <vector>
 #include <unordered_map>
 #include <string>
+#include <set>
 
 // =============================================================================
 // TYPE CHECKER - Runs BEFORE LIR generation
@@ -16,6 +17,9 @@
 
 namespace LM {
 namespace Frontend {
+
+// Use the TypeSystem from the Backend namespace
+using TypeSystem = LM::Backend::TypeSystem;
 
 class TypeChecker {
 private:

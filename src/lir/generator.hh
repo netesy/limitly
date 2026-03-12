@@ -247,7 +247,7 @@ private:
     uint32_t next_register_ = 0;
     uint32_t next_label_ = 0;
     std::map<std::string, TypePtr> variable_types_;
-    std::shared_ptr<TypeSystem> type_system_;
+    std::shared_ptr<LM::Backend::TypeSystem> type_system_;
     std::string current_function_name_;
     std::set<std::string> function_names_;
     std::map<std::string, std::shared_ptr<LM::Frontend::AST::Expression>> constant_expressions_;
@@ -311,30 +311,8 @@ private:
     void exit_concurrency_context() { concurrency_nesting_level_--; }
     bool is_in_concurrency_context() const { return concurrency_nesting_level_ > 0; }
 
-    // Frame system support (modern OOP)
-    struct FrameInfo {
-        std::string name;
-        std::vector<std::pair<std::string, TypePtr>> fields;  // field name -> type
-        std::unordered_map<std::string, LM::Frontend::AST::VisibilityLevel> field_visibilities;
-        std::vector<std::string> method_names;                // ordered method names
-        std::unordered_map<std::string, size_t> field_offsets; // field name -> offset
-        std::unordered_map<std::string, size_t> method_indices; // method name -> index
-        std::vector<std::string> implements;                  // trait names
-        bool has_init = false;
-        bool has_deinit = false;
-        size_t total_field_size = 0;
-        std::shared_ptr<LM::Frontend::AST::FrameDeclaration> declaration;
-    };
-    std::unordered_map<std::string, FrameInfo> frame_table_;
-
-    struct TraitInfo {
-        std::string name;
-        std::vector<std::string> extends;
-        std::shared_ptr<LM::Frontend::AST::TraitDeclaration> declaration;
-    };
-    std::unordered_map<std::string, TraitInfo> trait_table_;
+    // Frame and Trait tables are now using LM::Backend::TypeSystem registries
     Reg frame_this_register_ = UINT32_MAX;  // Register holding 'this' pointer in frame methods
-    
     
     // Channel context for concurrent blocks
     Reg channel_context_ = UINT32_MAX;
@@ -355,7 +333,6 @@ private:
     void collect_trait_signature(std::shared_ptr<LM::Frontend::AST::TraitDeclaration> trait_decl);
     void collect_frame_signatures(LM::Frontend::AST::Program& program);
     void collect_frame_signature(std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame_decl);
-    void calculate_frame_layout(FrameInfo& frame_info);
     size_t get_frame_field_offset(const std::string& frame_name, const std::string& field_name);
     size_t get_frame_method_index(const std::string& frame_name, const std::string& method_name);
     

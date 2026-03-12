@@ -1,4 +1,4 @@
-﻿#ifndef LM_LM_LIR_HH
+#ifndef LM_LM_LIR_HH
 #define LIR_H
 
 #include <vector>
@@ -14,6 +14,9 @@
 namespace LM {
 namespace LIR {
 
+// Import backend types
+using ValuePtr = LM::Backend::ValuePtr;
+using TypePtr = LM::Backend::TypePtr;
 
 namespace LIR {
 
@@ -603,9 +606,6 @@ std::string type_to_string(Type type);
 Type language_type_to_abi_type(TypePtr lang_type);
 
 } // namespace LIR
-
-
-
 
 } // namespace LM
 } // namespace LIR
