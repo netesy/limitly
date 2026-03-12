@@ -1,9 +1,0 @@
-print("=== Simple While Loop Test ===");
-
-var i = 0;
-while (i < 1300000) {
-    print("i = {i}");
-    i = i + 1;
-}
-
-print("Loop complete");

@@ -1,4 +1,0 @@
-var d = { "x": 10, "y": 20 };
-iter (entry in d) {
-    print(entry);
-}

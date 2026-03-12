@@ -1,6 +1,0 @@
-var d = { "a": 1 };
-iter (entry in d) {
-    print(entry);
-    print(entry.key);
-    print(entry.value);
-}

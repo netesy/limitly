@@ -1,5 +1,0 @@
-print("start");
-var d = { "a": 1 };
-print("dict created");
-print(d);
-print("done");

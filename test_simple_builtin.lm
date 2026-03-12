@@ -1,3 +1,0 @@
-// Simple test for one builtin function
-print("Testing abs function:");
-print(abs(5));

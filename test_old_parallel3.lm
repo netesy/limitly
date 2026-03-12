@@ -1,9 +1,0 @@
-var shared_sum = 0;
-
-parallel(cores=Auto, timeout=60s, grace=1s, on_error=Continue) {
-    iter(i in 1..10) {
-        shared_sum = shared_sum + i;
-    }
-}
-
-print("Sum: {shared_sum}");

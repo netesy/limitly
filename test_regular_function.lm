@@ -1,6 +1,0 @@
-// Test regular function
-fn test(x: str) {
-    print("test called");
-}
-
-test("hello");
