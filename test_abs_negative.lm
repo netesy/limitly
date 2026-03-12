@@ -1,4 +1,0 @@
-// Test abs with negative number
-print("Testing abs(-5):");
-var neg: int = -5;
-print(abs(neg));

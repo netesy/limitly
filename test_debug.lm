@@ -1,4 +1,0 @@
-// Simple test to debug LIR generation
-var lst = [];
-lst.append(42);
-print("List created and element appended");

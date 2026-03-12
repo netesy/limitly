@@ -1,6 +1,0 @@
-// Minimal test for optional parameters
-fn test(x: str?) {
-    print("test called");
-}
-
-test("hello");

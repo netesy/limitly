@@ -1,5 +1,0 @@
-// Tuple-based loop with explicit string list type
-var fruites = ("Apples", "Bananas", "Cherries");
-iter (fruit in fruites) {
-    print(fruit);
-}

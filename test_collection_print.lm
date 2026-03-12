@@ -1,9 +1,0 @@
-// Test collection printing
-var listss = [1, 2, 3];
-print(listss);
-
-var dictz = {"a": 1, "b": 2};
-print(dictz);
-
-var tuple2 = (1, "hello", true);
-print(tuple2);

@@ -1,3 +1,0 @@
-// Simple test to isolate the uint64 type issue
-var test: u64 = 18446744073709551615;
-print(test);

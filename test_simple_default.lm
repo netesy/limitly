@@ -1,5 +1,0 @@
-fn test(x: int = 42) {
-    print(x);
-}
-
-test();

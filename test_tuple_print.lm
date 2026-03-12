@@ -1,2 +1,0 @@
-var t = ("hello", 42);
-print(t);

@@ -1,7 +1,0 @@
-fn greet(name: str = "World") {
-    print("Hello, {name}!");
-}
-
-print("=== Testing default parameters ===");
-greet();
-greet("Alice");
