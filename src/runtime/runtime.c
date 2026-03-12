@@ -5,6 +5,36 @@
 #include <string.h>
 #include <stdio.h>
 
+RUNTIME_API void lm_print_int(int64_t val) {
+    printf("%ld\n", val);
+}
+
+RUNTIME_API void lm_print_string(const char* val) {
+    if (val) printf("%s\n", val);
+}
+
+RUNTIME_API void lm_print_box(LmBox* box) {
+    if (!box) {
+        printf("null\n");
+        return;
+    }
+    switch (box->type) {
+        case LM_BOX_INT: printf("%ld\n", box->value.as_int); break;
+        case LM_BOX_FLOAT: printf("%f\n", box->value.as_float); break;
+        case LM_BOX_BOOL: printf("%s\n", box->value.as_bool ? "true" : "false"); break;
+        case LM_BOX_STRING: printf("%s\n", (char*)box->value.as_ptr); break;
+        case LM_BOX_NULLPTR: printf("null\n"); break;
+        default: printf("<unknown box type %d>\n", box->type);
+    }
+}
+
+RUNTIME_API void lm_assert(int condition, const char* message) {
+    if (!condition) {
+        fprintf(stderr, "Assertion failed: %s\n", message ? message : "unnamed assertion");
+        abort();
+    }
+}
+
 RUNTIME_API LmBox* lm_box_int(int64_t value) {
     LmBox* box = (LmBox*)malloc(sizeof(LmBox));
     if (!box) return NULL;
