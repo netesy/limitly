@@ -26,6 +26,9 @@ public:
     // Generate Fyra IR from verified AST
     std::shared_ptr<ir::Module> generate_from_ast(
         const std::shared_ptr<Frontend::AST::Program>& program);
+
+    // Emit built-in functions
+    void emit_builtins();
     
     // Generate Fyra IR from a single function
     ir::Function* generate_function(

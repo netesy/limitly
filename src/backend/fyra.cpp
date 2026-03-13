@@ -5,6 +5,7 @@
 #include "codegen/CodeGen.h"
 #include "codegen/target/TargetInfo.h"
 #include "codegen/target/SystemV_x64.h"
+#include "codegen/execgen/elf.hh"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -16,34 +17,14 @@ namespace fs = std::filesystem;
 namespace LM::Backend::Fyra {
 
 FyraCompiler::FyraCompiler() {
-    // Initialize Fyra compiler
-    // This will be expanded as Fyra integration develops
 }
 
 FyraCompiler::~FyraCompiler() {
-    // Cleanup if needed
 }
 
-std::string FyraCompiler::convert_lir_to_fyra_ir(const LIR::LIR_Function& lir_func) {
+std::string FyraCompiler::convert_lir_to_fyra_ir(const LIR::LIR_Function& lir_func, TranslationReport& report) {
     std::stringstream ir;
-    
-    // Convert LIR instructions to Fyra IR format
-    // This is a placeholder - actual conversion will depend on Fyra's IR format
-    
-    ir << "// Fyra IR generated from LIR\n";
-    ir << "// Function: " << lir_func.name << "\n";
-    ir << "// Instructions: " << lir_func.instructions.size() << "\n\n";
-    
-    // Iterate through LIR instructions and convert to Fyra IR
-    const auto& instructions = lir_func.instructions;
-    for (size_t i = 0; i < instructions.size(); ++i) {
-        const auto& inst = instructions[i];
-        
-        // Convert each LIR instruction to Fyra IR
-        // This is a simplified placeholder
-        ir << "// [" << i << "] " << inst.to_string() << "\n";
-    }
-    
+    ir << "// Fyra IR generated from LIR\n// Function: " << lir_func.name << "\n\n";
     return ir.str();
 }
 
@@ -84,32 +65,53 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
             return result;
         }
 
-        std::string asm_file = options.output_file + ".s";
-        std::ofstream ofs(asm_file);
-
         // Use Fyra's CodeGen directly
         auto target_info = std::make_unique<codegen::target::SystemV_x64>();
-        codegen::CodeGen generator(*module, std::move(target_info), &ofs);
+        codegen::CodeGen generator(*module, std::move(target_info), nullptr);
         
         generator.emit(true);
-        ofs.close();
 
-        // Invoke GCC to compile assembly to executable
-        std::string cmd = "gcc -no-pie " + asm_file + " src/runtime/runtime.c -o " + options.output_file + " -lpthread";
-        if (debug_mode_) {
+        // Collect sections from assembler
+        std::map<std::string, std::vector<uint8_t>> sections;
+        sections[".text"] = generator.getAssembler().getCode();
+        sections[".data"] = generator.getRodataAssembler().getCode();
+
+        // Collect symbols
+        std::vector<ElfGenerator::Symbol> symbols;
+        for (const auto& sym : generator.getSymbols()) {
+            ElfGenerator::Symbol elf_sym;
+            elf_sym.name = sym.name;
+            elf_sym.value = sym.value;
+            elf_sym.size = sym.size;
+            elf_sym.type = sym.type;
+            elf_sym.binding = sym.binding;
+            elf_sym.sectionName = sym.sectionName;
+            symbols.push_back(elf_sym);
         }
-        
-        int exit_code = std::system(cmd.c_str());
-        if (exit_code == 0) {
+
+        // Collect relocations
+        std::vector<ElfGenerator::Relocation> relocs;
+        for (const auto& reloc : generator.getRelocations()) {
+            ElfGenerator::Relocation elf_reloc;
+            elf_reloc.offset = reloc.offset;
+            elf_reloc.type = reloc.type;
+            elf_reloc.addend = reloc.addend;
+            elf_reloc.symbolName = reloc.symbolName;
+            elf_reloc.sectionName = reloc.sectionName;
+            relocs.push_back(elf_reloc);
+        }
+
+        ElfGenerator elf_gen(options.output_file);
+        // Entry point should be _start, which is emitted by targetInfo->emitStartFunction
+        elf_gen.setEntryPointName("_start");
+        if (elf_gen.generateFromCode(sections, symbols, relocs, options.output_file)) {
             result.success = true;
             result.output_file = options.output_file;
-            // Clean up temporary assembly file
-            if (!options.debug_info) {
-                fs::remove(asm_file);
-            }
+            return result;
         } else {
             result.success = false;
-            result.error_message = "GCC exited with code " + std::to_string(exit_code);
+            result.error_message = "ELF generation failed: " + elf_gen.getLastError();
+            return result;
         }
         
     } catch (const std::exception& e) {
@@ -172,81 +174,6 @@ CompileResult FyraCompiler::compile_wasi(const LIR::LIR_Function& lir_func,
 CompileResult FyraCompiler::invoke_fyra(const std::string& ir_code,
                                        const FyraCompileOptions& options) {
     CompileResult result;
-    
-    try {
-        // Create temporary IR file
-        std::string temp_ir_file = "temp_fyra_ir.ll";
-        std::ofstream ir_file(temp_ir_file);
-        ir_file << ir_code;
-        ir_file.close();
-        
-        // Build Fyra command line
-        std::string cmd = "fyra";
-        
-        // Add target
-        switch (options.target) {
-            case CompileTarget::AOT:
-                cmd += " --target aot";
-                break;
-            case CompileTarget::WASM:
-                cmd += " --target wasm";
-                break;
-            case CompileTarget::WASI:
-                cmd += " --target wasi";
-                break;
-        }
-        
-        // Add optimization level
-        switch (options.opt_level) {
-            case OptimizationLevel::O0:
-                cmd += " -O0";
-                break;
-            case OptimizationLevel::O1:
-                cmd += " -O1";
-                break;
-            case OptimizationLevel::O2:
-                cmd += " -O2";
-                break;
-            case OptimizationLevel::O3:
-                cmd += " -O3";
-                break;
-        }
-        
-        // Add output file
-        cmd += " -o " + options.output_file;
-        
-        // Add debug info if requested
-        if (options.debug_info) {
-            cmd += " -g";
-        }
-        
-        // Add input file
-        cmd += " " + temp_ir_file;
-        
-        if (options.verbose) {
-        }
-        
-        // Execute Fyra compiler
-        int exit_code = std::system(cmd.c_str());
-        
-        // Clean up temporary file
-        fs::remove(temp_ir_file);
-        
-        if (exit_code == 0) {
-            result.success = true;
-            result.output_file = options.output_file;
-        } else {
-            result.success = false;
-            result.error_message = "Fyra compiler exited with code " + std::to_string(exit_code);
-            last_error_ = result.error_message;
-        }
-        
-    } catch (const std::exception& e) {
-        result.success = false;
-        result.error_message = std::string("Failed to invoke Fyra: ") + e.what();
-        last_error_ = result.error_message;
-    }
-    
     return result;
 }
 
