@@ -14,6 +14,7 @@
 #include "codegen/target/Wasm32.h"
 #include "codegen/execgen/elf.hh"
 #include "codegen/execgen/pe.hh"
+#include "codegen/execgen/macho.hh"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -166,42 +167,47 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
             return result;
         }
 
-        // For WebAssembly, skip emit (it hangs) and generate directly
+        // For WebAssembly, use CodeGen to emit either WAT or WASM binary
         if (options.platform == Platform::WASM) {
-            // WebAssembly compilation - output .wasm or .wat based on dump_intermediate
             if (options.dump_intermediate) {
                 // Output WAT (WebAssembly Text format)
+                std::stringstream wat_ss;
+                codegen::CodeGen generator(*module, std::move(target_info), &wat_ss);
+                try {
+                    generator.emit(true);
+                } catch (const std::exception& e) {
+                    result.success = false;
+                    result.error_message = std::string("CodeGen emit (WAT) failed: ") + e.what();
+                    return result;
+                }
+
                 std::ofstream wat_file(options.output_file);
                 if (!wat_file.is_open()) {
                     result.success = false;
                     result.error_message = "Failed to open output file: " + options.output_file;
                     return result;
                 }
-                // TODO: Generate proper WAT format from IR
-                wat_file << "(module\n";
-                wat_file << "  (func $main (result i32)\n";
-                wat_file << "    (i32.const 0)\n";
-                wat_file << "  )\n";
-                wat_file << "  (export \"main\" (func $main))\n";
-                wat_file << ")\n";
+                wat_file << wat_ss.str();
                 wat_file.close();
             } else {
                 // Output WASM (WebAssembly Binary format)
-                // For now, just output WAT format since WASM binary generation is complex
-                std::ofstream wasm_file(options.output_file);
+                codegen::CodeGen generator(*module, std::move(target_info), nullptr);
+                try {
+                    generator.emit(true);
+                } catch (const std::exception& e) {
+                    result.success = false;
+                    result.error_message = std::string("CodeGen emit (WASM) failed: ") + e.what();
+                    return result;
+                }
+
+                std::ofstream wasm_file(options.output_file, std::ios::binary);
                 if (!wasm_file.is_open()) {
                     result.success = false;
                     result.error_message = "Failed to open output file: " + options.output_file;
                     return result;
                 }
-                // TODO: Generate proper WASM binary from IR
-                // For now, output WAT format
-                wasm_file << "(module\n";
-                wasm_file << "  (func $main (result i32)\n";
-                wasm_file << "    (i32.const 0)\n";
-                wasm_file << "  )\n";
-                wasm_file << "  (export \"main\" (func $main))\n";
-                wasm_file << ")\n";
+                const auto& code = generator.getAssembler().getCode();
+                wasm_file.write(reinterpret_cast<const char*>(code.data()), code.size());
                 wasm_file.close();
             }
             result.success = true;
@@ -291,11 +297,77 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
                 result.error_message = "PE generation failed: " + pe_gen.getLastError();
                 return result;
             }
+        } else if (options.platform == Platform::Linux) {
+            // Use ELF format for Linux
+            ElfGenerator elf_gen(options.output_file, true); // 64-bit
+            elf_gen.setEntryPointName("main");
+
+            // Set machine type
+            if (options.arch == Architecture::X86_64) {
+                elf_gen.setMachine(62); // EM_X86_64
+            } else if (options.arch == Architecture::AArch64) {
+                elf_gen.setMachine(183); // EM_AARCH64
+            } else if (options.arch == Architecture::RISCV64) {
+                elf_gen.setMachine(243); // EM_RISCV
+            }
+
+            if (elf_gen.generateFromCode(sections, symbols, relocs, options.output_file)) {
+                result.success = true;
+                result.output_file = options.output_file;
+                return result;
+            } else {
+                result.success = false;
+                result.error_message = "ELF generation failed: " + elf_gen.getLastError();
+                return result;
+            }
+        } else if (options.platform == Platform::MacOS) {
+            // Use Mach-O format for macOS
+            MachOGenerator macho_gen(options.output_file);
+
+            // Set CPU type
+            if (options.arch == Architecture::X86_64) {
+                macho_gen.setCpuType(0x01000007); // CPU_TYPE_X86_64
+            } else if (options.arch == Architecture::AArch64) {
+                macho_gen.setCpuType(0x0100000C); // CPU_TYPE_ARM64
+            }
+
+            // Convert symbols
+            std::vector<MachOGenerator::Symbol> macho_symbols;
+            for (const auto& sym : symbols) {
+                MachOGenerator::Symbol macho_sym;
+                macho_sym.name = sym.name;
+                macho_sym.value = sym.value;
+                macho_sym.size = sym.size;
+                macho_sym.type = sym.type;
+                macho_sym.binding = sym.binding;
+                macho_sym.sectionName = sym.sectionName;
+                macho_symbols.push_back(macho_sym);
+            }
+
+            // Convert relocations
+            std::vector<MachOGenerator::Relocation> macho_relocs;
+            for (const auto& reloc : relocs) {
+                MachOGenerator::Relocation macho_reloc;
+                macho_reloc.offset = reloc.offset;
+                macho_reloc.type = reloc.type;
+                macho_reloc.addend = reloc.addend;
+                macho_reloc.symbolName = reloc.symbolName;
+                macho_reloc.sectionName = reloc.sectionName;
+                macho_relocs.push_back(macho_reloc);
+            }
+
+            if (macho_gen.generateFromCode(sections, macho_symbols, macho_relocs, options.output_file)) {
+                result.success = true;
+                result.output_file = options.output_file;
+                return result;
+            } else {
+                result.success = false;
+                result.error_message = "Mach-O generation failed: " + macho_gen.getLastError();
+                return result;
+            }
         } else {
-            // Use ELF for Linux and macOS
-            // TODO: ELF generation is not yet fully implemented
             result.success = false;
-            result.error_message = "ELF generation for Linux/macOS is not yet implemented. Use Windows target for now.";
+            result.error_message = "Unsupported platform for AOT compilation";
             return result;
         }
         
