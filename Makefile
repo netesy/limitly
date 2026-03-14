@@ -10,7 +10,7 @@ ifeq ($(OS),Windows_NT)
 	CXX := $(MSYS2_PATH)/mingw64/bin/g++.exe
 	CC := $(MSYS2_PATH)/mingw64/bin/gcc.exe
 	AR := $(MSYS2_PATH)/mingw64/bin/ar.exe
-	LIBS := -lws2_32 -lgccjit
+	LIBS := -lws2_32
 else
 	PLATFORM := linux
 	EXE_EXT :=
@@ -26,10 +26,10 @@ endif
 MODE ?= release
 
 ifeq ($(MODE),debug)
-	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit -Isrc/backend/fyra/include $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/fyra/include -Isrc/backend/fyra/src $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -g -fPIC -I.
 else
-	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/jit -Isrc/backend/fyra/include $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/fyra/include -Isrc/backend/fyra/src $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -O3 -fPIC -I.
 endif
 
@@ -60,15 +60,15 @@ FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp  \
               src/frontend/ast/builder.cpp src/frontend/ast/printer.cpp src/frontend/type_checker.cpp src/frontend/memory_checker.cpp \
               src/frontend/ast/optimizer.cpp 
 
-BACK_SRCS :=  src/backend/jit/jit.cpp src/backend/fyra.cpp src/backend/fyra_ir_generator.cpp
+BACK_SRCS :=  src/backend/fyra.cpp src/backend/fyra_ir_generator.cpp
 
 FYRA_DIR := src/backend/fyra
 FYRA_SRCS := $(wildcard $(FYRA_DIR)/src/ir/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/codegen/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/codegen/debug/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/codegen/target/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/codegen/execgen/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/codegen/objectgen/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/codegen/debug/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/codegen/profiling/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/codegen/validation/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/transforms/*.cpp) \
@@ -136,9 +136,6 @@ $(RSP_DIR):
 $(OBJ_DIR)/runtime:
 	@mkdir -p $@
 
-$(OBJ_DIR)/fyra:
-	@mkdir -p $@
-
 # =============================
 # Object compilation - C++ files
 # =============================
@@ -146,7 +143,7 @@ $(OBJ_DIR)/%.o: %.cpp | $(OBJ_DIR)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(OBJ_DIR)/fyra/%.o: src/backend/fyra/src/%.cpp | $(OBJ_DIR)/fyra
+$(OBJ_DIR)/fyra/%.o: src/backend/fyra/src/%.cpp | $(OBJ_DIR)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
@@ -169,12 +166,14 @@ $(RUNTIME_LIB): $(RUNTIME_OBJS)
 	@echo "✅ Runtime library built: $@"
 
 # =============================
-# Fyra library
+# Fyra library configuration
 # =============================
-fyra: $(FYRA_LIB)
+FYRA_DIR := src/backend/fyra
+FYRA_LIB := $(OBJ_DIR)/libfyra.a
 
+# Build Fyra using Makefile (excluding problematic debug files)
 $(FYRA_LIB): $(FYRA_OBJS)
-	@echo "Building fyra library: $@"
+	@echo "🔨 Building Fyra library with Makefile..."
 	@mkdir -p $(dir $@)
 	$(AR) rcs $@ $^
 	@echo "✅ Fyra library built: $@"
@@ -193,9 +192,9 @@ $(TEST_RSP): $(TEST_OBJS) | $(RSP_DIR)
 # =============================
 # Build targets
 # =============================
-windows: $(BIN_DIR) $(MAIN_RSP) $(RUNTIME_LIB)
+windows: $(BIN_DIR) $(MAIN_RSP) $(RUNTIME_LIB) $(FYRA_LIB)
 	@echo "🔨 Linking limitly.exe ..."
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(RUNTIME_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(RUNTIME_LIB) $(FYRA_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS)
 	@echo "✅ limitly.exe built."
 
 linux: $(BIN_DIR) $(MAIN_RSP) $(RUNTIME_LIB) $(FYRA_LIB)
@@ -219,8 +218,9 @@ clean:
 ifeq ($(PLATFORM),windows)
 	@powershell -Command "if (Test-Path 'build') { Remove-Item -Recurse -Force 'build' }"
 	@powershell -Command "if (Test-Path 'bin') { Remove-Item -Recurse -Force 'bin' }"
+	@powershell -Command "if (Test-Path '$(FYRA_DIR)/build') { Remove-Item -Recurse -Force '$(FYRA_DIR)/build' }"
 else
-	rm -rf build bin
+	rm -rf build bin $(FYRA_DIR)/build
 endif
 	@echo "🧹 Cleaned build artifacts."
 
@@ -249,16 +249,6 @@ else
 endif
 	@echo "✅ Root .lm files cleaned (std/ and tests/ preserved)."
 
-# =============================
-# JIT Test Target
-# =============================
-test-jit: $(BIN_DIR) $(RUNTIME_LIB)
-	@echo "🔨 Building JIT test..."
-	$(CXX) $(CXXFLAGS) -I. test_jit_operations.cpp src/backend/jit/jit.cpp src/lir/lir.cpp \
-		src/lir/lir_utils.cpp $(RUNTIME_LIB) -o $(BIN_DIR)/test_jit$(EXE_EXT) $(LIBS)
-	@echo "✅ JIT test built."
-	@echo "🧪 Running JIT test..."
-	$(BIN_DIR)/test_jit$(EXE_EXT)
 
 # =============================
 # Parser Test Target

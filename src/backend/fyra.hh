@@ -19,6 +19,20 @@ enum class CompileTarget {
     WASI        // WebAssembly System Interface
 };
 
+enum class Platform {
+    Windows,    // Windows platform
+    Linux,      // Linux platform
+    MacOS,      // macOS platform
+    WASM        // WebAssembly platform
+};
+
+enum class Architecture {
+    X86_64,     // x86-64 (x64)
+    AArch64,    // ARM64
+    WASM32,     // WebAssembly 32-bit
+    RISCV64     // RISC-V 64-bit
+};
+
 enum class OptimizationLevel {
     O0,         // No optimization
     O1,         // Basic optimization
@@ -28,10 +42,13 @@ enum class OptimizationLevel {
 
 struct FyraCompileOptions {
     CompileTarget target = CompileTarget::AOT;
+    Platform platform = Platform::Windows;
+    Architecture arch = Architecture::X86_64;
     OptimizationLevel opt_level = OptimizationLevel::O2;
     std::string output_file;
     bool debug_info = false;
     bool verbose = false;
+    bool dump_intermediate = false;  // Dump .s or .wat files
     std::string triple;  // Target triple (e.g., "x86_64-pc-windows-gnu")
 };
 
@@ -62,28 +79,39 @@ public:
     // Compile to AOT executable (AST path)
     CompileResult compile_ast_aot(std::shared_ptr<Frontend::AST::Program> program,
                                  const std::string& output_file,
-                                 OptimizationLevel opt_level = OptimizationLevel::O2);
+                                 Platform platform = Platform::Windows,
+                                 Architecture arch = Architecture::X86_64,
+                                 OptimizationLevel opt_level = OptimizationLevel::O2,
+                                 bool dump_intermediate = false);
 
     // Compile to AOT executable
     CompileResult compile_aot(const LIR::LIR_Function& lir_func,
                              const std::string& output_file,
-                             OptimizationLevel opt_level = OptimizationLevel::O2);
+                             Platform platform = Platform::Windows,
+                             Architecture arch = Architecture::X86_64,
+                             OptimizationLevel opt_level = OptimizationLevel::O2,
+                             bool dump_intermediate = false);
     
     // Compile to WebAssembly
     CompileResult compile_wasm(const LIR::LIR_Function& lir_func,
                               const std::string& output_file,
-                              OptimizationLevel opt_level = OptimizationLevel::O2);
+                              OptimizationLevel opt_level = OptimizationLevel::O2,
+                              bool dump_intermediate = false);
     
     // Compile to WASI (WebAssembly System Interface)
     CompileResult compile_wasi(const LIR::LIR_Function& lir_func,
                               const std::string& output_file,
-                              OptimizationLevel opt_level = OptimizationLevel::O2);
+                              OptimizationLevel opt_level = OptimizationLevel::O2,
+                              bool dump_intermediate = false);
     
     // Set debug mode
     void set_debug_mode(bool debug) { debug_mode_ = debug; }
     
     // Get last error message
     std::string get_last_error() const { return last_error_; }
+    
+    // Convert platform and architecture to target triple
+    static std::string get_target_triple(Platform platform, Architecture arch);
     
 public:
     struct TranslationDiagnostic {
