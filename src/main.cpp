@@ -10,7 +10,7 @@
 #include "frontend/ast.hh"
 #include "lir/generator.hh"
 #include "lir/functions.hh"
-#include "backend/jit/jit.hh"
+// #include "backend/jit/jit.hh"
 #include "backend/vm/register.hh"
 #include "backend/fyra.hh"
 #include "backend/fyra_ir_generator.hh"
@@ -25,19 +25,25 @@ using namespace LM;
 void printUsage(const char* programName) {
     std::cout << "Limit Programming Language\n";
     std::cout << "Usage:\n";
-    std::cout << "  " << programName << " <source_file>           - Execute a source file\n";
-    std::cout << "  " << programName << " -ast <source_file>      - Print the AST\n";
-    std::cout << "  " << programName << " -cst <source_file>      - Print the CST\n";
-    std::cout << "  " << programName << " -tokens <source_file>   - Print tokens\n";
-    std::cout << "  " << programName << " -lir <source_file>      - Print the LIR (Low-level IR)\n";
-    std::cout << "  " << programName << " -fyra-ir <source_file>  - Print the Fyra IR\n";
-    std::cout << "  " << programName << " -jit <source_file>      - JIT compile to executable\n";
-    std::cout << "  " << programName << " -jit-debug <source_file> - JIT compile and run directly\n";
-    std::cout << "  " << programName << " -aot <source_file>      - AOT compile with Fyra\n";
-    std::cout << "  " << programName << " -wasm <source_file>     - Compile to WebAssembly\n";
-    std::cout << "  " << programName << " -wasi <source_file>     - Compile to WASI\n";
-    std::cout << "  " << programName << " -debug <source_file>    - Execute with debug output\n";
-    std::cout << "  " << programName << " -repl                   - Start interactive REPL\n";
+    std::cout << "\n  Execution (Register VM):\n";
+    std::cout << "    " << programName << " run [options] <source_file>\n";
+    std::cout << "      Options:\n";
+    std::cout << "        -debug                Enable debug output\n";
+    std::cout << "\n  Compilation (AOT/WASM):\n";
+    std::cout << "    " << programName << " build [options] <source_file>\n";
+    std::cout << "      Options:\n";
+    std::cout << "        -target <target>      Target platform (windows, linux, macos, wasm)\n";
+    std::cout << "        -o <output>           Output file name\n";
+    std::cout << "        -O <level>            Optimization level (0, 1, 2, 3)\n";
+    std::cout << "        -d                    Output intermediate files (.s for native, .wat for wasm)\n";
+    std::cout << "\n  Debugging:\n";
+    std::cout << "    " << programName << " -ast <source_file>      Print the AST\n";
+    std::cout << "    " << programName << " -cst <source_file>      Print the CST\n";
+    std::cout << "    " << programName << " -tokens <source_file>   Print tokens\n";
+    std::cout << "    " << programName << " -lir <source_file>      Print the LIR (Low-level IR)\n";
+    std::cout << "    " << programName << " -fyra-ir <source_file>  Print the Fyra IR\n";
+    std::cout << "\n  Interactive:\n";
+    std::cout << "    " << programName << " -repl                   Start interactive REPL\n";
 }
 
 std::string readFile(const std::string& filename) {
@@ -54,7 +60,8 @@ std::string readFile(const std::string& filename) {
 int executeFile(const std::string& filename, bool printAst = false, bool printCst = false, 
                 bool printTokens = false, bool useJit = false, bool jitDebug = false, 
                 bool enableDebug = false, bool printLir = false, bool useAot = false,
-                bool useWasm = false, bool useWasi = false, bool printFyraIr = false) {
+                bool useWasm = false, bool useWasi = false, bool printFyraIr = false,
+                const std::string& platform = "windows", int opt_level = 2, bool dump_intermediate = false) {
     try {
         // Initialize LIR function systems
         // Note: Temporarily disabled due to crash in BuiltinUtils::initializeBuiltins()
@@ -238,22 +245,49 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                     output_filename.erase(dot_pos);
                 }
                 
+                // Convert platform string to enum
+                LM::Backend::Fyra::Platform fyra_platform = LM::Backend::Fyra::Platform::Windows;
+                if (platform == "linux") {
+                    fyra_platform = LM::Backend::Fyra::Platform::Linux;
+                } else if (platform == "macos") {
+                    fyra_platform = LM::Backend::Fyra::Platform::MacOS;
+                } else if (platform == "wasm") {
+                    fyra_platform = LM::Backend::Fyra::Platform::WASM;
+                }
+                
+                // Convert optimization level
+                LM::Backend::Fyra::OptimizationLevel fyra_opt = LM::Backend::Fyra::OptimizationLevel::O2;
+                if (opt_level == 0) {
+                    fyra_opt = LM::Backend::Fyra::OptimizationLevel::O0;
+                } else if (opt_level == 1) {
+                    fyra_opt = LM::Backend::Fyra::OptimizationLevel::O1;
+                } else if (opt_level == 3) {
+                    fyra_opt = LM::Backend::Fyra::OptimizationLevel::O3;
+                }
+                
                 LM::Backend::Fyra::CompileResult result;
                 
                 if (useAot) {
-                    #ifdef _WIN32
+                    // Add appropriate extension based on target platform, not host platform
+                    if (fyra_platform == LM::Backend::Fyra::Platform::Windows) {
                         output_filename += ".exe";
-                    #endif
-                    result = fyra.compile_ast_aot(post_opt_type_check.program, output_filename);
+                    }
+                    result = fyra.compile_ast_aot(post_opt_type_check.program, output_filename,
+                                                 fyra_platform, LM::Backend::Fyra::Architecture::X86_64,
+                                                 fyra_opt, dump_intermediate);
                     std::cout << "AOT compilation with Fyra (Direct AST Path)\n";
                 } else if (useWasm) {
-                    output_filename += ".wasm";
-                    // result = fyra.compile_wasm(*lir_function, output_filename);
-                    std::cout << "WebAssembly compilation with Fyra (Direct AST Path - Placeholder)\n";
+                    output_filename += dump_intermediate ? ".wat" : ".wasm";
+                    result = fyra.compile_ast_aot(post_opt_type_check.program, output_filename,
+                                                 LM::Backend::Fyra::Platform::WASM, LM::Backend::Fyra::Architecture::WASM32,
+                                                 fyra_opt, dump_intermediate);
+                    std::cout << "WebAssembly compilation with Fyra (Direct AST Path)\n";
                 } else if (useWasi) {
-                    output_filename += ".wasi";
-                    // result = fyra.compile_wasi(*lir_function, output_filename);
-                    std::cout << "WASI compilation with Fyra (Direct AST Path - Placeholder)\n";
+                    output_filename += dump_intermediate ? ".wat" : ".wasi";
+                    result = fyra.compile_ast_aot(post_opt_type_check.program, output_filename,
+                                                 LM::Backend::Fyra::Platform::WASM, LM::Backend::Fyra::Architecture::WASM32,
+                                                 fyra_opt, dump_intermediate);
+                    std::cout << "WASI compilation with Fyra (Direct AST Path)\n";
                 }
                 
                 if (result.success) {
@@ -267,38 +301,8 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 return 1;
             }
         } else if (useJit) {
-            try {
-                // Initialize JIT backend
-                LM::Backend::JIT::Compiler::JITBackend jit;
-                jit.set_debug_mode(enableDebug || jitDebug);
-                jit.process_function(*lir_function);
-                
-                if (jitDebug) {
-                    int exit_code = jit.execute_compiled_function();
-                    return exit_code;
-                } else {
-                    std::string output_filename = filename;
-                    size_t dot_pos = output_filename.rfind(".lm");
-                    if (dot_pos != std::string::npos) {
-                        output_filename.erase(dot_pos);
-                    }
-                    #ifdef _WIN32
-                        output_filename += ".exe";
-                    #endif
-                    
-                    auto result = jit.compile(LM::Backend::JIT::Compiler::CompileMode::ToExecutable, 
-                                            output_filename);
-                    if (result.success) {
-                        std::cout << "Compiled to " << result.output_file << "\n";
-                    } else {
-                        std::cerr << "JIT compilation failed: " << result.error_message << "\n";
-                        return 1;
-                    }
-                }
-            } catch (const std::exception& e) {
-                std::cerr << "JIT Error: " << e.what() << "\n";
-                return 1;
-            }
+            std::cerr << "JIT compilation is currently disabled.\n";
+            return 1;
         } else {
            
             try {
@@ -437,38 +441,197 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
-    std::string arg = argv[1];
+    std::string command = argv[1];
     
-    if (arg == "-repl") {
+    // Handle REPL
+    if (command == "-repl") {
         startRepl();
         return 0;
-    } else if (arg == "-ast" && argc >= 3) {
-        return executeFile(argv[2], true, false, false, false, false, false, false, false, false, false);
-    } else if (arg == "-cst" && argc >= 3) {
-        return executeFile(argv[2], false, true, false, false, false, false, false, false, false, false);
-    } else if (arg == "-tokens" && argc >= 3) {
-        return executeFile(argv[2], false, false, true, false, false, false, false, false, false, false);
-    } else if (arg == "-lir" && argc >= 3) {
-        return executeFile(argv[2], false, false, false, false, false, false, true, false, false, false, false);
-    } else if (arg == "-fyra-ir" && argc >= 3) {
-        return executeFile(argv[2], false, false, false, false, false, false, false, false, false, false, true);
-    } else if (arg == "-jit" && argc >= 3) {
-        return executeFile(argv[2], false, false, false, true, false, false, false, false, false, false, false);
-    } else if (arg == "-jit-debug" && argc >= 3) {
-        return executeFile(argv[2], false, false, false, true, true, false, false, false, false, false, false);
-    } else if (arg == "-aot" && argc >= 3) {
-        return executeFile(argv[2], false, false, false, false, false, false, false, true, false, false, false);
-    } else if (arg == "-wasm" && argc >= 3) {
-        return executeFile(argv[2], false, false, false, false, false, false, false, false, true, false, false);
-    } else if (arg == "-wasi" && argc >= 3) {
-        return executeFile(argv[2], false, false, false, false, false, false, false, false, false, true, false);
-    } else if (arg == "-debug" && argc >= 3) {
-        return executeFile(argv[2], false, false, false, false, false, true, false, false, false, false, false);
-    } else if (arg[0] == '-') {
-        std::cerr << "Unknown option: " << arg << "\n";
-        printUsage(argv[0]);
-        return 1;
-    } else {
-        return executeFile(arg, false, false, false, false, false, false, false, false, false, false, false);
     }
+    
+    // Handle debugging commands (legacy)
+    if (command == "-ast" && argc >= 3) {
+        return executeFile(argv[2], true, false, false, false, false, false, false, false, false, false);
+    } else if (command == "-cst" && argc >= 3) {
+        return executeFile(argv[2], false, true, false, false, false, false, false, false, false, false);
+    } else if (command == "-tokens" && argc >= 3) {
+        return executeFile(argv[2], false, false, true, false, false, false, false, false, false, false);
+    } else if (command == "-lir" && argc >= 3) {
+        return executeFile(argv[2], false, false, false, false, false, false, true, false, false, false, false);
+    } else if (command == "-fyra-ir" && argc >= 3) {
+        return executeFile(argv[2], false, false, false, false, false, false, false, false, false, false, true);
+    } else if (command == "-debug" && argc >= 3) {
+        return executeFile(argv[2], false, false, false, false, false, true, false, false, false, false, false);
+    }
+    
+    // Handle 'run' command
+    if (command == "run") {
+        if (argc < 3) {
+            std::cerr << "Error: 'run' command requires a source file\n";
+            std::cerr << "Usage: " << argv[0] << " run [options] <source_file>\n";
+            return 1;
+        }
+        
+        std::string source_file;
+        bool enable_debug = false;
+        
+        // Parse options
+        for (int i = 2; i < argc; i++) {
+            std::string arg = argv[i];
+            if (arg == "-debug") {
+                enable_debug = true;
+            } else if (arg[0] != '-') {
+                source_file = arg;
+            }
+        }
+        
+        if (source_file.empty()) {
+            std::cerr << "Error: No source file specified\n";
+            return 1;
+        }
+        
+        // Execute with register VM
+        return executeFile(source_file, false, false, false, false, false, enable_debug, false, false, false, false, false);
+    }
+    
+    // Handle 'build' command
+    if (command == "build") {
+        if (argc < 2) {
+            std::cerr << "Error: 'build' command requires a source file\n";
+            std::cerr << "Usage: " << argv[0] << " build [target] [arch] [opt_level] <source_file> [-d]\n";
+            std::cerr << "Targets: windows, linux, macos, wasm (default: current platform)\n";
+            std::cerr << "Arch: x86_64, aarch64, wasm32, riscv64 (default: x86_64)\n";
+            std::cerr << "Opt level: 0, 1, 2, 3 (default: 2)\n";
+            return 1;
+        }
+        
+        // Determine default target based on host platform
+        std::string default_target;
+        #ifdef _WIN32
+            default_target = "windows";
+        #elif defined(__APPLE__)
+            default_target = "macos";
+        #else
+            default_target = "linux";
+        #endif
+        
+        std::string target = default_target;
+        std::string arch = "x86_64";
+        int opt_level = 2;
+        std::string source_file;
+        bool dump_intermediate = false;
+        
+        // Parse positional arguments and flags
+        int positional_count = 0;
+        for (int i = 2; i < argc; i++) {
+            std::string arg = argv[i];
+            
+            if (arg == "-d") {
+                dump_intermediate = true;
+            } else if (arg[0] == '-') {
+                // Unknown flag
+                std::cerr << "Error: Unknown flag '" << arg << "'\n";
+                return 1;
+            } else if (positional_count >= 3) {
+                // Source file already set, ignore additional arguments
+                continue;
+            } else {
+                // Positional argument
+                if (positional_count == 0) {
+                    // Could be target or source file
+                    if (arg == "windows" || arg == "linux" || arg == "macos" || arg == "wasm") {
+                        target = arg;
+                        positional_count++;
+                    } else {
+                        // It's the source file
+                        source_file = arg;
+                        positional_count = 3;  // Mark source file as found
+                    }
+                } else if (positional_count == 1) {
+                    // Could be arch or source file
+                    if (arg == "x86_64" || arg == "aarch64" || arg == "wasm32" || arg == "riscv64") {
+                        arch = arg;
+                        positional_count++;
+                    } else {
+                        // It's the source file
+                        source_file = arg;
+                        positional_count = 3;  // Mark source file as found
+                    }
+                } else if (positional_count == 2) {
+                    // Could be opt_level or source file
+                    if (arg.length() == 1 && arg[0] >= '0' && arg[0] <= '3') {
+                        opt_level = std::stoi(arg);
+                        positional_count++;
+                    } else {
+                        // It's the source file
+                        source_file = arg;
+                        positional_count = 3;  // Mark source file as found
+                    }
+                }
+            }
+        }
+        
+        if (source_file.empty()) {
+            std::cerr << "Error: No source file specified\n";
+            return 1;
+        }
+        
+        // Validate target
+        if (target != "windows" && target != "linux" && target != "macos" && target != "wasm") {
+            std::cerr << "Error: Invalid target '" << target << "'\n";
+            std::cerr << "Valid targets: windows, linux, macos, wasm\n";
+            return 1;
+        }
+        
+        // Validate arch
+        if (arch != "x86_64" && arch != "aarch64" && arch != "wasm32" && arch != "riscv64") {
+            std::cerr << "Error: Invalid architecture '" << arch << "'\n";
+            std::cerr << "Valid architectures: x86_64, aarch64, wasm32, riscv64\n";
+            return 1;
+        }
+        
+        // Validate opt_level
+        if (opt_level < 0 || opt_level > 3) {
+            std::cerr << "Error: Invalid optimization level '" << opt_level << "'\n";
+            std::cerr << "Valid levels: 0, 1, 2, 3\n";
+            return 1;
+        }
+        
+        // Generate intermediate file extension based on target
+        std::string intermediate_ext;
+        if (target == "wasm") {
+            intermediate_ext = ".wat";
+        } else {
+            intermediate_ext = ".s";
+        }
+        
+        // If -d flag is set, output intermediate file instead of binary
+        if (dump_intermediate) {
+            std::string output_file = source_file;
+            size_t dot_pos = output_file.rfind(".lm");
+            if (dot_pos != std::string::npos) {
+                output_file.erase(dot_pos);
+            }
+            output_file += intermediate_ext;
+            std::cout << "Dumping intermediate " << intermediate_ext << " file to: " << output_file << "\n";
+            // TODO: Implement intermediate file output
+            return 0;
+        }
+        
+        // Compile based on target
+        bool use_aot = (target != "wasm");
+        bool use_wasm = (target == "wasm");
+        
+        return executeFile(source_file, false, false, false, false, false, false, false, use_aot, use_wasm, false, false, target, opt_level, dump_intermediate);
+    }
+    
+    // Handle legacy single file execution (backward compatibility)
+    if (command[0] != '-') {
+        return executeFile(command, false, false, false, false, false, false, false, false, false, false, false);
+    }
+    
+    // Unknown option
+    std::cerr << "Unknown option: " << command << "\n";
+    printUsage(argv[0]);
+    return 1;
 }
