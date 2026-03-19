@@ -87,7 +87,7 @@ BACKEND_COMMON_SRCS := src/backend/symbol_table.cpp src/backend/value.cpp
 ERROR_SRCS := src/error/debugger.cpp
 
 MAIN_SRCS := src/main.cpp $(BACKEND_COMMON_SRCS) $(BACK_SRCS) $(ERROR_SRCS) \
-             $(FRONT_SRCS) $(REGISTER_SRCS) $(LIR_CORE_SRCS) 
+             $(FRONT_SRCS) $(REGISTER_SRCS) $(LIR_CORE_SRCS) src/backend/fyra_builtin_functions.cpp
 
 TEST_SRCS := src/test_parser.cpp $(BACKEND_COMMON_SRCS) $(LIR_CORE_SRCS) $(ERROR_SRCS) \
              $(FRONT_SRCS)
