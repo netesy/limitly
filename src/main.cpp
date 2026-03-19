@@ -61,7 +61,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 bool printTokens = false, bool useJit = false, bool jitDebug = false, 
                 bool enableDebug = false, bool printLir = false, bool useAot = false,
                 bool useWasm = false, bool useWasi = false, bool printFyraIr = false,
-                const std::string& platform = "windows", int opt_level = 2, bool dump_intermediate = false) {
+                const std::string& platform = "linux", int opt_level = 2, bool dump_intermediate = false) {
     try {
         // Initialize LIR function systems
         // Note: Temporarily disabled due to crash in BuiltinUtils::initializeBuiltins()
@@ -147,32 +147,93 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         }
 
         // Generate Fyra IR if requested (before LIR generation)
-        if (printFyraIr) {
+        if (printFyraIr || useAot || useWasm || useWasi) {
             try {
-                std::cout << "Starting Fyra IR generation..." << std::endl;
-                LM::Backend::Fyra::FyraIRGenerator fyra_ir_gen;
-                auto fyra_ir_module = fyra_ir_gen.generate_from_ast(post_opt_type_check.program);
-                std::cout << "Fyra IR generation finished." << std::endl;
+                std::cerr << "Starting Fyra IR generation..." << std::endl;
+                auto fyra_ir_gen = std::make_shared<LM::Backend::Fyra::FyraIRGenerator>();
+                auto fyra_ir_module = fyra_ir_gen->generate_from_ast(post_opt_type_check.program);
+                std::cerr << "Fyra IR generation finished." << std::endl;
                 
                 if (!fyra_ir_module) {
                     std::cerr << "Failed to generate Fyra IR\n";
                     return 1;
                 }
                 
-                if (fyra_ir_gen.has_errors()) {
+                if (fyra_ir_gen->has_errors()) {
                     std::cerr << "Fyra IR generation errors:\n";
-                    for (const auto& error : fyra_ir_gen.get_errors()) {
+                    for (const auto& error : fyra_ir_gen->get_errors()) {
                         std::cerr << "  " << error << "\n";
                     }
                     return 1;
                 }
-                
-                std::cout << "=== Fyra IR ===\n";
-                // ir::Module doesn't have to_ir_string, we need to print it somehow or just acknowledge success for now
-                std::cout << "Fyra IR module generated successfully.\n";
-                return 0;
+
+                if (printFyraIr) {
+                    std::cout << "=== Fyra IR Module Created Successfully ===\n";
+                    if (fyra_ir_module) {
+                        for (const auto& func : fyra_ir_module->getFunctions()) {
+                            if (func) {
+                                func->print(std::cout);
+                                std::cout << "\n";
+                            }
+                        }
+                    }
+                    return 0;
+                }
+
+                if (useAot || useWasm || useWasi) {
+                    // Initialize Fyra compiler
+                    LM::Backend::Fyra::FyraCompiler fyra;
+                    fyra.set_debug_mode(enableDebug);
+                    
+                    std::string output_filename = filename;
+                    size_t dot_pos = output_filename.rfind(".lm");
+                    if (dot_pos != std::string::npos) {
+                        output_filename.erase(dot_pos);
+                    }
+                    
+                    // Convert platform string to enum
+                    LM::Backend::Fyra::Platform fyra_platform = LM::Backend::Fyra::Platform::Linux;
+                    if (platform == "linux") {
+                        fyra_platform = LM::Backend::Fyra::Platform::Linux;
+                    } else if (platform == "macos") {
+                        fyra_platform = LM::Backend::Fyra::Platform::MacOS;
+                    } else if (platform == "wasm") {
+                        fyra_platform = LM::Backend::Fyra::Platform::WASM;
+                    } else if (platform == "windows") {
+                        fyra_platform = LM::Backend::Fyra::Platform::Windows;
+                    }
+                    
+                    // Convert optimization level
+                    LM::Backend::Fyra::OptimizationLevel fyra_opt = LM::Backend::Fyra::OptimizationLevel::O2;
+                    if (opt_level == 0) {
+                        fyra_opt = LM::Backend::Fyra::OptimizationLevel::O0;
+                    } else if (opt_level == 1) {
+                        fyra_opt = LM::Backend::Fyra::OptimizationLevel::O1;
+                    } else if (opt_level == 3) {
+                        fyra_opt = LM::Backend::Fyra::OptimizationLevel::O3;
+                    }
+                    
+                    LM::Backend::Fyra::FyraCompileOptions options;
+                    options.platform = fyra_platform;
+                    options.arch = (fyra_platform == LM::Backend::Fyra::Platform::WASM ? LM::Backend::Fyra::Architecture::WASM32 : LM::Backend::Fyra::Architecture::X86_64);
+                    options.opt_level = fyra_opt;
+                    options.dump_intermediate = dump_intermediate;
+                    options.output_file = output_filename;
+                    if (useAot && fyra_platform == LM::Backend::Fyra::Platform::Windows) options.output_file += ".exe";
+                    else if (useWasm || useWasi) options.output_file += dump_intermediate ? ".wat" : (useWasm ? ".wasm" : ".wasi");
+
+                    auto result = fyra.compile_module(fyra_ir_module, options);
+                    
+                    if (result.success) {
+                        std::cout << "Compiled to " << result.output_file << "\n";
+                        return 0;
+                    } else {
+                        std::cerr << "Fyra compilation failed: " << result.error_message << "\n";
+                        return 1;
+                    }
+                }
             } catch (const std::exception& e) {
-                std::cerr << "Fyra IR generation error: " << e.what() << "\n";
+                std::cerr << "Fyra Error: " << e.what() << "\n";
                 return 1;
             }
         }
@@ -233,74 +294,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             return 0;
         }
 
-        if (useAot || useWasm || useWasi) {
-            try {
-                // Initialize Fyra compiler
-                LM::Backend::Fyra::FyraCompiler fyra;
-                fyra.set_debug_mode(enableDebug);
-                
-                std::string output_filename = filename;
-                size_t dot_pos = output_filename.rfind(".lm");
-                if (dot_pos != std::string::npos) {
-                    output_filename.erase(dot_pos);
-                }
-                
-                // Convert platform string to enum
-                LM::Backend::Fyra::Platform fyra_platform = LM::Backend::Fyra::Platform::Windows;
-                if (platform == "linux") {
-                    fyra_platform = LM::Backend::Fyra::Platform::Linux;
-                } else if (platform == "macos") {
-                    fyra_platform = LM::Backend::Fyra::Platform::MacOS;
-                } else if (platform == "wasm") {
-                    fyra_platform = LM::Backend::Fyra::Platform::WASM;
-                }
-                
-                // Convert optimization level
-                LM::Backend::Fyra::OptimizationLevel fyra_opt = LM::Backend::Fyra::OptimizationLevel::O2;
-                if (opt_level == 0) {
-                    fyra_opt = LM::Backend::Fyra::OptimizationLevel::O0;
-                } else if (opt_level == 1) {
-                    fyra_opt = LM::Backend::Fyra::OptimizationLevel::O1;
-                } else if (opt_level == 3) {
-                    fyra_opt = LM::Backend::Fyra::OptimizationLevel::O3;
-                }
-                
-                LM::Backend::Fyra::CompileResult result;
-                
-                if (useAot) {
-                    // Add appropriate extension based on target platform, not host platform
-                    if (fyra_platform == LM::Backend::Fyra::Platform::Windows) {
-                        output_filename += ".exe";
-                    }
-                    result = fyra.compile_ast_aot(post_opt_type_check.program, output_filename,
-                                                 fyra_platform, LM::Backend::Fyra::Architecture::X86_64,
-                                                 fyra_opt, dump_intermediate);
-                    std::cout << "AOT compilation with Fyra (Direct AST Path)\n";
-                } else if (useWasm) {
-                    output_filename += dump_intermediate ? ".wat" : ".wasm";
-                    result = fyra.compile_ast_aot(post_opt_type_check.program, output_filename,
-                                                 LM::Backend::Fyra::Platform::WASM, LM::Backend::Fyra::Architecture::WASM32,
-                                                 fyra_opt, dump_intermediate);
-                    std::cout << "WebAssembly compilation with Fyra (Direct AST Path)\n";
-                } else if (useWasi) {
-                    output_filename += dump_intermediate ? ".wat" : ".wasi";
-                    result = fyra.compile_ast_aot(post_opt_type_check.program, output_filename,
-                                                 LM::Backend::Fyra::Platform::WASM, LM::Backend::Fyra::Architecture::WASM32,
-                                                 fyra_opt, dump_intermediate);
-                    std::cout << "WASI compilation with Fyra (Direct AST Path)\n";
-                }
-                
-                if (result.success) {
-                    std::cout << "Compiled to " << result.output_file << "\n";
-                } else {
-                    std::cerr << "Fyra compilation failed: " << result.error_message << "\n";
-                    return 1;
-                }
-            } catch (const std::exception& e) {
-                std::cerr << "Fyra Error: " << e.what() << "\n";
-                return 1;
-            }
-        } else if (useJit) {
+        if (useJit) {
             std::cerr << "JIT compilation is currently disabled.\n";
             return 1;
         } else {

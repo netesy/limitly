@@ -1,5 +1,3 @@
-// fyra_ir_generator.cpp - Direct AST to Fyra IR Code Generation
-
 #include "fyra_ir_generator.hh"
 #include "ir/Constant.h"
 #include "ir/Type.h"
@@ -9,8 +7,9 @@
 namespace LM::Backend::Fyra {
 
 FyraIRGenerator::FyraIRGenerator() {
-    current_module_ = std::make_shared<ir::Module>("limit_module");
-    builder_ = std::make_unique<ir::IRBuilder>();
+    context_ = std::make_shared<ir::IRContext>();
+    current_module_ = context_->createModule("limit_module");
+    builder_ = std::make_unique<ir::IRBuilder>(context_);
     builder_->setModule(current_module_.get());
 }
 
@@ -26,8 +25,6 @@ std::shared_ptr<ir::Module> FyraIRGenerator::generate_from_ast(
         return nullptr;
     }
 
-    emit_builtins();
-    
     for (const auto& stmt : program->statements) {
         if (auto class_decl = std::dynamic_pointer_cast<Frontend::AST::FrameDeclaration>(stmt)) {
             std::vector<ir::Type*> fields;
@@ -40,7 +37,7 @@ std::shared_ptr<ir::Module> FyraIRGenerator::generate_from_ast(
                 struct_field_offsets_[class_decl->name][field->name] = offset;
                 offset += 8;
             }
-            ir::StructType* struct_ty = ir::StructType::create(class_decl->name);
+            ir::StructType* struct_ty = context_->createStructType(class_decl->name);
             struct_ty->setBody(fields);
             current_module_->addType(class_decl->name, struct_ty);
         }
@@ -59,7 +56,7 @@ std::shared_ptr<ir::Module> FyraIRGenerator::generate_from_ast(
                 std::string full_name = class_decl->name + "." + method->name;
                 ir::Type* ret_type = ast_type_to_fyra_type(method->returnType ? method->returnType->typeName : "void");
                 std::vector<ir::Type*> param_types;
-                param_types.push_back(ir::PointerType::get(current_module_->getType(class_decl->name)));
+                param_types.push_back(context_->getPointerType(current_module_->getType(class_decl->name)));
                 for (const auto& param : method->parameters) {
                     param_types.push_back(ast_type_to_fyra_type(param.second ? param.second->typeName : "int"));
                 }
@@ -68,7 +65,7 @@ std::shared_ptr<ir::Module> FyraIRGenerator::generate_from_ast(
         }
     }
 
-    ir::Function* top_level_func = builder_->createFunction("main", ir::IntegerType::get(64));
+    ir::Function* top_level_func = builder_->createFunction("__limit_main__", context_->getIntegerType(64));
     top_level_func->setExported(true);
     ir::BasicBlock* entry = builder_->createBasicBlock("entry", top_level_func);
     builder_->setInsertPoint(entry);
@@ -82,7 +79,7 @@ std::shared_ptr<ir::Module> FyraIRGenerator::generate_from_ast(
     }
     
     if (builder_->getInsertPoint() && (builder_->getInsertPoint()->getInstructions().empty() || builder_->getInsertPoint()->getInstructions().back()->getOpcode() != ir::Instruction::Ret)) {
-        builder_->createRet(ir::ConstantInt::get(ir::IntegerType::get(64), 0));
+        builder_->createRet(context_->getConstantInt(context_->getIntegerType(64), 0));
     }
     
 
@@ -94,149 +91,12 @@ std::shared_ptr<ir::Module> FyraIRGenerator::generate_from_ast(
         }
     }
 
+    FyraBuiltinFunctions::emit_used_builtins(current_module_.get(), builder_.get(), used_builtins_);
+
     return current_module_;
 }
 
-void FyraIRGenerator::emit_builtins() {
-    // lm_print_int(int)
-    ir::Function* print_int = builder_->createFunction("lm_print_int", ir::VoidType::get(), {ir::IntegerType::get(64)});
-    ir::BasicBlock* b_entry = builder_->createBasicBlock("entry", print_int);
-    ir::BasicBlock* b_neg = builder_->createBasicBlock("neg", print_int);
-    ir::BasicBlock* b_abs = builder_->createBasicBlock("abs", print_int);
-    ir::BasicBlock* b_loop = builder_->createBasicBlock("loop", print_int);
-    ir::BasicBlock* b_done = builder_->createBasicBlock("done", print_int);
-
-    builder_->setInsertPoint(b_entry);
-    ir::Value* val = print_int->getParameters().front().get();
-    ir::Value* buf = builder_->createAlloc(ir::ConstantInt::get(ir::IntegerType::get(64), 32), ir::IntegerType::get(64));
-    ir::Value* ptr = builder_->createAdd(buf, ir::ConstantInt::get(ir::IntegerType::get(64), 31));
-    builder_->createStoreb(ir::ConstantInt::get(ir::IntegerType::get(8), 10), ptr);
-
-    ir::Instruction* val_slot = builder_->createAlloc(ir::ConstantInt::get(ir::IntegerType::get(64), 8), ir::IntegerType::get(64));
-    ir::Instruction* ptr_slot = builder_->createAlloc(ir::ConstantInt::get(ir::IntegerType::get(64), 8), ir::IntegerType::get(64));
-    builder_->createStore(ptr, ptr_slot);
-
-    ir::Value* is_neg = builder_->createCslt(val, ir::ConstantInt::get(ir::IntegerType::get(64), 0));
-    builder_->createBr(is_neg, b_neg, b_abs);
-
-    builder_->setInsertPoint(b_neg);
-    std::string minus_name = "$str_minus";
-    auto gv_minus = new ir::GlobalVariable(ir::PointerType::get(ir::IntegerType::get(8)), minus_name, ir::ConstantString::get("-"), false, "");
-    current_module_->addGlobalVariable(gv_minus);
-
-    std::vector<ir::Value*> neg_sys_args = {
-        ir::ConstantInt::get(ir::IntegerType::get(64), 1), // stdout
-        gv_minus,
-        ir::ConstantInt::get(ir::IntegerType::get(64), 1)
-    };
-    builder_->createSyscall(ir::SyscallId::Write, neg_sys_args);
-    ir::Value* abs_v = builder_->createNeg(val);
-    builder_->createStore(abs_v, val_slot);
-    builder_->createJmp(b_loop);
-
-    builder_->setInsertPoint(b_abs);
-    builder_->createStore(val, val_slot);
-    builder_->createJmp(b_loop);
-
-    builder_->setInsertPoint(b_loop);
-    ir::Value* curr_val = builder_->createLoad(val_slot);
-    ir::Value* next_val = builder_->createDiv(curr_val, ir::ConstantInt::get(ir::IntegerType::get(64), 10));
-    ir::Value* rem = builder_->createRem(curr_val, ir::ConstantInt::get(ir::IntegerType::get(64), 10));
-    ir::Value* ascii = builder_->createAdd(rem, ir::ConstantInt::get(ir::IntegerType::get(64), 48));
-
-    ir::Value* curr_ptr = builder_->createLoad(ptr_slot);
-    ir::Value* next_ptr = builder_->createSub(curr_ptr, ir::ConstantInt::get(ir::IntegerType::get(64), 1));
-    builder_->createStoreb(builder_->createCast(ascii, ir::IntegerType::get(8)), next_ptr);
-
-    builder_->createStore(next_val, val_slot);
-    builder_->createStore(next_ptr, ptr_slot);
-
-    ir::Value* cond = builder_->createCuge(next_val, ir::ConstantInt::get(ir::IntegerType::get(64), 1));
-    builder_->createBr(cond, b_loop, b_done);
-
-    builder_->setInsertPoint(b_done);
-    ir::Value* final_ptr = builder_->createLoad(ptr_slot);
-    ir::Value* end_ptr = builder_->createAdd(buf, ir::ConstantInt::get(ir::IntegerType::get(64), 32));
-    ir::Value* len = builder_->createSub(end_ptr, final_ptr);
-
-    std::vector<ir::Value*> done_sys_args = {
-        ir::ConstantInt::get(ir::IntegerType::get(64), 1), // stdout
-        final_ptr,
-        len
-    };
-    builder_->createSyscall(ir::SyscallId::Write, done_sys_args);
-    builder_->createRet(nullptr);
-
-    // lm_assert(bool, string)
-    ir::Function* lm_assert = builder_->createFunction("lm_assert", ir::VoidType::get(), {ir::IntegerType::get(64), ir::IntegerType::get(64)});
-    ir::BasicBlock* a_entry = builder_->createBasicBlock("entry", lm_assert);
-    ir::BasicBlock* a_fail = builder_->createBasicBlock("fail", lm_assert);
-    ir::BasicBlock* a_pass = builder_->createBasicBlock("pass", lm_assert);
-
-    builder_->setInsertPoint(a_entry);
-    ir::Value* a_cond = lm_assert->getParameters().front().get();
-    builder_->createBr(a_cond, a_pass, a_fail);
-
-    builder_->setInsertPoint(a_fail);
-    std::vector<ir::Value*> fail_sys_args = {
-        ir::ConstantInt::get(ir::IntegerType::get(64), 1) // exit status
-    };
-    builder_->createSyscall(ir::SyscallId::Exit, fail_sys_args);
-    builder_->createRet(nullptr);
-
-    builder_->setInsertPoint(a_pass);
-    builder_->createRet(nullptr);
-
-    ir::Function* box_string = builder_->createFunction("lm_box_string", ir::IntegerType::get(64), {ir::IntegerType::get(64)});
-    ir::BasicBlock* s_entry = builder_->createBasicBlock("entry", box_string);
-    builder_->setInsertPoint(s_entry);
-    builder_->createRet(box_string->getParameters().front().get());
-
-    // lm_print_str(str)
-    ir::Function* print_str = builder_->createFunction("lm_print_str", ir::VoidType::get(), {ir::PointerType::get(ir::IntegerType::get(8))});
-    ir::BasicBlock* ps_entry = builder_->createBasicBlock("entry", print_str);
-    ir::BasicBlock* ps_loop = builder_->createBasicBlock("loop", print_str);
-    ir::BasicBlock* ps_done = builder_->createBasicBlock("done", print_str);
-
-    builder_->setInsertPoint(ps_entry);
-    ir::Value* s_val = print_str->getParameters().front().get();
-    ir::Instruction* len_slot = builder_->createAlloc(ir::ConstantInt::get(ir::IntegerType::get(64), 8), ir::IntegerType::get(64));
-    builder_->createStore(ir::ConstantInt::get(ir::IntegerType::get(64), 0), len_slot);
-    builder_->createJmp(ps_loop);
-
-    builder_->setInsertPoint(ps_loop);
-    ir::Value* curr_len = builder_->createLoad(len_slot);
-    ir::Value* ps_curr_ptr = builder_->createAdd(s_val, curr_len);
-    ir::Value* curr_char = builder_->createLoadub(ps_curr_ptr);
-    ir::Value* is_null = builder_->createCeq(curr_char, ir::ConstantInt::get(ir::IntegerType::get(8), 0));
-    ir::Value* next_len = builder_->createAdd(curr_len, ir::ConstantInt::get(ir::IntegerType::get(64), 1));
-    builder_->createStore(next_len, len_slot);
-    builder_->createBr(is_null, ps_done, ps_loop);
-
-    builder_->setInsertPoint(ps_done);
-    ir::Value* final_len = builder_->createLoad(len_slot);
-    ir::Value* actual_len = builder_->createSub(final_len, ir::ConstantInt::get(ir::IntegerType::get(64), 1));
-
-    // Syscall write args: fd, buf, count
-    std::vector<ir::Value*> ps_sys_args = {
-        ir::ConstantInt::get(ir::IntegerType::get(64), 1), // stdout
-        s_val,
-        actual_len
-    };
-    builder_->createSyscall(ir::SyscallId::Write, ps_sys_args);
-
-    // Print newline
-    auto gv_nl = new ir::GlobalVariable(ir::PointerType::get(ir::IntegerType::get(8)), "$nl", ir::ConstantString::get("\n"), false, "");
-    current_module_->addGlobalVariable(gv_nl);
-    std::vector<ir::Value*> nl_sys_args = {
-        ir::ConstantInt::get(ir::IntegerType::get(64), 1), // stdout
-        gv_nl,
-        ir::ConstantInt::get(ir::IntegerType::get(64), 1)
-    };
-    builder_->createSyscall(ir::SyscallId::Write, nl_sys_args);
-
-    builder_->createRet(nullptr);
-}
+void FyraIRGenerator::emit_builtins() {}
 
 ir::Function* FyraIRGenerator::generate_function(
     const std::shared_ptr<Frontend::AST::FunctionDeclaration>& func_decl) {
@@ -264,7 +124,7 @@ ir::Function* FyraIRGenerator::generate_function(
     for (size_t i = 0; i < func_decl->params.size() && it != params.end(); ++i, ++it) {
         std::string param_name = func_decl->params[i].first;
         ir::Type* p_type = it->get()->getType();
-        ir::Instruction* slot = builder_->createAlloc(ir::ConstantInt::get(ir::IntegerType::get(64), 8), p_type);
+        ir::Instruction* slot = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), p_type);
         slot->setName("slot_" + param_name);
         builder_->createStore(it->get(), slot);
         current_locals_[param_name] = slot;
@@ -310,18 +170,20 @@ ir::Value* FyraIRGenerator::emit_expression(
     } else if (auto list = std::dynamic_pointer_cast<Frontend::AST::ListExpr>(expr)) {
         result = emit_list_expr(list);
     } else if (auto tuple = std::dynamic_pointer_cast<Frontend::AST::TupleExpr>(expr)) {
+        used_builtins_.insert("lm_tuple_new");
+        used_builtins_.insert("lm_tuple_set");
         ir::Function* tuple_new = current_module_->getFunction("lm_tuple_new");
         if (!tuple_new) {
-            tuple_new = builder_->createFunction("lm_tuple_new", ir::IntegerType::get(64), {ir::IntegerType::get(64)});
+            tuple_new = builder_->createFunction("lm_tuple_new", context_->getIntegerType(64), {context_->getIntegerType(64)});
         }
-        ir::Value* tuple_val = builder_->createCall(tuple_new, {ir::ConstantInt::get(ir::IntegerType::get(64), (long long)tuple->elements.size())});
+        ir::Value* tuple_val = builder_->createCall(tuple_new, {context_->getConstantInt(context_->getIntegerType(64), (long long)tuple->elements.size())});
         ir::Function* tuple_set = current_module_->getFunction("lm_tuple_set");
         if (!tuple_set) {
-            tuple_set = builder_->createFunction("lm_tuple_set", ir::VoidType::get(), {ir::IntegerType::get(64), ir::IntegerType::get(64), ir::IntegerType::get(64)});
+            tuple_set = builder_->createFunction("lm_tuple_set", context_->getVoidType(), {context_->getIntegerType(64), context_->getIntegerType(64), context_->getIntegerType(64)});
         }
         for (size_t i = 0; i < tuple->elements.size(); ++i) {
             ir::Value* elem = emit_expression(tuple->elements[i]);
-            builder_->createCall(tuple_set, {tuple_val, ir::ConstantInt::get(ir::IntegerType::get(64), (long long)i), elem});
+            builder_->createCall(tuple_set, {tuple_val, context_->getConstantInt(context_->getIntegerType(64), (long long)i), elem});
         }
         result = tuple_val;
     } else if (auto dict = std::dynamic_pointer_cast<Frontend::AST::DictExpr>(expr)) {
@@ -331,15 +193,15 @@ ir::Value* FyraIRGenerator::emit_expression(
     } else if (auto frame_init = std::dynamic_pointer_cast<Frontend::AST::FrameInstantiationExpr>(expr)) {
         ir::Type* type = current_module_->getType(frame_init->frameName);
         if (!type) {
-            std::vector<ir::Type*> fields = {ir::IntegerType::get(64), ir::IntegerType::get(64)};
-            ir::StructType* struct_ty = ir::StructType::create(frame_init->frameName);
+            std::vector<ir::Type*> fields = {context_->getIntegerType(64), context_->getIntegerType(64)};
+            ir::StructType* struct_ty = context_->createStructType(frame_init->frameName);
             struct_ty->setBody(fields);
             current_module_->addType(frame_init->frameName, struct_ty);
             type = struct_ty;
         }
         size_t type_size = type->getSize();
         if (type_size == 0) type_size = 16;
-        ir::Value* size = ir::ConstantInt::get(ir::IntegerType::get(64), (long long)type_size);
+        ir::Value* size = context_->getConstantInt(context_->getIntegerType(64), (long long)type_size);
         ir::Value* alloc = builder_->createAlloc(size, type);
         std::string init_name = frame_init->frameName + ".init";
         ir::Function* init_func = current_module_->getFunction(init_name);
@@ -418,21 +280,23 @@ ir::Value* FyraIRGenerator::emit_literal_expr(
         std::string s = std::get<std::string>(expr->value);
         if (expr->literalType == Frontend::TokenType::INT_LITERAL) {
              long long val = std::stoll(s);
-             return ir::ConstantInt::get(ir::IntegerType::get(64), val);
+             return context_->getConstantInt(context_->getIntegerType(64), val);
         } else {
+             used_builtins_.insert("lm_box_string");
              ir::Function* box_string = current_module_->getFunction("lm_box_string");
              if (!box_string) {
-                 box_string = builder_->createFunction("lm_box_string", ir::IntegerType::get(64), {ir::IntegerType::get(64)});
+                 box_string = builder_->createFunction("lm_box_string", context_->getPointerType(context_->getIntegerType(8)), {context_->getPointerType(context_->getIntegerType(8))});
              }
-             ir::Value* str_const = ir::ConstantString::get(s);
+             ir::Value* str_const = context_->getConstantString(s);
              std::string name = "$str" + std::to_string(label_counter_++);
-             auto gv = new ir::GlobalVariable(ir::PointerType::get(ir::IntegerType::get(8)), name, static_cast<ir::Constant*>(str_const), false, "");
-             current_module_->addGlobalVariable(gv);
-             std::vector<ir::Value*> args = {gv};
+             auto gv = std::make_unique<ir::GlobalVariable>(context_->getPointerType(context_->getIntegerType(8)), name, static_cast<ir::Constant*>(str_const), false, ".data");
+             ir::GlobalVariable* gv_ptr = gv.get();
+             current_module_->addGlobalVariable(std::move(gv));
+             std::vector<ir::Value*> args = {gv_ptr};
              return builder_->createCall(box_string, args);
         }
     } else if (std::holds_alternative<bool>(expr->value)) {
-        return ir::ConstantInt::get(ir::IntegerType::get(64), std::get<bool>(expr->value) ? 1 : 0);
+        return context_->getConstantInt(context_->getIntegerType(64), std::get<bool>(expr->value) ? 1 : 0);
     }
     return nullptr;
 }
@@ -454,7 +318,7 @@ ir::Value* FyraIRGenerator::emit_call_expr(
     if (auto var = std::dynamic_pointer_cast<Frontend::AST::VariableExpr>(expr->callee)) {
         func_name = var->name;
         if (auto struct_ty = current_module_->getType(func_name)) {
-            ir::Value* size = ir::ConstantInt::get(ir::IntegerType::get(64), struct_ty->getSize() > 0 ? (long long)struct_ty->getSize() : 16);
+            ir::Value* size = context_->getConstantInt(context_->getIntegerType(64), struct_ty->getSize() > 0 ? (long long)struct_ty->getSize() : 16);
             ir::Instruction* alloc = builder_->createAlloc(size, struct_ty);
             std::string vname = "alloc_" + func_name;
             alloc->setName(vname);
@@ -482,24 +346,28 @@ ir::Value* FyraIRGenerator::emit_call_expr(
         }
     }
 
-    if (func_name == "print") {
-        ir::Value* arg = emit_expression(expr->arguments[0]);
-        if (arg->getType()->isPointerTy()) {
-             func_name = "lm_print_str";
+    if (FyraBuiltinFunctions::is_builtin(func_name)) {
+        if (func_name == "print") {
+            ir::Value* arg = emit_expression(expr->arguments[0]);
+            if (arg->getType()->isPointerTy()) {
+                 func_name = "lm_print_str";
+            } else {
+                 func_name = "lm_print_int";
+            }
         } else {
-             func_name = "lm_print_int";
+            func_name = FyraBuiltinFunctions::get_internal_name(func_name);
         }
+        used_builtins_.insert(func_name);
     }
-    if (func_name == "assert") func_name = "lm_assert";
 
     ir::Function* callee = current_module_->getFunction(func_name);
     if (!callee) {
         std::vector<ir::Type*> params;
         if (!args.empty()) params.push_back(args[0]->getType());
         for (const auto& arg : expr->arguments) {
-             params.push_back(ir::IntegerType::get(64));
+             params.push_back(context_->getIntegerType(64));
         }
-        callee = builder_->createFunction(func_name, ir::VoidType::get(), params);
+        callee = builder_->createFunction(func_name, context_->getVoidType(), params);
     }
     for (const auto& arg : expr->arguments) {
         args.push_back(emit_expression(arg));
@@ -526,14 +394,15 @@ ir::Value* FyraIRGenerator::emit_assign_expr(
                 std::string struct_name = struct_ty->getName();
                 if (struct_field_offsets_.count(struct_name) && struct_field_offsets_[struct_name].count(expr->member.value())) {
                     int offset = struct_field_offsets_[struct_name][expr->member.value()];
-                    ir::Value* field_ptr = builder_->createAdd(obj, ir::ConstantInt::get(ir::IntegerType::get(64), (long long)offset));
+                    ir::Value* field_ptr = builder_->createAdd(obj, context_->getConstantInt(context_->getIntegerType(64), (long long)offset));
                     builder_->createStore(val, field_ptr);
                     return val;
                 }
             }
         } else if (expr->index) {
+            used_builtins_.insert("lm_list_set");
             ir::Function* list_set = current_module_->getFunction("lm_list_set");
-            if (!list_set) list_set = builder_->createFunction("lm_list_set", ir::VoidType::get(), {ir::IntegerType::get(64), ir::IntegerType::get(64), ir::IntegerType::get(64)});
+            if (!list_set) list_set = builder_->createFunction("lm_list_set", context_->getVoidType(), {context_->getIntegerType(64), context_->getIntegerType(64), context_->getIntegerType(64)});
             ir::Value* idx = emit_expression(expr->index);
             builder_->createCall(list_set, {obj, idx, val});
             return val;
@@ -551,10 +420,11 @@ ir::Value* FyraIRGenerator::emit_assign_expr(
 
 ir::Value* FyraIRGenerator::emit_index_expr(
     const std::shared_ptr<Frontend::AST::IndexExpr>& expr) {
+    used_builtins_.insert("lm_list_get");
     ir::Value* obj = emit_expression(expr->object);
     ir::Value* idx = emit_expression(expr->index);
     ir::Function* list_get = current_module_->getFunction("lm_list_get");
-    if (!list_get) list_get = builder_->createFunction("lm_list_get", ir::IntegerType::get(64), {ir::IntegerType::get(64), ir::IntegerType::get(64)});
+    if (!list_get) list_get = builder_->createFunction("lm_list_get", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
     return builder_->createCall(list_get, {obj, idx});
 }
 
@@ -574,7 +444,7 @@ ir::Value* FyraIRGenerator::emit_member_expr(
         std::string struct_name = struct_ty->getName();
         if (struct_field_offsets_.count(struct_name) && struct_field_offsets_[struct_name].count(expr->name)) {
             int offset = struct_field_offsets_[struct_name][expr->name];
-            ir::Value* field_ptr = builder_->createAdd(obj, ir::ConstantInt::get(ir::IntegerType::get(64), (long long)offset));
+            ir::Value* field_ptr = builder_->createAdd(obj, context_->getConstantInt(context_->getIntegerType(64), (long long)offset));
             return builder_->createLoad(field_ptr);
         }
     }
@@ -583,11 +453,13 @@ ir::Value* FyraIRGenerator::emit_member_expr(
 
 ir::Value* FyraIRGenerator::emit_list_expr(
     const std::shared_ptr<Frontend::AST::ListExpr>& expr) {
+    used_builtins_.insert("lm_list_new");
+    used_builtins_.insert("lm_list_append");
     ir::Function* list_new = current_module_->getFunction("lm_list_new");
-    if (!list_new) list_new = builder_->createFunction("lm_list_new", ir::IntegerType::get(64), {});
+    if (!list_new) list_new = builder_->createFunction("lm_list_new", context_->getIntegerType(64), {});
     ir::Value* list = builder_->createCall(list_new, {});
     ir::Function* list_append = current_module_->getFunction("lm_list_append");
-    if (!list_append) list_append = builder_->createFunction("lm_list_append", ir::VoidType::get(), {ir::IntegerType::get(64), ir::IntegerType::get(64)});
+    if (!list_append) list_append = builder_->createFunction("lm_list_append", context_->getVoidType(), {context_->getIntegerType(64), context_->getIntegerType(64)});
     for (const auto& elem_expr : expr->elements) {
         ir::Value* elem = emit_expression(elem_expr);
         builder_->createCall(list_append, {list, elem});
@@ -597,11 +469,13 @@ ir::Value* FyraIRGenerator::emit_list_expr(
 
 ir::Value* FyraIRGenerator::emit_dict_expr(
     const std::shared_ptr<Frontend::AST::DictExpr>& expr) {
+    used_builtins_.insert("jit_dict_new");
+    used_builtins_.insert("lm_dict_set");
     ir::Function* dict_new = current_module_->getFunction("jit_dict_new");
-    if (!dict_new) dict_new = builder_->createFunction("jit_dict_new", ir::IntegerType::get(64), {});
+    if (!dict_new) dict_new = builder_->createFunction("jit_dict_new", context_->getIntegerType(64), {});
     ir::Value* dict = builder_->createCall(dict_new, {});
     ir::Function* dict_set = current_module_->getFunction("lm_dict_set");
-    if (!dict_set) dict_set = builder_->createFunction("lm_dict_set", ir::VoidType::get(), {ir::IntegerType::get(64), ir::IntegerType::get(64), ir::IntegerType::get(64)});
+    if (!dict_set) dict_set = builder_->createFunction("lm_dict_set", context_->getVoidType(), {context_->getIntegerType(64), context_->getIntegerType(64), context_->getIntegerType(64)});
     for (const auto& entry : expr->entries) {
         ir::Value* key = emit_expression(entry.first);
         ir::Value* val = emit_expression(entry.second);
@@ -618,7 +492,7 @@ ir::Value* FyraIRGenerator::emit_range_expr(
 void FyraIRGenerator::emit_var_declaration(
     const std::shared_ptr<Frontend::AST::VarDeclaration>& decl) {
     ir::Type* type = ast_type_to_fyra_type(decl->type.has_value() ? decl->type.value()->typeName : "int");
-    ir::Instruction* slot = builder_->createAlloc(ir::ConstantInt::get(ir::IntegerType::get(64), 8), type);
+    ir::Instruction* slot = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), type);
     slot->setName("var_" + decl->name);
     current_locals_[decl->name] = slot;
     if (decl->initializer) {
@@ -645,7 +519,7 @@ void FyraIRGenerator::emit_class_declaration(
         auto it = params.begin();
         if (it != params.end()) {
             ir::Type* self_type = it->get()->getType();
-            ir::Instruction* self_slot = builder_->createAlloc(ir::ConstantInt::get(ir::IntegerType::get(64), 8), self_type);
+            ir::Instruction* self_slot = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), self_type);
             self_slot->setName("slot_self");
             builder_->createStore(it->get(), self_slot);
             current_locals_["self"] = self_slot;
@@ -654,7 +528,7 @@ void FyraIRGenerator::emit_class_declaration(
         for (size_t i = 0; i < method->parameters.size() && it != params.end(); ++i, ++it) {
             std::string param_name = method->parameters[i].first;
             ir::Type* p_type = it->get()->getType();
-            ir::Instruction* p_slot = builder_->createAlloc(ir::ConstantInt::get(ir::IntegerType::get(64), 8), p_type);
+            ir::Instruction* p_slot = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), p_type);
             p_slot->setName("slot_" + param_name);
             builder_->createStore(it->get(), p_slot);
             current_locals_[param_name] = p_slot;
@@ -729,13 +603,15 @@ void FyraIRGenerator::emit_for_statement(
 
 void FyraIRGenerator::emit_iter_statement(
     const std::shared_ptr<Frontend::AST::IterStatement>& stmt) {
+    used_builtins_.insert("lm_list_len");
+    used_builtins_.insert("lm_list_get");
     ir::Value* iterable = emit_expression(stmt->iterable);
     ir::Function* func = builder_->getInsertPoint()->getParent();
     ir::Function* list_len = current_module_->getFunction("lm_list_len");
-    if (!list_len) list_len = builder_->createFunction("lm_list_len", ir::IntegerType::get(64), {ir::IntegerType::get(64)});
+    if (!list_len) list_len = builder_->createFunction("lm_list_len", context_->getIntegerType(64), {context_->getIntegerType(64)});
     ir::Value* len = builder_->createCall(list_len, {iterable});
-    ir::Instruction* counter_slot = builder_->createAlloc(ir::ConstantInt::get(ir::IntegerType::get(64), 8), ir::IntegerType::get(64));
-    builder_->createStore(ir::ConstantInt::get(ir::IntegerType::get(64), 0), counter_slot);
+    ir::Instruction* counter_slot = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), context_->getIntegerType(64));
+    builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), counter_slot);
     ir::BasicBlock* cond_bb = builder_->createBasicBlock(generate_label(), func);
     ir::BasicBlock* body_bb = builder_->createBasicBlock(generate_label(), func);
     ir::BasicBlock* end_bb = builder_->createBasicBlock(generate_label(), func);
@@ -746,15 +622,15 @@ void FyraIRGenerator::emit_iter_statement(
     builder_->createBr(cond, body_bb, end_bb);
     builder_->setInsertPoint(body_bb);
     ir::Function* list_get = current_module_->getFunction("lm_list_get");
-    if (!list_get) list_get = builder_->createFunction("lm_list_get", ir::IntegerType::get(64), {ir::IntegerType::get(64), ir::IntegerType::get(64)});
+    if (!list_get) list_get = builder_->createFunction("lm_list_get", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
     ir::Value* element = builder_->createCall(list_get, {iterable, counter});
     if (!stmt->loopVars.empty()) {
-        ir::Instruction* var_slot = builder_->createAlloc(ir::ConstantInt::get(ir::IntegerType::get(64), 8), ir::IntegerType::get(64));
+        ir::Instruction* var_slot = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), context_->getIntegerType(64));
         builder_->createStore(element, var_slot);
         current_locals_[stmt->loopVars[0]] = var_slot;
     }
     emit_statement(stmt->body);
-    ir::Value* next_counter = builder_->createAdd(counter, ir::ConstantInt::get(ir::IntegerType::get(64), 1));
+    ir::Value* next_counter = builder_->createAdd(counter, context_->getConstantInt(context_->getIntegerType(64), 1));
     builder_->createStore(next_counter, counter_slot);
     if (builder_->getInsertPoint()->getInstructions().empty() || builder_->getInsertPoint()->getInstructions().back()->getOpcode() != ir::Instruction::Ret) builder_->createJmp(cond_bb);
     builder_->setInsertPoint(end_bb);
@@ -772,11 +648,26 @@ void FyraIRGenerator::emit_concurrent_statement(
 
 void FyraIRGenerator::emit_print_statement(
     const std::shared_ptr<Frontend::AST::PrintStatement>& stmt) {
-    ir::Function* print_int = current_module_->getFunction("lm_print_int");
-    if (!print_int) print_int = builder_->createFunction("lm_print_int", ir::VoidType::get(), {ir::IntegerType::get(64)});
-    for (const auto& arg : stmt->arguments) {
-        ir::Value* val = emit_expression(arg);
-        if (val) builder_->createCall(print_int, {val});
+    for (const auto& arg_expr : stmt->arguments) {
+        ir::Value* val = emit_expression(arg_expr);
+        if (!val) continue;
+
+        std::string func_name;
+        if (val->getType()->isPointerTy()) {
+            func_name = "lm_print_str";
+        } else {
+            func_name = "lm_print_int";
+        }
+
+        used_builtins_.insert(func_name);
+        ir::Function* print_func = current_module_->getFunction(func_name);
+        if (!print_func) {
+            ir::Type* arg_type = (func_name == "lm_print_str") ? 
+                                 (ir::Type*)context_->getPointerType(context_->getIntegerType(8)) : 
+                                 (ir::Type*)context_->getIntegerType(64);
+            print_func = builder_->createFunction(func_name, context_->getVoidType(), {arg_type});
+        }
+        builder_->createCall(print_func, {val});
     }
 }
 
@@ -787,15 +678,15 @@ void FyraIRGenerator::emit_return_statement(
 }
 
 ir::Type* FyraIRGenerator::ast_type_to_fyra_type(const std::string& ast_type) {
-    if (ast_type == "int" || ast_type == "i64") return ir::IntegerType::get(64);
-    if (ast_type == "i32") return ir::IntegerType::get(32);
-    if (ast_type == "i8" || ast_type == "u8") return ir::IntegerType::get(8);
-    if (ast_type == "float" || ast_type == "f64") return ir::DoubleType::get();
-    if (ast_type == "bool") return ir::IntegerType::get(64);
-    if (ast_type == "void") return ir::VoidType::get();
+    if (ast_type == "int" || ast_type == "i64") return context_->getIntegerType(64);
+    if (ast_type == "i32") return context_->getIntegerType(32);
+    if (ast_type == "i8" || ast_type == "u8") return context_->getIntegerType(8);
+    if (ast_type == "float" || ast_type == "f64") return context_->getDoubleType();
+    if (ast_type == "bool") return context_->getIntegerType(64);
+    if (ast_type == "void") return context_->getVoidType();
     ir::Type* ty = current_module_->getType(ast_type);
-    if (ty) return ir::PointerType::get(ty);
-    return ir::IntegerType::get(64);
+    if (ty) return context_->getPointerType(ty);
+    return context_->getIntegerType(64);
 }
 
 } // namespace LM::Backend::Fyra

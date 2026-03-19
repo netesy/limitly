@@ -216,10 +216,13 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
         }
 
         // Use Fyra's CodeGen with selected target
+        std::cerr << "Fyra: Starting CodeGen for module: " << module->getName() << std::endl;
         codegen::CodeGen generator(*module, std::move(target_info), nullptr);
         
         try {
+            std::cerr << "Fyra: Calling generator.emit(true)" << std::endl;
             generator.emit(true);
+            std::cerr << "Fyra: CodeGen emit finished" << std::endl;
         } catch (const std::exception& e) {
             result.success = false;
             result.error_message = std::string("CodeGen emit failed: ") + e.what();
@@ -300,7 +303,7 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
         } else if (options.platform == Platform::Linux) {
             // Use ELF format for Linux
             ElfGenerator elf_gen(options.output_file, true); // 64-bit
-            elf_gen.setEntryPointName("main");
+            elf_gen.setEntryPointName("_start");
 
             // Set machine type
             if (options.arch == Architecture::X86_64) {
@@ -311,11 +314,14 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
                 elf_gen.setMachine(243); // EM_RISCV
             }
 
+            std::cerr << "Fyra: Starting ELF generation" << std::endl;
             if (elf_gen.generateFromCode(sections, symbols, relocs, options.output_file)) {
+                std::cerr << "Fyra: ELF generation successful" << std::endl;
                 result.success = true;
                 result.output_file = options.output_file;
                 return result;
             } else {
+                std::cerr << "Fyra: ELF generation failed" << std::endl;
                 result.success = false;
                 result.error_message = "ELF generation failed: " + elf_gen.getLastError();
                 return result;

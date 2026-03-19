@@ -4,6 +4,7 @@
 #pragma once
 
 #include "../frontend/ast.hh"
+#include "fyra_builtin_functions.hh"
 #include "ir/Module.h"
 #include "ir/Function.h"
 #include "ir/BasicBlock.h"
@@ -11,10 +12,12 @@
 #include "ir/Value.h"
 #include "ir/Type.h"
 #include "ir/IRBuilder.h"
+#include "ir/IRContext.h"
 #include <string>
 #include <memory>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace LM::Backend::Fyra {
 
@@ -39,11 +42,13 @@ public:
     bool has_errors() const { return !errors_.empty(); }
     
 private:
+    std::shared_ptr<ir::IRContext> context_;
     std::shared_ptr<ir::Module> current_module_;
     std::unique_ptr<ir::IRBuilder> builder_;
     std::unordered_map<std::string, ir::Value*> current_locals_;
     std::unordered_map<std::string, std::unordered_map<std::string, int>> struct_field_indices_;
     std::unordered_map<std::string, std::unordered_map<std::string, int>> struct_field_offsets_;
+    std::unordered_set<std::string> used_builtins_;
     std::vector<std::string> errors_;
     int label_counter_ = 0;
     

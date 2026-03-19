@@ -22,6 +22,11 @@ using namespace LM::Error;bool TypeChecker::check_program(std::shared_ptr<LM::Fr
     Debugger::resetError();
     errors.clear();
     current_scope = std::make_unique<Scope>();
+
+    // Register built-in functions in the global scope
+    for (const auto& pair : function_signatures) {
+        declare_variable(pair.first, type_system.FUNCTION_TYPE);
+    }
     
     // PASS 1: Name Registration
     for (const auto& stmt : program->statements) {
@@ -104,7 +109,11 @@ using namespace LM::Error;bool TypeChecker::check_program(std::shared_ptr<LM::Fr
         } else if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
             FunctionSignature sig;
             sig.name = func_decl->name;
-            sig.return_type = func_decl->returnType ? resolve_type_annotation(func_decl->returnType.value()) : type_system.STRING_TYPE;
+            if (func_decl->name == "main") {
+                 sig.return_type = type_system.INT64_TYPE;
+            } else {
+                 sig.return_type = func_decl->returnType ? resolve_type_annotation(func_decl->returnType.value()) : type_system.STRING_TYPE;
+            }
             sig.declaration = func_decl;
             sig.can_fail = func_decl->canFail || func_decl->throws;
             sig.error_types = func_decl->declaredErrorTypes;
@@ -123,6 +132,12 @@ using namespace LM::Error;bool TypeChecker::check_program(std::shared_ptr<LM::Fr
 
     // PASS 3: Body Verification
     for (const auto& stmt : program->statements) {
+        if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
+            if (func_decl->name == "main") {
+                // Ensure main's signature uses String for params if needed by the language
+                // but let's just make it return int
+            }
+        }
         check_statement(stmt);
     }
     
@@ -654,7 +669,9 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<LM::Frontend::AS
     
     // Resolve return type
     TypePtr return_type = type_system.STRING_TYPE; // Default
-    if (func->returnType) {
+    if (func->name == "main") {
+        return_type = type_system.INT64_TYPE;
+    } else if (func->returnType) {
         return_type = resolve_type_annotation(func->returnType.value());
     }
     
@@ -764,6 +781,9 @@ TypePtr TypeChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::Va
     if (declared_type && init_type) {
         // Both declared and initialized - check compatibility
         if (is_type_compatible(declared_type, init_type)) {
+            final_type = declared_type;
+        } else if (is_string_type(declared_type) && is_string_type(init_type)) {
+            // String type identity fix
             final_type = declared_type;
         } else {
             add_type_error(declared_type->toString(), init_type->toString(), var_decl->line);
@@ -1187,11 +1207,6 @@ TypePtr TypeChecker::check_expression_with_expected_type(std::shared_ptr<LM::Fro
 
 TypePtr TypeChecker::check_literal_expr(std::shared_ptr<LM::Frontend::AST::LiteralExpr> expr) {
     if (!expr) return nullptr;
-    
-    // CRITICAL FIX: If the literal already has a type (from constant propagation), preserve it
-    if (expr->inferred_type) {
-        return expr->inferred_type;
-    }
     
     // Set type based on the literal value and token type
     if (std::holds_alternative<std::string>(expr->value)) {
@@ -1703,7 +1718,8 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
     if (!expr->object && !expr->member && !expr->index) {
         TypePtr var_type = lookup_variable(expr->name);
         if (var_type) {
-            if (!is_type_compatible(var_type, value_type)) {
+            if (!is_type_compatible(var_type, value_type) && 
+                !(is_string_type(var_type) && is_string_type(value_type))) {
                 add_type_error(var_type->toString(), value_type->toString(), expr->line);
             }
             
@@ -3238,6 +3254,7 @@ void register_builtin_functions(TypeChecker& checker) {
     checker.register_builtin_function("date", {}, ts.STRING_TYPE);
     checker.register_builtin_function("now", {}, ts.STRING_TYPE);
     checker.register_builtin_function("assert", {ts.BOOL_TYPE, ts.STRING_TYPE}, ts.NIL_TYPE);
+    checker.register_builtin_function("print", {ts.ANY_TYPE}, ts.NIL_TYPE);
     
     // Math constants (as functions)
     checker.register_builtin_function("pi", {}, ts.FLOAT64_TYPE);
