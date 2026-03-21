@@ -12,8 +12,8 @@
 #include "lir/functions.hh"
 #include "backend/jit/jit.hh"
 #include "backend/vm/register.hh"
-#include "backend/fyra.hh"
-#include "backend/fyra_ir_generator.hh"
+// #include "backend/fyra.hh"
+// #include "backend/fyra_ir_generator.hh"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -141,6 +141,9 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
 
         // Generate Fyra IR if requested (before LIR generation)
         if (printFyraIr) {
+            std::cerr << "Fyra IR generation is currently disabled due to missing backend files.\n";
+            return 1;
+            /*
             try {
                 std::cout << "Starting Fyra IR generation..." << std::endl;
                 LM::Backend::Fyra::FyraIRGenerator fyra_ir_gen;
@@ -168,6 +171,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 std::cerr << "Fyra IR generation error: " << e.what() << "\n";
                 return 1;
             }
+            */
         }
 
         // Generate LIR once for all backends
@@ -227,6 +231,9 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         }
 
         if (useAot || useWasm || useWasi) {
+            std::cerr << "Fyra-based AOT, WASM, and WASI compilation are currently disabled due to missing backend files.\n";
+            return 1;
+            /*
             try {
                 // Initialize Fyra compiler
                 LM::Backend::Fyra::FyraCompiler fyra;
@@ -266,6 +273,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 std::cerr << "Fyra Error: " << e.what() << "\n";
                 return 1;
             }
+            */
         } else if (useJit) {
             try {
                 // Initialize JIT backend

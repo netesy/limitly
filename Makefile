@@ -60,21 +60,21 @@ FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp  \
               src/frontend/ast/builder.cpp src/frontend/ast/printer.cpp src/frontend/type_checker.cpp src/frontend/memory_checker.cpp \
               src/frontend/ast/optimizer.cpp 
 
-BACK_SRCS :=  src/backend/jit/jit.cpp src/backend/fyra.cpp src/backend/fyra_ir_generator.cpp
+BACK_SRCS :=  src/backend/jit/jit.cpp # src/backend/fyra.cpp src/backend/fyra_ir_generator.cpp
 
 FYRA_DIR := src/backend/fyra
-FYRA_SRCS := $(wildcard $(FYRA_DIR)/src/ir/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/codegen/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/codegen/target/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/codegen/execgen/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/codegen/objectgen/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/codegen/debug/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/codegen/profiling/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/codegen/validation/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/transforms/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/parser/*.cpp)
+FYRA_SRCS := # $(wildcard $(FYRA_DIR)/src/ir/*.cpp) \
+#              $(wildcard $(FYRA_DIR)/src/codegen/*.cpp) \
+#              $(wildcard $(FYRA_DIR)/src/codegen/target/*.cpp) \
+#              $(wildcard $(FYRA_DIR)/src/codegen/execgen/*.cpp) \
+#              $(wildcard $(FYRA_DIR)/src/codegen/objectgen/*.cpp) \
+#              $(wildcard $(FYRA_DIR)/src/codegen/debug/*.cpp) \
+#              $(wildcard $(FYRA_DIR)/src/codegen/profiling/*.cpp) \
+#              $(wildcard $(FYRA_DIR)/src/codegen/validation/*.cpp) \
+#              $(wildcard $(FYRA_DIR)/src/transforms/*.cpp) \
+#              $(wildcard $(FYRA_DIR)/src/parser/*.cpp)
 
-FYRA_OBJS := $(patsubst src/backend/fyra/src/%.cpp,$(OBJ_DIR)/fyra/%.o,$(FYRA_SRCS))
+FYRA_OBJS := # $(patsubst src/backend/fyra/src/%.cpp,$(OBJ_DIR)/fyra/%.o,$(FYRA_SRCS))
 FYRA_LIB := $(OBJ_DIR)/libfyra.a
 
 REGISTER_SRCS := src/backend/vm/register.cpp
@@ -198,9 +198,9 @@ windows: $(BIN_DIR) $(MAIN_RSP) $(RUNTIME_LIB)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(RUNTIME_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS)
 	@echo "✅ limitly.exe built."
 
-linux: $(BIN_DIR) $(MAIN_RSP) $(RUNTIME_LIB) $(FYRA_LIB)
+linux: $(BIN_DIR) $(MAIN_RSP) $(RUNTIME_LIB) # $(FYRA_LIB)
 	@echo "🔨 Linking limitly ..."
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(RUNTIME_LIB) $(FYRA_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS) -lpthread
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(RUNTIME_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS) -lpthread
 	@echo "✅ limitly built."
 
 # =============================

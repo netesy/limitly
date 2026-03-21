@@ -19,6 +19,8 @@
 #include <cstdlib>
 #include "../value.hh"
 
+#ifdef HAS_LIBGCCJIT
+
 extern "C" {
 #include "../../runtime/runtime_string.h"
 }
@@ -2562,6 +2564,8 @@ void JITBackend::compile_function_body(gccjit::function& native_func,
     jit_registers = saved_registers;
     label_blocks = saved_label_blocks;
 }
+
+#endif
 
 } // namespace Compiler
 } // namespace JIT
