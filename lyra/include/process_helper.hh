@@ -48,8 +48,13 @@ inline int run_command(const std::string& executable, const std::vector<std::str
         }
         c_args.push_back(nullptr);
 
+        // For debug
+        // std::cout << "Executing: " << executable << std::endl;
+        // for (auto arg : args) std::cout << "  arg: " << arg << std::endl;
+
         execvp(executable.c_str(), c_args.data());
         // If execvp returns, it failed
+        perror("execvp");
         std::cerr << "error: failed to execute " << executable << "\n";
         exit(1);
     } else if (pid > 0) {

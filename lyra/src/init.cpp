@@ -12,10 +12,10 @@ int handle_init() {
 
     std::cout << "Initializing project '" << project_name << "'...\n";
 
-    // Create luminar.toml
-    std::ofstream config_file("luminar.toml");
+    // Create lymar.toml
+    std::ofstream config_file("lymar.toml");
     if (!config_file.is_open()) {
-        std::cerr << "error: could not create luminar.toml\n";
+        std::cerr << "error: could not create lymar.toml\n";
         return 1;
     }
     config_file << "[package]\n";
@@ -33,7 +33,7 @@ int handle_init() {
         return 1;
     }
     main_file << "// Main entry point for " << project_name << "\n";
-    main_file << "print(\"Hello, Luminar!\");\n";
+    main_file << "print(\"Hello, Lymar!\");\n";
     main_file.close();
 
     std::cout << "Project initialized successfully.\n";

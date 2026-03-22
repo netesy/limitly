@@ -1,0 +1,2 @@
+import ("lib.lm");
+fn func_b() -> string { return func_a() + "B"; }

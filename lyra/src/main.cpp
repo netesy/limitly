@@ -5,13 +5,14 @@
 #include "config_parser.hh"
 
 void print_help() {
-    std::cout << "Lyra - Luminar (Limitly) Package Manager\n\n";
+    std::cout << "Lyra - Lymar (Limitly) Package Manager\n\n";
     std::cout << "Usage:\n";
     std::cout << "  lyra <command> [arguments]\n\n";
     std::cout << "Commands:\n";
     std::cout << "  init    Initialize a new project\n";
     std::cout << "  run     Run the current project\n";
     std::cout << "  build   Build the current project\n";
+    std::cout << "  update  Update dependencies and lockfile\n";
     std::cout << "  help    Show this help message\n";
 }
 
@@ -34,6 +35,8 @@ int main(int argc, char** argv) {
         return handle_run(argc, argv);
     } else if (command == "build") {
         return handle_build(argc, argv);
+    } else if (command == "update") {
+        return handle_update();
     }
 
     std::cerr << "error: unknown command '" << command << "'\n\n";

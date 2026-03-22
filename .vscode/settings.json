@@ -6,7 +6,7 @@
         "vector": "cpp",
         "chrono": "cpp",
         "xlocale": "cpp",
-        "*.lm": "luminar",
+        "*.lm": "lymar",
         "atomic": "cpp",
         "memory": "cpp",
         "system_error": "cpp",

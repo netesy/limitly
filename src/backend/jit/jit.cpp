@@ -2565,9 +2565,9 @@ void JITBackend::compile_function_body(gccjit::function& native_func,
     label_blocks = saved_label_blocks;
 }
 
-#endif
-
 } // namespace Compiler
 } // namespace JIT
 } // namespace Backend
 } // namespace LM
+
+#endif
