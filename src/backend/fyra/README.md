@@ -138,7 +138,6 @@ The Fyra compiler driver supports multiple input formats and compilation targets
 
 #### Code Generation Options
 ```sh
---enhanced                   # Use enhanced CodeGen with validation and optimization
 --object                     # Generate object file in addition to assembly
 --pipeline                   # Run comprehensive compilation pipeline for all targets
 ```
@@ -161,13 +160,13 @@ The Fyra compiler driver supports multiple input formats and compilation targets
 ./fyra_compiler program.fy -o program.s --target windows
 ```
 
-#### Enhanced Compilation with Validation
+#### Compilation with Validation
 ```sh
-# Use enhanced CodeGen with validation
-./fyra_compiler program.fyra -o program.s --enhanced --verbose
+# Use CodeGen with validation
+./fyra_compiler program.fyra -o program.s --verbose
 
 # Generate both assembly and object file
-./fyra_compiler program.fyra -o program.s --enhanced --object
+./fyra_compiler program.fyra -o program.s --object
 ```
 
 #### Multi-Target Pipeline
@@ -266,7 +265,7 @@ Here's how to build a simple `add` function programmatically:
 #include "ir/IRBuilder.h"
 #include "ir/Type.h"
 #include "ir/Constant.h"
-#include "codegen/EnhancedCodeGen.h"
+#include "codegen/CodeGen.h"
 #include <iostream>
 
 void build_ir_programmatically() {
@@ -294,8 +293,8 @@ void build_ir_programmatically() {
 
     builder.createRet(c);
 
-    // 6. Generate code using Enhanced CodeGen
-    auto codeGenerator = codegen::EnhancedCodeGenFactory::create(myModule, "linux");
+    // 6. Generate code using CodeGen
+    auto codeGenerator = codegen::CodeGenFactory::create(myModule, "linux");
     if (codeGenerator) {
         auto result = codeGenerator->compileToObject("output", true, false);
         if (result.success) {

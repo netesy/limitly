@@ -1416,8 +1416,22 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
     if (auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(expr.callee.get())) {
         std::string func_name = var_expr->name;
 
+        // Try looking up in imported symbols to find the actual qualified name
+        if (expr.inferred_type && expr.inferred_type->tag == ::TypeTag::Frame) {
+            FrameType ft = std::get<FrameType>(expr.inferred_type->extra);
+            func_name = ft.name;
+        }
+
         // Check if it's a frame instantiation
         auto frame_it = frame_table_.find(func_name);
+        if (frame_it == frame_table_.end()) {
+            // Fallback for namespaced functions if not a frame
+            if (expr.inferred_type && expr.inferred_type->tag == ::TypeTag::Function) {
+                // We might need to check if the function name is qualified
+                // For now, if we found it in TypeChecker, it should be in our table under some name
+            }
+        }
+
         if (frame_it != frame_table_.end()) {
             // Treat as instantiation
             Reg frame_reg = allocate_register();
@@ -1466,17 +1480,76 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                 std::string init_name = func_name + ".init";
                 std::vector<Reg> arg_regs;
                 arg_regs.push_back(frame_reg);
-                for (const auto& arg : expr.arguments) {
-                    arg_regs.push_back(emit_expr(*arg));
+
+                // Track which named arguments are consumed by init
+                std::unordered_set<std::string> consumed_named_args;
+
+                // Match arguments to init parameters
+                if (frame_info.declaration && frame_info.declaration->init) {
+                    const auto& init = frame_info.declaration->init;
+
+                    // 3a. Positional arguments match required parameters
+                    size_t pos_idx = 0;
+                    for (; pos_idx < expr.arguments.size() && pos_idx < init->parameters.size(); ++pos_idx) {
+                        arg_regs.push_back(emit_expr(*expr.arguments[pos_idx]));
+                    }
+
+                    // 3b. Remaining required parameters must be matched by named arguments
+                    for (; pos_idx < init->parameters.size(); ++pos_idx) {
+                        const std::string& param_name = init->parameters[pos_idx].first;
+                        auto it = expr.namedArgs.find(param_name);
+                        if (it != expr.namedArgs.end()) {
+                            arg_regs.push_back(emit_expr(*it->second));
+                            consumed_named_args.insert(param_name);
+                        } else {
+                            // Fallback to nil if missing required parameter (type checker should have caught this)
+                            Reg nil_reg = allocate_register();
+                            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, nil_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Nil), "")));
+                            arg_regs.push_back(nil_reg);
+                        }
+                    }
+
+                    // 3c. Optional parameters matched by remaining positional or named arguments
+                    size_t opt_pos_idx = pos_idx - init->parameters.size();
+                    for (size_t i = 0; i < init->optionalParams.size(); ++i) {
+                        const std::string& param_name = init->optionalParams[i].first;
+
+                        auto it = expr.namedArgs.find(param_name);
+                        if (it != expr.namedArgs.end()) {
+                            arg_regs.push_back(emit_expr(*it->second));
+                            consumed_named_args.insert(param_name);
+                        } else if (expr.arguments.size() > pos_idx) {
+                            arg_regs.push_back(emit_expr(*expr.arguments[pos_idx++]));
+                        } else {
+                            // Use default value
+                            if (init->optionalParams[i].second.second) {
+                                arg_regs.push_back(emit_expr(*init->optionalParams[i].second.second));
+                            } else {
+                                Reg nil_reg = allocate_register();
+                                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, nil_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Nil), "")));
+                                arg_regs.push_back(nil_reg);
+                            }
+                        }
+                    }
+                } else {
+                    // Fallback for missing declaration info
+                    for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
                 }
 
                 Reg init_result = allocate_register();
                 LIR_Inst call_inst(LIR_Op::Call, init_result, init_name, arg_regs);
-                // Set arg types
-                for (Reg r : arg_regs) {
-                    call_inst.call_arg_types.push_back(get_register_abi_type(r));
-                }
+                for (Reg r : arg_regs) call_inst.call_arg_types.push_back(get_register_abi_type(r));
                 emit_instruction(call_inst);
+
+                // 4. Apply remaining named arguments as direct field assignments
+                for (const auto& [name, arg_expr] : expr.namedArgs) {
+                    if (consumed_named_args.count(name)) continue;
+                    auto offset_it = frame_info.field_offsets.find(name);
+                    if (offset_it != frame_info.field_offsets.end()) {
+                        Reg val_reg = emit_expr(*arg_expr);
+                        emit_instruction(LIR_Inst(LIR_Op::FrameSetField, Type::Void, frame_reg, static_cast<uint32_t>(offset_it->second), val_reg));
+                    }
+                }
             }
 
             // Track instance for deinit at scope exit
@@ -4953,24 +5026,25 @@ void Generator::collect_function_signatures(const LM::Frontend::TypeCheckResult&
     // Also collect signatures from imported symbols
     for (const auto& [qualified_name, stmt] : type_check_result.program->imported_symbols) {
         if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
-            collect_function_signature(*func_decl);
+            std::cerr << "DEBUG LIR: Registering imported function: " << qualified_name << "\n";
+            collect_function_signature(*func_decl, qualified_name);
         }
     }
     
     std::cerr << "DEBUG LIR: Done collecting function signatures\n";
 }
 
-void Generator::collect_function_signature(LM::Frontend::AST::FunctionDeclaration& stmt) {
+void Generator::collect_function_signature(LM::Frontend::AST::FunctionDeclaration& stmt, const std::string& name_override) {
     // Store function info in table - body will be lowered in Pass 1
     FunctionInfo info;
-    info.name = stmt.name;
+    info.name = name_override.empty() ? stmt.name : name_override;
     info.param_count = stmt.params.size();
     info.optional_param_count = 0;
     info.has_closure = false;
     info.visibility = stmt.visibility;
     info.lir_function = nullptr;  // Will be created in Pass 1
     
-    function_table_[stmt.name] = std::move(info);
+    function_table_[info.name] = std::move(info);
 }
 
 void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_check_result) {
@@ -4983,6 +5057,21 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
         } else if (auto frame_stmt = dynamic_cast<LM::Frontend::AST::FrameDeclaration*>(stmt.get())) {
             // Lower frame methods
             lower_frame_methods(*frame_stmt);
+        }
+    }
+
+    // Also lower bodies from imported symbols
+    for (const auto& [qualified_name, stmt] : type_check_result.program->imported_symbols) {
+        if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
+            std::string original_name = func_decl->name;
+            func_decl->name = qualified_name;
+            lower_function_body(*func_decl);
+            func_decl->name = original_name;
+        } else if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
+            std::string original_name = frame_decl->name;
+            frame_decl->name = qualified_name;
+            lower_frame_methods(*frame_decl);
+            frame_decl->name = original_name;
         }
     }
 
@@ -6108,14 +6197,24 @@ void Generator::collect_frame_signatures(LM::Frontend::AST::Program& program) {
             collect_frame_signature(frame_decl);
         }
     }
+
+    // Also collect signatures from imported symbols
+    for (const auto& [qualified_name, stmt] : program.imported_symbols) {
+        if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
+            std::cerr << "DEBUG LIR: Registering imported frame: " << qualified_name << "\n";
+            collect_frame_signature(frame_decl, qualified_name);
+        }
+    }
 }
 
-void Generator::collect_frame_signature(std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame_decl) {
+void Generator::collect_frame_signature(std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame_decl, const std::string& name_override) {
     if (!frame_decl) return;
+
+    std::string frame_name = name_override.empty() ? frame_decl->name : name_override;
 
     FrameInfo frame_info;
     frame_info.declaration = frame_decl;
-    frame_info.name = frame_decl->name;
+    frame_info.name = frame_name;
     frame_info.implements = frame_decl->implements;
     frame_info.has_init = (frame_decl->init != nullptr);
     frame_info.has_deinit = (frame_decl->deinit != nullptr);
@@ -6141,7 +6240,7 @@ void Generator::collect_frame_signature(std::shared_ptr<LM::Frontend::AST::Frame
         
         // Register method in function table
         FunctionInfo func_info;
-        func_info.name = frame_decl->name + "." + method->name;
+        func_info.name = frame_name + "." + method->name;
         func_info.param_count = method->parameters.size() + 1; // +1 for 'this'
         func_info.visibility = method->visibility;
         func_info.has_closure = false;
@@ -6151,7 +6250,7 @@ void Generator::collect_frame_signature(std::shared_ptr<LM::Frontend::AST::Frame
     // Register init method if present
     if (frame_decl->init) {
         FunctionInfo init_info;
-        init_info.name = frame_decl->name + ".init";
+        init_info.name = frame_name + ".init";
         init_info.param_count = frame_decl->init->parameters.size() + 1; // +1 for 'this'
         init_info.visibility = frame_decl->init->visibility;
         init_info.has_closure = false;
@@ -6161,7 +6260,7 @@ void Generator::collect_frame_signature(std::shared_ptr<LM::Frontend::AST::Frame
     // Register deinit method if present
     if (frame_decl->deinit) {
         FunctionInfo deinit_info;
-        deinit_info.name = frame_decl->name + ".deinit";
+        deinit_info.name = frame_name + ".deinit";
         deinit_info.param_count = 1; // Only 'this'
         deinit_info.visibility = frame_decl->deinit->visibility;
         deinit_info.has_closure = false;
@@ -6172,7 +6271,7 @@ void Generator::collect_frame_signature(std::shared_ptr<LM::Frontend::AST::Frame
     calculate_frame_layout(frame_info);
     
     // Store frame information
-    frame_table_[frame_decl->name] = frame_info;
+    frame_table_[frame_name] = frame_info;
 }
 
 void Generator::calculate_frame_layout(FrameInfo& frame_info) {
@@ -6229,16 +6328,26 @@ void Generator::collect_trait_signatures(LM::Frontend::AST::Program& program) {
             collect_trait_signature(trait_decl);
         }
     }
+
+    // Also collect signatures from imported symbols
+    for (const auto& [qualified_name, stmt] : program.imported_symbols) {
+        if (auto trait_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
+            std::cerr << "DEBUG LIR: Registering imported trait: " << qualified_name << "\n";
+            collect_trait_signature(trait_decl, qualified_name);
+        }
+    }
 }
 
-void Generator::collect_trait_signature(std::shared_ptr<LM::Frontend::AST::TraitDeclaration> trait_decl) {
+void Generator::collect_trait_signature(std::shared_ptr<LM::Frontend::AST::TraitDeclaration> trait_decl, const std::string& name_override) {
     if (!trait_decl) return;
 
+    std::string trait_name = name_override.empty() ? trait_decl->name : name_override;
+
     TraitInfo info;
-    info.name = trait_decl->name;
+    info.name = trait_name;
     info.extends = trait_decl->extends;
     info.declaration = trait_decl;
-    trait_table_[trait_decl->name] = info;
+    trait_table_[trait_name] = info;
 
     // Register methods in function table
     for (const auto& method : trait_decl->methods) {

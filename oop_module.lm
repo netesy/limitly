@@ -1,0 +1,18 @@
+// oop_module.lm
+pub frame Person {
+    pub name: str;
+    pub age: int;
+
+    pub fn init(n: str, a: int) {
+        this.name = n;
+        this.age = a;
+    }
+
+    pub fn greet() {
+        print("Hello, my name is {this.name} and I am {this.age} years old.");
+    }
+}
+
+pub fn create_person(n: str, a: int): Person {
+    return Person(name=n, age=a);
+}
