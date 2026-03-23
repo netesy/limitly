@@ -16,23 +16,23 @@ public:
     TypeInfo getTypeInfo(const ir::Type* type) const override;
     std::string formatStackOperand(int offset) const override;
     std::string formatGlobalOperand(const std::string& name) const override;
-
+    
     // Register information
     const std::vector<std::string>& getRegisters(RegisterClass regClass) const override;
     const std::string& getReturnRegister(const ir::Type* type) const override;
-
+    
     // Stack frame management
     void emitPrologue(CodeGen& cg, int stack_size) override;
     void emitEpilogue(CodeGen& cg) override;
     void emitFunctionPrologue(CodeGen& cg, ir::Function& func) override;
     void emitFunctionEpilogue(CodeGen& cg, ir::Function& func) override;
-
+    
     // Enhanced calling convention support
     const std::vector<std::string>& getIntegerArgumentRegisters() const override;
     const std::vector<std::string>& getFloatArgumentRegisters() const override;
     const std::string& getIntegerReturnRegister() const override;
     const std::string& getFloatReturnRegister() const override;
-
+    
     // Argument passing
     size_t getMaxRegistersForArgs() const override;
     void emitPassArgument(CodeGen& cg, size_t argIndex,
@@ -56,7 +56,7 @@ public:
     void emitNeg(CodeGen& cg, ir::Instruction& instr) override;
     void emitCopy(CodeGen& cg, ir::Instruction& instr) override;
     void emitCall(CodeGen& cg, ir::Instruction& instr) override;
-
+    
     // New instruction emission methods
     void emitNot(CodeGen& cg, ir::Instruction& instr) override;
 
@@ -98,7 +98,7 @@ public:
 
     // Fused Instruction Support
     bool supportsFusedPattern(FusedPattern pattern) const override;
-
+    
     // Register classification
     bool isCallerSaved(const std::string& reg) const override;
     bool isCalleeSaved(const std::string& reg) const override;
@@ -106,7 +106,6 @@ public:
 
     // File Extensions
     std::string getAssemblyFileExtension() const override { return ".wat"; }
-    std::string getObjectFileExtension() const override { return ".wasm"; }
 
     // Wasm binary emission
     void emitHeader(CodeGen& cg);
@@ -115,7 +114,7 @@ public:
     void emitExportSection(CodeGen& cg);
     void emitCodeSection(CodeGen& cg);
     void emitStructuredFunctionBody(CodeGen& cg, ir::Function& func) override;
-
+    
 private:
     std::set<ir::BasicBlock*> visitedBlocks;
     transforms::DominatorTree* currentDomTree = nullptr;
@@ -132,14 +131,14 @@ private:
     std::string getWasmType(const ir::Type* type);
     std::string getWasmLoadInstruction(const ir::Type* type);
     std::string getWasmStoreInstruction(const ir::Type* type);
-
+    
     // Advanced control flow helpers
     std::string getWasmCompareOp(const std::string& op, const ir::Type* type, bool isUnsigned = false);
     void emitBlockStructure(CodeGen& cg, const std::string& blockType);
     void emitLoopStructure(CodeGen& cg, const std::string& label);
     void emitBasicBlock(CodeGen& cg, ir::BasicBlock& bb);
     void emitBasicBlockInstructions(CodeGen& cg, ir::BasicBlock& bb, const std::string& indent);
-
+    
     // Leaf optimization helpers
     bool isLeaf(ir::Function& func) const;
     bool needsTempLocals(ir::Function& func) const;

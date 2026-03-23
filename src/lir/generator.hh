@@ -24,6 +24,16 @@ public:
     std::unique_ptr<LIR_Function> generate_program(const LM::Frontend::TypeCheckResult& type_check_result);
     void generate_function(LM::Frontend::AST::FunctionDeclaration& fn);
     
+    // Set import aliases from type checker
+    void set_import_aliases(const std::unordered_map<std::string, std::string>& aliases) {
+        import_aliases_ = aliases;
+    }
+    
+    // Set registered modules from type checker
+    void set_registered_modules(const std::unordered_map<std::string, LM::Frontend::ModuleInfo>& modules) {
+        registered_modules_ = modules;
+    }
+    
     // Error handling
     bool has_errors() const;
     std::vector<std::string> get_errors() const;
@@ -301,6 +311,7 @@ private:
     
     // Import alias mapping for current scope
     std::unordered_map<std::string, std::string> import_aliases_;
+    std::unordered_map<std::string, LM::Frontend::ModuleInfo> registered_modules_;
     std::string current_module_ = "";  // Current module context
     
     Reg this_register_ = UINT32_MAX;  // Register holding 'this' pointer in methods

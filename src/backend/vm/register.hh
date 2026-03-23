@@ -86,6 +86,8 @@ private:
     // Current function for task execution
     const LIR::LIR_Function* current_function_ = nullptr;
     
+    // Global variable storage
+    std::unordered_map<std::string, RegisterValue> globals_;
     
     // Type system instance
     std::unique_ptr<TypeSystem> type_system;

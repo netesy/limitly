@@ -21,24 +21,25 @@ Generator::Generator() : current_function_(nullptr), next_register_(0), next_lab
 
 
 std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::TypeCheckResult& type_check_result) {
-    // Set type system reference BEFORE Pass 0
-    type_system_ = type_check_result.type_system;
-    
-    // PASS 0: Collect function, frame, and module signatures only
-    collect_trait_signatures(*type_check_result.program);
-    collect_frame_signatures(*type_check_result.program);
-    
-   // std::cout << "[DEBUG] PASS 0: Collecting signatures" << std::endl;
-    collect_function_signatures(type_check_result);
-    
-   // std::cout << "[DEBUG] Function signatures collected" << std::endl;
-    collect_module_signatures(*type_check_result.program);
-    
-   // std::cout << "[DEBUG] Module signatures collected" << std::endl;
-    
-    // PASS 1: Lower function bodies into separate LIR functions
-   // std::cout << "[DEBUG] PASS 1: Lowering function bodies" << std::endl;
-    lower_function_bodies(type_check_result);
+    try {
+        // Set type system reference BEFORE Pass 0
+        type_system_ = type_check_result.type_system;
+        
+        // PASS 0: Collect function, frame, and module signatures only
+        collect_trait_signatures(*type_check_result.program);
+        collect_frame_signatures(*type_check_result.program);
+        
+       // std::cout << "[DEBUG] PASS 0: Collecting signatures" << std::endl;
+        collect_function_signatures(type_check_result);
+        
+       // std::cout << "[DEBUG] Function signatures collected" << std::endl;
+        collect_module_signatures(*type_check_result.program);
+        
+       // std::cout << "[DEBUG] Module signatures collected" << std::endl;
+        
+        // PASS 1: Lower function bodies into separate LIR functions
+       // std::cout << "[DEBUG] PASS 1: Lowering function bodies" << std::endl;
+        lower_function_bodies(type_check_result);
     
    // std::cout << "[DEBUG] Function bodies lowered" << std::endl;
     
@@ -107,7 +108,15 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
     current_function_ = nullptr;
     scope_stack_.clear();
     register_types_.clear();
+    
     return result;
+    } catch (const std::exception& e) {
+        std::cerr << "ERROR in LIR generate_program: " << e.what() << "\n";
+        return nullptr;
+    } catch (...) {
+        std::cerr << "ERROR: Unknown exception in LIR generate_program\n";
+        return nullptr;
+    }
 }
 
 void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
@@ -1620,8 +1629,48 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             return 0;
         }
     } else if (auto member_expr = dynamic_cast<LM::Frontend::AST::MemberExpr*>(expr.callee.get())) {
-        // Method call: obj.method(args...)
+        // Method call: obj.method(args...) or module function call: module.function(args...)
         std::string method_name = member_expr->name;
+        
+        // Check if this is a module member access
+        if (auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(member_expr->object.get())) {
+            // Check if the variable is a module alias
+            auto alias_it = import_aliases_.find(var_expr->name);
+            if (alias_it != import_aliases_.end()) {
+                // This is a module function call
+                // Evaluate arguments
+                std::vector<Reg> arg_regs;
+                for (const auto& arg : expr.arguments) {
+                    Reg arg_reg = emit_expr(*arg);
+                    arg_regs.push_back(arg_reg);
+                }
+                
+                // Generate function call
+                Reg result = allocate_register();
+                
+                // Set the result type if available from type checking
+                if (expr.inferred_type) {
+                    set_register_language_type(result, expr.inferred_type);
+                    set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
+                } else {
+                    auto any_type = std::make_shared<::Type>(::TypeTag::Any);
+                    set_register_language_type(result, any_type);
+                    set_register_abi_type(result, language_type_to_abi_type(any_type));
+                }
+                
+                // Generate function call using the original function name
+                LIR_Inst call_inst(LIR_Op::Call, result, method_name, arg_regs);
+                
+                // Set argument types for the call
+                for (Reg arg_reg : arg_regs) {
+                    call_inst.call_arg_types.push_back(get_register_abi_type(arg_reg));
+                }
+                
+                emit_instruction(call_inst);
+                
+                return result;
+            }
+        }
         
         // Evaluate the object (this will be the first argument)
         Reg object_reg = emit_expr(*member_expr->object);
@@ -3842,10 +3891,13 @@ void Generator::emit_iter_stmt(LM::Frontend::AST::IterStatement& stmt) {
             
         } else if (iterable_type->tag == TypeTag::Tuple) {
             // Get tuple size from type system
-            const auto& tuple_type = std::get<TupleType>(iterable_type->extra);
-            int64_t tuple_len = static_cast<int64_t>(tuple_type.elementTypes.size());
-
-            emit_tuple_var_iter_stmt(stmt, iterable_reg, tuple_len);
+            auto* tuple_type_ptr = std::get_if<TupleType>(&iterable_type->extra);
+            if (tuple_type_ptr) {
+                int64_t tuple_len = static_cast<int64_t>(tuple_type_ptr->elementTypes.size());
+                emit_tuple_var_iter_stmt(stmt, iterable_reg, tuple_len);
+            } else {
+                emit_tuple_var_iter_stmt(stmt, iterable_reg, 0);
+            }
             
         } else {
             // Handle channel iteration - requires exactly one loop variable
@@ -4890,11 +4942,22 @@ std::shared_ptr<::Type> Generator::convert_ast_type_to_lir_type(const std::share
 // Symbol collection methods (Pass 0)
 void Generator::collect_function_signatures(const LM::Frontend::TypeCheckResult& type_check_result) {
     
+    std::cerr << "DEBUG LIR: Collecting function signatures from program statements\n";
     for (const auto& stmt : type_check_result.program->statements) {
         if (auto func_stmt = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(stmt.get())) {
             collect_function_signature(*func_stmt);
         }
     }
+    
+    std::cerr << "DEBUG LIR: Collecting function signatures from imported symbols\n";
+    // Also collect signatures from imported symbols
+    for (const auto& [qualified_name, stmt] : type_check_result.program->imported_symbols) {
+        if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
+            collect_function_signature(*func_decl);
+        }
+    }
+    
+    std::cerr << "DEBUG LIR: Done collecting function signatures\n";
 }
 
 void Generator::collect_function_signature(LM::Frontend::AST::FunctionDeclaration& stmt) {

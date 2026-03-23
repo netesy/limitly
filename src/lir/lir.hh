@@ -200,6 +200,8 @@ enum class LIR_Op : uint8_t {
     ExportSymbol,
     BeginModule,
     EndModule,
+    LoadGlobal,
+    StoreGlobal,
     
     // SharedCell operations for parallel execution
     SharedCellAlloc,    // Allocate SharedCell, returns cell_id (reg = cell_id)

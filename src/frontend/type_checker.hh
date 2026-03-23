@@ -17,6 +17,12 @@
 namespace LM {
 namespace Frontend {
 
+// Module information structure (public for use in TypeCheckResult)
+struct ModuleInfo {
+    std::string name;
+    std::unordered_map<std::string, TypePtr> symbols;
+};
+
 class TypeChecker {
 private:
     TypeSystem& type_system;
@@ -78,6 +84,10 @@ private:
     };
     std::unordered_map<std::string, TraitInfo> trait_declarations;
 
+    std::unordered_map<std::string, ModuleInfo> registered_modules;
+    std::unordered_map<std::string, std::string> import_aliases;
+    std::string current_module_name;
+
     // Current context
     std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> current_function = nullptr;
     std::shared_ptr<LM::Frontend::AST::FrameDeclaration> current_frame = nullptr;
@@ -113,6 +123,9 @@ private:
     // Scope tracking for lifetime analysis
     int current_scope_level = 0;
     
+    // Current program being checked (for import handling)
+    std::shared_ptr<LM::Frontend::AST::Program> current_program_ = nullptr;
+    
 public:
     explicit TypeChecker(TypeSystem& ts) : type_system(ts) {}
     
@@ -125,6 +138,12 @@ public:
     
     // Get the type system (for LIR generator)
     TypeSystem& get_type_system() { return type_system; }
+    
+    // Get import aliases (for LIR generator)
+    const std::unordered_map<std::string, std::string>& get_import_aliases() const { return import_aliases; }
+    
+    // Get registered modules (for LIR generator)
+    const std::unordered_map<std::string, ModuleInfo>& get_registered_modules() const { return registered_modules; }
     
     // Set source context for error reporting
     void set_source_context(const std::string& source, const std::string& file_path) {
@@ -200,6 +219,7 @@ private:
     TypePtr check_if_statement(std::shared_ptr<LM::Frontend::AST::IfStatement> if_stmt);
     TypePtr check_while_statement(std::shared_ptr<LM::Frontend::AST::WhileStatement> while_stmt);
     TypePtr check_for_statement(std::shared_ptr<LM::Frontend::AST::ForStatement> for_stmt);
+    TypePtr check_iter_statement(std::shared_ptr<LM::Frontend::AST::IterStatement> iter_stmt);
     TypePtr check_parallel_statement(std::shared_ptr<LM::Frontend::AST::ParallelStatement> parallel_stmt);
     TypePtr check_concurrent_statement(std::shared_ptr<LM::Frontend::AST::ConcurrentStatement> concurrent_stmt);
     TypePtr check_task_statement(std::shared_ptr<LM::Frontend::AST::TaskStatement> task_stmt);
@@ -231,6 +251,8 @@ private:
     TypePtr check_frame_instantiation_expr(std::shared_ptr<LM::Frontend::AST::FrameInstantiationExpr> expr);
     TypePtr check_frame_declaration(std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame);
     TypePtr check_trait_declaration(std::shared_ptr<LM::Frontend::AST::TraitDeclaration> trait);
+    TypePtr check_module_declaration(std::shared_ptr<LM::Frontend::AST::ModuleDeclaration> module_decl);
+    TypePtr check_import_statement(std::shared_ptr<LM::Frontend::AST::ImportStatement> import_stmt);
 
     // Type annotation resolution
     TypePtr resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::TypeAnnotation> annotation);
@@ -321,6 +343,8 @@ struct TypeCheckResult {
     std::shared_ptr<TypeSystem> type_system;
     bool success;
     std::vector<std::string> errors;
+    std::unordered_map<std::string, std::string> import_aliases;  // Module import aliases
+    std::unordered_map<std::string, ModuleInfo> registered_modules;  // Module information
     
     TypeCheckResult(std::shared_ptr<LM::Frontend::AST::Program> prog, std::shared_ptr<TypeSystem> ts, bool succ, 
                     const std::vector<std::string>& errs)

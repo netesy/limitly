@@ -8,6 +8,8 @@
 #include "frontend/type_checker.hh"
 #include "frontend/memory_checker.hh"
 #include "frontend/ast.hh"
+#include <set>
+#include <algorithm>
 #include "lir/generator.hh"
 #include "lir/functions.hh"
 // #include "backend/jit/jit.hh"
@@ -57,6 +59,66 @@ std::string readFile(const std::string& filename) {
     return buffer.str();
 }
 
+void resolveImports(std::shared_ptr<LM::Frontend::AST::Program> program, const std::string& currentPath, std::set<std::string>& loadedModules) {
+    std::vector<std::shared_ptr<LM::Frontend::AST::Statement>> moduleDeclarations;
+    
+    // Find all imports in the current program
+    for (const auto& stmt : program->statements) {
+        if (auto importStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ImportStatement>(stmt)) {
+            std::string modulePath = importStmt->modulePath;
+            if (loadedModules.count(modulePath)) continue;
+
+            // Convert dot notation to path
+            std::string filePath = modulePath;
+            std::replace(filePath.begin(), filePath.end(), '.', '/');
+            filePath += ".lm";
+
+            std::string source;
+            try {
+                source = readFile(filePath);
+            } catch (...) {
+                // If not found at root, try relative to currentPath? 
+                // For now, let's just stick to root-relative for tests
+                continue;
+            }
+
+            LM::Frontend::Scanner scanner(source, filePath);
+            scanner.scanTokens();
+            LM::Frontend::Parser parser(scanner);
+            auto moduleAst = parser.parse();
+
+            loadedModules.insert(modulePath);
+            // Recursively resolve imports for this module
+            resolveImports(moduleAst, filePath, loadedModules);
+
+            // Wrap module AST in a ModuleDeclaration
+            auto modDecl = std::make_shared<LM::Frontend::AST::ModuleDeclaration>();
+            modDecl->name = modulePath;
+            for (auto& s : moduleAst->statements) {
+                if (auto func = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(s)) {
+                    if (func->visibility == LM::Frontend::AST::VisibilityLevel::Public)
+                        modDecl->publicMembers.push_back(s);
+                    else
+                        modDecl->privateMembers.push_back(s);
+                } else if (auto var = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(s)) {
+                    if (var->visibility == LM::Frontend::AST::VisibilityLevel::Public)
+                        modDecl->publicMembers.push_back(s);
+                    else
+                        modDecl->privateMembers.push_back(s);
+                } else {
+                    modDecl->privateMembers.push_back(s);
+                }
+            }
+            moduleDeclarations.push_back(modDecl);
+        }
+    }
+
+    // Prepend module declarations to the program
+    if (!moduleDeclarations.empty()) {
+        program->statements.insert(program->statements.begin(), moduleDeclarations.begin(), moduleDeclarations.end());
+    }
+}
+
 int executeFile(const std::string& filename, bool printAst = false, bool printCst = false, 
                 bool printTokens = false, bool useJit = false, bool jitDebug = false, 
                 bool enableDebug = false, bool printLir = false, bool useAot = false,
@@ -89,6 +151,8 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         LM::Frontend::Parser parser(scanner, useCSTMode);
         std::shared_ptr<LM::Frontend::AST::Program> ast = parser.parse();
         
+        // Note: Import resolution is now handled by the type checker
+
         // Phase 1: Type checking
         auto type_check_result = LM::Frontend::TypeCheckerFactory::check_program(ast, source, filename);
         if (!type_check_result.success) {
@@ -112,6 +176,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         
         // Phase 3: Post-optimization verification
         auto post_opt_type_check = LM::Frontend::TypeCheckerFactory::check_program(ast, source, filename);
+        std::cerr << "DEBUG: Post-optimization type check completed\n";
         if (!post_opt_type_check.success) {
             std::cerr << "Post-optimization type checking failed\n";
              if (!post_opt_type_check.errors.empty()) {
@@ -126,6 +191,8 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             std::cerr << "Post-optimization type check returned null program\n";
             return 1;
         }
+        
+        std::cerr << "DEBUG: About to generate LIR\n";
 
         // Print CST if requested
         if (printCst) {
@@ -239,13 +306,32 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         }
 
         // Generate LIR once for all backends
+        std::cerr << "DEBUG: Creating LIR generator\n";
         LIR::Generator lir_generator;
-        auto lir_function = lir_generator.generate_program(post_opt_type_check);
+        std::cerr << "DEBUG: Setting import aliases\n";
+        lir_generator.set_import_aliases(post_opt_type_check.import_aliases);
+        std::cerr << "DEBUG: Setting registered modules\n";
+        lir_generator.set_registered_modules(post_opt_type_check.registered_modules);
+        std::cerr << "DEBUG: Calling generate_program\n";
+        
+        std::unique_ptr<LIR::LIR_Function> lir_function;
+        try {
+            lir_function = lir_generator.generate_program(post_opt_type_check);
+            std::cerr << "DEBUG: generate_program returned\n";
+        } catch (const std::exception& e) {
+            std::cerr << "ERROR in generate_program: " << e.what() << "\n";
+            return 1;
+        } catch (...) {
+            std::cerr << "ERROR: Unknown exception in generate_program\n";
+            return 1;
+        }
         
         if (!lir_function) {
             std::cerr << "Failed to generate LIR function\n";
             return 1;
         }
+        
+        std::cerr << "DEBUG: LIR function generated successfully\n";
         
         if (lir_generator.has_errors()) {
             std::cerr << "LIR generation errors:\n";
@@ -254,6 +340,8 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             }
             return 1;
         }
+        
+        std::cerr << "DEBUG: No LIR errors\n";
 
         // Print LIR if requested
         if (printLir) {
@@ -381,6 +469,8 @@ void startRepl() {
             LM::Frontend::Parser parser(scanner, false);
             std::shared_ptr<LM::Frontend::AST::Program> ast = parser.parse();
             
+            // Note: Import resolution is now handled by the type checker
+
             // Type checking
             auto type_check_result = LM::Frontend::TypeCheckerFactory::check_program(ast);
             if (!type_check_result.success) {
@@ -404,6 +494,8 @@ void startRepl() {
             
             // Backend: Generate LIR and execute
             LIR::Generator lir_generator;
+            lir_generator.set_import_aliases(post_opt_type_check.import_aliases);
+            lir_generator.set_registered_modules(post_opt_type_check.registered_modules);
             auto lir_function = lir_generator.generate_program(post_opt_type_check);
             
             if (!lir_function) {

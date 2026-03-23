@@ -922,7 +922,11 @@ void LIRBuiltinFunctions::registerCollectionFunctions() {
                 throw std::runtime_error("map: second argument must be a list");
             }
             
-            const auto& listValue = std::get<ListValue>(list->complexData);
+            auto* listValPtr = std::get_if<ListValue>(&list->complexData);
+            if (!listValPtr) {
+                return nullptr;
+            }
+            const auto& listValue = *listValPtr;
             ListValue result;
             
             // Simple transformation: if it's a number, double it
@@ -969,7 +973,11 @@ void LIRBuiltinFunctions::registerCollectionFunctions() {
                 throw std::runtime_error("filter: second argument must be a list");
             }
             
-            const auto& listValue = std::get<ListValue>(list->complexData);
+            auto* listValPtr = std::get_if<ListValue>(&list->complexData);
+            if (!listValPtr) {
+                return nullptr;
+            }
+            const auto& listValue = *listValPtr;
             ListValue result;
             
             // Simple filter: keep even numbers
@@ -1019,7 +1027,9 @@ void LIRBuiltinFunctions::registerCollectionFunctions() {
                 throw std::runtime_error("reduce: second argument must be a list");
             }
             
-            const auto& listValue = std::get<ListValue>(list->complexData);
+            auto* listValPtr = std::get_if<ListValue>(&list->complexData);
+            if (!listValPtr) return nullptr;
+            const auto& listValue = *listValPtr;
             
             if (listValue.elements.empty()) {
                 if (accumulator) {
@@ -1082,7 +1092,9 @@ void LIRBuiltinFunctions::registerCollectionFunctions() {
                 throw std::runtime_error("forEach: second argument must be a list");
             }
             
-            const auto& listValue = std::get<ListValue>(list->complexData);
+            auto* listValPtr = std::get_if<ListValue>(&list->complexData);
+            if (!listValPtr) return nullptr;
+            const auto& listValue = *listValPtr;
             
             // Simple forEach: print each element
             for (const auto& element : listValue.elements) {
@@ -1129,7 +1141,9 @@ void LIRBuiltinFunctions::registerSearchFunctions() {
                 throw std::runtime_error("find: second argument must be a list");
             }
             
-            const auto& listValue = std::get<ListValue>(list->complexData);
+            auto* listValPtr = std::get_if<ListValue>(&list->complexData);
+            if (!listValPtr) return nullptr;
+            const auto& listValue = *listValPtr;
             
             // Check predicate type and select appropriate built-in predicate
             std::string predicateType = "even"; // default
@@ -1216,7 +1230,9 @@ void LIRBuiltinFunctions::registerSearchFunctions() {
                 throw std::runtime_error("some: second argument must be a list");
             }
             
-            const auto& listValue = std::get<ListValue>(list->complexData);
+            auto* listValPtr = std::get_if<ListValue>(&list->complexData);
+            if (!listValPtr) return nullptr;
+            const auto& listValue = *listValPtr;
             
             // Check predicate type and select appropriate built-in predicate
             std::string predicateType = "even"; // default
@@ -1305,7 +1321,9 @@ void LIRBuiltinFunctions::registerSearchFunctions() {
                 throw std::runtime_error("every: second argument must be a list");
             }
             
-            const auto& listValue = std::get<ListValue>(list->complexData);
+            auto* listValPtr = std::get_if<ListValue>(&list->complexData);
+            if (!listValPtr) return nullptr;
+            const auto& listValue = *listValPtr;
             
             // Check predicate type and select appropriate built-in predicate
             std::string predicateType = "positive"; // default for every
