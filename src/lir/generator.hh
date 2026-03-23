@@ -53,7 +53,7 @@ private:
 
     // Symbol collection (Pass 0)
     void collect_function_signatures(const LM::Frontend::TypeCheckResult& type_check_result);
-    void collect_function_signature(LM::Frontend::AST::FunctionDeclaration& stmt);
+    void collect_function_signature(LM::Frontend::AST::FunctionDeclaration& stmt, const std::string& name_override = "");
     void lower_trait_declaration(LM::Frontend::AST::TraitDeclaration& trait_decl);
     void lower_trait_method(const std::string& trait_name, LM::Frontend::AST::FunctionDeclaration& method);
     void lower_frame_methods(LM::Frontend::AST::FrameDeclaration& frame_decl);
@@ -363,9 +363,9 @@ private:
     // Frame system helper methods
     bool is_visible(LM::Frontend::AST::VisibilityLevel level, const std::string& frame_name);
     void collect_trait_signatures(LM::Frontend::AST::Program& program);
-    void collect_trait_signature(std::shared_ptr<LM::Frontend::AST::TraitDeclaration> trait_decl);
+    void collect_trait_signature(std::shared_ptr<LM::Frontend::AST::TraitDeclaration> trait_decl, const std::string& name_override = "");
     void collect_frame_signatures(LM::Frontend::AST::Program& program);
-    void collect_frame_signature(std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame_decl);
+    void collect_frame_signature(std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame_decl, const std::string& name_override = "");
     void calculate_frame_layout(FrameInfo& frame_info);
     size_t get_frame_field_offset(const std::string& frame_name, const std::string& field_name);
     size_t get_frame_method_index(const std::string& frame_name, const std::string& method_name);

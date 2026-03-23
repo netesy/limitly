@@ -75,7 +75,6 @@ int main(int argc, char** argv) {
         std::cerr << "  --validate                                       Enable ASM validation (default: enabled)" << std::endl;
         std::cerr << "  --no-validate                                    Disable ASM validation" << std::endl;
         std::cerr << "  --object                                         Generate object file" << std::endl;
-        std::cerr << "  --enhanced                                       Use enhanced CodeGen with validation and object generation" << std::endl;
         std::cerr << "  --verbose                                        Enable verbose output" << std::endl;
         std::cerr << "  --pipeline                                       Run full compilation pipeline for all targets" << std::endl;
         std::cerr << "  --gen-exec                                       Generate an executable file (requires --enhanced)" << std::endl;
@@ -92,7 +91,6 @@ int main(int argc, char** argv) {
     // Parse command line options
     bool enableValidation = true;
     bool generateObject = false;
-    bool useEnhanced = false;
     bool verboseOutput = false;
     bool runPipeline = false;
     bool generateExecutable = false;
@@ -106,16 +104,12 @@ int main(int argc, char** argv) {
             enableValidation = true;
         } else if (arg == "--object") {
             generateObject = true;
-        } else if (arg == "--enhanced") {
-            useEnhanced = true;
         } else if (arg == "--verbose") {
             verboseOutput = true;
         } else if (arg == "--pipeline") {
             runPipeline = true;
-            useEnhanced = true; // Pipeline requires enhanced CodeGen
         } else if (arg == "--gen-exec") {
             generateExecutable = true;
-            useEnhanced = true; // Executable generation requires enhanced CodeGen
         } else if (arg == "-O0") {
             disableOptimizations = true;
         }
@@ -266,17 +260,17 @@ int main(int argc, char** argv) {
             return 1;
         }
         
-    } else if (useEnhanced) {
-        // Use enhanced CodeGen with validation and object generation
-        std::cout << "--- Using Enhanced CodeGen with Validation ---\n" << std::flush;
+    } else if (generateObject || generateExecutable || runPipeline) {
+        // Use CodeGen with validation and object generation
+        std::cout << "--- Using CodeGen with Validation ---\n" << std::flush;
         
-        auto enhancedCodeGen = codegen::CodeGenFactory::create(*module, targetName);
-        if (!enhancedCodeGen) {
-            std::cerr << "Error: Failed to create enhanced code generator for target: " << targetName << std::endl;
+        auto codeGen = codegen::CodeGenFactory::create(*module, targetName);
+        if (!codeGen) {
+            std::cerr << "Error: Failed to create code generator for target: " << targetName << std::endl;
             return 1;
         }
         
-        enhancedCodeGen->enableVerboseOutput(verboseOutput);
+        codeGen->enableVerboseOutput(verboseOutput);
         
         std::string outputPrefix = outputFile.substr(0, outputFile.find_last_of('.'));
         if (generateExecutable) {
@@ -388,19 +382,10 @@ int main(int argc, char** argv) {
                 }
             }
         } else {
-            auto enhancedCodeGen = codegen::CodeGenFactory::create(*module, targetName);
-            if (!enhancedCodeGen) {
-                std::cerr << "Error: Failed to create enhanced code generator for target: " << targetName << std::endl;
-                return 1;
-            }
-            
-            enhancedCodeGen->enableVerboseOutput(verboseOutput);
-
-            std::string outputPrefix = outputFile.substr(0, outputFile.find_last_of('.'));
-            auto result = enhancedCodeGen->compileToObject(outputPrefix, enableValidation, generateObject, false);
+            auto result = codeGen->compileToObject(outputPrefix, enableValidation, generateObject, false);
 
             if (result.success) {
-                std::cout << "Enhanced compilation successful in " << result.totalTimeMs << "ms" << std::endl;
+                std::cout << "Compilation successful in " << result.totalTimeMs << "ms" << std::endl;
                 std::cout << "Assembly: " << result.assemblyPath << std::endl;
                 if (generateObject && !result.objectPath.empty()) {
                     std::cout << "Object: " << result.objectPath << std::endl;
@@ -419,7 +404,7 @@ int main(int argc, char** argv) {
                     }
                 }
             } else {
-                std::cerr << "Enhanced compilation failed" << std::endl;
+                std::cerr << "Compilation failed" << std::endl;
                 auto errors = result.getAllErrors();
                 for (const auto& error : errors) {
                     std::cerr << "Error: " << error << std::endl;

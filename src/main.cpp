@@ -105,6 +105,9 @@ void resolveImports(std::shared_ptr<LM::Frontend::AST::Program> program, const s
                         modDecl->publicMembers.push_back(s);
                     else
                         modDecl->privateMembers.push_back(s);
+                } else if (auto frame = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(s)) {
+                    // Frames are public by default in this implementation
+                    modDecl->publicMembers.push_back(s);
                 } else {
                     modDecl->privateMembers.push_back(s);
                 }
@@ -151,7 +154,8 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         LM::Frontend::Parser parser(scanner, useCSTMode);
         std::shared_ptr<LM::Frontend::AST::Program> ast = parser.parse();
         
-        // Note: Import resolution is now handled by the type checker
+        std::set<std::string> loadedModules;
+        resolveImports(ast, filename, loadedModules);
 
         // Phase 1: Type checking
         auto type_check_result = LM::Frontend::TypeCheckerFactory::check_program(ast, source, filename);

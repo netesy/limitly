@@ -250,6 +250,7 @@ private:
     TypePtr check_fallible_expr(std::shared_ptr<LM::Frontend::AST::FallibleExpr> expr);
     TypePtr check_frame_instantiation_expr(std::shared_ptr<LM::Frontend::AST::FrameInstantiationExpr> expr);
     TypePtr check_frame_declaration(std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame);
+    TypePtr check_frame_declaration_with_name(const std::string& name, std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame);
     TypePtr check_trait_declaration(std::shared_ptr<LM::Frontend::AST::TraitDeclaration> trait);
     TypePtr check_module_declaration(std::shared_ptr<LM::Frontend::AST::ModuleDeclaration> module_decl);
     TypePtr check_import_statement(std::shared_ptr<LM::Frontend::AST::ImportStatement> import_stmt);
