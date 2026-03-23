@@ -2,482 +2,314 @@
 #include "ir/BasicBlock.h"
 #include "ir/Use.h"
 #include "ir/Type.h"
+#include "ir/Instruction.h"
+#include "ir/Constant.h"
+#include "ir/Module.h"
+#include "ir/PhiNode.h"
 #include <iostream>
 #include <set>
-#include <limits>
-#include <cmath>
+#include <map>
+#include <vector>
 
 namespace transforms {
 
 bool SCCP::performTransformation(ir::Function& func) {
     this->initialize(func);
-
+    
     std::set<ir::BasicBlock*> executableBlocks;
+    std::set<std::pair<ir::BasicBlock*, ir::BasicBlock*>> executableEdges;
+    
+    if (func.getBasicBlocks().empty()) return false;
+    ir::BasicBlock* entry = func.getBasicBlocks().front().get();
+    if (!entry) return false;
+    
+    blockWorklist.push_back(entry);
 
     while (!blockWorklist.empty() || !instructionWorklist.empty()) {
-        if (!blockWorklist.empty()) {
+        while (!blockWorklist.empty()) {
             ir::BasicBlock* bb = blockWorklist.back();
             blockWorklist.pop_back();
-
-            if (executableBlocks.count(bb)) {
-                continue;
-            }
-            executableBlocks.insert(bb);
-
-            for (auto& instr : bb->getInstructions()) {
-                this->visit(instr.get());
+            
+            if (executableBlocks.insert(bb).second) {
+                for (auto& instr : bb->getInstructions()) {
+                    if (instr) this->visit(instr.get(), executableEdges, executableBlocks);
+                }
             }
         }
+        
         if (!instructionWorklist.empty()) {
             ir::Instruction* instr = instructionWorklist.back();
             instructionWorklist.pop_back();
-            this->visit(instr);
-        }
-    }
-
-    // --- Transformation Phase ---
-    bool changed = false;
-    size_t constants_propagated = 0;
-
-    // Replace instructions that evaluated to a constant
-    for (auto const& [val, entry] : this->lattice) {
-        if (auto* instr = dynamic_cast<ir::Instruction*>(val)) {
-            if (entry.type == Constant) {
-                instr->replaceAllUsesWith(entry.constant);
-                changed = true;
-                constants_propagated++;
+            if (instr && instr->getParent() && executableBlocks.count(instr->getParent())) {
+                this->visit(instr, executableEdges, executableBlocks);
             }
         }
     }
 
-    if (constants_propagated > 0) {
-        reportInfo("SCCP propagated " + std::to_string(constants_propagated) + " constants");
-    }
+    bool changed = false;
+    for (auto& bb_ptr : func.getBasicBlocks()) {
+        ir::BasicBlock* bb = bb_ptr.get();
+        if (!bb || !executableBlocks.count(bb)) continue;
+        
+        auto& instrs = bb->getInstructions();
+        auto it = instrs.begin();
+        while (it != instrs.end()) {
+            ir::Instruction* instr = it->get();
+            if (!instr) { it = instrs.erase(it); continue; }
+            
+            ir::Instruction::Opcode op = instr->getOpcode();
+            if (op == ir::Instruction::Ret || op == ir::Instruction::Br || 
+                op == ir::Instruction::Jmp || op == ir::Instruction::Jnz || 
+                op == ir::Instruction::Jz || op == ir::Instruction::Phi) {
+                ++it;
+                continue;
+            }
 
+            auto entry = getLatticeValue(instr);
+            if (entry.type == Constant && entry.constant) {
+                if (instr->getType() && !instr->getType()->isVoidTy()) {
+                    instr->replaceAllUsesWith(entry.constant);
+                    it = instrs.erase(it);
+                    changed = true;
+                    continue;
+                }
+            }
+            ++it;
+        }
+    }
     return changed;
 }
 
-bool SCCP::validatePreconditions(ir::Function& func) {
-    // Validate that the function has basic blocks
-    if (func.getBasicBlocks().empty()) {
-        reportError("Function has no basic blocks");
-        return false;
-    }
-
-    // Basic validation - could be enhanced with SSA form checking
-    return true;
-}
-
 void SCCP::initialize(ir::Function& func) {
-    this->lattice.clear();
-    this->instructionWorklist.clear();
-    this->blockWorklist.clear();
-
-    // All instructions start as Top
-    for (auto& bb : func.getBasicBlocks()) {
+    lattice.clear();
+    instructionWorklist.clear();
+    blockWorklist.clear();
+    for (auto& bb_ptr : func.getBasicBlocks()) {
+        ir::BasicBlock* bb = bb_ptr.get();
+        if (!bb) continue;
         for (auto& instr : bb->getInstructions()) {
-            if (instr->getType()->getTypeID() != ir::Type::VoidTyID) {
-                this->lattice[instr.get()] = {Top, nullptr};
+            if (instr && instr->getType() && !instr->getType()->isVoidTy()) {
+                lattice[instr.get()] = LatticeEntry{Top, nullptr};
             }
         }
-    }
-
-    // Start by assuming the entry block is executable
-    if (!func.getBasicBlocks().empty()) {
-        this->blockWorklist.push_back(func.getBasicBlocks().front().get());
-    }
-}
-
-void SCCP::visit(ir::Instruction* instr) {
-    if (this->getLatticeValue(instr).type == Bottom) {
-        return;
-    }
-
-    switch (instr->getOpcode()) {
-        // Arithmetic operations
-        case ir::Instruction::Add:
-        case ir::Instruction::Sub:
-        case ir::Instruction::Mul:
-        case ir::Instruction::Div:
-        case ir::Instruction::Udiv:
-        case ir::Instruction::Rem:
-        case ir::Instruction::Urem:
-            handleArithmeticOp(instr);
-            break;
-
-        // Bitwise operations
-        case ir::Instruction::And:
-        case ir::Instruction::Or:
-        case ir::Instruction::Xor:
-        case ir::Instruction::Shl:
-        case ir::Instruction::Shr:
-        case ir::Instruction::Sar:
-            handleBitwiseOp(instr);
-            break;
-
-        // Comparison operations
-        case ir::Instruction::Ceq:
-        case ir::Instruction::Cne:
-        case ir::Instruction::Csle:
-        case ir::Instruction::Cslt:
-        case ir::Instruction::Csge:
-        case ir::Instruction::Csgt:
-        case ir::Instruction::Cule:
-        case ir::Instruction::Cult:
-        case ir::Instruction::Cuge:
-        case ir::Instruction::Cugt:
-            handleComparisonOp(instr);
-            break;
-
-        // Unary operations
-        case ir::Instruction::Neg:
-            handleUnaryOp(instr);
-            break;
-
-        // Control flow
-        case ir::Instruction::Jmp: {
-            this->blockWorklist.push_back(static_cast<ir::BasicBlock*>(instr->getOperands()[0]->get()));
-            break;
-        }
-        case ir::Instruction::Jnz:
-        case ir::Instruction::Br: {
-            if (instr->getOperands().size() == 1) { // Unconditional branch
-                this->blockWorklist.push_back(static_cast<ir::BasicBlock*>(instr->getOperands()[0]->get()));
-                break;
-            }
-            LatticeEntry cond = this->getLatticeValue(instr->getOperands()[0]->get());
-            if (cond.type == Top) return;
-
-            if (cond.type == Bottom) {
-                this->blockWorklist.push_back(static_cast<ir::BasicBlock*>(instr->getOperands()[1]->get()));
-                this->blockWorklist.push_back(static_cast<ir::BasicBlock*>(instr->getOperands()[2]->get()));
-            } else {
-                auto* c = static_cast<ir::ConstantInt*>(cond.constant);
-                if (c->getValue() != 0) {
-                    this->blockWorklist.push_back(static_cast<ir::BasicBlock*>(instr->getOperands()[1]->get()));
-                } else {
-                    this->blockWorklist.push_back(static_cast<ir::BasicBlock*>(instr->getOperands()[2]->get()));
-                }
-            }
-            break;
-        }
-
-        // Default: mark as bottom (unknown value)
-        default:
-            this->setLatticeValue(instr, {Bottom, nullptr});
-            break;
     }
 }
 
 SCCP::LatticeEntry SCCP::getLatticeValue(ir::Value* val) {
-    if (auto* c = dynamic_cast<ir::Constant*>(val)) {
-        return {Constant, c};
-    }
-    if (this->lattice.find(val) == this->lattice.end()) {
-        // Parameters are Bottom (unknown), other non-constants not in lattice are Top
-        if (dynamic_cast<ir::Parameter*>(val)) {
-            return {Bottom, nullptr};
-        }
-        return {Top, nullptr};
-    }
-    return this->lattice[val];
+    if (!val) return LatticeEntry{Bottom, nullptr};
+    if (auto* ci = dynamic_cast<ir::ConstantInt*>(val)) return LatticeEntry{Constant, ci};
+    if (auto* cf = dynamic_cast<ir::ConstantFP*>(val)) return LatticeEntry{Constant, cf};
+    auto it = lattice.find(val);
+    if (it != lattice.end()) return it->second;
+    return LatticeEntry{Bottom, nullptr};
 }
 
-void SCCP::setLatticeValue(ir::Instruction* instr, SCCP::LatticeEntry new_val) {
-    LatticeEntry old_val = this->getLatticeValue(instr);
-    if (old_val.type == new_val.type && old_val.constant == new_val.constant) {
-        return;
+void SCCP::setLatticeValue(ir::Instruction* instr, LatticeEntry new_val) {
+    if (!instr || !instr->getType() || instr->getType()->isVoidTy()) return;
+    
+    LatticeEntry old_val = LatticeEntry{Top, nullptr};
+    auto it = lattice.find(instr);
+    if (it != lattice.end()) old_val = it->second;
+    else lattice[instr] = old_val;
+
+    if (old_val.type == Bottom) return;
+    if (new_val.type == Top) return;
+    if (old_val.type == Constant && new_val.type == Top) return;
+    if (old_val.type == new_val.type && old_val.constant == new_val.constant) return;
+
+    if (new_val.type == Top) return;
+    if (old_val.type == Bottom) return;
+    if (old_val.type == Constant && new_val.type == Constant) {
+        auto* ci1 = dynamic_cast<ir::ConstantInt*>(old_val.constant);
+        auto* ci2 = dynamic_cast<ir::ConstantInt*>(new_val.constant);
+        if (ci1 && ci2 && ci1->getValue() == ci2->getValue()) return;
     }
-
-    if (old_val.type == Bottom) {
-        return;
-    }
-
-    this->lattice[instr] = new_val;
-
+    lattice[instr] = new_val;
     for (auto& use : instr->getUseList()) {
-        this->instructionWorklist.push_back(static_cast<ir::Instruction*>(use->getUser()));
+        if (use && use->getUser()) {
+            if (auto* user_instr = dynamic_cast<ir::Instruction*>(use->getUser())) {
+                bool found = false;
+                // Speed up check with a limit or a set if it gets too slow
+                for (auto* item : instructionWorklist) if (item == user_instr) { found = true; break; }
+                if (!found) instructionWorklist.push_back(user_instr);
+            }
+        }
     }
 }
 
-void SCCP::handleArithmeticOp(ir::Instruction* instr) {
-    LatticeEntry v1 = this->getLatticeValue(instr->getOperands()[0]->get());
-    LatticeEntry v2 = this->getLatticeValue(instr->getOperands()[1]->get());
-
-    if (v1.type == Top || v2.type == Top) return;
-    if (v1.type == Bottom || v2.type == Bottom) {
-        this->setLatticeValue(instr, {Bottom, nullptr});
-        return;
-    }
-
-    auto* c1 = static_cast<ir::ConstantInt*>(v1.constant);
-    auto* c2 = static_cast<ir::ConstantInt*>(v2.constant);
-
-    ir::Constant* result = performSafeArithmetic(instr->getOpcode(), c1, c2);
-    if (result) {
-        this->setLatticeValue(instr, {Constant, result});
-    } else {
-        this->setLatticeValue(instr, {Bottom, nullptr});
-    }
-}
-
-void SCCP::handleBitwiseOp(ir::Instruction* instr) {
-    LatticeEntry v1 = this->getLatticeValue(instr->getOperands()[0]->get());
-    LatticeEntry v2 = this->getLatticeValue(instr->getOperands()[1]->get());
-
-    if (v1.type == Top || v2.type == Top) return;
-    if (v1.type == Bottom || v2.type == Bottom) {
-        this->setLatticeValue(instr, {Bottom, nullptr});
-        return;
-    }
-
-    auto* c1 = static_cast<ir::ConstantInt*>(v1.constant);
-    auto* c2 = static_cast<ir::ConstantInt*>(v2.constant);
-
-    ir::Constant* result = performSafeBitwise(instr->getOpcode(), c1, c2);
-    if (result) {
-        this->setLatticeValue(instr, {Constant, result});
-    } else {
-        this->setLatticeValue(instr, {Bottom, nullptr});
-    }
-}
-
-void SCCP::handleComparisonOp(ir::Instruction* instr) {
-    LatticeEntry v1 = this->getLatticeValue(instr->getOperands()[0]->get());
-    LatticeEntry v2 = this->getLatticeValue(instr->getOperands()[1]->get());
-
-    if (v1.type == Top || v2.type == Top) return;
-    if (v1.type == Bottom || v2.type == Bottom) {
-        this->setLatticeValue(instr, {Bottom, nullptr});
-        return;
-    }
-
-    auto* c1 = static_cast<ir::ConstantInt*>(v1.constant);
-    auto* c2 = static_cast<ir::ConstantInt*>(v2.constant);
-
-    ir::Constant* result = performSafeComparison(instr->getOpcode(), c1, c2);
-    if (result) {
-        this->setLatticeValue(instr, {Constant, result});
-    } else {
-        this->setLatticeValue(instr, {Bottom, nullptr});
-    }
-}
-
-void SCCP::handleUnaryOp(ir::Instruction* instr) {
-    LatticeEntry v1 = this->getLatticeValue(instr->getOperands()[0]->get());
-
-    if (v1.type == Top) return;
-    if (v1.type == Bottom) {
-        this->setLatticeValue(instr, {Bottom, nullptr});
-        return;
-    }
-
-    auto* c1 = static_cast<ir::ConstantInt*>(v1.constant);
-    auto* ty = static_cast<ir::IntegerType*>(c1->getType());
-
+void SCCP::visit(ir::Instruction* instr, std::set<std::pair<ir::BasicBlock*, ir::BasicBlock*>>& executableEdges, std::set<ir::BasicBlock*>& executableBlocks) {
+    if (!instr) return;
     switch (instr->getOpcode()) {
-        case ir::Instruction::Neg: {
-            // Perform negation with overflow check
-            uint64_t value = c1->getValue();
-            uint64_t result = (~value) + 1; // Two's complement negation
-
-            ir::Constant* resultConst = ir::ConstantInt::get(ty, result);
-            this->setLatticeValue(instr, {Constant, resultConst});
+        case ir::Instruction::Phi: {
+            ir::PhiNode* phi = dynamic_cast<ir::PhiNode*>(instr);
+            if (!phi) break;
+            LatticeEntry res = LatticeEntry{Top, nullptr};
+            auto& ops = phi->getOperands();
+            bool hasExecutablePredecessor = false;
+            for (size_t i = 0; i + 1 < ops.size(); i += 2) {
+                ir::BasicBlock* pred = dynamic_cast<ir::BasicBlock*>(ops[i]->get());
+                if (pred && executableEdges.count({pred, phi->getParent()})) {
+                    hasExecutablePredecessor = true;
+                    auto val = getLatticeValue(ops[i+1]->get());
+                    if (val.type == Bottom) { res = LatticeEntry{Bottom, nullptr}; break; }
+                    if (val.type == Constant && val.constant) {
+                        if (res.type == Top) res = val;
+                        else if (res.constant != val.constant) {
+                            auto* ci1 = dynamic_cast<ir::ConstantInt*>(res.constant);
+                            auto* ci2 = dynamic_cast<ir::ConstantInt*>(val.constant);
+                            if (ci1 && ci2 && ci1->getValue() == ci2->getValue()) {
+                                // Same value, stay constant
+                            } else {
+                                res = LatticeEntry{Bottom, nullptr}; break;
+                            }
+                        }
+                    }
+                }
+            }
+            if (!hasExecutablePredecessor) res = LatticeEntry{Top, nullptr};
+            setLatticeValue(instr, res);
             break;
         }
-        default:
-            this->setLatticeValue(instr, {Bottom, nullptr});
+        case ir::Instruction::Copy:
+            if (!instr->getOperands().empty() && instr->getOperands()[0]) {
+                setLatticeValue(instr, getLatticeValue(instr->getOperands()[0]->get()));
+            }
             break;
-    }
-}
-
-bool SCCP::detectAddOverflow(uint64_t a, uint64_t b, ir::IntegerType* type) {
-    // For simplicity, we'll check if the result exceeds the maximum value for the type
-    uint64_t max_val = (1ULL << type->getBitwidth()) - 1;
-    return (a > max_val - b);
-}
-
-bool SCCP::detectMulOverflow(uint64_t a, uint64_t b, ir::IntegerType* type) {
-    if (a == 0 || b == 0) return false;
-    uint64_t max_val = (1ULL << type->getBitwidth()) - 1;
-    return (a > max_val / b);
-}
-
-bool SCCP::detectDivisionByZero(uint64_t divisor) {
-    return divisor == 0;
-}
-
-ir::Constant* SCCP::performSafeArithmetic(ir::Instruction::Opcode op,
-                                         ir::ConstantInt* c1, ir::ConstantInt* c2) {
-    auto* ty = static_cast<ir::IntegerType*>(c1->getType());
-    uint64_t val1 = c1->getValue();
-    uint64_t val2 = c2->getValue();
-    uint64_t result;
-
-    switch (op) {
         case ir::Instruction::Add:
-            if (detectAddOverflow(val1, val2, ty)) {
-                reportWarning("Integer overflow detected in addition");
-                return nullptr;
-            }
-            result = val1 + val2;
-            break;
-
         case ir::Instruction::Sub:
-            result = val1 - val2;
-            break;
-
         case ir::Instruction::Mul:
-            if (detectMulOverflow(val1, val2, ty)) {
-                reportWarning("Integer overflow detected in multiplication");
-                return nullptr;
-            }
-            result = val1 * val2;
-            break;
-
         case ir::Instruction::Div:
         case ir::Instruction::Udiv:
-            if (detectDivisionByZero(val2)) {
-                reportError("Division by zero detected");
-                return nullptr;
-            }
-            if (op == ir::Instruction::Div) {
-                result = static_cast<int64_t>(val1) / static_cast<int64_t>(val2);
-            } else {
-                result = val1 / val2;
-            }
-            break;
-
         case ir::Instruction::Rem:
         case ir::Instruction::Urem:
-            if (detectDivisionByZero(val2)) {
-                reportError("Modulo by zero detected");
-                return nullptr;
-            }
-            if (op == ir::Instruction::Rem) {
-                result = static_cast<int64_t>(val1) % static_cast<int64_t>(val2);
-            } else {
-                result = val1 % val2;
-            }
-            break;
-
-        default:
-            return nullptr;
-    }
-
-    return ir::ConstantInt::get(ty, result);
-}
-
-ir::Constant* SCCP::performSafeBitwise(ir::Instruction::Opcode op,
-                                     ir::ConstantInt* c1, ir::ConstantInt* c2) {
-    auto* ty = static_cast<ir::IntegerType*>(c1->getType());
-    uint64_t val1 = c1->getValue();
-    uint64_t val2 = c2->getValue();
-    uint64_t result;
-
-    switch (op) {
         case ir::Instruction::And:
-            result = val1 & val2;
-            break;
-
         case ir::Instruction::Or:
-            result = val1 | val2;
-            break;
-
         case ir::Instruction::Xor:
-            result = val1 ^ val2;
-            break;
-
         case ir::Instruction::Shl:
-            if (val2 >= ty->getBitwidth()) {
-                reportWarning("Left shift by " + std::to_string(val2) + " bits exceeds type width");
-                return nullptr;
-            }
-            result = val1 << val2;
-            break;
-
         case ir::Instruction::Shr:
-            if (val2 >= ty->getBitwidth()) {
-                reportWarning("Right shift by " + std::to_string(val2) + " bits exceeds type width");
-                return nullptr;
-            }
-            result = val1 >> val2;
-            break;
-
         case ir::Instruction::Sar:
-            if (val2 >= ty->getBitwidth()) {
-                reportWarning("Arithmetic right shift by " + std::to_string(val2) + " bits exceeds type width");
-                return nullptr;
-            }
-            // Arithmetic right shift (sign-extending)
-            result = static_cast<int64_t>(val1) >> val2;
-            break;
-
-        default:
-            return nullptr;
-    }
-
-    return ir::ConstantInt::get(ty, result);
-}
-
-ir::Constant* SCCP::performSafeComparison(ir::Instruction::Opcode op,
-                                        ir::ConstantInt* c1, ir::ConstantInt* c2) {
-    // Get a boolean type (we'll use 1-bit integer for boolean results)
-    // SCCP is a legacy pass, we try to infer context.
-    ir::Type* boolType = nullptr;
-    if (c1 && c1->getType()) {
-         // This is still a bit of a hack until SCCP is fully context-aware.
-    }
-    uint64_t val1 = c1->getValue();
-    uint64_t val2 = c2->getValue();
-    bool result;
-
-    switch (op) {
         case ir::Instruction::Ceq:
-            result = (val1 == val2);
-            break;
-
         case ir::Instruction::Cne:
-            result = (val1 != val2);
-            break;
-
-        case ir::Instruction::Csle:
-            result = (static_cast<int64_t>(val1) <= static_cast<int64_t>(val2));
-            break;
-
         case ir::Instruction::Cslt:
-            result = (static_cast<int64_t>(val1) < static_cast<int64_t>(val2));
-            break;
-
-        case ir::Instruction::Csge:
-            result = (static_cast<int64_t>(val1) >= static_cast<int64_t>(val2));
-            break;
-
+        case ir::Instruction::Csle:
         case ir::Instruction::Csgt:
-            result = (static_cast<int64_t>(val1) > static_cast<int64_t>(val2));
-            break;
-
-        case ir::Instruction::Cule:
-            result = (val1 <= val2);
-            break;
-
+        case ir::Instruction::Csge:
         case ir::Instruction::Cult:
-            result = (val1 < val2);
-            break;
-
-        case ir::Instruction::Cuge:
-            result = (val1 >= val2);
-            break;
-
+        case ir::Instruction::Cule:
         case ir::Instruction::Cugt:
-            result = (val1 > val2);
+        case ir::Instruction::Cuge:
+        {
+            if (instr->getOperands().size() < 2 || !instr->getOperands()[0] || !instr->getOperands()[1]) {
+                if (instr->getType() && !instr->getType()->isVoidTy()) setLatticeValue(instr, LatticeEntry{Bottom, nullptr});
+                break;
+            }
+            auto l = getLatticeValue(instr->getOperands()[0]->get());
+            auto r = getLatticeValue(instr->getOperands()[1]->get());
+            
+            if (l.type == Bottom || r.type == Bottom) {
+                setLatticeValue(instr, LatticeEntry{Bottom, nullptr});
+            } else if (l.type == Constant && r.type == Constant) {
+                auto* lc = dynamic_cast<ir::ConstantInt*>(l.constant);
+                auto* rc = dynamic_cast<ir::ConstantInt*>(r.constant);
+                if (lc && rc) {
+                    int64_t v = 0;
+                    bool possible = true;
+                    ir::Instruction::Opcode op = instr->getOpcode();
+                    switch (op) {
+                        case ir::Instruction::Add: v = lc->getValue() + rc->getValue(); break;
+                        case ir::Instruction::Sub: v = lc->getValue() - rc->getValue(); break;
+                        case ir::Instruction::Mul: v = lc->getValue() * rc->getValue(); break;
+                        case ir::Instruction::Div: if (rc->getValue() != 0) v = lc->getValue() / rc->getValue(); else possible = false; break;
+                        case ir::Instruction::Udiv: if (rc->getValue() != 0) v = (uint64_t)lc->getValue() / (uint64_t)rc->getValue(); else possible = false; break;
+                        case ir::Instruction::Rem: if (rc->getValue() != 0) v = lc->getValue() % rc->getValue(); else possible = false; break;
+                        case ir::Instruction::Urem: if (rc->getValue() != 0) v = (uint64_t)lc->getValue() % (uint64_t)rc->getValue(); else possible = false; break;
+                        case ir::Instruction::And: v = lc->getValue() & rc->getValue(); break;
+                        case ir::Instruction::Or:  v = lc->getValue() | rc->getValue(); break;
+                        case ir::Instruction::Xor: v = lc->getValue() ^ rc->getValue(); break;
+                        case ir::Instruction::Shl: v = lc->getValue() << (rc->getValue() & 63); break;
+                        case ir::Instruction::Shr: v = (uint64_t)lc->getValue() >> (rc->getValue() & 63); break;
+                        case ir::Instruction::Sar: v = lc->getValue() >> (rc->getValue() & 63); break;
+                        case ir::Instruction::Ceq: v = lc->getValue() == rc->getValue(); break;
+                        case ir::Instruction::Cne: v = lc->getValue() != rc->getValue(); break;
+                        case ir::Instruction::Cslt: v = lc->getValue() < rc->getValue(); break;
+                        case ir::Instruction::Csle: v = lc->getValue() <= rc->getValue(); break;
+                        case ir::Instruction::Csgt: v = lc->getValue() > rc->getValue(); break;
+                        case ir::Instruction::Csge: v = lc->getValue() >= rc->getValue(); break;
+                        case ir::Instruction::Cult: v = (uint64_t)lc->getValue() < (uint64_t)rc->getValue(); break;
+                        case ir::Instruction::Cule: v = (uint64_t)lc->getValue() <= (uint64_t)rc->getValue(); break;
+                        case ir::Instruction::Cugt: v = (uint64_t)lc->getValue() > (uint64_t)rc->getValue(); break;
+                        case ir::Instruction::Cuge: v = (uint64_t)lc->getValue() >= (uint64_t)rc->getValue(); break;
+                        default: break;
+                    }
+                    if (possible) setLatticeValue(instr, LatticeEntry{Constant, ir::ConstantInt::get(static_cast<ir::IntegerType*>(instr->getType()), v)});
+                    else setLatticeValue(instr, LatticeEntry{Bottom, nullptr});
+                } else setLatticeValue(instr, LatticeEntry{Bottom, nullptr});
+            }
             break;
+        }
+        case ir::Instruction::Jmp: {
+            if (instr->getOperands().empty() || !instr->getOperands()[0]) break;
+            ir::BasicBlock* target = dynamic_cast<ir::BasicBlock*>(instr->getOperands()[0]->get());
+            if (target) {
+                if (executableEdges.insert({instr->getParent(), target}).second) {
+                    if (executableBlocks.count(target)) {
+                        for (auto& t_instr : target->getInstructions()) {
+                            if (t_instr && t_instr->getOpcode() == ir::Instruction::Phi) {
+                                bool found = false;
+                                for (auto* item : instructionWorklist) if (item == t_instr.get()) { found = true; break; }
+                                if (!found) instructionWorklist.push_back(t_instr.get());
+                            }
+                            else break;
+                        }
+                    } else blockWorklist.push_back(target);
+                }
+            }
+            break;
+        }
+        case ir::Instruction::Br:
+        case ir::Instruction::Jnz:
+        case ir::Instruction::Jz: {
+            if (instr->getOperands().empty() || !instr->getOperands()[0]) break;
+            auto cond = getLatticeValue(instr->getOperands()[0]->get());
+            ir::BasicBlock* trueDest = (instr->getOperands().size() > 1) ? dynamic_cast<ir::BasicBlock*>(instr->getOperands()[1]->get()) : nullptr;
+            ir::BasicBlock* falseDest = (instr->getOperands().size() > 2) ? dynamic_cast<ir::BasicBlock*>(instr->getOperands()[2]->get()) : nullptr;
+            
+            auto mark = [&](ir::BasicBlock* d) {
+                if (d && executableEdges.insert({instr->getParent(), d}).second) {
+                    if (executableBlocks.count(d)) {
+                        for (auto& t_instr : d->getInstructions()) {
+                            if (t_instr && t_instr->getOpcode() == ir::Instruction::Phi) {
+                                bool found = false;
+                                for (auto* item : instructionWorklist) if (item == t_instr.get()) { found = true; break; }
+                                if (!found) instructionWorklist.push_back(t_instr.get());
+                            }
+                            else break;
+                        }
+                    } else blockWorklist.push_back(d);
+                }
+            };
 
+            if (cond.type == Constant && cond.constant) {
+                auto* cc = dynamic_cast<ir::ConstantInt*>(cond.constant);
+                if (cc) {
+                    bool condition = cc->getValue() != 0;
+                    if (instr->getOpcode() == ir::Instruction::Jz) condition = !condition;
+                    
+                    if (condition) mark(trueDest);
+                    else mark(falseDest);
+                }
+            } else if (cond.type == Bottom) {
+                mark(trueDest);
+                mark(falseDest);
+            }
+            break;
+        }
         default:
-            return nullptr;
+            if (instr->getType() && !instr->getType()->isVoidTy()) setLatticeValue(instr, LatticeEntry{Bottom, nullptr});
+            break;
     }
-
-    return ir::ConstantInt::get(static_cast<ir::IntegerType*>(boolType), result ? 1 : 0);
 }
+
+bool SCCP::validatePreconditions(ir::Function& f) { return !f.getBasicBlocks().empty(); }
 
 } // namespace transforms

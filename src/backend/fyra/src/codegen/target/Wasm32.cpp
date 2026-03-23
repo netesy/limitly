@@ -17,6 +17,7 @@
 #include <cassert>
 #include <iostream>
 #include <map>
+#include <algorithm>
 
 namespace codegen {
 namespace target {

@@ -15,24 +15,24 @@ public:
     TypeInfo getTypeInfo(const ir::Type* type) const override;
     std::string formatStackOperand(int offset) const override;
     std::string formatGlobalOperand(const std::string& name) const override;
-
+    
     // Register information
     const std::vector<std::string>& getRegisters(RegisterClass regClass) const override;
     const std::string& getReturnRegister(const ir::Type* type) const override;
-
+    
     // Stack frame management
     void emitPrologue(CodeGen& cg, int stack_size) override;
     void emitEpilogue(CodeGen& cg) override;
     void emitFunctionPrologue(CodeGen& cg, ir::Function& func) override;
     void emitFunctionEpilogue(CodeGen& cg, ir::Function& func) override;
     void emitStartFunction(CodeGen& cg) override;
-
+    
     // Enhanced calling convention support
     const std::vector<std::string>& getIntegerArgumentRegisters() const override;
     const std::vector<std::string>& getFloatArgumentRegisters() const override;
     const std::string& getIntegerReturnRegister() const override;
     const std::string& getFloatReturnRegister() const override;
-
+    
     // Argument passing
     size_t getMaxRegistersForArgs() const override;
     void emitPassArgument(CodeGen& cg, size_t argIndex,
@@ -56,7 +56,7 @@ public:
     void emitNeg(CodeGen& cg, ir::Instruction& instr) override;
     void emitCopy(CodeGen& cg, ir::Instruction& instr) override;
     void emitCall(CodeGen& cg, ir::Instruction& instr) override;
-
+    
     // New instruction emission methods
     void emitNot(CodeGen& cg, ir::Instruction& instr) override;
 
@@ -79,13 +79,13 @@ public:
     uint64_t getSyscallNumber(ir::SyscallId id) const override;
     void emitBr(CodeGen& cg, ir::Instruction& instr) override;
     void emitJmp(CodeGen& cg, ir::Instruction& instr) override;
-
+    
     // === NEON/Vector Support ===
     VectorCapabilities getVectorCapabilities() const override;
     bool supportsVectorWidth(unsigned width) const override;
     bool supportsVectorType(const ir::VectorType* type) const override;
     unsigned getOptimalVectorWidth(const ir::Type* elementType) const override;
-
+    
     // Vector instruction emission
     void emitVectorLoad(CodeGen& cg, ir::VectorInstruction& instr) override;
     void emitVectorStore(CodeGen& cg, ir::VectorInstruction& instr) override;
@@ -96,22 +96,21 @@ public:
     void emitVectorBroadcast(CodeGen& cg, ir::VectorInstruction& instr) override;
     void emitVectorExtract(CodeGen& cg, ir::VectorInstruction& instr) override;
     void emitVectorInsert(CodeGen& cg, ir::VectorInstruction& instr) override;
-
-    // Advanced NEON operations
-    void emitVectorHorizontalOp(CodeGen& cg, ir::VectorInstruction& instr) override;
-    void emitVectorNeg(CodeGen& cg, ir::VectorInstruction& instr) override;
     void emitVectorNot(CodeGen& cg, ir::VectorInstruction& instr) override;
+    void emitVectorHorizontalOp(CodeGen& cg, ir::VectorInstruction& instr) override;
     void emitVectorReduction(CodeGen& cg, ir::VectorInstruction& instr) override;
-
+    
+    // Advanced NEON operations
+    void emitVectorNeg(CodeGen& cg, ir::VectorInstruction& instr) override;
+    
     // Fused instruction support
     bool supportsFusedPattern(FusedPattern pattern) const override;
     void emitFusedMultiplyAdd(CodeGen& cg, const ir::FusedInstruction& instr) override;
-
+    
     // Register classification
     bool isCallerSaved(const std::string& reg) const override;
     bool isCalleeSaved(const std::string& reg) const override;
-    std::string getDataRelocationType() const override { return "R_AARCH64_ABS64"; }
-
+    
 private:
     void emitAddBinary(CodeGen& cg, ir::Instruction& instr);
     void emitSubBinary(CodeGen& cg, ir::Instruction& instr);
@@ -129,7 +128,7 @@ private:
     size_t align_to_16(size_t size) const { return (size + 15) & ~15; }
     std::string getWRegister(const std::string& xReg) const;
     std::string getAArch64InstructionSuffix(const ir::Type* type) const;
-
+    
     // NEON helper methods
     std::string getNEONRegister(const std::string& baseReg, unsigned lanes) const;
     std::string getNEONLanes(const ir::VectorType* type) const;
@@ -138,7 +137,7 @@ private:
     bool hasAdvancedSIMD() const { return true; } // NEON is standard on AArch64
     bool hasCrypto() const { return false; } // Optional crypto extensions
     bool hasSVE() const { return false; } // Scalable Vector Extensions
-
+    
     // Advanced control flow helpers
     void emitConditionalBranch(CodeGen& cg, const std::string& condition,
                               const std::string& trueLabel, const std::string& falseLabel);

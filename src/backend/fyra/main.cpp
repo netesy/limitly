@@ -1,6 +1,5 @@
 #include "parser/Parser.h"
 #include "codegen/CodeGen.h"
-#include "codegen/EnhancedCodeGen.h"
 #include "codegen/execgen/elf.hh"
 #include "codegen/execgen/pe.hh"
 #include "codegen/execgen/macho.hh"
@@ -89,7 +88,7 @@ int main(int argc, char** argv) {
     std::string inputFile = argv[1];
     std::string outputFile = get_arg(argc, argv, "-o");
     std::string target = get_arg(argc, argv, "--target");
-
+    
     // Parse command line options
     bool enableValidation = true;
     bool generateObject = false;
@@ -98,7 +97,7 @@ int main(int argc, char** argv) {
     bool runPipeline = false;
     bool generateExecutable = false;
     bool disableOptimizations = false;
-
+    
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg == "--no-validate") {
@@ -121,7 +120,7 @@ int main(int argc, char** argv) {
             disableOptimizations = true;
         }
     }
-
+    
     // Detect input file format
     parser::FileFormat format = detectFileFormat(inputFile);
     std::string formatName;
@@ -154,10 +153,10 @@ int main(int argc, char** argv) {
 
     // 2. Run Enhanced SSA and Optimization Pipeline
     std::cout << "--- Running Enhanced Optimization Pipeline... ---\n" << std::flush;
-
+    
     // Create shared error reporter for all passes
     auto error_reporter = std::make_shared<transforms::ErrorReporter>(std::cerr, false);
-
+    
     for (auto& func : module->getFunctions()) {
         // Phase 1: SSA Construction (using legacy interface for compatibility)
         transforms::CFGBuilder::run(*func);
@@ -169,7 +168,7 @@ int main(int argc, char** argv) {
         phiInserter.run(*func, domFrontier);
         transforms::SSARenamer ssaRenamer;
         ssaRenamer.run(*func, domTree);
-
+        
         if (target != "wasm32") {
             transforms::Mem2Reg mem2reg;
             mem2reg.run(*func);
@@ -188,40 +187,26 @@ int main(int argc, char** argv) {
         transforms::SCCP enhanced_sccp(error_reporter);
         transforms::ControlFlowSimplification cfg_simplifier(error_reporter);
         transforms::DeadInstructionElimination enhanced_dce(error_reporter);
-
+        transforms::CopyElimination copy_elim;
+        transforms::GVN gvn;
+        transforms::LoopInvariantCodeMotion licm(error_reporter);
+        
         // Run optimization passes in optimal order
         bool optimization_changed = true;
         int iteration = 1;
-
-        while (optimization_changed && iteration <= 3) { // Limit iterations to prevent infinite loops
+        
+        while (optimization_changed && iteration <= 5) {
             optimization_changed = false;
-
-            if (verboseOutput) {
-                std::cout << "  Optimization iteration " << iteration << " on function: " << func->getName() << std::endl;
-            }
-
-            // Constant propagation and folding (should run first)
-            if (verboseOutput) std::cout << "  Running SCCP..." << std::endl;
-            if (enhanced_sccp.run(*func)) {
-                optimization_changed = true;
-            }
-
-            // Control flow simplification (after constant propagation)
-            if (verboseOutput) std::cout << "  Running CFG Simplifier..." << std::endl;
-            if (cfg_simplifier.run(*func)) {
-                optimization_changed = true;
-            }
-
-            // Dead code elimination (should run last to clean up)
-            if (verboseOutput) std::cout << "  Running DCE..." << std::endl;
-            if (enhanced_dce.run(*func)) {
-                optimization_changed = true;
-            }
-
+            if (enhanced_sccp.run(*func)) optimization_changed = true;
+            if (copy_elim.run(*func)) optimization_changed = true;
+            if (gvn.run(*func)) optimization_changed = true;
+            if (cfg_simplifier.run(*func)) optimization_changed = true;
+            if (licm.run(*func)) optimization_changed = true;
+            if (enhanced_dce.run(*func)) optimization_changed = true;
             iteration++;
         }
     }
-
+    
     // Print optimization summary
     if (error_reporter->hasErrors()) {
         std::cout << "--- Optimization completed with errors ---\n" << std::flush;
@@ -231,7 +216,7 @@ int main(int argc, char** argv) {
     } else {
         std::cout << "--- Enhanced Optimization Pipeline complete ---\n" << std::flush;
     }
-
+    
     // Continue with register allocation if no critical errors
     if (!error_reporter->hasCriticalErrors()) {
         // 3. Run Register Allocation (skip for WASM)
@@ -252,26 +237,26 @@ int main(int argc, char** argv) {
 
     // 4. Generate code
     std::string targetName = target.empty() ? "linux" : target;
-
+    
     if (runPipeline) {
         // Use comprehensive pipeline for all targets
         std::cout << "--- Running Comprehensive Compilation Pipeline ---\n" << std::flush;
-
+        
         codegen::CodeGenPipeline pipeline;
         codegen::CodeGenPipeline::PipelineConfig config;
         config.enableValidation = enableValidation;
         config.enableObjectGeneration = generateObject;
         config.enableVerboseOutput = verboseOutput;
         config.outputPrefix = outputFile.substr(0, outputFile.find_last_of('.'));
-
+        
         if (!target.empty()) {
             config.targetPlatforms = {target};
         }
-
+        
         auto pipelineResult = pipeline.execute(*module, config);
-
+        
         if (pipelineResult.success) {
-            std::cout << "Pipeline completed successfully for " << pipelineResult.getSuccessfulTargets()
+            std::cout << "Pipeline completed successfully for " << pipelineResult.getSuccessfulTargets() 
                      << " targets in " << pipelineResult.totalTimeMs << "ms" << std::endl;
         } else {
             std::cerr << "Pipeline failed. " << pipelineResult.getFailedTargets() << " targets failed." << std::endl;
@@ -280,19 +265,19 @@ int main(int argc, char** argv) {
             }
             return 1;
         }
-
+        
     } else if (useEnhanced) {
         // Use enhanced CodeGen with validation and object generation
         std::cout << "--- Using Enhanced CodeGen with Validation ---\n" << std::flush;
-
-        auto enhancedCodeGen = codegen::EnhancedCodeGenFactory::create(*module, targetName);
+        
+        auto enhancedCodeGen = codegen::CodeGenFactory::create(*module, targetName);
         if (!enhancedCodeGen) {
             std::cerr << "Error: Failed to create enhanced code generator for target: " << targetName << std::endl;
             return 1;
         }
-
+        
         enhancedCodeGen->enableVerboseOutput(verboseOutput);
-
+        
         std::string outputPrefix = outputFile.substr(0, outputFile.find_last_of('.'));
         if (generateExecutable) {
             std::cout << "--- Generating Executable (In-Memory) ---\n" << std::flush;
@@ -403,12 +388,12 @@ int main(int argc, char** argv) {
                 }
             }
         } else {
-            auto enhancedCodeGen = codegen::EnhancedCodeGenFactory::create(*module, targetName);
+            auto enhancedCodeGen = codegen::CodeGenFactory::create(*module, targetName);
             if (!enhancedCodeGen) {
                 std::cerr << "Error: Failed to create enhanced code generator for target: " << targetName << std::endl;
                 return 1;
             }
-
+            
             enhancedCodeGen->enableVerboseOutput(verboseOutput);
 
             std::string outputPrefix = outputFile.substr(0, outputFile.find_last_of('.'));
@@ -420,7 +405,7 @@ int main(int argc, char** argv) {
                 if (generateObject && !result.objectPath.empty()) {
                     std::cout << "Object: " << result.objectPath << std::endl;
                 }
-
+                
                 // Print validation summary
                 if (enableValidation) {
                     std::cout << "Validation: " << result.validation.errors.size() << " errors, "
@@ -442,11 +427,11 @@ int main(int argc, char** argv) {
                 return 1;
             }
         }
-
+        
     } else {
         // Use legacy CodeGen
         std::cout << "--- Generating code for target: " << targetName << " (legacy mode) ---\n" << std::flush;
-
+        
         // Select target
         std::unique_ptr<codegen::target::TargetInfo> targetInfo;
         if (target == "windows" || target == "windows-amd64" || target == "windows-x64") {
@@ -467,7 +452,7 @@ int main(int argc, char** argv) {
             // Default to Linux
             targetInfo = std::make_unique<codegen::target::SystemV_x64>();
         }
-
+        
         std::ofstream outFile(outputFile);
         if (!outFile.is_open()) {
             std::cerr << "Error: could not open output file " << outputFile << std::endl;

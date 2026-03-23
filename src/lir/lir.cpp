@@ -312,6 +312,8 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::ExportSymbol: return "export_symbol";
         case LIR_Op::BeginModule: return "begin_module";
         case LIR_Op::EndModule: return "end_module";
+        case LIR_Op::LoadGlobal: return "load_global";
+        case LIR_Op::StoreGlobal: return "store_global";
         
         // === SHARED CELL OPERATIONS ===
         case LIR_Op::SharedCellAlloc: return "shared_cell_alloc";

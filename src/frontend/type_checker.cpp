@@ -1,6 +1,8 @@
 #include "type_checker.hh"
 #include "../error/debugger.hh"
 #include "../memory/model.hh"
+#include "parser.hh"
+#include "scanner.hh"
 #include <memory>
 #include <vector>
 #include <unordered_map>
@@ -10,14 +12,20 @@
 #include <limits>
 #include <algorithm>
 #include <unordered_set>
+#include <fstream>
+#include <sstream>
 
 namespace LM {
 namespace Frontend {
-using namespace LM::Error;bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> program) {
+using namespace LM::Error;
+
+bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> program) {
     if (!program) {
         add_error("Null program provided");
         return false;
     }
+    
+    current_program_ = program;  // Store for import handling
     
     Debugger::resetError();
     errors.clear();
@@ -139,6 +147,22 @@ using namespace LM::Error;bool TypeChecker::check_program(std::shared_ptr<LM::Fr
             }
         }
         check_statement(stmt);
+    }
+    
+    // PASS 4: Populate imported_symbols map for LIR generator
+    // This allows the LIR generator to find imported functions when resolving member calls
+    for (const auto& [alias, module_path] : import_aliases) {
+        auto it = registered_modules.find(module_path);
+        if (it != registered_modules.end()) {
+            for (const auto& [symbol_name, symbol_type] : it->second.symbols) {
+                std::string qualified_name = alias + "." + symbol_name;
+                // Find the actual function declaration from function_signatures
+                auto sig_it = function_signatures.find(symbol_name);
+                if (sig_it != function_signatures.end() && sig_it->second.declaration) {
+                    program->imported_symbols[qualified_name] = sig_it->second.declaration;
+                }
+            }
+        }
     }
     
     program->inferred_type = type_system.NIL_TYPE;
@@ -654,6 +678,8 @@ TypePtr TypeChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statemen
         return check_match_statement(match_stmt);
     } else if (auto contract_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ContractStatement>(stmt)) {
         return check_contract_statement(contract_stmt);
+    } else if (auto import_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ImportStatement>(stmt)) {
+        return check_import_statement(import_stmt);
     } else if (auto expr_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ExprStatement>(stmt)) {
         return check_expression(expr_stmt->expression);
     }
@@ -1511,8 +1537,32 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
         }
     }
     
-    // Check if callee is a member expression (method call)
+    // Check if callee is a member expression (method call or module function call)
     if (auto member_expr = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(expr->callee)) {
+        // Check if this is a module member access (e.g., math.add)
+        if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(member_expr->object)) {
+            // Check if the variable is a module alias
+            auto alias_it = import_aliases.find(var_expr->name);
+            if (alias_it != import_aliases.end()) {
+                // This is a module member access
+                std::string module_path = alias_it->second;
+                std::string function_name = member_expr->name;
+                std::string full_function_name = function_name;  // The function is registered by its original name
+                
+                // Look up the function signature
+                auto sig_it = function_signatures.find(full_function_name);
+                if (sig_it != function_signatures.end()) {
+                    // Validate argument types
+                    validate_argument_types(sig_it->second.param_types, arg_types, full_function_name);
+                    expr->inferred_type = sig_it->second.return_type;
+                    return sig_it->second.return_type;
+                } else {
+                    add_error("Module '" + module_path + "' has no function '" + function_name + "'", expr->line);
+                    return type_system.ANY_TYPE;
+                }
+            }
+        }
+        
         // Get the object type
         TypePtr object_type = check_expression(member_expr->object);
         
@@ -2372,7 +2422,11 @@ bool TypeChecker::is_optional_type(TypePtr type) {
     
     // Both optional types (str?) and fallible types (int?DivisionByZero) 
     // should be allowed in if conditions for null/error checking
-    auto errorUnion = std::get<ErrorUnionType>(type->extra);
+    auto* errorUnionPtr = std::get_if<ErrorUnionType>(&type->extra);
+    if (!errorUnionPtr) {
+        throw std::runtime_error("Missing ErrorUnionType data in ErrorUnion type");
+    }
+    auto& errorUnion = *errorUnionPtr;
     
     // Optional types: empty error types and marked as generic (str?)
     bool isOptional = errorUnion.errorTypes.empty() && errorUnion.isGenericError;
@@ -2409,7 +2463,11 @@ void TypeChecker::validate_function_error_types(const std::shared_ptr<LM::Fronte
         auto returnType = resolve_type_annotation(*stmt->returnType);
         
         if (is_error_union_type(returnType)) {
-            auto errorUnion = std::get<ErrorUnionType>(returnType->extra);
+            auto* errorUnionPtr = std::get_if<ErrorUnionType>(&returnType->extra);
+            if (!errorUnionPtr) {
+                throw std::runtime_error("Missing ErrorUnionType data in ErrorUnion type");
+            }
+            auto& errorUnion = *errorUnionPtr;
             
             // If function declares specific error types, they should match return type
             if (stmt->canFail && !stmt->declaredErrorTypes.empty()) {
@@ -2604,8 +2662,13 @@ bool TypeChecker::is_error_union_compatible(TypePtr from, TypePtr to) {
         return false;
     }
     
-    auto fromErrorUnion = std::get<ErrorUnionType>(from->extra);
-    auto toErrorUnion = std::get<ErrorUnionType>(to->extra);
+    auto* fromErrorUnionPtr = std::get_if<ErrorUnionType>(&from->extra);
+    auto* toErrorUnionPtr = std::get_if<ErrorUnionType>(&to->extra);
+    if (!fromErrorUnionPtr || !toErrorUnionPtr) {
+        return false;
+    }
+    auto& fromErrorUnion = *fromErrorUnionPtr;
+    auto& toErrorUnion = *toErrorUnionPtr;
     
     // Success types must be compatible
     if (!is_type_compatible(fromErrorUnion.successType, toErrorUnion.successType)) {
@@ -2638,7 +2701,11 @@ bool TypeChecker::is_exhaustive_error_match(const std::vector<std::shared_ptr<LM
         return true; // Non-error types don't need exhaustive error matching
     }
     
-    auto errorUnion = std::get<ErrorUnionType>(type->extra);
+    auto* errorUnionPtr = std::get_if<ErrorUnionType>(&type->extra);
+    if (!errorUnionPtr) {
+        return false;
+    }
+    auto& errorUnion = *errorUnionPtr;
     
     bool hasSuccessCase = false;
     bool hasGenericErrorCase = false;
@@ -2885,9 +2952,12 @@ void TypeChecker::validate_pattern_compatibility(std::shared_ptr<LM::Frontend::A
         if (bindingPattern->typeName == "val") {
             // val pattern expects success type
             if (is_error_union_type(match_type)) {
-                auto errorUnion = std::get<ErrorUnionType>(match_type->extra);
-                // val pattern should match the success type
-                // This is a simplified check - in practice, we'd need more sophisticated matching
+                auto* errorUnionPtr = std::get_if<ErrorUnionType>(&match_type->extra);
+                if (errorUnionPtr) {
+                    auto& errorUnion = *errorUnionPtr;
+                    // val pattern should match the success type
+                    // This is a simplified check - in practice, we'd need more sophisticated matching
+                }
             } else {
                 add_error("val pattern can only be used with error union types", line);
             }
@@ -3122,7 +3192,11 @@ TypePtr TypeChecker::check_match_statement(std::shared_ptr<LM::Frontend::AST::Ma
     // Enhanced exhaustiveness checking for different type categories
     if (is_error_union_type(matchType)) {
         if (!is_exhaustive_error_match(case_ptrs, matchType)) {
-            auto errorUnion = std::get<ErrorUnionType>(matchType->extra);
+            auto* errorUnionPtr = std::get_if<ErrorUnionType>(&matchType->extra);
+            if (!errorUnionPtr) {
+                throw std::runtime_error("Missing ErrorUnionType data in ErrorUnion type");
+            }
+            auto& errorUnion = *errorUnionPtr;
             
             if (errorUnion.isGenericError) {
                 add_error("Match statement is not exhaustive for error union type. Must handle both success case (val pattern) and error case (err pattern)", 
@@ -3180,6 +3254,8 @@ TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> progra
     checker->set_source_context(source, file_path);
     
     TypeCheckResult result(program, type_system, checker->check_program(program), checker->get_errors());
+    result.import_aliases = checker->get_import_aliases();  // Copy import aliases from checker
+    result.registered_modules = checker->get_registered_modules();  // Copy registered modules from checker
     
     return result;
 }
@@ -3584,6 +3660,227 @@ TypePtr TypeChecker::check_frame_instantiation_expr(std::shared_ptr<LM::Frontend
     expr->inferred_type = frame_type;
     
     return frame_type;
+}
+
+// Helper: Collect all function dependencies (functions called by a function)
+static std::set<std::string> collect_function_dependencies(
+    const std::shared_ptr<LM::Frontend::AST::FunctionDeclaration>& func,
+    const std::unordered_map<std::string, std::shared_ptr<LM::Frontend::AST::FunctionDeclaration>>& all_functions) {
+    
+    std::set<std::string> dependencies;
+    if (!func || !func->body) return dependencies;
+    
+    // Walk the AST and find all function calls
+    std::function<void(const std::shared_ptr<LM::Frontend::AST::Statement>&)> visit_stmt = 
+        [&](const std::shared_ptr<LM::Frontend::AST::Statement>& stmt) {
+            if (!stmt) return;
+            
+            // Check if it's an expression statement
+            if (auto expr_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ExprStatement>(stmt)) {
+                // Visit the expression
+                std::function<void(const std::shared_ptr<LM::Frontend::AST::Expression>&)> visit_expr = 
+                    [&](const std::shared_ptr<LM::Frontend::AST::Expression>& expr) {
+                        if (!expr) return;
+                        
+                        // Check for function calls
+                        if (auto call = std::dynamic_pointer_cast<LM::Frontend::AST::CallExpr>(expr)) {
+                            if (auto var = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(call->callee)) {
+                                if (all_functions.find(var->name) != all_functions.end()) {
+                                    dependencies.insert(var->name);
+                                }
+                            }
+                            // Visit arguments
+                            for (const auto& arg : call->arguments) {
+                                visit_expr(arg);
+                            }
+                        }
+                        // Recursively visit sub-expressions
+                        else if (auto binary = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
+                            visit_expr(binary->left);
+                            visit_expr(binary->right);
+                        }
+                        else if (auto unary = std::dynamic_pointer_cast<LM::Frontend::AST::UnaryExpr>(expr)) {
+                            visit_expr(unary->right);
+                        }
+                    };
+                visit_expr(expr_stmt->expression);
+            }
+            // Recursively visit block statements
+            else if (auto block = std::dynamic_pointer_cast<LM::Frontend::AST::BlockStatement>(stmt)) {
+                for (const auto& s : block->statements) {
+                    visit_stmt(s);
+                }
+            }
+            else if (auto if_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::IfStatement>(stmt)) {
+                visit_stmt(if_stmt->thenBranch);
+                if (if_stmt->elseBranch) {
+                    visit_stmt(if_stmt->elseBranch);
+                }
+            }
+            else if (auto while_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::WhileStatement>(stmt)) {
+                visit_stmt(while_stmt->body);
+            }
+            else if (auto for_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ForStatement>(stmt)) {
+                visit_stmt(for_stmt->body);
+            }
+        };
+    
+    // Visit all statements in the function body
+    for (const auto& stmt : func->body->statements) {
+        visit_stmt(stmt);
+    }
+    
+    return dependencies;
+}
+
+// Helper: Recursively collect all dependencies (transitive closure)
+static std::set<std::string> collect_all_dependencies(
+    const std::string& symbol_name,
+    const std::unordered_map<std::string, std::shared_ptr<LM::Frontend::AST::FunctionDeclaration>>& all_functions,
+    std::set<std::string>& visited) {
+    
+    std::set<std::string> all_deps;
+    if (visited.find(symbol_name) != visited.end()) {
+        return all_deps;  // Already processed
+    }
+    visited.insert(symbol_name);
+    
+    auto it = all_functions.find(symbol_name);
+    if (it == all_functions.end()) {
+        return all_deps;  // Not a function
+    }
+    
+    // Get direct dependencies
+    auto direct_deps = collect_function_dependencies(it->second, all_functions);
+    all_deps.insert(direct_deps.begin(), direct_deps.end());
+    
+    // Recursively get dependencies of dependencies
+    for (const auto& dep : direct_deps) {
+        auto transitive = collect_all_dependencies(dep, all_functions, visited);
+        all_deps.insert(transitive.begin(), transitive.end());
+    }
+    
+    return all_deps;
+}
+
+TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::ImportStatement> import_stmt) {
+    if (!import_stmt) return nullptr;
+  
+    // Get the module path
+    std::string module_path = import_stmt->modulePath;
+    
+    // Try to load the module file
+    std::string module_file = module_path + ".lm";
+    std::ifstream file(module_file);
+    
+    if (!file.is_open()) {
+        add_error("Cannot open module file: " + module_file, import_stmt->line);
+        return nullptr;
+    }
+    
+    // Read the module file
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string module_source = buffer.str();
+    file.close();
+    
+    // Parse the module
+    std::shared_ptr<LM::Frontend::AST::Program> module_ast;
+    try {
+        Scanner scanner(module_source, module_file);
+        scanner.scanTokens();
+        Parser parser(scanner, false);
+        module_ast = parser.parse();
+        
+        if (!module_ast) {
+            add_error("Failed to parse module: " + module_path, import_stmt->line);
+            return nullptr;
+        }
+    } catch (const std::exception& e) {
+        add_error("Exception parsing module: " + std::string(e.what()), import_stmt->line);
+        return nullptr;
+    }
+    
+    // Collect all public functions from the module
+    std::set<std::string> public_symbols;
+    
+    for (const auto& stmt : module_ast->statements) {
+        if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
+            // Only consider public functions
+            if (func_decl->visibility == LM::Frontend::AST::VisibilityLevel::Public) {
+                public_symbols.insert(func_decl->name);
+            }
+        }
+    }
+    
+    // Determine which symbols to import based on visibility and filters
+    std::set<std::string> symbols_to_import;
+    
+    if (import_stmt->alias) {
+        // Aliased import: import all public symbols with alias prefix
+        std::string alias = import_stmt->alias.value();
+        import_aliases[alias] = module_path;
+        symbols_to_import = public_symbols;
+    } else if (import_stmt->filter) {
+        // Filtered import: import specified symbols if they're public
+        const auto& filter = import_stmt->filter.value();
+        
+        if (filter.type == LM::Frontend::AST::ImportFilterType::Show) {
+            // Only import specified identifiers (if public)
+            for (const auto& identifier : filter.identifiers) {
+                if (public_symbols.find(identifier) != public_symbols.end()) {
+                    symbols_to_import.insert(identifier);
+                }
+            }
+        } else if (filter.type == LM::Frontend::AST::ImportFilterType::Hide) {
+            // Import all public except specified identifiers
+            for (const auto& symbol : public_symbols) {
+                if (std::find(filter.identifiers.begin(), filter.identifiers.end(), symbol) == filter.identifiers.end()) {
+                    symbols_to_import.insert(symbol);
+                }
+            }
+        }
+    } else {
+        // No alias, no filter: import all public symbols
+        symbols_to_import = public_symbols;
+    }
+    
+    // Store imported functions for later use by LIR generator
+    std::string alias = import_stmt->alias ? import_stmt->alias.value() : "";
+    
+    for (const auto& stmt : module_ast->statements) {
+        if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
+            if (symbols_to_import.find(func_decl->name) != symbols_to_import.end()) {
+                // Type-check the function in the current context
+                check_function_declaration(func_decl);
+                
+                // Register the function signature
+                std::vector<TypePtr> param_types;
+                for (const auto& [param_name, param_type] : func_decl->params) {
+                    TypePtr ptype = resolve_type_annotation(param_type);
+                    param_types.push_back(ptype);
+                }
+                
+                TypePtr return_type = func_decl->returnType ? 
+                    resolve_type_annotation(func_decl->returnType.value()) : type_system.NIL_TYPE;
+                
+                FunctionSignature sig(func_decl->name, param_types, return_type);
+                sig.declaration = func_decl;
+                function_signatures[func_decl->name] = sig;
+                
+                // Store in imported_symbols map for LIR generator
+                if (!alias.empty()) {
+                    std::string qualified_name = alias + "." + func_decl->name;
+                    current_program_->imported_symbols[qualified_name] = func_decl;
+                } else {
+                    // Direct import - store by name
+                    current_program_->imported_symbols[func_decl->name] = func_decl;
+                }
+            }
+        }
+    }
+    
+    return type_system.NIL_TYPE;
 }
 
 } // namespace Frontend

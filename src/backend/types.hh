@@ -164,132 +164,137 @@ private:
 
         // Handle list and dict type compatibility
         if (from->tag == TypeTag::List && to->tag == TypeTag::List) {
-            auto fromListType = std::get<ListType>(from->extra);
-            auto toListType = std::get<ListType>(to->extra);
-            return canConvert(fromListType.elementType, toListType.elementType);
+            auto fromListType = std::get_if<ListType>(&from->extra);
+            auto toListType = std::get_if<ListType>(&to->extra);
+            if (fromListType && toListType) {
+                return canConvert(fromListType->elementType, toListType->elementType);
+            }
+            return true; // Generic list
         }
 
         if (from->tag == TypeTag::Dict && to->tag == TypeTag::Dict) {
-            auto fromDictType = std::get<DictType>(from->extra);
-            auto toDictType = std::get<DictType>(to->extra);
-            return canConvert(fromDictType.keyType, toDictType.keyType) &&
-                   canConvert(fromDictType.valueType, toDictType.valueType);
+            auto fromDictType = std::get_if<DictType>(&from->extra);
+            auto toDictType = std::get_if<DictType>(&to->extra);
+            if (fromDictType && toDictType) {
+                return canConvert(fromDictType->keyType, toDictType->keyType) &&
+                       canConvert(fromDictType->valueType, toDictType->valueType);
+            }
+            return true; // Generic dict
         }
 
         // Handle tuple type compatibility
         if (from->tag == TypeTag::Tuple && to->tag == TypeTag::Tuple) {
-            auto fromTupleType = std::get<TupleType>(from->extra);
-            auto toTupleType = std::get<TupleType>(to->extra);
+            auto fromTupleType = std::get_if<TupleType>(&from->extra);
+            auto toTupleType = std::get_if<TupleType>(&to->extra);
             
-            // Tuples must have same number of elements
-            if (fromTupleType.elementTypes.size() != toTupleType.elementTypes.size()) {
-                return false;
-            }
-            
-            // All corresponding element types must be compatible
-            for (size_t i = 0; i < fromTupleType.elementTypes.size(); ++i) {
-                if (!canConvert(fromTupleType.elementTypes[i], toTupleType.elementTypes[i])) {
+            if (fromTupleType && toTupleType) {
+                // Tuples must have same number of elements
+                if (fromTupleType->elementTypes.size() != toTupleType->elementTypes.size()) {
                     return false;
                 }
+                
+                // All corresponding element types must be compatible
+                for (size_t i = 0; i < fromTupleType->elementTypes.size(); ++i) {
+                    if (!canConvert(fromTupleType->elementTypes[i], toTupleType->elementTypes[i])) {
+                        return false;
+                    }
+                }
+                return true;
             }
             return true;
         }
 
         // Union and sum type compatibility
         if (from->tag == TypeTag::Union) {
-            auto unionTypes = std::get<UnionType>(from->extra).types;
-            return std::any_of(unionTypes.begin(), unionTypes.end(),
-                               [&](TypePtr type) { return canConvert(type, to); });
+            if (auto* unionType = std::get_if<UnionType>(&from->extra)) {
+                return std::any_of(unionType->types.begin(), unionType->types.end(),
+                                   [&](TypePtr type) { return canConvert(type, to); });
+            }
         }
         
         // Target is union type - source can convert if it matches any member
         if (to->tag == TypeTag::Union) {
-            auto unionTypes = std::get<UnionType>(to->extra).types;
-            // For optional types (T?), allow T to be passed directly
-            return std::any_of(unionTypes.begin(), unionTypes.end(),
-                               [&](TypePtr type) { return canConvert(from, type); });
-        }
-        
-        // Source is union type - can convert if any member can convert to target
-        if (from->tag == TypeTag::Union) {
-            auto unionTypes = std::get<UnionType>(from->extra).types;
-            return std::any_of(unionTypes.begin(), unionTypes.end(),
-                               [&](TypePtr type) { return canConvert(type, to); });
+            if (auto* unionType = std::get_if<UnionType>(&to->extra)) {
+                // For optional types (T?), allow T to be passed directly
+                return std::any_of(unionType->types.begin(), unionType->types.end(),
+                                   [&](TypePtr type) { return canConvert(from, type); });
+            }
         }
 
         // Error union type compatibility
         if (from->tag == TypeTag::ErrorUnion && to->tag == TypeTag::ErrorUnion) {
-            auto fromErrorUnion = std::get<ErrorUnionType>(from->extra);
-            auto toErrorUnion = std::get<ErrorUnionType>(to->extra);
+            auto fromErrorUnion = std::get_if<ErrorUnionType>(&from->extra);
+            auto toErrorUnion = std::get_if<ErrorUnionType>(&to->extra);
             
-            // Success types must be compatible
-            if (!canConvert(fromErrorUnion.successType, toErrorUnion.successType)) {
-                return false;
-            }
-            
-            // If target is generic error (Type?), any error union is compatible
-            if (toErrorUnion.isGenericError) {
-                return true;
-            }
-            
-            // If source is generic error, it's only compatible with generic target
-            if (fromErrorUnion.isGenericError) {
-                return toErrorUnion.isGenericError;
-            }
-            
-            // Check that all source error types are in target error types
-            for (const auto& sourceError : fromErrorUnion.errorTypes) {
-                bool found = std::find(toErrorUnion.errorTypes.begin(), 
-                                     toErrorUnion.errorTypes.end(), 
-                                     sourceError) != toErrorUnion.errorTypes.end();
-                if (!found) {
+            if (fromErrorUnion && toErrorUnion) {
+                // Success types must be compatible
+                if (!canConvert(fromErrorUnion->successType, toErrorUnion->successType)) {
                     return false;
                 }
+                
+                // If target is generic error (Type?), any error union is compatible
+                if (toErrorUnion->isGenericError) {
+                    return true;
+                }
+                
+                // If source is generic error, it's only compatible with generic target
+                if (fromErrorUnion->isGenericError) {
+                    return toErrorUnion->isGenericError;
+                }
+                
+                // Check that all source error types are in target error types
+                for (const auto& sourceError : fromErrorUnion->errorTypes) {
+                    bool found = std::find(toErrorUnion->errorTypes.begin(), 
+                                         toErrorUnion->errorTypes.end(), 
+                                         sourceError) != toErrorUnion->errorTypes.end();
+                    if (!found) {
+                        return false;
+                    }
+                }
+                
+                return true;
             }
-            
             return true;
         }
         
         // Success type can be converted to error union if success types are compatible
         if (to->tag == TypeTag::ErrorUnion) {
-            auto toErrorUnion = std::get<ErrorUnionType>(to->extra);
-            return canConvert(from, toErrorUnion.successType);
+            if (auto* toErrorUnion = std::get_if<ErrorUnionType>(&to->extra)) {
+                return canConvert(from, toErrorUnion->successType);
+            }
         }
 
         // Function type compatibility
         if (from->tag == TypeTag::Function && to->tag == TypeTag::Function) {
             // Handle case where one or both types don't have function type information
-            bool fromHasExtra = std::holds_alternative<FunctionType>(from->extra);
-            bool toHasExtra = std::holds_alternative<FunctionType>(to->extra);
+            auto fromFuncType = std::get_if<FunctionType>(&from->extra);
+            auto toFuncType = std::get_if<FunctionType>(&to->extra);
             
             // If neither has specific function type info, they're compatible (generic function types)
-            if (!fromHasExtra && !toHasExtra) {
+            if (!fromFuncType && !toFuncType) {
                 return true;
             }
             
             // If one is generic function type and other is specific, they're compatible
-            if (!fromHasExtra || !toHasExtra) {
+            if (!fromFuncType || !toFuncType) {
                 return true;
             }
             
             // Both have specific function type information - do detailed compatibility check
-            auto fromFuncType = std::get<FunctionType>(from->extra);
-            auto toFuncType = std::get<FunctionType>(to->extra);
-            
             // Check parameter count
-            if (fromFuncType.paramTypes.size() != toFuncType.paramTypes.size()) {
+            if (fromFuncType->paramTypes.size() != toFuncType->paramTypes.size()) {
                 return false;
             }
             
             // Check parameter types (contravariant)
-            for (size_t i = 0; i < fromFuncType.paramTypes.size(); ++i) {
-                if (!canConvert(toFuncType.paramTypes[i], fromFuncType.paramTypes[i])) {
+            for (size_t i = 0; i < fromFuncType->paramTypes.size(); ++i) {
+                if (!canConvert(toFuncType->paramTypes[i], fromFuncType->paramTypes[i])) {
                     return false;
                 }
             }
             
             // Check return type (covariant)
-            return canConvert(fromFuncType.returnType, toFuncType.returnType);
+            return canConvert(fromFuncType->returnType, toFuncType->returnType);
         }
 
         return false;
@@ -1268,10 +1273,13 @@ public:
             return false;
         }
         
-        auto fromFuncType = std::get<FunctionType>(fromFunc->extra);
-        auto toFuncType = std::get<FunctionType>(toFunc->extra);
+        auto* fromFuncType = std::get_if<FunctionType>(&fromFunc->extra);
+        auto* toFuncType = std::get_if<FunctionType>(&toFunc->extra);
         
-        return fromFuncType.isCompatibleWith(toFuncType);
+        if (fromFuncType && toFuncType) {
+            return fromFuncType->isCompatibleWith(*toFuncType);
+        }
+        return true; // Generic function types
     }
     
     // Container type validation methods
@@ -1281,10 +1289,11 @@ public:
         }
         
         if (containerType->tag == TypeTag::List) {
-            auto listType = std::get<ListType>(containerType->extra);
-            for (const auto& element : elements) {
-                if (!isCompatible(element->type, listType.elementType)) {
-                    return false;
+            if (auto* listType = std::get_if<ListType>(&containerType->extra)) {
+                for (const auto& element : elements) {
+                    if (!isCompatible(element->type, listType->elementType)) {
+                        return false;
+                    }
                 }
             }
             return true;
@@ -1299,11 +1308,12 @@ public:
         }
         
         if (dictType->tag == TypeTag::Dict) {
-            auto dictTypeInfo = std::get<DictType>(dictType->extra);
-            for (const auto& [key, value] : entries) {
-                if (!isCompatible(key->type, dictTypeInfo.keyType) || 
-                    !isCompatible(value->type, dictTypeInfo.valueType)) {
-                    return false;
+            if (auto* dictTypeInfo = std::get_if<DictType>(&dictType->extra)) {
+                for (const auto& [key, value] : entries) {
+                    if (!isCompatible(key->type, dictTypeInfo->keyType) || 
+                        !isCompatible(value->type, dictTypeInfo->valueType)) {
+                        return false;
+                    }
                 }
             }
             return true;
@@ -1319,8 +1329,9 @@ public:
         }
         
         if (containerType->tag == TypeTag::List) {
-            auto listType = std::get<ListType>(containerType->extra);
-            return listType.elementType;
+            if (auto* listType = std::get_if<ListType>(&containerType->extra)) {
+                return listType->elementType;
+            }
         }
         
         return ANY_TYPE;
@@ -1332,8 +1343,10 @@ public:
             return {STRING_TYPE, ANY_TYPE}; // Default types
         }
         
-        auto dictTypeInfo = std::get<DictType>(dictType->extra);
-        return {dictTypeInfo.keyType, dictTypeInfo.valueType};
+        if (auto* dictTypeInfo = std::get_if<DictType>(&dictType->extra)) {
+            return {dictTypeInfo->keyType, dictTypeInfo->valueType};
+        }
+        return {STRING_TYPE, ANY_TYPE};
     }
     
     // Function overloading support
@@ -1390,60 +1403,64 @@ public:
             return true; // Simple types match by tag alone
 
         case TypeTag::List: {
-            const auto &listType = std::get<ListType>(expectedType->extra);
-            if (const auto *listValue = std::get_if<ListValue>(&value->complexData)) {
-                for (const auto &element : listValue->elements) {
-                    if (!checkType(element, listType.elementType)) {
-                        return false;
+            if (const auto* listType = std::get_if<ListType>(&expectedType->extra)) {
+                if (const auto *listValue = std::get_if<ListValue>(&value->complexData)) {
+                    for (const auto &element : listValue->elements) {
+                        if (!checkType(element, listType->elementType)) {
+                            return false;
+                        }
                     }
+                    return true;
                 }
-                return true;
             }
-            break;
+            return true;
         }
 
         case TypeTag::Dict: {
-            const auto &dictType = std::get<DictType>(expectedType->extra);
-            if (const auto *dictValue = std::get_if<DictValue>(&value->complexData)) {
-                for (const auto &[key, val] : dictValue->elements) {
-                    if (!checkType(key, dictType.keyType) || !checkType(val, dictType.valueType)) {
-                        return false;
+            if (const auto* dictType = std::get_if<DictType>(&expectedType->extra)) {
+                if (const auto *dictValue = std::get_if<DictValue>(&value->complexData)) {
+                    for (const auto &[key, val] : dictValue->elements) {
+                        if (!checkType(key, dictType->keyType) || !checkType(val, dictType->valueType)) {
+                            return false;
+                        }
                     }
+                    return true;
                 }
-                return true;
             }
-            break;
+            return true;
         }
 
         case TypeTag::Tuple: {
-            const auto &tupleType = std::get<TupleType>(expectedType->extra);
-            if (const auto *tupleValue = std::get_if<TupleValue>(&value->complexData)) {
-                // Check that tuple has correct number of elements
-                if (tupleValue->elements.size() != tupleType.elementTypes.size()) {
-                    return false;
-                }
-                
-                // Check each element type
-                for (size_t i = 0; i < tupleValue->elements.size(); ++i) {
-                    if (!checkType(tupleValue->elements[i], tupleType.elementTypes[i])) {
+            if (const auto* tupleType = std::get_if<TupleType>(&expectedType->extra)) {
+                if (const auto *tupleValue = std::get_if<TupleValue>(&value->complexData)) {
+                    // Check that tuple has correct number of elements
+                    if (tupleValue->elements.size() != tupleType->elementTypes.size()) {
                         return false;
                     }
+                    
+                    // Check each element type
+                    for (size_t i = 0; i < tupleValue->elements.size(); ++i) {
+                        if (!checkType(tupleValue->elements[i], tupleType->elementTypes[i])) {
+                            return false;
+                        }
+                    }
+                    return true;
                 }
-                return true;
             }
-            break;
+            return true;
         }
 
         case TypeTag::Sum: {
-            const auto &sumType = std::get<SumType>(expectedType->extra);
-            if (const auto *sumValue = std::get_if<SumValue>(&value->complexData)) {
-                if (sumValue->activeVariant >= sumType.variants.size()) {
-                    return false;
+            if (const auto* sumType = std::get_if<SumType>(&expectedType->extra)) {
+                if (const auto *sumValue = std::get_if<SumValue>(&value->complexData)) {
+                    if (sumValue->activeVariant >= sumType->variants.size()) {
+                        return false;
+                    }
+                    const auto &variantType = sumType->variants[sumValue->activeVariant];
+                    return checkType(sumValue->value, variantType);
                 }
-                const auto &variantType = sumType.variants[sumValue->activeVariant];
-                return checkType(sumValue->value, variantType);
             }
-            break;
+            return true;
         }
 
        case TypeTag::Enum: {
@@ -1495,10 +1512,12 @@ public:
 
         // Handle Union type separately, as it can match multiple types
         if (expectedType->tag == TypeTag::Union) {
-            const auto &unionType = std::get<UnionType>(expectedType->extra);
-            for (const auto &type : unionType.types) {
-                if (checkType(value, type)) {
-                    return true;
+            const auto* unionPtr = std::get_if<UnionType>(&expectedType->extra);
+            if (unionPtr) {
+                for (const auto &type : unionPtr->types) {
+                    if (checkType(value, type)) {
+                        return true;
+                    }
                 }
             }
             return false;
@@ -1506,7 +1525,9 @@ public:
 
         // Handle ErrorUnion type separately
         if (expectedType->tag == TypeTag::ErrorUnion) {
-            const auto &errorUnionType = std::get<ErrorUnionType>(expectedType->extra);
+            const auto* errorUnionPtr = std::get_if<ErrorUnionType>(&expectedType->extra);
+            if (!errorUnionPtr) return false;
+            const auto& errorUnionType = *errorUnionPtr;
             
             // Check if value is an error
             if (const auto *errorValue = std::get_if<ErrorValue>(&value->complexData)) {

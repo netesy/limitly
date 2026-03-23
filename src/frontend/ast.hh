@@ -269,6 +269,9 @@ namespace AST {
     // Program - the root of our AST
     struct Program : public Node {
         std::vector<std::shared_ptr<Statement>> statements;
+        
+        // Map of imported symbols: "alias.name" or "name" -> original function/frame declaration
+        std::unordered_map<std::string, std::shared_ptr<Statement>> imported_symbols;
     };
 
     // Binary expression (e.g., a + b, x == y)

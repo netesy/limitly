@@ -10,6 +10,11 @@
 namespace codegen {
 namespace target {
 
+RiscV64::RiscV64() {}
+RiscV64::~RiscV64() {}
+
+size_t RiscV64::getPointerSize() const { return 64; }
+
 namespace {
 
 uint8_t getLoadFunct3(const ir::Type* type) {
@@ -978,7 +983,7 @@ TypeInfo RiscV64::getTypeInfo(const ir::Type* type) const {
     info.align = type->getAlignment() * 8; // bits
     info.isFloatingPoint = type->isFloatingPoint();
     info.isSigned = true;
-
+    
     if (type->isFloatingPoint()) {
         info.regClass = RegisterClass::Float;
     } else if (type->isVector()) {
@@ -986,7 +991,7 @@ TypeInfo RiscV64::getTypeInfo(const ir::Type* type) const {
     } else {
         info.regClass = RegisterClass::Integer;
     }
-
+    
     return info;
 }
 
@@ -1005,7 +1010,7 @@ const std::vector<std::string>& RiscV64::getRegisters(RegisterClass regClass) co
         "v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23",
         "v24", "v25", "v26", "v27", "v28", "v29", "v30", "v31"
     };
-
+    
     switch (regClass) {
         case RegisterClass::Integer: return intRegs;
         case RegisterClass::Float: return floatRegs;
@@ -1955,7 +1960,7 @@ bool RiscV64::isCallerSaved(const std::string& reg) const {
     // - Return registers: a0-a1 (x10-x11)
     // - Floating-point temporaries: ft0-ft11 (f0-f11)
     // - Floating-point arguments: fa0-fa7 (f10-f17)
-
+    
     return (reg[0] == 't' || reg[0] == 'a' || reg[0] == 'f');
 }
 
@@ -1966,7 +1971,7 @@ bool RiscV64::isCalleeSaved(const std::string& reg) const {
     // - Thread pointer: tp (x4)
     // - Frame pointer: fp/s0 (x8)
     // - Floating-point saved: fs0-fs11 (f8-f19)
-
+    
     return (reg[0] == 's' || reg == "gp" || reg == "tp" || reg == "fp");
 }
 

@@ -228,7 +228,7 @@ ir::Instruction* Parser::parseInstruction(ir::BasicBlock* bb) {
         getNextToken();
 
         ir::Instruction* instr = nullptr;
-
+        
         // Parse operands first, then look for colon type syntax
         if (opcodeStr == "add" || opcodeStr == "sub" || opcodeStr == "mul" || opcodeStr == "div" ||
             opcodeStr == "udiv" || opcodeStr == "rem" || opcodeStr == "urem" ||
@@ -240,7 +240,7 @@ ir::Instruction* Parser::parseInstruction(ir::BasicBlock* bb) {
             opcodeStr == "fadd" || opcodeStr == "fsub" || opcodeStr == "fmul" || opcodeStr == "fdiv" ||
             opcodeStr == "lt" || opcodeStr == "le" || opcodeStr == "gt" || opcodeStr == "ge" ||
             opcodeStr == "co" || opcodeStr == "cuo" || opcodeStr == "cmp") {
-
+            
             // Check if this is a QBE-style comparison: cmp <op> %lhs, %rhs
             if (opcodeStr == "cmp") {
                 if (currentToken.type != TokenType::Keyword) return nullptr;
@@ -252,7 +252,7 @@ ir::Instruction* Parser::parseInstruction(ir::BasicBlock* bb) {
             if (currentToken.type != TokenType::Comma) return nullptr;
             getNextToken(); // consume ,
             ir::Value* rhs = parseValue();
-
+            
             // Parse type with colon syntax
             ir::Type* instrType = nullptr;
             if (currentToken.type == TokenType::Colon) {
@@ -269,7 +269,7 @@ ir::Instruction* Parser::parseInstruction(ir::BasicBlock* bb) {
                     rhs = context->getConstantInt(static_cast<ir::IntegerType*>(instrType), ci->getValue());
                 }
             }
-
+            
             // Handle arithmetic and comparison operations
             if (opcodeStr == "add") instr = builder.createAdd(lhs, rhs, instrType ? instrType : lhs->getType());
             else if (opcodeStr == "sub") instr = builder.createSub(lhs, rhs, instrType ? instrType : lhs->getType());
@@ -363,26 +363,26 @@ ir::Instruction* Parser::parseInstruction(ir::BasicBlock* bb) {
         else if (opcodeStr == "neg") {
             ir::Value* op = parseValue();
             if (!op) return nullptr;
-
+            
             // Parse type with colon syntax
             ir::Type* instrType = nullptr;
             if (currentToken.type == TokenType::Colon) {
                 getNextToken(); // consume ':'
                 instrType = parseIRType();
             }
-
+            
             instr = builder.createNeg(op);
         } else if (opcodeStr == "copy") {
             ir::Value* op = parseValue();
             if (!op) return nullptr;
-
+            
             // Parse type with colon syntax
             ir::Type* instrType = nullptr;
             if (currentToken.type == TokenType::Colon) {
                 getNextToken(); // consume ':'
                 instrType = parseIRType();
             }
-
+            
             instr = instrType ? builder.createCopy(op, instrType) : builder.createCopy(op);
         } else if (opcodeStr == "alloc4" || opcodeStr == "alloc8" || opcodeStr == "alloc16" || opcodeStr == "alloc") {
             // Fyra memory allocation with optional size
@@ -390,14 +390,14 @@ ir::Instruction* Parser::parseInstruction(ir::BasicBlock* bb) {
             if (currentToken.type == TokenType::Number || currentToken.type == TokenType::Temporary) {
                 size = parseValue();
             }
-
+            
             // Parse type with colon syntax
             ir::Type* instrType = nullptr;
             if (currentToken.type == TokenType::Colon) {
                 getNextToken(); // consume ':'
                 instrType = parseIRType();
             }
-
+            
             if (opcodeStr == "alloc4") instr = builder.createAlloc4(instrType);
             else if (opcodeStr == "alloc8") instr = builder.createAlloc(size, instrType);
             else if (opcodeStr == "alloc16") instr = builder.createAlloc16(instrType);
@@ -460,7 +460,7 @@ ir::Instruction* Parser::parseInstruction(ir::BasicBlock* bb) {
                    opcodeStr == "stosi" || opcodeStr == "stoui" || opcodeStr == "sltof" ||
                    opcodeStr == "ultof" || opcodeStr == "cast") {
             ir::Value* val = parseValue();
-
+            
             // Parse colon and type conversion syntax: : srctype -> desttype
             ir::Type* srcType = nullptr;
             ir::Type* destType = nullptr;
@@ -471,7 +471,7 @@ ir::Instruction* Parser::parseInstruction(ir::BasicBlock* bb) {
                 // For now, we'll use the instruction opcode to determine the conversion
                 // This is a simplified approach - a full implementation would parse the arrow syntax
             }
-
+            
             // For conversion instructions, we need a destination type
             // Using a default approach for now
             if (!destType) {
@@ -493,7 +493,7 @@ ir::Instruction* Parser::parseInstruction(ir::BasicBlock* bb) {
                     destType = srcType; // for cast, keep same type
                 }
             }
-
+            
             if (opcodeStr == "extub") instr = builder.createExtUB(val, destType);
             else if (opcodeStr == "extuh") instr = builder.createExtUH(val, destType);
             else if (opcodeStr == "extuw") instr = builder.createExtUW(val, destType);
@@ -513,14 +513,14 @@ ir::Instruction* Parser::parseInstruction(ir::BasicBlock* bb) {
             else if (opcodeStr == "cast") instr = builder.createCast(val, destType);
         } else if (opcodeStr == "vaarg") {
             ir::Value* val = parseValue();
-
+            
             // Parse type with colon syntax
             ir::Type* instrType = nullptr;
             if (currentToken.type == TokenType::Colon) {
                 getNextToken(); // consume ':'
                 instrType = parseIRType();
             }
-
+            
             instr = builder.createVAArg(val, instrType);
         } else if (opcodeStr == "vastart") {
             ir::Value* val = parseValue();
@@ -575,7 +575,7 @@ ir::Instruction* Parser::parseInstruction(ir::BasicBlock* bb) {
             ir::Value* retVal = nullptr;
             if (currentToken.type != TokenType::RCurly && currentToken.type != TokenType::Label && currentToken.type != TokenType::Eof) {
                 retVal = parseValue();
-
+                
                 // Parse type with colon syntax
                 if (currentToken.type == TokenType::Colon) {
                     getNextToken(); // consume ':'
@@ -589,7 +589,7 @@ ir::Instruction* Parser::parseInstruction(ir::BasicBlock* bb) {
             if (currentToken.type != TokenType::Comma) return nullptr;
             getNextToken();
             ir::Value* ptr = parseValue();
-
+            
             ir::Type* instrType = nullptr;
             if (currentToken.type == TokenType::Colon) {
                 getNextToken(); // consume ':'
@@ -706,7 +706,7 @@ void Parser::parseType() {
         }
         getNextToken(); // consume '}'
 
-        auto* unionType = ir::UnionType::create(typeName, unionElements);
+        auto* unionType = new ir::UnionType(typeName, unionElements);
         // This is a simplification. We should probably add the union type to the module with a different method.
         module->addType(typeName, unionType);
     } else if (currentToken.type == TokenType::Number) {
@@ -718,13 +718,13 @@ void Parser::parseType() {
             return;
         }
         getNextToken(); // consume '}'
-        auto* structType = ir::StructType::create(typeName);
+        auto* structType = context->createStructType(typeName);
         structType->setBody({}, true);
         module->addType(typeName, structType);
 
     } else {
         std::vector<ir::Type*> elements = parseStructElements();
-        auto* structType = ir::StructType::create(typeName);
+        auto* structType = context->createStructType(typeName);
         structType->setBody(elements);
         module->addType(typeName, structType);
     }
@@ -752,13 +752,13 @@ ir::Instruction* Parser::parseCallInstruction(ir::Type* retType) {
         }
         getNextToken(); // consume ')'
     }
-
+    
     // Parse return type with colon syntax
     if (currentToken.type == TokenType::Colon) {
         getNextToken(); // consume ':'
         retType = parseIRType();
     }
-
+    
     return builder.createCall(callee, args, retType);
 }
 

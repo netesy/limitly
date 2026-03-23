@@ -8,7 +8,7 @@
 namespace transforms {
 
 // Define the number of available physical registers for our target
-const unsigned int NUM_PHYSICAL_REGISTERS = 3; // Use a small number to force spilling
+const unsigned int NUM_PHYSICAL_REGISTERS = 14; 
 
 void LinearScanAllocator::run(ir::Function& func) {
     linearScan(func);

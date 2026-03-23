@@ -87,7 +87,7 @@ void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node,
     if (auto program = std::dynamic_pointer_cast<LM::Frontend::AST::Program>(node)) {
         std::cout << indentation << "Program:" << std::endl;
         for (const auto& stmt : program->statements) {
-            printNode(stmt, indent + 1);
+            if (stmt) printNode(stmt, indent + 1);
         }
     }
     else if (auto varDecl = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(node)) {
@@ -173,25 +173,25 @@ void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node,
             std::cout << indentation << "  Parameters:" << std::endl;
             
             // Required parameters
-            for (const auto& [name, type] : funcDecl->params) {
-                std::cout << indentation << "    " << name;
-                if (type) {
-                    std::cout << ": " << typeToString(type);
+            for (const auto& param : funcDecl->params) {
+                std::cout << indentation << "    " << param.first;
+                if (param.second) {
+                    std::cout << ": " << typeToString(param.second);
                 }
                 std::cout << std::endl;
             }
             
             // Optional parameters
-            for (const auto& [name, param] : funcDecl->optionalParams) {
-                std::cout << indentation << "    " << name << " (optional)";
-                if (param.first) {
-                    std::cout << ": " << typeToString(param.first);
+            for (const auto& optParam : funcDecl->optionalParams) {
+                std::cout << indentation << "    " << optParam.first << " (optional)";
+                if (optParam.second.first) {
+                    std::cout << ": " << typeToString(optParam.second.first);
                 }
                 std::cout << std::endl;
                 
-                if (param.second) {
+                if (optParam.second.second) {
                     std::cout << indentation << "      Default value:" << std::endl;
-                    printNode(param.second, indent + 3);
+                    printNode(optParam.second.second, indent + 3);
                 }
             }
         }
@@ -212,7 +212,7 @@ void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node,
     else if (auto blockStmt = std::dynamic_pointer_cast<LM::Frontend::AST::BlockStatement>(node)) {
         std::cout << indentation << "BlockStatement:" << std::endl;
         for (const auto& stmt : blockStmt->statements) {
-            printNode(stmt, indent + 1);
+            if (stmt) printNode(stmt, indent + 1);
         }
     }
     else if (auto ifStmt = std::dynamic_pointer_cast<LM::Frontend::AST::IfStatement>(node)) {
@@ -295,6 +295,22 @@ void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node,
                 std::cout << " (type: " << typeToString(*variant.second) << ")";
             }
             std::cout << std::endl;
+        }
+    }
+    else if (auto frameInstExpr = std::dynamic_pointer_cast<LM::Frontend::AST::FrameInstantiationExpr>(node)) {
+        std::cout << indentation << "FrameInstantiation: " << frameInstExpr->frameName << std::endl;
+        if (!frameInstExpr->positionalArgs.empty()) {
+            std::cout << indentation << "  PositionalArgs:" << std::endl;
+            for (const auto& arg : frameInstExpr->positionalArgs) {
+                printNode(arg, indent + 2);
+            }
+        }
+        if (!frameInstExpr->namedArgs.empty()) {
+            std::cout << indentation << "  NamedArgs:" << std::endl;
+            for (const auto& [name, arg] : frameInstExpr->namedArgs) {
+                std::cout << indentation << "    " << name << ":" << std::endl;
+                printNode(arg, indent + 3);
+            }
         }
     }
     else if (auto matchStmt = std::dynamic_pointer_cast<LM::Frontend::AST::MatchStatement>(node)) {
@@ -400,25 +416,25 @@ void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node,
                 std::cout << indentation << "      Parameters:" << std::endl;
                 
                 // Required parameters
-                for (const auto& [name, type] : frameDecl->init->parameters) {
-                    std::cout << indentation << "        " << name;
-                    if (type) {
-                        std::cout << ": " << typeToString(type);
+                for (const auto& param : frameDecl->init->parameters) {
+                    std::cout << indentation << "        " << param.first;
+                    if (param.second) {
+                        std::cout << ": " << typeToString(param.second);
                     }
                     std::cout << std::endl;
                 }
                 
                 // Optional parameters
-                for (const auto& [name, param] : frameDecl->init->optionalParams) {
-                    std::cout << indentation << "        " << name << " (optional)";
-                    if (param.first) {
-                        std::cout << ": " << typeToString(param.first);
+                for (const auto& optParam : frameDecl->init->optionalParams) {
+                    std::cout << indentation << "        " << optParam.first << " (optional)";
+                    if (optParam.second.first) {
+                        std::cout << ": " << typeToString(optParam.second.first);
                     }
                     std::cout << std::endl;
                     
-                    if (param.second) {
+                    if (optParam.second.second) {
                         std::cout << indentation << "          Default value:" << std::endl;
-                        printNode(param.second, indent + 5);
+                        printNode(optParam.second.second, indent + 5);
                     }
                 }
             }
@@ -451,25 +467,25 @@ void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node,
                     std::cout << indentation << "      Parameters:" << std::endl;
                     
                     // Required parameters
-                    for (const auto& [name, type] : method->parameters) {
-                        std::cout << indentation << "        " << name;
-                        if (type) {
-                            std::cout << ": " << typeToString(type);
+                    for (const auto& param : method->parameters) {
+                        std::cout << indentation << "          " << param.first;
+                        if (param.second) {
+                            std::cout << ": " << typeToString(param.second);
                         }
                         std::cout << std::endl;
                     }
                     
                     // Optional parameters
-                    for (const auto& [name, param] : method->optionalParams) {
-                        std::cout << indentation << "        " << name << " (optional)";
-                        if (param.first) {
-                            std::cout << ": " << typeToString(param.first);
+                    for (const auto& optParam : method->optionalParams) {
+                        std::cout << indentation << "          " << optParam.first << " (optional)";
+                        if (optParam.second.first) {
+                            std::cout << ": " << typeToString(optParam.second.first);
                         }
                         std::cout << std::endl;
                         
-                        if (param.second) {
+                        if (optParam.second.second) {
                             std::cout << indentation << "          Default value:" << std::endl;
-                            printNode(param.second, indent + 5);
+                            printNode(optParam.second.second, indent + 6);
                         }
                     }
                 }
@@ -691,11 +707,11 @@ void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node,
     }
     else if (auto dictExpr = std::dynamic_pointer_cast<LM::Frontend::AST::DictExpr>(node)) {
         std::cout << indentation << "DictionaryExpression: {" << dictExpr->entries.size() << " entries}" << std::endl;
-        for (const auto& [key, value] : dictExpr->entries) {
+        for (const auto& entry : dictExpr->entries) {
             std::cout << indentation << "  Key:" << std::endl;
-            printNode(std::static_pointer_cast<LM::Frontend::AST::Node>(key), indent + 2);
+            printNode(std::static_pointer_cast<LM::Frontend::AST::Node>(entry.first), indent + 2);
             std::cout << indentation << "  Value:" << std::endl;
-            printNode(std::static_pointer_cast<LM::Frontend::AST::Node>(value), indent + 2);
+            printNode(std::static_pointer_cast<LM::Frontend::AST::Node>(entry.second), indent + 2);
         }
     }
     else if (auto rangeExpr = std::dynamic_pointer_cast<LM::Frontend::AST::RangeExpr>(node)) {
@@ -792,25 +808,25 @@ void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node,
             std::cout << indentation << "  Parameters:" << std::endl;
             
             // Required parameters
-            for (const auto& [name, type] : asyncFuncDecl->params) {
-                std::cout << indentation << "    " << name;
-                if (type) {
-                    std::cout << ": " << typeToString(type);
+            for (const auto& param : asyncFuncDecl->params) {
+                std::cout << indentation << "    " << param.first;
+                if (param.second) {
+                    std::cout << ": " << typeToString(param.second);
                 }
                 std::cout << std::endl;
             }
             
             // Optional parameters
-            for (const auto& [name, param] : asyncFuncDecl->optionalParams) {
-                std::cout << indentation << "    " << name << " (optional)";
-                if (param.first) {
-                    std::cout << ": " << typeToString(param.first);
+            for (const auto& optParam : asyncFuncDecl->optionalParams) {
+                std::cout << indentation << "    " << optParam.first << " (optional)";
+                if (optParam.second.first) {
+                    std::cout << ": " << typeToString(optParam.second.first);
                 }
                 std::cout << std::endl;
                 
-                if (param.second) {
+                if (optParam.second.second) {
                     std::cout << indentation << "      Default value:" << std::endl;
-                    printNode(param.second, indent + 3);
+                    printNode(optParam.second.second, indent + 3);
                 }
             }
         }
@@ -907,10 +923,10 @@ void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node,
         
         if (!lambdaExpr->params.empty()) {
             std::cout << indentation << "  Parameters:" << std::endl;
-            for (const auto& [name, type] : lambdaExpr->params) {
-                std::cout << indentation << "    " << name;
-                if (type) {
-                    std::cout << ": " << typeToString(type);
+            for (const auto& param : lambdaExpr->params) {
+                std::cout << indentation << "    " << param.first;
+                if (param.second) {
+                    std::cout << ": " << typeToString(param.second);
                 }
                 std::cout << std::endl;
             }
