@@ -762,7 +762,7 @@ public:
     }
     
     // Create union type
-    TypePtr createUnionType(const std::vector<TypePtr>& types) {
+    TypePtr createUnionType(const std::vector<TypePtr>& types, const std::vector<std::string>& names = {}) {
         if (types.empty()) {
             return NIL_TYPE;
         }
@@ -772,6 +772,13 @@ public:
         
         UnionType unionType;
         unionType.types = types;
+        if (names.empty()) {
+            for (const auto& t : types) {
+                unionType.variantNames.push_back(t->toString());
+            }
+        } else {
+            unionType.variantNames = names;
+        }
         
         return std::make_shared<Type>(TypeTag::Union, unionType);
     }

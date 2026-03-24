@@ -172,7 +172,8 @@ enum class TypeTag {
     Class,
     Channel,
     Object,
-    Module
+    Module,
+    Refined
 };
 
 // Forward declaration for ClosureValue factory method with proper TypePtr
@@ -302,11 +303,13 @@ struct UserDefinedType
 struct SumType
 {
     std::vector<TypePtr> variants;
+    std::vector<std::string> variantNames;
 };
 
 struct UnionType
 {
     std::vector<TypePtr> types;
+    std::vector<std::string> variantNames;
 };
 
 struct ErrorUnionType
@@ -316,12 +319,17 @@ struct ErrorUnionType
     bool isGenericError = false;             // True for Type?, false for Type?Error1, Error2
 };
 
+struct RefinedType {
+    TypePtr baseType;
+    std::shared_ptr<AST::Expression> condition;
+};
+
 struct Type
 {
     TypeTag tag;
     bool isList = false;
     bool isDict = false;
-    std::variant<std::monostate, ListType, DictType, TupleType, EnumType, FunctionType, SumType, UnionType, ErrorUnionType, UserDefinedType>
+    std::variant<std::monostate, ListType, DictType, TupleType, EnumType, FunctionType, SumType, UnionType, ErrorUnionType, UserDefinedType, RefinedType>
         extra;
 
     Type(TypeTag t)
@@ -337,7 +345,8 @@ struct Type
                             SumType,
                             UnionType,
                             ErrorUnionType,
-                            UserDefinedType> &ex)
+                            UserDefinedType,
+                            RefinedType> &ex)
         : tag(t)
         , extra(ex)
     {}
@@ -433,6 +442,12 @@ struct Type
             return "Class";
         case TypeTag::Module:
             return "Module";
+        case TypeTag::Refined: {
+            if (const auto* refinedType = std::get_if<RefinedType>(&extra)) {
+                return refinedType->baseType->toString() + " where condition";
+            }
+            return "RefinedType";
+        }
         default:
             return "Unknown Type";
         }
@@ -1086,6 +1101,28 @@ struct Value {
         }
         
         return nullptr; // Invalid variant index
+    }
+
+    // Get the name of the currently active variant (for Union or Sum types)
+    std::string getActiveVariantName() const {
+        if (!type) return "";
+
+        if (type->tag == TypeTag::Union) {
+            if (const auto* unionType = std::get_if<UnionType>(&type->extra)) {
+                if (activeUnionVariant < unionType->variantNames.size()) {
+                    return unionType->variantNames[activeUnionVariant];
+                }
+            }
+        } else if (type->tag == TypeTag::Sum) {
+            if (const auto* sumValue = std::get_if<SumValue>(&complexData)) {
+                if (const auto* sumType = std::get_if<SumType>(&type->extra)) {
+                    if (sumValue->activeVariant < sumType->variantNames.size()) {
+                        return sumType->variantNames[sumValue->activeVariant];
+                    }
+                }
+            }
+        }
+        return "";
     }
 
     // Check if union value matches a specific variant type

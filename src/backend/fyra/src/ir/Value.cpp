@@ -7,10 +7,10 @@ namespace ir {
 
 Value::~Value() {
     // Break connections to all users before this value is destroyed.
-    // We iterate over a copy because u->set(nullptr) will call removeUse,
-    // which modifies use_list.
-    auto current_uses = use_list;
-    for (Use* u : current_uses) {
+    // Use a while loop with front() to safely handle modifications to use_list
+    // during iteration, as u->set(nullptr) will call removeUse on this value.
+    while (!use_list.empty()) {
+        Use* u = use_list.front();
         u->set(nullptr);
     }
 }

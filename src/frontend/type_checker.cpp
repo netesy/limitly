@@ -2424,6 +2424,27 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
         }
     }
     
+    // Handle refinement types (e.g., int where value > 0)
+    if (annotation->isRefined && annotation->refinementCondition) {
+        // Create new scope to avoid polluting outer scope with 'value'
+        enter_scope();
+        // Bind 'value' to the base type for condition checking
+        declare_variable("value", base_type);
+
+        // Check the refinement condition
+        TypePtr conditionType = check_expression(annotation->refinementCondition);
+        if (!is_boolean_type(conditionType)) {
+            add_error("Refinement condition must be boolean, got " + conditionType->toString(), annotation->line);
+        }
+
+        exit_scope();
+
+        RefinedType refined;
+        refined.baseType = base_type;
+        refined.condition = annotation->refinementCondition;
+        base_type = std::make_shared<::Type>(TypeTag::Refined, refined);
+    }
+
     // Handle optional types (e.g., str?, int?) - unified Type? system
     if (annotation->isOptional) {
         // Create a fallible type (Type?) using the unified error system
@@ -2435,6 +2456,23 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
 }
 
 bool TypeChecker::is_type_compatible(TypePtr expected, TypePtr actual) {
+    if (!expected || !actual) return false;
+
+    // Handle refinement types
+    if (expected->tag == TypeTag::Refined) {
+        if (const auto* refined = std::get_if<RefinedType>(&expected->extra)) {
+            // A refined type is compatible if the base types are compatible
+            // In a full implementation, we'd also need to check the condition.
+            return is_type_compatible(refined->baseType, actual);
+        }
+    }
+
+    if (actual->tag == TypeTag::Refined) {
+        if (const auto* refined = std::get_if<RefinedType>(&actual->extra)) {
+            return is_type_compatible(expected, refined->baseType);
+        }
+    }
+
     return type_system.isCompatible(actual, expected);
 }
 
@@ -2945,94 +2983,33 @@ bool TypeChecker::is_exhaustive_union_match(TypePtr union_type, const std::vecto
         return true;
     }
     
-    std::set<TypeTag> coveredTypeTags;
-    std::set<std::string> coveredTypeNames;
+    std::set<std::string> coveredVariantNames;
     bool hasWildcard = false;
     
     for (const auto& matchCase : cases) {
         if (auto bindingPattern = std::dynamic_pointer_cast<LM::Frontend::AST::BindingPatternExpr>(matchCase->pattern)) {
-            // Pattern like Some(x), None, etc.
-            coveredTypeNames.insert(bindingPattern->typeName);
-        } else if (auto typePattern = std::dynamic_pointer_cast<LM::Frontend::AST::TypePatternExpr>(matchCase->pattern)) {
-            // Pattern matching specific types
-            if (typePattern->type) {
-                coveredTypeNames.insert(typePattern->type->typeName);
-                // Also resolve type to get its tag
-                TypePtr resolvedType = resolve_type_annotation(typePattern->type);
-                if (resolvedType) {
-                    coveredTypeTags.insert(resolvedType->tag);
-                }
-            }
+            coveredVariantNames.insert(bindingPattern->typeName);
         } else if (auto literalExpr = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(matchCase->pattern)) {
-            // Literal patterns - check if they match union variant types
             if (std::holds_alternative<std::string>(literalExpr->value)) {
-                std::string literalValue = std::get<std::string>(literalExpr->value);
-                coveredTypeNames.insert(literalValue);
+                coveredVariantNames.insert(std::get<std::string>(literalExpr->value));
             } else if (std::holds_alternative<std::nullptr_t>(literalExpr->value)) {
-                // This is a wildcard pattern represented as nil literal
                 hasWildcard = true;
             }
         } else if (auto varExpr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(matchCase->pattern)) {
-            // Variable patterns - check for wildcard or specific variant names
             if (varExpr->name == "_") {
                 hasWildcard = true;
             } else {
-                // This is a type pattern like 'int', 'str', 'bool', 'f64'
-                coveredTypeNames.insert(varExpr->name);
-                
-                // Map type names to type tags for better matching
-                if (varExpr->name == "int") coveredTypeTags.insert(TypeTag::Int);
-                else if (varExpr->name == "str") coveredTypeTags.insert(TypeTag::String);
-                else if (varExpr->name == "bool") coveredTypeTags.insert(TypeTag::Bool);
-                else if (varExpr->name == "f64") coveredTypeTags.insert(TypeTag::Float64);
-                else if (varExpr->name == "float") coveredTypeTags.insert(TypeTag::Float64);
-                else if (varExpr->name == "i64") coveredTypeTags.insert(TypeTag::Int64);
-                else if (varExpr->name == "u64") coveredTypeTags.insert(TypeTag::UInt64);
+                coveredVariantNames.insert(varExpr->name);
             }
         }
     }
     
-    // If we have a wildcard, match is exhaustive
-    if (hasWildcard) {
-        return true;
-    }
+    if (hasWildcard) return true;
     
-    // Check if all union variants are covered
-    for (const auto& variantType : unionTypeInfo->types) {
-        bool variantCovered = false;
-        
-        // Check by type tag (most reliable for primitive types)
-        if (coveredTypeTags.find(variantType->tag) != coveredTypeTags.end()) {
-            variantCovered = true;
-        }
-        
-        // Check by type name
-        std::string variantName = variantType->toString();
-        if (coveredTypeNames.find(variantName) != coveredTypeNames.end()) {
-            variantCovered = true;
-        }
-        
-        // Additional checks for common type name variations
-        if (variantType->tag == TypeTag::Int && 
-            (coveredTypeNames.find("int") != coveredTypeNames.end() || 
-             coveredTypeNames.find("Int") != coveredTypeNames.end())) {
-            variantCovered = true;
-        }
-        
-        if (variantType->tag == TypeTag::String && 
-            (coveredTypeNames.find("str") != coveredTypeNames.end() || 
-             coveredTypeNames.find("String") != coveredTypeNames.end())) {
-            variantCovered = true;
-        }
-        
-        if (variantType->tag == TypeTag::Bool && 
-            (coveredTypeNames.find("bool") != coveredTypeNames.end() || 
-             coveredTypeNames.find("Bool") != coveredTypeNames.end())) {
-            variantCovered = true;
-        }
-        
-        if (!variantCovered) {
-            return false; // Found uncovered variant
+    // Check if all variant names are covered
+    for (const auto& name : unionTypeInfo->variantNames) {
+        if (coveredVariantNames.find(name) == coveredVariantNames.end()) {
+            return false;
         }
     }
     
@@ -3079,39 +3056,31 @@ std::string TypeChecker::get_missing_union_variants(TypePtr union_type, const st
         return "";
     }
     
-    std::set<std::string> coveredTypeNames;
+    std::set<std::string> coveredVariantNames;
     bool hasWildcard = false;
     
-    // Collect covered types
     for (const auto& matchCase : cases) {
         if (auto bindingPattern = std::dynamic_pointer_cast<LM::Frontend::AST::BindingPatternExpr>(matchCase->pattern)) {
-            coveredTypeNames.insert(bindingPattern->typeName);
+            coveredVariantNames.insert(bindingPattern->typeName);
         } else if (auto varExpr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(matchCase->pattern)) {
             if (varExpr->name == "_") {
                 hasWildcard = true;
             } else {
-                coveredTypeNames.insert(varExpr->name);
+                coveredVariantNames.insert(varExpr->name);
             }
         }
     }
     
-    // If wildcard, no missing variants
-    if (hasWildcard) {
-        return "";
-    }
+    if (hasWildcard) return "";
     
-    // Find missing variants
     std::vector<std::string> missing;
-    for (const auto& variantType : unionTypeInfo->types) {
-        std::string variantName = variantType->toString();
-        if (coveredTypeNames.find(variantName) == coveredTypeNames.end()) {
-            missing.push_back(variantName);
+    for (const auto& name : unionTypeInfo->variantNames) {
+        if (coveredVariantNames.find(name) == coveredVariantNames.end()) {
+            missing.push_back(name);
         }
     }
     
-    if (missing.empty()) {
-        return "";
-    }
+    if (missing.empty()) return "";
     
     std::string result = "Missing patterns for: ";
     for (size_t i = 0; i < missing.size(); ++i) {
