@@ -93,12 +93,13 @@ public:
         spinLock();
         
         if (freeBlocks.empty()) {
-            spinUnlock();
+            spinUnlock(); // Release lock before potentially long expansion
+
             // Expand pool by 50% when exhausted
             size_t expandSize = std::max(size_t(32), allocatedChunks.size() * POOL_CHUNK_SIZE / 2);
             expandPool(expandSize);
-            spinLock();
             
+            spinLock(); // Re-acquire lock
             if (freeBlocks.empty()) {
                 spinUnlock();
                 return nullptr;
@@ -404,14 +405,19 @@ public:
             auto it = generationObjects.find(removable);
             
             if (it != generationObjects.end()) {
-                // Add bounds checking and error handling
-                const auto& objects = it->second;
-                for (auto objIt = objects.begin(); objIt != objects.end(); ++objIt) {
-                    void* ptr = *objIt;
+                // Safely deallocate all objects in this generation.
+                // We make a copy of the pointers to avoid issues if deallocation
+                // somehow triggers modifications to the container.
+                std::vector<void*> objectsToDeallocate = it->second;
+                it->second.clear(); // Clear the list in the map first.
+
+                for (void* ptr : objectsToDeallocate) {
                     if (ptr != nullptr) {
                         try {
-                            manager.deallocate(ptr);
+                            // Important: erase from objectGenerations before deallocating
+                            // to maintain a consistent state for isValid() checks.
                             objectGenerations.erase(ptr);
+                            manager.deallocate(ptr);
                         } catch (...) {
                             // Skip corrupted objects to prevent hanging
                             continue;
