@@ -930,6 +930,25 @@ public:
         return std::make_shared<Type>(TypeTag::Union, unionType);
     }
 
+    // Create sum type (discriminated union)
+    TypePtr createSumType(const std::vector<TypePtr>& variants, const std::vector<std::string>& names = {}) {
+        if (variants.empty()) {
+            return NIL_TYPE;
+        }
+
+        SumType sumType;
+        sumType.variants = variants;
+        if (names.empty()) {
+            for (const auto& t : variants) {
+                sumType.variantNames.push_back(t->toString());
+            }
+        } else {
+            sumType.variantNames = names;
+        }
+
+        return std::make_shared<Type>(TypeTag::Sum, sumType);
+    }
+
     // Create union value with specific variant
     ValuePtr createUnionValue(TypePtr unionType, size_t variantIndex, ValuePtr variantValue) {
         if (!unionType || unionType->tag != TypeTag::Union) {
