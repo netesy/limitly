@@ -2,6 +2,8 @@
 #define LIR_GENERATOR_H
 
 #include "lir.hh"
+#include "optimizer.hh"
+#include "metrics.hh"
 #include "../memory/memory.hh"
 #include "../frontend/ast.hh"
 #include "../frontend/type_checker.hh"

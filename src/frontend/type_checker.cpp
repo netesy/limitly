@@ -1,4 +1,5 @@
 #include "type_checker.hh"
+#include "module_manager.hh"
 #include "../error/debugger.hh"
 #include "../memory/model.hh"
 #include "parser.hh"
@@ -31,10 +32,33 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
     errors.clear();
     current_scope = std::make_unique<Scope>();
 
-    // PASS 0: Module Resolution
+    // PASS 0: Module Resolution and Type Checking
+    auto& manager = ModuleManager::getInstance();
+    // manager.clear(); // Removed to prevent infinite recursion
+    // manager.resolve_all(program, "root"); // Handled by factory or initial call
+    if (manager.has_circular_dependencies()) {
+        add_error("Circular dependency detected in modules");
+    }
+
+    // Type check all loaded modules recursively
+    auto all_modules = manager.get_all_modules();
+    for (const auto& [path, module] : all_modules) {
+        if (module && !module->is_checked) {
+            module->is_checked = true; // Mark before to prevent recursion
+            TypeSystem ts;
+            TypeChecker checker(ts);
+            checker.set_source_context(module->source, module->path);
+            if (!checker.check_program(module->ast)) {
+                add_error("Failed to type check module: " + path);
+            }
+        }
+    }
+
     for (const auto& stmt : program->statements) {
         if (auto mod_decl = std::dynamic_pointer_cast<LM::Frontend::AST::ModuleDeclaration>(stmt)) {
             check_module_declaration(mod_decl);
+        } else if (auto import_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ImportStatement>(stmt)) {
+            check_import_statement(import_stmt);
         }
     }
 
@@ -153,6 +177,9 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
             }
             function_signatures[name] = sig;
             declare_variable(name, type_system.FUNCTION_TYPE);
+        } else if (auto var_decl = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
+            TypePtr var_type = (var_decl->type && var_decl->type.value()) ? resolve_type_annotation(var_decl->type.value()) : type_system.ANY_TYPE;
+            declare_variable(name, var_type);
         }
     };
 
@@ -674,7 +701,9 @@ void TypeChecker::mark_variable_dropped(const std::string& name) {
 TypePtr TypeChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statement> stmt) {
     if (!stmt) return nullptr;
     
-    if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
+    if (auto import_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ImportStatement>(stmt)) {
+        return check_import_statement(import_stmt);
+    } else if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
         return check_function_declaration(func_decl);
     } else if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
         return check_frame_declaration(frame_decl);
@@ -897,7 +926,6 @@ TypePtr TypeChecker::check_module_declaration(std::shared_ptr<LM::Frontend::AST:
     std::string prev_module = current_module_name;
     current_module_name = module_decl->name;
 
-    std::cerr << "DEBUG: Checking module " << module_decl->name << "\n";
 
     // Inline members into the program's imported_symbols map
     for (const auto& member : module_decl->publicMembers) {
@@ -908,7 +936,6 @@ TypePtr TypeChecker::check_module_declaration(std::shared_ptr<LM::Frontend::AST:
 
         if (!name.empty()) {
             std::string qualified_name = module_decl->name + "." + name;
-            std::cerr << "DEBUG: Inlining module member " << qualified_name << "\n";
             current_program_->imported_symbols[qualified_name] = member;
             // Also inline with original name to allow direct access if not aliased?
             // The main.cpp resolveImports doesn't support aliasing yet, so it just prepends modDecl
@@ -1379,6 +1406,13 @@ TypePtr TypeChecker::check_literal_expr_with_expected_type(std::shared_ptr<LM::F
 TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::VariableExpr> expr) {
     if (!expr) return nullptr;
 
+    // Check for module alias access (e.g., math in math.add)
+    if (import_aliases.count(expr->name)) {
+        TypePtr type = type_system.createFrameType(expr->name);
+        expr->inferred_type = type;
+        return type;
+    }
+
     // Check if it's an imported frame or function name (without prefix)
     auto it = current_program_->imported_symbols.find(expr->name);
     if (it != current_program_->imported_symbols.end()) {
@@ -1729,6 +1763,10 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
 
             // 2. Check if it's a module function
             auto sig_it = function_signatures.find(qualified_name);
+            if (sig_it == function_signatures.end()) {
+                // Try dotted name without :: if LIR generator use .
+                sig_it = function_signatures.find(var_expr->name + "." + member_expr->name);
+            }
             if (sig_it != function_signatures.end()) {
                 validate_argument_types(sig_it->second.param_types, arg_types, qualified_name);
                 expr->inferred_type = sig_it->second.return_type;
@@ -1738,6 +1776,13 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
             // 3. Fallback for module alias
             auto alias_it = import_aliases.find(var_expr->name);
             if (alias_it != import_aliases.end()) {
+                std::string full_name = alias_it->second + "." + member_expr->name;
+                auto sig_it2 = function_signatures.find(full_name);
+                if (sig_it2 != function_signatures.end()) {
+                    validate_argument_types(sig_it2->second.param_types, arg_types, full_name);
+                    expr->inferred_type = sig_it2->second.return_type;
+                    return sig_it2->second.return_type;
+                }
                 add_error("Module '" + alias_it->second + "' has no member '" + member_expr->name + "'", expr->line);
                 return type_system.ANY_TYPE;
             }
@@ -2038,6 +2083,32 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
         
         const FrameInfo& frame_info = frame_it->second;
         
+        // Check if this is a module alias access
+        if (import_aliases.count(frame_name)) {
+            std::string qualified_name = frame_name + "." + member_name;
+            TypePtr member_type = lookup_variable(qualified_name);
+            if (member_type && member_type->tag != TypeTag::Nil) {
+                expr->inferred_type = member_type;
+                return member_type;
+            }
+            // Check for functions
+            if (function_signatures.count(qualified_name)) {
+                expr->inferred_type = type_system.FUNCTION_TYPE;
+                return type_system.FUNCTION_TYPE;
+            }
+        }
+
+        if (!frame_info.declaration) {
+            // If it's a module alias, we shouldn't fail if we just haven't found the member yet
+            // but we should have found it if it exists.
+            if (import_aliases.count(frame_name)) {
+                add_error("Module '" + frame_name + "' has no member '" + member_name + "'", expr->line);
+            } else {
+                add_error("Invalid frame declaration for " + frame_name, expr->line);
+            }
+            return type_system.ANY_TYPE;
+        }
+
         // Check if member is a field
         for (const auto& [field_name, field_type] : frame_info.fields) {
             if (field_name == member_name) {
@@ -2434,7 +2505,7 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
         // Check the refinement condition
         TypePtr conditionType = check_expression(annotation->refinementCondition);
         if (!is_boolean_type(conditionType)) {
-            add_error("Refinement condition must be boolean, got " + conditionType->toString(), annotation->line);
+            add_error("Refinement condition must be boolean, got " + conditionType->toString(), annotation->refinementCondition->line);
         }
 
         exit_scope();
@@ -3395,6 +3466,11 @@ void TypeChecker::register_builtin_function(const std::string& name,
 namespace TypeCheckerFactory {
 
 TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> program, const std::string& source, const std::string& file_path) {
+    // Resolve all modules once at the beginning
+    auto& manager = ModuleManager::getInstance();
+    manager.clear();
+    manager.resolve_all(program, "root");
+
     // Create type system
     auto type_system = std::make_shared<TypeSystem>();
     auto checker = create(*type_system);
@@ -3402,7 +3478,8 @@ TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> progra
     // Set source context for error reporting
     checker->set_source_context(source, file_path);
     
-    TypeCheckResult result(program, type_system, checker->check_program(program), checker->get_errors());
+    bool success = checker->check_program(program);
+    TypeCheckResult result(program, type_system, success, checker->get_errors());
     result.import_aliases = checker->get_import_aliases();  // Copy import aliases from checker
     result.registered_modules = checker->get_registered_modules();  // Copy registered modules from checker
     
@@ -3919,105 +3996,52 @@ static std::set<std::string> collect_all_dependencies(
 TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::ImportStatement> import_stmt) {
     if (!import_stmt) return nullptr;
 
-    std::cerr << "DEBUG: Resolving import " << import_stmt->modulePath << "\n";
-  
-    // Get the module path
-    std::string module_path = import_stmt->modulePath;
-    
-    // Try to load the module file
-    std::string module_file = module_path + ".lm";
-    std::ifstream file(module_file);
-    
-    if (!file.is_open()) {
-        add_error("Cannot open module file: " + module_file, import_stmt->line);
+    auto& manager = ModuleManager::getInstance();
+    auto module = manager.load_module(import_stmt->modulePath);
+    if (!module) {
+        add_error("Failed to load module: " + import_stmt->modulePath, import_stmt->line);
         return nullptr;
     }
-    
-    // Read the module file
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    std::string module_source = buffer.str();
-    file.close();
-    
-    // Parse the module
-    std::shared_ptr<LM::Frontend::AST::Program> module_ast;
-    try {
-        Scanner scanner(module_source, module_file);
-        scanner.scanTokens();
-        Parser parser(scanner, false);
-        module_ast = parser.parse();
-        
-        if (!module_ast) {
-            add_error("Failed to parse module: " + module_path, import_stmt->line);
-            return nullptr;
-        }
-    } catch (const std::exception& e) {
-        add_error("Exception parsing module: " + std::string(e.what()), import_stmt->line);
-        return nullptr;
-    }
-    
-    // Collect all public symbols from the module
-    std::set<std::string> public_symbols;
-    
-    for (const auto& stmt : module_ast->statements) {
-        if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
-            if (func_decl->visibility == LM::Frontend::AST::VisibilityLevel::Public) {
-                public_symbols.insert(func_decl->name);
-            }
-        } else if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
-            // Frames are public by default in modules for now
-            public_symbols.insert(frame_decl->name);
-        } else if (auto var_decl = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
-            if (var_decl->visibility == LM::Frontend::AST::VisibilityLevel::Public) {
-                public_symbols.insert(var_decl->name);
-            }
-        }
-    }
-    
-    // Determine which symbols to import based on filters
-    std::set<std::string> symbols_to_import;
-    if (import_stmt->filter) {
-        const auto& filter = import_stmt->filter.value();
-        if (filter.type == LM::Frontend::AST::ImportFilterType::Show) {
-            for (const auto& identifier : filter.identifiers) {
-                if (public_symbols.count(identifier)) symbols_to_import.insert(identifier);
-            }
-        } else { // Hide
-            for (const auto& symbol : public_symbols) {
-                if (std::find(filter.identifiers.begin(), filter.identifiers.end(), symbol) == filter.identifiers.end()) {
-                    symbols_to_import.insert(symbol);
-                }
-            }
-        }
-    } else {
-        symbols_to_import = public_symbols;
-    }
+
+    auto symbols_to_import = manager.filter_symbols(module, import_stmt->filter);
     
     // Alias management
     std::string alias = import_stmt->alias ? import_stmt->alias.value() : "";
-    if (!alias.empty()) {
-        import_aliases[alias] = module_path;
+    if (alias.empty()) {
+        // If no alias, use the last part of the module path
+        size_t last_dot = import_stmt->modulePath.find_last_of('.');
+        if (last_dot != std::string::npos) {
+            alias = import_stmt->modulePath.substr(last_dot + 1);
+        } else {
+            alias = import_stmt->modulePath;
+        }
     }
+    import_aliases[alias] = import_stmt->modulePath;
+
+    // Register the alias as a "variable" that points to a dummy frame
+    // This allows the TypeChecker to resolve 'math' in 'math.add'
+    TypeSystem::FrameInfo dummy_info;
+    dummy_info.name = alias;
+    type_system.registerFrame(alias, dummy_info);
+    declare_variable(alias, type_system.createFrameType(alias));
+
+    // Also add to frame_declarations so check_member_expr doesn't complain
+    FrameInfo info;
+    info.name = alias;
+    frame_declarations[alias] = info;
     
     // Inline symbols into the current program's imported_symbols map
-    for (const auto& stmt : module_ast->statements) {
+    for (const auto& stmt : module->ast->statements) {
         std::string name;
         if (auto func = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) name = func->name;
         else if (auto frame = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) name = frame->name;
         else if (auto var = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) name = var->name;
 
         if (!name.empty() && symbols_to_import.count(name)) {
-            // Store with appropriate name mapping
-            std::string qualified_name = alias.empty() ? name : alias + "." + name;
-            std::cerr << "DEBUG: Inlining " << qualified_name << "\n";
+            std::string qualified_name = alias + "." + name;
             current_program_->imported_symbols[qualified_name] = stmt;
-
-            // For frames, we must register all methods with the qualified name prefix
-            if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
-                if (frame_decl->init) {
-                    // Handled during signature resolution in PASS 2 of the main program
-                }
-            }
+            // Also allow direct name if it doesn't conflict?
+            // For now, only qualified names via alias are supported.
         }
     }
     

@@ -24,6 +24,15 @@ namespace Backend {
 }
 
 // Forward declarations for AST types
+namespace LM {
+    namespace Frontend {
+        namespace AST {
+            struct Expression;
+            struct FunctionDeclaration;
+        }
+    }
+}
+
 namespace AST {
 class FunctionDeclaration;
 }

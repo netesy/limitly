@@ -1721,6 +1721,18 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 registers[pc->dst] = old_value;
                 break;
             }
+            case LIR::LIR_Op::LoadGlobal: {
+                if (globals_.count(pc->func_name)) {
+                    registers[pc->dst] = globals_[pc->func_name];
+                } else {
+                    registers[pc->dst] = nullptr;
+                }
+                break;
+            }
+            case LIR::LIR_Op::StoreGlobal: {
+                globals_[pc->func_name] = registers[pc->a];
+                break;
+            }
             case LIR::LIR_Op::Await:
             case LIR::LIR_Op::AsyncCall:
             case LIR::LIR_Op::ImportModule:
