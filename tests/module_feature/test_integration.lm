@@ -1,0 +1,11 @@
+import math_module as math
+
+fn main(): int {
+    print("Testing module integration...")
+    var result = math.add(10, 20)
+    print("10 + 20 = ")
+    print(result)
+    assert(result == 30, "Module addition failed")
+    print("Module test passed!")
+    return 0
+}

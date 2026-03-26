@@ -7,6 +7,7 @@
 #include "frontend/ast/printer.hh"
 #include "frontend/type_checker.hh"
 #include "frontend/memory_checker.hh"
+#include "frontend/module_manager.hh"
 #include "frontend/ast.hh"
 #include <set>
 #include <algorithm>
@@ -60,66 +61,8 @@ std::string readFile(const std::string& filename) {
 }
 
 void resolveImports(std::shared_ptr<LM::Frontend::AST::Program> program, const std::string& currentPath, std::set<std::string>& loadedModules) {
-    std::vector<std::shared_ptr<LM::Frontend::AST::Statement>> moduleDeclarations;
-    
-    // Find all imports in the current program
-    for (const auto& stmt : program->statements) {
-        if (auto importStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ImportStatement>(stmt)) {
-            std::string modulePath = importStmt->modulePath;
-            if (loadedModules.count(modulePath)) continue;
-
-            // Convert dot notation to path
-            std::string filePath = modulePath;
-            std::replace(filePath.begin(), filePath.end(), '.', '/');
-            filePath += ".lm";
-
-            std::string source;
-            try {
-                source = readFile(filePath);
-            } catch (...) {
-                // If not found at root, try relative to currentPath? 
-                // For now, let's just stick to root-relative for tests
-                continue;
-            }
-
-            LM::Frontend::Scanner scanner(source, filePath);
-            scanner.scanTokens();
-            LM::Frontend::Parser parser(scanner);
-            auto moduleAst = parser.parse();
-
-            loadedModules.insert(modulePath);
-            // Recursively resolve imports for this module
-            resolveImports(moduleAst, filePath, loadedModules);
-
-            // Wrap module AST in a ModuleDeclaration
-            auto modDecl = std::make_shared<LM::Frontend::AST::ModuleDeclaration>();
-            modDecl->name = modulePath;
-            for (auto& s : moduleAst->statements) {
-                if (auto func = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(s)) {
-                    if (func->visibility == LM::Frontend::AST::VisibilityLevel::Public)
-                        modDecl->publicMembers.push_back(s);
-                    else
-                        modDecl->privateMembers.push_back(s);
-                } else if (auto var = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(s)) {
-                    if (var->visibility == LM::Frontend::AST::VisibilityLevel::Public)
-                        modDecl->publicMembers.push_back(s);
-                    else
-                        modDecl->privateMembers.push_back(s);
-                } else if (auto frame = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(s)) {
-                    // Frames are public by default in this implementation
-                    modDecl->publicMembers.push_back(s);
-                } else {
-                    modDecl->privateMembers.push_back(s);
-                }
-            }
-            moduleDeclarations.push_back(modDecl);
-        }
-    }
-
-    // Prepend module declarations to the program
-    if (!moduleDeclarations.empty()) {
-        program->statements.insert(program->statements.begin(), moduleDeclarations.begin(), moduleDeclarations.end());
-    }
+    // New ModuleManager handles this recursively
+    LM::Frontend::ModuleManager::getInstance().resolve_all(program, "root");
 }
 
 int executeFile(const std::string& filename, bool printAst = false, bool printCst = false, 
@@ -180,7 +123,6 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         
         // Phase 3: Post-optimization verification
         auto post_opt_type_check = LM::Frontend::TypeCheckerFactory::check_program(ast, source, filename);
-        std::cerr << "DEBUG: Post-optimization type check completed\n";
         if (!post_opt_type_check.success) {
             std::cerr << "Post-optimization type checking failed\n";
              if (!post_opt_type_check.errors.empty()) {
@@ -196,7 +138,6 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             return 1;
         }
         
-        std::cerr << "DEBUG: About to generate LIR\n";
 
         // Print CST if requested
         if (printCst) {
@@ -310,18 +251,13 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
         }
 
         // Generate LIR once for all backends
-        std::cerr << "DEBUG: Creating LIR generator\n";
         LIR::Generator lir_generator;
-        std::cerr << "DEBUG: Setting import aliases\n";
         lir_generator.set_import_aliases(post_opt_type_check.import_aliases);
-        std::cerr << "DEBUG: Setting registered modules\n";
         lir_generator.set_registered_modules(post_opt_type_check.registered_modules);
-        std::cerr << "DEBUG: Calling generate_program\n";
         
         std::unique_ptr<LIR::LIR_Function> lir_function;
         try {
             lir_function = lir_generator.generate_program(post_opt_type_check);
-            std::cerr << "DEBUG: generate_program returned\n";
         } catch (const std::exception& e) {
             std::cerr << "ERROR in generate_program: " << e.what() << "\n";
             return 1;
@@ -335,7 +271,6 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             return 1;
         }
         
-        std::cerr << "DEBUG: LIR function generated successfully\n";
         
         if (lir_generator.has_errors()) {
             std::cerr << "LIR generation errors:\n";
@@ -345,7 +280,6 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
             return 1;
         }
         
-        std::cerr << "DEBUG: No LIR errors\n";
 
         // Print LIR if requested
         if (printLir) {
@@ -401,6 +335,7 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 main_lir_func = func_manager.createFunction("__top_level_wrapper__", main_params, LIR::Type::I64, nullptr);
                 main_lir_func->setInstructions(lir_function->instructions);
                 
+                // Run top-level wrapper (which now contains module initializer calls)
                 register_vm.execute_lir_function(*main_lir_func);
                 
                 // Check for explicit return statement

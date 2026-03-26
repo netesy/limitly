@@ -599,25 +599,6 @@ public:
     std::string disassemble_instruction(const LIR_Inst& inst) const;
 };
 
-// Optimizer
-class Optimizer {
-    LIR_Function& func;
-    
-    bool peephole_optimize();
-    bool constant_folding();
-    bool dead_code_elimination();
-    
-public:
-    Optimizer(LIR_Function& f) : func(f) {}
-    
-    // Run all enabled optimizations
-    bool optimize();
-    
-    // Enable/disable specific optimizations
-    void set_optimization_flags(const OptimizationFlags& flags) {
-        func.optimizations = flags;
-    }
-};
 
 // Utility functions
 std::string lir_op_to_string(LIR_Op op);

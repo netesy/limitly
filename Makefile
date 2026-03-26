@@ -58,7 +58,7 @@ RUNTIME_OBJS := $(patsubst $(RUNTIME_DIR)/%.c,$(OBJ_DIR)/runtime/%.o,$(RUNTIME_S
 FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp  \
               src/frontend/cst.cpp src/frontend/cst/printer.cpp src/frontend/cst/utils.cpp \
               src/frontend/ast/builder.cpp src/frontend/ast/printer.cpp src/frontend/type_checker.cpp src/frontend/memory_checker.cpp \
-              src/frontend/ast/optimizer.cpp 
+              src/frontend/ast/optimizer.cpp src/frontend/module_manager.cpp
 
 BACK_SRCS :=  src/backend/fyra.cpp src/backend/fyra_ir_generator.cpp
 
@@ -80,7 +80,8 @@ FYRA_LIB := $(OBJ_DIR)/libfyra.a
 REGISTER_SRCS := src/backend/vm/register.cpp
 
 LIR_CORE_SRCS := src/lir/lir.cpp src/lir/lir_utils.cpp src/lir/functions.cpp \
-                 src/lir/builtin_functions.cpp src/lir/lir_types.cpp src/lir/generator.cpp src/lir/function_registry.cpp
+                 src/lir/builtin_functions.cpp src/lir/lir_types.cpp src/lir/generator.cpp src/lir/function_registry.cpp \
+                 src/lir/optimizer.cpp src/lir/metrics.cpp src/lir/serializer.cpp
 
 BACKEND_COMMON_SRCS := src/backend/symbol_table.cpp src/backend/value.cpp 
 

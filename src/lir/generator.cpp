@@ -1,5 +1,6 @@
 #include "generator.hh"
 #include "functions.hh"
+#include "../frontend/module_manager.hh"
 #include "function_registry.hh"
 #include "builtin_functions.hh"
 #include "../frontend/ast.hh"
@@ -28,22 +29,16 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
         // PASS 0: Collect function, frame, and module signatures only
         collect_trait_signatures(*type_check_result.program);
         collect_frame_signatures(*type_check_result.program);
-        
-       // std::cout << "[DEBUG] PASS 0: Collecting signatures" << std::endl;
         collect_function_signatures(type_check_result);
-        
-       // std::cout << "[DEBUG] Function signatures collected" << std::endl;
         collect_module_signatures(*type_check_result.program);
         
-       // std::cout << "[DEBUG] Module signatures collected" << std::endl;
-        
         // PASS 1: Lower function bodies into separate LIR functions
-       // std::cout << "[DEBUG] PASS 1: Lowering function bodies" << std::endl;
         lower_function_bodies(type_check_result);
     
    // std::cout << "[DEBUG] Function bodies lowered" << std::endl;
     
     // PASS 2: Generate main function with top-level code only
+    current_module_ = "root";
     current_function_ = std::make_unique<LIR_Function>("__top_level_wrapper__", 0);
     next_register_ = 0;
     next_label_ = 0;
@@ -54,18 +49,29 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
     register_language_types_.clear();
     enter_scope();
     
-    // Use CFG mode for proper JIT compatibility
-    cfg_context_.building_cfg = false;  // DISABLED: CFG linearization has bugs with elif
+    cfg_context_.building_cfg = false;
     cfg_context_.current_block = nullptr;
     
-    // Create CFG for JIT compatibility (disabled for now)
-    // start_cfg_build();
+    // 1. Module Initializations in Topological Order
+    auto& manager = LM::Frontend::ModuleManager::getInstance();
+    auto sorted_modules = manager.get_topological_order();
     
-    // Generate top-level statements (excluding function definitions)
+    for (const auto& module_path : sorted_modules) {
+        // Skip root as it is the current program
+        if (module_path == "root") continue;
+
+        std::string init_func_name = module_path + ".__init__";
+        if (LIRFunctionManager::getInstance().hasFunction(init_func_name) || function_table_.count(init_func_name)) {
+            std::vector<Reg> empty_args;
+            Reg dummy_res = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::Call, dummy_res, init_func_name, empty_args));
+        }
+    }
+
+    // 2. Generate top-level statements
     for (const auto& stmt : type_check_result.program->statements) {
         if (!stmt) continue;
         if (auto func_stmt = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(stmt.get())) {
-            // Skip function definitions - they're already lowered
             continue;
         }
         emit_stmt(*stmt);
@@ -73,6 +79,7 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
     
     // Call exit_scope BEFORE implicit return to ensure deinitializers are called
     exit_scope();
+    current_module_ = "";
 
     // Add implicit return if none exists
     if (cfg_context_.building_cfg && get_current_block() && !get_current_block()->has_terminator()) {
@@ -102,6 +109,17 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
             report_error("CFG validation failed for main function");
         }
         finish_cfg_build();
+    }
+
+    // Optimize the generated LIR
+    Optimizer optimizer(*current_function_);
+    optimizer.optimize();
+
+    // Collect metrics
+    auto metrics = MetricsCollector::collect(*current_function_);
+    if (type_check_result.program->statements.size() > 0) {
+        // Only print metrics if there's actual code
+        // metrics.print();
     }
 
     auto result = std::move(current_function_);
@@ -920,6 +938,24 @@ Reg Generator::emit_literal_expr(LM::Frontend::AST::LiteralExpr& expr, TypePtr e
 }
 
 Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
+    // Check if it's a global module variable accessed directly (e.g. within the module itself)
+    if (!current_module_.empty() && current_module_ != "root") {
+        std::string qualified_name = current_module_ + "." + expr.name;
+        Reg reg = resolve_variable(expr.name);
+        if (reg != UINT32_MAX) return reg;
+
+        // If not local, try LoadGlobal
+        Reg result = allocate_register();
+        LIR_Inst load_inst(LIR_Op::LoadGlobal, Type::Ptr, result, 0, 0);
+        load_inst.func_name = qualified_name;
+        emit_instruction(load_inst);
+        if (expr.inferred_type) {
+            set_register_language_type(result, expr.inferred_type);
+            set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
+        }
+        return result;
+    }
+
     // First check if this is a module variable access (e.g., "math.pi")
     size_t dot_pos = expr.name.find("::");
     if (dot_pos != std::string::npos) {
@@ -1711,6 +1747,9 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             auto alias_it = import_aliases_.find(var_expr->name);
             if (alias_it != import_aliases_.end()) {
                 // This is a module function call
+                std::string module_path = alias_it->second;
+                std::string qualified_name = module_path + "." + method_name;
+
                 // Evaluate arguments
                 std::vector<Reg> arg_regs;
                 for (const auto& arg : expr.arguments) {
@@ -1731,8 +1770,8 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                     set_register_abi_type(result, language_type_to_abi_type(any_type));
                 }
                 
-                // Generate function call using the original function name
-                LIR_Inst call_inst(LIR_Op::Call, result, method_name, arg_regs);
+                // Generate function call using the qualified name
+                LIR_Inst call_inst(LIR_Op::Call, result, qualified_name, arg_regs);
                 
                 // Set argument types for the call
                 for (Reg arg_reg : arg_regs) {
@@ -2324,6 +2363,30 @@ Reg Generator::emit_index_expr(LM::Frontend::AST::IndexExpr& expr) {
 }
 
 Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
+    // Check if it's a module alias access (e.g. math.version)
+    if (auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(expr.object.get())) {
+        auto alias_it = import_aliases_.find(var_expr->name);
+        if (alias_it != import_aliases_.end()) {
+            std::string module_path = alias_it->second;
+            std::string qualified_name = module_path + "." + expr.name;
+
+            Reg result = allocate_register();
+            LIR_Inst load_inst(LIR_Op::LoadGlobal, Type::Ptr, result, 0, 0);
+            load_inst.func_name = qualified_name;
+            emit_instruction(load_inst);
+
+            if (expr.inferred_type) {
+                set_register_language_type(result, expr.inferred_type);
+                set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
+            } else {
+                auto any_type = std::make_shared<::Type>(::TypeTag::Any);
+                set_register_language_type(result, any_type);
+                set_register_abi_type(result, language_type_to_abi_type(any_type));
+            }
+            return result;
+        }
+    }
+
     // First evaluate the object expression
     Reg object_reg = emit_expr(*expr.object);
     
@@ -2647,6 +2710,24 @@ void Generator::emit_print_value(Reg value) {
 
 void Generator::emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt) {
    // std::cout << "[DEBUG] emit_var_stmt called for variable: " << stmt.name << std::endl;
+
+    // Check if this is a module-level variable (global)
+    if (!current_module_.empty() && current_module_ != "root") {
+        std::string qualified_name = current_module_ + "." + stmt.name;
+        Reg val_reg = 0;
+        if (stmt.initializer) {
+            val_reg = emit_expr(*stmt.initializer);
+        } else {
+            val_reg = allocate_register();
+            ValuePtr nil_val = std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Nil), "");
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, val_reg, nil_val));
+        }
+        LIR_Inst store_inst(LIR_Op::StoreGlobal, Type::Void, 0, val_reg, 0);
+        store_inst.func_name = qualified_name;
+        emit_instruction(store_inst);
+        return;
+    }
+
     Reg value_reg;
     
     // Determine the declared type first, before processing the initializer
@@ -5015,23 +5096,19 @@ std::shared_ptr<::Type> Generator::convert_ast_type_to_lir_type(const std::share
 // Symbol collection methods (Pass 0)
 void Generator::collect_function_signatures(const LM::Frontend::TypeCheckResult& type_check_result) {
     
-    std::cerr << "DEBUG LIR: Collecting function signatures from program statements\n";
     for (const auto& stmt : type_check_result.program->statements) {
         if (auto func_stmt = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(stmt.get())) {
             collect_function_signature(*func_stmt);
         }
     }
     
-    std::cerr << "DEBUG LIR: Collecting function signatures from imported symbols\n";
     // Also collect signatures from imported symbols
     for (const auto& [qualified_name, stmt] : type_check_result.program->imported_symbols) {
         if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
-            std::cerr << "DEBUG LIR: Registering imported function: " << qualified_name << "\n";
             collect_function_signature(*func_decl, qualified_name);
         }
     }
     
-    std::cerr << "DEBUG LIR: Done collecting function signatures\n";
 }
 
 void Generator::collect_function_signature(LM::Frontend::AST::FunctionDeclaration& stmt, const std::string& name_override) {
@@ -5048,34 +5125,79 @@ void Generator::collect_function_signature(LM::Frontend::AST::FunctionDeclaratio
 }
 
 void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_check_result) {
+    auto& manager = LM::Frontend::ModuleManager::getInstance();
     
+    // Lower root program symbols
     for (const auto& stmt : type_check_result.program->statements) {
         if (auto func_stmt = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(stmt.get())) {
              lower_function_body(*func_stmt);
         } else if (auto trait_stmt = dynamic_cast<LM::Frontend::AST::TraitDeclaration*>(stmt.get())) {
             lower_trait_declaration(*trait_stmt);
         } else if (auto frame_stmt = dynamic_cast<LM::Frontend::AST::FrameDeclaration*>(stmt.get())) {
-            // Lower frame methods
             lower_frame_methods(*frame_stmt);
         }
     }
 
-    // Also lower bodies from imported symbols
-    for (const auto& [qualified_name, stmt] : type_check_result.program->imported_symbols) {
-        if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
-            std::string original_name = func_decl->name;
-            func_decl->name = qualified_name;
-            lower_function_body(*func_decl);
-            func_decl->name = original_name;
-        } else if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
-            std::string original_name = frame_decl->name;
-            frame_decl->name = qualified_name;
-            lower_frame_methods(*frame_decl);
-            frame_decl->name = original_name;
+    // Lower all module symbols and generate .__init__ functions
+    for (const auto& [path, module] : manager.get_all_modules()) {
+        if (path == "root" || !module || !module->ast) continue;
+
+        std::string prev_mod = current_module_;
+        current_module_ = path;
+
+        // 1. Lower module symbols
+        for (const auto& stmt : module->ast->statements) {
+            if (auto func_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
+                std::string original_name = func_stmt->name;
+                func_stmt->name = path + "." + original_name;
+                generate_function(*func_stmt);
+                func_stmt->name = original_name;
+            } else if (auto frame_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
+                std::string original_name = frame_stmt->name;
+                frame_stmt->name = path + "." + original_name;
+                lower_frame_methods(*frame_stmt);
+                frame_stmt->name = original_name;
+            } else if (auto trait_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
+                std::string original_name = trait_stmt->name;
+                trait_stmt->name = path + "." + original_name;
+                lower_trait_declaration(*trait_stmt);
+                trait_stmt->name = original_name;
+            }
         }
+
+        // 2. Generate .__init__ function for this module
+        std::string init_func_name = path + ".__init__";
+        current_function_ = std::make_unique<LIR_Function>(init_func_name, 0);
+        next_register_ = 0;
+        scope_stack_.clear();
+        enter_scope();
+
+        for (const auto& stmt : module->ast->statements) {
+            if (dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(stmt.get()) ||
+                dynamic_cast<LM::Frontend::AST::FrameDeclaration*>(stmt.get()) ||
+                dynamic_cast<LM::Frontend::AST::TraitDeclaration*>(stmt.get())) {
+                continue;
+            }
+            emit_stmt(*stmt);
+        }
+
+        if (current_function_->instructions.empty() || !current_function_->instructions.back().isReturn()) {
+            emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, 0, 0));
+        }
+
+        auto result = std::move(current_function_);
+        current_function_ = nullptr;
+
+        // Register with LIRFunctionManager to ensure it's found during Call execution
+        std::vector<LIRParameter> params;
+        auto lir_func = LIRFunctionManager::getInstance().createFunction(init_func_name, params, Type::Void, nullptr);
+        lir_func->setInstructions(result->instructions);
+
+        current_module_ = prev_mod;
     }
 
-    // Also lower task bodies by searching through all statements
+    // Bodies from imported symbols are already lowered in the module loop above.
+
     lower_task_bodies_recursive(type_check_result.program->statements);
 }
 
@@ -5854,49 +5976,17 @@ Reg Generator::emit_this_expr(LM::Frontend::AST::ThisExpr& expr) {
 
 // Smart module system implementations
 void Generator::collect_module_signatures(LM::Frontend::AST::Program& program) {
-    
-    for (const auto& stmt : program.statements) {
-        if (auto module_decl = dynamic_cast<LM::Frontend::AST::ModuleDeclaration*>(stmt.get())) {
-            collect_module_declaration(*module_decl);
-        }
-    }
-}
+    auto& manager = LM::Frontend::ModuleManager::getInstance();
+    for (const auto& [path, module] : manager.get_all_modules()) {
+        if (path == "root") continue;
 
-void Generator::collect_module_declaration(LM::Frontend::AST::ModuleDeclaration& module_decl) {
-    std::string saved_module = current_module_;
-    current_module_ = module_decl.name;
-    
-    // Process public members
-    for (const auto& member : module_decl.publicMembers) {
-        if (auto func_decl = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(member.get())) {
-            register_module_symbol(module_decl.name, func_decl->name, LM::Frontend::AST::VisibilityLevel::Public, 
-                                true, func_decl->params.size());
-        } else if (auto var_decl = dynamic_cast<LM::Frontend::AST::VarDeclaration*>(member.get())) {
-            register_module_symbol(module_decl.name, var_decl->name, LM::Frontend::AST::VisibilityLevel::Public, false);
-        }
+        std::string init_func_name = path + ".__init__";
+        FunctionInfo init_info;
+        init_info.name = init_func_name;
+        init_info.param_count = 0;
+        init_info.visibility = LM::Frontend::AST::VisibilityLevel::Public;
+        function_table_[init_func_name] = std::move(init_info);
     }
-    
-    // Process protected members
-    for (const auto& member : module_decl.protectedMembers) {
-        if (auto func_decl = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(member.get())) {
-            register_module_symbol(module_decl.name, func_decl->name, LM::Frontend::AST::VisibilityLevel::Protected, 
-                                true, func_decl->params.size());
-        } else if (auto var_decl = dynamic_cast<LM::Frontend::AST::VarDeclaration*>(member.get())) {
-            register_module_symbol(module_decl.name, var_decl->name, LM::Frontend::AST::VisibilityLevel::Protected, false);
-        }
-    }
-    
-    // Process private members
-    for (const auto& member : module_decl.privateMembers) {
-        if (auto func_decl = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(member.get())) {
-            register_module_symbol(module_decl.name, func_decl->name, LM::Frontend::AST::VisibilityLevel::Private, 
-                                true, func_decl->params.size());
-        } else if (auto var_decl = dynamic_cast<LM::Frontend::AST::VarDeclaration*>(member.get())) {
-            register_module_symbol(module_decl.name, var_decl->name, LM::Frontend::AST::VisibilityLevel::Private, false);
-        }
-    }
-    
-    current_module_ = saved_module;
 }
 
 void Generator::register_module_symbol(const std::string& module_name, const std::string& symbol_name, 
@@ -6201,7 +6291,6 @@ void Generator::collect_frame_signatures(LM::Frontend::AST::Program& program) {
     // Also collect signatures from imported symbols
     for (const auto& [qualified_name, stmt] : program.imported_symbols) {
         if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
-            std::cerr << "DEBUG LIR: Registering imported frame: " << qualified_name << "\n";
             collect_frame_signature(frame_decl, qualified_name);
         }
     }
@@ -6332,7 +6421,6 @@ void Generator::collect_trait_signatures(LM::Frontend::AST::Program& program) {
     // Also collect signatures from imported symbols
     for (const auto& [qualified_name, stmt] : program.imported_symbols) {
         if (auto trait_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
-            std::cerr << "DEBUG LIR: Registering imported trait: " << qualified_name << "\n";
             collect_trait_signature(trait_decl, qualified_name);
         }
     }
