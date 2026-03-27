@@ -42,14 +42,28 @@ bool Parser::isAtEnd() {
 
 Token Parser::consume(TokenType type, const std::string &message) {
     if (check(type)) return advance();
+    
+    // Report error but don't throw - let parser continue
     error(message);
-    throw std::runtime_error(message);
+    
+    // Return a dummy token to allow parsing to continue
+    Token dummy;
+    dummy.type = type;
+    dummy.lexeme = "";
+    dummy.line = peek().line;
+    dummy.start = peek().start;
+    return dummy;
 }
 
 void Parser::synchronize() {
     advance();
 
-    while (!isAtEnd()) {
+    int max_iterations = 1000;  // Prevent infinite loops
+    int iterations = 0;
+    
+    while (!isAtEnd() && iterations < max_iterations) {
+        iterations++;
+        
         if (previous().type == TokenType::SEMICOLON) return;
 
         switch (peek().type) {
@@ -61,12 +75,25 @@ void Parser::synchronize() {
             case TokenType::WHILE:
             case TokenType::PRINT:
             case TokenType::RETURN:
+            case TokenType::IMPORT:
+            case TokenType::TRAIT:
+            case TokenType::ENUM:
+            case TokenType::TYPE:
                 return;
             default:
                 break;
         }
 
         advance();
+    }
+    
+    // If we hit max iterations, skip to next statement boundary
+    if (iterations >= max_iterations) {
+        while (!isAtEnd() && peek().type != TokenType::SEMICOLON && 
+               peek().type != TokenType::FN && peek().type != TokenType::VAR &&
+               peek().type != TokenType::IF && peek().type != TokenType::WHILE) {
+            advance();
+        }
     }
 }
 
@@ -482,13 +509,23 @@ std::shared_ptr<LM::Frontend::AST::Program> Parser::parse() {
 
     try {
         while (!isAtEnd()) {
-            auto stmt = declaration();
-            if (stmt) {
-                program->statements.push_back(stmt);
+            try {
+                auto stmt = declaration();
+                if (stmt) {
+                    program->statements.push_back(stmt);
+                }
+            } catch (const std::exception &e) {
+                // Handle parsing errors for individual statements
+                synchronize();
+                
+                // If we've hit too many errors, stop parsing
+                if (errors.size() >= MAX_ERRORS) {
+                    break;
+                }
             }
         }
     } catch (const std::exception &e) {
-        // Handle parsing errors
+        // Handle parsing errors at top level
         synchronize();
         
         // Add error info to CST if in CST mode

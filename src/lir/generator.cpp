@@ -14,6 +14,9 @@ using namespace LM::LIR;
 namespace LM {
 namespace LIR {
 
+// Static member initialization
+bool Generator::optimization_enabled_ = true;
+bool Generator::show_optimization_debug_ = false;
 
 Generator::Generator() : current_function_(nullptr), next_register_(0), next_label_(0) {
     // Initialize LIR function system
@@ -111,9 +114,11 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
         finish_cfg_build();
     }
 
-    // Optimize the generated LIR
-    Optimizer optimizer(*current_function_);
-    optimizer.optimize();
+    // Optimize the generated LIR (but NOT for top-level wrapper)
+    if (current_function_->name != "__top_level_wrapper__") {
+        Optimizer optimizer(*current_function_);
+        optimizer.optimize();
+    }
 
     // Collect metrics
     auto metrics = MetricsCollector::collect(*current_function_);
@@ -233,6 +238,42 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     
     // Copy the instructions from our LIR_Function
     lir_func->setInstructions(result->instructions);
+    
+    // Optimize the generated LIR for this function
+    if (Generator::is_optimization_enabled()) {
+        if (Generator::should_show_optimization_debug()) {
+            std::cout << "\n=== Optimizing Function: " << fn.name << " ===\n";
+            std::cout << "BEFORE Optimization (" << result->instructions.size() << " instructions):\n";
+            for (size_t i = 0; i < result->instructions.size(); ++i) {
+                std::cout << i << ": " << result->instructions[i].to_string() << "\n";
+            }
+        }
+        
+        Optimizer optimizer(*result);
+        optimizer.optimize();
+        
+        if (Generator::should_show_optimization_debug()) {
+            std::cout << "\nAFTER Optimization (" << result->instructions.size() << " instructions):\n";
+            for (size_t i = 0; i < result->instructions.size(); ++i) {
+                std::cout << i << ": " << result->instructions[i].to_string() << "\n";
+            }
+            std::cout << "\n";
+        }
+        
+        // Update the function with optimized instructions
+        lir_func->setInstructions(result->instructions);
+    } else {
+        // No optimization - use original instructions
+        if (Generator::should_show_optimization_debug()) {
+            std::cout << "\n=== Function: " << fn.name << " (Optimizations Disabled) ===\n";
+            std::cout << "Instructions (" << result->instructions.size() << "):\n";
+            for (size_t i = 0; i < result->instructions.size(); ++i) {
+                std::cout << i << ": " << result->instructions[i].to_string() << "\n";
+            }
+            std::cout << "\n";
+        }
+        lir_func->setInstructions(result->instructions);
+    }
 }
 
 Reg Generator::allocate_register() {
