@@ -2228,13 +2228,17 @@ std::shared_ptr<LM::Frontend::AST::EnumDeclaration> Parser::enumDeclaration() {
         do {
             std::string variantName = consume(TokenType::IDENTIFIER, "Expected variant name.").lexeme;
 
-            std::optional<std::shared_ptr<LM::Frontend::AST::TypeAnnotation>> variantType;
+            std::vector<std::shared_ptr<LM::Frontend::AST::TypeAnnotation>> variantTypes;
             if (match({TokenType::LEFT_PAREN})) {
-                variantType = parseTypeAnnotation();
-                consume(TokenType::RIGHT_PAREN, "Expected ')' after variant type.");
+                if (!check(TokenType::RIGHT_PAREN)) {
+                    do {
+                        variantTypes.push_back(parseTypeAnnotation());
+                    } while (match({TokenType::COMMA}));
+                }
+                consume(TokenType::RIGHT_PAREN, "Expected ')' after variant types.");
             }
 
-            enumDecl->variants.push_back({variantName, variantType});
+            enumDecl->variants.push_back({variantName, variantTypes});
         } while (match({TokenType::COMMA}));
     }
 
@@ -2362,8 +2366,14 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseBindingPattern() {
     pattern->line = peek().line;
     pattern->typeName = consume(TokenType::IDENTIFIER, "Expected type name in binding pattern.").lexeme;
     consume(TokenType::LEFT_PAREN, "Expected '(' after type name in binding pattern.");
-    pattern->variableName = consume(TokenType::IDENTIFIER, "Expected variable name in binding pattern.").lexeme;
-    consume(TokenType::RIGHT_PAREN, "Expected ')' after variable name in binding pattern.");
+
+    if (!check(TokenType::RIGHT_PAREN)) {
+        do {
+            pattern->variableNames.push_back(consume(TokenType::IDENTIFIER, "Expected variable name in binding pattern.").lexeme);
+        } while (match({TokenType::COMMA}));
+    }
+
+    consume(TokenType::RIGHT_PAREN, "Expected ')' after variable names in binding pattern.");
     return pattern;
 }
 
@@ -3970,7 +3980,11 @@ std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::parseBasicType() {
     }
 
     // Parse primitive and user-defined types
-    if (match({TokenType::INT_TYPE})) {
+    if (check(TokenType::IDENTIFIER) && !isPrimitiveType(peek().type) && !isKnownTypeName(peek().lexeme)) {
+        // This is a user-defined type (like a Frame or Enum)
+        type->typeName = consume(TokenType::IDENTIFIER, "Expected type name.").lexeme;
+        type->isUserDefined = true;
+    } else if (match({TokenType::INT_TYPE})) {
         type->typeName = "int";
         type->isPrimitive = true;
     } else if (match({TokenType::INT8_TYPE})) {
@@ -4109,18 +4123,6 @@ std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::parseBasicType() {
         }
         type->typeName = "\"" + literalValue + "\""; // Keep quotes to indicate it's a literal type
         type->isPrimitive = true; // Treat literal types as primitive
-    } else {
-        // Handle user-defined types
-        if (check(TokenType::IDENTIFIER)) {
-            // Parse the user-defined type name
-            std::string typeName = consume(TokenType::IDENTIFIER, "Expected type name.").lexeme;
-            type->typeName = typeName;
-            type->isUserDefined = true;
-        } else {
-            // Fall back to identifier for user-defined types
-            type->typeName = consume(TokenType::IDENTIFIER, "Expected type name for definition.").lexeme;
-            type->isUserDefined = true;
-        }
     }
 
     // Check for optional type or error union type

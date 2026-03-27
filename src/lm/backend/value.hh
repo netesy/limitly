@@ -209,13 +209,16 @@ struct TupleType
 
 struct EnumType
 {
+    std::string name;
     std::vector<std::string> values;
+    std::map<std::string, std::vector<TypePtr>> variantTypes;
 
-    void addVariant(const std::string& name) {
+    void addVariant(const std::string& name, const std::vector<TypePtr>& types = {}) {
         if (std::find(values.begin(), values.end(), name) != values.end()) {
             throw std::runtime_error("Enum variant already exists: " + name);
         }
         values.push_back(name);
+        variantTypes[name] = types;
     }
 
     std::string toString() const {

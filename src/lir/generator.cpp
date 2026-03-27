@@ -493,6 +493,10 @@ void Generator::emit_stmt(LM::Frontend::AST::Statement& stmt) {
         emit_match_stmt(*match_stmt);
     } else if (auto module_stmt = dynamic_cast<LM::Frontend::AST::ModuleDeclaration*>(&stmt)) {
         emit_module_stmt(*module_stmt);
+    } else if (auto type_decl = dynamic_cast<LM::Frontend::AST::TypeDeclaration*>(&stmt)) {
+        // Type aliases don't generate code
+    } else if (auto enum_decl = dynamic_cast<LM::Frontend::AST::EnumDeclaration*>(&stmt)) {
+        // Enums don't generate code yet
     } else {
         report_error("Unsupported statement type in LIR generator");
     }
@@ -6038,24 +6042,37 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
     for (size_t i = 0; i < stmt.cases.size(); i++) {
         const auto& match_case = stmt.cases[i];
         
-        // For simple literal patterns, emit comparison
+        uint32_t next_pattern_label = (i + 1 < stmt.cases.size()) ? generate_label() : end_label;
+
+        // Pattern matching logic
         if (auto literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(match_case.pattern.get())) {
-            Reg pattern_reg = emit_expr(*literal);
-            Reg compare_reg = allocate_register();
-            
-            // Compare value with pattern
-            emit_instruction(LIR_Inst(LIR_Op::CmpEQ, compare_reg, value_reg, pattern_reg));
-            
-            // Jump to case if match, otherwise jump to next case
-            uint32_t next_label = (i + 1 < stmt.cases.size()) ? case_labels[i + 1] : end_label;
-            emit_instruction(LIR_Inst(LIR_Op::JumpIf, compare_reg, case_labels[i], 0));
-            emit_instruction(LIR_Inst(LIR_Op::Jump, next_label, 0, 0));
+            // Wildcard handling
+            if (std::holds_alternative<std::nullptr_t>(literal->value)) {
+                emit_instruction(LIR_Inst(LIR_Op::Jump, case_labels[i], 0, 0));
+            } else {
+                Reg pattern_reg = emit_expr(*literal);
+                Reg compare_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::CmpEQ, compare_reg, value_reg, pattern_reg));
+                emit_instruction(LIR_Inst(LIR_Op::JumpIf, compare_reg, case_labels[i], 0));
+                emit_instruction(LIR_Inst(LIR_Op::Jump, next_pattern_label, 0, 0));
+            }
+        } else if (auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(match_case.pattern.get())) {
+            if (var_expr->name == "_") {
+                emit_instruction(LIR_Inst(LIR_Op::Jump, case_labels[i], 0, 0));
+            } else {
+                // Binding pattern (wildcard with name)
+                bind_variable(var_expr->name, value_reg);
+                emit_instruction(LIR_Inst(LIR_Op::Jump, case_labels[i], 0, 0));
+            }
         } else {
-            // For complex patterns, just jump to next case for now
-            uint32_t next_label = (i + 1 < stmt.cases.size()) ? case_labels[i + 1] : end_label;
-            emit_instruction(LIR_Inst(LIR_Op::Jump, next_label, 0, 0));
+            // For complex patterns (Enum variants etc), just skip for now to avoid hanging
+            emit_instruction(LIR_Inst(LIR_Op::Jump, case_labels[i], 0, 0)); // Treat as match for now
         }
         
+        if (next_pattern_label != end_label) {
+            emit_instruction(LIR_Inst(LIR_Op::Label, next_pattern_label, 0, 0));
+        }
+
         // Emit case label
         emit_instruction(LIR_Inst(LIR_Op::Label, case_labels[i], 0, 0));
         

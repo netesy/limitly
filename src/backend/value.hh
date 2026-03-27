@@ -219,13 +219,16 @@ struct TupleType
 
 struct EnumType
 {
+    std::string name;
     std::vector<std::string> values;
+    std::map<std::string, std::vector<TypePtr>> variantTypes;
 
-    void addVariant(const std::string& name) {
+    void addVariant(const std::string& name, const std::vector<TypePtr>& types = {}) {
         if (std::find(values.begin(), values.end(), name) != values.end()) {
             throw std::runtime_error("Enum variant already exists: " + name);
         }
         values.push_back(name);
+        variantTypes[name] = types;
     }
 
     std::string toString() const {
@@ -440,8 +443,12 @@ struct Type
             }
             return "Tuple";
         }
-        case TypeTag::Enum:
+        case TypeTag::Enum: {
+            if (const auto* enumType = std::get_if<EnumType>(&extra)) {
+                return "Enum<" + enumType->name + ">";
+            }
             return "Enum";
+        }
         case TypeTag::Function: {
             if (const auto* funcType = std::get_if<FunctionType>(&extra)) {
                 return funcType->toString();
@@ -506,7 +513,24 @@ struct Type
         }
     }
 
-    bool operator==(const Type &other) const { return tag == other.tag; }
+    bool operator==(const Type &other) const {
+        if (tag != other.tag) return false;
+        if (tag == TypeTag::Enum) {
+            if (auto* enumThis = std::get_if<EnumType>(&extra)) {
+                if (auto* enumOther = std::get_if<EnumType>(&other.extra)) {
+                    return enumThis->name == enumOther->name;
+                }
+            }
+        }
+        if (tag == TypeTag::Frame) {
+            if (auto* frameThis = std::get_if<FrameType>(&extra)) {
+                if (auto* frameOther = std::get_if<FrameType>(&other.extra)) {
+                    return frameThis->name == frameOther->name;
+                }
+            }
+        }
+        return true;
+    }
     bool operator!=(const Type &other) const { return !(*this == other); }
 };
 
