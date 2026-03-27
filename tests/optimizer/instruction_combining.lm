@@ -1,0 +1,116 @@
+// Instruction Combining Tests
+// Tests that the optimizer correctly combines instructions
+
+print("=== Instruction Combining Tests ===\n");
+
+// Test 1: Load and use
+print("Test 1: Load and use");
+fn test_load_use(): int {
+    var x = 10;
+    return x;
+}
+var r1 = test_load_use();
+if (r1 == 10) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 10, got {r1}\n"); }
+
+// Test 2: Store and load
+print("Test 2: Store and load");
+fn test_store_load(): int {
+    var x = 0;
+    x = 25;
+    return x;
+}
+var r2 = test_store_load();
+if (r2 == 25) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 25, got {r2}\n"); }
+
+// Test 3: Multiple stores
+print("Test 3: Multiple stores");
+fn test_multi_store(): int {
+    var x = 0;
+    x = 5;
+    x = 10;
+    x = 15;
+    return x;
+}
+var r3 = test_multi_store();
+if (r3 == 15) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 15, got {r3}\n"); }
+
+// Test 4: Arithmetic combining
+print("Test 4: Arithmetic combining");
+fn test_arith_combine(): int {
+    var x = 10;
+    var y = 20;
+    var z = x + y;
+    return z;
+}
+var r4 = test_arith_combine();
+if (r4 == 30) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 30, got {r4}\n"); }
+
+// Test 5: Chained operations
+print("Test 5: Chained operations");
+fn test_chained(): int {
+    var a = 2;
+    var b = a * 3;
+    var c = b + 4;
+    var d = c * 2;
+    return d;
+}
+var r5 = test_chained();
+if (r5 == 20) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 20, got {r5}\n"); }
+
+// Test 6: Comparison combining
+print("Test 6: Comparison combining");
+fn test_cmp_combine(): bool {
+    var x = 10;
+    var y = 5;
+    var result = x > y;
+    return result;
+}
+var r6 = test_cmp_combine();
+if (r6 == true) { print("✅ PASS\n"); } else { print("❌ FAIL: expected true, got {r6}\n"); }
+
+// Test 7: Boolean combining
+print("Test 7: Boolean combining");
+fn test_bool_combine(): bool {
+    var a = true;
+    var b = false;
+    var result = a and b;
+    return result;
+}
+var r7 = test_bool_combine();
+if (r7 == false) { print("✅ PASS\n"); } else { print("❌ FAIL: expected false, got {r7}\n"); }
+
+// Test 8: Nested combining
+print("Test 8: Nested combining");
+fn test_nested_combine(): int {
+    var x = (2 + 3) * (4 + 5);
+    return x;
+}
+var r8 = test_nested_combine();
+if (r8 == 45) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 45, got {r8}\n"); }
+
+// Test 9: Function call combining
+print("Test 9: Function call combining");
+fn add(a: int, b: int): int {
+    return a + b;
+}
+fn test_call_combine(): int {
+    var result = add(10, 20);
+    return result;
+}
+var r9 = test_call_combine();
+if (r9 == 30) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 30, got {r9}\n"); }
+
+// Test 10: Complex combining
+print("Test 10: Complex combining");
+fn test_complex_combine(): int {
+    var a = 5;
+    var b = 10;
+    var c = a + b;
+    var d = c * 2;
+    var e = d - 10;
+    return e;
+}
+var r10 = test_complex_combine();
+if (r10 == 20) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 20, got {r10}\n"); }
+
+print("=== Instruction Combining Tests Complete ===\n");

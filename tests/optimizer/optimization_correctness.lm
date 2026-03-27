@@ -1,0 +1,137 @@
+// Optimization Correctness Tests
+// Tests that optimizations don't change program behavior
+
+print("=== Optimization Correctness Tests ===\n");
+
+// Test 1: Correctness with variables
+print("Test 1: Correctness with variables");
+fn test_var_correctness(): int {
+    var x = 10;
+    var y = 20;
+    var z = 30;
+    return x + y + z;
+}
+var r1 = test_var_correctness();
+if (r1 == 60) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 60, got {r1}\n"); }
+
+// Test 2: Correctness with loops
+print("Test 2: Correctness with loops");
+fn test_loop_correctness(): int {
+    var sum = 0;
+    var i = 0;
+    while (i < 10) {
+        sum = sum + i;
+        i = i + 1;
+    }
+    return sum;
+}
+var r2 = test_loop_correctness();
+if (r2 == 45) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 45, got {r2}\n"); }
+
+// Test 3: Correctness with conditionals
+print("Test 3: Correctness with conditionals");
+fn test_cond_correctness(x: int): int {
+    if (x > 10) {
+        return x * 2;
+    } else if (x > 5) {
+        return x + 10;
+    } else {
+        return x;
+    }
+}
+var r3a = test_cond_correctness(15);
+var r3b = test_cond_correctness(8);
+var r3c = test_cond_correctness(3);
+if (r3a == 30 and r3b == 18 and r3c == 3) { print("✅ PASS\n"); } else { print("❌ FAIL\n"); }
+
+// Test 4: Correctness with function calls
+print("Test 4: Correctness with function calls");
+fn multiply(a: int, b: int): int {
+    return a * b;
+}
+fn test_call_correctness(): int {
+    var a = multiply(3, 4);
+    var b = multiply(5, 6);
+    return a + b;
+}
+var r4 = test_call_correctness();
+if (r4 == 42) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 42, got {r4}\n"); }
+
+// Test 5: Correctness with nested calls
+print("Test 5: Correctness with nested calls");
+fn square(x: int): int {
+    return x * x;
+}
+fn test_nested_call(): int {
+    return square(square(2));
+}
+var r5 = test_nested_call();
+if (r5 == 16) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 16, got {r5}\n"); }
+
+// Test 6: Correctness with recursion
+print("Test 6: Correctness with recursion");
+fn factorial(n: int): int {
+    if (n <= 1) {
+        return 1;
+    } else {
+        return n * factorial(n - 1);
+    }
+}
+var r6 = factorial(5);
+if (r6 == 120) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 120, got {r6}\n"); }
+
+// Test 7: Correctness with complex expressions
+print("Test 7: Correctness with complex expressions");
+fn test_complex_expr(): int {
+    var a = 2;
+    var b = 3;
+    var c = 4;
+    return a * b + c * (a + b);
+}
+var r7 = test_complex_expr();
+if (r7 == 26) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 26, got {r7}\n"); }
+
+// Test 8: Correctness with boolean logic
+print("Test 8: Correctness with boolean logic");
+fn test_bool_logic(): bool {
+    var a = true;
+    var b = false;
+    var c = true;
+    return (a and c) or b;
+}
+var r8 = test_bool_logic();
+if (r8 == true) { print("✅ PASS\n"); } else { print("❌ FAIL: expected true, got {r8}\n"); }
+
+// Test 9: Correctness with comparisons
+print("Test 9: Correctness with comparisons");
+fn test_comparisons(): int {
+    var count = 0;
+    if (5 > 3) { count = count + 1; }
+    if (10 < 20) { count = count + 1; }
+    if (7 == 7) { count = count + 1; }
+    if (4 != 5) { count = count + 1; }
+    return count;
+}
+var r9 = test_comparisons();
+if (r9 == 4) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 4, got {r9}\n"); }
+
+// Test 10: Correctness with mixed operations
+print("Test 10: Correctness with mixed operations");
+fn test_mixed(): int {
+    var x = 10;
+    var y = 20;
+    var z = 0;
+    
+    if (x < y) {
+        z = x + y;
+    } else {
+        z = x - y;
+    }
+    
+    var result = z * 2;
+    return result;
+}
+var r10 = test_mixed();
+if (r10 == 60) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 60, got {r10}\n"); }
+
+print("=== Optimization Correctness Tests Complete ===\n");

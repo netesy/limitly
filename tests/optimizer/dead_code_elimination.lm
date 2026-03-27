@@ -1,0 +1,99 @@
+// Dead Code Elimination Tests
+// Tests that the optimizer correctly removes dead code while preserving live code
+
+print("=== Dead Code Elimination Tests ===\n");
+
+// Test 1: Simple dead assignment
+print("Test 1: Simple dead assignment");
+fn test_dead_assignment(): int {
+    var x = 10;  // Dead - never used
+    var y = 20;  // Live - returned
+    return y;
+}
+var r1 = test_dead_assignment();
+if (r1 == 20) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 20, got {r1}\n"); }
+
+// Test 2: Dead computation before return
+print("Test 2: Dead computation before return");
+fn test_dead_before_return(): int {
+    var unused = 5 * 6;  // Dead - never used
+    return 42;           // Live - returned
+}
+var r2 = test_dead_before_return();
+if (r2 == 42) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 42, got {r2}\n"); }
+
+// Test 3: Dead variable in conditional
+print("Test 3: Dead variable in conditional");
+fn test_dead_in_conditional(flag: bool): int {
+    var dead = 100;  // Dead - never used
+    if (flag) {
+        return 1;
+    } else {
+        return 2;
+    }
+}
+var r3a = test_dead_in_conditional(true);
+var r3b = test_dead_in_conditional(false);
+if (r3a == 1 and r3b == 2) { print("✅ PASS\n"); } else { print("❌ FAIL\n"); }
+
+// Test 4: Dead loop
+print("Test 4: Dead loop");
+fn test_dead_loop(): int {
+    var i = 0;
+    while (i < 10) {  // Dead loop - never executed
+        i = i + 1;
+    }
+    return 99;
+}
+var r4 = test_dead_loop();
+if (r4 == 99) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 99, got {r4}\n"); }
+
+// Test 5: Multiple dead assignments
+print("Test 5: Multiple dead assignments");
+fn test_multiple_dead(): int {
+    var a = 1;   // Dead
+    var b = 2;   // Dead
+    var c = 3;   // Dead
+    var d = 4;   // Live
+    return d;
+}
+var r5 = test_multiple_dead();
+if (r5 == 4) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 4, got {r5}\n"); }
+
+// Test 6: Dead code after return
+print("Test 6: Dead code after return");
+fn test_dead_after_return(): int {
+    return 77;
+    var x = 100;  // Dead - unreachable
+    return x;     // Dead - unreachable
+}
+var r6 = test_dead_after_return();
+if (r6 == 77) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 77, got {r6}\n"); }
+
+// Test 7: Dead function call result
+print("Test 7: Dead function call result");
+fn helper(): int {
+    return 50;
+}
+fn test_dead_call(): int {
+    var unused = helper();  // Dead - result never used
+    return 88;
+}
+var r7 = test_dead_call();
+if (r7 == 88) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 88, got {r7}\n"); }
+
+// Test 8: Dead nested blocks
+print("Test 8: Dead nested blocks");
+fn test_dead_nested(): int {
+    {
+        var x = 10;  // Dead
+        {
+            var y = 20;  // Dead
+        }
+    }
+    return 55;
+}
+var r8 = test_dead_nested();
+if (r8 == 55) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 55, got {r8}\n"); }
+
+print("=== Dead Code Elimination Tests Complete ===\n");

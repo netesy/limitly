@@ -36,6 +36,24 @@ public:
         registered_modules_ = modules;
     }
     
+    // Optimization control
+    static void set_optimization_enabled(bool enabled) {
+        optimization_enabled_ = enabled;
+    }
+    
+    static bool is_optimization_enabled() {
+        return optimization_enabled_;
+    }
+    
+    // Debug output control
+    static void set_show_optimization_debug(bool show) {
+        show_optimization_debug_ = show;
+    }
+    
+    static bool should_show_optimization_debug() {
+        return show_optimization_debug_;
+    }
+    
     // Error handling
     bool has_errors() const;
     std::vector<std::string> get_errors() const;
@@ -48,6 +66,8 @@ public:
     const std::unordered_map<Reg, ErrorInfo>& get_error_info_table() const { return error_info_table_; }
 
 private:
+    static bool optimization_enabled_;
+    static bool show_optimization_debug_;
     
     // Function body lowering (Pass 1)
     void lower_function_bodies(const LM::Frontend::TypeCheckResult& type_check_result);

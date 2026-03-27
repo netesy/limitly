@@ -1,0 +1,115 @@
+// Return Value Preservation Tests
+// Tests that return value computations are never removed as dead code
+
+print("=== Return Value Preservation Tests ===\n");
+
+// Test 1: Simple return value
+print("Test 1: Simple return value");
+fn test_simple_return(): int {
+    return 42;
+}
+var r1 = test_simple_return();
+if (r1 == 42) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 42, got {r1}\n"); }
+
+// Test 2: Computed return value
+print("Test 2: Computed return value");
+fn test_computed_return(): int {
+    return 10 + 20;
+}
+var r2 = test_computed_return();
+if (r2 == 30) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 30, got {r2}\n"); }
+
+// Test 3: Variable return
+print("Test 3: Variable return");
+fn test_var_return(): int {
+    var x = 55;
+    return x;
+}
+var r3 = test_var_return();
+if (r3 == 55) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 55, got {r3}\n"); }
+
+// Test 4: Function call return
+print("Test 4: Function call return");
+fn helper_func(): int {
+    return 77;
+}
+fn test_call_return(): int {
+    return helper_func();
+}
+var r4 = test_call_return();
+if (r4 == 77) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 77, got {r4}\n"); }
+
+// Test 5: Complex expression return
+print("Test 5: Complex expression return");
+fn test_complex_return(): int {
+    return 2 * 3 + 4 * 5;
+}
+var r5 = test_complex_return();
+if (r5 == 26) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 26, got {r5}\n"); }
+
+// Test 6: Conditional return
+print("Test 6: Conditional return");
+fn test_cond_return(flag: bool): int {
+    if (flag) {
+        return 100;
+    } else {
+        return 200;
+    }
+}
+var r6a = test_cond_return(true);
+var r6b = test_cond_return(false);
+if (r6a == 100 and r6b == 200) { print("✅ PASS\n"); } else { print("❌ FAIL\n"); }
+
+// Test 7: Loop with return
+print("Test 7: Loop with return");
+fn test_loop_return(): int {
+    var sum = 0;
+    var i = 0;
+    while (i < 5) {
+        sum = sum + i;
+        i = i + 1;
+    }
+    return sum;
+}
+var r7 = test_loop_return();
+if (r7 == 10) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 10, got {r7}\n"); }
+
+// Test 8: Nested function return
+print("Test 8: Nested function return");
+fn inner(): int {
+    return 33;
+}
+fn outer(): int {
+    return inner();
+}
+fn test_nested_return(): int {
+    return outer();
+}
+var r8 = test_nested_return();
+if (r8 == 33) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 33, got {r8}\n"); }
+
+// Test 9: Multiple computations before return
+print("Test 9: Multiple computations before return");
+fn test_multi_compute(): int {
+    var a = 5;
+    var b = 10;
+    var c = a + b;
+    var d = c * 2;
+    return d;
+}
+var r9 = test_multi_compute();
+if (r9 == 30) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 30, got {r9}\n"); }
+
+// Test 10: Return with side effects
+print("Test 10: Return with side effects");
+fn test_return_side_effects(): int {
+    var x = 0;
+    x = x + 1;
+    x = x + 2;
+    x = x + 3;
+    return x;
+}
+var r10 = test_return_side_effects();
+if (r10 == 6) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 6, got {r10}\n"); }
+
+print("=== Return Value Preservation Tests Complete ===\n");

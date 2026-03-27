@@ -13,6 +13,7 @@
 #include <algorithm>
 #include "lir/generator.hh"
 #include "lir/functions.hh"
+#include "lir/optimizer.hh"
 // #include "backend/jit/jit.hh"
 #include "backend/vm/register.hh"
 #include "backend/fyra.hh"
@@ -43,7 +44,8 @@ void printUsage(const char* programName) {
     std::cout << "    " << programName << " -ast <source_file>      Print the AST\n";
     std::cout << "    " << programName << " -cst <source_file>      Print the CST\n";
     std::cout << "    " << programName << " -tokens <source_file>   Print tokens\n";
-    std::cout << "    " << programName << " -lir <source_file>      Print the LIR (Low-level IR)\n";
+    std::cout << "    " << programName << " -lir [--no-opt] <file>  Print the LIR (Low-level IR)\n";
+    std::cout << "                                  --no-opt: Disable optimizations for baseline\n";
     std::cout << "    " << programName << " -fyra-ir <source_file>  Print the Fyra IR\n";
     std::cout << "\n  Interactive:\n";
     std::cout << "    " << programName << " -repl                   Start interactive REPL\n";
@@ -69,7 +71,8 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
                 bool printTokens = false, bool useJit = false, bool jitDebug = false, 
                 bool enableDebug = false, bool printLir = false, bool useAot = false,
                 bool useWasm = false, bool useWasi = false, bool printFyraIr = false,
-                const std::string& platform = "linux", int opt_level = 2, bool dump_intermediate = false) {
+                const std::string& platform = "linux", int opt_level = 2, bool dump_intermediate = false,
+                bool disable_opt = false) {
     try {
         // Initialize LIR function systems
         // Note: Temporarily disabled due to crash in BuiltinUtils::initializeBuiltins()
@@ -283,12 +286,8 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
 
         // Print LIR if requested
         if (printLir) {
-            std::cout << "Generated LIR function with " << lir_function->instructions.size() << " instructions\n";
-            std::cout << "CFG generation completed with " << lir_function->cfg->blocks.size() << " blocks\n";
-            
-            // Initialize and run LIR disassembler
+            std::cout << "\n=== Final LIR ===\n";
             LIR::Disassembler disassemble(*lir_function, true);
-            std::cout << "\n=== LIR Disassembly ===\n";
             std::cout << disassemble.disassemble() << std::endl;
             
             std::cout << "\n=== Detailed Instruction Analysis with Types ===\n";
@@ -482,7 +481,32 @@ int main(int argc, char* argv[]) {
     } else if (command == "-tokens" && argc >= 3) {
         return executeFile(argv[2], false, false, true, false, false, false, false, false, false, false);
     } else if (command == "-lir" && argc >= 3) {
-        return executeFile(argv[2], false, false, false, false, false, false, true, false, false, false, false);
+        bool disable_opt = false;
+        std::string filename;
+        
+        // Parse arguments - could be: -lir file or -lir --no-opt file
+        for (int i = 2; i < argc; i++) {
+            std::string arg = argv[i];
+            if (arg == "--no-opt") {
+                disable_opt = true;
+            } else if (arg[0] != '-') {
+                filename = arg;
+            }
+        }
+        
+        if (filename.empty()) {
+            std::cerr << "Error: -lir requires a source file\n";
+            return 1;
+        }
+        
+        if (disable_opt) {
+            LIR::Generator::set_optimization_enabled(false);
+        }
+        
+        // Enable debug output for -lir
+        LIR::Generator::set_show_optimization_debug(true);
+        
+        return executeFile(filename, false, false, false, false, false, false, true, false, false, false, false, "linux", 2, false, disable_opt);
     } else if (command == "-fyra-ir" && argc >= 3) {
         return executeFile(argv[2], false, false, false, false, false, false, false, false, false, false, true);
     } else if (command == "-debug" && argc >= 3) {

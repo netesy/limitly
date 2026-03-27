@@ -18,10 +18,22 @@ public:
     bool optimize();
 
     /**
-     * @brief Perform Dead Code Elimination
+     * @brief Perform Dead Code Elimination with CFG-based liveness analysis
      * @return true if instructions were removed
      */
     bool dead_code_elimination();
+
+    /**
+     * @brief Remove unreachable code after unconditional jumps and returns
+     * @return true if instructions were removed
+     */
+    bool remove_unreachable_code();
+
+    /**
+     * @brief Perform Dead Code Elimination using simple backward pass
+     * @return true if instructions were removed
+     */
+    bool dead_code_elimination_simple();
 
     /**
      * @brief Perform Peephole Optimization
@@ -37,6 +49,13 @@ public:
 
 private:
     LIR_Function& func_;
+
+    /**
+     * @brief Check if an instruction has side effects
+     * @param inst The instruction to check
+     * @return true if the instruction has side effects
+     */
+    bool has_instruction_side_effects(const LIR_Inst& inst) const;
 };
 
 } // namespace LIR

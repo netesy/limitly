@@ -1,0 +1,86 @@
+// Constant Folding Tests
+// Tests that the optimizer correctly folds constant expressions
+
+print("=== Constant Folding Tests ===\n");
+
+// Test 1: Simple arithmetic folding
+print("Test 1: Simple arithmetic folding");
+fn test_simple_fold(): int {
+    return 2 + 3;  // Should fold to 5
+}
+var r1 = test_simple_fold();
+if (r1 == 5) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 5, got {r1}\n"); }
+
+// Test 2: Multiplication folding
+print("Test 2: Multiplication folding");
+fn test_mult_fold(): int {
+    return 4 * 5;  // Should fold to 20
+}
+var r2 = test_mult_fold();
+if (r2 == 20) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 20, got {r2}\n"); }
+
+// Test 3: Complex expression folding
+print("Test 3: Complex expression folding");
+fn test_complex_fold(): int {
+    return 2 + 3 * 4;  // Should fold to 14
+}
+var r3 = test_complex_fold();
+if (r3 == 14) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 14, got {r3}\n"); }
+
+// Test 4: Nested folding
+print("Test 4: Nested folding");
+fn test_nested_fold(): int {
+    return (2 + 3) * (4 + 5);  // Should fold to 45
+}
+var r4 = test_nested_fold();
+if (r4 == 45) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 45, got {r4}\n"); }
+
+// Test 5: Division folding
+print("Test 5: Division folding");
+fn test_div_fold(): int {
+    return 100 / 4;  // Should fold to 25
+}
+var r5 = test_div_fold();
+if (r5 == 25) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 25, got {r5}\n"); }
+
+// Test 6: Modulo folding
+print("Test 6: Modulo folding");
+fn test_mod_fold(): int {
+    return 17 % 5;  // Should fold to 2
+}
+var r6 = test_mod_fold();
+if (r6 == 2) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 2, got {r6}\n"); }
+
+// Test 7: Boolean folding
+print("Test 7: Boolean folding");
+fn test_bool_fold(): bool {
+    return true && true;  // Should fold to true
+}
+var r7 = test_bool_fold();
+if (r7 == true) { print("✅ PASS\n"); } else { print("❌ FAIL: expected true, got {r7}\n"); }
+
+// Test 8: Comparison folding
+print("Test 8: Comparison folding");
+fn test_cmp_fold(): bool {
+    return 5 > 3;  // Should fold to true
+}
+var r8 = test_cmp_fold();
+if (r8 == true) { print("✅ PASS\n"); } else { print("❌ FAIL: expected true, got {r8}\n"); }
+
+// Test 9: Subtraction folding
+print("Test 9: Subtraction folding");
+fn test_sub_fold(): int {
+    return 100 - 30;  // Should fold to 70
+}
+var r9 = test_sub_fold();
+if (r9 == 70) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 70, got {r9}\n"); }
+
+// Test 10: Multiple operations folding
+print("Test 10: Multiple operations folding");
+fn test_multi_fold(): int {
+    return 2 * 3 + 4 * 5;  // Should fold to 26
+}
+var r10 = test_multi_fold();
+if (r10 == 26) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 26, got {r10}\n"); }
+
+print("=== Constant Folding Tests Complete ===\n");

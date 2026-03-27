@@ -1,0 +1,129 @@
+// Optimizer Edge Cases Tests
+// Tests edge cases and corner cases for the optimizer
+
+print("=== Optimizer Edge Cases Tests ===\n");
+
+// Test 1: Empty function
+print("Test 1: Empty function body");
+fn test_empty(): int {
+    return 42;
+}
+var r1 = test_empty();
+if (r1 == 42) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 42, got {r1}\n"); }
+
+// Test 2: Single statement
+print("Test 2: Single statement");
+fn test_single(): int {
+    return 99;
+}
+var r2 = test_single();
+if (r2 == 99) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 99, got {r2}\n"); }
+
+// Test 3: Very large constant
+print("Test 3: Very large constant");
+fn test_large_const(): int {
+    return 999999;
+}
+var r3 = test_large_const();
+if (r3 == 999999) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 999999, got {r3}\n"); }
+
+// Test 4: Zero operations
+print("Test 4: Zero operations");
+fn test_zero(): int {
+    return 0;
+}
+var r4 = test_zero();
+if (r4 == 0) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 0, got {r4}\n"); }
+
+// Test 5: Negative numbers
+print("Test 5: Negative numbers");
+fn test_negative(): int {
+    return -42;
+}
+var r5 = test_negative();
+if (r5 == -42) { print("✅ PASS\n"); } else { print("❌ FAIL: expected -42, got {r5}\n"); }
+
+// Test 6: Deep nesting
+print("Test 6: Deep nesting");
+fn test_deep_nest(): int {
+    if (true) {
+        if (true) {
+            if (true) {
+                if (true) {
+                    return 77;
+                }
+            }
+        }
+    }
+    return 0;
+}
+var r6 = test_deep_nest();
+if (r6 == 77) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 77, got {r6}\n"); }
+
+// Test 7: Multiple returns
+print("Test 7: Multiple returns");
+fn test_multi_return(x: int): int {
+    if (x == 1) { return 10; }
+    if (x == 2) { return 20; }
+    if (x == 3) { return 30; }
+    return 0;
+}
+var r7a = test_multi_return(1);
+var r7b = test_multi_return(2);
+var r7c = test_multi_return(3);
+if (r7a == 10 and r7b == 20 and r7c == 30) { print("✅ PASS\n"); } else { print("❌ FAIL\n"); }
+
+// Test 8: Unused parameters
+print("Test 8: Unused parameters");
+fn test_unused_param(unused: int): int {
+    return 55;
+}
+var r8 = test_unused_param(999);
+if (r8 == 55) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 55, got {r8}\n"); }
+
+// Test 9: Unused local variables
+print("Test 9: Unused local variables");
+fn test_unused_locals(): int {
+    var a = 1;
+    var b = 2;
+    var c = 3;
+    var d = 4;
+    var e = 5;
+    return 88;
+}
+var r9 = test_unused_locals();
+if (r9 == 88) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 88, got {r9}\n"); }
+
+// Test 10: Redundant operations
+print("Test 10: Redundant operations");
+fn test_redundant(): int {
+    var x = 10;
+    var y = x;
+    var z = y;
+    return z;
+}
+var r10 = test_redundant();
+if (r10 == 10) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 10, got {r10}\n"); }
+
+// Test 11: Identity operations
+print("Test 11: Identity operations");
+fn test_identity(): int {
+    var x = 42;
+    var y = x + 0;
+    var z = y * 1;
+    return z;
+}
+var r11 = test_identity();
+if (r11 == 42) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 42, got {r11}\n"); }
+
+// Test 12: Commutative operations
+print("Test 12: Commutative operations");
+fn test_commutative(): int {
+    var a = 5 + 10;
+    var b = 10 + 5;
+    return a + b;
+}
+var r12 = test_commutative();
+if (r12 == 30) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 30, got {r12}\n"); }
+
+print("=== Optimizer Edge Cases Tests Complete ===\n");
