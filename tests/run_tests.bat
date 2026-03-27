@@ -41,34 +41,43 @@ echo.
 echo === FUNCTION TESTS ===
 call :run_test_with_error_check "tests\functions\basic.lm"
 call :run_test_with_error_check "tests\functions\advanced.lm"
-@REM call :run_test_with_error_check "tests\functions\closures.lm"
-@REM call :run_test_allow_semantic_errors "tests\functions\first_class.lm"
+call :run_test_allow_semantic_errors "tests\functions\closures.lm"
+call :run_test_allow_semantic_errors "tests\functions\first_class.lm"
 
 echo.
 echo === TYPE TESTS ===
-call :run_test_allow_semantic_errors "tests\types\basic.lm"
-call :run_test_allow_semantic_errors "tests\types\unions.lm"
-call :run_test_allow_semantic_errors "tests\types\options.lm"
+call :run_test_with_error_check "tests\types\basic.lm"
+call :run_test_with_error_check "tests\types\unions.lm"
+call :run_test_with_error_check "tests\types\options.lm"
 call :run_test_with_error_check "tests\types\advanced.lm"
+call :run_test_with_error_check "tests\types\enums.lm"
+call :run_test_with_error_check "tests\types\refined_types.lm"
+call :run_test_with_error_check "tests\types\discriminated_unions.lm"
 
-@REM echo.
-@REM echo === MODULE TESTS ===
-@REM call :run_test_with_error_check "tests\modules\basic_import_test.lm"
+echo.
+echo === MODULE TESTS ===
+call :run_test_with_error_check "tests\modules\basic_import_test.lm"
 @REM call :run_test_with_error_check "tests\modules\comprehensive_module_test.lm"
-@REM call :run_test_with_error_check "tests\modules\show_filter_test.lm"
-@REM call :run_test_with_error_check "tests\modules\hide_filter_test.lm"
-@REM call :run_test_with_error_check "tests\modules\module_caching_test.lm"
-@REM call :run_test_with_error_check "tests\modules\function_params_test.lm"
+call :run_test_with_error_check "tests\modules\show_filter_test.lm"
+call :run_test_with_error_check "tests\modules\hide_filter_test.lm"
+call :run_test_with_error_check "tests\modules\module_caching_test.lm"
+call :run_test_with_error_check "tests\modules\function_params_test.lm"
+call :run_test_with_error_check "tests\modules\alias_import_test.lm"
+call :run_test_with_error_check "tests\modules\multiple_imports_test.lm"
+
+echo.
+echo === OOP TESTS ===
+call :run_test_with_error_check "tests\oop\frame_syntax_only.lm"
+call :run_test_with_error_check "tests\oop\frame_declaration.lm"
+@REM call :run_test_with_error_check "tests\oop\traits_dynamic.lm"
+call :run_test_with_error_check "tests\oop\traits_inheritance.lm"
+call :run_test_with_error_check "tests\oop\visibility_test.lm"
+call :run_test_with_error_check "tests\oop\composition_test.lm"
 
 @REM echo.
 @REM echo === ERROR HANDLING TESTS ===
 @REM call :run_test_with_error_check "tests\error_handling\simple_test.lm"
 @REM call :run_test_with_error_check "tests\error_handling\comprehensive_test.lm"
-
-@REM echo.
-@REM echo === CLASS TESTS ===
-@REM call :run_test_with_error_check "tests\classes\basic_classes.lm"
-@REM call :run_test_with_error_check "tests\classes\inheritance.lm"
 
 echo.
 echo === CONCURRENCY TESTS ===

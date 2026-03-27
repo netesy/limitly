@@ -81,17 +81,38 @@ run_test_allow_semantic_errors "tests/functions/first_class.lm"
 
 echo
 echo "=== TYPE TESTS ==="
-run_test_allow_semantic_errors "tests/types/basic.lm"
-run_test_allow_semantic_errors "tests/types/unions.lm"
-run_test_allow_semantic_errors "tests/types/options.lm"
+run_test_with_error_check "tests/types/basic.lm"
+run_test_with_error_check "tests/types/unions.lm"
+run_test_with_error_check "tests/types/options.lm"
 run_test_with_error_check "tests/types/advanced.lm"
+run_test_allow_semantic_errors "tests/types/enums.lm"
+run_test_allow_semantic_errors "tests/types/refined_types.lm"
+run_test_allow_semantic_errors "tests/types/discriminated_unions.lm"
 
 echo
 echo "=== MODULE TESTS ==="
 run_test_with_error_check "tests/modules/basic_import_test.lm"
+run_test_with_error_check "tests/modules/comprehensive_module_test.lm"
+run_test_with_error_check "tests/modules/show_filter_test.lm"
+run_test_with_error_check "tests/modules/hide_filter_test.lm"
+run_test_with_error_check "tests/modules/module_caching_test.lm"
+run_test_with_error_check "tests/modules/function_params_test.lm"
+run_test_with_error_check "tests/modules/alias_import_test.lm"
+run_test_with_error_check "tests/modules/multiple_imports_test.lm"
 
 echo
-echo "========================================"
+echo "=== OOP TESTS ==="
+run_test_with_error_check "tests/oop/frame_syntax_only.lm"
+run_test_with_error_check "tests/oop/frame_declaration.lm"
+run_test_with_error_check "tests/oop/traits_dynamic.lm"
+run_test_with_error_check "tests/oop/traits_inheritance.lm"
+run_test_with_error_check "tests/oop/visibility_test.lm"
+run_test_allow_semantic_errors "tests/oop/composition_test.lm"
+
+echo
+echo "=== CONCURRENCY TESTS ==="
+run_test_with_error_check "tests/concurrency/parallel_blocks.lm"
+run_test_with_error_check "tests/concurrency/concurrent_blocks.lm"
 echo "Test Results:"
 echo "  PASSED: $PASSED"
 echo "  FAILED: $FAILED"

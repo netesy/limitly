@@ -1,0 +1,339 @@
+// Discriminated Union Type Tests - Comprehensive Coverage
+// Tests named variants for Union and Sum types with exhaustive match checking
+
+print("=== Discriminated Union Type Tests ===");
+
+// Test 1: Basic discriminated union with named variants
+print("\n--- Test 1: Basic Discriminated Union ---");
+type Response = Success(str) | Error(str) | Pending;
+
+var resp1: Response = Success("Operation completed");
+var resp2: Response = Error("Something went wrong");
+var resp3: Response = Pending;
+
+print("Response 1: {resp1}");
+print("Response 2: {resp2}");
+print("Response 3: {resp3}");
+
+// Test 2: Discriminated union with different types
+print("\n--- Test 2: Discriminated Union with Different Types ---");
+type Result = Ok(int) | Err(str) | Timeout;
+
+var result1: Result = Ok(42);
+var result2: Result = Err("Connection failed");
+var result3: Result = Timeout;
+
+print("Result 1: {result1}");
+print("Result 2: {result2}");
+print("Result 3: {result3}");
+
+// Test 3: Exhaustive pattern matching on discriminated union
+print("\n--- Test 3: Exhaustive Pattern Matching ---");
+fn handleResponse(resp: Response): str {
+    match (resp) {
+        Success(msg) => { return "Success: " + msg; },
+        Error(msg) => { return "Error: " + msg; },
+        Pending => { return "Still pending..."; }
+    }
+}
+
+var msg1 = handleResponse(Success("Done"));
+var msg2 = handleResponse(Error("Failed"));
+var msg3 = handleResponse(Pending);
+
+print("Message 1: {msg1}");
+print("Message 2: {msg2}");
+print("Message 3: {msg3}");
+
+// Test 4: Discriminated union with multiple associated values
+print("\n--- Test 4: Multiple Associated Values ---");
+type Event = Click(int, int) | Scroll(int) | KeyPress(str);
+
+var event1: Event = Click(100, 200);
+var event2: Event = Scroll(50);
+var event3: Event = KeyPress("Enter");
+
+print("Event 1: {event1}");
+print("Event 2: {event2}");
+print("Event 3: {event3}");
+
+// Test 5: Pattern matching with associated values
+print("\n--- Test 5: Pattern Matching with Associated Values ---");
+fn describeEvent(event: Event): str {
+    match (event) {
+        Click(x, y) => { return "Clicked at ({x}, {y})"; },
+        Scroll(amount) => { return "Scrolled by {amount}"; },
+        KeyPress(key) => { return "Pressed key: {key}"; }
+    }
+}
+
+var desc1 = describeEvent(Click(150, 250));
+var desc2 = describeEvent(Scroll(100));
+var desc3 = describeEvent(KeyPress("Space"));
+
+print("Description 1: {desc1}");
+print("Description 2: {desc2}");
+print("Description 3: {desc3}");
+
+// Test 6: Discriminated union in collections
+print("\n--- Test 6: Discriminated Union in Collections ---");
+var responses: [Response] = [
+    Success("First"),
+    Error("Second"),
+    Pending,
+    Success("Third")
+];
+
+var results: [Result] = [
+    Ok(1),
+    Err("Failed"),
+    Ok(2),
+    Timeout
+];
+
+print("Responses: {responses}");
+print("Results: {results}");
+
+// Test 7: Nested discriminated unions
+print("\n--- Test 7: Nested Discriminated Unions ---");
+type Status = Active | Inactive;
+type UserState = LoggedIn(str, Status) | LoggedOut | Suspended(str);
+
+var state1: UserState = LoggedIn("alice", Active);
+var state2: UserState = LoggedIn("bob", Inactive);
+var state3: UserState = LoggedOut;
+var state4: UserState = Suspended("Violation");
+
+print("User state 1: {state1}");
+print("User state 2: {state2}");
+print("User state 3: {state3}");
+print("User state 4: {state4}");
+
+// Test 8: Discriminated union with default case
+print("\n--- Test 8: Discriminated Union with Default Case ---");
+fn processResult(result: Result): str {
+    match (result) {
+        Ok(value) => { return "Success: {value}"; },
+        _ => { return "Failed or timeout"; }
+    }
+}
+
+var proc1 = processResult(Ok(100));
+var proc2 = processResult(Err("Error"));
+var proc3 = processResult(Timeout);
+
+print("Process 1: {proc1}");
+print("Process 2: {proc2}");
+print("Process 3: {proc3}");
+
+// Test 9: Discriminated union in function parameters
+print("\n--- Test 9: Discriminated Union in Function Parameters ---");
+fn isSuccess(resp: Response): bool {
+    match (resp) {
+        Success(_) => { return true; },
+        _ => { return false; }
+    }
+}
+
+fn isPending(resp: Response): bool {
+    match (resp) {
+        Pending => { return true; },
+        _ => { return false; }
+    }
+}
+
+var check1 = isSuccess(Success("OK"));
+var check2 = isSuccess(Error("Fail"));
+var check3 = isPending(Pending);
+var check4 = isPending(Success("OK"));
+
+print("Is success 1: {check1}");
+print("Is success 2: {check2}");
+print("Is pending 1: {check3}");
+print("Is pending 2: {check4}");
+
+// Test 10: Discriminated union with type aliases
+print("\n--- Test 10: Discriminated Union Type Aliases ---");
+type ApiResponse = Response;
+type ComputeResult = Result;
+
+var api1: ApiResponse = Success("Data fetched");
+var compute1: ComputeResult = Ok(42);
+
+print("API response: {api1}");
+print("Compute result: {compute1}");
+
+// Test 11: Discriminated union with complex patterns
+print("\n--- Test 11: Complex Pattern Matching ---");
+fn analyzeEvent(event: Event): str {
+    match (event) {
+        Click(x, y) => {
+            if (x > 500) {
+                return "Right side click at {y}";
+            } else {
+                return "Left side click at {y}";
+            }
+        },
+        Scroll(amount) => {
+            if (amount > 0) {
+                return "Scrolled down {amount}";
+            } else {
+                return "Scrolled up {amount}";
+            }
+        },
+        KeyPress(key) => { return "Key: {key}"; }
+    }
+}
+
+var analysis1 = analyzeEvent(Click(600, 300));
+var analysis2 = analyzeEvent(Click(200, 300));
+var analysis3 = analyzeEvent(Scroll(50));
+
+print("Analysis 1: {analysis1}");
+print("Analysis 2: {analysis2}");
+print("Analysis 3: {analysis3}");
+
+// Test 12: Discriminated union exhaustiveness
+print("\n--- Test 12: Exhaustiveness Checking ---");
+fn handleAllResponses(resp: Response): int {
+    match (resp) {
+        Success(_) => { return 1; },
+        Error(_) => { return 2; },
+        Pending => { return 3; }
+    }
+}
+
+var handle1 = handleAllResponses(Success("OK"));
+var handle2 = handleAllResponses(Error("Fail"));
+var handle3 = handleAllResponses(Pending);
+
+print("Handle 1: {handle1}");
+print("Handle 2: {handle2}");
+print("Handle 3: {handle3}");
+
+// Test 13: Discriminated union with unit variants
+print("\n--- Test 13: Unit Variants ---");
+type Command = Start | Stop | Pause | Resume;
+
+var cmd1: Command = Start;
+var cmd2: Command = Stop;
+var cmd3: Command = Pause;
+var cmd4: Command = Resume;
+
+print("Command 1: {cmd1}");
+print("Command 2: {cmd2}");
+print("Command 3: {cmd3}");
+print("Command 4: {cmd4}");
+
+// Test 14: Discriminated union with mixed variants
+print("\n--- Test 14: Mixed Variant Types ---");
+type Message = Text(str) | Number(int) | Flag | Empty;
+
+var msg1: Message = Text("Hello");
+var msg2: Message = Number(42);
+var msg3: Message = Flag;
+var msg4: Message = Empty;
+
+print("Message 1: {msg1}");
+print("Message 2: {msg2}");
+print("Message 3: {msg3}");
+print("Message 4: {msg4}");
+
+// Test 15: Discriminated union with boolean variants
+print("\n--- Test 15: Boolean Variants ---");
+type BoolResult = True(str) | False(str);
+
+var br1: BoolResult = True("Condition met");
+var br2: BoolResult = False("Condition not met");
+
+print("Bool result 1: {br1}");
+print("Bool result 2: {br2}");
+
+// Test 16: Discriminated union in loops
+print("\n--- Test 16: Discriminated Union in Loops ---");
+var commands: [Command] = [Start, Stop, Pause, Resume, Start];
+iter (cmd in commands) {
+    print("Command: {cmd}");
+}
+
+// Test 17: Discriminated union with nested matching
+print("\n--- Test 17: Nested Matching ---");
+fn processUserState(state: UserState): str {
+    match (state) {
+        LoggedIn(name, status) => {
+            match (status) {
+                Active => { return name + " is active"; },
+                Inactive => { return name + " is inactive"; }
+            }
+        },
+        LoggedOut => { return "User logged out"; },
+        Suspended(reason) => { return "Suspended: " + reason; }
+    }
+}
+
+var nested1 = processUserState(LoggedIn("alice", Active));
+var nested2 = processUserState(LoggedIn("bob", Inactive));
+var nested3 = processUserState(LoggedOut);
+var nested4 = processUserState(Suspended("Abuse"));
+
+print("Nested 1: {nested1}");
+print("Nested 2: {nested2}");
+print("Nested 3: {nested3}");
+print("Nested 4: {nested4}");
+
+// Test 18: Discriminated union with numeric variants
+print("\n--- Test 18: Numeric Variants ---");
+type NumericResult = Success(int) | Error(int) | Pending;
+
+var nr1: NumericResult = Success(100);
+var nr2: NumericResult = Error(404);
+var nr3: NumericResult = Pending;
+
+print("Numeric result 1: {nr1}");
+print("Numeric result 2: {nr2}");
+print("Numeric result 3: {nr3}");
+
+// Test 19: Discriminated union in dictionaries
+print("\n--- Test 19: Discriminated Union in Dictionaries ---");
+var responseMap: {str: Response} = {
+    "op1": Success("Done"),
+    "op2": Error("Failed"),
+    "op3": Pending
+};
+
+print("Response map: {responseMap}");
+
+// Test 20: Comprehensive discriminated union coverage
+print("\n--- Test 20: Comprehensive Coverage ---");
+fn comprehensiveUnion(resp: Response, result: Result, cmd: Command): str {
+    var respStr = match (resp) {
+        Success(msg) => { "Success: " + msg; },
+        Error(msg) => { "Error: " + msg; },
+        Pending => { "Pending"; }
+    };
+    
+    var resultStr = match (result) {
+        Ok(val) => { "Ok: {val}"; },
+        Err(msg) => { "Err: " + msg; },
+        Timeout => { "Timeout"; }
+    };
+    
+    var cmdStr = match (cmd) {
+        Start => { "Start"; },
+        Stop => { "Stop"; },
+        Pause => { "Pause"; },
+        Resume => { "Resume"; }
+    };
+    
+    return respStr + " | " + resultStr + " | " + cmdStr;
+}
+
+var comp1 = comprehensiveUnion(Success("OK"), Ok(42), Start);
+var comp2 = comprehensiveUnion(Error("Fail"), Err("Error"), Stop);
+var comp3 = comprehensiveUnion(Pending, Timeout, Pause);
+
+print("Comprehensive 1: {comp1}");
+print("Comprehensive 2: {comp2}");
+print("Comprehensive 3: {comp3}");
+
+print("\n=== Discriminated Union Type Tests Complete ===");
