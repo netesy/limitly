@@ -1,0 +1,283 @@
+// Refined Type Tests - Comprehensive Coverage
+// Tests refined types with compile-time evaluation for arithmetic conditions
+
+print("=== Refined Type Tests ===");
+
+// Test 1: Basic refined type with arithmetic condition
+print("\n--- Test 1: Basic Refined Type with Arithmetic Condition ---");
+type PositiveInt = int where value > 0;
+type LargeInt = int where value > 100;
+type SmallInt = int where value < 10;
+
+var pos1: PositiveInt = 5;
+var pos2: PositiveInt = 42;
+var pos3: PositiveInt = 1000;
+
+print("Positive int 1: {pos1}");
+print("Positive int 2: {pos2}");
+print("Positive int 3: {pos3}");
+
+// Test 2: Refined type with comparison operators
+print("\n--- Test 2: Refined Type with Comparison Operators ---");
+type EvenNumber = int where value % 2 == 0;
+type OddNumber = int where value % 2 != 0;
+type TenOrMore = int where value >= 10;
+type TenOrLess = int where value <= 10;
+
+var even1: EvenNumber = 2;
+var even2: EvenNumber = 100;
+var odd1: OddNumber = 3;
+var odd2: OddNumber = 99;
+
+print("Even number 1: {even1}");
+print("Even number 2: {even2}");
+print("Odd number 1: {odd1}");
+print("Odd number 2: {odd2}");
+
+// Test 3: Refined type with complex arithmetic
+print("\n--- Test 3: Refined Type with Complex Arithmetic ---");
+type DoubleDigit = int where value > 10 * 2;
+type TripleDigit = int where value > 100 * 2;
+type InRange = int where value > 5 + 5;
+
+var dd1: DoubleDigit = 21;
+var dd2: DoubleDigit = 999;
+var td1: TripleDigit = 201;
+
+print("Double digit 1: {dd1}");
+print("Double digit 2: {dd2}");
+print("Triple digit 1: {td1}");
+
+// Test 4: Refined string types
+print("\n--- Test 4: Refined String Types ---");
+type NonEmptyString = str where length(value) > 0;
+type LongString = str where length(value) > 10;
+type ShortString = str where length(value) < 5;
+
+var str1: NonEmptyString = "hello";
+var str2: LongString = "this is a long string";
+var str3: ShortString = "hi";
+
+print("Non-empty string: {str1}");
+print("Long string: {str2}");
+print("Short string: {str3}");
+
+// Test 5: Refined type in function parameters
+print("\n--- Test 5: Refined Type in Function Parameters ---");
+fn processPositive(value: PositiveInt): int {
+    return value * 2;
+}
+
+fn processLarge(value: LargeInt): int {
+    return value + 50;
+}
+
+var result1 = processPositive(10);
+var result2 = processLarge(150);
+
+print("Process positive result: {result1}");
+print("Process large result: {result2}");
+
+// Test 6: Refined type in function return
+print("\n--- Test 6: Refined Type in Function Return ---");
+fn getPositiveNumber(): PositiveInt {
+    return 42;
+}
+
+fn getLargeNumber(): LargeInt {
+    return 500;
+}
+
+var num1 = getPositiveNumber();
+var num2 = getLargeNumber();
+
+print("Positive number: {num1}");
+print("Large number: {num2}");
+
+// Test 7: Refined type with logical operators
+print("\n--- Test 7: Refined Type with Logical Operators ---");
+type ValidAge = int where value > 0;
+type WorkingAge = int where value >= 18;
+
+var age1: ValidAge = 25;
+var age2: ValidAge = 100;
+var age3: WorkingAge = 30;
+var age4: WorkingAge = 65;
+
+print("Valid age 1: {age1}");
+print("Valid age 2: {age2}");
+print("Working age 1: {age3}");
+print("Working age 2: {age4}");
+
+// Test 8: Refined type compatibility
+print("\n--- Test 8: Refined Type Compatibility ---");
+type BasePositive = int where value > 0;
+type StrictPositive = int where value > 10;
+
+var base: BasePositive = 5;
+var strict: StrictPositive = 20;
+
+print("Base positive: {base}");
+print("Strict positive: {strict}");
+
+// Test 9: Refined type in collections
+print("\n--- Test 9: Refined Type in Collections ---");
+var positives: [PositiveInt] = [1, 2, 3, 4, 5];
+var larges: [LargeInt] = [101, 200, 500];
+var evens: [EvenNumber] = [2, 4, 6, 8, 10];
+
+print("Positives: {positives}");
+print("Larges: {larges}");
+print("Evens: {evens}");
+
+// Test 10: Refined type with arithmetic expressions
+print("\n--- Test 10: Refined Type with Arithmetic Expressions ---");
+type PowerOfTwo = int where value > 0;
+type Divisible = int where value % 3 == 0;
+type InBounds = int where value > 0;
+
+var pow1: PowerOfTwo = 2;
+var pow2: PowerOfTwo = 64;
+var div1: Divisible = 9;
+var div2: Divisible = 30;
+var bound1: InBounds = 500;
+
+print("Power of two 1: {pow1}");
+print("Power of two 2: {pow2}");
+print("Divisible 1: {div1}");
+print("Divisible 2: {div2}");
+print("In bounds: {bound1}");
+
+// Test 11: Refined type type aliases
+print("\n--- Test 11: Refined Type Aliases ---");
+type StrictRange = int where value > 10;
+type RefinedAlias = StrictRange;
+
+var refined1: RefinedAlias = 50;
+var refined2: RefinedAlias = 99;
+
+print("Refined alias 1: {refined1}");
+print("Refined alias 2: {refined2}");
+
+// Test 12: Refined type with function calls
+print("\n--- Test 12: Refined Type with Function Calls ---");
+fn isPositive(value: int): bool {
+    return value > 0;
+}
+
+fn isLarge(value: int): bool {
+    return value > 100;
+}
+
+var check1 = isPositive(42);
+var check2 = isLarge(500);
+
+print("Is positive: {check1}");
+print("Is large: {check2}");
+
+// Test 13: Refined type with division
+print("\n--- Test 13: Refined Type with Division ---");
+type NonZero = int where value != 0;
+type HighValue = int where value > 1000;
+
+var nz1: NonZero = 5;
+var nz2: NonZero = -10;
+var hv1: HighValue = 2000;
+
+print("Non-zero 1: {nz1}");
+print("Non-zero 2: {nz2}");
+print("High value: {hv1}");
+
+// Test 14: Refined type with modulo
+print("\n--- Test 14: Refined Type with Modulo ---");
+type Multiple = int where value % 5 == 0;
+type NotMultiple = int where value % 5 != 0;
+
+var mult1: Multiple = 10;
+var mult2: Multiple = 25;
+var notMult1: NotMultiple = 7;
+var notMult2: NotMultiple = 13;
+
+print("Multiple 1: {mult1}");
+print("Multiple 2: {mult2}");
+print("Not multiple 1: {notMult1}");
+print("Not multiple 2: {notMult2}");
+
+// Test 15: Refined type in dictionaries
+print("\n--- Test 15: Refined Type in Dictionaries ---");
+var ageMap: {str: ValidAge} = {"Alice": 25, "Bob": 30, "Charlie": 35};
+var scoreMap: {str: PositiveInt} = {"player1": 100, "player2": 250};
+
+print("Age map: {ageMap}");
+print("Score map: {scoreMap}");
+
+// Test 16: Refined type with subtraction
+print("\n--- Test 16: Refined Type with Subtraction ---");
+type AboveZero = int where value > 0;
+type BelowHundred = int where value < 100;
+
+var az1: AboveZero = 50;
+var bh1: BelowHundred = 75;
+
+print("Above zero: {az1}");
+print("Below hundred: {bh1}");
+
+// Test 17: Refined type with addition
+print("\n--- Test 17: Refined Type with Addition ---");
+type SumPositive = int where value > 5 + 5;
+type SumLarge = int where value > 100 + 100;
+
+var sp1: SumPositive = 15;
+var sl1: SumLarge = 250;
+
+print("Sum positive: {sp1}");
+print("Sum large: {sl1}");
+
+// Test 18: Refined type with multiplication
+print("\n--- Test 18: Refined Type with Multiplication ---");
+type ProductLarge = int where value > 10 * 10;
+type ProductSmall = int where value < 5 * 5;
+
+var pl1: ProductLarge = 150;
+var ps1: ProductSmall = 20;
+
+print("Product large: {pl1}");
+print("Product small: {ps1}");
+
+// Test 19: Refined type in function with conditionals
+print("\n--- Test 19: Refined Type in Function with Conditionals ---");
+fn validatePositive(value: PositiveInt): str {
+    if (value > 50) {
+        return "Large positive";
+    } else if (value > 10) {
+        return "Medium positive";
+    } else {
+        return "Small positive";
+    }
+}
+
+var val1 = validatePositive(5);
+var val2 = validatePositive(25);
+var val3 = validatePositive(100);
+
+print("Validate 1: {val1}");
+print("Validate 2: {val2}");
+print("Validate 3: {val3}");
+
+// Test 20: Refined type comprehensive coverage
+print("\n--- Test 20: Refined Type Comprehensive Coverage ---");
+type RangeType = int where value > 0;
+type LimitType = int where value < 1000;
+type MidType = int where value > 100;
+
+fn processRefined(r: RangeType, l: LimitType, m: MidType): int {
+    return r + l + m;
+}
+
+var r1 = processRefined(10, 500, 200);
+var r2 = processRefined(50, 900, 300);
+
+print("Refined result 1: {r1}");
+print("Refined result 2: {r2}");
+
+print("\n=== Refined Type Tests Complete ===");

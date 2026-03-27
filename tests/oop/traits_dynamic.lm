@@ -28,7 +28,7 @@ frame Square : Shape {
     }
 }
 
-fn print_shape_info(s: &Shape) {
+fn print_shape_info(s: Shape) {
     print(s.name());
     print(s.area());
 }
@@ -41,3 +41,5 @@ fn main() {
     print_shape_info(c);
     print_shape_info(s);
 }
+
+main();

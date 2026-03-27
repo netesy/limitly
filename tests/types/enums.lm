@@ -1,0 +1,320 @@
+// Enum Type Tests - Comprehensive Coverage
+// Tests enum declarations, variants, pattern matching, and edge cases
+
+print("=== Enum Type Tests ===");
+
+// Test 1: Basic enum declaration
+print("\n--- Test 1: Basic Enum Declaration ---");
+enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+var color1: Color = Red;
+var color2: Color = Green;
+var color3: Color = Blue;
+
+print("Color 1: {color1}");
+print("Color 2: {color2}");
+print("Color 3: {color3}");
+
+// Test 2: Enum with associated values
+print("\n--- Test 2: Enum with Associated Values ---");
+enum Result {
+    Success(str),
+    Error(str),
+    Pending
+}
+
+var result1: Result = Success("Operation completed");
+var result2: Result = Error("Something went wrong");
+var result3: Result = Pending;
+
+print("Result 1: {result1}");
+print("Result 2: {result2}");
+print("Result 3: {result3}");
+
+// Test 3: Enum pattern matching
+print("\n--- Test 3: Enum Pattern Matching ---");
+fn describeColor(color: Color): str {
+    match (color) {
+        Red => { return "The color red"; },
+        Green => { return "The color green"; },
+        Blue => { return "The color blue"; }
+    }
+}
+
+var desc1 = describeColor(Red);
+var desc2 = describeColor(Green);
+var desc3 = describeColor(Blue);
+
+print("Description 1: {desc1}");
+print("Description 2: {desc2}");
+print("Description 3: {desc3}");
+
+// Test 4: Enum with multiple variants
+print("\n--- Test 4: Enum with Multiple Variants ---");
+enum Status {
+    Active,
+    Inactive,
+    Pending,
+    Archived,
+    Deleted
+}
+
+var status1: Status = Active;
+var status2: Status = Pending;
+var status3: Status = Archived;
+var status4: Status = Inactive;
+var status5: Status = Deleted;
+
+print("Status 1: {status1}");
+print("Status 2: {status2}");
+print("Status 3: {status3}");
+print("Status 4: {status4}");
+print("Status 5: {status5}");
+
+// Test 5: Enum in function parameters
+print("\n--- Test 5: Enum in Function Parameters ---");
+fn isActive(status: Status): bool {
+    match (status) {
+        Active => { return true; },
+        _ => { return false; }
+    }
+}
+
+var active1 = isActive(Active);
+var active2 = isActive(Inactive);
+var active3 = isActive(Pending);
+
+print("Is Active 1: {active1}");
+print("Is Active 2: {active2}");
+print("Is Active 3: {active3}");
+
+// Test 6: Enum with numeric association
+print("\n--- Test 6: Enum with Numeric Association ---");
+enum Priority {
+    Low(int),
+    Medium(int),
+    High(int)
+}
+
+var priority1: Priority = Low(1);
+var priority2: Priority = Medium(5);
+var priority3: Priority = High(10);
+
+print("Priority 1: {priority1}");
+print("Priority 2: {priority2}");
+print("Priority 3: {priority3}");
+
+// Test 7: Enum type compatibility
+print("\n--- Test 7: Enum Type Compatibility ---");
+type ColorType = Color;
+type StatusType = Status;
+
+var colorVar: ColorType = Red;
+var statusVar: StatusType = Active;
+
+print("Color variable: {colorVar}");
+print("Status variable: {statusVar}");
+
+// Test 8: Enum in collections
+print("\n--- Test 8: Enum in Collections ---");
+var colors: [Color] = [Red, Green, Blue, Red, Green];
+var statuses: [Status] = [Active, Inactive, Pending, Active];
+
+print("Colors list: {colors}");
+print("Statuses list: {statuses}");
+
+// Test 9: Enum exhaustiveness checking
+print("\n--- Test 9: Enum Exhaustiveness ---");
+fn getColorCode(color: Color): int {
+    match (color) {
+        Red => { return 255; },
+        Green => { return 128; },
+        Blue => { return 64; }
+    }
+}
+
+var code1 = getColorCode(Red);
+var code2 = getColorCode(Green);
+var code3 = getColorCode(Blue);
+
+print("Color code 1: {code1}");
+print("Color code 2: {code2}");
+print("Color code 3: {code3}");
+
+// Test 10: Enum with default case
+print("\n--- Test 10: Enum with Default Case ---");
+fn describeStatus(status: Status): str {
+    match (status) {
+        Active => { return "Currently active"; },
+        Inactive => { return "Currently inactive"; },
+        _ => { return "Other status"; }
+    }
+}
+
+var desc4 = describeStatus(Active);
+var desc5 = describeStatus(Pending);
+var desc6 = describeStatus(Archived);
+
+print("Status description 1: {desc4}");
+print("Status description 2: {desc5}");
+print("Status description 3: {desc6}");
+
+// Test 11: Enum with string association
+print("\n--- Test 11: Enum with String Association ---");
+enum Message {
+    Info(str),
+    Warning(str),
+    Error(str)
+}
+
+var msg1: Message = Info("All systems operational");
+var msg2: Message = Warning("Low memory");
+var msg3: Message = Error("Critical failure");
+
+print("Message 1: {msg1}");
+print("Message 2: {msg2}");
+print("Message 3: {msg3}");
+
+// Test 12: Enum pattern matching with extraction
+print("\n--- Test 12: Enum Pattern Matching with Extraction ---");
+fn extractMessage(msg: Message): str {
+    match (msg) {
+        Info(text) => { return "INFO: " + text; },
+        Warning(text) => { return "WARN: " + text; },
+        Error(text) => { return "ERR: " + text; }
+    }
+}
+
+var extracted1 = extractMessage(Info("Test"));
+var extracted2 = extractMessage(Warning("Alert"));
+var extracted3 = extractMessage(Error("Fail"));
+
+print("Extracted 1: {extracted1}");
+print("Extracted 2: {extracted2}");
+print("Extracted 3: {extracted3}");
+
+// Test 13: Enum in nested structures
+print("\n--- Test 13: Enum in Nested Structures ---");
+var colorDict: {str: Color} = {"primary": Red, "secondary": Green, "tertiary": Blue};
+var statusDict: {str: Status} = {"user1": Active, "user2": Inactive};
+
+print("Color dict: {colorDict}");
+print("Status dict: {statusDict}");
+
+// Test 14: Enum comparison in conditionals
+print("\n--- Test 14: Enum Comparison in Conditionals ---");
+fn checkStatus(status: Status): str {
+    if (status == Active) {
+        return "System is active";
+    } else if (status == Inactive) {
+        return "System is inactive";
+    } else {
+        return "System is in other state";
+    }
+}
+
+var check1 = checkStatus(Active);
+var check2 = checkStatus(Inactive);
+var check3 = checkStatus(Pending);
+
+print("Check 1: {check1}");
+print("Check 2: {check2}");
+print("Check 3: {check3}");
+
+// Test 15: Enum with multiple associated values
+print("\n--- Test 15: Enum with Multiple Associated Values ---");
+enum Event {
+    Click(int, int, str),
+    Scroll(int, bool),
+    KeyPress(str, bool, bool)
+}
+
+var event1: Event = Click(100, 200, "left");
+var event2: Event = Scroll(50, true);
+var event3: Event = KeyPress("Enter", true, false);
+
+print("Event 1: {event1}");
+print("Event 2: {event2}");
+print("Event 3: {event3}");
+
+// Test 16: Enum function returning enum
+print("\n--- Test 16: Enum Function Returning Enum ---");
+fn getDefaultColor(): Color {
+    return Red;
+}
+
+fn getDefaultStatus(): Status {
+    return Active;
+}
+
+var defaultColor = getDefaultColor();
+var defaultStatus = getDefaultStatus();
+
+print("Default color: {defaultColor}");
+print("Default status: {defaultStatus}");
+
+// Test 17: Enum in loops
+print("\n--- Test 17: Enum in Loops ---");
+var colorList: [Color] = [Red, Green, Blue];
+iter (color in colorList) {
+    print("Processing color: {color}");
+}
+
+// Test 18: Enum type aliases with pattern matching
+print("\n--- Test 18: Enum Type Aliases with Pattern Matching ---");
+type MyColor = Color;
+type MyStatus = Status;
+
+fn processMyColor(c: MyColor): str {
+    match (c) {
+        Red => { return "Red color"; },
+        Green => { return "Green color"; },
+        Blue => { return "Blue color"; }
+    }
+}
+
+var myColorResult = processMyColor(Red);
+print("My color result: {myColorResult}");
+
+// Test 19: Enum with boolean association
+print("\n--- Test 19: Enum with Boolean Association ---");
+enum Flag {
+    Enabled(bool),
+    Disabled(bool)
+}
+
+var flag1: Flag = Enabled(true);
+var flag2: Flag = Disabled(false);
+
+print("Flag 1: {flag1}");
+print("Flag 2: {flag2}");
+
+// Test 20: Comprehensive enum matching
+print("\n--- Test 20: Comprehensive Enum Matching ---");
+fn comprehensiveMatch(status: Status): int {
+    match (status) {
+        Active => { return 1; },
+        Inactive => { return 2; },
+        Pending => { return 3; },
+        Archived => { return 4; },
+        Deleted => { return 5; }
+    }
+}
+
+var comp1 = comprehensiveMatch(Active);
+var comp2 = comprehensiveMatch(Inactive);
+var comp3 = comprehensiveMatch(Pending);
+var comp4 = comprehensiveMatch(Archived);
+var comp5 = comprehensiveMatch(Deleted);
+
+print("Comprehensive 1: {comp1}");
+print("Comprehensive 2: {comp2}");
+print("Comprehensive 3: {comp3}");
+print("Comprehensive 4: {comp4}");
+print("Comprehensive 5: {comp5}");
+
+print("\n=== Enum Type Tests Complete ===");
