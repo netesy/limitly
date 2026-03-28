@@ -32,6 +32,59 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
     errors.clear();
     current_scope = std::make_unique<Scope>();
 
+    // PASS -1: Basic Type Discovery (Pre-registration)
+    auto register_custom_type = [&](const std::string& name, const std::shared_ptr<LM::Frontend::AST::Statement>& stmt) {
+        if (auto enum_decl = std::dynamic_pointer_cast<LM::Frontend::AST::EnumDeclaration>(stmt)) {
+            EnumType enumTypeInfo;
+            enumTypeInfo.name = name;
+            for (const auto& variant : enum_decl->variants) enumTypeInfo.addVariant(variant.first);
+            TypePtr enumType = std::make_shared<::Type>(TypeTag::Enum, enumTypeInfo);
+            type_system.addUserDefinedType(name, enumType);
+
+            // Register variants in global scope and qualified
+            for (const auto& variant : enum_decl->variants) {
+                std::string qualified = name + "." + variant.first;
+                if (variant.second.empty()) {
+                    variable_types[variant.first] = enumType;
+                    variable_types[qualified] = enumType;
+                    FunctionSignature sig;
+                    sig.name = variant.first;
+                    sig.return_type = enumType;
+                    function_signatures[variant.first] = sig;
+                    function_signatures[qualified] = sig;
+                } else {
+                    std::vector<TypePtr> paramTypes;
+                    for (const auto& t : variant.second) paramTypes.push_back(type_system.ANY_TYPE);
+                    TypePtr constructorType = type_system.createFunctionType(paramTypes, enumType);
+                    variable_types[variant.first] = constructorType;
+                    variable_types[qualified] = constructorType;
+                    FunctionSignature sig;
+                    sig.name = variant.first;
+                    sig.param_types = paramTypes;
+                    sig.return_type = enumType;
+                    function_signatures[variant.first] = sig;
+                    function_signatures[qualified] = sig;
+                }
+            }
+        } else if (auto type_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TypeDeclaration>(stmt)) {
+            type_system.addUserDefinedType(name, type_system.ANY_TYPE);
+        } else if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
+            type_system.addUserDefinedType(name, type_system.createFrameType(name));
+        }
+    };
+
+    for (const auto& stmt : program->statements) {
+        std::string name;
+        if (auto frame = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) name = frame->name;
+        else if (auto trait = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) name = trait->name;
+        else if (auto enm = std::dynamic_pointer_cast<LM::Frontend::AST::EnumDeclaration>(stmt)) name = enm->name;
+        else if (auto type_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TypeDeclaration>(stmt)) name = type_decl->name;
+        if (!name.empty()) register_custom_type(name, stmt);
+    }
+    for (const auto& [name, stmt] : program->imported_symbols) {
+        register_custom_type(name, stmt);
+    }
+
     // PASS 0: Module Resolution and Type Checking
     auto& manager = ModuleManager::getInstance();
     // manager.clear(); // Removed to prevent infinite recursion
@@ -82,6 +135,7 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
         std::string name;
         if (auto frame = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) name = frame->name;
         else if (auto trait = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) name = trait->name;
+        else if (auto enm = std::dynamic_pointer_cast<LM::Frontend::AST::EnumDeclaration>(stmt)) name = enm->name;
         if (!name.empty()) register_name(name, stmt);
     }
     for (const auto& [name, stmt] : program->imported_symbols) {
@@ -180,6 +234,10 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
         } else if (auto var_decl = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
             TypePtr var_type = (var_decl->type && var_decl->type.value()) ? resolve_type_annotation(var_decl->type.value()) : type_system.ANY_TYPE;
             declare_variable(name, var_type);
+        } else if (auto enum_decl = std::dynamic_pointer_cast<LM::Frontend::AST::EnumDeclaration>(stmt)) {
+            check_enum_declaration(enum_decl);
+        } else if (auto type_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TypeDeclaration>(stmt)) {
+            check_type_declaration(type_decl);
         }
     };
 
@@ -195,6 +253,13 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
     }
 
     // PASS 3: Body Verification (local and inlined symbols)
+    for (const auto& stmt : program->statements) {
+        if (auto enum_decl = std::dynamic_pointer_cast<LM::Frontend::AST::EnumDeclaration>(stmt)) {
+            // Already handled in PASS 2/3 but let's be explicit
+        } else if (auto type_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TypeDeclaration>(stmt)) {
+            // Already handled
+        }
+    }
     for (const auto& stmt : program->statements) {
         if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
             if (func_decl->name == "main") {
@@ -699,6 +764,7 @@ void TypeChecker::mark_variable_dropped(const std::string& name) {
 }
 
 TypePtr TypeChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statement> stmt) {
+    std::cerr << "[DEBUG] check_statement: " << typeid(*stmt).name() << std::endl;
     if (!stmt) return nullptr;
     
     if (auto import_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ImportStatement>(stmt)) {
@@ -871,6 +937,10 @@ TypePtr TypeChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::Va
             // String type identity fix
             final_type = declared_type;
         } else {
+            std::cerr << "[DEBUG] Compat fail: declared=" << declared_type->toString()
+                      << " tag=" << (int)declared_type->tag
+                      << " init=" << init_type->toString()
+                      << " tag=" << (int)init_type->tag << std::endl;
             add_type_error(declared_type->toString(), init_type->toString(), var_decl->line);
             final_type = declared_type; // Use declared type anyway
         }
@@ -946,6 +1016,68 @@ TypePtr TypeChecker::check_module_declaration(std::shared_ptr<LM::Frontend::AST:
     current_module_name = prev_module;
 
     return type_system.NIL_TYPE;
+}
+
+TypePtr TypeChecker::check_enum_declaration(std::shared_ptr<LM::Frontend::AST::EnumDeclaration> enum_decl) {
+    if (!enum_decl) return nullptr;
+
+    // Create or get the base enum type
+    TypePtr enumType = type_system.getType(enum_decl->name);
+    if (!enumType || enumType->tag == TypeTag::Nil) {
+        EnumType enumTypeInfo;
+        enumTypeInfo.name = enum_decl->name;
+        for (const auto& variant : enum_decl->variants) {
+            std::vector<TypePtr> associated;
+            for (const auto& t : variant.second) associated.push_back(resolve_type_annotation(t));
+            enumTypeInfo.addVariant(variant.first, associated);
+        }
+        enumType = std::make_shared<::Type>(TypeTag::Enum, enumTypeInfo);
+        type_system.addUserDefinedType(enum_decl->name, enumType);
+    }
+
+    // Register variants in the current scope
+    for (const auto& variant : enum_decl->variants) {
+        const std::string& variantName = variant.first;
+        const auto& associatedTypes = variant.second;
+
+        if (associatedTypes.empty()) {
+            // Unit variant - can be used as a value
+            declare_variable(variantName, enumType);
+
+            // Also register in function signatures so check_function_call or lookup find it as available
+            FunctionSignature sig;
+            sig.name = variantName;
+            sig.return_type = enumType;
+            // Store the full qualified name and the base name
+            function_signatures[variantName] = sig;
+            function_signatures[enum_decl->name + "." + variantName] = sig;
+        } else {
+            // Variant with associated values - functions as a constructor
+            std::vector<TypePtr> paramTypes;
+            for (const auto& astType : associatedTypes) {
+                paramTypes.push_back(resolve_type_annotation(astType));
+            }
+
+            TypePtr constructorType = type_system.createFunctionType(paramTypes, enumType);
+            declare_variable(variantName, constructorType);
+
+            // Also register in function signatures so check_function_call finds it
+            FunctionSignature sig;
+            sig.name = variantName;
+            sig.param_types = paramTypes;
+            sig.return_type = enumType;
+            function_signatures[variantName] = sig;
+            function_signatures[enum_decl->name + "." + variantName] = sig;
+
+            // Also register as a type if it's a single associated type (for sum-type like behavior)
+            if (paramTypes.size() == 1) {
+                type_system.registerType(variantName, constructorType);
+            }
+        }
+    }
+
+    enum_decl->inferred_type = enumType;
+    return enumType;
 }
 
 TypePtr TypeChecker::check_block_statement(std::shared_ptr<LM::Frontend::AST::BlockStatement> block) {
@@ -1207,17 +1339,17 @@ TypePtr TypeChecker::check_print_statement(std::shared_ptr<LM::Frontend::AST::Pr
     return result_type;
 }
 
-TypePtr TypeChecker::check_expression(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
+TypePtr TypeChecker::check_expression(std::shared_ptr<LM::Frontend::AST::Expression> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
     TypePtr type = nullptr;
     
     if (auto literal = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr)) {
-        type = check_literal_expr(literal);
+        type = check_literal_expr(literal, expected_type);
     } else if (auto call = std::dynamic_pointer_cast<LM::Frontend::AST::CallExpr>(expr)) {
-        type = check_call_expr(call);
+        type = check_call_expr(call, expected_type);
     } else if (auto variable = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr)) {
-        type = check_variable_expr(variable);
+        type = check_variable_expr(variable, expected_type);
     } else if (auto this_expr = std::dynamic_pointer_cast<LM::Frontend::AST::ThisExpr>(expr)) {
         // Handle 'this' reference in frame methods
         if (current_frame) {
@@ -1227,9 +1359,9 @@ TypePtr TypeChecker::check_expression(std::shared_ptr<LM::Frontend::AST::Express
             type = type_system.ANY_TYPE;
         }
     } else if (auto binary = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
-        type = check_binary_expr(binary);
+        type = check_binary_expr(binary, expected_type);
     } else if (auto unary = std::dynamic_pointer_cast<LM::Frontend::AST::UnaryExpr>(expr)) {
-        type = check_unary_expr(unary);
+        type = check_unary_expr(unary, expected_type);
     } else if (auto assign = std::dynamic_pointer_cast<LM::Frontend::AST::AssignExpr>(expr)) {
         type = check_assign_expr(assign);
     } else if (auto grouping = std::dynamic_pointer_cast<LM::Frontend::AST::GroupingExpr>(expr)) {
@@ -1275,9 +1407,9 @@ TypePtr TypeChecker::check_expression_with_expected_type(std::shared_ptr<LM::Fro
     if (auto literal = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr)) {
         type = check_literal_expr_with_expected_type(literal, expected_type);
     } else if (auto call = std::dynamic_pointer_cast<LM::Frontend::AST::CallExpr>(expr)) {
-        type = check_call_expr(call);
+        type = check_call_expr(call, expected_type);
     } else if (auto variable = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr)) {
-        type = check_variable_expr(variable);
+        type = check_variable_expr(variable, expected_type);
     } else if (auto binary = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
         type = check_binary_expr(binary);
     } else if (auto unary = std::dynamic_pointer_cast<LM::Frontend::AST::UnaryExpr>(expr)) {
@@ -1319,7 +1451,7 @@ TypePtr TypeChecker::check_expression_with_expected_type(std::shared_ptr<LM::Fro
     return type;
 }
 
-TypePtr TypeChecker::check_literal_expr(std::shared_ptr<LM::Frontend::AST::LiteralExpr> expr) {
+TypePtr TypeChecker::check_literal_expr(std::shared_ptr<LM::Frontend::AST::LiteralExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
     // Set type based on the literal value and token type
@@ -1403,7 +1535,7 @@ TypePtr TypeChecker::check_literal_expr_with_expected_type(std::shared_ptr<LM::F
     return type_system.STRING_TYPE;
 }
 
-TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::VariableExpr> expr) {
+TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::VariableExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
 
     // Check for module alias access (e.g., math in math.add)
@@ -1439,7 +1571,25 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::Vari
     // Check linear type access
     check_linear_type_access(expr->name, expr->line);
     
-    TypePtr type = lookup_variable(expr->name);
+    TypePtr type = nullptr;
+    // 1. Context-based disambiguation for Enum variants
+    TypePtr context_type = expected_type ? expected_type : current_return_type;
+    if (context_type && context_type->tag == TypeTag::Enum) {
+        if (auto* et = std::get_if<EnumType>(&context_type->extra)) {
+            std::string qualified = et->name + "." + expr->name;
+            type = lookup_variable(qualified);
+        }
+    }
+
+    if (!type) type = lookup_variable(expr->name);
+    if (!type) {
+        // Check if it's an enum variant or type
+        type = type_system.getType(expr->name);
+        if (type && type->tag == TypeTag::Nil) {
+            type = nullptr;
+        }
+    }
+
     if (!type) {
         add_error("Undefined variable: " + expr->name + " [Mitigation: Declare variable before use]", expr->line);
         return nullptr;
@@ -1452,7 +1602,7 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::Vari
     return type;
 }
 
-TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::BinaryExpr> expr) {
+TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::BinaryExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
     TypePtr left_type = check_expression(expr->left);
@@ -1504,7 +1654,7 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
     }
 }
 
-TypePtr TypeChecker::check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryExpr> expr) {
+TypePtr TypeChecker::check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
     TypePtr right_type = check_expression(expr->right);
@@ -1578,7 +1728,7 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryEx
     }
 }
 
-TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr> expr) {
+TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
     // Check positional arguments first
@@ -1678,7 +1828,17 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
 
         // Check if it's a function call
         TypePtr result_type = nullptr;
-        if (check_function_call(var_expr->name, arg_types, result_type)) {
+        // Optimization: Try to use expected type to disambiguate enum variant constructors
+        std::string target_name = var_expr->name;
+        TypePtr context_type = expected_type ? expected_type : current_return_type;
+        if (context_type && context_type->tag == TypeTag::Enum) {
+             if (auto* et = std::get_if<EnumType>(&context_type->extra)) {
+                  std::string qualified = et->name + "." + var_expr->name;
+                  if (function_signatures.count(qualified)) target_name = qualified;
+             }
+        }
+
+        if (check_function_call(target_name, arg_types, result_type)) {
             expr->inferred_type = result_type;
             return result_type;
         }
@@ -2473,7 +2633,11 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
     // Check if getType returned NIL_TYPE (which means type not found)
     if (base_type && base_type->tag == TypeTag::Nil) {
         // Type not found, try type alias
-        base_type = type_system.getTypeAlias(annotation->typeName);
+        try {
+            base_type = type_system.getTypeAlias(annotation->typeName);
+        } catch (...) {
+            base_type = nullptr;
+        }
     }
     
     if (!base_type || base_type->tag == TypeTag::Nil) {
@@ -2487,11 +2651,14 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
         } else if (annotation->typeName == "nil") {
             base_type = type_system.NIL_TYPE;
         } else {
-            // If it's not a built-in type, it might be a user-defined type alias
-            // For now, we'll return STRING_TYPE as fallback, but this should be improved
-            // to properly handle type aliases and union types
-            add_error("Unknown type: " + annotation->typeName);
-            return type_system.STRING_TYPE;
+            // If it's not a built-in type, it might be a user-defined type alias or enum
+            TypePtr custom_type = type_system.getType(annotation->typeName);
+            if (custom_type && custom_type->tag != TypeTag::Nil) {
+                base_type = custom_type;
+            } else {
+                add_error("Unknown type: " + annotation->typeName);
+                return type_system.STRING_TYPE;
+            }
         }
     }
     
@@ -2580,6 +2747,17 @@ bool TypeChecker::can_implicitly_convert(TypePtr from, TypePtr to) {
 bool TypeChecker::check_function_call(const std::string& func_name, 
                                      const std::vector<TypePtr>& arg_types,
                                      TypePtr& result_type) {
+    // Check if it's an enum variant constructor
+    TypePtr callee_type = lookup_variable(func_name);
+    if (callee_type && callee_type->tag == TypeTag::Function) {
+        if (auto* func_type = std::get_if<FunctionType>(&callee_type->extra)) {
+            if (validate_argument_types(func_type->paramTypes, arg_types, func_name)) {
+                result_type = func_type->returnType;
+                return true;
+            }
+        }
+    }
+
     auto it = function_signatures.find(func_name);
     if (it == function_signatures.end()) {
         add_error("Undefined function: " + func_name);
@@ -2600,10 +2778,20 @@ bool TypeChecker::check_function_call(const std::string& func_name,
 bool TypeChecker::validate_argument_types(const std::vector<TypePtr>& expected,
                                          const std::vector<TypePtr>& actual,
                                          const std::string& func_name) {
+    // Check if we have enough arguments
+    if (actual.size() > expected.size()) {
+        return false;
+    }
+
     // Get function signature to check optional parameters
     auto func_it = function_signatures.find(func_name);
     if (func_it == function_signatures.end()) {
-        return false;
+        // Might be a constructor/enum variant, check strictly
+        if (actual.size() != expected.size()) return false;
+        for (size_t i = 0; i < actual.size(); ++i) {
+            if (!is_type_compatible(expected[i], actual[i])) return false;
+        }
+        return true;
     }
     
     const FunctionSignature& sig = func_it->second;
@@ -3173,10 +3361,10 @@ void TypeChecker::validate_pattern_compatibility(std::shared_ptr<LM::Frontend::A
             // val pattern expects success type
             if (is_error_union_type(match_type)) {
                 auto* errorUnionPtr = std::get_if<ErrorUnionType>(&match_type->extra);
-                if (errorUnionPtr) {
+                if (errorUnionPtr && !bindingPattern->variableNames.empty()) {
                     auto& errorUnion = *errorUnionPtr;
-                    // val pattern should match the success type
-                    // This is a simplified check - in practice, we'd need more sophisticated matching
+                    // Register the success value binding
+                    declare_variable(bindingPattern->variableNames[0], errorUnion.successType);
                 }
             } else {
                 add_error("val pattern can only be used with error union types", line);
@@ -3185,6 +3373,60 @@ void TypeChecker::validate_pattern_compatibility(std::shared_ptr<LM::Frontend::A
             // err pattern expects error type
             if (!is_error_union_type(match_type)) {
                 add_error("err pattern can only be used with error union types", line);
+            } else if (!bindingPattern->variableNames.empty()) {
+                // Register the error value binding
+                declare_variable(bindingPattern->variableNames[0], type_system.STRING_TYPE);
+            }
+        } else {
+            bool variant_handled = false;
+            // 1. Context-based Enum variant lookup (preferred)
+            if (match_type && match_type->tag == TypeTag::Enum) {
+                if (auto* enumType = std::get_if<EnumType>(&match_type->extra)) {
+                    auto it = std::find(enumType->values.begin(), enumType->values.end(), bindingPattern->typeName);
+                    if (it != enumType->values.end()) {
+                        auto vIt = enumType->variantTypes.find(bindingPattern->typeName);
+                        if (vIt != enumType->variantTypes.end()) {
+                            const std::vector<TypePtr>& paramTypes = vIt->second;
+                            if (bindingPattern->variableNames.size() != paramTypes.size()) {
+                                add_error("Pattern " + bindingPattern->typeName + " expects " +
+                                          std::to_string(paramTypes.size()) + " values, but found " +
+                                          std::to_string(bindingPattern->variableNames.size()), line);
+                            } else {
+                                for (size_t i = 0; i < bindingPattern->variableNames.size(); ++i) {
+                                    declare_variable(bindingPattern->variableNames[i], paramTypes[i]);
+                                }
+                            }
+                        } else if (!bindingPattern->variableNames.empty()) {
+                            add_error("Unit variant " + bindingPattern->typeName + " cannot have associated values", line);
+                        }
+                        variant_handled = true;
+                    }
+                }
+            }
+
+            if (!variant_handled) {
+                // 2. Global lookup (fallback)
+                TypePtr constructorType = lookup_variable(bindingPattern->typeName);
+                if (constructorType && constructorType->tag == TypeTag::Function) {
+                    auto* funcType = std::get_if<FunctionType>(&constructorType->extra);
+                    if (funcType) {
+                        if (bindingPattern->variableNames.size() != funcType->paramTypes.size()) {
+                            add_error("Pattern " + bindingPattern->typeName + " expects " +
+                                      std::to_string(funcType->paramTypes.size()) + " values, but found " +
+                                      std::to_string(bindingPattern->variableNames.size()), line);
+                        } else {
+                            for (size_t i = 0; i < bindingPattern->variableNames.size(); ++i) {
+                                declare_variable(bindingPattern->variableNames[i], funcType->paramTypes[i]);
+                            }
+                        }
+                    }
+                } else if (constructorType && constructorType->tag == TypeTag::Enum) {
+                    if (!bindingPattern->variableNames.empty()) {
+                        add_error("Unit variant " + bindingPattern->typeName + " cannot have associated values", line);
+                    }
+                } else {
+                    add_error("Unknown pattern or constructor: " + bindingPattern->typeName, line);
+                }
             }
         }
     } else if (auto typePattern = std::dynamic_pointer_cast<LM::Frontend::AST::TypePatternExpr>(pattern_node)) {
@@ -3197,6 +3439,10 @@ void TypeChecker::validate_pattern_compatibility(std::shared_ptr<LM::Frontend::A
         }
     } else if (auto literalPattern = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(pattern_node)) {
         // Literal pattern - check compatibility
+        if (std::holds_alternative<std::nullptr_t>(literalPattern->value)) {
+            // Wildcard pattern - always compatible
+            return;
+        }
         TypePtr literalType = check_literal_expr(literalPattern);
         if (!is_type_compatible(literalType, match_type)) {
             add_error("Literal pattern type " + literalType->toString() + " does not match match type " + match_type->toString(), line);
@@ -3386,7 +3632,12 @@ TypePtr TypeChecker::check_match_statement(std::shared_ptr<LM::Frontend::AST::Ma
     TypePtr matchType = check_expression(match_stmt->value);
     
     // Check each case
-    for (const auto& matchCase : match_stmt->cases) {
+    for (auto& matchCase : match_stmt->cases) {
+        enter_scope();
+
+        // Validate pattern compatibility and register bindings
+        validate_pattern_compatibility(matchCase.pattern, matchType, match_stmt->line);
+
         // Check guard if present
         if (matchCase.guard) {
             TypePtr guardType = check_expression(matchCase.guard);
@@ -3398,8 +3649,7 @@ TypePtr TypeChecker::check_match_statement(std::shared_ptr<LM::Frontend::AST::Ma
         // Check case body
         check_statement(matchCase.body);
         
-        // Validate pattern compatibility with matched type
-        validate_pattern_compatibility(matchCase.pattern, matchType, match_stmt->line);
+        exit_scope();
     }
     
     // Convert cases to shared_ptr vector for function calls
@@ -3457,6 +3707,7 @@ void TypeChecker::register_builtin_function(const std::string& name,
     sig.declaration = nullptr; // Builtin functions have no declaration
     
     function_signatures[name] = sig;
+    declare_variable(name, type_system.FUNCTION_TYPE);
 }
 
 // =============================================================================

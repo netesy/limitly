@@ -26,23 +26,7 @@ run_test_with_error_check() {
 }
 
 run_test_allow_semantic_errors() {
-    ((TOTAL++))
-    echo "Running $1..."
-
-    TEMP_FILE=$(mktemp)
-    "$LIMITLY" "$1" > "$TEMP_FILE" 2>&1
-
-    if grep -q -E "RuntimeError|BytecodeError|Error:" "$TEMP_FILE" | grep -v "SemanticError"; then
-        echo "  FAIL: $1 (contains runtime errors)"
-        echo "  Error output:"
-        grep -E "RuntimeError|BytecodeError|Error:" "$TEMP_FILE" | grep -v "SemanticError"
-        ((FAILED++))
-    else
-        echo "  PASS: $1 (semantic errors allowed)"
-        ((PASSED++))
-    fi
-
-    rm "$TEMP_FILE"
+    run_test_with_error_check "$1"
 }
 
 echo "========================================"
