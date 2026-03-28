@@ -935,21 +935,21 @@ TypePtr TypeChecker::check_print_statement(std::shared_ptr<AST::PrintStatement> 
     return result_type;
 }
 
-TypePtr TypeChecker::check_expression(std::shared_ptr<AST::Expression> expr) {
+TypePtr TypeChecker::check_expression(std::shared_ptr<AST::Expression> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
     TypePtr type = nullptr;
     
     if (auto literal = std::dynamic_pointer_cast<AST::LiteralExpr>(expr)) {
-        type = check_literal_expr(literal);
+        type = check_literal_expr(literal, expected_type);
     } else if (auto call = std::dynamic_pointer_cast<AST::CallExpr>(expr)) {
-        type = check_call_expr(call);
+        type = check_call_expr(call, expected_type);
     } else if (auto variable = std::dynamic_pointer_cast<AST::VariableExpr>(expr)) {
-        type = check_variable_expr(variable);
+        type = check_variable_expr(variable, expected_type);
     } else if (auto binary = std::dynamic_pointer_cast<AST::BinaryExpr>(expr)) {
-        type = check_binary_expr(binary);
+        type = check_binary_expr(binary, expected_type);
     } else if (auto unary = std::dynamic_pointer_cast<AST::UnaryExpr>(expr)) {
-        type = check_unary_expr(unary);
+        type = check_unary_expr(unary, expected_type);
     } else if (auto assign = std::dynamic_pointer_cast<AST::AssignExpr>(expr)) {
         type = check_assign_expr(assign);
     } else if (auto grouping = std::dynamic_pointer_cast<AST::GroupingExpr>(expr)) {
@@ -993,9 +993,9 @@ TypePtr TypeChecker::check_expression_with_expected_type(std::shared_ptr<AST::Ex
     if (auto literal = std::dynamic_pointer_cast<AST::LiteralExpr>(expr)) {
         type = check_literal_expr_with_expected_type(literal, expected_type);
     } else if (auto call = std::dynamic_pointer_cast<AST::CallExpr>(expr)) {
-        type = check_call_expr(call);
+        type = check_call_expr(call, expected_type);
     } else if (auto variable = std::dynamic_pointer_cast<AST::VariableExpr>(expr)) {
-        type = check_variable_expr(variable);
+        type = check_variable_expr(variable, expected_type);
     } else if (auto binary = std::dynamic_pointer_cast<AST::BinaryExpr>(expr)) {
         type = check_binary_expr(binary);
     } else if (auto unary = std::dynamic_pointer_cast<AST::UnaryExpr>(expr)) {
@@ -1035,7 +1035,7 @@ TypePtr TypeChecker::check_expression_with_expected_type(std::shared_ptr<AST::Ex
     return type;
 }
 
-TypePtr TypeChecker::check_literal_expr(std::shared_ptr<AST::LiteralExpr> expr) {
+TypePtr TypeChecker::check_literal_expr(std::shared_ptr<AST::LiteralExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
     // CRITICAL FIX: If the literal already has a type (from constant propagation), preserve it
@@ -1124,7 +1124,7 @@ TypePtr TypeChecker::check_literal_expr_with_expected_type(std::shared_ptr<AST::
     return type_system.STRING_TYPE;
 }
 
-TypePtr TypeChecker::check_variable_expr(std::shared_ptr<AST::VariableExpr> expr) {
+TypePtr TypeChecker::check_variable_expr(std::shared_ptr<AST::VariableExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
     // Check if this is a reference
@@ -1156,7 +1156,7 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<AST::VariableExpr> expr
     return type;
 }
 
-TypePtr TypeChecker::check_binary_expr(std::shared_ptr<AST::BinaryExpr> expr) {
+TypePtr TypeChecker::check_binary_expr(std::shared_ptr<AST::BinaryExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
     TypePtr left_type = check_expression(expr->left);
@@ -1208,7 +1208,7 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<AST::BinaryExpr> expr) {
     }
 }
 
-TypePtr TypeChecker::check_unary_expr(std::shared_ptr<AST::UnaryExpr> expr) {
+TypePtr TypeChecker::check_unary_expr(std::shared_ptr<AST::UnaryExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
     TypePtr right_type = check_expression(expr->right);
@@ -1282,7 +1282,7 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<AST::UnaryExpr> expr) {
     }
 }
 
-TypePtr TypeChecker::check_call_expr(std::shared_ptr<AST::CallExpr> expr) {
+TypePtr TypeChecker::check_call_expr(std::shared_ptr<AST::CallExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
     // Check arguments first

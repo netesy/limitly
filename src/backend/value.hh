@@ -516,18 +516,20 @@ struct Type
     bool operator==(const Type &other) const {
         if (tag != other.tag) return false;
         if (tag == TypeTag::Enum) {
-            if (auto* enumThis = std::get_if<EnumType>(&extra)) {
-                if (auto* enumOther = std::get_if<EnumType>(&other.extra)) {
-                    return enumThis->name == enumOther->name;
-                }
+            auto* enumThis = std::get_if<EnumType>(&extra);
+            auto* enumOther = std::get_if<EnumType>(&other.extra);
+            if (enumThis && enumOther) {
+                return enumThis->name == enumOther->name;
             }
+            return enumThis == enumOther; // Both null is true
         }
         if (tag == TypeTag::Frame) {
-            if (auto* frameThis = std::get_if<FrameType>(&extra)) {
-                if (auto* frameOther = std::get_if<FrameType>(&other.extra)) {
-                    return frameThis->name == frameOther->name;
-                }
+            auto* frameThis = std::get_if<FrameType>(&extra);
+            auto* frameOther = std::get_if<FrameType>(&other.extra);
+            if (frameThis && frameOther) {
+                return frameThis->name == frameOther->name;
             }
+            return frameThis == frameOther;
         }
         return true;
     }
