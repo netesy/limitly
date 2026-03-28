@@ -174,12 +174,13 @@ private:
     void mark_variable_initialized(const std::string& name);
     
     // Type checking methods
-    TypePtr check_expression(std::shared_ptr<AST::Expression> expr);
+    TypePtr check_expression(std::shared_ptr<AST::Expression> expr, TypePtr expected_type = nullptr);
     TypePtr check_expression_with_expected_type(std::shared_ptr<AST::Expression> expr, TypePtr expected_type);
     TypePtr check_statement(std::shared_ptr<AST::Statement> stmt);
     TypePtr check_function_declaration(std::shared_ptr<AST::FunctionDeclaration> func);
     TypePtr check_var_declaration(std::shared_ptr<AST::VarDeclaration> var_decl);
     TypePtr check_type_declaration(std::shared_ptr<AST::TypeDeclaration> type_decl);
+    TypePtr check_enum_declaration(std::shared_ptr<AST::EnumDeclaration> enum_decl);
     TypePtr check_block_statement(std::shared_ptr<AST::BlockStatement> block);
     TypePtr check_if_statement(std::shared_ptr<AST::IfStatement> if_stmt);
     TypePtr check_while_statement(std::shared_ptr<AST::WhileStatement> while_stmt);
@@ -190,12 +191,12 @@ private:
     TypePtr check_contract_statement(std::shared_ptr<AST::ContractStatement> contract_stmt);
     
     // Expression type checking
-    TypePtr check_literal_expr(std::shared_ptr<AST::LiteralExpr> expr);
+    TypePtr check_literal_expr(std::shared_ptr<AST::LiteralExpr> expr, TypePtr expected_type = nullptr);
     TypePtr check_literal_expr_with_expected_type(std::shared_ptr<AST::LiteralExpr> expr, TypePtr expected_type);
-    TypePtr check_variable_expr(std::shared_ptr<AST::VariableExpr> expr);
-    TypePtr check_binary_expr(std::shared_ptr<AST::BinaryExpr> expr);
-    TypePtr check_unary_expr(std::shared_ptr<AST::UnaryExpr> expr);
-    TypePtr check_call_expr(std::shared_ptr<AST::CallExpr> expr);
+    TypePtr check_variable_expr(std::shared_ptr<AST::VariableExpr> expr, TypePtr expected_type = nullptr);
+    TypePtr check_binary_expr(std::shared_ptr<AST::BinaryExpr> expr, TypePtr expected_type = nullptr);
+    TypePtr check_unary_expr(std::shared_ptr<AST::UnaryExpr> expr, TypePtr expected_type = nullptr);
+    TypePtr check_call_expr(std::shared_ptr<AST::CallExpr> expr, TypePtr expected_type = nullptr);
     TypePtr check_assign_expr(std::shared_ptr<AST::AssignExpr> expr);
     TypePtr check_grouping_expr(std::shared_ptr<AST::GroupingExpr> expr);
     TypePtr check_member_expr(std::shared_ptr<AST::MemberExpr> expr);

@@ -291,8 +291,13 @@ void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node,
         std::cout << indentation << "EnumDeclaration: " << enumDecl->name << std::endl;
         for (const auto& variant : enumDecl->variants) {
             std::cout << indentation << "  Variant: " << variant.first;
-            if (variant.second) {
-                std::cout << " (type: " << typeToString(*variant.second) << ")";
+            if (!variant.second.empty()) {
+                std::cout << " (types: ";
+                for (size_t i = 0; i < variant.second.size(); ++i) {
+                    if (i > 0) std::cout << ", ";
+                    std::cout << typeToString(variant.second[i]);
+                }
+                std::cout << ")";
             }
             std::cout << std::endl;
         }
@@ -849,8 +854,13 @@ void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node,
     }
     else if (auto bindingPatternExpr = std::dynamic_pointer_cast<LM::Frontend::AST::BindingPatternExpr>(node)) {
         std::cout << indentation << "BindingPattern: " << bindingPatternExpr->typeName;
-        if (!bindingPatternExpr->variableName.empty()) {
-            std::cout << "(" << bindingPatternExpr->variableName << ")";
+        if (!bindingPatternExpr->variableNames.empty()) {
+            std::cout << "(";
+            for (size_t i = 0; i < bindingPatternExpr->variableNames.size(); ++i) {
+                if (i > 0) std::cout << ", ";
+                std::cout << bindingPatternExpr->variableNames[i];
+            }
+            std::cout << ")";
         }
         std::cout << std::endl;
     }
@@ -1075,6 +1085,17 @@ std::string ASTPrinter::valueToString(const std::variant<std::string, bool, std:
 std::string ASTPrinter::typeToString(const std::shared_ptr<LM::Frontend::AST::TypeAnnotation>& type) const {
     if (!type) return "<unknown>";
     
+    // Safety check: ensure we're not in an infinite recursion
+    static thread_local std::set<LM::Frontend::AST::TypeAnnotation*> visiting;
+    if (visiting.count(type.get())) return type->typeName.empty() ? "<circular>" : type->typeName;
+    visiting.insert(type.get());
+
+    struct ExitGuard {
+        LM::Frontend::AST::TypeAnnotation* t;
+        ExitGuard(LM::Frontend::AST::TypeAnnotation* ptr) : t(ptr) {}
+        ~ExitGuard() { visiting.erase(t); }
+    } guard(type.get());
+
     std::string result = type->typeName;
     
     // Handle optional type
@@ -1084,7 +1105,8 @@ std::string ASTPrinter::typeToString(const std::shared_ptr<LM::Frontend::AST::Ty
     
     // Handle list type
     if (type->isList && type->elementType) {
-        return "[" + typeToString(type->elementType) + "]";
+        std::string elem = typeToString(type->elementType);
+        return "[" + elem + "]";
     }
     
     // Handle dictionary type

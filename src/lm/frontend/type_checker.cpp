@@ -30,10 +30,23 @@ bool TypeChecker::check_program(std::shared_ptr<AST::Program> program) {
     errors.clear();
     current_scope = std::make_unique<Scope>();
     
+    // PASS -1: Pre-register custom types
+    for (const auto& stmt : program->statements) {
+        if (auto enum_decl = std::dynamic_pointer_cast<AST::EnumDeclaration>(stmt)) {
+            type_system.addUserDefinedType(enum_decl->name, std::make_shared<::Type>(TypeTag::Enum));
+        } else if (auto type_decl = std::dynamic_pointer_cast<AST::TypeDeclaration>(stmt)) {
+            type_system.addUserDefinedType(type_decl->name, type_system.ANY_TYPE);
+        }
+    }
+
     // First pass: collect function declarations
     for (const auto& stmt : program->statements) {
         if (auto func_decl = std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt)) {
             check_function_declaration(func_decl);
+        } else if (auto enum_decl = std::dynamic_pointer_cast<AST::EnumDeclaration>(stmt)) {
+            check_enum_declaration(enum_decl);
+        } else if (auto type_decl = std::dynamic_pointer_cast<AST::TypeDeclaration>(stmt)) {
+            check_type_declaration(type_decl);
         }
     }
     
@@ -705,6 +718,53 @@ TypePtr TypeChecker::check_type_declaration(std::shared_ptr<AST::TypeDeclaration
     return underlying_type;
 }
 
+TypePtr TypeChecker::check_enum_declaration(std::shared_ptr<AST::EnumDeclaration> enum_decl) {
+    if (!enum_decl) return nullptr;
+
+    // Create or get the base enum type
+    TypePtr enumType = type_system.getType(enum_decl->name);
+    if (!enumType || enumType->tag == TypeTag::Nil) {
+        enumType = std::make_shared<::Type>(TypeTag::Enum);
+        type_system.addUserDefinedType(enum_decl->name, enumType);
+    }
+
+    // Register variants in the current scope
+    for (const auto& variant : enum_decl->variants) {
+        const std::string& variantName = variant.first;
+        const auto& associatedTypes = variant.second;
+
+        if (associatedTypes.empty()) {
+            // Unit variant - can be used as a value
+            declare_variable(variantName, enumType);
+
+            // Also register in function signatures so check_function_call or lookup find it as available
+            FunctionSignature sig;
+            sig.name = variantName;
+            sig.return_type = enumType;
+            function_signatures[variantName] = sig;
+        } else {
+            // Variant with associated values - functions as a constructor
+            std::vector<TypePtr> paramTypes;
+            for (const auto& astType : associatedTypes) {
+                paramTypes.push_back(resolve_type_annotation(astType));
+            }
+
+            TypePtr constructorType = type_system.createFunctionType(paramTypes, enumType);
+            declare_variable(variantName, constructorType);
+
+            // Also register in function signatures so check_function_call finds it
+            FunctionSignature sig;
+            sig.name = variantName;
+            sig.param_types = paramTypes;
+            sig.return_type = enumType;
+            function_signatures[variantName] = sig;
+        }
+    }
+
+    enum_decl->inferred_type = enumType;
+    return enumType;
+}
+
 TypePtr TypeChecker::check_block_statement(std::shared_ptr<AST::BlockStatement> block) {
     if (!block) return nullptr;
     
@@ -875,21 +935,21 @@ TypePtr TypeChecker::check_print_statement(std::shared_ptr<AST::PrintStatement> 
     return result_type;
 }
 
-TypePtr TypeChecker::check_expression(std::shared_ptr<AST::Expression> expr) {
+TypePtr TypeChecker::check_expression(std::shared_ptr<AST::Expression> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
     TypePtr type = nullptr;
     
     if (auto literal = std::dynamic_pointer_cast<AST::LiteralExpr>(expr)) {
-        type = check_literal_expr(literal);
+        type = check_literal_expr(literal, expected_type);
     } else if (auto call = std::dynamic_pointer_cast<AST::CallExpr>(expr)) {
-        type = check_call_expr(call);
+        type = check_call_expr(call, expected_type);
     } else if (auto variable = std::dynamic_pointer_cast<AST::VariableExpr>(expr)) {
-        type = check_variable_expr(variable);
+        type = check_variable_expr(variable, expected_type);
     } else if (auto binary = std::dynamic_pointer_cast<AST::BinaryExpr>(expr)) {
-        type = check_binary_expr(binary);
+        type = check_binary_expr(binary, expected_type);
     } else if (auto unary = std::dynamic_pointer_cast<AST::UnaryExpr>(expr)) {
-        type = check_unary_expr(unary);
+        type = check_unary_expr(unary, expected_type);
     } else if (auto assign = std::dynamic_pointer_cast<AST::AssignExpr>(expr)) {
         type = check_assign_expr(assign);
     } else if (auto grouping = std::dynamic_pointer_cast<AST::GroupingExpr>(expr)) {
@@ -933,9 +993,9 @@ TypePtr TypeChecker::check_expression_with_expected_type(std::shared_ptr<AST::Ex
     if (auto literal = std::dynamic_pointer_cast<AST::LiteralExpr>(expr)) {
         type = check_literal_expr_with_expected_type(literal, expected_type);
     } else if (auto call = std::dynamic_pointer_cast<AST::CallExpr>(expr)) {
-        type = check_call_expr(call);
+        type = check_call_expr(call, expected_type);
     } else if (auto variable = std::dynamic_pointer_cast<AST::VariableExpr>(expr)) {
-        type = check_variable_expr(variable);
+        type = check_variable_expr(variable, expected_type);
     } else if (auto binary = std::dynamic_pointer_cast<AST::BinaryExpr>(expr)) {
         type = check_binary_expr(binary);
     } else if (auto unary = std::dynamic_pointer_cast<AST::UnaryExpr>(expr)) {
@@ -975,7 +1035,7 @@ TypePtr TypeChecker::check_expression_with_expected_type(std::shared_ptr<AST::Ex
     return type;
 }
 
-TypePtr TypeChecker::check_literal_expr(std::shared_ptr<AST::LiteralExpr> expr) {
+TypePtr TypeChecker::check_literal_expr(std::shared_ptr<AST::LiteralExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
     // CRITICAL FIX: If the literal already has a type (from constant propagation), preserve it
@@ -1064,7 +1124,7 @@ TypePtr TypeChecker::check_literal_expr_with_expected_type(std::shared_ptr<AST::
     return type_system.STRING_TYPE;
 }
 
-TypePtr TypeChecker::check_variable_expr(std::shared_ptr<AST::VariableExpr> expr) {
+TypePtr TypeChecker::check_variable_expr(std::shared_ptr<AST::VariableExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
     // Check if this is a reference
@@ -1096,7 +1156,7 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<AST::VariableExpr> expr
     return type;
 }
 
-TypePtr TypeChecker::check_binary_expr(std::shared_ptr<AST::BinaryExpr> expr) {
+TypePtr TypeChecker::check_binary_expr(std::shared_ptr<AST::BinaryExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
     TypePtr left_type = check_expression(expr->left);
@@ -1148,7 +1208,7 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<AST::BinaryExpr> expr) {
     }
 }
 
-TypePtr TypeChecker::check_unary_expr(std::shared_ptr<AST::UnaryExpr> expr) {
+TypePtr TypeChecker::check_unary_expr(std::shared_ptr<AST::UnaryExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
     TypePtr right_type = check_expression(expr->right);
@@ -1222,7 +1282,7 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<AST::UnaryExpr> expr) {
     }
 }
 
-TypePtr TypeChecker::check_call_expr(std::shared_ptr<AST::CallExpr> expr) {
+TypePtr TypeChecker::check_call_expr(std::shared_ptr<AST::CallExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
     // Check arguments first

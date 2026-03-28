@@ -131,6 +131,17 @@ private:
         return from == to;
     }
 
+    // Handle enum type conversions
+    if (from->tag == TypeTag::Enum && to->tag == TypeTag::Enum) {
+        auto fromEnumType = std::get_if<EnumType>(&from->extra);
+        auto toEnumType = std::get_if<EnumType>(&to->extra);
+
+        if (fromEnumType && toEnumType) {
+            return fromEnumType->name == toEnumType->name;
+        }
+        return from == to;
+    }
+
         // Numeric type conversions - all integer types are compatible with each other
         bool fromIsInt = (from->tag == TypeTag::Int || from->tag == TypeTag::Int8 || 
                          from->tag == TypeTag::Int16 || from->tag == TypeTag::Int32 || 

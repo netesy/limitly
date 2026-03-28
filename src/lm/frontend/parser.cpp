@@ -2297,13 +2297,17 @@ std::shared_ptr<AST::EnumDeclaration> Parser::enumDeclaration() {
         do {
             std::string variantName = consume(TokenType::IDENTIFIER, "Expected variant name.").lexeme;
 
-            std::optional<std::shared_ptr<AST::TypeAnnotation>> variantType;
+            std::vector<std::shared_ptr<AST::TypeAnnotation>> variantTypes;
             if (match({TokenType::LEFT_PAREN})) {
-                variantType = parseTypeAnnotation();
-                consume(TokenType::RIGHT_PAREN, "Expected ')' after variant type.");
+                if (!check(TokenType::RIGHT_PAREN)) {
+                    do {
+                        variantTypes.push_back(parseTypeAnnotation());
+                    } while (match({TokenType::COMMA}));
+                }
+                consume(TokenType::RIGHT_PAREN, "Expected ')' after variant types.");
             }
 
-            enumDecl->variants.push_back({variantName, variantType});
+            enumDecl->variants.push_back({variantName, variantTypes});
         } while (match({TokenType::COMMA}));
     }
 
@@ -2431,8 +2435,14 @@ std::shared_ptr<AST::Expression> Parser::parseBindingPattern() {
     pattern->line = peek().line;
     pattern->typeName = consume(TokenType::IDENTIFIER, "Expected type name in binding pattern.").lexeme;
     consume(TokenType::LEFT_PAREN, "Expected '(' after type name in binding pattern.");
-    pattern->variableName = consume(TokenType::IDENTIFIER, "Expected variable name in binding pattern.").lexeme;
-    consume(TokenType::RIGHT_PAREN, "Expected ')' after variable name in binding pattern.");
+
+    if (!check(TokenType::RIGHT_PAREN)) {
+        do {
+            pattern->variableNames.push_back(consume(TokenType::IDENTIFIER, "Expected variable name in binding pattern.").lexeme);
+        } while (match({TokenType::COMMA}));
+    }
+
+    consume(TokenType::RIGHT_PAREN, "Expected ')' after variable names in binding pattern.");
     return pattern;
 }
 
@@ -4035,7 +4045,11 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseBasicType() {
     }
 
     // Parse primitive and user-defined types
-    if (match({TokenType::INT_TYPE})) {
+    if (check(TokenType::IDENTIFIER) && !isPrimitiveType(peek().type) && !isKnownTypeName(peek().lexeme)) {
+        // This is a user-defined type (like a Frame or Enum)
+        type->typeName = consume(TokenType::IDENTIFIER, "Expected type name.").lexeme;
+        type->isUserDefined = true;
+    } else if (match({TokenType::INT_TYPE})) {
         type->typeName = "int";
         type->isPrimitive = true;
     } else if (match({TokenType::INT8_TYPE})) {
@@ -4174,18 +4188,6 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseBasicType() {
         }
         type->typeName = "\"" + literalValue + "\""; // Keep quotes to indicate it's a literal type
         type->isPrimitive = true; // Treat literal types as primitive
-    } else {
-        // Handle user-defined types
-        if (check(TokenType::IDENTIFIER)) {
-            // Parse the user-defined type name
-            std::string typeName = consume(TokenType::IDENTIFIER, "Expected type name.").lexeme;
-            type->typeName = typeName;
-            type->isUserDefined = true;
-        } else {
-            // Fall back to identifier for user-defined types
-            type->typeName = consume(TokenType::IDENTIFIER, "Expected type name for definition.").lexeme;
-            type->isUserDefined = true;
-        }
     }
 
     // Check for optional type or error union type
@@ -4350,12 +4352,22 @@ std::shared_ptr<AST::TypeAnnotation> Parser::parseDictionaryType() {
 
 // Helper method to check if a lexeme is a known type name
 bool Parser::isKnownTypeName(const std::string& name) {
-    return name == "any" || name == "str" || name == "int" || name == "float" || 
-           name == "bool" || name == "list" || name == "dict" || name == "option" || 
-           name == "result" || name == "i8" || name == "i16" || name == "i32" || 
-           name == "i64" || name == "u8" || name == "u16" || name == "u32" || 
-           name == "u64" || name == "f32" || name == "f64" || name == "uint" ||
-           name == "nil" || name == "tuple" || name == "function";
+    // Check if it's a built-in type
+    if (name == "any" || name == "str" || name == "int" || name == "float" ||
+        name == "bool" || name == "list" || name == "dict" || name == "option" ||
+        name == "result" || name == "i8" || name == "i16" || name == "i32" ||
+        name == "i64" || name == "u8" || name == "u16" || name == "u32" ||
+        name == "u64" || name == "f32" || name == "f64" || name == "uint" ||
+        name == "nil" || name == "tuple" || name == "function") {
+        return true;
+    }
+
+    // Check if it's likely a user-defined type (starts with uppercase)
+    if (!name.empty() && std::isupper(name[0])) {
+        return true;
+    }
+
+    return false;
 }
 
 // Parse structural type (e.g., { name: str, age: int, ...baseRecord })

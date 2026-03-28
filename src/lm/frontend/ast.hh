@@ -620,7 +620,7 @@ namespace AST {
     // Enum declaration
     struct EnumDeclaration : public Statement {
         std::string name;
-        std::vector<std::pair<std::string, std::optional<std::shared_ptr<TypeAnnotation>>>> variants;
+        std::vector<std::pair<std::string, std::vector<std::shared_ptr<TypeAnnotation>>>> variants;
     };
 
     // Pattern matching
@@ -646,7 +646,7 @@ namespace AST {
     // Binding pattern in a match statement (e.g., Some(x))
     struct BindingPatternExpr : public Expression {
         std::string typeName;
-        std::string variableName;
+        std::vector<std::string> variableNames;
     };
 
     // List pattern in a match statement (e.g., [x, ...xs])
