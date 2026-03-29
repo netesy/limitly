@@ -107,21 +107,49 @@ void Parser::error(const std::string &message, bool suppressException) {
     if (current < scanner.getTokens().size()) {
         Token currentToken = peek();
         lexeme = currentToken.lexeme;
-        line = currentToken.line;
-        column = currentToken.start;
+        
+        // For "Expected X" errors, use the previous token's line if we're at a different line
+        // This helps report errors on the line where the problem occurred
+        if (current > 0 && message.find("Expected") != std::string::npos) {
+            Token prevToken = scanner.getTokens()[current - 1];
+            // If current token is on a different line, use previous token's line
+            if (currentToken.line > prevToken.line) {
+                line = prevToken.line;
+            } else {
+                line = currentToken.line;
+            }
+        } else {
+            line = currentToken.line;
+        }
+        
+        // Calculate column number relative to the start of the line
+        const std::string& src = scanner.getSource();
+        size_t charOffset = currentToken.start;
+        column = 1; // Columns are 1-based
+        
+        // Find the start of the line
+        size_t lineStart = 0;
+        for (size_t i = 0; i < charOffset && i < src.length(); ++i) {
+            if (src[i] == '\n') {
+                lineStart = i + 1; // Start of next line
+            }
+        }
+        
+        // Calculate column as offset from line start
+        column = (charOffset - lineStart) + 1;
+        
         // Extract code context (source line)
         if (line > 0) {
-            const std::string& src = scanner.getSource();
             size_t srcLen = src.length();
-            size_t lineStart = 0, lineEnd = srcLen;
+            size_t lineStartPos = 0, lineEnd = srcLen;
             int curLine = 1;
             for (size_t i = 0; i < srcLen; ++i) {
                 if (curLine == line) {
-                    lineStart = i;
-                    while (lineStart > 0 && src[lineStart - 1] != '\n') --lineStart;
+                    lineStartPos = i;
+                    while (lineStartPos > 0 && src[lineStartPos - 1] != '\n') --lineStartPos;
                     lineEnd = i;
                     while (lineEnd < srcLen && src[lineEnd] != '\n') ++lineEnd;
-                    codeContext = src.substr(lineStart, lineEnd - lineStart);
+                    codeContext = src.substr(lineStartPos, lineEnd - lineStartPos);
                     break;
                 }
                 if (src[i] == '\n') ++curLine;
@@ -514,6 +542,19 @@ std::shared_ptr<LM::Frontend::AST::Program> Parser::parse() {
                 if (stmt) {
                     program->statements.push_back(stmt);
                 }
+            } catch (const std::runtime_error& e) {
+                // Check if this is the "too many errors" exception
+                if (std::string(e.what()).find("Too many syntax errors") != std::string::npos) {
+                    // Re-throw to exit cleanly
+                    throw;
+                }
+                // Handle other parsing errors for individual statements
+                synchronize();
+                
+                // If we've hit too many errors, stop parsing
+                if (errors.size() >= MAX_ERRORS) {
+                    break;
+                }
             } catch (const std::exception &e) {
                 // Handle parsing errors for individual statements
                 synchronize();
@@ -523,6 +564,19 @@ std::shared_ptr<LM::Frontend::AST::Program> Parser::parse() {
                     break;
                 }
             }
+        }
+    } catch (const std::runtime_error& e) {
+        // Check if this is the "too many errors" exception
+        if (std::string(e.what()).find("Too many syntax errors") != std::string::npos) {
+            // Re-throw to exit cleanly
+            throw;
+        }
+        // Handle other parsing errors at top level
+        synchronize();
+        
+        // Add error info to CST if in CST mode
+        if (cstMode && cstRoot) {
+            cstRoot->setError("Parse error: " + std::string(e.what()));
         }
     } catch (const std::exception &e) {
         // Handle parsing errors at top level
@@ -538,23 +592,13 @@ std::shared_ptr<LM::Frontend::AST::Program> Parser::parse() {
     // Individual tokens are added to their respective statement/expression nodes
     // No need to add all tokens to root since we have proper structure
 
-    // After parsing, print all collected errors if any
-    if (!errors.empty()) {
-        std::cerr << "\n--- Syntax Errors ---\n";
+    // Errors are now printed via modern diagnostics in debugConsole
+    // No need for duplicate summary section
+    // Add errors to CST if in CST mode
+    if (cstMode && cstRoot && !errors.empty()) {
         for (const auto& err : errors) {
-            std::cerr << "[Line " << err.line << ", Col " << err.column << "]: " << err.message << "\n";
-            if (!err.codeContext.empty()) {
-                std::cerr << "    " << err.codeContext << "\n";
-            }
-        }
-        std::cerr << "---------------------\n";
-        
-        // Add errors to CST if in CST mode
-        if (cstMode && cstRoot) {
-            for (const auto& err : errors) {
-                auto errorNode = std::make_unique<CST::ErrorNode>(err.message, 0, 0);
-                addChildToCurrentContext(std::move(errorNode));
-            }
+            auto errorNode = std::make_unique<CST::ErrorNode>(err.message, 0, 0);
+            addChildToCurrentContext(std::move(errorNode));
         }
     }
     
@@ -714,6 +758,15 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::declaration() {
         auto stmt = statement();
         if (stmt) stmt->annotations = annotations;
         return stmt;
+    } catch (const std::runtime_error &e) {
+        // Check if this is the "too many errors" exception
+        if (std::string(e.what()).find("Too many syntax errors") != std::string::npos) {
+            // Re-throw to exit cleanly
+            throw;
+        }
+        // Handle other parsing errors
+        synchronize();
+        return nullptr;
     } catch (const std::exception &e) {
         synchronize();
         return nullptr;
@@ -748,8 +801,8 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::varDeclaration() {
         consume(TokenType::EQUAL, "Expected '=' in tuple destructuring assignment.");
         destructuring->initializer = expression();
         
-        // Make semicolon optional
-        match({TokenType::SEMICOLON});
+        // Semicolon is required after variable declarations
+        consume(TokenType::SEMICOLON, "Expected ';' after variable declaration.");
         
         return destructuring;
     }
@@ -772,13 +825,30 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::varDeclaration() {
         var->initializer = expression();
     }
 
-    // Make semicolon optional
-    match({TokenType::SEMICOLON});
+    // Semicolon is required after variable declarations
+    consume(TokenType::SEMICOLON, "Expected ';' after variable declaration.");
     
     return var;
 }
 
 std::shared_ptr<LM::Frontend::AST::Statement> Parser::statement() {
+    // Skip empty statements (blank lines, just semicolons)
+    if (check(TokenType::SEMICOLON)) {
+        advance();
+        auto emptyStmt = std::make_shared<LM::Frontend::AST::ExprStatement>();
+        emptyStmt->line = previous().line;
+        emptyStmt->expression = nullptr;
+        return emptyStmt;
+    }
+    
+    // Don't try to parse statements at EOF or closing braces
+    if (isAtEnd() || check(TokenType::RIGHT_BRACE) || check(TokenType::EOF_TOKEN)) {
+        auto emptyStmt = std::make_shared<LM::Frontend::AST::ExprStatement>();
+        emptyStmt->line = peek().line;
+        emptyStmt->expression = nullptr;
+        return emptyStmt;
+    }
+    
     if (match({TokenType::PRINT})) {
         return printStatement();
     }
@@ -841,6 +911,17 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::expressionStatement() {
         // Make semicolon optional
         match({TokenType::SEMICOLON});
         
+        return stmt;
+    } catch (const std::runtime_error &e) {
+        // Check if this is the "too many errors" exception
+        if (std::string(e.what()).find("Too many syntax errors") != std::string::npos) {
+            // Re-throw to exit cleanly
+            throw;
+        }
+        // If we can't parse an expression, return an empty statement
+        auto stmt = createNodeWithContext<LM::Frontend::AST::ExprStatement>();
+        stmt->line = peek().line;
+        stmt->expression = nullptr;
         return stmt;
     } catch (const std::exception &e) {
         // If we can't parse an expression, return an empty statement
@@ -1500,6 +1581,14 @@ std::shared_ptr<LM::Frontend::AST::BlockStatement> Parser::block() {
             if (declaration) {
                 block->statements.push_back(declaration);
             }
+        } catch (const std::runtime_error &e) {
+            // Check if this is the "too many errors" exception
+            if (std::string(e.what()).find("Too many syntax errors") != std::string::npos) {
+                // Re-throw to exit cleanly
+                throw;
+            }
+            // Skip invalid statements and continue parsing
+            synchronize();
         } catch (const std::exception &e) {
             // Skip invalid statements and continue parsing
             synchronize();
@@ -2406,7 +2495,13 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseBindingPattern() {
 
     if (!check(TokenType::RIGHT_PAREN)) {
         do {
-            pattern->variableNames.push_back(consume(TokenType::IDENTIFIER, "Expected variable name in binding pattern.").lexeme);
+            // Handle wildcard pattern (_) in binding patterns
+            if (check(TokenType::DEFAULT) || (check(TokenType::IDENTIFIER) && peek().lexeme == "_")) {
+                advance(); // consume '_' or DEFAULT
+                pattern->variableNames.push_back("_"); // Use "_" to represent wildcard
+            } else {
+                pattern->variableNames.push_back(consume(TokenType::IDENTIFIER, "Expected variable name in binding pattern.").lexeme);
+            }
         } while (match({TokenType::COMMA}));
     }
 
@@ -2503,6 +2598,30 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::expression() {
         }
         
         return expr;
+    } catch (const std::runtime_error& e) {
+        // Check if this is the "too many errors" exception
+        if (std::string(e.what()).find("Too many syntax errors") != std::string::npos) {
+            // Re-throw to exit cleanly
+            throw;
+        }
+        // Invalid syntax recovery for CST parser
+        if (cstMode) {
+            // Create an error node for invalid syntax
+            auto errorCSTNode = std::make_unique<CST::Node>(CST::NodeKind::ERROR_NODE);
+            errorCSTNode->setDescription("Invalid expression syntax: " + std::string(e.what()));
+            errorCSTNode->setError("error recovery in expression");
+            
+            // Skip tokens until we find a synchronization point
+            while (!isAtEnd() && !check(TokenType::SEMICOLON) && !check(TokenType::RIGHT_BRACE) && 
+                   !check(TokenType::RIGHT_PAREN) && !check(TokenType::COMMA) && !check(TokenType::NEWLINE)) {
+                errorCSTNode->addToken(advance());
+            }
+            
+            addChildToCurrentContext(std::move(errorCSTNode));
+        }
+        
+        // Return a placeholder error expression
+        return makeErrorExpr();
     } catch (const std::exception& e) {
         // Invalid syntax recovery for CST parser
         if (cstMode) {
@@ -3854,8 +3973,8 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::typeDeclaration() {
         error("Expected type definition after '='.");
     }
     
-    // Parse optional semicolon
-    match({TokenType::SEMICOLON});
+    // Semicolon is required after type declarations
+    consume(TokenType::SEMICOLON, "Expected ';' after type declaration.");
     
     return typeDecl;
 }
@@ -4182,6 +4301,21 @@ std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::parseBasicType() {
             // This is a simple optional type: Type?
             type->isOptional = true;
         }
+    }
+    
+    // Check for type constructor with associated values (e.g., Success(str), Error(str, int))
+    if (check(TokenType::LEFT_PAREN) && !type->isList && !type->isTuple && !type->isDict) {
+        // This is a type constructor with associated values
+        advance(); // consume '('
+        
+        // Parse associated value types
+        if (!check(TokenType::RIGHT_PAREN)) {
+            do {
+                type->associatedTypes.push_back(parseBasicType());
+            } while (match({TokenType::COMMA}));
+        }
+        
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after type constructor parameters.");
     }
 
     return type;

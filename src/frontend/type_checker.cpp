@@ -292,11 +292,13 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
 }
 
 void TypeChecker::add_error(const std::string& message, int line) {
-    // Use same error system as parser - use the 7-parameter signature to avoid ambiguity
+    // Type checker errors default to column 1 since we don't have precise token positions
+    int column = 1;
+    
     if (line > 0 && !current_source.empty()) {
-        Debugger::error(message, line, 0, InterpretationStage::SEMANTIC, current_source, current_file_path, "", "");
+        Debugger::error(message, line, column, InterpretationStage::SEMANTIC, current_source, current_file_path, "", "");
     } else {
-        Debugger::error(message, line, 0, InterpretationStage::SEMANTIC, "repl", "repl", "", "");
+        Debugger::error(message, line, column, InterpretationStage::SEMANTIC, "(in REPL)", "(in REPL)", "", "");
     }
 }
 
@@ -764,7 +766,6 @@ void TypeChecker::mark_variable_dropped(const std::string& name) {
 }
 
 TypePtr TypeChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statement> stmt) {
-    std::cerr << "[DEBUG] check_statement: " << typeid(*stmt).name() << std::endl;
     if (!stmt) return nullptr;
     
     if (auto import_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ImportStatement>(stmt)) {
@@ -1591,7 +1592,9 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::Vari
     }
 
     if (!type) {
-        add_error("Undefined variable: " + expr->name + " [Mitigation: Declare variable before use]", expr->line);
+        // Track this as an undefined symbol to suppress cascading errors
+        undefined_symbols.insert(expr->name);
+        add_error("Undefined variable: " + expr->name, expr->line);
         return nullptr;
     }
     
@@ -1838,7 +1841,7 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
              }
         }
 
-        if (check_function_call(target_name, arg_types, result_type)) {
+        if (check_function_call(target_name, arg_types, result_type, expr->line)) {
             expr->inferred_type = result_type;
             return result_type;
         }
@@ -2076,9 +2079,26 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
     }
     
     // If not a known function, check the callee as an expression
+    // But first check if it's already marked as undefined to avoid cascading errors
+    if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->callee)) {
+        if (undefined_symbols.find(var_expr->name) != undefined_symbols.end()) {
+            // Already reported as undefined, don't cascade
+            return type_system.STRING_TYPE;
+        }
+    }
+    
     TypePtr callee_type = check_expression(expr->callee);
     
-    add_error("Cannot call non-function value", expr->line);
+    // Only report error if the callee is not an undefined symbol
+    // (to avoid cascading errors)
+    if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->callee)) {
+        if (undefined_symbols.find(var_expr->name) == undefined_symbols.end()) {
+            add_error("Cannot call non-function value", expr->line);
+        }
+    } else {
+        add_error("Cannot call non-function value", expr->line);
+    }
+    
     return type_system.STRING_TYPE;
 }
 
@@ -2746,7 +2766,8 @@ bool TypeChecker::can_implicitly_convert(TypePtr from, TypePtr to) {
 
 bool TypeChecker::check_function_call(const std::string& func_name, 
                                      const std::vector<TypePtr>& arg_types,
-                                     TypePtr& result_type) {
+                                     TypePtr& result_type,
+                                     int line) {
     // Check if it's an enum variant constructor
     TypePtr callee_type = lookup_variable(func_name);
     if (callee_type && callee_type->tag == TypeTag::Function) {
@@ -2760,7 +2781,9 @@ bool TypeChecker::check_function_call(const std::string& func_name,
 
     auto it = function_signatures.find(func_name);
     if (it == function_signatures.end()) {
-        add_error("Undefined function: " + func_name);
+        // Track this as an undefined symbol to suppress cascading errors
+        undefined_symbols.insert(func_name);
+        add_error("Undefined function: " + func_name, line);
         return false;
     }
     

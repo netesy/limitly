@@ -4,6 +4,27 @@
 using namespace LM::Frontend;
 using namespace LM::Error;
 
+// Helper method to normalize line endings (CRLF -> LF)
+std::string Scanner::normalizeLineEndings(const std::string& input) {
+    std::string result;
+    result.reserve(input.size());
+    
+    for (size_t i = 0; i < input.size(); ++i) {
+        if (i + 1 < input.size() && input[i] == '\r' && input[i + 1] == '\n') {
+            // Skip the \r, keep only \n
+            result += '\n';
+            ++i; // Skip the \n in the next iteration
+        } else if (input[i] == '\r') {
+            // Standalone \r, convert to \n
+            result += '\n';
+        } else {
+            result += input[i];
+        }
+    }
+    
+    return result;
+}
+
 std::vector<Token> Scanner::scanTokens() {
     return scanTokens(ScanMode::LEGACY);
 }

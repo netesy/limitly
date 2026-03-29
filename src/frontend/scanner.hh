@@ -243,7 +243,7 @@ struct CSTConfig {
 class Scanner {
 public:
     explicit Scanner(const std::string& source, const std::string& filePath = "") 
-        : source(source), filePath(filePath), start(0), current(0), line(1) {}
+        : source(normalizeLineEndings(source)), filePath(filePath), start(0), current(0), line(1) {}
     
     // Constructor that takes pre-scanned tokens (for use in string interpolation)
     explicit Scanner(const std::vector<Token>& preScannedTokens) 
@@ -306,6 +306,9 @@ private:
     CSTConfig cstConfig;
     ScanMode scanMode = ScanMode::LEGACY;  // Current scanning mode
     std::vector<Token> triviaBuffer;       // Buffer for collecting trivia before meaningful tokens
+
+    // Helper method to normalize line endings (CRLF -> LF)
+    static std::string normalizeLineEndings(const std::string& input);
 
     void addToken(TokenType type);
     void addToken(TokenType type, const std::string& text);
