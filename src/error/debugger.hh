@@ -19,6 +19,7 @@ namespace Error {
  * - Duplicate error prevention
  * - Console and log file output
  * - Context-aware error messages
+ * - Modern compiler-style diagnostics (Rust/Go/TypeScript style) - internal only
  */
 class Debugger {
 public:
@@ -100,16 +101,45 @@ public:
     static void resetError() { 
         hadError = false; 
         reportedErrors.clear();
+        collectedDiagnostics.clear();
+        errorCount = 0;
+        warningCount = 0;
     }
+
+    /**
+     * @brief Enable modern compiler-style diagnostics output
+     */
+    static void enableModernDiagnostics(bool enable) { useModernDiagnostics = enable; }
 
 private:
     static std::vector<std::string> sourceCodeLines;
     static bool hadError;
     static std::set<std::string> reportedErrors;
+    static bool debugMode;
+    static bool useModernDiagnostics;
+    static size_t errorCount;
+    static size_t warningCount;
+    
+    // Modern diagnostics storage (internal only)
+    struct Diagnostic {
+        std::string code;
+        std::string severity;  // "error", "warning", "note"
+        std::string message;
+        std::string filePath;
+        int line;
+        int column;
+        std::string sourceSnippet;
+        std::string hint;
+    };
+    static std::vector<Diagnostic> collectedDiagnostics;
 
     // Console and log output methods
     static void debugConsole(const Message &errorMessage);
     static void debugLog(const Message &errorMessage);
+
+    // Modern diagnostics output (internal only)
+    static void printModernDiagnostic(const Diagnostic &diag, bool useColor);
+    static std::string createCaretLine(int column);
 
     // Helper methods
     static void printContextLines(std::ostream &out, int errorLine, int errorColumn);
@@ -118,6 +148,7 @@ private:
     static std::string getSuggestion(const std::string &errorMessage,
                                      const std::string &expectedValue);
     static std::string stageToString(InterpretationStage stage);
+    static std::string stageToErrorCode(InterpretationStage stage);
 
     // Create enhanced error message from components
     static Message createEnhancedErrorMessage(
@@ -130,6 +161,12 @@ private:
         const std::string &lexeme = "",
         const std::string &expectedValue = "",
         const std::optional<BlockContext> &blockContext = std::nullopt);
+    
+    // Collect diagnostic for modern output (internal only)
+    static void collectDiagnostic(const std::string &code, const std::string &severity,
+                                  const std::string &message, const std::string &filePath,
+                                  int line, int column, const std::string &sourceSnippet,
+                                  const std::string &hint);
 };
 
 } // namespace Error

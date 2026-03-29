@@ -225,6 +225,7 @@ namespace AST {
         std::vector<std::shared_ptr<TypeAnnotation>> functionParams;    // Legacy function parameters (for backward compatibility)
         std::vector<std::shared_ptr<TypeAnnotation>> unionTypes;        // Types in a union (e.g., int | str)
         std::vector<std::shared_ptr<TypeAnnotation>> tupleTypes;        // Types in a tuple (e.g., (int, str))
+        std::vector<std::shared_ptr<TypeAnnotation>> associatedTypes;   // Associated types for type constructors (e.g., Success(str))
         std::vector<StructuralTypeField> structuralFields;              // Fields in a structural type
         
         std::shared_ptr<Expression> refinementCondition = nullptr;      // For refined types (e.g., int where value > 0)

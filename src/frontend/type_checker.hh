@@ -7,6 +7,7 @@
 #include <memory>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <string>
 
 // =============================================================================
@@ -30,6 +31,9 @@ private:
     
     // Symbol table for variable types
     std::unordered_map<std::string, TypePtr> variable_types;
+    
+    // Track undefined symbols to suppress cascading errors
+    std::unordered_set<std::string> undefined_symbols;
     
     // Memory safety tracking
     struct VariableInfo {
@@ -267,7 +271,8 @@ private:
     // Function type checking
     bool check_function_call(const std::string& func_name, 
                             const std::vector<TypePtr>& arg_types,
-                            TypePtr& result_type);
+                            TypePtr& result_type,
+                            int line = 0);
     bool validate_argument_types(const std::vector<TypePtr>& expected,
                                  const std::vector<TypePtr>& actual,
                                  const std::string& func_name);
