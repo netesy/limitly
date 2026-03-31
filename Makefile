@@ -55,7 +55,9 @@ RUNTIME_OBJS := $(patsubst $(RUNTIME_DIR)/%.c,$(OBJ_DIR)/runtime/%.o,$(RUNTIME_S
 # =============================
 # Sources
 # =============================
-FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp  \
+FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp \
+              src/frontend/parser/statements.cpp src/frontend/parser/expressions.cpp \
+              src/frontend/parser/types.cpp src/frontend/parser/patterns.cpp \
               src/frontend/cst.cpp src/frontend/cst/printer.cpp src/frontend/cst/utils.cpp \
               src/frontend/ast/builder.cpp src/frontend/ast/printer.cpp src/frontend/type_checker.cpp src/frontend/memory_checker.cpp \
               src/frontend/ast/optimizer.cpp src/frontend/module_manager.cpp

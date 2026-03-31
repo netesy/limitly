@@ -5,6 +5,7 @@ print("=== Option Type Tests ===");
 
 // Test 1: Basic Option type definition
 print("\n--- Test 1: Basic Option Types ---");
+type Some = int | str;
 type IntOption = Some |nil;
 type StringOption = Some |nil;
 
@@ -16,8 +17,8 @@ print("\n--- Test 2: Option-like Union Types ---");
 type MaybeInt = int |nil;
 type MaybeString = str |nil;
 
-// Using a placeholder fornil (sincenil isn't fully implemented)
-typenilType = str;
+// Using a placeholder for nil (since nil isn't fully implemented)
+type nilType = str;
 var noneValue:nilType = "None";
 
 var maybeInt1: int = 42;

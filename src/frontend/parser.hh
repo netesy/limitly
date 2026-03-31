@@ -62,12 +62,7 @@ public:
     bool hadError() const { return !errors.empty(); }
 
     // Helper to create a placeholder error expression
-    std::shared_ptr<LM::Frontend::AST::LiteralExpr> makeErrorExpr() {
-        auto errorExpr = std::make_shared<LM::Frontend::AST::LiteralExpr>();
-        errorExpr->line = peek().line;
-        errorExpr->value = nullptr; // Use null as a placeholder
-        return errorExpr;
-    };
+    std::shared_ptr<LM::Frontend::AST::LiteralExpr> makeErrorExpr();
 
     // Unified node creation helper - creates CST::Node or LM::Frontend::AST::Node based on cstMode
     template<typename ASTNodeType>

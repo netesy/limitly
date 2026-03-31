@@ -41,28 +41,26 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
             TypePtr enumType = std::make_shared<::Type>(TypeTag::Enum, enumTypeInfo);
             type_system.addUserDefinedType(name, enumType);
 
-            // Register variants in global scope and qualified
+            // Register variants in global scope (qualified only) and track ownership
             for (const auto& variant : enum_decl->variants) {
                 std::string qualified = name + "." + variant.first;
+                variant_owners[variant.first].push_back(enumType);
+                
                 if (variant.second.empty()) {
-                    variable_types[variant.first] = enumType;
                     variable_types[qualified] = enumType;
                     FunctionSignature sig;
                     sig.name = variant.first;
                     sig.return_type = enumType;
-                    function_signatures[variant.first] = sig;
                     function_signatures[qualified] = sig;
                 } else {
                     std::vector<TypePtr> paramTypes;
                     for (const auto& t : variant.second) paramTypes.push_back(type_system.ANY_TYPE);
                     TypePtr constructorType = type_system.createFunctionType(paramTypes, enumType);
-                    variable_types[variant.first] = constructorType;
                     variable_types[qualified] = constructorType;
                     FunctionSignature sig;
                     sig.name = variant.first;
                     sig.param_types = paramTypes;
                     sig.return_type = enumType;
-                    function_signatures[variant.first] = sig;
                     function_signatures[qualified] = sig;
                 }
             }
@@ -116,9 +114,14 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
     }
 
 
-    // Register built-in functions in the global scope
+    // Register built-in and already-discovered symbols in the global scope
     for (const auto& pair : function_signatures) {
-        declare_variable(pair.first, type_system.FUNCTION_TYPE);
+        TypePtr type = type_system.FUNCTION_TYPE;
+        auto vt_it = variable_types.find(pair.first);
+        if (vt_it != variable_types.end()) {
+            type = vt_it->second;
+        }
+        declare_variable(pair.first, type);
     }
     
     // PASS 1: Name Registration (including inlined symbols)
@@ -1036,22 +1039,20 @@ TypePtr TypeChecker::check_enum_declaration(std::shared_ptr<LM::Frontend::AST::E
         type_system.addUserDefinedType(enum_decl->name, enumType);
     }
 
-    // Register variants in the current scope
+    // Register variants (qualified only) in global maps
     for (const auto& variant : enum_decl->variants) {
         const std::string& variantName = variant.first;
         const auto& associatedTypes = variant.second;
+        std::string qualified = enum_decl->name + "." + variantName;
 
         if (associatedTypes.empty()) {
-            // Unit variant - can be used as a value
-            declare_variable(variantName, enumType);
+            // Unit variant
+            variable_types[qualified] = enumType;
 
-            // Also register in function signatures so check_function_call or lookup find it as available
             FunctionSignature sig;
             sig.name = variantName;
             sig.return_type = enumType;
-            // Store the full qualified name and the base name
-            function_signatures[variantName] = sig;
-            function_signatures[enum_decl->name + "." + variantName] = sig;
+            function_signatures[qualified] = sig;
         } else {
             // Variant with associated values - functions as a constructor
             std::vector<TypePtr> paramTypes;
@@ -1060,15 +1061,13 @@ TypePtr TypeChecker::check_enum_declaration(std::shared_ptr<LM::Frontend::AST::E
             }
 
             TypePtr constructorType = type_system.createFunctionType(paramTypes, enumType);
-            declare_variable(variantName, constructorType);
+            variable_types[qualified] = constructorType;
 
-            // Also register in function signatures so check_function_call finds it
             FunctionSignature sig;
             sig.name = variantName;
             sig.param_types = paramTypes;
             sig.return_type = enumType;
-            function_signatures[variantName] = sig;
-            function_signatures[enum_decl->name + "." + variantName] = sig;
+            function_signatures[qualified] = sig;
 
             // Also register as a type if it's a single associated type (for sum-type like behavior)
             if (paramTypes.size() == 1) {
@@ -1583,18 +1582,60 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::Vari
     }
 
     if (!type) type = lookup_variable(expr->name);
+    
+    // Resolve enum variants
     if (!type) {
-        // Check if it's an enum variant or type
-        type = type_system.getType(expr->name);
-        if (type && type->tag == TypeTag::Nil) {
-            type = nullptr;
+        // 1. Try to resolve via expected type context
+        if (expected_type && expected_type->tag == TypeTag::Enum) {
+            auto enumInfoPtr = std::get_if<EnumType>(&expected_type->extra);
+            if (enumInfoPtr) {
+                for (const auto& v : enumInfoPtr->values) {
+                    if (v == expr->name) {
+                        type = expected_type;
+                        // But wait! If it's a constructor (has types), we need the constructor type
+                        if (!enumInfoPtr->variantTypes.at(v).empty()) {
+                            type = variable_types[enumInfoPtr->name + "." + v];
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    if (!type) {
+        // 2. Try to resolve via variant_owners tracking
+        auto it = variant_owners.find(expr->name);
+        if (it != variant_owners.end()) {
+            if (it->second.size() == 1) {
+                // Unambiguous variant from a single enum
+                TypePtr owner = it->second[0];
+                auto enumInfoPtr = std::get_if<EnumType>(&owner->extra);
+                if (!enumInfoPtr->variantTypes.at(expr->name).empty()) {
+                    type = variable_types[enumInfoPtr->name + "." + expr->name];
+                } else type = owner;
+            } else if (it->second.size() > 1) {
+                add_error("Ambiguous variant reference: '" + expr->name + "' is defined in multiple enums.", expr->line);
+                return nullptr;
+            }
         }
     }
 
     if (!type) {
-        // Track this as an undefined symbol to suppress cascading errors
+        // Check if it's a type name or a qualified name
+        type = type_system.getType(expr->name);
+        if (type && (type->tag == TypeTag::Nil)) type = nullptr;
+    }
+
+    // Fallback to global variable lookup (which includes qualified names like Status.Pending)
+    if (!type) {
+        auto it = variable_types.find(expr->name);
+        if (it != variable_types.end()) type = it->second;
+    }
+
+    if (!type) {
         undefined_symbols.insert(expr->name);
-        add_error("Undefined variable: " + expr->name, expr->line);
+        add_error("Undefined variable or variant: " + expr->name, expr->line);
         return nullptr;
     }
     
@@ -1829,16 +1870,36 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
             return frame_type;
         }
 
-        // Check if it's a function call
+        // Check if it's a function call or enum variant constructor
         TypePtr result_type = nullptr;
-        // Optimization: Try to use expected type to disambiguate enum variant constructors
         std::string target_name = var_expr->name;
+        
+        // 1. Try context-aware resolution for enum constructors
         TypePtr context_type = expected_type ? expected_type : current_return_type;
+        bool resolved = false;
         if (context_type && context_type->tag == TypeTag::Enum) {
-             if (auto* et = std::get_if<EnumType>(&context_type->extra)) {
-                  std::string qualified = et->name + "." + var_expr->name;
-                  if (function_signatures.count(qualified)) target_name = qualified;
-             }
+            if (auto* et = std::get_if<EnumType>(&context_type->extra)) {
+                std::string qualified = et->name + "." + var_expr->name;
+                if (function_signatures.count(qualified)) {
+                    target_name = qualified;
+                    resolved = true;
+                }
+            }
+        }
+        
+        // 2. Try unambiguous resolution via variant_owners
+        if (!resolved) {
+            auto it = variant_owners.find(var_expr->name);
+            if (it != variant_owners.end()) {
+                if (it->second.size() == 1) {
+                    TypePtr owner = it->second[0];
+                    auto enumInfoPtr = std::get_if<EnumType>(&owner->extra);
+                    target_name = enumInfoPtr->name + "." + var_expr->name;
+                } else if (it->second.size() > 1) {
+                    add_error("Ambiguous variant constructor: '" + var_expr->name + "' is defined in multiple enums.", expr->line);
+                    return nullptr;
+                }
+            }
         }
 
         if (check_function_call(target_name, arg_types, result_type, expr->line)) {
@@ -2242,6 +2303,18 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
         }
     }
     
+    // Handle enum variant access: Color.Red
+    if (object_type && object_type->tag == TypeTag::Enum) {
+        if (auto var_obj = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->object)) {
+            std::string qualified = var_obj->name + "." + expr->name;
+            if (variable_types.count(qualified)) {
+                TypePtr variantType = variable_types[qualified];
+                expr->inferred_type = variantType;
+                return variantType;
+            }
+        }
+    }
+
     // Handle frame member access
     if (object_type && object_type->tag == TypeTag::Frame) {
         // Get the frame name from the FrameType
@@ -3401,40 +3474,42 @@ void TypeChecker::validate_pattern_compatibility(std::shared_ptr<LM::Frontend::A
                 declare_variable(bindingPattern->variableNames[0], type_system.STRING_TYPE);
             }
         } else {
-            bool variant_handled = false;
-            // 1. Context-based Enum variant lookup (preferred)
-            if (match_type && match_type->tag == TypeTag::Enum) {
-                if (auto* enumType = std::get_if<EnumType>(&match_type->extra)) {
-                    auto it = std::find(enumType->values.begin(), enumType->values.end(), bindingPattern->typeName);
-                    if (it != enumType->values.end()) {
-                        auto vIt = enumType->variantTypes.find(bindingPattern->typeName);
-                        if (vIt != enumType->variantTypes.end()) {
-                            const std::vector<TypePtr>& paramTypes = vIt->second;
-                            if (bindingPattern->variableNames.size() != paramTypes.size()) {
-                                add_error("Pattern " + bindingPattern->typeName + " expects " +
-                                          std::to_string(paramTypes.size()) + " values, but found " +
-                                          std::to_string(bindingPattern->variableNames.size()), line);
-                            } else {
-                                for (size_t i = 0; i < bindingPattern->variableNames.size(); ++i) {
-                                    declare_variable(bindingPattern->variableNames[i], paramTypes[i]);
-                                }
-                            }
-                        } else if (!bindingPattern->variableNames.empty()) {
-                            add_error("Unit variant " + bindingPattern->typeName + " cannot have associated values", line);
-                        }
-                        variant_handled = true;
+            bool variant_resolved = false;
+            // 1. Resolve via qualified name or global lookup
+            TypePtr constructorType = lookup_variable(bindingPattern->typeName);
+            if (!constructorType) {
+                auto it = variable_types.find(bindingPattern->typeName);
+                if (it != variable_types.end()) {
+                    constructorType = it->second;
+                } else {
+                    std::cout << "[DEBUG] '" << bindingPattern->typeName << "' (len=" << bindingPattern->typeName.length() << ") NOT FOUND. Hex: ";
+                    for (char c : bindingPattern->typeName) {
+                        std::printf("%02x ", (unsigned char)c);
                     }
+                    std::cout << std::endl;
+                    std::cout << "[DEBUG] Sample variable_types key: 'Message.Move' (len=12) Hex: ";
+                    std::string s = "Message.Move";
+                    for (char c : s) std::printf("%02x ", (unsigned char)c);
+                    std::cout << std::endl;
                 }
             }
 
-            if (!variant_handled) {
-                // 2. Global lookup (fallback)
-                TypePtr constructorType = lookup_variable(bindingPattern->typeName);
-                if (constructorType && constructorType->tag == TypeTag::Function) {
+            // 2. Resolve via expected enum type context (if name is just "Move")
+            if (!constructorType && match_type && match_type->tag == TypeTag::Enum) {
+                if (auto* et = std::get_if<EnumType>(&match_type->extra)) {
+                    std::string qualified = et->name + "." + bindingPattern->typeName;
+                    auto it = variable_types.find(qualified);
+                    if (it != variable_types.end()) constructorType = it->second;
+                }
+            }
+
+            if (constructorType) {
+                std::cout << "[DEBUG] Resolved constructor " << bindingPattern->typeName << " : " << constructorType->toString() << " tag=" << (int)constructorType->tag << std::endl;
+                if (constructorType->tag == TypeTag::Function) {
                     auto* funcType = std::get_if<FunctionType>(&constructorType->extra);
                     if (funcType) {
                         if (bindingPattern->variableNames.size() != funcType->paramTypes.size()) {
-                            add_error("Pattern " + bindingPattern->typeName + " expects " +
+                            add_error("Pattern '" + bindingPattern->typeName + "' expects " +
                                       std::to_string(funcType->paramTypes.size()) + " values, but found " +
                                       std::to_string(bindingPattern->variableNames.size()), line);
                         } else {
@@ -3442,15 +3517,32 @@ void TypeChecker::validate_pattern_compatibility(std::shared_ptr<LM::Frontend::A
                                 declare_variable(bindingPattern->variableNames[i], funcType->paramTypes[i]);
                             }
                         }
+                        variant_resolved = true;
                     }
-                } else if (constructorType && constructorType->tag == TypeTag::Enum) {
+                } else if (constructorType->tag == TypeTag::Enum) {
                     if (!bindingPattern->variableNames.empty()) {
-                        add_error("Unit variant " + bindingPattern->typeName + " cannot have associated values", line);
+                        add_error("Unit variant '" + bindingPattern->typeName + "' cannot have associated values", line);
                     }
-                } else {
-                    add_error("Unknown pattern or constructor: " + bindingPattern->typeName, line);
+                    variant_resolved = true;
                 }
             }
+
+            if (!variant_resolved) {
+                add_error("Unknown pattern or constructor: " + bindingPattern->typeName, line);
+            }
+        }
+    } else if (auto memberExpr = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(pattern_node)) {
+        TypePtr patternType = check_member_expr(memberExpr);
+        if (!is_type_compatible(patternType, match_type)) {
+            add_error("Pattern " + patternType->toString() + " does not match match type " + match_type->toString(), line);
+        }
+    } else if (auto varExpr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(pattern_node)) {
+        // Only allow if it's the wildcard "_" or a qualified variant
+        if (varExpr->name == "_") return;
+        
+        TypePtr patternType = check_variable_expr(varExpr, match_type);
+        if (patternType && !is_type_compatible(patternType, match_type)) {
+            add_error("Pattern " + patternType->toString() + " does not match match type " + match_type->toString(), line);
         }
     } else if (auto typePattern = std::dynamic_pointer_cast<LM::Frontend::AST::TypePatternExpr>(pattern_node)) {
         // Type pattern - check compatibility

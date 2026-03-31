@@ -127,7 +127,9 @@ private:
     // Scope tracking for lifetime analysis
     int current_scope_level = 0;
     
-    // Current program being checked (for import handling)
+    // Map to track which enums define which variants
+    std::unordered_map<std::string, std::vector<TypePtr>> variant_owners;
+    
     std::shared_ptr<LM::Frontend::AST::Program> current_program_ = nullptr;
     
 public:

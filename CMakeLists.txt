@@ -27,6 +27,10 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno
 set(FRONTEND_SOURCES
     src/frontend/scanner.cpp
     src/frontend/parser.cpp
+    src/frontend/parser/statements.cpp
+    src/frontend/parser/expressions.cpp
+    src/frontend/parser/types.cpp
+    src/frontend/parser/patterns.cpp
     src/frontend/cst.cpp
     src/frontend/cst/printer.cpp
     src/frontend/cst/utils.cpp
@@ -147,10 +151,9 @@ add_executable(limitly
     src/backend/type_checker.cpp
     src/backend/type_system.cpp
     src/backend/value.cpp
-    src/backend/vm.cpp
-    src/frontend/ast.cpp
     src/frontend/lexer.cpp
-    src/frontend/parser.cpp
+    src/frontend/ast.cpp
+    ${FRONTEND_SOURCES}
     src/common/builtin_functions.cpp
     src/backend.hh
     src/compile.cpp
@@ -167,9 +170,7 @@ add_executable(limitly
 # Add test_parser executable
 add_executable(test_parser
     src/test_parser.cpp
-    src/frontend/scanner.cpp
-    src/frontend/parser.cpp
-    src/frontend/cst.cpp
+    ${FRONTEND_SOURCES}
     src/frontend/ast_builder.cpp
     src/backend/ast_printer.cpp
     src/backend/bytecode_printer.cpp
@@ -217,8 +218,7 @@ add_executable(test_scanner
 add_executable(benchmark_parsers
     src/benchmark_parsers.cpp
     src/frontend/parser_benchmark.cpp
-    src/frontend/scanner.cpp
-    src/frontend/parser.cpp
+    ${FRONTEND_SOURCES}
     # cst_parser.cpp functionality now integrated into parser.cpp
     src/frontend/cst.cpp
     src/frontend/ast_builder.cpp
@@ -255,10 +255,8 @@ add_executable(test_performance_optimization
     src/test_performance_optimization.cpp
     src/frontend/parser_benchmark.cpp
     src/frontend/trivia_optimizer.cpp
-    src/frontend/scanner.cpp
-    src/frontend/parser.cpp
+    ${FRONTEND_SOURCES}
     # cst_parser.cpp functionality now integrated into parser.cpp
-    src/frontend/cst.cpp
     src/frontend/ast_builder.cpp
     src/backend/ast_printer.cpp
     src/backend/bytecode_printer.cpp
