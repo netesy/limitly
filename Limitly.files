@@ -70,6 +70,10 @@ src/frontend/cst_printer.hh
 src/frontend/cst_utils.cpp
 src/frontend/cst_utils.hh
 src/frontend/parser.cpp
+src/frontend/parser/statements.cpp
+src/frontend/parser/expressions.cpp
+src/frontend/parser/types.cpp
+src/frontend/parser/patterns.cpp
 src/frontend/parser.hh
 src/frontend/parser_benchmark.cpp
 src/frontend/parser_benchmark.hh

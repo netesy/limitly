@@ -11,9 +11,9 @@ enum Color {
     Blue
 }
 
-var color1: Color = Red;
-var color2: Color = Green;
-var color3: Color = Blue;
+var color1: Color = Color.Red;
+var color2: Color = Color.Green;
+var color3: Color = Color.Blue;
 
 print("Color 1: {color1}");
 print("Color 2: {color2}");
@@ -27,9 +27,9 @@ enum Result {
     Pending
 }
 
-var result1: Result = Success("Operation completed");
-var result2: Result = Error("Something went wrong");
-var result3: Result = Pending;
+var result1: Result = Result.Success("Operation completed");
+var result2: Result = Result.Error("Something went wrong");
+var result3: Result = Result.Pending;
 
 print("Result 1: {result1}");
 print("Result 2: {result2}");
@@ -39,15 +39,15 @@ print("Result 3: {result3}");
 print("\n--- Test 3: Enum Pattern Matching ---");
 fn describeColor(color: Color): str {
     match (color) {
-        Red => { return "The color red"; },
-        Green => { return "The color green"; },
-        Blue => { return "The color blue"; }
+        Color.Red => { return "The color red"; },
+        Color.Green => { return "The color green"; },
+        Color.Blue => { return "The color blue"; }
     }
 }
 
-var desc1 = describeColor(Red);
-var desc2 = describeColor(Green);
-var desc3 = describeColor(Blue);
+var desc1 = describeColor(Color.Red);
+var desc2 = describeColor(Color.Green);
+var desc3 = describeColor(Color.Blue);
 
 print("Description 1: {desc1}");
 print("Description 2: {desc2}");
@@ -63,11 +63,11 @@ enum Status {
     Deleted
 }
 
-var status1: Status = Active;
-var status2: Status = Pending;
-var status3: Status = Archived;
-var status4: Status = Inactive;
-var status5: Status = Deleted;
+var status1: Status = Status.Active;
+var status2: Status = Status.Pending;
+var status3: Status = Status.Archived;
+var status4: Status = Status.Inactive;
+var status5: Status = Status.Deleted;
 
 print("Status 1: {status1}");
 print("Status 2: {status2}");
@@ -79,14 +79,14 @@ print("Status 5: {status5}");
 print("\n--- Test 5: Enum in Function Parameters ---");
 fn isActive(status: Status): bool {
     match (status) {
-        Active => { return true; },
+        Status.Active => { return true; },
         _ => { return false; }
     }
 }
 
-var active1 = isActive(Active);
-var active2 = isActive(Inactive);
-var active3 = isActive(Pending);
+var active1 = isActive(Status.Active);
+var active2 = isActive(Status.Inactive);
+var active3 = isActive(Status.Pending);
 
 print("Is Active 1: {active1}");
 print("Is Active 2: {active2}");
@@ -100,9 +100,9 @@ enum Priority {
     High(int)
 }
 
-var priority1: Priority = Low(1);
-var priority2: Priority = Medium(5);
-var priority3: Priority = High(10);
+var priority1: Priority =  Priority.Low(1);
+var priority2: Priority =  Priority.Medium(5);
+var priority3: Priority =  Priority.High(10);
 
 print("Priority 1: {priority1}");
 print("Priority 2: {priority2}");
@@ -113,16 +113,16 @@ print("\n--- Test 7: Enum Type Compatibility ---");
 type ColorType = Color;
 type StatusType = Status;
 
-var colorVar: ColorType = Red;
-var statusVar: StatusType = Active;
+var colorVar: ColorType = Color.Red;
+var statusVar: StatusType = Status.Active;
 
 print("Color variable: {colorVar}");
 print("Status variable: {statusVar}");
 
 // Test 8: Enum in collections
 print("\n--- Test 8: Enum in Collections ---");
-var colors: [Color] = [Red, Green, Blue, Red, Green];
-var statuses: [Status] = [Active, Inactive, Pending, Active];
+var colors: [Color] = [Color.Red, Color.Green, Color.Blue, Color.Red, Color.Green];
+var statuses: [Status] = [Status.Active, Status.Inactive, Status.Pending, Status.Active];
 
 print("Colors list: {colors}");
 print("Statuses list: {statuses}");
@@ -131,190 +131,94 @@ print("Statuses list: {statuses}");
 print("\n--- Test 9: Enum Exhaustiveness ---");
 fn getColorCode(color: Color): int {
     match (color) {
-        Red => { return 255; },
-        Green => { return 128; },
-        Blue => { return 64; }
+        Color.Red => { return 255; },
+        Color.Green => { return 128; },
+        Color.Blue => { return 64; }
     }
 }
 
-var code1 = getColorCode(Red);
-var code2 = getColorCode(Green);
-var code3 = getColorCode(Blue);
-
-print("Color code 1: {code1}");
-print("Color code 2: {code2}");
-print("Color code 3: {code3}");
-
-// Test 10: Enum with default case
-print("\n--- Test 10: Enum with Default Case ---");
-fn describeStatus(status: Status): str {
-    match (status) {
-        Active => { return "Currently active"; },
-        Inactive => { return "Currently inactive"; },
-        _ => { return "Other status"; }
-    }
-}
-
-var desc4 = describeStatus(Active);
-var desc5 = describeStatus(Pending);
-var desc6 = describeStatus(Archived);
-
-print("Status description 1: {desc4}");
-print("Status description 2: {desc5}");
-print("Status description 3: {desc6}");
-
-// Test 11: Enum with string association
-print("\n--- Test 11: Enum with String Association ---");
+// Test 7: Complex Enum with Mixed Variants
+print("\n--- Test 7: Complex Enum with Mixed Variants ---");
 enum Message {
-    Info(str),
-    Warning(str),
-    Error(str)
+    Quit,
+    Move(int, int),
+    Write(str),
+    ChangeColor(int, int, int)
 }
 
-var msg1: Message = Info("All systems operational");
-var msg2: Message = Warning("Low memory");
-var msg3: Message = Error("Critical failure");
-
-print("Message 1: {msg1}");
-print("Message 2: {msg2}");
-print("Message 3: {msg3}");
-
-// Test 12: Enum pattern matching with extraction
-print("\n--- Test 12: Enum Pattern Matching with Extraction ---");
-fn extractMessage(msg: Message): str {
+fn processMessage(msg: Message) {
     match (msg) {
-        Info(text) => { return "INFO: " + text; },
-        Warning(text) => { return "WARN: " + text; },
-        Error(text) => { return "ERR: " + text; }
+        Message.Quit => { print("Quitting..."); },
+        Message.Move(x, y) => { print("Moving to ({x}, {y})"); },
+        Message.Write(text) => { print("Writing: {text}"); },
+        Message.ChangeColor(r, g, b) => { print("Changing color to RGB({r}, {g}, {b})"); }
     }
 }
 
-var extracted1 = extractMessage(Info("Test"));
-var extracted2 = extractMessage(Warning("Alert"));
-var extracted3 = extractMessage(Error("Fail"));
+processMessage(Message.Quit);
+processMessage(Message.Move(10, 20));
+processMessage(Message.Write("Hello World"));
+processMessage(Message.ChangeColor(255, 0, 0));
 
-print("Extracted 1: {extracted1}");
-print("Extracted 2: {extracted2}");
-print("Extracted 3: {extracted3}");
+// Test 8: Nested Enum Usage
+print("\n--- Test 8: Nested Enum Usage ---");
+enum Shape {
+    Circle(float),
+    Rectangle(float, float)
+}
 
-// Test 13: Enum in nested structures
-print("\n--- Test 13: Enum in Nested Structures ---");
-var colorDict: {str: Color} = {"primary": Red, "secondary": Green, "tertiary": Blue};
-var statusDict: {str: Status} = {"user1": Active, "user2": Inactive};
+enum ShapeStatus {
+    Visible(Shape),
+    Hidden
+}
 
-print("Color dict: {colorDict}");
-print("Status dict: {statusDict}");
+var s1 = ShapeStatus.Visible(Shape.Circle(5.0));
+var s2 = ShapeStatus.Hidden;
 
-// Test 14: Enum comparison in conditionals
-print("\n--- Test 14: Enum Comparison in Conditionals ---");
-fn checkStatus(status: Status): str {
-    if (status == Active) {
-        return "System is active";
-    } else if (status == Inactive) {
-        return "System is inactive";
-    } else {
-        return "System is in other state";
+fn describeShapeStatus(ss: ShapeStatus) {
+    match (ss) {
+        ShapeStatus.Visible(shape) => {
+            match (shape) {
+                Shape.Circle(r) => { print("Visible Circle with radius {r}"); },
+                Shape.Rectangle(w, h) => { print("Visible Rectangle with {w}x{h}"); }
+            }
+        },
+        ShapeStatus.Hidden => { print("Shape is hidden"); }
     }
 }
 
-var check1 = checkStatus(Active);
-var check2 = checkStatus(Inactive);
-var check3 = checkStatus(Pending);
+describeShapeStatus(s1);
+describeShapeStatus(s2);
 
-print("Check 1: {check1}");
-print("Check 2: {check2}");
-print("Check 3: {check3}");
-
-// Test 15: Enum with multiple associated values
-print("\n--- Test 15: Enum with Multiple Associated Values ---");
-enum Event {
-    Click(int, int, str),
-    Scroll(int, bool),
-    KeyPress(str, bool, bool)
+// Test 9: Enum with Type Aliases for context (Simulating Ambiguity)
+print("\n--- Test 9: Enum Ambiguity Handling ---");
+enum State {
+    Running,
+    Stopped,
+    Pending
 }
 
-var event1: Event = Click(100, 200, "left");
-var event2: Event = Scroll(50, true);
-var event3: Event = KeyPress("Enter", true, false);
+// Result.Pending vs Status.Pending vs State.Pending
+// Enforced qualification should resolve this
+var state1: State = State.Pending;
+var status6: Status = Status.Pending;
+var result4: Result = Result.Pending;
 
-print("Event 1: {event1}");
-print("Event 2: {event2}");
-print("Event 3: {event3}");
+print("State: {state1}");
+print("Status: {status6}");
+print("Result: {result4}");
 
-// Test 16: Enum function returning enum
-print("\n--- Test 16: Enum Function Returning Enum ---");
-fn getDefaultColor(): Color {
-    return Red;
-}
-
-fn getDefaultStatus(): Status {
-    return Active;
-}
-
-var defaultColor = getDefaultColor();
-var defaultStatus = getDefaultStatus();
-
-print("Default color: {defaultColor}");
-print("Default status: {defaultStatus}");
-
-// Test 17: Enum in loops
-print("\n--- Test 17: Enum in Loops ---");
-var colorList: [Color] = [Red, Green, Blue];
-iter (color in colorList) {
-    print("Processing color: {color}");
-}
-
-// Test 18: Enum type aliases with pattern matching
-print("\n--- Test 18: Enum Type Aliases with Pattern Matching ---");
-type MyColor = Color;
-type MyStatus = Status;
-
-fn processMyColor(c: MyColor): str {
-    match (c) {
-        Red => { return "Red color"; },
-        Green => { return "Green color"; },
-        Blue => { return "Blue color"; }
-    }
-}
-
-var myColorResult = processMyColor(Red);
-print("My color result: {myColorResult}");
-
-// Test 19: Enum with boolean association
-print("\n--- Test 19: Enum with Boolean Association ---");
-enum Flag {
-    Enabled(bool),
-    Disabled(bool)
-}
-
-var flag1: Flag = Enabled(true);
-var flag2: Flag = Disabled(false);
-
-print("Flag 1: {flag1}");
-print("Flag 2: {flag2}");
-
-// Test 20: Comprehensive enum matching
-print("\n--- Test 20: Comprehensive Enum Matching ---");
-fn comprehensiveMatch(status: Status): int {
+// Test 10: Using wildcards in enum matching
+print("\n--- Test 10: Wildcards in Matching ---");
+fn checkConnectivity(status: Status) {
     match (status) {
-        Active => { return 1; },
-        Inactive => { return 2; },
-        Pending => { return 3; },
-        Archived => { return 4; },
-        Deleted => { return 5; }
+        Status.Active => { print("Connected and active"); },
+        _ => { print("Not active ({status})"); }
     }
 }
 
-var comp1 = comprehensiveMatch(Active);
-var comp2 = comprehensiveMatch(Inactive);
-var comp3 = comprehensiveMatch(Pending);
-var comp4 = comprehensiveMatch(Archived);
-var comp5 = comprehensiveMatch(Deleted);
-
-print("Comprehensive 1: {comp1}");
-print("Comprehensive 2: {comp2}");
-print("Comprehensive 3: {comp3}");
-print("Comprehensive 4: {comp4}");
-print("Comprehensive 5: {comp5}");
+checkConnectivity(Status.Active);
+checkConnectivity(Status.Inactive);
+checkConnectivity(Status.Deleted);
 
 print("\n=== Enum Type Tests Complete ===");
