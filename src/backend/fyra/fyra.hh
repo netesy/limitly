@@ -3,13 +3,14 @@
 
 #pragma once
 
-#include "../lir/lir.hh"
-#include "../frontend/ast.hh"
+#include "../../lir/lir.hh"
+#include "../../frontend/ast.hh"
+#include "builder.hh"
 #include <string>
 #include <memory>
 #include <vector>
 
-namespace ir { class Module; }
+namespace ir { class Module; class IRContext; }
 
 namespace LM::Backend::Fyra {
 
@@ -113,38 +114,11 @@ public:
     // Convert platform and architecture to target triple
     static std::string get_target_triple(Platform platform, Architecture arch);
     
-public:
-    struct TranslationDiagnostic {
-        enum class Severity {
-            Error,
-            Warning
-        };
-
-        Severity severity = Severity::Warning;
-        size_t instruction_index = 0;
-        std::string message;
-    };
-
-    struct TranslationReport {
-        std::vector<TranslationDiagnostic> diagnostics;
-
-        bool has_errors() const {
-            for (const auto& diagnostic : diagnostics) {
-                if (diagnostic.severity == TranslationDiagnostic::Severity::Error) {
-                    return true;
-                }
-            }
-            return false;
-        }
-    };
-
 private:
     bool debug_mode_ = false;
     std::string last_error_;
+    std::shared_ptr<ir::IRContext> context_;
 
-    // Internal conversion from LIR to Fyra IR
-    std::string convert_lir_to_fyra_ir(const LIR::LIR_Function& lir_func, TranslationReport& report);
-    
     // Invoke Fyra compiler
     CompileResult invoke_fyra(const std::string& ir_code,
                              const FyraCompileOptions& options);

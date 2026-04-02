@@ -1,6 +1,4 @@
 #include "codegen/InstructionFusion.h"
-#include "ir/Function.h"
-#include "ir/BasicBlock.h"
 
 namespace codegen {
 namespace target {
@@ -19,6 +17,11 @@ void FusionCoordinator::optimizeFunction(ir::Function& func) {
 
 void FusionCoordinator::optimizeBasicBlock(ir::BasicBlock& bb) {
     // Stub implementation
+}
+
+void FusionCoordinator::setOptimizationLevel(unsigned level) {
+    // Stub implementation
+    (void)level;
 }
 
 } // namespace target
