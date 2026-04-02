@@ -117,6 +117,11 @@ enum class LIR_Op : uint8_t {
     IsError,     // Check if Result contains an error
     Unwrap,      // Unwrap Result value (panic if error)
     UnwrapOr,    // Unwrap with default value
+
+    // Enum operations (tagged payload representation)
+    MakeEnum,    // Construct enum value from tag and optional payload
+    GetTag,      // Extract enum tag
+    GetPayload,  // Extract enum payload
     
     // Atomic operations
     AtomicLoad,

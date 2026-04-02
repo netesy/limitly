@@ -16,7 +16,7 @@ struct FrameInstance;
 using FrameInstancePtr = std::shared_ptr<FrameInstance>;
 
 // Register value type - now includes frame instances
-using RegisterValue = std::variant<int64_t, uint64_t, double, bool, std::string, std::nullptr_t, std::shared_ptr<struct FrameInstance>>;
+using RegisterValue = std::variant<int64_t, uint64_t, double, bool, std::string, std::nullptr_t, FrameInstancePtr>;
 
 // Frame instance representation for VM execution
 struct FrameInstance {
