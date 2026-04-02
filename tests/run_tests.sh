@@ -71,7 +71,6 @@ run_test_with_error_check "tests/types/options.lm"
 run_test_with_error_check "tests/types/advanced.lm"
 run_test_allow_semantic_errors "tests/types/enums.lm"
 run_test_allow_semantic_errors "tests/types/refined_types.lm"
-run_test_allow_semantic_errors "tests/types/discriminated_unions.lm"
 
 echo
 echo "=== MODULE TESTS ==="

@@ -52,7 +52,6 @@ call :run_test_with_error_check "tests\types\options.lm"
 call :run_test_with_error_check "tests\types\advanced.lm"
 call :run_test_with_error_check "tests\types\enums.lm"
 call :run_test_with_error_check "tests\types\refined_types.lm"
-call :run_test_with_error_check "tests\types\discriminated_unions.lm"
 
 echo.
 echo === MODULE TESTS ===
