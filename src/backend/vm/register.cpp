@@ -1705,6 +1705,39 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 }
                 break;
             }
+            case LIR::LIR_Op::MakeEnum: {
+                auto enum_value = std::make_shared<FrameInstance>("__enum__", 2);
+                enum_value->setField(0, static_cast<int64_t>(pc->imm));
+                enum_value->setField(1, (pc->a != 0) ? registers[pc->a] : RegisterValue(nullptr));
+                registers[pc->dst] = enum_value;
+                break;
+            }
+            case LIR::LIR_Op::GetTag: {
+                if (std::holds_alternative<FrameInstancePtr>(registers[pc->a])) {
+                    auto enum_value = std::get<FrameInstancePtr>(registers[pc->a]);
+                    if (enum_value && enum_value->frame_type == "__enum__") {
+                        registers[pc->dst] = to_int(enum_value->getField(0));
+                    } else {
+                        registers[pc->dst] = int64_t(0);
+                    }
+                } else {
+                    registers[pc->dst] = int64_t(0);
+                }
+                break;
+            }
+            case LIR::LIR_Op::GetPayload: {
+                if (std::holds_alternative<FrameInstancePtr>(registers[pc->a])) {
+                    auto enum_value = std::get<FrameInstancePtr>(registers[pc->a]);
+                    if (enum_value && enum_value->frame_type == "__enum__") {
+                        registers[pc->dst] = enum_value->getField(1);
+                    } else {
+                        registers[pc->dst] = nullptr;
+                    }
+                } else {
+                    registers[pc->dst] = nullptr;
+                }
+                break;
+            }
             case LIR::LIR_Op::AtomicLoad: {
                 registers[pc->dst] = default_atomic.load();
                 break;
