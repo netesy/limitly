@@ -11,8 +11,22 @@ run_test_with_error_check() {
 
     TEMP_FILE=$(mktemp)
     "$LIMITLY" "$1" > "$TEMP_FILE" 2>&1
+    EXIT_CODE=$?
 
-    if grep -q -E "error[E|:|RuntimeError|SemanticError|BytecodeError]" "$TEMP_FILE"; then
+    if [ $EXIT_CODE -ne 0 ]; then
+        echo "  FAIL: $1 (non-zero exit: $EXIT_CODE)"
+        if grep -qi -E "segmentation fault|segfault" "$TEMP_FILE"; then
+            echo "  Reason: segmentation fault detected"
+        fi
+        echo "  Output:"
+        cat "$TEMP_FILE"
+        ((FAILED++))
+    elif grep -qi -E "segmentation fault|segfault" "$TEMP_FILE"; then
+        echo "  FAIL: $1 (segmentation fault detected in output)"
+        echo "  Output:"
+        cat "$TEMP_FILE"
+        ((FAILED++))
+    elif grep -q -E "error[E|:|RuntimeError|SemanticError|BytecodeError]" "$TEMP_FILE"; then
         echo "  FAIL: $1 (contains errors)"
         echo "  Error output:"
         grep -E "error[E|:|RuntimeError|SemanticError|BytecodeError]" "$TEMP_FILE"
