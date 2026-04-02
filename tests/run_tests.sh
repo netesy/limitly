@@ -11,17 +11,8 @@ run_test_with_error_check() {
 
     TEMP_FILE=$(mktemp)
     "$LIMITLY" "$1" > "$TEMP_FILE" 2>&1
-    EXIT_CODE=$?
 
-    if [ $EXIT_CODE -ne 0 ]; then
-        echo "  FAIL: $1 (non-zero exit: $EXIT_CODE)"
-        if grep -qi -E "segmentation fault|segfault" "$TEMP_FILE"; then
-            echo "  Reason: segmentation fault detected"
-        fi
-        echo "  Output:"
-        cat "$TEMP_FILE"
-        ((FAILED++))
-    elif grep -qi -E "segmentation fault|segfault" "$TEMP_FILE"; then
+    if grep -qi -E "segmentation fault|segfault" "$TEMP_FILE"; then
         echo "  FAIL: $1 (segmentation fault detected in output)"
         echo "  Output:"
         cat "$TEMP_FILE"

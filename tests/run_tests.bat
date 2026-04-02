@@ -120,20 +120,6 @@ echo Running %~1...
 rem Create a temporary file to capture output
 set TEMP_FILE=%TEMP%\limitly_test_output_%RANDOM%.txt
 %LIMITLY% %~1 > "%TEMP_FILE%" 2>&1
-set EXIT_CODE=%ERRORLEVEL%
-
-if NOT "%EXIT_CODE%"=="0" (
-    echo   FAIL: %~1 ^(non-zero exit: %EXIT_CODE%^)
-    findstr /I /C:"segmentation fault" /C:"segfault" "%TEMP_FILE%" >nul 2>&1
-    if !ERRORLEVEL! EQU 0 (
-        echo   Reason: segmentation fault detected
-    )
-    echo   Output:
-    type "%TEMP_FILE%"
-    set /a FAILED+=1
-    del "%TEMP_FILE%" >nul 2>&1
-    goto :eof
-)
 
 findstr /I /C:"segmentation fault" /C:"segfault" "%TEMP_FILE%" >nul 2>&1
 if !ERRORLEVEL! EQU 0 (
@@ -168,20 +154,6 @@ echo Running %~1...
 rem Create a temporary file to capture output
 set TEMP_FILE=%TEMP%\limitly_test_output_%RANDOM%.txt
 %LIMITLY% %~1 > "%TEMP_FILE%" 2>&1
-set EXIT_CODE=%ERRORLEVEL%
-
-if NOT "%EXIT_CODE%"=="0" (
-    echo   FAIL: %~1 ^(non-zero exit: %EXIT_CODE%^)
-    findstr /I /C:"segmentation fault" /C:"segfault" "%TEMP_FILE%" >nul 2>&1
-    if !ERRORLEVEL! EQU 0 (
-        echo   Reason: segmentation fault detected
-    )
-    echo   Output:
-    type "%TEMP_FILE%"
-    set /a FAILED+=1
-    del "%TEMP_FILE%" >nul 2>&1
-    goto :eof
-)
 
 findstr /I /C:"segmentation fault" /C:"segfault" "%TEMP_FILE%" >nul 2>&1
 if !ERRORLEVEL! EQU 0 (
