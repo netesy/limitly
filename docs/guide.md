@@ -2,6 +2,56 @@
 
 Welcome to the official guide for the Limit programming language. This document will walk you through the core features of the language, from basic syntax to advanced concepts like structured concurrency.
 
+> **Important:** this guide is descriptive, but the **authoritative syntax and currently working behavior** is the `tests/` folder in the repository.
+> If this document and tests diverge, prefer tests.
+
+## Current Working System (VM-first)
+
+The primary active pipeline in this repository is:
+
+`Source (.lm) -> Frontend/Type Checker -> LIR -> Register VM`
+
+When validating syntax/semantics, use these test suites as canonical:
+
+- `tests/basic/*`
+- `tests/expressions/*`
+- `tests/functions/*`
+- `tests/types/*`
+- `tests/modules/*`
+- `tests/oop/*`
+- `tests/concurrency/*`
+
+### Verified syntax examples (from tests)
+
+```lm
+enum Result {
+    Success(str),
+    Error(str),
+    Pending
+}
+
+fn describe(r: Result): str {
+    match (r) {
+        Result.Success(msg) => { return "ok: {msg}"; },
+        Result.Error(err) => { return "err: {err}"; },
+        Result.Pending => { return "pending"; }
+    }
+}
+```
+
+```lm
+import tests.modules.basic_module as basic;
+var out = basic.add(5, 3);
+print("sum={out}");
+```
+
+```lm
+parallel {
+    task worker1 { print("w1"); }
+    task worker2 { print("w2"); }
+}
+```
+
 ## Table of Contents
 
 1.  [Getting Started](#getting-started)
