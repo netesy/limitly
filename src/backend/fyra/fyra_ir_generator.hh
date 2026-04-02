@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include "../frontend/ast.hh"
-#include "../lir/lir.hh"
+#include "../../frontend/ast.hh"
+#include "../../lir/lir.hh"
 #include "fyra_builtin_functions.hh"
 #include "ir/Module.h"
 #include "ir/Function.h"
@@ -32,8 +32,7 @@ public:
         const std::shared_ptr<Frontend::AST::Program>& program);
     
     // Generate Fyra IR directly from LIR
-    std::shared_ptr<ir::Module> generate_from_lir(
-        const LIR::LIR_Function& lir_func);
+
 
     // Emit built-in functions
     void emit_builtins();

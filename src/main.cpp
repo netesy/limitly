@@ -16,8 +16,12 @@
 #include "lir/optimizer.hh"
 // #include "backend/jit/jit.hh"
 #include "backend/vm/register.hh"
-#include "backend/fyra.hh"
-#include "backend/fyra_ir_generator.hh"
+#include "backend/fyra/fyra.hh"
+#include "backend/fyra/fyra_ir_generator.hh"
+#include "backend/fyra/builder.hh"
+#include "ir/IRContext.h"
+#include "ir/Module.h"
+#include "ir/Function.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -193,11 +197,12 @@ int executeFile(const std::string& filename, bool printAst = false, bool printCs
 
         if (printFyraIr || useAot || useWasm || useWasi) {
             try {
-                auto fyra_ir_gen = std::make_shared<LM::Backend::Fyra::FyraIRGenerator>();
-                auto fyra_ir_module = fyra_ir_gen->generate_from_lir(*lir_function);
-                if (!fyra_ir_module || fyra_ir_gen->has_errors()) {
+                auto ir_context = std::make_shared<ir::IRContext>();
+                LM::Backend::Fyra::LIRToFyraIRBuilder builder(ir_context);
+                auto fyra_ir_module = builder.build(*lir_function);
+                if (!fyra_ir_module || builder.has_errors()) {
                     std::cerr << "Failed to generate Fyra IR from LIR\n";
-                    for (const auto& error : fyra_ir_gen->get_errors()) {
+                    for (const auto& error : builder.get_errors()) {
                         std::cerr << "  " << error << "\n";
                     }
                     return 1;
@@ -549,49 +554,37 @@ int main(int argc, char* argv[]) {
         int positional_count = 0;
         for (int i = 2; i < argc; i++) {
             std::string arg = argv[i];
-            
             if (arg == "-d") {
                 dump_intermediate = true;
             } else if (arg[0] == '-') {
-                // Unknown flag
-                std::cerr << "Error: Unknown flag '" << arg << "'\n";
+                std::cerr << "Error: Unknown flag '" << arg << "'" << std::endl;
                 return 1;
-            } else if (positional_count >= 3) {
-                // Source file already set, ignore additional arguments
-                continue;
             } else {
-                // Positional argument
                 if (positional_count == 0) {
-                    // Could be target or source file
                     if (arg == "windows" || arg == "linux" || arg == "macos" || arg == "wasm") {
                         target = arg;
-                        positional_count++;
                     } else {
-                        // It's the source file
                         source_file = arg;
-                        positional_count = 3;  // Mark source file as found
+                        positional_count = 3;
                     }
                 } else if (positional_count == 1) {
-                    // Could be arch or source file
                     if (arg == "x86_64" || arg == "aarch64" || arg == "wasm32" || arg == "riscv64") {
                         arch = arg;
-                        positional_count++;
                     } else {
-                        // It's the source file
                         source_file = arg;
-                        positional_count = 3;  // Mark source file as found
+                        positional_count = 3;
                     }
                 } else if (positional_count == 2) {
-                    // Could be opt_level or source file
                     if (arg.length() == 1 && arg[0] >= '0' && arg[0] <= '3') {
                         opt_level = std::stoi(arg);
-                        positional_count++;
                     } else {
-                        // It's the source file
                         source_file = arg;
-                        positional_count = 3;  // Mark source file as found
+                        positional_count = 3;
                     }
+                } else if (positional_count == 3) {
+                    source_file = arg;
                 }
+                positional_count++;
             }
         }
         

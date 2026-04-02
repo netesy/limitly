@@ -24,7 +24,7 @@ run_aot_test() {
 
     # Build the AOT executable
     # Usage: build [target] [arch] [opt_level] <source_file>
-    "$LIMITLY" build linux x86_64 2 "$SOURCE_FILE" > /dev/null 2>&1
+    "$LIMITLY" build linux x86_64 2 "$SOURCE_FILE"
     BUILD_STATUS=$?
 
     if [ $BUILD_STATUS -ne 0 ]; then

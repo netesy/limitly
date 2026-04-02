@@ -26,10 +26,10 @@ endif
 MODE ?= release
 
 ifeq ($(MODE),debug)
-	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/fyra/include -Isrc/backend/fyra/src $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/fyra -Isrc/backend/fyra/include -Isrc/backend/fyra/src $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -g -fPIC -I.
 else
-	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/fyra/include -Isrc/backend/fyra/src $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc/backend/fyra -Isrc/backend/fyra/include -Isrc/backend/fyra/src $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -O3 -fPIC -I.
 endif
 
@@ -62,7 +62,7 @@ FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp \
               src/frontend/ast/builder.cpp src/frontend/ast/printer.cpp src/frontend/type_checker.cpp src/frontend/memory_checker.cpp \
               src/frontend/ast/optimizer.cpp src/frontend/module_manager.cpp
 
-BACK_SRCS :=  src/backend/fyra.cpp src/backend/fyra_ir_generator.cpp
+BACK_SRCS := src/backend/fyra/fyra.cpp src/backend/fyra/fyra_ir_generator.cpp src/backend/fyra/builder.cpp src/backend/fyra/fyra_builtin_functions.cpp
 
 FYRA_DIR := src/backend/fyra
 FYRA_SRCS := $(wildcard $(FYRA_DIR)/src/ir/*.cpp) \
@@ -93,7 +93,7 @@ BACKEND_COMMON_SRCS := src/backend/symbol_table.cpp src/backend/value.cpp
 ERROR_SRCS := src/error/debugger.cpp
 
 MAIN_SRCS := src/main.cpp $(BACKEND_COMMON_SRCS) $(BACK_SRCS) $(ERROR_SRCS) \
-             $(FRONT_SRCS) $(REGISTER_SRCS) $(LIR_CORE_SRCS) src/backend/fyra_builtin_functions.cpp
+             $(FRONT_SRCS) $(REGISTER_SRCS) $(LIR_CORE_SRCS)
 
 TEST_SRCS := src/test_parser.cpp $(BACKEND_COMMON_SRCS) $(LIR_CORE_SRCS) $(ERROR_SRCS) \
              $(FRONT_SRCS)
