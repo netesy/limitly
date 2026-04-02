@@ -748,12 +748,18 @@ bool TypeChecker::is_visible(const std::string& frame_name, LM::Frontend::AST::V
         return true;
     }
 
-    // Protected allows access from sub-frames (traits in this system)
+    // Protected allows access from related frames (those sharing traits)
     if (visibility == LM::Frontend::AST::VisibilityLevel::Protected) {
-        // Find if current frame implements any trait that corresponds to the target frame
-        // In this system, traits don't have fields, so protected fields are only between frames.
-        // Since there's no frame inheritance yet, protected is same as private for now.
-        // TODO: Implement trait-based protected access if needed
+        auto target_info = type_system.getFrameInfo(frame_name);
+        auto current_info = type_system.getFrameInfo(current_frame->name);
+
+        if (target_info && current_info) {
+            for (const auto& trait_a : target_info->implements) {
+                for (const auto& trait_b : current_info->implements) {
+                    if (trait_a == trait_b) return true;
+                }
+            }
+        }
         return false;
     }
 
@@ -2208,9 +2214,17 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
             }
             
             // Check visibility
-            // TODO: Implement proper visibility checking based on context
-            
-            // Check type compatibility
+            if (frame_info.declaration) {
+                for (const auto& field : frame_info.declaration->fields) {
+                    if (field->name == field_name) {
+                        if (!is_visible(frame_name, field->visibility, expr->line)) {
+                            add_error("Cannot assign to " + LM::Frontend::AST::visibilityToString(field->visibility) +
+                                     " field '" + field_name + "' of frame '" + frame_name + "'", expr->line);
+                        }
+                        break;
+                    }
+                }
+            }
             if (!is_type_compatible(field_type, value_type)) {
                 add_type_error(field_type->toString(), value_type->toString(), expr->line);
             }
@@ -2281,6 +2295,7 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
     if (!expr) return nullptr;
     
     TypePtr object_type = check_expression(expr->object);
+    std::string member_name = expr->name;
     
     // Handle channel method access
     if (object_type && object_type->tag == TypeTag::Channel) {
@@ -2315,6 +2330,24 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
         }
     }
 
+    // Handle trait member access
+    if (object_type && object_type->tag == TypeTag::Trait) {
+        auto traitTypeData = std::get_if<TraitType>(&object_type->extra);
+        if (traitTypeData) {
+            std::string trait_name = traitTypeData->name;
+            auto trait_it = trait_declarations.find(trait_name);
+            if (trait_it != trait_declarations.end()) {
+                for (const auto& method : trait_it->second.declaration->methods) {
+                    if (method->name == member_name) {
+                        if (method->returnType.has_value()) return resolve_type_annotation(method->returnType.value());
+                        return type_system.NIL_TYPE;
+                    }
+                }
+            }
+        }
+        return type_system.ANY_TYPE;
+    }
+
     // Handle frame member access
     if (object_type && object_type->tag == TypeTag::Frame) {
         // Get the frame name from the FrameType
@@ -2325,7 +2358,6 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
         }
         
         std::string frame_name = frameTypeData->name;
-        std::string member_name = expr->name;
         
         // Look up the frame declaration
         auto frame_it = frame_declarations.find(frame_name);
@@ -2424,9 +2456,20 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
         return type_system.ANY_TYPE;
     }
     
-    // For now, assume all other member access returns string
-    // TODO: Implement proper class/struct type checking
-    return type_system.STRING_TYPE;
+    // Handle other types of member access (e.g. built-in types like String, List)
+    if (object_type->tag == TypeTag::String) {
+        if (member_name == "len") return type_system.INT_TYPE;
+        if (member_name == "upper" || member_name == "lower") return type_system.FUNCTION_TYPE;
+    } else if (object_type->tag == TypeTag::List) {
+        if (member_name == "len") return type_system.INT_TYPE;
+        if (member_name == "append" || member_name == "pop") return type_system.FUNCTION_TYPE;
+    } else if (object_type->tag == TypeTag::Dict) {
+        if (member_name == "len") return type_system.INT_TYPE;
+        if (member_name == "keys" || member_name == "values") return type_system.FUNCTION_TYPE;
+    }
+
+    add_error("Type '" + object_type->toString() + "' has no member '" + member_name + "'", expr->line);
+    return type_system.ANY_TYPE;
 }
 
 TypePtr TypeChecker::check_index_expr(std::shared_ptr<LM::Frontend::AST::IndexExpr> expr) {
@@ -2435,9 +2478,26 @@ TypePtr TypeChecker::check_index_expr(std::shared_ptr<LM::Frontend::AST::IndexEx
     TypePtr object_type = check_expression(expr->object);
     TypePtr index_type = check_expression(expr->index);
     
-    // For now, assume all indexing returns string
-    // TODO: Implement proper collection type checking
-    return type_system.STRING_TYPE;
+    if (object_type->tag == TypeTag::List) {
+        if (index_type->tag != TypeTag::Int && index_type->tag != TypeTag::Int64) {
+             add_error("List index must be an integer, got " + index_type->toString(), expr->line);
+        }
+        if (auto lt = std::get_if<ListType>(&object_type->extra)) {
+            return lt->elementType;
+        }
+    } else if (object_type->tag == TypeTag::Dict) {
+        if (auto dt = std::get_if<DictType>(&object_type->extra)) {
+            return dt->valueType;
+        }
+    } else if (object_type->tag == TypeTag::String) {
+        if (index_type->tag != TypeTag::Int && index_type->tag != TypeTag::Int64) {
+             add_error("String index must be an integer, got " + index_type->toString(), expr->line);
+        }
+        return type_system.STRING_TYPE;
+    }
+
+    add_error("Cannot index type '" + object_type->toString() + "'", expr->line);
+    return type_system.ANY_TYPE;
 }
 
 TypePtr TypeChecker::check_list_expr(std::shared_ptr<LM::Frontend::AST::ListExpr> expr) {
@@ -3995,9 +4055,16 @@ TypePtr TypeChecker::check_trait_declaration(std::shared_ptr<LM::Frontend::AST::
 
     trait_declarations[trait->name] = trait_info;
     
-    TypePtr trait_type = std::make_shared<::Type>(TypeTag::Trait);
+        TypePtr trait_type = std::make_shared<::Type>(TypeTag::Trait);
+    TraitType trait_extra;
+    trait_extra.name = trait->name;
+    trait_extra.extends = trait->extends;
+    for (const auto& method : trait->methods) {
+        TypePtr ret_type = method->returnType ? resolve_type_annotation(method->returnType.value()) : type_system.NIL_TYPE;
+        trait_extra.methodSignatures.push_back({method->name, ret_type});
+    }
+    trait_type->extra = trait_extra;
     type_system.addUserDefinedType(trait->name, trait_type);
-    // TODO: add TraitType extra info
     trait->inferred_type = trait_type;
     
     return trait_type;

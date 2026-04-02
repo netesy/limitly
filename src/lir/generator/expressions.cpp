@@ -766,10 +766,24 @@ Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
     }
     else if (expr.op == LM::Frontend::TokenType::MODULUS) op = LIR_Op::Mod;
     else if (expr.op == LM::Frontend::TokenType::POWER) {
-        // Power operation - for now, use multiplication (a * a for simple cases)
-        // TODO: Implement proper power operation or call to math library
-        emit_instruction(LIR_Inst(LIR_Op::Mul, dst, left, left));
-        return dst;
+        Reg res = allocate_register();
+        auto float_type = std::make_shared<::Type>(::TypeTag::Float64);
+        Reg f_left = left;
+        if (get_register_type(left)->tag != ::TypeTag::Float64) {
+            f_left = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::Cast, Type::F64, f_left, left, 0));
+        }
+        Reg f_right = right;
+        if (get_register_type(right)->tag != ::TypeTag::Float64) {
+            f_right = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::Cast, Type::F64, f_right, right, 0));
+        }
+        LIR_Inst call_inst(LIR_Op::CallBuiltin, Type::F64, res, 0);
+        call_inst.func_name = "pow";
+        call_inst.call_args = {f_left, f_right};
+        emit_instruction(call_inst);
+        set_register_type(res, float_type);
+        return res;
     }
     else if (expr.op == LM::Frontend::TokenType::EQUAL_EQUAL) op = LIR_Op::CmpEQ;
     else if (expr.op == LM::Frontend::TokenType::BANG_EQUAL) op = LIR_Op::CmpNEQ;

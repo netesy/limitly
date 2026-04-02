@@ -584,13 +584,18 @@ void Generator::emit_while_stmt_cfg(LM::Frontend::AST::WhileStatement& stmt) {
 
 
 void Generator::emit_while_stmt_linear(LM::Frontend::AST::WhileStatement& stmt) {
-    // For linear mode, implement a simple while loop
-    // TODO: This is a simplified version - proper implementation needs labels/jumps
+    Imm cond_label = (Imm)current_function_->instructions.size();
+    Reg cond_reg = emit_expr(*stmt.condition);
     
-    // For now, just emit the body once (simplified)
-    if (stmt.body) {
-        emit_stmt(*stmt.body);
-    }
+    size_t jump_to_patch = current_function_->instructions.size();
+    emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, Type::Void, 0, cond_reg, 0, 0));
+
+    if (stmt.body) emit_stmt(*stmt.body);
+
+    emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, cond_label));
+
+    Imm end_label = (Imm)current_function_->instructions.size();
+    current_function_->instructions[jump_to_patch].imm = end_label;
 }
 
 
@@ -717,23 +722,31 @@ void Generator::emit_for_stmt_cfg(LM::Frontend::AST::ForStatement& stmt) {
 
 
 void Generator::emit_for_stmt_linear(LM::Frontend::AST::ForStatement& stmt) {
-    // For linear mode, implement a simple for loop
-    // TODO: This is a simplified version - proper implementation needs labels/jumps
+    enter_scope();
+    if (stmt.initializer) emit_stmt(*stmt.initializer);
     
-    // Emit initialization
-    if (stmt.initializer) {
-        emit_stmt(*stmt.initializer);
+    Imm cond_label = (Imm)current_function_->instructions.size();
+    Reg cond_reg = 0;
+    size_t jump_to_patch = 0;
+    bool has_cond = false;
+    
+    if (stmt.condition) {
+        cond_reg = emit_expr(*stmt.condition);
+        jump_to_patch = current_function_->instructions.size();
+        emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, Type::Void, 0, cond_reg, 0, 0));
+        has_cond = true;
     }
     
-    // For now, just emit body once (simplified)
-    if (stmt.body) {
-        emit_stmt(*stmt.body);
+    if (stmt.body) emit_stmt(*stmt.body);
+    if (stmt.increment) emit_expr(*stmt.increment);
+
+    emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, cond_label));
+
+    if (has_cond) {
+        Imm end_label = (Imm)current_function_->instructions.size();
+        current_function_->instructions[jump_to_patch].imm = end_label;
     }
-    
-    // Emit increment
-    if (stmt.increment) {
-        emit_expr(*stmt.increment); // increment is an Expression, not Statement
-    }
+    exit_scope();
 }
 
 
@@ -1049,16 +1062,12 @@ void Generator::emit_dict_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::
     // For now, we'll use a simplified approach that creates keys based on the index
     // In a full implementation, this would involve proper dict key extraction methods
     
-    // Create a key based on the current index (simplified approach)
-    // TODO: Implement proper dict key extraction using dict methods
+    // Extract key from dict at current index
     Reg key_reg = allocate_register();
     auto key_type = std::make_shared<::Type>(::TypeTag::String);
-    
-    // For now, create a string key based on index - this is a placeholder
-    // In a real implementation, we'd call a dict method to get the key at index
-    std::string key_base = "dict_key_";
-    ValuePtr key_val = std::make_shared<Value>(key_type, key_base + std::to_string(0)); // Placeholder
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, key_reg, key_val));
+    LIR_Inst call_inst(LIR_Op::DictItems, Type::Ptr, key_reg, 0);
+    call_inst.call_args = {dict_reg, index_reg};
+    emit_instruction(call_inst);
     set_register_type(key_reg, key_type);
     
     // Move key to loop variable
