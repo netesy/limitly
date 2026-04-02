@@ -116,6 +116,17 @@ private:
         return true;
     }
     
+    // Handle frame-to-trait conversions
+    if (from->tag == TypeTag::Frame && to->tag == TypeTag::Trait) {
+        auto fromFrameType = std::get_if<FrameType>(&from->extra);
+        auto toTraitType = std::get_if<TraitType>(&to->extra);
+        if (fromFrameType && toTraitType) {
+            for (const auto& traitName : fromFrameType->implements) {
+                if (traitName == toTraitType->name) return true;
+            }
+        }
+    }
+
     // Handle frame type conversions
     if (from->tag == TypeTag::Frame && to->tag == TypeTag::Frame) {
         // Get frame names from both types

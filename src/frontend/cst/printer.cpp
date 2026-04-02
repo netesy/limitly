@@ -687,14 +687,49 @@ namespace CST {
             return oss.str();
         }
         
+
+
+        size_t countNodes(const Node* node) {
+            if (!node) return 0;
+            size_t count = 1;
+            for (const auto& element : node->elements) {
+                if (std::holds_alternative<std::unique_ptr<Node>>(element)) {
+                    count += countNodes(std::get<std::unique_ptr<Node>>(element).get());
+                }
+            }
+            return count;
+        }
+
+        size_t calculateMaxDepth(const Node* node) {
+            if (!node) return 0;
+            size_t maxChildDepth = 0;
+            for (const auto& element : node->elements) {
+                if (std::holds_alternative<std::unique_ptr<Node>>(element)) {
+                    maxChildDepth = std::max(maxChildDepth, calculateMaxDepth(std::get<std::unique_ptr<Node>>(element).get()));
+                }
+            }
+            return 1 + maxChildDepth;
+        }
+
         std::string printMemoryUsage(const Node* root) {
-            // Placeholder for memory usage analysis
-            return "Memory usage analysis not implemented";
+            if (!root) return "Memory Usage: 0 bytes";
+            size_t nodeCount = countNodes(root);
+            size_t totalMemory = nodeCount * sizeof(Node);
+            std::ostringstream oss;
+            oss << "CST Memory Usage Analysis:" << std::endl;
+            oss << "  Total Nodes: " << nodeCount << std::endl;
+            oss << "  Approximate Memory: " << totalMemory << " bytes" << std::endl;
+            return oss.str();
         }
         
         std::string printPerformanceMetrics(const Node* root) {
-            // Placeholder for performance metrics
-            return "Performance metrics not implemented";
+            if (!root) return "No performance data";
+            size_t depth = calculateMaxDepth(root);
+            std::ostringstream oss;
+            oss << "CST Performance Metrics:" << std::endl;
+            oss << "  Maximum Tree Depth: " << depth << std::endl;
+            oss << "  Estimated Processing Cost: O(" << depth << ")" << std::endl;
+            return oss.str();
         }
         
     } // namespace Debug
