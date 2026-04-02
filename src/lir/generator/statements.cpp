@@ -1602,11 +1602,20 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
             Reg expected_len = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, expected_len, std::make_shared<Value>(i64, static_cast<int64_t>(list_pattern->elements.size()))));
             Reg cmp_len = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::CmpEQ, cmp_len, len, expected_len));
+            if (list_pattern->restElement.has_value()) {
+                emit_instruction(LIR_Inst(LIR_Op::CmpGE, cmp_len, len, expected_len));
+            } else {
+                emit_instruction(LIR_Inst(LIR_Op::CmpEQ, cmp_len, len, expected_len));
+            }
             uint32_t len_ok = generate_label();
             emit_instruction(LIR_Inst(LIR_Op::JumpIf, cmp_len, len_ok, 0));
             emit_instruction(LIR_Inst(LIR_Op::Jump, fail_label, 0, 0));
             emit_instruction(LIR_Inst(LIR_Op::Label, len_ok, 0, 0));
+
+            if (list_pattern->restElement.has_value() && list_pattern->restElement.value() != "_") {
+                // Coarse rest binding fallback: bind original list when slicing helper is unavailable.
+                bind_variable(list_pattern->restElement.value(), candidate);
+            }
 
             for (size_t i = 0; i < list_pattern->elements.size(); ++i) {
                 Reg idx = allocate_register();
@@ -1631,6 +1640,7 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
 
     for (size_t i = 0; i < stmt.cases.size(); ++i) {
         const auto& match_case = stmt.cases[i];
+        enter_scope();
         uint32_t case_label = generate_label();
         uint32_t next_case = (i + 1 < stmt.cases.size()) ? generate_label() : end_label;
 
@@ -1655,6 +1665,7 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
         if (next_case != end_label) {
             emit_instruction(LIR_Inst(LIR_Op::Label, next_case, 0, 0));
         }
+        exit_scope();
     }
 
     emit_instruction(LIR_Inst(LIR_Op::Label, end_label, 0, 0));
