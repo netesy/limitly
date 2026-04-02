@@ -82,7 +82,10 @@ FYRA_LIB := $(OBJ_DIR)/libfyra.a
 REGISTER_SRCS := src/backend/vm/register.cpp
 
 LIR_CORE_SRCS := src/lir/lir.cpp src/lir/lir_utils.cpp src/lir/functions.cpp \
-                 src/lir/builtin_functions.cpp src/lir/lir_types.cpp src/lir/generator.cpp src/lir/function_registry.cpp \
+                 src/lir/builtin_functions.cpp src/lir/lir_types.cpp src/lir/generator.cpp \
+                 src/lir/generator/core.cpp src/lir/generator/statements.cpp src/lir/generator/expressions.cpp \
+                 src/lir/generator/signatures.cpp src/lir/generator/oop.cpp src/lir/generator/concurrency.cpp \
+                 src/lir/generator/modules.cpp src/lir/function_registry.cpp \
                  src/lir/optimizer.cpp src/lir/metrics.cpp src/lir/serializer.cpp
 
 BACKEND_COMMON_SRCS := src/backend/symbol_table.cpp src/backend/value.cpp 

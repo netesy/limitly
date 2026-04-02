@@ -19,6 +19,23 @@ To learn how to use the Limit language, check out our comprehensive, step-by-ste
 *   **Modules:** A flexible module system for organizing code.
 *   **AOT Compilation:** An AOT compiler for high-performance applications.
 
+## ✅ VM-backed Current Status (Source of Truth)
+
+The **runtime source of truth** for currently supported syntax/behavior is the `tests/` directory.
+If docs and examples ever disagree, prefer what is covered by passing tests in:
+
+- `tests/basic/`, `tests/expressions/`, `tests/loops/`, `tests/functions/`
+- `tests/types/` (including enums and match usage)
+- `tests/modules/`
+- `tests/oop/` (frames/traits/visibility/composition)
+- `tests/concurrency/` (`parallel`/`concurrent`, task/worker/channel flows)
+
+The compiler currently targets the VM/register execution path and supports tested constructs including:
+- enums + `match`-based handling,
+- list/tuple/dict usage,
+- frame/trait OOP features,
+- structured concurrency blocks and channels.
+
 ## 🛠️ Building and Running
 
 ### Prerequisites
@@ -56,3 +73,5 @@ The project includes a comprehensive test suite in the `tests/` directory.
 ./tests/run_tests.sh
 
 ```
+
+> Note: test syntax and behavior in `tests/` should be treated as canonical language reference.

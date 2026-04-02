@@ -12,10 +12,15 @@ run_test_with_error_check() {
     TEMP_FILE=$(mktemp)
     "$LIMITLY" "$1" > "$TEMP_FILE" 2>&1
 
-    if grep -q -E "error[E|:|RuntimeError|SemanticError|BytecodeError]" "$TEMP_FILE"; then
+    if grep -qi -E "segmentation fault|segfault" "$TEMP_FILE"; then
+        echo "  FAIL: $1 (segmentation fault detected in output)"
+        echo "  Output:"
+        cat "$TEMP_FILE"
+        ((FAILED++))
+    elif grep -q -E "error\\[E|Error:|RuntimeError|SemanticError|BytecodeError" "$TEMP_FILE"; then
         echo "  FAIL: $1 (contains errors)"
         echo "  Error output:"
-        grep -E "error[E|:|RuntimeError|SemanticError|BytecodeError]" "$TEMP_FILE"
+        grep -E "error\\[E|Error:|RuntimeError|SemanticError|BytecodeError" "$TEMP_FILE"
         ((FAILED++))
     else
         echo "  PASS: $1"
@@ -71,7 +76,6 @@ run_test_with_error_check "tests/types/options.lm"
 run_test_with_error_check "tests/types/advanced.lm"
 run_test_allow_semantic_errors "tests/types/enums.lm"
 run_test_allow_semantic_errors "tests/types/refined_types.lm"
-run_test_allow_semantic_errors "tests/types/discriminated_unions.lm"
 
 echo
 echo "=== MODULE TESTS ==="

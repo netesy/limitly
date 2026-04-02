@@ -27,6 +27,8 @@ uint64_t to_uint(const RegisterValue& value);
 double to_float(const RegisterValue& value);
 bool to_bool(const RegisterValue& value);
 
+constexpr const char* INTERNAL_ENUM_FRAME_TYPE = "__lir_internal_enum__";
+
 // Boxing/Unboxing functions for C runtime integration
 void* box_register_value(const RegisterValue& value) {
     // Use the runtime boxing functions
@@ -1702,6 +1704,39 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                     registers[pc->dst] = registers[pc->b];
                 } else {
                     registers[pc->dst] = registers[pc->a];
+                }
+                break;
+            }
+            case LIR::LIR_Op::MakeEnum: {
+                auto enum_value = std::make_shared<FrameInstance>(INTERNAL_ENUM_FRAME_TYPE, 2);
+                enum_value->setField(0, static_cast<int64_t>(pc->imm));
+                enum_value->setField(1, (pc->a != 0) ? registers[pc->a] : RegisterValue(nullptr));
+                registers[pc->dst] = enum_value;
+                break;
+            }
+            case LIR::LIR_Op::GetTag: {
+                if (std::holds_alternative<FrameInstancePtr>(registers[pc->a])) {
+                    auto enum_value = std::get<FrameInstancePtr>(registers[pc->a]);
+                    if (enum_value && enum_value->frame_type == INTERNAL_ENUM_FRAME_TYPE) {
+                        registers[pc->dst] = to_int(enum_value->getField(0));
+                    } else {
+                        registers[pc->dst] = int64_t(0);
+                    }
+                } else {
+                    registers[pc->dst] = int64_t(0);
+                }
+                break;
+            }
+            case LIR::LIR_Op::GetPayload: {
+                if (std::holds_alternative<FrameInstancePtr>(registers[pc->a])) {
+                    auto enum_value = std::get<FrameInstancePtr>(registers[pc->a]);
+                    if (enum_value && enum_value->frame_type == INTERNAL_ENUM_FRAME_TYPE) {
+                        registers[pc->dst] = enum_value->getField(1);
+                    } else {
+                        registers[pc->dst] = nullptr;
+                    }
+                } else {
+                    registers[pc->dst] = nullptr;
                 }
                 break;
             }

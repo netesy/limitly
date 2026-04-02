@@ -2,6 +2,8 @@
 
 Welcome to the official guide for the Limit programming language. This document will walk you through the core features of the language, from basic syntax to advanced concepts like structured concurrency.
 
+> **Canonical syntax note:** the `tests/` folder is the authoritative reference for currently supported language syntax/semantics in the VM-backed implementation. Keep guide examples aligned with passing tests.
+
 ## Table of Contents
 
 1.  [Getting Started](#getting-started)

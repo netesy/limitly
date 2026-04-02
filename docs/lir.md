@@ -345,6 +345,17 @@ LIR supports both linear instruction sequences and Control Flow Graphs:
 - Runtime values are managed by the VM/JIT
 - Memory allocation is handled by the runtime system
 
+### 10.3 Enum/Tagged Value Representation (Current VM Path)
+
+LIR enum values are represented as tagged containers with optional payload.
+
+Relevant ops:
+- `make_enum r_out, tag, payload_reg?`
+- `get_tag r_out, r_enum`
+- `get_payload r_out, r_enum`
+
+Operationally, VM execution stores enum values in an internal runtime container and uses the tag for branch decisions in lowered `match` logic.
+
 ---
 
 ## 11. Instruction Format

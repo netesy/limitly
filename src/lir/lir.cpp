@@ -134,6 +134,16 @@ std::string LIR_Inst::to_string() const {
         case LIR_Op::TupleSet:
             oss << " r" << dst << ", r" << a << ", r" << b;
             break;
+        case LIR_Op::MakeEnum:
+            oss << " r" << dst << ", " << imm;
+            if (a != 0) {
+                oss << ", r" << a;
+            }
+            break;
+        case LIR_Op::GetTag:
+        case LIR_Op::GetPayload:
+            oss << " r" << dst << ", r" << a;
+            break;
         case LIR_Op::NewFrame:
             oss << " r" << dst << ", " << func_name << ", fields=" << imm;
             break;
@@ -253,6 +263,9 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::IsError: return "is_error";
         case LIR_Op::Unwrap: return "unwrap";
         case LIR_Op::UnwrapOr: return "unwrap_or";
+        case LIR_Op::MakeEnum: return "make_enum";
+        case LIR_Op::GetTag: return "get_tag";
+        case LIR_Op::GetPayload: return "get_payload";
 
         //  === ATOMIC OPERATIONS ===
         case LIR_Op::AtomicLoad: return "atomic_load";
