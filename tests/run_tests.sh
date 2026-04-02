@@ -17,10 +17,10 @@ run_test_with_error_check() {
         echo "  Output:"
         cat "$TEMP_FILE"
         ((FAILED++))
-    elif grep -q -E "error[E|:|RuntimeError|SemanticError|BytecodeError]" "$TEMP_FILE"; then
+    elif grep -q -E "error\\[E|Error:|RuntimeError|SemanticError|BytecodeError" "$TEMP_FILE"; then
         echo "  FAIL: $1 (contains errors)"
         echo "  Error output:"
-        grep -E "error[E|:|RuntimeError|SemanticError|BytecodeError]" "$TEMP_FILE"
+        grep -E "error\\[E|Error:|RuntimeError|SemanticError|BytecodeError" "$TEMP_FILE"
         ((FAILED++))
     else
         echo "  PASS: $1"

@@ -1646,7 +1646,9 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
         }
 
         if (match_case.body) {
+            enter_scope();
             emit_stmt(*match_case.body);
+            exit_scope();
         }
         emit_instruction(LIR_Inst(LIR_Op::Jump, end_label, 0, 0));
 
