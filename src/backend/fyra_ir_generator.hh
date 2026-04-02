@@ -4,6 +4,7 @@
 #pragma once
 
 #include "../frontend/ast.hh"
+#include "../lir/lir.hh"
 #include "fyra_builtin_functions.hh"
 #include "ir/Module.h"
 #include "ir/Function.h"
@@ -29,6 +30,10 @@ public:
     // Generate Fyra IR from verified AST
     std::shared_ptr<ir::Module> generate_from_ast(
         const std::shared_ptr<Frontend::AST::Program>& program);
+    
+    // Generate Fyra IR directly from LIR
+    std::shared_ptr<ir::Module> generate_from_lir(
+        const LIR::LIR_Function& lir_func);
 
     // Emit built-in functions
     void emit_builtins();
@@ -55,6 +60,7 @@ private:
     // Helper methods
     std::string generate_label();
     ir::Type* ast_type_to_fyra_type(const std::string& ast_type);
+    ir::Type* lir_type_to_fyra_type(LIR::Type lir_type);
     
     // AST traversal methods
     ir::Value* emit_expression(const std::shared_ptr<Frontend::AST::Expression>& expr);

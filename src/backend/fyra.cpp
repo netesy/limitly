@@ -101,10 +101,29 @@ CompileResult FyraCompiler::compile_ast(std::shared_ptr<Frontend::AST::Program> 
 
 CompileResult FyraCompiler::compile(const LIR::LIR_Function& lir_func,
                                    const FyraCompileOptions& options) {
-    CompileResult result;
-    result.success = false;
-    result.error_message = "LIR to Fyra IR path is deprecated. Use AST to Fyra IR instead.";
-    return result;
+    FyraIRGenerator generator;
+    auto module = generator.generate_from_lir(lir_func);
+
+    if (!module) {
+        CompileResult result;
+        result.success = false;
+        result.error_message = "Failed to generate Fyra IR from LIR";
+        if (generator.has_errors()) {
+            result.error_message += ": " + generator.get_errors().front();
+        }
+        return result;
+    }
+    if (generator.has_errors()) {
+        CompileResult result;
+        result.success = false;
+        result.error_message = "LIR to Fyra IR lowering errors";
+        for (const auto& error : generator.get_errors()) {
+            result.warnings.push_back(error);
+        }
+        return result;
+    }
+
+    return compile_module(module, options);
 }
 
 CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
