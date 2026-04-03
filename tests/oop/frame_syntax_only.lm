@@ -1,4 +1,4 @@
-/ Test frame declaration parsing - syntax only
+// Test frame declaration parsing - syntax only
 // No code execution, just frame declarations
 
 frame Person {

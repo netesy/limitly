@@ -1,0 +1,13 @@
+# Vendored dependencies
+vendor/fyra/ linguist-vendored
+vendor/fyra/** -diff -merge -text
+vendor/lyra/ linguist-vendored
+vendor/lyra/** -diff -merge -text
+
+# Treat all vendor files as binary to prevent line ending issues
+vendor/** linguist-vendored
+vendor/** -diff -merge -text binary
+
+# GitHub linguist detection
+vendor/fyra linguist-vendored=false
+vendor/lyra linguist-vendored=false

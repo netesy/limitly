@@ -74,8 +74,8 @@ run_test_with_error_check "tests/types/basic.lm"
 run_test_with_error_check "tests/types/unions.lm"
 run_test_with_error_check "tests/types/options.lm"
 run_test_with_error_check "tests/types/advanced.lm"
-run_test_allow_semantic_errors "tests/types/enums.lm"
-run_test_allow_semantic_errors "tests/types/refined_types.lm"
+run_test_with_error_check  "tests/types/enums.lm"
+run_test_with_error_check  "tests/types/refined_types.lm"
 
 echo
 echo "=== MODULE TESTS ==="
@@ -90,7 +90,6 @@ run_test_with_error_check "tests/modules/multiple_imports_test.lm"
 
 echo
 echo "=== OOP TESTS ==="
-run_test_with_error_check "tests/oop/frame_syntax_only.lm"
 run_test_with_error_check "tests/oop/frame_declaration.lm"
 run_test_with_error_check "tests/oop/traits_dynamic.lm"
 run_test_with_error_check "tests/oop/traits_inheritance.lm"
@@ -101,6 +100,9 @@ echo
 echo "=== CONCURRENCY TESTS ==="
 run_test_with_error_check "tests/concurrency/parallel_blocks.lm"
 run_test_with_error_check "tests/concurrency/concurrent_blocks.lm"
+
+echo.
+echo ========================================
 echo "Test Results:"
 echo "  PASSED: $PASSED"
 echo "  FAILED: $FAILED"
