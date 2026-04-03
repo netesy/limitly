@@ -30,12 +30,23 @@ tags
 moc_*.cpp
 ui_*.h
 qrc_*.cpp
-Thumbs.db
-*.res
-*.log
-*.rc
-/.qmake.cache
-/.qmake.stash
+
+# Build artifacts
+build/
+bin/
+*.exe
+
+# Vendored dependencies (keep the structure but ignore generated files within)
+vendor/fyra/build/
+vendor/fyra/*.a
+vendor/fyra/*.so
+vendor/fyra/*.dll
+vendor/fyra/.git/
+vendor/lyra/build/
+vendor/lyra/*.a
+vendor/lyra/*.so
+vendor/lyra/*.dll
+vendor/lyra/.git/
 
 # qtcreator generated files
 *.pro.user*
@@ -69,11 +80,10 @@ CMakeLists.txt.user*
 # Python byte code
 *.pyc
 
-# Binaries
-# --------
-*.dll
-*.exe
-
-/build
-/bin
+# Other
+Thumbs.db
+*.res
+*.rc
+/.qmake.cache
+/.qmake.stash
 .cache

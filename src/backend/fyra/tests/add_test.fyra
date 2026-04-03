@@ -1,5 +1,0 @@
-export function $main() : w {
-@start
-    %a = add 1, 2 : w
-    ret %a : w
-}

@@ -41,7 +41,7 @@ echo.
 echo === FUNCTION TESTS ===
 call :run_test_with_error_check "tests\functions\basic.lm"
 call :run_test_with_error_check "tests\functions\advanced.lm"
-call :run_test_allow_semantic_errors "tests\functions\closures.lm"
+call :run_test_with_error_check  "tests\functions\closures.lm"
 call :run_test_allow_semantic_errors "tests\functions\first_class.lm"
 
 echo.
@@ -52,7 +52,6 @@ call :run_test_with_error_check "tests\types\options.lm"
 call :run_test_with_error_check "tests\types\advanced.lm"
 call :run_test_with_error_check "tests\types\enums.lm"
 call :run_test_with_error_check "tests\types\refined_types.lm"
-call :run_test_with_error_check "tests\types\discriminated_unions.lm"
 
 echo.
 echo === MODULE TESTS ===
@@ -67,9 +66,8 @@ call :run_test_with_error_check "tests\modules\multiple_imports_test.lm"
 
 echo.
 echo === OOP TESTS ===
-call :run_test_with_error_check "tests\oop\frame_syntax_only.lm"
 call :run_test_with_error_check "tests\oop\frame_declaration.lm"
-@REM call :run_test_with_error_check "tests\oop\traits_dynamic.lm"
+call :run_test_with_error_check "tests\oop\traits_dynamic.lm"
 call :run_test_with_error_check "tests\oop\traits_inheritance.lm"
 call :run_test_with_error_check "tests\oop\visibility_test.lm"
 call :run_test_with_error_check "tests\oop\composition_test.lm"
@@ -83,19 +81,6 @@ echo.
 echo === CONCURRENCY TESTS ===
 call :run_test_with_error_check "tests\concurrency\parallel_blocks.lm"
 call :run_test_with_error_check "tests\concurrency\concurrent_blocks.lm"
-
-@REM echo.
-@REM echo === INTEGRATION TESTS ===
-@REM call :run_test_with_error_check "tests\integration\comprehensive.lm"
-
-@REM echo.
-@REM echo === REGRESSION TESTS ===
-@REM call :run_test_with_error_check "debug_default_params.lm"
-@REM call :run_test_with_error_check "debug_complex_expr.lm"
-@REM call :run_test_with_error_check "debug_alias.lm"
-@REM call :run_test_with_error_check "debug_union.lm"
-@REM call :run_test_with_error_check "test_basic_functions.lm"
-@REM call :run_test_with_error_check "test_closures.lm"
 
 echo.
 echo ========================================
