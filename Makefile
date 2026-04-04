@@ -79,6 +79,14 @@ FYRA_SRCS := $(wildcard $(FYRA_DIR)/src/ir/*.cpp) \
 FYRA_OBJS := $(patsubst vendor/fyra/src/%.cpp,$(OBJ_DIR)/fyra/%.o,$(FYRA_SRCS))
 FYRA_LIB := $(OBJ_DIR)/libfyra.a
 
+# =============================
+# Lyra Package Manager
+# =============================
+LYRA_DIR := vendor/lyra
+LYRA_SRCS := $(wildcard $(LYRA_DIR)/src/*.cpp)
+LYRA_OBJS := $(patsubst $(LYRA_DIR)/src/%.cpp,$(OBJ_DIR)/lyra/%.o,$(LYRA_SRCS))
+LYRA_BIN := $(BIN_DIR)/lyra$(EXE_EXT)
+
 REGISTER_SRCS := src/backend/vm/register.cpp
 
 LIR_CORE_SRCS := src/lir/lir.cpp src/lir/lir_utils.cpp src/lir/functions.cpp \
@@ -190,6 +198,19 @@ $(FYRA_LIB): $(FYRA_OBJS)
 	@echo "✅ Fyra library built: $@"
 
 # =============================
+# Lyra Package Manager
+# =============================
+$(LYRA_BIN): $(LYRA_OBJS) | $(BIN_DIR)
+	@echo "🔨 Building Lyra package manager..."
+	$(CXX) -std=c++17 -Wall -Wextra -I$(LYRA_DIR)/include $(LYRA_OBJS) -o $@
+	@echo "✅ Lyra built: $@"
+
+# Lyra object compilation
+$(OBJ_DIR)/lyra/%.o: $(LYRA_DIR)/src/%.cpp | $(OBJ_DIR)
+	@mkdir -p $(dir $@)
+	$(CXX) -std=c++17 -Wall -Wextra -I$(LYRA_DIR)/include -c $< -o $@
+
+# =============================
 # Response files generation
 # =============================
 $(MAIN_RSP): $(MAIN_OBJS) | $(RSP_DIR)
@@ -203,12 +224,12 @@ $(TEST_RSP): $(TEST_OBJS) | $(RSP_DIR)
 # =============================
 # Build targets
 # =============================
-windows: $(BIN_DIR) $(MAIN_RSP) $(RUNTIME_LIB) $(FYRA_LIB)
+windows: $(BIN_DIR) $(MAIN_RSP) $(RUNTIME_LIB) $(FYRA_LIB) $(LYRA_BIN)
 	@echo "🔨 Linking limitly.exe ..."
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(RUNTIME_LIB) $(FYRA_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS)
 	@echo "✅ limitly.exe built."
 
-linux: $(BIN_DIR) $(MAIN_RSP) $(RUNTIME_LIB) $(FYRA_LIB)
+linux: $(BIN_DIR) $(MAIN_RSP) $(RUNTIME_LIB) $(FYRA_LIB) $(LYRA_BIN)
 	@echo "🔨 Linking limitly ..."
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(RUNTIME_LIB) $(FYRA_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS) -lpthread
 	@echo "✅ limitly built."
