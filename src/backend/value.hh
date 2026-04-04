@@ -183,7 +183,8 @@ enum class TypeTag {
     Frame,
     Trait,
     TraitObject,
-    Refined
+    Refined,
+    Structural
 };
 
 // Forward declaration for ClosureValue factory method with proper TypePtr
@@ -342,6 +343,10 @@ struct FrameType
     std::string name;                        // Frame type name
     std::vector<std::pair<std::string, TypePtr>> fields;  // Field names and types
     std::vector<std::string> implements;     // Trait names this frame implements
+struct StructuralType {
+    std::vector<std::pair<std::string, TypePtr>> fields;
+    bool hasRest = false;
+};
     std::map<std::string, TypePtr> methodSignatures;  // Method name to return type
     bool hasInit = false;                    // Whether frame has init() method
     bool hasDeinit = false;                  // Whether frame has deinit() method
@@ -386,7 +391,8 @@ struct Type
                             FrameType,
                             TraitType,
                             TraitObjectType,
-                            RefinedType> &ex)
+                            Refined,
+    StructuralType> &ex)
         : tag(t)
         , extra(ex)
     {}
@@ -508,6 +514,24 @@ struct Type
             }
             return "RefinedType";
         }
+        case TypeTag::Structural: {
+            if (const auto* structuralType = std::get_if<StructuralType>(&extra)) {
+                std::string result = "{ ";
+                for (size_t i = 0; i < structuralType->fields.size(); ++i) {
+                    if (i > 0) result += ", ";
+                    result += structuralType->fields[i].first + ": " + structuralType->fields[i].second->toString();
+                }
+                if (structuralType->hasRest) {
+                    if (!structuralType->fields.empty()) result += ", ";
+                    result += "...";
+                }
+                result += " }";
+                return result;
+            }
+            return "Structural";
+        }
+            return "RefinedType";
+        }
         default:
             return "Unknown Type";
         }
@@ -522,6 +546,7 @@ struct Type
                 return enumThis->name == enumOther->name;
             }
             return enumThis == enumOther; // Both null is true
+        case TypeTag::Structural: return "Structural";
         }
         if (tag == TypeTag::Frame) {
             auto* frameThis = std::get_if<FrameType>(&extra);

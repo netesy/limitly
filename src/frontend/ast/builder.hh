@@ -239,7 +239,7 @@ namespace Frontend {
         std::shared_ptr<AST::TypeAnnotation> createPrimitiveType(const std::string& typeName);
         std::shared_ptr<AST::TypeAnnotation> createOptionalType(std::shared_ptr<AST::TypeAnnotation> baseType);
         std::shared_ptr<AST::TypeAnnotation> createUnionType(const std::vector<std::shared_ptr<AST::TypeAnnotation>>& types);
-        std::shared_ptr<AST::TypeAnnotation> createDeferredType(const std::string& placeholder);
+        std::shared_ptr<AST::TypeAnnotation> createDeferredType(const std::string& typeName);
         std::shared_ptr<AST::TypeAnnotation> createInferredType(const std::string& hint = "");
         
         // Type validation and compatibility

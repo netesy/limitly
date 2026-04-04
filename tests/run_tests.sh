@@ -75,7 +75,15 @@ run_test_with_error_check "tests/types/unions.lm"
 run_test_with_error_check "tests/types/options.lm"
 run_test_with_error_check "tests/types/advanced.lm"
 run_test_with_error_check  "tests/types/enums.lm"
-run_test_with_error_check  "tests/types/refined_types.lm"
+run_test_with_error_check "tests/types/refined_types.lm"
+run_test_with_error_check "tests/types/structural_type_tests.lm"
+run_test_with_error_check "tests/types/structural_type_tests.lm"
+run_test_with_error_check "tests/types/structural_type_tests.lm"
+run_test_with_error_check "tests/types/structural_type_tests.lm"
+run_test_with_error_check "tests/types/structural_type_tests.lm"
+run_test_with_error_check "tests/types/structural_type_tests.lm"
+run_test_with_error_check "tests/types/structural_type_tests.lm"
+run_test_with_error_check "tests/types/structural_type_tests.lm"
 
 echo
 echo "=== MODULE TESTS ==="
@@ -101,7 +109,7 @@ echo "=== CONCURRENCY TESTS ==="
 run_test_with_error_check "tests/concurrency/parallel_blocks.lm"
 run_test_with_error_check "tests/concurrency/concurrent_blocks.lm"
 
-echo.
+echo
 echo ========================================
 echo "Test Results:"
 echo "  PASSED: $PASSED"

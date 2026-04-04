@@ -25,6 +25,7 @@ namespace AST {
     struct Expression;
     struct Statement;
     struct Program;
+    struct ErrorExpr;
     struct BinaryExpr;
     struct UnaryExpr;
     struct LiteralExpr;
@@ -160,6 +161,11 @@ namespace AST {
     };
 
     // Base expression type
+    // Error expression for graceful error recovery
+    struct ErrorExpr : public Expression {
+        std::string message;
+        int line;
+    };
     struct Expression : public Node {
         // inferred_type is inherited from Node
         
@@ -213,7 +219,8 @@ namespace AST {
         bool isList = false;                                   // Whether this is a list type (e.g., [int], ListOfString)
         bool isDict = false;                                   // Whether this is a dictionary type (e.g., {str: int}, DictOfStrToInt)
         bool isFunction = false;                               // Whether this is a function type
-        bool isTuple = false;                                  // Whether this is a tuple type (e.g., (int, str))
+        bool isTuple = false;
+        bool isDeferred = false;                                  // Whether this is a tuple type (e.g., (int, str))
         bool isRefined = false;                                // Whether this is a refined type (e.g., int where value > 0)
         bool hasRest = false;                                  // Whether this structural type has a rest parameter (...)
         

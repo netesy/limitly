@@ -744,7 +744,7 @@ namespace CST {
         
         std::vector<const LM::Frontend::CST::Node*> findMissingNodes(const LM::Frontend::CST::Node* root) {
             return Traversal::findAll(root, [](const LM::Frontend::CST::Node* node) {
-                return node->kind == LM::Frontend::CST::NodeKind::MISSING_NODE;
+                return node->kind == LM::Frontend::CST::NodeKind::ERROR_NODE;
             });
         }
         

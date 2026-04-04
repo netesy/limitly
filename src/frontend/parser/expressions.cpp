@@ -598,8 +598,7 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::primary() {
         return dictExpr;
     }
     if (current > 0 && current < scanner.getTokens().size() && scanner.getTokens()[current-1].type == TokenType::LEFT_BRACE && scanner.getTokens()[current].type == TokenType::RIGHT_BRACE) {
-        auto placeholderExpr = std::make_shared<LM::Frontend::AST::LiteralExpr>();
-        placeholderExpr->line = peek().line; placeholderExpr->value = nullptr; return placeholderExpr;
+        return makeErrorExpr("Empty dictionary not allowed here");
     } else if (match({TokenType::SELF, TokenType::THIS})) {
         auto thisExpr = createNodeWithContext<LM::Frontend::AST::ThisExpr>();
         thisExpr->line = previous().line; attachTriviaFromToken(previous()); return thisExpr;

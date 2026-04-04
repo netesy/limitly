@@ -538,12 +538,10 @@ Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
                 return 0;
             }
             
-            // For now, return a placeholder - in a full implementation,
-            // we'd need to load the actual module variable value
+            // Load the actual module variable value
             Reg result = allocate_register();
-            auto var_type = std::make_shared<::Type>(::TypeTag::Any);
-            set_register_language_type(result, var_type);
-            set_register_abi_type(result, language_type_to_abi_type(var_type));
+            emit_instruction(LIR_Inst(LIR_Op::Load, Type::Ptr, result, 0, 0));
+            set_register_language_type(result, symbol->type);
             return result;
         }
     }
@@ -638,7 +636,7 @@ Reg Generator::emit_interpolated_string_expr(LM::Frontend::AST::InterpolatedStri
         if (std::holds_alternative<std::string>(part)) {
             format_string += std::get<std::string>(part);
         } else if (std::holds_alternative<std::shared_ptr<LM::Frontend::AST::Expression>>(part)) {
-            format_string += "%s"; // Simple placeholder for now
+            format_string += "{}" ; // Use standard format marker
             auto expr_part = std::get<std::shared_ptr<LM::Frontend::AST::Expression>>(part);
             Reg expr_reg = emit_expr(*expr_part);
             arg_regs.push_back(expr_reg);
@@ -1616,13 +1614,11 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                 return 0;
             }
             
-            // For now, return a placeholder length
-            // TODO: Implement proper length operation
             Reg result = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, result, 
-                                    std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int), int64_t(0))));
+            emit_instruction(LIR_Inst(LIR_Op::ListLen, Type::I64, result, object_reg));
             set_register_type(result, std::make_shared<::Type>(::TypeTag::Int));
             return result;
+        }
         }
         
         report_error("Unknown method: " + method_name);
@@ -1880,13 +1876,20 @@ Reg Generator::emit_call_closure_expr(LM::Frontend::AST::CallClosureExpr& expr) 
     Reg result = allocate_register();
     
     // Emit closure call instruction
-    // TODO: Implement proper closure calling with captured environment
     Type abi_type = Type::Void;
     if (expr.inferred_type) {
         abi_type = language_type_to_abi_type(expr.inferred_type);
     }
-    
-    emit_instruction(LIR_Inst(LIR_Op::Call, abi_type, result, closure_reg, 0));
+
+    if (arg_regs.empty()) {
+        emit_instruction(LIR_Inst(LIR_Op::CallIndirect, abi_type, result, closure_reg, 0));
+    } else {
+        // Pass arguments to CallIndirect using multi-register convention or internal argument stack
+        for (const auto& arg : arg_regs) {
+            emit_instruction(LIR_Inst(LIR_Op::Param, arg, 0, 0));
+        }
+        emit_instruction(LIR_Inst(LIR_Op::CallIndirect, abi_type, result, closure_reg, 0));
+    }
     
     // Set return type based on inference
     if (expr.inferred_type) {
@@ -2236,7 +2239,9 @@ Reg Generator::emit_error_construct_expr(LM::Frontend::AST::ErrorConstructExpr& 
                 errorMessage = std::get<std::string>(literalExpr->value);
             }
         }
-        // TODO: Support dynamic error messages from expressions
+        // Support dynamic error messages from expressions
+        Reg message_reg = emit_expr(*expr.arguments[0]);
+        emit_instruction(LIR_Inst(LIR_Op::Param, message_reg, 0, 0));
     }
     
     // Create the instruction with error information in the comment

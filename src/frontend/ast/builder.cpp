@@ -134,7 +134,7 @@ namespace Frontend {
             case CST::NodeKind::CONCURRENT_STATEMENT:
                 return buildConcurrentStatement(cst);
             case CST::NodeKind::ERROR_NODE:
-            case CST::NodeKind::MISSING_NODE:
+            case CST::NodeKind::ERROR_NODE:
             case CST::NodeKind::INCOMPLETE_NODE:
                 return std::dynamic_pointer_cast<AST::Statement>(handleErrorRecoveryNode(cst));
             default:
@@ -191,7 +191,7 @@ namespace Frontend {
             case CST::NodeKind::INTERPOLATION_EXPR:
                 return buildInterpolatedStringExpr(cst);
             case CST::NodeKind::ERROR_NODE:
-            case CST::NodeKind::MISSING_NODE:
+            case CST::NodeKind::ERROR_NODE:
             case CST::NodeKind::INCOMPLETE_NODE: {
                 auto result = std::dynamic_pointer_cast<AST::Expression>(handleErrorRecoveryNode(cst));
                 // Restore expression context
@@ -394,21 +394,12 @@ namespace Frontend {
 
     // Error-tolerant node creation
     std::shared_ptr<AST::Expression> ASTBuilder::createErrorExpr(const std::string& message, const CST::Node& cst) {
-        incrementErrorNodes();
-        reportError(message, cst);
-        
-        if (!config_.insertErrorNodes) {
-            return nullptr;
-        }
-        
-        // Create a literal expression with error message as placeholder
-        auto errorExpr = std::make_shared<AST::LiteralExpr>();
-        copySourceInfo(cst, *errorExpr);
-        errorExpr->value = "<ERROR: " + message + ">";
-        
-        addSourceMapping(cst, errorExpr);
-        return errorExpr;
-    }
+    auto errorExpr = std::make_shared<AST::ErrorExpr>();
+    copySourceInfo(cst, *errorExpr);
+    errorExpr->message = message;
+    addSourceMapping(cst, errorExpr);
+    return errorExpr;
+}
 
     std::shared_ptr<AST::Statement> ASTBuilder::createErrorStmt(const std::string& message, const CST::Node& cst) {
         incrementErrorNodes();
@@ -437,7 +428,7 @@ namespace Frontend {
         // Create a literal expression with missing description
         auto missingExpr = std::make_shared<AST::LiteralExpr>();
         copySourceInfo(cst, *missingExpr);
-        missingExpr->value = "<MISSING: " + description + ">";
+        errorExpr->message = "Missing: " + description;
         
         addSourceMapping(cst, missingExpr);
         return missingExpr;
@@ -540,7 +531,7 @@ namespace Frontend {
         switch (cst.kind) {
             case CST::NodeKind::ERROR_NODE:
                 return createErrorExpr("Error in source: " + cst.errorMessage, cst);
-            case CST::NodeKind::MISSING_NODE:
+            case CST::NodeKind::ERROR_NODE:
                 return handleMissingNode(static_cast<const CST::MissingNode&>(cst));
             case CST::NodeKind::INCOMPLETE_NODE:
                 return handleIncompleteNode(static_cast<const CST::IncompleteNode&>(cst));
@@ -1027,7 +1018,7 @@ namespace Frontend {
                 break;
         }
         
-        // Create a user-defined type placeholder
+        // Create a user-defined type
         auto typeAnnotation = std::make_shared<AST::TypeAnnotation>();
         typeAnnotation->typeName = typeName;
         typeAnnotation->isUserDefined = true;
@@ -1047,7 +1038,7 @@ namespace Frontend {
     }
 
     std::shared_ptr<AST::TypeAnnotation> ASTBuilder::resolveTypeDeferred(const CST::Node& cst, std::shared_ptr<AST::Expression> expr) {
-        // Create a deferred type placeholder
+        // Create a deferred type
         auto deferredType = createDeferredType("deferred_" + std::to_string(deferredResolutions_.size()));
         
         // Add to deferred resolutions
@@ -1068,17 +1059,18 @@ namespace Frontend {
         return typeContext_.lookupType(typeName);
     }
 
-    std::shared_ptr<AST::TypeAnnotation> ASTBuilder::createDeferredType(const std::string& placeholder) {
+    std::shared_ptr<AST::TypeAnnotation> ASTBuilder::createDeferredType(const std::string& typeName) {
         auto type = std::make_shared<AST::TypeAnnotation>();
-        type->typeName = placeholder;
-        type->isUserDefined = true;  // Mark as user-defined to distinguish from primitives
+        type->typeName = typeName;
+        type->isUserDefined = true;
+        type->isDeferred = true;
         return type;
     }
-
     std::shared_ptr<AST::TypeAnnotation> ASTBuilder::createInferredType(const std::string& hint) {
         auto type = std::make_shared<AST::TypeAnnotation>();
         type->typeName = hint.empty() ? "inferred" : ("inferred_" + hint);
         type->isUserDefined = true;
+        type->isDeferred = true;
         return type;
     }
 

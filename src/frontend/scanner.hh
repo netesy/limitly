@@ -171,7 +171,7 @@ enum class TokenType {
     COMMENT_LINE,   // // comments
     COMMENT_BLOCK,  // /* */ comments
     ERROR,          // invalid/unrecognized input
-    MISSING,        // placeholder for missing tokens
+    ILLEGAL,        // Internal illegal token marker
 
     // Other
     UNDEFINED, // undefined token

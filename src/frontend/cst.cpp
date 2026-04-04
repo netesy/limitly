@@ -503,7 +503,7 @@ namespace CST {
             
             // Error recovery nodes
             case NodeKind::ERROR_NODE: return "ERROR_NODE";
-            case NodeKind::MISSING_NODE: return "MISSING_NODE";
+            case NodeKind::ERROR_NODE: return "ERROR_NODE";
             case NodeKind::INCOMPLETE_NODE: return "INCOMPLETE_NODE";
             
             default: return "UNKNOWN";
@@ -579,7 +579,7 @@ namespace CST {
     bool isErrorRecoveryNode(NodeKind kind) {
         switch (kind) {
             case NodeKind::ERROR_NODE:
-            case NodeKind::MISSING_NODE:
+            case NodeKind::ERROR_NODE:
             case NodeKind::INCOMPLETE_NODE:
                 return true;
             default:

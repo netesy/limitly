@@ -147,10 +147,10 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     
     auto& func_manager = LIRFunctionManager::getInstance();
     
-    // Pre-register a placeholder for recursive calls
+    // Register function signature early for recursive calls
     if (!func_manager.hasFunction(fn.name)) {
         std::vector<LIRParameter> empty_params;
-        auto placeholder = func_manager.createFunction(fn.name, empty_params, Type::I64, nullptr);
+        auto func = func_manager.createFunction(fn.name, empty_params, abi_type, nullptr);
     }
     
     // Create function with parameters (including optional parameters)
@@ -221,7 +221,7 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
         LIRParameter lir_param;
         lir_param.name = param.first;
         // Convert type - for now use I64 as default
-        lir_param.type = Type::I64;
+        lir_param.type = abi_type;
         params.push_back(lir_param);
     }
     
@@ -230,12 +230,12 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
         LIRParameter lir_param;
         lir_param.name = optional_param.first;
         // Convert type - for now use I64 as default
-        lir_param.type = Type::I64;
+        lir_param.type = abi_type;
         params.push_back(lir_param);
     }
     
     // Create function with I64 return type for now
-    auto lir_func = func_manager.createFunction(fn.name, params, Type::I64, nullptr);
+    auto lir_func = func_manager.createFunction(fn.name, params, abi_type, nullptr);
     
     // Copy the instructions from our LIR_Function
     lir_func->setInstructions(result->instructions);
@@ -1006,7 +1006,26 @@ bool Generator::is_visible(LM::Frontend::AST::VisibilityLevel level, const std::
         return true;
     }
 
-    // TODO: Handle inheritance (Protected) when implemented
+    // Handle inheritance (Protected) when implemented
+    if (level == LM::Frontend::AST::VisibilityLevel::Protected) {
+        auto* target_info = type_system_->getFrameInfo(frame_name);
+        if (target_info) {
+            for (const auto& trait : target_info->implements) {
+                // If current frame context is also a method of a frame implementing same trait
+                // We need to extract current frame name from current_function_->name
+                auto dot_pos = current_function_->name.find(".");
+                if (dot_pos != std::string::npos) {
+                    std::string current_frame_name = current_function_->name.substr(0, dot_pos);
+                    auto* current_info = type_system_->getFrameInfo(current_frame_name);
+                    if (current_info) {
+                        for (const auto& ctrait : current_info->implements) {
+                            if (trait == ctrait) return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     return false;
 }

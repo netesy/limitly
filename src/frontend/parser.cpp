@@ -243,11 +243,12 @@ std::string Parser::parseStringLiteral(const std::string& tokenLexeme) {
     return result;
 }
 
-std::shared_ptr<LM::Frontend::AST::LiteralExpr> Parser::makeErrorExpr() {
-    auto expr = std::make_shared<LM::Frontend::AST::LiteralExpr>();
+std::shared_ptr<LM::Frontend::AST::ErrorExpr> Parser::makeErrorExpr(const std::string& message) {
+    auto expr = std::make_shared<LM::Frontend::AST::ErrorExpr>();
     expr->line = current > 0 ? scanner.getTokens()[current - 1].line : 1;
-    expr->value = nullptr;
+    expr->message = message;
     return expr;
+}
 }
 
 // Unified node creation helper - creates CST::Node or LM::Frontend::AST::Node based on cstMode

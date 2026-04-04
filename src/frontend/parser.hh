@@ -61,8 +61,8 @@ public:
     const std::vector<ParseError>& getErrors() const { return errors; }
     bool hadError() const { return !errors.empty(); }
 
-    // Helper to create a placeholder error expression
-    std::shared_ptr<LM::Frontend::AST::LiteralExpr> makeErrorExpr();
+    // Helper to create an error expression for recovery
+    std::shared_ptr<LM::Frontend::AST::ErrorExpr> makeErrorExpr(const std::string& message = "Unknown error");
 
     // Unified node creation helper - creates CST::Node or LM::Frontend::AST::Node based on cstMode
     template<typename ASTNodeType>
