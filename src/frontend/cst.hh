@@ -109,7 +109,7 @@ namespace CST {
         
         // Error recovery nodes
         ERROR_NODE,           // Invalid syntax
-        MISSING_NODE,         // Missing required elements
+        ERROR_NODE,         // Missing required elements
         INCOMPLETE_NODE,      // Partial constructs
     };
 
@@ -275,7 +275,7 @@ namespace CST {
         NodeKind expectedKind;             // What kind of node was expected
         
         MissingNode(NodeKind expected, const std::string& description, size_t start = 0, size_t end = 0)
-            : Node(NodeKind::MISSING_NODE, start, end), expectedKind(expected) {
+            : Node(NodeKind::ERROR_NODE, start, end), expectedKind(expected) {
             setDescription(description);
             isValid = false;
         }

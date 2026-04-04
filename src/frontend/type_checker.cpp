@@ -752,8 +752,14 @@ bool TypeChecker::is_visible(const std::string& frame_name, LM::Frontend::AST::V
     if (visibility == LM::Frontend::AST::VisibilityLevel::Protected) {
         auto target_info = type_system.getFrameInfo(frame_name);
         auto current_info = type_system.getFrameInfo(current_frame->name);
+    // Protected allows access from related frames (those sharing traits)
+    if (visibility == LM::Frontend::AST::VisibilityLevel::Protected) {
+        auto target_info = type_system.getFrameInfo(frame_name);
+        auto current_info = type_system.getFrameInfo(current_frame->name);
 
         if (target_info && current_info) {
+            // Check if current frame inherits from target frame
+            if (target_info->name == current_info->name) return true;
             for (const auto& trait_a : target_info->implements) {
                 for (const auto& trait_b : current_info->implements) {
                     if (trait_a == trait_b) return true;
@@ -762,7 +768,6 @@ bool TypeChecker::is_visible(const std::string& frame_name, LM::Frontend::AST::V
         }
         return false;
     }
-
     return false;
 }
 
@@ -2456,6 +2461,20 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
         return type_system.ANY_TYPE;
     }
     
+    // Handle structural type member access
+    if (object_type->tag == TypeTag::Structural) {
+        auto* structType = std::get_if<StructuralType>(&object_type->extra);
+        if (structType) {
+            for (const auto& field : structType->fields) {
+                if (field.first == member_name) {
+                    expr->inferred_type = field.second;
+                    return field.second;
+                }
+            }
+        }
+        add_error("Structural type has no member " + member_name, expr->line);
+        return type_system.ANY_TYPE;
+    }
     // Handle other types of member access (e.g. built-in types like String, List)
     if (object_type->tag == TypeTag::String) {
         if (member_name == "len") return type_system.INT_TYPE;
@@ -2754,14 +2773,14 @@ TypePtr TypeChecker::check_fallible_expr(std::shared_ptr<LM::Frontend::AST::Fall
 TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::TypeAnnotation> annotation) {
     if (!annotation) return nullptr;
     
-    // Handle structural types (basic support - just return a placeholder for now)
+     // Handle structural types
     if (annotation->isStructural && !annotation->structuralFields.empty()) {
-        // For now, structural types are not fully implemented in the type system
-        // We'll return a placeholder type to indicate the parsing worked
-        add_error("Structural types are parsed but not yet fully implemented in the type system");
-        return type_system.STRING_TYPE; // Placeholder
+        std::vector<std::pair<std::string, TypePtr>> fields;
+        for (const auto& field : annotation->structuralFields) {
+            fields.push_back({field.name, resolve_type_annotation(field.type)});
+        }
+        return type_system.createStructuralType(fields, annotation->hasRest);
     }
-    
     // Handle union types
     if (annotation->isUnion && !annotation->unionTypes.empty()) {
         std::vector<TypePtr> union_member_types;

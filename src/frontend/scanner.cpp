@@ -1024,8 +1024,8 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "COMMENT_BLOCK";
     case TokenType::ERROR:
         return "ERROR";
-    case TokenType::MISSING:
-        return "MISSING";
+    case TokenType::ILLEGAL:
+        return "ILLEGAL";
     case TokenType::UNDEFINED:
         return "UNDEFINED";
     case TokenType::EOF_TOKEN:

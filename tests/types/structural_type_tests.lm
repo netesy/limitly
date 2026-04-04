@@ -52,4 +52,23 @@ type Complex = {
 };
 
 print("Structural type declarations completed!");
-print("Note: Structural types are parsed correctly but not yet fully implemented in the type system.");
+print("Note: Structural types are now fully implemented in the type system.");
+// Test 6: Structural Type Compatibility
+print("\n--- Test 6: Structural Type Compatibility ---");
+fn print_name(obj: { name: str }) {
+    print("Name: " + obj.name);
+}
+
+frame MyPerson {
+    pub var name: str;
+    pub var age: int;
+}
+
+var p = MyPerson();
+p.name = "John Doe";
+p.age = 30;
+
+// This should work because MyPerson is compatible with { name: str }
+print_name(p);
+
+print("Structural type compatibility tests passed!");

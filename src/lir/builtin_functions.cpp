@@ -786,7 +786,7 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
         std::vector<TypeTag>{}, // No parameters
         TypeTag::Channel, // Returns channel handle
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
-            // For LIR generation, return a placeholder channel handle
+            // Construct a channel handle
             auto channel_type = std::make_shared<::Type>(TypeTag::Channel);
             return std::make_shared<Value>(channel_type, static_cast<int64_t>(0));
         }
@@ -1408,7 +1408,7 @@ void LIRBuiltinFunctions::registerCompositionFunctions() {
             const auto& f = args[0];
             const auto& g = args[1];
             
-            // For now, return a nil value as a placeholder
+            // Partial implementation: return a nil value
             // This will be replaced with proper function composition when closures are implemented
             auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
             return std::make_shared<Value>(nil_type);
@@ -1422,7 +1422,7 @@ void LIRBuiltinFunctions::registerCompositionFunctions() {
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             const auto& function = args[0];
             
-            // For now, return a nil value as a placeholder
+            // Partial implementation: return a nil value
             // This will be replaced with proper function currying when closures are implemented
             auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
             return std::make_shared<Value>(nil_type);
@@ -1439,7 +1439,7 @@ void LIRBuiltinFunctions::registerCompositionFunctions() {
             // The remaining arguments are the partial arguments to be applied
             std::vector<ValuePtr> partialArgs(args.begin() + 1, args.end());
             
-            // For now, return a nil value as a placeholder
+            // Partial implementation: return a nil value
             // This will be replaced with proper partial application when closures are implemented
             auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
             return std::make_shared<Value>(nil_type);

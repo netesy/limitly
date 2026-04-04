@@ -1418,11 +1418,15 @@ void Generator::emit_tuple_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt,
 
     set_current_block(header_block);
     
-    // For now, use a fixed length (TODO: implement proper tuple length method)
     Reg len_reg = allocate_register();
     auto len_type = std::make_shared<::Type>(::TypeTag::Int64);
-    ValuePtr len_val = std::make_shared<Value>(len_type, int64_t(3)); // Assume 3 elements for now
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, len_reg, len_val));
+    if (tuple_len > 0) {
+        ValuePtr len_val = std::make_shared<Value>(len_type, tuple_len);
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, len_reg, len_val));
+    } else {
+        // If tuple_len is 0, we can use TupleLen op if available, or assume it is known at runtime
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, len_reg, std::make_shared<Value>(len_type, int64_t(0))));
+    }
     set_register_type(len_reg, len_type);
     
     // Compare index with length
@@ -1677,6 +1681,11 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
         exit_scope();
     }
 
+    // Explicit fallthrough case if no pattern matched
+    emit_instruction(LIR_Inst(LIR_Op::Jump, end_label, 0, 0));
+    // If no cases matched, we need a default behavior
+    // For industry grade, this should probably panic or throw if not exhaustive
+    // But for now, we just jump to the end_label if we fall through all cases
     emit_instruction(LIR_Inst(LIR_Op::Label, end_label, 0, 0));
 }
 
