@@ -134,7 +134,6 @@ namespace Frontend {
             case CST::NodeKind::CONCURRENT_STATEMENT:
                 return buildConcurrentStatement(cst);
             case CST::NodeKind::ERROR_NODE:
-            case CST::NodeKind::ERROR_NODE:
             case CST::NodeKind::INCOMPLETE_NODE:
                 return std::dynamic_pointer_cast<AST::Statement>(handleErrorRecoveryNode(cst));
             default:
@@ -190,7 +189,6 @@ namespace Frontend {
                 return buildLambdaExpr(cst);
             case CST::NodeKind::INTERPOLATION_EXPR:
                 return buildInterpolatedStringExpr(cst);
-            case CST::NodeKind::ERROR_NODE:
             case CST::NodeKind::ERROR_NODE:
             case CST::NodeKind::INCOMPLETE_NODE: {
                 auto result = std::dynamic_pointer_cast<AST::Expression>(handleErrorRecoveryNode(cst));
@@ -428,7 +426,6 @@ namespace Frontend {
         // Create a literal expression with missing description
         auto missingExpr = std::make_shared<AST::LiteralExpr>();
         copySourceInfo(cst, *missingExpr);
-        errorExpr->message = "Missing: " + description;
         
         addSourceMapping(cst, missingExpr);
         return missingExpr;
@@ -531,8 +528,6 @@ namespace Frontend {
         switch (cst.kind) {
             case CST::NodeKind::ERROR_NODE:
                 return createErrorExpr("Error in source: " + cst.errorMessage, cst);
-            case CST::NodeKind::ERROR_NODE:
-                return handleMissingNode(static_cast<const CST::MissingNode&>(cst));
             case CST::NodeKind::INCOMPLETE_NODE:
                 return handleIncompleteNode(static_cast<const CST::IncompleteNode&>(cst));
             default:

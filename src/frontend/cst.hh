@@ -109,7 +109,6 @@ namespace CST {
         
         // Error recovery nodes
         ERROR_NODE,           // Invalid syntax
-        ERROR_NODE,         // Missing required elements
         INCOMPLETE_NODE,      // Partial constructs
     };
 

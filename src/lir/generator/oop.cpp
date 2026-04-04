@@ -85,11 +85,11 @@ void Generator::lower_trait_method(const std::string& trait_name, LM::Frontend::
     for (const auto& param : method.params) {
         LIRParameter lir_param;
         lir_param.name = param.first;
-        lir_param.type = abi_type;
+        lir_param.type = Type::I64;
         params.push_back(lir_param);
     }
     
-    auto lir_func = func_manager.createFunction(full_method_name, params, abi_type, nullptr);
+    auto lir_func = func_manager.createFunction(full_method_name, params, Type::I64, nullptr);
     lir_func->setInstructions(result->instructions);
 }
 
@@ -123,7 +123,7 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
     // Register function signature early for recursive calls
     if (!func_manager.hasFunction(full_method_name)) {
         std::vector<LIRParameter> empty_params;
-        auto func = func_manager.createFunction(full_method_name, empty_params, abi_type, nullptr);
+        auto func = func_manager.createFunction(full_method_name, empty_params, Type::I64, nullptr);
     }
     
     // Create function with parameters (including 'this' as first parameter)
@@ -200,12 +200,12 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
         LIRParameter lir_param;
         lir_param.name = param.first;
         // Convert type - for now use I64 as default
-        lir_param.type = abi_type;
+        lir_param.type = Type::I64;
         params.push_back(lir_param);
     }
     
     // Create function with I64 return type for now
-    auto lir_func = func_manager.createFunction(full_method_name, params, abi_type, nullptr);
+    auto lir_func = func_manager.createFunction(full_method_name, params, Type::I64, nullptr);
     
     // Copy the instructions from our LIR_Function
     lir_func->setInstructions(result->instructions);
@@ -225,7 +225,7 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
     // Register function signature early for recursive calls
     if (!func_manager.hasFunction(full_method_name)) {
         std::vector<LIRParameter> empty_params;
-        auto func = func_manager.createFunction(full_method_name, empty_params, abi_type, nullptr);
+        auto func = func_manager.createFunction(full_method_name, empty_params, Type::I64, nullptr);
     }
     
     // Create function with parameters (including 'this' as first parameter)
@@ -302,12 +302,12 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
         LIRParameter lir_param;
         lir_param.name = param.first;
         // Convert type - for now use I64 as default
-        lir_param.type = abi_type;
+        lir_param.type = Type::I64;
         params.push_back(lir_param);
     }
     
     // Create function with I64 return type for now
-    auto lir_func = func_manager.createFunction(full_method_name, params, abi_type, nullptr);
+    auto lir_func = func_manager.createFunction(full_method_name, params, Type::I64, nullptr);
     
     // Copy the instructions from our LIR_Function
     lir_func->setInstructions(result->instructions);
@@ -327,7 +327,7 @@ void Generator::lower_frame_deinit_method(const std::string& frame_name, LM::Fro
     // Register function signature early for recursive calls
     if (!func_manager.hasFunction(full_method_name)) {
         std::vector<LIRParameter> empty_params;
-        auto func = func_manager.createFunction(full_method_name, empty_params, abi_type, nullptr);
+        auto func = func_manager.createFunction(full_method_name, empty_params, Type::I64, nullptr);
     }
     
     // Create function with only 'this' parameter (deinit takes no other parameters)
@@ -405,7 +405,7 @@ void Generator::lower_frame_deinit_method(const std::string& frame_name, LM::Fro
     params.push_back(this_param);
     
     // Create function with I64 return type for now
-    auto lir_func = func_manager.createFunction(full_method_name, params, abi_type, nullptr);
+    auto lir_func = func_manager.createFunction(full_method_name, params, Type::I64, nullptr);
     
     // Copy the instructions from our LIR_Function
     lir_func->setInstructions(result->instructions);

@@ -249,7 +249,6 @@ std::shared_ptr<LM::Frontend::AST::ErrorExpr> Parser::makeErrorExpr(const std::s
     expr->message = message;
     return expr;
 }
-}
 
 // Unified node creation helper - creates CST::Node or LM::Frontend::AST::Node based on cstMode
 template<typename ASTNodeType>

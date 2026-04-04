@@ -150,7 +150,8 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     // Register function signature early for recursive calls
     if (!func_manager.hasFunction(fn.name)) {
         std::vector<LIRParameter> empty_params;
-        auto func = func_manager.createFunction(fn.name, empty_params, abi_type, nullptr);
+        Type return_abi_type = Type::I64;  // Default return type
+        auto func = func_manager.createFunction(fn.name, empty_params, return_abi_type, nullptr);
     }
     
     // Create function with parameters (including optional parameters)
@@ -221,7 +222,7 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
         LIRParameter lir_param;
         lir_param.name = param.first;
         // Convert type - for now use I64 as default
-        lir_param.type = abi_type;
+        lir_param.type = Type::I64;
         params.push_back(lir_param);
     }
     
@@ -230,12 +231,12 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
         LIRParameter lir_param;
         lir_param.name = optional_param.first;
         // Convert type - for now use I64 as default
-        lir_param.type = abi_type;
+        lir_param.type = Type::I64;
         params.push_back(lir_param);
     }
     
     // Create function with I64 return type for now
-    auto lir_func = func_manager.createFunction(fn.name, params, abi_type, nullptr);
+    auto lir_func = func_manager.createFunction(fn.name, params, Type::I64, nullptr);
     
     // Copy the instructions from our LIR_Function
     lir_func->setInstructions(result->instructions);
