@@ -1269,167 +1269,31 @@ public:
     
     // Create frame type (for OOP frames)
     TypePtr createFrameType(const std::string& frameName) {
-
-    // Create structural type
-    TypePtr createStructuralType(const std::vector<std::pair<std::string, TypePtr>>& fields, bool hasRest = false) {
-        StructuralType structType;
-        structType.fields = fields;
-        structType.hasRest = hasRest;
-        return std::make_shared<Type>(TypeTag::Structural, structType);
-    }
         // Check if frame type already exists
-
-    // Create structural type
-    TypePtr createStructuralType(const std::vector<std::pair<std::string, TypePtr>>& fields, bool hasRest = false) {
-        StructuralType structType;
-        structType.fields = fields;
-        structType.hasRest = hasRest;
-        return std::make_shared<Type>(TypeTag::Structural, structType);
-    }
         auto it = userDefinedTypes.find(frameName);
-
-    // Create structural type
-    TypePtr createStructuralType(const std::vector<std::pair<std::string, TypePtr>>& fields, bool hasRest = false) {
-        StructuralType structType;
-        structType.fields = fields;
-        structType.hasRest = hasRest;
-        return std::make_shared<Type>(TypeTag::Structural, structType);
-    }
         if (it != userDefinedTypes.end()) {
-
-    // Create structural type
-    TypePtr createStructuralType(const std::vector<std::pair<std::string, TypePtr>>& fields, bool hasRest = false) {
-        StructuralType structType;
-        structType.fields = fields;
-        structType.hasRest = hasRest;
-        return std::make_shared<Type>(TypeTag::Structural, structType);
-    }
             return it->second;
-
-    // Create structural type
-    TypePtr createStructuralType(const std::vector<std::pair<std::string, TypePtr>>& fields, bool hasRest = false) {
-        StructuralType structType;
-        structType.fields = fields;
-        structType.hasRest = hasRest;
-        return std::make_shared<Type>(TypeTag::Structural, structType);
-    }
         }
-
-    // Create structural type
-    TypePtr createStructuralType(const std::vector<std::pair<std::string, TypePtr>>& fields, bool hasRest = false) {
-        StructuralType structType;
-        structType.fields = fields;
-        structType.hasRest = hasRest;
-        return std::make_shared<Type>(TypeTag::Structural, structType);
-    }
         
-
-    // Create structural type
-    TypePtr createStructuralType(const std::vector<std::pair<std::string, TypePtr>>& fields, bool hasRest = false) {
-        StructuralType structType;
-        structType.fields = fields;
-        structType.hasRest = hasRest;
-        return std::make_shared<Type>(TypeTag::Structural, structType);
-    }
         // Create a FrameType with the frame name
-
-    // Create structural type
-    TypePtr createStructuralType(const std::vector<std::pair<std::string, TypePtr>>& fields, bool hasRest = false) {
-        StructuralType structType;
-        structType.fields = fields;
-        structType.hasRest = hasRest;
-        return std::make_shared<Type>(TypeTag::Structural, structType);
-    }
         FrameType frameTypeData;
-
-    // Create structural type
-    TypePtr createStructuralType(const std::vector<std::pair<std::string, TypePtr>>& fields, bool hasRest = false) {
-        StructuralType structType;
-        structType.fields = fields;
-        structType.hasRest = hasRest;
-        return std::make_shared<Type>(TypeTag::Structural, structType);
-    }
         frameTypeData.name = frameName;
-
-    // Create structural type
-    TypePtr createStructuralType(const std::vector<std::pair<std::string, TypePtr>>& fields, bool hasRest = false) {
-        StructuralType structType;
-        structType.fields = fields;
-        structType.hasRest = hasRest;
-        return std::make_shared<Type>(TypeTag::Structural, structType);
-    }
         
-
-    // Create structural type
-    TypePtr createStructuralType(const std::vector<std::pair<std::string, TypePtr>>& fields, bool hasRest = false) {
-        StructuralType structType;
-        structType.fields = fields;
-        structType.hasRest = hasRest;
-        return std::make_shared<Type>(TypeTag::Structural, structType);
-    }
         // Create a frame type with the Frame tag and FrameType data
-
-    // Create structural type
-    TypePtr createStructuralType(const std::vector<std::pair<std::string, TypePtr>>& fields, bool hasRest = false) {
-        StructuralType structType;
-        structType.fields = fields;
-        structType.hasRest = hasRest;
-        return std::make_shared<Type>(TypeTag::Structural, structType);
-    }
         TypePtr frameType = std::make_shared<Type>(TypeTag::Frame, frameTypeData);
-
-    // Create structural type
-    TypePtr createStructuralType(const std::vector<std::pair<std::string, TypePtr>>& fields, bool hasRest = false) {
-        StructuralType structType;
-        structType.fields = fields;
-        structType.hasRest = hasRest;
-        return std::make_shared<Type>(TypeTag::Structural, structType);
-    }
         
-
-    // Create structural type
-    TypePtr createStructuralType(const std::vector<std::pair<std::string, TypePtr>>& fields, bool hasRest = false) {
-        StructuralType structType;
-        structType.fields = fields;
-        structType.hasRest = hasRest;
-        return std::make_shared<Type>(TypeTag::Structural, structType);
-    }
         // Store the frame name in the user-defined types map
-
-    // Create structural type
-    TypePtr createStructuralType(const std::vector<std::pair<std::string, TypePtr>>& fields, bool hasRest = false) {
-        StructuralType structType;
-        structType.fields = fields;
-        structType.hasRest = hasRest;
-        return std::make_shared<Type>(TypeTag::Structural, structType);
-    }
         userDefinedTypes[frameName] = frameType;
-
-    // Create structural type
-    TypePtr createStructuralType(const std::vector<std::pair<std::string, TypePtr>>& fields, bool hasRest = false) {
-        StructuralType structType;
-        structType.fields = fields;
-        structType.hasRest = hasRest;
-        return std::make_shared<Type>(TypeTag::Structural, structType);
-    }
         
-
-    // Create structural type
-    TypePtr createStructuralType(const std::vector<std::pair<std::string, TypePtr>>& fields, bool hasRest = false) {
-        StructuralType structType;
-        structType.fields = fields;
-        structType.hasRest = hasRest;
-        return std::make_shared<Type>(TypeTag::Structural, structType);
-    }
         return frameType;
-
+    }
+    
     // Create structural type
     TypePtr createStructuralType(const std::vector<std::pair<std::string, TypePtr>>& fields, bool hasRest = false) {
         StructuralType structType;
         structType.fields = fields;
         structType.hasRest = hasRest;
         return std::make_shared<Type>(TypeTag::Structural, structType);
-    }
     }
     
     // Create function type from AST function type annotation (implemented below)

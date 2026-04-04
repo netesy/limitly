@@ -161,15 +161,16 @@ namespace AST {
     };
 
     // Base expression type
-    // Error expression for graceful error recovery
-    struct ErrorExpr : public Expression {
-        std::string message;
-        int line;
-    };
     struct Expression : public Node {
         // inferred_type is inherited from Node
         
         virtual ~Expression() = default;
+    };
+
+    // Error expression for graceful error recovery
+    struct ErrorExpr : public Expression {
+        std::string message;
+        int line;
     };
 
     // Base statement type

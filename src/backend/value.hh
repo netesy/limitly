@@ -343,13 +343,14 @@ struct FrameType
     std::string name;                        // Frame type name
     std::vector<std::pair<std::string, TypePtr>> fields;  // Field names and types
     std::vector<std::string> implements;     // Trait names this frame implements
-struct StructuralType {
-    std::vector<std::pair<std::string, TypePtr>> fields;
-    bool hasRest = false;
-};
     std::map<std::string, TypePtr> methodSignatures;  // Method name to return type
     bool hasInit = false;                    // Whether frame has init() method
     bool hasDeinit = false;                  // Whether frame has deinit() method
+};
+
+struct StructuralType {
+    std::vector<std::pair<std::string, TypePtr>> fields;
+    bool hasRest = false;
 };
 
 struct TraitType
@@ -371,30 +372,67 @@ struct Type
     TypeTag tag;
     bool isList = false;
     bool isDict = false;
-    std::variant<std::monostate, ListType, DictType, TupleType, EnumType, FunctionType, SumType, UnionType, ErrorUnionType, UserDefinedType, FrameType, TraitType, TraitObjectType, RefinedType>
+    std::variant<std::monostate, ListType, DictType, TupleType, EnumType, FunctionType, SumType, UnionType, ErrorUnionType, UserDefinedType, FrameType, TraitType, TraitObjectType, RefinedType, StructuralType>
         extra;
 
     Type(TypeTag t)
         : tag(t)
     {}
-    Type(TypeTag t,
-         const std::variant<std::monostate,
-                            ListType,
-                            DictType,
-                            TupleType,
-                            EnumType,
-                            FunctionType,
-                            SumType,
-                            UnionType,
-                            ErrorUnionType,
-                            UserDefinedType,
-                            FrameType,
-                            TraitType,
-                            TraitObjectType,
-                            Refined,
-    StructuralType> &ex)
-        : tag(t)
-        , extra(ex)
+    
+    Type(TypeTag t, const ListType& listType)
+        : tag(t), extra(listType)
+    {}
+    
+    Type(TypeTag t, const DictType& dictType)
+        : tag(t), extra(dictType)
+    {}
+    
+    Type(TypeTag t, const TupleType& tupleType)
+        : tag(t), extra(tupleType)
+    {}
+    
+    Type(TypeTag t, const EnumType& enumType)
+        : tag(t), extra(enumType)
+    {}
+    
+    Type(TypeTag t, const FunctionType& functionType)
+        : tag(t), extra(functionType)
+    {}
+    
+    Type(TypeTag t, const SumType& sumType)
+        : tag(t), extra(sumType)
+    {}
+    
+    Type(TypeTag t, const UnionType& unionType)
+        : tag(t), extra(unionType)
+    {}
+    
+    Type(TypeTag t, const ErrorUnionType& errorUnionType)
+        : tag(t), extra(errorUnionType)
+    {}
+    
+    Type(TypeTag t, const UserDefinedType& userDefinedType)
+        : tag(t), extra(userDefinedType)
+    {}
+    
+    Type(TypeTag t, const FrameType& frameType)
+        : tag(t), extra(frameType)
+    {}
+    
+    Type(TypeTag t, const TraitType& traitType)
+        : tag(t), extra(traitType)
+    {}
+    
+    Type(TypeTag t, const TraitObjectType& traitObjectType)
+        : tag(t), extra(traitObjectType)
+    {}
+    
+    Type(TypeTag t, const RefinedType& refinedType)
+        : tag(t), extra(refinedType)
+    {}
+    
+    Type(TypeTag t, const StructuralType& structuralType)
+        : tag(t), extra(structuralType)
     {}
 
     // In value.hh, add this inside the Type struct
@@ -530,8 +568,6 @@ struct Type
             }
             return "Structural";
         }
-            return "RefinedType";
-        }
         default:
             return "Unknown Type";
         }
@@ -546,7 +582,6 @@ struct Type
                 return enumThis->name == enumOther->name;
             }
             return enumThis == enumOther; // Both null is true
-        case TypeTag::Structural: return "Structural";
         }
         if (tag == TypeTag::Frame) {
             auto* frameThis = std::get_if<FrameType>(&extra);

@@ -541,7 +541,8 @@ Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
             // Load the actual module variable value
             Reg result = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::Load, Type::Ptr, result, 0, 0));
-            set_register_language_type(result, symbol->type);
+            // Note: Module variable type information is not available in ModuleSymbolInfo
+            // Type information should be obtained from the module's type system
             return result;
         }
     }
@@ -1618,7 +1619,6 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             emit_instruction(LIR_Inst(LIR_Op::ListLen, Type::I64, result, object_reg));
             set_register_type(result, std::make_shared<::Type>(::TypeTag::Int));
             return result;
-        }
         }
         
         report_error("Unknown method: " + method_name);
