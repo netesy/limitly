@@ -35,7 +35,7 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
     errors_.clear();
     used_builtins_.clear();
 
-    ir::Function* main_fn = builder_->createFunction(lir_func.name.empty() ? "__limit_main__" : lir_func.name, context_->getIntegerType(64));
+    ir::Function* main_fn = builder_->createFunction(lir_func.name.empty() ? "main" : lir_func.name, context_->getIntegerType(64));
     main_fn->setExported(true);
 
     // 1. Identify all jump targets
