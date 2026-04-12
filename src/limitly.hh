@@ -31,4 +31,9 @@ namespace LM {
     public:
         static std::string format(const std::string& source);
     };
+
+    class LSP {
+    public:
+        static void run();
+    };
 }
