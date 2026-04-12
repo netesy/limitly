@@ -100,8 +100,10 @@ BACKEND_COMMON_SRCS := src/backend/symbol_table.cpp src/backend/value.cpp
 
 ERROR_SRCS := src/error/debugger.cpp
 
-MAIN_SRCS := src/main.cpp $(BACKEND_COMMON_SRCS) $(BACK_SRCS) $(ERROR_SRCS) \
+LIB_LIMITLY_SRCS := src/limitly.cpp $(BACKEND_COMMON_SRCS) $(BACK_SRCS) $(ERROR_SRCS) \
              $(FRONT_SRCS) $(REGISTER_SRCS) $(LIR_CORE_SRCS)
+
+MAIN_SRCS := src/main.cpp
 
 TEST_SRCS := src/test_parser.cpp $(BACKEND_COMMON_SRCS) $(LIR_CORE_SRCS) $(ERROR_SRCS) \
              $(FRONT_SRCS)
@@ -109,6 +111,7 @@ TEST_SRCS := src/test_parser.cpp $(BACKEND_COMMON_SRCS) $(LIR_CORE_SRCS) $(ERROR
 # =============================
 # Objects and response files
 # =============================
+LIB_LIMITLY_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(LIB_LIMITLY_SRCS))
 MAIN_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(MAIN_SRCS))
 TEST_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(TEST_SRCS))
 
@@ -123,7 +126,7 @@ TEST_RSP := $(RSP_DIR)/build_test.rsp
 # =============================
 # Default target
 # =============================
-all: check-deps $(PLATFORM)
+all: check-deps liblimitly $(PLATFORM)
 
 # =============================
 # Dependency check
@@ -200,9 +203,9 @@ $(FYRA_LIB): $(FYRA_OBJS)
 # =============================
 # Lyra Package Manager
 # =============================
-$(LYRA_BIN): $(LYRA_OBJS) | $(BIN_DIR)
+$(LYRA_BIN): $(LYRA_OBJS) liblimitly | $(BIN_DIR)
 	@echo "🔨 Building Lyra package manager..."
-	$(CXX) -std=c++17 -Wall -Wextra -I$(LYRA_DIR)/include $(LYRA_OBJS) -o $@
+	$(CXX) -std=c++20 -Wall -Wextra -I$(LYRA_DIR)/include -I. $(LYRA_OBJS) $(OBJ_DIR)/libLimitly.a $(RUNTIME_LIB) $(FYRA_LIB) -o $@ -lpthread
 	@echo "✅ Lyra built: $@"
 
 # Lyra object compilation
@@ -224,14 +227,21 @@ $(TEST_RSP): $(TEST_OBJS) | $(RSP_DIR)
 # =============================
 # Build targets
 # =============================
-windows: $(BIN_DIR) $(MAIN_RSP) $(RUNTIME_LIB) $(FYRA_LIB) $(LYRA_BIN)
+liblimitly: $(OBJ_DIR)/libLimitly.a
+
+$(OBJ_DIR)/libLimitly.a: $(LIB_LIMITLY_OBJS) $(RUNTIME_LIB) $(FYRA_LIB)
+	@echo "🔨 Building libLimitly.a ..."
+	@mkdir -p $(dir $@)
+	$(AR) rcs $@ $(LIB_LIMITLY_OBJS)
+
+windows: $(BIN_DIR) $(MAIN_RSP) liblimitly $(LYRA_BIN)
 	@echo "🔨 Linking limitly.exe ..."
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(RUNTIME_LIB) $(FYRA_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/libLimitly.a $(RUNTIME_LIB) $(FYRA_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS)
 	@echo "✅ limitly.exe built."
 
-linux: $(BIN_DIR) $(MAIN_RSP) $(RUNTIME_LIB) $(FYRA_LIB) $(LYRA_BIN)
+linux: $(BIN_DIR) $(MAIN_RSP) liblimitly $(LYRA_BIN)
 	@echo "🔨 Linking limitly ..."
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(RUNTIME_LIB) $(FYRA_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS) -lpthread
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/libLimitly.a $(RUNTIME_LIB) $(FYRA_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS) -lpthread
 	@echo "✅ limitly built."
 
 # =============================
