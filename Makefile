@@ -100,7 +100,7 @@ BACKEND_COMMON_SRCS := src/backend/symbol_table.cpp src/backend/value.cpp
 
 ERROR_SRCS := src/error/debugger.cpp
 
-LIB_LIMITLY_SRCS := src/limitly.cpp $(BACKEND_COMMON_SRCS) $(BACK_SRCS) $(ERROR_SRCS) \
+LIB_LIMITLY_SRCS := src/limitly.cpp src/formatter.cpp src/lsp.cpp $(BACKEND_COMMON_SRCS) $(BACK_SRCS) $(ERROR_SRCS) \
              $(FRONT_SRCS) $(REGISTER_SRCS) $(LIR_CORE_SRCS)
 
 MAIN_SRCS := src/main.cpp
@@ -304,6 +304,8 @@ parser: $(BIN_DIR) $(TEST_RSP)
 # Test Target
 # =============================
 tests: $(PLATFORM)
+	@echo "Running project formatting test..."
+	./bin/lyra format
 	@echo "========================================"
 	@echo "Running Limit Language Test Suite"
 	@echo "========================================"

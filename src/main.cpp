@@ -1,5 +1,7 @@
 #include "limitly.hh"
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -16,6 +18,9 @@ void printUsage(const char* programName) {
     std::cout << "        -target <target>      Target platform (windows, linux, macos, wasm)\n";
     std::cout << "        -o <output>           Output file name\n";
     std::cout << "        -O <level>            Optimization level (0, 1, 2, 3)\n";
+    std::cout << "\n  Tooling:\n";
+    std::cout << "    " << programName << " -lsp                 Start LSP server\n";
+    std::cout << "    " << programName << " -format <file>       Format a source file\n";
     std::cout << "\n  Debugging:\n";
     std::cout << "    " << programName << " -ast <source_file>      Print the AST\n";
     std::cout << "    " << programName << " -cst <source_file>      Print the CST\n";
@@ -32,6 +37,20 @@ int main(int argc, char* argv[]) {
     std::string command = argv[1];
     LM::CompileOptions options;
     std::string source_file;
+
+    if (command == "-lsp") {
+        LM::LSP::run();
+        return 0;
+    }
+
+    if (command == "-format" && argc >= 3) {
+        std::ifstream file(argv[2]);
+        if (!file.is_open()) return 1;
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        std::cout << LM::Formatter::format(buffer.str()) << std::endl;
+        return 0;
+    }
 
     if (command == "-ast" && argc >= 3) { options.print_ast = true; return LM::Compiler::executeFile(argv[2], options); }
     if (command == "-cst" && argc >= 3) { options.print_cst = true; return LM::Compiler::executeFile(argv[2], options); }
