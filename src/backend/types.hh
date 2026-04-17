@@ -142,18 +142,31 @@ private:
         return from == to;
     }
 
-    // Handle enum type conversions
+    // Handle enum type conversions - Strict identity enforcement
     if (from->tag == TypeTag::Enum && to->tag == TypeTag::Enum) {
         auto fromEnumType = std::get_if<EnumType>(&from->extra);
         auto toEnumType = std::get_if<EnumType>(&to->extra);
 
         if (fromEnumType && toEnumType) {
+            // Enums must be strong, name-based unique types
             return fromEnumType->name == toEnumType->name;
         }
-        return from == to;
+        return false; // Identity is not preserved if info is missing
     }
 
-        // Numeric type conversions - all integer types are compatible with each other
+    // Handle Refined Types - Mandate 7
+    if (from->tag == TypeTag::Refined) {
+        if (auto* refined = std::get_if<RefinedType>(&from->extra)) {
+            return canConvert(refined->baseType, to);
+        }
+    }
+    if (to->tag == TypeTag::Refined) {
+        if (auto* refined = std::get_if<RefinedType>(&to->extra)) {
+            return canConvert(from, refined->baseType);
+        }
+    }
+
+        // Numeric type conversions - Strict enforcement (Mandate 10)
         bool fromIsInt = (from->tag == TypeTag::Int || from->tag == TypeTag::Int8 || 
                          from->tag == TypeTag::Int16 || from->tag == TypeTag::Int32 || 
                          from->tag == TypeTag::Int64 || from->tag == TypeTag::Int128 ||
@@ -179,10 +192,8 @@ private:
             return true;
         }
         
-        // Integer to float conversions (promotion)
-        if (fromIsInt && toIsFloat) {
-            return true;
-        }
+        // Mandate 10: No implicit int -> float
+        // Explicitly removed the promotion branch here.
 
         // Handle list and dict type compatibility
         if (from->tag == TypeTag::List && to->tag == TypeTag::List) {
@@ -226,10 +237,11 @@ private:
             return true;
         }
 
-        // Union and sum type compatibility
+        // Union and sum type compatibility - Mandate 9
         if (from->tag == TypeTag::Union) {
             if (auto* unionType = std::get_if<UnionType>(&from->extra)) {
-                return std::any_of(unionType->types.begin(), unionType->types.end(),
+                // ALL members of source union must be compatible with target
+                return std::all_of(unionType->types.begin(), unionType->types.end(),
                                    [&](TypePtr type) { return canConvert(type, to); });
             }
         }
@@ -701,30 +713,55 @@ public:
     }
 
     TypePtr getCommonType(TypePtr a, TypePtr b)
-    {   if(!a || !b)
-            return nullptr;
-    // Handle Any type
-    if (a->tag == TypeTag::Any) return b;
-    if (b->tag == TypeTag::Any) return a;
+    {
+        if (!a || !b) return nullptr;
+        if (a->tag == TypeTag::Any) return b;
+        if (b->tag == TypeTag::Any) return a;
 
-    // Handle Nil type
-    if (a->tag == TypeTag::Nil) return b;
-    if (b->tag == TypeTag::Nil) return a;
+        // Unify element types for collections (Mandate 3)
+        if (a->tag == TypeTag::List && b->tag == TypeTag::List) {
+            auto aList = std::get_if<ListType>(&a->extra);
+            auto bList = std::get_if<ListType>(&b->extra);
+            if (aList && bList) {
+                return createTypedListType(getCommonType(aList->elementType, bList->elementType));
+            }
+        }
 
-    // Handle Bool type
-    if (a->tag == TypeTag::Bool && b->tag == TypeTag::Bool) {
-        return a;
+        if (a->tag == TypeTag::Dict && b->tag == TypeTag::Dict) {
+            auto aDict = std::get_if<DictType>(&a->extra);
+            auto bDict = std::get_if<DictType>(&b->extra);
+            if (aDict && bDict) {
+                return createTypedDictType(
+                    getCommonType(aDict->keyType, bDict->keyType),
+                    getCommonType(aDict->valueType, bDict->valueType)
+                );
+            }
+        }
+
+        // Numeric unification rules (Mandate 10)
+        bool aIsFloat = (a->tag == TypeTag::Float32 || a->tag == TypeTag::Float64);
+        bool bIsFloat = (b->tag == TypeTag::Float32 || b->tag == TypeTag::Float64);
+        bool aIsInt = isIntegerType(a);
+        bool bIsInt = isIntegerType(b);
+
+        if (aIsFloat || bIsFloat) {
+            if ((aIsFloat || aIsInt) && (bIsFloat || bIsInt)) return FLOAT64_TYPE;
+        }
+
+        if (canConvert(a, b)) return b;
+        if (canConvert(b, a)) return a;
+
+        throw std::runtime_error("Incompatible types: " + a->toString() + " and " + b->toString());
     }
 
-    // If types are the same, return either
-    if (a->tag == b->tag) {
-        return a;
-    }
-
-    // Handle other type conversions
-    if (canConvert(a, b)) return b;
-    if (canConvert(b, a)) return a;
-    throw std::runtime_error("Incompatible types: " + a->toString() + " and " + b->toString());
+    TypePtr unwrapRefined(TypePtr type) {
+        if (!type) return nullptr;
+        if (type->tag == TypeTag::Refined) {
+            if (auto* refined = std::get_if<RefinedType>(&type->extra)) {
+                return unwrapRefined(refined->baseType);
+            }
+        }
+        return type;
     }
 
     void addUserDefinedType(const std::string &name, TypePtr type)
@@ -1538,13 +1575,27 @@ public:
         case TypeTag::Module:
         case TypeTag::Frame:
         case TypeTag::Trait:
+        case TypeTag::Refined: {
+            if (const auto* refined = std::get_if<RefinedType>(&expectedType->extra)) {
+                // Check if value matches the base type
+                // In a full implementation, we'd also evaluate the condition
+                return checkType(value, refined->baseType);
+            }
+            return false;
+        }
+
+        case TypeTag::Structural: {
+            if (const auto* structType = std::get_if<StructuralType>(&expectedType->extra)) {
+                // Basic structural check - ensure it's a UserDefinedValue or similar
+                // that contains fields matching the structural type's fields
+                return std::holds_alternative<UserDefinedValue>(value->complexData);
+            }
+            return false;
+        }
+
         case TypeTag::TraitObject:
             // TODO: implement checks for these
             return false;
-
-        //default:
-        //    throw std::runtime_error("Unsupported type tag: "
-        //                             + std::to_string(static_cast<int>(expectedType->tag)));
         }
 
         // Handle Union type separately, as it can match multiple types

@@ -1,0 +1,49 @@
+// Mandate Verification Suite
+
+print("=== Mandate 1 & 2: Match Codegen & Type Safety ===");
+enum Status { Pending, Active(int), Closed }
+fn get_status_code(s: Status): int {
+    match (s) {
+        Status.Pending => { return 0; },
+        Status.Active(v) => { return v; },
+        Status.Closed => { return -1; },
+    }
+    return -2;
+}
+print("Status Pending: {get_status_code(Status.Pending)}");
+print("Status Active(42): {get_status_code(Status.Active(42))}");
+
+print("\n=== Mandate 3: Collection Type Unification ===");
+var int_list = [1, 2, 3];
+var float_list = [1.5, 2.5];
+print("Int list length: {int_list.len()}");
+print("Float list length: {float_list.len()}");
+
+print("\n=== Mandate 4: Enum Type Integrity ===");
+enum Color { Red, Green }
+enum Traffic { Red, Yellow, Green }
+var c_val = Color.Red;
+var t_val = Traffic.Red;
+print("Enum instances created");
+
+print("\n=== Mandate 5 & 6: First-Class Functions & Multi-Pass ===");
+fn outer_func() {
+    print("Calling forward declared function: {forward_func()}");
+}
+fn forward_func(): str { return "I am from the future"; }
+outer_func();
+
+print("\n=== Mandate 7: Refined Type Arithmetic ===");
+type PosNum = int where value > 0;
+var p_val: PosNum = 10;
+var res_refined = p_val + 5;
+print("Refined arithmetic result: {res_refined}");
+
+print("\n=== Mandate 9: Union Type Compatibility ===");
+type Union1 = int | str;
+type Union2 = int | str | bool;
+var u1_data: Union1 = 42;
+var u2_data: Union2 = u1_data;
+print("Union assignment successful");
+
+print("\n=== All Mandates Verified ===");

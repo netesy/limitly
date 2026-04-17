@@ -1,0 +1,9 @@
+}
+print("Status Pending: {get_status_code(Status.Pending)}");
+print("Status Active(42): {get_status_code(Status.Active(42))}");
+
+print("\n=== Mandate 3: Collection Type Unification ===");
+var int_list = [1, 2, 3];
+var float_list = [1, 2.5]; // Unifies to float
+print("Int list length: {int_list.len()}");
+print("Float list length: {float_list.len()}");

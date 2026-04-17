@@ -99,8 +99,6 @@ void Generator::emit_stmt(LM::Frontend::AST::Statement& stmt) {
         emit_trait_stmt(*trait_stmt);
     } else if (auto frame_stmt = dynamic_cast<LM::Frontend::AST::FrameDeclaration*>(&stmt)) {
         emit_frame_stmt(*frame_stmt);
-    } else if (auto match_stmt = dynamic_cast<LM::Frontend::AST::MatchStatement*>(&stmt)) {
-        emit_match_stmt(*match_stmt);
     } else if (auto module_stmt = dynamic_cast<LM::Frontend::AST::ModuleDeclaration*>(&stmt)) {
         emit_module_stmt(*module_stmt);
     } else if (auto type_decl = dynamic_cast<LM::Frontend::AST::TypeDeclaration*>(&stmt)) {
@@ -1516,177 +1514,93 @@ void Generator::emit_unsafe_stmt(LM::Frontend::AST::UnsafeStatement& stmt) {
 
 
 void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
+    if (!stmt.value) return;
     Reg value_reg = emit_expr(*stmt.value);
-    uint32_t end_label = generate_label();
+    std::vector<size_t> end_jumps;
 
-    std::function<void(Reg, LM::Frontend::AST::Expression&, uint32_t, uint32_t)> emit_pattern_check;
-    emit_pattern_check = [&](Reg candidate, LM::Frontend::AST::Expression& pattern, uint32_t success_label, uint32_t fail_label) {
-        if (auto literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(&pattern)) {
-            if (std::holds_alternative<std::nullptr_t>(literal->value)) {
-                emit_instruction(LIR_Inst(LIR_Op::Jump, success_label, 0, 0));
-                return;
-            }
-
-            Reg literal_reg = emit_expr(*literal);
-            Reg cmp = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::CmpEQ, cmp, candidate, literal_reg));
-            emit_instruction(LIR_Inst(LIR_Op::JumpIf, cmp, success_label, 0));
-            emit_instruction(LIR_Inst(LIR_Op::Jump, fail_label, 0, 0));
-            return;
-        }
-
-        if (auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(&pattern)) {
-            if (var_expr->name != "_") {
-                bind_variable(var_expr->name, candidate);
-            }
-            emit_instruction(LIR_Inst(LIR_Op::Jump, success_label, 0, 0));
-            return;
-        }
-
-        if (auto binding = dynamic_cast<LM::Frontend::AST::BindingPatternExpr*>(&pattern)) {
-            int64_t tag = 0;
-            size_t arity = 0;
-            TypePtr match_type = stmt.value ? stmt.value->inferred_type : nullptr;
-            if (!resolve_match_variant_info(type_system_.get(), match_type, binding->typeName, tag, arity)) {
-                emit_instruction(LIR_Inst(LIR_Op::Jump, fail_label, 0, 0));
-                return;
-            }
-
-            Reg tag_reg = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::GetTag, Type::I64, tag_reg, candidate));
-            Reg expected = allocate_register();
-            auto i64 = std::make_shared<::Type>(::TypeTag::Int64);
-            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, expected, std::make_shared<Value>(i64, tag)));
-            Reg cmp = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::CmpEQ, cmp, tag_reg, expected));
-            uint32_t variant_ok = generate_label();
-            emit_instruction(LIR_Inst(LIR_Op::JumpIf, cmp, variant_ok, 0));
-            emit_instruction(LIR_Inst(LIR_Op::Jump, fail_label, 0, 0));
-            emit_instruction(LIR_Inst(LIR_Op::Label, variant_ok, 0, 0));
-
-            if (!binding->variableNames.empty()) {
-                Reg payload = allocate_register();
-                emit_instruction(LIR_Inst(LIR_Op::GetPayload, Type::Ptr, payload, candidate));
-
-                if (binding->variableNames.size() == 1) {
-                    bind_variable(binding->variableNames[0], payload);
-                } else {
-                    // Multi-bind payload destructure assumes tuple payload
-                    for (size_t i = 0; i < binding->variableNames.size(); ++i) {
-                        Reg idx = allocate_register();
-                        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx, std::make_shared<Value>(i64, static_cast<int64_t>(i))));
-                        Reg element = allocate_register();
-                        emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, element, payload, idx));
-                        if (binding->variableNames[i] != "_") {
-                            bind_variable(binding->variableNames[i], element);
-                        }
-                    }
-                }
-            }
-
-            emit_instruction(LIR_Inst(LIR_Op::Jump, success_label, 0, 0));
-            return;
-        }
-
-        if (auto tuple_pattern = dynamic_cast<LM::Frontend::AST::TuplePatternExpr*>(&pattern)) {
-            auto i64 = std::make_shared<::Type>(::TypeTag::Int64);
-            uint32_t cursor = generate_label();
-            emit_instruction(LIR_Inst(LIR_Op::Jump, cursor, 0, 0));
-            for (size_t i = 0; i < tuple_pattern->elements.size(); ++i) {
-                emit_instruction(LIR_Inst(LIR_Op::Label, cursor, 0, 0));
-                Reg idx = allocate_register();
-                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx, std::make_shared<Value>(i64, static_cast<int64_t>(i))));
-                Reg elem = allocate_register();
-                emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, elem, candidate, idx));
-                uint32_t next = (i + 1 < tuple_pattern->elements.size()) ? generate_label() : success_label;
-                emit_pattern_check(elem, *tuple_pattern->elements[i], next, fail_label);
-                cursor = next;
-            }
-            if (tuple_pattern->elements.empty()) {
-                emit_instruction(LIR_Inst(LIR_Op::Jump, success_label, 0, 0));
-            }
-            return;
-        }
-
-        if (auto list_pattern = dynamic_cast<LM::Frontend::AST::ListPatternExpr*>(&pattern)) {
-            auto i64 = std::make_shared<::Type>(::TypeTag::Int64);
-            Reg len = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::ListLen, Type::I64, len, candidate));
-            Reg expected_len = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, expected_len, std::make_shared<Value>(i64, static_cast<int64_t>(list_pattern->elements.size()))));
-            Reg cmp_len = allocate_register();
-            if (list_pattern->restElement.has_value()) {
-                emit_instruction(LIR_Inst(LIR_Op::CmpGE, cmp_len, len, expected_len));
-            } else {
-                emit_instruction(LIR_Inst(LIR_Op::CmpEQ, cmp_len, len, expected_len));
-            }
-            uint32_t len_ok = generate_label();
-            emit_instruction(LIR_Inst(LIR_Op::JumpIf, cmp_len, len_ok, 0));
-            emit_instruction(LIR_Inst(LIR_Op::Jump, fail_label, 0, 0));
-            emit_instruction(LIR_Inst(LIR_Op::Label, len_ok, 0, 0));
-
-            if (list_pattern->restElement.has_value() && list_pattern->restElement.value() != "_") {
-                // Coarse rest binding fallback: bind original list when slicing helper is unavailable.
-                bind_variable(list_pattern->restElement.value(), candidate);
-            }
-
-            for (size_t i = 0; i < list_pattern->elements.size(); ++i) {
-                Reg idx = allocate_register();
-                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx, std::make_shared<Value>(i64, static_cast<int64_t>(i))));
-                Reg elem = allocate_register();
-                emit_instruction(LIR_Inst(LIR_Op::ListIndex, Type::Ptr, elem, candidate, idx));
-                uint32_t next = (i + 1 < list_pattern->elements.size()) ? generate_label() : success_label;
-                emit_pattern_check(elem, *list_pattern->elements[i], next, fail_label);
-                if (next != success_label) {
-                    emit_instruction(LIR_Inst(LIR_Op::Label, next, 0, 0));
-                }
-            }
-            if (list_pattern->elements.empty()) {
-                emit_instruction(LIR_Inst(LIR_Op::Jump, success_label, 0, 0));
-            }
-            return;
-        }
-
-        // Conservative fallback: unknown pattern kinds fail this branch.
-        emit_instruction(LIR_Inst(LIR_Op::Jump, fail_label, 0, 0));
-    };
+    auto i64_type = std::make_shared<::Type>(::TypeTag::Int64);
 
     for (size_t i = 0; i < stmt.cases.size(); ++i) {
         const auto& match_case = stmt.cases[i];
         enter_scope();
-        uint32_t case_label = generate_label();
-        uint32_t next_case = (i + 1 < stmt.cases.size()) ? generate_label() : end_label;
+        std::vector<size_t> fail_jumps;
 
-        emit_pattern_check(value_reg, *match_case.pattern, case_label, next_case);
+        // Pattern Check
+        if (auto literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(match_case.pattern.get())) {
+            if (!std::holds_alternative<std::nullptr_t>(literal->value)) {
+                Reg literal_reg = emit_expr(*literal);
+                Reg cmp = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::CmpEQ, cmp, value_reg, literal_reg));
+                fail_jumps.push_back(current_function_->instructions.size());
+                emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp, 0));
+            }
+        } else if (auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(match_case.pattern.get())) {
+            if (var_expr->name != "_") {
+                bind_variable(var_expr->name, value_reg);
+            }
+        } else if (auto binding = dynamic_cast<LM::Frontend::AST::BindingPatternExpr*>(match_case.pattern.get())) {
+            int64_t tag = 0; size_t arity = 0;
+            TypePtr m_type = stmt.value->inferred_type;
+            if (m_type && resolve_match_variant_info(type_system_.get(), m_type, binding->typeName, tag, arity)) {
+                Reg tag_reg = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::GetTag, Type::I64, tag_reg, value_reg));
+                Reg expected = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, expected, std::make_shared<Value>(i64_type, tag)));
+                Reg cmp = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::CmpEQ, cmp, tag_reg, expected));
+                fail_jumps.push_back(current_function_->instructions.size());
+                emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp, 0));
 
-        emit_instruction(LIR_Inst(LIR_Op::Label, case_label, 0, 0));
+                if (!binding->variableNames.empty()) {
+                    Reg payload = allocate_register();
+                    emit_instruction(LIR_Inst(LIR_Op::GetPayload, Type::Ptr, payload, value_reg));
+                    if (binding->variableNames.size() == 1) {
+                        if (binding->variableNames[0] != "_") bind_variable(binding->variableNames[0], payload);
+                    } else {
+                        for (size_t v_idx = 0; v_idx < binding->variableNames.size(); ++v_idx) {
+                            Reg idx_reg = allocate_register();
+                            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, std::make_shared<Value>(i64_type, static_cast<int64_t>(v_idx))));
+                            Reg elem = allocate_register();
+                            emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, elem, payload, idx_reg));
+                            if (binding->variableNames[v_idx] != "_") bind_variable(binding->variableNames[v_idx], elem);
+                        }
+                    }
+                }
+            } else {
+                fail_jumps.push_back(current_function_->instructions.size());
+                emit_instruction(LIR_Inst(LIR_Op::Jump, 0));
+            }
+        }
+
+        // Guard Check
         if (match_case.guard) {
             Reg guard_reg = emit_expr(*match_case.guard);
-            uint32_t guard_ok = generate_label();
-            emit_instruction(LIR_Inst(LIR_Op::JumpIf, guard_reg, guard_ok, 0));
-            emit_instruction(LIR_Inst(LIR_Op::Jump, next_case, 0, 0));
-            emit_instruction(LIR_Inst(LIR_Op::Label, guard_ok, 0, 0));
+            fail_jumps.push_back(current_function_->instructions.size());
+            emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, guard_reg, 0));
         }
 
+        // Body
         if (match_case.body) {
-            enter_scope();
             emit_stmt(*match_case.body);
-            exit_scope();
         }
-        emit_instruction(LIR_Inst(LIR_Op::Jump, end_label, 0, 0));
 
-        if (next_case != end_label) {
-            emit_instruction(LIR_Inst(LIR_Op::Label, next_case, 0, 0));
+        // Jump to end of match after successful execution
+        end_jumps.push_back(current_function_->instructions.size());
+        emit_instruction(LIR_Inst(LIR_Op::Jump, 0));
+
+        // Patch failure jumps to next case start
+        size_t next_case_pc = current_function_->instructions.size();
+        for (size_t f_pc : fail_jumps) {
+            current_function_->instructions[f_pc].imm = next_case_pc;
         }
         exit_scope();
     }
 
-    // Explicit fallthrough case if no pattern matched
-    emit_instruction(LIR_Inst(LIR_Op::Jump, end_label, 0, 0));
-    // If no cases matched, we need a default behavior
-    // For industry grade, this should probably panic or throw if not exhaustive
-    // But for now, we just jump to the end_label if we fall through all cases
-    emit_instruction(LIR_Inst(LIR_Op::Label, end_label, 0, 0));
+    // Final Patch: All successful ends jump to after the match
+    size_t match_end_pc = current_function_->instructions.size();
+    for (size_t e_pc : end_jumps) {
+        current_function_->instructions[e_pc].imm = match_end_pc;
+    }
 }
 
 
