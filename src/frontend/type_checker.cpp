@@ -113,17 +113,6 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
         }
     }
 
-
-    // Register built-in and already-discovered symbols in the global scope
-    for (const auto& pair : function_signatures) {
-        TypePtr type = type_system.FUNCTION_TYPE;
-        auto vt_it = variable_types.find(pair.first);
-        if (vt_it != variable_types.end()) {
-            type = vt_it->second;
-        }
-        declare_variable(pair.first, type);
-    }
-    
     // PASS 1: Name Registration (including inlined symbols)
     auto register_name = [&](const std::string& name, const std::shared_ptr<LM::Frontend::AST::Statement>& stmt) {
         if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
@@ -249,10 +238,22 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
         if (auto frame = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) name = frame->name;
         else if (auto trait = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) name = trait->name;
         else if (auto func = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) name = func->name;
+        else if (auto enm = std::dynamic_pointer_cast<LM::Frontend::AST::EnumDeclaration>(stmt)) name = enm->name;
         if (!name.empty()) resolve_sig(name, stmt);
     }
     for (const auto& [name, stmt] : program->imported_symbols) {
         resolve_sig(name, stmt);
+    }
+
+    // PASS 2.5: Global Scope Population
+    // Register built-in and already-discovered symbols in the global scope
+    for (const auto& pair : function_signatures) {
+        TypePtr type = type_system.FUNCTION_TYPE;
+        auto vt_it = variable_types.find(pair.first);
+        if (vt_it != variable_types.end()) {
+            type = vt_it->second;
+        }
+        declare_variable(pair.first, type);
     }
 
     // PASS 3: Body Verification (local and inlined symbols)
@@ -1659,16 +1660,24 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
     TypePtr left_type = check_expression(expr->left);
     TypePtr right_type = check_expression(expr->right);
     
+    // Mandate 7: Automatically unwrap refined types for operations
+    TypePtr left_base = type_system.unwrapRefined(left_type);
+    TypePtr right_base = type_system.unwrapRefined(right_type);
+
+    // If unwrapped, update the inferred type of operands for the backend
+    if (left_type->tag == TypeTag::Refined) expr->left->inferred_type = left_base;
+    if (right_type->tag == TypeTag::Refined) expr->right->inferred_type = right_base;
+
     switch (expr->op) {
         case TokenType::PLUS:
         case TokenType::MINUS:
         case TokenType::STAR:
         case TokenType::SLASH:
-            // Arithmetic operations
-            if (is_numeric_type(left_type) && is_numeric_type(right_type)) {
-                return promote_numeric_types(left_type, right_type);
+            // Arithmetic operations - Mandate 10: promotion rules
+            if (is_numeric_type(left_base) && is_numeric_type(right_base)) {
+                return promote_numeric_types(left_base, right_base);
             } else if (expr->op == TokenType::PLUS && 
-                      (is_string_type(left_type) || is_string_type(right_type))) {
+                      (is_string_type(left_base) || is_string_type(right_base))) {
                 return type_system.STRING_TYPE;
             }
             add_error("Invalid operand types for arithmetic operation", expr->line);
@@ -1709,7 +1718,8 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryEx
     if (!expr) return nullptr;
     
     TypePtr right_type = check_expression(expr->right);
-    
+    TypePtr right_base = type_system.unwrapRefined(right_type);
+
     switch (expr->op) {
         case TokenType::BANG:
             // Logical NOT
@@ -1721,13 +1731,13 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryEx
         case TokenType::MINUS:
         case TokenType::PLUS:
             // Numeric negation/affirmation
-            if (!is_numeric_type(right_type)) {
-                add_type_error("numeric", right_type->toString(), expr->line);
+            if (!is_numeric_type(right_base)) {
+                add_type_error("numeric", right_base->toString(), expr->line);
             }
             
             // Special case: Handle large integers that were parsed as float due to overflow
             // but should be integers when negated (e.g., -9223372036854775808 = INT64_MIN)
-            if (expr->op == TokenType::MINUS && right_type->tag == TypeTag::Float64) {
+            if (expr->op == TokenType::MINUS && right_base->tag == TypeTag::Float64) {
                 if (auto literal = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr->right)) {
                     if (std::holds_alternative<std::string>(literal->value)) {
                         const std::string& str = std::get<std::string>(literal->value);
@@ -2795,6 +2805,35 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
         }
     }
     
+    // Handle List types (e.g., [int])
+    if (annotation->isList) {
+        TypePtr elemType = type_system.ANY_TYPE;
+        if (!annotation->functionParams.empty()) {
+            elemType = resolve_type_annotation(annotation->functionParams[0]);
+        }
+        return type_system.createTypedListType(elemType);
+    }
+
+    // Handle Dict types (e.g., {str: int})
+    if (annotation->isDict) {
+        TypePtr keyType = type_system.STRING_TYPE;
+        TypePtr valType = type_system.ANY_TYPE;
+        if (annotation->functionParams.size() >= 2) {
+            keyType = resolve_type_annotation(annotation->functionParams[0]);
+            valType = resolve_type_annotation(annotation->functionParams[1]);
+        }
+        return type_system.createTypedDictType(keyType, valType);
+    }
+
+    // Handle Tuple types (e.g., (int, str))
+    if (annotation->isTuple) {
+        std::vector<TypePtr> elementTypes;
+        for (const auto& t : annotation->tupleTypes) {
+            elementTypes.push_back(resolve_type_annotation(t));
+        }
+        return type_system.createTupleType(elementTypes);
+    }
+
     // First try to get the base type from the type system (handles built-in types and aliases)
     TypePtr base_type = type_system.getType(annotation->typeName);
     
@@ -3556,16 +3595,6 @@ void TypeChecker::validate_pattern_compatibility(std::shared_ptr<LM::Frontend::A
                 auto it = variable_types.find(bindingPattern->typeName);
                 if (it != variable_types.end()) {
                     constructorType = it->second;
-                } else {
-                    std::cout << "[DEBUG] '" << bindingPattern->typeName << "' (len=" << bindingPattern->typeName.length() << ") NOT FOUND. Hex: ";
-                    for (char c : bindingPattern->typeName) {
-                        std::printf("%02x ", (unsigned char)c);
-                    }
-                    std::cout << std::endl;
-                    std::cout << "[DEBUG] Sample variable_types key: 'Message.Move' (len=12) Hex: ";
-                    std::string s = "Message.Move";
-                    for (char c : s) std::printf("%02x ", (unsigned char)c);
-                    std::cout << std::endl;
                 }
             }
 
@@ -3579,7 +3608,6 @@ void TypeChecker::validate_pattern_compatibility(std::shared_ptr<LM::Frontend::A
             }
 
             if (constructorType) {
-                std::cout << "[DEBUG] Resolved constructor " << bindingPattern->typeName << " : " << constructorType->toString() << " tag=" << (int)constructorType->tag << std::endl;
                 if (constructorType->tag == TypeTag::Function) {
                     auto* funcType = std::get_if<FunctionType>(&constructorType->extra);
                     if (funcType) {
@@ -3820,7 +3848,8 @@ TypePtr TypeChecker::check_match_statement(std::shared_ptr<LM::Frontend::AST::Ma
     
     // Check the matched expression
     TypePtr matchType = check_expression(match_stmt->value);
-    
+    TypePtr unified_branch_type = nullptr;
+
     // Check each case
     for (auto& matchCase : match_stmt->cases) {
         enter_scope();
@@ -3837,10 +3866,23 @@ TypePtr TypeChecker::check_match_statement(std::shared_ptr<LM::Frontend::AST::Ma
         }
         
         // Check case body
-        check_statement(matchCase.body);
+        TypePtr branch_type = check_statement(matchCase.body);
+
+        // Mandate 2: All branches must resolve to a single unified type
+        if (!unified_branch_type) {
+            unified_branch_type = branch_type;
+        } else if (branch_type) {
+            try {
+                unified_branch_type = type_system.getCommonType(unified_branch_type, branch_type);
+            } catch (const std::exception& e) {
+                add_error("Match branch type mismatch: " + std::string(e.what()), match_stmt->line);
+            }
+        }
         
         exit_scope();
     }
+
+    match_stmt->inferred_type = unified_branch_type ? unified_branch_type : type_system.NIL_TYPE;
     
     // Convert cases to shared_ptr vector for function calls
     std::vector<std::shared_ptr<LM::Frontend::AST::MatchCase>> case_ptrs;

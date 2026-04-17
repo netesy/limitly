@@ -1,0 +1,10 @@
+print("\n=== Mandate 9: Union Type Compatibility ===");
+type U1 = int | str;
+type U2 = int | str | bool;
+var u1_val: U1 = 42;
+var u2_val: U2 = u1_val;
+print("Union assignment successful");
+
+print("\n=== Mandate 10: Strict Conversions ===");
+var i_val: int = 42;
+var f_val: float = i_val as float;

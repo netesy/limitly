@@ -239,7 +239,7 @@ windows: $(BIN_DIR) $(MAIN_RSP) liblimitly $(LYRA_BIN)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/libLimitly.a $(RUNTIME_LIB) $(FYRA_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS)
 	@echo "✅ limitly.exe built."
 
-linux: $(BIN_DIR) $(MAIN_RSP) liblimitly $(LYRA_BIN)
+linux: $(BIN_DIR) $(MAIN_RSP) liblimitly
 	@echo "🔨 Linking limitly ..."
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/libLimitly.a $(RUNTIME_LIB) $(FYRA_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS) -lpthread
 	@echo "✅ limitly built."

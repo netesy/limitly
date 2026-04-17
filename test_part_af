@@ -1,0 +1,3 @@
+print("Explicit cast result: {f_val}");
+
+print("\n=== All Mandates Verified ===");
