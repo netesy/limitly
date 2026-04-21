@@ -1583,7 +1583,7 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
         if (match_case.body) {
             emit_stmt(*match_case.body);
         }
-
+        
         // Jump to end of match after successful execution
         end_jumps.push_back(current_function_->instructions.size());
         emit_instruction(LIR_Inst(LIR_Op::Jump, 0));

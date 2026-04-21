@@ -15,6 +15,7 @@
 #include <charconv>
 #include "channel.hh"
 #include <atomic>
+#include <iostream>
 
 // Forward declaration for Register::Channel
 namespace LM {
@@ -385,7 +386,8 @@ struct Type
     
     Type(TypeTag t, const DictType& dictType)
         : tag(t), extra(dictType)
-    {}
+    {
+    }
     
     Type(TypeTag t, const TupleType& tupleType)
         : tag(t), extra(tupleType)
@@ -397,7 +399,8 @@ struct Type
     
     Type(TypeTag t, const FunctionType& functionType)
         : tag(t), extra(functionType)
-    {}
+    {
+    }
     
     Type(TypeTag t, const SumType& sumType)
         : tag(t), extra(sumType)
@@ -442,6 +445,11 @@ struct Type
 
     std::string toString() const
     {
+        return toString_internal();
+    }
+
+    std::string toString_internal() const
+    {
         switch (tag) {
         case TypeTag::Nil:
             return "Nil";
@@ -477,10 +485,20 @@ struct Type
             return "Float64";
         case TypeTag::String:
             return "String";
-        case TypeTag::List:
+        case TypeTag::List: {
+            if (const auto* listType = std::get_if<ListType>(&extra)) {
+                return "List<" + (listType->elementType ? listType->elementType->toString() : "Any") + ">";
+            }
             return "List";
-        case TypeTag::Dict:
-            return "Dict";
+        }
+        case TypeTag::Dict: {
+            if (const auto* dictType = std::get_if<DictType>(&extra)) {
+                return "Dict<" + (dictType->keyType ? dictType->keyType->toString() : "Any") + ", " + (dictType->valueType ? dictType->valueType->toString() : "Any") + ">";
+            }
+            std::ostringstream oss;
+            oss << "Dict(failed get_if, index=" << extra.index() << ")";
+            return oss.str();
+        }
         case TypeTag::Tuple: {
             if (const auto* tupleType = std::get_if<TupleType>(&extra)) {
                 return tupleType->toString();
@@ -497,7 +515,9 @@ struct Type
             if (const auto* funcType = std::get_if<FunctionType>(&extra)) {
                 return funcType->toString();
             }
-            return "Function";  // Generic function type
+            std::ostringstream oss;
+            oss << "Function(failed get_if, index=" << extra.index() << ")";
+            return oss.str();
         }
         case TypeTag::Closure:
             return "Closure";
@@ -575,23 +595,91 @@ struct Type
 
     bool operator==(const Type &other) const {
         if (tag != other.tag) return false;
-        if (tag == TypeTag::Enum) {
-            auto* enumThis = std::get_if<EnumType>(&extra);
-            auto* enumOther = std::get_if<EnumType>(&other.extra);
-            if (enumThis && enumOther) {
-                return enumThis->name == enumOther->name;
+        
+        switch (tag) {
+            case TypeTag::Enum: {
+                auto* enumThis = std::get_if<EnumType>(&extra);
+                auto* enumOther = std::get_if<EnumType>(&other.extra);
+                if (enumThis && enumOther) return enumThis->name == enumOther->name;
+                return enumThis == enumOther;
             }
-            return enumThis == enumOther; // Both null is true
-        }
-        if (tag == TypeTag::Frame) {
-            auto* frameThis = std::get_if<FrameType>(&extra);
-            auto* frameOther = std::get_if<FrameType>(&other.extra);
-            if (frameThis && frameOther) {
-                return frameThis->name == frameOther->name;
+            case TypeTag::Frame: {
+                auto* frameThis = std::get_if<FrameType>(&extra);
+                auto* frameOther = std::get_if<FrameType>(&other.extra);
+                if (frameThis && frameOther) return frameThis->name == frameOther->name;
+                return frameThis == frameOther;
             }
-            return frameThis == frameOther;
+            case TypeTag::List: {
+                auto* listThis = std::get_if<ListType>(&extra);
+                auto* listOther = std::get_if<ListType>(&other.extra);
+                if (listThis && listOther) {
+                    if (!listThis->elementType || !listOther->elementType) return listThis->elementType == listOther->elementType;
+                    return *listThis->elementType == *listOther->elementType;
+                }
+                return listThis == listOther;
+            }
+            case TypeTag::Dict: {
+                auto* dictThis = std::get_if<DictType>(&extra);
+                auto* dictOther = std::get_if<DictType>(&other.extra);
+                if (dictThis && dictOther) {
+                    bool keysMatch = false;
+                    if (!dictThis->keyType || !dictOther->keyType) keysMatch = (dictThis->keyType == dictOther->keyType);
+                    else keysMatch = (*dictThis->keyType == *dictOther->keyType);
+                    
+                    bool valuesMatch = false;
+                    if (!dictThis->valueType || !dictOther->valueType) valuesMatch = (dictThis->valueType == dictOther->valueType);
+                    else valuesMatch = (*dictThis->valueType == *dictOther->valueType);
+                    
+                    return keysMatch && valuesMatch;
+                }
+                return dictThis == dictOther;
+            }
+            case TypeTag::Tuple: {
+                auto* tupleThis = std::get_if<TupleType>(&extra);
+                auto* tupleOther = std::get_if<TupleType>(&other.extra);
+                if (tupleThis && tupleOther) {
+                    if (tupleThis->elementTypes.size() != tupleOther->elementTypes.size()) return false;
+                    for (size_t i = 0; i < tupleThis->elementTypes.size(); ++i) {
+                        if (!tupleThis->elementTypes[i] || !tupleOther->elementTypes[i]) {
+                            if (tupleThis->elementTypes[i] != tupleOther->elementTypes[i]) return false;
+                        } else if (*tupleThis->elementTypes[i] != *tupleOther->elementTypes[i]) return false;
+                    }
+                    return true;
+                }
+                return tupleThis == tupleOther;
+            }
+            case TypeTag::Union: {
+                auto* unionThis = std::get_if<UnionType>(&extra);
+                auto* unionOther = std::get_if<UnionType>(&other.extra);
+                if (unionThis && unionOther) {
+                    if (unionThis->types.size() != unionOther->types.size()) return false;
+                    for (size_t i = 0; i < unionThis->types.size(); ++i) {
+                         if (!unionThis->types[i] || !unionOther->types[i]) {
+                            if (unionThis->types[i] != unionOther->types[i]) return false;
+                        } else if (*unionThis->types[i] != *unionOther->types[i]) return false;
+                    }
+                    return true;
+                }
+                return unionThis == unionOther;
+            }
+             case TypeTag::Function: {
+                auto* funcThis = std::get_if<FunctionType>(&extra);
+                auto* funcOther = std::get_if<FunctionType>(&other.extra);
+                if (funcThis && funcOther) {
+                    if (funcThis->paramTypes.size() != funcOther->paramTypes.size()) return false;
+                    for (size_t i = 0; i < funcThis->paramTypes.size(); ++i) {
+                         if (!funcThis->paramTypes[i] || !funcOther->paramTypes[i]) {
+                            if (funcThis->paramTypes[i] != funcOther->paramTypes[i]) return false;
+                        } else if (*funcThis->paramTypes[i] != *funcOther->paramTypes[i]) return false;
+                    }
+                    if (!funcThis->returnType || !funcOther->returnType) return funcThis->returnType == funcOther->returnType;
+                    return *funcThis->returnType == *funcOther->returnType;
+                }
+                return funcThis == funcOther;
+            }
+            default:
+                return true;
         }
-        return true;
     }
     bool operator!=(const Type &other) const { return !(*this == other); }
 };
@@ -609,6 +697,7 @@ constexpr int getSizeInBits(TypeTag tag)
     case TypeTag::UInt:
     case TypeTag::Int32:
     case TypeTag::UInt32:
+        return 32;
     case TypeTag::Float32:
         return 32;
     case TypeTag::Int64:

@@ -949,10 +949,6 @@ TypePtr TypeChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::Va
             // String type identity fix
             final_type = declared_type;
         } else {
-            std::cerr << "[DEBUG] Compat fail: declared=" << declared_type->toString()
-                      << " tag=" << (int)declared_type->tag
-                      << " init=" << init_type->toString()
-                      << " tag=" << (int)init_type->tag << std::endl;
             add_type_error(declared_type->toString(), init_type->toString(), var_decl->line);
             final_type = declared_type; // Use declared type anyway
         }
@@ -3867,7 +3863,7 @@ TypePtr TypeChecker::check_match_statement(std::shared_ptr<LM::Frontend::AST::Ma
         
         // Check case body
         TypePtr branch_type = check_statement(matchCase.body);
-
+        
         // Mandate 2: All branches must resolve to a single unified type
         if (!unified_branch_type) {
             unified_branch_type = branch_type;
