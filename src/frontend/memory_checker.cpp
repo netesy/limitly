@@ -30,6 +30,14 @@ using namespace LM::Error;MemoryCheckResult MemoryChecker::check_program(std::sh
     
     // Enter initial memory region
     enter_memory_region();
+    for (const auto& [name, stmt] : program->imported_symbols) { initialized_variables.insert(name); }
+    for (auto& stmt : program->statements) {
+        if (auto func = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) { initialized_variables.insert(func->name); }
+    }
+    for (const auto& [name, stmt] : program->imported_symbols) { initialized_variables.insert(name); }
+    for (auto& stmt : program->statements) {
+        if (auto func = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) { initialized_variables.insert(func->name); }
+    }
     
     // Check all statements for memory safety
     for (auto& stmt : program->statements) {
@@ -110,7 +118,7 @@ void MemoryChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::Var
                                var_expr->line);
             } else {
                 // Mark source variable as moved (for linear types)
-                mark_variable_moved(var_expr->name);
+                if (!(var_expr->inferred_type && var_expr->inferred_type->tag == TypeTag::Function)) mark_variable_moved(var_expr->name);
             }
         }
     }
@@ -130,7 +138,7 @@ void MemoryChecker::check_assignment(std::shared_ptr<LM::Frontend::AST::AssignEx
                            var_expr->line);
         } else {
             // Mark source variable as moved (for linear types)
-            mark_variable_moved(var_expr->name);
+            if (!(var_expr->inferred_type && var_expr->inferred_type->tag == TypeTag::Function)) mark_variable_moved(var_expr->name);
         }
     }
     

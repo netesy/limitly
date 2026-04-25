@@ -26,10 +26,10 @@ endif
 MODE ?= release
 
 ifeq ($(MODE),debug)
-	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Ivendor/fyra/include -Ivendor/fyra/src $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Ivendor/fyra/include -Ivendor/fyra/src  $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -g -fPIC -I.
 else
-	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Ivendor/fyra/include -Ivendor/fyra/src $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Ivendor/fyra/include -Ivendor/fyra/src  $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -O3 -fPIC -I.
 endif
 
@@ -67,12 +67,30 @@ BACK_SRCS := src/backend/fyra/fyra.cpp src/backend/fyra/fyra_ir_generator.cpp sr
 FYRA_DIR := vendor/fyra
 FYRA_SRCS := $(wildcard $(FYRA_DIR)/src/ir/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/codegen/*.cpp) \
+			 $(wildcard $(FYRA_DIR)/src/codegen/abi/*.cpp) \
+			 $(wildcard $(FYRA_DIR)/src/codegen/asm/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/codegen/debug/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/codegen/target/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/codegen/execgen/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/codegen/objectgen/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/codegen/profiling/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/codegen/regalloc/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/codegen/validation/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/codegen/optimize/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/target/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/target/architecture/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/target/architecture/aarch64/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/target/architecture/riscv64/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/target/architecture/wasm32/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/target/architecture/x64/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/target/artifact/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/target/artifact/apk/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/target/artifact/executable/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/target/capabilities/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/target/core/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/target/os/linux/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/target/os/macos/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/target/os/wasi/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/target/os/windows/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/transforms/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/parser/*.cpp)
 
@@ -111,7 +129,7 @@ TEST_SRCS := src/test_parser.cpp $(BACKEND_COMMON_SRCS) $(LIR_CORE_SRCS) $(ERROR
 # =============================
 # Objects and response files
 # =============================
-LIB_LIMITLY_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(LIB_LIMITLY_SRCS))
+LIB_LIMITLY_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(LIB_LIMITLY_SRCS)) $(FYRA_OBJS)
 MAIN_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(MAIN_SRCS))
 TEST_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(TEST_SRCS))
 
@@ -203,9 +221,9 @@ $(FYRA_LIB): $(FYRA_OBJS)
 # =============================
 # Lyra Package Manager
 # =============================
-$(LYRA_BIN): $(LYRA_OBJS) liblimitly | $(BIN_DIR)
+$(LYRA_BIN): $(LYRA_OBJS) | $(BIN_DIR)
 	@echo "🔨 Building Lyra package manager..."
-	$(CXX) -std=c++20 -Wall -Wextra -I$(LYRA_DIR)/include -I. $(LYRA_OBJS) $(OBJ_DIR)/libLimitly.a $(RUNTIME_LIB) $(FYRA_LIB) -o $@ -lpthread
+	$(CXX) -std=c++17 -Wall -Wextra -I$(LYRA_DIR)/include $(LYRA_OBJS) -o $@
 	@echo "✅ Lyra built: $@"
 
 # Lyra object compilation

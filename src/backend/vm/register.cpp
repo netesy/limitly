@@ -58,11 +58,13 @@ RegisterValue unbox_register_value(void* boxed_value) {
         return nullptr;
     }
     
-    // Use the runtime unboxing functions
-    LmBox* box = static_cast<LmBox*>(boxed_value);
-    if (!box) {
+    // Safety check: if the pointer is very small, it's not a valid object
+    if (reinterpret_cast<uintptr_t>(boxed_value) < 4096) {
         return nullptr;
     }
+
+    // Use the runtime unboxing functions
+    LmBox* box = static_cast<LmBox*>(boxed_value);
     
     switch (box->type) {
         case LM_BOX_INT:
@@ -296,6 +298,7 @@ RegisterVM::RegisterVM()
 
 void RegisterVM::reset() {
     std::fill(registers.begin(), registers.end(), nullptr);
+    argument_stack.clear();
     task_contexts.clear();
     channels.clear();
     scheduler = std::make_unique<Scheduler>();
@@ -325,6 +328,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
     
     // Main execution loop using switch statement
     while (pc < end) {
+        std::cout << "[VM TRACE] " << function.name << " PC=" << (pc - function.instructions.data()) << " " << pc->to_string() << std::endl;
         instruction_count++;
         if (instruction_count > MAX_INSTRUCTIONS) {
             std::cerr << "Error: Instruction limit exceeded (" << MAX_INSTRUCTIONS << ") - possible infinite loop" << std::endl;
@@ -494,7 +498,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                     } else if (target_type->tag == TypeTag::Bool) {
                         registers[pc->dst] = static_cast<bool>(cv->data == "true");
                     } else if (target_type->tag == TypeTag::String) {
-                        registers[pc->dst] = std::string(static_cast<const char*>(cv->data.c_str()));
+                        registers[pc->dst] = cv->data;
                     } else {
                         registers[pc->dst] = nullptr;
                     }
@@ -503,7 +507,9 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             }
             case LIR::LIR_Op::Ret: {
                 // Copy return value from specified register to register 0 (standard return register)
-                if (pc->dst != 0) {
+                if (pc->a != 0) {
+                    registers[0] = registers[pc->a];
+                } else if (pc->dst != 0) {
                     registers[0] = registers[pc->dst];
                 }
                 return;
@@ -742,7 +748,9 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             }
             case LIR::LIR_Op::Return: {
                 // Copy return value from specified register to register 0 (standard return register)
-                if (pc->dst != 0) {
+                if (pc->a != 0) {
+                    registers[0] = registers[pc->a];
+                } else if (pc->dst != 0) {
                     registers[0] = registers[pc->dst];
                 }
                 return;
@@ -1124,7 +1132,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             }
             case LIR::LIR_Op::TupleCreate: {
                 // Create a proper tuple using C runtime with size
-                uint64_t size = static_cast<uint64_t>(pc->b);
+                uint64_t size = static_cast<uint64_t>(pc->imm);
                 void* tuple = lm_tuple_new(size);
                 registers[pc->dst] = static_cast<int64_t>(reinterpret_cast<uintptr_t>(tuple));
                 break;
@@ -1512,6 +1520,53 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 }
                 break;
             }
+            case LIR::LIR_Op::CallIndirect: {
+                const RegisterValue& func_val = registers[pc->a];
+                std::string func_name;
+                if (std::holds_alternative<std::string>(func_val)) {
+                    func_name = std::get<std::string>(func_val);
+                } else {
+                    registers[pc->dst] = nullptr;
+                    break;
+                }
+
+                auto& func_manager = LIR::LIRFunctionManager::getInstance();
+                auto func = func_manager.getFunction(func_name);
+
+                if (func) {
+                    auto saved_registers = registers;
+                    const LIR::LIR_Function* saved_func = current_function_;
+                    size_t param_count = func->getParameters().size();
+                    std::vector<RegisterValue> args;
+                    
+                    // Pop arguments in correct order (they were pushed in order, so popping gives reverse)
+                    for (size_t i = 0; i < param_count && !argument_stack.empty(); ++i) {
+                        args.insert(args.begin(), argument_stack.back());
+                        argument_stack.pop_back();
+                    }
+                    argument_stack.clear();
+
+                    // Reset registers for new call frame
+                    registers.assign(registers.size(), nullptr);
+                    for (size_t i = 0; i < args.size() && i < registers.size(); ++i) {
+                        registers[i] = args[i];
+                    }
+                    
+                    LIR::LIR_Function temp_wrapper(func->getName(), static_cast<uint32_t>(param_count));
+                    temp_wrapper.instructions = func->getInstructions();
+                    current_function_ = &temp_wrapper;
+
+                    execute_instructions(temp_wrapper, 0, temp_wrapper.instructions.size());
+                    
+                    RegisterValue return_value = registers[0];
+                    registers = saved_registers;
+                    current_function_ = saved_func;
+                    registers[pc->dst] = return_value;
+                } else {
+                    registers[pc->dst] = nullptr;
+                }
+                break;
+            }
             case LIR::LIR_Op::Call: {
                 // Handle both builtin and user function calls using new LIR format
                 if (!pc->func_name.empty()) {
@@ -1519,7 +1574,55 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                     const auto& arg_regs = pc->call_args;
                     // std::cout << "[VM DEBUG] Call: " << func_name << " dst=" << pc->dst << std::endl;
                     
-                    // First try builtin functions
+                    // Then try user-defined functions FIRST to allow shadowing builtins
+                    auto& func_manager = LIR::LIRFunctionManager::getInstance();
+                    if (func_manager.hasFunction(func_name)) {
+                        auto func = func_manager.getFunction(func_name);
+                        
+                        if (func) {
+                            auto saved_registers = registers;
+                            
+                            // Use a temporary vector to avoid overwriting registers that are used as source for subsequent parameters
+                            std::vector<RegisterValue> args;
+                            for (size_t i = 0; i < arg_regs.size(); ++i) {
+                                args.push_back(registers[arg_regs[i]]);
+                            }
+
+                            // Save current context
+                            const LIR::LIR_Function* saved_func = current_function_;
+
+                            // Set up parameters and clear other registers to prevent state leakage/corruption
+                            size_t param_count = func->getParameters().size();
+                            for (size_t i = 0; i < registers.size(); ++i) {
+                                if (i < param_count) {
+                                    registers[i] = (i < args.size()) ? args[i] : nullptr;
+                                } else {
+                                    registers[i] = nullptr;
+                                }
+                            }
+                            
+                            // Execute function
+                            LIR::LIR_Function temp_wrapper(func->getName(), param_count);
+                            temp_wrapper.instructions = func->getInstructions();
+                            current_function_ = &temp_wrapper;
+
+                            execute_instructions(temp_wrapper, 0, temp_wrapper.instructions.size());
+                            
+                            // Get return value from register 0 (standard return register)
+                            RegisterValue return_value = registers[0];
+                            
+                            // Restore caller's context
+                            registers = saved_registers;
+                            current_function_ = saved_func;
+                            
+                            // Set return value in destination register
+                            registers[pc->dst] = return_value;
+                            
+                            break;
+                        }
+                    }
+
+                    // Then try builtin functions
                     if (LIR::BuiltinUtils::isBuiltinFunction(func_name)) {
                         std::vector<ValuePtr> args;
                         
@@ -1580,54 +1683,6 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                         break;
                     }
                     
-                    // Then try user-defined functions
-                    auto& func_manager = LIR::LIRFunctionManager::getInstance();
-                    if (func_manager.hasFunction(func_name)) {
-                        auto func = func_manager.getFunction(func_name);
-                        
-                        if (func) {
-                            auto saved_registers = registers;
-                            
-                            // Use a temporary vector to avoid overwriting registers that are used as source for subsequent parameters
-                            std::vector<RegisterValue> args;
-                            for (size_t i = 0; i < arg_regs.size(); ++i) {
-                                args.push_back(registers[arg_regs[i]]);
-                            }
-
-                            // Save current context
-                            const LIR::LIR_Function* saved_func = current_function_;
-
-                            // Set up parameters and clear other registers to prevent state leakage/corruption
-                            size_t param_count = func->getParameters().size();
-                            for (size_t i = 0; i < registers.size(); ++i) {
-                                if (i < param_count) {
-                                    registers[i] = (i < args.size()) ? args[i] : nullptr;
-                                } else {
-                                    registers[i] = nullptr;
-                                }
-                            }
-                            
-                            // Execute function
-                            LIR::LIR_Function temp_wrapper(func->getName(), param_count);
-                            temp_wrapper.instructions = func->getInstructions();
-                            current_function_ = &temp_wrapper;
-
-                            execute_instructions(temp_wrapper, 0, temp_wrapper.instructions.size());
-                            
-                            // Get return value from register 0 (standard return register)
-                            RegisterValue return_value = registers[0];
-                            
-                            // Restore caller's context
-                            registers = saved_registers;
-                            current_function_ = saved_func;
-                            
-                            // Set return value in destination register
-                            registers[pc->dst] = return_value;
-                            
-                            break;
-                        }
-                    }
-                    
                     // Function not found
                     std::cerr << "Error: Function '" << func_name << "' not found" << std::endl;
                     registers[pc->dst] = nullptr;
@@ -1653,7 +1708,11 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             }
             case LIR::LIR_Op::Label:
             case LIR::LIR_Op::FuncDef:
-            case LIR::LIR_Op::Param:
+                break;
+            case LIR::LIR_Op::Param: {
+                argument_stack.push_back(registers[pc->a]);
+                break;
+            }
             case LIR::LIR_Op::ConstructError: {
                 std::string errorType = "DefaultError";
                 std::string errorMessage = "Operation failed";

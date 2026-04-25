@@ -208,7 +208,7 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
             if (func_decl->name == "main") {
                  sig.return_type = type_system.INT64_TYPE;
             } else {
-                 sig.return_type = func_decl->returnType ? resolve_type_annotation(func_decl->returnType.value()) : type_system.STRING_TYPE;
+                 sig.return_type = func_decl->returnType ? resolve_type_annotation(func_decl->returnType.value()) : type_system.NIL_TYPE;
             }
             sig.declaration = func_decl;
             sig.can_fail = func_decl->canFail || func_decl->throws;
@@ -222,7 +222,20 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                 sig.optional_params.push_back(true);
             }
             function_signatures[name] = sig;
-            declare_variable(name, type_system.FUNCTION_TYPE);
+            
+            std::vector<std::string> param_names;
+            std::vector<bool> has_defaults;
+            for (const auto& p : func_decl->params) {
+                param_names.push_back(p.first);
+                has_defaults.push_back(false);
+            }
+            for (const auto& op : func_decl->optionalParams) {
+                param_names.push_back(op.first);
+                has_defaults.push_back(op.second.second != nullptr);
+            }
+            TypePtr func_type = type_system.createFunctionType(param_names, sig.param_types, sig.return_type, has_defaults);
+            variable_types[name] = func_type;
+            declare_variable(name, func_type);
         } else if (auto var_decl = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
             TypePtr var_type = (var_decl->type && var_decl->type.value()) ? resolve_type_annotation(var_decl->type.value()) : type_system.ANY_TYPE;
             declare_variable(name, var_type);
@@ -248,10 +261,12 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
     // PASS 2.5: Global Scope Population
     // Register built-in and already-discovered symbols in the global scope
     for (const auto& pair : function_signatures) {
-        TypePtr type = type_system.FUNCTION_TYPE;
+        TypePtr type = nullptr;
         auto vt_it = variable_types.find(pair.first);
         if (vt_it != variable_types.end()) {
             type = vt_it->second;
+        } else {
+            type = type_system.createFunctionType(pair.second.param_types, pair.second.return_type);
         }
         declare_variable(pair.first, type);
     }
@@ -536,6 +551,10 @@ void TypeChecker::check_scope_escape(const std::string& ref_name, int target_sco
 }
 
 void TypeChecker::declare_variable(const std::string& name, TypePtr type) {
+    if (type && type->tag == TypeTag::Function) {
+        declare_variable_memory(name, type);
+        mark_variable_initialized(name);
+    }
     if (current_scope) {
         current_scope->declare(name, type);
     }
@@ -671,6 +690,8 @@ void TypeChecker::check_race_condition(const std::string& shared_var, int line) 
 }
 
 void TypeChecker::check_variable_use(const std::string& name, int line) {
+    TypePtr type = lookup_variable(name);
+    if (type && (type->tag == TypeTag::Function || type->tag == TypeTag::Int || type->tag == TypeTag::Int64 || type->tag == TypeTag::String || type->tag == TypeTag::Bool)) return;
     auto it = variable_memory_info.find(name);
     if (it != variable_memory_info.end()) {
         if (it->second.memory_state == "moved") {
@@ -687,6 +708,8 @@ void TypeChecker::check_variable_use(const std::string& name, int line) {
 }
 
 void TypeChecker::check_variable_move(const std::string& name) {
+    TypePtr type = lookup_variable(name);
+    if (type && (type->tag == TypeTag::Function || type->tag == TypeTag::Int || type->tag == TypeTag::Int64 || type->tag == TypeTag::String || type->tag == TypeTag::Bool)) return;
     auto it = variable_memory_info.find(name);
     if (it != variable_memory_info.end()) {
         if (it->second.memory_state == "moved") {
@@ -787,6 +810,8 @@ TypePtr TypeChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statemen
         return check_frame_declaration(frame_decl);
     } else if (auto trait_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
         return check_trait_declaration(trait_decl);
+    } else if (auto dest_decl = std::dynamic_pointer_cast<LM::Frontend::AST::DestructuringDeclaration>(stmt)) {
+        return check_destructuring_declaration(dest_decl);
     } else if (auto var_decl = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
         return check_var_declaration(var_decl);
     } else if (auto type_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TypeDeclaration>(stmt)) {
@@ -831,7 +856,7 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<LM::Frontend::AS
     enter_memory_region();
     
     // Resolve return type
-    TypePtr return_type = type_system.STRING_TYPE; // Default
+    TypePtr return_type = type_system.NIL_TYPE; // Default
     if (func->name == "main") {
         return_type = type_system.INT64_TYPE;
     } else if (func->returnType) {
@@ -875,7 +900,11 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<LM::Frontend::AS
     
     // Declare the function name as a variable in the current scope
     // This allows the function to be called by name
-    TypePtr function_type = type_system.FUNCTION_TYPE;
+    std::vector<std::string> param_names;
+    for (const auto& p : func->params) param_names.push_back(p.first);
+    for (const auto& op : func->optionalParams) param_names.push_back(op.first);
+    
+    TypePtr function_type = type_system.createFunctionType(param_names, signature.param_types, return_type, signature.has_default_values);
     declare_variable(func->name, function_type);
     mark_variable_initialized(func->name);
     
@@ -918,6 +947,47 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<LM::Frontend::AS
     return return_type;
 }
 
+
+TypePtr TypeChecker::check_destructuring_declaration(std::shared_ptr<LM::Frontend::AST::DestructuringDeclaration> dest_decl) {
+    if (!dest_decl) return nullptr;
+    
+    TypePtr init_type = check_expression(dest_decl->initializer);
+    if (!init_type) {
+        add_error("Failed to determine type of initializer in destructuring declaration", dest_decl->line);
+        return nullptr;
+    }
+    
+    if (init_type->tag == TypeTag::Tuple) {
+        auto* tuple_type = std::get_if<TupleType>(&init_type->extra);
+        if (tuple_type) {
+            if (dest_decl->names.size() != tuple_type->elementTypes.size()) {
+                add_error("Tuple size mismatch in destructuring: expected " + 
+                         std::to_string(tuple_type->elementTypes.size()) + " variables, got " + 
+                         std::to_string(dest_decl->names.size()), dest_decl->line);
+            }
+            
+            for (size_t i = 0; i < std::min(dest_decl->names.size(), tuple_type->elementTypes.size()); ++i) {
+                declare_variable(dest_decl->names[i], tuple_type->elementTypes[i]);
+                declare_variable_memory(dest_decl->names[i], tuple_type->elementTypes[i]);
+                mark_variable_initialized(dest_decl->names[i]);
+            }
+        }
+    } else if (init_type->tag == TypeTag::List) {
+        auto* list_type = std::get_if<ListType>(&init_type->extra);
+        if (list_type) {
+            for (const auto& name : dest_decl->names) {
+                declare_variable(name, list_type->elementType);
+                declare_variable_memory(name, list_type->elementType);
+                mark_variable_initialized(name);
+            }
+        }
+    } else {
+        add_error("Cannot destructure non-tuple/list type: " + init_type->toString(), dest_decl->line);
+    }
+    
+    dest_decl->inferred_type = init_type;
+    return init_type;
+}
 TypePtr TypeChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::VarDeclaration> var_decl) {
     if (!var_decl) return nullptr;
     
@@ -933,9 +1003,14 @@ TypePtr TypeChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::Va
         
         // Check if initializing from another variable (potential move)
         if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(var_decl->initializer)) {
-            // For complex types, this would be a move
-            // For now, we'll implement basic move semantics for all types
-            check_variable_move(var_expr->name);
+            TypePtr rhs_type = lookup_variable(var_expr->name);
+            bool is_copyable = (rhs_type && rhs_type->tag == TypeTag::Function);
+            
+            if (!is_copyable) {
+                // For complex types, this would be a move
+                // For now, we'll implement basic move semantics for all types
+                check_variable_move(var_expr->name);
+            }
         }
     }
     
@@ -1122,7 +1197,7 @@ TypePtr TypeChecker::check_if_statement(std::shared_ptr<LM::Frontend::AST::IfSta
     }
     
     // Set the inferred type on the if statement
-    TypePtr result_type = type_system.STRING_TYPE; // if statements don't produce a value
+    TypePtr result_type = type_system.NIL_TYPE; // if statements don't produce a value
     if_stmt->inferred_type = result_type;
     
     return result_type;
@@ -1144,7 +1219,7 @@ TypePtr TypeChecker::check_while_statement(std::shared_ptr<LM::Frontend::AST::Wh
     in_loop = was_in_loop;
     
     // Set the inferred type on the while statement
-    TypePtr result_type = type_system.STRING_TYPE;
+    TypePtr result_type = type_system.NIL_TYPE;
     while_stmt->inferred_type = result_type;
     
     return result_type;
@@ -1182,7 +1257,7 @@ TypePtr TypeChecker::check_for_statement(std::shared_ptr<LM::Frontend::AST::ForS
     exit_scope();
     
     // Set the inferred type on the for statement
-    TypePtr result_type = type_system.STRING_TYPE;
+    TypePtr result_type = type_system.NIL_TYPE;
     for_stmt->inferred_type = result_type;
     
     return result_type;
@@ -1329,6 +1404,21 @@ TypePtr TypeChecker::check_return_statement(std::shared_ptr<LM::Frontend::AST::R
     return return_type;
 }
 
+TypePtr TypeChecker::check_range_expr(std::shared_ptr<LM::Frontend::AST::RangeExpr> expr) {
+    if (!expr) return nullptr;
+    TypePtr startType = check_expression(expr->start);
+    TypePtr endType = check_expression(expr->end);
+    if (!is_numeric_type(startType)) add_type_error("numeric", startType->toString(), expr->line);
+    if (!is_numeric_type(endType)) add_type_error("numeric", endType->toString(), expr->line);
+    if (expr->step) {
+        TypePtr stepType = check_expression(expr->step);
+        if (!is_numeric_type(stepType)) add_type_error("numeric", stepType->toString(), expr->line);
+    }
+    TypePtr rangeType = std::make_shared<::Type>(TypeTag::Range);
+    expr->inferred_type = rangeType;
+    return rangeType;
+}
+
 TypePtr TypeChecker::check_print_statement(std::shared_ptr<LM::Frontend::AST::PrintStatement> print_stmt) {
     if (!print_stmt) return nullptr;
     
@@ -1380,6 +1470,8 @@ TypePtr TypeChecker::check_expression(std::shared_ptr<LM::Frontend::AST::Express
         type = check_tuple_expr(tuple);
     } else if (auto dict = std::dynamic_pointer_cast<LM::Frontend::AST::DictExpr>(expr)) {
         type = check_dict_expr(dict);
+    } else if (auto range = std::dynamic_pointer_cast<LM::Frontend::AST::RangeExpr>(expr)) {
+        type = check_range_expr(range);
     } else if (auto interpolated = std::dynamic_pointer_cast<LM::Frontend::AST::InterpolatedStringExpr>(expr)) {
         type = check_interpolated_string_expr(interpolated);
     } else if (auto lambda = std::dynamic_pointer_cast<LM::Frontend::AST::LambdaExpr>(expr)) {
@@ -1394,7 +1486,7 @@ TypePtr TypeChecker::check_expression(std::shared_ptr<LM::Frontend::AST::Express
         type = check_frame_instantiation_expr(frame_inst);
     } else {
         add_error("Unknown expression type", expr->line);
-        type = type_system.STRING_TYPE; // Default fallback
+        type = type_system.NIL_TYPE; // Default fallback
     }
     
     // Set the inferred type on the expression node
@@ -1432,6 +1524,8 @@ TypePtr TypeChecker::check_expression_with_expected_type(std::shared_ptr<LM::Fro
         type = check_tuple_expr(tuple);
     } else if (auto dict = std::dynamic_pointer_cast<LM::Frontend::AST::DictExpr>(expr)) {
         type = check_dict_expr(dict);
+    } else if (auto range = std::dynamic_pointer_cast<LM::Frontend::AST::RangeExpr>(expr)) {
+        type = check_range_expr(range);
     } else if (auto interpolated = std::dynamic_pointer_cast<LM::Frontend::AST::InterpolatedStringExpr>(expr)) {
         type = check_interpolated_string_expr(interpolated);
     } else if (auto lambda = std::dynamic_pointer_cast<LM::Frontend::AST::LambdaExpr>(expr)) {
@@ -1446,7 +1540,7 @@ TypePtr TypeChecker::check_expression_with_expected_type(std::shared_ptr<LM::Fro
         type = check_frame_instantiation_expr(frame_inst);
     } else {
         add_error("Unknown expression type", expr->line);
-        type = type_system.STRING_TYPE; // Default fallback
+        type = type_system.NIL_TYPE; // Default fallback
     }
     
     // Set the inferred type on the expression node
@@ -1486,8 +1580,8 @@ TypePtr TypeChecker::check_literal_expr(std::shared_ptr<LM::Frontend::AST::Liter
         return type_system.NIL_TYPE;
     }
     
-    expr->inferred_type = type_system.STRING_TYPE;
-    return type_system.STRING_TYPE;
+    expr->inferred_type = type_system.NIL_TYPE;
+    return type_system.NIL_TYPE;
 }
 
 TypePtr TypeChecker::check_literal_expr_with_expected_type(std::shared_ptr<LM::Frontend::AST::LiteralExpr> expr, TypePtr expected_type) {
@@ -1524,15 +1618,15 @@ TypePtr TypeChecker::check_literal_expr_with_expected_type(std::shared_ptr<LM::F
                 
             default:
                 // Non-numeric string literal
-                expr->inferred_type = type_system.STRING_TYPE;
-                return type_system.STRING_TYPE;
+                expr->inferred_type = type_system.NIL_TYPE;
+                return type_system.NIL_TYPE;
         }
     } else if (std::holds_alternative<bool>(expr->value)) {
         expr->inferred_type = type_system.BOOL_TYPE;
         return type_system.BOOL_TYPE;
     } else if (std::holds_alternative<std::nullptr_t>(expr->value)) {
-        expr->inferred_type = type_system.NIL_TYPE;
-        return type_system.NIL_TYPE;
+        expr->inferred_type = type_system.STRING_TYPE;
+        return type_system.STRING_TYPE;
     }
     
     expr->inferred_type = type_system.STRING_TYPE;
@@ -1674,7 +1768,7 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
                 return promote_numeric_types(left_base, right_base);
             } else if (expr->op == TokenType::PLUS && 
                       (is_string_type(left_base) || is_string_type(right_base))) {
-                return type_system.STRING_TYPE;
+                return type_system.NIL_TYPE;
             }
             add_error("Invalid operand types for arithmetic operation", expr->line);
             return type_system.INT_TYPE;
@@ -1706,7 +1800,7 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
             return type_system.INT_TYPE;
         default:
             add_error("Unsupported binary operator", expr->line);
-            return type_system.STRING_TYPE;
+            return type_system.NIL_TYPE;
     }
 }
 
@@ -2157,23 +2251,41 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
     if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->callee)) {
         if (undefined_symbols.find(var_expr->name) != undefined_symbols.end()) {
             // Already reported as undefined, don't cascade
-            return type_system.STRING_TYPE;
+            return type_system.NIL_TYPE;
         }
     }
     
     TypePtr callee_type = check_expression(expr->callee);
     
+    if (callee_type && callee_type->tag == TypeTag::Function) {
+        if (auto* func_type = std::get_if<FunctionType>(&callee_type->extra)) {
+            // Validate arguments against function type
+            if (arg_types.size() != func_type->paramTypes.size()) {
+                add_error("Function expects " + std::to_string(func_type->paramTypes.size()) + 
+                         " arguments, but " + std::to_string(arg_types.size()) + " were provided", expr->line);
+            } else {
+                for (size_t i = 0; i < arg_types.size(); ++i) {
+                    if (!is_type_compatible(func_type->paramTypes[i], arg_types[i])) {
+                        add_type_error(func_type->paramTypes[i]->toString(), arg_types[i]->toString(), expr->line);
+                    }
+                }
+            }
+            expr->inferred_type = func_type->returnType;
+            return func_type->returnType;
+        }
+    }
+
     // Only report error if the callee is not an undefined symbol
     // (to avoid cascading errors)
     if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->callee)) {
         if (undefined_symbols.find(var_expr->name) == undefined_symbols.end()) {
-            add_error("Cannot call non-function value", expr->line);
+            add_error("Cannot call non-function value: " + callee_type->toString(), expr->line);
         }
     } else {
         add_error("Cannot call non-function value", expr->line);
     }
     
-    return type_system.STRING_TYPE;
+    return type_system.NIL_TYPE;
 }
 
 TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::AssignExpr> expr) {
@@ -2262,7 +2374,10 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
             
             // Check if we're assigning from another variable (create reference or move)
             if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->value)) {
-                if (linear_types.find(var_expr->name) != linear_types.end()) {
+                TypePtr rhs_type = lookup_variable(var_expr->name);
+                bool is_copyable = (rhs_type && rhs_type->tag == TypeTag::Function);
+                
+                if (!is_copyable && linear_types.find(var_expr->name) != linear_types.end()) {
                     // This is a linear type - move it and increment generation
                     move_linear_type(var_expr->name, var_expr->line);
                     
@@ -2385,8 +2500,10 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
             }
             // Check for functions
             if (function_signatures.count(qualified_name)) {
-                expr->inferred_type = type_system.FUNCTION_TYPE;
-                return type_system.FUNCTION_TYPE;
+                const auto& sig = function_signatures[qualified_name];
+                TypePtr func_type = type_system.createFunctionType(sig.param_types, sig.return_type);
+                expr->inferred_type = func_type;
+                return func_type;
             }
         }
 
@@ -2514,7 +2631,7 @@ TypePtr TypeChecker::check_index_expr(std::shared_ptr<LM::Frontend::AST::IndexEx
         if (index_type->tag != TypeTag::Int && index_type->tag != TypeTag::Int64) {
              add_error("String index must be an integer, got " + index_type->toString(), expr->line);
         }
-        return type_system.STRING_TYPE;
+        return type_system.NIL_TYPE;
     }
 
     add_error("Cannot index type '" + object_type->toString() + "'", expr->line);
@@ -2575,7 +2692,7 @@ TypePtr TypeChecker::check_dict_expr(std::shared_ptr<LM::Frontend::AST::DictExpr
     
     if (expr->entries.empty()) {
         // Empty dictionary - return generic dict type
-        return type_system.createTypedDictType(type_system.STRING_TYPE, type_system.ANY_TYPE);
+        return type_system.createTypedDictType(type_system.NIL_TYPE, type_system.ANY_TYPE);
     }
     
     // Check all entries and infer common key and value types
@@ -2600,7 +2717,7 @@ TypePtr TypeChecker::check_dict_expr(std::shared_ptr<LM::Frontend::AST::DictExpr
             add_error("Inconsistent key types in dictionary literal: cannot mix " + 
                     commonKeyType->toString() + " and " + keyTypes[i]->toString() + 
                     ": " + e.what(), expr->line);
-            return type_system.createTypedDictType(type_system.STRING_TYPE, type_system.ANY_TYPE);
+            return type_system.createTypedDictType(type_system.NIL_TYPE, type_system.ANY_TYPE);
         }
     }
     
@@ -2683,7 +2800,9 @@ TypePtr TypeChecker::check_lambda_expr(std::shared_ptr<LM::Frontend::AST::Lambda
     exit_scope(); // Exit lambda scope
     
     // Create and return function type
-    TypePtr functionType = type_system.createFunctionType(paramTypes, returnType);
+    std::vector<std::string> param_names;
+    for (const auto& p : expr->params) param_names.push_back(p.first);
+    TypePtr functionType = type_system.createFunctionType(param_names, paramTypes, returnType);
     expr->inferred_type = functionType;
     return functionType;
 }
@@ -2705,7 +2824,7 @@ TypePtr TypeChecker::check_error_construct_expr(std::shared_ptr<LM::Frontend::AS
     } else {
         // Fallback: create a generic error union type
         // This should ideally be inferred from context in a full implementation
-        error_union_type = type_system.createFallibleType(type_system.STRING_TYPE);
+        error_union_type = type_system.createFallibleType(type_system.NIL_TYPE);
     }
     
     expr->inferred_type = error_union_type;
@@ -2765,7 +2884,7 @@ TypePtr TypeChecker::check_fallible_expr(std::shared_ptr<LM::Frontend::AST::Fall
     TypePtr success_type = type_system.getFallibleSuccessType(expr_type);
     if (!success_type) {
         add_error("Failed to extract success type from fallible type", expr->line);
-        return type_system.STRING_TYPE;
+        return type_system.NIL_TYPE;
     }
     
     expr->inferred_type = success_type;
@@ -2812,7 +2931,7 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
 
     // Handle Dict types (e.g., {str: int})
     if (annotation->isDict) {
-        TypePtr keyType = type_system.STRING_TYPE;
+        TypePtr keyType = type_system.NIL_TYPE;
         TypePtr valType = type_system.ANY_TYPE;
         if (annotation->functionParams.size() >= 2) {
             keyType = resolve_type_annotation(annotation->functionParams[0]);
@@ -2828,6 +2947,37 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
             elementTypes.push_back(resolve_type_annotation(t));
         }
         return type_system.createTupleType(elementTypes);
+    }
+
+    // Handle Function types (e.g., fn(int, int): int)
+    if (annotation->isFunction) {
+        std::vector<TypePtr> paramTypes;
+        std::vector<std::string> paramNames;
+        
+        // Handle both FunctionTypeAnnotation and generic TypeAnnotation with isFunction=true
+        if (auto func_annot = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionTypeAnnotation>(annotation)) {
+            for (const auto& p : func_annot->parameters) {
+                paramTypes.push_back(resolve_type_annotation(p.type));
+                paramNames.push_back(p.name);
+            }
+            TypePtr returnType = func_annot->returnType ? resolve_type_annotation(func_annot->returnType) : type_system.NIL_TYPE;
+            return type_system.createFunctionType(paramNames, paramTypes, returnType);
+        } else if (!annotation->functionParameters.empty()) {
+            for (const auto& p : annotation->functionParameters) {
+                paramTypes.push_back(resolve_type_annotation(p.type));
+                paramNames.push_back(p.name);
+            }
+            TypePtr returnType = annotation->returnType ? resolve_type_annotation(annotation->returnType) : type_system.NIL_TYPE;
+            return type_system.createFunctionType(paramNames, paramTypes, returnType);
+        } else {
+            // Fallback for legacy functionParams
+            for (const auto& p : annotation->functionParams) {
+                paramTypes.push_back(resolve_type_annotation(p));
+                paramNames.push_back("");
+            }
+            TypePtr returnType = annotation->returnType ? resolve_type_annotation(annotation->returnType) : type_system.NIL_TYPE;
+            return type_system.createFunctionType(paramNames, paramTypes, returnType);
+        }
     }
 
     // First try to get the base type from the type system (handles built-in types and aliases)
@@ -2860,7 +3010,7 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
                 base_type = custom_type;
             } else {
                 add_error("Unknown type: " + annotation->typeName);
-                return type_system.STRING_TYPE;
+                return type_system.NIL_TYPE;
             }
         }
     }
@@ -3581,7 +3731,7 @@ void TypeChecker::validate_pattern_compatibility(std::shared_ptr<LM::Frontend::A
                 add_error("err pattern can only be used with error union types", line);
             } else if (!bindingPattern->variableNames.empty()) {
                 // Register the error value binding
-                declare_variable(bindingPattern->variableNames[0], type_system.STRING_TYPE);
+                declare_variable(bindingPattern->variableNames[0], type_system.NIL_TYPE);
             }
         } else {
             bool variant_resolved = false;
@@ -3767,7 +3917,7 @@ TypePtr TypeChecker::infer_literal_type(const std::shared_ptr<LM::Frontend::AST:
                     return type_system.FLOAT64_TYPE;
                 } catch (const std::exception&) {
                     // If parsing fails, treat as string
-                    return type_system.STRING_TYPE;
+                    return type_system.NIL_TYPE;
                 }
             } else {
                 // Integer values - determine appropriate integer type
@@ -3791,7 +3941,7 @@ TypePtr TypeChecker::infer_literal_type(const std::shared_ptr<LM::Frontend::AST:
             }
         } else {
             // String literal
-            return type_system.STRING_TYPE;
+            return type_system.NIL_TYPE;
         }
     } else if (std::holds_alternative<bool>(expr->value)) {
         return type_system.BOOL_TYPE;
@@ -3799,7 +3949,7 @@ TypePtr TypeChecker::infer_literal_type(const std::shared_ptr<LM::Frontend::AST:
         return type_system.NIL_TYPE;
     }
     
-    return type_system.STRING_TYPE; // Default fallback
+    return type_system.NIL_TYPE; // Default fallback
 }
 
 // =============================================================================
@@ -3878,7 +4028,8 @@ TypePtr TypeChecker::check_match_statement(std::shared_ptr<LM::Frontend::AST::Ma
         exit_scope();
     }
 
-    match_stmt->inferred_type = unified_branch_type ? unified_branch_type : type_system.NIL_TYPE;
+    TypePtr result_type = unified_branch_type ? unified_branch_type : type_system.NIL_TYPE;
+    match_stmt->inferred_type = result_type;
     
     // Convert cases to shared_ptr vector for function calls
     std::vector<std::shared_ptr<LM::Frontend::AST::MatchCase>> case_ptrs;
@@ -3921,8 +4072,7 @@ TypePtr TypeChecker::check_match_statement(std::shared_ptr<LM::Frontend::AST::Ma
         }
     }
     
-    match_stmt->inferred_type = matchType;
-    return matchType;
+    return result_type;
 }
 
 void TypeChecker::register_builtin_function(const std::string& name, 
@@ -3935,7 +4085,8 @@ void TypeChecker::register_builtin_function(const std::string& name,
     sig.declaration = nullptr; // Builtin functions have no declaration
     
     function_signatures[name] = sig;
-    declare_variable(name, type_system.FUNCTION_TYPE);
+    TypePtr func_type = type_system.createFunctionType(sig.param_types, sig.return_type);
+    declare_variable(name, func_type);
 }
 
 // =============================================================================

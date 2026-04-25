@@ -58,6 +58,8 @@ void Generator::emit_stmt(LM::Frontend::AST::Statement& stmt) {
         emit_print_stmt(*print_stmt);
     } else if (auto var_stmt = dynamic_cast<LM::Frontend::AST::VarDeclaration*>(&stmt)) {
         emit_var_stmt(*var_stmt);
+    } else if (auto dest_stmt = dynamic_cast<LM::Frontend::AST::DestructuringDeclaration*>(&stmt)) { 
+        emit_destructuring_var_stmt(*dest_stmt);
     } else if (auto block_stmt = dynamic_cast<LM::Frontend::AST::BlockStatement*>(&stmt)) {
         emit_block_stmt(*block_stmt);
     } else if (auto if_stmt = dynamic_cast<LM::Frontend::AST::IfStatement*>(&stmt)) {
@@ -341,6 +343,60 @@ void Generator::emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt) {
    // std::cout << "[DEBUG] Binding variable: " << stmt.name << " to register " << value_reg << std::endl;
     bind_variable(stmt.name, value_reg);
    // std::cout << "[DEBUG] emit_var_stmt completed for: " << stmt.name << std::endl;
+}
+void Generator::emit_destructuring_var_stmt(LM::Frontend::AST::DestructuringDeclaration& stmt) {
+    Reg init_reg = emit_expr(*stmt.initializer);
+    TypePtr init_type = stmt.initializer ? stmt.initializer->inferred_type : nullptr;
+    
+    if (!init_type) {
+        init_type = get_register_language_type(init_reg);
+    }
+
+    if (init_type && init_type->tag == ::TypeTag::Tuple) {
+        auto* tuple_type = std::get_if<TupleType>(&init_type->extra);
+        if (tuple_type) {
+            for (size_t i = 0; i < std::min(stmt.names.size(), tuple_type->elementTypes.size()); ++i) {
+                Reg val_reg = allocate_register();
+                Reg index_reg = allocate_register();
+                auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
+                ValuePtr index_val = std::make_shared<Value>(int_type, static_cast<int64_t>(i));
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, index_reg, index_val));
+                set_register_type(index_reg, int_type);
+                
+                Type abi_type = language_type_to_abi_type(tuple_type->elementTypes[i]);
+                emit_instruction(LIR_Inst(LIR_Op::TupleGet, abi_type, val_reg, init_reg, index_reg));
+                set_register_language_type(val_reg, tuple_type->elementTypes[i]);
+                bind_variable(stmt.names[i], val_reg);
+            }
+        }
+    } else if (init_type && (init_type->tag == ::TypeTag::List || init_type->tag == ::TypeTag::Any)) {
+        TypePtr elem_type = (init_type->tag == ::TypeTag::List) ? 
+            std::get<ListType>(init_type->extra).elementType : 
+            std::make_shared<::Type>(::TypeTag::Any);
+
+        for (size_t i = 0; i < stmt.names.size(); ++i) {
+            Reg val_reg = allocate_register();
+            Reg index_reg = allocate_register();
+            auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
+            ValuePtr index_val = std::make_shared<Value>(int_type, static_cast<int64_t>(i));
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, index_reg, index_val));
+            set_register_type(index_reg, int_type);
+            
+            Type abi_type = language_type_to_abi_type(elem_type);
+            // Use ListIndex as the generic indexer for List/Any
+            emit_instruction(LIR_Inst(LIR_Op::ListIndex, abi_type, val_reg, init_reg, index_reg));
+            set_register_language_type(val_reg, elem_type);
+            bind_variable(stmt.names[i], val_reg);
+        }
+    } else {
+        // Fallback: Bind to nil if type is unknown or unsupported
+        for (const auto& name : stmt.names) {
+            Reg val_reg = allocate_register();
+            ValuePtr nil_val = std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Nil), "");
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, val_reg, nil_val));
+            bind_variable(name, val_reg);
+        }
+    }
 }
 
 
@@ -764,7 +820,9 @@ void Generator::emit_return_stmt(LM::Frontend::AST::ReturnStatement& stmt) {
         // Normal return statement
         if (stmt.value) {
             Reg value = emit_expr(*stmt.value);
-            emit_instruction(LIR_Inst(LIR_Op::Return, value));
+            LIR_Inst ret_inst(LIR_Op::Return);
+            ret_inst.a = value;
+            emit_instruction(ret_inst);
         } else {
             emit_instruction(LIR_Inst(LIR_Op::Return));
         }
