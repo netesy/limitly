@@ -277,6 +277,8 @@ private:
     size_t task_counter_ = 0;
     // Worker counter for generating unique worker function names
     size_t worker_counter_ = 0;
+    // Lambda counter for generating unique lambda function names
+    static size_t lambda_counter_;
     uint32_t next_register_ = 0;
     uint32_t next_label_ = 0;
     std::map<std::string, TypePtr> variable_types_;
@@ -338,6 +340,8 @@ private:
     std::string current_module_ = "";  // Current module context
     
     Reg this_register_ = UINT32_MAX;  // Register holding 'this' pointer in methods
+    Reg env_register_ = UINT32_MAX;   // Register holding the closure environment
+    std::vector<std::string> current_lambda_captures_; // Captures for current lambda
     
     // Concurrency context tracking
     int concurrency_nesting_level_ = 0;

@@ -93,39 +93,57 @@ int64_t to_int(const RegisterValue& value) {
     if (std::holds_alternative<int64_t>(value)) {
         return std::get<int64_t>(value);
     } else if (std::holds_alternative<double>(value)) {
-        return static_cast<int64_t>(to_float(value));
+        return static_cast<int64_t>(std::get<double>(value));
     } else if (std::holds_alternative<uint64_t>(value)) {
-        return static_cast<int64_t>(to_uint(value));
+        return static_cast<int64_t>(std::get<uint64_t>(value));
     } else if (std::holds_alternative<bool>(value)) {
-        return to_bool(value) ? 1 : 0;
+        return std::get<bool>(value) ? 1 : 0;
+    } else if (std::holds_alternative<std::string>(value)) {
+        try {
+            return std::stoll(std::get<std::string>(value));
+        } catch (...) {
+            return 0;
+        }
     } else {
         return 0;
     }
 }
 
 uint64_t to_uint(const RegisterValue& value) {
-    if (std::holds_alternative<int64_t>(value)) {
-        return static_cast<uint64_t>(to_int(value));
-    } else if (std::holds_alternative<double>(value)) {
-        return static_cast<uint64_t>(to_float(value));
-    } else if (std::holds_alternative<uint64_t>(value)) {
+    if (std::holds_alternative<uint64_t>(value)) {
         return std::get<uint64_t>(value);
+    } else if (std::holds_alternative<int64_t>(value)) {
+        return static_cast<uint64_t>(std::get<int64_t>(value));
+    } else if (std::holds_alternative<double>(value)) {
+        return static_cast<uint64_t>(std::get<double>(value));
     } else if (std::holds_alternative<bool>(value)) {
-        return to_bool(value) ? 1 : 0;
+        return std::get<bool>(value) ? 1 : 0;
+    } else if (std::holds_alternative<std::string>(value)) {
+        try {
+            return std::stoull(std::get<std::string>(value));
+        } catch (...) {
+            return 0;
+        }
     } else {
         return 0;
     }
 }
 
 double to_float(const RegisterValue& value) {
-    if (std::holds_alternative<int64_t>(value)) {
-        return static_cast<double>(to_int(value));
-    } else if (std::holds_alternative<double>(value)) {
+    if (std::holds_alternative<double>(value)) {
         return std::get<double>(value);
+    } else if (std::holds_alternative<int64_t>(value)) {
+        return static_cast<double>(std::get<int64_t>(value));
     } else if (std::holds_alternative<uint64_t>(value)) {
-        return static_cast<double>(to_uint(value));
+        return static_cast<double>(std::get<uint64_t>(value));
     } else if (std::holds_alternative<bool>(value)) {
-        return to_bool(value) ? 1.0 : 0.0;
+        return std::get<bool>(value) ? 1.0 : 0.0;
+    } else if (std::holds_alternative<std::string>(value)) {
+        try {
+            return std::stod(std::get<std::string>(value));
+        } catch (...) {
+            return 0.0;
+        }
     } else {
         return 0.0;
     }
@@ -515,22 +533,14 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 return;
             }
             case LIR::LIR_Op::Add: {
-                const RegisterValue* temp_a = &registers[pc->a];
-                const RegisterValue* temp_b = &registers[pc->b];
-                if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
-                    TypePtr result_type = (pc->result_type == LIR::Type::F64) ? 
-                                          type_system->FLOAT64_TYPE : type_system->INT64_TYPE;
-                    
-                    bool a_is_float = std::holds_alternative<double>(*temp_a);
-                    bool b_is_float = std::holds_alternative<double>(*temp_b);
-                    
-                    if (result_type->tag == TypeTag::Float32 || result_type->tag == TypeTag::Float64 || a_is_float || b_is_float) {
-                        registers[pc->dst] = to_float(*temp_a) + to_float(*temp_b);
+                if (pc->dst >= registers.size() || pc->a >= registers.size() || pc->b >= registers.size()) break;
+                const RegisterValue& val_a = registers[pc->a];
+                const RegisterValue& val_b = registers[pc->b];
+                if (is_numeric(val_a) && is_numeric(val_b)) {
+                    if (std::holds_alternative<double>(val_a) || std::holds_alternative<double>(val_b)) {
+                        registers[pc->dst] = to_float(val_a) + to_float(val_b);
                     } else {
-                        int64_t left = to_int(*temp_a);
-                        int64_t right = to_int(*temp_b);
-                        int64_t int_result = left + right;
-                        registers[pc->dst] = int_result;
+                        registers[pc->dst] = to_int(val_a) + to_int(val_b);
                     }
                 } else {
                     registers[pc->dst] = nullptr;
@@ -538,20 +548,14 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 break;
             }
             case LIR::LIR_Op::Sub: {
-                const RegisterValue* temp_a = &registers[pc->a];
-                const RegisterValue* temp_b = &registers[pc->b];
-                if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
-                    TypePtr result_type = (pc->result_type == LIR::Type::F64) ? 
-                                          type_system->FLOAT64_TYPE : type_system->INT64_TYPE;
-                    
-                    bool a_is_float = std::holds_alternative<double>(*temp_a);
-                    bool b_is_float = std::holds_alternative<double>(*temp_b);
-                    
-                    if (result_type->tag == TypeTag::Float32 || result_type->tag == TypeTag::Float64 || a_is_float || b_is_float) {
-                        registers[pc->dst] = to_float(*temp_a) - to_float(*temp_b);
+                if (pc->dst >= registers.size() || pc->a >= registers.size() || pc->b >= registers.size()) break;
+                const RegisterValue& val_a = registers[pc->a];
+                const RegisterValue& val_b = registers[pc->b];
+                if (is_numeric(val_a) && is_numeric(val_b)) {
+                    if (std::holds_alternative<double>(val_a) || std::holds_alternative<double>(val_b)) {
+                        registers[pc->dst] = to_float(val_a) - to_float(val_b);
                     } else {
-                        int64_t int_result = to_int(*temp_a) - to_int(*temp_b);
-                        registers[pc->dst] = int_result;
+                        registers[pc->dst] = to_int(val_a) - to_int(val_b);
                     }
                 } else {
                     registers[pc->dst] = nullptr;
@@ -559,20 +563,14 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 break;
             }
             case LIR::LIR_Op::Mul: {
-                const RegisterValue* temp_a = &registers[pc->a];
-                const RegisterValue* temp_b = &registers[pc->b];
-                if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
-                    TypePtr result_type = (pc->result_type == LIR::Type::F64) ? 
-                                          type_system->FLOAT64_TYPE : type_system->INT64_TYPE;
-                    
-                    bool a_is_float = std::holds_alternative<double>(*temp_a);
-                    bool b_is_float = std::holds_alternative<double>(*temp_b);
-                    
-                    if (result_type->tag == TypeTag::Float32 || result_type->tag == TypeTag::Float64 || a_is_float || b_is_float) {
-                        registers[pc->dst] = to_float(*temp_a) * to_float(*temp_b);
+                if (pc->dst >= registers.size() || pc->a >= registers.size() || pc->b >= registers.size()) break;
+                const RegisterValue& val_a = registers[pc->a];
+                const RegisterValue& val_b = registers[pc->b];
+                if (is_numeric(val_a) && is_numeric(val_b)) {
+                    if (std::holds_alternative<double>(val_a) || std::holds_alternative<double>(val_b)) {
+                        registers[pc->dst] = to_float(val_a) * to_float(val_b);
                     } else {
-                        int64_t int_result = to_int(*temp_a) * to_int(*temp_b);
-                        registers[pc->dst] = int_result;
+                        registers[pc->dst] = to_int(val_a) * to_int(val_b);
                     }
                 } else {
                     registers[pc->dst] = nullptr;
@@ -580,30 +578,29 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 break;
             }
             case LIR::LIR_Op::Div: {
-                const RegisterValue* temp_a = &registers[pc->a];
-                const RegisterValue* temp_b = &registers[pc->b];
-                if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
-                    TypePtr result_type = (pc->result_type == LIR::Type::F64) ? 
-                                          type_system->FLOAT64_TYPE : type_system->INT64_TYPE;
+                if (pc->dst >= registers.size() || pc->a >= registers.size() || pc->b >= registers.size()) break;
+                const RegisterValue& val_a = registers[pc->a];
+                const RegisterValue& val_b = registers[pc->b];
+                
+                if (is_numeric(val_a) && is_numeric(val_b)) {
+                    double fa = to_float(val_a);
+                    double fb = to_float(val_b);
                     
-                    bool a_is_float = std::holds_alternative<double>(*temp_a);
-                    bool b_is_float = std::holds_alternative<double>(*temp_b);
-                    
-                    if (result_type->tag == TypeTag::Float32 || result_type->tag == TypeTag::Float64 || a_is_float || b_is_float) {
-                        double divisor = to_float(*temp_b);
-                        if (divisor != 0.0) {
-                            registers[pc->dst] = to_float(*temp_a) / divisor;
+                    if (fb != 0.0) {
+                        if (std::holds_alternative<double>(val_a) || std::holds_alternative<double>(val_b)) {
+                            registers[pc->dst] = fa / fb;
                         } else {
-                            registers[pc->dst] = nullptr; // Division by zero
+                            int64_t ia = to_int(val_a);
+                            int64_t ib = to_int(val_b);
+                            if (ib == -1 && (uint64_t)ia == 0x8000000000000000ULL) {
+                                registers[pc->dst] = ia;
+                            } else {
+                                registers[pc->dst] = ia / ib;
+                            }
                         }
                     } else {
-                        int64_t divisor = to_int(*temp_b);
-                        if (divisor != 0) {
-                            int64_t int_result = to_int(*temp_a) / divisor;
-                            registers[pc->dst] = int_result;
-                        } else {
-                            registers[pc->dst] = nullptr; // Division by zero
-                        }
+                         std::cerr << "VM Error: Division by zero" << std::endl;
+                         registers[pc->dst] = nullptr;
                     }
                 } else {
                     registers[pc->dst] = nullptr;
@@ -611,15 +608,21 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 break;
             }
             case LIR::LIR_Op::Mod: {
-                const RegisterValue* temp_a = &registers[pc->a];
-                const RegisterValue* temp_b = &registers[pc->b];
-                if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
-                    int64_t divisor = to_int(*temp_b);
-                    if (divisor != 0) {
-                        int64_t int_result = to_int(*temp_a) % divisor;
-                        registers[pc->dst] = int_result;
+                if (pc->dst >= registers.size() || pc->a >= registers.size() || pc->b >= registers.size()) break;
+                const RegisterValue& val_a = registers[pc->a];
+                const RegisterValue& val_b = registers[pc->b];
+                if (is_numeric(val_a) && is_numeric(val_b)) {
+                    int64_t ia = to_int(val_a);
+                    int64_t ib = to_int(val_b);
+                    if (ib != 0) {
+                        if (ib == -1 && (uint64_t)ia == 0x8000000000000000ULL) {
+                            registers[pc->dst] = (int64_t)0;
+                        } else {
+                            registers[pc->dst] = ia % ib;
+                        }
                     } else {
-                        registers[pc->dst] = nullptr; // Modulo by zero
+                        std::cerr << "VM Error: Modulo by zero" << std::endl;
+                        registers[pc->dst] = nullptr;
                     }
                 } else {
                     registers[pc->dst] = nullptr;
@@ -1523,9 +1526,26 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             case LIR::LIR_Op::CallIndirect: {
                 const RegisterValue& func_val = registers[pc->a];
                 std::string func_name;
+                RegisterValue env_val = nullptr;
+
                 if (std::holds_alternative<std::string>(func_val)) {
                     func_name = std::get<std::string>(func_val);
-                } else {
+                } else if (std::holds_alternative<int64_t>(func_val)) {
+                    // Possible closure Tuple pointer
+                    void* tuple_ptr = reinterpret_cast<void*>(static_cast<uintptr_t>(to_int(func_val)));
+                    if (tuple_ptr) {
+                        void* name_val = lm_tuple_get(static_cast<LmTuple*>(tuple_ptr), 0);
+                        if (name_val) {
+                            RegisterValue unboxed_name = unbox_register_value(name_val);
+                            if (std::holds_alternative<std::string>(unboxed_name)) {
+                                func_name = std::get<std::string>(unboxed_name);
+                                env_val = func_val; // The tuple itself is the environment
+                            }
+                        }
+                    }
+                }
+
+                if (func_name.empty()) {
                     registers[pc->dst] = nullptr;
                     break;
                 }
@@ -1540,11 +1560,16 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                     std::vector<RegisterValue> args;
                     
                     // Pop arguments in correct order (they were pushed in order, so popping gives reverse)
-                    for (size_t i = 0; i < param_count && !argument_stack.empty(); ++i) {
+                    bool has_env = (env_val.index() != std::variant_npos);
+                    for (size_t i = 0; i < (param_count - (has_env ? 1 : 0)) && !argument_stack.empty(); ++i) {
                         args.insert(args.begin(), argument_stack.back());
                         argument_stack.pop_back();
                     }
                     argument_stack.clear();
+
+                    if (has_env) {
+                        args.push_back(env_val);
+                    }
 
                     // Reset registers for new call frame
                     registers.assign(registers.size(), nullptr);

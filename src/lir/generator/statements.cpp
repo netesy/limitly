@@ -468,7 +468,7 @@ void Generator::emit_if_stmt_cfg(LM::Frontend::AST::IfStatement& stmt) {
     // Jump to end after then branch (only if no terminator already exists)
     if (get_current_block() && !get_current_block()->has_terminator()) {
         emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, end_block->id));
-        add_block_edge(then_block, end_block);  // Add CFG edge
+        add_block_edge(get_current_block(), end_block);  // Add CFG edge from CURRENT block (which might have changed)
     }
     
     // === Else Block (if present) ===
@@ -481,13 +481,13 @@ void Generator::emit_if_stmt_cfg(LM::Frontend::AST::IfStatement& stmt) {
         }
         
         // Jump to end after else branch (only if no terminator already exists)
-        // This is important: we only jump if the current block doesn't already have a terminator
-        // (like a return statement from a nested if)
-        LIR_BasicBlock* current = get_current_block();
-        if (current && !current->has_terminator()) {
+        if (get_current_block() && !get_current_block()->has_terminator()) {
             emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, end_block->id));
-            add_block_edge(current, end_block);  // Add CFG edge
+            add_block_edge(get_current_block(), end_block);  // Add CFG edge
         }
+    } else {
+        // No else block, add edge from condition block to end block
+        // (This was missing in some cases where JumpIfFalse target was end_block)
     }
     
     // === End Block: continuation ===
@@ -1573,29 +1573,51 @@ void Generator::emit_unsafe_stmt(LM::Frontend::AST::UnsafeStatement& stmt) {
 
 void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
     if (!stmt.value) return;
+    
     Reg value_reg = emit_expr(*stmt.value);
-    std::vector<size_t> end_jumps;
-
+    LIR_BasicBlock* match_exit = create_basic_block("match_exit");
+    
+    LIR_BasicBlock* current_case_pattern = nullptr;
     auto i64_type = std::make_shared<::Type>(::TypeTag::Int64);
 
     for (size_t i = 0; i < stmt.cases.size(); ++i) {
         const auto& match_case = stmt.cases[i];
-        enter_scope();
-        std::vector<size_t> fail_jumps;
+        
+        LIR_BasicBlock* pattern_block = current_case_pattern ? current_case_pattern : create_basic_block("match_pattern_" + std::to_string(i));
+        LIR_BasicBlock* body_block = create_basic_block("match_body_" + std::to_string(i));
+        LIR_BasicBlock* next_case_pattern = (i + 1 < stmt.cases.size()) ? create_basic_block("match_pattern_" + std::to_string(i+1)) : match_exit;
 
-        // Pattern Check
+        // Connect current block to pattern block
+        if (get_current_block() && get_current_block() != pattern_block && !get_current_block()->has_terminator()) {
+            emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, pattern_block->id));
+            add_block_edge(get_current_block(), pattern_block);
+        }
+        
+        set_current_block(pattern_block);
+        enter_scope();
+
+        // 1. Pattern Matching Logic
         if (auto literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(match_case.pattern.get())) {
-            if (!std::holds_alternative<std::nullptr_t>(literal->value)) {
+            if (std::holds_alternative<std::nullptr_t>(literal->value)) {
+                // Wildcard _ or nil pattern that matches anything
+                emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, body_block->id));
+                add_block_edge(pattern_block, body_block);
+            } else {
                 Reg literal_reg = emit_expr(*literal);
                 Reg cmp = allocate_register();
                 emit_instruction(LIR_Inst(LIR_Op::CmpEQ, cmp, value_reg, literal_reg));
-                fail_jumps.push_back(current_function_->instructions.size());
-                emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp, 0));
+                set_register_type(cmp, std::make_shared<::Type>(::TypeTag::Bool));
+                
+                emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp, 0, next_case_pattern->id));
+                add_block_edge(pattern_block, next_case_pattern);
+                // Success falls through to body or guard
             }
         } else if (auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(match_case.pattern.get())) {
             if (var_expr->name != "_") {
                 bind_variable(var_expr->name, value_reg);
             }
+            emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, body_block->id));
+            add_block_edge(pattern_block, body_block);
         } else if (auto binding = dynamic_cast<LM::Frontend::AST::BindingPatternExpr*>(match_case.pattern.get())) {
             int64_t tag = 0; size_t arity = 0;
             TypePtr m_type = stmt.value->inferred_type;
@@ -1606,9 +1628,12 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
                 emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, expected, std::make_shared<Value>(i64_type, tag)));
                 Reg cmp = allocate_register();
                 emit_instruction(LIR_Inst(LIR_Op::CmpEQ, cmp, tag_reg, expected));
-                fail_jumps.push_back(current_function_->instructions.size());
-                emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp, 0));
+                set_register_type(cmp, std::make_shared<::Type>(::TypeTag::Bool));
 
+                emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp, 0, next_case_pattern->id));
+                add_block_edge(pattern_block, next_case_pattern);
+                
+                // Payload extraction
                 if (!binding->variableNames.empty()) {
                     Reg payload = allocate_register();
                     emit_instruction(LIR_Inst(LIR_Op::GetPayload, Type::Ptr, payload, value_reg));
@@ -1624,41 +1649,45 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
                         }
                     }
                 }
+                // Falls through to body or guard
             } else {
-                fail_jumps.push_back(current_function_->instructions.size());
-                emit_instruction(LIR_Inst(LIR_Op::Jump, 0));
+                emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, next_case_pattern->id));
+                add_block_edge(pattern_block, next_case_pattern);
             }
         }
 
-        // Guard Check
+        // 2. Guard Logic
         if (match_case.guard) {
-            Reg guard_reg = emit_expr(*match_case.guard);
-            fail_jumps.push_back(current_function_->instructions.size());
-            emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, guard_reg, 0));
+            // Success of pattern (not wildcard) might fall through here
+            if (get_current_block() && !get_current_block()->has_terminator()) {
+                Reg guard_res = emit_expr(*match_case.guard);
+                emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, guard_res, 0, next_case_pattern->id));
+                add_block_edge(get_current_block(), next_case_pattern);
+            }
         }
 
-        // Body
+        // Success of pattern (and guard) -> Body
+        if (get_current_block() && !get_current_block()->has_terminator()) {
+            emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, body_block->id));
+            add_block_edge(get_current_block(), body_block);
+        }
+
+        // 3. Body Logic
+        set_current_block(body_block);
         if (match_case.body) {
             emit_stmt(*match_case.body);
         }
         
-        // Jump to end of match after successful execution
-        end_jumps.push_back(current_function_->instructions.size());
-        emit_instruction(LIR_Inst(LIR_Op::Jump, 0));
-
-        // Patch failure jumps to next case start
-        size_t next_case_pc = current_function_->instructions.size();
-        for (size_t f_pc : fail_jumps) {
-            current_function_->instructions[f_pc].imm = next_case_pc;
+        if (get_current_block() && !get_current_block()->has_terminator()) {
+            emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, match_exit->id));
+            add_block_edge(get_current_block(), match_exit);
         }
+        
         exit_scope();
+        current_case_pattern = next_case_pattern;
     }
 
-    // Final Patch: All successful ends jump to after the match
-    size_t match_end_pc = current_function_->instructions.size();
-    for (size_t e_pc : end_jumps) {
-        current_function_->instructions[e_pc].imm = match_end_pc;
-    }
+    set_current_block(match_exit);
 }
 
 

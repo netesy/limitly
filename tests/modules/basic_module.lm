@@ -10,6 +10,6 @@ pub fn add(a, b) {
     return a + b;
 }
 
-pub fn getModuleVar() {
+pub fn getModuleVar():str {
     return moduleVar;
 }

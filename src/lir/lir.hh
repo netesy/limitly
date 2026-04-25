@@ -340,7 +340,9 @@ struct LIR_BasicBlock {
         const auto& last = instructions.back();
         return last.op == LIR_Op::Jump || 
                last.op == LIR_Op::JumpIfFalse || 
-               last.op == LIR_Op::Return;
+               last.op == LIR_Op::JumpIf || 
+               last.op == LIR_Op::Return ||
+               last.op == LIR_Op::Ret;
     }
 };
 

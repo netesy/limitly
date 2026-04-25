@@ -1618,19 +1618,19 @@ TypePtr TypeChecker::check_literal_expr_with_expected_type(std::shared_ptr<LM::F
                 
             default:
                 // Non-numeric string literal
-                expr->inferred_type = type_system.NIL_TYPE;
-                return type_system.NIL_TYPE;
+                expr->inferred_type = type_system.STRING_TYPE;
+                return type_system.STRING_TYPE;
         }
     } else if (std::holds_alternative<bool>(expr->value)) {
         expr->inferred_type = type_system.BOOL_TYPE;
         return type_system.BOOL_TYPE;
     } else if (std::holds_alternative<std::nullptr_t>(expr->value)) {
-        expr->inferred_type = type_system.STRING_TYPE;
-        return type_system.STRING_TYPE;
+        expr->inferred_type = type_system.NIL_TYPE;
+        return type_system.NIL_TYPE;
     }
     
-    expr->inferred_type = type_system.STRING_TYPE;
-    return type_system.STRING_TYPE;
+    expr->inferred_type = type_system.NIL_TYPE;
+    return type_system.NIL_TYPE;
 }
 
 TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::VariableExpr> expr, TypePtr expected_type) {
@@ -1728,7 +1728,13 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::Vari
     // Fallback to global variable lookup (which includes qualified names like Status.Pending)
     if (!type) {
         auto it = variable_types.find(expr->name);
-        if (it != variable_types.end()) type = it->second;
+        if (it != variable_types.end()) {
+            type = it->second;
+            // Ensure even global fallback triggers capture analysis
+            if (!lambda_captures_stack.empty()) {
+                lambda_captures_stack.back().insert(expr->name);
+            }
+        }
     }
 
     if (!type) {
@@ -2923,7 +2929,9 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
     // Handle List types (e.g., [int])
     if (annotation->isList) {
         TypePtr elemType = type_system.ANY_TYPE;
-        if (!annotation->functionParams.empty()) {
+        if (annotation->elementType) {
+            elemType = resolve_type_annotation(annotation->elementType);
+        } else if (!annotation->functionParams.empty()) {
             elemType = resolve_type_annotation(annotation->functionParams[0]);
         }
         return type_system.createTypedListType(elemType);
@@ -2931,9 +2939,12 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
 
     // Handle Dict types (e.g., {str: int})
     if (annotation->isDict) {
-        TypePtr keyType = type_system.NIL_TYPE;
+        TypePtr keyType = type_system.ANY_TYPE;
         TypePtr valType = type_system.ANY_TYPE;
-        if (annotation->functionParams.size() >= 2) {
+        if (annotation->keyType && annotation->valueType) {
+            keyType = resolve_type_annotation(annotation->keyType);
+            valType = resolve_type_annotation(annotation->valueType);
+        } else if (annotation->functionParams.size() >= 2) {
             keyType = resolve_type_annotation(annotation->functionParams[0]);
             valType = resolve_type_annotation(annotation->functionParams[1]);
         }

@@ -96,6 +96,8 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
         current_function_ = std::make_unique<LIR_Function>(init_func_name, 0);
         next_register_ = 0;
         scope_stack_.clear();
+        
+        start_cfg_build();
         enter_scope();
 
         for (const auto& stmt : module->ast->statements) {
@@ -107,9 +109,12 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
             emit_stmt(*stmt);
         }
 
-        if (current_function_->instructions.empty() || !current_function_->instructions.back().isReturn()) {
+        if (get_current_block() && !get_current_block()->has_terminator()) {
             emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, 0, 0));
         }
+
+        exit_scope();
+        finish_cfg_build();
 
         auto result = std::move(current_function_);
         current_function_ = nullptr;

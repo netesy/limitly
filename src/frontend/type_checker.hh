@@ -127,6 +127,9 @@ private:
     // Scope tracking for lifetime analysis
     int current_scope_level = 0;
     
+    // Lambda capture tracking
+    std::vector<std::unordered_set<std::string>> lambda_captures_stack;
+    
     // Map to track which enums define which variants
     std::unordered_map<std::string, std::vector<TypePtr>> variant_owners;
     

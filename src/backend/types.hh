@@ -121,8 +121,17 @@ private:
         auto fromFrameType = std::get_if<FrameType>(&from->extra);
         auto toTraitType = std::get_if<TraitType>(&to->extra);
         if (fromFrameType && toTraitType) {
+            // Check direct implements
             for (const auto& traitName : fromFrameType->implements) {
                 if (traitName == toTraitType->name) return true;
+            }
+            
+            // Check frame registry for more complete info
+            if (frameRegistry.count(fromFrameType->name)) {
+                const auto& info = frameRegistry.at(fromFrameType->name);
+                for (const auto& traitName : info.implements) {
+                    if (traitName == toTraitType->name) return true;
+                }
             }
         }
     }
@@ -163,6 +172,65 @@ private:
     if (to->tag == TypeTag::Refined) {
         if (auto* refined = std::get_if<RefinedType>(&to->extra)) {
             return canConvert(from, refined->baseType);
+        }
+    }
+
+    // Handle Structural Type Compatibility
+    if (to->tag == TypeTag::Structural) {
+        auto toStruct = std::get_if<StructuralType>(&to->extra);
+        if (!toStruct) return false;
+
+        if (from->tag == TypeTag::Structural) {
+            auto fromStruct = std::get_if<StructuralType>(&from->extra);
+            if (!fromStruct) return false;
+
+            // Target must be a subset of source (or equal)
+            for (const auto& targetField : toStruct->fields) {
+                bool found = false;
+                for (const auto& sourceField : fromStruct->fields) {
+                    if (targetField.first == sourceField.first) {
+                        if (!canConvert(sourceField.second, targetField.second)) return false;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) return false;
+            }
+            return true;
+        }
+
+        if (from->tag == TypeTag::Frame) {
+            auto fromFrame = std::get_if<FrameType>(&from->extra);
+            if (!fromFrame) return false;
+
+            // Frames can satisfy structural types if they have all required fields
+            for (const auto& targetField : toStruct->fields) {
+                bool found = false;
+                
+                // Check local frame info
+                for (const auto& sourceField : fromFrame->fields) {
+                    if (targetField.first == sourceField.first) {
+                        if (!canConvert(sourceField.second, targetField.second)) return false;
+                        found = true;
+                        break;
+                    }
+                }
+                
+                // Check registry if not found locally
+                if (!found && frameRegistry.count(fromFrame->name)) {
+                    const auto& info = frameRegistry.at(fromFrame->name);
+                    for (const auto& sourceField : info.fields) {
+                        if (targetField.first == sourceField.first) {
+                            if (!canConvert(sourceField.second, targetField.second)) return false;
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if (!found) return false;
+            }
+            return true;
         }
     }
 
