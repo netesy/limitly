@@ -550,6 +550,21 @@ Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
     // Check regular variable scope
     Reg reg = resolve_variable(expr.name);
     if (reg == UINT32_MAX) {
+        // Check if it's a function name used as a value (first-class functions)
+        if (function_table_.find(expr.name) != function_table_.end() || 
+            LIRFunctionManager::getInstance().hasFunction(expr.name)) {
+            
+            Reg func_reg = allocate_register();
+            auto func_type = std::make_shared<::Type>(::TypeTag::Function);
+            // In our LIR/VM, functions are referred to by name strings
+            auto string_type = std::make_shared<::Type>(::TypeTag::String);
+            ValuePtr name_val = std::make_shared<Value>(string_type, expr.name);
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, func_reg, name_val));
+            set_register_language_type(func_reg, func_type);
+            set_register_abi_type(func_reg, Type::Ptr);
+            return func_reg;
+        }
+
         report_error("Undefined variable: " + expr.name);
         return 0;
     }
@@ -637,7 +652,7 @@ Reg Generator::emit_interpolated_string_expr(LM::Frontend::AST::InterpolatedStri
         if (std::holds_alternative<std::string>(part)) {
             format_string += std::get<std::string>(part);
         } else if (std::holds_alternative<std::shared_ptr<LM::Frontend::AST::Expression>>(part)) {
-            format_string += "{}" ; // Use standard format marker
+            format_string += "%s" ; // Use standard format marker
             auto expr_part = std::get<std::shared_ptr<LM::Frontend::AST::Expression>>(part);
             Reg expr_reg = emit_expr(*expr_part);
             arg_regs.push_back(expr_reg);
@@ -1224,7 +1239,34 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             }
         }
         
-        if (BuiltinUtils::isBuiltinFunction(func_name)) {
+        if (function_table_.find(func_name) != function_table_.end()) {
+           // std::cout << "[DEBUG] LIR Generator: Generating call to user function '" << func_name << "'" << std::endl;
+            
+            // Evaluate arguments and store them in registers
+            std::vector<Reg> arg_regs;
+            for (const auto& arg : expr.arguments) {
+                Reg arg_reg = emit_expr(*arg);
+                arg_regs.push_back(arg_reg);
+            }
+            
+            // Allocate result register
+            Reg result = allocate_register();
+            
+            // Set the result type if available from type checking
+            if (expr.inferred_type) {
+                set_register_language_type(result, expr.inferred_type);
+                set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
+            } else {
+                auto any_type = std::make_shared<::Type>(::TypeTag::Any);
+                set_register_language_type(result, any_type);
+                set_register_abi_type(result, language_type_to_abi_type(any_type));
+            }
+            
+            // Generate user function call using new format: call r2, user_func(r0, r1, r2, ...)
+            emit_instruction(LIR_Inst(LIR_Op::Call, result, func_name, arg_regs));
+            
+            return result;
+        } else if (BuiltinUtils::isBuiltinFunction(func_name)) {
            // std::cout << "[DEBUG] LIR Generator: Generating builtin call to '" << func_name << "'" << std::endl;
             
             // Special handling for channel() function
@@ -1283,35 +1325,19 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             
             return result;
             
-        } else if (function_table_.find(func_name) != function_table_.end()) {
-           // std::cout << "[DEBUG] LIR Generator: Generating call to user function '" << func_name << "'" << std::endl;
-            
-            // Evaluate arguments and store them in registers
-            std::vector<Reg> arg_regs;
-            for (const auto& arg : expr.arguments) {
-                Reg arg_reg = emit_expr(*arg);
-                arg_regs.push_back(arg_reg);
-            }
-            
-            // Allocate result register
-            Reg result = allocate_register();
-            
-            // Set the result type if available from type checking
-            if (expr.inferred_type) {
-                set_register_language_type(result, expr.inferred_type);
-                set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
-            } else {
-                auto any_type = std::make_shared<::Type>(::TypeTag::Any);
-                set_register_language_type(result, any_type);
-                set_register_abi_type(result, language_type_to_abi_type(any_type));
-            }
-            
-            // Generate user function call using new format: call r2, user_func(r0, r1, r2, ...)
-            emit_instruction(LIR_Inst(LIR_Op::Call, result, func_name, arg_regs));
-            
-            return result;
-            
         } else {
+            // Check if it's actually a variable holding a function (indirect call)
+            Reg var_reg = resolve_variable(func_name);
+            if (var_reg != UINT32_MAX) {
+                // Redirect to closure call
+                LM::Frontend::AST::CallClosureExpr closure_call;
+                closure_call.closure = expr.callee;
+                closure_call.arguments = expr.arguments;
+                closure_call.namedArgs = expr.namedArgs;
+                closure_call.inferred_type = expr.inferred_type;
+                return emit_call_closure_expr(closure_call);
+            }
+
             report_error("Unknown function: " + func_name);
             return 0;
         }
@@ -1886,7 +1912,9 @@ Reg Generator::emit_call_closure_expr(LM::Frontend::AST::CallClosureExpr& expr) 
     } else {
         // Pass arguments to CallIndirect using multi-register convention or internal argument stack
         for (const auto& arg : arg_regs) {
-            emit_instruction(LIR_Inst(LIR_Op::Param, arg, 0, 0));
+            LIR_Inst param_inst(LIR_Op::Param);
+            param_inst.a = arg;
+            emit_instruction(param_inst);
         }
         emit_instruction(LIR_Inst(LIR_Op::CallIndirect, abi_type, result, closure_reg, 0));
     }
@@ -2167,7 +2195,7 @@ Reg Generator::emit_tuple_expr(LM::Frontend::AST::TupleExpr& expr) {
     Type abi_type = language_type_to_abi_type(expr.inferred_type);
     
     // Emit TupleCreate instruction with the correct size
-    emit_instruction(LIR_Inst(LIR_Op::TupleCreate, abi_type, tuple_reg, 0, static_cast<uint32_t>(expr.elements.size())));
+    emit_instruction(LIR_Inst(LIR_Op::TupleCreate, abi_type, tuple_reg, 0, 0, static_cast<uint32_t>(expr.elements.size())));
     set_register_type(tuple_reg, expr.inferred_type);
     
     // Use TupleSet to add elements to the tuple
@@ -2214,8 +2242,26 @@ Reg Generator::emit_range_expr(LM::Frontend::AST::RangeExpr& expr) {
 
 
 Reg Generator::emit_lambda_expr(LM::Frontend::AST::LambdaExpr& expr) {
-    report_error("Lambda expressions not yet implemented");
-    return 0;
+    std::string lambda_name = "__lambda_" + std::to_string(next_label_++);
+    
+    auto fn_decl = std::make_shared<LM::Frontend::AST::FunctionDeclaration>();
+    fn_decl->name = lambda_name;
+    fn_decl->params = expr.params;
+    fn_decl->returnType = expr.returnType;
+    fn_decl->body = expr.body;
+    fn_decl->inferred_type = expr.inferred_type;
+    
+    generate_function(*fn_decl);
+    
+    Reg func_reg = allocate_register();
+    auto func_type = std::make_shared<::Type>(::TypeTag::Function);
+    auto string_type = std::make_shared<::Type>(::TypeTag::String);
+    ValuePtr name_val = std::make_shared<Value>(string_type, lambda_name);
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, func_reg, name_val));
+    set_register_language_type(func_reg, func_type);
+    set_register_abi_type(func_reg, Type::Ptr);
+    
+    return func_reg;
 }
 
 // Statement handlers

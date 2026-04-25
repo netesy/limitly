@@ -58,6 +58,9 @@ std::string LIR_Inst::to_string() const {
             }
             oss << ")";
             break;
+        case LIR_Op::Param:
+            oss << " r" << a;
+            break;
         case LIR_Op::FuncDef:
             // Follow clean format: fn r2, add(r0, r1) or fn print(r0)
             oss << "fn ";
@@ -79,12 +82,18 @@ std::string LIR_Inst::to_string() const {
             oss << " r" << a;
             break;
         case LIR_Op::Return:
-            if (dst != 0) {
+            if (a != 0) {
+                oss << " r" << a;
+            } else if (dst != 0) {
                 oss << " r" << dst;
             }
             break;
         case LIR_Op::Ret:
-            oss << " r" << dst;
+            if (a != 0) {
+                oss << " r" << a;
+            } else {
+                oss << " r" << dst;
+            }
             break;
         case LIR_Op::Load:
         case LIR_Op::Store:

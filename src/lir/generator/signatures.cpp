@@ -50,18 +50,22 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
     auto& manager = LM::Frontend::ModuleManager::getInstance();
     
     // Lower root program symbols
-    for (const auto& stmt : type_check_result.program->statements) {
-        if (auto func_stmt = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(stmt.get())) {
-             lower_function_body(*func_stmt);
-        } else if (auto trait_stmt = dynamic_cast<LM::Frontend::AST::TraitDeclaration*>(stmt.get())) {
-            lower_trait_declaration(*trait_stmt);
-        } else if (auto frame_stmt = dynamic_cast<LM::Frontend::AST::FrameDeclaration*>(stmt.get())) {
-            lower_frame_methods(*frame_stmt);
+    if (type_check_result.program && type_check_result.program->statements.size() > 0) {
+        for (const auto& stmt : type_check_result.program->statements) {
+            if (!stmt) continue;
+            if (auto func_stmt = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(stmt.get())) {
+                 lower_function_body(*func_stmt);
+            } else if (auto trait_stmt = dynamic_cast<LM::Frontend::AST::TraitDeclaration*>(stmt.get())) {
+                lower_trait_declaration(*trait_stmt);
+            } else if (auto frame_stmt = dynamic_cast<LM::Frontend::AST::FrameDeclaration*>(stmt.get())) {
+                lower_frame_methods(*frame_stmt);
+            }
         }
     }
 
     // Lower all module symbols and generate .__init__ functions
-    for (const auto& [path, module] : manager.get_all_modules()) {
+    auto modules = manager.get_all_modules();
+    for (const auto& [path, module] : modules) {
         if (path == "root" || !module || !module->ast) continue;
 
         std::string prev_mod = current_module_;
@@ -126,35 +130,59 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
 
 void Generator::lower_task_bodies_recursive(const std::vector<std::shared_ptr<LM::Frontend::AST::Statement>>& statements) {
     for (const auto& stmt : statements) {
+        if (!stmt) continue;
+
         if (auto concurrent_stmt = dynamic_cast<LM::Frontend::AST::ConcurrentStatement*>(stmt.get())) {
-
+            if (concurrent_stmt->body) {
+                lower_task_bodies_recursive(concurrent_stmt->body->statements);
+            }
         } else if (auto parallel_stmt = dynamic_cast<LM::Frontend::AST::ParallelStatement*>(stmt.get())) {
-            // === SHARED CELL PARALLEL HANDLING ===
-            // Use SharedCell system instead of old task_variable_mappings_
-            
-            // Find variables accessed in task/worker bodies that need to be shared
-            std::set<std::string> accessed_variables;
-            // find_accessed_variables_recursive(parallel_stmt->body->statements, accessed_variables);
-            
-            // Allocate SharedCell IDs for each accessed variable
-            parallel_block_cell_ids_.clear();
-            for (const auto& var_name : accessed_variables) {
-                // Emit SharedCell allocation LIR instruction
-                Reg cell_id_reg = allocate_register();
-                emit_instruction(LIR_Inst(LIR_Op::SharedCellAlloc, Type::I64, cell_id_reg, 0, 0));
-                
-                // Store the SharedCell ID register for this variable
-                parallel_block_cell_ids_[var_name] = cell_id_reg;
-                
-           }
-            
-
+            if (parallel_stmt->body) {
+                lower_task_bodies_recursive(parallel_stmt->body->statements);
+            }
         } else if (auto task_stmt = dynamic_cast<LM::Frontend::AST::TaskStatement*>(stmt.get())) {
             lower_task_body(*task_stmt);
+            if (task_stmt->body) {
+                lower_task_bodies_recursive(task_stmt->body->statements);
+            }
         } else if (auto worker_stmt = dynamic_cast<LM::Frontend::AST::WorkerStatement*>(stmt.get())) {
             lower_worker_body(*worker_stmt);
+            if (worker_stmt->body) {
+                lower_task_bodies_recursive(worker_stmt->body->statements);
+            }
         } else if (auto block_stmt = dynamic_cast<LM::Frontend::AST::BlockStatement*>(stmt.get())) {
-            // Recursively search within block statements
+            lower_task_bodies_recursive(block_stmt->statements);
+        } else if (auto iter_stmt = dynamic_cast<LM::Frontend::AST::IterStatement*>(stmt.get())) {
+            if (iter_stmt->body) {
+                 std::vector<std::shared_ptr<LM::Frontend::AST::Statement>> stmts = {iter_stmt->body};
+                 lower_task_bodies_recursive(stmts);
+            }
+        } else if (auto for_stmt = dynamic_cast<LM::Frontend::AST::ForStatement*>(stmt.get())) {
+            if (for_stmt->body) {
+                 std::vector<std::shared_ptr<LM::Frontend::AST::Statement>> stmts = {for_stmt->body};
+                 lower_task_bodies_recursive(stmts);
+            }
+        } else if (auto while_stmt = dynamic_cast<LM::Frontend::AST::WhileStatement*>(stmt.get())) {
+            if (while_stmt->body) {
+                 std::vector<std::shared_ptr<LM::Frontend::AST::Statement>> stmts = {while_stmt->body};
+                 lower_task_bodies_recursive(stmts);
+            }
+        } else if (auto if_stmt = dynamic_cast<LM::Frontend::AST::IfStatement*>(stmt.get())) {
+            if (if_stmt->thenBranch) {
+                 std::vector<std::shared_ptr<LM::Frontend::AST::Statement>> stmts = {if_stmt->thenBranch};
+                 lower_task_bodies_recursive(stmts);
+            }
+            if (if_stmt->elseBranch) {
+                 std::vector<std::shared_ptr<LM::Frontend::AST::Statement>> stmts = {if_stmt->elseBranch};
+                 lower_task_bodies_recursive(stmts);
+            }
+        } else if (auto match_stmt = dynamic_cast<LM::Frontend::AST::MatchStatement*>(stmt.get())) {
+            for (auto& match_case : match_stmt->cases) {
+                if (match_case.body) {
+                    std::vector<std::shared_ptr<LM::Frontend::AST::Statement>> stmts = {match_case.body};
+                    lower_task_bodies_recursive(stmts);
+                }
+            }
         }
     }
 }

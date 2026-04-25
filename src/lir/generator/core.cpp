@@ -38,8 +38,6 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
         // PASS 1: Lower function bodies into separate LIR functions
         lower_function_bodies(type_check_result);
     
-   // std::cout << "[DEBUG] Function bodies lowered" << std::endl;
-    
     // PASS 2: Generate main function with top-level code only
     current_module_ = "root";
     current_function_ = std::make_unique<LIR_Function>("__top_level_wrapper__", 0);
@@ -50,10 +48,9 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
     register_types_.clear();
     register_abi_types_.clear();
     register_language_types_.clear();
-    enter_scope();
     
-    cfg_context_.building_cfg = false;
-    cfg_context_.current_block = nullptr;
+    start_cfg_build();
+    enter_scope();
     
     // 1. Module Initializations in Topological Order
     auto& manager = LM::Frontend::ModuleManager::getInstance();
@@ -85,34 +82,17 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
     current_module_ = "";
 
     // Add implicit return if none exists
-    if (cfg_context_.building_cfg && get_current_block() && !get_current_block()->has_terminator()) {
+    if (get_current_block() && !get_current_block()->has_terminator()) {
         // For main function, use halt instead of return for proper termination
         if (current_function_->name == "__top_level_wrapper__") {
             emit_instruction(LIR_Inst(LIR_Op::Ret, Type::Void, 0, 0, 0)); // Use Ret for main termination
         } else {
             emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, 0, 0));
         }
-    } else if (!cfg_context_.building_cfg) {
-        // Linear mode - add implicit return if function doesn't end with return
-        if (current_function_->instructions.empty() || 
-            !current_function_->instructions.back().isReturn()) {
-            if (current_function_->name == "__top_level_wrapper__") {
-                emit_instruction(LIR_Inst(LIR_Op::Ret, Type::Void, 0, 0, 0)); // Use Ret for main termination
-            } else {
-                emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, 0, 0));
-            }
-        }
     }
 
-    // Finish CFG building for main (only if CFG was used)
-    if (cfg_context_.building_cfg) {
-        // Validate CFG before finishing
-        // Temporarily disable CFG validation for concurrent debugging
-        if (false && !validate_cfg()) {
-            report_error("CFG validation failed for main function");
-        }
-        finish_cfg_build();
-    }
+    // Finish CFG building for main
+    finish_cfg_build();
 
     // Optimize the generated LIR (but NOT for top-level wrapper)
     if (current_function_->name != "__top_level_wrapper__") {
@@ -144,16 +124,19 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
 
 
 void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
-    
     auto& func_manager = LIRFunctionManager::getInstance();
     
-    // Register function signature early for recursive calls
-    if (!func_manager.hasFunction(fn.name)) {
-        std::vector<LIRParameter> empty_params;
-        Type return_abi_type = Type::I64;  // Default return type
-        auto func = func_manager.createFunction(fn.name, empty_params, return_abi_type, nullptr);
-    }
-    
+    // Save current function state to allow recursive calls (e.g. lambdas)
+    auto saved_function = std::move(current_function_);
+    uint32_t saved_next_reg = next_register_;
+    uint32_t saved_next_label = next_label_;
+    auto saved_scope_stack = std::move(scope_stack_);
+    auto saved_loop_stack = std::move(loop_stack_);
+    auto saved_reg_types = std::move(register_types_);
+    auto saved_reg_abi_types = std::move(register_abi_types_);
+    auto saved_reg_lang_types = std::move(register_language_types_);
+    auto saved_cfg_context = cfg_context_;
+
     // Create function with parameters (including optional parameters)
     size_t total_params = fn.params.size() + fn.optionalParams.size();
     current_function_ = std::make_unique<LIR_Function>(fn.name, total_params);
@@ -162,10 +145,9 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     scope_stack_.clear();
     loop_stack_.clear();
     register_types_.clear();
-    enter_scope();
     
-    // Start CFG building (disabled for now - has bugs with elif)
-    // start_cfg_build();
+    start_cfg_build();
+    enter_scope();
     
     // Register regular parameters
     for (size_t i = 0; i < fn.params.size(); ++i) {
@@ -180,9 +162,6 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
         set_register_type(static_cast<Reg>(reg_index), nullptr);
     }
     
-    // Default parameter handling is done at runtime in the register VM
-    // No need to generate LIR code for default parameters
-    
     // Emit function body
     if (fn.body) {
         emit_stmt(*fn.body);
@@ -192,23 +171,11 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     exit_scope();
 
     // Add implicit return if none exists
-    if (cfg_context_.building_cfg) {
-        if (get_current_block() && !get_current_block()->has_terminator()) {
-            emit_instruction(LIR_Inst(LIR_Op::Return));
-        }
-
-        // Finish CFG building
-        if (!validate_cfg()) {
-            report_error("CFG validation failed for function: " + fn.name);
-        }
-        finish_cfg_build();
-    } else {
-        // Linear mode - add implicit return if function doesn't end with return
-        if (current_function_->instructions.empty() ||
-            !current_function_->instructions.back().isReturn()) {
-            emit_instruction(LIR_Inst(LIR_Op::Return));
-        }
+    if (get_current_block() && !get_current_block()->has_terminator()) {
+        emit_instruction(LIR_Inst(LIR_Op::Return));
     }
+    
+    finish_cfg_build();
     
     // Convert LIR_Function to LIRFunction and update the registration
     auto result = std::move(current_function_);
@@ -216,66 +183,48 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     
     // Create proper LIRFunction from our LIR_Function
     std::vector<LIRParameter> params;
-    
-    // Add regular parameters
     for (const auto& param : fn.params) {
         LIRParameter lir_param;
         lir_param.name = param.first;
-        // Convert type - for now use I64 as default
         lir_param.type = Type::I64;
         params.push_back(lir_param);
     }
-    
-    // Add optional parameters
     for (const auto& optional_param : fn.optionalParams) {
         LIRParameter lir_param;
         lir_param.name = optional_param.first;
-        // Convert type - for now use I64 as default
         lir_param.type = Type::I64;
         params.push_back(lir_param);
     }
     
-    // Create function with I64 return type for now
-    auto lir_func = func_manager.createFunction(fn.name, params, Type::I64, nullptr);
-    
-    // Copy the instructions from our LIR_Function
+    Type return_abi_type = Type::I64;
+    if (fn.returnType.has_value()) {
+        auto lang_type = convert_ast_type_to_lir_type(fn.returnType.value());
+        return_abi_type = language_type_to_abi_type(lang_type);
+    }
+
+    auto lir_func = std::make_shared<LIRFunction>(fn.name, params, return_abi_type, nullptr);
     lir_func->setInstructions(result->instructions);
     
     // Optimize the generated LIR for this function
     if (Generator::is_optimization_enabled()) {
-        if (Generator::should_show_optimization_debug()) {
-            std::cout << "\n=== Optimizing Function: " << fn.name << " ===\n";
-            std::cout << "BEFORE Optimization (" << result->instructions.size() << " instructions):\n";
-            for (size_t i = 0; i < result->instructions.size(); ++i) {
-                std::cout << i << ": " << result->instructions[i].to_string() << "\n";
-            }
-        }
-        
         Optimizer optimizer(*result);
         optimizer.optimize();
-        
-        if (Generator::should_show_optimization_debug()) {
-            std::cout << "\nAFTER Optimization (" << result->instructions.size() << " instructions):\n";
-            for (size_t i = 0; i < result->instructions.size(); ++i) {
-                std::cout << i << ": " << result->instructions[i].to_string() << "\n";
-            }
-            std::cout << "\n";
-        }
-        
-        // Update the function with optimized instructions
-        lir_func->setInstructions(result->instructions);
-    } else {
-        // No optimization - use original instructions
-        if (Generator::should_show_optimization_debug()) {
-            std::cout << "\n=== Function: " << fn.name << " (Optimizations Disabled) ===\n";
-            std::cout << "Instructions (" << result->instructions.size() << "):\n";
-            for (size_t i = 0; i < result->instructions.size(); ++i) {
-                std::cout << i << ": " << result->instructions[i].to_string() << "\n";
-            }
-            std::cout << "\n";
-        }
         lir_func->setInstructions(result->instructions);
     }
+
+    // Register with manager AFTER instructions and optimization are complete
+    func_manager.registerFunction(lir_func);
+
+    // Restore previous state
+    current_function_ = std::move(saved_function);
+    next_register_ = saved_next_reg;
+    next_label_ = saved_next_label;
+    scope_stack_ = std::move(saved_scope_stack);
+    loop_stack_ = std::move(saved_loop_stack);
+    register_types_ = std::move(saved_reg_types);
+    register_abi_types_ = std::move(saved_reg_abi_types);
+    register_language_types_ = std::move(saved_reg_lang_types);
+    cfg_context_ = saved_cfg_context;
 }
 
 
@@ -687,59 +636,31 @@ void Generator::flatten_cfg_to_instructions() {
     // Create a map from block ID to instruction position (label)
     std::unordered_map<uint32_t, size_t> block_positions;
     
-    // Use a smarter linearization that respects control flow structure
-    // Strategy: Use BFS but prioritize blocks that are not end blocks
+    // Use DFS to find a linearization (Reverse Post-Order is best)
     std::vector<LIR_BasicBlock*> sorted_blocks;
     std::unordered_set<uint32_t> visited;
-    std::queue<uint32_t> queue;
     
-    // Start from entry block
-    if (current_function_->cfg->entry_block_id != UINT32_MAX) {
-        queue.push(current_function_->cfg->entry_block_id);
-        visited.insert(current_function_->cfg->entry_block_id);
-    }
-    
-    // BFS traversal
-    while (!queue.empty()) {
-        uint32_t block_id = queue.front();
-        queue.pop();
+    std::function<void(uint32_t)> visit = [&](uint32_t block_id) {
+        if (visited.count(block_id)) return;
+        visited.insert(block_id);
         
         auto block = current_function_->cfg->get_block(block_id);
-        if (!block) continue;
+        if (!block) return;
+        
+        // Visit successors (in reverse order often helps with linear layout)
+        for (auto it = block->successors.rbegin(); it != block->successors.rend(); ++it) {
+            visit(*it);
+        }
         
         sorted_blocks.push_back(block);
-        
-        // Add successors to queue, but prioritize non-end blocks
-        std::vector<uint32_t> end_block_successors;
-        std::vector<uint32_t> other_successors;
-        
-        for (uint32_t successor_id : block->successors) {
-            if (visited.count(successor_id)) continue;
-            
-            auto successor = current_function_->cfg->get_block(successor_id);
-            if (successor && successor->label.find("_end") != std::string::npos) {
-                end_block_successors.push_back(successor_id);
-            } else {
-                other_successors.push_back(successor_id);
-            }
-        }
-        
-        // Add non-end blocks first
-        for (uint32_t successor_id : other_successors) {
-            if (!visited.count(successor_id)) {
-                visited.insert(successor_id);
-                queue.push(successor_id);
-            }
-        }
-        
-        // Add end blocks last
-        for (uint32_t successor_id : end_block_successors) {
-            if (!visited.count(successor_id)) {
-                visited.insert(successor_id);
-                queue.push(successor_id);
-            }
-        }
+    };
+
+    if (current_function_->cfg->entry_block_id != UINT32_MAX) {
+        visit(current_function_->cfg->entry_block_id);
     }
+    
+    // Reverse to get topological/linear order
+    std::reverse(sorted_blocks.begin(), sorted_blocks.end());
     
     // Add any remaining blocks (shouldn't happen in well-formed CFG)
     for (const auto& block : current_function_->cfg->blocks) {
@@ -765,10 +686,7 @@ void Generator::flatten_cfg_to_instructions() {
             if (inst.op == LIR_Op::Jump || inst.op == LIR_Op::JumpIf || inst.op == LIR_Op::JumpIfFalse) {
                 auto it = block_positions.find(inst.imm);
                 if (it != block_positions.end()) {
-                    modified_inst.imm = it->second; // Use instruction position as label
-                } else {
-                    // Block not found - this might be an error
-                    std::cerr << "Warning: Jump target block " << inst.imm << " not found in block_positions" << std::endl;
+                    modified_inst.imm = static_cast<Imm>(it->second); // Use instruction position as label
                 }
             }
             

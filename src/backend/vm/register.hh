@@ -113,6 +113,9 @@ private:
     std::vector<std::queue<uint64_t>> work_queues;
     std::atomic<uint64_t> work_queue_counter{0};
     
+    // Argument stack for indirect calls and parameter passing
+    std::vector<RegisterValue> argument_stack;
+
     // Instruction count limit to prevent infinite loops
     static constexpr uint64_t MAX_INSTRUCTIONS = 100000;
     uint64_t instruction_count = 0;

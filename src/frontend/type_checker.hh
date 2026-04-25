@@ -220,6 +220,7 @@ private:
     TypePtr check_statement(std::shared_ptr<LM::Frontend::AST::Statement> stmt);
     TypePtr check_function_declaration(std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> func);
     TypePtr check_var_declaration(std::shared_ptr<LM::Frontend::AST::VarDeclaration> var_decl);
+    TypePtr check_destructuring_declaration(std::shared_ptr<LM::Frontend::AST::DestructuringDeclaration> dest_decl);
     TypePtr check_type_declaration(std::shared_ptr<LM::Frontend::AST::TypeDeclaration> type_decl);
     TypePtr check_block_statement(std::shared_ptr<LM::Frontend::AST::BlockStatement> block);
     TypePtr check_if_statement(std::shared_ptr<LM::Frontend::AST::IfStatement> if_stmt);
@@ -249,6 +250,7 @@ private:
     TypePtr check_list_expr(std::shared_ptr<LM::Frontend::AST::ListExpr> expr);
     TypePtr check_tuple_expr(std::shared_ptr<LM::Frontend::AST::TupleExpr> expr);
     TypePtr check_dict_expr(std::shared_ptr<LM::Frontend::AST::DictExpr> expr);
+    TypePtr check_range_expr(std::shared_ptr<LM::Frontend::AST::RangeExpr> expr);
     TypePtr check_interpolated_string_expr(std::shared_ptr<LM::Frontend::AST::InterpolatedStringExpr> expr);
     TypePtr check_lambda_expr(std::shared_ptr<LM::Frontend::AST::LambdaExpr> expr);
     TypePtr check_error_construct_expr(std::shared_ptr<LM::Frontend::AST::ErrorConstructExpr> expr);

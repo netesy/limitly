@@ -731,10 +731,16 @@ void Generator::lower_task_body(LM::Frontend::AST::TaskStatement& stmt) {
     auto saved_next_register = next_register_;
     auto saved_scope_stack = std::move(scope_stack_);
     auto saved_register_types = std::move(register_types_);
+    auto saved_cfg_context = cfg_context_;
+    auto saved_next_label = next_label_;
+    auto saved_loop_stack = std::move(loop_stack_);
     
     // Set up function context
     current_function_ = std::move(func);
     next_register_ = param_count;  // Start after all parameters
+    next_label_ = 0;
+    loop_stack_.clear();
+    cfg_context_ = CFGContext();
     scope_stack_.clear();
     register_types_.clear();
     
@@ -786,6 +792,9 @@ void Generator::lower_task_body(LM::Frontend::AST::TaskStatement& stmt) {
     next_register_ = saved_next_register;
     scope_stack_ = std::move(saved_scope_stack);
     register_types_ = std::move(saved_register_types);
+    cfg_context_ = saved_cfg_context;
+    next_label_ = saved_next_label;
+    loop_stack_ = std::move(saved_loop_stack);
 }
 
 
@@ -799,10 +808,16 @@ void Generator::lower_worker_body(LM::Frontend::AST::WorkerStatement& stmt) {
     auto saved_next_register = next_register_;
     auto saved_scope_stack = std::move(scope_stack_);
     auto saved_register_types = std::move(register_types_);
+    auto saved_cfg_context = cfg_context_;
+    auto saved_next_label = next_label_;
+    auto saved_loop_stack = std::move(loop_stack_);
     
     // Set up function context
     current_function_ = std::move(func);
     next_register_ = 4;  // Start after parameters
+    next_label_ = 0;
+    loop_stack_.clear();
+    cfg_context_ = CFGContext();
     scope_stack_.clear();
     register_types_.clear();
     
@@ -863,6 +878,9 @@ void Generator::lower_worker_body(LM::Frontend::AST::WorkerStatement& stmt) {
     next_register_ = saved_next_register;
     scope_stack_ = std::move(saved_scope_stack);
     register_types_ = std::move(saved_register_types);
+    cfg_context_ = saved_cfg_context;
+    next_label_ = saved_next_label;
+    loop_stack_ = std::move(saved_loop_stack);
 }
 
 // Error and Result type expression handlers - Unified Type? system

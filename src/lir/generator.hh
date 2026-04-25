@@ -198,6 +198,7 @@ private:
     void emit_print_stmt(LM::Frontend::AST::PrintStatement& stmt);
     void emit_print_value(Reg value);  // Helper for printing single values
     void emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt);
+    void emit_destructuring_var_stmt(LM::Frontend::AST::DestructuringDeclaration& stmt);
     void emit_block_stmt(LM::Frontend::AST::BlockStatement& stmt);
     void emit_if_stmt(LM::Frontend::AST::IfStatement& stmt);
     void emit_if_stmt_cfg(LM::Frontend::AST::IfStatement& stmt);

@@ -73,16 +73,23 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
             std::cout << "\n";
         }
 
+        std::cout << "[DEBUG] Starting LIR generation..." << std::endl;
         LIR::Generator lir_generator;
         lir_generator.set_import_aliases(post_opt_type_check.import_aliases);
         lir_generator.set_registered_modules(post_opt_type_check.registered_modules);
 
         auto lir_function = lir_generator.generate_program(post_opt_type_check);
-        if (!lir_function) return 1;
+        if (!lir_function) {
+            std::cerr << "[ERROR] LIR generation failed" << std::endl;
+            return 1;
+        }
+        std::cout << "[DEBUG] LIR generation complete. Instructions: " << lir_function->instructions.size() << std::endl;
 
         if (options.print_lir) {
              std::cout << "\n=== Final LIR ===\n";
-             // Disassembler used to be here, but let's keep it simple for now or re-include headers
+             for (size_t i = 0; i < lir_function->instructions.size(); ++i) {
+                 std::cout << i << ": " << lir_function->instructions[i].to_string() << "\n";
+             }
         }
 
         if (options.use_aot || options.use_wasm || options.use_wasi || options.print_fyra_ir) {
@@ -108,12 +115,10 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
             auto result = fyra.compile(*lir_function, fyra_options);
             return result.success ? 0 : 1;
         } else {
+            std::cout << "[DEBUG] Starting VM execution..." << std::endl;
             LM::Backend::VM::Register::RegisterVM register_vm;
-            auto& func_manager = LIR::LIRFunctionManager::getInstance();
-            std::vector<LIR::LIRParameter> main_params;
-            auto main_lir_func = func_manager.createFunction("__top_level_wrapper__", main_params, LIR::Type::I64, nullptr);
-            main_lir_func->setInstructions(lir_function->instructions);
-            register_vm.execute_lir_function(*main_lir_func);
+            register_vm.execute_function(*lir_function);
+            std::cout << "[DEBUG] VM execution complete." << std::endl;
         }
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << "\n";

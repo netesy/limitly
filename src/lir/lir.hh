@@ -488,7 +488,7 @@ public:
     std::unordered_map<Reg, TypePtr> register_language_types; // Language types for reference
 
     LIR_Function(const std::string& name, uint32_t param_count = 0)
-        : name(name), param_count(param_count), register_count(0), cfg(std::make_unique<LIR_CFG>()) {
+        : name(name), cfg(std::make_unique<LIR_CFG>()), param_count(param_count), register_count(0) {
         // Ensure the name is properly initialized
         this->name = name;
     }
