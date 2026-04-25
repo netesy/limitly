@@ -1,9 +1,0 @@
-}
-fn forward_func(): str { return "I am from the future"; }
-outer();
-
-print("\n=== Mandate 7: Refined Type Arithmetic ===");
-type Pos = int where value > 0;
-var p: Pos = 10;
-var res_refined = p + 5;
-print("Refined arithmetic result: {res_refined}");

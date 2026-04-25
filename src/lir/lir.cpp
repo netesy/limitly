@@ -363,7 +363,9 @@ bool LIR_CFG::validate() const {
         for (const auto& inst : block->instructions) {
             if (inst.op == LIR_Op::Jump || 
                 inst.op == LIR_Op::JumpIfFalse || 
-                inst.op == LIR_Op::Return) {
+                inst.op == LIR_Op::JumpIf || 
+                inst.op == LIR_Op::Return ||
+                inst.op == LIR_Op::Ret) {
                 terminator_count++;
             }
         }
@@ -415,6 +417,17 @@ bool LIR_CFG::validate() const {
                 }
                 if (std::find(block->successors.begin(), block->successors.end(), target) == block->successors.end()) {
                     std::cerr << "CFG Error: JumpIfFalse target " << target << " not in successors list for block " << block->id << std::endl;
+                    return false;
+                }
+            } else if (last_inst.op == LIR_Op::JumpIf) {
+                uint32_t target = last_inst.imm;
+                // JumpIf should have two successors: target and fall-through
+                if (block->successors.size() != 2) {
+                    std::cerr << "CFG Error: JumpIf block should have exactly 2 successors, has " << block->successors.size() << std::endl;
+                    return false;
+                }
+                if (std::find(block->successors.begin(), block->successors.end(), target) == block->successors.end()) {
+                    std::cerr << "CFG Error: JumpIf target " << target << " not in successors list for block " << block->id << std::endl;
                     return false;
                 }
             }

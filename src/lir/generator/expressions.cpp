@@ -499,6 +499,32 @@ Reg Generator::emit_literal_expr(LM::Frontend::AST::LiteralExpr& expr, TypePtr e
 
 
 Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
+    // Check if this is a captured variable in a lambda
+    if (env_register_ != UINT32_MAX) {
+        auto it = std::find(current_lambda_captures_.begin(), current_lambda_captures_.end(), expr.name);
+        if (it != current_lambda_captures_.end()) {
+            size_t index = std::distance(current_lambda_captures_.begin(), it);
+            Reg result = allocate_register();
+            
+            // In Tuple: (lambda_name, capture0, capture1, ...)
+            // Captured variables start at index 1
+            Reg idx_reg = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), (int64_t)(index + 1))));
+            
+            Type abi_type = Type::I64;
+            if (expr.inferred_type) {
+                abi_type = language_type_to_abi_type(expr.inferred_type);
+            }
+            
+            emit_instruction(LIR_Inst(LIR_Op::TupleGet, abi_type, result, env_register_, idx_reg));
+            
+            if (expr.inferred_type) {
+                set_register_language_type(result, expr.inferred_type);
+            }
+            return result;
+        }
+    }
+
     // Check if it's a global module variable accessed directly (e.g. within the module itself)
     if (!current_module_.empty() && current_module_ != "root") {
         std::string qualified_name = current_module_ + "." + expr.name;
@@ -2242,7 +2268,7 @@ Reg Generator::emit_range_expr(LM::Frontend::AST::RangeExpr& expr) {
 
 
 Reg Generator::emit_lambda_expr(LM::Frontend::AST::LambdaExpr& expr) {
-    std::string lambda_name = "__lambda_" + std::to_string(next_label_++);
+    std::string lambda_name = "__lambda_" + std::to_string(lambda_counter_++);
     
     auto fn_decl = std::make_shared<LM::Frontend::AST::FunctionDeclaration>();
     fn_decl->name = lambda_name;
@@ -2251,13 +2277,64 @@ Reg Generator::emit_lambda_expr(LM::Frontend::AST::LambdaExpr& expr) {
     fn_decl->body = expr.body;
     fn_decl->inferred_type = expr.inferred_type;
     
+    // Set captures for the new function's generation
+    auto prev_captures = current_lambda_captures_;
+    current_lambda_captures_ = expr.capturedVars;
+    
     generate_function(*fn_decl);
     
+    current_lambda_captures_ = prev_captures;
+
+    // Create the lambda/closure object
     Reg func_reg = allocate_register();
-    auto func_type = std::make_shared<::Type>(::TypeTag::Function);
     auto string_type = std::make_shared<::Type>(::TypeTag::String);
     ValuePtr name_val = std::make_shared<Value>(string_type, lambda_name);
-    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, func_reg, name_val));
+    Reg name_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, name_reg, name_val));
+
+    if (expr.capturedVars.empty()) {
+        // Simple function pointer
+        emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Ptr, func_reg, name_reg, 0));
+    } else {
+        // Bundle into a Tuple: (lambda_name, capture1, capture2, ...)
+        Reg closure_tuple = allocate_register();
+        uint32_t tuple_size = static_cast<uint32_t>(expr.capturedVars.size() + 1);
+        emit_instruction(LIR_Inst(LIR_Op::TupleCreate, Type::Ptr, closure_tuple, 0, 0, tuple_size));
+        
+        // Set lambda name at index 0
+        Reg zero_idx = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, zero_idx, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), (int64_t)0)));
+        emit_instruction(LIR_Inst(LIR_Op::TupleSet, Type::Void, closure_tuple, zero_idx, name_reg));
+
+        // Set captured variables
+        for (size_t i = 0; i < expr.capturedVars.size(); ++i) {
+            Reg val_reg = resolve_variable(expr.capturedVars[i]);
+            if (val_reg == UINT32_MAX) {
+                // If not found in local scope, it might be in current lambda's env
+                if (env_register_ != UINT32_MAX) {
+                    auto it = std::find(current_lambda_captures_.begin(), current_lambda_captures_.end(), expr.capturedVars[i]);
+                    if (it != current_lambda_captures_.end()) {
+                        size_t inner_idx = std::distance(current_lambda_captures_.begin(), it);
+                        Reg inner_idx_reg = allocate_register();
+                        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, inner_idx_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), (int64_t)(inner_idx + 1))));
+                        
+                        val_reg = allocate_register();
+                        emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::I64, val_reg, env_register_, inner_idx_reg));
+                    }
+                }
+            }
+            
+            if (val_reg == UINT32_MAX) continue;
+
+            Reg idx_reg = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), (int64_t)(i + 1))));
+            emit_instruction(LIR_Inst(LIR_Op::TupleSet, Type::Void, closure_tuple, idx_reg, val_reg));
+        }
+        
+        emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Ptr, func_reg, closure_tuple, 0));
+    }
+
+    auto func_type = std::make_shared<::Type>(::TypeTag::Function);
     set_register_language_type(func_reg, func_type);
     set_register_abi_type(func_reg, Type::Ptr);
     

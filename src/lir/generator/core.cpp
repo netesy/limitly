@@ -17,6 +17,7 @@ namespace LIR {
 // Static member initialization
 bool Generator::optimization_enabled_ = true;
 bool Generator::show_optimization_debug_ = false;
+size_t Generator::lambda_counter_ = 0;
 
 Generator::Generator() : current_function_(nullptr), next_register_(0), next_label_(0) {
     // Initialize LIR function system
@@ -139,8 +140,21 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
 
     // Create function with parameters (including optional parameters)
     size_t total_params = fn.params.size() + fn.optionalParams.size();
+    
+    // Add hidden environment parameter if this is a closure
+    bool is_closure = !current_lambda_captures_.empty();
+    if (is_closure) {
+        total_params++;
+    }
+
     current_function_ = std::make_unique<LIR_Function>(fn.name, total_params);
     next_register_ = total_params;
+
+    if (is_closure) {
+        env_register_ = static_cast<Reg>(total_params - 1);
+    } else {
+        env_register_ = UINT32_MAX;
+    }
     next_label_ = 0;
     scope_stack_.clear();
     loop_stack_.clear();
@@ -615,11 +629,9 @@ void Generator::remove_unreachable_blocks() {
     
     // Remove unreachable blocks
     auto& blocks = current_function_->cfg->blocks;
-    for (auto it = blocks.begin(); it != blocks.end(); ) {
-        if (*it && reachable_blocks.find((*it)->id) == reachable_blocks.end()) {
-            it = blocks.erase(it);  // Remove unreachable block
-        } else {
-            ++it;
+    for (auto& block : blocks) {
+        if (block && reachable_blocks.find(block->id) == reachable_blocks.end()) {
+            block.reset();  // Set to nullptr to maintain index consistency
         }
     }
 }
@@ -662,12 +674,29 @@ void Generator::flatten_cfg_to_instructions() {
     // Reverse to get topological/linear order
     std::reverse(sorted_blocks.begin(), sorted_blocks.end());
     
-    // Add any remaining blocks (shouldn't happen in well-formed CFG)
+    // Safety check: ensure ALL blocks are present if they are referenced anywhere
+    std::unordered_set<uint32_t> referenced_blocks;
     for (const auto& block : current_function_->cfg->blocks) {
-        if (block && !visited.count(block->id)) {
-            sorted_blocks.push_back(block.get());
+        if (!block) continue;
+        for (const auto& inst : block->instructions) {
+            if (inst.op == LIR_Op::Jump || inst.op == LIR_Op::JumpIf || inst.op == LIR_Op::JumpIfFalse) {
+                referenced_blocks.insert(inst.imm);
+            }
         }
     }
+
+    for (uint32_t ref_id : referenced_blocks) {
+        if (visited.find(ref_id) == visited.end()) {
+            auto block = current_function_->cfg->get_block(ref_id);
+            if (block) {
+                // If a referenced block was missed (e.g. by jump optimization), force it in
+                visit(ref_id);
+            }
+        }
+    }
+
+    // Reachable blocks only are in sorted_blocks at this point.
+    // We intentionally don't add remaining blocks as they are unreachable.
     
     // Calculate positions for each block
     size_t current_pos = 0;
@@ -686,7 +715,10 @@ void Generator::flatten_cfg_to_instructions() {
             if (inst.op == LIR_Op::Jump || inst.op == LIR_Op::JumpIf || inst.op == LIR_Op::JumpIfFalse) {
                 auto it = block_positions.find(inst.imm);
                 if (it != block_positions.end()) {
-                    modified_inst.imm = static_cast<Imm>(it->second); // Use instruction position as label
+                    modified_inst.imm = it->second; // Use instruction position as label
+                } else {
+                    // Block not found - this might be an error
+                    std::cerr << "Warning: Jump target block " << inst.imm << " not found in block_positions" << std::endl;
                 }
             }
             

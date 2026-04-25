@@ -327,13 +327,12 @@ bool Optimizer::peephole_optimize() {
 
         // 7. Eliminate redundant comparisons: cmpeq rX, rY, rY -> load_const rX, true
         if ((inst.op == LIR_Op::CmpEQ || inst.op == LIR_Op::CmpLE || inst.op == LIR_Op::CmpGE) && 
-            inst.a == inst.b) {
+            inst.a != UINT32_MAX && inst.a == inst.b) {
             inst.op = LIR_Op::LoadConst;
             inst.a = UINT32_MAX;
             inst.b = UINT32_MAX;
             // Create a true constant
-            auto true_val = std::make_shared<Value>();
-            true_val->data = "1";
+            auto true_val = std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Bool), true);
             inst.const_val = true_val;
             changed = true;
             continue;
@@ -341,13 +340,12 @@ bool Optimizer::peephole_optimize() {
 
         // 8. Eliminate redundant comparisons: cmpne rX, rY, rY -> load_const rX, false
         if ((inst.op == LIR_Op::CmpNEQ || inst.op == LIR_Op::CmpLT || inst.op == LIR_Op::CmpGT) && 
-            inst.a == inst.b) {
+            inst.a != UINT32_MAX && inst.a == inst.b) {
             inst.op = LIR_Op::LoadConst;
             inst.a = UINT32_MAX;
             inst.b = UINT32_MAX;
             // Create a false constant
-            auto false_val = std::make_shared<Value>();
-            false_val->data = "0";
+            auto false_val = std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Bool), false);
             inst.const_val = false_val;
             changed = true;
             continue;
@@ -370,12 +368,11 @@ bool Optimizer::peephole_optimize() {
         }
 
         // 11. Eliminate redundant boolean operations: xor rX, rY, rY -> load_const rX, false
-        if (inst.op == LIR_Op::Xor && inst.a == inst.b) {
+        if (inst.op == LIR_Op::Xor && inst.a != UINT32_MAX && inst.a == inst.b) {
             inst.op = LIR_Op::LoadConst;
             inst.a = UINT32_MAX;
             inst.b = UINT32_MAX;
-            auto false_val = std::make_shared<Value>();
-            false_val->data = "0";
+            auto false_val = std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Bool), false);
             inst.const_val = false_val;
             changed = true;
             continue;
@@ -466,8 +463,7 @@ bool Optimizer::peephole_optimize() {
                     inst.op = LIR_Op::LoadConst;
                     inst.a = UINT32_MAX;
                     inst.b = UINT32_MAX;
-                    auto zero_val = std::make_shared<Value>();
-                    zero_val->data = "0";
+                    auto zero_val = std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), (int64_t)0);
                     inst.const_val = zero_val;
                     changed = true;
                     continue;
