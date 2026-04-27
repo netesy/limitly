@@ -1,0 +1,61 @@
+// Standard Library Iterator Module
+
+frame Iterator {
+    var data: [int];
+    var index: int;
+
+    pub fn has_next(): bool {
+        return self.index < self.data.length;
+    }
+
+    pub fn next(): int? {
+        if (!self.has_next()) return nil;
+        var v = self.data[self.index];
+        self.index = self.index + 1;
+        return v;
+    }
+
+    pub fn map(f: fn(int): int): [int] {
+        var out: [int] = [];
+        var i: int = self.index;
+        var j: int = 0;
+        while (i < self.data.length) {
+            out[j] = f(self.data[i]);
+            i = i + 1;
+            j = j + 1;
+        }
+        return out;
+    }
+
+    pub fn filter(f: fn(int): bool): [int] {
+        var out: [int] = [];
+        var i: int = self.index;
+        var j: int = 0;
+        while (i < self.data.length) {
+            if (f(self.data[i])) {
+                out[j] = self.data[i];
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        return out;
+    }
+
+    pub fn fold(f: fn(int, int): int, initial: int): int {
+        var acc: int = initial;
+        var i: int = self.index;
+        while (i < self.data.length) {
+            acc = f(acc, self.data[i]);
+            i = i + 1;
+        }
+        return acc;
+    }
+
+    pub fn for_each(f: fn(int): int): nil {
+        var i: int = self.index;
+        while (i < self.data.length) {
+            f(self.data[i]);
+            i = i + 1;
+        }
+    }
+}

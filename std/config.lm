@@ -1,0 +1,19 @@
+// Config module
+import std.io as io;
+
+frame Config {
+    var values: {str: str};
+
+    pub fn load(path: str): Config {
+        return Config(values={});
+    }
+
+    pub fn get(key: str): str? {
+        return self.values[key];
+    }
+
+    pub fn set(key: str, value: str): Config {
+        self.values[key] = value;
+        return self;
+    }
+}

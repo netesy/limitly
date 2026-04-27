@@ -1,0 +1,11 @@
+// Filesystem structure module
+import std.path as path;
+import std.io as io;
+
+frame FS {
+    pub fn exists(p: path.Path): bool { return io.exists(p.value); }
+    pub fn create_dir(p: path.Path): nil?io.IOError { return io.create_directory(p.value); }
+    pub fn remove(p: path.Path): nil?io.IOError { return io.delete_file(p.value); }
+    pub fn rename(from: path.Path, to: path.Path): nil?io.IOError { return io.move_file(from.value, to.value); }
+    pub fn list_dir(p: path.Path): [str]?io.IOError { return io.list_directory(p.value); }
+}

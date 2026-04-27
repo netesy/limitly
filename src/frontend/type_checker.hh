@@ -26,6 +26,8 @@ struct ModuleInfo {
 
 class TypeChecker {
 private:
+    struct Scope;
+
     TypeSystem& type_system;
     std::vector<std::string> errors;
     
@@ -128,7 +130,8 @@ private:
     int current_scope_level = 0;
     
     // Lambda capture tracking
-    std::vector<std::unordered_set<std::string>> lambda_captures_stack;
+    std::vector<std::vector<std::string>> lambda_captures_stack;
+    std::vector<Scope*> lambda_scope_markers;
     
     // Map to track which enums define which variants
     std::unordered_map<std::string, std::vector<TypePtr>> variant_owners;
@@ -324,6 +327,7 @@ private:
     // Enhanced type inference
     TypePtr infer_lambda_return_type(const std::shared_ptr<LM::Frontend::AST::Statement>& body);
     TypePtr infer_literal_type(const std::shared_ptr<LM::Frontend::AST::LiteralExpr>& expr, TypePtr expected_type = nullptr);
+    bool should_capture_variable(const std::string& name) const;
     
     // Scope management
     struct Scope {

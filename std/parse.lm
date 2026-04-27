@@ -1,0 +1,16 @@
+// Parse module
+import std.core as core;
+
+frame Parse {
+    pub fn int(value: str): core.ResultInt {
+        return core.err_int("not implemented");
+    }
+
+    pub fn float(value: str): core.ResultStr {
+        return core.err_str("not implemented");
+    }
+
+    pub fn bool(value: str): bool {
+        return value == "true";
+    }
+}
