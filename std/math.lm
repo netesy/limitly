@@ -69,3 +69,200 @@ fn max_int(a: int, b: int): int { return IntOps(value=a).max(b); }
 fn abs_float(x: float): float { return FloatOps(value=x).abs(); }
 fn min_float(a: float, b: float): float { return FloatOps(value=a).min(b); }
 fn max_float(a: float, b: float): float { return FloatOps(value=a).max(b); }
+
+fn normalize_angle(x: float): float {
+    var y: float = x;
+    while (y > PI) {
+        y = y - TAU;
+    }
+    while (y < -PI) {
+        y = y + TAU;
+    }
+    return y;
+}
+
+fn sin(x: float): float {
+    // Taylor expansion with range reduction.
+    var y: float = normalize_angle(x);
+    var term: float = y;
+    var sum: float = y;
+    var n: int = 1;
+    while (n < 10) {
+        var k: float = (2.0 * n) * (2.0 * n + 1.0);
+        term = -term * y * y / k;
+        sum = sum + term;
+        n = n + 1;
+    }
+    return sum;
+}
+
+fn cos(x: float): float {
+    var y: float = normalize_angle(x);
+    var term: float = 1.0;
+    var sum: float = 1.0;
+    var n: int = 1;
+    while (n < 10) {
+        var k: float = (2.0 * n - 1.0) * (2.0 * n);
+        term = -term * y * y / k;
+        sum = sum + term;
+        n = n + 1;
+    }
+    return sum;
+}
+
+fn tan(x: float): float {
+    var c: float = cos(x);
+    if (abs_float(c) < 0.000000001) {
+        return 0.0;
+    }
+    return sin(x) / c;
+}
+
+fn sqrt(x: float): float? {
+    if (x < 0.0) {
+        return nil;
+    }
+    if (x == 0.0) {
+        return 0.0;
+    }
+
+    var guess: float = x;
+    if (guess < 1.0) {
+        guess = 1.0;
+    }
+
+    var i: int = 0;
+    while (i < 20) {
+        guess = 0.5 * (guess + x / guess);
+        i = i + 1;
+    }
+    return guess;
+}
+
+fn atan(x: float): float {
+    // Piecewise approximation: series for small magnitudes, identity for large.
+    if (abs_float(x) > 1.0) {
+        if (x > 0.0) {
+            return PI / 2.0 - atan(1.0 / x);
+        }
+        return -PI / 2.0 - atan(1.0 / x);
+    }
+
+    var term: float = x;
+    var sum: float = x;
+    var n: int = 1;
+    while (n < 20) {
+        term = -term * x * x;
+        sum = sum + term / (2.0 * n + 1.0);
+        n = n + 1;
+    }
+    return sum;
+}
+
+fn asin(x: float): float? {
+    if (x < -1.0 or x > 1.0) {
+        return nil;
+    }
+
+    var denom = sqrt(1.0 - x * x);
+    if (denom == nil) {
+        return nil;
+    }
+    if (denom == 0.0) {
+        if (x >= 0.0) {
+            return PI / 2.0;
+        }
+        return -PI / 2.0;
+    }
+    return atan(x / denom);
+}
+
+fn acos(x: float): float? {
+    var a = asin(x);
+    if (a == nil) {
+        return nil;
+    }
+    return PI / 2.0 - a;
+}
+
+fn exp(x: float): float {
+    var term: float = 1.0;
+    var sum: float = 1.0;
+    var n: int = 1;
+    while (n < 30) {
+        term = term * x / n;
+        sum = sum + term;
+        n = n + 1;
+    }
+    return sum;
+}
+
+fn log(x: float): float? {
+    if (x <= 0.0) {
+        return nil;
+    }
+
+    // log(x) = 2 * (y + y^3/3 + y^5/5 + ...), where y = (x-1)/(x+1)
+    var y: float = (x - 1.0) / (x + 1.0);
+    var y2: float = y * y;
+    var term: float = y;
+    var sum: float = 0.0;
+    var n: int = 1;
+    while (n < 60) {
+        sum = sum + term / n;
+        term = term * y2;
+        n = n + 2;
+    }
+    return 2.0 * sum;
+}
+
+fn log10(x: float): float? {
+    var ln = log(x);
+    if (ln == nil) {
+        return nil;
+    }
+    return ln / 2.302585092994046;
+}
+
+fn pow(base: float, exponent: float): float {
+    if (base <= 0.0) {
+        if (base == 0.0 and exponent > 0.0) {
+            return 0.0;
+        }
+        return 0.0;
+    }
+
+    var ln = log(base);
+    if (ln == nil) {
+        return 0.0;
+    }
+    return exp(exponent * ln);
+}
+
+fn floor(x: float): int {
+    // Placeholder until explicit cast ops are added to std/runtime.
+    return 0;
+}
+
+fn ceil(x: float): int {
+    // Placeholder until explicit cast ops are added to std/runtime.
+    return 0;
+}
+
+fn round(x: float): int {
+    // Placeholder until explicit cast ops are added to std/runtime.
+    return 0;
+}
+
+fn random(): float {
+    // Deterministic placeholder in absence of RNG intrinsics.
+    return 0.5;
+}
+
+fn random_int(min: int, max: int): int {
+    return min;
+}
+
+fn random_float(min: float, max: float): float {
+    return min;
+}
