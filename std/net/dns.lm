@@ -1,0 +1,5 @@
+import std.core as core;
+
+frame DNS {
+    pub fn resolve(host: str): core.ResultStr { return core.err_str("dns resolve not implemented"); }
+}

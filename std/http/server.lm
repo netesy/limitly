@@ -1,0 +1,7 @@
+import std.core as core;
+
+frame HTTPServer {
+    pub fn listen(port: int): core.ResultInt { return core.err_int("http listen not implemented"); }
+    pub fn route(method: str, path: str): core.ResultInt { return core.ok_int(0); }
+    pub fn respond(status: int, body: str): core.ResultInt { return core.ok_int(status); }
+}

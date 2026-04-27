@@ -1,0 +1,9 @@
+import std.core as core;
+
+frame HTTPClient {
+    pub fn get(url: str): core.ResultStr { return core.err_str("http get not implemented"); }
+    pub fn post(url: str, body: str): core.ResultStr { return core.err_str("http post not implemented"); }
+    pub fn put(url: str, body: str): core.ResultStr { return core.err_str("http put not implemented"); }
+    pub fn delete(url: str): core.ResultStr { return core.err_str("http delete not implemented"); }
+    pub fn request(method: str, url: str, body: str): core.ResultStr { return core.err_str("http request not implemented"); }
+}

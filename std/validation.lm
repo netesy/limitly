@@ -1,0 +1,7 @@
+// Validation module
+
+frame Validate {
+    pub fn is_empty(value: str): bool { return value == ""; }
+    pub fn is_number(value: str): bool { return false; }
+    pub fn is_alpha(value: str): bool { return false; }
+}

@@ -1,0 +1,10 @@
+import std.core as core;
+
+frame TCP {
+    pub fn connect(address: str, port: int): core.ResultInt { return core.err_int("tcp connect not implemented"); }
+    pub fn listen(port: int): core.ResultInt { return core.err_int("tcp listen not implemented"); }
+    pub fn accept(listener: int): core.ResultInt { return core.err_int("tcp accept not implemented"); }
+    pub fn send(handle: int, data: str): core.ResultInt { return core.err_int("tcp send not implemented"); }
+    pub fn recv(handle: int): core.ResultStr { return core.err_str("tcp recv not implemented"); }
+    pub fn close(handle: int): core.ResultInt { return core.ok_int(0); }
+}

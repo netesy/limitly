@@ -1,0 +1,7 @@
+// Random module
+import std.math as math;
+
+frame Random {
+    pub fn int(min: int, max: int): int { return math.random_int(min, max); }
+    pub fn float(): float { return math.random(); }
+}

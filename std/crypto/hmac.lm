@@ -1,0 +1,6 @@
+import std.core as core;
+
+frame HMAC {
+    pub fn sign(key: str, data: str): core.ResultStr { return core.err_str("hmac sign not implemented"); }
+    pub fn verify(key: str, data: str, signature: str): core.ResultInt { return core.err_int("hmac verify not implemented"); }
+}

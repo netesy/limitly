@@ -1,0 +1,7 @@
+import std.core as core;
+
+frame UDP {
+    pub fn bind(port: int): core.ResultInt { return core.err_int("udp bind not implemented"); }
+    pub fn send_to(handle: int, address: str, port: int, data: str): core.ResultInt { return core.err_int("udp send_to not implemented"); }
+    pub fn recv_from(handle: int): core.ResultStr { return core.err_str("udp recv_from not implemented"); }
+}

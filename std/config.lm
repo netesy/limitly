@@ -1,0 +1,30 @@
+// Config abstraction (format-agnostic)
+import std.core as core;
+
+frame Config {
+    var data: {str: str};
+
+    pub fn get(key: str): core.ResultStr {
+        var value = self.data[key];
+        if (value == nil) return core.err_str("missing key: " + key);
+        return core.ok_str(value);
+    }
+
+    pub fn set(key: str, value: str): Config {
+        self.data[key] = value;
+        return self;
+    }
+
+    pub fn has(key: str): bool {
+        return self.data[key] != nil;
+    }
+
+    pub fn remove(key: str): Config {
+        self.data[key] = nil;
+        return self;
+    }
+}
+
+fn new_config(): Config {
+    return Config(data={});
+}

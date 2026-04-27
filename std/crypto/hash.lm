@@ -1,0 +1,6 @@
+import std.core as core;
+
+frame Hash {
+    pub fn sha256(data: str): core.ResultStr { return core.err_str("sha256 not implemented"); }
+    pub fn sha512(data: str): core.ResultStr { return core.err_str("sha512 not implemented"); }
+}
