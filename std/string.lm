@@ -1,0 +1,10 @@
+// Compatibility module to keep singular naming alongside std.strings
+import std.strings as strings;
+
+var StringOps = strings.StringOps;
+var split = strings.split;
+var join_strings = strings.join_strings;
+var trim = strings.trim;
+var to_upper = strings.to_upper;
+var to_lower = strings.to_lower;
+var substring = strings.substring;

@@ -1,0 +1,19 @@
+// Standard Library Iterator Module (Frame-Centric)
+
+frame IteratorInt {
+    var data: [int];
+    var index: int;
+
+    pub fn has_next(): bool {
+        return self.index < self.data.length;
+    }
+
+    pub fn next(): int? {
+        if (!self.has_next()) {
+            return nil;
+        }
+        var value = self.data[self.index];
+        self.index = self.index + 1;
+        return value;
+    }
+}
