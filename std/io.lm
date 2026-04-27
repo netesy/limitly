@@ -1,5 +1,5 @@
 // Standard Library I/O Module
-// In-memory implementation that provides deterministic behavior across targets.
+// Uses compiler/runtime intrinsics: file_open/read/write/close/exists/delete.
 
 type IOError = FileNotFound | PermissionDenied | DiskFull | NetworkError | UnknownError;
 
@@ -12,80 +12,82 @@ type UnknownError = { message: str };
 type FileStream = {
     path: str,
     mode: str,
-    position: int
+    position: int,
+    handle: int
 };
 
-var __files: {str: str} = {};
-var __file_exists: {str: bool} = {};
-var __directories: {str: bool} = {};
-
-fn __init_io_state() {
-    if (!__directories["/"]) {
-        __directories["/"] = true;
-    }
-}
-
 fn read_file(path: str): str?IOError {
-    __init_io_state();
-    if (!__file_exists[path]) {
+    if (!file_exists(path)) {
         return FileNotFound { path: path };
     }
-    return __files[path];
+
+    var handle = file_open(path, "read");
+    var content = file_read(handle);
+    file_close(handle);
+    return content;
 }
 
 fn write_file(path: str, content: str): nil?IOError {
-    __init_io_state();
-    __files[path] = content;
-    __file_exists[path] = true;
+    var handle = file_open(path, "write");
+    file_write(handle, content);
+    file_close(handle);
     return nil;
 }
 
 fn append_file(path: str, content: str): nil?IOError {
-    __init_io_state();
-    if (__file_exists[path]) {
-        __files[path] = __files[path] + content;
-    } else {
-        __files[path] = content;
-        __file_exists[path] = true;
+    var previous: str = "";
+    if (file_exists(path)) {
+        var current = read_file(path);
+        match (current) {
+            FileNotFound => previous = "";
+            PermissionDenied => previous = "";
+            DiskFull => previous = "";
+            NetworkError => previous = "";
+            UnknownError => previous = "";
+            _ => previous = current;
+        }
     }
-    return nil;
-}
 
-fn file_exists(path: str): bool {
-    __init_io_state();
-    return __file_exists[path];
+    return write_file(path, previous + content);
 }
 
 fn file_size(path: str): int?IOError {
-    __init_io_state();
-    if (!__file_exists[path]) {
-        return FileNotFound { path: path };
+    var content = read_file(path);
+    match (content) {
+        FileNotFound => return FileNotFound { path: path };
+        PermissionDenied => return PermissionDenied { path: path, operation: "read" };
+        DiskFull => return DiskFull { path: path };
+        NetworkError => return NetworkError { message: "network error" };
+        UnknownError => return UnknownError { message: "unknown error" };
+        _ => return content.length;
     }
-    return __files[path].length;
 }
 
 fn delete_file(path: str): nil?IOError {
-    __init_io_state();
-    if (!__file_exists[path]) {
+    if (!file_exists(path)) {
         return FileNotFound { path: path };
     }
-    __file_exists[path] = false;
-    __files[path] = "";
+
+    var deleted = file_delete(path);
+    if (!deleted) {
+        return UnknownError { message: "failed to delete file" };
+    }
     return nil;
 }
 
 fn copy_file(source: str, destination: str): nil?IOError {
-    __init_io_state();
-    if (!__file_exists[source]) {
-        return FileNotFound { path: source };
+    var content = read_file(source);
+    match (content) {
+        FileNotFound => return FileNotFound { path: source };
+        PermissionDenied => return PermissionDenied { path: source, operation: "read" };
+        DiskFull => return DiskFull { path: source };
+        NetworkError => return NetworkError { message: "network error" };
+        UnknownError => return UnknownError { message: "unknown error" };
+        _ => return write_file(destination, content);
     }
-    __files[destination] = __files[source];
-    __file_exists[destination] = true;
-    return nil;
 }
 
 fn move_file(source: str, destination: str): nil?IOError {
-    __init_io_state();
     var copy_res = copy_file(source, destination);
     if (copy_res != nil) {
         return copy_res;
@@ -94,28 +96,22 @@ fn move_file(source: str, destination: str): nil?IOError {
 }
 
 fn create_directory(path: str): nil?IOError {
-    __init_io_state();
-    __directories[path] = true;
+    // Directory intrinsic support is not available yet.
     return nil;
 }
 
 fn list_directory(path: str): [str]?IOError {
-    __init_io_state();
-    if (!__directories[path]) {
-        return FileNotFound { path: path };
-    }
-
     var entries: [str] = [];
     return entries;
 }
 
 fn directory_exists(path: str): bool {
-    __init_io_state();
-    return __directories[path];
+    // Directory intrinsic support is not available yet.
+    return false;
 }
 
 fn read_line(): str?IOError {
-    return "";
+    return input("");
 }
 
 fn print_line(message: str): nil {
@@ -127,27 +123,28 @@ fn print_no_newline(message: str): nil {
 }
 
 fn open_file(path: str, mode: str): FileStream?IOError {
-    __init_io_state();
-    if (mode == "read" and !__file_exists[path]) {
+    if (mode == "read" and !file_exists(path)) {
         return FileNotFound { path: path };
     }
-    if (mode == "write") {
-        __files[path] = "";
-        __file_exists[path] = true;
+
+    var handle_mode: str = mode;
+    if (mode == "read") {
+        handle_mode = "r";
+    } else if (mode == "write") {
+        handle_mode = "w";
+    } else if (mode == "append") {
+        handle_mode = "a";
     }
-    if (mode == "append" and !__file_exists[path]) {
-        __files[path] = "";
-        __file_exists[path] = true;
-    }
-    return FileStream { path: path, mode: mode, position: 0 };
+
+    var handle = file_open(path, handle_mode);
+    return FileStream { path: path, mode: mode, position: 0, handle: handle };
 }
 
 fn read_from_stream(self: FileStream, bytes: int): str?IOError {
-    if (!__file_exists[self.path]) {
+    if (!file_exists(self.path)) {
         return FileNotFound { path: self.path };
     }
-
-    return __files[self.path];
+    return file_read(self.handle);
 }
 
 fn write_to_stream(self: FileStream, data: str): nil?IOError {
@@ -155,13 +152,11 @@ fn write_to_stream(self: FileStream, data: str): nil?IOError {
         return PermissionDenied { path: self.path, operation: "write" };
     }
 
-    if (self.mode == "append") {
-        return append_file(self.path, data);
-    }
-
-    return write_file(self.path, data);
+    file_write(self.handle, data);
+    return nil;
 }
 
 fn close_stream(self: FileStream): nil?IOError {
+    file_close(self.handle);
     return nil;
 }
