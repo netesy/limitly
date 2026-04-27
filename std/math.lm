@@ -3,6 +3,7 @@
 var PI: float = 3.141592653589793;
 var E: float = 2.718281828459045;
 var TAU: float = 6.283185307179586;
+var __rand_state: int = 123456789;
 
 frame IntOps {
     var value: int;
@@ -240,29 +241,50 @@ fn pow(base: float, exponent: float): float {
 }
 
 fn floor(x: float): int {
-    // Placeholder until explicit cast ops are added to std/runtime.
-    return 0;
+    var i: int = x as int;
+    if ((i as float) > x) {
+        return i - 1;
+    }
+    return i;
 }
 
 fn ceil(x: float): int {
-    // Placeholder until explicit cast ops are added to std/runtime.
-    return 0;
+    var i: int = x as int;
+    if ((i as float) < x) {
+        return i + 1;
+    }
+    return i;
 }
 
 fn round(x: float): int {
-    // Placeholder until explicit cast ops are added to std/runtime.
-    return 0;
+    if (x >= 0.0) {
+        return floor(x + 0.5);
+    }
+    return ceil(x - 0.5);
 }
 
 fn random(): float {
-    // Deterministic placeholder in absence of RNG intrinsics.
-    return 0.5;
+    __rand_state = ((__rand_state * 1103515245 + 12345) % 2147483647);
+    return (__rand_state as float) / 2147483647.0;
 }
 
 fn random_int(min: int, max: int): int {
-    return min;
+    if (max <= min) {
+        return min;
+    }
+
+    var range = max - min + 1;
+    var ratio = random();
+    var offset = floor(ratio * (range as float));
+    if (offset >= range) {
+        offset = range - 1;
+    }
+    return min + offset;
 }
 
 fn random_float(min: float, max: float): float {
-    return min;
+    if (max <= min) {
+        return min;
+    }
+    return min + (max - min) * random();
 }
