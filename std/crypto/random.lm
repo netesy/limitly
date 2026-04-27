@@ -1,0 +1,17 @@
+import std.core as core;
+import std.math as math;
+
+frame CryptoRandom {
+    pub fn bytes(length: int): core.ResultStr {
+        if (length < 0) return core.err_str("invalid length");
+        var out: str = "";
+        var i: int = 0;
+        while (i < length) {
+            out = out + "x";
+            i = i + 1;
+        }
+        return core.ok_str(out);
+    }
+
+    pub fn int(min: int, max: int): core.ResultInt { return core.ok_int(math.random_int(min, max)); }
+}

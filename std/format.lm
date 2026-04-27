@@ -1,0 +1,7 @@
+// Format module
+
+frame Format {
+    pub fn int(value: int): str { return "" + value; }
+    pub fn float(value: float): str { return "" + value; }
+    pub fn pad(value: str, length: int): str { return value; }
+}

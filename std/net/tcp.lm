@@ -1,0 +1,44 @@
+import std.core as core;
+import std.math as math;
+
+var __tcp_next_handle: int = 1000;
+var __tcp_buffers: {int: str} = {};
+
+frame TCP {
+    pub fn connect(address: str, port: int): core.ResultInt {
+        __tcp_next_handle = __tcp_next_handle + 1;
+        __tcp_buffers[__tcp_next_handle] = "";
+        return core.ok_int(__tcp_next_handle);
+    }
+
+    pub fn listen(port: int): core.ResultInt {
+        __tcp_next_handle = __tcp_next_handle + 1;
+        __tcp_buffers[__tcp_next_handle] = "";
+        return core.ok_int(__tcp_next_handle);
+    }
+
+    pub fn accept(listener: int): core.ResultInt {
+        __tcp_next_handle = __tcp_next_handle + 1;
+        __tcp_buffers[__tcp_next_handle] = "";
+        return core.ok_int(__tcp_next_handle);
+    }
+
+    pub fn send(handle: int, data: str): core.ResultInt {
+        var current = __tcp_buffers[handle];
+        if (current == nil) return core.err_int("invalid tcp handle");
+        __tcp_buffers[handle] = current + data;
+        return core.ok_int(data.length);
+    }
+
+    pub fn recv(handle: int): core.ResultStr {
+        var current = __tcp_buffers[handle];
+        if (current == nil) return core.err_str("invalid tcp handle");
+        __tcp_buffers[handle] = "";
+        return core.ok_str(current);
+    }
+
+    pub fn close(handle: int): core.ResultInt {
+        __tcp_buffers[handle] = nil;
+        return core.ok_int(0);
+    }
+}

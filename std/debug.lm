@@ -1,0 +1,17 @@
+import std.core as core;
+
+frame Debug {
+    pub fn assert(condition: bool, message: str): core.ResultInt {
+        if (!condition) return core.err_int(message);
+        return core.ok_int(1);
+    }
+
+    pub fn assert_eq(left: str, right: str): core.ResultInt {
+        if (left == right) return core.ok_int(1);
+        return core.err_int("assert_eq failed");
+    }
+
+    pub fn trace(message: str): nil {
+        print("[TRACE] " + message);
+    }
+}

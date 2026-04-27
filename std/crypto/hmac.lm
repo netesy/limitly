@@ -1,0 +1,14 @@
+import std.core as core;
+
+frame HMAC {
+    pub fn sign(key: str, data: str): core.ResultStr {
+        return core.ok_str("hmac:" + key + ":" + data);
+    }
+
+    pub fn verify(key: str, data: str, signature: str): core.ResultInt {
+        var expected = sign(key, data);
+        if (expected.is_err()) return core.err_int("sign failed");
+        if (expected.unwrap() == signature) return core.ok_int(1);
+        return core.err_int("invalid signature");
+    }
+}

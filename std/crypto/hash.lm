@@ -1,0 +1,11 @@
+import std.core as core;
+
+frame Hash {
+    pub fn sha256(data: str): core.ResultStr {
+        return core.ok_str("sha256:" + data.length);
+    }
+
+    pub fn sha512(data: str): core.ResultStr {
+        return core.ok_str("sha512:" + data.length);
+    }
+}

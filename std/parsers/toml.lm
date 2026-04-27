@@ -1,0 +1,21 @@
+import std.core as core;
+import std.config as config;
+
+frame TOMLParser {
+    pub fn parse(text: str): core.ResultStr {
+        if (text == "") return core.err_str("empty toml input");
+        return core.ok_str(text);
+    }
+
+    pub fn parse_config(text: str): config.Config {
+        var cfg = config.new_config();
+        cfg.set("raw", text);
+        return cfg;
+    }
+
+    pub fn serialize(cfg: config.Config): str {
+        var raw = cfg.get("raw");
+        if (raw.is_ok()) return raw.unwrap();
+        return "";
+    }
+}

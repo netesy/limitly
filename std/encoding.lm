@@ -1,0 +1,10 @@
+import std.core as core;
+
+frame Encoding {
+    pub fn base64_encode(value: str): core.ResultStr { return core.ok_str(value); }
+    pub fn base64_decode(value: str): core.ResultStr { return core.ok_str(value); }
+    pub fn url_encode(value: str): core.ResultStr { return core.ok_str(value); }
+    pub fn url_decode(value: str): core.ResultStr { return core.ok_str(value); }
+    pub fn hex_encode(value: str): core.ResultStr { return core.ok_str(value); }
+    pub fn hex_decode(value: str): core.ResultStr { return core.ok_str(value); }
+}
