@@ -1,164 +1,290 @@
-// Standard Library Math Module
-// Provides mathematical functions and constants
+// Standard Library Math Module (Frame-Centric)
 
-// Mathematical constants
 var PI: float = 3.141592653589793;
 var E: float = 2.718281828459045;
 var TAU: float = 6.283185307179586;
+var __rand_state: int = 123456789;
 
-// Trigonometric functions
+frame IntOps {
+    var value: int;
+
+    pub fn add(other: int): int {
+        return self.value + other;
+    }
+
+    pub fn abs(): int {
+        if (self.value < 0) {
+            return -self.value;
+        }
+        return self.value;
+    }
+
+    pub fn min(other: int): int {
+        if (self.value < other) {
+            return self.value;
+        }
+        return other;
+    }
+
+    pub fn max(other: int): int {
+        if (self.value > other) {
+            return self.value;
+        }
+        return other;
+    }
+}
+
+frame FloatOps {
+    var value: float;
+
+    pub fn add(other: float): float {
+        return self.value + other;
+    }
+
+    pub fn abs(): float {
+        if (self.value < 0.0) {
+            return -self.value;
+        }
+        return self.value;
+    }
+
+    pub fn min(other: float): float {
+        if (self.value < other) {
+            return self.value;
+        }
+        return other;
+    }
+
+    pub fn max(other: float): float {
+        if (self.value > other) {
+            return self.value;
+        }
+        return other;
+    }
+}
+
+fn abs_int(x: int): int { return IntOps(value=x).abs(); }
+fn min_int(a: int, b: int): int { return IntOps(value=a).min(b); }
+fn max_int(a: int, b: int): int { return IntOps(value=a).max(b); }
+
+fn abs_float(x: float): float { return FloatOps(value=x).abs(); }
+fn min_float(a: float, b: float): float { return FloatOps(value=a).min(b); }
+fn max_float(a: float, b: float): float { return FloatOps(value=a).max(b); }
+
+fn normalize_angle(x: float): float {
+    var y: float = x;
+    while (y > PI) {
+        y = y - TAU;
+    }
+    while (y < -PI) {
+        y = y + TAU;
+    }
+    return y;
+}
+
 fn sin(x: float): float {
-    // Sine function
-    // Note: This would need proper implementation using math libraries
-    return 0.0;
+    // Taylor expansion with range reduction.
+    var y: float = normalize_angle(x);
+    var term: float = y;
+    var sum: float = y;
+    var n: int = 1;
+    while (n < 10) {
+        var k: float = (2.0 * n) * (2.0 * n + 1.0);
+        term = -term * y * y / k;
+        sum = sum + term;
+        n = n + 1;
+    }
+    return sum;
 }
 
 fn cos(x: float): float {
-    // Cosine function
-    return 0.0;
+    var y: float = normalize_angle(x);
+    var term: float = 1.0;
+    var sum: float = 1.0;
+    var n: int = 1;
+    while (n < 10) {
+        var k: float = (2.0 * n - 1.0) * (2.0 * n);
+        term = -term * y * y / k;
+        sum = sum + term;
+        n = n + 1;
+    }
+    return sum;
 }
 
 fn tan(x: float): float {
-    // Tangent function
-    return 0.0;
+    var c: float = cos(x);
+    if (abs_float(c) < 0.000000001) {
+        return 0.0;
+    }
+    return sin(x) / c;
 }
 
-fn asin(x: float): float? {
-    // Arcsine with domain checking
-    if (x < -1.0 or x > 1.0) {
+fn sqrt(x: float): float? {
+    if (x < 0.0) {
         return nil;
     }
-    return 0.0;
-}
+    if (x == 0.0) {
+        return 0.0;
+    }
 
-fn acos(x: float): float? {
-    // Arccosine with domain checking
-    if (x < -1.0 or x > 1.0) {
-        return nil;
+    var guess: float = x;
+    if (guess < 1.0) {
+        guess = 1.0;
     }
-    return 0.0;
+
+    var i: int = 0;
+    while (i < 20) {
+        guess = 0.5 * (guess + x / guess);
+        i = i + 1;
+    }
+    return guess;
 }
 
 fn atan(x: float): float {
-    // Arctangent function
-    return 0.0;
+    // Piecewise approximation: series for small magnitudes, identity for large.
+    if (abs_float(x) > 1.0) {
+        if (x > 0.0) {
+            return PI / 2.0 - atan(1.0 / x);
+        }
+        return -PI / 2.0 - atan(1.0 / x);
+    }
+
+    var term: float = x;
+    var sum: float = x;
+    var n: int = 1;
+    while (n < 20) {
+        term = -term * x * x;
+        sum = sum + term / (2.0 * n + 1.0);
+        n = n + 1;
+    }
+    return sum;
 }
 
-// Power and logarithmic functions
-fn sqrt(x: float): float? {
-    // Square root with non-negative check
-    if (x < 0.0) {
+fn asin(x: float): float? {
+    if (x < -1.0 or x > 1.0) {
         return nil;
     }
-    // Note: This would need proper implementation
-    return 0.0;
-}
 
-fn pow(base: float, exponent: float): float {
-    // Power function
-    return 0.0;
-}
-
-fn log(x: float): float? {
-    // Natural logarithm with positive check
-    if (x <= 0.0) {
+    var denom = sqrt(1.0 - x * x);
+    if (denom == nil) {
         return nil;
     }
-    return 0.0;
+    if (denom == 0.0) {
+        if (x >= 0.0) {
+            return PI / 2.0;
+        }
+        return -PI / 2.0;
+    }
+    return atan(x / denom);
 }
 
-fn log10(x: float): float? {
-    // Base-10 logarithm with positive check
-    if (x <= 0.0) {
+fn acos(x: float): float? {
+    var a = asin(x);
+    if (a == nil) {
         return nil;
     }
-    return 0.0;
+    return PI / 2.0 - a;
 }
 
 fn exp(x: float): float {
-    // Exponential function
-    return 0.0;
+    var term: float = 1.0;
+    var sum: float = 1.0;
+    var n: int = 1;
+    while (n < 30) {
+        term = term * x / n;
+        sum = sum + term;
+        n = n + 1;
+    }
+    return sum;
 }
 
-// Utility functions for integers
-fn abs_int(x: int): int {
-    // Absolute value for int
-    if (x < 0) {
-        return -x;
+fn log(x: float): float? {
+    if (x <= 0.0) {
+        return nil;
     }
-    return x;
+
+    // log(x) = 2 * (y + y^3/3 + y^5/5 + ...), where y = (x-1)/(x+1)
+    var y: float = (x - 1.0) / (x + 1.0);
+    var y2: float = y * y;
+    var term: float = y;
+    var sum: float = 0.0;
+    var n: int = 1;
+    while (n < 60) {
+        sum = sum + term / n;
+        term = term * y2;
+        n = n + 2;
+    }
+    return 2.0 * sum;
 }
 
-fn min_int(a: int, b: int): int {
-    // Minimum of two integers
-    if (a < b) {
-        return a;
+fn log10(x: float): float? {
+    var ln = log(x);
+    if (ln == nil) {
+        return nil;
     }
-    return b;
+    return ln / 2.302585092994046;
 }
 
-fn max_int(a: int, b: int): int {
-    // Maximum of two integers
-    if (a > b) {
-        return a;
+fn pow(base: float, exponent: float): float {
+    if (base <= 0.0) {
+        if (base == 0.0 and exponent > 0.0) {
+            return 0.0;
+        }
+        return 0.0;
     }
-    return b;
-}
 
-// Utility functions for floats
-fn abs_float(x: float): float {
-    // Absolute value for float
-    if (x < 0.0) {
-        return -x;
+    var ln = log(base);
+    if (ln == nil) {
+        return 0.0;
     }
-    return x;
-}
-
-fn min_float(a: float, b: float): float {
-    // Minimum of two floats
-    if (a < b) {
-        return a;
-    }
-    return b;
-}
-
-fn max_float(a: float, b: float): float {
-    // Maximum of two floats
-    if (a > b) {
-        return a;
-    }
-    return b;
+    return exp(exponent * ln);
 }
 
 fn floor(x: float): int {
-    // Floor function
-    // Note: This would need proper implementation
-    return 0;
+    var i: int = x as int;
+    if ((i as float) > x) {
+        return i - 1;
+    }
+    return i;
 }
 
 fn ceil(x: float): int {
-    // Ceiling function
-    return 0;
+    var i: int = x as int;
+    if ((i as float) < x) {
+        return i + 1;
+    }
+    return i;
 }
 
 fn round(x: float): int {
-    // Round to nearest integer
-    return 0;
+    if (x >= 0.0) {
+        return floor(x + 0.5);
+    }
+    return ceil(x - 0.5);
 }
 
-// Random number generation
 fn random(): float {
-    // Random float between 0.0 and 1.0
-    // Note: This would need proper implementation with random number generator
-    return 0.5;
+    __rand_state = ((__rand_state * 1103515245 + 12345) % 2147483647);
+    return (__rand_state as float) / 2147483647.0;
 }
 
 fn random_int(min: int, max: int): int {
-    // Random integer in range [min, max]
-    return min;
+    if (max <= min) {
+        return min;
+    }
+
+    var range = max - min + 1;
+    var ratio = random();
+    var offset = floor(ratio * (range as float));
+    if (offset >= range) {
+        offset = range - 1;
+    }
+    return min + offset;
 }
 
 fn random_float(min: float, max: float): float {
-    // Random float in range [min, max]
-    return min;
+    if (max <= min) {
+        return min;
+    }
+    return min + (max - min) * random();
 }

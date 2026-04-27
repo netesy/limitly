@@ -1,83 +1,137 @@
-// Standard Library Collections Module
-// Provides enhanced array and dictionary operations using Limit's existing types
+// Standard Library Collections Module (Frame-Centric)
+// Frames are the primary abstraction; compatibility functions are preserved.
 
-// Array operations for integers
-fn push(arr: [int], item: int): [int] {
-    // Create new array with additional item
-    var newArr: [int] = [];
-    var i: int = 0;
-    while (i < arr.length) {
-        newArr[i] = arr[i];
-        i = i + 1;
+frame ListOps {
+    var data: [int];
+
+    pub fn push(item: int): [int] {
+        var new_data: [int] = [];
+        var i: int = 0;
+        while (i < self.data.length) {
+            new_data[i] = self.data[i];
+            i = i + 1;
+        }
+        new_data[self.data.length] = item;
+        return new_data;
     }
-    newArr[arr.length] = item;
-    return newArr;
+
+    pub fn pop(): int? {
+        if (self.data.length == 0) {
+            return nil;
+        }
+        return self.data[self.data.length - 1];
+    }
+
+    pub fn get(index: int): int? {
+        if (index < 0 or index >= self.data.length) {
+            return nil;
+        }
+        return self.data[index];
+    }
+
+    pub fn length(): int {
+        return self.data.length;
+    }
+
+    pub fn contains(item: int): bool {
+        var i: int = 0;
+        while (i < self.data.length) {
+            if (self.data[i] == item) {
+                return true;
+            }
+            i = i + 1;
+        }
+        return false;
+    }
+
+    pub fn find(item: int): int? {
+        var i: int = 0;
+        while (i < self.data.length) {
+            if (self.data[i] == item) {
+                return i;
+            }
+            i = i + 1;
+        }
+        return nil;
+    }
+
+    pub fn map(transform: fn(int): int): [int] {
+        var result: [int] = [];
+        var i: int = 0;
+        while (i < self.data.length) {
+            result[i] = transform(self.data[i]);
+            i = i + 1;
+        }
+        return result;
+    }
+
+    pub fn filter(predicate: fn(int): bool): [int] {
+        var result: [int] = [];
+        var j: int = 0;
+        var i: int = 0;
+        while (i < self.data.length) {
+            if (predicate(self.data[i])) {
+                result[j] = self.data[i];
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        return result;
+    }
+
+    pub fn fold(initial: int, combine: fn(int, int): int): int {
+        var acc: int = initial;
+        var i: int = 0;
+        while (i < self.data.length) {
+            acc = combine(acc, self.data[i]);
+            i = i + 1;
+        }
+        return acc;
+    }
+}
+
+// Compatibility free functions (existing API)
+fn push(arr: [int], item: int): [int] {
+    return ListOps(data=arr).push(item);
 }
 
 fn pop(arr: [int]): int? {
-    // Remove and return last item
-    if (arr.length == 0) {
-        return nil;
-    }
-    return arr[arr.length - 1];
+    return ListOps(data=arr).pop();
 }
 
 fn get(arr: [int], index: int): int? {
-    // Safe array access
-    if (index < 0 or index >= arr.length) {
-        return nil;
-    }
-    return arr[index];
+    return ListOps(data=arr).get(index);
 }
 
 fn length(arr: [int]): int {
-    // Get array length
-    return arr.length;
+    return ListOps(data=arr).length();
 }
 
 fn contains(arr: [int], item: int): bool {
-    // Check if array contains item
-    var i: int = 0;
-    while (i < arr.length) {
-        if (arr[i] == item) {
-            return true;
-        }
-        i = i + 1;
-    }
-    return false;
+    return ListOps(data=arr).contains(item);
 }
 
 fn find(arr: [int], item: int): int? {
-    // Find index of item
-    var i: int = 0;
-    while (i < arr.length) {
-        if (arr[i] == item) {
-            return i;
-        }
-        i = i + 1;
-    }
-    return nil;
+    return ListOps(data=arr).find(item);
 }
 
-// String array operations
+// String list helpers remain as primitive utilities.
 fn push_str(arr: [str], item: str): [str] {
-    // Add string to array
-    var newArr: [str] = [];
+    var new_arr: [str] = [];
     var i: int = 0;
     while (i < arr.length) {
-        newArr[i] = arr[i];
+        new_arr[i] = arr[i];
         i = i + 1;
     }
-    newArr[arr.length] = item;
-    return newArr;
+    new_arr[arr.length] = item;
+    return new_arr;
 }
 
 fn join(arr: [str], separator: str): str {
-    // Join strings with separator
     if (arr.length == 0) {
         return "";
     }
-    
+
     var result: str = arr[0];
     var i: int = 1;
     while (i < arr.length) {
@@ -88,7 +142,6 @@ fn join(arr: [str], separator: str): str {
 }
 
 fn contains_str(arr: [str], item: str): bool {
-    // Check if string array contains item
     var i: int = 0;
     while (i < arr.length) {
         if (arr[i] == item) {
@@ -97,13 +150,4 @@ fn contains_str(arr: [str], item: str): bool {
         i = i + 1;
     }
     return false;
-}
-
-// Dictionary operations - simplified for initial implementation
-// Note: Dictionary operations would need proper VM support for full functionality
-
-fn dict_example(): nil {
-    // Placeholder for dictionary operations
-    // Full implementation would require enhanced VM support
-    print("Dictionary operations placeholder");
 }

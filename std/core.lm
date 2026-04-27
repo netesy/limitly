@@ -1,0 +1,24 @@
+// Standard Library Core Module (Frame-Centric)
+
+import std.result as result;
+
+frame Option {
+    var has_value: bool;
+
+    pub fn is_some(): bool {
+        return self.has_value;
+    }
+}
+
+frame ResultOps {
+    var ok: bool;
+
+    pub fn is_ok(): bool {
+        return self.ok;
+    }
+}
+
+var some_int = result.some_int;
+var none_int = result.none_int;
+var some_str = result.some_str;
+var none_str = result.none_str;

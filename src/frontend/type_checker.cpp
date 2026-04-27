@@ -1730,10 +1730,6 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::Vari
         auto it = variable_types.find(expr->name);
         if (it != variable_types.end()) {
             type = it->second;
-            // Ensure even global fallback triggers capture analysis
-            if (!lambda_captures_stack.empty()) {
-                lambda_captures_stack.back().insert(expr->name);
-            }
         }
     }
 
@@ -1745,6 +1741,14 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::Vari
     
     // Check memory safety before using the variable
     check_variable_use(expr->name, expr->line);
+
+    // Track captures for lambda lowering: only variables resolved from outer scopes
+    if (!lambda_captures_stack.empty() && should_capture_variable(expr->name)) {
+        auto& captures = lambda_captures_stack.back();
+        if (std::find(captures.begin(), captures.end(), expr->name) == captures.end()) {
+            captures.push_back(expr->name);
+        }
+    }
     
     expr->inferred_type = type;
     return type;
@@ -2760,6 +2764,8 @@ TypePtr TypeChecker::check_lambda_expr(std::shared_ptr<LM::Frontend::AST::Lambda
     
     // Create new scope for lambda parameters
     enter_scope();
+    lambda_captures_stack.emplace_back();
+    lambda_scope_markers.push_back(current_scope.get());
     
     // Process parameters and add them to scope
     std::vector<TypePtr> paramTypes;
@@ -2802,6 +2808,11 @@ TypePtr TypeChecker::check_lambda_expr(std::shared_ptr<LM::Frontend::AST::Lambda
     // Restore previous context
     current_function = prevFunction;
     current_return_type = prevReturnType;
+
+    // Materialize deterministic capture list for backend closure lowering
+    expr->capturedVars = lambda_captures_stack.back();
+    lambda_captures_stack.pop_back();
+    lambda_scope_markers.pop_back();
     
     exit_scope(); // Exit lambda scope
     
@@ -2811,6 +2822,43 @@ TypePtr TypeChecker::check_lambda_expr(std::shared_ptr<LM::Frontend::AST::Lambda
     TypePtr functionType = type_system.createFunctionType(param_names, paramTypes, returnType);
     expr->inferred_type = functionType;
     return functionType;
+}
+
+bool TypeChecker::should_capture_variable(const std::string& name) const {
+    if (lambda_captures_stack.empty() || lambda_scope_markers.empty() || !current_scope) {
+        return false;
+    }
+
+    // Find the nearest scope that defines this symbol.
+    const Scope* defining_scope = nullptr;
+    const Scope* scope = current_scope.get();
+    while (scope) {
+        if (scope->variables.find(name) != scope->variables.end()) {
+            defining_scope = scope;
+            break;
+        }
+        scope = scope->parent.get();
+    }
+
+    // If it's not in lexical scopes, it's global/module/builtin lookup and should not be captured.
+    if (!defining_scope) {
+        return false;
+    }
+
+    // A capture is a symbol defined outside the current lambda lexical boundary.
+    const Scope* lambda_scope = lambda_scope_markers.back();
+    scope = current_scope.get();
+    while (scope) {
+        if (scope == defining_scope) {
+            return false; // Defined in lambda scope or nested blocks within it.
+        }
+        if (scope == lambda_scope) {
+            break;
+        }
+        scope = scope->parent.get();
+    }
+
+    return true;
 }
 
 TypePtr TypeChecker::check_error_construct_expr(std::shared_ptr<LM::Frontend::AST::ErrorConstructExpr> expr) {

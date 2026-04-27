@@ -1,17 +1,22 @@
-// Standard Library Main Module
-// Provides access to all core standard library functionality
+// Standard Library Main Module (Frame-Centric facade)
 
-// Import all core modules
+import std.core as core;
 import std.collections as collections;
 import std.strings as strings;
 import std.math as math;
 import std.io as io;
 import std.result as result;
 import std.functional as functional;
+import std.iter as iter;
 
-// Re-export commonly used functions for convenience
+// Core/result
+var Option = core.Option;
+var ResultOps = core.ResultOps;
+var ResultInt = result.ResultInt;
+var ResultStr = result.ResultStr;
 
 // Collections
+var ListOps = collections.ListOps;
 var push = collections.push;
 var pop = collections.pop;
 var get = collections.get;
@@ -20,13 +25,16 @@ var contains = collections.contains;
 var find = collections.find;
 
 // String operations
+var StringOps = strings.StringOps;
 var split = strings.split;
 var join = strings.join_strings;
 var trim = strings.trim;
 var to_upper = strings.to_upper;
 var to_lower = strings.to_lower;
 
-// Math constants and functions
+// Math
+var IntOps = math.IntOps;
+var FloatOps = math.FloatOps;
 var PI = math.PI;
 var E = math.E;
 var TAU = math.TAU;
@@ -37,13 +45,13 @@ var max_int = math.max_int;
 var min_float = math.min_float;
 var max_float = math.max_float;
 
-// I/O operations
+// I/O
 var read_file = io.read_file;
 var write_file = io.write_file;
 var file_exists = io.file_exists;
 var print_line = io.print_line;
 
-// Result utilities
+// Result helpers
 var some_int = result.some_int;
 var none_int = result.none_int;
 var some_str = result.some_str;
@@ -53,10 +61,16 @@ var err_int = result.err_int;
 var ok_str = result.ok_str;
 var err_str = result.err_str;
 
-// Functional programming
+// Functional
+var FunctionOpsInt = functional.FunctionOpsInt;
+var FunctionOpsIntBool = functional.FunctionOpsIntBool;
+var ReducerOpsInt = functional.ReducerOpsInt;
 var map_int = functional.map_int;
 var filter_int = functional.filter_int;
 var reduce_int = functional.reduce_int;
 var find_int = functional.find_int;
 var any_int = functional.any_int;
 var all_int = functional.all_int;
+
+// Iteration
+var IteratorInt = iter.IteratorInt;
