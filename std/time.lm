@@ -1,0 +1,11 @@
+// Time module
+
+frame Time {
+    pub fn now(): int {
+        return time();
+    }
+
+    pub fn sleep(ms: int): nil {
+        sleep((ms as float) / 1000.0);
+    }
+}

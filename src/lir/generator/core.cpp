@@ -585,6 +585,11 @@ void Generator::finish_cfg_build() {
     
     // Remove unreachable blocks before flattening
     remove_unreachable_blocks();
+
+    // Validate CFG integrity after edge cleanup and before linearization.
+    if (!validate_cfg()) {
+        report_error("CFG validation failed before flattening for function: " + current_function_->name);
+    }
     
     // Flatten CFG blocks into linear instruction stream for JIT consumption
     flatten_cfg_to_instructions();
@@ -807,6 +812,29 @@ bool Generator::validate_cfg() {
             if (!successor_block) {
                 report_error("CFG validation: Block " + std::to_string(block->id) + 
                             " references non-existent successor " + std::to_string(successor_id));
+                is_valid = false;
+            }
+        }
+
+        // Check that terminator jump targets resolve to valid blocks and CFG edges.
+        for (const auto& inst : block->instructions) {
+            if (inst.op != LIR_Op::Jump && inst.op != LIR_Op::JumpIf && inst.op != LIR_Op::JumpIfFalse) {
+                continue;
+            }
+
+            uint32_t target_id = inst.imm;
+            auto target_block = current_function_->cfg->get_block(target_id);
+            if (!target_block) {
+                report_error("CFG validation: Block " + std::to_string(block->id) +
+                            " has jump to non-existent block " + std::to_string(target_id));
+                is_valid = false;
+                continue;
+            }
+
+            if (std::find(block->successors.begin(), block->successors.end(), target_id) == block->successors.end()) {
+                report_error("CFG validation: Block " + std::to_string(block->id) +
+                            " has jump to block " + std::to_string(target_id) +
+                            " without a corresponding CFG edge");
                 is_valid = false;
             }
         }

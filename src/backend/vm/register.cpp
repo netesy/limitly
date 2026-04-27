@@ -1527,6 +1527,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 const RegisterValue& func_val = registers[pc->a];
                 std::string func_name;
                 RegisterValue env_val = nullptr;
+                bool has_env = false;
 
                 if (std::holds_alternative<std::string>(func_val)) {
                     func_name = std::get<std::string>(func_val);
@@ -1540,6 +1541,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                             if (std::holds_alternative<std::string>(unboxed_name)) {
                                 func_name = std::get<std::string>(unboxed_name);
                                 env_val = func_val; // The tuple itself is the environment
+                                has_env = true;
                             }
                         }
                     }
@@ -1560,8 +1562,17 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                     std::vector<RegisterValue> args;
                     
                     // Pop arguments in correct order (they were pushed in order, so popping gives reverse)
-                    bool has_env = (env_val.index() != std::variant_npos);
-                    for (size_t i = 0; i < (param_count - (has_env ? 1 : 0)) && !argument_stack.empty(); ++i) {
+                    size_t expected_stack_args = param_count;
+                    if (has_env) {
+                        if (expected_stack_args == 0) {
+                            std::cerr << "VM Error: Invalid closure call target '" << func_name
+                                      << "' with zero parameters" << std::endl;
+                            registers[pc->dst] = nullptr;
+                            break;
+                        }
+                        expected_stack_args -= 1;
+                    }
+                    for (size_t i = 0; i < expected_stack_args && !argument_stack.empty(); ++i) {
                         args.insert(args.begin(), argument_stack.back());
                         argument_stack.pop_back();
                     }

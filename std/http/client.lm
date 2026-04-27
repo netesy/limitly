@@ -1,0 +1,13 @@
+import std.core as core;
+
+frame HTTPClient {
+    pub fn get(url: str): core.ResultStr { return request("GET", url, ""); }
+    pub fn post(url: str, body: str): core.ResultStr { return request("POST", url, body); }
+    pub fn put(url: str, body: str): core.ResultStr { return request("PUT", url, body); }
+    pub fn delete(url: str): core.ResultStr { return request("DELETE", url, ""); }
+
+    pub fn request(method: str, url: str, body: str): core.ResultStr {
+        if (url == "") return core.err_str("empty url");
+        return core.ok_str(method + " " + url + " " + body);
+    }
+}

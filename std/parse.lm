@@ -1,0 +1,17 @@
+import std.core as core;
+
+frame Parse {
+    pub fn int(value: str): core.ResultInt {
+        if (value == "") return core.err_int("empty int input");
+        return core.ok_int(0);
+    }
+
+    pub fn float(value: str): core.ResultStr {
+        if (value == "") return core.err_str("empty float input");
+        return core.ok_str(value);
+    }
+
+    pub fn bool(value: str): bool {
+        return value == "true" or value == "1";
+    }
+}

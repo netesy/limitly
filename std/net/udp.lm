@@ -1,0 +1,26 @@
+import std.core as core;
+
+var __udp_next_handle: int = 2000;
+var __udp_buffers: {int: str} = {};
+
+frame UDP {
+    pub fn bind(port: int): core.ResultInt {
+        __udp_next_handle = __udp_next_handle + 1;
+        __udp_buffers[__udp_next_handle] = "";
+        return core.ok_int(__udp_next_handle);
+    }
+
+    pub fn send_to(handle: int, address: str, port: int, data: str): core.ResultInt {
+        var current = __udp_buffers[handle];
+        if (current == nil) return core.err_int("invalid udp handle");
+        __udp_buffers[handle] = current + data;
+        return core.ok_int(data.length);
+    }
+
+    pub fn recv_from(handle: int): core.ResultStr {
+        var current = __udp_buffers[handle];
+        if (current == nil) return core.err_str("invalid udp handle");
+        __udp_buffers[handle] = "";
+        return core.ok_str(current);
+    }
+}

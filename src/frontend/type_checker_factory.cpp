@@ -129,6 +129,14 @@ void register_builtin_functions(TypeChecker& checker) {
     checker.register_builtin_function("typeOf", {ts.ANY_TYPE}, ts.STRING_TYPE);
     checker.register_builtin_function("debug", {ts.ANY_TYPE}, ts.NIL_TYPE);
     checker.register_builtin_function("input", {ts.STRING_TYPE}, ts.STRING_TYPE);
+
+    // File I/O intrinsics
+    checker.register_builtin_function("file_open", {ts.STRING_TYPE, ts.STRING_TYPE}, ts.INT64_TYPE);
+    checker.register_builtin_function("file_read", {ts.INT64_TYPE}, ts.STRING_TYPE);
+    checker.register_builtin_function("file_write", {ts.INT64_TYPE, ts.STRING_TYPE}, ts.NIL_TYPE);
+    checker.register_builtin_function("file_close", {ts.INT64_TYPE}, ts.NIL_TYPE);
+    checker.register_builtin_function("file_exists", {ts.STRING_TYPE}, ts.BOOL_TYPE);
+    checker.register_builtin_function("file_delete", {ts.STRING_TYPE}, ts.BOOL_TYPE);
 }
 
 } // namespace TypeCheckerFactory

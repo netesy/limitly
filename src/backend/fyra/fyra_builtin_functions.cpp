@@ -10,7 +10,8 @@ namespace LM::Backend::Fyra {
 bool FyraBuiltinFunctions::is_builtin(const std::string& name) {
     static const std::unordered_set<std::string> builtins = {
         "print", "assert", "abs", "sqrt", "sin", "cos", "tan", "asin", "acos", "atan",
-        "log", "log10", "exp", "ceil", "floor", "round", "len",
+        "log", "log10", "exp", "ceil", "floor", "round", "len", "input", "time", "sleep", "typeof",
+        "file_open", "file_read", "file_write", "file_close", "file_exists", "file_delete",
         "lm_box_string", "lm_list_new", "lm_list_append", "lm_list_get", "lm_list_set", "lm_list_len",
         "lm_tuple_new", "lm_tuple_set", "lm_tuple_get",
         "jit_dict_new", "lm_dict_set", "lm_dict_get"

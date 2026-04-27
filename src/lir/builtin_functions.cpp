@@ -12,9 +12,29 @@
 #include <ctime>
 #include <chrono>
 #include <thread>
+#include <fstream>
+#include <unordered_map>
+#include <filesystem>
+#include <mutex>
 
 namespace LM {
 namespace LIR {
+
+namespace {
+    std::mutex g_file_table_mutex;
+    int64_t g_next_file_handle = 1;
+    std::unordered_map<int64_t, std::shared_ptr<std::fstream>> g_file_table;
+
+    std::ios_base::openmode parse_open_mode(const std::string& mode) {
+        if (mode == "r" || mode == "read") return std::ios::in;
+        if (mode == "w" || mode == "write") return std::ios::out | std::ios::trunc;
+        if (mode == "a" || mode == "append") return std::ios::out | std::ios::app;
+        if (mode == "r+") return std::ios::in | std::ios::out;
+        if (mode == "w+") return std::ios::in | std::ios::out | std::ios::trunc;
+        if (mode == "a+") return std::ios::in | std::ios::out | std::ios::app;
+        throw std::runtime_error("file_open: unsupported mode '" + mode + "'");
+    }
+}
 
 // LIRBuiltinFunction implementation
 LIRBuiltinFunction::LIRBuiltinFunction(const std::string& name,
@@ -159,6 +179,135 @@ void LIRBuiltinFunctions::registerIOFunctions() {
             std::getline(std::cin, line);
             auto string_type = std::make_shared<::Type>(TypeTag::String);
             return std::make_shared<Value>(string_type, line);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "file_open",
+        std::vector<TypeTag>{TypeTag::String, TypeTag::String},
+        TypeTag::Int64,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            const std::string path = args[0]->as<std::string>();
+            const std::string mode = args[1]->as<std::string>();
+
+            auto file = std::make_shared<std::fstream>();
+            file->open(path, parse_open_mode(mode));
+            if (!file->is_open()) {
+                throw std::runtime_error("file_open: failed to open '" + path + "'");
+            }
+
+            std::lock_guard<std::mutex> lock(g_file_table_mutex);
+            const int64_t handle = g_next_file_handle++;
+            g_file_table[handle] = file;
+
+            auto int64_type = std::make_shared<::Type>(TypeTag::Int64);
+            return std::make_shared<Value>(int64_type, handle);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "file_read",
+        std::vector<TypeTag>{TypeTag::Int64},
+        TypeTag::String,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            const int64_t handle = args[0]->as<int64_t>();
+
+            std::shared_ptr<std::fstream> file;
+            {
+                std::lock_guard<std::mutex> lock(g_file_table_mutex);
+                auto it = g_file_table.find(handle);
+                if (it == g_file_table.end()) {
+                    throw std::runtime_error("file_read: invalid file handle");
+                }
+                file = it->second;
+            }
+
+            file->clear();
+            file->seekg(0, std::ios::beg);
+            std::ostringstream buffer;
+            buffer << file->rdbuf();
+
+            auto string_type = std::make_shared<::Type>(TypeTag::String);
+            return std::make_shared<Value>(string_type, buffer.str());
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "file_write",
+        std::vector<TypeTag>{TypeTag::Int64, TypeTag::String},
+        TypeTag::Nil,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            const int64_t handle = args[0]->as<int64_t>();
+            const std::string content = args[1]->as<std::string>();
+
+            std::shared_ptr<std::fstream> file;
+            {
+                std::lock_guard<std::mutex> lock(g_file_table_mutex);
+                auto it = g_file_table.find(handle);
+                if (it == g_file_table.end()) {
+                    throw std::runtime_error("file_write: invalid file handle");
+                }
+                file = it->second;
+            }
+
+            file->clear();
+            (*file) << content;
+            file->flush();
+
+            auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
+            return std::make_shared<Value>(nil_type);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "file_close",
+        std::vector<TypeTag>{TypeTag::Int64},
+        TypeTag::Nil,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            const int64_t handle = args[0]->as<int64_t>();
+
+            std::shared_ptr<std::fstream> file;
+            {
+                std::lock_guard<std::mutex> lock(g_file_table_mutex);
+                auto it = g_file_table.find(handle);
+                if (it == g_file_table.end()) {
+                    auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
+                    return std::make_shared<Value>(nil_type);
+                }
+                file = it->second;
+                g_file_table.erase(it);
+            }
+
+            if (file->is_open()) {
+                file->close();
+            }
+
+            auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
+            return std::make_shared<Value>(nil_type);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "file_exists",
+        std::vector<TypeTag>{TypeTag::String},
+        TypeTag::Bool,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            const std::string path = args[0]->as<std::string>();
+            const bool exists = std::filesystem::exists(path);
+            auto bool_type = std::make_shared<::Type>(TypeTag::Bool);
+            return std::make_shared<Value>(bool_type, exists);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "file_delete",
+        std::vector<TypeTag>{TypeTag::String},
+        TypeTag::Bool,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            const std::string path = args[0]->as<std::string>();
+            const bool removed = std::filesystem::remove(path);
+            auto bool_type = std::make_shared<::Type>(TypeTag::Bool);
+            return std::make_shared<Value>(bool_type, removed);
         }
     ));
 }

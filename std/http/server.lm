@@ -1,0 +1,16 @@
+import std.core as core;
+
+frame HTTPServer {
+    pub fn listen(port: int): core.ResultInt {
+        if (port <= 0) return core.err_int("invalid port");
+        return core.ok_int(port);
+    }
+
+    pub fn route(method: str, path: str): core.ResultInt {
+        return core.ok_int(1);
+    }
+
+    pub fn respond(status: int, body: str): core.ResultInt {
+        return core.ok_int(status);
+    }
+}

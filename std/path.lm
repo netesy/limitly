@@ -1,0 +1,24 @@
+// Path module
+
+frame Path {
+    var value: str;
+
+    pub fn join(other: str): Path {
+        if (self.value == "") return Path(value=other);
+        return Path(value=self.value + "/" + other);
+    }
+
+    pub fn parent(): Path {
+        return Path(value=self.value);
+    }
+
+    pub fn basename(): str { return self.value; }
+    pub fn extension(): str { return ""; }
+    pub fn normalize(): Path { return self; }
+    pub fn is_absolute(): bool {
+        if (self.value == "/") return true;
+        return false;
+    }
+}
+
+fn from_string(v: str): Path { return Path(value=v); }

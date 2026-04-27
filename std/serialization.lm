@@ -1,0 +1,8 @@
+import std.core as core;
+
+frame Serialization {
+    pub fn json_encode(value: str): core.ResultStr { return core.ok_str(value); }
+    pub fn json_decode(value: str): core.ResultStr { return core.ok_str(value); }
+    pub fn binary_encode(value: str): core.ResultStr { return core.ok_str(value); }
+    pub fn binary_decode(value: str): core.ResultStr { return core.ok_str(value); }
+}

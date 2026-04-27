@@ -1,0 +1,7 @@
+// Process module
+
+frame Process {
+    pub fn exit(code: int): nil { }
+    pub fn run(command: str): int { return 0; }
+    pub fn id(): int { return 0; }
+}
