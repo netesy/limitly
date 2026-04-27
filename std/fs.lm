@@ -5,7 +5,24 @@ import std.io as io;
 frame FS {
     pub fn exists(p: path.Path): bool { return io.exists(p.value); }
     pub fn create_dir(p: path.Path): nil?io.IOError { return io.create_directory(p.value); }
-    pub fn remove(p: path.Path): nil?io.IOError { return io.delete_file(p.value); }
-    pub fn rename(from: path.Path, to: path.Path): nil?io.IOError { return io.move_file(from.value, to.value); }
+    pub fn remove(p: path.Path): nil?io.IOError {
+        if (!io.delete(p.value)) return io.UnknownError { message: "failed to remove path" };
+        return nil;
+    }
+    pub fn rename(from: path.Path, to: path.Path): nil?io.IOError {
+        var src = io.open(from.value, "read");
+        match (src) {
+            io.FileNotFound => return io.FileNotFound { path: from.value };
+            _ => {
+                var content = src.read();
+                src.close();
+                var dst = io.open(to.value, "write");
+                dst.write(content);
+                dst.close();
+                io.delete(from.value);
+                return nil;
+            }
+        }
+    }
     pub fn list_dir(p: path.Path): [str]?io.IOError { return io.list_directory(p.value); }
 }

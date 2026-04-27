@@ -1,5 +1,5 @@
 // Config module
-import std.io as io;
+import std.core as core;
 
 frame Config {
     var values: {str: str};
@@ -8,8 +8,17 @@ frame Config {
         return Config(values={});
     }
 
-    pub fn get(key: str): str? {
-        return self.values[key];
+    pub fn get(key: str): core.ResultStr {
+        var value = self.values[key];
+        if (value == nil) return core.err_str("missing key: " + key);
+        return core.ok_str(value);
+    }
+
+    pub fn get_int(key: str, default_value: int): core.ResultInt {
+        var value = self.values[key];
+        if (value == nil) return core.ok_int(default_value);
+        // parsing primitive kept minimal until parser intrinsics are extended.
+        return core.ok_int(default_value);
     }
 
     pub fn set(key: str, value: str): Config {

@@ -1,4 +1,6 @@
-// Standard Library I/O Module
+// Standard Library I/O Module (frame-first)
+
+import std.core as core;
 
 type IOError = FileNotFound | PermissionDenied | DiskFull | NetworkError | UnknownError;
 type FileNotFound = { path: str };
@@ -8,13 +10,8 @@ type NetworkError = { message: str };
 type UnknownError = { message: str };
 
 frame Console {
-    pub fn print(msg: str): nil {
-        print(msg);
-    }
-
-    pub fn read_line(): str {
-        return input("");
-    }
+    pub fn print(msg: str): nil { print(msg); }
+    pub fn read_line(): str { return input(""); }
 }
 
 frame File {
@@ -43,92 +40,20 @@ frame File {
     }
 }
 
-fn open(path: str): File?IOError {
-    var h = file_open(path, "a+");
-    return File(path=path, handle=h);
-}
+// Intrinsic wrappers (canonical boundary)
+fn open(path: str, mode: str): File?IOError {
+    if (mode == "read" and !file_exists(path)) return FileNotFound { path: path };
 
-fn exists(path: str): bool {
-    return file_exists(path);
-}
-
-// Compatibility wrappers
-fn read_file(path: str): str?IOError {
-    if (!file_exists(path)) return FileNotFound { path: path };
-    var h = file_open(path, "r");
-    var v = file_read(h);
-    file_close(h);
-    return v;
-}
-
-fn write_file(path: str, content: str): nil?IOError {
-    var h = file_open(path, "w");
-    file_write(h, content);
-    file_close(h);
-    return nil;
-}
-
-fn append_file(path: str, content: str): nil?IOError {
-    var h = file_open(path, "a+");
-    var prev = file_read(h);
-    file_write(h, prev + content);
-    file_close(h);
-    return nil;
-}
-
-fn file_size(path: str): int?IOError {
-    var c = read_file(path);
-    match (c) {
-        FileNotFound => return FileNotFound { path: path };
-        PermissionDenied => return PermissionDenied { path: path, operation: "read" };
-        DiskFull => return DiskFull { path: path };
-        NetworkError => return NetworkError { message: "network" };
-        UnknownError => return UnknownError { message: "unknown" };
-        _ => return c.length;
-    }
-}
-
-fn delete_file(path: str): nil?IOError {
-    if (!file_exists(path)) return FileNotFound { path: path };
-    if (!file_delete(path)) return UnknownError { message: "failed to delete" };
-    return nil;
-}
-
-fn copy_file(source: str, destination: str): nil?IOError {
-    var c = read_file(source);
-    match (c) {
-        FileNotFound => return FileNotFound { path: source };
-        PermissionDenied => return PermissionDenied { path: source, operation: "read" };
-        DiskFull => return DiskFull { path: source };
-        NetworkError => return NetworkError { message: "network" };
-        UnknownError => return UnknownError { message: "unknown" };
-        _ => return write_file(destination, c);
-    }
-}
-
-fn move_file(source: str, destination: str): nil?IOError {
-    var r = copy_file(source, destination);
-    if (r != nil) return r;
-    return delete_file(source);
-}
-
-fn create_directory(path: str): nil?IOError { return nil; }
-fn list_directory(path: str): [str]?IOError { return []; }
-fn directory_exists(path: str): bool { return false; }
-fn read_line(): str?IOError { return input(""); }
-fn print_line(message: str): nil { print(message); }
-fn print_no_newline(message: str): nil { print(message); }
-
-type FileStream = { path: str, mode: str, position: int, handle: int };
-
-fn open_file(path: str, mode: str): FileStream?IOError {
     var mode_internal = "r";
     if (mode == "write") mode_internal = "w";
     if (mode == "append") mode_internal = "a+";
+
     var h = file_open(path, mode_internal);
-    return FileStream { path: path, mode: mode, position: 0, handle: h };
+    return File(path=path, handle=h);
 }
 
-fn read_from_stream(self: FileStream, bytes: int): str?IOError { return file_read(self.handle); }
-fn write_to_stream(self: FileStream, data: str): nil?IOError { file_write(self.handle, data); return nil; }
-fn close_stream(self: FileStream): nil?IOError { file_close(self.handle); return nil; }
+fn exists(path: str): bool { return file_exists(path); }
+fn delete(path: str): bool { return file_delete(path); }
+fn create_directory(path: str): nil?IOError { return nil; }
+fn list_directory(path: str): [str]?IOError { return []; }
+fn directory_exists(path: str): bool { return false; }
