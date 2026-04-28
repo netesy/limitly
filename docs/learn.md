@@ -87,6 +87,7 @@ A variable is a name that refers to a value. You can create a variable using the
 var my_age: int = 28;
 var my_name: str = "Jules";
 ```
+❌ TEACHING WITHOUT SPEC BACKING: Formal specification (language.md) for type inference limits is missing.
 
 Limit is a statically-typed language, which means that every variable has a type that is known when you write the code. The basic types are:
 *   **`int`**: for integers (e.g., `10`, `-5`).
@@ -179,6 +180,8 @@ print("Liftoff!");
 ## 🧰 Functions
 
 Functions are reusable blocks of code that you can call by name. They help you organize your code and avoid repetition.
+
+⚠️ PEDAGOGICAL BREAK: Functions are introduced before visibility modifiers (pub/prot) which are essential for frames discussed later.
 
 **How to define and call a function:**
 You can define a function using the `fn` keyword.

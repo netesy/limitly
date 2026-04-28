@@ -671,6 +671,8 @@ print(counter()); // Output: 3
 
 Limit is an object-oriented language and supports classes for creating user-defined types.
 
+⚠️ UNVERIFIED USAGE PATTERN: The `class` keyword is not supported for declarations in the current parser. Use `frame` instead.
+
 ### Defining Classes
 
 Classes are defined using the `class` keyword.
