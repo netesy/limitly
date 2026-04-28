@@ -27,7 +27,7 @@ To get started with Limit, you'll need to build the interpreter from source. Don
 *   **On macOS or Linux:**
     ```bash
     # Open your terminal
-    make
+    make linux
     ```
 
 *   **On Windows (with MSYS2/MinGW64):**
@@ -36,13 +36,13 @@ To get started with Limit, you'll need to build the interpreter from source. Don
     build.bat
     ```
 
-After building, you'll have a `limitly` executable. This is the Limit interpreter!
+After building, you'll have a `limitly` executable in the `bin/` directory. This is the Limit interpreter!
 
 **Verify your installation:**
 While there isn't a `--version` command yet, you can test your installation by starting the interactive REPL (Read-Eval-Print Loop):
 
 ```bash
-./limitly -repl
+./bin/limitly -repl
 ```
 
 If you see a `>` prompt, you're all set! You can type `exit` to leave the REPL.
@@ -62,7 +62,7 @@ print("Hello, world!");
 3.  Save the file and run it from your terminal:
 
 ```bash
-./limitly hello.lm
+./bin/limitly hello.lm
 ```
 
 You should see the following output:
@@ -287,21 +287,37 @@ iter (color: str in colors) {
 }
 ```
 
+## 🧱 Object-Oriented Programming with Frames
+
+Limit uses **frames** for object-oriented programming. A frame is a blueprint for creating objects that bundle data and behavior.
+
+```limit
+frame Greeter {
+    pub var name: str = "World";
+
+    pub fn say_hello() {
+        print("Hello, {this.name}!");
+    }
+}
+
+var greeter = Greeter();
+greeter.say_hello(); // Output: Hello, World!
+```
+
+Wait, what is `this`? Inside a frame's method, `this` refers to the specific object you are working with. You can also use `self` if you prefer - Limit supports both!
+
 ## 🧪 Errors and Optional Values
 
 In Limit, errors and absent values are not seen as crashes, but as a normal part of a program's flow that you should plan for. The language gives you powerful tools to handle situations where things might go wrong or where values might be absent.
 
-**Key Principle**: Limit is null-free by design. There are no null pointers or null references. Instead, we use a unified system where "absence of value" is treated as an error condition.
-
-There are two main ways to deal with potential errors or absent values: **handling** them immediately with a `match` statement, or **propagating** (passing) them up to the function that called your function.
+**Key Principle**: Limit is designed to be safe. We use a unified system where potential failure is represented in the type itself.
 
 ### The Unified Error and Optional Value System
 
 Limit uses a single system for both error handling and optional values:
-- **`Type?`** represents a value that might be present or absent (where absence is an error condition)
-- **`Type?ErrorType`** represents a value that might succeed or fail with specific error types
-- **`ok(value)`** creates a success/present value
-- **`err()`** creates an error/absent value (no nulls - absence is an error)
+- **`Type?`** represents a value that might be present or absent/error.
+- **`ok(value)`** creates a success value.
+- **`err()`** creates an error or "absent" value.
 
 ### Handling Errors with `match`
 
@@ -309,8 +325,8 @@ When you have a function that might fail or return an absent value, you can use 
 
 ```limit
 fn might_fail(): int? {
-    // This function might return a value or be absent (error condition)
-    return err(); // Absence is treated as an error
+    // This function might return a value or be absent
+    return err();
 }
 
 fn do_something(): int? {
@@ -331,20 +347,17 @@ fn do_something(): int? {
 
 ### Propagating Errors with `?`
 
-The `?` operator works for both error propagation and absence propagation:
+The `?` operator is a shortcut for passing errors up the line:
 
 ```limit
 fn might_fail(): int? {
-    return err(); // Absent value (treated as error)
+    return err();
 }
 
 fn do_something(): int? {
-    // If might_fail() returns Err (absent), the '?' will immediately
-    // stop do_something() and return that same Err.
-    // If it's Ok(value), the '?' will unwrap the value and continue.
+    // If might_fail() returns Err, '?' immediately returns it from do_something()
     var result: int = might_fail()?;
 
-    // This part only runs if might_fail() had a value
     print("It worked!");
     return ok(result);
 }
@@ -352,52 +365,42 @@ fn do_something(): int? {
 
 ### Inline Error Handling with `? else`
 
-Handle errors or absent values inline without a full `match` block:
+Handle errors or absent values inline with a fallback value:
 
 ```limit
 fn divide(a: int, b: int): int? {
     if (b == 0) {
-        return err(); // Division by zero is an error (no null values)
+        return err();
     }
     return ok(a / b);
 }
 
-// Provide a default value if division fails or is absent
+// Provide a default value if division fails
 var result: int = divide(10, 0)? else {
-    print("Division failed or result absent");
-    return -1; // Default value (not null - Limit is null-free)
+    print("Division failed");
+    return -1;
 };
 
 print("The final result is: {result}"); // Output: The final result is: -1
 ```
 
-This unified approach means you learn one pattern that works for both error handling and optional values, while maintaining Limit's null-free design.
-
 ## 🚀 Mini Project: Number Guessing Game
 
-Now it's time to put everything you've learned together! Let's build a simple number guessing game. This example will also show you how to handle potential errors gracefully.
-
-The goal is for the user to guess a secret number. The program will tell them if their guess is too high or too low. If they enter something that isn't a number, our program will handle it without crashing.
+Now it's time to put everything you've learned together! Let's build a simple number guessing game.
 
 ```limit
 // --- Number Guessing Game ---
 
-// Let's assume the language provides these built-in functions.
-// fn randint(min: int, max: int): int { ... }
+// Assuming built-in helpers
 // fn read_line(): str { ... }
 // fn to_int(s: str): int? { ... }
 
-// --- The Game Code ---
+var secret_number: int = 7;
+print("I'm thinking of a number. Guess what it is!");
 
-var secret_number: int = 7; // In a real game, you'd use randint(1, 100)
-print("I'm thinking of a number between 1 and 100. Guess what it is!");
-
-loop { // An infinite loop
+loop {
     print("Please input your guess:");
-
-    // For this example, we'll simulate user input.
-    // In a real program, you would use: var input_str: str = read_line();
-    var input_str: str = "7"; // Let's pretend the user guessed "7"
+    var input_str: str = "7"; // Simulating input
 
     var guess_result: int? = to_int(input_str);
 
@@ -410,34 +413,22 @@ loop { // An infinite loop
                 print("Too high!");
             } else {
                 print("You win!");
-                break; // Exit the loop
+                break;
             }
         },
         Err => {
             print("That's not a number! Please try again.");
         }
     }
-
-    // In a real game, we'd loop again. For this example, we'll just break.
     break;
 }
 ```
 
-**How it works:**
-*   **Error Handling with `match`:** The `to_int` function returns `int?` (an optional integer). We use a `match` statement to **handle** both the success case (`Ok`) and the error/absent case (`Err`). If the user enters bad input, we don't want the game to crash; we just want to print a message and let them try again. This demonstrates Limit's null-free approach where parsing failures result in absent values (treated as errors) rather than null values.
-*   **Looping:** The `loop` creates an infinite loop. The `break` keyword is used to exit the loop once the correct number has been guessed.
-
-**Your Challenge:**
-*   Can you modify the code to get a random number instead of using a fixed one? You'll have to imagine a `randint(min, max)` function exists.
-*   Can you remove the `break` at the end of the `match` statement to allow the user to guess multiple times?
-
 ## 📎 Next Steps / Resources
 
-Congratulations on completing this beginner's guide! You've learned the fundamentals of the Limit language.
+Congratulations! You've learned the fundamentals of the Limit language.
 
-Here are some resources to help you continue your journey:
-
-*   **Full Language Guide:** For a more in-depth look at all of Limit's features, check out the [**Full Language Guide**](./guide.md).
-*   **The Zen of Limit:** To understand the philosophy behind the language, read [**The Zen of Limit**](./zen.md).
-*   **Limit vs. Python:** To see how Limit compares to a popular dynamic language, check out our [**Limit vs. Python Comparison**](./limit_vs_python.md).
-*   **Explore the Code:** The best way to learn is to read code! Check out the `tests/` directory in this project to see examples of every feature in action.
+*   **Full Language Guide:** For a more in-depth look: [**Full Language Guide**](./guide.md).
+*   **Language Specification:** Formal details: [**Language Spec**](./language.md).
+*   **The Zen of Limit:** Our design philosophy: [**The Zen of Limit**](./zen.md).
+*   **Explore the Code:** Check out the `tests/` directory to see examples of every feature in action.
