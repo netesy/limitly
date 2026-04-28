@@ -1,10 +1,8 @@
 # The Zen of Limit
 
 *Explicit is better than implicit.*
-Mapped to: `TypeChecker` enforcement of annotations.
 
 *Errors are not exceptions; they are values to be handled.*
-Mapped to: `Type?` unified system and `std/core.lm`.
 
 *Concurrency should be structured, not chaotic.*
 
@@ -12,15 +10,13 @@ Mapped to: `Type?` unified system and `std/core.lm`.
 
 *Clarity is king; code is read more often than it is written.*
 
-*The absence of a value is an error condition to be handled, not a `null` to be feared.*
-🚨 CONTRADICTION: ZEN vs REALITY - While the philosophy claims no `null`, the parser still contains a `NIL` token and `nil` literal.
+*The absence of a value is a state to be handled explicitly, not a source of crashes.*
 
 *If the implementation is hard to explain, it's a bad idea.*
 
 *If the implementation is easy to explain, it may be a good idea.*
 
 *Modules are one honking great idea -- let's do more of those.*
-Mapped to: `src/frontend/module_manager.cpp`.
 
 *Readability counts.*
 
@@ -37,3 +33,13 @@ Mapped to: `src/frontend/module_manager.cpp`.
 *Now is better than never.*
 
 *Although never is often better than *right* now.*
+
+---
+
+## Philosophy Mapping
+
+- **Explicit vs Implicit**: Enforced by `TypeChecker`.
+- **Errors as Values**: Implemented via the `Type?` system and `std/core.lm`.
+- **Structured Concurrency**: Enforced by `parallel` and `concurrent` scope-bound blocks.
+- **Safety**: Managed by the region-based deterministic memory model.
+- **Modules**: Implemented in `src/frontend/module_manager.cpp`.
