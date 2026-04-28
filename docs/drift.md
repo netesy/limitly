@@ -14,3 +14,6 @@
 
 ## 4. Runtime Drift (Resolved)
 - Verified that all documented examples in `learn.md` and `guide.md` compile and run against the current parser implementation.
+
+## 5. Implementation Stubs
+- **Frame Modifiers**: The keywords `abstract`, `final`, and `data` are recognized by the scanner and stored in the AST. However, they are currently **not enforced** by the TypeChecker or LIR generator. They remain in the language spec as they are essential for the intended object model, but users should be aware they are currently documentation-only hints.
