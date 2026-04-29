@@ -840,6 +840,16 @@ TypePtr TypeChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statemen
         return check_match_statement(match_stmt);
     } else if (auto contract_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ContractStatement>(stmt)) {
         return check_contract_statement(contract_stmt);
+    } else if (auto comptime_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ComptimeStatement>(stmt)) {
+        // Strict phase separation: comptime evaluation is not allowed to consume runtime state
+        // until a dedicated deterministic comptime evaluator is implemented.
+        add_error("comptime statements are currently disabled: compile-time execution cannot depend on runtime values", comptime_stmt->line);
+        return type_system.NIL_TYPE;
+    } else if (auto unsafe_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::UnsafeStatement>(stmt)) {
+        // Unsafe operations must always be explicitly scoped and validated; reject until
+        // full unsafe memory-model checks are implemented in frontend + lowering + runtime.
+        add_error("unsafe statements are currently disabled: explicit unsafe boundaries require full memory-model validation", unsafe_stmt->line);
+        return type_system.NIL_TYPE;
     } else if (auto import_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ImportStatement>(stmt)) {
         return check_import_statement(import_stmt);
     } else if (auto expr_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ExprStatement>(stmt)) {
@@ -856,7 +866,7 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<LM::Frontend::AS
     enter_memory_region();
     
     // Resolve return type
-    TypePtr return_type = type_system.NIL_TYPE; // Default
+    TypePtr return_type = type_system.ANY_TYPE; // Default for unannotated functions
     if (func->name == "main") {
         return_type = type_system.INT64_TYPE;
     } else if (func->returnType) {
@@ -873,7 +883,7 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<LM::Frontend::AS
     
     // Check parameters
     for (const auto& param : func->params) {
-        TypePtr param_type = type_system.STRING_TYPE; // Default
+        TypePtr param_type = type_system.ANY_TYPE; // Default for untyped parameters
         if (param.second) {
             param_type = resolve_type_annotation(param.second);
         }
@@ -884,7 +894,7 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<LM::Frontend::AS
     
     // Check optional parameters
     for (const auto& optional_param : func->optionalParams) {
-        TypePtr param_type = type_system.STRING_TYPE; // Default
+        TypePtr param_type = type_system.ANY_TYPE; // Default for untyped parameters
         if (optional_param.second.first) {
             param_type = resolve_type_annotation(optional_param.second.first);
         }
@@ -932,6 +942,13 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<LM::Frontend::AS
     
     // Check body
     TypePtr body_type = check_statement(func->body);
+
+    // Infer return type for unannotated non-main functions from body.
+    if (func->name != "main" && !func->returnType.has_value() && body_type) {
+        return_type = body_type;
+        signature.return_type = return_type;
+        function_signatures[func->name] = signature;
+    }
     
     // Validate function body error types
     validate_function_body_error_types(func);
@@ -1778,7 +1795,7 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
                 return promote_numeric_types(left_base, right_base);
             } else if (expr->op == TokenType::PLUS && 
                       (is_string_type(left_base) || is_string_type(right_base))) {
-                return type_system.NIL_TYPE;
+                return type_system.STRING_TYPE;
             }
             add_error("Invalid operand types for arithmetic operation", expr->line);
             return type_system.INT_TYPE;
@@ -1803,8 +1820,8 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
             
         case TokenType::MODULUS:
         case TokenType::POWER:
-            if (is_numeric_type(left_type) && is_numeric_type(right_type)) {
-                return promote_numeric_types(left_type, right_type);
+            if (is_numeric_type(left_base) && is_numeric_type(right_base)) {
+                return promote_numeric_types(left_base, right_base);
             }
             add_error("Invalid operand types for arithmetic operation", expr->line);
             return type_system.INT_TYPE;
@@ -2097,6 +2114,7 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                         }
                     }
                 }
+
                 TypePtr frame_type = type_system.createFrameType(qualified_name);
                 expr->inferred_type = frame_type;
                 return frame_type;
@@ -2653,6 +2671,10 @@ TypePtr TypeChecker::check_index_expr(std::shared_ptr<LM::Frontend::AST::IndexEx
         }
     } else if (object_type->tag == TypeTag::Dict) {
         if (auto dt = std::get_if<DictType>(&object_type->extra)) {
+            if (!is_type_compatible(dt->keyType, index_type)) {
+                add_error("Dictionary key type mismatch: expected " + dt->keyType->toString() +
+                         ", got " + index_type->toString(), expr->line);
+            }
             return dt->valueType;
         }
     } else if (object_type->tag == TypeTag::String) {
@@ -2681,15 +2703,14 @@ TypePtr TypeChecker::check_list_expr(std::shared_ptr<LM::Frontend::AST::ListExpr
         elementTypes.push_back(elemType);
     }
     
-    // Find common type for all elements
+    // Enforce strict homogeneous element typing with no implicit widening.
     TypePtr commonElementType = elementTypes[0];
     for (size_t i = 1; i < elementTypes.size(); ++i) {
-        try {
-            commonElementType = get_common_type(commonElementType, elementTypes[i]);
-        } catch (const std::exception& e) {
-            add_error("Inconsistent element types in list literal: cannot mix " + 
-                    commonElementType->toString() + " and " + elementTypes[i]->toString() + 
-                    ": " + e.what(), expr->line);
+        if (!commonElementType || !elementTypes[i] ||
+            commonElementType->toString() != elementTypes[i]->toString()) {
+            add_error("Inconsistent element types in list literal: expected all elements to be '" +
+                    (commonElementType ? commonElementType->toString() : "unknown") +
+                    "', found '" + (elementTypes[i] ? elementTypes[i]->toString() : "unknown") + "'", expr->line);
             return type_system.createTypedListType(type_system.ANY_TYPE);
         }
     }
@@ -2734,28 +2755,26 @@ TypePtr TypeChecker::check_dict_expr(std::shared_ptr<LM::Frontend::AST::DictExpr
         valueTypes.push_back(valueType);
     }
     
-    // Find common types for keys and values
+    // Enforce strict homogeneous key/value typing with no implicit widening.
     TypePtr commonKeyType = keyTypes[0];
     TypePtr commonValueType = valueTypes[0];
     
     for (size_t i = 1; i < keyTypes.size(); ++i) {
-        try {
-            commonKeyType = get_common_type(commonKeyType, keyTypes[i]);
-        } catch (const std::exception& e) {
-            add_error("Inconsistent key types in dictionary literal: cannot mix " + 
-                    commonKeyType->toString() + " and " + keyTypes[i]->toString() + 
-                    ": " + e.what(), expr->line);
+        if (!commonKeyType || !keyTypes[i] ||
+            commonKeyType->toString() != keyTypes[i]->toString()) {
+            add_error("Inconsistent key types in dictionary literal: expected all keys to be '" +
+                    (commonKeyType ? commonKeyType->toString() : "unknown") +
+                    "', found '" + (keyTypes[i] ? keyTypes[i]->toString() : "unknown") + "'", expr->line);
             return type_system.createTypedDictType(type_system.NIL_TYPE, type_system.ANY_TYPE);
         }
     }
     
     for (size_t i = 1; i < valueTypes.size(); ++i) {
-        try {
-            commonValueType = get_common_type(commonValueType, valueTypes[i]);
-        } catch (const std::exception& e) {
-            add_error("Inconsistent value types in dictionary literal: cannot mix " + 
-                    commonValueType->toString() + " and " + valueTypes[i]->toString() + 
-                    ": " + e.what(), expr->line);
+        if (!commonValueType || !valueTypes[i] ||
+            commonValueType->toString() != valueTypes[i]->toString()) {
+            add_error("Inconsistent value types in dictionary literal: expected all values to be '" +
+                    (commonValueType ? commonValueType->toString() : "unknown") +
+                    "', found '" + (valueTypes[i] ? valueTypes[i]->toString() : "unknown") + "'", expr->line);
             return type_system.createTypedDictType(commonKeyType, type_system.ANY_TYPE);
         }
     }
