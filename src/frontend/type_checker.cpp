@@ -1950,6 +1950,16 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                 }
             }
 
+            // For direct structural-style frame construction (no init positional args),
+            // require all declared fields to be explicitly initialized.
+            if (expr->arguments.empty() && frame_info.declaration && !frame_info.fields.empty()) {
+                for (const auto& field : frame_info.fields) {
+                    if (expr->namedArgs.find(field.first) == expr->namedArgs.end()) {
+                        add_error("Frame '" + var_expr->name + "' is missing required field '" + field.first + "'", expr->line);
+                    }
+                }
+            }
+
             // Validate positional arguments (passing to init)
             if (!expr->arguments.empty() || sig_it != function_signatures.end()) {
                 if (sig_it == function_signatures.end()) {
@@ -2094,6 +2104,14 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                                  add_error("Frame '" + qualified_name + "' init method requires " + std::to_string(required_count) + " arguments, but only " +
                                           std::to_string(expr->arguments.size() + satisfied_by_named) + " were provided", expr->line);
                              }
+                        }
+                    }
+                }
+
+                if (expr->arguments.empty() && frame_info.declaration && !frame_info.fields.empty()) {
+                    for (const auto& field : frame_info.fields) {
+                        if (expr->namedArgs.find(field.first) == expr->namedArgs.end()) {
+                            add_error("Frame '" + qualified_name + "' is missing required field '" + field.first + "'", expr->line);
                         }
                     }
                 }
@@ -2653,6 +2671,10 @@ TypePtr TypeChecker::check_index_expr(std::shared_ptr<LM::Frontend::AST::IndexEx
         }
     } else if (object_type->tag == TypeTag::Dict) {
         if (auto dt = std::get_if<DictType>(&object_type->extra)) {
+            if (!is_type_compatible(dt->keyType, index_type)) {
+                add_error("Dictionary key type mismatch: expected " + dt->keyType->toString() +
+                         ", got " + index_type->toString(), expr->line);
+            }
             return dt->valueType;
         }
     } else if (object_type->tag == TypeTag::String) {
@@ -2681,15 +2703,14 @@ TypePtr TypeChecker::check_list_expr(std::shared_ptr<LM::Frontend::AST::ListExpr
         elementTypes.push_back(elemType);
     }
     
-    // Find common type for all elements
+    // Enforce strict homogeneous element typing with no implicit widening.
     TypePtr commonElementType = elementTypes[0];
     for (size_t i = 1; i < elementTypes.size(); ++i) {
-        try {
-            commonElementType = get_common_type(commonElementType, elementTypes[i]);
-        } catch (const std::exception& e) {
-            add_error("Inconsistent element types in list literal: cannot mix " + 
-                    commonElementType->toString() + " and " + elementTypes[i]->toString() + 
-                    ": " + e.what(), expr->line);
+        if (!commonElementType || !elementTypes[i] ||
+            commonElementType->toString() != elementTypes[i]->toString()) {
+            add_error("Inconsistent element types in list literal: expected all elements to be '" +
+                    (commonElementType ? commonElementType->toString() : "unknown") +
+                    "', found '" + (elementTypes[i] ? elementTypes[i]->toString() : "unknown") + "'", expr->line);
             return type_system.createTypedListType(type_system.ANY_TYPE);
         }
     }
@@ -2734,28 +2755,26 @@ TypePtr TypeChecker::check_dict_expr(std::shared_ptr<LM::Frontend::AST::DictExpr
         valueTypes.push_back(valueType);
     }
     
-    // Find common types for keys and values
+    // Enforce strict homogeneous key/value typing with no implicit widening.
     TypePtr commonKeyType = keyTypes[0];
     TypePtr commonValueType = valueTypes[0];
     
     for (size_t i = 1; i < keyTypes.size(); ++i) {
-        try {
-            commonKeyType = get_common_type(commonKeyType, keyTypes[i]);
-        } catch (const std::exception& e) {
-            add_error("Inconsistent key types in dictionary literal: cannot mix " + 
-                    commonKeyType->toString() + " and " + keyTypes[i]->toString() + 
-                    ": " + e.what(), expr->line);
+        if (!commonKeyType || !keyTypes[i] ||
+            commonKeyType->toString() != keyTypes[i]->toString()) {
+            add_error("Inconsistent key types in dictionary literal: expected all keys to be '" +
+                    (commonKeyType ? commonKeyType->toString() : "unknown") +
+                    "', found '" + (keyTypes[i] ? keyTypes[i]->toString() : "unknown") + "'", expr->line);
             return type_system.createTypedDictType(type_system.NIL_TYPE, type_system.ANY_TYPE);
         }
     }
     
     for (size_t i = 1; i < valueTypes.size(); ++i) {
-        try {
-            commonValueType = get_common_type(commonValueType, valueTypes[i]);
-        } catch (const std::exception& e) {
-            add_error("Inconsistent value types in dictionary literal: cannot mix " + 
-                    commonValueType->toString() + " and " + valueTypes[i]->toString() + 
-                    ": " + e.what(), expr->line);
+        if (!commonValueType || !valueTypes[i] ||
+            commonValueType->toString() != valueTypes[i]->toString()) {
+            add_error("Inconsistent value types in dictionary literal: expected all values to be '" +
+                    (commonValueType ? commonValueType->toString() : "unknown") +
+                    "', found '" + (valueTypes[i] ? valueTypes[i]->toString() : "unknown") + "'", expr->line);
             return type_system.createTypedDictType(commonKeyType, type_system.ANY_TYPE);
         }
     }

@@ -53,11 +53,12 @@ call :run_test_with_error_check "tests\types\options.lm"
 call :run_test_with_error_check "tests\types\advanced.lm"
 call :run_test_with_error_check "tests\types\enums.lm"
 call :run_test_with_error_check "tests\types\refined_types.lm"
+call :run_test_with_error_check "tests\types\structural_type_tests.lm"
 
 echo.
 echo === MODULE TESTS ===
 call :run_test_with_error_check "tests\modules\basic_import_test.lm"
-@REM call :run_test_with_error_check "tests\modules\comprehensive_module_test.lm"
+call :run_test_with_error_check "tests\modules\comprehensive_module_test.lm"
 call :run_test_with_error_check "tests\modules\show_filter_test.lm"
 call :run_test_with_error_check "tests\modules\hide_filter_test.lm"
 call :run_test_with_error_check "tests\modules\module_caching_test.lm"
@@ -125,8 +126,15 @@ if !ERRORLEVEL! EQU 0 (
     type "%TEMP_FILE%" | findstr /C:"error[E" /C:"Error:" /C:"RuntimeError" /C:"SemanticError" /C:"BytecodeError"
     set /a FAILED+=1
 ) else (
-    echo   PASS: %~1
-    set /a PASSED+=1
+    findstr /C:"❌ FAIL" /C:"ASSERT FAIL" /C:"Assertion failed" "%TEMP_FILE%" >nul 2>&1
+    if !ERRORLEVEL! EQU 0 (
+        echo   FAIL: %~1 ^(assertion failure detected^)
+        type "%TEMP_FILE%"
+        set /a FAILED+=1
+    ) else (
+        echo   PASS: %~1
+        set /a PASSED+=1
+    )
 )
 
 rem Clean up temporary file

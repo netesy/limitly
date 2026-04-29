@@ -1,123 +1,121 @@
 #!/bin/bash
+set -euo pipefail
 
 LIMITLY="./bin/limitly"
 FAILED=0
 PASSED=0
+SKIPPED=0
 TOTAL=0
 
+echo "Building compiler before running tests..."
+echo "Ensuring submodule dependencies are available..."
+git submodule sync --recursive >/dev/null 2>&1 || true
+git submodule update --init --recursive >/dev/null 2>&1 || true
+
+if [[ ! -f "vendor/fyra/include/ir/Module.h" ]]; then
+  FYRA_URL=$(git config -f .gitmodules --get submodule.fyra.url || true)
+  if [[ -z "${FYRA_URL}" ]]; then
+    echo "Missing vendor/fyra and no submodule.fyra.url configured in .gitmodules."
+    exit 1
+  fi
+  echo "Hydrating vendor/fyra from ${FYRA_URL}..."
+  rm -rf vendor/fyra
+  git clone --depth 1 "${FYRA_URL}" vendor/fyra
+fi
+
+if ! make; then
+  echo "Build failed. Aborting tests."
+  exit 1
+fi
+
+if [[ ! -x "$LIMITLY" ]]; then
+  echo "Compiler binary not found at $LIMITLY after build."
+  exit 1
+fi
+
+# Files that are module fixtures, samples, or intentionally invalid suites.
+SKIP_PATTERNS=(
+  "tests/modules/basic_module.lm"
+  "tests/modules/math_module.lm"
+  "tests/modules/my_module.lm"
+  "tests/modules/string_module.lm"
+  "tests/modules/nested/deep_module.lm"
+  "tests/errors/"
+  "tests/error_handling/"
+  "tests/types/type_error_tests.lm"
+  "tests/types/union_error_tests.lm"
+  "tests/types/structural_error_tests.lm"
+  "tests/modules/comprehensive_error_tests.lm"
+  "tests/modules/error_tests_simple.lm"
+  "tests/format/test_unformatted.lm"
+)
+
+should_skip() {
+  local file="$1"
+  for p in "${SKIP_PATTERNS[@]}"; do
+    if [[ "$file" == "$p" || "$file" == *"$p"* ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 run_test_with_error_check() {
-    ((TOTAL++))
-    echo "Running $1..."
+    local file="$1"
+    ((TOTAL+=1))
+    echo "Running $file..."
 
     TEMP_FILE=$(mktemp)
-    "$LIMITLY" "$1" > "$TEMP_FILE" 2>&1
+    "$LIMITLY" "$file" > "$TEMP_FILE" 2>&1 || true
 
     if grep -qi -E "segmentation fault|segfault" "$TEMP_FILE"; then
-        echo "  FAIL: $1 (segmentation fault detected in output)"
-        echo "  Output:"
+        echo "  FAIL: $file (segmentation fault detected in output)"
         cat "$TEMP_FILE"
-        ((FAILED++))
+        ((FAILED+=1))
     elif grep -q -E "error\\[E|Error:|RuntimeError|SemanticError|BytecodeError" "$TEMP_FILE"; then
-        echo "  FAIL: $1 (contains errors)"
-        echo "  Error output:"
+        echo "  FAIL: $file (contains errors)"
         grep -E "error\\[E|Error:|RuntimeError|SemanticError|BytecodeError" "$TEMP_FILE"
-        ((FAILED++))
+        ((FAILED+=1))
+    elif grep -q -E "❌ FAIL|ASSERT.*FAIL|Assertion.*failed" "$TEMP_FILE"; then
+        echo "  FAIL: $file (assertion failure detected)"
+        cat "$TEMP_FILE"
+        ((FAILED+=1))
     else
-        echo "  PASS: $1"
-        ((PASSED++))
+        echo "  PASS: $file"
+        ((PASSED+=1))
     fi
-
-    rm "$TEMP_FILE"
-}
-
-run_test_allow_semantic_errors() {
-    run_test_with_error_check "$1"
+    rm -f "$TEMP_FILE"
 }
 
 echo "========================================"
-echo "Running Limit Language Test Suite"
+echo "Running Limit Language Test Suite (discovery mode)"
 echo "========================================"
 echo
-echo "=== BASIC TESTS ==="
-run_test_with_error_check "tests/basic/variables.lm"
-run_test_with_error_check "tests/basic/literals.lm"
-run_test_with_error_check "tests/basic/control_flow.lm"
-run_test_with_error_check "tests/basic/print_statements.lm"
+
+mapfile -t ALL_TESTS < <(find tests -name '*.lm' | sort)
+
+for test_file in "${ALL_TESTS[@]}"; do
+  if should_skip "$test_file"; then
+    echo "Skipping $test_file (fixture/negative test)"
+    ((SKIPPED+=1))
+    continue
+  fi
+  run_test_with_error_check "$test_file"
+done
 
 echo
-echo "=== EXPRESSION TESTS ==="
-run_test_with_error_check "tests/expressions/arithmetic.lm"
-run_test_with_error_check "tests/expressions/logical.lm"
-run_test_with_error_check "tests/expressions/ranges.lm"
-run_test_with_error_check "tests/expressions/scientific_notation.lm"
-run_test_with_error_check "tests/expressions/large_literals.lm"
-
-echo
-echo "=== STRING TESTS ==="
-run_test_with_error_check "tests/strings/interpolation.lm"
-run_test_with_error_check "tests/strings/operations.lm"
-
-echo
-echo "=== LOOP TESTS ==="
-run_test_with_error_check "tests/loops/for_loops.lm"
-run_test_with_error_check "tests/loops/iter_loops.lm"
-run_test_with_error_check "tests/loops/while_loops.lm"
-run_test_with_error_check "tests/loops/match.lm"
-
-echo
-echo "=== FUNCTION TESTS ==="
-run_test_with_error_check "tests/functions/basic.lm"
-run_test_with_error_check "tests/functions/advanced.lm"
-run_test_with_error_check "tests/functions/closures.lm"
-run_test_with_error_check "tests/functions/first_class.lm"
-
-echo
-echo "=== TYPE TESTS ==="
-run_test_with_error_check "tests/types/basic.lm"
-run_test_with_error_check "tests/types/unions.lm"
-run_test_with_error_check "tests/types/options.lm"
-run_test_with_error_check "tests/types/advanced.lm"
-run_test_with_error_check  "tests/types/enums.lm"
-run_test_with_error_check "tests/types/refined_types.lm"
-run_test_with_error_check "tests/types/structural_type_tests.lm"
-
-
-echo
-echo "=== MODULE TESTS ==="
-run_test_with_error_check "tests/modules/basic_import_test.lm"
-run_test_with_error_check "tests/modules/comprehensive_module_test.lm"
-run_test_with_error_check "tests/modules/show_filter_test.lm"
-run_test_with_error_check "tests/modules/hide_filter_test.lm"
-run_test_with_error_check "tests/modules/module_caching_test.lm"
-run_test_with_error_check "tests/modules/function_params_test.lm"
-run_test_with_error_check "tests/modules/alias_import_test.lm"
-run_test_with_error_check "tests/modules/multiple_imports_test.lm"
-
-echo
-echo "=== OOP TESTS ==="
-run_test_with_error_check "tests/oop/frame_declaration.lm"
-run_test_with_error_check "tests/oop/traits_dynamic.lm"
-run_test_with_error_check "tests/oop/traits_inheritance.lm"
-run_test_with_error_check "tests/oop/visibility_test.lm"
-run_test_with_error_check "tests/oop/composition_test.lm"
-
-echo
-echo "=== CONCURRENCY TESTS ==="
-run_test_with_error_check "tests/concurrency/parallel_blocks.lm"
-run_test_with_error_check "tests/concurrency/concurrent_blocks.lm"
-
-echo
-echo ========================================
+echo "========================================"
 echo "Test Results:"
-echo "  PASSED: $PASSED"
-echo "  FAILED: $FAILED"
-echo "  TOTAL:  $TOTAL"
+echo "  PASSED:  $PASSED"
+echo "  FAILED:  $FAILED"
+echo "  SKIPPED: $SKIPPED"
+echo "  TOTAL:   $TOTAL"
 echo "========================================"
 
 if [ "$FAILED" -gt 0 ]; then
     echo "Some tests failed!"
     exit 1
 else
-    echo "All tests passed!"
+    echo "All discovered tests passed!"
     exit 0
 fi
