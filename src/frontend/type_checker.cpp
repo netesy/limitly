@@ -866,7 +866,7 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<LM::Frontend::AS
     enter_memory_region();
     
     // Resolve return type
-    TypePtr return_type = type_system.NIL_TYPE; // Default
+    TypePtr return_type = type_system.ANY_TYPE; // Default for unannotated functions
     if (func->name == "main") {
         return_type = type_system.INT64_TYPE;
     } else if (func->returnType) {
@@ -942,6 +942,13 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<LM::Frontend::AS
     
     // Check body
     TypePtr body_type = check_statement(func->body);
+
+    // Infer return type for unannotated non-main functions from body.
+    if (func->name != "main" && !func->returnType.has_value() && body_type) {
+        return_type = body_type;
+        signature.return_type = return_type;
+        function_signatures[func->name] = signature;
+    }
     
     // Validate function body error types
     validate_function_body_error_types(func);
@@ -1788,7 +1795,7 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
                 return promote_numeric_types(left_base, right_base);
             } else if (expr->op == TokenType::PLUS && 
                       (is_string_type(left_base) || is_string_type(right_base))) {
-                return type_system.NIL_TYPE;
+                return type_system.STRING_TYPE;
             }
             add_error("Invalid operand types for arithmetic operation", expr->line);
             return type_system.INT_TYPE;
@@ -1813,8 +1820,8 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
             
         case TokenType::MODULUS:
         case TokenType::POWER:
-            if (is_numeric_type(left_type) && is_numeric_type(right_type)) {
-                return promote_numeric_types(left_type, right_type);
+            if (is_numeric_type(left_base) && is_numeric_type(right_base)) {
+                return promote_numeric_types(left_base, right_base);
             }
             add_error("Invalid operand types for arithmetic operation", expr->line);
             return type_system.INT_TYPE;
