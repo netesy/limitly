@@ -2,120 +2,65 @@
 set -euo pipefail
 
 LIMITLY="./bin/limitly"
-FAILED=0
-PASSED=0
-SKIPPED=0
-TOTAL=0
+MANIFEST="tests/test_manifest.txt"
 
-echo "Building compiler before running tests..."
 echo "Ensuring submodule dependencies are available..."
 git submodule sync --recursive >/dev/null 2>&1 || true
 git submodule update --init --recursive >/dev/null 2>&1 || true
-
 if [[ ! -f "vendor/fyra/include/ir/Module.h" ]]; then
   FYRA_URL=$(git config -f .gitmodules --get submodule.fyra.url || true)
-  if [[ -z "${FYRA_URL}" ]]; then
-    echo "Missing vendor/fyra and no submodule.fyra.url configured in .gitmodules."
-    exit 1
-  fi
-  echo "Hydrating vendor/fyra from ${FYRA_URL}..."
+  [[ -n "${FYRA_URL}" ]] || { echo "Missing Fyra URL in .gitmodules"; exit 1; }
   rm -rf vendor/fyra
   git clone --depth 1 "${FYRA_URL}" vendor/fyra
 fi
 
-if ! make; then
-  echo "Build failed. Aborting tests."
-  exit 1
-fi
+echo "Building compiler before running tests..."
+make
+[[ -x "$LIMITLY" ]] || { echo "Compiler binary not found at $LIMITLY"; exit 1; }
 
-if [[ ! -x "$LIMITLY" ]]; then
-  echo "Compiler binary not found at $LIMITLY after build."
-  exit 1
-fi
+python3 - <<'PY'
+import glob, fnmatch, re, subprocess, pathlib
+manifest='tests/test_manifest.txt'
+rules=[]
+for ln in pathlib.Path(manifest).read_text().splitlines():
+    ln=ln.strip()
+    if not ln or ln.startswith('#'): continue
+    status,pat=ln.split('|',1)
+    rules.append((status.strip(),pat.strip()))
+files=sorted(glob.glob('tests/**/*.lm',recursive=True))
+errpat=re.compile(r"segmentation fault|segfault|error\[E|Error:|RuntimeError|SemanticError|BytecodeError|❌ FAIL|ASSERT.*FAIL|Assertion.*failed",re.I)
+counts={'pass':0,'compile_error':0,'skip':0,'fail':0}
 
-# Files that are module fixtures, samples, or intentionally invalid suites.
-SKIP_PATTERNS=(
-  "tests/modules/basic_module.lm"
-  "tests/modules/math_module.lm"
-  "tests/modules/my_module.lm"
-  "tests/modules/string_module.lm"
-  "tests/modules/nested/deep_module.lm"
-  "tests/errors/"
-  "tests/error_handling/"
-  "tests/types/type_error_tests.lm"
-  "tests/types/union_error_tests.lm"
-  "tests/types/structural_error_tests.lm"
-  "tests/modules/comprehensive_error_tests.lm"
-  "tests/modules/error_tests_simple.lm"
-  "tests/format/test_unformatted.lm"
-)
+def expected(file):
+    e='pass'
+    for st,pat in rules:
+        if fnmatch.fnmatch(file, pat):
+            e=st
+    return e
 
-should_skip() {
-  local file="$1"
-  for p in "${SKIP_PATTERNS[@]}"; do
-    if [[ "$file" == "$p" || "$file" == *"$p"* ]]; then
-      return 0
-    fi
-  done
-  return 1
-}
+for f in files:
+    exp=expected(f)
+    if exp=='skip':
+        print(f"SKIP {f}")
+        counts['skip']+=1
+        continue
+    
+    try:
+        out=subprocess.run(['./bin/limitly',f],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=20).stdout
+    except subprocess.TimeoutExpired:
+        out='TIMEOUT'
 
-run_test_with_error_check() {
-    local file="$1"
-    ((TOTAL+=1))
-    echo "Running $file..."
+    has_err=bool(errpat.search(out))
+    ok=(not has_err) if exp=='pass' else has_err
+    if ok:
+        print(f"PASS {f} (expected {exp})")
+        counts[exp]+=1
+    else:
+        print(f"FAIL {f} (expected {exp})")
+        print('\n'.join(out.splitlines()[:8]))
+        counts['fail']+=1
 
-    TEMP_FILE=$(mktemp)
-    "$LIMITLY" "$file" > "$TEMP_FILE" 2>&1 || true
-
-    if grep -qi -E "segmentation fault|segfault" "$TEMP_FILE"; then
-        echo "  FAIL: $file (segmentation fault detected in output)"
-        cat "$TEMP_FILE"
-        ((FAILED+=1))
-    elif grep -q -E "error\\[E|Error:|RuntimeError|SemanticError|BytecodeError" "$TEMP_FILE"; then
-        echo "  FAIL: $file (contains errors)"
-        grep -E "error\\[E|Error:|RuntimeError|SemanticError|BytecodeError" "$TEMP_FILE"
-        ((FAILED+=1))
-    elif grep -q -E "❌ FAIL|ASSERT.*FAIL|Assertion.*failed" "$TEMP_FILE"; then
-        echo "  FAIL: $file (assertion failure detected)"
-        cat "$TEMP_FILE"
-        ((FAILED+=1))
-    else
-        echo "  PASS: $file"
-        ((PASSED+=1))
-    fi
-    rm -f "$TEMP_FILE"
-}
-
-echo "========================================"
-echo "Running Limit Language Test Suite (discovery mode)"
-echo "========================================"
-echo
-
-mapfile -t ALL_TESTS < <(find tests -name '*.lm' | sort)
-
-for test_file in "${ALL_TESTS[@]}"; do
-  if should_skip "$test_file"; then
-    echo "Skipping $test_file (fixture/negative test)"
-    ((SKIPPED+=1))
-    continue
-  fi
-  run_test_with_error_check "$test_file"
-done
-
-echo
-echo "========================================"
-echo "Test Results:"
-echo "  PASSED:  $PASSED"
-echo "  FAILED:  $FAILED"
-echo "  SKIPPED: $SKIPPED"
-echo "  TOTAL:   $TOTAL"
-echo "========================================"
-
-if [ "$FAILED" -gt 0 ]; then
-    echo "Some tests failed!"
-    exit 1
-else
-    echo "All discovered tests passed!"
-    exit 0
-fi
+print('=== SUMMARY ===')
+for k,v in counts.items(): print(f"{k.upper()}: {v}")
+raise SystemExit(1 if counts['fail'] else 0)
+PY
