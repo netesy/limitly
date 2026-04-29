@@ -1,188 +1,98 @@
 # Limitly Language - AI Agent Guidelines
 
-This document provides essential guidelines for AI agents generating code for the Limitly language to ensure compatibility and avoid introducing unsupported features.
+This document provides essential guidelines for AI agents working with the Limitly language. It highlights the current state of the compiler (Parser vs. TypeChecker vs. Backend) to avoid using features that are "syntax-only".
 
-## 🚫 **DO NOT USE - Unsupported Features**
+## 📊 **Semantic Implementation Status**
 
-### **Generics/Template Types**
-- ❌ `fn my_func<T>(param: T): T` - Generic type parameters are NOT supported
-- ❌ `List<T>` - Generic collections are NOT implemented
-- ❌ `Dict<K, V>` - Generic dictionaries are NOT implemented
-- ❌ `Option<T>` - Generic option types are NOT supported
-- ❌ `Result<T, E>` - Generic result types are NOT supported
+| Feature | Parser | TypeChecker | Backend (VM/AOT) | Notes |
+| :--- | :---: | :---: | :---: | :--- |
+| **Basic Types (int, float, str, bool)** | ✅ | ✅ | ✅ | Fully supported. |
+| **Type Aliases** | ✅ | ✅ | ✅ | Basic aliases work. |
+| **Union Types (`int \| str`)** | ✅ | ✅ | ⚠️ | Checked, but runtime behavior for complex unions may vary. |
+| **Optional Types (`T?`)** | ✅ | ✅ | ✅ | Implemented as ErrorUnions internally. |
+| **Lists (`[T]`)** | ✅ | ⚠️ | ✅ | TypeChecker often falls back to `any` for empty or nested lists. |
+| **Dicts (`{K: V}`)** | ✅ | ⚠️ | ✅ | Similar to Lists, type inference is incomplete. |
+| **Frames (Classes)** | ✅ | ✅ | ✅ | Basic methods and fields work. |
+| **Traits (Interfaces)** | ✅ | ✅ | ⚠️ | Dynamic dispatch is partially implemented. |
+| **Closures / Lambdas** | ✅ | ⚠️ | ⚠️ | Parsed and basic check, but capture logic is fragile. |
+| **Channels / Concurrency** | ✅ | ⚠️ | ✅ | Runtime works, but TypeChecker lacks deep channel type validation. |
+| **Match Statements** | ✅ | ✅ | ⚠️ | Exhaustiveness checking exists but is not exhaustive for all types. |
+| **Structural Types (`{f: T}`)** | ✅ | ⚠️ | ❌ | Parsed, but literal instantiation and field access are incomplete. |
 
-### **Advanced Type Features**
-- ❌ Generic type constraints (`where T: Trait`)
-- ❌ Type inference for complex generic scenarios
-- ❌ Variadic generics (`T...`)
-- ❌ Generic trait implementations
+## 🚫 **STRICTLY AVOID (Syntax-only or Unimplemented)**
 
-## ✅ **USE - Supported Features**
+The following are present in the parser but **NOT** semantically implemented or checked. Using them will likely cause silent failures or crashes:
 
-### **Type System**
-- ✅ **Type Aliases**: `type UserId = int`
-- ✅ **Optional Types**: `str?` (union with nil)
-- ✅ **Union Types**: `int | string`
-- ✅ **Error Unions**: `Result<int, Error>`
-- ✅ **Frame Types**: User-defined objects with fields and methods
-- ✅ **Trait Types**: Interfaces with method signatures
-- ✅ **Primitive Types**: `int`, `float`, `str`, `bool`, `nil`
-- ✅ **Collection Types**: `[int]` (lists), `{str: int}` (dicts), `(int, str)` (tuples)
+- ❌ **`break` / `continue`**: Parsed but ignored by the TypeChecker and VM.
+- ❌ **`unsafe { ... }`**: Parsed but has no effect.
+- ❌ **`comptime { ... }`**: Parsed but not executed at compile time.
+- ❌ **Object Literals**: `{ name: "val" }` (structural literals) are not yet supported.
+- ❌ **Interface Declarations**: Use `trait` instead; `interface` is parsed but stashed.
+- ❌ **Generics**: `fn func<T>(...)` - Completely unsupported (syntax error or ignored).
+- ❌ **Async/Await**: `async fn` and `await` are not yet functional.
 
-### **Functions**
-- ✅ **Optional Parameters**: `fn greet(name: str = "World")`
-- ✅ **Default Values**: Function parameters can have defaults
-- ✅ **Multiple Parameters**: `fn func(a: int, b: str, c: bool = true)`
-- ✅ **Return Types**: `fn add(a: int, b: int): int`
-- ✅ **Closures**: Functions that capture variables
-- ✅ **First-class Functions**: Functions as values
+## ⚠️ **KNOWN TYPECHECKER ISSUES**
 
-### **Control Flow**
-- ✅ **Match Statements**: Pattern matching with type guards
-- ✅ **If/Else**: Conditional statements
-- ✅ **Loops**: `for`, `while`, `iter`
-- ✅ **Ranges**: `1..10`, `start..end`
+- **`ANY_TYPE` Fallbacks**: The TypeChecker frequently defaults to `any` when it cannot resolve a type (e.g., in complex lambdas, worker parameters, or empty collections). This bypasses safety.
+- **Linear Types**: The linear type system (move semantics) is implemented but should be used with caution as it's still being refined.
+- **Reference Invalidation**: Manual generation-based reference tracking is experimental.
+- **Incomplete Exhaustiveness**: Match statements on custom unions might miss some edge cases.
 
-### **Modules**
-- ✅ **Import**: `import std.collections as collections`
-- ✅ **Module Aliases**: `as` keyword for renaming
-- ✅ **Selective Import**: `import module { specific_function }`
+## ✅ **SAFE TO USE (Recommended)**
 
-### **OOP Features**
-- ✅ **Frames**: User-defined objects with fields and methods
-- ✅ **Traits**: Interfaces that frames can implement
-- ✅ **Method Calls**: `obj.method()`
-- ✅ **Field Access**: `obj.field`
-- ✅ **Trait Implementation**: Frames can implement multiple traits
-
-### **Concurrency**
-- ✅ **Parallel Blocks**: `parallel { ... }`
-- ✅ **Concurrent Blocks**: `concurrent { ... }`
-- ✅ **Tasks**: `task(i in 1..10) { ... }`
-- ✅ **Atomic Types**: `var counter: atomic = 0`
+- **Variable Declarations**: `var x: int = 10`
+- **Functions**: `fn add(a: int, b: int): int { return a + b }`
+- **Control Flow**: `if/else`, `while`, `for`, `iter`
+- **Error Unions**: `fn work(): int!Error { ... }` and `?` operator.
+- **Frames/Traits**: Basic object-oriented patterns.
+- **Concurrency**: `concurrent { ... }`, `task(i in range) { ... }`, and channels.
 
 ## 📝 **Code Examples**
 
 ### **Correct Usage**
 ```limit
-// Type aliases
-type UserId = int
-type Name = str
-
-// Optional parameters with defaults
-fn createUser(name: str, age: int = 18, active: bool = true): str {
-    return "{name}, {age}, {active}"
-}
-
-// Optional types (not generics)
-fn processOptional(value: int?): str {
-    if (value) {
-        return "Got: {value}"
-    } else {
-        return "Got nothing"
+// Concrete types and basic flow
+fn process(val: int): int {
+    if (val > 0) {
+        return val * 2
     }
+    return 0
 }
 
-// Union types
-fn handleValue(value: int | str): str {
-    match (value) {
-        int => return "Integer: {value}",
-        str => return "String: {value}"
-    }
+// Error handling
+fn fallible(): int! {
+    return err("Failure")
 }
 
-// Frame with trait
-trait Drawable {
-    fn draw(): str
-}
-
-frame Circle implements Drawable {
-    var radius: float
-    pub fn draw(): str {
-        return "Drawing circle with radius {self.radius}"
-    }
-}
-
-// Collections (concrete types)
-var numbers: [int] = [1, 2, 3]
-var mapping: {str: int} = {"a": 1, "b": 2}
-var point: (int, int) = (10, 20)
+var x = fallible() ? else { return 0 }
 ```
 
 ### **Incorrect Usage - DO NOT DO THIS**
 ```limit
+// ❌ NO OBJECT LITERALS
+var p = { name: "Alice", age: 30 }; // Parsed but will fail semantically
+
+// ❌ NO BREAK/CONTINUE
+while (true) {
+    if (done) break; // Parser accepts, but it won't actually break the loop
+}
+
 // ❌ NO GENERICS
-fn identity<T>(x: T): T {
-    return x
-}
-
-// ❌ NO GENERIC COLLECTIONS
-var list: List<int> = [1, 2, 3]
-var dict: Dict<string, int> = {"a": 1}
-
-// ❌ NO GENERIC TRAITS
-trait Comparable<T> {
-    fn compare(other: T): int
-}
-
-// ❌ NO GENERIC CONSTRAINTS
-fn sort<T where T: Comparable>(list: [T]): [T] {
-    // implementation
-}
-```
-
-## 🔧 **Common Patterns**
-
-### **Instead of Generics, Use:**
-1. **Type Aliases**: `type UserId = int`
-2. **Union Types**: `int | str | bool`
-3. **Overloaded Functions**: Multiple functions with different parameter types
-4. **Trait Objects**: Dynamic dispatch through traits
-
-### **Function Signatures**
-```limit
-// ✅ GOOD: Specific types
-fn processInts(numbers: [int]): int
-fn processStrings(texts: [str]): str
-
-// ❌ BAD: Generic types
-fn process<T>(items: [T]): T
-```
-
-### **Collection Handling**
-```limit
-// ✅ GOOD: Concrete collections
-var numbers: [int] = [1, 2, 3]
-var names: [str] = ["Alice", "Bob"]
-var data: {str: int} = {"count": 10}
-
-// ❌ BAD: Generic collections
-var items: List<T> = []
-var mapping: Dict<K, V> = {}
+fn identity<T>(x: T): T { return x }
 ```
 
 ## 🎯 **Key Principles**
 
-1. **Be Specific**: Use concrete types instead of generic placeholders
-2. **Use Unions**: For multiple possible types, use union syntax
-3. **Leverage Traits**: For polymorphism, use traits not generics
-4. **Type Aliases**: Create meaningful aliases for complex types
-5. **Optional Types**: Use `?` syntax for nullable values
+1. **Explicit Types**: Avoid relying on inference for complex structures; the TypeChecker may default to `any`.
+2. **Avoid Structural Literals**: Use `frame` and `FrameName()` instead.
+3. **Trait Dispatch**: Keep trait hierarchies simple.
+4. **Check `run_tests.sh`**: Always verify your logic against the tests in the `tests/` directory.
 
-## ⚠️ **Important Notes**
+---
+*Updated based on analysis of `src/frontend/type_checker.cpp` and `src/frontend/ast.hh`.*
 
-- The type system is **static** and **strong** - no implicit conversions
-- **Optional types** use `?` syntax (e.g., `int?`) not generic `Option<T>`
-- **Union types** use `|` syntax (e.g., `int | string`)
-- **Error handling** uses error unions, not generic `Result<T, E>`
-- **Collections** are homogeneous but not generic - specify element types directly
+## 🚨 **CRITICAL: Test Suite Reliability**
 
-## 📚 **Reference Implementation**
-
-Always check existing standard library code for patterns:
-- `std/collections/list.lm` - List implementation
-- `std/collections/hashmap.lm` - HashMap implementation  
-- `std/core.lm` - Core type definitions
-- Test files in `tests/` directory for working examples
-
-When in doubt, write concrete, specific code rather than attempting generic abstractions.
+- **False Positives**: The `./tests/run_tests.sh` script may report **PASS** even if the compiler binary (`./bin/limitly`) is missing or failing to execute. It only marks a failure if it specifically finds "Error" or "RuntimeError" in the output.
+- **Build Failures**: Currently, the project may have build issues due to missing dependencies (e.g., `fyra` IR headers). Always verify that `./bin/limitly` exists and is functional before trusting test results.
+- **Skipped Tests**: Over 100 tests in the `tests/` directory are currently **NOT** included in the automated test suite. Many of these contain the "rigorous" or "error" cases that would reveal the TypeChecker's current limitations.
