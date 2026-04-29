@@ -1,0 +1,270 @@
+// Set Frame - Unique element collection implementation
+
+import std.core as core;
+
+frame Set {
+    var elements: [int];
+
+    pub fn init(): Set {
+        return Set(elements=[]);
+    }
+
+    pub fn from_array(arr: [int]): Set {
+        var elements: [int] = [];
+        var seen: {int: bool} = {};
+        var i: int = 0;
+        var j: int = 0;
+        
+        while (i < arr.length) {
+            var value = arr[i];
+            if (seen[value] == nil) {
+                elements[j] = value;
+                seen[value] = true;
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        
+        return Set(elements=elements);
+    }
+
+    // Basic operations
+    pub fn add(value: int): Set {
+        if (self.contains(value)) return self;
+        
+        var new_elements: [int] = [];
+        var i: int = 0;
+        
+        while (i < self.elements.length) {
+            new_elements[i] = self.elements[i];
+            i = i + 1;
+        }
+        
+        new_elements[self.elements.length] = value;
+        return Set(elements=new_elements);
+    }
+
+    pub fn remove(value: int): Set {
+        var index = self.find_index(value);
+        if (index == nil) return self;
+        
+        var new_elements: [int] = [];
+        var i: int = 0;
+        var j: int = 0;
+        
+        while (i < self.elements.length) {
+            if (i != index) {
+                new_elements[j] = self.elements[i];
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        
+        return Set(elements=new_elements);
+    }
+
+    pub fn contains(value: int): bool {
+        return self.find_index(value) != nil;
+    }
+
+    pub fn size(): int {
+        return self.elements.length;
+    }
+
+    pub fn is_empty(): bool {
+        return self.elements.length == 0;
+    }
+
+    pub fn clear(): Set {
+        return Set(elements=[]);
+    }
+
+    // Set operations
+    pub fn union(other: Set): Set {
+        var combined = Set.from_array(self.elements);
+        var i: int = 0;
+        
+        while (i < other.elements.length) {
+            combined = combined.add(other.elements[i]);
+            i = i + 1;
+        }
+        
+        return combined;
+    }
+
+    pub fn intersection(other: Set): Set {
+        var result: [int] = [];
+        var i: int = 0;
+        var j: int = 0;
+        
+        while (i < self.elements.length) {
+            if (other.contains(self.elements[i])) {
+                result[j] = self.elements[i];
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        
+        return Set(elements=result);
+    }
+
+    pub fn difference(other: Set): Set {
+        var result: [int] = [];
+        var i: int = 0;
+        var j: int = 0;
+        
+        while (i < self.elements.length) {
+            if (!other.contains(self.elements[i])) {
+                result[j] = self.elements[i];
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        
+        return Set(elements=result);
+    }
+
+    pub fn symmetric_difference(other: Set): Set {
+        var diff1 = self.difference(other);
+        var diff2 = other.difference(self);
+        return diff1.union(diff2);
+    }
+
+    pub fn is_subset(other: Set): bool {
+        var i: int = 0;
+        while (i < self.elements.length) {
+            if (!other.contains(self.elements[i])) return false;
+            i = i + 1;
+        }
+        return true;
+    }
+
+    pub fn is_superset(other: Set): bool {
+        return other.is_subset(self);
+    }
+
+    pub fn is_disjoint(other: Set): bool {
+        return self.intersection(other).is_empty();
+    }
+
+    // Functional operations
+    pub fn map(f: fn(int): int): Set {
+        var result: [int] = [];
+        var seen: {int: bool} = {};
+        var i: int = 0;
+        var j: int = 0;
+        
+        while (i < self.elements.length) {
+            var mapped_value = f(self.elements[i]);
+            if (seen[mapped_value] == nil) {
+                result[j] = mapped_value;
+                seen[mapped_value] = true;
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        
+        return Set(elements=result);
+    }
+
+    pub fn filter(predicate: fn(int): bool): Set {
+        var result: [int] = [];
+        var i: int = 0;
+        var j: int = 0;
+        
+        while (i < self.elements.length) {
+            if (predicate(self.elements[i])) {
+                result[j] = self.elements[i];
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        
+        return Set(elements=result);
+    }
+
+    pub fn fold(f: fn(int, int): int, initial: int): int {
+        var acc: int = initial;
+        var i: int = 0;
+        while (i < self.elements.length) {
+            acc = f(acc, self.elements[i]);
+            i = i + 1;
+        }
+        return acc;
+    }
+
+    pub fn for_each(f: fn(int): nil): nil {
+        var i: int = 0;
+        while (i < self.elements.length) {
+            f(self.elements[i]);
+            i = i + 1;
+        }
+    }
+
+    pub fn sum(): int {
+        return self.fold(fn(acc: int, x: int): int { return acc + x; }, 0);
+    }
+
+    pub fn product(): int {
+        return self.fold(fn(acc: int, x: int): int { return acc * x; }, 1);
+    }
+
+    pub fn min(): int? {
+        if (self.elements.length == 0) return nil;
+        var min_val = self.elements[0];
+        var i: int = 1;
+        while (i < self.elements.length) {
+            if (self.elements[i] < min_val) min_val = self.elements[i];
+            i = i + 1;
+        }
+        return min_val;
+    }
+
+    pub fn max(): int? {
+        if (self.elements.length == 0) return nil;
+        var max_val = self.elements[0];
+        var i: int = 1;
+        while (i < self.elements.length) {
+            if (self.elements[i] > max_val) max_val = self.elements[i];
+            i = i + 1;
+        }
+        return max_val;
+    }
+
+    // Utility methods
+    private fn find_index(value: int): int? {
+        var i: int = 0;
+        while (i < self.elements.length) {
+            if (self.elements[i] == value) return i;
+            i = i + 1;
+        }
+        return nil;
+    }
+
+    pub fn to_array(): [int] {
+        return self.elements;
+    }
+
+    pub fn to_string(): str {
+        var result = "{";
+        var i: int = 0;
+        
+        while (i < self.elements.length) {
+            if (i > 0) result = result + ", ";
+            result = result + self.elements[i] as str;
+            i = i + 1;
+        }
+        
+        result = result + "}";
+        return result;
+    }
+}
+
+// Utility functions
+fn set(): Set {
+    return Set.init();
+}
+
+fn set_from(arr: [int]): Set {
+    return Set.from_array(arr);
+}

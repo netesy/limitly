@@ -1,11 +1,41 @@
-// Standard Library Iterator Module
+// Standard Library Iterator Module - Enhanced functional programming
 
 frame Iterator {
     var data: [int];
     var index: int;
+    var start_index: int;
+    var end_index: int;
 
+    // Factory methods
+    pub fn from_array(arr: [int]): Iterator {
+        return Iterator(data=arr, index=0, start_index=0, end_index=arr.length);
+    }
+
+    pub fn from_range(start: int, end: int): Iterator {
+        var arr: [int] = [];
+        var i: int = start;
+        while (i <= end) {
+            arr[i - start] = i;
+            i = i + 1;
+        }
+        return Iterator(data=arr, index=0, start_index=0, end_index=arr.length);
+    }
+
+    pub fn from_range_step(start: int, end: int, step: int): Iterator {
+        var arr: [int] = [];
+        var i: int = start;
+        var j: int = 0;
+        while (i <= end) {
+            arr[j] = i;
+            i = i + step;
+            j = j + 1;
+        }
+        return Iterator(data=arr, index=0, start_index=0, end_index=arr.length);
+    }
+
+    // Basic iterator operations
     pub fn has_next(): bool {
-        return self.index < self.data.length;
+        return self.index < self.end_index;
     }
 
     pub fn next(): int? {
@@ -15,11 +45,22 @@ frame Iterator {
         return v;
     }
 
+    pub fn peek(): int? {
+        if (!self.has_next()) return nil;
+        return self.data[self.index];
+    }
+
+    pub fn reset(): Iterator {
+        self.index = self.start_index;
+        return self;
+    }
+
+    // Functional operations
     pub fn map(f: fn(int): int): [int] {
         var out: [int] = [];
         var i: int = self.index;
         var j: int = 0;
-        while (i < self.data.length) {
+        while (i < self.end_index) {
             out[j] = f(self.data[i]);
             i = i + 1;
             j = j + 1;
@@ -31,7 +72,7 @@ frame Iterator {
         var out: [int] = [];
         var i: int = self.index;
         var j: int = 0;
-        while (i < self.data.length) {
+        while (i < self.end_index) {
             if (f(self.data[i])) {
                 out[j] = self.data[i];
                 j = j + 1;
@@ -44,18 +85,439 @@ frame Iterator {
     pub fn fold(f: fn(int, int): int, initial: int): int {
         var acc: int = initial;
         var i: int = self.index;
-        while (i < self.data.length) {
+        while (i < self.end_index) {
             acc = f(acc, self.data[i]);
             i = i + 1;
         }
         return acc;
     }
 
-    pub fn for_each(f: fn(int): int): nil {
+    pub fn for_each(f: fn(int): nil): nil {
         var i: int = self.index;
-        while (i < self.data.length) {
+        while (i < self.end_index) {
             f(self.data[i]);
             i = i + 1;
         }
     }
+
+    // Advanced functional operations
+    pub fn take(n: int): [int] {
+        var out: [int] = [];
+        var i: int = self.index;
+        var j: int = 0;
+        var count: int = 0;
+        
+        while (i < self.end_index and count < n) {
+            out[j] = self.data[i];
+            i = i + 1;
+            j = j + 1;
+            count = count + 1;
+        }
+        
+        return out;
+    }
+
+    pub fn skip(n: int): [int] {
+        var skip_to = self.index + n;
+        if (skip_to > self.end_index) skip_to = self.end_index;
+        
+        var out: [int] = [];
+        var i: int = skip_to;
+        var j: int = 0;
+        
+        while (i < self.end_index) {
+            out[j] = self.data[i];
+            i = i + 1;
+            j = j + 1;
+        }
+        
+        return out;
+    }
+
+    pub fn take_while(f: fn(int): bool): [int] {
+        var out: [int] = [];
+        var i: int = self.index;
+        var j: int = 0;
+        
+        while (i < self.end_index and f(self.data[i])) {
+            out[j] = self.data[i];
+            i = i + 1;
+            j = j + 1;
+        }
+        
+        return out;
+    }
+
+    pub fn skip_while(f: fn(int): bool): [int] {
+        var i: int = self.index;
+        
+        while (i < self.end_index and f(self.data[i])) {
+            i = i + 1;
+        }
+        
+        var out: [int] = [];
+        var j: int = 0;
+        
+        while (i < self.end_index) {
+            out[j] = self.data[i];
+            i = i + 1;
+            j = j + 1;
+        }
+        
+        return out;
+    }
+
+    pub fn enumerate(): [(int, int)] {
+        var out: [(int, int)] = [];
+        var i: int = self.index;
+        var j: int = 0;
+        
+        while (i < self.end_index) {
+            out[j] = (j, self.data[i]);
+            i = i + 1;
+            j = j + 1;
+        }
+        
+        return out;
+    }
+
+    pub fn zip(other: Iterator): [(int, int)] {
+        var out: [(int, int)] = [];
+        var i: int = self.index;
+        var j: int = other.index;
+        var k: int = 0;
+        
+        while (i < self.end_index and j < other.end_index) {
+            out[k] = (self.data[i], other.data[j]);
+            i = i + 1;
+            j = j + 1;
+            k = k + 1;
+        }
+        
+        return out;
+    }
+
+    pub fn chain(other: Iterator): [int] {
+        var out: [int] = [];
+        var i: int = 0;
+        var j: int = 0;
+        
+        // Add elements from first iterator
+        while (i < self.end_index) {
+            out[j] = self.data[i];
+            i = i + 1;
+            j = j + 1;
+        }
+        
+        // Add elements from second iterator
+        i = other.index;
+        while (i < other.end_index) {
+            out[j] = other.data[i];
+            i = i + 1;
+            j = j + 1;
+        }
+        
+        return out;
+    }
+
+    // Searching and finding
+    pub fn find(f: fn(int): bool): int? {
+        var i: int = self.index;
+        
+        while (i < self.end_index) {
+            if (f(self.data[i])) {
+                return self.data[i];
+            }
+            i = i + 1;
+        }
+        
+        return nil;
+    }
+
+    pub fn find_index(f: fn(int): bool): int? {
+        var i: int = self.index;
+        
+        while (i < self.end_index) {
+            if (f(self.data[i])) {
+                return i;
+            }
+            i = i + 1;
+        }
+        
+        return nil;
+    }
+
+    pub fn position(value: int): int? {
+        var i: int = self.index;
+        
+        while (i < self.end_index) {
+            if (self.data[i] == value) {
+                return i;
+            }
+            i = i + 1;
+        }
+        
+        return nil;
+    }
+
+    pub fn contains(value: int): bool {
+        return self.position(value) != nil;
+    }
+
+    // Aggregation operations
+    pub fn count(): int {
+        return self.end_index - self.index;
+    }
+
+    pub fn count_where(f: fn(int): bool): int {
+        var count: int = 0;
+        var i: int = self.index;
+        
+        while (i < self.end_index) {
+            if (f(self.data[i])) {
+                count = count + 1;
+            }
+            i = i + 1;
+        }
+        
+        return count;
+    }
+
+    pub fn sum(): int {
+        return self.fold(fn(acc: int, x: int): int { return acc + x; }, 0);
+    }
+
+    pub fn product(): int {
+        return self.fold(fn(acc: int, x: int): int { return acc * x; }, 1);
+    }
+
+    pub fn min(): int? {
+        if (self.count() == 0) return nil;
+        
+        var min_val = self.data[self.index];
+        var i: int = self.index + 1;
+        
+        while (i < self.end_index) {
+            if (self.data[i] < min_val) {
+                min_val = self.data[i];
+            }
+            i = i + 1;
+        }
+        
+        return min_val;
+    }
+
+    pub fn max(): int? {
+        if (self.count() == 0) return nil;
+        
+        var max_val = self.data[self.index];
+        var i: int = self.index + 1;
+        
+        while (i < self.end_index) {
+            if (self.data[i] > max_val) {
+                max_val = self.data[i];
+            }
+            i = i + 1;
+        }
+        
+        return max_val;
+    }
+
+    pub fn average(): float? {
+        var count = self.count();
+        if (count == 0) return nil;
+        
+        var sum = self.sum();
+        return sum as float / count as float;
+    }
+
+    // Boolean operations
+    pub fn all(f: fn(int): bool): bool {
+        var i: int = self.index;
+        
+        while (i < self.end_index) {
+            if (!f(self.data[i])) {
+                return false;
+            }
+            i = i + 1;
+        }
+        
+        return true;
+    }
+
+    pub fn any(f: fn(int): bool): bool {
+        var i: int = self.index;
+        
+        while (i < self.end_index) {
+            if (f(self.data[i])) {
+                return true;
+            }
+            i = i + 1;
+        }
+        
+        return false;
+    }
+
+    pub fn none(f: fn(int): bool): bool {
+        return !self.any(f);
+    }
+
+    // Partitioning and grouping
+    pub fn partition(f: fn(int): bool): ([int], [int]) {
+        var true_out: [int] = [];
+        var false_out: [int] = [];
+        var true_i: int = 0;
+        var false_i: int = 0;
+        
+        var i: int = self.index;
+        
+        while (i < self.end_index) {
+            if (f(self.data[i])) {
+                true_out[true_i] = self.data[i];
+                true_i = true_i + 1;
+            } else {
+                false_out[false_i] = self.data[i];
+                false_i = false_i + 1;
+            }
+            i = i + 1;
+        }
+        
+        return (true_out, false_out);
+    }
+
+    pub fn group_by(key_fn: fn(int): int): {int: [int]} {
+        var groups: {int: [int]} = {};
+        
+        var i: int = self.index;
+        
+        while (i < self.end_index) {
+            var value = self.data[i];
+            var key = key_fn(value);
+            
+            if (groups[key] == nil) {
+                groups[key] = [];
+            }
+            
+            var group = groups[key];
+            group[group.length] = value;
+            groups[key] = group;
+            
+            i = i + 1;
+        }
+        
+        return groups;
+    }
+
+    // Windowing operations
+    pub fn window(size: int): [[int]] {
+        if (size <= 0 or self.count() < size) {
+            return [];
+        }
+        
+        var windows: [[int]] = [];
+        var window_count = self.count() - size + 1;
+        var i: int = 0;
+        
+        while (i < window_count) {
+            var window: [int] = [];
+            var j: int = 0;
+            
+            while (j < size) {
+                window[j] = self.data[self.index + i + j];
+                j = j + 1;
+            }
+            
+            windows[i] = window;
+            i = i + 1;
+        }
+        
+        return windows;
+    }
+
+    pub fn chunks(size: int): [[int]] {
+        if (size <= 0) {
+            return [];
+        }
+        
+        var chunks: [[int]] = [];
+        var i: int = self.index;
+        var chunk_index: int = 0;
+        
+        while (i < self.end_index) {
+            var chunk: [int] = [];
+            var j: int = 0;
+            
+            while (j < size and i < self.end_index) {
+                chunk[j] = self.data[i];
+                i = i + 1;
+                j = j + 1;
+            }
+            
+            chunks[chunk_index] = chunk;
+            chunk_index = chunk_index + 1;
+        }
+        
+        return chunks;
+    }
+
+    // Utility methods
+    pub fn clone(): Iterator {
+        return Iterator(
+            data=self.data,
+            index=self.index,
+            start_index=self.start_index,
+            end_index=self.end_index
+        );
+    }
+
+    pub fn slice(start: int, end: int): Iterator {
+        var new_start = self.index + start;
+        var new_end = self.index + end;
+        
+        if (new_start < self.index) new_start = self.index;
+        if (new_end > self.end_index) new_end = self.end_index;
+        if (new_start > new_end) new_start = new_end;
+        
+        return Iterator(
+            data=self.data,
+            index=new_start,
+            start_index=new_start,
+            end_index=new_end
+        );
+    }
+
+    pub fn to_array(): [int] {
+        var out: [int] = [];
+        var i: int = self.index;
+        var j: int = 0;
+        
+        while (i < self.end_index) {
+            out[j] = self.data[i];
+            i = i + 1;
+            j = j + 1;
+        }
+        
+        return out;
+    }
+
+    pub fn collect(): [int] {
+        return self.to_array();
+    }
+}
+
+// Utility functions
+fn iter_array(arr: [int]): Iterator {
+    return Iterator.from_array(arr);
+}
+
+fn iter_range(start: int, end: int): Iterator {
+    return Iterator.from_range(start, end);
+}
+
+fn iter_range_step(start: int, end: int, step: int): Iterator {
+    return Iterator.from_range_step(start, end, step);
+}
+
+fn iter_empty(): Iterator {
+    return Iterator(data=[], index=0, start_index=0, end_index=0);
 }

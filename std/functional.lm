@@ -3,27 +3,434 @@
 frame FunctionInt {
     var fn_ref: fn(int): int;
 
+    pub fn init(fn_ref: fn(int): int): FunctionInt {
+        return FunctionInt(fn_ref=fn_ref);
+    }
+
     pub fn call(value: int): int {
         return self.fn_ref(value);
     }
 
     pub fn compose(other: FunctionInt): FunctionInt {
-        // f.compose(g) => f(g(x)); represented via compatibility helper
-        return self;
+        return FunctionInt(fn=fn(x: int): int {
+            return self.call(other.call(x));
+        });
     }
 
     pub fn and_then(other: FunctionInt): FunctionInt {
-        return other;
+        return self.compose(other);
+    }
+
+    pub fn memoize(): FunctionInt {
+        var cache: {int: int} = {};
+        
+        return FunctionInt(fn=fn(x: int): int {
+            if (cache[x] != nil) {
+                return cache[x];
+            }
+            
+            var result = self.call(x);
+            cache[x] = result;
+            return result;
+        });
+    }
+
+    pub fn repeat(n: int): FunctionInt {
+        return FunctionInt(fn=fn(x: int): int {
+            var result = x;
+            var i: int = 0;
+            while (i < n) {
+                result = self.call(result);
+                i = i + 1;
+            }
+            return result;
+        });
     }
 }
 
 frame FunctionIntBool {
     var fn_ref: fn(int): bool;
 
+    pub fn init(fn_ref: fn(int): bool): FunctionIntBool {
+        return FunctionIntBool(fn_ref=fn_ref);
+    }
+
     pub fn call(value: int): bool {
         return self.fn_ref(value);
     }
+
+    pub fn not(): FunctionIntBool {
+        return FunctionIntBool(fn=fn(x: int): bool {
+            return !self.call(x);
+        });
+    }
+
+    pub fn and(other: FunctionIntBool): FunctionIntBool {
+        return FunctionIntBool(fn=fn(x: int): bool {
+            return self.call(x) and other.call(x);
+        });
+    }
+
+    pub fn or(other: FunctionIntBool): FunctionIntBool {
+        return FunctionIntBool(fn=fn(x: int): bool {
+            return self.call(x) or other.call(x);
+        });
+    }
 }
 
-fn compose_int(f: fn(int): int, g: fn(int): int, value: int): int { return f(g(value)); }
-fn pipe_int(value: int, f: fn(int): int, g: fn(int): int): int { return g(f(value)); }
+frame FunctionStrStr {
+    var fn_ref: fn(str): str;
+
+    pub fn init(fn_ref: fn(str): str): FunctionStrStr {
+        return FunctionStrStr(fn_ref=fn_ref);
+    }
+
+    pub fn call(value: str): str {
+        return self.fn_ref(value);
+    }
+
+    pub fn compose(other: FunctionStrStr): FunctionStrStr {
+        return FunctionStrStr(fn=fn(x: str): str {
+            return self.call(other.call(x));
+        });
+    }
+
+    pub fn memoize(): FunctionStrStr {
+        var cache: {str: str} = {};
+        
+        return FunctionStrStr(fn=fn(x: str): str {
+            if (cache[x] != nil) {
+                return cache[x];
+            }
+            
+            var result = self.call(x);
+            cache[x] = result;
+            return result;
+        });
+    }
+}
+
+// Higher-order functions
+fn compose_int(f: fn(int): int, g: fn(int): int): fn(int): int {
+    return fn(x: int): int {
+        return f(g(x));
+    };
+}
+
+fn compose_str(f: fn(str): str, g: fn(str): str): fn(str): str {
+    return fn(x: str): str {
+        return f(g(x));
+    };
+}
+
+fn pipe_int(f: fn(int): int, g: fn(int): int): fn(int): int {
+    return fn(x: int): int {
+        return g(f(x));
+    };
+}
+
+fn pipe_str(f: fn(str): str, g: fn(str): str): fn(str): str {
+    return fn(x: str): str {
+        return g(f(x));
+    };
+}
+
+// Currying functions
+fn curry_add(a: int): fn(int): int {
+    return fn(b: int): int {
+        return a + b;
+    };
+}
+
+fn curry_multiply(a: int): fn(int): int {
+    return fn(b: int): int {
+        return a * b;
+    };
+}
+
+fn curry_string_append(prefix: str): fn(str): str {
+    return fn(suffix: str): str {
+        return prefix + suffix;
+    };
+}
+
+fn curry_string_prepend(suffix: str): fn(str): str {
+    return fn(prefix: str): str {
+        return prefix + suffix;
+    };
+}
+
+// Partial application
+fn partial_apply_binary(fn_ref: fn(int, int): int, first_arg: int): fn(int): int {
+    return fn(second_arg: int): int {
+        return fn_ref(first_arg, second_arg);
+    };
+}
+
+fn partial_apply_ternary(fn_ref: fn(int, int, int): int, first_arg: int): fn(int, int): int {
+    return fn(second_arg: int, third_arg: int): int {
+        return fn_ref(first_arg, second_arg, third_arg);
+    };
+}
+
+// Function composition utilities
+fn compose_three_int(f: fn(int): int, g: fn(int): int, h: fn(int): int): fn(int): int {
+    return fn(x: int): int {
+        return f(g(h(x)));
+    };
+}
+
+fn compose_three_str(f: fn(str): str, g: fn(str): str, h: fn(str): str): fn(str): str {
+    return fn(x: str): str {
+        return f(g(h(x)));
+    };
+}
+
+fn pipe_three_int(f: fn(int): int, g: fn(int): int, h: fn(int): int): fn(int): int {
+    return fn(x: int): int {
+        return h(g(f(x)));
+    };
+}
+
+// Predicate functions
+fn always_true(x: int): bool {
+    return true;
+}
+
+fn always_false(x: int): bool {
+    return false;
+}
+
+fn equals(value: int): fn(int): bool {
+    return fn(x: int): bool {
+        return x == value;
+    };
+}
+
+fn not_equals(value: int): fn(int): bool {
+    return fn(x: int): bool {
+        return x != value;
+    };
+}
+
+fn greater_than(value: int): fn(int): bool {
+    return fn(x: int): bool {
+        return x > value;
+    };
+}
+
+fn less_than(value: int): fn(int): bool {
+    return fn(x: int): bool {
+        return x < value;
+    };
+}
+
+fn greater_than_or_equal(value: int): fn(int): bool {
+    return fn(x: int): bool {
+        return x >= value;
+    };
+}
+
+fn less_than_or_equal(value: int): fn(int): bool {
+    return fn(x: int): bool {
+        return x <= value;
+    };
+}
+
+fn is_even(x: int): bool {
+    return x % 2 == 0;
+}
+
+fn is_odd(x: int): bool {
+    return x % 2 != 0;
+}
+
+fn is_positive(x: int): bool {
+    return x > 0;
+}
+
+fn is_negative(x: int): bool {
+    return x < 0;
+}
+
+fn is_zero(x: int): bool {
+    return x == 0;
+}
+
+// Predicate combinators
+fn not(predicate: fn(int): bool): fn(int): bool {
+    return fn(x: int): bool {
+        return !predicate(x);
+    };
+}
+
+fn and(pred1: fn(int): bool, pred2: fn(int): bool): fn(int): bool {
+    return fn(x: int): bool {
+        return pred1(x) and pred2(x);
+    };
+}
+
+fn or(pred1: fn(int): bool, pred2: fn(int): bool): fn(int): bool {
+    return fn(x: int): bool {
+        return pred1(x) or pred2(x);
+    };
+}
+
+fn xor(pred1: fn(int): bool, pred2: fn(int): bool): fn(int): bool {
+    return fn(x: int): bool {
+        return pred1(x) != pred2(x);
+    };
+}
+
+// Memoization utilities
+fn memoize_int(fn_ref: fn(int): int): fn(int): int {
+    var cache: {int: int} = {};
+    
+    return fn(x: int): int {
+        if (cache[x] != nil) {
+            return cache[x];
+        }
+        
+        var result = fn_ref(x);
+        cache[x] = result;
+        return result;
+    };
+}
+
+fn memoize_str(fn_ref: fn(str): str): fn(str): str {
+    var cache: {str: str} = {};
+    
+    return fn(x: str): str {
+        if (cache[x] != nil) {
+            return cache[x];
+        }
+        
+        var result = fn_ref(x);
+        cache[x] = result;
+        return result;
+    };
+}
+
+fn memoize_bool(fn_ref: fn(int): bool): fn(int): bool {
+    var cache: {int: bool} = {};
+    
+    return fn(x: int): bool {
+        if (cache[x] != nil) {
+            return cache[x];
+        }
+        
+        var result = fn_ref(x);
+        cache[x] = result;
+        return result;
+    };
+}
+
+// Function utilities
+fn identity(x: int): int {
+    return x;
+}
+
+fn identity_str(x: str): str {
+    return x;
+}
+
+fn constant(value: int): fn(int): int {
+    return fn(x: int): int {
+        return value;
+    };
+}
+
+fn constant_str(value: str): fn(str): str {
+    return fn(x: str): str {
+        return value;
+    };
+}
+
+fn flip(fn_ref: fn(int, int): int): fn(int, int): int {
+    return fn(a: int, b: int): int {
+        return fn_ref(b, a);
+    };
+}
+
+// Function application utilities
+fn apply_n_times(fn_ref: fn(int): int, n: int, initial: int): int {
+    var result = initial;
+    var i: int = 0;
+    while (i < n) {
+        result = fn_ref(result);
+        i = i + 1;
+    }
+    return result;
+}
+
+fn apply_until(fn_ref: fn(int): int, predicate: fn(int): bool, initial: int): int {
+    var result = initial;
+    while (!predicate(result)) {
+        result = fn_ref(result);
+    }
+    return result;
+}
+
+fn apply_while(fn_ref: fn(int): int, predicate: fn(int): bool, initial: int): int {
+    var result = initial;
+    while (predicate(result)) {
+        result = fn_ref(result);
+    }
+    return result;
+}
+
+// Function building utilities
+fn add_n(n: int): fn(int): int {
+    return fn(x: int): int {
+        return x + n;
+    };
+}
+
+fn multiply_n(n: int): fn(int): int {
+    return fn(x: int): int {
+        return x * n;
+    };
+}
+
+fn power_n(n: int): fn(int): int {
+    return fn(x: int): int {
+        var result = 1;
+        var i: int = 0;
+        while (i < n) {
+            result = result * x;
+            i = i + 1;
+        }
+        return result;
+    };
+}
+
+// String function utilities
+fn wrap_with(wrapper: str): fn(str): str {
+    return fn(x: str): str {
+        return wrapper + x + wrapper;
+    };
+}
+
+fn prepend(prefix: str): fn(str): str {
+    return fn(x: str): str {
+        return prefix + x;
+    };
+}
+
+fn append(suffix: str): fn(str): str {
+    return fn(x: str): str {
+        return x + suffix;
+    };
+}
+
+fn repeat(times: int): fn(str): str {
+    return fn(x: str): str {
+        var result = "";
+        var i: int = 0;
+        while (i < times) {
+            result = result + x;
+            i = i + 1;
+        }
+        return result;
+    };
+}

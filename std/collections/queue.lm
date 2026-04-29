@@ -1,0 +1,258 @@
+// Queue Frame - FIFO (First In, First Out) implementation
+
+import std.core as core;
+
+frame Queue {
+    var data: [int];
+    var front: int;
+    var back: int;
+
+    pub fn init(): Queue {
+        return Queue(data=[], front=0, back=0);
+    }
+
+    pub fn from_array(arr: [int]): Queue {
+        return Queue(data=arr, front=0, back=arr.length);
+    }
+
+    // Queue operations
+    pub fn enqueue(value: int): Queue {
+        var new_data: [int] = [];
+        var i: int = 0;
+        
+        // Copy existing data
+        while (i < self.data.length) {
+            new_data[i] = self.data[i];
+            i = i + 1;
+        }
+        
+        // Add new element at back
+        new_data[self.back] = value;
+        
+        return Queue(data=new_data, front=self.front, back=self.back + 1);
+    }
+
+    pub fn dequeue(): int? {
+        if (self.front >= self.back) return nil;
+        
+        var value = self.data[self.front];
+        return Queue(data=self.data, front=self.front + 1, back=self.back);
+    }
+
+    pub fn peek(): int? {
+        if (self.front >= self.back) return nil;
+        return self.data[self.front];
+    }
+
+    pub fn size(): int {
+        return self.back - self.front;
+    }
+
+    pub fn is_empty(): bool {
+        return self.front >= self.back;
+    }
+
+    pub fn clear(): Queue {
+        return Queue(data=[], front=0, back=0);
+    }
+
+    // Advanced operations
+    pub fn peek_front(): int? {
+        return self.peek();
+    }
+
+    pub fn peek_back(): int? {
+        if (self.front >= self.back) return nil;
+        return self.data[self.back - 1];
+    }
+
+    pub fn contains(value: int): bool {
+        var i: int = self.front;
+        while (i < self.back) {
+            if (self.data[i] == value) return true;
+            i = i + 1;
+        }
+        return false;
+    }
+
+    pub fn index_of(value: int): int? {
+        var i: int = self.front;
+        var index: int = 0;
+        while (i < self.back) {
+            if (self.data[i] == value) return index;
+            i = i + 1;
+            index = index + 1;
+        }
+        return nil;
+    }
+
+    pub fn reverse(): Queue {
+        var reversed: [int] = [];
+        var i: int = self.back - 1;
+        var j: int = 0;
+        
+        while (i >= self.front) {
+            reversed[j] = self.data[i];
+            i = i - 1;
+            j = j + 1;
+        }
+        
+        return Queue(data=reversed, front=0, front=self.back - self.front);
+    }
+
+    pub fn copy(): Queue {
+        var new_data: [int] = [];
+        var i: int = self.front;
+        var j: int = 0;
+        
+        while (i < self.back) {
+            new_data[j] = self.data[i];
+            i = i + 1;
+            j = j + 1;
+        }
+        
+        return Queue(data=new_data, front=0, back=self.back - self.front);
+    }
+
+    pub fn slice(start: int, end: int): Queue {
+        if (start < 0) start = 0;
+        if (end > self.size()) end = self.size();
+        if (start >= end) return Queue.init();
+        
+        var sliced_data: [int] = [];
+        var i: int = start;
+        var j: int = 0;
+        
+        while (i < end) {
+            sliced_data[j] = self.data[self.front + i];
+            i = i + 1;
+            j = j + 1;
+        }
+        
+        return Queue(data=sliced_data, front=0, back=end - start);
+    }
+
+    // Functional operations
+    pub fn map(f: fn(int): int): Queue {
+        var new_data: [int] = [];
+        var i: int = self.front;
+        var j: int = 0;
+        
+        while (i < self.back) {
+            new_data[j] = f(self.data[i]);
+            i = i + 1;
+            j = j + 1;
+        }
+        
+        return Queue(data=new_data, front=0, back=self.back - self.front);
+    }
+
+    pub fn filter(predicate: fn(int): bool): Queue {
+        var filtered_data: [int] = [];
+        var i: int = self.front;
+        var j: int = 0;
+        
+        while (i < self.back) {
+            if (predicate(self.data[i])) {
+                filtered_data[j] = self.data[i];
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        
+        return Queue(data=filtered_data, front=0, back=j);
+    }
+
+    pub fn fold(f: fn(int, int): int, initial: int): int {
+        var acc: int = initial;
+        var i: int = self.front;
+        
+        while (i < self.back) {
+            acc = f(acc, self.data[i]);
+            i = i + 1;
+        }
+        
+        return acc;
+    }
+
+    pub fn for_each(action: fn(int): nil): nil {
+        var i: int = self.front;
+        while (i < self.back) {
+            action(self.data[i]);
+            i = i + 1;
+        }
+    }
+
+    pub fn sum(): int {
+        return self.fold(fn(acc: int, x: int): int { return acc + x; }, 0);
+    }
+
+    pub fn product(): int {
+        return self.fold(fn(acc: int, x: int): int { return acc * x; }, 1);
+    }
+
+    pub fn min(): int? {
+        if (self.is_empty()) return nil;
+        
+        var min_val = self.data[self.front];
+        var i: int = self.front + 1;
+        
+        while (i < self.back) {
+            if (self.data[i] < min_val) min_val = self.data[i];
+            i = i + 1;
+        }
+        
+        return min_val;
+    }
+
+    pub fn max(): int? {
+        if (self.is_empty()) return nil;
+        
+        var max_val = self.data[self.front];
+        var i: int = self.front + 1;
+        
+        while (i < self.back) {
+            if (self.data[i] > max_val) max_val = self.data[i];
+            i = i + 1;
+        }
+        
+        return max_val;
+    }
+
+    pub fn to_array(): [int] {
+        var result: [int] = [];
+        var i: int = self.front;
+        var j: int = 0;
+        
+        while (i < self.back) {
+            result[j] = self.data[i];
+            i = i + 1;
+            j = j + 1;
+        }
+        
+        return result;
+    }
+
+    pub fn to_string(): str {
+        var result = "Queue[";
+        var i: int = self.front;
+        
+        while (i < self.back) {
+            if (i > self.front) result = result + ", ";
+            result = result + self.data[i] as str;
+            i = i + 1;
+        }
+        
+        result = result + "]";
+        return result;
+    }
+}
+
+// Utility functions
+fn queue(): Queue {
+    return Queue.init();
+}
+
+fn queue_from(arr: [int]): Queue {
+    return Queue.from_array(arr);
+}

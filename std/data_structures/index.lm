@@ -1,0 +1,23 @@
+// Data Structures Module Index - Re-exports all advanced data structures
+
+// Import all data structure frames
+import std.data_structures.binary_tree as binary_tree;
+import std.data_structures.graph as graph;
+import std.data_structures.priority_queue as priority_queue;
+
+// Re-export frames for easy access
+var BinaryTree = binary_tree.BinaryTree;
+var Graph = graph.Graph;
+var PriorityQueue = priority_queue.PriorityQueue;
+
+// Re-export utility functions
+var binary_tree = binary_tree.binary_tree;
+var binary_tree_from_array = binary_tree.binary_tree_from_array;
+var graph = graph.graph;
+var undirected_graph = graph.undirected_graph;
+var directed_graph = graph.directed_graph;
+var graph_from_edges = graph.graph_from_edges;
+var priority_queue = priority_queue.priority_queue;
+var max_priority_queue = priority_queue.max_priority_queue;
+var priority_queue_from_array = priority_queue.priority_queue_from_array;
+var max_priority_queue_from_array = priority_queue.max_priority_queue_from_array;

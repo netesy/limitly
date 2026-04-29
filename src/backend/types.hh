@@ -120,17 +120,31 @@ private:
     if (from->tag == TypeTag::Frame && to->tag == TypeTag::Trait) {
         auto fromFrameType = std::get_if<FrameType>(&from->extra);
         auto toTraitType = std::get_if<TraitType>(&to->extra);
+        std::cerr << "[DEBUG canConvert] Frame->Trait: fromFrame=" << (fromFrameType ? fromFrameType->name : "null") 
+                  << ", toTrait=" << (toTraitType ? toTraitType->name : "null") << std::endl;
         if (fromFrameType && toTraitType) {
+            std::cerr << "[DEBUG canConvert] Frame implements: ";
+            for (const auto& t : fromFrameType->implements) std::cerr << t << " ";
+            std::cerr << std::endl;
             // Check direct implements
             for (const auto& traitName : fromFrameType->implements) {
-                if (traitName == toTraitType->name) return true;
+                if (traitName == toTraitType->name) {
+                    std::cerr << "[DEBUG canConvert] Found match!" << std::endl;
+                    return true;
+                }
             }
             
             // Check frame registry for more complete info
             if (frameRegistry.count(fromFrameType->name)) {
                 const auto& info = frameRegistry.at(fromFrameType->name);
+                std::cerr << "[DEBUG canConvert] Frame registry implements: ";
+                for (const auto& t : info.implements) std::cerr << t << " ";
+                std::cerr << std::endl;
                 for (const auto& traitName : info.implements) {
-                    if (traitName == toTraitType->name) return true;
+                    if (traitName == toTraitType->name) {
+                        std::cerr << "[DEBUG canConvert] Found match in registry!" << std::endl;
+                        return true;
+                    }
                 }
             }
         }
@@ -494,6 +508,15 @@ public:
     // --- Persistence Methods ---
     void registerFrame(const std::string& name, const FrameInfo& info) {
         frameRegistry[name] = info;
+        
+        // Also update the cached frame type with implements info
+        auto it = userDefinedTypes.find(name);
+        if (it != userDefinedTypes.end()) {
+            auto frameTypePtr = std::get_if<FrameType>(&it->second->extra);
+            if (frameTypePtr) {
+                frameTypePtr->implements = info.implements;
+            }
+        }
     }
     
     FrameInfo* getFrameInfo(const std::string& name) {
@@ -573,18 +596,51 @@ public:
         // 1. Check contextual scopes (inner to outer)
         for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
             auto found = it->find(name);
-            if (found != it->end()) return found->second;
+            if (found != it->end()) {
+                if (name == "Shape") {
+                    std::cerr << "[DEBUG getType] Shape found in scopeStack, tag=" << static_cast<int>(found->second->tag);
+                    if (found->second->tag == TypeTag::Trait) {
+                        if (const auto* traitData = std::get_if<TraitType>(&found->second->extra)) {
+                            std::cerr << ", traitName=" << traitData->name;
+                        } else {
+                            std::cerr << ", NO TraitType data!";
+                        }
+                    }
+                    std::cerr << std::endl;
+                }
+                return found->second;
+            }
         }
 
-        // 2. Check persistent registries for frames/traits
+        // 2. Check user-defined types (includes traits registered in Pass 1)
+        auto it = userDefinedTypes.find(name);
+        if (it != userDefinedTypes.end()) {
+            if (name == "Shape") {
+                std::cerr << "[DEBUG getType] Shape found in userDefinedTypes, tag=" << static_cast<int>(it->second->tag);
+                if (it->second->tag == TypeTag::Trait) {
+                    if (const auto* traitData = std::get_if<TraitType>(&it->second->extra)) {
+                        std::cerr << ", traitName=" << traitData->name;
+                    } else {
+                        std::cerr << ", NO TraitType data!";
+                    }
+                }
+                std::cerr << std::endl;
+            }
+            return it->second;
+        }
+        
+        // 3. Check persistent registries for frames/traits
         if (frameRegistry.count(name)) return createFrameType(name);
         if (traitRegistry.count(name)) {
+            std::cerr << "[DEBUG] getType('" << name << "') found in traitRegistry" << std::endl;
             return getCanonicalType("trait:" + name, [&]() {
-                return std::make_shared<Type>(TypeTag::Trait);
+                TraitType traitTypeData;
+                traitTypeData.name = name;
+                return std::make_shared<Type>(TypeTag::Trait, traitTypeData);
             });
         }
 
-        // 3. Check built-in types
+        // 4. Check built-in types
         if (name == "bigint" || name == "int" || name == "i64" || name == "u64" || 
             name == "i32" || name == "u32" || name == "i16" || name == "u16" ||
             name == "i8" || name == "u8" || name == "i128" || name == "u128" ||
@@ -621,12 +677,6 @@ public:
         TypePtr aliasType = resolveTypeAlias(name);
         if (aliasType) {
             return aliasType;
-        }
-        
-        // Check user-defined types
-        auto it = userDefinedTypes.find(name);
-        if (it != userDefinedTypes.end()) {
-            return it->second;
         }
         
         return NIL_TYPE;
@@ -1383,6 +1433,12 @@ public:
         // Create a FrameType with the frame name
         FrameType frameTypeData;
         frameTypeData.name = frameName;
+        
+        // Populate implements from frame registry if available
+        auto frameInfoIt = frameRegistry.find(frameName);
+        if (frameInfoIt != frameRegistry.end()) {
+            frameTypeData.implements = frameInfoIt->second.implements;
+        }
         
         // Create a frame type with the Frame tag and FrameType data
         TypePtr frameType = std::make_shared<Type>(TypeTag::Frame, frameTypeData);

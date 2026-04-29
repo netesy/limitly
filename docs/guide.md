@@ -32,12 +32,12 @@ Welcome to the official guide for the Limit programming language. This document 
     *   [Default Parameters](#default-parameters)
     *   [Higher-Order Functions](#higher-order-functions)
     *   [Closures](#closures)
-6.  [Classes](#classes)
-    *   [Defining Classes](#defining-classes)
-    *   [Class Members and Modifiers](#class-members-and-modifiers)
+6.  [Frames](#frames)
+    *   [Defining Frames](#defining-frames)
+    *   [Frame Members and Modifiers](#frame-members-and-modifiers)
     *   [Fields and Methods](#fields-and-methods)
     *   [The `init` Constructor](#the-init-constructor)
-    *   [The `self` Keyword](#the-self-keyword)
+    *   [The `this` Keyword](#the-this-keyword)
     *   [Inheritance](#inheritance)
     *   [Method Overriding](#method-overriding)
     *   [The `super` Keyword](#the-super-keyword)
@@ -79,16 +79,12 @@ This section covers how to build the Limit compiler and run Limit programs.
 
 **Build Instructions:**
 
-You can build the project using `make`, a Windows batch script, or a Unix shell script. The recommended method is using `make`.
+You can build the project using `make`, a Windows batch script, or a Unix shell script. The recommended method is using `make linux`.
 
 *   **Using Make (recommended for cross-platform):**
     By default, this builds the release version.
     ```bash
-    make
-    ```
-    To build the debug version:
-    ```bash
-    make debug
+    make linux
     ```
 
 *   **Using Windows Batch (MSYS2/MinGW64):**
@@ -105,51 +101,16 @@ You can build the project using `make`, a Windows batch script, or a Unix shell 
 
 **Running the Interpreter:**
 
-The `limitly` executable is the interpreter for the Limit language. It can be used to execute source files, inspect the compilation process, or start an interactive session (REPL).
+The `limitly` executable is the interpreter for the Limit language, located in `bin/`. It can be used to execute source files, inspect the compilation process, or start an interactive session (REPL).
 
 *   **Execute a source file:**
     ```bash
-    ./limitly your_script.lm
-    ```
-
-*   **Print the tokens (from the scanner):**
-    ```bash
-    ./limitly -tokens your_script.lm
-    ```
-
-*   **Print the Abstract Syntax Tree (AST):**
-    ```bash
-    ./limitly -ast your_script.lm
-    ```
-
-*   **Print the bytecode:**
-    ```bash
-    ./limitly -bytecode your_script.lm
-    ```
-
-*   **Print the Concrete Syntax Tree (CST):**
-    ```bash
-    ./limitly -cst your_script.lm
-    ```
-
-*   **JIT Compile a source file:**
-    ```bash
-    ./limitly -jit your_script.lm
-    ```
-
-*   **JIT compile and run directly (debug mode):**
-    ```bash
-    ./limitly -jit-debug your_script.lm
-    ```
-
-*   **Execute with debug output enabled:**
-    ```bash
-    ./limitly -debug your_script.lm
+    ./bin/limitly your_script.lm
     ```
 
 *   **Start the REPL (interactive mode):**
     ```bash
-    ./limitly -repl
+    ./bin/limitly -repl
     ```
 
 ## Basic Syntax
@@ -546,7 +507,7 @@ print(person.1); // Output: 30
 
 ### Object Literals
 
-Object literals provide a way to create instances of user-defined types, like classes or enums, with a specific structure. This is especially useful for enums with associated data.
+Object literals provide a way to create instances of user-defined types, like frames or enums, with a specific structure. This is especially useful for enums with associated data.
 
 ```limit
 enum Option {
@@ -667,20 +628,20 @@ print(counter()); // Output: 2
 print(counter()); // Output: 3
 ```
 
-## Classes
+## Frames
 
-Limit is an object-oriented language and supports classes for creating user-defined types.
+Limit is an object-oriented language and supports **frames** for creating user-defined types. Frames are the primary mechanism for bundling data and behavior.
 
-### Defining Classes
+### Defining Frames
 
-Classes are defined using the `class` keyword.
+Frames are defined using the `frame` keyword.
 
 ```limit
-class Greeter {
+frame Greeter {
     var name: str = "World";
 
     fn say_hello() {
-        print("Hello, {self.name}!");
+        print("Hello, {this.name}!");
     }
 }
 
@@ -688,20 +649,20 @@ var greeter: Greeter = Greeter();
 greeter.say_hello(); // Output: Hello, World!
 ```
 
-### Class Members and Modifiers
+### Frame Members and Modifiers
 
-Limit provides several modifiers to control the behavior and visibility of classes and their members.
+Limit provides several modifiers to control the behavior and visibility of frames and their members.
 
 #### Visibility Modifiers
 
-You can control the visibility of class members (fields and methods) using `pub` (public) and `prot` (protected). By default, all members are `private`.
+You can control the visibility of frame members (fields and methods) using `pub` (public) and `prot` (protected). By default, all members are `private`.
 
-*   **`private`** (default): The member can only be accessed from within the class.
-*   **`prot`** (protected): The member can be accessed from within the class and by its subclasses.
+*   **`private`** (default): The member can only be accessed from within the frame.
+*   **`prot`** (protected): The member can be accessed from within the frame and by its subframes.
 *   **`pub`** (public): The member can be accessed from anywhere.
 
 ```limit
-class MyClass {
+frame MyClass {
     var private_field = 1;      // private by default
     pub var public_field = 2;
     prot var protected_field = 3;
@@ -714,10 +675,10 @@ class MyClass {
 
 #### Static Members
 
-You can declare `static` fields and methods, which belong to the class itself rather than to an instance.
+You can declare `static` fields and methods, which belong to the frame itself rather than to an instance.
 
 ```limit
-class Counter {
+frame Counter {
     static var count = 0;
 
     static fn increment() {
@@ -729,46 +690,46 @@ Counter.increment();
 print(Counter.count); // Output: 1
 ```
 
-#### Abstract Classes and Methods
+#### Abstract Frames and Methods
 
-An `abstract` class cannot be instantiated directly and is meant to be subclassed. It can contain `abstract` methods, which are declared without a body and must be implemented by subclasses.
+An `abstract` frame cannot be instantiated directly and is meant to be subframed. It can contain `abstract` methods, which are declared without a body and must be implemented by subframes.
 
 ```limit
-abstract class Shape {
+abstract frame Shape {
     abstract fn area(): float;
 }
 
-class Circle : Shape {
+frame Circle : Shape {
     var radius: float;
 
     fn init(r: float) {
-        self.radius = r;
+        this.radius = r;
     }
 
     fn area(): float {
-        return 3.14 * self.radius * self.radius;
+        return 3.14 * this.radius * this.radius;
     }
 }
 ```
 
-#### Final Classes and Methods
+#### Final Frames and Methods
 
-A `final` class cannot be subclassed. A `final` method cannot be overridden by a subclass.
+A `final` frame cannot be subframed. A `final` method cannot be overridden by a subframe.
 
 ```limit
-final class Uninheritable {}
+final frame Uninheritable {}
 
-class Parent {
+frame Parent {
     final fn cannot_override() {}
 }
 ```
 
-#### Data Classes
+#### Data Frames
 
-A `data` class is a special kind of class that automatically generates useful methods, such as a constructor for all its fields. Data classes are implicitly `final`.
+A `data` frame is a special kind of frame that automatically generates useful methods, such as a constructor for all its fields. Data frames are implicitly `final`.
 
 ```limit
-data User {
+data frame User {
     name: str,
     age: int
 }
@@ -779,24 +740,24 @@ print(user.name); // Output: Alice
 
 ### Fields and Methods
 
-Classes can have both data (fields) and behavior (methods). Fields are variables declared within the class, and methods are functions defined within the class.
+Frames can have both data (fields) and behavior (methods). Fields are variables declared within the frame, and methods are functions defined within the frame.
 
 ### The `init` Constructor
 
-The `init` method is a special method that acts as the class constructor. It is called when a new instance of the class is created.
+The `init` method is a special method that acts as the frame constructor. It is called when a new instance of the frame is created.
 
 ```
-class Person {
+frame Person {
     var name: str;
     var age: int;
 
     fn init(name_param: str, age_param: int) {
-        self.name = name_param;
-        self.age = age_param;
+        this.name = name_param;
+        this.age = age_param;
     }
 
     fn introduce() {
-        print("Hi, I'm {self.name} and I'm {self.age} years old.");
+        print("Hi, I'm {this.name} and I'm {this.age} years old.");
     }
 }
 
@@ -804,22 +765,22 @@ var person: Person = Person("Jules", 28);
 person.introduce(); // Output: Hi, I'm Jules and I'm 28 years old.
 ```
 
-### The `self` Keyword
+### The `this` Keyword
 
-The `self` keyword refers to the current instance of the class. It is used to access the instance's fields and methods.
+The `this` keyword refers to the current instance of the frame. It is used to access the instance's fields and methods. Limit also supports `self` as an alias for `this`.
 
 ### Inheritance
 
-A class can inherit from a parent class using the `:` operator. This allows the child class to inherit the fields and methods of the parent.
+A frame can inherit from a parent frame using the `:` operator. This allows the child frame to inherit the fields and methods of the parent.
 
 ```
-class Animal {
+frame Animal {
     fn speak() {
         print("The animal makes a sound.");
     }
 }
 
-class Dog : Animal {
+frame Dog : Animal {
     // Dog inherits the speak() method from Animal
 }
 
@@ -829,10 +790,10 @@ my_dog.speak(); // Output: The animal makes a sound.
 
 ### Method Overriding
 
-A child class can provide its own implementation of a method that it inherited from its parent.
+A child frame can provide its own implementation of a method that it inherited from its parent.
 
 ```
-class Cat : Animal {
+frame Cat : Animal {
     fn speak() {
         print("The cat meows.");
     }
@@ -844,10 +805,10 @@ my_cat.speak(); // Output: The cat meows.
 
 ### The `super` Keyword
 
-The `super` keyword can be used to call methods from the parent class.
+The `super` keyword can be used to call methods from the parent frame.
 
 ```
-class SmartDog : Dog {
+frame SmartDog : Dog {
     fn speak() {
         super.speak(); // Call the speak() method from the parent (Dog)
         print("Woof woof!");
@@ -863,7 +824,7 @@ smart_dog.speak();
 
 ### Polymorphism
 
-Polymorphism allows you to treat objects of different classes as objects of a common parent class.
+Polymorphism allows you to treat objects of different frames as objects of a common parent frame.
 
 ```
 var animals: [Animal] = [Dog(), Cat(), Animal()];
@@ -949,7 +910,7 @@ module my_app.utils {
     }
 
     @protected
-    class StringHelper {
+    frame StringHelper {
         // ...
     }
 
@@ -1099,7 +1060,7 @@ set_age(-5); // This would be a runtime error
 
 ### Structural Types
 
-A structural type allows you to define a type based on its structure or shape, rather than by a specific name. This is useful for working with data that has a consistent structure but may not be an instance of a named class.
+A structural type allows you to define a type based on its structure or shape, rather than by a specific name. This is useful for working with data that has a consistent structure but may not be an instance of a named frame.
 
 ```limit
 type Point = {x: float, y: float};
@@ -1139,14 +1100,14 @@ var current_status: Status = Status.Running;
 
 ### Traits and Interfaces
 
-Traits and interfaces are used to define a set of methods that a class must implement. This is a powerful tool for abstraction and polymorphism.
+Traits and interfaces are used to define a set of methods that a frame must implement. This is a powerful tool for abstraction and polymorphism.
 
 ```limit
 trait Speaker {
     fn speak();
 }
 
-class Dog : Speaker {
+frame Dog : Speaker {
     fn speak() {
         print("Woof!");
     }
@@ -1155,7 +1116,7 @@ class Dog : Speaker {
 
 ### Error Handling
 
-**Key Design Principle**: Limit is designed to be null-free. It does not have null pointers, references, or values. Instead, Limit uses a robust type-based system to handle optionality and errors.
+**Key Design Principle**: Limit is designed to be safe. It does not use exceptions for expected errors. Instead, Limit uses a robust type-based system to handle optionality and errors.
 
 ### The `Option` Type for Optional Values
 
@@ -1210,7 +1171,7 @@ match (result) {
 
 ### The Unified `Type?` System
 
-For convenience, Limit provides the `Type?` syntax as a shorthand for fallible operations. The `Type?` syntax is syntactic sugar for `Result<Type, DefaultError>`, where `DefaultError` is a generic error type used when a specific one is not provided.
+For convenience, Limit provides the `Type?` syntax as a shorthand for fallible operations. The `Type?` syntax is syntactic sugar for `Result<Type, DefaultError>`.
 - **`Type?`**: A type that can either hold a value of `Type` or an error.
 - **`ok(value)`**: Constructs a success value.
 - **`err()`**: Constructs an error value.
@@ -1396,12 +1357,12 @@ fn divide(a: int, b: int): int? {
 // Use `? else` to provide a default value on failure or absence
 var value: int = divide(10, 0)? else {
     print("Division failed or result absent");
-    return 0; // Default value (not null - Limit is null-free)
+    return 0; // Default value 
 };
 // `value` will be 0.
 ```
 
-This syntax is particularly useful for providing default values while maintaining Limit's null-free design principles.
+This syntax is particularly useful for providing default values while maintaining Limit's safe design principles.
 
 ## Concurrency
 

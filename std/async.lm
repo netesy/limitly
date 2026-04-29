@@ -1,0 +1,379 @@
+// Async Programming Module - Asynchronous operations and promises
+
+import std.core as core;
+
+// Promise frame for asynchronous operations
+frame Promise {
+    var state: str;  // "pending", "fulfilled", "rejected"
+    var value: str?;
+    var error: str?;
+    var then_callbacks: [fn(str): str];
+    var catch_callbacks: [fn(str): str];
+
+    pub fn init(): Promise {
+        return Promise(state="pending", value=nil, error=nil, then_callbacks=[], catch_callbacks=[]);
+    }
+
+    // Resolution methods
+    pub fn resolve(value: str): Promise {
+        if (self.state != "pending") return self;
+        
+        self.state = "fulfilled";
+        self.value = value;
+        
+        // Execute then callbacks
+        var i: int = 0;
+        while (i < self.then_callbacks.length) {
+            var result = self.then_callbacks[i](value);
+            self.value = result;
+            i = i + 1;
+        }
+        
+        return self;
+    }
+
+    pub fn reject(error: str): Promise {
+        if (self.state != "pending") return self;
+        
+        self.state = "rejected";
+        self.error = error;
+        
+        // Execute catch callbacks
+        var i: int = 0;
+        while (i < self.catch_callbacks.length) {
+            var result = self.catch_callbacks[i](error);
+            i = i + 1;
+        }
+        
+        return self;
+    }
+
+    // Chaining methods
+    pub fn then(callback: fn(str): str): Promise {
+        self.then_callbacks[self.then_callbacks.length] = callback;
+        
+        if (self.state == "fulfilled" and self.value != nil) {
+            var result = callback(self.value);
+            self.value = result;
+        }
+        
+        return self;
+    }
+
+    pub fn catch(callback: fn(str): str): Promise {
+        self.catch_callbacks[self.catch_callbacks.length] = callback;
+        
+        if (self.state == "rejected" and self.error != nil) {
+            callback(self.error);
+        }
+        
+        return self;
+    }
+
+    pub fn finally(callback: fn(): nil): Promise {
+        // Execute callback regardless of state
+        if (self.state != "pending") {
+            callback();
+        } else {
+            // Would need to store finally callback for later execution
+        }
+        
+        return self;
+    }
+
+    // State inspection
+    pub fn is_pending(): bool {
+        return self.state == "pending";
+    }
+
+    pub fn is_fulfilled(): bool {
+        return self.state == "fulfilled";
+    }
+
+    pub fn is_rejected(): bool {
+        return self.state == "rejected";
+    }
+
+    pub fn get_value(): str? {
+        return self.value;
+    }
+
+    pub fn get_error(): str? {
+        return self.error;
+    }
+
+    // Utility methods
+    pub fn to_string(): str {
+        return "Promise(state=" + self.state + 
+               (if self.value != nil then ", value=" + self.value else "") +
+               (if self.error != nil then ", error=" + self.error else "") + ")";
+    }
+}
+
+// Async utilities
+frame Async {
+    
+    // Promise creation
+    pub fn resolve(value: str): Promise {
+        var promise = Promise.init();
+        return promise.resolve(value);
+    }
+
+    pub fn reject(error: str): Promise {
+        var promise = Promise.init();
+        return promise.reject(error);
+    }
+
+    pub fn all(promises: [Promise]): Promise {
+        var result_promise = Promise.init();
+        var results: [str] = [];
+        var completed: int = 0;
+        var has_error: bool = false;
+
+        var i: int = 0;
+        while (i < promises.length) {
+            var promise = promises[i];
+            
+            promise.then(fn(value: str): str {
+                if (has_error) return value;
+                
+                results[i] = value;
+                completed = completed + 1;
+                
+                if (completed == promises.length) {
+                    var combined_result = "";
+                    var j: int = 0;
+                    while (j < results.length) {
+                        if (j > 0) combined_result = combined_result + ",";
+                        combined_result = combined_result + results[j];
+                        j = j + 1;
+                    }
+                    result_promise.resolve(combined_result);
+                }
+                
+                return value;
+            });
+            
+            promise.catch(fn(error: str): str {
+                if (!has_error) {
+                    has_error = true;
+                    result_promise.reject(error);
+                }
+                return error;
+            });
+            
+            i = i + 1;
+        }
+
+        return result_promise;
+    }
+
+    pub fn race(promises: [Promise]): Promise {
+        var result_promise = Promise.init();
+        var settled: bool = false;
+
+        var i: int = 0;
+        while (i < promises.length) {
+            var promise = promises[i];
+            
+            promise.then(fn(value: str): str {
+                if (!settled) {
+                    settled = true;
+                    result_promise.resolve(value);
+                }
+                return value;
+            });
+            
+            promise.catch(fn(error: str): str {
+                if (!settled) {
+                    settled = true;
+                    result_promise.reject(error);
+                }
+                return error;
+            });
+            
+            i = i + 1;
+        }
+
+        return result_promise;
+    }
+
+    // Delay utilities
+    pub fn delay(ms: int): Promise {
+        var promise = Promise.init();
+        
+        // In a real implementation, this would use timers
+        // For now, we'll simulate the delay
+        var result = "delayed_" + ms as str;
+        return promise.resolve(result);
+    }
+
+    pub fn timeout(ms: int): Promise {
+        var promise = Promise.init();
+        
+        // Simulate timeout
+        var error = "timeout after " + ms as str + "ms";
+        return promise.reject(error);
+    }
+
+    // Retry utilities
+    pub fn retry(operation: fn(): Promise, max_attempts: int): Promise {
+        var attempt: int = 0;
+        
+        fn try_operation(): Promise {
+            attempt = attempt + 1;
+            
+            var result = operation();
+            
+            result.catch(fn(error: str): str {
+                if (attempt < max_attempts) {
+                    return try_operation().get_value() if try_operation().is_fulfilled() else "";
+                }
+                return error;
+            });
+            
+            return result;
+        }
+        
+        return try_operation();
+    }
+
+    // Async iteration utilities
+    pub fn map_async(items: [str], mapper: fn(str): Promise): Promise {
+        var promises: [Promise] = [];
+        var i: int = 0;
+        
+        while (i < items.length) {
+            promises[i] = mapper(items[i]);
+            i = i + 1;
+        }
+        
+        return Async.all(promises);
+    }
+
+    pub fn filter_async(items: [str], predicate: fn(str): Promise): Promise {
+        var promises: [Promise] = [];
+        var i: int = 0;
+        
+        while (i < items.length) {
+            promises[i] = predicate(items[i]);
+            i = i + 1;
+        }
+        
+        var filter_promise = Async.all(promises);
+        
+        filter_promise.then(fn(results: str): str {
+            var filtered_items: [str] = [];
+            var result_parts = results.split(",");
+            var j: int = 0;
+            var k: int = 0;
+            
+            while (j < result_parts.length) {
+                if (result_parts[j] == "true") {
+                    filtered_items[k] = items[j];
+                    k = k + 1;
+                }
+                j = j + 1;
+            }
+            
+            var combined = "";
+            var l: int = 0;
+            while (l < filtered_items.length) {
+                if (l > 0) combined = combined + ",";
+                combined = combined + filtered_items[l];
+                l = l + 1;
+            }
+            
+            return combined;
+        });
+        
+        return filter_promise;
+    }
+
+    // Async utilities
+    pub fn memoize_async(operation: fn(str): Promise): fn(str): Promise {
+        var cache: {str: Promise} = {};
+        
+        return fn(key: str): Promise {
+            if (cache[key] != nil) {
+                return cache[key];
+            }
+            
+            var promise = operation(key);
+            cache[key] = promise;
+            return promise;
+        };
+    }
+
+    pub fn debounce(operation: fn(): Promise, delay_ms: int): fn(): Promise {
+        var last_call: int = 0;
+        var timeout_promise: Promise = Promise.init();
+        
+        return fn(): Promise {
+            var current_time = 0; // Would need actual time function
+            last_call = current_time;
+            
+            timeout_promise = Async.delay(delay_ms);
+            timeout_promise.then(fn(_: str): str {
+                if (last_call == current_time) {
+                    return operation().get_value() if operation().is_fulfilled() else "";
+                }
+                return "";
+            });
+            
+            return timeout_promise;
+        };
+    }
+
+    pub fn throttle(operation: fn(): Promise, interval_ms: int): fn(): Promise {
+        var last_execution: int = 0;
+        var in_progress: bool = false;
+        
+        return fn(): Promise {
+            var current_time = 0; // Would need actual time function
+            
+            if (in_progress or current_time - last_execution < interval_ms) {
+                return Async.reject("throttled");
+            }
+            
+            in_progress = true;
+            last_execution = current_time;
+            
+            var result = operation();
+            result.finally(fn(): nil {
+                in_progress = false;
+            });
+            
+            return result;
+        };
+    }
+}
+
+// Utility functions
+fn promise(): Promise {
+    return Promise.init();
+}
+
+fn resolve_promise(value: str): Promise {
+    return Async.resolve(value);
+}
+
+fn reject_promise(error: str): Promise {
+    return Async.reject(error);
+}
+
+fn all_promises(promises: [Promise]): Promise {
+    return Async.all(promises);
+}
+
+fn race_promises(promises: [Promise]): Promise {
+    return Async.race(promises);
+}
+
+fn delay_async(ms: int): Promise {
+    return Async.delay(ms);
+}
+
+fn retry_async(operation: fn(): Promise, max_attempts: int): Promise {
+    return Async.retry(operation, max_attempts);
+}

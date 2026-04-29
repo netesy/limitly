@@ -27,33 +27,154 @@ frame Float {
     pub fn abs(): float { if (self.value < 0.0) return -self.value; return self.value; }
     pub fn min(other: float): float { if (self.value < other) return self.value; return other; }
     pub fn max(other: float): float { if (self.value > other) return self.value; return other; }
+    
+    // Trigonometric functions
+    pub fn sin(): float { 
+        var y: float = self.normalize_angle(); 
+        var term: float = y; 
+        var sum: float = y; 
+        var n: int = 1; 
+        while (n < 10) { 
+            var k: float = (2.0 * n) * (2.0 * n + 1.0); 
+            term = -term * y * y / k; 
+            sum = sum + term; 
+            n = n + 1; 
+        } 
+        return sum; 
+    }
+    
+    pub fn cos(): float { 
+        var y: float = self.normalize_angle(); 
+        var term: float = 1.0; 
+        var sum: float = 1.0; 
+        var n: int = 1; 
+        while (n < 10) { 
+            var k: float = (2.0 * n - 1.0) * (2.0 * n); 
+            term = -term * y * y / k; 
+            sum = sum + term; 
+            n = n + 1; 
+        } 
+        return sum; 
+    }
+    
+    pub fn tan(): float { 
+        var c: float = self.cos(); 
+        if (c < 0.000000001) return 0.0; 
+        return self.sin() / c; 
+    }
+    
+    pub fn atan(): float { 
+        if (self.abs() > 1.0) { 
+            if (self.value > 0.0) return PI / 2.0 - Float(value=1.0 / self.value).atan(); 
+            return -PI / 2.0 - Float(value=1.0 / self.value).atan(); 
+        } 
+        var term: float = self.value; 
+        var sum: float = self.value; 
+        var n: int = 1; 
+        while (n < 20) { 
+            term = -term * self.value * self.value; 
+            sum = sum + term / (2.0 * n + 1.0); 
+            n = n + 1; 
+        } 
+        return sum; 
+    }
+    
+    pub fn asin(): float? { 
+        if (self.value < -1.0 or self.value > 1.0) return nil; 
+        var d = Float(value=1.0 - self.value*self.value).sqrt(); 
+        if (d == nil) return nil; 
+        if (d == 0.0) { 
+            if (self.value >= 0.0) return PI/2.0; 
+            return -PI/2.0; 
+        } 
+        return Float(value=self.value / d).atan(); 
+    }
+    
+    pub fn acos(): float? { 
+        var a = self.asin(); 
+        if (a == nil) return nil; 
+        return PI/2.0 - a; 
+    }
+    
+    // Logarithmic and exponential functions
+    pub fn exp(): float { 
+        var term: float = 1.0; 
+        var sum: float = 1.0; 
+        var n: int = 1; 
+        while (n < 30) { 
+            term = term * self.value / n; 
+            sum = sum + term; 
+            n = n + 1; 
+        } 
+        return sum; 
+    }
+    
+    pub fn log(): float? { 
+        if (self.value <= 0.0) return nil; 
+        var y: float = (self.value-1.0)/(self.value+1.0); 
+        var y2: float = y*y; 
+        var term: float = y; 
+        var sum: float = 0.0; 
+        var n: int = 1; 
+        while (n < 60) { 
+            sum = sum + term / n; 
+            term = term * y2; 
+            n = n + 2; 
+        } 
+        return 2.0 * sum; 
+    }
+    
+    pub fn log10(): float? { 
+        var l = self.log(); 
+        if (l == nil) return nil; 
+        return l / 2.302585092994046; 
+    }
+    
+    pub fn sqrt(): float? { 
+        if (self.value < 0.0) return nil; 
+        if (self.value == 0.0) return 0.0; 
+        var guess: float = self.value; 
+        if (guess < 1.0) guess = 1.0; 
+        var i: int = 0; 
+        while (i < 20) { 
+            guess = 0.5 * (guess + self.value / guess); 
+            i = i + 1; 
+        } 
+        return guess; 
+    }
+    
+    pub fn pow(exponent: float): float { 
+        if (self.value <= 0.0) { 
+            if (self.value == 0.0 and exponent > 0.0) return 0.0; 
+            return 0.0; 
+        } 
+        var l = self.log(); 
+        if (l == nil) return 0.0; 
+        return Float(value=exponent * l).exp(); 
+    }
+    
+    // Helper method for trigonometric functions
+    private fn normalize_angle(): float { 
+        var y: float = self.value; 
+        while (y > PI) { y = y - TAU; } 
+        while (y < -PI) { y = y + TAU; } 
+        return y; 
+    }
 }
 
-fn abs_int(x: int): int { return Int(value=x).abs(); }
-fn min_int(a: int, b: int): int { return Int(value=a).min(b); }
-fn max_int(a: int, b: int): int { return Int(value=a).max(b); }
-fn abs_float(x: float): float { return Float(value=x).abs(); }
-fn min_float(a: float, b: float): float { return Float(value=a).min(b); }
-fn max_float(a: float, b: float): float { return Float(value=a).max(b); }
+// Frame-focused math operations - use Int and Float frames directly
+// Example: Float(value=3.14).sin() instead of sin(3.14)
 
-fn normalize_angle(x: float): float { var y: float = x; while (y > PI) { y = y - TAU; } while (y < -PI) { y = y + TAU; } return y; }
-fn sin(x: float): float { var y: float = normalize_angle(x); var term: float = y; var sum: float = y; var n: int = 1; while (n < 10) { var k: float = (2.0 * n) * (2.0 * n + 1.0); term = -term * y * y / k; sum = sum + term; n = n + 1; } return sum; }
-fn cos(x: float): float { var y: float = normalize_angle(x); var term: float = 1.0; var sum: float = 1.0; var n: int = 1; while (n < 10) { var k: float = (2.0 * n - 1.0) * (2.0 * n); term = -term * y * y / k; sum = sum + term; n = n + 1; } return sum; }
-fn tan(x: float): float { var c: float = cos(x); if (abs_float(c) < 0.000000001) return 0.0; return sin(x) / c; }
-fn sqrt(x: float): float? { if (x < 0.0) return nil; if (x == 0.0) return 0.0; var guess: float = x; if (guess < 1.0) guess = 1.0; var i: int = 0; while (i < 20) { guess = 0.5 * (guess + x / guess); i = i + 1; } return guess; }
-fn atan(x: float): float { if (abs_float(x) > 1.0) { if (x > 0.0) return PI / 2.0 - atan(1.0 / x); return -PI / 2.0 - atan(1.0 / x); } var term: float = x; var sum: float = x; var n: int = 1; while (n < 20) { term = -term * x * x; sum = sum + term / (2.0 * n + 1.0); n = n + 1; } return sum; }
-fn asin(x: float): float? { if (x < -1.0 or x > 1.0) return nil; var d = sqrt(1.0 - x*x); if (d == nil) return nil; if (d == 0.0) { if (x >= 0.0) return PI/2.0; return -PI/2.0; } return atan(x / d); }
-fn acos(x: float): float? { var a = asin(x); if (a == nil) return nil; return PI/2.0 - a; }
-fn exp(x: float): float { var term: float = 1.0; var sum: float = 1.0; var n: int = 1; while (n < 30) { term = term * x / n; sum = sum + term; n = n + 1; } return sum; }
-fn log(x: float): float? { if (x <= 0.0) return nil; var y: float = (x-1.0)/(x+1.0); var y2: float = y*y; var term: float = y; var sum: float = 0.0; var n: int = 1; while (n < 60) { sum = sum + term / n; term = term * y2; n = n + 2; } return 2.0 * sum; }
-fn log10(x: float): float? { var l = log(x); if (l == nil) return nil; return l / 2.302585092994046; }
-fn pow(base: float, exponent: float): float { if (base <= 0.0) { if (base == 0.0 and exponent > 0.0) return 0.0; return 0.0; } var l = log(base); if (l == nil) return 0.0; return exp(exponent * l); }
-
+// Pure utility functions that don't duplicate frame functionality
 fn floor(x: float): int { var i: int = x as int; if ((i as float) > x) return i - 1; return i; }
 fn ceil(x: float): int { var i: int = x as int; if ((i as float) < x) return i + 1; return i; }
 fn round(x: float): int { if (x >= 0.0) return floor(x + 0.5); return ceil(x - 0.5); }
+
+// Random number generation (stateful utility, not frame method)
 fn random(): float { __rand_state = ((__rand_state * 1103515245 + 12345) % 2147483647); return (__rand_state as float) / 2147483647.0; }
 fn random_int(min: int, max: int): int { if (max <= min) return min; var range = max - min + 1; var offset = floor(random() * (range as float)); if (offset >= range) offset = range - 1; return min + offset; }
 fn random_float(min: float, max: float): float { if (max <= min) return min; return min + (max - min) * random(); }
+
+// Utility functions that operate on multiple values
 fn clamp(value: float, min_value: float, max_value: float): float { if (value < min_value) return min_value; if (value > max_value) return max_value; return value; }
 fn lerp(start: float, end: float, t: float): float { return start + (end - start) * t; }

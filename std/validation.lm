@@ -1,15 +1,325 @@
-// Validation module
+// Validation module - Comprehensive input validation
 
 frame Validate {
-    pub fn is_empty(value: str): bool { return value == ""; }
+    
+    // Basic validation
+    pub fn is_empty(value: str): bool {
+        return value == "";
+    }
 
+    pub fn is_not_empty(value: str): bool {
+        return value != "";
+    }
+
+    pub fn is_blank(value: str): bool {
+        var i: int = 0;
+        while (i < value.length) {
+            var ch = value[i];
+            if (ch != " " and ch != "\t" and ch != "\n" and ch != "\r") {
+                return false;
+            }
+            i = i + 1;
+        }
+        return true;
+    }
+
+    // Type validation
     pub fn is_number(value: str): bool {
         if (value == "") return false;
-        return true;
+        
+        var i: int = 0;
+        var has_digit = false;
+        var has_decimal = false;
+        
+        // Handle sign
+        if (i < value.length and (value[i] == "-" or value[i] == "+")) {
+            i = i + 1;
+        }
+        
+        while (i < value.length) {
+            var ch = value[i];
+            if (ch >= "0" and ch <= "9") {
+                has_digit = true;
+            } else if (ch == "." and not has_decimal) {
+                has_decimal = true;
+            } else {
+                return false;
+            }
+            i = i + 1;
+        }
+        
+        return has_digit;
+    }
+
+    pub fn is_integer(value: str): bool {
+        if (value == "") return false;
+        
+        var i: int = 0;
+        var has_digit = false;
+        
+        // Handle sign
+        if (i < value.length and (value[i] == "-" or value[i] == "+")) {
+            i = i + 1;
+        }
+        
+        while (i < value.length) {
+            var ch = value[i];
+            if (ch >= "0" and ch <= "9") {
+                has_digit = true;
+            } else {
+                return false;
+            }
+            i = i + 1;
+        }
+        
+        return has_digit;
     }
 
     pub fn is_alpha(value: str): bool {
         if (value == "") return false;
+        
+        var i: int = 0;
+        while (i < value.length) {
+            var ch = value[i];
+            if ((ch >= "a" and ch <= "z") or (ch >= "A" and ch <= "Z")) {
+                // Valid
+            } else {
+                return false;
+            }
+            i = i + 1;
+        }
         return true;
     }
+
+    pub fn is_alphanumeric(value: str): bool {
+        if (value == "") return false;
+        
+        var i: int = 0;
+        while (i < value.length) {
+            var ch = value[i];
+            if ((ch >= "a" and ch <= "z") or (ch >= "A" and ch <= "Z") or (ch >= "0" and ch <= "9")) {
+                // Valid
+            } else {
+                return false;
+            }
+            i = i + 1;
+        }
+        return true;
+    }
+
+    // Pattern validation
+    pub fn is_email(value: str): bool {
+        if (value == "") return false;
+        
+        // Basic email validation: local@domain.tld
+        var at_pos = value.index_of("@");
+        if (at_pos == nil or at_pos == 0 or at_pos == value.length - 1) {
+            return false;
+        }
+        
+        var local = value.substring(0, at_pos);
+        var domain = value.substring(at_pos + 1, value.length);
+        
+        // Local part validation
+        if (not self.is_alphanumeric(local) and not self.validate_email_local(local)) {
+            return false;
+        }
+        
+        // Domain part validation
+        var dot_pos = domain.last_index_of(".");
+        if (dot_pos == nil or dot_pos == 0 or dot_pos == domain.length - 1) {
+            return false;
+        }
+        
+        var domain_name = domain.substring(0, dot_pos);
+        var tld = domain.substring(dot_pos + 1, domain.length);
+        
+        return self.is_alphanumeric(domain_name) and self.is_alpha(tld) and tld.length >= 2;
+    }
+
+    private fn validate_email_local(local: str): bool {
+        // Allow dots, underscores, hyphens in local part
+        var i: int = 0;
+        while (i < local.length) {
+            var ch = local[i];
+            if ((ch >= "a" and ch <= "z") or (ch >= "A" and ch <= "Z") or (ch >= "0" and ch <= "9") or ch == "." or ch == "_" or ch == "-") {
+                // Valid
+            } else {
+                return false;
+            }
+            i = i + 1;
+        }
+        return true;
+    }
+
+    pub fn is_url(value: str): bool {
+        if (value == "") return false;
+        
+        // Basic URL validation: protocol://domain/path
+        if (value.starts_with("http://") or value.starts_with("https://")) {
+            var after_proto = value.substring(7, value.length) if value.starts_with("http://") else value.substring(8, value.length);
+            var slash_pos = after_proto.index_of("/");
+            var domain = after_proto if slash_pos == nil else after_proto.substring(0, slash_pos);
+            
+            return self.is_domain(domain);
+        }
+        
+        return false;
+    }
+
+    pub fn is_domain(value: str): bool {
+        if (value == "") return false;
+        
+        var dot_pos = value.last_index_of(".");
+        if (dot_pos == nil or dot_pos == 0 or dot_pos == value.length - 1) {
+            return false;
+        }
+        
+        var domain_name = value.substring(0, dot_pos);
+        var tld = value.substring(dot_pos + 1, value.length);
+        
+        return self.is_alphanumeric(domain_name) and self.is_alpha(tld) and tld.length >= 2;
+    }
+
+    pub fn is_uuid(value: str): bool {
+        if (value == "") return false;
+        
+        // UUID format: 8-4-4-4-12 hex digits
+        if (value.length != 36) return false;
+        
+        var expected_dashes = [8, 13, 18, 23];
+        var i: int = 0;
+        var dash_index: int = 0;
+        
+        while (i < value.length) {
+            var ch = value[i];
+            
+            // Check for dashes at expected positions
+            if (dash_index < expected_dashes.length and i == expected_dashes[ dash_index]) {
+                if (ch != "-") return false;
+                dash_index = dash_index + 1;
+            } else {
+                // Must be hex digit
+                if ((ch >= "0" and ch <= "9") or (ch >= "a" and ch <= "f") or (ch >= "A" and ch <= "F")) {
+                    // Valid
+                } else {
+                    return false;
+                }
+            }
+            i = i + 1;
+        }
+        
+        return true;
+    }
+
+    pub fn is_ip_address(value: str): bool {
+        return self.is_ipv4(value) or self.is_ipv6(value);
+    }
+
+    pub fn is_ipv4(value: str): bool {
+        if (value == "") return false;
+        
+        var parts = value.split(".");
+        if (parts.length != 4) return false;
+        
+        var i: int = 0;
+        while (i < parts.length) {
+            var part = parts[i];
+            if (not self.is_integer(part)) return false;
+            
+            var num = part as int;
+            if (num < 0 or num > 255) return false;
+            
+            i = i + 1;
+        }
+        
+        return true;
+    }
+
+    pub fn is_ipv6(value: str): bool {
+        // Basic IPv6 validation - stub implementation
+        if (value == "") return false;
+        if (value.count(":") < 2) return false;
+        
+        // Would need full IPv6 parsing
+        return true;
+    }
+
+    // Length validation
+    pub fn length_range(value: str, min: int, max: int): bool {
+        var len = value.length;
+        return len >= min and len <= max;
+    }
+
+    pub fn min_length(value: str, min: int): bool {
+        return value.length >= min;
+    }
+
+    pub fn max_length(value: str, max: int): bool {
+        return value.length <= max;
+    }
+
+    pub fn exact_length(value: str, length: int): bool {
+        return value.length == length;
+    }
+
+    // Content validation
+    pub fn contains(value: str, substring: str): bool {
+        return value.contains(substring);
+    }
+
+    pub fn starts_with(value: str, prefix: str): bool {
+        return value.starts_with(prefix);
+    }
+
+    pub fn ends_with(value: str, suffix: str): bool {
+        return value.ends_with(suffix);
+    }
+
+    pub fn matches_pattern(value: str, pattern: str): bool {
+        // Basic pattern matching - stub implementation
+        // Would need regex engine for full implementation
+        return value.contains(pattern);
+    }
+
+    // Custom validation
+    pub fn custom_validator(value: str, validator: fn(str): bool): bool {
+        return validator(value);
+    }
+
+    // Compound validation
+    pub fn all_valid(value: str, validators: [fn(str): bool]): bool {
+        var i: int = 0;
+        while (i < validators.length) {
+            if (not validators[i](value)) return false;
+            i = i + 1;
+        }
+        return true;
+    }
+
+    pub fn any_valid(value: str, validators: [fn(str): bool]): bool {
+        var i: int = 0;
+        while (i < validators.length) {
+            if (validators[i](value)) return true;
+            i = i + 1;
+        }
+        return false;
+    }
+}
+
+// Utility functions
+fn is_empty(value: str): bool {
+    return Validate.is_empty(value);
+}
+
+fn is_number(value: str): bool {
+    return Validate.is_number(value);
+}
+
+fn is_email(value: str): bool {
+    return Validate.is_email(value);
+}
+
+fn is_url(value: str): bool {
+    return Validate.is_url(value);
 }

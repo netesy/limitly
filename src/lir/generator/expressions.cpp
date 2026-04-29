@@ -716,6 +716,32 @@ Reg Generator::emit_interpolated_string_expr(LM::Frontend::AST::InterpolatedStri
 
 
 Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
+    if (expr.op == LM::Frontend::TokenType::AND || expr.op == LM::Frontend::TokenType::OR) {
+        LIR_BasicBlock* right_block = create_basic_block("logic_right");
+        LIR_BasicBlock* end_block = create_basic_block("logic_end");
+        Reg result = allocate_register();
+        set_register_language_type(result, std::make_shared<::Type>(::TypeTag::Bool));
+        Reg left = emit_expr(*expr.left);
+        if (expr.op == LM::Frontend::TokenType::AND) {
+            emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Bool, result, left, 0));
+            emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, left, 0, end_block->id));
+        } else {
+            emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Bool, result, left, 0));
+            emit_instruction(LIR_Inst(LIR_Op::JumpIf, 0, left, 0, end_block->id));
+        }
+        add_block_edge(get_current_block(), right_block);
+        add_block_edge(get_current_block(), end_block);
+        set_current_block(right_block);
+        Reg right = emit_expr(*expr.right);
+        emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Bool, result, right, 0));
+        if (get_current_block() && !get_current_block()->has_terminator()) {
+            emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, end_block->id));
+            add_block_edge(get_current_block(), end_block);
+        }
+        set_current_block(end_block);
+        return result;
+    }
+
     // Handle PLUS operator - check for string concatenation first
     if (expr.op == LM::Frontend::TokenType::PLUS) {
         // Emit left and right operands FIRST to get their types
@@ -831,8 +857,8 @@ Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
     else if (expr.op == LM::Frontend::TokenType::LESS_EQUAL) op = LIR_Op::CmpLE;
     else if (expr.op == LM::Frontend::TokenType::GREATER) op = LIR_Op::CmpGT;
     else if (expr.op == LM::Frontend::TokenType::GREATER_EQUAL) op = LIR_Op::CmpGE;
-    else if (expr.op == LM::Frontend::TokenType::AND) op = LIR_Op::And;
-    else if (expr.op == LM::Frontend::TokenType::OR) op = LIR_Op::Or;
+
+
     else if (expr.op == LM::Frontend::TokenType::CARET) op = LIR_Op::Xor;
     else {
         report_error("Unknown binary operator");

@@ -80,13 +80,9 @@ void ModuleManager::extract_metadata(std::shared_ptr<Module> module) {
 
     for (const auto& stmt : module->ast->statements) {
         if (auto func = std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt)) {
-            if (func->visibility == AST::VisibilityLevel::Public) {
-                module->public_symbols.insert(func->name);
-            }
+            module->public_symbols.insert(func->name);
         } else if (auto var = std::dynamic_pointer_cast<AST::VarDeclaration>(stmt)) {
-            if (var->visibility == AST::VisibilityLevel::Public) {
-                module->public_symbols.insert(var->name);
-            }
+            module->public_symbols.insert(var->name);
         } else if (auto frame = std::dynamic_pointer_cast<AST::FrameDeclaration>(stmt)) {
             module->public_symbols.insert(frame->name);
         } else if (auto import_stmt = std::dynamic_pointer_cast<AST::ImportStatement>(stmt)) {

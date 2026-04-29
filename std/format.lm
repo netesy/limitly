@@ -1,7 +1,333 @@
-// Format module
+// Format module - Comprehensive string formatting
 
 frame Format {
-    pub fn int(value: int): str { return "" + value; }
-    pub fn float(value: float): str { return "" + value; }
-    pub fn pad(value: str, length: int): str { return value; }
+    
+    // Basic type formatting
+    pub fn int(value: int): str {
+        return value as str;
+    }
+
+    pub fn float(value: float): str {
+        return value as str;
+    }
+
+    pub fn bool(value: bool): str {
+        return "true" if value else "false";
+    }
+
+    // Number formatting with options
+    pub fn int_with_base(value: int, base: int): str {
+        if (base == 2) return self.int_to_binary(value);
+        if (base == 8) return self.int_to_octal(value);
+        if (base == 16) return self.int_to_hexadecimal(value);
+        return value as str;
+    }
+
+    pub fn int_padded(value: int, padding: int, fill_char: str): str {
+        var str_value = value as str;
+        return self.pad_left(str_value, padding, fill_char);
+    }
+
+    pub fn float_with_precision(value: float, precision: int): str {
+        // Basic float precision formatting - stub implementation
+        var str_value = value as str;
+        var dot_pos = str_value.index_of(".");
+        
+        if (dot_pos == nil) return str_value;
+        
+        var decimal_part = str_value.substring(dot_pos + 1, str_value.length);
+        if (decimal_part.length <= precision) return str_value;
+        
+        return str_value.substring(0, dot_pos + 1 + precision);
+    }
+
+    pub fn float_fixed(value: float, precision: int): str {
+        var formatted = self.float_with_precision(value, precision);
+        var dot_pos = formatted.index_of(".");
+        
+        if (dot_pos == nil) return formatted + "." + self.repeat_string("0", precision);
+        
+        var decimal_part = formatted.substring(dot_pos + 1, formatted.length);
+        if (decimal_part.length < precision) {
+            return formatted + self.repeat_string("0", precision - decimal_part.length);
+        }
+        
+        return formatted;
+    }
+
+    // String formatting
+    pub fn pad_left(value: str, length: int, fill_char: str): str {
+        if (value.length >= length) return value;
+        
+        var padding = length - value.length;
+        var pad_str = self.repeat_string(fill_char, padding);
+        return pad_str + value;
+    }
+
+    pub fn pad_right(value: str, length: int, fill_char: str): str {
+        if (value.length >= length) return value;
+        
+        var padding = length - value.length;
+        var pad_str = self.repeat_string(fill_char, padding);
+        return value + pad_str;
+    }
+
+    pub fn pad(value: str, length: int): str {
+        return self.pad_left(value, length, " ");
+    }
+
+    pub fn center(value: str, length: int, fill_char: str): str {
+        if (value.length >= length) return value;
+        
+        var padding = length - value.length;
+        var left_pad = padding / 2;
+        var right_pad = padding - left_pad;
+        
+        return self.repeat_string(fill_char, left_pad) + value + self.repeat_string(fill_char, right_pad);
+    }
+
+    pub fn truncate(value: str, length: int, ellipsis: bool): str {
+        if (value.length <= length) return value;
+        
+        if (ellipsis and length > 3) {
+            return value.substring(0, length - 3) + "...";
+        }
+        
+        return value.substring(0, length);
+    }
+
+    pub fn truncate_words(value: str, max_words: int, ellipsis: bool): str {
+        var words = value.split(" ");
+        if (words.length <= max_words) return value;
+        
+        var result = "";
+        var i: int = 0;
+        while (i < max_words) {
+            if (i > 0) result = result + " ";
+            result = result + words[i];
+            i = i + 1;
+        }
+        
+        if (ellipsis) result = result + "...";
+        return result;
+    }
+
+    // Case formatting
+    pub fn title_case(value: str): str {
+        if (value == "") return "";
+        
+        var words = value.split(" ");
+        var result = "";
+        var i: int = 0;
+        
+        while (i < words.length) {
+            var word = words[i];
+            if (word == "") {
+                if (i > 0) result = result + " ";
+            } else {
+                if (i > 0) result = result + " ";
+                var first_char = word.substring(0, 1).to_upper();
+                var rest = word.substring(1, word.length).to_lower();
+                result = result + first_char + rest;
+            }
+            i = i + 1;
+        }
+        
+        return result;
+    }
+
+    pub fn snake_case(value: str): str {
+        var result = "";
+        var i: int = 0;
+        
+        while (i < value.length) {
+            var ch = value[i];
+            if ((ch >= "A" and ch <= "Z")) {
+                if (i > 0) result = result + "_";
+                result = result + ch.to_lower();
+            } else if (ch == " " or ch == "-") {
+                result = result + "_";
+            } else {
+                result = result + ch;
+            }
+            i = i + 1;
+        }
+        
+        return result;
+    }
+
+    pub fn camel_case(value: str): str {
+        var snake = self.snake_case(value);
+        var parts = snake.split("_");
+        var result = "";
+        var i: int = 0;
+        
+        while (i < parts.length) {
+            var part = parts[i];
+            if (part == "") continue;
+            
+            if (i == 0) {
+                result = result + part;
+            } else {
+                var first_char = part.substring(0, 1).to_upper();
+                var rest = part.substring(1, part.length);
+                result = result + first_char + rest;
+            }
+            i = i + 1;
+        }
+        
+        return result;
+    }
+
+    pub fn kebab_case(value: str): str {
+        return self.snake_case(value).replace("_", "-");
+    }
+
+    pub fn pascal_case(value: str): str {
+        var snake = self.snake_case(value);
+        var parts = snake.split("_");
+        var result = "";
+        var i: int = 0;
+        
+        while (i < parts.length) {
+            var part = parts[i];
+            if (part == "") continue;
+            
+            var first_char = part.substring(0, 1).to_upper();
+            var rest = part.substring(1, part.length);
+            result = result + first_char + rest;
+            i = i + 1;
+        }
+        
+        return result;
+    }
+
+    // Template formatting
+    pub fn printf_template(template: str, args: [...]): str {
+        var result = "";
+        var i: int = 0;
+        var arg_index: int = 0;
+        
+        while (i < template.length) {
+            var ch = template[i];
+            
+            if (ch == "{" and i + 1 < template.length and template[i + 1] == "}") {
+                // Replace { } with argument
+                if (arg_index < args.length) {
+                    result = result + (args[arg_index] as str);
+                    arg_index = arg_index + 1;
+                }
+                i = i + 2;
+            } else {
+                result = result + ch;
+                i = i + 1;
+            }
+        }
+        
+        return result;
+    }
+
+    pub fn format_named(template: str, values: {str: str}): str {
+        var result = template;
+        var keys = self.get_dict_keys(values);
+        var i: int = 0;
+        
+        while (i < keys.length) {
+            var key = keys[i];
+            var placeholder = "{" + key + "}";
+            result = result.replace(placeholder, values[key]);
+            i = i + 1;
+        }
+        
+        return result;
+    }
+
+    // Utility methods
+    private fn repeat_string(char: str, count: int): str {
+        var result = "";
+        var i: int = 0;
+        while (i < count) {
+            result = result + char;
+            i = i + 1;
+        }
+        return result;
+    }
+
+    private fn int_to_binary(value: int): str {
+        if (value == 0) return "0";
+        
+        var result = "";
+        var num = value;
+        
+        while (num > 0) {
+            result = (num % 2) as str + result;
+            num = num / 2;
+        }
+        
+        return result;
+    }
+
+    private fn int_to_octal(value: int): str {
+        if (value == 0) return "0";
+        
+        var result = "";
+        var num = value;
+        
+        while (num > 0) {
+            result = (num % 8) as str + result;
+            num = num / 8;
+        }
+        
+        return result;
+    }
+
+    private fn int_to_hexadecimal(value: int): str {
+        if (value == 0) return "0";
+        
+        var result = "";
+        var num = value;
+        var hex_chars = "0123456789ABCDEF";
+        
+        while (num > 0) {
+            var digit = num % 16;
+            result = hex_chars[digit] + result;
+            num = num / 16;
+        }
+        
+        return result;
+    }
+
+    private fn get_dict_keys(dict: {str: str}): [str] {
+        // Stub - would need proper dictionary key extraction
+        return [];
+    }
+}
+
+// Utility functions
+fn format_int(value: int): str {
+    return Format.int(value);
+}
+
+fn format_float(value: float): str {
+    return Format.float(value);
+}
+
+fn pad_string(value: str, length: int): str {
+    return Format.pad(value, length);
+}
+
+fn title_case(value: str): str {
+    return Format.title_case(value);
+}
+
+fn snake_case(value: str): str {
+    return Format.snake_case(value);
+}
+
+fn camel_case(value: str): str {
+    return Format.camel_case(value);
+}
+
+fn truncate_string(value: str, length: int): str {
+    return Format.truncate(value, length, true);
 }
