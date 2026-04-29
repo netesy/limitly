@@ -1960,16 +1960,6 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                 }
             }
 
-            // For direct structural-style frame construction (no init positional args),
-            // require all declared fields to be explicitly initialized.
-            if (expr->arguments.empty() && frame_info.declaration && !frame_info.fields.empty()) {
-                for (const auto& field : frame_info.fields) {
-                    if (expr->namedArgs.find(field.first) == expr->namedArgs.end()) {
-                        add_error("Frame '" + var_expr->name + "' is missing required field '" + field.first + "'", expr->line);
-                    }
-                }
-            }
-
             // Validate positional arguments (passing to init)
             if (!expr->arguments.empty() || sig_it != function_signatures.end()) {
                 if (sig_it == function_signatures.end()) {
@@ -2118,13 +2108,6 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                     }
                 }
 
-                if (expr->arguments.empty() && frame_info.declaration && !frame_info.fields.empty()) {
-                    for (const auto& field : frame_info.fields) {
-                        if (expr->namedArgs.find(field.first) == expr->namedArgs.end()) {
-                            add_error("Frame '" + qualified_name + "' is missing required field '" + field.first + "'", expr->line);
-                        }
-                    }
-                }
                 TypePtr frame_type = type_system.createFrameType(qualified_name);
                 expr->inferred_type = frame_type;
                 return frame_type;
