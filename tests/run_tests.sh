@@ -49,6 +49,8 @@ echo "=== EXPRESSION TESTS ==="
 run_test_with_error_check "tests/expressions/arithmetic.lm"
 run_test_with_error_check "tests/expressions/logical.lm"
 run_test_with_error_check "tests/expressions/ranges.lm"
+run_test_with_error_check "tests/expressions/scientific_notation.lm"
+run_test_with_error_check "tests/expressions/large_literals.lm"
 
 echo
 echo "=== STRING TESTS ==="
@@ -60,13 +62,14 @@ echo "=== LOOP TESTS ==="
 run_test_with_error_check "tests/loops/for_loops.lm"
 run_test_with_error_check "tests/loops/iter_loops.lm"
 run_test_with_error_check "tests/loops/while_loops.lm"
+run_test_with_error_check "tests/loops/match.lm"
 
 echo
 echo "=== FUNCTION TESTS ==="
 run_test_with_error_check "tests/functions/basic.lm"
 run_test_with_error_check "tests/functions/advanced.lm"
 run_test_with_error_check "tests/functions/closures.lm"
-run_test_allow_semantic_errors "tests/functions/first_class.lm"
+run_test_with_error_check "tests/functions/first_class.lm"
 
 echo
 echo "=== TYPE TESTS ==="
@@ -77,13 +80,7 @@ run_test_with_error_check "tests/types/advanced.lm"
 run_test_with_error_check  "tests/types/enums.lm"
 run_test_with_error_check "tests/types/refined_types.lm"
 run_test_with_error_check "tests/types/structural_type_tests.lm"
-run_test_with_error_check "tests/types/structural_type_tests.lm"
-run_test_with_error_check "tests/types/structural_type_tests.lm"
-run_test_with_error_check "tests/types/structural_type_tests.lm"
-run_test_with_error_check "tests/types/structural_type_tests.lm"
-run_test_with_error_check "tests/types/structural_type_tests.lm"
-run_test_with_error_check "tests/types/structural_type_tests.lm"
-run_test_with_error_check "tests/types/structural_type_tests.lm"
+
 
 echo
 echo "=== MODULE TESTS ==="
@@ -102,7 +99,7 @@ run_test_with_error_check "tests/oop/frame_declaration.lm"
 run_test_with_error_check "tests/oop/traits_dynamic.lm"
 run_test_with_error_check "tests/oop/traits_inheritance.lm"
 run_test_with_error_check "tests/oop/visibility_test.lm"
-run_test_allow_semantic_errors "tests/oop/composition_test.lm"
+run_test_with_error_check "tests/oop/composition_test.lm"
 
 echo
 echo "=== CONCURRENCY TESTS ==="

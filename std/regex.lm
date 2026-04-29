@@ -1,0 +1,289 @@
+// Regular Expressions Module - Pattern matching and text processing
+
+import std.core as core;
+
+frame Regex {
+    var pattern: str;
+    var flags: int;  // Simple flag system: 1=case_insensitive, 2=multiline, 4=global
+
+    pub fn init(pattern: str): Regex {
+        return Regex(pattern=pattern, flags=0);
+    }
+
+    pub fn init_with_flags(pattern: str, flags: int): Regex {
+        return Regex(pattern=pattern, flags=flags);
+    }
+
+    // Basic pattern matching
+    pub fn matches(text: str): bool {
+        return self.find_first_match(text) != nil;
+    }
+
+    pub fn find_first_match(text: str): core.ResultStr {
+        // Simple regex engine implementation - stub for basic patterns
+        if (self.pattern == "" or text == "") {
+            return core.err_str("empty pattern or text");
+        }
+
+        var match = self.simple_match(text, 0);
+        if (match == nil) {
+            return core.err_str("no match found");
+        }
+
+        return core.ok_str(match);
+    }
+
+    pub fn find_all_matches(text: str): [str] {
+        var matches: [str] = [];
+        var start_pos: int = 0;
+        var i: int = 0;
+
+        while (start_pos < text.length) {
+            var match = self.simple_match(text, start_pos);
+            if (match == nil) break;
+            
+            matches[i] = match;
+            start_pos = start_pos + match.length + 1;
+            i = i + 1;
+        }
+
+        return matches;
+    }
+
+    // Replacement operations
+    pub fn replace(text: str, replacement: str): str {
+        var result = "";
+        var start_pos: int = 0;
+        var replaced = false;
+
+        while (start_pos < text.length) {
+            var match = self.simple_match(text, start_pos);
+            if (match == nil) {
+                result = result + text.substring(start_pos, text.length);
+                break;
+            }
+
+            // Add text before match
+            var match_start = self.find_match_start(text, start_pos);
+            if (match_start == nil) break;
+
+            result = result + text.substring(start_pos, match_start);
+            result = result + replacement;
+            
+            start_pos = match_start + match.length;
+            replaced = true;
+
+            // If not global flag, stop after first replacement
+            if ((self.flags & 4) == 0) {
+                result = result + text.substring(start_pos, text.length);
+                break;
+            }
+        }
+
+        return result;
+    }
+
+    pub fn replace_all(text: str, replacement: str): str {
+        var regex_with_global = Regex(pattern=self.pattern, flags=self.flags | 4);
+        return regex_with_global.replace(text, replacement);
+    }
+
+    // Splitting operations
+    pub fn split(text: str): [str] {
+        var parts: [str] = [];
+        var start_pos: int = 0;
+        var i: int = 0;
+
+        while (start_pos <= text.length) {
+            var match = self.simple_match(text, start_pos);
+            if (match == nil) {
+                parts[i] = text.substring(start_pos, text.length);
+                break;
+            }
+
+            var match_start = self.find_match_start(text, start_pos);
+            if (match_start == nil) break;
+
+            parts[i] = text.substring(start_pos, match_start);
+            start_pos = match_start + match.length;
+            i = i + 1;
+        }
+
+        return parts;
+    }
+
+    // Utility methods
+    pub fn is_valid(): bool {
+        return self.pattern != "" and self.is_balanced_pattern();
+    }
+
+    pub fn to_string(): str {
+        var flag_str = "";
+        if (self.flags & 1 != 0) flag_str = flag_str + "i";
+        if (self.flags & 2 != 0) flag_str = flag_str + "m";
+        if (self.flags & 4 != 0) flag_str = flag_str + "g";
+        
+        return "/" + self.pattern + "/" + flag_str;
+    }
+
+    // Private helper methods
+    private fn simple_match(text: str, start_pos: int): str? {
+        // Very basic pattern matching - handles literal strings and simple wildcards
+        if (self.pattern == "*") {
+            return text.substring(start_pos, start_pos + 1) if start_pos < text.length else nil;
+        }
+
+        if (self.pattern == ".*") {
+            // Match any sequence
+            return text.substring(start_pos, text.length) if start_pos < text.length else nil;
+        }
+
+        // Literal string matching
+        var pattern_to_use = self.pattern;
+        if (self.flags & 1 != 0) {  // case insensitive
+            pattern_to_use = pattern_to_use.to_lower();
+        }
+
+        var text_to_search = text;
+        if (self.flags & 1 != 0) {  // case insensitive
+            text_to_search = text_to_search.to_lower();
+        }
+
+        var pos = text_to_search.index_of(pattern_to_use, start_pos);
+        if (pos != nil and pos >= start_pos) {
+            return text.substring(pos, pos + pattern_to_use.length);
+        }
+
+        return nil;
+    }
+
+    private fn find_match_start(text: str, start_pos: int): int? {
+        var match = self.simple_match(text, start_pos);
+        if (match == nil) return nil;
+
+        var pattern_to_use = self.pattern;
+        if (self.flags & 1 != 0) {  // case insensitive
+            pattern_to_use = pattern_to_use.to_lower();
+        }
+
+        var text_to_search = text;
+        if (self.flags & 1 != 0) {  // case insensitive
+            text_to_search = text_to_search.to_lower();
+        }
+
+        return text_to_search.index_of(pattern_to_use, start_pos);
+    }
+
+    private fn is_balanced_pattern(): bool {
+        var open_parens: int = 0;
+        var open_brackets: int = 0;
+        var open_braces: int = 0;
+        var i: int = 0;
+
+        while (i < self.pattern.length) {
+            var ch = self.pattern[i];
+            
+            if (ch == "(") open_parens = open_parens + 1;
+            else if (ch == ")") open_parens = open_parens - 1;
+            else if (ch == "[") open_brackets = open_brackets + 1;
+            else if (ch == "]") open_brackets = open_brackets - 1;
+            else if (ch == "{") open_braces = open_braces + 1;
+            else if (ch == "}") open_braces = open_braces - 1;
+
+            i = i + 1;
+        }
+
+        return open_parens == 0 and open_brackets == 0 and open_braces == 0;
+    }
+}
+
+// Predefined common patterns
+frame RegexPatterns {
+    
+    pub fn email(): Regex {
+        return Regex.init("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}");
+    }
+
+    pub fn url(): Regex {
+        return Regex.init("https?://[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}(/[^\\s]*)?");
+    }
+
+    pub fn phone(): Regex {
+        return Regex.init("\\(?([0-9]{3})\\)?[-.\\s]?([0-9]{3})[-.\\s]?([0-9]{4})");
+    }
+
+    pub fn ipv4(): Regex {
+        return Regex.init("([0-9]{1,3}\\.){3}[0-9]{1,3}");
+    }
+
+    pub fn uuid(): Regex {
+        return Regex.init("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+    }
+
+    pub fn date(): Regex {
+        return Regex.init("\\d{4}-\\d{2}-\\d{2}");
+    }
+
+    pub fn time(): Regex {
+        return Regex.init("\\d{2}:\\d{2}:\\d{2}");
+    }
+
+    pub fn whitespace(): Regex {
+        return Regex.init("\\s+");
+    }
+
+    pub fn word(): Regex {
+        return Regex.init("\\b\\w+\\b");
+    }
+
+    pub fn number(): Regex {
+        return Regex.init("-?\\d+(\\.\\d+)?");
+    }
+
+    pub fn alphanumeric(): Regex {
+        return Regex.init("[a-zA-Z0-9]+");
+    }
+}
+
+// Utility functions
+fn regex(pattern: str): Regex {
+    return Regex.init(pattern);
+}
+
+fn regex_case_insensitive(pattern: str): Regex {
+    return Regex.init_with_flags(pattern, 1);
+}
+
+fn regex_global(pattern: str): Regex {
+    return Regex.init_with_flags(pattern, 4);
+}
+
+fn is_match(pattern: str, text: str): bool {
+    var regex = Regex.init(pattern);
+    return regex.matches(text);
+}
+
+fn replace_regex(pattern: str, text: str, replacement: str): str {
+    var regex = Regex.init(pattern);
+    return regex.replace(text, replacement);
+}
+
+fn split_regex(pattern: str, text: str): [str] {
+    var regex = Regex.init(pattern);
+    return regex.split(text);
+}
+
+fn extract_emails(text: str): [str] {
+    var email_regex = RegexPatterns.email();
+    return email_regex.find_all_matches(text);
+}
+
+fn extract_urls(text: str): [str] {
+    var url_regex = RegexPatterns.url();
+    return url_regex.find_all_matches(text);
+}
+
+fn extract_numbers(text: str): [str] {
+    var number_regex = RegexPatterns.number();
+    return number_regex.find_all_matches(text);
+}

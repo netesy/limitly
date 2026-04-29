@@ -10,7 +10,7 @@
 
 *Clarity is king; code is read more often than it is written.*
 
-*The absence of a value is an error condition to be handled, not a `null` to be feared.*
+*The absence of a value is a state to be handled explicitly, not a source of crashes.*
 
 *If the implementation is hard to explain, it's a bad idea.*
 
@@ -33,3 +33,13 @@
 *Now is better than never.*
 
 *Although never is often better than *right* now.*
+
+---
+
+## Philosophy Mapping
+
+- **Explicit vs Implicit**: Enforced by `TypeChecker`.
+- **Errors as Values**: Implemented via the `Type?` system and `std/core.lm`.
+- **Structured Concurrency**: Enforced by `parallel` and `concurrent` scope-bound blocks.
+- **Safety**: Managed by the region-based deterministic memory model.
+- **Modules**: Implemented in `src/frontend/module_manager.cpp`.

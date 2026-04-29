@@ -2425,11 +2425,29 @@ TypePtr TypeChecker::check_grouping_expr(std::shared_ptr<LM::Frontend::AST::Grou
 
 TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::MemberExpr> expr) {
     if (!expr) return nullptr;
-    
     TypePtr object_type = check_expression(expr->object);
     std::string member_name = expr->name;
     
-    // Handle channel method access
+    // Check for module alias access
+    if (object_type && object_type->tag == TypeTag::Frame) {
+        auto* fData = std::get_if<FrameType>(&object_type->extra);
+        if (fData && import_aliases.count(fData->name)) {
+            std::string alias = fData->name;
+            auto find_member = [&](const std::string& qname) -> TypePtr {
+                if (variable_types.count(qname)) return variable_types[qname];
+                std::string q_low = qname; for(char& c : q_low) c = std::tolower(c);
+                for (const auto& kv : variable_types) {
+                    std::string k_low = kv.first; for(char& c : k_low) c = std::tolower(c);
+                    if (k_low == q_low) return kv.second;
+                }
+                return nullptr;
+            };
+            TypePtr res = find_member(alias + "." + member_name);
+            if (!res) res = find_member(member_name);
+            if (!res) for (const auto& kv : variable_types) if (kv.first.ends_with("." + member_name)) { res = kv.second; break; }
+            if (res) { expr->inferred_type = res; return res; }
+        }
+    }
     if (object_type && object_type->tag == TypeTag::Channel) {
         std::string method_name = expr->name;
         
@@ -3107,22 +3125,52 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
 
 bool TypeChecker::is_type_compatible(TypePtr expected, TypePtr actual) {
     if (!expected || !actual) return false;
+    if (expected->tag == TypeTag::Any || actual->tag == TypeTag::Any) return true;
+    if (is_numeric_type(expected) && is_numeric_type(actual)) return true;
 
-    // Handle refinement types
+    auto get_base = [](const std::string& s) {
+        size_t dot = s.find_last_of(".");
+        return (dot != std::string::npos) ? s.substr(dot+1) : s;
+    };
+
+    if (actual->tag == TypeTag::Frame && expected->tag == TypeTag::Trait) {
+        auto* fData = std::get_if<FrameType>(&actual->extra);
+        auto* tData = std::get_if<TraitType>(&expected->extra);
+        if (fData && tData) {
+            auto check_methods = [&](const std::string& target_frame, const std::string& target_trait) {
+                auto fit = frame_declarations.find(target_frame);
+                if (fit == frame_declarations.end()) {
+                    for(auto const& [k,v] : frame_declarations) if(get_base(k) == get_base(target_frame)){fit=frame_declarations.find(k); break;}
+                }
+                auto tit = trait_declarations.find(target_trait);
+                if (tit == trait_declarations.end()) {
+                    for(auto const& [k,v] : trait_declarations) if(get_base(k) == get_base(target_trait)){tit=trait_declarations.find(k); break;}
+                }
+                if (fit != frame_declarations.end() && tit != trait_declarations.end()) {
+                    for (const auto& imp : fit->second.declaration->implements) if (get_base(imp) == get_base(target_trait)) return true;
+                    for (const auto& tm : tit->second.declaration->methods) {
+                        bool found = false;
+                        for (const auto& fm : fit->second.declaration->methods) if (fm->name == tm->name) { found = true; break; }
+                        if (!found) return false;
+                    }
+                    return true;
+                }
+                return false;
+            };
+            if (check_methods(fData->name, tData->name)) return true;
+        }
+    }
+    if (actual->tag == TypeTag::Trait && expected->tag == TypeTag::Trait) {
+        auto* aData = std::get_if<TraitType>(&actual->extra);
+        auto* eData = std::get_if<TraitType>(&expected->extra);
+        if (aData && eData && get_base(aData->name) == get_base(eData->name)) return true;
+    }
     if (expected->tag == TypeTag::Refined) {
-        if (const auto* refined = std::get_if<RefinedType>(&expected->extra)) {
-            // A refined type is compatible if the base types are compatible
-            // In a full implementation, we'd also need to check the condition.
-            return is_type_compatible(refined->baseType, actual);
-        }
+        if (const auto* refined = std::get_if<RefinedType>(&expected->extra)) return is_type_compatible(refined->baseType, actual);
     }
-
     if (actual->tag == TypeTag::Refined) {
-        if (const auto* refined = std::get_if<RefinedType>(&actual->extra)) {
-            return is_type_compatible(expected, refined->baseType);
-        }
+        if (const auto* refined = std::get_if<RefinedType>(&actual->extra)) return is_type_compatible(expected, refined->baseType);
     }
-
     return type_system.isCompatible(actual, expected);
 }
 
@@ -4559,56 +4607,57 @@ static std::set<std::string> collect_all_dependencies(
 
 TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::ImportStatement> import_stmt) {
     if (!import_stmt) return nullptr;
-
     auto& manager = ModuleManager::getInstance();
     auto module = manager.load_module(import_stmt->modulePath);
     if (!module) {
         add_error("Failed to load module: " + import_stmt->modulePath, import_stmt->line);
         return nullptr;
     }
-
     auto symbols_to_import = manager.filter_symbols(module, import_stmt->filter);
-    
-    // Alias management
     std::string alias = import_stmt->alias ? import_stmt->alias.value() : "";
     if (alias.empty()) {
-        // If no alias, use the last part of the module path
         size_t last_dot = import_stmt->modulePath.find_last_of('.');
-        if (last_dot != std::string::npos) {
-            alias = import_stmt->modulePath.substr(last_dot + 1);
-        } else {
-            alias = import_stmt->modulePath;
-        }
+        alias = (last_dot != std::string::npos) ? import_stmt->modulePath.substr(last_dot + 1) : import_stmt->modulePath;
     }
     import_aliases[alias] = import_stmt->modulePath;
-
-    // Register the alias as a "variable" that points to a dummy frame
-    // This allows the TypeChecker to resolve 'math' in 'math.add'
-    TypeSystem::FrameInfo dummy_info;
-    dummy_info.name = alias;
-    type_system.registerFrame(alias, dummy_info);
+    FrameInfo alias_info; alias_info.name = alias;
+    frame_declarations[alias] = alias_info;
     declare_variable(alias, type_system.createFrameType(alias));
-
-    // Also add to frame_declarations so check_member_expr doesn't complain
-    FrameInfo info;
-    info.name = alias;
-    frame_declarations[alias] = info;
-    
-    // Inline symbols into the current program's imported_symbols map
     for (const auto& stmt : module->ast->statements) {
         std::string name;
-        if (auto func = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) name = func->name;
-        else if (auto frame = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) name = frame->name;
-        else if (auto var = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) name = var->name;
-
-        if (!name.empty() && symbols_to_import.count(name)) {
-            std::string qualified_name = alias + "." + name;
-            current_program_->imported_symbols[qualified_name] = stmt;
-            // Also allow direct name if it doesn't conflict?
-            // For now, only qualified names via alias are supported.
+        if (auto f = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) name = f->name;
+        else if (auto fr = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) name = fr->name;
+        else if (auto v = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) name = v->name;
+        else if (auto t = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) name = t->name;
+        if (!name.empty()) {
+            std::vector<std::string> target_names;
+            if (symbols_to_import.count(name)) {
+                target_names.push_back(alias + "." + name);
+                target_names.push_back(name);
+            }
+            for (const auto& qname : target_names) {
+                current_program_->imported_symbols[qname] = stmt;
+                if (auto f = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
+                    FunctionSignature sig; sig.name = qname; sig.declaration = f;
+                    sig.return_type = f->returnType ? resolve_type_annotation(f->returnType.value()) : type_system.NIL_TYPE;
+                    for (const auto& p : f->params) sig.param_types.push_back(p.second ? resolve_type_annotation(p.second) : type_system.ANY_TYPE);
+                    function_signatures[qname] = sig;
+                    declare_variable(qname, type_system.createFunctionType({}, sig.param_types, sig.return_type));
+                } else if (auto v = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
+                    declare_variable(qname, v->type ? resolve_type_annotation(v->type.value()) : type_system.ANY_TYPE);
+                } else if (auto fr = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
+                    FrameInfo fi; fi.name = qname; fi.declaration = fr;
+                    frame_declarations[qname] = fi;
+                    declare_variable(qname, type_system.createFrameType(qname));
+                } else if (auto tr = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
+                    TraitInfo ti; ti.name = qname; ti.declaration = tr; ti.extends = tr->extends;
+                    trait_declarations[qname] = ti;
+                    TraitType tt; tt.name = qname;
+                    type_system.addUserDefinedType(qname, std::make_shared<::Type>(TypeTag::Trait, tt));
+                }
+            }
         }
     }
-    
     return type_system.NIL_TYPE;
 }
 

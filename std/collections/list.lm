@@ -1,0 +1,299 @@
+// List Frame - Enhanced dynamic array implementation
+
+import std.core as core;
+
+frame List {
+    var data: [int];
+
+    pub fn init(): List {
+        return List(data=[]);
+    }
+
+    pub fn from_array(arr: [int]): List {
+        return List(data=arr);
+    }
+
+    // Basic operations
+    pub fn push(value: int): List {
+        var out: [int] = [];
+        var i: int = 0;
+        while (i < self.data.length) {
+            out[i] = self.data[i];
+            i = i + 1;
+        }
+        out[self.data.length] = value;
+        return List(data=out);
+    }
+
+    pub fn pop(): int? {
+        if (self.data.length == 0) return nil;
+        return self.data[self.data.length - 1];
+    }
+
+    pub fn get(index: int): int? {
+        if (index < 0 or index >= self.data.length) return nil;
+        return self.data[index];
+    }
+
+    pub fn set(index: int, value: int): List {
+        var out: [int] = [];
+        var i: int = 0;
+        while (i < self.data.length) {
+            out[i] = self.data[i];
+            i = i + 1;
+        }
+        if (index >= 0 and index < out.length) {
+            out[index] = value;
+        }
+        return List(data=out);
+    }
+
+    pub fn length(): int { return self.data.length; }
+    pub fn is_empty(): bool { return self.data.length == 0; }
+    pub fn clear(): List { return List(data=[]); }
+
+    // Advanced operations
+    pub fn insert(index: int, value: int): List {
+        if (index < 0) index = 0;
+        if (index > self.data.length) index = self.data.length;
+        
+        var out: [int] = [];
+        var i: int = 0;
+        
+        // Copy elements before insertion point
+        while (i < index) {
+            out[i] = self.data[i];
+            i = i + 1;
+        }
+        
+        // Insert new element
+        out[i] = value;
+        i = i + 1;
+        
+        // Copy remaining elements
+        while (i < self.data.length + 1) {
+            out[i] = self.data[i - 1];
+            i = i + 1;
+        }
+        
+        return List(data=out);
+    }
+
+    pub fn remove(index: int): List {
+        if (index < 0 or index >= self.data.length) return self;
+        
+        var out: [int] = [];
+        var i: int = 0;
+        var j: int = 0;
+        
+        while (i < self.data.length) {
+            if (i != index) {
+                out[j] = self.data[i];
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        
+        return List(data=out);
+    }
+
+    pub fn remove_value(value: int): List {
+        var index = self.index_of(value);
+        if (index == nil) return self;
+        return self.remove(index);
+    }
+
+    pub fn index_of(value: int): int? {
+        var i: int = 0;
+        while (i < self.data.length) {
+            if (self.data[i] == value) return i;
+            i = i + 1;
+        }
+        return nil;
+    }
+
+    pub fn contains(value: int): bool {
+        return self.index_of(value) != nil;
+    }
+
+    pub fn first(): int? {
+        if (self.data.length == 0) return nil;
+        return self.data[0];
+    }
+
+    pub fn last(): int? {
+        if (self.data.length == 0) return nil;
+        return self.data[self.data.length - 1];
+    }
+
+    pub fn slice(start: int, end: int): List {
+        if (start < 0) start = 0;
+        if (end > self.data.length) end = self.data.length;
+        if (start >= end) return List(data=[]);
+        
+        var out: [int] = [];
+        var i: int = start;
+        var j: int = 0;
+        
+        while (i < end) {
+            out[j] = self.data[i];
+            i = i + 1;
+            j = j + 1;
+        }
+        
+        return List(data=out);
+    }
+
+    pub fn reverse(): List {
+        var out: [int] = [];
+        var i: int = 0;
+        
+        while (i < self.data.length) {
+            out[i] = self.data[self.data.length - 1 - i];
+            i = i + 1;
+        }
+        
+        return List(data=out);
+    }
+
+    pub fn sort(): List {
+        var out: [int] = [];
+        var i: int = 0;
+        
+        // Copy array
+        while (i < self.data.length) {
+            out[i] = self.data[i];
+            i = i + 1;
+        }
+        
+        // Simple bubble sort
+        i = 0;
+        while (i < out.length - 1) {
+            var j: int = 0;
+            while (j < out.length - i - 1) {
+                if (out[j] > out[j + 1]) {
+                    var temp = out[j];
+                    out[j] = out[j + 1];
+                    out[j + 1] = temp;
+                }
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        
+        return List(data=out);
+    }
+
+    pub fn unique(): List {
+        var out: [int] = [];
+        var seen: {int: bool} = {};
+        var i: int = 0;
+        var j: int = 0;
+        
+        while (i < self.data.length) {
+            var value = self.data[i];
+            if (seen[value] == nil) {
+                out[j] = value;
+                seen[value] = true;
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        
+        return List(data=out);
+    }
+
+    // Functional operations
+    pub fn map(f: fn(int): int): List {
+        var out: [int] = [];
+        var i: int = 0;
+        while (i < self.data.length) {
+            out[i] = f(self.data[i]);
+            i = i + 1;
+        }
+        return List(data=out);
+    }
+
+    pub fn filter(f: fn(int): bool): List {
+        var out: [int] = [];
+        var i: int = 0;
+        var j: int = 0;
+        while (i < self.data.length) {
+            if (f(self.data[i])) {
+                out[j] = self.data[i];
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        return List(data=out);
+    }
+
+    pub fn fold(f: fn(int, int): int, initial: int): int {
+        var acc: int = initial;
+        var i: int = 0;
+        while (i < self.data.length) {
+            acc = f(acc, self.data[i]);
+            i = i + 1;
+        }
+        return acc;
+    }
+
+    pub fn for_each(f: fn(int): nil): nil {
+        var i: int = 0;
+        while (i < self.data.length) {
+            f(self.data[i]);
+            i = i + 1;
+        }
+    }
+
+    pub fn sum(): int {
+        return self.fold(fn(acc: int, x: int): int { return acc + x; }, 0);
+    }
+
+    pub fn product(): int {
+        return self.fold(fn(acc: int, x: int): int { return acc * x; }, 1);
+    }
+
+    pub fn min(): int? {
+        if (self.data.length == 0) return nil;
+        var min_val = self.data[0];
+        var i: int = 1;
+        while (i < self.data.length) {
+            if (self.data[i] < min_val) min_val = self.data[i];
+            i = i + 1;
+        }
+        return min_val;
+    }
+
+    pub fn max(): int? {
+        if (self.data.length == 0) return nil;
+        var max_val = self.data[0];
+        var i: int = 1;
+        while (i < self.data.length) {
+            if (self.data[i] > max_val) max_val = self.data[i];
+            i = i + 1;
+        }
+        return max_val;
+    }
+
+    pub fn to_string(): str {
+        var result = "[";
+        var i: int = 0;
+        while (i < self.data.length) {
+            if (i > 0) result = result + ", ";
+            result = result + self.data[i] as str;
+            i = i + 1;
+        }
+        result = result + "]";
+        return result;
+    }
+}
+
+// Utility functions
+fn list(): List {
+    return List.init();
+}
+
+fn list_from(arr: [int]): List {
+    return List.from_array(arr);
+}

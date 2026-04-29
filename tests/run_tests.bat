@@ -36,13 +36,14 @@ echo === LOOP TESTS ===
 call :run_test_with_error_check "tests\loops\for_loops.lm"
 call :run_test_with_error_check "tests\loops\iter_loops.lm"
 call :run_test_with_error_check "tests\loops\while_loops.lm"
+call :run_test_with_error_check "tests\loops\match.lm"
 
 echo.
 echo === FUNCTION TESTS ===
 call :run_test_with_error_check "tests\functions\basic.lm"
 call :run_test_with_error_check "tests\functions\advanced.lm"
 call :run_test_with_error_check  "tests\functions\closures.lm"
-call :run_test_allow_semantic_errors "tests\functions\first_class.lm"
+call :run_test_with_error_check "tests\functions\first_class.lm"
 
 echo.
 echo === TYPE TESTS ===

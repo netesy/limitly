@@ -1,8 +1,20 @@
-// Standard Library Collections Module
+// Standard Library Collections Module - Enhanced with HashMap, Set, Queue, Stack
 
+import std.core as core;
+
+// Enhanced List frame
 frame List {
     var data: [int];
 
+    pub fn init(): List {
+        return List(data=[]);
+    }
+
+    pub fn from_array(arr: [int]): List {
+        return List(data=arr);
+    }
+
+    // Basic operations
     pub fn push(value: int): List {
         var out: [int] = [];
         var i: int = 0;
@@ -41,6 +53,158 @@ frame List {
     pub fn is_empty(): bool { return self.data.length == 0; }
     pub fn clear(): List { return List(data=[]); }
 
+    // Advanced operations
+    pub fn insert(index: int, value: int): List {
+        if (index < 0) index = 0;
+        if (index > self.data.length) index = self.data.length;
+        
+        var out: [int] = [];
+        var i: int = 0;
+        
+        // Copy elements before insertion point
+        while (i < index) {
+            out[i] = self.data[i];
+            i = i + 1;
+        }
+        
+        // Insert new element
+        out[i] = value;
+        i = i + 1;
+        
+        // Copy remaining elements
+        while (i < self.data.length + 1) {
+            out[i] = self.data[i - 1];
+            i = i + 1;
+        }
+        
+        return List(data=out);
+    }
+
+    pub fn remove(index: int): List {
+        if (index < 0 or index >= self.data.length) return self;
+        
+        var out: [int] = [];
+        var i: int = 0;
+        var j: int = 0;
+        
+        while (i < self.data.length) {
+            if (i != index) {
+                out[j] = self.data[i];
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        
+        return List(data=out);
+    }
+
+    pub fn remove_value(value: int): List {
+        var index = self.index_of(value);
+        if (index == nil) return self;
+        return self.remove(index);
+    }
+
+    pub fn index_of(value: int): int? {
+        var i: int = 0;
+        while (i < self.data.length) {
+            if (self.data[i] == value) return i;
+            i = i + 1;
+        }
+        return nil;
+    }
+
+    pub fn contains(value: int): bool {
+        return self.index_of(value) != nil;
+    }
+
+    pub fn first(): int? {
+        if (self.data.length == 0) return nil;
+        return self.data[0];
+    }
+
+    pub fn last(): int? {
+        if (self.data.length == 0) return nil;
+        return self.data[self.data.length - 1];
+    }
+
+    pub fn slice(start: int, end: int): List {
+        if (start < 0) start = 0;
+        if (end > self.data.length) end = self.data.length;
+        if (start >= end) return List(data=[]);
+        
+        var out: [int] = [];
+        var i: int = start;
+        var j: int = 0;
+        
+        while (i < end) {
+            out[j] = self.data[i];
+            i = i + 1;
+            j = j + 1;
+        }
+        
+        return List(data=out);
+    }
+
+    pub fn reverse(): List {
+        var out: [int] = [];
+        var i: int = 0;
+        
+        while (i < self.data.length) {
+            out[i] = self.data[self.data.length - 1 - i];
+            i = i + 1;
+        }
+        
+        return List(data=out);
+    }
+
+    pub fn sort(): List {
+        var out: [int] = [];
+        var i: int = 0;
+        
+        // Copy array
+        while (i < self.data.length) {
+            out[i] = self.data[i];
+            i = i + 1;
+        }
+        
+        // Simple bubble sort
+        i = 0;
+        while (i < out.length - 1) {
+            var j: int = 0;
+            while (j < out.length - i - 1) {
+                if (out[j] > out[j + 1]) {
+                    var temp = out[j];
+                    out[j] = out[j + 1];
+                    out[j + 1] = temp;
+                }
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        
+        return List(data=out);
+    }
+
+    pub fn unique(): List {
+        var out: [int] = [];
+        var seen: {int: bool} = {};
+        var i: int = 0;
+        var j: int = 0;
+        
+        while (i < self.data.length) {
+            var value = self.data[i];
+            if (seen[value] == nil) {
+                out[j] = value;
+                seen[value] = true;
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        
+        return List(data=out);
+    }
+
+    // Functional operations
     pub fn map(f: fn(int): int): List {
         var out: [int] = [];
         var i: int = 0;
@@ -53,8 +217,8 @@ frame List {
 
     pub fn filter(f: fn(int): bool): List {
         var out: [int] = [];
-        var j: int = 0;
         var i: int = 0;
+        var j: int = 0;
         while (i < self.data.length) {
             if (f(self.data[i])) {
                 out[j] = self.data[i];
@@ -75,7 +239,612 @@ frame List {
         return acc;
     }
 
-    pub fn find(f: fn(int): bool): int? {
+    pub fn for_each(f: fn(int): nil): nil {
+        var i: int = 0;
+        while (i < self.data.length) {
+            f(self.data[i]);
+            i = i + 1;
+        }
+    }
+
+    pub fn sum(): int {
+        return self.fold(fn(acc: int, x: int): int { return acc + x; }, 0);
+    }
+
+    pub fn product(): int {
+        return self.fold(fn(acc: int, x: int): int { return acc * x; }, 1);
+    }
+
+    pub fn min(): int? {
+        if (self.data.length == 0) return nil;
+        var min_val = self.data[0];
+        var i: int = 1;
+        while (i < self.data.length) {
+            if (self.data[i] < min_val) min_val = self.data[i];
+            i = i + 1;
+        }
+        return min_val;
+    }
+
+    pub fn max(): int? {
+        if (self.data.length == 0) return nil;
+        var max_val = self.data[0];
+        var i: int = 1;
+        while (i < self.data.length) {
+            if (self.data[i] > max_val) max_val = self.data[i];
+            i = i + 1;
+        }
+        return max_val;
+    }
+
+    pub fn to_string(): str {
+        var result = "[";
+        var i: int = 0;
+        while (i < self.data.length) {
+            if (i > 0) result = result + ", ";
+            result = result + self.data[i] as str;
+            i = i + 1;
+        }
+        result = result + "]";
+        return result;
+    }
+}
+
+// HashMap frame for key-value storage
+frame HashMap {
+    var keys: [str];
+    var values: [int];
+
+    pub fn init(): HashMap {
+        return HashMap(keys=[], values=[]);
+    }
+
+    pub fn from_pairs(pairs: [(str, int)]): HashMap {
+        var keys: [str] = [];
+        var values: [int] = [];
+        var i: int = 0;
+        
+        while (i < pairs.length) {
+            var pair = pairs[i];
+            keys[i] = pair[0];
+            values[i] = pair[1];
+            i = i + 1;
+        }
+        
+        return HashMap(keys=keys, values=values);
+    }
+
+    // Basic operations
+    pub fn put(key: str, value: int): HashMap {
+        var index = self.find_key_index(key);
+        
+        if (index != nil) {
+            // Update existing key
+            var new_values: [int] = [];
+            var i: int = 0;
+            while (i < self.values.length) {
+                new_values[i] = if (i == index) then value else self.values[i];
+                i = i + 1;
+            }
+            return HashMap(keys=self.keys, values=new_values);
+        } else {
+            // Add new key-value pair
+            var new_keys: [str] = [];
+            var new_values: [int] = [];
+            var i: int = 0;
+            
+            while (i < self.keys.length) {
+                new_keys[i] = self.keys[i];
+                new_values[i] = self.values[i];
+                i = i + 1;
+            }
+            
+            new_keys[self.keys.length] = key;
+            new_values[self.values.length] = value;
+            
+            return HashMap(keys=new_keys, values=new_values);
+        }
+    }
+
+    pub fn get(key: str): int? {
+        var index = self.find_key_index(key);
+        if (index != nil) return self.values[index];
+        return nil;
+    }
+
+    pub fn remove(key: str): HashMap {
+        var index = self.find_key_index(key);
+        if (index == nil) return self;
+        
+        var new_keys: [str] = [];
+        var new_values: [int] = [];
+        var i: int = 0;
+        var j: int = 0;
+        
+        while (i < self.keys.length) {
+            if (i != index) {
+                new_keys[j] = self.keys[i];
+                new_values[j] = self.values[i];
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        
+        return HashMap(keys=new_keys, values=new_values);
+    }
+
+    pub fn contains_key(key: str): bool {
+        return self.find_key_index(key) != nil;
+    }
+
+    pub fn contains_value(value: int): bool {
+        var i: int = 0;
+        while (i < self.values.length) {
+            if (self.values[i] == value) return true;
+            i = i + 1;
+        }
+        return false;
+    }
+
+    pub fn size(): int {
+        return self.keys.length;
+    }
+
+    pub fn is_empty(): bool {
+        return self.keys.length == 0;
+    }
+
+    pub fn clear(): HashMap {
+        return HashMap(keys=[], values=[]);
+    }
+
+    // Collection operations
+    pub fn keys(): [str] {
+        return self.keys;
+    }
+
+    pub fn values(): [int] {
+        return self.values;
+    }
+
+    pub fn entries(): [(str, int)] {
+        var entries: [(str, int)] = [];
+        var i: int = 0;
+        
+        while (i < self.keys.length) {
+            entries[i] = (self.keys[i], self.values[i]);
+            i = i + 1;
+        }
+        
+        return entries;
+    }
+
+    // Functional operations
+    pub fn map_values(f: fn(int): int): HashMap {
+        var new_values: [int] = [];
+        var i: int = 0;
+        
+        while (i < self.values.length) {
+            new_values[i] = f(self.values[i]);
+            i = i + 1;
+        }
+        
+        return HashMap(keys=self.keys, values=new_values);
+    }
+
+    pub fn filter(predicate: fn(str, int): bool): HashMap {
+        var new_keys: [str] = [];
+        var new_values: [int] = [];
+        var i: int = 0;
+        var j: int = 0;
+        
+        while (i < self.keys.length) {
+            if (predicate(self.keys[i], self.values[i])) {
+                new_keys[j] = self.keys[i];
+                new_values[j] = self.values[i];
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        
+        return HashMap(keys=new_keys, values=new_values);
+    }
+
+    // Utility methods
+    private fn find_key_index(key: str): int? {
+        var i: int = 0;
+        while (i < self.keys.length) {
+            if (self.keys[i] == key) return i;
+            i = i + 1;
+        }
+        return nil;
+    }
+
+    pub fn to_string(): str {
+        var result = "{";
+        var i: int = 0;
+        
+        while (i < self.keys.length) {
+            if (i > 0) result = result + ", ";
+            result = result + self.keys[i] + ": " + self.values[i] as str;
+            i = i + 1;
+        }
+        
+        result = result + "}";
+        return result;
+    }
+}
+
+// Set frame for unique elements
+frame Set {
+    var elements: [int];
+
+    pub fn init(): Set {
+        return Set(elements=[]);
+    }
+
+    pub fn from_array(arr: [int]): Set {
+        var elements: [int] = [];
+        var seen: {int: bool} = {};
+        var i: int = 0;
+        var j: int = 0;
+        
+        while (i < arr.length) {
+            var value = arr[i];
+            if (seen[value] == nil) {
+                elements[j] = value;
+                seen[value] = true;
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        
+        return Set(elements=elements);
+    }
+
+    // Basic operations
+    pub fn add(value: int): Set {
+        if (self.contains(value)) return self;
+        
+        var new_elements: [int] = [];
+        var i: int = 0;
+        
+        while (i < self.elements.length) {
+            new_elements[i] = self.elements[i];
+            i = i + 1;
+        }
+        
+        new_elements[self.elements.length] = value;
+        return Set(elements=new_elements);
+    }
+
+    pub fn remove(value: int): Set {
+        var index = self.find_index(value);
+        if (index == nil) return self;
+        
+        var new_elements: [int] = [];
+        var i: int = 0;
+        var j: int = 0;
+        
+        while (i < self.elements.length) {
+            if (i != index) {
+                new_elements[j] = self.elements[i];
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        
+        return Set(elements=new_elements);
+    }
+
+    pub fn contains(value: int): bool {
+        return self.find_index(value) != nil;
+    }
+
+    pub fn size(): int {
+        return self.elements.length;
+    }
+
+    pub fn is_empty(): bool {
+        return self.elements.length == 0;
+    }
+
+    pub fn clear(): Set {
+        return Set(elements=[]);
+    }
+
+    // Set operations
+    pub fn union(other: Set): Set {
+        var combined = Set.from_array(self.elements);
+        var i: int = 0;
+        
+        while (i < other.elements.length) {
+            combined = combined.add(other.elements[i]);
+            i = i + 1;
+        }
+        
+        return combined;
+    }
+
+    pub fn intersection(other: Set): Set {
+        var result: [int] = [];
+        var i: int = 0;
+        var j: int = 0;
+        
+        while (i < self.elements.length) {
+            if (other.contains(self.elements[i])) {
+                result[j] = self.elements[i];
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        
+        return Set(elements=result);
+    }
+
+    pub fn difference(other: Set): Set {
+        var result: [int] = [];
+        var i: int = 0;
+        var j: int = 0;
+        
+        while (i < self.elements.length) {
+            if (!other.contains(self.elements[i])) {
+                result[j] = self.elements[i];
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        
+        return Set(elements=result);
+    }
+
+    pub fn is_subset(other: Set): bool {
+        var i: int = 0;
+        while (i < self.elements.length) {
+            if (!other.contains(self.elements[i])) return false;
+            i = i + 1;
+        }
+        return true;
+    }
+
+    pub fn is_superset(other: Set): bool {
+        return other.is_subset(self);
+    }
+
+    // Utility methods
+    private fn find_index(value: int): int? {
+        var i: int = 0;
+        while (i < self.elements.length) {
+            if (self.elements[i] == value) return i;
+            i = i + 1;
+        }
+        return nil;
+    }
+
+    pub fn to_array(): [int] {
+        return self.elements;
+    }
+
+    pub fn to_string(): str {
+        var result = "{";
+        var i: int = 0;
+        
+        while (i < self.elements.length) {
+            if (i > 0) result = result + ", ";
+            result = result + self.elements[i] as str;
+            i = i + 1;
+        }
+        
+        result = result + "}";
+        return result;
+    }
+}
+
+// Queue frame for FIFO operations
+frame Queue {
+    var data: [int];
+    var front: int;
+    var back: int;
+
+    pub fn init(): Queue {
+        return Queue(data=[], front=0, back=0);
+    }
+
+    pub fn from_array(arr: [int]): Queue {
+        return Queue(data=arr, front=0, back=arr.length);
+    }
+
+    // Queue operations
+    pub fn enqueue(value: int): Queue {
+        var new_data: [int] = [];
+        var i: int = 0;
+        
+        // Copy existing data
+        while (i < self.data.length) {
+            new_data[i] = self.data[i];
+            i = i + 1;
+        }
+        
+        // Add new element at back
+        new_data[self.back] = value;
+        
+        return Queue(data=new_data, front=self.front, back=self.back + 1);
+    }
+
+    pub fn dequeue(): int? {
+        if (self.front >= self.back) return nil;
+        
+        var value = self.data[self.front];
+        return Queue(data=self.data, front=self.front + 1, back=self.back);
+    }
+
+    pub fn peek(): int? {
+        if (self.front >= self.back) return nil;
+        return self.data[self.front];
+    }
+
+    pub fn size(): int {
+        return self.back - self.front;
+    }
+
+    pub fn is_empty(): bool {
+        return self.front >= self.back;
+    }
+
+    pub fn clear(): Queue {
+        return Queue(data=[], front=0, back=0);
+    }
+
+    pub fn to_array(): [int] {
+        var result: [int] = [];
+        var i: int = self.front;
+        var j: int = 0;
+        
+        while (i < self.back) {
+            result[j] = self.data[i];
+            i = i + 1;
+            j = j + 1;
+        }
+        
+        return result;
+    }
+
+    pub fn to_string(): str {
+        var result = "Queue[";
+        var i: int = self.front;
+        
+        while (i < self.back) {
+            if (i > self.front) result = result + ", ";
+            result = result + self.data[i] as str;
+            i = i + 1;
+        }
+        
+        result = result + "]";
+        return result;
+    }
+}
+
+// Stack frame for LIFO operations
+frame Stack {
+    var data: [int];
+
+    pub fn init(): Stack {
+        return Stack(data=[]);
+    }
+
+    pub fn from_array(arr: [int]): Stack {
+        return Stack(data=arr);
+    }
+
+    // Stack operations
+    pub fn push(value: int): Stack {
+        var new_data: [int] = [];
+        var i: int = 0;
+        
+        // Copy existing data
+        while (i < self.data.length) {
+            new_data[i] = self.data[i];
+            i = i + 1;
+        }
+        
+        // Add new element at top
+        new_data[self.data.length] = value;
+        
+        return Stack(data=new_data);
+    }
+
+    pub fn pop(): int? {
+        if (self.data.length == 0) return nil;
+        
+        var value = self.data[self.data.length - 1];
+        var new_data: [int] = [];
+        var i: int = 0;
+        
+        // Copy all except last element
+        while (i < self.data.length - 1) {
+            new_data[i] = self.data[i];
+            i = i + 1;
+        }
+        
+        return Stack(data=new_data);
+    }
+
+    pub fn peek(): int? {
+        if (self.data.length == 0) return nil;
+        return self.data[self.data.length - 1];
+    }
+
+    pub fn size(): int {
+        return self.data.length;
+    }
+
+    pub fn is_empty(): bool {
+        return self.data.length == 0;
+    }
+
+    pub fn clear(): Stack {
+        return Stack(data=[]);
+    }
+
+    pub fn to_array(): [int] {
+        return self.data;
+    }
+
+    pub fn to_string(): str {
+        var result = "Stack[";
+        var i: int = 0;
+        
+        while (i < self.data.length) {
+            if (i > 0) result = result + ", ";
+            result = result + self.data[i] as str;
+            i = i + 1;
+        }
+        
+        result = result + "]";
+        return result;
+    }
+}
+
+// Utility functions for all collection types
+fn list(): List {
+    return List.init();
+}
+
+fn list_from(arr: [int]): List {
+    return List.from_array(arr);
+}
+
+fn hashmap(): HashMap {
+    return HashMap.init();
+}
+
+fn hashmap_from(pairs: [(str, int)]): HashMap {
+    return HashMap.from_pairs(pairs);
+}
+
+fn set(): Set {
+    return Set.init();
+}
+
+fn set_from(arr: [int]): Set {
+    return Set.from_array(arr);
+}
+
+fn queue(): Queue {
+    return Queue.init();
+}
+
+fn queue_from(arr: [int]): Queue {
+    return Queue.from_array(arr);
+}
+
+fn stack(): Stack {
+    return Stack.init();
+}
+
+fn stack_from(arr: [int]): Stack {
+    return Stack.from_array(arr);
+}
         var i: int = 0;
         while (i < self.data.length) {
             if (f(self.data[i])) return self.data[i];
@@ -112,13 +881,11 @@ frame List {
     }
 }
 
-// Compatibility shims
-fn push(arr: [int], item: int): [int] { return List(data=arr).push(item).data; }
-fn pop(arr: [int]): int? { return List(data=arr).pop(); }
-fn get(arr: [int], index: int): int? { return List(data=arr).get(index); }
-fn length(arr: [int]): int { return List(data=arr).length(); }
-fn contains(arr: [int], item: int): bool { return List(data=arr).contains(item); }
-fn find(arr: [int], item: int): int? {
+// Frame-focused collections - use List frame directly
+// Example: List(data=[1,2,3]).push(4) instead of push([1,2,3], 4)
+
+// Pure utility functions that don't duplicate frame functionality
+fn find_index(arr: [int], item: int): int? {
     var i: int = 0;
     while (i < arr.length) {
         if (arr[i] == item) return i;
@@ -127,7 +894,8 @@ fn find(arr: [int], item: int): int? {
     return nil;
 }
 
-fn join(arr: [str], separator: str): str {
+// String-specific join utility (different from List operations)
+fn join_string_array(arr: [str], separator: str): str {
     if (arr.length == 0) return "";
     var out: str = arr[0];
     var i: int = 1;

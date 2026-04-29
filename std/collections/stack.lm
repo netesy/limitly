@@ -1,0 +1,341 @@
+// Stack Frame - LIFO (Last In, First Out) implementation
+
+import std.core as core;
+
+frame Stack {
+    var data: [int];
+
+    pub fn init(): Stack {
+        return Stack(data=[]);
+    }
+
+    pub fn from_array(arr: [int]): Stack {
+        return Stack(data=arr);
+    }
+
+    // Stack operations
+    pub fn push(value: int): Stack {
+        var new_data: [int] = [];
+        var i: int = 0;
+        
+        // Copy existing data
+        while (i < self.data.length) {
+            new_data[i] = self.data[i];
+            i = i + 1;
+        }
+        
+        // Add new element at top
+        new_data[self.data.length] = value;
+        
+        return Stack(data=new_data);
+    }
+
+    pub fn pop(): int? {
+        if (self.data.length == 0) return nil;
+        
+        var value = self.data[self.data.length - 1];
+        var new_data: [int] = [];
+        var i: int = 0;
+        
+        // Copy all except last element
+        while (i < self.data.length - 1) {
+            new_data[i] = self.data[i];
+            i = i + 1;
+        }
+        
+        return Stack(data=new_data);
+    }
+
+    pub fn peek(): int? {
+        if (self.data.length == 0) return nil;
+        return self.data[self.data.length - 1];
+    }
+
+    pub fn size(): int {
+        return self.data.length;
+    }
+
+    pub fn is_empty(): bool {
+        return self.data.length == 0;
+    }
+
+    pub fn clear(): Stack {
+        return Stack(data=[]);
+    }
+
+    // Advanced operations
+    pub fn peek_top(): int? {
+        return self.peek();
+    }
+
+    pub fn peek_bottom(): int? {
+        if (self.data.length == 0) return nil;
+        return self.data[0];
+    }
+
+    pub fn contains(value: int): bool {
+        var i: int = 0;
+        while (i < self.data.length) {
+            if (self.data[i] == value) return true;
+            i = i + 1;
+        }
+        return false;
+    }
+
+    pub fn index_of(value: int): int? {
+        var i: int = 0;
+        while (i < self.data.length) {
+            if (self.data[i] == value) return i;
+            i = i + 1;
+        }
+        return nil;
+    }
+
+    pub fn reverse(): Stack {
+        var reversed: [int] = [];
+        var i: int = 0;
+        
+        while (i < self.data.length) {
+            reversed[i] = self.data[self.data.length - 1 - i];
+            i = i + 1;
+        }
+        
+        return Stack(data=reversed);
+    }
+
+    pub fn copy(): Stack {
+        var new_data: [int] = [];
+        var i: int = 0;
+        
+        while (i < self.data.length) {
+            new_data[i] = self.data[i];
+            i = i + 1;
+        }
+        
+        return Stack(data=new_data);
+    }
+
+    pub fn slice(start: int, end: int): Stack {
+        if (start < 0) start = 0;
+        if (end > self.data.length) end = self.data.length;
+        if (start >= end) return Stack.init();
+        
+        var sliced_data: [int] = [];
+        var i: int = start;
+        var j: int = 0;
+        
+        while (i < end) {
+            sliced_data[j] = self.data[i];
+            i = i + 1;
+            j = j + 1;
+        }
+        
+        return Stack(data=sliced_data);
+    }
+
+    pub fn push_multiple(values: [int]): Stack {
+        var result = self;
+        var i: int = 0;
+        
+        while (i < values.length) {
+            result = result.push(values[i]);
+            i = i + 1;
+        }
+        
+        return result;
+    }
+
+    pub fn pop_multiple(count: int): ([int], Stack) {
+        if (count <= 0) return ([], self);
+        if (count > self.data.length) count = self.data.length;
+        
+        var popped: [int] = [];
+        var i: int = 0;
+        var remaining_stack = self;
+        
+        while (i < count) {
+            var top = remaining_stack.peek();
+            if (top != nil) {
+                popped[i] = top;
+                remaining_stack = remaining_stack.pop();
+            }
+            i = i + 1;
+        }
+        
+        return (popped, remaining_stack);
+    }
+
+    pub fn swap(): Stack {
+        if (self.data.length < 2) return self;
+        
+        var new_data: [int] = [];
+        var i: int = 0;
+        
+        // Copy all elements
+        while (i < self.data.length) {
+            new_data[i] = self.data[i];
+            i = i + 1;
+        }
+        
+        // Swap top two elements
+        var temp = new_data[self.data.length - 1];
+        new_data[self.data.length - 1] = new_data[self.data.length - 2];
+        new_data[self.data.length - 2] = temp;
+        
+        return Stack(data=new_data);
+    }
+
+    pub fn rotate(count: int): Stack {
+        if (self.data.length <= 1 or count == 0) return self;
+        
+        var new_data: [int] = [];
+        var i: int = 0;
+        
+        // Normalize count
+        while (count < 0) count = count + self.data.length;
+        count = count % self.data.length;
+        
+        // Copy elements with rotation
+        while (i < self.data.length) {
+            var new_index = (i + count) % self.data.length;
+            new_data[new_index] = self.data[i];
+            i = i + 1;
+        }
+        
+        return Stack(data=new_data);
+    }
+
+    // Functional operations
+    pub fn map(f: fn(int): int): Stack {
+        var new_data: [int] = [];
+        var i: int = 0;
+        
+        while (i < self.data.length) {
+            new_data[i] = f(self.data[i]);
+            i = i + 1;
+        }
+        
+        return Stack(data=new_data);
+    }
+
+    pub fn filter(predicate: fn(int): bool): Stack {
+        var filtered_data: [int] = [];
+        var i: int = 0;
+        var j: int = 0;
+        
+        while (i < self.data.length) {
+            if (predicate(self.data[i])) {
+                filtered_data[j] = self.data[i];
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        
+        return Stack(data=filtered_data);
+    }
+
+    pub fn fold(f: fn(int, int): int, initial: int): int {
+        var acc: int = initial;
+        var i: int = 0;
+        
+        while (i < self.data.length) {
+            acc = f(acc, self.data[i]);
+            i = i + 1;
+        }
+        
+        return acc;
+    }
+
+    pub fn for_each(action: fn(int): nil): nil {
+        var i: int = 0;
+        while (i < self.data.length) {
+            action(self.data[i]);
+            i = i + 1;
+        }
+    }
+
+    pub fn sum(): int {
+        return self.fold(fn(acc: int, x: int): int { return acc + x; }, 0);
+    }
+
+    pub fn product(): int {
+        return self.fold(fn(acc: int, x: int): int { return acc * x; }, 1);
+    }
+
+    pub fn min(): int? {
+        if (self.data.length == 0) return nil;
+        var min_val = self.data[0];
+        var i: int = 1;
+        while (i < self.data.length) {
+            if (self.data[i] < min_val) min_val = self.data[i];
+            i = i + 1;
+        }
+        return min_val;
+    }
+
+    pub fn max(): int? {
+        if (self.data.length == 0) return nil;
+        var max_val = self.data[0];
+        var i: int = 1;
+        while (i < self.data.length) {
+            if (self.data[i] > max_val) max_val = self.data[i];
+            i = i + 1;
+        }
+        return max_val;
+    }
+
+    pub fn sort(): Stack {
+        var sorted_data: [int] = [];
+        var i: int = 0;
+        
+        // Copy data
+        while (i < self.data.length) {
+            sorted_data[i] = self.data[i];
+            i = i + 1;
+        }
+        
+        // Simple bubble sort
+        i = 0;
+        while (i < sorted_data.length - 1) {
+            var j: int = 0;
+            while (j < sorted_data.length - i - 1) {
+                if (sorted_data[j] > sorted_data[j + 1]) {
+                    var temp = sorted_data[j];
+                    sorted_data[j] = sorted_data[j + 1];
+                    sorted_data[j + 1] = temp;
+                }
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        
+        return Stack(data=sorted_data);
+    }
+
+    pub fn to_array(): [int] {
+        return self.data;
+    }
+
+    pub fn to_string(): str {
+        var result = "Stack[";
+        var i: int = 0;
+        
+        while (i < self.data.length) {
+            if (i > 0) result = result + ", ";
+            result = result + self.data[i] as str;
+            i = i + 1;
+        }
+        
+        result = result + "]";
+        return result;
+    }
+}
+
+// Utility functions
+fn stack(): Stack {
+    return Stack.init();
+}
+
+fn stack_from(arr: [int]): Stack {
+    return Stack.from_array(arr);
+}

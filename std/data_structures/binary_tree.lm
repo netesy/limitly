@@ -1,0 +1,378 @@
+// Binary Tree Frame - Binary search tree implementation
+
+import std.core as core;
+
+frame BinaryTree {
+    var value: int;
+    var left: BinaryTree?;
+    var right: BinaryTree?;
+
+    pub fn init(value: int): BinaryTree {
+        return BinaryTree(value=value, left=nil, right=nil);
+    }
+
+    pub fn insert(value: int): BinaryTree {
+        if (value == self.value) return self;
+        
+        if (value < self.value) {
+            if (self.left == nil) {
+                return BinaryTree(value=self.value, left=BinaryTree.init(value), right=self.right);
+            } else {
+                return BinaryTree(value=self.value, left=self.left.insert(value), right=self.right);
+            }
+        } else {
+            if (self.right == nil) {
+                return BinaryTree(value=self.value, left=self.left, right=BinaryTree.init(value));
+            } else {
+                return BinaryTree(value=self.value, left=self.left, right=self.right.insert(value));
+            }
+        }
+    }
+
+    pub fn contains(value: int): bool {
+        if (value == self.value) return true;
+        
+        if (value < self.value and self.left != nil) {
+            return self.left.contains(value);
+        } else if (value > self.value and self.right != nil) {
+            return self.right.contains(value);
+        }
+        
+        return false;
+    }
+
+    pub fn remove(value: int): BinaryTree? {
+        if (value < self.value and self.left != nil) {
+            var new_left = self.left.remove(value);
+            if (new_left != nil) {
+                return BinaryTree(value=self.value, left=new_left, right=self.right);
+            }
+            return self;
+        } else if (value > self.value and self.right != nil) {
+            var new_right = self.right.remove(value);
+            if (new_right != nil) {
+                return BinaryTree(value=self.value, left=self.left, right=new_right);
+            }
+            return self;
+        } else if (value == self.value) {
+            // Node to remove found
+            if (self.left == nil and self.right == nil) {
+                return nil;
+            } else if (self.left == nil) {
+                return self.right;
+            } else if (self.right == nil) {
+                return self.left;
+            } else {
+                // Node has two children - find successor
+                var successor = self.right.find_min();
+                var new_right = self.right.remove(successor);
+                return BinaryTree(value=successor, left=self.left, right=new_right);
+            }
+        }
+        
+        return self;
+    }
+
+    pub fn find_min(): int {
+        if (self.left == nil) return self.value;
+        return self.left.find_min();
+    }
+
+    pub fn find_max(): int {
+        if (self.right == nil) return self.value;
+        return self.right.find_max();
+    }
+
+    pub fn find(value: int): BinaryTree? {
+        if (value == self.value) return self;
+        
+        if (value < self.value and self.left != nil) {
+            return self.left.find(value);
+        } else if (value > self.value and self.right != nil) {
+            return self.right.find(value);
+        }
+        
+        return nil;
+    }
+
+    pub fn inorder(): [int] {
+        var result: [int] = [];
+        
+        if (self.left != nil) {
+            var left_result = self.left.inorder();
+            var i: int = 0;
+            while (i < left_result.length) {
+                result[result.length] = left_result[i];
+                i = i + 1;
+            }
+        }
+        
+        result[result.length] = self.value;
+        
+        if (self.right != nil) {
+            var right_result = self.right.inorder();
+            var i: int = 0;
+            while (i < right_result.length) {
+                result[result.length] = right_result[i];
+                i = i + 1;
+            }
+        }
+        
+        return result;
+    }
+
+    pub fn preorder(): [int] {
+        var result: [int] = [];
+        result[0] = self.value;
+        
+        if (self.left != nil) {
+            var left_result = self.left.preorder();
+            var i: int = 0;
+            while (i < left_result.length) {
+                result[result.length] = left_result[i];
+                i = i + 1;
+            }
+        }
+        
+        if (self.right != nil) {
+            var right_result = self.right.preorder();
+            var i: int = 0;
+            while (i < right_result.length) {
+                result[result.length] = right_result[i];
+                i = i + 1;
+            }
+        }
+        
+        return result;
+    }
+
+    pub fn postorder(): [int] {
+        var result: [int] = [];
+        
+        if (self.left != nil) {
+            var left_result = self.left.postorder();
+            var i: int = 0;
+            while (i < left_result.length) {
+                result[result.length] = left_result[i];
+                i = i + 1;
+            }
+        }
+        
+        if (self.right != nil) {
+            var right_result = self.right.postorder();
+            var i: int = 0;
+            while (i < right_result.length) {
+                result[result.length] = right_result[i];
+                i = i + 1;
+            }
+        }
+        
+        result[result.length] = self.value;
+        
+        return result;
+    }
+
+    pub fn level_order(): [int] {
+        var result: [int] = [];
+        var queue: [(BinaryTree?, int)] = [(self, 0)];
+        var queue_front = 0;
+        
+        while (queue_front < queue.length) {
+            var current = queue[queue_front];
+            queue_front = queue_front + 1;
+            
+            if (current[0] != nil) {
+                result[result.length] = current[0].value;
+                queue[queue.length] = (current[0].left, current[1] + 1);
+                queue[queue.length] = (current[0].right, current[1] + 1);
+            }
+        }
+        
+        return result;
+    }
+
+    pub fn height(): int {
+        var left_height = 0;
+        var right_height = 0;
+        
+        if (self.left != nil) left_height = self.left.height();
+        if (self.right != nil) right_height = self.right.height();
+        
+        return 1 + (left_height if left_height > right_height else right_height);
+    }
+
+    pub fn size(): int {
+        var count = 1;
+        if (self.left != nil) count = count + self.left.size();
+        if (self.right != nil) count = count + self.right.size();
+        return count;
+    }
+
+    pub fn is_balanced(): bool {
+        var left_height = 0;
+        var right_height = 0;
+        var left_balanced = true;
+        var right_balanced = true;
+        
+        if (self.left != nil) {
+            left_height = self.left.height();
+            left_balanced = self.left.is_balanced();
+        }
+        
+        if (self.right != nil) {
+            right_height = self.right.height();
+            right_balanced = self.right.is_balanced();
+        }
+        
+        var height_diff = left_height - right_height;
+        if (height_diff < 0) height_diff = -height_diff;
+        
+        return left_balanced and right_balanced and height_diff <= 1;
+    }
+
+    pub fn is_bst(): bool {
+        var left_valid = true;
+        var right_valid = true;
+        
+        if (self.left != nil) {
+            left_valid = self.left.is_bst() and self.left.max() < self.value;
+        }
+        
+        if (self.right != nil) {
+            right_valid = self.right.is_bst() and self.right.min() > self.value;
+        }
+        
+        return left_valid and right_valid;
+    }
+
+    pub fn depth(value: int): int {
+        if (value == self.value) return 0;
+        
+        if (value < self.value and self.left != nil) {
+            var left_depth = self.left.depth(value);
+            return left_depth + 1 if left_depth != -1 else -1;
+        } else if (value > self.value and self.right != nil) {
+            var right_depth = self.right.depth(value);
+            return right_depth + 1 if right_depth != -1 else -1;
+        }
+        
+        return -1;
+    }
+
+    pub fn count_leaves(): int {
+        if (self.left == nil and self.right == nil) return 1;
+        
+        var leaves = 0;
+        if (self.left != nil) leaves = leaves + self.left.count_leaves();
+        if (self.right != nil) leaves = leaves + self.right.count_leaves();
+        
+        return leaves;
+    }
+
+    pub fn count_internal_nodes(): int {
+        if (self.left == nil and self.right == nil) return 0;
+        
+        var internal = 1;
+        if (self.left != nil) internal = internal + self.left.count_internal_nodes();
+        if (self.right != nil) internal = internal + self.right.count_internal_nodes();
+        
+        return internal;
+    }
+
+    pub fn mirror(): BinaryTree {
+        var mirrored_left = nil;
+        var mirrored_right = nil;
+        
+        if (self.left != nil) mirrored_left = self.left.mirror();
+        if (self.right != nil) mirrored_right = self.right.mirror();
+        
+        return BinaryTree(value=self.value, left=mirrored_right, right=mirrored_left);
+    }
+
+    pub fn is_same_structure(other: BinaryTree?): bool {
+        if (other == nil) return false;
+        if (self.value != other.value) return false;
+        
+        var left_same = true;
+        var right_same = true;
+        
+        if (self.left == nil and other.left != nil) left_same = false;
+        else if (self.left != nil and other.left == nil) left_same = false;
+        else if (self.left != nil and other.left != nil) left_same = self.left.is_same_structure(other.left);
+        
+        if (self.right == nil and other.right != nil) right_same = false;
+        else if (self.right != nil and other.right == nil) right_same = false;
+        else if (self.right != nil and other.right != nil) right_same = self.right.is_same_structure(other.right);
+        
+        return left_same and right_same;
+    }
+
+    pub fn to_string(): str {
+        var result = "(" + self.value as str;
+        
+        if (self.left != nil) {
+            result = result + " L:" + self.left.to_string();
+        }
+        
+        if (self.right != nil) {
+            result = result + " R:" + self.right.to_string();
+        }
+        
+        result = result + ")";
+        return result;
+    }
+
+    pub fn to_string_pretty(): str {
+        return self.to_string_pretty_helper("", true);
+    }
+
+    private fn to_string_pretty_helper(prefix: str, is_last: bool): str {
+        var result = "";
+        
+        result = result + prefix;
+        if (is_last) {
+            result = result + "└── ";
+        } else {
+            result = result + "├── ";
+        }
+        
+        result = result + self.value as str + "\n";
+        
+        if (self.left != nil or self.right != nil) {
+            var next_prefix = prefix;
+            if (is_last) {
+                next_prefix = next_prefix + "    ";
+            } else {
+                next_prefix = next_prefix + "│   ";
+            }
+            
+            if (self.left != nil) {
+                result = result + self.left.to_string_pretty_helper(next_prefix, self.right == nil);
+            }
+            
+            if (self.right != nil) {
+                result = result + self.right.to_string_pretty_helper(next_prefix, true);
+            }
+        }
+        
+        return result;
+    }
+}
+
+// Utility functions
+fn binary_tree(value: int): BinaryTree {
+    return BinaryTree.init(value);
+}
+
+fn binary_tree_from_array(arr: [int]): BinaryTree {
+    if (arr.length == 0) return BinaryTree.init(0);
+    
+    var tree = BinaryTree.init(arr[0]);
+    var i: int = 1;
+    while (i < arr.length) {
+        tree = tree.insert(arr[i]);
+        i = i + 1;
+    }
+    
+    return tree;
+}

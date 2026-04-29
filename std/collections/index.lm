@@ -1,0 +1,27 @@
+// Collections Module Index - Re-exports all collection frames
+
+// Import all collection frames
+import std.collections.list as list;
+import std.collections.hashmap as hashmap;
+import std.collections.set as set;
+import std.collections.queue as queue;
+import std.collections.stack as stack;
+
+// Re-export frames for easy access
+var List = list.List;
+var HashMap = hashmap.HashMap;
+var Set = set.Set;
+var Queue = queue.Queue;
+var Stack = stack.Stack;
+
+// Re-export utility functions
+var list = list.list;
+var list_from = list.list_from;
+var hashmap = hashmap.hashmap;
+var hashmap_from = hashmap.hashmap_from;
+var set = set.set;
+var set_from = set.set_from;
+var queue = queue.queue;
+var queue_from = queue.queue_from;
+var stack = stack.stack;
+var stack_from = stack.stack_from;

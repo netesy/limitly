@@ -4,7 +4,7 @@ print("=== Alias Import Test ===");
 import tests.modules.math_module as math;
 
 print("Test 2.1: Access aliased module variable");
-print("PI = " + math.pi);
+print("PI = " + math.PI);
 
 print("Test 2.2: Call aliased module function");
 var squared = math.square(5);

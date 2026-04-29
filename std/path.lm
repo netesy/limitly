@@ -1,24 +1,225 @@
-// Path module
+// Path module - Cross-platform path manipulation
 
 frame Path {
     var value: str;
 
+    // Factory methods
+    pub fn from_string(path: str): Path {
+        return Path(value=path);
+    }
+
     pub fn join(other: str): Path {
         if (self.value == "") return Path(value=other);
-        return Path(value=self.value + "/" + other);
+        if (other == "") return self;
+        
+        // Handle path separators
+        var separator = "/";
+        if (self.value.ends_with(separator) or other.starts_with(separator)) {
+            return Path(value=self.value + other);
+        }
+        return Path(value=self.value + separator + other);
     }
 
-    pub fn parent(): Path {
-        return Path(value=self.value);
+    pub fn join_multiple(parts: [str]): Path {
+        var result = self;
+        var i: int = 0;
+        while (i < parts.length) {
+            result = result.join(parts[i]);
+            i = i + 1;
+        }
+        return result;
     }
 
-    pub fn basename(): str { return self.value; }
-    pub fn extension(): str { return ""; }
-    pub fn normalize(): Path { return self; }
+    // Path components
+    pub fn parent(): Path? {
+        if (self.value == "" or self.value == "/") return nil;
+        
+        var last_sep = self.value.last_index_of("/");
+        if (last_sep == nil) return Path(value="");
+        
+        var parent_path = self.value.substring(0, last_sep);
+        return Path(value=parent_path if parent_path != nil else "");
+    }
+
+    pub fn basename(): str {
+        if (self.value == "" or self.value == "/") return self.value;
+        
+        var last_sep = self.value.last_index_of("/");
+        if (last_sep == nil) return self.value;
+        
+        return self.value.substring(last_sep + 1, self.value.length) if last_sep + 1 < self.value.length else "";
+    }
+
+    pub fn stem(): str {
+        var base = self.basename();
+        var last_dot = base.last_index_of(".");
+        if (last_dot == nil or last_dot == 0) return base;
+        
+        return base.substring(0, last_dot) if last_dot != nil else base;
+    }
+
+    pub fn extension(): str {
+        var base = self.basename();
+        var last_dot = base.last_index_of(".");
+        if (last_dot == nil or last_dot == 0 or last_dot == base.length - 1) return "";
+        
+        return base.substring(last_dot + 1, base.length) if last_dot + 1 < base.length else "";
+    }
+
+    // Path normalization
+    pub fn normalize(): Path {
+        var parts: [str] = [];
+        var normalized_parts: [str] = [];
+        
+        // Split path into parts
+        if (self.value.starts_with("/")) {
+            normalized_parts.push("/");
+        }
+        
+        // Handle current path
+        if (self.value == ".") return Path(value=".");
+        if (self.value == "..") return Path(value="..");
+        
+        // Split and normalize
+        var current = self.value;
+        var start = 0;
+        var i: int = 0;
+        while (i <= current.length) {
+            if (i == current.length or current[i] == "/") {
+                if (i > start) {
+                    var part = current.substring(start, i);
+                    if (part == "..") {
+                        if (normalized_parts.length > 0 and normalized_parts[normalized_parts.length - 1] != "..") {
+                            normalized_parts.pop();
+                        } else {
+                            normalized_parts.push("..");
+                        }
+                    } else if (part != "." and part != "") {
+                        normalized_parts.push(part);
+                    }
+                }
+                start = i + 1;
+            }
+            i = i + 1;
+        }
+        
+        // Reconstruct path
+        if (normalized_parts.length == 0) return Path(value=".");
+        if (normalized_parts.length == 1 and normalized_parts[0] == "/") return Path(value="/");
+        
+        var result = "";
+        i = 0;
+        while (i < normalized_parts.length) {
+            if (i > 0 and not (normalized_parts[0] == "/" and i == 1)) {
+                result = result + "/";
+            }
+            result = result + normalized_parts[i];
+            i = i + 1;
+        }
+        
+        return Path(value=result);
+    }
+
+    pub fn resolve(): Path {
+        if (self.is_absolute()) return self.normalize();
+        
+        // Would need current working directory - stub for now
+        return self.normalize();
+    }
+
+    pub fn relative_to(base: Path): Path? {
+        var abs_self = self.resolve();
+        var abs_base = base.resolve();
+        
+        // Simple relative path calculation - stub implementation
+        if (abs_self.value.starts_with(abs_base.value)) {
+            var relative = abs_self.value.substring(abs_base.value.length, abs_self.value.length);
+            if (relative.starts_with("/")) {
+                relative = relative.substring(1, relative.length);
+            }
+            return Path(value=relative);
+        }
+        
+        return nil;
+    }
+
+    // Path properties
     pub fn is_absolute(): bool {
-        if (self.value == "/") return true;
+        return self.value.starts_with("/") or self.value.starts_with("C:") or self.value.starts_with("D:");
+    }
+
+    pub fn is_relative(): bool {
+        return not self.is_absolute();
+    }
+
+    pub fn exists(): bool {
+        // Stub - would need file system integration
         return false;
+    }
+
+    pub fn is_file(): bool {
+        // Stub - would need file system integration
+        return false;
+    }
+
+    pub fn is_dir(): bool {
+        // Stub - would need file system integration
+        return false;
+    }
+
+    // Path operations
+    pub fn with_extension(extension: str): Path {
+        var base = self.stem();
+        return Path(value=base + "." + extension);
+    }
+
+    pub fn with_basename(basename: str): Path {
+        var parent = self.parent();
+        if (parent == nil) return Path(value=basename);
+        return parent.join(basename);
+    }
+
+    // Comparison
+    pub fn equals(other: Path): bool {
+        return self.normalize().value == other.normalize().value;
+    }
+
+    pub fn starts_with(prefix: Path): bool {
+        return self.normalize().value.starts_with(prefix.normalize().value);
+    }
+
+    pub fn ends_with(suffix: Path): bool {
+        return self.normalize().value.ends_with(suffix.normalize().value);
+    }
+
+    // Formatting
+    pub fn to_string(): str {
+        return self.value;
+    }
+
+    pub fn display(): str {
+        return self.to_string();
     }
 }
 
-fn from_string(v: str): Path { return Path(value=v); }
+// Utility functions
+fn from_string(v: str): Path { 
+    return Path.from_string(v); 
+}
+
+fn join(paths: [str]): Path {
+    if (paths.length == 0) return Path(value="");
+    if (paths.length == 1) return Path.from_string(paths[0]);
+    
+    var result = Path.from_string(paths[0]);
+    var i: int = 1;
+    while (i < paths.length) {
+        result = result.join(paths[i]);
+        i = i + 1;
+    }
+    return result;
+}
+
+fn normalize(path: str): Path {
+    return Path.from_string(path).normalize();
+}

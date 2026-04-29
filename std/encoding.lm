@@ -1,10 +1,302 @@
+// Encoding module - Comprehensive data encoding and decoding
+
 import std.core as core;
 
 frame Encoding {
-    pub fn base64_encode(value: str): core.ResultStr { return core.ok_str(value); }
-    pub fn base64_decode(value: str): core.ResultStr { return core.ok_str(value); }
-    pub fn url_encode(value: str): core.ResultStr { return core.ok_str(value); }
-    pub fn url_decode(value: str): core.ResultStr { return core.ok_str(value); }
-    pub fn hex_encode(value: str): core.ResultStr { return core.ok_str(value); }
-    pub fn hex_decode(value: str): core.ResultStr { return core.ok_str(value); }
+    
+    // Base64 encoding/decoding
+    pub fn base64_encode(value: str): core.ResultStr {
+        if (value == "") return core.ok_str("");
+        
+        var base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        var result = "";
+        var i: int = 0;
+        
+        while (i < value.length) {
+            var byte1 = value[i] as int;
+            var byte2 = 0;
+            var byte3 = 0;
+            
+            if (i + 1 < value.length) byte2 = value[i + 1] as int;
+            if (i + 2 < value.length) byte3 = value[i + 2] as int;
+            
+            var combined = (byte1 << 16) | (byte2 << 8) | byte3;
+            
+            // Extract 4 base64 characters
+            var char1 = (combined >> 18) & 0x3F;
+            var char2 = (combined >> 12) & 0x3F;
+            var char3 = (combined >> 6) & 0x3F;
+            var char4 = combined & 0x3F;
+            
+            result = result + base64_chars[char1];
+            
+            if (i + 1 < value.length) {
+                result = result + base64_chars[char2];
+            } else {
+                result = result + "=";
+            }
+            
+            if (i + 2 < value.length) {
+                result = result + base64_chars[char3];
+                result = result + base64_chars[char4];
+            } else {
+                result = result + "=";
+                result = result + "=";
+            }
+            
+            i = i + 3;
+        }
+        
+        return core.ok_str(result);
+    }
+
+    pub fn base64_decode(value: str): core.ResultStr {
+        if (value == "") return core.ok_str("");
+        
+        var base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        var char_to_value: {str: int} = {};
+        
+        // Build reverse lookup table
+        var i: int = 0;
+        while (i < base64_chars.length) {
+            char_to_value[base64_chars[i]] = i;
+            i = i + 1;
+        }
+        
+        var result = "";
+        var i: int = 0;
+        
+        while (i < value.length) {
+            var char1 = value[i];
+            var char2 = value[i + 1];
+            var char3 = value[i + 2];
+            var char4 = value[i + 3];
+            
+            var val1 = char_to_value[char1] if char1 != "=" else 0;
+            var val2 = char_to_value[char2] if char2 != "=" else 0;
+            var val3 = char_to_value[char3] if char3 != "=" else 0;
+            var val4 = char_to_value[char4] if char4 != "=" else 0;
+            
+            var combined = (val1 << 18) | (val2 << 12) | (val3 << 6) | val4;
+            
+            // Extract 3 bytes
+            var byte1 = (combined >> 16) & 0xFF;
+            var byte2 = (combined >> 8) & 0xFF;
+            var byte3 = combined & 0xFF;
+            
+            result = result + byte1 as str;
+            
+            if (char2 != "=") {
+                result = result + byte2 as str;
+            }
+            
+            if (char3 != "=") {
+                result = result + byte3 as str;
+            }
+            
+            i = i + 4;
+        }
+        
+        return core.ok_str(result);
+    }
+
+    // URL encoding/decoding
+    pub fn url_encode(value: str): core.ResultStr {
+        if (value == "") return core.ok_str("");
+        
+        var result = "";
+        var i: int = 0;
+        
+        while (i < value.length) {
+            var ch = value[i];
+            
+            // Characters that don't need encoding
+            if ((ch >= "A" and ch <= "Z") or (ch >= "a" and ch <= "z") or (ch >= "0" and ch <= "9") or 
+                ch == "-" or ch == "_" or ch == "." or ch == "~") {
+                result = result + ch;
+            } else if (ch == " ") {
+                result = result + "+";
+            } else {
+                // Percent encode
+                var byte_val = ch as int;
+                var hex = self.byte_to_hex(byte_val);
+                result = result + "%" + hex;
+            }
+            
+            i = i + 1;
+        }
+        
+        return core.ok_str(result);
+    }
+
+    pub fn url_decode(value: str): core.ResultStr {
+        if (value == "") return core.ok_str("");
+        
+        var result = "";
+        var i: int = 0;
+        
+        while (i < value.length) {
+            var ch = value[i];
+            
+            if (ch == "+") {
+                result = result + " ";
+            } else if (ch == "%" and i + 2 < value.length) {
+                var hex1 = value[i + 1];
+                var hex2 = value[i + 2];
+                var byte_val = self.hex_to_byte(hex1 + hex2);
+                result = result + byte_val as str;
+                i = i + 2;
+            } else {
+                result = result + ch;
+            }
+            
+            i = i + 1;
+        }
+        
+        return core.ok_str(result);
+    }
+
+    // Hexadecimal encoding/decoding
+    pub fn hex_encode(value: str): core.ResultStr {
+        if (value == "") return core.ok_str("");
+        
+        var result = "";
+        var i: int = 0;
+        
+        while (i < value.length) {
+            var byte_val = value[i] as int;
+            var hex = self.byte_to_hex(byte_val);
+            result = result + hex;
+            i = i + 1;
+        }
+        
+        return core.ok_str(result);
+    }
+
+    pub fn hex_decode(value: str): core.ResultStr {
+        if (value == "") return core.ok_str("");
+        
+        if (value.length % 2 != 0) {
+            return core.err_str("Invalid hex string length");
+        }
+        
+        var result = "";
+        var i: int = 0;
+        
+        while (i < value.length) {
+            var hex1 = value[i];
+            var hex2 = value[i + 1];
+            var byte_val = self.hex_to_byte(hex1 + hex2);
+            result = result + byte_val as str;
+            i = i + 2;
+        }
+        
+        return core.ok_str(result);
+    }
+
+    // Binary encoding/decoding
+    pub fn binary_encode(value: str): core.ResultStr {
+        if (value == "") return core.ok_str("");
+        
+        var result = "";
+        var i: int = 0;
+        
+        while (i < value.length) {
+            var byte_val = value[i] as int;
+            var binary = self.byte_to_binary(byte_val);
+            result = result + binary;
+            i = i + 1;
+        }
+        
+        return core.ok_str(result);
+    }
+
+    pub fn binary_decode(value: str): core.ResultStr {
+        if (value == "") return core.ok_str("");
+        
+        if (value.length % 8 != 0) {
+            return core.err_str("Invalid binary string length");
+        }
+        
+        var result = "";
+        var i: int = 0;
+        
+        while (i < value.length) {
+            var binary_str = value.substring(i, i + 8);
+            var byte_val = self.binary_to_byte(binary_str);
+            result = result + byte_val as str;
+            i = i + 8;
+        }
+        
+        return core.ok_str(result);
+    }
+
+    // Utility methods
+    private fn byte_to_hex(byte: int): str {
+        var hex_chars = "0123456789ABCDEF";
+        var high = (byte >> 4) & 0x0F;
+        var low = byte & 0x0F;
+        return hex_chars[high] + hex_chars[low];
+    }
+
+    private fn hex_to_byte(hex: str): int {
+        var hex_chars = "0123456789ABCDEF";
+        var high = hex_chars.index_of(hex[0]);
+        var low = hex_chars.index_of(hex[1]);
+        
+        if (high == nil or low == nil) return 0;
+        
+        return ((high if high != nil else 0) << 4) | (low if low != nil else 0);
+    }
+
+    private fn byte_to_binary(byte: int): str {
+        var result = "";
+        var i: int = 7;
+        while (i >= 0) {
+            var bit = (byte >> i) & 1;
+            result = result + (bit as str);
+            i = i - 1;
+        }
+        return result;
+    }
+
+    private fn binary_to_byte(binary: str): int {
+        if (binary.length != 8) return 0;
+        
+        var result = 0;
+        var i: int = 0;
+        while (i < 8) {
+            var bit = binary[i] as int - 48; // Convert '0'/'1' to 0/1
+            if (bit == 1) {
+                result = result | (1 << (7 - i));
+            }
+            i = i + 1;
+        }
+        return result;
+    }
+}
+
+// Utility functions
+fn base64_encode(value: str): core.ResultStr {
+    return Encoding.base64_encode(value);
+}
+
+fn base64_decode(value: str): core.ResultStr {
+    return Encoding.base64_decode(value);
+}
+
+fn url_encode(value: str): core.ResultStr {
+    return Encoding.url_encode(value);
+}
+
+fn url_decode(value: str): core.ResultStr {
+    return Encoding.url_decode(value);
+}
+
+fn hex_encode(value: str): core.ResultStr {
+    return Encoding.hex_encode(value);
+}
+
+fn hex_decode(value: str): core.ResultStr {
+    return Encoding.hex_decode(value);
 }

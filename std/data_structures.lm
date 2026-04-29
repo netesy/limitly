@@ -1,0 +1,615 @@
+// Advanced Data Structures Module - Tree, Graph, and other complex structures
+
+import std.core as core;
+
+// Binary Tree frame
+frame BinaryTree {
+    var value: int;
+    var left: BinaryTree?;
+    var right: BinaryTree?;
+
+    pub fn init(value: int): BinaryTree {
+        return BinaryTree(value=value, left=nil, right=nil);
+    }
+
+    pub fn insert(value: int): BinaryTree {
+        if (value == self.value) return self;
+        
+        if (value < self.value) {
+            if (self.left == nil) {
+                return BinaryTree(value=self.value, left=BinaryTree.init(value), right=self.right);
+            } else {
+                return BinaryTree(value=self.value, left=self.left.insert(value), right=self.right);
+            }
+        } else {
+            if (self.right == nil) {
+                return BinaryTree(value=self.value, left=self.left, right=BinaryTree.init(value));
+            } else {
+                return BinaryTree(value=self.value, left=self.left, right=self.right.insert(value));
+            }
+        }
+    }
+
+    pub fn contains(value: int): bool {
+        if (value == self.value) return true;
+        
+        if (value < self.value and self.left != nil) {
+            return self.left.contains(value);
+        } else if (value > self.value and self.right != nil) {
+            return self.right.contains(value);
+        }
+        
+        return false;
+    }
+
+    pub fn remove(value: int): BinaryTree? {
+        if (value < self.value and self.left != nil) {
+            var new_left = self.left.remove(value);
+            if (new_left != nil) {
+                return BinaryTree(value=self.value, left=new_left, right=self.right);
+            }
+            return self;
+        } else if (value > self.value and self.right != nil) {
+            var new_right = self.right.remove(value);
+            if (new_right != nil) {
+                return BinaryTree(value=self.value, left=self.left, right=new_right);
+            }
+            return self;
+        } else if (value == self.value) {
+            // Node to remove found
+            if (self.left == nil and self.right == nil) {
+                return nil;
+            } else if (self.left == nil) {
+                return self.right;
+            } else if (self.right == nil) {
+                return self.left;
+            } else {
+                // Node has two children - find successor
+                var successor = self.right.find_min();
+                var new_right = self.right.remove(successor);
+                return BinaryTree(value=successor, left=self.left, right=new_right);
+            }
+        }
+        
+        return self;
+    }
+
+    pub fn find_min(): int {
+        if (self.left == nil) return self.value;
+        return self.left.find_min();
+    }
+
+    pub fn find_max(): int {
+        if (self.right == nil) return self.value;
+        return self.right.find_max();
+    }
+
+    pub fn inorder(): [int] {
+        var result: [int] = [];
+        
+        if (self.left != nil) {
+            var left_result = self.left.inorder();
+            var i: int = 0;
+            while (i < left_result.length) {
+                result[result.length] = left_result[i];
+                i = i + 1;
+            }
+        }
+        
+        result[result.length] = self.value;
+        
+        if (self.right != nil) {
+            var right_result = self.right.inorder();
+            var i: int = 0;
+            while (i < right_result.length) {
+                result[result.length] = right_result[i];
+                i = i + 1;
+            }
+        }
+        
+        return result;
+    }
+
+    pub fn preorder(): [int] {
+        var result: [int] = [];
+        result[0] = self.value;
+        
+        if (self.left != nil) {
+            var left_result = self.left.preorder();
+            var i: int = 0;
+            while (i < left_result.length) {
+                result[result.length] = left_result[i];
+                i = i + 1;
+            }
+        }
+        
+        if (self.right != nil) {
+            var right_result = self.right.preorder();
+            var i: int = 0;
+            while (i < right_result.length) {
+                result[result.length] = right_result[i];
+                i = i + 1;
+            }
+        }
+        
+        return result;
+    }
+
+    pub fn postorder(): [int] {
+        var result: [int] = [];
+        
+        if (self.left != nil) {
+            var left_result = self.left.postorder();
+            var i: int = 0;
+            while (i < left_result.length) {
+                result[result.length] = left_result[i];
+                i = i + 1;
+            }
+        }
+        
+        if (self.right != nil) {
+            var right_result = self.right.postorder();
+            var i: int = 0;
+            while (i < right_result.length) {
+                result[result.length] = right_result[i];
+                i = i + 1;
+            }
+        }
+        
+        result[result.length] = self.value;
+        
+        return result;
+    }
+
+    pub fn height(): int {
+        var left_height = 0;
+        var right_height = 0;
+        
+        if (self.left != nil) left_height = self.left.height();
+        if (self.right != nil) right_height = self.right.height();
+        
+        return 1 + (left_height if left_height > right_height else right_height);
+    }
+
+    pub fn size(): int {
+        var count = 1;
+        if (self.left != nil) count = count + self.left.size();
+        if (self.right != nil) count = count + self.right.size();
+        return count;
+    }
+
+    pub fn is_balanced(): bool {
+        var left_height = 0;
+        var right_height = 0;
+        var left_balanced = true;
+        var right_balanced = true;
+        
+        if (self.left != nil) {
+            left_height = self.left.height();
+            left_balanced = self.left.is_balanced();
+        }
+        
+        if (self.right != nil) {
+            right_height = self.right.height();
+            right_balanced = self.right.is_balanced();
+        }
+        
+        var height_diff = left_height - right_height;
+        if (height_diff < 0) height_diff = -height_diff;
+        
+        return left_balanced and right_balanced and height_diff <= 1;
+    }
+
+    pub fn to_string(): str {
+        var result = "(" + self.value as str;
+        
+        if (self.left != nil) {
+            result = result + " L:" + self.left.to_string();
+        }
+        
+        if (self.right != nil) {
+            result = result + " R:" + self.right.to_string();
+        }
+        
+        result = result + ")";
+        return result;
+    }
+}
+
+// Graph frame for network data structures
+frame Graph {
+    var vertices: [int];
+    var edges: {int: [int]};  // adjacency list representation
+    var directed: bool;
+
+    pub fn init(directed: bool): Graph {
+        return Graph(vertices=[], edges={}, directed=directed);
+    }
+
+    pub fn add_vertex(vertex: int): Graph {
+        if (self.contains_vertex(vertex)) return self;
+        
+        var new_vertices: [int] = [];
+        var i: int = 0;
+        while (i < self.vertices.length) {
+            new_vertices[i] = self.vertices[i];
+            i = i + 1;
+        }
+        new_vertices[self.vertices.length] = vertex;
+        
+        var new_edges = self.edges;
+        new_edges[vertex] = [];
+        
+        return Graph(vertices=new_vertices, edges=new_edges, directed=self.directed);
+    }
+
+    pub fn add_edge(from: int, to: int): Graph {
+        var graph = self;
+        
+        // Add vertices if they don't exist
+        graph = graph.add_vertex(from);
+        graph = graph.add_vertex(to);
+        
+        // Add edge
+        var from_edges = graph.edges[from];
+        var i: int = 0;
+        while (i < from_edges.length) {
+            if (from_edges[i] == to) return graph; // Edge already exists
+            i = i + 1;
+        }
+        
+        from_edges[from_edges.length] = to;
+        graph.edges[from] = from_edges;
+        
+        // Add reverse edge for undirected graphs
+        if (!graph.directed) {
+            var to_edges = graph.edges[to];
+            to_edges[to_edges.length] = from;
+            graph.edges[to] = to_edges;
+        }
+        
+        return graph;
+    }
+
+    pub fn remove_vertex(vertex: int): Graph {
+        if (!self.contains_vertex(vertex)) return self;
+        
+        // Remove from vertices list
+        var new_vertices: [int] = [];
+        var i: int = 0;
+        var j: int = 0;
+        while (i < self.vertices.length) {
+            if (self.vertices[i] != vertex) {
+                new_vertices[j] = self.vertices[i];
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        
+        // Remove all edges to/from this vertex
+        var new_edges: {int: [int]} = {};
+        i = 0;
+        while (i < self.vertices.length) {
+            var v = self.vertices[i];
+            if (v != vertex) {
+                var edges = self.edges[v];
+                var filtered_edges: [int] = [];
+                var k: int = 0;
+                var l: int = 0;
+                while (k < edges.length) {
+                    if (edges[k] != vertex) {
+                        filtered_edges[l] = edges[k];
+                        l = l + 1;
+                    }
+                    k = k + 1;
+                }
+                new_edges[v] = filtered_edges;
+            }
+            i = i + 1;
+        }
+        
+        return Graph(vertices=new_vertices, edges=new_edges, directed=self.directed);
+    }
+
+    pub fn remove_edge(from: int, to: int): Graph {
+        if (!self.contains_vertex(from) or !self.contains_vertex(to)) return self;
+        
+        var new_edges = self.edges;
+        var from_edges = new_edges[from];
+        
+        // Remove edge from adjacency list
+        var filtered_edges: [int] = [];
+        var i: int = 0;
+        var j: int = 0;
+        while (i < from_edges.length) {
+            if (from_edges[i] != to) {
+                filtered_edges[j] = from_edges[i];
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        new_edges[from] = filtered_edges;
+        
+        // Remove reverse edge for undirected graphs
+        if (!self.directed) {
+            var to_edges = new_edges[to];
+            var filtered_to_edges: [int] = [];
+            i = 0;
+            j = 0;
+            while (i < to_edges.length) {
+                if (to_edges[i] != from) {
+                    filtered_to_edges[j] = to_edges[i];
+                    j = j + 1;
+                }
+                i = i + 1;
+            }
+            new_edges[to] = filtered_to_edges;
+        }
+        
+        return Graph(vertices=self.vertices, edges=new_edges, directed=self.directed);
+    }
+
+    pub fn contains_vertex(vertex: int): bool {
+        var i: int = 0;
+        while (i < self.vertices.length) {
+            if (self.vertices[i] == vertex) return true;
+            i = i + 1;
+        }
+        return false;
+    }
+
+    pub fn contains_edge(from: int, to: int): bool {
+        if (!self.contains_vertex(from)) return false;
+        
+        var edges = self.edges[from];
+        var i: int = 0;
+        while (i < edges.length) {
+            if (edges[i] == to) return true;
+            i = i + 1;
+        }
+        return false;
+    }
+
+    pub fn get_neighbors(vertex: int): [int] {
+        if (!self.contains_vertex(vertex)) return [];
+        return self.edges[vertex];
+    }
+
+    pub fn degree(vertex: int): int {
+        return self.get_neighbors(vertex).length;
+    }
+
+    pub fn vertex_count(): int {
+        return self.vertices.length;
+    }
+
+    pub fn edge_count(): int {
+        var count = 0;
+        var i: int = 0;
+        while (i < self.vertices.length) {
+            count = count + self.edges[self.vertices[i]].length;
+            i = i + 1;
+        }
+        
+        // For undirected graphs, each edge is counted twice
+        if (!self.directed) count = count / 2;
+        
+        return count;
+    }
+
+    pub fn bfs(start: int): [int] {
+        if (!self.contains_vertex(start)) return [];
+        
+        var visited: {int: bool} = {};
+        var queue: [int] = [];
+        var result: [int] = [];
+        
+        queue[0] = start;
+        visited[start] = true;
+        
+        var queue_front = 0;
+        while (queue_front < queue.length) {
+            var current = queue[queue_front];
+            result[result.length] = current;
+            queue_front = queue_front + 1;
+            
+            var neighbors = self.get_neighbors(current);
+            var i: int = 0;
+            while (i < neighbors.length) {
+                var neighbor = neighbors[i];
+                if (visited[neighbor] == nil) {
+                    visited[neighbor] = true;
+                    queue[queue.length] = neighbor;
+                }
+                i = i + 1;
+            }
+        }
+        
+        return result;
+    }
+
+    pub fn dfs(start: int): [int] {
+        if (!self.contains_vertex(start)) return [];
+        
+        var visited: {int: bool} = {};
+        var result: [int] = [];
+        
+        fn dfs_visit(vertex: int): nil {
+            visited[vertex] = true;
+            result[result.length] = vertex;
+            
+            var neighbors = self.get_neighbors(vertex);
+            var i: int = 0;
+            while (i < neighbors.length) {
+                var neighbor = neighbors[i];
+                if (visited[neighbor] == nil) {
+                    dfs_visit(neighbor);
+                }
+                i = i + 1;
+            }
+        }
+        
+        dfs_visit(start);
+        return result;
+    }
+
+    pub fn to_string(): str {
+        var result = "Graph(" + (if self.directed then "directed" else "undirected") + ")\n";
+        var i: int = 0;
+        
+        while (i < self.vertices.length) {
+            var vertex = self.vertices[i];
+            result = result + vertex as str + ": [";
+            
+            var edges = self.edges[vertex];
+            var j: int = 0;
+            while (j < edges.length) {
+                if (j > 0) result = result + ", ";
+                result = result + edges[j] as str;
+                j = j + 1;
+            }
+            
+            result = result + "]\n";
+            i = i + 1;
+        }
+        
+        return result;
+    }
+}
+
+// Priority Queue frame
+frame PriorityQueue {
+    var data: [int];
+    var comparator: fn(int, int): bool;  // returns true if first should come before second
+
+    pub fn init(): PriorityQueue {
+        return PriorityQueue(data=[], comparator=fn(a: int, b: int): bool { return a < b; });
+    }
+
+    pub fn init_with_custom(comparator: fn(int, int): bool): PriorityQueue {
+        return PriorityQueue(data=[], comparator=comparator);
+    }
+
+    pub fn enqueue(value: int): PriorityQueue {
+        var new_data: [int] = [];
+        var i: int = 0;
+        
+        // Copy existing data
+        while (i < self.data.length) {
+            new_data[i] = self.data[i];
+            i = i + 1;
+        }
+        
+        // Add new element
+        new_data[self.data.length] = value;
+        
+        // Heapify up
+        var current = new_data.length - 1;
+        while (current > 0) {
+            var parent = (current - 1) / 2;
+            if (self.comparator(new_data[current], new_data[parent])) {
+                var temp = new_data[current];
+                new_data[current] = new_data[parent];
+                new_data[parent] = temp;
+                current = parent;
+            } else {
+                break;
+            }
+        }
+        
+        return PriorityQueue(data=new_data, comparator=self.comparator);
+    }
+
+    pub fn dequeue(): int? {
+        if (self.data.length == 0) return nil;
+        
+        var result = self.data[0];
+        
+        // Move last element to root
+        var new_data: [int] = [];
+        var i: int = 1;
+        while (i < self.data.length) {
+            new_data[i - 1] = self.data[i];
+            i = i + 1;
+        }
+        
+        if (new_data.length > 0) {
+            // Heapify down
+            var current = 0;
+            while (true) {
+                var left_child = 2 * current + 1;
+                var right_child = 2 * current + 2;
+                var smallest = current;
+                
+                if (left_child < new_data.length and self.comparator(new_data[left_child], new_data[smallest])) {
+                    smallest = left_child;
+                }
+                
+                if (right_child < new_data.length and self.comparator(new_data[right_child], new_data[smallest])) {
+                    smallest = right_child;
+                }
+                
+                if (smallest != current) {
+                    var temp = new_data[current];
+                    new_data[current] = new_data[smallest];
+                    new_data[smallest] = temp;
+                    current = smallest;
+                } else {
+                    break;
+                }
+            }
+        }
+        
+        return result;
+    }
+
+    pub fn peek(): int? {
+        if (self.data.length == 0) return nil;
+        return self.data[0];
+    }
+
+    pub fn size(): int {
+        return self.data.length;
+    }
+
+    pub fn is_empty(): bool {
+        return self.data.length == 0;
+    }
+
+    pub fn to_string(): str {
+        var result = "PriorityQueue[";
+        var i: int = 0;
+        while (i < self.data.length) {
+            if (i > 0) result = result + ", ";
+            result = result + self.data[i] as str;
+            i = i + 1;
+        }
+        result = result + "]";
+        return result;
+    }
+}
+
+// Utility functions for advanced data structures
+fn binary_tree(value: int): BinaryTree {
+    return BinaryTree.init(value);
+}
+
+fn graph(directed: bool): Graph {
+    return Graph.init(directed);
+}
+
+fn undirected_graph(): Graph {
+    return Graph.init(false);
+}
+
+fn directed_graph(): Graph {
+    return Graph.init(true);
+}
+
+fn priority_queue(): PriorityQueue {
+    return PriorityQueue.init();
+}
+
+fn max_priority_queue(): PriorityQueue {
+    return PriorityQueue.init_with_custom(fn(a: int, b: int): bool { return a > b; });
+}

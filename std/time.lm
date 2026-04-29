@@ -1,11 +1,344 @@
-// Time module
+// Time module - Carbon-like time handling
 
+// Duration frame for time arithmetic
+frame Duration {
+    var seconds: int;
+    var microseconds: int;
+
+    pub fn init(seconds: int, microseconds: int): Duration {
+        return Duration(seconds=seconds, microseconds=microseconds);
+    }
+
+    // Factory methods
+    pub fn from_days(days: int): Duration {
+        return Duration(seconds=days * 86400, microseconds=0);
+    }
+
+    pub fn from_hours(hours: int): Duration {
+        return Duration(seconds=hours * 3600, microseconds=0);
+    }
+
+    pub fn from_minutes(minutes: int): Duration {
+        return Duration(seconds=minutes * 60, microseconds=0);
+    }
+
+    pub fn from_seconds(seconds: int): Duration {
+        return Duration(seconds=seconds, microseconds=0);
+    }
+
+    pub fn from_milliseconds(ms: int): Duration {
+        return Duration(seconds=ms / 1000, microseconds=(ms % 1000) * 1000);
+    }
+
+    pub fn from_microseconds(us: int): Duration {
+        return Duration(seconds=us / 1000000, microseconds=us % 1000000);
+    }
+
+    // Arithmetic operations
+    pub fn add(other: Duration): Duration {
+        var total_microseconds = self.microseconds + other.microseconds;
+        var extra_seconds = total_microseconds / 1000000;
+        var final_microseconds = total_microseconds % 1000000;
+        
+        return Duration(
+            seconds=self.seconds + other.seconds + extra_seconds,
+            microseconds=final_microseconds
+        );
+    }
+
+    pub fn subtract(other: Duration): Duration {
+        var total_microseconds = self.microseconds - other.microseconds;
+        var extra_seconds = total_microseconds / 1000000;
+        var final_microseconds = total_microseconds % 1000000;
+        
+        return Duration(
+            seconds=self.seconds - other.seconds + extra_seconds,
+            microseconds=final_microseconds
+        );
+    }
+
+    pub fn multiply(factor: int): Duration {
+        var total_microseconds = self.microseconds * factor;
+        var extra_seconds = total_microseconds / 1000000;
+        var final_microseconds = total_microseconds % 1000000;
+        
+        return Duration(
+            seconds=self.seconds * factor + extra_seconds,
+            microseconds=final_microseconds
+        );
+    }
+
+    // Comparison
+    pub fn equals(other: Duration): bool {
+        return self.seconds == other.seconds and self.microseconds == other.microseconds;
+    }
+
+    pub fn greater_than(other: Duration): bool {
+        return self.seconds > other.seconds or (self.seconds == other.seconds and self.microseconds > other.microseconds);
+    }
+
+    pub fn less_than(other: Duration): bool {
+        return self.seconds < other.seconds or (self.seconds == other.seconds and self.microseconds < other.microseconds);
+    }
+
+    // Conversion
+    pub fn to_seconds(): float {
+        return self.seconds as float + (self.microseconds as float) / 1000000.0;
+    }
+
+    pub fn to_milliseconds(): int {
+        return self.seconds * 1000 + self.microseconds / 1000;
+    }
+
+    pub fn to_microseconds(): int {
+        return self.seconds * 1000000 + self.microseconds;
+    }
+
+    // Formatting
+    pub fn to_string(): str {
+        if (self.seconds >= 0) {
+            return self.seconds as str + "." + (self.microseconds / 1000) as str + "s";
+        } else {
+            return "-" + (-self.seconds) as str + "." + (-self.microseconds / 1000) as str + "s";
+        }
+    }
+}
+
+// Time zone frame
+frame TimeZone {
+    var name: str;
+    var offset_hours: int;
+    var offset_minutes: int;
+
+    pub fn init(name: str, offset_hours: int, offset_minutes: int): TimeZone {
+        return TimeZone(name=name, offset_hours=offset_hours, offset_minutes=offset_minutes);
+    }
+
+    pub fn utc(): TimeZone {
+        return TimeZone(name="UTC", offset_hours=0, offset_minutes=0);
+    }
+
+    pub fn from_offset(offset_hours: int): TimeZone {
+        return TimeZone(name="UTC" + offset_hours as str, offset_hours=offset_hours, offset_minutes=0);
+    }
+
+    pub fn to_seconds_offset(): int {
+        return self.offset_hours * 3600 + self.offset_minutes * 60;
+    }
+}
+
+// Main Time frame - Carbon-like functionality
 frame Time {
-    pub fn now(): int {
-        return time();
+    var timestamp: int;  // Unix timestamp in seconds
+    var microseconds: int;  // Microseconds part
+    var timezone: TimeZone;
+
+    pub fn init(timestamp: int, microseconds: int, timezone: TimeZone): Time {
+        return Time(timestamp=timestamp, microseconds=microseconds, timezone=timezone);
     }
 
-    pub fn sleep(ms: int): nil {
-        sleep((ms as float) / 1000.0);
+    // Factory methods
+    pub fn now(): Time {
+        return Time(timestamp=time(), microseconds=0, timezone=TimeZone.utc());
     }
+
+    pub fn from_timestamp(timestamp: int): Time {
+        return Time(timestamp=timestamp, microseconds=0, timezone=TimeZone.utc());
+    }
+
+    pub fn from_string(datetime: str): Time? {
+        // Basic ISO 8601 parsing stub
+        return Time(timestamp=time(), microseconds=0, timezone=TimeZone.utc());
+    }
+
+    pub fn from_components(year: int, month: int, day: int, hour: int, minute: int, second: int): Time {
+        // Stub implementation - would need proper date calculation
+        var timestamp = year * 365 * 24 * 3600 + month * 30 * 24 * 3600 + day * 24 * 3600 + hour * 3600 + minute * 60 + second;
+        return Time(timestamp=timestamp, microseconds=0, timezone=TimeZone.utc());
+    }
+
+    // Time arithmetic
+    pub fn add(duration: Duration): Time {
+        var total_microseconds = self.microseconds + duration.microseconds;
+        var extra_seconds = total_microseconds / 1000000;
+        var final_microseconds = total_microseconds % 1000000;
+        
+        return Time(
+            timestamp=self.timestamp + duration.seconds + extra_seconds,
+            microseconds=final_microseconds,
+            timezone=self.timezone
+        );
+    }
+
+    pub fn subtract(duration: Duration): Time {
+        var total_microseconds = self.microseconds - duration.microseconds;
+        var extra_seconds = total_microseconds / 1000000;
+        var final_microseconds = total_microseconds % 1000000;
+        
+        return Time(
+            timestamp=self.timestamp - duration.seconds + extra_seconds,
+            microseconds=final_microseconds,
+            timezone=self.timezone
+        );
+    }
+
+    pub fn difference(other: Time): Duration {
+        var seconds_diff = self.timestamp - other.timestamp;
+        var microseconds_diff = self.microseconds - other.microseconds;
+        
+        return Duration(seconds=seconds_diff, microseconds=microseconds_diff);
+    }
+
+    // Time component access
+    pub fn year(): int {
+        // Stub - would need proper date calculation
+        return 2024;
+    }
+
+    pub fn month(): int {
+        return 1;
+    }
+
+    pub fn day(): int {
+        return 1;
+    }
+
+    pub fn hour(): int {
+        return (self.timestamp % 86400) / 3600;
+    }
+
+    pub fn minute(): int {
+        return (self.timestamp % 3600) / 60;
+    }
+
+    pub fn second(): int {
+        return self.timestamp % 60;
+    }
+
+    pub fn day_of_week(): int {
+        return (self.timestamp / 86400 + 4) % 7; // 0=Sunday, 1=Monday, etc.
+    }
+
+    pub fn day_of_year(): int {
+        return 1; // Stub
+    }
+
+    // Time modification
+    pub fn with_year(year: int): Time {
+        return Time.from_components(year, self.month(), self.day(), self.hour(), self.minute(), self.second());
+    }
+
+    pub fn with_month(month: int): Time {
+        return Time.from_components(self.year(), month, self.day(), self.hour(), self.minute(), self.second());
+    }
+
+    pub fn with_day(day: int): Time {
+        return Time.from_components(self.year(), self.month(), day, self.hour(), self.minute(), self.second());
+    }
+
+    pub fn with_hour(hour: int): Time {
+        return Time.from_components(self.year(), self.month(), self.day(), hour, self.minute(), self.second());
+    }
+
+    pub fn with_minute(minute: int): Time {
+        return Time.from_components(self.year(), self.month(), self.day(), self.hour(), minute, self.second());
+    }
+
+    pub fn with_second(second: int): Time {
+        return Time.from_components(self.year(), self.month(), self.day(), self.hour(), self.minute(), second);
+    }
+
+    // Timezone operations
+    pub fn with_timezone(timezone: TimeZone): Time {
+        var offset_diff = timezone.to_seconds_offset() - self.timezone.to_seconds_offset();
+        return Time(
+            timestamp=self.timestamp + offset_diff,
+            microseconds=self.microseconds,
+            timezone=timezone
+        );
+    }
+
+    pub fn to_timezone(timezone: TimeZone): Time {
+        return self.with_timezone(timezone);
+    }
+
+    // Comparison
+    pub fn equals(other: Time): bool {
+        return self.timestamp == other.timestamp and self.microseconds == other.microseconds;
+    }
+
+    pub fn greater_than(other: Time): bool {
+        return self.timestamp > other.timestamp or (self.timestamp == other.timestamp and self.microseconds > other.microseconds);
+    }
+
+    pub fn less_than(other: Time): bool {
+        return self.timestamp < other.timestamp or (self.timestamp == other.timestamp and self.microseconds < other.microseconds);
+    }
+
+    pub fn is_between(start: Time, end: Time): bool {
+        return self.greater_than(start) and self.less_than(end);
+    }
+
+    // Formatting
+    pub fn format(format_string: str): str {
+        // Basic formatting stub - would need full format string parsing
+        var year = self.year();
+        var month = self.month();
+        var day = self.day();
+        var hour = self.hour();
+        var minute = self.minute();
+        var second = self.second();
+        
+        return year as str + "-" + (month if month >= 10 else "0" + month as str) + "-" + (day if day >= 10 else "0" + day as str) + " " +
+               (hour if hour >= 10 else "0" + hour as str) + ":" + (minute if minute >= 10 else "0" + minute as str) + ":" + (second if second >= 10 else "0" + second as str);
+    }
+
+    pub fn to_iso_string(): str {
+        return self.format("Y-m-d H:i:s");
+    }
+
+    pub fn to_string(): str {
+        return self.to_iso_string() + " " + self.timezone.name;
+    }
+
+    // Utility methods
+    pub fn is_weekend(): bool {
+        var day = self.day_of_week();
+        return day == 0 or day == 6; // Sunday or Saturday
+    }
+
+    pub fn is_weekday(): bool {
+        return !self.is_weekend();
+    }
+
+    pub fn start_of_day(): Time {
+        return Time.from_components(self.year(), self.month(), self.day(), 0, 0, 0);
+    }
+
+    pub fn end_of_day(): Time {
+        return Time.from_components(self.year(), self.month(), self.day(), 23, 59, 59);
+    }
+
+    pub fn start_of_week(): Time {
+        var current_day = self.day_of_week();
+        var days_to_sunday = current_day;
+        return self.subtract(Duration.from_days(days_to_sunday)).start_of_day();
+    }
+
+    pub fn start_of_month(): Time {
+        return Time.from_components(self.year(), self.month(), 1, 0, 0, 0);
+    }
+
+    pub fn start_of_year(): Time {
+        return Time.from_components(self.year(), 1, 1, 0, 0, 0);
+    }
+}
+
+// Utility functions
+fn sleep(ms: int): nil {
+    sleep((ms as float) / 1000.0);
+}
+
+fn sleep_duration(duration: Duration): nil {
+    sleep(duration.to_milliseconds());
 }
