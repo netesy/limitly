@@ -840,6 +840,16 @@ TypePtr TypeChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statemen
         return check_match_statement(match_stmt);
     } else if (auto contract_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ContractStatement>(stmt)) {
         return check_contract_statement(contract_stmt);
+    } else if (auto comptime_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ComptimeStatement>(stmt)) {
+        // Strict phase separation: comptime evaluation is not allowed to consume runtime state
+        // until a dedicated deterministic comptime evaluator is implemented.
+        add_error("comptime statements are currently disabled: compile-time execution cannot depend on runtime values", comptime_stmt->line);
+        return type_system.NIL_TYPE;
+    } else if (auto unsafe_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::UnsafeStatement>(stmt)) {
+        // Unsafe operations must always be explicitly scoped and validated; reject until
+        // full unsafe memory-model checks are implemented in frontend + lowering + runtime.
+        add_error("unsafe statements are currently disabled: explicit unsafe boundaries require full memory-model validation", unsafe_stmt->line);
+        return type_system.NIL_TYPE;
     } else if (auto import_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ImportStatement>(stmt)) {
         return check_import_statement(import_stmt);
     } else if (auto expr_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ExprStatement>(stmt)) {
