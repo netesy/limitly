@@ -311,6 +311,7 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
 }
 
 void TypeChecker::add_error(const std::string& message, int line) {
+    errors.push_back(message);
     // Type checker errors default to column 1 since we don't have precise token positions
     int column = 1;
     
@@ -332,6 +333,7 @@ void TypeChecker::add_error(const std::string& message, int line, int column, co
         enhancedMessage += " - expected: " + expected_value;
     }
     
+    errors.push_back(enhancedMessage);
     if (line > 0 && !current_source.empty()) {
         Debugger::error(enhancedMessage, line, column, InterpretationStage::SEMANTIC, current_source, current_file_path, context, "");
     } else {
@@ -1024,7 +1026,7 @@ TypePtr TypeChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::Va
             bool is_copyable = (rhs_type &&
                 (rhs_type->tag == TypeTag::Function ||
                  rhs_type->tag == TypeTag::Int || rhs_type->tag == TypeTag::Int64 ||
-                 rhs_type->tag == TypeTag::Float || rhs_type->tag == TypeTag::Float64 ||
+                 rhs_type->tag == TypeTag::Float32 || rhs_type->tag == TypeTag::Float64 ||
                  rhs_type->tag == TypeTag::Bool || rhs_type->tag == TypeTag::String ||
                  rhs_type->tag == TypeTag::Nil || rhs_type->tag == TypeTag::Any));
             
