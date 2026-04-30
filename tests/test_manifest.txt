@@ -1,0 +1,16 @@
+# status|pattern
+pass|tests/**/*.lm
+skip|tests/modules/basic_module.lm
+skip|tests/modules/math_module.lm
+skip|tests/modules/my_module.lm
+skip|tests/modules/string_module.lm
+skip|tests/modules/nested/deep_module.lm
+skip|tests/format/test_unformatted.lm
+skip|tests/**/legacy/**
+compile_error|tests/errors/*.lm
+compile_error|tests/error_handling/*.lm
+compile_error|tests/types/type_error_tests.lm
+compile_error|tests/types/union_error_tests.lm
+compile_error|tests/types/structural_error_tests.lm
+compile_error|tests/modules/comprehensive_error_tests.lm
+compile_error|tests/modules/error_tests_simple.lm
