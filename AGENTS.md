@@ -38,7 +38,7 @@ This document provides essential guidelines for AI agents generating code for th
 - ✅ **First-class Functions**: Functions as values
 
 ### **Control Flow**
-- ✅ **Match Statements**: Pattern matching with type guards
+- ✅ **Match Statements**: Pattern matching with literal, enum, frame, variable patterns
 - ✅ **If/Else**: Conditional statements
 - ✅ **Loops**: `for`, `while`, `iter`
 - ✅ **Ranges**: `1..10`, `start..end`
@@ -83,11 +83,10 @@ fn processOptional(value: int?): str {
     }
 }
 
-// Union types
+// Union types with proper match patterns
 fn handleValue(value: int | str): str {
     match (value) {
-        int => return "Integer: {value}",
-        str => return "String: {value}"
+        n => { return "Value: {n}"; }
     }
 }
 
@@ -132,6 +131,73 @@ fn sort<T where T: Comparable>(list: [T]): [T] {
 ```
 
 ## 🔧 **Common Patterns**
+
+### **Match Statement Patterns**
+
+Match statements in Limitly use **block syntax** (`=> { statements }`) and support these pattern types:
+
+```limit
+// 1. Literal Patterns
+match (x) {
+    5 => { print("x is five"); },
+    10 => { print("x is ten"); },
+    _ => { print("x is something else"); }
+}
+
+// 2. Enum Patterns
+enum Status { Active, Inactive, Pending }
+
+match (status) {
+    Status.Active => { print("Active"); },
+    Status.Inactive => { print("Inactive"); },
+    _ => { print("Other"); }
+}
+
+// 3. Enum with Associated Values
+enum Result {
+    Success(str),
+    Error(str)
+}
+
+match (result) {
+    Result.Success(msg) => { print("Success: {msg}"); },
+    Result.Error(msg) => { print("Error: {msg}"); }
+}
+
+// 4. Variable Binding Patterns
+match (value) {
+    n => { print("The value is: {n}"); }
+}
+
+// 5. Frame Patterns
+frame Point { var x: float; var y: float; }
+
+match (p) {
+    point => { print("Point at ({point.x}, {point.y})"); }
+}
+
+// 6. Wildcard Patterns
+match (anything) {
+    _ => { print("Matched anything"); }
+}
+```
+
+**Important**: Match statements MUST use block syntax with braces:
+```limit
+// ✅ CORRECT
+match (x) {
+    5 => { print("five"); },
+    _ => { print("other"); }
+}
+
+// ❌ INCORRECT - Missing braces
+match (x) {
+    5 => print("five"),
+    _ => print("other")
+}
+```
+
+**❌ DO NOT use type patterns** like `int =>` or `str =>` - these are not valid patterns.
 
 ### **Instead of Generics, Use:**
 1. **Type Aliases**: `type UserId = int`

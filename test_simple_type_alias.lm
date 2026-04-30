@@ -1,0 +1,10 @@
+// Simple type alias pattern matching test
+type UserId = int;
+
+var user_id: UserId = 123;
+
+match (user_id) {
+    UserId => print("UserId pattern matched: {user_id}"),
+    int => print("int pattern matched: {user_id}"),
+    _ => print("No pattern matched")
+}

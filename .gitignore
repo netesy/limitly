@@ -22,6 +22,11 @@
 core
 !core/
 tags
+.cache
+.kiro
+.qoder
+.vscode
+.windsurf
 .DS_Store
 .directory
 *.debug
@@ -37,6 +42,7 @@ bin/
 *.exe
 
 # Vendored dependencies (keep the structure but ignore generated files within)
+vendor/
 vendor/fyra/build/
 vendor/fyra/*.a
 vendor/fyra/*.so

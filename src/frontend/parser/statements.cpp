@@ -864,7 +864,11 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::matchStatement() {
         if (match({TokenType::WHERE})) matchCase.guard = expression();
         skipTrivia();
         consume(TokenType::ARROW, "Expected '=>' after match pattern.");
-        matchCase.body = statement();
+        // Handle expressions in match cases without requiring semicolons
+        auto exprStmt = createNodeWithContext<LM::Frontend::AST::ExprStatement>();
+        exprStmt->line = peek().line;
+        exprStmt->expression = expression();
+        matchCase.body = exprStmt;
         if (match({TokenType::COMMA})) if (check(TokenType::RIGHT_BRACE)) break;
         stmt->cases.push_back(matchCase);
     }

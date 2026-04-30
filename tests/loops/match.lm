@@ -1,31 +1,158 @@
-var x:int = 10;
+// Match Statement Tests - Comprehensive Coverage
+// Tests literal patterns, enum patterns, frame patterns, variable patterns, and wildcards
+
+print("=== Match Statement Tests ===");
+
+// Test 1: Literal integer patterns
+print("\n--- Test 1: Literal Integer Patterns ---");
+var x: int = 10;
 
 match (x) {
-    5 => {
-        print("x is five");
-    },
-    10 => {
-        print("x is ten");
-    },
-    _ => {
-        print("x is something else");
+    5 => { print("x is five"); },
+    10 => { print("x is ten"); },
+    _ => { print("x is something else"); }
+}
+
+// Test 2: Variable binding patterns
+print("\n--- Test 2: Variable Binding Patterns ---");
+var value = 42;
+
+match (value) {
+    n => { print("The value is: {n}"); }
+}
+
+// Test 3: Enum pattern matching
+print("\n--- Test 3: Enum Pattern Matching ---");
+enum Status {
+    Active,
+    Inactive,
+    Pending
+}
+
+var status = Status.Active;
+
+match (status) {
+    Status.Active => { print("Status is Active"); },
+    Status.Inactive => { print("Status is Inactive"); },
+    Status.Pending => { print("Status is Pending"); },
+    _ => { print("Unknown status"); }
+}
+
+// Test 4: Enum with associated values
+print("\n--- Test 4: Enum with Associated Values ---");
+enum Result {
+    Success(str),
+    Error(str),
+    Pending
+}
+
+var result1 = Result.Success("Operation completed");
+var result2 = Result.Error("Something went wrong");
+
+fn describeResult(r: Result) {
+    match (r) {
+        Result.Success(msg) => { print("Success: {msg}"); },
+        Result.Error(msg) => { print("Error: {msg}"); },
+        Result.Pending => { print("Operation is pending"); }
     }
 }
 
-var value = false;
-match (value) {
-        int => {
-             print("Integer: {value}");
-             },
-        str => {
-             print("String: {value}");
-             },
-        list => {
-             print("List of integers: {value}"); },
-        dict => { print("Dictionary: {value}"); },
-        _ => { print("Unknown type");
+describeResult(result1);
+describeResult(result2);
+
+// Test 5: Frame pattern matching
+print("\n--- Test 5: Frame Pattern Matching ---");
+frame Point {
+    var x: float;
+    var y: float;
+}
+
+var p = Point ( x: 10.0, y: 20.0 );
+
+match (p) {
+    point => { print("Point at ({point.x}, {point.y})"); }
+}
+
+// Test 6: Wildcard patterns
+print("\n--- Test 6: Wildcard Patterns ---");
+var anything = "hello";
+
+match (anything) {
+    _ => { print("Matched anything: {anything}"); }
+}
+
+// Test 7: Nested match statements
+print("\n--- Test 7: Nested Match Statements ---");
+enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+enum Shape {
+    Circle(Color),
+    Square(Color)
+}
+
+var shape = Shape.Circle(Color.Red);
+
+match (shape) {
+    Shape.Circle(color) => {
+        match (color) {
+            Color.Red => { print("Red circle"); },
+            Color.Green => { print("Green circle"); },
+            Color.Blue => { print("Blue circle"); },
+            _ => { print("Unknown color circle"); }
+        }
+    },
+    Shape.Square(color) => {
+        match (color) {
+            Color.Red => { print("Red square"); },
+            Color.Green => { print("Green square"); },
+            Color.Blue => { print("Blue square"); },
+            _ => { print("Unknown color square"); }
+        }
     }
 }
+
+// Test 8: Match in function with return
+print("\n--- Test 8: Match with Return Values ---");
+fn getDayName(dayNum: int): str {
+    match (dayNum) {
+        1 => { return "Monday"; },
+        2 => { return "Tuesday"; },
+        3 => { return "Wednesday"; },
+        4 => { return "Thursday"; },
+        5 => { return "Friday"; },
+        6 => { return "Saturday"; },
+        7 => { return "Sunday"; },
+        _ => { return "Invalid day"; }
+    }
+}
+
+print("Day 1: {getDayName(1)}");
+print("Day 5: {getDayName(5)}");
+print("Day 10: {getDayName(10)}");
+
+// Test 9: Match with multiple cases
+print("\n--- Test 9: Multiple Match Cases ---");
+enum Message {
+    Quit,
+    Move(int, int),
+    Write(str)
+}
+
+fn processMessage(msg: Message) {
+    match (msg) {
+        Message.Quit => { print("Quitting application..."); },
+        Message.Move(x, y) => { print("Moving to position ({x}, {y})"); },
+        Message.Write(text) => { print("Writing message: {text}"); }
+    }
+}
+
+processMessage(Message.Quit);
+processMessage(Message.Move(10, 20));
+processMessage(Message.Write("Hello, World!"));
 
 
     match(10) {
@@ -49,3 +176,5 @@ match_example(42);
 match_example("Hello, Luminar!");
 match_example([1, 2, 3]);
 match_example({ "a": 1, "b": 2 });
+
+print("\n=== Match Statement Tests Complete ===");
