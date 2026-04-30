@@ -1021,7 +1021,12 @@ TypePtr TypeChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::Va
         // Check if initializing from another variable (potential move)
         if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(var_decl->initializer)) {
             TypePtr rhs_type = lookup_variable(var_expr->name);
-            bool is_copyable = (rhs_type && rhs_type->tag == TypeTag::Function);
+            bool is_copyable = (rhs_type &&
+                (rhs_type->tag == TypeTag::Function ||
+                 rhs_type->tag == TypeTag::Int || rhs_type->tag == TypeTag::Int64 ||
+                 rhs_type->tag == TypeTag::Float || rhs_type->tag == TypeTag::Float64 ||
+                 rhs_type->tag == TypeTag::Bool || rhs_type->tag == TypeTag::String ||
+                 rhs_type->tag == TypeTag::Nil || rhs_type->tag == TypeTag::Any));
             
             if (!is_copyable) {
                 // For complex types, this would be a move
@@ -1791,6 +1796,9 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
         case TokenType::STAR:
         case TokenType::SLASH:
             // Arithmetic operations - Mandate 10: promotion rules
+            if (left_base->tag == TypeTag::Any || right_base->tag == TypeTag::Any) {
+                return type_system.ANY_TYPE;
+            }
             if (is_numeric_type(left_base) && is_numeric_type(right_base)) {
                 return promote_numeric_types(left_base, right_base);
             } else if (expr->op == TokenType::PLUS && 
@@ -1820,6 +1828,9 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
             
         case TokenType::MODULUS:
         case TokenType::POWER:
+            if (left_base->tag == TypeTag::Any || right_base->tag == TypeTag::Any) {
+                return type_system.ANY_TYPE;
+            }
             if (is_numeric_type(left_base) && is_numeric_type(right_base)) {
                 return promote_numeric_types(left_base, right_base);
             }
@@ -4658,7 +4669,7 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
                 current_program_->imported_symbols[qname] = stmt;
                 if (auto f = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
                     FunctionSignature sig; sig.name = qname; sig.declaration = f;
-                    sig.return_type = f->returnType ? resolve_type_annotation(f->returnType.value()) : type_system.NIL_TYPE;
+                    sig.return_type = f->returnType ? resolve_type_annotation(f->returnType.value()) : type_system.ANY_TYPE;
                     for (const auto& p : f->params) sig.param_types.push_back(p.second ? resolve_type_annotation(p.second) : type_system.ANY_TYPE);
                     function_signatures[qname] = sig;
                     declare_variable(qname, type_system.createFunctionType({}, sig.param_types, sig.return_type));
