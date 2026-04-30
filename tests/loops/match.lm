@@ -67,7 +67,7 @@ frame Point {
     var y: float;
 }
 
-var p = Point ( x: 10.0, y: 20.0 );
+var p = Point(x=10.0, y=20.0);
 
 match (p) {
     point => { print("Point at ({point.x}, {point.y})"); }
@@ -154,22 +154,24 @@ processMessage(Message.Quit);
 processMessage(Message.Move(10, 20));
 processMessage(Message.Write("Hello, World!"));
 
+// Test 10: Guard clauses
+print("\n--- Test 10: Guard Clauses ---");
+match(10) {
+    x where x > 10 => { print("{x} is greater than 10"); },
+    x where x < 10 => { print("{x} is less than 10"); },
+    x => { print("{x} is 10"); }
+}
 
-    match(10) {
-        x where x > 10 => { print("{x} is greater than 10"); },
-        x where x < 10 => { print("{x} is less than 10"); },
-        x => { print("{x} is 10"); }
-    }
-
+// Test 11: Type patterns
+print("\n--- Test 11: Type Patterns ---");
 fn match_example(value) {
     match (value) {
         int => { print("Integer: {value}"); },
         str => { print("String: {value}"); },
         list => { print("List of integers: {value}"); },
         dict => { print("Dictionary: {value}"); },
-        _ => { print("Unknown type");
+        _ => { print("Unknown type"); }
     }
-   }
 }
 
 match_example(42);
