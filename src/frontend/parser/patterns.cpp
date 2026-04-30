@@ -90,16 +90,40 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::parsePattern() {
         if (current + lookahead < tokens.size() && tokens[current + lookahead].type == TokenType::LEFT_PAREN) {
             return parseBindingPattern();
         }
+        
+        // Check for qualified enum pattern without parentheses: Status.Active => or Status.Active where ...
+        // Pattern: IDENTIFIER DOT IDENTIFIER followed by ARROW or WHERE
+        if (current + 2 < tokens.size() &&
+            tokens[current + 1].type == TokenType::DOT &&
+            tokens[current + 2].type == TokenType::IDENTIFIER) {
+            // Check if followed by ARROW or WHERE (indicating a pattern, not a type)
+            size_t afterQualified = current + 3;
+            if (afterQualified < tokens.size() &&
+                (tokens[afterQualified].type == TokenType::ARROW ||
+                 tokens[afterQualified].type == TokenType::WHERE)) {
+                return parseBindingPattern();
+            }
+        }
 
         if (isErrorType(peek().lexeme)) return parseErrorTypePattern();
         
         // Check if this is a variable pattern (followed by WHERE or => without parentheses)
+        // Also handle qualified patterns like Status.Active => by looking past DOT and second IDENTIFIER
         auto varLookahead = 1;
         const auto& patternTokens = scanner.getTokens();
         bool isVariablePattern = false;
         
         if (current + varLookahead < patternTokens.size()) {
             auto nextToken = patternTokens[current + varLookahead];
+            // Skip past DOT.IDENTIFIER for qualified patterns (e.g., Status.Active)
+            if (nextToken.type == TokenType::DOT &&
+                current + varLookahead + 1 < patternTokens.size() &&
+                patternTokens[current + varLookahead + 1].type == TokenType::IDENTIFIER) {
+                varLookahead += 2; // Skip DOT and the second IDENTIFIER
+                if (current + varLookahead < patternTokens.size()) {
+                    nextToken = patternTokens[current + varLookahead];
+                }
+            }
             if (nextToken.type == TokenType::WHERE || nextToken.type == TokenType::ARROW) {
                 isVariablePattern = true;
             }
@@ -136,13 +160,15 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseBindingPattern() {
     auto pattern = std::make_shared<LM::Frontend::AST::BindingPatternExpr>();
     pattern->line = previous().line;
     pattern->typeName = typeName;
-    consume(TokenType::LEFT_PAREN, "Expected '(' after type name in binding pattern.");
-    if (!check(TokenType::RIGHT_PAREN)) {
-        do {
-            pattern->variableNames.push_back(consume(TokenType::IDENTIFIER, "Expected variable name in binding pattern.").lexeme);
-        } while (match({TokenType::COMMA}));
+    // Parentheses are optional - handle both Status.Active and Status.Active(x, y)
+    if (match({TokenType::LEFT_PAREN})) {
+        if (!check(TokenType::RIGHT_PAREN)) {
+            do {
+                pattern->variableNames.push_back(consume(TokenType::IDENTIFIER, "Expected variable name in binding pattern.").lexeme);
+            } while (match({TokenType::COMMA}));
+        }
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after binding variables.");
     }
-    consume(TokenType::RIGHT_PAREN, "Expected ')' after binding variables.");
     return pattern;
 }
 
