@@ -2373,7 +2373,7 @@ Reg Generator::emit_error_construct_expr(LM::Frontend::AST::ErrorConstructExpr& 
     Reg dst = allocate_register();
     
     // For the unified Type? system, err() creates a generic error
-    auto result_type = std::make_shared<::Type>(::TypeTag::ErrorUnion);
+    TypePtr result_type = expr.inferred_type ? expr.inferred_type : std::make_shared<::Type>(::TypeTag::ErrorUnion);
     set_register_type(dst, result_type);
     
     // Enhanced error construction with custom type and message
@@ -2409,7 +2409,7 @@ Reg Generator::emit_ok_construct_expr(LM::Frontend::AST::OkConstructExpr& expr) 
     Reg value_reg = emit_expr(*expr.value);
     
     // Create ok value using the unified system
-    auto result_type = std::make_shared<::Type>(::TypeTag::ErrorUnion);
+    TypePtr result_type = expr.inferred_type ? expr.inferred_type : std::make_shared<::Type>(::TypeTag::ErrorUnion);
     set_register_type(dst, result_type);
     
     // Generate ConstructOk instruction with the actual value
@@ -2454,13 +2454,18 @@ Reg Generator::emit_fallible_expr(LM::Frontend::AST::FallibleExpr& expr) {
         
         Reg unwrapped_reg = allocate_register();
         TypePtr fallible_type = get_register_type(result_reg);
-        TypePtr success_type = type_system_->STRING_TYPE; // Should extract from ErrorUnion type
+        TypePtr success_type = type_system_->ANY_TYPE;
+        if (fallible_type && fallible_type->tag == ::TypeTag::ErrorUnion) {
+            if (auto* eu = std::get_if<ErrorUnionType>(&fallible_type->extra)) {
+                if (eu->successType) success_type = eu->successType;
+            }
+        }
         set_register_type(unwrapped_reg, success_type);
-        
-        emit_instruction(LIR_Inst(LIR_Op::Unwrap, Type::I64, unwrapped_reg, result_reg, 0));
+        Type success_abi = language_type_to_abi_type(success_type);
+        emit_instruction(LIR_Inst(LIR_Op::Unwrap, success_abi, unwrapped_reg, result_reg, 0));
         
         // Move unwrapped value to final result register
-        emit_instruction(LIR_Inst(LIR_Op::Mov, Type::I64, final_result_reg, unwrapped_reg, 0));
+        emit_instruction(LIR_Inst(LIR_Op::Mov, success_abi, final_result_reg, unwrapped_reg, 0));
         
         // Jump to continue block
         emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, continue_block->id));

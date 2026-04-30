@@ -44,6 +44,7 @@ pub fn is_prime(n: int): bool {
     return true;
 }
 pub var PI:f64 = 3.14159;
+pub var pi:f64 = PI;
 
-const var PI_CONST: int = PI;
+const var PI_CONST: f64 = PI;
 const var E: f64 = 128300000;
