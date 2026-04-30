@@ -11,6 +11,7 @@
 #include "backend/vm/register.hh"
 #include "backend/fyra/fyra.hh"
 #include "backend/fyra/builder.hh"
+#include "error/debugger.hh"
 #include "ir/IRContext.h"
 #include "ir/Module.h"
 #include "ir/Function.h"
@@ -47,18 +48,19 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
 
         LM::Frontend::Parser parser(scanner, options.print_cst);
         std::shared_ptr<LM::Frontend::AST::Program> ast = parser.parse();
+        if (LM::Error::Debugger::hasError()) return 1;
 
         LM::Frontend::ModuleManager::getInstance().resolve_all(ast, "root");
 
         auto type_check_result = LM::Frontend::TypeCheckerFactory::check_program(ast, source, filename);
-        if (!type_check_result.success) return 1;
+        if (!type_check_result.success || !type_check_result.errors.empty()) return 1;
 
         auto memory_check_result = LM::Frontend::MemoryCheckerFactory::check_program(type_check_result.program, source, filename);
         if (!memory_check_result.success) return 1;
         ast = memory_check_result.program;
 
         auto post_opt_type_check = LM::Frontend::TypeCheckerFactory::check_program(ast, source, filename);
-        if (!post_opt_type_check.success) return 1;
+        if (!post_opt_type_check.success || !post_opt_type_check.errors.empty()) return 1;
 
         if (options.print_cst) {
             std::cout << "=== CST ===\n";

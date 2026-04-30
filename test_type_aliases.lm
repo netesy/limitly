@@ -1,0 +1,50 @@
+// Test type alias pattern matching
+type NumberOrString = int | str;
+type MaybeInt = int | nil;
+type UserId = int;
+type UserName = str;
+
+fn test_type_aliases() {
+    var num_val: NumberOrString = 42;
+    var str_val: NumberOrString = "hello";
+    var maybe_val: MaybeInt = 100;
+    var user_id: UserId = 12345;
+    var user_name: UserName = "alice";
+    
+    // Test type alias patterns
+    match (num_val) {
+        NumberOrString => print("NumberOrString pattern matched (int)"),
+        _ => print("NumberOrString pattern failed")
+    }
+    
+    match (str_val) {
+        NumberOrString => print("NumberOrString pattern matched (str)"),
+        _ => print("NumberOrString pattern failed")
+    }
+    
+    match (maybe_val) {
+        MaybeInt => print("MaybeInt pattern matched"),
+        _ => print("MaybeInt pattern failed")
+    }
+    
+    match (user_id) {
+        UserId => print("UserId pattern matched"),
+        _ => print("UserId pattern failed")
+    }
+    
+    match (user_name) {
+        UserName => print("UserName pattern matched"),
+        _ => print("UserName pattern failed")
+    }
+    
+    // Test mixed patterns with type aliases
+    var mixed_val: NumberOrString = 99;
+    match (mixed_val) {
+        NumberOrString => print("Mixed NumberOrString matched"),
+        int => print("Int pattern matched"),
+        str => print("Str pattern matched"),
+        _ => print("No pattern matched")
+    }
+}
+
+test_type_aliases()

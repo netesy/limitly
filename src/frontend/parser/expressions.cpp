@@ -477,6 +477,14 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::primary() {
         auto thisExpr = std::make_shared<LM::Frontend::AST::ThisExpr>();
         thisExpr->line = previous().line; return thisExpr;
     }
+    if (match({TokenType::PRINT})) {
+        auto token = previous();
+        // Treat 'print' as a variable expression so it can be used in function calls
+        auto varExpr = std::make_shared<LM::Frontend::AST::VariableExpr>();
+        varExpr->line = token.line; varExpr->name = token.lexeme;
+        attachTriviaFromToken(token);
+        return varExpr;
+    }
     if (match({TokenType::IDENTIFIER})) {
         auto token = previous();
         if (token.lexeme == "self" || token.lexeme == "this") {

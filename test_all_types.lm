@@ -1,0 +1,94 @@
+// Test all type patterns comprehensively
+fn test_all_types() {
+    var int_val = 42;
+    var str_val = "hello";
+    var bool_val = true;
+    var list_val = [1, 2, 3];
+    var dict_val = {"a": 1, "b": 2};
+    
+    // Test basic type patterns
+    match (int_val) {
+        int => print("int pattern matched"),
+        _ => print("int pattern failed")
+    }
+    
+    match (str_val) {
+        str => print("str pattern matched"),
+        _ => print("str pattern failed")
+    }
+    
+    match (bool_val) {
+        bool => print("bool pattern matched"),
+        _ => print("bool pattern failed")
+    }
+    
+    match (list_val) {
+        list => print("list pattern matched"),
+        _ => print("list pattern failed")
+    }
+    
+    match (dict_val) {
+        dict => print("dict pattern matched"),
+        _ => print("dict pattern failed")
+    }
+    
+    // Test numeric type patterns
+    var i8_val = 8i8;
+    var i16_val = 16i16;
+    var i32_val = 32i32;
+    var i64_val = 64i64;
+    var u8_val = 8u8;
+    var f32_val = 3.14f32;
+    var f64_val = 2.718;
+    
+    match (i8_val) {
+        i8 => print("i8 pattern matched"),
+        _ => print("i8 pattern failed")
+    }
+    
+    match (i16_val) {
+        i16 => print("i16 pattern matched"),
+        _ => print("i16 pattern failed")
+    }
+    
+    match (i32_val) {
+        i32 => print("i32 pattern matched"),
+        _ => print("i32 pattern failed")
+    }
+    
+    match (i64_val) {
+        i64 => print("i64 pattern matched"),
+        _ => print("i64 pattern failed")
+    }
+    
+    match (u8_val) {
+        u8 => print("u8 pattern matched"),
+        _ => print("u8 pattern failed")
+    }
+    
+    match (f32_val) {
+        f32 => print("f32 pattern matched"),
+        _ => print("f32 pattern failed")
+    }
+    
+    match (f64_val) {
+        float => print("float pattern matched"),
+        _ => print("float pattern failed")
+    }
+    
+    // Test special type patterns
+    var nil_val = nil;
+    var any_val = "anything";
+    
+    match (nil_val) {
+        nil => print("nil pattern matched"),
+        _ => print("nil pattern failed")
+    }
+    
+    match (any_val) {
+        any => print("any pattern matched"),
+        _ => print("any pattern failed")
+    }
+}
+
+test_all_types()

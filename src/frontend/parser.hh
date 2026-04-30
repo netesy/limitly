@@ -216,6 +216,7 @@ public:
     std::shared_ptr<LM::Frontend::AST::Expression> parseErrorTypePattern();
     
     // Helper methods for error pattern matching
+    std::shared_ptr<LM::Frontend::AST::TypeAnnotation> createTypeAnnotationFromToken(const Token& token);
     bool isErrorType(const std::string& name);
 };
 
