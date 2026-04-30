@@ -476,7 +476,7 @@ uint32_t Generator::generate_label() {
 
 
 void Generator::enter_loop() {
-    loop_stack_.push_back({0, 0, 0}); // Placeholder, will be set by set_loop_labels
+    loop_stack_.push_back({INVALID_LOOP_LABEL, INVALID_LOOP_LABEL, INVALID_LOOP_LABEL}); // Placeholder, will be set by set_loop_labels
 }
 
 
@@ -489,11 +489,15 @@ void Generator::exit_loop() {
 
 void Generator::set_loop_labels(uint32_t start_label, uint32_t end_label, uint32_t continue_label) {
     if (!loop_stack_.empty()) {
-        if (loop_stack_.back().start_label == 0) {
+        if (loop_stack_.back().start_label == INVALID_LOOP_LABEL) {
             loop_stack_.back().start_label = start_label;
         }
-        loop_stack_.back().end_label = end_label;
-        loop_stack_.back().continue_label = continue_label;
+        if (end_label != INVALID_LOOP_LABEL) {
+            loop_stack_.back().end_label = end_label;
+        }
+        if (continue_label != INVALID_LOOP_LABEL) {
+            loop_stack_.back().continue_label = continue_label;
+        }
     }
 }
 
@@ -501,7 +505,10 @@ void Generator::set_loop_labels(uint32_t start_label, uint32_t end_label, uint32
 uint32_t Generator::get_break_label() {
     if (loop_stack_.empty()) {
         report_error("break statement not in loop");
-        return 0;
+        return INVALID_LOOP_LABEL;
+    }
+    if (loop_stack_.back().end_label == INVALID_LOOP_LABEL) {
+        report_error("break statement used before loop exit label is initialized");
     }
     return loop_stack_.back().end_label;
 }
@@ -510,7 +517,10 @@ uint32_t Generator::get_break_label() {
 uint32_t Generator::get_continue_label() {
     if (loop_stack_.empty()) {
         report_error("continue statement not in loop");
-        return 0;
+        return INVALID_LOOP_LABEL;
+    }
+    if (loop_stack_.back().continue_label == INVALID_LOOP_LABEL) {
+        report_error("continue statement used before loop continue label is initialized");
     }
     return loop_stack_.back().continue_label;
 }

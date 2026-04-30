@@ -20,6 +20,7 @@ namespace LIR {
 
 class Generator {
 public:
+    static constexpr uint32_t INVALID_LOOP_LABEL = UINT32_MAX;
     explicit Generator();
     
     // Main entry point - now takes TypeCheckResult instead of raw LM::Frontend::AST

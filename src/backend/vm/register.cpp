@@ -1789,6 +1789,22 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 if (isErrorValue(pc->a)) {
                     std::cerr << "Runtime Error: Attempted to unwrap an error value" << std::endl;
                     registers[pc->dst] = nullptr;
+                } else if (std::holds_alternative<FrameInstancePtr>(value)) {
+                    // Defensive union-layout validation: if the runtime value is represented
+                    // as an internal enum/union frame, ensure tag/payload layout is intact.
+                    auto frame = std::get<FrameInstancePtr>(value);
+                    if (!frame || frame->frame_type != INTERNAL_ENUM_FRAME_TYPE || frame->fields.size() < 2) {
+                        std::cerr << "Runtime Error: Invalid union layout during unwrap (expected enum frame with tag+payload)" << std::endl;
+                        registers[pc->dst] = nullptr;
+                    } else {
+                        const auto& tag_reg = frame->getField(0);
+                        if (!(std::holds_alternative<int64_t>(tag_reg) || std::holds_alternative<uint64_t>(tag_reg))) {
+                            std::cerr << "Runtime Error: Invalid union tag type during unwrap" << std::endl;
+                            registers[pc->dst] = nullptr;
+                        } else {
+                            registers[pc->dst] = frame->getField(1);
+                        }
+                    }
                 } else {
                     registers[pc->dst] = value;
                 }
@@ -1812,9 +1828,16 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             case LIR::LIR_Op::GetTag: {
                 if (std::holds_alternative<FrameInstancePtr>(registers[pc->a])) {
                     auto enum_value = std::get<FrameInstancePtr>(registers[pc->a]);
-                    if (enum_value && enum_value->frame_type == INTERNAL_ENUM_FRAME_TYPE) {
-                        registers[pc->dst] = to_int(enum_value->getField(0));
+                    if (enum_value && enum_value->frame_type == INTERNAL_ENUM_FRAME_TYPE && enum_value->fields.size() >= 2) {
+                        const auto& tag = enum_value->getField(0);
+                        if (!(std::holds_alternative<int64_t>(tag) || std::holds_alternative<uint64_t>(tag))) {
+                            std::cerr << "Runtime Error: Invalid union tag representation in GetTag" << std::endl;
+                            registers[pc->dst] = int64_t(0);
+                        } else {
+                            registers[pc->dst] = to_int(tag);
+                        }
                     } else {
+                        std::cerr << "Runtime Error: Invalid union layout in GetTag" << std::endl;
                         registers[pc->dst] = int64_t(0);
                     }
                 } else {
@@ -1825,9 +1848,16 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             case LIR::LIR_Op::GetPayload: {
                 if (std::holds_alternative<FrameInstancePtr>(registers[pc->a])) {
                     auto enum_value = std::get<FrameInstancePtr>(registers[pc->a]);
-                    if (enum_value && enum_value->frame_type == INTERNAL_ENUM_FRAME_TYPE) {
-                        registers[pc->dst] = enum_value->getField(1);
+                    if (enum_value && enum_value->frame_type == INTERNAL_ENUM_FRAME_TYPE && enum_value->fields.size() >= 2) {
+                        const auto& tag = enum_value->getField(0);
+                        if (!(std::holds_alternative<int64_t>(tag) || std::holds_alternative<uint64_t>(tag))) {
+                            std::cerr << "Runtime Error: Invalid union tag representation in GetPayload" << std::endl;
+                            registers[pc->dst] = nullptr;
+                        } else {
+                            registers[pc->dst] = enum_value->getField(1);
+                        }
                     } else {
+                        std::cerr << "Runtime Error: Invalid union layout in GetPayload" << std::endl;
                         registers[pc->dst] = nullptr;
                     }
                 } else {

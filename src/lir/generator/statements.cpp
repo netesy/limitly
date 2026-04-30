@@ -638,7 +638,12 @@ void Generator::emit_while_stmt_cfg(LM::Frontend::AST::WhileStatement& stmt) {
 
 
 void Generator::emit_while_stmt_linear(LM::Frontend::AST::WhileStatement& stmt) {
+    enter_scope();
+    enter_loop();
+
     Imm cond_label = (Imm)current_function_->instructions.size();
+    // In linear mode, continue should jump to condition re-evaluation.
+    set_loop_labels(static_cast<uint32_t>(cond_label), INVALID_LOOP_LABEL, static_cast<uint32_t>(cond_label));
     Reg cond_reg = emit_expr(*stmt.condition);
     
     size_t jump_to_patch = current_function_->instructions.size();
@@ -649,7 +654,12 @@ void Generator::emit_while_stmt_linear(LM::Frontend::AST::WhileStatement& stmt) 
     emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, cond_label));
 
     Imm end_label = (Imm)current_function_->instructions.size();
+    // Patch break target once loop end is known.
+    set_loop_labels(static_cast<uint32_t>(cond_label), static_cast<uint32_t>(end_label), static_cast<uint32_t>(cond_label));
     current_function_->instructions[jump_to_patch].imm = end_label;
+
+    exit_loop();
+    exit_scope();
 }
 
 
@@ -777,9 +787,11 @@ void Generator::emit_for_stmt_cfg(LM::Frontend::AST::ForStatement& stmt) {
 
 void Generator::emit_for_stmt_linear(LM::Frontend::AST::ForStatement& stmt) {
     enter_scope();
+    enter_loop();
     if (stmt.initializer) emit_stmt(*stmt.initializer);
     
     Imm cond_label = (Imm)current_function_->instructions.size();
+    Imm increment_label = cond_label;
     Reg cond_reg = 0;
     size_t jump_to_patch = 0;
     bool has_cond = false;
@@ -792,14 +804,18 @@ void Generator::emit_for_stmt_linear(LM::Frontend::AST::ForStatement& stmt) {
     }
     
     if (stmt.body) emit_stmt(*stmt.body);
+    increment_label = static_cast<Imm>(current_function_->instructions.size());
+    set_loop_labels(static_cast<uint32_t>(cond_label), INVALID_LOOP_LABEL, static_cast<uint32_t>(increment_label));
     if (stmt.increment) emit_expr(*stmt.increment);
 
     emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, cond_label));
 
+    Imm end_label = (Imm)current_function_->instructions.size();
+    set_loop_labels(static_cast<uint32_t>(cond_label), static_cast<uint32_t>(end_label), static_cast<uint32_t>(increment_label));
     if (has_cond) {
-        Imm end_label = (Imm)current_function_->instructions.size();
         current_function_->instructions[jump_to_patch].imm = end_label;
     }
+    exit_loop();
     exit_scope();
 }
 
@@ -1533,7 +1549,7 @@ void Generator::emit_tuple_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt,
 
 void Generator::emit_break_stmt(LM::Frontend::AST::BreakStatement& stmt) {
     uint32_t break_label = get_break_label();
-    if (break_label != 0) {
+    if (break_label != INVALID_LOOP_LABEL) {
         emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, break_label));
         // Add edge to break target block
         LIR_BasicBlock* break_target = current_function_->cfg->get_block(break_label);
@@ -1550,7 +1566,7 @@ void Generator::emit_break_stmt(LM::Frontend::AST::BreakStatement& stmt) {
 
 void Generator::emit_continue_stmt(LM::Frontend::AST::ContinueStatement& stmt) {
     uint32_t continue_label = get_continue_label();
-    if (continue_label != 0) {
+    if (continue_label != INVALID_LOOP_LABEL) {
         emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, continue_label));
         // Add edge to continue target block
         LIR_BasicBlock* continue_target = current_function_->cfg->get_block(continue_label);
