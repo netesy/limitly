@@ -95,7 +95,7 @@ trait Drawable {
     fn draw(): str
 }
 
-frame Circle implements Drawable {
+frame Circle: Drawable {
     var radius: float
     pub fn draw(): str {
         return "Drawing circle with radius {self.radius}"

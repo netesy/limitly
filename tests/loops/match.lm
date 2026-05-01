@@ -63,8 +63,8 @@ describeResult(result2);
 // Test 5: Frame pattern matching
 print("\n--- Test 5: Frame Pattern Matching ---");
 frame Point {
-    var x: float;
-    var y: float;
+    pub var x: float;
+    pub var y: float;
 }
 
 var p = Point(x=10.0, y=20.0);
